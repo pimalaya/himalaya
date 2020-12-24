@@ -1,22 +1,24 @@
+use serde::Deserialize;
 use std::env;
 use std::fs::File;
-use std::io::Read;
+use std::io::{self, Read};
 use std::path::PathBuf;
-use toml::Value;
+use toml;
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
+pub struct ServerInfo {
+    host: String,
+    port: usize,
+    login: String,
+    password: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct Config {
     name: String,
     email: String,
-}
-
-impl Config {
-    fn new() -> Config {
-        Config {
-            name: String::new(),
-            email: String::new(),
-        }
-    }
+    imap: ServerInfo,
+    smtp: ServerInfo,
 }
 
 pub fn from_xdg() -> Option<PathBuf> {
@@ -58,20 +60,17 @@ pub fn file_path() -> PathBuf {
     }
 }
 
-pub fn read_file() -> Config {
+pub fn read_file_content() -> Result<String, io::Error> {
     let path = file_path();
-    match File::open(path) {
-        Err(_) => panic!("Config file not found!"),
-        Ok(mut file) => {
-            let mut content = String::new();
-            match file.read_to_string(&mut content) {
-                Err(err) => panic!(err),
-                Ok(_) => {
-                    let toml = content.parse::<Value>().unwrap();
-                    println!("{:?}", toml);
-                    Config::new()
-                }
-            }
-        }
+    let mut file = File::open(path)?;
+    let mut content = String::new();
+    file.read_to_string(&mut content)?;
+    Ok(content)
+}
+
+pub fn read_file() -> Config {
+    match read_file_content() {
+        Err(err) => panic!(err),
+        Ok(content) => toml::from_str(&content).unwrap(),
     }
 }
