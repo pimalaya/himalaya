@@ -7,18 +7,36 @@ use toml;
 
 #[derive(Debug, Deserialize)]
 pub struct ServerInfo {
-    host: String,
-    port: usize,
-    login: String,
-    password: String,
+    pub host: String,
+    pub port: u16,
+    pub login: String,
+    pub password: String,
+}
+
+impl ServerInfo {
+    pub fn get_host(&self) -> &str {
+        &self.host[..]
+    }
+
+    pub fn get_addr(&self) -> (&str, u16) {
+        (&self.host[..], self.port)
+    }
+
+    pub fn get_login(&self) -> &str {
+        &self.login[..]
+    }
+
+    pub fn get_password(&self) -> &str {
+        &self.password[..]
+    }
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    name: String,
-    email: String,
-    imap: ServerInfo,
-    smtp: ServerInfo,
+    pub name: String,
+    pub email: String,
+    pub imap: ServerInfo,
+    pub smtp: ServerInfo,
 }
 
 pub fn from_xdg() -> Option<PathBuf> {

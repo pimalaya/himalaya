@@ -1,5 +1,8 @@
 mod config;
+mod imap;
 
 fn main() {
-    println!("{:?}", config::read_file());
+    let config = config::read_file();
+    let sess = imap::login(&config);
+    println!("{:?}", sess);
 }

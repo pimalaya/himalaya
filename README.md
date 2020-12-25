@@ -1,3 +1,3 @@
 # Himalaya
 
-📫 Minimalist mail client, written in Rust.
+📫 Minimalist CLI mail client, written in Rust.
