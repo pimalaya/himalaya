@@ -24,7 +24,7 @@ fn main() {
 
     let matches = App::new("Himalaya")
         .version("0.1.0")
-        .about("📫 Minimalist CLI mail client")
+        .about("📫 Minimalist CLI email client")
         .author("soywod <clement.douin@posteo.net>")
         .subcommand(
             SubCommand::with_name("read")

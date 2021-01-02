@@ -1,6 +1,6 @@
 [package]
 name = "himalaya"
-description = "📫 Minimalist CLI mail client"
+description = "📫 Minimalist CLI email client"
 version = "0.1.0"
 authors = ["soywod <clement.douin@posteo.net>"]
 edition = "2018"
