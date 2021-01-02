@@ -6,6 +6,7 @@ authors = ["soywod <clement.douin@posteo.net>"]
 edition = "2018"
 
 [dependencies]
+clap = "2.33.3"
 imap = "2.4.0"
 native-tls = "0.2"
 rfc2047-decoder = "0.1.2"

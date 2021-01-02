@@ -96,17 +96,14 @@ fn date_from_fetch(fetch: &imap::types::Fetch) -> String {
     }
 }
 
-pub fn read_new_emails(imap_sess: &mut ImapSession, mbox: &str) -> imap::Result<()> {
+pub fn read_emails(imap_sess: &mut ImapSession, mbox: &str, query: &str) -> imap::Result<()> {
     imap_sess.select(mbox)?;
-    // let mboxes = imap_sess.list(Some(""), Some("*"))?;
-    // println!("Mboxes {:?}", mboxes);
 
     let seqs = imap_sess
-        .search("NOT SEEN")?
+        .search(query)?
         .iter()
         .map(|n| n.to_string())
-        .collect::<Vec<_>>()
-        .join(",");
+        .collect::<Vec<_>>();
 
     let table_head = vec![
         table::Cell::new(
@@ -128,7 +125,10 @@ pub fn read_new_emails(imap_sess: &mut ImapSession, mbox: &str) -> imap::Result<
     ];
 
     let mut table_rows = imap_sess
-        .fetch(seqs, "(INTERNALDATE ENVELOPE)")?
+        .fetch(
+            seqs[..20.min(seqs.len())].join(","),
+            "(INTERNALDATE ENVELOPE)",
+        )?
         .iter()
         .map(|fetch| {
             vec![
@@ -146,3 +146,6 @@ pub fn read_new_emails(imap_sess: &mut ImapSession, mbox: &str) -> imap::Result<
 
     Ok(())
 }
+
+// List mailboxes
+// let mboxes = imap_sess.list(Some(""), Some("*"))?;

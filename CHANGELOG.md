@@ -13,9 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Populate Config struct from TOML [#2]
 - Set up IMAP connection [#3]
 - List new emails [#6]
+- Set up CLI arg parser [#15]
 
 [unreleased]: https://github.com/soywod/himalaya
 
 [#1]: https://github.com/soywod/himalaya/issues/1
 [#2]: https://github.com/soywod/himalaya/issues/2
 [#3]: https://github.com/soywod/himalaya/issues/3
+[#15]: https://github.com/soywod/himalaya/issues/15
