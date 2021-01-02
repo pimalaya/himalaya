@@ -15,19 +15,19 @@ pub struct ServerInfo {
 
 impl ServerInfo {
     pub fn get_host(&self) -> &str {
-        &self.host[..]
+        &self.host
     }
 
     pub fn get_addr(&self) -> (&str, u16) {
-        (&self.host[..], self.port)
+        (&self.host, self.port)
     }
 
     pub fn get_login(&self) -> &str {
-        &self.login[..]
+        &self.login
     }
 
     pub fn get_password(&self) -> &str {
-        &self.password[..]
+        &self.password
     }
 }
 
