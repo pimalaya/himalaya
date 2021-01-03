@@ -1,4 +1,4 @@
-# 📫 Himalaya
+# 📫 Himalaya [WIP]
 
 Minimalist CLI email client, written in Rust.
 
