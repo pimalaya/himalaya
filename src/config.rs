@@ -39,6 +39,12 @@ pub struct Config {
     pub smtp: ServerInfo,
 }
 
+impl Config {
+    pub fn email_full(&self) -> String {
+        format!("{} <{}>", self.name, self.email)
+    }
+}
+
 pub fn from_xdg() -> Option<PathBuf> {
     match env::var("XDG_CONFIG_HOME") {
         Err(_) => None,

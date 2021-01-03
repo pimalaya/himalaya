@@ -1,8 +1,15 @@
 mod config;
 mod imap;
+mod smtp;
 mod table;
 
 use clap::{App, Arg, SubCommand};
+use std::io::prelude::*;
+use std::{env, fs, process};
+
+fn nem_email_tpl() -> String {
+    ["To: ", "Subject: ", ""].join("\r\n")
+}
 
 fn mailbox_arg() -> Arg<'static, 'static> {
     Arg::with_name("mailbox")
@@ -77,6 +84,10 @@ fn main() {
         )
         .get_matches();
 
+    if let Some(_) = matches.subcommand_matches("list") {
+        imap::list_mailboxes(&mut imap_sess).unwrap();
+    }
+
     if let Some(matches) = matches.subcommand_matches("search") {
         let mbox = matches.value_of("mailbox").unwrap();
 
@@ -108,10 +119,6 @@ fn main() {
         }
     }
 
-    if let Some(_) = matches.subcommand_matches("list") {
-        imap::list_mailboxes(&mut imap_sess).unwrap();
-    }
-
     if let Some(matches) = matches.subcommand_matches("read") {
         let mbox = matches.value_of("mailbox").unwrap();
         let mime = matches.value_of("mime-type").unwrap();
@@ -119,5 +126,30 @@ fn main() {
         if let Some(uid) = matches.value_of("uid") {
             imap::read_email(&mut imap_sess, mbox, uid, mime).unwrap();
         }
+    }
+
+    if let Some(_) = matches.subcommand_matches("write") {
+        let mut draft_path = env::temp_dir();
+        draft_path.push("himalaya-draft.mail");
+
+        fs::File::create(&draft_path)
+            .expect("Could not create draft file")
+            .write(nem_email_tpl().as_bytes())
+            .expect("Could not write into draft file");
+
+        process::Command::new(env!("EDITOR"))
+            .arg(&draft_path)
+            .status()
+            .expect("Could not start $EDITOR");
+
+        let mut draft = String::new();
+        fs::File::open(&draft_path)
+            .expect("Could not open draft file")
+            .read_to_string(&mut draft)
+            .expect("Could not read draft file");
+
+        fs::remove_file(&draft_path).expect("Could not remove draft file");
+
+        smtp::send(&config, &draft.as_bytes());
     }
 }

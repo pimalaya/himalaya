@@ -8,6 +8,7 @@ edition = "2018"
 [dependencies]
 clap = "2.33.3"
 imap = "2.4.0"
+lettre = "0.10.0-alpha.4"
 mailparse = "0.13.1"
 native-tls = "0.2"
 rfc2047-decoder = "0.1.2"
