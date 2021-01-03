@@ -27,12 +27,6 @@ fn main() {
         .about("📫 Minimalist CLI email client")
         .author("soywod <clement.douin@posteo.net>")
         .subcommand(
-            SubCommand::with_name("read")
-                .about("Reads an email by its UID")
-                .arg(mailbox_arg())
-                .arg(uid_arg()),
-        )
-        .subcommand(
             SubCommand::with_name("query")
                 .about("Prints emails filtered by the given IMAP query")
                 .arg(mailbox_arg())
@@ -43,6 +37,13 @@ fn main() {
                         .multiple(true)
                         .required(true),
                 ),
+        )
+        .subcommand(SubCommand::with_name("list").about("Lists all available mailboxes"))
+        .subcommand(
+            SubCommand::with_name("read")
+                .about("Reads an email by its UID")
+                .arg(mailbox_arg())
+                .arg(uid_arg()),
         )
         .subcommand(SubCommand::with_name("write").about("Writes a new email"))
         .subcommand(
@@ -71,15 +72,22 @@ fn main() {
         if let Some(matches) = matches.values_of("query") {
             let query = matches
                 .fold((false, vec![]), |(escape, mut cmds), cmd| {
-                    if ["subject", "body", "text"].contains(&cmd.to_lowercase().as_str()) {
-                        cmds.push(cmd.to_string());
-                        (true, cmds)
-                    } else if escape {
-                        cmds.push(format!("\"{}\"", cmd));
-                        (false, cmds)
-                    } else {
-                        cmds.push(cmd.to_string());
-                        (false, cmds)
+                    match (cmd, escape) {
+                        // Next command needs to be escaped
+                        ("subject", _) | ("body", _) | ("text", _) => {
+                            cmds.push(cmd.to_string());
+                            (true, cmds)
+                        }
+                        // Escaped commands
+                        (_, true) => {
+                            cmds.push(format!("\"{}\"", cmd));
+                            (false, cmds)
+                        }
+                        // Regular commands
+                        (_, false) => {
+                            cmds.push(cmd.to_string());
+                            (false, cmds)
+                        }
                     }
                 })
                 .1
@@ -87,5 +95,9 @@ fn main() {
 
             imap::read_emails(&mut imap_sess, &mbox, &query).unwrap();
         }
+    }
+
+    if let Some(_) = matches.subcommand_matches("list") {
+        imap::list_mailboxes(&mut imap_sess).unwrap();
     }
 }

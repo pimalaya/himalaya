@@ -147,5 +147,48 @@ pub fn read_emails(imap_sess: &mut ImapSession, mbox: &str, query: &str) -> imap
     Ok(())
 }
 
-// List mailboxes
-// let mboxes = imap_sess.list(Some(""), Some("*"))?;
+pub fn list_mailboxes(imap_sess: &mut ImapSession) -> imap::Result<()> {
+    let mboxes = imap_sess.list(Some(""), Some("*"))?;
+
+    let table_head = vec![
+        table::Cell::new(
+            vec![table::BOLD, table::UNDERLINE, table::WHITE],
+            String::from("DELIM"),
+        ),
+        table::Cell::new(
+            vec![table::BOLD, table::UNDERLINE, table::WHITE],
+            String::from("NAME"),
+        ),
+        table::Cell::new(
+            vec![table::BOLD, table::UNDERLINE, table::WHITE],
+            String::from("ATTRIBUTES"),
+        ),
+    ];
+
+    let mut table_rows = mboxes
+        .iter()
+        .map(|mbox| {
+            vec![
+                table::Cell::new(
+                    vec![table::BLUE],
+                    mbox.delimiter().unwrap_or("").to_string(),
+                ),
+                table::Cell::new(vec![table::GREEN], mbox.name().to_string()),
+                table::Cell::new(
+                    vec![table::YELLOW],
+                    mbox.attributes()
+                        .iter()
+                        .map(|a| format!("{:?}", a))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                ),
+            ]
+        })
+        .collect::<Vec<_>>();
+
+    table_rows.insert(0, table_head);
+
+    println!("{}", table::render(table_rows));
+
+    Ok(())
+}

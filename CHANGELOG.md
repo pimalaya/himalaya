@@ -14,10 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Set up IMAP connection [#3]
 - List new emails [#6]
 - Set up CLI arg parser [#15]
+- List mailboxes command [#5]
 
 [unreleased]: https://github.com/soywod/himalaya
 
 [#1]: https://github.com/soywod/himalaya/issues/1
 [#2]: https://github.com/soywod/himalaya/issues/2
 [#3]: https://github.com/soywod/himalaya/issues/3
+[#5]: https://github.com/soywod/himalaya/issues/5
 [#15]: https://github.com/soywod/himalaya/issues/15
