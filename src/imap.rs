@@ -1,4 +1,5 @@
 use imap;
+use mailparse::{self, MailHeaderMap};
 use native_tls::{TlsConnector, TlsStream};
 use rfc2047_decoder;
 use std::net::TcpStream;
@@ -99,13 +100,17 @@ fn date_from_fetch(fetch: &imap::types::Fetch) -> String {
 pub fn read_emails(imap_sess: &mut ImapSession, mbox: &str, query: &str) -> imap::Result<()> {
     imap_sess.select(mbox)?;
 
-    let seqs = imap_sess
-        .search(query)?
+    let uids = imap_sess
+        .uid_search(query)?
         .iter()
         .map(|n| n.to_string())
         .collect::<Vec<_>>();
 
     let table_head = vec![
+        table::Cell::new(
+            vec![table::BOLD, table::UNDERLINE, table::WHITE],
+            String::from("ID"),
+        ),
         table::Cell::new(
             vec![table::BOLD, table::UNDERLINE, table::WHITE],
             String::from("FLAGS"),
@@ -125,13 +130,14 @@ pub fn read_emails(imap_sess: &mut ImapSession, mbox: &str, query: &str) -> imap
     ];
 
     let mut table_rows = imap_sess
-        .fetch(
-            seqs[..20.min(seqs.len())].join(","),
-            "(INTERNALDATE ENVELOPE)",
+        .uid_fetch(
+            uids[..20.min(uids.len())].join(","),
+            "(INTERNALDATE ENVELOPE UID)",
         )?
         .iter()
         .map(|fetch| {
             vec![
+                table::Cell::new(vec![table::RED], fetch.uid.unwrap_or(0).to_string()),
                 table::Cell::new(vec![table::WHITE], String::from("!@")),
                 table::Cell::new(vec![table::BLUE], first_addr_from_fetch(fetch)),
                 table::Cell::new(vec![table::GREEN], subject_from_fetch(fetch)),
@@ -186,9 +192,58 @@ pub fn list_mailboxes(imap_sess: &mut ImapSession) -> imap::Result<()> {
         })
         .collect::<Vec<_>>();
 
-    table_rows.insert(0, table_head);
+    if table_rows.len() == 0 {
+        println!("No email found!");
+    } else {
+        table_rows.insert(0, table_head);
+        println!("{}", table::render(table_rows));
+    }
 
-    println!("{}", table::render(table_rows));
+    Ok(())
+}
+
+fn extract_subparts_by_mime(mime: &str, part: &mailparse::ParsedMail, parts: &mut Vec<String>) {
+    match part.subparts.len() {
+        0 => {
+            if part
+                .get_headers()
+                .get_first_value("content-type")
+                .and_then(|v| if v.starts_with(mime) { Some(()) } else { None })
+                .is_some()
+            {
+                parts.push(part.get_body().unwrap_or(String::new()))
+            }
+        }
+        _ => {
+            part.subparts
+                .iter()
+                .for_each(|p| extract_subparts_by_mime(mime, p, parts));
+        }
+    }
+}
+
+pub fn read_email(
+    imap_sess: &mut ImapSession,
+    mbox: &str,
+    uid: &str,
+    mime: &str,
+) -> imap::Result<()> {
+    imap_sess.select(mbox)?;
+
+    match imap_sess.uid_fetch(uid, "BODY[]")?.first() {
+        None => println!("No email found in mailbox {} with UID {}", mbox, uid),
+        Some(email_raw) => {
+            let email = mailparse::parse_mail(email_raw.body().unwrap_or(&[])).unwrap();
+            let mut parts = vec![];
+            extract_subparts_by_mime(mime, &email, &mut parts);
+
+            if parts.len() == 0 {
+                println!("No {} content found for email {}!", mime, uid);
+            } else {
+                println!("{}", parts.join("\r\n"));
+            }
+        }
+    }
 
     Ok(())
 }

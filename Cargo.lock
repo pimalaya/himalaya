@@ -52,6 +52,12 @@ dependencies = [
 
 [[package]]
 name = "base64"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3441f0f7b02788e948e47f457ca01f1d7e6d92c693bc132c22b087d3141c03ff"
+
+[[package]]
+name = "base64"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
@@ -196,6 +202,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "imap",
+ "mailparse",
  "native-tls",
  "rfc2047-decoder",
  "serde",
@@ -259,6 +266,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4fabed175da42fed1fa0746b0ea71f412aa9d35e76e95e59b192c64b9dc2bf8b"
 dependencies = [
  "cfg-if 0.1.10",
+]
+
+[[package]]
+name = "mailparse"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "388a77a7f161b32d0314404306b8ed5966b34b797fc9ef6bcf6686935162da3c"
+dependencies = [
+ "base64 0.12.3",
+ "charset",
+ "quoted_printable",
 ]
 
 [[package]]

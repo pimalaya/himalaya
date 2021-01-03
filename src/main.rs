@@ -6,9 +6,11 @@ use clap::{App, Arg, SubCommand};
 
 fn mailbox_arg() -> Arg<'static, 'static> {
     Arg::with_name("mailbox")
+        .short("m")
+        .long("mailbox")
         .help("Name of the targeted mailbox")
-        .value_name("MAILBOX")
-        .required(true)
+        .value_name("STRING")
+        .default_value("INBOX")
 }
 
 fn uid_arg() -> Arg<'static, 'static> {
@@ -26,37 +28,46 @@ fn main() {
         .version("0.1.0")
         .about("📫 Minimalist CLI email client")
         .author("soywod <clement.douin@posteo.net>")
+        .subcommand(SubCommand::with_name("list").about("Lists all available mailboxes"))
         .subcommand(
-            SubCommand::with_name("query")
-                .about("Prints emails filtered by the given IMAP query")
+            SubCommand::with_name("search")
+                .about("Lists emails matching the given IMAP query")
                 .arg(mailbox_arg())
                 .arg(
                     Arg::with_name("query")
                         .help("IMAP query (see https://tools.ietf.org/html/rfc3501#section-6.4.4)")
-                        .value_name("COMMANDS")
+                        .value_name("QUERY")
                         .multiple(true)
                         .required(true),
                 ),
         )
-        .subcommand(SubCommand::with_name("list").about("Lists all available mailboxes"))
         .subcommand(
             SubCommand::with_name("read")
                 .about("Reads an email by its UID")
+                .arg(uid_arg())
                 .arg(mailbox_arg())
-                .arg(uid_arg()),
+                .arg(
+                    Arg::with_name("mime-type")
+                        .help("MIME type to use")
+                        .short("t")
+                        .long("mime-type")
+                        .value_name("STRING")
+                        .possible_values(&["text/plain", "text/html"])
+                        .default_value("text/plain"),
+                ),
         )
         .subcommand(SubCommand::with_name("write").about("Writes a new email"))
         .subcommand(
             SubCommand::with_name("forward")
                 .about("Forwards an email by its UID")
-                .arg(mailbox_arg())
-                .arg(uid_arg()),
+                .arg(uid_arg())
+                .arg(mailbox_arg()),
         )
         .subcommand(
             SubCommand::with_name("reply")
                 .about("Replies to an email by its UID")
-                .arg(mailbox_arg())
                 .arg(uid_arg())
+                .arg(mailbox_arg())
                 .arg(
                     Arg::with_name("reply all")
                         .help("Replies to all recipients")
@@ -66,8 +77,8 @@ fn main() {
         )
         .get_matches();
 
-    if let Some(matches) = matches.subcommand_matches("query") {
-        let mbox = matches.value_of("mailbox").unwrap_or("inbox");
+    if let Some(matches) = matches.subcommand_matches("search") {
+        let mbox = matches.value_of("mailbox").unwrap();
 
         if let Some(matches) = matches.values_of("query") {
             let query = matches
@@ -99,5 +110,14 @@ fn main() {
 
     if let Some(_) = matches.subcommand_matches("list") {
         imap::list_mailboxes(&mut imap_sess).unwrap();
+    }
+
+    if let Some(matches) = matches.subcommand_matches("read") {
+        let mbox = matches.value_of("mailbox").unwrap();
+        let mime = matches.value_of("mime-type").unwrap();
+
+        if let Some(uid) = matches.value_of("uid") {
+            imap::read_email(&mut imap_sess, mbox, uid, mime).unwrap();
+        }
     }
 }

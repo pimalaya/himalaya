@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - List new emails [#6]
 - Set up CLI arg parser [#15]
 - List mailboxes command [#5]
+- Text and HTML previews [#12] [#13]
 
 [unreleased]: https://github.com/soywod/himalaya
 
@@ -22,4 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#2]: https://github.com/soywod/himalaya/issues/2
 [#3]: https://github.com/soywod/himalaya/issues/3
 [#5]: https://github.com/soywod/himalaya/issues/5
+[#12]: https://github.com/soywod/himalaya/issues/12
+[#13]: https://github.com/soywod/himalaya/issues/13
 [#15]: https://github.com/soywod/himalaya/issues/15
