@@ -31,19 +31,16 @@ impl fmt::Display for Style {
 
 #[derive(Debug)]
 pub struct Cell {
-    styles: Vec<Style>,
-    value: String,
-}
-
-impl Clone for Cell {
-    fn clone(&self) -> Self {
-        Cell::new(self.styles.clone(), self.value.clone())
-    }
+    pub styles: Vec<Style>,
+    pub value: String,
 }
 
 impl Cell {
-    pub fn new(styles: Vec<Style>, value: String) -> Cell {
-        Cell { styles, value }
+    pub fn new<'a>(styles: &'a [Style], value: &'a str) -> Cell {
+        Cell {
+            styles: styles.to_vec(),
+            value: value.to_string(),
+        }
     }
 
     pub fn printable_value_len(&self) -> usize {
@@ -68,50 +65,60 @@ impl Cell {
     }
 }
 
-type Matrix<T> = Vec<Vec<T>>;
+pub trait DisplayCell {
+    fn styles(&self) -> &[Style];
+    fn value(&self) -> String;
 
-pub fn transpose<T: Clone>(m: Matrix<T>) -> Matrix<T> {
-    let mut tm: Matrix<T> = vec![];
-    let col_size = m.iter().next().unwrap_or(&vec![]).len();
+    fn to_cell(&self) -> Cell {
+        Cell::new(self.styles(), &self.value())
+    }
+}
 
-    for idx in 0..col_size {
-        let col = m
+pub trait DisplayRow {
+    fn to_row(&self) -> Vec<Cell>;
+}
+
+pub trait DisplayTable<'a, T: DisplayRow> {
+    fn cols() -> &'a [&'a str];
+    fn rows(&self) -> &Vec<T>;
+
+    fn to_table(&self) -> String {
+        let mut col_sizes = vec![];
+
+        let head = Self::cols()
             .iter()
-            .map(|row| row.get(idx).unwrap().clone())
+            .map(|col| {
+                let cell = Cell::new(&[BOLD, UNDERLINE, WHITE], &col.to_uppercase());
+                col_sizes.push(cell.printable_value_len());
+                cell
+            })
             .collect::<Vec<_>>();
 
-        tm.push(col)
-    }
-
-    tm
-}
-
-fn render_cols(cells: Matrix<Cell>) -> Matrix<String> {
-    fn render_tcols(tcells: &Vec<Cell>) -> Vec<String> {
-        let col_size = tcells
+        let mut body = self
+            .rows()
             .iter()
-            .map(|cell| cell.printable_value_len())
-            .max()
-            .unwrap();
-        tcells.iter().map(|tcell| tcell.render(col_size)).collect()
-    };
+            .map(|item| {
+                let row = item.to_row();
+                row.iter().enumerate().for_each(|(i, cell)| {
+                    col_sizes[i] = col_sizes[i].max(cell.printable_value_len())
+                });
+                row
+            })
+            .collect::<Vec<_>>();
 
-    let tcells: Matrix<String> = transpose(cells).iter().map(render_tcols).collect();
-    transpose(tcells)
-}
+        body.insert(0, head);
 
-fn render_rows(m: Matrix<String>) -> Vec<String> {
-    m.iter()
-        .map(|row| String::from(row.join(&sep()) + "\n"))
-        .collect()
-}
+        body.iter().fold(String::new(), |output, row| {
+            let row_str = row
+                .iter()
+                .enumerate()
+                .map(|(i, cell)| cell.render(col_sizes[i]))
+                .collect::<Vec<_>>()
+                .join(&Cell::new(&[ext(8)], "|").render(0));
 
-pub fn render(m: Matrix<Cell>) -> String {
-    render_rows(render_cols(m)).concat()
-}
-
-pub fn sep() -> String {
-    Cell::new(vec![ext(8)], "|".to_string()).render(0)
+            output + &row_str + "\n"
+        })
+    }
 }
 
 #[allow(dead_code)]

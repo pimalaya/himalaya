@@ -4,10 +4,16 @@ mod smtp;
 mod table;
 
 use clap::{App, Arg, SubCommand};
-use std::io::prelude::*;
-use std::{env, fs, process};
 
-fn nem_email_tpl() -> String {
+use crate::config::Config;
+use crate::imap::ImapConnector;
+use crate::table::DisplayTable;
+
+fn new_email_tpl() -> String {
+    ["To: ", "Subject: ", ""].join("\r\n")
+}
+
+fn forward_email_tpl() -> String {
     ["To: ", "Subject: ", ""].join("\r\n")
 }
 
@@ -28,9 +34,12 @@ fn uid_arg() -> Arg<'static, 'static> {
 }
 
 fn main() {
-    let config = config::read_file();
-    let mut imap_sess = imap::login(&config);
+    if let Err(err) = dispatch() {
+        panic!(err);
+    }
+}
 
+fn dispatch() -> Result<(), imap::Error> {
     let matches = App::new("Himalaya")
         .version("0.1.0")
         .about("📫 Minimalist CLI email client")
@@ -84,11 +93,13 @@ fn main() {
         )
         .get_matches();
 
-    if let Some(_) = matches.subcommand_matches("list") {
-        imap::list_mailboxes(&mut imap_sess).unwrap();
-    }
+    // if let Some(_) = matches.subcommand_matches("list") {
+    //     let config = Config::new_from_file();
+    //     ImapConnector::new(&config.imap).list_mailboxes().unwrap();
+    // }
 
     if let Some(matches) = matches.subcommand_matches("search") {
+        let config = Config::new_from_file();
         let mbox = matches.value_of("mailbox").unwrap();
 
         if let Some(matches) = matches.values_of("query") {
@@ -115,41 +126,74 @@ fn main() {
                 .1
                 .join(" ");
 
-            imap::read_emails(&mut imap_sess, &mbox, &query).unwrap();
+            let emails = ImapConnector::new(config.imap)?
+                .read_emails(&mbox, &query)?
+                .to_table();
+
+            println!("{}", emails);
         }
     }
 
-    if let Some(matches) = matches.subcommand_matches("read") {
-        let mbox = matches.value_of("mailbox").unwrap();
-        let mime = matches.value_of("mime-type").unwrap();
+    // if let Some(matches) = matches.subcommand_matches("read") {
+    //     let mbox = matches.value_of("mailbox").unwrap();
+    //     let mime = matches.value_of("mime-type").unwrap();
+    //     let uid = matches.value_of("uid").unwrap();
 
-        if let Some(uid) = matches.value_of("uid") {
-            imap::read_email(&mut imap_sess, mbox, uid, mime).unwrap();
-        }
-    }
+    //     imap::read_email(&mut imap_sess, mbox, uid, mime).unwrap();
+    // }
 
-    if let Some(_) = matches.subcommand_matches("write") {
-        let mut draft_path = env::temp_dir();
-        draft_path.push("himalaya-draft.mail");
+    // if let Some(_) = matches.subcommand_matches("write") {
+    //     let mut draft_path = env::temp_dir();
+    //     draft_path.push("himalaya-draft.mail");
 
-        fs::File::create(&draft_path)
-            .expect("Could not create draft file")
-            .write(nem_email_tpl().as_bytes())
-            .expect("Could not write into draft file");
+    //     fs::File::create(&draft_path)
+    //         .expect("Could not create draft file")
+    //         .write(new_email_tpl().as_bytes())
+    //         .expect("Could not write into draft file");
 
-        process::Command::new(env!("EDITOR"))
-            .arg(&draft_path)
-            .status()
-            .expect("Could not start $EDITOR");
+    //     process::Command::new(env!("EDITOR"))
+    //         .arg(&draft_path)
+    //         .status()
+    //         .expect("Could not start $EDITOR");
 
-        let mut draft = String::new();
-        fs::File::open(&draft_path)
-            .expect("Could not open draft file")
-            .read_to_string(&mut draft)
-            .expect("Could not read draft file");
+    //     let mut draft = String::new();
+    //     fs::File::open(&draft_path)
+    //         .expect("Could not open draft file")
+    //         .read_to_string(&mut draft)
+    //         .expect("Could not read draft file");
 
-        fs::remove_file(&draft_path).expect("Could not remove draft file");
+    //     fs::remove_file(&draft_path).expect("Could not remove draft file");
 
-        smtp::send(&config, &draft.as_bytes());
-    }
+    //     smtp::send(&config, &draft.as_bytes());
+    // }
+
+    // if let Some(_) = matches.subcommand_matches("forward") {
+    //     let mbox = matches.value_of("mailbox").unwrap();
+    //     let uid = matches.value_of("uid").unwrap();
+
+    //     let mut draft_path = env::temp_dir();
+    //     draft_path.push("himalaya-draft.mail");
+
+    //     fs::File::create(&draft_path)
+    //         .expect("Could not create draft file")
+    //         .write(forward_email_tpl().as_bytes())
+    //         .expect("Could not write into draft file");
+
+    //     process::Command::new(env!("EDITOR"))
+    //         .arg(&draft_path)
+    //         .status()
+    //         .expect("Could not start $EDITOR");
+
+    //     let mut draft = String::new();
+    //     fs::File::open(&draft_path)
+    //         .expect("Could not open draft file")
+    //         .read_to_string(&mut draft)
+    //         .expect("Could not read draft file");
+
+    //     fs::remove_file(&draft_path).expect("Could not remove draft file");
+
+    //     smtp::send(&config, &draft.as_bytes());
+    // }
+
+    Ok(())
 }

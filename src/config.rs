@@ -14,20 +14,8 @@ pub struct ServerInfo {
 }
 
 impl ServerInfo {
-    pub fn get_host(&self) -> &str {
-        &self.host
-    }
-
     pub fn get_addr(&self) -> (&str, u16) {
         (&self.host, self.port)
-    }
-
-    pub fn get_login(&self) -> &str {
-        &self.login
-    }
-
-    pub fn get_password(&self) -> &str {
-        &self.password
     }
 }
 
@@ -40,6 +28,13 @@ pub struct Config {
 }
 
 impl Config {
+    pub fn new_from_file() -> Self {
+        match read_file_content() {
+            Err(err) => panic!(err),
+            Ok(content) => toml::from_str(&content).unwrap(),
+        }
+    }
+
     pub fn email_full(&self) -> String {
         format!("{} <{}>", self.name, self.email)
     }
@@ -90,11 +85,4 @@ pub fn read_file_content() -> Result<String, io::Error> {
     let mut content = String::new();
     file.read_to_string(&mut content)?;
     Ok(content)
-}
-
-pub fn read_file() -> Config {
-    match read_file_content() {
-        Err(err) => panic!(err),
-        Ok(content) => toml::from_str(&content).unwrap(),
-    }
 }
