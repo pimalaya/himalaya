@@ -1,5 +1,7 @@
 mod config;
+mod email;
 mod imap;
+mod mailbox;
 mod smtp;
 mod table;
 
@@ -9,13 +11,13 @@ use crate::config::Config;
 use crate::imap::ImapConnector;
 use crate::table::DisplayTable;
 
-fn new_email_tpl() -> String {
-    ["To: ", "Subject: ", ""].join("\r\n")
-}
+// fn new_email_tpl() -> String {
+//     ["To: ", "Subject: ", ""].join("\r\n")
+// }
 
-fn forward_email_tpl() -> String {
-    ["To: ", "Subject: ", ""].join("\r\n")
-}
+// fn forward_email_tpl() -> String {
+//     ["To: ", "Subject: ", ""].join("\r\n")
+// }
 
 fn mailbox_arg() -> Arg<'static, 'static> {
     Arg::with_name("mailbox")
@@ -93,10 +95,14 @@ fn dispatch() -> Result<(), imap::Error> {
         )
         .get_matches();
 
-    // if let Some(_) = matches.subcommand_matches("list") {
-    //     let config = Config::new_from_file();
-    //     ImapConnector::new(&config.imap).list_mailboxes().unwrap();
-    // }
+    if let Some(_) = matches.subcommand_matches("list") {
+        let config = Config::new_from_file();
+        let mboxes = ImapConnector::new(config.imap)?
+            .list_mailboxes()?
+            .to_table();
+
+        println!("{}", mboxes);
+    }
 
     if let Some(matches) = matches.subcommand_matches("search") {
         let config = Config::new_from_file();
