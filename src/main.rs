@@ -6,14 +6,25 @@ mod smtp;
 mod table;
 
 use clap::{App, Arg, SubCommand};
+use std::env::temp_dir;
+use std::fs::{remove_file, File};
+use std::io::{Read, Write};
+use std::process::{exit, Command};
 
 use crate::config::Config;
 use crate::imap::ImapConnector;
 use crate::table::DisplayTable;
 
-// fn new_email_tpl() -> String {
-//     ["To: ", "Subject: ", ""].join("\r\n")
-// }
+fn main() {
+    if let Err(err) = dispatch() {
+        eprintln!("Error: {}", err);
+        exit(1);
+    }
+}
+
+fn new_email_tpl() -> String {
+    ["To: ", "Subject: ", ""].join("\r\n")
+}
 
 // fn forward_email_tpl() -> String {
 //     ["To: ", "Subject: ", ""].join("\r\n")
@@ -33,12 +44,6 @@ fn uid_arg() -> Arg<'static, 'static> {
         .help("UID of the targeted email")
         .value_name("UID")
         .required(true)
-}
-
-fn main() {
-    if let Err(err) = dispatch() {
-        panic!(err);
-    }
 }
 
 fn dispatch() -> Result<(), imap::Error> {
@@ -140,63 +145,68 @@ fn dispatch() -> Result<(), imap::Error> {
         }
     }
 
-    // if let Some(matches) = matches.subcommand_matches("read") {
-    //     let mbox = matches.value_of("mailbox").unwrap();
-    //     let mime = matches.value_of("mime-type").unwrap();
-    //     let uid = matches.value_of("uid").unwrap();
+    if let Some(matches) = matches.subcommand_matches("read") {
+        let config = Config::new_from_file();
+        let mbox = matches.value_of("mailbox").unwrap();
+        let uid = matches.value_of("uid").unwrap();
+        let mime = matches.value_of("mime-type").unwrap();
+        let email = ImapConnector::new(config.imap)?.read_email(&mbox, &uid, &mime)?;
 
-    //     imap::read_email(&mut imap_sess, mbox, uid, mime).unwrap();
-    // }
+        println!("{}", email);
+    }
 
-    // if let Some(_) = matches.subcommand_matches("write") {
-    //     let mut draft_path = env::temp_dir();
-    //     draft_path.push("himalaya-draft.mail");
+    if let Some(_) = matches.subcommand_matches("write") {
+        let config = Config::new_from_file();
 
-    //     fs::File::create(&draft_path)
-    //         .expect("Could not create draft file")
-    //         .write(new_email_tpl().as_bytes())
-    //         .expect("Could not write into draft file");
+        let mut draft_path = temp_dir();
+        draft_path.push("himalaya-draft.mail");
 
-    //     process::Command::new(env!("EDITOR"))
-    //         .arg(&draft_path)
-    //         .status()
-    //         .expect("Could not start $EDITOR");
+        File::create(&draft_path)
+            .expect("Could not create draft file")
+            .write(new_email_tpl().as_bytes())
+            .expect("Could not write into draft file");
 
-    //     let mut draft = String::new();
-    //     fs::File::open(&draft_path)
-    //         .expect("Could not open draft file")
-    //         .read_to_string(&mut draft)
-    //         .expect("Could not read draft file");
+        Command::new(env!("EDITOR"))
+            .arg(&draft_path)
+            .status()
+            .expect("Could not start $EDITOR");
 
-    //     fs::remove_file(&draft_path).expect("Could not remove draft file");
+        let mut draft = String::new();
+        File::open(&draft_path)
+            .expect("Could not open draft file")
+            .read_to_string(&mut draft)
+            .expect("Could not read draft file");
 
-    //     smtp::send(&config, &draft.as_bytes());
-    // }
+        remove_file(&draft_path).expect("Could not remove draft file");
+
+        smtp::send(&config, &draft.as_bytes());
+    }
 
     // if let Some(_) = matches.subcommand_matches("forward") {
+    //     let config = Config::new_from_file();
     //     let mbox = matches.value_of("mailbox").unwrap();
     //     let uid = matches.value_of("uid").unwrap();
 
-    //     let mut draft_path = env::temp_dir();
+    //     let mut draft_path = temp_dir();
     //     draft_path.push("himalaya-draft.mail");
 
-    //     fs::File::create(&draft_path)
+    //     File::create(&draft_path)
     //         .expect("Could not create draft file")
     //         .write(forward_email_tpl().as_bytes())
     //         .expect("Could not write into draft file");
 
-    //     process::Command::new(env!("EDITOR"))
+    //     Command::new(env!("EDITOR"))
     //         .arg(&draft_path)
     //         .status()
     //         .expect("Could not start $EDITOR");
 
     //     let mut draft = String::new();
-    //     fs::File::open(&draft_path)
+    //     File::open(&draft_path)
     //         .expect("Could not open draft file")
     //         .read_to_string(&mut draft)
     //         .expect("Could not read draft file");
 
-    //     fs::remove_file(&draft_path).expect("Could not remove draft file");
+    //     remove_file(&draft_path).expect("Could not remove draft file");
 
     //     smtp::send(&config, &draft.as_bytes());
     // }

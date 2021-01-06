@@ -3,7 +3,8 @@ use rfc2047_decoder;
 
 use crate::table::{self, DisplayCell, DisplayRow, DisplayTable};
 
-pub struct Uid(u32);
+#[derive(Debug)]
+pub struct Uid(pub u32);
 
 impl Uid {
     pub fn from_fetch(fetch: &imap::types::Fetch) -> Self {
@@ -21,6 +22,7 @@ impl DisplayCell for Uid {
     }
 }
 
+#[derive(Debug)]
 pub struct Flags<'a>(Vec<imap::types::Flag<'a>>);
 
 impl Flags<'_> {
@@ -67,6 +69,7 @@ impl DisplayCell for Flags<'_> {
     }
 }
 
+#[derive(Debug)]
 pub struct Sender(String);
 
 impl Sender {
@@ -97,6 +100,7 @@ impl DisplayCell for Sender {
     }
 }
 
+#[derive(Debug)]
 pub struct Subject(String);
 
 impl Subject {
@@ -124,6 +128,7 @@ impl DisplayCell for Subject {
     }
 }
 
+#[derive(Debug)]
 pub struct Date(String);
 
 impl Date {
@@ -148,6 +153,7 @@ impl DisplayCell for Date {
     }
 }
 
+#[derive(Debug)]
 pub struct Email<'a> {
     pub uid: Uid,
     pub flags: Flags<'a>,
