@@ -1,4 +1,5 @@
 mod config;
+mod editor;
 mod email;
 mod imap;
 mod mailbox;
@@ -6,29 +7,53 @@ mod smtp;
 mod table;
 
 use clap::{App, Arg, SubCommand};
-use std::env::temp_dir;
-use std::fs::{remove_file, File};
-use std::io::{Read, Write};
-use std::process::{exit, Command};
+use std::{error, fmt, process::exit, result};
 
 use crate::config::Config;
 use crate::imap::ImapConnector;
 use crate::table::DisplayTable;
 
-fn main() {
-    if let Err(err) = dispatch() {
-        eprintln!("Error: {}", err);
-        exit(1);
+#[derive(Debug)]
+pub enum Error {
+    EditorError(editor::Error),
+    ImapError(imap::Error),
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Error::EditorError(err) => err.fmt(f),
+            Error::ImapError(err) => err.fmt(f),
+        }
     }
 }
 
-fn new_email_tpl() -> String {
-    ["To: ", "Subject: ", ""].join("\r\n")
+impl error::Error for Error {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        match *self {
+            Error::EditorError(ref err) => Some(err),
+            Error::ImapError(ref err) => Some(err),
+        }
+    }
 }
 
-// fn forward_email_tpl() -> String {
-//     ["To: ", "Subject: ", ""].join("\r\n")
-// }
+impl From<editor::Error> for Error {
+    fn from(err: editor::Error) -> Error {
+        Error::EditorError(err)
+    }
+}
+
+impl From<imap::Error> for Error {
+    fn from(err: imap::Error) -> Error {
+        Error::ImapError(err)
+    }
+}
+
+// Result wrapper
+
+type Result<T> = result::Result<T, Error>;
+
+// Run
 
 fn mailbox_arg() -> Arg<'static, 'static> {
     Arg::with_name("mailbox")
@@ -46,7 +71,7 @@ fn uid_arg() -> Arg<'static, 'static> {
         .required(true)
 }
 
-fn dispatch() -> Result<(), imap::Error> {
+fn run() -> Result<()> {
     let matches = App::new("Himalaya")
         .version("0.1.0")
         .about("📫 Minimalist CLI email client")
@@ -117,12 +142,12 @@ fn dispatch() -> Result<(), imap::Error> {
             let query = matches
                 .fold((false, vec![]), |(escape, mut cmds), cmd| {
                     match (cmd, escape) {
-                        // Next command needs to be escaped
+                        // Next command is an arg and needs to be escaped
                         ("subject", _) | ("body", _) | ("text", _) => {
                             cmds.push(cmd.to_string());
                             (true, cmds)
                         }
-                        // Escaped commands
+                        // Escaped arg commands
                         (_, true) => {
                             cmds.push(format!("\"{}\"", cmd));
                             (false, cmds)
@@ -157,59 +182,19 @@ fn dispatch() -> Result<(), imap::Error> {
 
     if let Some(_) = matches.subcommand_matches("write") {
         let config = Config::new_from_file();
+        let draft = editor::open_with_new_template()?;
 
-        let mut draft_path = temp_dir();
-        draft_path.push("himalaya-draft.mail");
-
-        File::create(&draft_path)
-            .expect("Could not create draft file")
-            .write(new_email_tpl().as_bytes())
-            .expect("Could not write into draft file");
-
-        Command::new(env!("EDITOR"))
-            .arg(&draft_path)
-            .status()
-            .expect("Could not start $EDITOR");
-
-        let mut draft = String::new();
-        File::open(&draft_path)
-            .expect("Could not open draft file")
-            .read_to_string(&mut draft)
-            .expect("Could not read draft file");
-
-        remove_file(&draft_path).expect("Could not remove draft file");
-
-        smtp::send(&config, &draft.as_bytes());
+        smtp::send(&config, draft.as_bytes());
     }
 
-    // if let Some(_) = matches.subcommand_matches("forward") {
-    //     let config = Config::new_from_file();
-    //     let mbox = matches.value_of("mailbox").unwrap();
-    //     let uid = matches.value_of("uid").unwrap();
-
-    //     let mut draft_path = temp_dir();
-    //     draft_path.push("himalaya-draft.mail");
-
-    //     File::create(&draft_path)
-    //         .expect("Could not create draft file")
-    //         .write(forward_email_tpl().as_bytes())
-    //         .expect("Could not write into draft file");
-
-    //     Command::new(env!("EDITOR"))
-    //         .arg(&draft_path)
-    //         .status()
-    //         .expect("Could not start $EDITOR");
-
-    //     let mut draft = String::new();
-    //     File::open(&draft_path)
-    //         .expect("Could not open draft file")
-    //         .read_to_string(&mut draft)
-    //         .expect("Could not read draft file");
-
-    //     remove_file(&draft_path).expect("Could not remove draft file");
-
-    //     smtp::send(&config, &draft.as_bytes());
-    // }
-
     Ok(())
+}
+
+// Main
+
+fn main() {
+    if let Err(err) = run() {
+        eprintln!("Error: {}", err);
+        exit(1);
+    }
 }
