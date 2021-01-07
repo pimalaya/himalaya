@@ -7,8 +7,6 @@ himalaya --help
 ```
 
 ```help
-Himalaya 0.1.0
-soywod <clement.douin@posteo.net>
 📫 Minimalist CLI email client
 
 USAGE:
@@ -21,8 +19,10 @@ FLAGS:
 SUBCOMMANDS:
     forward    Forwards an email by its UID
     help       Prints this message or the help of the given subcommand(s)
-    query      Prints emails filtered by the given IMAP query
+    list       Lists all available mailboxes
     read       Reads an email by its UID
     reply      Replies to an email by its UID
+    search     Lists emails matching the given IMAP query
+    send       Send a draft by its UID
     write      Writes a new email
 ```

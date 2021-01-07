@@ -104,11 +104,9 @@ fn run() -> Result<()> {
                         .default_value("text/plain"),
                 ),
         )
-        .subcommand(SubCommand::with_name("write").about("Writes a new email"))
         .subcommand(
-            SubCommand::with_name("forward")
-                .about("Forwards an email by its UID")
-                .arg(uid_arg())
+            SubCommand::with_name("write")
+                .about("Writes a new email")
                 .arg(mailbox_arg()),
         )
         .subcommand(
@@ -122,6 +120,17 @@ fn run() -> Result<()> {
                         .short("a")
                         .long("all"),
                 ),
+        )
+        .subcommand(
+            SubCommand::with_name("forward")
+                .about("Forwards an email by its UID")
+                .arg(uid_arg())
+                .arg(mailbox_arg()),
+        )
+        .subcommand(
+            SubCommand::with_name("send")
+                .about("Send a draft by its UID")
+                .arg(uid_arg()),
         )
         .get_matches();
 
@@ -184,9 +193,22 @@ fn run() -> Result<()> {
         let config = Config::new_from_file()?;
         let draft = editor::open_with_new_template()?;
 
+        // TODO: save as draft instead (IMAP)
         println!("Sending ...");
         smtp::send(&config, draft.as_bytes());
         println!("Done!");
+    }
+
+    if let Some(_) = matches.subcommand_matches("reply") {
+        // TODO
+    }
+
+    if let Some(_) = matches.subcommand_matches("forward") {
+        // TODO
+    }
+
+    if let Some(_) = matches.subcommand_matches("send") {
+        // TODO
     }
 
     Ok(())
