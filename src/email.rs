@@ -1,4 +1,5 @@
 use imap;
+use mailparse::{self, MailHeaderMap};
 use rfc2047_decoder;
 
 use crate::table::{self, DisplayCell, DisplayRow, DisplayTable};
@@ -194,4 +195,32 @@ impl<'a> DisplayTable<'a, Email<'a>> for Vec<Email<'a>> {
     fn rows(&self) -> &Vec<Email<'a>> {
         self
     }
+}
+
+// Utils
+
+fn extract_text_bodies_into(mime: &str, part: &mailparse::ParsedMail, parts: &mut Vec<String>) {
+    match part.subparts.len() {
+        0 => {
+            if part
+                .get_headers()
+                .get_first_value("content-type")
+                .and_then(|v| if v.starts_with(mime) { Some(()) } else { None })
+                .is_some()
+            {
+                parts.push(part.get_body().unwrap_or(String::new()))
+            }
+        }
+        _ => {
+            part.subparts
+                .iter()
+                .for_each(|part| extract_text_bodies_into(mime, part, parts));
+        }
+    }
+}
+
+pub fn extract_text_bodies(mime: &str, email: &mailparse::ParsedMail) -> String {
+    let mut parts = vec![];
+    extract_text_bodies_into(mime, email, &mut parts);
+    parts.join("\r\n")
 }

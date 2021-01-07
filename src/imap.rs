@@ -1,10 +1,10 @@
 use imap;
-use mailparse::{self, MailHeaderMap};
+use mailparse;
 use native_tls::{self, TlsConnector, TlsStream};
 use std::{fmt, net::TcpStream, result};
 
 use crate::config;
-use crate::email::Email;
+use crate::email::{self, Email};
 use crate::mailbox::Mailbox;
 
 // Error wrapper
@@ -13,6 +13,7 @@ use crate::mailbox::Mailbox;
 pub enum Error {
     CreateTlsConnectorError(native_tls::Error),
     CreateImapSession(imap::Error),
+    ParseEmailError(mailparse::MailParseError),
     ReadEmailNotFoundError(String),
     ReadEmailEmptyPartError(String, String),
 }
@@ -23,6 +24,7 @@ impl fmt::Display for Error {
         match self {
             Error::CreateTlsConnectorError(err) => err.fmt(f),
             Error::CreateImapSession(err) => err.fmt(f),
+            Error::ParseEmailError(err) => err.fmt(f),
             Error::ReadEmailNotFoundError(uid) => {
                 write!(f, "no email found for uid {}", uid)
             }
@@ -45,6 +47,12 @@ impl From<imap::Error> for Error {
     }
 }
 
+impl From<mailparse::MailParseError> for Error {
+    fn from(err: mailparse::MailParseError) -> Error {
+        Error::ParseEmailError(err)
+    }
+}
+
 // Result wrapper
 
 type Result<T> = result::Result<T, Error>;
@@ -58,27 +66,6 @@ pub struct ImapConnector {
 }
 
 impl ImapConnector {
-    fn extract_subparts_by_mime(mime: &str, part: &mailparse::ParsedMail, parts: &mut Vec<String>) {
-        match part.subparts.len() {
-            0 => {
-                if part
-                    .get_headers()
-                    .get_first_value("content-type")
-                    .and_then(|v| if v.starts_with(mime) { Some(()) } else { None })
-                    .is_some()
-                {
-                    // TODO: push part instead of body str
-                    parts.push(part.get_body().unwrap_or(String::new()))
-                }
-            }
-            _ => {
-                part.subparts
-                    .iter()
-                    .for_each(|p| Self::extract_subparts_by_mime(mime, p, parts));
-            }
-        }
-    }
-
     pub fn new(config: config::ServerInfo) -> Result<Self> {
         let tls = TlsConnector::new()?;
         let client = imap::connect(config.get_addr(), &config.host, &tls)?;
@@ -123,23 +110,23 @@ impl ImapConnector {
         Ok(emails)
     }
 
-    pub fn read_email(&mut self, mbox: &str, uid: &str, mime: &str) -> Result<String> {
+    pub fn read_email_body(&mut self, mbox: &str, uid: &str, mime: &str) -> Result<String> {
         self.sess.select(mbox)?;
 
         match self.sess.uid_fetch(uid, "BODY[]")?.first() {
             None => Err(Error::ReadEmailNotFoundError(uid.to_string())),
             Some(fetch) => {
-                let email = mailparse::parse_mail(fetch.body().unwrap_or(&[])).unwrap();
-                let mut parts = vec![];
-                Self::extract_subparts_by_mime(mime, &email, &mut parts);
+                let bytes = fetch.body().unwrap_or(&[]);
+                let email = mailparse::parse_mail(bytes)?;
+                let bodies = email::extract_text_bodies(&mime, &email);
 
-                if parts.len() == 0 {
+                if bodies.is_empty() {
                     Err(Error::ReadEmailEmptyPartError(
                         uid.to_string(),
                         mime.to_string(),
                     ))
                 } else {
-                    Ok(parts.join("\r\n"))
+                    Ok(bodies)
                 }
             }
         }

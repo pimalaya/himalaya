@@ -45,9 +45,8 @@ pub fn send(config: &config::Config, bytes: &[u8]) {
         .credentials(creds)
         .build();
 
-    println!("Sending ...");
     match mailer.send(&email) {
-        Ok(_) => println!("Email sent successfully!"),
+        Ok(_) => (),
         Err(e) => panic!("Could not send email: {:?}", e),
     }
 }

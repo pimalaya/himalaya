@@ -175,16 +175,18 @@ fn run() -> Result<()> {
         let mbox = matches.value_of("mailbox").unwrap();
         let uid = matches.value_of("uid").unwrap();
         let mime = matches.value_of("mime-type").unwrap();
-        let email = ImapConnector::new(config.imap)?.read_email(&mbox, &uid, &mime)?;
+        let body = ImapConnector::new(config.imap)?.read_email_body(&mbox, &uid, &mime)?;
 
-        println!("{}", email);
+        println!("{}", body);
     }
 
     if let Some(_) = matches.subcommand_matches("write") {
         let config = Config::new_from_file()?;
         let draft = editor::open_with_new_template()?;
 
+        println!("Sending ...");
         smtp::send(&config, draft.as_bytes());
+        println!("Done!");
     }
 
     Ok(())
