@@ -1,7 +1,7 @@
 use imap;
 use mailparse::{self, MailHeaderMap};
 use native_tls::{self, TlsConnector, TlsStream};
-use std::{error, fmt, net::TcpStream, result};
+use std::{fmt, net::TcpStream, result};
 
 use crate::config;
 use crate::email::Email;
@@ -19,26 +19,16 @@ pub enum Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "(imap): ")?;
         match self {
             Error::CreateTlsConnectorError(err) => err.fmt(f),
             Error::CreateImapSession(err) => err.fmt(f),
             Error::ReadEmailNotFoundError(uid) => {
-                write!(f, "No email found for UID {}", uid)
+                write!(f, "no email found for uid {}", uid)
             }
             Error::ReadEmailEmptyPartError(uid, mime) => {
-                write!(f, "No {} content found for UID {}", mime, uid)
+                write!(f, "no {} content found for uid {}", mime, uid)
             }
-        }
-    }
-}
-
-impl error::Error for Error {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        match *self {
-            Error::CreateTlsConnectorError(ref err) => Some(err),
-            Error::CreateImapSession(ref err) => Some(err),
-            Error::ReadEmailNotFoundError(_) => None,
-            Error::ReadEmailEmptyPartError(_, _) => None,
         }
     }
 }
@@ -77,6 +67,7 @@ impl ImapConnector {
                     .and_then(|v| if v.starts_with(mime) { Some(()) } else { None })
                     .is_some()
                 {
+                    // TODO: push part instead of body str
                     parts.push(part.get_body().unwrap_or(String::new()))
                 }
             }
@@ -136,9 +127,9 @@ impl ImapConnector {
         self.sess.select(mbox)?;
 
         match self.sess.uid_fetch(uid, "BODY[]")?.first() {
-            None => return Err(Error::ReadEmailNotFoundError(uid.to_string())),
-            Some(email_raw) => {
-                let email = mailparse::parse_mail(email_raw.body().unwrap_or(&[])).unwrap();
+            None => Err(Error::ReadEmailNotFoundError(uid.to_string())),
+            Some(fetch) => {
+                let email = mailparse::parse_mail(fetch.body().unwrap_or(&[])).unwrap();
                 let mut parts = vec![];
                 Self::extract_subparts_by_mime(mime, &email, &mut parts);
 

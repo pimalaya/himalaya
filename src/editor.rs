@@ -2,7 +2,7 @@ use std::env::temp_dir;
 use std::fs::{remove_file, File};
 use std::io::{self, Read, Write};
 use std::process::Command;
-use std::{error, fmt, result};
+use std::{fmt, result};
 
 // Error wrapper
 
@@ -19,14 +19,6 @@ impl fmt::Display for Error {
     }
 }
 
-impl error::Error for Error {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        match *self {
-            Error::IoError(ref err) => Some(err),
-        }
-    }
-}
-
 impl From<io::Error> for Error {
     fn from(err: io::Error) -> Error {
         Error::IoError(err)
@@ -37,7 +29,7 @@ impl From<io::Error> for Error {
 
 type Result<T> = result::Result<T, Error>;
 
-// Utils
+// Editor utils
 
 fn open_with_template(template: &[u8]) -> Result<String> {
     // Create temporary draft

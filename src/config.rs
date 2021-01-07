@@ -1,9 +1,58 @@
 use serde::Deserialize;
-use std::env;
-use std::fs::File;
-use std::io::{self, Read};
-use std::path::PathBuf;
+use std::{
+    env, fmt,
+    fs::File,
+    io::{self, Read},
+    path::PathBuf,
+    result,
+};
 use toml;
+
+// Error wrapper
+
+#[derive(Debug)]
+pub enum Error {
+    IoError(io::Error),
+    ParseTomlError(toml::de::Error),
+    GetEnvVarError(env::VarError),
+    GetPathNotFoundError,
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "(config): ")?;
+        match self {
+            Error::IoError(err) => err.fmt(f),
+            Error::ParseTomlError(err) => err.fmt(f),
+            Error::GetEnvVarError(err) => err.fmt(f),
+            Error::GetPathNotFoundError => write!(f, "path not found"),
+        }
+    }
+}
+
+impl From<io::Error> for Error {
+    fn from(err: io::Error) -> Error {
+        Error::IoError(err)
+    }
+}
+
+impl From<toml::de::Error> for Error {
+    fn from(err: toml::de::Error) -> Error {
+        Error::ParseTomlError(err)
+    }
+}
+
+impl From<env::VarError> for Error {
+    fn from(err: env::VarError) -> Error {
+        Error::GetEnvVarError(err)
+    }
+}
+
+// Result wrapper
+
+type Result<T> = result::Result<T, Error>;
+
+// Config
 
 #[derive(Debug, Deserialize)]
 pub struct ServerInfo {
@@ -28,61 +77,48 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new_from_file() -> Self {
-        match read_file_content() {
-            Err(err) => panic!(err),
-            Ok(content) => toml::from_str(&content).unwrap(),
-        }
+    fn path_from_xdg() -> Result<PathBuf> {
+        let path = env::var("XDG_CONFIG_HOME")?;
+        let mut path = PathBuf::from(path);
+        path.push("himalaya");
+        path.push("config.toml");
+
+        Ok(path)
+    }
+
+    fn path_from_home(_err: Error) -> Result<PathBuf> {
+        let path = env::var("HOME")?;
+        let mut path = PathBuf::from(path);
+        path.push(".config");
+        path.push("himalaya");
+        path.push("config.toml");
+
+        Ok(path)
+    }
+
+    fn path_from_tmp(_err: Error) -> Result<PathBuf> {
+        let mut path = env::temp_dir();
+        path.push("himalaya");
+        path.push("config.toml");
+
+        Ok(path)
+    }
+
+    pub fn new_from_file() -> Result<Self> {
+        let mut file = File::open(
+            Self::path_from_xdg()
+                .or_else(Self::path_from_home)
+                .or_else(Self::path_from_tmp)
+                .or_else(|_| Err(Error::GetPathNotFoundError))?,
+        )?;
+
+        let mut content = String::new();
+        file.read_to_string(&mut content)?;
+
+        Ok(toml::from_str(&content)?)
     }
 
     pub fn email_full(&self) -> String {
         format!("{} <{}>", self.name, self.email)
     }
-}
-
-pub fn from_xdg() -> Option<PathBuf> {
-    match env::var("XDG_CONFIG_HOME") {
-        Err(_) => None,
-        Ok(path_str) => {
-            let mut path = PathBuf::from(path_str);
-            path.push("himalaya");
-            path.push("config.toml");
-            Some(path)
-        }
-    }
-}
-
-pub fn from_home() -> Option<PathBuf> {
-    match env::var("HOME") {
-        Err(_) => None,
-        Ok(path_str) => {
-            let mut path = PathBuf::from(path_str);
-            path.push(".config");
-            path.push("himalaya");
-            path.push("config.toml");
-            Some(path)
-        }
-    }
-}
-
-pub fn from_tmp() -> Option<PathBuf> {
-    let mut path = env::temp_dir();
-    path.push("himalaya");
-    path.push("config.toml");
-    Some(path)
-}
-
-pub fn file_path() -> PathBuf {
-    match from_xdg().or_else(from_home).or_else(from_tmp) {
-        None => panic!("Config file path not found."),
-        Some(path) => path,
-    }
-}
-
-pub fn read_file_content() -> Result<String, io::Error> {
-    let path = file_path();
-    let mut file = File::open(path)?;
-    let mut content = String::new();
-    file.read_to_string(&mut content)?;
-    Ok(content)
 }

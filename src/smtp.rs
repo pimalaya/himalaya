@@ -7,6 +7,7 @@ use mailparse;
 
 use crate::config;
 
+// TODO: improve error management
 pub fn send(config: &config::Config, bytes: &[u8]) {
     let email_origin = mailparse::parse_mail(bytes).unwrap();
     let email = email_origin
