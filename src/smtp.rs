@@ -1,52 +1,43 @@
-use lettre::{
-    message::{header, Message, SinglePart},
-    transport::smtp::{authentication::Credentials, SmtpTransport},
-    Transport,
-};
-use mailparse;
+use lettre;
+use std::{fmt, result};
 
 use crate::config;
+use crate::msg::Msg;
 
-// TODO: improve error management
-pub fn send(config: &config::Config, bytes: &[u8]) {
-    let email_origin = mailparse::parse_mail(bytes).unwrap();
-    let email = email_origin
-        .headers
-        .iter()
-        .fold(Message::builder(), |msg, h| {
-            match h.get_key().to_lowercase().as_str() {
-                "to" => msg.to(h.get_value().parse().unwrap()),
-                "cc" => match h.get_value().parse() {
-                    Err(_) => msg,
-                    Ok(addr) => msg.cc(addr),
-                },
-                "bcc" => match h.get_value().parse() {
-                    Err(_) => msg,
-                    Ok(addr) => msg.bcc(addr),
-                },
-                "subject" => msg.subject(h.get_value()),
-                _ => msg,
-            }
-        })
-        .from(config.email_full().parse().unwrap())
-        .singlepart(
-            SinglePart::builder()
-                .header(header::ContentType(
-                    "text/plain; charset=utf-8".parse().unwrap(),
-                ))
-                .header(header::ContentTransferEncoding::Base64)
-                .body(email_origin.get_body_raw().unwrap()),
-        )
-        .unwrap();
+// Error wrapper
 
-    let creds = Credentials::new(config.smtp.login.clone(), config.smtp.password.clone());
-    let mailer = SmtpTransport::relay(&config.smtp.host)
-        .unwrap()
-        .credentials(creds)
-        .build();
+#[derive(Debug)]
+pub enum Error {
+    TransportError(lettre::transport::smtp::Error),
+}
 
-    match mailer.send(&email) {
-        Ok(_) => (),
-        Err(e) => panic!("Could not send email: {:?}", e),
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "(smtp): ")?;
+        match self {
+            Error::TransportError(err) => err.fmt(f),
+        }
     }
+}
+
+impl From<lettre::transport::smtp::Error> for Error {
+    fn from(err: lettre::transport::smtp::Error) -> Error {
+        Error::TransportError(err)
+    }
+}
+
+// Result wrapper
+
+type Result<T> = result::Result<T, Error>;
+
+// Utils
+
+pub fn send(config: &config::ServerInfo, msg: &Msg) -> Result<()> {
+    use lettre::Transport;
+
+    lettre::transport::smtp::SmtpTransport::relay(&config.host)?
+        .credentials(config.to_smtp_creds())
+        .build()
+        .send(msg.as_sendable_msg())
+        .map(|_| Ok(()))?
 }

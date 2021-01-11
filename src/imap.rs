@@ -6,6 +6,7 @@ use std::{fmt, net::TcpStream, result};
 use crate::config;
 use crate::email::{self, Email};
 use crate::mailbox::Mailbox;
+use crate::msg::Msg;
 
 // Error wrapper
 
@@ -76,7 +77,7 @@ impl ImapConnector {
         Ok(Self { config, sess })
     }
 
-    pub fn list_mailboxes(&mut self) -> Result<Vec<Mailbox<'_>>> {
+    pub fn list_mboxes(&mut self) -> Result<Vec<Mailbox<'_>>> {
         let mboxes = self
             .sess
             .list(Some(""), Some("*"))?
@@ -130,5 +131,11 @@ impl ImapConnector {
                 }
             }
         }
+    }
+
+    pub fn append_msg(&mut self, mbox: &str, msg: &Msg) -> Result<()> {
+        use imap::types::Flag::*;
+        self.sess.append_with_flags(mbox, msg.to_vec(), &[Seen])?;
+        Ok(())
     }
 }

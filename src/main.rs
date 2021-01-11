@@ -1,8 +1,9 @@
 mod config;
-mod editor;
 mod email;
 mod imap;
+mod input;
 mod mailbox;
+mod msg;
 mod smtp;
 mod table;
 
@@ -11,21 +12,26 @@ use std::{fmt, process::exit, result};
 
 use crate::config::Config;
 use crate::imap::ImapConnector;
+use crate::msg::Msg;
 use crate::table::DisplayTable;
 
 #[derive(Debug)]
 pub enum Error {
     ConfigError(config::Error),
+    InputError(input::Error),
+    MsgError(msg::Error),
     ImapError(imap::Error),
-    EditorError(editor::Error),
+    SmtpError(smtp::Error),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Error::ConfigError(err) => err.fmt(f),
+            Error::InputError(err) => err.fmt(f),
+            Error::MsgError(err) => err.fmt(f),
             Error::ImapError(err) => err.fmt(f),
-            Error::EditorError(err) => err.fmt(f),
+            Error::SmtpError(err) => err.fmt(f),
         }
     }
 }
@@ -36,15 +42,27 @@ impl From<config::Error> for Error {
     }
 }
 
+impl From<input::Error> for Error {
+    fn from(err: input::Error) -> Error {
+        Error::InputError(err)
+    }
+}
+
+impl From<msg::Error> for Error {
+    fn from(err: msg::Error) -> Error {
+        Error::MsgError(err)
+    }
+}
+
 impl From<imap::Error> for Error {
     fn from(err: imap::Error) -> Error {
         Error::ImapError(err)
     }
 }
 
-impl From<editor::Error> for Error {
-    fn from(err: editor::Error) -> Error {
-        Error::EditorError(err)
+impl From<smtp::Error> for Error {
+    fn from(err: smtp::Error) -> Error {
+        Error::SmtpError(err)
     }
 }
 
@@ -60,7 +78,6 @@ fn mailbox_arg() -> Arg<'static, 'static> {
         .long("mailbox")
         .help("Name of the targeted mailbox")
         .value_name("STRING")
-        .default_value("INBOX")
 }
 
 fn uid_arg() -> Arg<'static, 'static> {
@@ -80,7 +97,7 @@ fn run() -> Result<()> {
         .subcommand(
             SubCommand::with_name("search")
                 .about("Lists emails matching the given IMAP query")
-                .arg(mailbox_arg())
+                .arg(mailbox_arg().default_value("INBOX"))
                 .arg(
                     Arg::with_name("query")
                         .help("IMAP query (see https://tools.ietf.org/html/rfc3501#section-6.4.4)")
@@ -93,7 +110,7 @@ fn run() -> Result<()> {
             SubCommand::with_name("read")
                 .about("Reads an email by its UID")
                 .arg(uid_arg())
-                .arg(mailbox_arg())
+                .arg(mailbox_arg().default_value("INBOX"))
                 .arg(
                     Arg::with_name("mime-type")
                         .help("MIME type to use")
@@ -104,16 +121,12 @@ fn run() -> Result<()> {
                         .default_value("text/plain"),
                 ),
         )
-        .subcommand(
-            SubCommand::with_name("write")
-                .about("Writes a new email")
-                .arg(mailbox_arg()),
-        )
+        .subcommand(SubCommand::with_name("write").about("Writes a new email"))
         .subcommand(
             SubCommand::with_name("reply")
                 .about("Replies to an email by its UID")
                 .arg(uid_arg())
-                .arg(mailbox_arg())
+                .arg(mailbox_arg().default_value("INBOX"))
                 .arg(
                     Arg::with_name("reply all")
                         .help("Replies to all recipients")
@@ -125,20 +138,13 @@ fn run() -> Result<()> {
             SubCommand::with_name("forward")
                 .about("Forwards an email by its UID")
                 .arg(uid_arg())
-                .arg(mailbox_arg()),
-        )
-        .subcommand(
-            SubCommand::with_name("send")
-                .about("Send a draft by its UID")
-                .arg(uid_arg()),
+                .arg(mailbox_arg().default_value("INBOX")),
         )
         .get_matches();
 
     if let Some(_) = matches.subcommand_matches("list") {
         let config = Config::new_from_file()?;
-        let mboxes = ImapConnector::new(config.imap)?
-            .list_mailboxes()?
-            .to_table();
+        let mboxes = ImapConnector::new(config.imap)?.list_mboxes()?.to_table();
 
         println!("{}", mboxes);
     }
@@ -191,12 +197,15 @@ fn run() -> Result<()> {
 
     if let Some(_) = matches.subcommand_matches("write") {
         let config = Config::new_from_file()?;
-        let draft = editor::open_with_new_template()?;
+        let content = input::open_editor_with_new_tpl(&config)?;
+        let msg = Msg::from_raw(content.as_bytes())?;
 
-        // TODO: save as draft instead (IMAP)
-        println!("Sending ...");
-        smtp::send(&config, draft.as_bytes());
-        println!("Done!");
+        input::ask_for_confirmation("Would you like to send this email?")?;
+
+        println!("Sending …");
+        smtp::send(&config.smtp, &msg)?;
+        ImapConnector::new(config.imap)?.append_msg("Sent", &msg)?;
+        println!("Sent!");
     }
 
     if let Some(_) = matches.subcommand_matches("reply") {
@@ -204,10 +213,6 @@ fn run() -> Result<()> {
     }
 
     if let Some(_) = matches.subcommand_matches("forward") {
-        // TODO
-    }
-
-    if let Some(_) = matches.subcommand_matches("send") {
         // TODO
     }
 

@@ -1,3 +1,4 @@
+use lettre::transport::smtp::authentication::Credentials;
 use serde::Deserialize;
 use std::{
     env, fmt,
@@ -65,6 +66,10 @@ pub struct ServerInfo {
 impl ServerInfo {
     pub fn get_addr(&self) -> (&str, u16) {
         (&self.host, self.port)
+    }
+
+    pub fn to_smtp_creds(&self) -> Credentials {
+        Credentials::new(self.login.to_owned(), self.password.to_owned())
     }
 }
 
