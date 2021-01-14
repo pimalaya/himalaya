@@ -78,6 +78,7 @@ fn mailbox_arg() -> Arg<'static, 'static> {
         .long("mailbox")
         .help("Name of the targeted mailbox")
         .value_name("STRING")
+        .default_value("INBOX")
 }
 
 fn uid_arg() -> Arg<'static, 'static> {
@@ -97,7 +98,7 @@ fn run() -> Result<()> {
         .subcommand(
             SubCommand::with_name("search")
                 .about("Lists emails matching the given IMAP query")
-                .arg(mailbox_arg().default_value("INBOX"))
+                .arg(mailbox_arg())
                 .arg(
                     Arg::with_name("query")
                         .help("IMAP query (see https://tools.ietf.org/html/rfc3501#section-6.4.4)")
@@ -110,7 +111,7 @@ fn run() -> Result<()> {
             SubCommand::with_name("read")
                 .about("Reads an email by its UID")
                 .arg(uid_arg())
-                .arg(mailbox_arg().default_value("INBOX"))
+                .arg(mailbox_arg())
                 .arg(
                     Arg::with_name("mime-type")
                         .help("MIME type to use")
@@ -126,7 +127,7 @@ fn run() -> Result<()> {
             SubCommand::with_name("reply")
                 .about("Replies to an email by its UID")
                 .arg(uid_arg())
-                .arg(mailbox_arg().default_value("INBOX"))
+                .arg(mailbox_arg())
                 .arg(
                     Arg::with_name("reply all")
                         .help("Replies to all recipients")
@@ -138,13 +139,13 @@ fn run() -> Result<()> {
             SubCommand::with_name("forward")
                 .about("Forwards an email by its UID")
                 .arg(uid_arg())
-                .arg(mailbox_arg().default_value("INBOX")),
+                .arg(mailbox_arg()),
         )
         .get_matches();
 
     if let Some(_) = matches.subcommand_matches("list") {
         let config = Config::new_from_file()?;
-        let mboxes = ImapConnector::new(config.imap)?.list_mboxes()?.to_table();
+        let mboxes = ImapConnector::new(&config.imap)?.list_mboxes()?.to_table();
 
         println!("{}", mboxes);
     }
@@ -177,7 +178,7 @@ fn run() -> Result<()> {
                 .1
                 .join(" ");
 
-            let emails = ImapConnector::new(config.imap)?
+            let emails = ImapConnector::new(&config.imap)?
                 .read_emails(&mbox, &query)?
                 .to_table();
 
@@ -190,30 +191,71 @@ fn run() -> Result<()> {
         let mbox = matches.value_of("mailbox").unwrap();
         let uid = matches.value_of("uid").unwrap();
         let mime = matches.value_of("mime-type").unwrap();
-        let body = ImapConnector::new(config.imap)?.read_email_body(&mbox, &uid, &mime)?;
+        let body = ImapConnector::new(&config.imap)?.read_email_body(&mbox, &uid, &mime)?;
 
         println!("{}", body);
     }
 
     if let Some(_) = matches.subcommand_matches("write") {
         let config = Config::new_from_file()?;
-        let content = input::open_editor_with_new_tpl(&config)?;
-        let msg = Msg::from_raw(content.as_bytes())?;
+        let mut imap_conn = ImapConnector::new(&config.imap)?;
+        let tpl = Msg::build_new_tpl(&config)?;
+        let content = input::open_editor_with_tpl(&tpl.as_bytes())?;
+        let msg = Msg::from(content.as_bytes())?;
 
-        input::ask_for_confirmation("Would you like to send this email?")?;
+        input::ask_for_confirmation("Send the message?")?;
 
         println!("Sending …");
-        smtp::send(&config.smtp, &msg)?;
-        ImapConnector::new(config.imap)?.append_msg("Sent", &msg)?;
-        println!("Sent!");
+        smtp::send(&config.smtp, &msg.to_sendable_msg()?)?;
+        imap_conn.append_msg("Sent", &msg.to_vec()?)?;
+        println!("Done!");
     }
 
-    if let Some(_) = matches.subcommand_matches("reply") {
-        // TODO
+    if let Some(matches) = matches.subcommand_matches("reply") {
+        let config = Config::new_from_file()?;
+        let mbox = matches.value_of("mailbox").unwrap();
+        let uid = matches.value_of("uid").unwrap();
+        let mut imap_conn = ImapConnector::new(&config.imap)?;
+
+        let msg = imap_conn.read_msg(&mbox, &uid)?;
+        let msg = Msg::from(&msg)?;
+
+        let tpl = if matches.is_present("reply all") {
+            msg.build_reply_all_tpl(&config)?
+        } else {
+            msg.build_reply_tpl(&config)?
+        };
+
+        let content = input::open_editor_with_tpl(&tpl.as_bytes())?;
+        let msg = Msg::from(content.as_bytes())?;
+
+        input::ask_for_confirmation("Send the message?")?;
+
+        println!("Sending …");
+        smtp::send(&config.smtp, &msg.to_sendable_msg()?)?;
+        imap_conn.append_msg("Sent", &msg.to_vec()?)?;
+        println!("Done!");
     }
 
-    if let Some(_) = matches.subcommand_matches("forward") {
-        // TODO
+    if let Some(matches) = matches.subcommand_matches("forward") {
+        let config = Config::new_from_file()?;
+        let mbox = matches.value_of("mailbox").unwrap();
+        let uid = matches.value_of("uid").unwrap();
+        let mut imap_conn = ImapConnector::new(&config.imap)?;
+
+        let msg = imap_conn.read_msg(&mbox, &uid)?;
+        let msg = Msg::from(&msg)?;
+
+        let tpl = msg.build_forward_tpl(&config)?;
+        let content = input::open_editor_with_tpl(&tpl.as_bytes())?;
+        let msg = Msg::from(content.as_bytes())?;
+
+        input::ask_for_confirmation("Send the message?")?;
+
+        println!("Sending …");
+        smtp::send(&config.smtp, &msg.to_sendable_msg()?)?;
+        imap_conn.append_msg("Sent", &msg.to_vec()?)?;
+        println!("Done!");
     }
 
     Ok(())

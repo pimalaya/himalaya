@@ -2,7 +2,6 @@ use lettre;
 use std::{fmt, result};
 
 use crate::config;
-use crate::msg::Msg;
 
 // Error wrapper
 
@@ -32,12 +31,12 @@ type Result<T> = result::Result<T, Error>;
 
 // Utils
 
-pub fn send(config: &config::ServerInfo, msg: &Msg) -> Result<()> {
+pub fn send(config: &config::ServerInfo, msg: &lettre::Message) -> Result<()> {
     use lettre::Transport;
 
     lettre::transport::smtp::SmtpTransport::relay(&config.host)?
         .credentials(config.to_smtp_creds())
         .build()
-        .send(msg.as_sendable_msg())
+        .send(msg)
         .map(|_| Ok(()))?
 }

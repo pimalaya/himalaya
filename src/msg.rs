@@ -1,6 +1,8 @@
 use lettre;
-use mailparse;
-use std::{fmt, result};
+use mailparse::{self, MailHeaderMap};
+use std::{fmt, ops, result};
+
+use crate::Config;
 
 // Error wrapper
 
@@ -8,6 +10,7 @@ use std::{fmt, result};
 pub enum Error {
     ParseMsgError(mailparse::MailParseError),
     BuildEmailError(lettre::error::Error),
+    TryError,
 }
 
 impl fmt::Display for Error {
@@ -16,6 +19,7 @@ impl fmt::Display for Error {
         match self {
             Error::ParseMsgError(err) => err.fmt(f),
             Error::BuildEmailError(err) => err.fmt(f),
+            Error::TryError => write!(f, "cannot parse"),
         }
     }
 }
@@ -38,30 +42,68 @@ type Result<T> = result::Result<T, Error>;
 
 // Wrapper around mailparse::ParsedMail and lettre::Message
 
-pub struct Msg(lettre::Message);
+#[derive(Debug)]
+pub struct Msg<'a>(mailparse::ParsedMail<'a>);
 
-impl Msg {
-    pub fn from_raw(bytes: &[u8]) -> Result<Msg> {
+impl<'a> ops::Deref for Msg<'a> {
+    type Target = mailparse::ParsedMail<'a>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'a> Msg<'a> {
+    pub fn from(bytes: &'a [u8]) -> Result<Self> {
+        Ok(Self(mailparse::parse_mail(bytes)?))
+    }
+
+    pub fn to_vec(&self) -> Result<Vec<u8>> {
+        let headers = self.0.get_headers().get_raw_bytes().to_vec();
+        let sep = "\r\n".as_bytes().to_vec();
+        let body = self.0.get_body()?.as_bytes().to_vec();
+
+        Ok(vec![headers, sep, body].concat())
+    }
+
+    pub fn to_sendable_msg(&self) -> Result<lettre::Message> {
         use lettre::message::header::{ContentTransferEncoding, ContentType};
         use lettre::message::{Message, SinglePart};
 
-        let parsed_msg = mailparse::parse_mail(bytes)?;
-        let built_msg = parsed_msg
+        let msg = self
+            .0
             .headers
             .iter()
             .fold(Message::builder(), |msg, h| {
+                let value = String::from_utf8(h.get_value_raw().to_vec())
+                    .unwrap()
+                    .replace("\r", "");
+
                 match h.get_key().to_lowercase().as_str() {
-                    "from" => msg.from(h.get_value().parse().unwrap()),
-                    "to" => msg.to(h.get_value().parse().unwrap()),
-                    "cc" => match h.get_value().parse() {
+                    "in-reply-to" => msg.in_reply_to(value.parse().unwrap()),
+                    "from" => match value.parse() {
+                        Ok(addr) => msg.from(addr),
                         Err(_) => msg,
-                        Ok(addr) => msg.cc(addr),
                     },
-                    "bcc" => match h.get_value().parse() {
-                        Err(_) => msg,
-                        Ok(addr) => msg.bcc(addr),
-                    },
-                    "subject" => msg.subject(h.get_value()),
+                    "to" => value
+                        .split(",")
+                        .fold(msg, |msg, addr| match addr.trim().parse() {
+                            Ok(addr) => msg.to(addr),
+                            Err(_) => msg,
+                        }),
+                    "cc" => value
+                        .split(",")
+                        .fold(msg, |msg, addr| match addr.trim().parse() {
+                            Ok(addr) => msg.cc(addr),
+                            Err(_) => msg,
+                        }),
+                    "bcc" => value
+                        .split(",")
+                        .fold(msg, |msg, addr| match addr.trim().parse() {
+                            Ok(addr) => msg.bcc(addr),
+                            Err(_) => msg,
+                        }),
+                    "subject" => msg.subject(value),
                     _ => msg,
                 }
             })
@@ -69,17 +111,171 @@ impl Msg {
                 SinglePart::builder()
                     .header(ContentType("text/plain; charset=utf-8".parse().unwrap()))
                     .header(ContentTransferEncoding::Base64)
-                    .body(parsed_msg.get_body_raw()?),
+                    .body(self.0.get_body_raw()?),
             )?;
 
-        Ok(Msg(built_msg))
+        Ok(msg)
     }
 
-    pub fn as_sendable_msg(&self) -> &lettre::Message {
-        &self.0
+    pub fn build_new_tpl(config: &Config) -> Result<String> {
+        let mut tpl = vec![];
+
+        // "From" header
+        tpl.push(format!("From: {}", config.email_full()));
+
+        // "To" header
+        tpl.push("To: ".to_string());
+
+        // "Subject" header
+        tpl.push("Subject: ".to_string());
+
+        Ok(tpl.join("\r\n"))
     }
 
-    pub fn to_vec(&self) -> Vec<u8> {
-        self.0.formatted()
+    pub fn build_reply_tpl(&self, config: &Config) -> Result<String> {
+        let msg = &self.0;
+        let headers = msg.get_headers();
+        let mut tpl = vec![];
+
+        // "From" header
+        tpl.push(format!("From: {}", config.email_full()));
+
+        // "In-Reply-To" header
+        if let Some(msg_id) = headers.get_first_value("message-id") {
+            tpl.push(format!("In-Reply-To: {}", msg_id));
+        }
+
+        // "To" header
+        let to = headers
+            .get_first_value("reply-to")
+            .or(headers.get_first_value("from"))
+            .unwrap_or(String::new());
+        tpl.push(format!("To: {}", to));
+
+        // "Subject" header
+        let subject = headers.get_first_value("subject").unwrap_or(String::new());
+        tpl.push(format!("Subject: Re: {}", subject));
+
+        // Separator between headers and body
+        tpl.push(String::new());
+
+        // Original msg prepend with ">"
+        let thread = msg
+            .get_body()
+            .unwrap()
+            .split("\r\n")
+            .map(|line| format!(">{}", line))
+            .collect::<Vec<String>>()
+            .join("\r\n");
+        tpl.push(thread);
+
+        Ok(tpl.join("\r\n"))
+    }
+
+    pub fn build_reply_all_tpl(&self, config: &Config) -> Result<String> {
+        let msg = &self.0;
+        let headers = msg.get_headers();
+        let mut tpl = vec![];
+
+        // "From" header
+        tpl.push(format!("From: {}", config.email_full()));
+
+        // "In-Reply-To" header
+        if let Some(msg_id) = headers.get_first_value("message-id") {
+            tpl.push(format!("In-Reply-To: {}", msg_id));
+        }
+
+        // "To" header
+        // All addresses coming from original "To" …
+        let email: lettre::Address = config.email.parse().unwrap();
+        let to = headers
+            .get_all_values("to")
+            .iter()
+            .flat_map(|addrs| addrs.split(","))
+            .fold(vec![], |mut mboxes, addr| {
+                match addr.trim().parse::<lettre::message::Mailbox>() {
+                    Err(_) => mboxes,
+                    Ok(mbox) => {
+                        // … except current user's one (from config) …
+                        if mbox.email != email {
+                            mboxes.push(mbox.to_string());
+                        }
+                        mboxes
+                    }
+                }
+            });
+        // … and the ones coming from either "Reply-To" or "From"
+        let reply_to = headers
+            .get_all_values("reply-to")
+            .iter()
+            .flat_map(|addrs| addrs.split(","))
+            .map(|addr| addr.trim().to_string())
+            .collect::<Vec<String>>();
+        let reply_to = if reply_to.is_empty() {
+            headers
+                .get_all_values("from")
+                .iter()
+                .flat_map(|addrs| addrs.split(","))
+                .map(|addr| addr.trim().to_string())
+                .collect::<Vec<String>>()
+        } else {
+            reply_to
+        };
+        tpl.push(format!("To: {}", vec![reply_to, to].concat().join(", ")));
+
+        // "Cc" header
+        let cc = headers
+            .get_all_values("cc")
+            .iter()
+            .flat_map(|addrs| addrs.split(","))
+            .map(|addr| addr.trim().to_string())
+            .collect::<Vec<String>>();
+        if !cc.is_empty() {
+            tpl.push(format!("Cc: {}", cc.join(", ")));
+        }
+
+        // "Subject" header
+        let subject = headers.get_first_value("subject").unwrap_or(String::new());
+        tpl.push(format!("Subject: Re: {}", subject));
+
+        // Separator between headers and body
+        tpl.push(String::new());
+
+        // Original msg prepend with ">"
+        let thread = msg
+            .get_body()
+            .unwrap()
+            .split("\r\n")
+            .map(|line| format!(">{}", line))
+            .collect::<Vec<String>>()
+            .join("\r\n");
+        tpl.push(thread);
+
+        Ok(tpl.join("\r\n"))
+    }
+
+    pub fn build_forward_tpl(&self, config: &Config) -> Result<String> {
+        let msg = &self.0;
+        let headers = msg.get_headers();
+        let mut tpl = vec![];
+
+        // "From" header
+        tpl.push(format!("From: {}", config.email_full()));
+
+        // "To" header
+        tpl.push("To: ".to_string());
+
+        // "Subject" header
+        let subject = headers.get_first_value("subject").unwrap_or(String::new());
+        tpl.push(format!("Subject: Fwd: {}", subject));
+
+        // Separator between headers and body
+        tpl.push(String::new());
+
+        // Original msg
+        tpl.push("-------- Forwarded Message --------".to_string());
+        tpl.push(msg.get_body().unwrap_or(String::new()));
+
+        Ok(tpl.join("\r\n"))
     }
 }

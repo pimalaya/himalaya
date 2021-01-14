@@ -1,12 +1,10 @@
 use imap;
-use mailparse;
 use native_tls::{self, TlsConnector, TlsStream};
 use std::{fmt, net::TcpStream, result};
 
 use crate::config;
 use crate::email::{self, Email};
 use crate::mailbox::Mailbox;
-use crate::msg::Msg;
 
 // Error wrapper
 
@@ -61,13 +59,13 @@ type Result<T> = result::Result<T, Error>;
 // Imap connector
 
 #[derive(Debug)]
-pub struct ImapConnector {
-    pub config: config::ServerInfo,
+pub struct ImapConnector<'a> {
+    pub config: &'a config::ServerInfo,
     pub sess: imap::Session<TlsStream<TcpStream>>,
 }
 
-impl ImapConnector {
-    pub fn new(config: config::ServerInfo) -> Result<Self> {
+impl<'a> ImapConnector<'a> {
+    pub fn new(config: &'a config::ServerInfo) -> Result<Self> {
         let tls = TlsConnector::new()?;
         let client = imap::connect(config.get_addr(), &config.host, &tls)?;
         let sess = client
@@ -133,9 +131,18 @@ impl ImapConnector {
         }
     }
 
-    pub fn append_msg(&mut self, mbox: &str, msg: &Msg) -> Result<()> {
+    pub fn read_msg(&mut self, mbox: &str, uid: &str) -> Result<Vec<u8>> {
+        self.sess.select(mbox)?;
+
+        match self.sess.uid_fetch(uid, "BODY[]")?.first() {
+            None => Err(Error::ReadEmailNotFoundError(uid.to_string())),
+            Some(fetch) => Ok(fetch.body().unwrap_or(&[]).to_vec()),
+        }
+    }
+
+    pub fn append_msg(&mut self, mbox: &str, msg: &[u8]) -> Result<()> {
         use imap::types::Flag::*;
-        self.sess.append_with_flags(mbox, msg.to_vec(), &[Seen])?;
+        self.sess.append_with_flags(mbox, msg, &[Seen])?;
         Ok(())
     }
 }

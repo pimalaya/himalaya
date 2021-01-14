@@ -7,8 +7,6 @@ use std::{
     result,
 };
 
-use crate::config::Config;
-
 // Error wrapper
 
 #[derive(Debug)]
@@ -39,7 +37,7 @@ type Result<T> = result::Result<T, Error>;
 
 // Utils
 
-fn open_editor_with_tpl(tpl: &[u8]) -> Result<String> {
+pub fn open_editor_with_tpl(tpl: &[u8]) -> Result<String> {
     // Creates draft file
     let mut draft_path = temp_dir();
     draft_path.push("himalaya-draft.mail");
@@ -54,15 +52,6 @@ fn open_editor_with_tpl(tpl: &[u8]) -> Result<String> {
     remove_file(&draft_path)?;
 
     Ok(draft)
-}
-
-pub fn open_editor_with_new_tpl(config: &Config) -> Result<String> {
-    let from = &format!("From: {}", config.email_full());
-    let to = "To: ";
-    let subject = "Subject: ";
-    let headers = [from, to, subject, ""].join("\r\n");
-
-    Ok(open_editor_with_tpl(headers.as_bytes())?)
 }
 
 pub fn ask_for_confirmation(prompt: &str) -> Result<()> {
