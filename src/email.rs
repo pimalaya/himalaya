@@ -52,21 +52,24 @@ impl DisplayCell for Flags<'_> {
     }
 
     fn value(&self) -> String {
-        use imap::types::Flag::*;
+        // FIXME
+        // use imap::types::Flag::*;
 
-        let Flags(flags) = self;
-        let mut flags_str = String::new();
+        // let flags = &self.0;
+        // let mut flags_str = String::new();
 
-        flags_str.push_str(if !flags.contains(&Seen) { &"N" } else { &" " });
-        flags_str.push_str(if flags.contains(&Answered) {
-            &"R"
-        } else {
-            &" "
-        });
-        flags_str.push_str(if flags.contains(&Draft) { &"D" } else { &" " });
-        flags_str.push_str(if flags.contains(&Flagged) { &"F" } else { &" " });
+        // flags_str.push_str(if flags.contains(&Seen) { &" " } else { &"N" });
+        // flags_str.push_str(if flags.contains(&Answered) {
+        //     &"R"
+        // } else {
+        //     &" "
+        // });
+        // flags_str.push_str(if flags.contains(&Draft) { &"D" } else { &" " });
+        // flags_str.push_str(if flags.contains(&Flagged) { &"F" } else { &" " });
 
-        flags_str
+        // flags_str
+
+        String::new()
     }
 }
 
