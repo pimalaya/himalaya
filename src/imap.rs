@@ -15,6 +15,7 @@ pub enum Error {
     ParseEmailError(mailparse::MailParseError),
     ReadEmailNotFoundError(String),
     ReadEmailEmptyPartError(String, String),
+    ExtractAttachmentsEmptyError(String),
 }
 
 impl fmt::Display for Error {
@@ -29,6 +30,9 @@ impl fmt::Display for Error {
             }
             Error::ReadEmailEmptyPartError(uid, mime) => {
                 write!(f, "no {} content found for uid {}", mime, uid)
+            }
+            Error::ExtractAttachmentsEmptyError(uid) => {
+                write!(f, "no attachment found for uid {}", uid)
             }
         }
     }

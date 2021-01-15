@@ -77,6 +77,7 @@ impl ServerInfo {
 pub struct Config {
     pub name: String,
     pub email: String,
+    pub downloads_dir: Option<PathBuf>,
     pub imap: ServerInfo,
     pub smtp: ServerInfo,
 }
@@ -91,7 +92,7 @@ impl Config {
         Ok(path)
     }
 
-    fn path_from_home(_err: Error) -> Result<PathBuf> {
+    fn path_from_home() -> Result<PathBuf> {
         let path = env::var("HOME")?;
         let mut path = PathBuf::from(path);
         path.push(".config");
@@ -101,7 +102,7 @@ impl Config {
         Ok(path)
     }
 
-    fn path_from_tmp(_err: Error) -> Result<PathBuf> {
+    fn path_from_tmp() -> Result<PathBuf> {
         let mut path = env::temp_dir();
         path.push("himalaya");
         path.push("config.toml");
@@ -112,18 +113,25 @@ impl Config {
     pub fn new_from_file() -> Result<Self> {
         let mut file = File::open(
             Self::path_from_xdg()
-                .or_else(Self::path_from_home)
-                .or_else(Self::path_from_tmp)
+                .or_else(|_| Self::path_from_home())
+                .or_else(|_| Self::path_from_tmp())
                 .or_else(|_| Err(Error::GetPathNotFoundError))?,
         )?;
 
-        let mut content = String::new();
-        file.read_to_string(&mut content)?;
+        let mut content = vec![];
+        file.read_to_end(&mut content)?;
 
-        Ok(toml::from_str(&content)?)
+        Ok(toml::from_slice(&content)?)
     }
 
     pub fn email_full(&self) -> String {
         format!("{} <{}>", self.name, self.email)
+    }
+
+    pub fn downloads_filepath(&self, filename: &str) -> PathBuf {
+        let temp_dir = env::temp_dir();
+        let mut full_path = self.downloads_dir.as_ref().unwrap_or(&temp_dir).to_owned();
+        full_path.push(filename);
+        full_path
     }
 }

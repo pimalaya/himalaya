@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Text and HTML previews [#12] [#13]
 - Set up SMTP connection [#4]
 - Write new email [#8]
+- Write new email [#8]
+- Reply, reply all and forward [#9] [#10] [#11]
+- Download attachments [#14]
 
 [unreleased]: https://github.com/soywod/himalaya
 
@@ -27,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#4]: https://github.com/soywod/himalaya/issues/4
 [#5]: https://github.com/soywod/himalaya/issues/5
 [#8]: https://github.com/soywod/himalaya/issues/8
+[#9]: https://github.com/soywod/himalaya/issues/9
+[#10]: https://github.com/soywod/himalaya/issues/10
+[#11]: https://github.com/soywod/himalaya/issues/11
 [#12]: https://github.com/soywod/himalaya/issues/12
 [#13]: https://github.com/soywod/himalaya/issues/13
+[#14]: https://github.com/soywod/himalaya/issues/14
 [#15]: https://github.com/soywod/himalaya/issues/15

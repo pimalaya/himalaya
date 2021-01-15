@@ -8,7 +8,7 @@ mod smtp;
 mod table;
 
 use clap::{App, AppSettings, Arg, SubCommand};
-use std::{fmt, process::exit, result};
+use std::{fmt, fs, process::exit, result};
 
 use crate::config::Config;
 use crate::imap::ImapConnector;
@@ -76,14 +76,14 @@ fn mailbox_arg() -> Arg<'static, 'static> {
     Arg::with_name("mailbox")
         .short("m")
         .long("mailbox")
-        .help("Name of the targeted mailbox")
+        .help("Name of the mailbox")
         .value_name("STRING")
         .default_value("INBOX")
 }
 
 fn uid_arg() -> Arg<'static, 'static> {
     Arg::with_name("uid")
-        .help("UID of the targeted email")
+        .help("UID of the email")
         .value_name("UID")
         .required(true)
 }
@@ -109,7 +109,7 @@ fn run() -> Result<()> {
         )
         .subcommand(
             SubCommand::with_name("read")
-                .about("Reads an email by its UID")
+                .about("Reads text bodies of an email")
                 .arg(uid_arg())
                 .arg(mailbox_arg())
                 .arg(
@@ -118,26 +118,32 @@ fn run() -> Result<()> {
                         .short("t")
                         .long("mime-type")
                         .value_name("STRING")
-                        .possible_values(&["text/plain", "text/html"])
-                        .default_value("text/plain"),
+                        .possible_values(&["plain", "html"])
+                        .default_value("plain"),
                 ),
+        )
+        .subcommand(
+            SubCommand::with_name("attachments")
+                .about("Downloads all attachments from an email")
+                .arg(uid_arg())
+                .arg(mailbox_arg()),
         )
         .subcommand(SubCommand::with_name("write").about("Writes a new email"))
         .subcommand(
             SubCommand::with_name("reply")
-                .about("Replies to an email by its UID")
+                .about("Answers to an email")
                 .arg(uid_arg())
                 .arg(mailbox_arg())
                 .arg(
-                    Arg::with_name("reply all")
-                        .help("Replies to all recipients")
+                    Arg::with_name("reply-all")
+                        .help("Including all recipients")
                         .short("a")
                         .long("all"),
                 ),
         )
         .subcommand(
             SubCommand::with_name("forward")
-                .about("Forwards an email by its UID")
+                .about("Forwards an email")
                 .arg(uid_arg())
                 .arg(mailbox_arg()),
         )
@@ -190,10 +196,33 @@ fn run() -> Result<()> {
         let config = Config::new_from_file()?;
         let mbox = matches.value_of("mailbox").unwrap();
         let uid = matches.value_of("uid").unwrap();
-        let mime = matches.value_of("mime-type").unwrap();
+        let mime = format!("text/{}", matches.value_of("mime-type").unwrap());
         let body = ImapConnector::new(&config.imap)?.read_email_body(&mbox, &uid, &mime)?;
 
         println!("{}", body);
+    }
+
+    if let Some(matches) = matches.subcommand_matches("attachments") {
+        let config = Config::new_from_file()?;
+        let mbox = matches.value_of("mailbox").unwrap();
+        let uid = matches.value_of("uid").unwrap();
+        let mut imap_conn = ImapConnector::new(&config.imap)?;
+
+        let msg = imap_conn.read_msg(&mbox, &uid)?;
+        let msg = Msg::from(&msg)?;
+        let parts = msg.extract_parts()?;
+
+        if parts.is_empty() {
+            println!("No attachment found for message {}", uid);
+        } else {
+            println!("{} attachment(s) found for message {}", parts.len(), uid);
+            msg.extract_parts()?.iter().for_each(|(filename, bytes)| {
+                let filepath = config.downloads_filepath(&filename);
+                println!("Downloading {} …", filename);
+                fs::write(filepath, bytes).unwrap()
+            });
+            println!("Done!");
+        }
     }
 
     if let Some(_) = matches.subcommand_matches("write") {
@@ -220,7 +249,7 @@ fn run() -> Result<()> {
         let msg = imap_conn.read_msg(&mbox, &uid)?;
         let msg = Msg::from(&msg)?;
 
-        let tpl = if matches.is_present("reply all") {
+        let tpl = if matches.is_present("reply-all") {
             msg.build_reply_all_tpl(&config)?
         } else {
             msg.build_reply_tpl(&config)?

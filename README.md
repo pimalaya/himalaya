@@ -19,11 +19,12 @@ FLAGS:
     -V, --version    Prints version information
 
 SUBCOMMANDS:
-    forward    Forwards an email by its UID
-    help       Prints this message or the help of the given subcommand(s)
-    list       Lists all available mailboxes
-    read       Reads an email by its UID
-    reply      Replies to an email by its UID
-    search     Lists emails matching the given IMAP query
-    write      Writes a new email
+    attachments    Downloads all attachments from an email
+    forward        Forwards an email
+    help           Prints this message or the help of the given subcommand(s)
+    list           Lists all available mailboxes
+    read           Reads text bodies of an email
+    reply          Answers to an email
+    search         Lists emails matching the given IMAP query
+    write          Writes a new email
 ```

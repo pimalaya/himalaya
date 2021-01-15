@@ -117,6 +117,40 @@ impl<'a> Msg<'a> {
         Ok(msg)
     }
 
+    fn extract_parts_into(part: &mailparse::ParsedMail, parts: &mut Vec<(String, Vec<u8>)>) {
+        match part.subparts.len() {
+            0 => {
+                let content_disp = part.get_content_disposition();
+                let content_type = part
+                    .get_headers()
+                    .get_first_value("content-type")
+                    .unwrap_or_default();
+
+                let default_attachment_name = format!("attachment-{}", parts.len());
+                let attachment_name = content_disp
+                    .params
+                    .get("filename")
+                    .unwrap_or(&default_attachment_name)
+                    .to_owned();
+
+                if !content_type.starts_with("text") {
+                    parts.push((attachment_name, part.get_body_raw().unwrap_or_default()))
+                }
+            }
+            _ => {
+                part.subparts
+                    .iter()
+                    .for_each(|part| Self::extract_parts_into(part, parts));
+            }
+        }
+    }
+
+    pub fn extract_parts(&self) -> Result<Vec<(String, Vec<u8>)>> {
+        let mut parts = vec![];
+        Self::extract_parts_into(&self.0, &mut parts);
+        Ok(parts)
+    }
+
     pub fn build_new_tpl(config: &Config) -> Result<String> {
         let mut tpl = vec![];
 

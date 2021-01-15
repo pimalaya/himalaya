@@ -205,7 +205,7 @@ fn extract_text_bodies_into(mime: &str, part: &mailparse::ParsedMail, parts: &mu
             if part
                 .get_headers()
                 .get_first_value("content-type")
-                .and_then(|v| if v.starts_with(mime) { Some(()) } else { None })
+                .and_then(|v| if v.starts_with(&mime) { Some(()) } else { None })
                 .is_some()
             {
                 parts.push(part.get_body().unwrap_or(String::new()))
@@ -214,13 +214,13 @@ fn extract_text_bodies_into(mime: &str, part: &mailparse::ParsedMail, parts: &mu
         _ => {
             part.subparts
                 .iter()
-                .for_each(|part| extract_text_bodies_into(mime, part, parts));
+                .for_each(|part| extract_text_bodies_into(&mime, part, parts));
         }
     }
 }
 
 pub fn extract_text_bodies(mime: &str, email: &mailparse::ParsedMail) -> String {
     let mut parts = vec![];
-    extract_text_bodies_into(mime, email, &mut parts);
+    extract_text_bodies_into(&mime, email, &mut parts);
     parts.join("\r\n")
 }
