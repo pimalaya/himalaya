@@ -1,6 +1,7 @@
-use lettre::transport::smtp::authentication::Credentials;
+use lettre::transport::smtp::authentication::Credentials as SmtpCredentials;
 use serde::Deserialize;
 use std::{
+    collections::HashMap,
     env, fmt,
     fs::File,
     io::{self, Read},
@@ -15,8 +16,11 @@ use toml;
 pub enum Error {
     IoError(io::Error),
     ParseTomlError(toml::de::Error),
+    ParseTomlAccountsError,
     GetEnvVarError(env::VarError),
     GetPathNotFoundError,
+    GetAccountNotFoundError(String),
+    GetAccountDefaultNotFoundError,
 }
 
 impl fmt::Display for Error {
@@ -25,8 +29,11 @@ impl fmt::Display for Error {
         match self {
             Error::IoError(err) => err.fmt(f),
             Error::ParseTomlError(err) => err.fmt(f),
+            Error::ParseTomlAccountsError => write!(f, "no account found"),
             Error::GetEnvVarError(err) => err.fmt(f),
             Error::GetPathNotFoundError => write!(f, "path not found"),
+            Error::GetAccountNotFoundError(account) => write!(f, "account {} not found", account),
+            Error::GetAccountDefaultNotFoundError => write!(f, "no default account found"),
         }
     }
 }
@@ -53,33 +60,48 @@ impl From<env::VarError> for Error {
 
 type Result<T> = result::Result<T, Error>;
 
-// Config
+// Account
 
 #[derive(Debug, Deserialize)]
-pub struct ServerInfo {
-    pub host: String,
-    pub port: u16,
-    pub login: String,
-    pub password: String,
+pub struct Account {
+    // Override
+    pub name: Option<String>,
+    pub downloads_dir: Option<PathBuf>,
+
+    // Specific
+    pub default: Option<bool>,
+    pub email: String,
+
+    pub imap_host: String,
+    pub imap_port: u16,
+    pub imap_login: String,
+    pub imap_password: String,
+
+    pub smtp_host: String,
+    pub smtp_port: u16,
+    pub smtp_login: String,
+    pub smtp_password: String,
 }
 
-impl ServerInfo {
-    pub fn get_addr(&self) -> (&str, u16) {
-        (&self.host, self.port)
+impl Account {
+    pub fn imap_addr(&self) -> (&str, u16) {
+        (&self.imap_host, self.imap_port)
     }
 
-    pub fn to_smtp_creds(&self) -> Credentials {
-        Credentials::new(self.login.to_owned(), self.password.to_owned())
+    pub fn smtp_creds(&self) -> SmtpCredentials {
+        SmtpCredentials::new(self.smtp_login.to_owned(), self.smtp_password.to_owned())
     }
 }
+
+// Config
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub name: String,
-    pub email: String,
     pub downloads_dir: Option<PathBuf>,
-    pub imap: ServerInfo,
-    pub smtp: ServerInfo,
+
+    #[serde(flatten)]
+    pub accounts: HashMap<String, Account>,
 }
 
 impl Config {
@@ -124,14 +146,35 @@ impl Config {
         Ok(toml::from_slice(&content)?)
     }
 
-    pub fn email_full(&self) -> String {
-        format!("{} <{}>", self.name, self.email)
+    pub fn get_account(&self, name: Option<&str>) -> Result<&Account> {
+        match name {
+            Some(name) => self
+                .accounts
+                .get(name)
+                .ok_or_else(|| Error::GetAccountNotFoundError(name.to_owned())),
+            None => self
+                .accounts
+                .iter()
+                .find(|(_, account)| account.default.unwrap_or(false))
+                .map(|(_, account)| account)
+                .ok_or_else(|| Error::GetAccountDefaultNotFoundError),
+        }
     }
 
-    pub fn downloads_filepath(&self, filename: &str) -> PathBuf {
+    pub fn downloads_filepath(&self, account: &Account, filename: &str) -> PathBuf {
         let temp_dir = env::temp_dir();
-        let mut full_path = self.downloads_dir.as_ref().unwrap_or(&temp_dir).to_owned();
+        let mut full_path = account
+            .downloads_dir
+            .as_ref()
+            .unwrap_or(self.downloads_dir.as_ref().unwrap_or(&temp_dir))
+            .to_owned();
+
         full_path.push(filename);
         full_path
+    }
+
+    pub fn address(&self, account: &Account) -> String {
+        let name = account.name.as_ref().unwrap_or(&self.name);
+        format!("{} <{}>", name, account.email)
     }
 }

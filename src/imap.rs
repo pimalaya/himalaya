@@ -2,7 +2,7 @@ use imap;
 use native_tls::{self, TlsConnector, TlsStream};
 use std::{fmt, net::TcpStream, result};
 
-use crate::config;
+use crate::config::Account;
 use crate::mbox::Mbox;
 use crate::msg::Msg;
 
@@ -64,19 +64,19 @@ type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug)]
 pub struct ImapConnector<'a> {
-    pub config: &'a config::ServerInfo,
+    pub account: &'a Account,
     pub sess: imap::Session<TlsStream<TcpStream>>,
 }
 
 impl<'a> ImapConnector<'a> {
-    pub fn new(config: &'a config::ServerInfo) -> Result<Self> {
+    pub fn new(account: &'a Account) -> Result<Self> {
         let tls = TlsConnector::new()?;
-        let client = imap::connect(config.get_addr(), &config.host, &tls)?;
+        let client = imap::connect(account.imap_addr(), &account.imap_host, &tls)?;
         let sess = client
-            .login(&config.login, &config.password)
+            .login(&account.imap_login, &account.imap_password)
             .map_err(|res| res.0)?;
 
-        Ok(Self { config, sess })
+        Ok(Self { account, sess })
     }
 
     pub fn close(&mut self) {

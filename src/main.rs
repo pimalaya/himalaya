@@ -117,6 +117,13 @@ fn run() -> Result<()> {
         .about("📫 Minimalist CLI email client")
         .author("soywod <clement.douin@posteo.net>")
         .setting(AppSettings::ArgRequiredElseHelp)
+        .arg(
+            Arg::with_name("account")
+                .long("account")
+                .short("a")
+                .help("Name of the config file to use")
+                .value_name("STRING"),
+        )
         .subcommand(
             SubCommand::with_name("mailboxes")
                 .aliases(&["mboxes", "mb", "m"])
@@ -191,9 +198,12 @@ fn run() -> Result<()> {
         )
         .get_matches();
 
+    let account_name = matches.value_of("account");
+
     if let Some(_) = matches.subcommand_matches("mailboxes") {
         let config = Config::new_from_file()?;
-        let mut imap_conn = ImapConnector::new(&config.imap)?;
+        let account = config.get_account(account_name)?;
+        let mut imap_conn = ImapConnector::new(&account)?;
 
         let mboxes = imap_conn.list_mboxes()?;
         println!("{}", mboxes.to_table());
@@ -203,7 +213,8 @@ fn run() -> Result<()> {
 
     if let Some(matches) = matches.subcommand_matches("list") {
         let config = Config::new_from_file()?;
-        let mut imap_conn = ImapConnector::new(&config.imap)?;
+        let account = config.get_account(account_name)?;
+        let mut imap_conn = ImapConnector::new(&account)?;
 
         let mbox = matches.value_of("mailbox").unwrap();
         let page_size: u32 = matches
@@ -225,7 +236,8 @@ fn run() -> Result<()> {
 
     if let Some(matches) = matches.subcommand_matches("search") {
         let config = Config::new_from_file()?;
-        let mut imap_conn = ImapConnector::new(&config.imap)?;
+        let account = config.get_account(account_name)?;
+        let mut imap_conn = ImapConnector::new(&account)?;
 
         let mbox = matches.value_of("mailbox").unwrap();
         let page_size: usize = matches
@@ -271,7 +283,8 @@ fn run() -> Result<()> {
 
     if let Some(matches) = matches.subcommand_matches("read") {
         let config = Config::new_from_file()?;
-        let mut imap_conn = ImapConnector::new(&config.imap)?;
+        let account = config.get_account(account_name)?;
+        let mut imap_conn = ImapConnector::new(&account)?;
 
         let mbox = matches.value_of("mailbox").unwrap();
         let uid = matches.value_of("uid").unwrap();
@@ -286,7 +299,8 @@ fn run() -> Result<()> {
 
     if let Some(matches) = matches.subcommand_matches("attachments") {
         let config = Config::new_from_file()?;
-        let mut imap_conn = ImapConnector::new(&config.imap)?;
+        let account = config.get_account(account_name)?;
+        let mut imap_conn = ImapConnector::new(&account)?;
 
         let mbox = matches.value_of("mailbox").unwrap();
         let uid = matches.value_of("uid").unwrap();
@@ -299,7 +313,7 @@ fn run() -> Result<()> {
         } else {
             println!("{} attachment(s) found for message {}", parts.len(), uid);
             parts.iter().for_each(|(filename, bytes)| {
-                let filepath = config.downloads_filepath(&filename);
+                let filepath = config.downloads_filepath(&account, &filename);
                 println!("Downloading {} …", filename);
                 fs::write(filepath, bytes).unwrap()
             });
@@ -311,16 +325,17 @@ fn run() -> Result<()> {
 
     if let Some(_) = matches.subcommand_matches("write") {
         let config = Config::new_from_file()?;
-        let mut imap_conn = ImapConnector::new(&config.imap)?;
+        let account = config.get_account(account_name)?;
+        let mut imap_conn = ImapConnector::new(&account)?;
 
-        let tpl = Msg::build_new_tpl(&config)?;
+        let tpl = Msg::build_new_tpl(&config, &account)?;
         let content = input::open_editor_with_tpl(&tpl.as_bytes())?;
         let msg = Msg::from(content);
 
         input::ask_for_confirmation("Send the message?")?;
 
         println!("Sending …");
-        smtp::send(&config.smtp, &msg.to_sendable_msg()?)?;
+        smtp::send(&account, &msg.to_sendable_msg()?)?;
         imap_conn.append_msg("Sent", &msg.to_vec()?)?;
         println!("Done!");
 
@@ -329,16 +344,17 @@ fn run() -> Result<()> {
 
     if let Some(matches) = matches.subcommand_matches("reply") {
         let config = Config::new_from_file()?;
-        let mut imap_conn = ImapConnector::new(&config.imap)?;
+        let account = config.get_account(account_name)?;
+        let mut imap_conn = ImapConnector::new(&account)?;
 
         let mbox = matches.value_of("mailbox").unwrap();
         let uid = matches.value_of("uid").unwrap();
 
         let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
         let tpl = if matches.is_present("reply-all") {
-            msg.build_reply_all_tpl(&config)?
+            msg.build_reply_all_tpl(&config, &account)?
         } else {
-            msg.build_reply_tpl(&config)?
+            msg.build_reply_tpl(&config, &account)?
         };
 
         let content = input::open_editor_with_tpl(&tpl.as_bytes())?;
@@ -347,7 +363,7 @@ fn run() -> Result<()> {
         input::ask_for_confirmation("Send the message?")?;
 
         println!("Sending …");
-        smtp::send(&config.smtp, &msg.to_sendable_msg()?)?;
+        smtp::send(&account, &msg.to_sendable_msg()?)?;
         imap_conn.append_msg("Sent", &msg.to_vec()?)?;
         println!("Done!");
 
@@ -356,20 +372,21 @@ fn run() -> Result<()> {
 
     if let Some(matches) = matches.subcommand_matches("forward") {
         let config = Config::new_from_file()?;
-        let mut imap_conn = ImapConnector::new(&config.imap)?;
+        let account = config.get_account(account_name)?;
+        let mut imap_conn = ImapConnector::new(&account)?;
 
         let mbox = matches.value_of("mailbox").unwrap();
         let uid = matches.value_of("uid").unwrap();
 
         let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
-        let tpl = msg.build_forward_tpl(&config)?;
+        let tpl = msg.build_forward_tpl(&config, &account)?;
         let content = input::open_editor_with_tpl(&tpl.as_bytes())?;
         let msg = Msg::from(content);
 
         input::ask_for_confirmation("Send the message?")?;
 
         println!("Sending …");
-        smtp::send(&config.smtp, &msg.to_sendable_msg()?)?;
+        smtp::send(&account, &msg.to_sendable_msg()?)?;
         imap_conn.append_msg("Sent", &msg.to_vec()?)?;
         println!("Done!");
 

@@ -2,8 +2,8 @@ use lettre;
 use mailparse::{self, MailHeaderMap};
 use std::{fmt, result};
 
+use crate::config::{Account, Config};
 use crate::table::{self, DisplayRow, DisplayTable};
-use crate::Config;
 
 // Error wrapper
 
@@ -208,11 +208,11 @@ impl<'a> Msg {
         Ok(parts)
     }
 
-    pub fn build_new_tpl(config: &Config) -> Result<String> {
+    pub fn build_new_tpl(config: &Config, account: &Account) -> Result<String> {
         let mut tpl = vec![];
 
         // "From" header
-        tpl.push(format!("From: {}", config.email_full()));
+        tpl.push(format!("From: {}", config.address(account)));
 
         // "To" header
         tpl.push("To: ".to_string());
@@ -223,13 +223,13 @@ impl<'a> Msg {
         Ok(tpl.join("\r\n"))
     }
 
-    pub fn build_reply_tpl(&self, config: &Config) -> Result<String> {
+    pub fn build_reply_tpl(&self, config: &Config, account: &Account) -> Result<String> {
         let msg = &self.parse()?;
         let headers = msg.get_headers();
         let mut tpl = vec![];
 
         // "From" header
-        tpl.push(format!("From: {}", config.email_full()));
+        tpl.push(format!("From: {}", config.address(account)));
 
         // "In-Reply-To" header
         if let Some(msg_id) = headers.get_first_value("message-id") {
@@ -263,13 +263,13 @@ impl<'a> Msg {
         Ok(tpl.join("\r\n"))
     }
 
-    pub fn build_reply_all_tpl(&self, config: &Config) -> Result<String> {
+    pub fn build_reply_all_tpl(&self, config: &Config, account: &Account) -> Result<String> {
         let msg = &self.parse()?;
         let headers = msg.get_headers();
         let mut tpl = vec![];
 
         // "From" header
-        tpl.push(format!("From: {}", config.email_full()));
+        tpl.push(format!("From: {}", config.address(account)));
 
         // "In-Reply-To" header
         if let Some(msg_id) = headers.get_first_value("message-id") {
@@ -278,7 +278,7 @@ impl<'a> Msg {
 
         // "To" header
         // All addresses coming from original "To" …
-        let email: lettre::Address = config.email.parse().unwrap();
+        let email: lettre::Address = account.email.parse().unwrap();
         let to = headers
             .get_all_values("to")
             .iter()
@@ -345,13 +345,13 @@ impl<'a> Msg {
         Ok(tpl.join("\r\n"))
     }
 
-    pub fn build_forward_tpl(&self, config: &Config) -> Result<String> {
+    pub fn build_forward_tpl(&self, config: &Config, account: &Account) -> Result<String> {
         let msg = &self.parse()?;
         let headers = msg.get_headers();
         let mut tpl = vec![];
 
         // "From" header
-        tpl.push(format!("From: {}", config.email_full()));
+        tpl.push(format!("From: {}", config.address(account)));
 
         // "To" header
         tpl.push("To: ".to_string());

@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Merge `Email` with `Msg` [#21]
 - List command with pagination [#19]
 - Icon in table when attachment is present [#16]
+- Multi-account [#17]
 
 [unreleased]: https://github.com/soywod/himalaya
 
@@ -41,5 +42,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#14]: https://github.com/soywod/himalaya/issues/14
 [#15]: https://github.com/soywod/himalaya/issues/15
 [#16]: https://github.com/soywod/himalaya/issues/16
+[#17]: https://github.com/soywod/himalaya/issues/17
 [#19]: https://github.com/soywod/himalaya/issues/19
 [#21]: https://github.com/soywod/himalaya/issues/21
