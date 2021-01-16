@@ -3,7 +3,6 @@ use native_tls::{self, TlsConnector, TlsStream};
 use std::{fmt, net::TcpStream, result};
 
 use crate::config;
-use crate::email::{self, Email};
 use crate::mbox::Mbox;
 use crate::msg::Msg;
 
@@ -114,49 +113,34 @@ impl<'a> ImapConnector<'a> {
         Ok(msgs)
     }
 
-    pub fn read_emails(&mut self, mbox: &str, query: &str) -> Result<Vec<Email<'_>>> {
+    pub fn search_msgs(
+        &mut self,
+        mbox: &str,
+        query: &str,
+        page_size: &usize,
+        page: &usize,
+    ) -> Result<Vec<Msg>> {
         self.sess.select(mbox)?;
 
+        let begin = page * page_size;
+        let end = begin + (page_size - 1);
         let uids = self
             .sess
-            .uid_search(query)?
+            .search(query)?
             .iter()
-            .map(|n| n.to_string())
+            .map(|seq| seq.to_string())
             .collect::<Vec<_>>();
+        let range = uids[begin..end.min(uids.len())].join(",");
 
-        let emails = self
+        let msgs = self
             .sess
-            .uid_fetch(
-                uids[..20.min(uids.len())].join(","),
-                "(UID ENVELOPE INTERNALDATE)",
-            )?
+            .fetch(range, "(UID ENVELOPE INTERNALDATE)")?
             .iter()
-            .map(Email::from_fetch)
+            .rev()
+            .map(Msg::from)
             .collect::<Vec<_>>();
 
-        Ok(emails)
-    }
-
-    pub fn read_email_body(&mut self, mbox: &str, uid: &str, mime: &str) -> Result<String> {
-        self.sess.select(mbox)?;
-
-        match self.sess.uid_fetch(uid, "BODY[]")?.first() {
-            None => Err(Error::ReadEmailNotFoundError(uid.to_string())),
-            Some(fetch) => {
-                let bytes = fetch.body().unwrap_or(&[]);
-                let email = mailparse::parse_mail(bytes)?;
-                let bodies = email::extract_text_bodies(&mime, &email);
-
-                if bodies.is_empty() {
-                    Err(Error::ReadEmailEmptyPartError(
-                        uid.to_string(),
-                        mime.to_string(),
-                    ))
-                } else {
-                    Ok(bodies)
-                }
-            }
-        }
+        Ok(msgs)
     }
 
     pub fn read_msg(&mut self, mbox: &str, uid: &str) -> Result<Vec<u8>> {

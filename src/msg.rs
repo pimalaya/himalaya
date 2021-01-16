@@ -48,12 +48,22 @@ pub struct Msg {
     raw: Vec<u8>,
 }
 
-impl From<&[u8]> for Msg {
-    fn from(item: &[u8]) -> Self {
+impl From<String> for Msg {
+    fn from(item: String) -> Self {
         Self {
             uid: 0,
             flags: vec![],
-            raw: item.to_vec(),
+            raw: item.as_bytes().to_vec(),
+        }
+    }
+}
+
+impl From<Vec<u8>> for Msg {
+    fn from(item: Vec<u8>) -> Self {
+        Self {
+            uid: 0,
+            flags: vec![],
+            raw: item,
         }
     }
 }
@@ -133,7 +143,38 @@ impl<'a> Msg {
         Ok(msg)
     }
 
-    fn extract_parts_into(part: &mailparse::ParsedMail, parts: &mut Vec<(String, Vec<u8>)>) {
+    fn extract_text_bodies_into(part: &mailparse::ParsedMail, mime: &str, parts: &mut Vec<String>) {
+        match part.subparts.len() {
+            0 => {
+                let content_type = part
+                    .get_headers()
+                    .get_first_value("content-type")
+                    .unwrap_or_default();
+
+                if content_type.starts_with(mime) {
+                    parts.push(part.get_body().unwrap_or_default())
+                }
+            }
+            _ => {
+                part.subparts
+                    .iter()
+                    .for_each(|part| Self::extract_text_bodies_into(part, mime, parts));
+            }
+        }
+    }
+
+    fn extract_text_bodies(&self, mime: &str) -> Result<Vec<String>> {
+        let mut parts = vec![];
+        Self::extract_text_bodies_into(&self.parse()?, mime, &mut parts);
+        Ok(parts)
+    }
+
+    pub fn text_bodies(&self, mime: &str) -> Result<String> {
+        let text_bodies = self.extract_text_bodies(mime)?;
+        Ok(text_bodies.join("\r\n"))
+    }
+
+    fn extract_attachments_into(part: &mailparse::ParsedMail, parts: &mut Vec<(String, Vec<u8>)>) {
         match part.subparts.len() {
             0 => {
                 let content_disp = part.get_content_disposition();
@@ -156,14 +197,14 @@ impl<'a> Msg {
             _ => {
                 part.subparts
                     .iter()
-                    .for_each(|part| Self::extract_parts_into(part, parts));
+                    .for_each(|part| Self::extract_attachments_into(part, parts));
             }
         }
     }
 
-    pub fn extract_parts(&self) -> Result<Vec<(String, Vec<u8>)>> {
+    pub fn extract_attachments(&self) -> Result<Vec<(String, Vec<u8>)>> {
         let mut parts = vec![];
-        Self::extract_parts_into(&self.parse()?, &mut parts);
+        Self::extract_attachments_into(&self.parse()?, &mut parts);
         Ok(parts)
     }
 

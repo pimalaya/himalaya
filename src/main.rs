@@ -1,5 +1,4 @@
 mod config;
-mod email;
 mod imap;
 mod input;
 mod mbox;
@@ -15,8 +14,8 @@ use crate::imap::ImapConnector;
 use crate::msg::Msg;
 use crate::table::DisplayTable;
 
-const DEFAULT_PAGE_SIZE: u32 = 10;
-const DEFAULT_PAGE: u32 = 0;
+const DEFAULT_PAGE_SIZE: usize = 10;
+const DEFAULT_PAGE: usize = 0;
 
 #[derive(Debug)]
 pub enum Error {
@@ -91,9 +90,27 @@ fn uid_arg() -> Arg<'static, 'static> {
         .required(true)
 }
 
+fn page_size_arg<'a>(default: &'a str) -> Arg<'a, 'a> {
+    Arg::with_name("size")
+        .help("Page size")
+        .short("s")
+        .long("size")
+        .value_name("INT")
+        .default_value(default)
+}
+
+fn page_arg<'a>(default: &'a str) -> Arg<'a, 'a> {
+    Arg::with_name("page")
+        .help("Page number")
+        .short("p")
+        .long("page")
+        .value_name("INT")
+        .default_value(default)
+}
+
 fn run() -> Result<()> {
-    let default_page_size = &DEFAULT_PAGE_SIZE.to_string();
-    let default_page = &DEFAULT_PAGE.to_string();
+    let default_page_size_str = &DEFAULT_PAGE_SIZE.to_string();
+    let default_page_str = &DEFAULT_PAGE.to_string();
 
     let matches = App::new("Himalaya")
         .version("0.1.0")
@@ -110,28 +127,16 @@ fn run() -> Result<()> {
                 .aliases(&["lst", "l"])
                 .about("Lists emails sorted by arrival date")
                 .arg(mailbox_arg())
-                .arg(
-                    Arg::with_name("size")
-                        .help("Page size")
-                        .short("s")
-                        .long("size")
-                        .value_name("INT")
-                        .default_value(default_page_size),
-                )
-                .arg(
-                    Arg::with_name("page")
-                        .help("Page number")
-                        .short("p")
-                        .long("page")
-                        .value_name("INT")
-                        .default_value(default_page),
-                ),
+                .arg(page_size_arg(default_page_size_str))
+                .arg(page_arg(default_page_str)),
         )
         .subcommand(
             SubCommand::with_name("search")
                 .aliases(&["query", "q", "s"])
                 .about("Lists emails matching the given IMAP query")
                 .arg(mailbox_arg())
+                .arg(page_size_arg(default_page_size_str))
+                .arg(page_arg(default_page_str))
                 .arg(
                     Arg::with_name("query")
                         .help("IMAP query (see https://tools.ietf.org/html/rfc3501#section-6.4.4)")
@@ -205,12 +210,12 @@ fn run() -> Result<()> {
             .value_of("size")
             .unwrap()
             .parse()
-            .unwrap_or(DEFAULT_PAGE_SIZE);
+            .unwrap_or(DEFAULT_PAGE_SIZE as u32);
         let page: u32 = matches
             .value_of("page")
             .unwrap()
             .parse()
-            .unwrap_or(DEFAULT_PAGE);
+            .unwrap_or(DEFAULT_PAGE as u32);
 
         let msgs = imap_conn.list_msgs(&mbox, &page_size, &page)?;
         println!("{}", msgs.to_table());
@@ -223,6 +228,16 @@ fn run() -> Result<()> {
         let mut imap_conn = ImapConnector::new(&config.imap)?;
 
         let mbox = matches.value_of("mailbox").unwrap();
+        let page_size: usize = matches
+            .value_of("size")
+            .unwrap()
+            .parse()
+            .unwrap_or(DEFAULT_PAGE_SIZE);
+        let page: usize = matches
+            .value_of("page")
+            .unwrap()
+            .parse()
+            .unwrap_or(DEFAULT_PAGE);
         let query = matches
             .values_of("query")
             .unwrap_or_default()
@@ -248,7 +263,7 @@ fn run() -> Result<()> {
             .1
             .join(" ");
 
-        let msgs = imap_conn.read_emails(&mbox, &query)?;
+        let msgs = imap_conn.search_msgs(&mbox, &query, &page_size, &page)?;
         println!("{}", msgs.to_table());
 
         imap_conn.close();
@@ -262,8 +277,9 @@ fn run() -> Result<()> {
         let uid = matches.value_of("uid").unwrap();
         let mime = format!("text/{}", matches.value_of("mime-type").unwrap());
 
-        let body = imap_conn.read_email_body(&mbox, &uid, &mime)?;
-        println!("{}", body);
+        let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
+        let text_bodies = msg.text_bodies(&mime)?;
+        println!("{}", text_bodies);
 
         imap_conn.close();
     }
@@ -275,8 +291,8 @@ fn run() -> Result<()> {
         let mbox = matches.value_of("mailbox").unwrap();
         let uid = matches.value_of("uid").unwrap();
 
-        let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?.as_slice());
-        let parts = msg.extract_parts()?;
+        let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
+        let parts = msg.extract_attachments()?;
 
         if parts.is_empty() {
             println!("No attachment found for message {}", uid);
@@ -299,7 +315,7 @@ fn run() -> Result<()> {
 
         let tpl = Msg::build_new_tpl(&config)?;
         let content = input::open_editor_with_tpl(&tpl.as_bytes())?;
-        let msg = Msg::from(content.as_bytes());
+        let msg = Msg::from(content);
 
         input::ask_for_confirmation("Send the message?")?;
 
@@ -318,7 +334,7 @@ fn run() -> Result<()> {
         let mbox = matches.value_of("mailbox").unwrap();
         let uid = matches.value_of("uid").unwrap();
 
-        let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?.as_slice());
+        let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
         let tpl = if matches.is_present("reply-all") {
             msg.build_reply_all_tpl(&config)?
         } else {
@@ -326,7 +342,7 @@ fn run() -> Result<()> {
         };
 
         let content = input::open_editor_with_tpl(&tpl.as_bytes())?;
-        let msg = Msg::from(content.as_bytes());
+        let msg = Msg::from(content);
 
         input::ask_for_confirmation("Send the message?")?;
 
@@ -345,10 +361,10 @@ fn run() -> Result<()> {
         let mbox = matches.value_of("mailbox").unwrap();
         let uid = matches.value_of("uid").unwrap();
 
-        let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?.as_slice());
+        let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
         let tpl = msg.build_forward_tpl(&config)?;
         let content = input::open_editor_with_tpl(&tpl.as_bytes())?;
-        let msg = Msg::from(content.as_bytes());
+        let msg = Msg::from(content);
 
         input::ask_for_confirmation("Send the message?")?;
 
