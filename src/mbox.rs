@@ -1,120 +1,39 @@
 use imap;
 
-use crate::table::{self, DisplayCell, DisplayRow, DisplayTable};
+use crate::table::{self, DisplayRow, DisplayTable};
 
-pub struct Delim(String);
-
-impl Delim {
-    pub fn from_name(name: &imap::types::Name) -> Self {
-        Self(name.delimiter().unwrap_or("/").to_string())
-    }
+pub struct Mbox {
+    pub delim: String,
+    pub name: String,
+    pub attributes: Vec<String>,
 }
 
-impl DisplayCell for Delim {
-    fn styles(&self) -> &[table::Style] {
-        &[table::BLUE]
-    }
-
-    fn value(&self) -> String {
-        self.0.to_owned()
-    }
-}
-
-pub struct Name(String);
-
-impl Name {
-    pub fn from_name(name: &imap::types::Name) -> Self {
-        Self(name.name().to_string())
-    }
-}
-
-impl DisplayCell for Name {
-    fn styles(&self) -> &[table::Style] {
-        &[table::GREEN]
-    }
-
-    fn value(&self) -> String {
-        self.0.to_owned()
-    }
-}
-
-pub struct Attributes<'a>(Vec<imap::types::NameAttribute<'a>>);
-
-impl Attributes<'_> {
-    pub fn from_name(name: &imap::types::Name) -> Self {
-        let attrs = name.attributes().iter().fold(vec![], |mut attrs, attr| {
-            use imap::types::NameAttribute::*;
-
-            match attr {
-                NoInferiors => attrs.push(NoInferiors),
-                NoSelect => attrs.push(NoSelect),
-                Marked => attrs.push(Marked),
-                Unmarked => attrs.push(Unmarked),
-                _ => (),
-            };
-
-            attrs
-        });
-
-        Self(attrs)
-    }
-}
-
-impl DisplayCell for Attributes<'_> {
-    fn styles(&self) -> &[table::Style] {
-        &[table::YELLOW]
-    }
-
-    fn value(&self) -> String {
-        use imap::types::NameAttribute::*;
-
-        self.0
-            .iter()
-            .map(|attr| match attr {
-                NoInferiors => vec!["no inferiors"],
-                NoSelect => vec!["no select"],
-                Marked => vec!["marked"],
-                Unmarked => vec!["unmarked"],
-                _ => vec![],
-            })
-            .collect::<Vec<_>>()
-            .concat()
-            .join(", ")
-    }
-}
-
-pub struct Mbox<'a> {
-    pub delim: Delim,
-    pub name: Name,
-    pub attributes: Attributes<'a>,
-}
-
-impl Mbox<'_> {
+impl Mbox {
     pub fn from_name(name: &imap::types::Name) -> Self {
         Self {
-            delim: Delim::from_name(name),
-            name: Name::from_name(name),
-            attributes: Attributes::from_name(name),
+            delim: name.delimiter().unwrap_or_default().to_owned(),
+            name: name.name().to_owned(),
+            attributes: vec![], // TODO: set attributes
         }
     }
 }
 
-impl<'a> DisplayRow for Mbox<'a> {
+impl DisplayRow for Mbox {
     fn to_row(&self) -> Vec<table::Cell> {
         vec![
-            self.delim.to_cell(),
-            self.name.to_cell(),
-            self.attributes.to_cell(),
+            table::Cell::new(&[table::BLUE], &self.delim),
+            table::Cell::new(&[table::GREEN], &self.name),
+            table::Cell::new(&[table::YELLOW], &self.attributes.join(", ")),
         ]
     }
 }
 
-impl<'a> DisplayTable<'a, Mbox<'a>> for Vec<Mbox<'a>> {
+impl<'a> DisplayTable<'a, Mbox> for Vec<Mbox> {
     fn cols() -> &'a [&'a str] {
         &["delim", "name", "attributes"]
     }
 
-    fn rows(&self) -> &Vec<Mbox<'a>> {
+    fn rows(&self) -> &Vec<Mbox> {
         self
     }
 }

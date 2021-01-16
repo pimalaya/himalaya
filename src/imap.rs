@@ -85,7 +85,7 @@ impl<'a> ImapConnector<'a> {
         }
     }
 
-    pub fn list_mboxes(&mut self) -> Result<Vec<Mbox<'_>>> {
+    pub fn list_mboxes(&mut self) -> Result<Vec<Mbox>> {
         let mboxes = self
             .sess
             .list(Some(""), Some("*"))?

@@ -36,7 +36,7 @@ pub struct Cell {
 }
 
 impl Cell {
-    pub fn new<'a>(styles: &'a [Style], value: &'a str) -> Cell {
+    pub fn new(styles: &[Style], value: &str) -> Cell {
         Cell {
             styles: styles.to_vec(),
             value: value.to_string(),
@@ -62,15 +62,6 @@ impl Cell {
         };
 
         String::from(style_start + &self.value + &padding + "\x1b[0m")
-    }
-}
-
-pub trait DisplayCell {
-    fn styles(&self) -> &[Style];
-    fn value(&self) -> String;
-
-    fn to_cell(&self) -> Cell {
-        Cell::new(self.styles(), &self.value())
     }
 }
 
