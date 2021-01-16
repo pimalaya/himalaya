@@ -379,7 +379,10 @@ impl DisplayRow for Msg {
                 let headers = parsed.get_headers();
 
                 let uid = &self.uid.to_string();
-                let flags = String::new(); // TODO: render flags
+                let flags = match self.extract_attachments().map(|vec| vec.is_empty()) {
+                    Ok(false) => "",
+                    _ => " ",
+                };
                 let sender = headers
                     .get_first_value("reply-to")
                     .or(headers.get_first_value("from"))
@@ -387,21 +390,33 @@ impl DisplayRow for Msg {
                 let subject = headers.get_first_value("subject").unwrap_or_default();
                 let date = headers.get_first_value("date").unwrap_or_default();
 
-                vec![
-                    table::Cell::new(&[table::RED], &uid),
-                    table::Cell::new(&[table::WHITE], &flags),
-                    table::Cell::new(&[table::BLUE], &sender),
-                    table::Cell::new(&[table::GREEN], &subject),
-                    table::Cell::new(&[table::YELLOW], &date),
-                ]
+                {
+                    use crate::table::*;
+
+                    vec![
+                        Cell::new(&[RED], &uid),
+                        Cell::new(&[WHITE], &flags),
+                        Cell::new(&[BLUE], &sender),
+                        FlexCell::new(&[GREEN], &subject),
+                        Cell::new(&[YELLOW], &date),
+                    ]
+                }
             }
         }
     }
 }
 
 impl<'a> DisplayTable<'a, Msg> for Vec<Msg> {
-    fn cols() -> &'a [&'a str] {
-        &["uid", "flags", "sender", "subject", "date"]
+    fn header_row() -> Vec<table::Cell> {
+        use crate::table::*;
+
+        vec![
+            Cell::new(&[BOLD, UNDERLINE, WHITE], "UID"),
+            Cell::new(&[BOLD, UNDERLINE, WHITE], "FLAGS"),
+            Cell::new(&[BOLD, UNDERLINE, WHITE], "SENDER"),
+            FlexCell::new(&[BOLD, UNDERLINE, WHITE], "SUBJECT"),
+            Cell::new(&[BOLD, UNDERLINE, WHITE], "DATE"),
+        ]
     }
 
     fn rows(&self) -> &Vec<Msg> {

@@ -1,4 +1,5 @@
 use std::fmt;
+use terminal_size::terminal_size;
 
 #[derive(Clone, Debug)]
 pub struct Style(u8, u8, u8);
@@ -33,13 +34,15 @@ impl fmt::Display for Style {
 pub struct Cell {
     pub styles: Vec<Style>,
     pub value: String,
+    pub flex: bool,
 }
 
 impl Cell {
-    pub fn new(styles: &[Style], value: &str) -> Cell {
-        Cell {
+    pub fn new(styles: &[Style], value: &str) -> Self {
+        Self {
             styles: styles.to_vec(),
-            value: value.to_string(),
+            value: value.trim().to_string(),
+            flex: false,
         }
     }
 
@@ -48,20 +51,45 @@ impl Cell {
     }
 
     pub fn render(&self, col_size: usize) -> String {
-        let style_start = self
+        let style_begin = self
             .styles
             .iter()
-            .map(|style| format!("{}", style))
+            .map(|style| style.to_string())
             .collect::<Vec<_>>()
             .concat();
+        let style_end = "\x1b[0m";
 
-        let padding = if col_size == 0 {
-            "".to_string()
+        if col_size > 0 && self.printable_value_len() > col_size {
+            let col_size = self
+                .value
+                .char_indices()
+                .map(|(i, _)| i)
+                .nth(col_size)
+                .unwrap()
+                - 2;
+
+            String::from(style_begin + &self.value[0..=col_size] + "… " + style_end)
         } else {
-            " ".repeat(col_size - self.printable_value_len() + 1)
-        };
+            let padding = if col_size == 0 {
+                "".to_string()
+            } else {
+                " ".repeat(col_size - self.printable_value_len() + 1)
+            };
 
-        String::from(style_start + &self.value + &padding + "\x1b[0m")
+            String::from(style_begin + &self.value + &padding + style_end)
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct FlexCell;
+
+impl FlexCell {
+    pub fn new(styles: &[Style], value: &str) -> Cell {
+        Cell {
+            flex: true,
+            ..Cell::new(styles, value)
+        }
     }
 }
 
@@ -70,22 +98,18 @@ pub trait DisplayRow {
 }
 
 pub trait DisplayTable<'a, T: DisplayRow + 'a> {
-    fn cols() -> &'a [&'a str];
+    fn header_row() -> Vec<Cell>;
     fn rows(&self) -> &Vec<T>;
 
     fn to_table(&self) -> String {
         let mut col_sizes = vec![];
+        let head = Self::header_row();
 
-        let head = Self::cols()
-            .iter()
-            .map(|col| {
-                let cell = Cell::new(&[BOLD, UNDERLINE, WHITE], &col.to_uppercase());
-                col_sizes.push(cell.printable_value_len());
-                cell
-            })
-            .collect::<Vec<_>>();
+        head.iter().for_each(|cell| {
+            col_sizes.push(cell.printable_value_len());
+        });
 
-        let mut body = self
+        let mut table = self
             .rows()
             .iter()
             .map(|item| {
@@ -97,13 +121,28 @@ pub trait DisplayTable<'a, T: DisplayRow + 'a> {
             })
             .collect::<Vec<_>>();
 
-        body.insert(0, head);
+        table.insert(0, head);
 
-        body.iter().fold(String::new(), |output, row| {
+        let term_width = terminal_size().map(|size| size.0 .0).unwrap_or(0) as usize;
+        let seps_width = 2 * col_sizes.len() - 1;
+        let table_width = col_sizes.iter().sum::<usize>() + seps_width;
+        let diff_width = if table_width < term_width {
+            0
+        } else {
+            table_width - term_width
+        };
+
+        table.iter().fold(String::new(), |output, row| {
             let row_str = row
                 .iter()
                 .enumerate()
-                .map(|(i, cell)| cell.render(col_sizes[i]))
+                .map(|(i, cell)| {
+                    if cell.flex && col_sizes[i] > diff_width {
+                        cell.render(col_sizes[i] - diff_width)
+                    } else {
+                        cell.render(col_sizes[i])
+                    }
+                })
                 .collect::<Vec<_>>()
                 .join(&Cell::new(&[ext(8)], "|").render(0));
 

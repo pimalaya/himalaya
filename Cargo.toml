@@ -14,4 +14,5 @@ native-tls = "0.2"
 rfc2047-decoder = "0.1.2"
 rustyline = "7.1.0"
 serde = { version = "1.0.118", features = ["derive"] }
+terminal_size = "0.1.15"
 toml = "0.5.8"

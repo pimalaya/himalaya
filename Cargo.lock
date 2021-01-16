@@ -280,6 +280,7 @@ dependencies = [
  "rfc2047-decoder",
  "rustyline",
  "serde",
+ "terminal_size",
  "toml",
 ]
 
@@ -943,6 +944,16 @@ dependencies = [
  "rand",
  "redox_syscall 0.1.57",
  "remove_dir_all",
+ "winapi",
+]
+
+[[package]]
+name = "terminal_size"
+version = "0.1.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4bd2d183bd3fac5f5fe38ddbeb4dc9aec4a39a9d7d59e7491d900302da01cbe1"
+dependencies = [
+ "libc",
  "winapi",
 ]
 
