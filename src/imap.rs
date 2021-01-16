@@ -4,7 +4,8 @@ use std::{fmt, net::TcpStream, result};
 
 use crate::config;
 use crate::email::{self, Email};
-use crate::mailbox::Mailbox;
+use crate::mbox::Mbox;
+use crate::msg::Msg;
 
 // Error wrapper
 
@@ -79,15 +80,38 @@ impl<'a> ImapConnector<'a> {
         Ok(Self { config, sess })
     }
 
-    pub fn list_mboxes(&mut self) -> Result<Vec<Mailbox<'_>>> {
+    pub fn close(&mut self) {
+        match self.sess.close() {
+            _ => (),
+        }
+    }
+
+    pub fn list_mboxes(&mut self) -> Result<Vec<Mbox<'_>>> {
         let mboxes = self
             .sess
             .list(Some(""), Some("*"))?
             .iter()
-            .map(Mailbox::from_name)
+            .map(Mbox::from_name)
             .collect::<Vec<_>>();
 
         Ok(mboxes)
+    }
+
+    pub fn list_msgs(&mut self, mbox: &str, page_size: &u32, page: &u32) -> Result<Vec<Msg>> {
+        let last_seq = self.sess.select(mbox)?.exists;
+        let begin = last_seq - (page * page_size);
+        let end = begin - (page_size - 1);
+        let range = format!("{}:{}", begin, end);
+
+        let msgs = self
+            .sess
+            .fetch(range, "(UID BODY.PEEK[])")?
+            .iter()
+            .rev()
+            .map(Msg::from)
+            .collect::<Vec<_>>();
+
+        Ok(msgs)
     }
 
     pub fn read_emails(&mut self, mbox: &str, query: &str) -> Result<Vec<Email<'_>>> {

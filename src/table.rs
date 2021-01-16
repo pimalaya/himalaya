@@ -78,7 +78,7 @@ pub trait DisplayRow {
     fn to_row(&self) -> Vec<Cell>;
 }
 
-pub trait DisplayTable<'a, T: DisplayRow> {
+pub trait DisplayTable<'a, T: DisplayRow + 'a> {
     fn cols() -> &'a [&'a str];
     fn rows(&self) -> &Vec<T>;
 

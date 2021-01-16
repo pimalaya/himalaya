@@ -1,7 +1,8 @@
 use lettre;
 use mailparse::{self, MailHeaderMap};
-use std::{fmt, ops, result};
+use std::{fmt, result};
 
+use crate::table::{self, DisplayRow, DisplayTable};
 use crate::Config;
 
 // Error wrapper
@@ -9,8 +10,7 @@ use crate::Config;
 #[derive(Debug)]
 pub enum Error {
     ParseMsgError(mailparse::MailParseError),
-    BuildEmailError(lettre::error::Error),
-    TryError,
+    BuildSendableMsgError(lettre::error::Error),
 }
 
 impl fmt::Display for Error {
@@ -18,8 +18,7 @@ impl fmt::Display for Error {
         write!(f, "(msg): ")?;
         match self {
             Error::ParseMsgError(err) => err.fmt(f),
-            Error::BuildEmailError(err) => err.fmt(f),
-            Error::TryError => write!(f, "cannot parse"),
+            Error::BuildSendableMsgError(err) => err.fmt(f),
         }
     }
 }
@@ -32,7 +31,7 @@ impl From<mailparse::MailParseError> for Error {
 
 impl From<lettre::error::Error> for Error {
     fn from(err: lettre::error::Error) -> Error {
-        Error::BuildEmailError(err)
+        Error::BuildSendableMsgError(err)
     }
 }
 
@@ -40,28 +39,45 @@ impl From<lettre::error::Error> for Error {
 
 type Result<T> = result::Result<T, Error>;
 
-// Wrapper around mailparse::ParsedMail and lettre::Message
+// Msg
 
 #[derive(Debug)]
-pub struct Msg<'a>(mailparse::ParsedMail<'a>);
+pub struct Msg {
+    pub uid: u32,
+    pub flags: Vec<String>,
+    raw: Vec<u8>,
+}
 
-impl<'a> ops::Deref for Msg<'a> {
-    type Target = mailparse::ParsedMail<'a>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
+impl From<&[u8]> for Msg {
+    fn from(item: &[u8]) -> Self {
+        Self {
+            uid: 0,
+            flags: vec![],
+            raw: item.to_vec(),
+        }
     }
 }
 
-impl<'a> Msg<'a> {
-    pub fn from(bytes: &'a [u8]) -> Result<Self> {
-        Ok(Self(mailparse::parse_mail(bytes)?))
+impl From<&imap::types::Fetch> for Msg {
+    fn from(fetch: &imap::types::Fetch) -> Self {
+        Self {
+            uid: fetch.uid.unwrap_or_default(),
+            flags: vec![],
+            raw: fetch.body().unwrap_or_default().to_vec(),
+        }
+    }
+}
+
+impl<'a> Msg {
+    pub fn parse(&'a self) -> Result<mailparse::ParsedMail<'a>> {
+        Ok(mailparse::parse_mail(&self.raw)?)
     }
 
     pub fn to_vec(&self) -> Result<Vec<u8>> {
-        let headers = self.0.get_headers().get_raw_bytes().to_vec();
+        let parsed = self.parse()?;
+        let headers = parsed.get_headers().get_raw_bytes().to_vec();
         let sep = "\r\n".as_bytes().to_vec();
-        let body = self.0.get_body()?.as_bytes().to_vec();
+        let body = parsed.get_body()?.as_bytes().to_vec();
 
         Ok(vec![headers, sep, body].concat())
     }
@@ -70,8 +86,8 @@ impl<'a> Msg<'a> {
         use lettre::message::header::{ContentTransferEncoding, ContentType};
         use lettre::message::{Message, SinglePart};
 
-        let msg = self
-            .0
+        let parsed = self.parse()?;
+        let msg = parsed
             .headers
             .iter()
             .fold(Message::builder(), |msg, h| {
@@ -111,7 +127,7 @@ impl<'a> Msg<'a> {
                 SinglePart::builder()
                     .header(ContentType("text/plain; charset=utf-8".parse().unwrap()))
                     .header(ContentTransferEncoding::Base64)
-                    .body(self.0.get_body_raw()?),
+                    .body(parsed.get_body_raw()?),
             )?;
 
         Ok(msg)
@@ -147,7 +163,7 @@ impl<'a> Msg<'a> {
 
     pub fn extract_parts(&self) -> Result<Vec<(String, Vec<u8>)>> {
         let mut parts = vec![];
-        Self::extract_parts_into(&self.0, &mut parts);
+        Self::extract_parts_into(&self.parse()?, &mut parts);
         Ok(parts)
     }
 
@@ -167,7 +183,7 @@ impl<'a> Msg<'a> {
     }
 
     pub fn build_reply_tpl(&self, config: &Config) -> Result<String> {
-        let msg = &self.0;
+        let msg = &self.parse()?;
         let headers = msg.get_headers();
         let mut tpl = vec![];
 
@@ -207,7 +223,7 @@ impl<'a> Msg<'a> {
     }
 
     pub fn build_reply_all_tpl(&self, config: &Config) -> Result<String> {
-        let msg = &self.0;
+        let msg = &self.parse()?;
         let headers = msg.get_headers();
         let mut tpl = vec![];
 
@@ -289,7 +305,7 @@ impl<'a> Msg<'a> {
     }
 
     pub fn build_forward_tpl(&self, config: &Config) -> Result<String> {
-        let msg = &self.0;
+        let msg = &self.parse()?;
         let headers = msg.get_headers();
         let mut tpl = vec![];
 
@@ -311,5 +327,43 @@ impl<'a> Msg<'a> {
         tpl.push(msg.get_body().unwrap_or(String::new()));
 
         Ok(tpl.join("\r\n"))
+    }
+}
+
+impl DisplayRow for Msg {
+    fn to_row(&self) -> Vec<table::Cell> {
+        match self.parse() {
+            Err(_) => vec![],
+            Ok(parsed) => {
+                let headers = parsed.get_headers();
+
+                let uid = &self.uid.to_string();
+                let flags = String::new(); // TODO: render flags
+                let sender = headers
+                    .get_first_value("reply-to")
+                    .or(headers.get_first_value("from"))
+                    .unwrap_or_default();
+                let subject = headers.get_first_value("subject").unwrap_or_default();
+                let date = headers.get_first_value("date").unwrap_or_default();
+
+                vec![
+                    table::Cell::new(&[table::RED], &uid),
+                    table::Cell::new(&[table::WHITE], &flags),
+                    table::Cell::new(&[table::BLUE], &sender),
+                    table::Cell::new(&[table::GREEN], &subject),
+                    table::Cell::new(&[table::YELLOW], &date),
+                ]
+            }
+        }
+    }
+}
+
+impl<'a> DisplayTable<'a, Msg> for Vec<Msg> {
+    fn cols() -> &'a [&'a str] {
+        &["uid", "flags", "sender", "subject", "date"]
+    }
+
+    fn rows(&self) -> &Vec<Msg> {
+        self
     }
 }

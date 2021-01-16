@@ -83,13 +83,13 @@ impl DisplayCell for Attributes<'_> {
     }
 }
 
-pub struct Mailbox<'a> {
+pub struct Mbox<'a> {
     pub delim: Delim,
     pub name: Name,
     pub attributes: Attributes<'a>,
 }
 
-impl Mailbox<'_> {
+impl Mbox<'_> {
     pub fn from_name(name: &imap::types::Name) -> Self {
         Self {
             delim: Delim::from_name(name),
@@ -99,7 +99,7 @@ impl Mailbox<'_> {
     }
 }
 
-impl<'a> DisplayRow for Mailbox<'a> {
+impl<'a> DisplayRow for Mbox<'a> {
     fn to_row(&self) -> Vec<table::Cell> {
         vec![
             self.delim.to_cell(),
@@ -109,12 +109,12 @@ impl<'a> DisplayRow for Mailbox<'a> {
     }
 }
 
-impl<'a> DisplayTable<'a, Mailbox<'a>> for Vec<Mailbox<'a>> {
+impl<'a> DisplayTable<'a, Mbox<'a>> for Vec<Mbox<'a>> {
     fn cols() -> &'a [&'a str] {
         &["delim", "name", "attributes"]
     }
 
-    fn rows(&self) -> &Vec<Mailbox<'a>> {
+    fn rows(&self) -> &Vec<Mbox<'a>> {
         self
     }
 }

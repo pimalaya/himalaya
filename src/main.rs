@@ -2,7 +2,7 @@ mod config;
 mod email;
 mod imap;
 mod input;
-mod mailbox;
+mod mbox;
 mod msg;
 mod smtp;
 mod table;
@@ -14,6 +14,9 @@ use crate::config::Config;
 use crate::imap::ImapConnector;
 use crate::msg::Msg;
 use crate::table::DisplayTable;
+
+const DEFAULT_PAGE_SIZE: u32 = 10;
+const DEFAULT_PAGE: u32 = 0;
 
 #[derive(Debug)]
 pub enum Error {
@@ -89,14 +92,44 @@ fn uid_arg() -> Arg<'static, 'static> {
 }
 
 fn run() -> Result<()> {
+    let default_page_size = &DEFAULT_PAGE_SIZE.to_string();
+    let default_page = &DEFAULT_PAGE.to_string();
+
     let matches = App::new("Himalaya")
         .version("0.1.0")
         .about("📫 Minimalist CLI email client")
         .author("soywod <clement.douin@posteo.net>")
         .setting(AppSettings::ArgRequiredElseHelp)
-        .subcommand(SubCommand::with_name("list").about("Lists all available mailboxes"))
+        .subcommand(
+            SubCommand::with_name("mailboxes")
+                .aliases(&["mboxes", "mb", "m"])
+                .about("Lists all available mailboxes"),
+        )
+        .subcommand(
+            SubCommand::with_name("list")
+                .aliases(&["lst", "l"])
+                .about("Lists emails sorted by arrival date")
+                .arg(mailbox_arg())
+                .arg(
+                    Arg::with_name("size")
+                        .help("Page size")
+                        .short("s")
+                        .long("size")
+                        .value_name("INT")
+                        .default_value(default_page_size),
+                )
+                .arg(
+                    Arg::with_name("page")
+                        .help("Page number")
+                        .short("p")
+                        .long("page")
+                        .value_name("INT")
+                        .default_value(default_page),
+                ),
+        )
         .subcommand(
             SubCommand::with_name("search")
+                .aliases(&["query", "q", "s"])
                 .about("Lists emails matching the given IMAP query")
                 .arg(mailbox_arg())
                 .arg(
@@ -109,6 +142,7 @@ fn run() -> Result<()> {
         )
         .subcommand(
             SubCommand::with_name("read")
+                .aliases(&["r"])
                 .about("Reads text bodies of an email")
                 .arg(uid_arg())
                 .arg(mailbox_arg())
@@ -124,6 +158,7 @@ fn run() -> Result<()> {
         )
         .subcommand(
             SubCommand::with_name("attachments")
+                .aliases(&["attach", "a"])
                 .about("Downloads all attachments from an email")
                 .arg(uid_arg())
                 .arg(mailbox_arg()),
@@ -131,6 +166,7 @@ fn run() -> Result<()> {
         .subcommand(SubCommand::with_name("write").about("Writes a new email"))
         .subcommand(
             SubCommand::with_name("reply")
+                .aliases(&["rep", "re"])
                 .about("Answers to an email")
                 .arg(uid_arg())
                 .arg(mailbox_arg())
@@ -143,94 +179,127 @@ fn run() -> Result<()> {
         )
         .subcommand(
             SubCommand::with_name("forward")
+                .aliases(&["fwd", "f"])
                 .about("Forwards an email")
                 .arg(uid_arg())
                 .arg(mailbox_arg()),
         )
         .get_matches();
 
-    if let Some(_) = matches.subcommand_matches("list") {
+    if let Some(_) = matches.subcommand_matches("mailboxes") {
         let config = Config::new_from_file()?;
-        let mboxes = ImapConnector::new(&config.imap)?.list_mboxes()?.to_table();
+        let mut imap_conn = ImapConnector::new(&config.imap)?;
 
-        println!("{}", mboxes);
+        let mboxes = imap_conn.list_mboxes()?;
+        println!("{}", mboxes.to_table());
+
+        imap_conn.close();
+    }
+
+    if let Some(matches) = matches.subcommand_matches("list") {
+        let config = Config::new_from_file()?;
+        let mut imap_conn = ImapConnector::new(&config.imap)?;
+
+        let mbox = matches.value_of("mailbox").unwrap();
+        let page_size: u32 = matches
+            .value_of("size")
+            .unwrap()
+            .parse()
+            .unwrap_or(DEFAULT_PAGE_SIZE);
+        let page: u32 = matches
+            .value_of("page")
+            .unwrap()
+            .parse()
+            .unwrap_or(DEFAULT_PAGE);
+
+        let msgs = imap_conn.list_msgs(&mbox, &page_size, &page)?;
+        println!("{}", msgs.to_table());
+
+        imap_conn.close();
     }
 
     if let Some(matches) = matches.subcommand_matches("search") {
         let config = Config::new_from_file()?;
+        let mut imap_conn = ImapConnector::new(&config.imap)?;
+
         let mbox = matches.value_of("mailbox").unwrap();
-
-        if let Some(matches) = matches.values_of("query") {
-            let query = matches
-                .fold((false, vec![]), |(escape, mut cmds), cmd| {
-                    match (cmd, escape) {
-                        // Next command is an arg and needs to be escaped
-                        ("subject", _) | ("body", _) | ("text", _) => {
-                            cmds.push(cmd.to_string());
-                            (true, cmds)
-                        }
-                        // Escaped arg commands
-                        (_, true) => {
-                            cmds.push(format!("\"{}\"", cmd));
-                            (false, cmds)
-                        }
-                        // Regular commands
-                        (_, false) => {
-                            cmds.push(cmd.to_string());
-                            (false, cmds)
-                        }
+        let query = matches
+            .values_of("query")
+            .unwrap_or_default()
+            .fold((false, vec![]), |(escape, mut cmds), cmd| {
+                match (cmd, escape) {
+                    // Next command is an arg and needs to be escaped
+                    ("subject", _) | ("body", _) | ("text", _) => {
+                        cmds.push(cmd.to_string());
+                        (true, cmds)
                     }
-                })
-                .1
-                .join(" ");
+                    // Escaped arg commands
+                    (_, true) => {
+                        cmds.push(format!("\"{}\"", cmd));
+                        (false, cmds)
+                    }
+                    // Regular commands
+                    (_, false) => {
+                        cmds.push(cmd.to_string());
+                        (false, cmds)
+                    }
+                }
+            })
+            .1
+            .join(" ");
 
-            let emails = ImapConnector::new(&config.imap)?
-                .read_emails(&mbox, &query)?
-                .to_table();
+        let msgs = imap_conn.read_emails(&mbox, &query)?;
+        println!("{}", msgs.to_table());
 
-            println!("{}", emails);
-        }
+        imap_conn.close();
     }
 
     if let Some(matches) = matches.subcommand_matches("read") {
         let config = Config::new_from_file()?;
+        let mut imap_conn = ImapConnector::new(&config.imap)?;
+
         let mbox = matches.value_of("mailbox").unwrap();
         let uid = matches.value_of("uid").unwrap();
         let mime = format!("text/{}", matches.value_of("mime-type").unwrap());
-        let body = ImapConnector::new(&config.imap)?.read_email_body(&mbox, &uid, &mime)?;
 
+        let body = imap_conn.read_email_body(&mbox, &uid, &mime)?;
         println!("{}", body);
+
+        imap_conn.close();
     }
 
     if let Some(matches) = matches.subcommand_matches("attachments") {
         let config = Config::new_from_file()?;
-        let mbox = matches.value_of("mailbox").unwrap();
-        let uid = matches.value_of("uid").unwrap();
         let mut imap_conn = ImapConnector::new(&config.imap)?;
 
-        let msg = imap_conn.read_msg(&mbox, &uid)?;
-        let msg = Msg::from(&msg)?;
+        let mbox = matches.value_of("mailbox").unwrap();
+        let uid = matches.value_of("uid").unwrap();
+
+        let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?.as_slice());
         let parts = msg.extract_parts()?;
 
         if parts.is_empty() {
             println!("No attachment found for message {}", uid);
         } else {
             println!("{} attachment(s) found for message {}", parts.len(), uid);
-            msg.extract_parts()?.iter().for_each(|(filename, bytes)| {
+            parts.iter().for_each(|(filename, bytes)| {
                 let filepath = config.downloads_filepath(&filename);
                 println!("Downloading {} …", filename);
                 fs::write(filepath, bytes).unwrap()
             });
             println!("Done!");
         }
+
+        imap_conn.close();
     }
 
     if let Some(_) = matches.subcommand_matches("write") {
         let config = Config::new_from_file()?;
         let mut imap_conn = ImapConnector::new(&config.imap)?;
+
         let tpl = Msg::build_new_tpl(&config)?;
         let content = input::open_editor_with_tpl(&tpl.as_bytes())?;
-        let msg = Msg::from(content.as_bytes())?;
+        let msg = Msg::from(content.as_bytes());
 
         input::ask_for_confirmation("Send the message?")?;
 
@@ -238,17 +307,18 @@ fn run() -> Result<()> {
         smtp::send(&config.smtp, &msg.to_sendable_msg()?)?;
         imap_conn.append_msg("Sent", &msg.to_vec()?)?;
         println!("Done!");
+
+        imap_conn.close();
     }
 
     if let Some(matches) = matches.subcommand_matches("reply") {
         let config = Config::new_from_file()?;
-        let mbox = matches.value_of("mailbox").unwrap();
-        let uid = matches.value_of("uid").unwrap();
         let mut imap_conn = ImapConnector::new(&config.imap)?;
 
-        let msg = imap_conn.read_msg(&mbox, &uid)?;
-        let msg = Msg::from(&msg)?;
+        let mbox = matches.value_of("mailbox").unwrap();
+        let uid = matches.value_of("uid").unwrap();
 
+        let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?.as_slice());
         let tpl = if matches.is_present("reply-all") {
             msg.build_reply_all_tpl(&config)?
         } else {
@@ -256,7 +326,7 @@ fn run() -> Result<()> {
         };
 
         let content = input::open_editor_with_tpl(&tpl.as_bytes())?;
-        let msg = Msg::from(content.as_bytes())?;
+        let msg = Msg::from(content.as_bytes());
 
         input::ask_for_confirmation("Send the message?")?;
 
@@ -264,20 +334,21 @@ fn run() -> Result<()> {
         smtp::send(&config.smtp, &msg.to_sendable_msg()?)?;
         imap_conn.append_msg("Sent", &msg.to_vec()?)?;
         println!("Done!");
+
+        imap_conn.close();
     }
 
     if let Some(matches) = matches.subcommand_matches("forward") {
         let config = Config::new_from_file()?;
-        let mbox = matches.value_of("mailbox").unwrap();
-        let uid = matches.value_of("uid").unwrap();
         let mut imap_conn = ImapConnector::new(&config.imap)?;
 
-        let msg = imap_conn.read_msg(&mbox, &uid)?;
-        let msg = Msg::from(&msg)?;
+        let mbox = matches.value_of("mailbox").unwrap();
+        let uid = matches.value_of("uid").unwrap();
 
+        let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?.as_slice());
         let tpl = msg.build_forward_tpl(&config)?;
         let content = input::open_editor_with_tpl(&tpl.as_bytes())?;
-        let msg = Msg::from(content.as_bytes())?;
+        let msg = Msg::from(content.as_bytes());
 
         input::ask_for_confirmation("Send the message?")?;
 
@@ -285,6 +356,8 @@ fn run() -> Result<()> {
         smtp::send(&config.smtp, &msg.to_sendable_msg()?)?;
         imap_conn.append_msg("Sent", &msg.to_vec()?)?;
         println!("Done!");
+
+        imap_conn.close();
     }
 
     Ok(())
