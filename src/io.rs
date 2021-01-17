@@ -1,6 +1,5 @@
 use std::{
-    env::temp_dir,
-    fmt,
+    env, fmt,
     fs::{remove_file, File},
     io::{self, Read, Write},
     process::{Command, Output},
@@ -12,7 +11,8 @@ use std::{
 #[derive(Debug)]
 pub enum Error {
     IoError(io::Error),
-    AskForSendingConfirmationError,
+    GetEditorEnvVarNotFoundError(env::VarError),
+    AskForConfirmationDeniedError,
 }
 
 impl fmt::Display for Error {
@@ -21,7 +21,8 @@ impl fmt::Display for Error {
 
         match self {
             Error::IoError(err) => err.fmt(f),
-            Error::AskForSendingConfirmationError => write!(f, "action cancelled"),
+            Error::GetEditorEnvVarNotFoundError(err) => err.fmt(f),
+            Error::AskForConfirmationDeniedError => write!(f, "action cancelled"),
         }
     }
 }
@@ -29,6 +30,12 @@ impl fmt::Display for Error {
 impl From<io::Error> for Error {
     fn from(err: io::Error) -> Error {
         Error::IoError(err)
+    }
+}
+
+impl From<env::VarError> for Error {
+    fn from(err: env::VarError) -> Error {
+        Error::GetEditorEnvVarNotFoundError(err)
     }
 }
 
@@ -40,12 +47,14 @@ type Result<T> = result::Result<T, Error>;
 
 pub fn open_editor_with_tpl(tpl: &[u8]) -> Result<String> {
     // Creates draft file
-    let mut draft_path = temp_dir();
+    let mut draft_path = env::temp_dir();
     draft_path.push("himalaya-draft.mail");
     File::create(&draft_path)?.write(tpl)?;
 
     // Opens editor and saves user input to draft file
-    Command::new(env!("EDITOR")).arg(&draft_path).status()?;
+    Command::new(env::var("EDITOR")?)
+        .arg(&draft_path)
+        .status()?;
 
     // Extracts draft file content
     let mut draft = String::new();
@@ -66,7 +75,7 @@ pub fn ask_for_confirmation(prompt: &str) -> Result<()> {
         .map(|bytes| bytes as char)
     {
         Some('y') | Some('Y') => Ok(()),
-        _ => Err(Error::AskForSendingConfirmationError),
+        _ => Err(Error::AskForConfirmationDeniedError),
     }
 }
 
