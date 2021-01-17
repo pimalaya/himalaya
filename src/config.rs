@@ -10,6 +10,8 @@ use std::{
 };
 use toml;
 
+use crate::io::run_cmd;
+
 // Error wrapper
 
 #[derive(Debug)]
@@ -21,11 +23,14 @@ pub enum Error {
     GetPathNotFoundError,
     GetAccountNotFoundError(String),
     GetAccountDefaultNotFoundError,
+    ParseImapPasswdUtf8Error,
+    ParseSmtpPasswdUtf8Error,
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "(config): ")?;
+        write!(f, "config: ")?;
+
         match self {
             Error::IoError(err) => err.fmt(f),
             Error::ParseTomlError(err) => err.fmt(f),
@@ -34,6 +39,8 @@ impl fmt::Display for Error {
             Error::GetPathNotFoundError => write!(f, "path not found"),
             Error::GetAccountNotFoundError(account) => write!(f, "account {} not found", account),
             Error::GetAccountDefaultNotFoundError => write!(f, "no default account found"),
+            Error::ParseImapPasswdUtf8Error => write!(f, "imap passwd invalid utf8"),
+            Error::ParseSmtpPasswdUtf8Error => write!(f, "smtp passwd invalid utf8"),
         }
     }
 }
@@ -75,21 +82,35 @@ pub struct Account {
     pub imap_host: String,
     pub imap_port: u16,
     pub imap_login: String,
-    pub imap_password: String,
+    pub imap_passwd_cmd: String,
 
     pub smtp_host: String,
     pub smtp_port: u16,
     pub smtp_login: String,
-    pub smtp_password: String,
+    pub smtp_passwd_cmd: String,
 }
 
 impl Account {
-    pub fn imap_addr(&self) -> (&str, u16) {
-        (&self.imap_host, self.imap_port)
+    pub fn imap_passwd(&self) -> Result<String> {
+        let cmd = run_cmd(&self.imap_passwd_cmd)?;
+        let passwd = String::from_utf8(cmd.stdout);
+        let passwd = passwd.map_err(|_| Error::ParseImapPasswdUtf8Error)?;
+        let passwd = passwd.trim_end_matches("\n").to_owned();
+
+        Ok(passwd)
     }
 
-    pub fn smtp_creds(&self) -> SmtpCredentials {
-        SmtpCredentials::new(self.smtp_login.to_owned(), self.smtp_password.to_owned())
+    pub fn smtp_creds(&self) -> Result<SmtpCredentials> {
+        let cmd = run_cmd(&self.smtp_passwd_cmd)?;
+        let passwd = String::from_utf8(cmd.stdout);
+        let passwd = passwd.map_err(|_| Error::ParseImapPasswdUtf8Error)?;
+        let passwd = passwd.trim_end_matches("\n").to_owned();
+
+        Ok(SmtpCredentials::new(self.smtp_login.to_owned(), passwd))
+    }
+
+    pub fn imap_addr(&self) -> (&str, u16) {
+        (&self.imap_host, self.imap_port)
     }
 }
 

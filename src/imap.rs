@@ -2,7 +2,7 @@ use imap;
 use native_tls::{self, TlsConnector, TlsStream};
 use std::{fmt, net::TcpStream, result};
 
-use crate::config::Account;
+use crate::config::{self, Account};
 use crate::mbox::Mbox;
 use crate::msg::Msg;
 
@@ -16,15 +16,18 @@ pub enum Error {
     ReadEmailNotFoundError(String),
     ReadEmailEmptyPartError(String, String),
     ExtractAttachmentsEmptyError(String),
+    ConfigError(config::Error),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "(imap): ")?;
+        write!(f, "imap: ")?;
+
         match self {
             Error::CreateTlsConnectorError(err) => err.fmt(f),
             Error::CreateImapSession(err) => err.fmt(f),
             Error::ParseEmailError(err) => err.fmt(f),
+            Error::ConfigError(err) => err.fmt(f),
             Error::ReadEmailNotFoundError(uid) => {
                 write!(f, "no email found for uid {}", uid)
             }
@@ -56,6 +59,12 @@ impl From<mailparse::MailParseError> for Error {
     }
 }
 
+impl From<config::Error> for Error {
+    fn from(err: config::Error) -> Error {
+        Error::ConfigError(err)
+    }
+}
+
 // Result wrapper
 
 type Result<T> = result::Result<T, Error>;
@@ -73,7 +82,7 @@ impl<'a> ImapConnector<'a> {
         let tls = TlsConnector::new()?;
         let client = imap::connect(account.imap_addr(), &account.imap_host, &tls)?;
         let sess = client
-            .login(&account.imap_login, &account.imap_password)
+            .login(&account.imap_login, &account.imap_passwd()?)
             .map_err(|res| res.0)?;
 
         Ok(Self { account, sess })

@@ -1,6 +1,6 @@
 mod config;
 mod imap;
-mod input;
+mod io;
 mod mbox;
 mod msg;
 mod smtp;
@@ -20,7 +20,7 @@ const DEFAULT_PAGE: usize = 0;
 #[derive(Debug)]
 pub enum Error {
     ConfigError(config::Error),
-    InputError(input::Error),
+    IoError(io::Error),
     MsgError(msg::Error),
     ImapError(imap::Error),
     SmtpError(smtp::Error),
@@ -30,7 +30,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Error::ConfigError(err) => err.fmt(f),
-            Error::InputError(err) => err.fmt(f),
+            Error::IoError(err) => err.fmt(f),
             Error::MsgError(err) => err.fmt(f),
             Error::ImapError(err) => err.fmt(f),
             Error::SmtpError(err) => err.fmt(f),
@@ -44,9 +44,9 @@ impl From<config::Error> for Error {
     }
 }
 
-impl From<input::Error> for Error {
-    fn from(err: input::Error) -> Error {
-        Error::InputError(err)
+impl From<crate::io::Error> for Error {
+    fn from(err: crate::io::Error) -> Error {
+        Error::IoError(err)
     }
 }
 
@@ -329,10 +329,10 @@ fn run() -> Result<()> {
         let mut imap_conn = ImapConnector::new(&account)?;
 
         let tpl = Msg::build_new_tpl(&config, &account)?;
-        let content = input::open_editor_with_tpl(&tpl.as_bytes())?;
+        let content = io::open_editor_with_tpl(&tpl.as_bytes())?;
         let msg = Msg::from(content);
 
-        input::ask_for_confirmation("Send the message?")?;
+        io::ask_for_confirmation("Send the message?")?;
 
         println!("Sending …");
         smtp::send(&account, &msg.to_sendable_msg()?)?;
@@ -357,10 +357,10 @@ fn run() -> Result<()> {
             msg.build_reply_tpl(&config, &account)?
         };
 
-        let content = input::open_editor_with_tpl(&tpl.as_bytes())?;
+        let content = io::open_editor_with_tpl(&tpl.as_bytes())?;
         let msg = Msg::from(content);
 
-        input::ask_for_confirmation("Send the message?")?;
+        io::ask_for_confirmation("Send the message?")?;
 
         println!("Sending …");
         smtp::send(&account, &msg.to_sendable_msg()?)?;
@@ -380,10 +380,10 @@ fn run() -> Result<()> {
 
         let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
         let tpl = msg.build_forward_tpl(&config, &account)?;
-        let content = input::open_editor_with_tpl(&tpl.as_bytes())?;
+        let content = io::open_editor_with_tpl(&tpl.as_bytes())?;
         let msg = Msg::from(content);
 
-        input::ask_for_confirmation("Send the message?")?;
+        io::ask_for_confirmation("Send the message?")?;
 
         println!("Sending …");
         smtp::send(&account, &msg.to_sendable_msg()?)?;
@@ -400,7 +400,7 @@ fn run() -> Result<()> {
 
 fn main() {
     if let Err(err) = run() {
-        eprintln!("Error {}", err);
+        eprintln!("Error: {}", err);
         exit(1);
     }
 }

@@ -3,7 +3,7 @@ use std::{
     fmt,
     fs::{remove_file, File},
     io::{self, Read, Write},
-    process::Command,
+    process::{Command, Output},
     result,
 };
 
@@ -17,7 +17,8 @@ pub enum Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "(input): ")?;
+        write!(f, "input: ")?;
+
         match self {
             Error::IoError(err) => err.fmt(f),
             Error::AskForSendingConfirmationError => write!(f, "action cancelled"),
@@ -66,5 +67,13 @@ pub fn ask_for_confirmation(prompt: &str) -> Result<()> {
     {
         Some('y') | Some('Y') => Ok(()),
         _ => Err(Error::AskForSendingConfirmationError),
+    }
+}
+
+pub fn run_cmd(cmd: &str) -> io::Result<Output> {
+    if cfg!(target_os = "windows") {
+        Command::new("cmd").args(&["/C", cmd]).output()
+    } else {
+        Command::new("sh").arg("-c").arg(cmd).output()
     }
 }
