@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2021-01-17
+
 ### Added
 
 - Parse TOML config [#1]
@@ -26,8 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Icon in table when attachment is present [#16]
 - Multi-account [#17]
 - Password from command [#22]
+- Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/soywod/himalaya/releases/tag/v0.1.0
 
 [#1]: https://github.com/soywod/himalaya/issues/1
 [#2]: https://github.com/soywod/himalaya/issues/2
@@ -45,5 +49,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#16]: https://github.com/soywod/himalaya/issues/16
 [#17]: https://github.com/soywod/himalaya/issues/17
 [#19]: https://github.com/soywod/himalaya/issues/19
+[#20]: https://github.com/soywod/himalaya/issues/20
 [#21]: https://github.com/soywod/himalaya/issues/21
 [#22]: https://github.com/soywod/himalaya/issues/22
