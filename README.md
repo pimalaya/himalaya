@@ -265,7 +265,7 @@ USAGE:
 
 FLAGS:
     -h, --help       Prints help information
-    -a, --all        Including all recipients
+    -a, --all        Includs all recipients
     -V, --version    Prints version information
 
 OPTIONS:

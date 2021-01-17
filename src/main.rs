@@ -184,7 +184,7 @@ fn run() -> Result<()> {
                 .arg(mailbox_arg())
                 .arg(
                     Arg::with_name("reply-all")
-                        .help("Including all recipients")
+                        .help("Includs all recipients")
                         .short("a")
                         .long("all"),
                 ),
