@@ -1,8 +1,9 @@
 mod config;
 mod imap;
-mod io;
+mod input;
 mod mbox;
 mod msg;
+mod output;
 mod smtp;
 mod table;
 
@@ -12,7 +13,7 @@ use std::{fmt, fs, process::exit, result};
 use crate::config::Config;
 use crate::imap::ImapConnector;
 use crate::msg::Msg;
-use crate::table::DisplayTable;
+use crate::output::print;
 
 const DEFAULT_PAGE_SIZE: usize = 10;
 const DEFAULT_PAGE: usize = 0;
@@ -20,7 +21,8 @@ const DEFAULT_PAGE: usize = 0;
 #[derive(Debug)]
 pub enum Error {
     ConfigError(config::Error),
-    IoError(io::Error),
+    InputError(input::Error),
+    OutputError(output::Error),
     MsgError(msg::Error),
     ImapError(imap::Error),
     SmtpError(smtp::Error),
@@ -30,7 +32,8 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Error::ConfigError(err) => err.fmt(f),
-            Error::IoError(err) => err.fmt(f),
+            Error::InputError(err) => err.fmt(f),
+            Error::OutputError(err) => err.fmt(f),
             Error::MsgError(err) => err.fmt(f),
             Error::ImapError(err) => err.fmt(f),
             Error::SmtpError(err) => err.fmt(f),
@@ -44,9 +47,15 @@ impl From<config::Error> for Error {
     }
 }
 
-impl From<crate::io::Error> for Error {
-    fn from(err: crate::io::Error) -> Error {
-        Error::IoError(err)
+impl From<input::Error> for Error {
+    fn from(err: input::Error) -> Error {
+        Error::InputError(err)
+    }
+}
+
+impl From<output::Error> for Error {
+    fn from(err: output::Error) -> Error {
+        Error::OutputError(err)
     }
 }
 
@@ -117,6 +126,15 @@ fn run() -> Result<()> {
         .about("📫 Minimalist CLI email client")
         .author("soywod <clement.douin@posteo.net>")
         .setting(AppSettings::ArgRequiredElseHelp)
+        .arg(
+            Arg::with_name("output")
+                .long("output")
+                .short("o")
+                .help("Format of the output to print")
+                .value_name("STRING")
+                .possible_values(&["text", "json"])
+                .default_value("text"),
+        )
         .arg(
             Arg::with_name("account")
                 .long("account")
@@ -199,6 +217,7 @@ fn run() -> Result<()> {
         .get_matches();
 
     let account_name = matches.value_of("account");
+    let output_type = matches.value_of("output").unwrap().to_owned();
 
     if let Some(_) = matches.subcommand_matches("mailboxes") {
         let config = Config::new_from_file()?;
@@ -206,7 +225,7 @@ fn run() -> Result<()> {
         let mut imap_conn = ImapConnector::new(&account)?;
 
         let mboxes = imap_conn.list_mboxes()?;
-        println!("{}", mboxes.to_table());
+        print(&output_type, mboxes)?;
 
         imap_conn.close();
     }
@@ -215,7 +234,6 @@ fn run() -> Result<()> {
         let config = Config::new_from_file()?;
         let account = config.get_account(account_name)?;
         let mut imap_conn = ImapConnector::new(&account)?;
-
         let mbox = matches.value_of("mailbox").unwrap();
         let page_size: u32 = matches
             .value_of("size")
@@ -229,7 +247,7 @@ fn run() -> Result<()> {
             .unwrap_or(DEFAULT_PAGE as u32);
 
         let msgs = imap_conn.list_msgs(&mbox, &page_size, &page)?;
-        println!("{}", msgs.to_table());
+        print(&output_type, msgs)?;
 
         imap_conn.close();
     }
@@ -238,7 +256,6 @@ fn run() -> Result<()> {
         let config = Config::new_from_file()?;
         let account = config.get_account(account_name)?;
         let mut imap_conn = ImapConnector::new(&account)?;
-
         let mbox = matches.value_of("mailbox").unwrap();
         let page_size: usize = matches
             .value_of("size")
@@ -276,7 +293,7 @@ fn run() -> Result<()> {
             .join(" ");
 
         let msgs = imap_conn.search_msgs(&mbox, &query, &page_size, &page)?;
-        println!("{}", msgs.to_table());
+        print(&output_type, msgs)?;
 
         imap_conn.close();
     }
@@ -285,12 +302,11 @@ fn run() -> Result<()> {
         let config = Config::new_from_file()?;
         let account = config.get_account(account_name)?;
         let mut imap_conn = ImapConnector::new(&account)?;
-
         let mbox = matches.value_of("mailbox").unwrap();
         let uid = matches.value_of("uid").unwrap();
         let mime = format!("text/{}", matches.value_of("mime-type").unwrap());
-
         let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
+
         let text_bodies = msg.text_bodies(&mime)?;
         println!("{}", text_bodies);
 
@@ -301,10 +317,8 @@ fn run() -> Result<()> {
         let config = Config::new_from_file()?;
         let account = config.get_account(account_name)?;
         let mut imap_conn = ImapConnector::new(&account)?;
-
         let mbox = matches.value_of("mailbox").unwrap();
         let uid = matches.value_of("uid").unwrap();
-
         let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
         let parts = msg.extract_attachments()?;
 
@@ -314,7 +328,7 @@ fn run() -> Result<()> {
             println!("{} attachment(s) found for message {}", parts.len(), uid);
             parts.iter().for_each(|(filename, bytes)| {
                 let filepath = config.downloads_filepath(&account, &filename);
-                println!("Downloading {} …", filename);
+                println!("Downloading {}…", filename);
                 fs::write(filepath, bytes).unwrap()
             });
             println!("Done!");
@@ -327,14 +341,13 @@ fn run() -> Result<()> {
         let config = Config::new_from_file()?;
         let account = config.get_account(account_name)?;
         let mut imap_conn = ImapConnector::new(&account)?;
-
         let tpl = Msg::build_new_tpl(&config, &account)?;
-        let content = io::open_editor_with_tpl(&tpl.as_bytes())?;
+        let content = input::open_editor_with_tpl(&tpl.as_bytes())?;
         let msg = Msg::from(content);
 
-        io::ask_for_confirmation("Send the message?")?;
+        input::ask_for_confirmation("Send the message?")?;
 
-        println!("Sending …");
+        println!("Sending…");
         smtp::send(&account, &msg.to_sendable_msg()?)?;
         imap_conn.append_msg("Sent", &msg.to_vec()?)?;
         println!("Done!");
@@ -357,12 +370,12 @@ fn run() -> Result<()> {
             msg.build_reply_tpl(&config, &account)?
         };
 
-        let content = io::open_editor_with_tpl(&tpl.as_bytes())?;
+        let content = input::open_editor_with_tpl(&tpl.as_bytes())?;
         let msg = Msg::from(content);
 
-        io::ask_for_confirmation("Send the message?")?;
+        input::ask_for_confirmation("Send the message?")?;
 
-        println!("Sending …");
+        println!("Sending…");
         smtp::send(&account, &msg.to_sendable_msg()?)?;
         imap_conn.append_msg("Sent", &msg.to_vec()?)?;
         println!("Done!");
@@ -380,12 +393,12 @@ fn run() -> Result<()> {
 
         let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
         let tpl = msg.build_forward_tpl(&config, &account)?;
-        let content = io::open_editor_with_tpl(&tpl.as_bytes())?;
+        let content = input::open_editor_with_tpl(&tpl.as_bytes())?;
         let msg = Msg::from(content);
 
-        io::ask_for_confirmation("Send the message?")?;
+        input::ask_for_confirmation("Send the message?")?;
 
-        println!("Sending …");
+        println!("Sending…");
         smtp::send(&account, &msg.to_sendable_msg()?)?;
         imap_conn.append_msg("Sent", &msg.to_vec()?)?;
         println!("Done!");

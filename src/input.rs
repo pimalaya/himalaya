@@ -2,7 +2,7 @@ use std::{
     env, fmt,
     fs::{remove_file, File},
     io::{self, Read, Write},
-    process::{Command, Output},
+    process::Command,
     result,
 };
 
@@ -76,13 +76,5 @@ pub fn ask_for_confirmation(prompt: &str) -> Result<()> {
     {
         Some('y') | Some('Y') => Ok(()),
         _ => Err(Error::AskForConfirmationDeniedError),
-    }
-}
-
-pub fn run_cmd(cmd: &str) -> io::Result<Output> {
-    if cfg!(target_os = "windows") {
-        Command::new("cmd").args(&["/C", cmd]).output()
-    } else {
-        Command::new("sh").arg("-c").arg(cmd).output()
     }
 }

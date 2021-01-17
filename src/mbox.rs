@@ -1,7 +1,12 @@
 use imap;
+use serde::Serialize;
+use std::fmt;
 
 use crate::table::{self, DisplayRow, DisplayTable};
 
+// Mbox
+
+#[derive(Debug, Serialize)]
 pub struct Mbox {
     pub delim: String,
     pub name: String,
@@ -30,7 +35,12 @@ impl DisplayRow for Mbox {
     }
 }
 
-impl<'a> DisplayTable<'a, Mbox> for Vec<Mbox> {
+// Mboxes
+
+#[derive(Debug, Serialize)]
+pub struct Mboxes(pub Vec<Mbox>);
+
+impl<'a> DisplayTable<'a, Mbox> for Mboxes {
     fn header_row() -> Vec<table::Cell> {
         use crate::table::*;
 
@@ -42,6 +52,12 @@ impl<'a> DisplayTable<'a, Mbox> for Vec<Mbox> {
     }
 
     fn rows(&self) -> &Vec<Mbox> {
-        self
+        &self.0
+    }
+}
+
+impl fmt::Display for Mboxes {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.to_table())
     }
 }

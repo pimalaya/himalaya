@@ -1,5 +1,6 @@
 use lettre;
 use mailparse::{self, MailHeaderMap};
+use serde::Serialize;
 use std::{fmt, result};
 
 use crate::config::{Account, Config};
@@ -41,10 +42,12 @@ type Result<T> = result::Result<T, Error>;
 
 // Msg
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Msg {
     pub uid: u32,
     pub flags: Vec<String>,
+
+    #[serde(skip_serializing)]
     raw: Vec<u8>,
 }
 
@@ -406,7 +409,12 @@ impl DisplayRow for Msg {
     }
 }
 
-impl<'a> DisplayTable<'a, Msg> for Vec<Msg> {
+// Msgs
+
+#[derive(Debug, Serialize)]
+pub struct Msgs(pub Vec<Msg>);
+
+impl<'a> DisplayTable<'a, Msg> for Msgs {
     fn header_row() -> Vec<table::Cell> {
         use crate::table::*;
 
@@ -420,6 +428,12 @@ impl<'a> DisplayTable<'a, Msg> for Vec<Msg> {
     }
 
     fn rows(&self) -> &Vec<Msg> {
-        self
+        &self.0
+    }
+}
+
+impl fmt::Display for Msgs {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.to_table())
     }
 }

@@ -10,7 +10,7 @@ use std::{
 };
 use toml;
 
-use crate::io::run_cmd;
+use crate::output::{self, run_cmd};
 
 // Error wrapper
 
@@ -23,8 +23,7 @@ pub enum Error {
     GetPathNotFoundError,
     GetAccountNotFoundError(String),
     GetAccountDefaultNotFoundError,
-    ParseImapPasswdUtf8Error,
-    ParseSmtpPasswdUtf8Error,
+    OutputError(output::Error),
 }
 
 impl fmt::Display for Error {
@@ -39,8 +38,7 @@ impl fmt::Display for Error {
             Error::GetPathNotFoundError => write!(f, "path not found"),
             Error::GetAccountNotFoundError(account) => write!(f, "account {} not found", account),
             Error::GetAccountDefaultNotFoundError => write!(f, "no default account found"),
-            Error::ParseImapPasswdUtf8Error => write!(f, "imap passwd invalid utf8"),
-            Error::ParseSmtpPasswdUtf8Error => write!(f, "smtp passwd invalid utf8"),
+            Error::OutputError(err) => err.fmt(f),
         }
     }
 }
@@ -60,6 +58,12 @@ impl From<toml::de::Error> for Error {
 impl From<env::VarError> for Error {
     fn from(err: env::VarError) -> Error {
         Error::GetEnvVarError(err)
+    }
+}
+
+impl From<output::Error> for Error {
+    fn from(err: output::Error) -> Error {
+        Error::OutputError(err)
     }
 }
 
@@ -92,18 +96,14 @@ pub struct Account {
 
 impl Account {
     pub fn imap_passwd(&self) -> Result<String> {
-        let cmd = run_cmd(&self.imap_passwd_cmd)?;
-        let passwd = String::from_utf8(cmd.stdout);
-        let passwd = passwd.map_err(|_| Error::ParseImapPasswdUtf8Error)?;
+        let passwd = run_cmd(&self.imap_passwd_cmd)?;
         let passwd = passwd.trim_end_matches("\n").to_owned();
 
         Ok(passwd)
     }
 
     pub fn smtp_creds(&self) -> Result<SmtpCredentials> {
-        let cmd = run_cmd(&self.smtp_passwd_cmd)?;
-        let passwd = String::from_utf8(cmd.stdout);
-        let passwd = passwd.map_err(|_| Error::ParseImapPasswdUtf8Error)?;
+        let passwd = run_cmd(&self.smtp_passwd_cmd)?;
         let passwd = passwd.trim_end_matches("\n").to_owned();
 
         Ok(SmtpCredentials::new(self.smtp_login.to_owned(), passwd))

@@ -3,8 +3,8 @@ use native_tls::{self, TlsConnector, TlsStream};
 use std::{fmt, net::TcpStream, result};
 
 use crate::config::{self, Account};
-use crate::mbox::Mbox;
-use crate::msg::Msg;
+use crate::mbox::{Mbox, Mboxes};
+use crate::msg::{Msg, Msgs};
 
 // Error wrapper
 
@@ -94,7 +94,7 @@ impl<'a> ImapConnector<'a> {
         }
     }
 
-    pub fn list_mboxes(&mut self) -> Result<Vec<Mbox>> {
+    pub fn list_mboxes(&mut self) -> Result<Mboxes> {
         let mboxes = self
             .sess
             .list(Some(""), Some("*"))?
@@ -102,10 +102,10 @@ impl<'a> ImapConnector<'a> {
             .map(Mbox::from_name)
             .collect::<Vec<_>>();
 
-        Ok(mboxes)
+        Ok(Mboxes(mboxes))
     }
 
-    pub fn list_msgs(&mut self, mbox: &str, page_size: &u32, page: &u32) -> Result<Vec<Msg>> {
+    pub fn list_msgs(&mut self, mbox: &str, page_size: &u32, page: &u32) -> Result<Msgs> {
         let last_seq = self.sess.select(mbox)?.exists;
         let begin = last_seq - (page * page_size);
         let end = begin - (page_size - 1);
@@ -119,7 +119,7 @@ impl<'a> ImapConnector<'a> {
             .map(Msg::from)
             .collect::<Vec<_>>();
 
-        Ok(msgs)
+        Ok(Msgs(msgs))
     }
 
     pub fn search_msgs(
@@ -128,7 +128,7 @@ impl<'a> ImapConnector<'a> {
         query: &str,
         page_size: &usize,
         page: &usize,
-    ) -> Result<Vec<Msg>> {
+    ) -> Result<Msgs> {
         self.sess.select(mbox)?;
 
         let begin = page * page_size;
@@ -149,7 +149,7 @@ impl<'a> ImapConnector<'a> {
             .map(Msg::from)
             .collect::<Vec<_>>();
 
-        Ok(msgs)
+        Ok(Msgs(msgs))
     }
 
     pub fn read_msg(&mut self, mbox: &str, uid: &str) -> Result<Vec<u8>> {
