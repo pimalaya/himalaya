@@ -167,7 +167,7 @@ impl Config {
         Ok(toml::from_slice(&content)?)
     }
 
-    pub fn get_account(&self, name: Option<&str>) -> Result<&Account> {
+    pub fn find_account_by_name(&self, name: Option<&str>) -> Result<&Account> {
         match name {
             Some(name) => self
                 .accounts

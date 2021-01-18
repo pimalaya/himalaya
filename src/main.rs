@@ -221,19 +221,20 @@ fn run() -> Result<()> {
 
     if let Some(_) = matches.subcommand_matches("mailboxes") {
         let config = Config::new_from_file()?;
-        let account = config.get_account(account_name)?;
+        let account = config.find_account_by_name(account_name)?;
         let mut imap_conn = ImapConnector::new(&account)?;
 
         let mboxes = imap_conn.list_mboxes()?;
         print(&output_type, mboxes)?;
 
-        imap_conn.close();
+        imap_conn.logout();
     }
 
     if let Some(matches) = matches.subcommand_matches("list") {
         let config = Config::new_from_file()?;
-        let account = config.get_account(account_name)?;
+        let account = config.find_account_by_name(account_name)?;
         let mut imap_conn = ImapConnector::new(&account)?;
+
         let mbox = matches.value_of("mailbox").unwrap();
         let page_size: u32 = matches
             .value_of("size")
@@ -249,12 +250,12 @@ fn run() -> Result<()> {
         let msgs = imap_conn.list_msgs(&mbox, &page_size, &page)?;
         print(&output_type, msgs)?;
 
-        imap_conn.close();
+        imap_conn.logout();
     }
 
     if let Some(matches) = matches.subcommand_matches("search") {
         let config = Config::new_from_file()?;
-        let account = config.get_account(account_name)?;
+        let account = config.find_account_by_name(account_name)?;
         let mut imap_conn = ImapConnector::new(&account)?;
         let mbox = matches.value_of("mailbox").unwrap();
         let page_size: usize = matches
@@ -295,12 +296,12 @@ fn run() -> Result<()> {
         let msgs = imap_conn.search_msgs(&mbox, &query, &page_size, &page)?;
         print(&output_type, msgs)?;
 
-        imap_conn.close();
+        imap_conn.logout();
     }
 
     if let Some(matches) = matches.subcommand_matches("read") {
         let config = Config::new_from_file()?;
-        let account = config.get_account(account_name)?;
+        let account = config.find_account_by_name(account_name)?;
         let mut imap_conn = ImapConnector::new(&account)?;
         let mbox = matches.value_of("mailbox").unwrap();
         let uid = matches.value_of("uid").unwrap();
@@ -310,12 +311,12 @@ fn run() -> Result<()> {
         let text_bodies = msg.text_bodies(&mime)?;
         println!("{}", text_bodies);
 
-        imap_conn.close();
+        imap_conn.logout();
     }
 
     if let Some(matches) = matches.subcommand_matches("attachments") {
         let config = Config::new_from_file()?;
-        let account = config.get_account(account_name)?;
+        let account = config.find_account_by_name(account_name)?;
         let mut imap_conn = ImapConnector::new(&account)?;
         let mbox = matches.value_of("mailbox").unwrap();
         let uid = matches.value_of("uid").unwrap();
@@ -334,12 +335,12 @@ fn run() -> Result<()> {
             println!("Done!");
         }
 
-        imap_conn.close();
+        imap_conn.logout();
     }
 
     if let Some(_) = matches.subcommand_matches("write") {
         let config = Config::new_from_file()?;
-        let account = config.get_account(account_name)?;
+        let account = config.find_account_by_name(account_name)?;
         let mut imap_conn = ImapConnector::new(&account)?;
         let tpl = Msg::build_new_tpl(&config, &account)?;
         let content = input::open_editor_with_tpl(&tpl.as_bytes())?;
@@ -352,12 +353,12 @@ fn run() -> Result<()> {
         imap_conn.append_msg("Sent", &msg.to_vec()?)?;
         println!("Done!");
 
-        imap_conn.close();
+        imap_conn.logout();
     }
 
     if let Some(matches) = matches.subcommand_matches("reply") {
         let config = Config::new_from_file()?;
-        let account = config.get_account(account_name)?;
+        let account = config.find_account_by_name(account_name)?;
         let mut imap_conn = ImapConnector::new(&account)?;
 
         let mbox = matches.value_of("mailbox").unwrap();
@@ -380,12 +381,12 @@ fn run() -> Result<()> {
         imap_conn.append_msg("Sent", &msg.to_vec()?)?;
         println!("Done!");
 
-        imap_conn.close();
+        imap_conn.logout();
     }
 
     if let Some(matches) = matches.subcommand_matches("forward") {
         let config = Config::new_from_file()?;
-        let account = config.get_account(account_name)?;
+        let account = config.find_account_by_name(account_name)?;
         let mut imap_conn = ImapConnector::new(&account)?;
 
         let mbox = matches.value_of("mailbox").unwrap();
@@ -403,7 +404,7 @@ fn run() -> Result<()> {
         imap_conn.append_msg("Sent", &msg.to_vec()?)?;
         println!("Done!");
 
-        imap_conn.close();
+        imap_conn.logout();
     }
 
     Ok(())

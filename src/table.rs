@@ -60,15 +60,11 @@ impl Cell {
         let style_end = "\x1b[0m";
 
         if col_size > 0 && self.printable_value_len() > col_size {
-            let col_size = self
-                .value
-                .char_indices()
-                .map(|(i, _)| i)
-                .nth(col_size)
-                .unwrap()
-                - 2;
+            let value: String = self.value.chars().collect::<Vec<_>>()[0..=col_size - 2]
+                .into_iter()
+                .collect();
 
-            String::from(style_begin + &self.value[0..=col_size] + "… " + style_end)
+            String::from(style_begin + &value + "… " + style_end)
         } else {
             let padding = if col_size == 0 {
                 "".to_string()

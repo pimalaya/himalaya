@@ -235,6 +235,7 @@ dependencies = [
  "lettre",
  "mailparse",
  "native-tls",
+ "rfc2047-decoder",
  "serde",
  "serde_json",
  "terminal_size",
@@ -705,6 +706,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3acd125665422973a33ac9d3dd2df85edad0f4ae9b00dafb1a05e43a9f5ef8e7"
 dependencies = [
  "winapi",
+]
+
+[[package]]
+name = "rfc2047-decoder"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "87ecf2ba387f446155e26796aabb727e9ae1427dd13ac9cc21773a3fbda19d77"
+dependencies = [
+ "base64 0.13.0",
+ "charset",
+ "quoted_printable",
 ]
 
 [[package]]

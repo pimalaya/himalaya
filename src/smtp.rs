@@ -42,6 +42,9 @@ type Result<T> = result::Result<T, Error>;
 pub fn send(account: &Account, msg: &lettre::Message) -> Result<()> {
     use lettre::Transport;
 
+    // TODO
+    // lettre::transport::smtp::SmtpTransport::starttls_relay
+
     lettre::transport::smtp::SmtpTransport::relay(&account.smtp_host)?
         .credentials(account.smtp_creds()?)
         .build()

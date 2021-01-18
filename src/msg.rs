@@ -1,5 +1,6 @@
 use lettre;
 use mailparse::{self, MailHeaderMap};
+use rfc2047_decoder;
 use serde::Serialize;
 use std::{fmt, result};
 
@@ -45,38 +46,54 @@ type Result<T> = result::Result<T, Error>;
 #[derive(Debug, Serialize)]
 pub struct Msg {
     pub uid: u32,
-    pub flags: Vec<String>,
+    pub subject: String,
+    pub sender: String,
+    pub date: String,
 
     #[serde(skip_serializing)]
     raw: Vec<u8>,
 }
 
-impl From<String> for Msg {
-    fn from(item: String) -> Self {
+impl From<Vec<u8>> for Msg {
+    fn from(raw: Vec<u8>) -> Self {
         Self {
             uid: 0,
-            flags: vec![],
-            raw: item.as_bytes().to_vec(),
+            subject: String::from(""),
+            sender: String::from(""),
+            date: String::from(""),
+            raw,
         }
     }
 }
 
-impl From<Vec<u8>> for Msg {
-    fn from(item: Vec<u8>) -> Self {
-        Self {
-            uid: 0,
-            flags: vec![],
-            raw: item,
-        }
+impl From<String> for Msg {
+    fn from(raw: String) -> Self {
+        Self::from(raw.as_bytes().to_vec())
     }
 }
 
 impl From<&imap::types::Fetch> for Msg {
     fn from(fetch: &imap::types::Fetch) -> Self {
-        Self {
-            uid: fetch.uid.unwrap_or_default(),
-            flags: vec![],
-            raw: fetch.body().unwrap_or_default().to_vec(),
+        match fetch.envelope() {
+            None => Self::from(fetch.body().unwrap_or_default().to_vec()),
+            Some(envelope) => Self {
+                uid: fetch.uid.unwrap_or_default(),
+                subject: envelope
+                    .subject
+                    .and_then(|subj| rfc2047_decoder::decode(subj).ok())
+                    .unwrap_or_default(),
+                sender: envelope
+                    .from
+                    .as_ref()
+                    .and_then(|addrs| addrs.first()?.name)
+                    .and_then(|name| rfc2047_decoder::decode(name).ok())
+                    .unwrap_or_default(),
+                date: fetch
+                    .internal_date()
+                    .map(|date| date.naive_local().to_string())
+                    .unwrap_or_default(),
+                raw: fetch.body().unwrap_or_default().to_vec(),
+            },
         }
     }
 }
@@ -376,36 +393,14 @@ impl<'a> Msg {
 
 impl DisplayRow for Msg {
     fn to_row(&self) -> Vec<table::Cell> {
-        match self.parse() {
-            Err(_) => vec![],
-            Ok(parsed) => {
-                let headers = parsed.get_headers();
+        use crate::table::*;
 
-                let uid = &self.uid.to_string();
-                let flags = match self.extract_attachments().map(|vec| vec.is_empty()) {
-                    Ok(false) => "",
-                    _ => " ",
-                };
-                let sender = headers
-                    .get_first_value("reply-to")
-                    .or(headers.get_first_value("from"))
-                    .unwrap_or_default();
-                let subject = headers.get_first_value("subject").unwrap_or_default();
-                let date = headers.get_first_value("date").unwrap_or_default();
-
-                {
-                    use crate::table::*;
-
-                    vec![
-                        Cell::new(&[RED], &uid),
-                        Cell::new(&[WHITE], &flags),
-                        Cell::new(&[BLUE], &sender),
-                        FlexCell::new(&[GREEN], &subject),
-                        Cell::new(&[YELLOW], &date),
-                    ]
-                }
-            }
-        }
+        vec![
+            Cell::new(&[RED], &self.uid.to_string()),
+            Cell::new(&[BLUE], &self.sender),
+            FlexCell::new(&[GREEN], &self.subject),
+            Cell::new(&[YELLOW], &self.date),
+        ]
     }
 }
 
@@ -420,7 +415,6 @@ impl<'a> DisplayTable<'a, Msg> for Msgs {
 
         vec![
             Cell::new(&[BOLD, UNDERLINE, WHITE], "UID"),
-            Cell::new(&[BOLD, UNDERLINE, WHITE], "FLAGS"),
             Cell::new(&[BOLD, UNDERLINE, WHITE], "SENDER"),
             FlexCell::new(&[BOLD, UNDERLINE, WHITE], "SUBJECT"),
             Cell::new(&[BOLD, UNDERLINE, WHITE], "DATE"),

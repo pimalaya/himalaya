@@ -88,8 +88,8 @@ impl<'a> ImapConnector<'a> {
         Ok(Self { account, sess })
     }
 
-    pub fn close(&mut self) {
-        match self.sess.close() {
+    pub fn logout(&mut self) {
+        match self.sess.logout() {
             _ => (),
         }
     }
@@ -113,7 +113,7 @@ impl<'a> ImapConnector<'a> {
 
         let msgs = self
             .sess
-            .fetch(range, "(UID BODY.PEEK[])")?
+            .fetch(range, "(UID ENVELOPE INTERNALDATE)")?
             .iter()
             .rev()
             .map(Msg::from)
@@ -143,9 +143,8 @@ impl<'a> ImapConnector<'a> {
 
         let msgs = self
             .sess
-            .fetch(range, "(UID BODY.PEEK[])")?
+            .fetch(range, "(UID ENVELOPE INTERNALDATE)")?
             .iter()
-            .rev()
             .map(Msg::from)
             .collect::<Vec<_>>();
 
