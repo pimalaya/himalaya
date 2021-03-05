@@ -1,4 +1,4 @@
-# 📫 Himalaya [![gh-actions](https://github.com/soywod/himalaya/workflows/deployment/badge.svg)](https://github.com/soywod/himalaya/actions?query=workflow%3Adeployment)
+# 📫 Himalaya [WIP] [![gh-actions](https://github.com/soywod/himalaya/workflows/deployment/badge.svg)](https://github.com/soywod/himalaya/actions?query=workflow%3Adeployment)
 
 Minimalist CLI email client, written in Rust.
 
