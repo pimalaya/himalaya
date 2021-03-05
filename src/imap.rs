@@ -80,7 +80,10 @@ pub struct ImapConnector<'a> {
 impl<'a> ImapConnector<'a> {
     pub fn new(account: &'a Account) -> Result<Self> {
         let tls = TlsConnector::new()?;
-        let client = imap::connect(account.imap_addr(), &account.imap_host, &tls)?;
+        let client = match account.imap_starttls {
+            Some(true) => imap::connect_starttls(account.imap_addr(), &account.imap_host, &tls),
+            _ => imap::connect(account.imap_addr(), &account.imap_host, &tls),
+        }?;
         let sess = client
             .login(&account.imap_login, &account.imap_passwd()?)
             .map_err(|res| res.0)?;
@@ -107,8 +110,8 @@ impl<'a> ImapConnector<'a> {
 
     pub fn list_msgs(&mut self, mbox: &str, page_size: &u32, page: &u32) -> Result<Msgs> {
         let last_seq = self.sess.select(mbox)?.exists;
-        let begin = last_seq - (page * page_size);
-        let end = begin - (page_size - 1);
+        let begin = last_seq - page * page_size;
+        let end = begin - (begin - 1).min(page_size - 1);
         let range = format!("{}:{}", begin, end);
 
         let msgs = self

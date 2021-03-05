@@ -74,6 +74,7 @@ type Result<T> = result::Result<T, Error>;
 // Account
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct Account {
     // Override
     pub name: Option<String>,
@@ -85,16 +86,22 @@ pub struct Account {
 
     pub imap_host: String,
     pub imap_port: u16,
+    pub imap_starttls: Option<bool>,
     pub imap_login: String,
     pub imap_passwd_cmd: String,
 
     pub smtp_host: String,
     pub smtp_port: u16,
+    pub smtp_starttls: Option<bool>,
     pub smtp_login: String,
     pub smtp_passwd_cmd: String,
 }
 
 impl Account {
+    pub fn imap_addr(&self) -> (&str, u16) {
+        (&self.imap_host, self.imap_port)
+    }
+
     pub fn imap_passwd(&self) -> Result<String> {
         let passwd = run_cmd(&self.imap_passwd_cmd)?;
         let passwd = passwd.trim_end_matches("\n").to_owned();
@@ -108,15 +115,12 @@ impl Account {
 
         Ok(SmtpCredentials::new(self.smtp_login.to_owned(), passwd))
     }
-
-    pub fn imap_addr(&self) -> (&str, u16) {
-        (&self.imap_host, self.imap_port)
-    }
 }
 
 // Config
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct Config {
     pub name: String,
     pub downloads_dir: Option<PathBuf>,
