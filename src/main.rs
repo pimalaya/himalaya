@@ -8,6 +8,7 @@ mod smtp;
 mod table;
 
 use clap::{App, AppSettings, Arg, SubCommand};
+use serde_json::json;
 use std::{fmt, fs, process::exit, result};
 
 use crate::config::Config;
@@ -99,6 +100,13 @@ fn uid_arg() -> Arg<'static, 'static> {
         .required(true)
 }
 
+fn reply_all_arg() -> Arg<'static, 'static> {
+    Arg::with_name("reply-all")
+        .help("Includes all recipients")
+        .short("a")
+        .long("all")
+}
+
 fn page_size_arg<'a>(default: &'a str) -> Arg<'a, 'a> {
     Arg::with_name("size")
         .help("Page size")
@@ -139,12 +147,12 @@ fn run() -> Result<()> {
             Arg::with_name("account")
                 .long("account")
                 .short("a")
-                .help("Name of the config file to use")
+                .help("Name of the account to use")
                 .value_name("STRING"),
         )
         .subcommand(
             SubCommand::with_name("mailboxes")
-                .aliases(&["mboxes", "mb", "m"])
+                .aliases(&["mboxes", "mbox", "mb", "m"])
                 .about("Lists all available mailboxes"),
         )
         .subcommand(
@@ -188,7 +196,7 @@ fn run() -> Result<()> {
         )
         .subcommand(
             SubCommand::with_name("attachments")
-                .aliases(&["attach", "a"])
+                .aliases(&["attach", "att", "a"])
                 .about("Downloads all attachments from an email")
                 .arg(uid_arg())
                 .arg(mailbox_arg()),
@@ -200,12 +208,7 @@ fn run() -> Result<()> {
                 .about("Answers to an email")
                 .arg(uid_arg())
                 .arg(mailbox_arg())
-                .arg(
-                    Arg::with_name("reply-all")
-                        .help("Includs all recipients")
-                        .short("a")
-                        .long("all"),
-                ),
+                .arg(reply_all_arg()),
         )
         .subcommand(
             SubCommand::with_name("forward")
@@ -213,6 +216,32 @@ fn run() -> Result<()> {
                 .about("Forwards an email")
                 .arg(uid_arg())
                 .arg(mailbox_arg()),
+        )
+        .subcommand(
+            SubCommand::with_name("template")
+                .aliases(&["tpl", "t"])
+                .about("Generates a message template")
+                .subcommand(
+                    SubCommand::with_name("new")
+                        .aliases(&["n"])
+                        .about("Generates a new message template")
+                        .arg(mailbox_arg()),
+                )
+                .subcommand(
+                    SubCommand::with_name("reply")
+                        .aliases(&["rep", "r"])
+                        .about("Generates a reply message template")
+                        .arg(uid_arg())
+                        .arg(mailbox_arg())
+                        .arg(reply_all_arg()),
+                )
+                .subcommand(
+                    SubCommand::with_name("forward")
+                        .aliases(&["fwd", "fw", "f"])
+                        .about("Generates a forward message template")
+                        .arg(uid_arg())
+                        .arg(mailbox_arg()),
+                ),
         )
         .get_matches();
 
@@ -309,7 +338,7 @@ fn run() -> Result<()> {
         let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
 
         let text_bodies = msg.text_bodies(&mime)?;
-        println!("{}", text_bodies);
+        print(&output_type, json!({ "content": text_bodies }))?;
 
         imap_conn.logout();
     }
@@ -343,7 +372,7 @@ fn run() -> Result<()> {
         let account = config.find_account_by_name(account_name)?;
         let mut imap_conn = ImapConnector::new(&account)?;
         let tpl = Msg::build_new_tpl(&config, &account)?;
-        let content = input::open_editor_with_tpl(&tpl.as_bytes())?;
+        let content = input::open_editor_with_tpl(tpl.to_string().as_bytes())?;
         let msg = Msg::from(content);
 
         input::ask_for_confirmation("Send the message?")?;
@@ -354,6 +383,41 @@ fn run() -> Result<()> {
         println!("Done!");
 
         imap_conn.logout();
+    }
+
+    if let Some(matches) = matches.subcommand_matches("template") {
+        let config = Config::new_from_file()?;
+        let account = config.find_account_by_name(account_name)?;
+        let mut imap_conn = ImapConnector::new(&account)?;
+
+        if let Some(_) = matches.subcommand_matches("new") {
+            let tpl = Msg::build_new_tpl(&config, &account)?;
+            print(&output_type, &tpl)?;
+        }
+
+        if let Some(matches) = matches.subcommand_matches("reply") {
+            let uid = matches.value_of("uid").unwrap();
+            let mbox = matches.value_of("mailbox").unwrap();
+
+            let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
+            let tpl = if matches.is_present("reply-all") {
+                msg.build_reply_all_tpl(&config, &account)?
+            } else {
+                msg.build_reply_tpl(&config, &account)?
+            };
+
+            print(&output_type, &tpl)?;
+        }
+
+        if let Some(matches) = matches.subcommand_matches("forward") {
+            let uid = matches.value_of("uid").unwrap();
+            let mbox = matches.value_of("mailbox").unwrap();
+
+            let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
+            let tpl = msg.build_forward_tpl(&config, &account)?;
+
+            print(&output_type, &tpl)?;
+        }
     }
 
     if let Some(matches) = matches.subcommand_matches("reply") {
@@ -371,7 +435,7 @@ fn run() -> Result<()> {
             msg.build_reply_tpl(&config, &account)?
         };
 
-        let content = input::open_editor_with_tpl(&tpl.as_bytes())?;
+        let content = input::open_editor_with_tpl(&tpl.to_string().as_bytes())?;
         let msg = Msg::from(content);
 
         input::ask_for_confirmation("Send the message?")?;
@@ -394,7 +458,7 @@ fn run() -> Result<()> {
 
         let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
         let tpl = msg.build_forward_tpl(&config, &account)?;
-        let content = input::open_editor_with_tpl(&tpl.as_bytes())?;
+        let content = input::open_editor_with_tpl(&tpl.to_string().as_bytes())?;
         let msg = Msg::from(content);
 
         input::ask_for_confirmation("Send the message?")?;

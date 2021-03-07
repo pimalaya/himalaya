@@ -1,7 +1,10 @@
 use lettre;
 use mailparse::{self, MailHeaderMap};
 use rfc2047_decoder;
-use serde::Serialize;
+use serde::{
+    ser::{self, SerializeStruct},
+    Serialize,
+};
 use std::{fmt, result};
 
 use crate::config::{Account, Config};
@@ -41,7 +44,29 @@ impl From<lettre::error::Error> for Error {
 
 type Result<T> = result::Result<T, Error>;
 
-// Msg
+// Template
+
+#[derive(Debug)]
+pub struct Tpl(String);
+
+impl fmt::Display for Tpl {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl Serialize for Tpl {
+    fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        let mut state = serializer.serialize_struct("Tpl", 1)?;
+        state.serialize_field("template", &self.0)?;
+        state.end()
+    }
+}
+
+// Message
 
 #[derive(Debug, Serialize)]
 pub struct Msg {
@@ -228,7 +253,7 @@ impl<'a> Msg {
         Ok(parts)
     }
 
-    pub fn build_new_tpl(config: &Config, account: &Account) -> Result<String> {
+    pub fn build_new_tpl(config: &Config, account: &Account) -> Result<Tpl> {
         let mut tpl = vec![];
 
         // "From" header
@@ -240,10 +265,10 @@ impl<'a> Msg {
         // "Subject" header
         tpl.push("Subject: ".to_string());
 
-        Ok(tpl.join("\r\n"))
+        Ok(Tpl(tpl.join("\r\n")))
     }
 
-    pub fn build_reply_tpl(&self, config: &Config, account: &Account) -> Result<String> {
+    pub fn build_reply_tpl(&self, config: &Config, account: &Account) -> Result<Tpl> {
         let msg = &self.parse()?;
         let headers = msg.get_headers();
         let mut tpl = vec![];
@@ -271,19 +296,19 @@ impl<'a> Msg {
         tpl.push(String::new());
 
         // Original msg prepend with ">"
-        let thread = msg
-            .get_body()
-            .unwrap()
-            .split("\r\n")
+        let thread = self
+            .text_bodies("text/plain")?
+            .replace("\r", "")
+            .split("\n")
             .map(|line| format!(">{}", line))
             .collect::<Vec<String>>()
             .join("\r\n");
         tpl.push(thread);
 
-        Ok(tpl.join("\r\n"))
+        Ok(Tpl(tpl.join("\r\n")))
     }
 
-    pub fn build_reply_all_tpl(&self, config: &Config, account: &Account) -> Result<String> {
+    pub fn build_reply_all_tpl(&self, config: &Config, account: &Account) -> Result<Tpl> {
         let msg = &self.parse()?;
         let headers = msg.get_headers();
         let mut tpl = vec![];
@@ -353,19 +378,18 @@ impl<'a> Msg {
         tpl.push(String::new());
 
         // Original msg prepend with ">"
-        let thread = msg
-            .get_body()
-            .unwrap()
+        let thread = self
+            .text_bodies("text/plain")?
             .split("\r\n")
             .map(|line| format!(">{}", line))
             .collect::<Vec<String>>()
             .join("\r\n");
         tpl.push(thread);
 
-        Ok(tpl.join("\r\n"))
+        Ok(Tpl(tpl.join("\r\n")))
     }
 
-    pub fn build_forward_tpl(&self, config: &Config, account: &Account) -> Result<String> {
+    pub fn build_forward_tpl(&self, config: &Config, account: &Account) -> Result<Tpl> {
         let msg = &self.parse()?;
         let headers = msg.get_headers();
         let mut tpl = vec![];
@@ -385,9 +409,9 @@ impl<'a> Msg {
 
         // Original msg
         tpl.push("-------- Forwarded Message --------".to_string());
-        tpl.push(msg.get_body().unwrap_or(String::new()));
+        tpl.push(self.text_bodies("text/plain")?);
 
-        Ok(tpl.join("\r\n"))
+        Ok(Tpl(tpl.join("\r\n")))
     }
 }
 
