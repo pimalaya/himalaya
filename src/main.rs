@@ -218,6 +218,17 @@ fn run() -> Result<()> {
                 .arg(mailbox_arg()),
         )
         .subcommand(
+            SubCommand::with_name("send")
+                .about("Sends a raw message")
+                .arg(Arg::with_name("message").raw(true)),
+        )
+        .subcommand(
+            SubCommand::with_name("save")
+                .about("Saves a raw message in the given mailbox")
+                .arg(mailbox_arg())
+                .arg(Arg::with_name("message").raw(true)),
+        )
+        .subcommand(
             SubCommand::with_name("template")
                 .aliases(&["tpl", "t"])
                 .about("Generates a message template")
@@ -468,6 +479,32 @@ fn run() -> Result<()> {
         imap_conn.append_msg("Sent", &msg.to_vec()?)?;
         println!("Done!");
 
+        imap_conn.logout();
+    }
+
+    if let Some(matches) = matches.subcommand_matches("send") {
+        let config = Config::new_from_file()?;
+        let account = config.find_account_by_name(account_name)?;
+        let mut imap_conn = ImapConnector::new(&account)?;
+
+        let msg = matches.value_of("message").unwrap();
+        let msg = Msg::from(msg.to_string());
+
+        smtp::send(&account, &msg.to_sendable_msg()?)?;
+        imap_conn.append_msg("Sent", &msg.to_vec()?)?;
+        imap_conn.logout();
+    }
+
+    if let Some(matches) = matches.subcommand_matches("save") {
+        let config = Config::new_from_file()?;
+        let account = config.find_account_by_name(account_name)?;
+        let mut imap_conn = ImapConnector::new(&account)?;
+
+        let mbox = matches.value_of("mailbox").unwrap();
+        let msg = matches.value_of("message").unwrap();
+        let msg = Msg::from(msg.to_string());
+
+        imap_conn.append_msg(mbox, &msg.to_vec()?)?;
         imap_conn.logout();
     }
 
