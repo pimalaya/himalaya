@@ -8,28 +8,30 @@ Minimalist CLI email client, written in Rust.
 
 * [Motivation](#motivation)
 * [Installation](#installation)
+* [Configuration](#configuration)
 * [Usage](#usage)
   * [List mailboxes](#list-mailboxes)
-  * [List emails](#list-emails)
-  * [Search emails](#search-emails)
-  * [Download email attachments](#download-email-attachments)
-  * [Read email](#read-email)
-  * [Reply email](#reply-email)
-  * [Forward email](#forward-email)
+  * [List messages](#list-messages)
+  * [Search messages](#search-messages)
+  * [Download attachments](#download-attachments)
+  * [Read a message](#read-a-message)
+  * [Write a new message](#write-a-new-message)
+  * [Reply to a message](#reply-to-a-message)
+  * [Forward a message](#forward-a-message)
 * [License](https://github.com/soywod/himalaya/blob/master/LICENSE)
 * [Changelog](https://github.com/soywod/himalaya/blob/master/CHANGELOG.md)
 * [Credits](#credits)
 
 ## Motivation
 
-Bringing emails to your terminal is a pain. The mainstream TUI, (neo)mutt,
-takes time to configure. The default mapping is not intuitive when coming from
-the Vim environment. It is even scary to use at the beginning, since you are
+Bringing emails to the terminal is a pain. The mainstream TUI, (neo)mutt, takes
+time to configure. The default mapping is not intuitive when coming from the
+Vim environment. It is even scary to use at the beginning, since you are
 dealing with sensitive data!
 
 The aim of Himalaya is to extract the email logic into a simple CLI API that
-can be used either directly for the terminal or from various interfaces. It
-gives users more flexibility.
+can be used either directly from the terminal or from interfaces. It gives
+users more flexibility.
 
 ## Installation
 
@@ -46,7 +48,7 @@ more information.*
 # ~/.config/himalaya/config.toml
 
 name = "Your full name"
-downloads_dir = "/abs/path/to/downloads"
+downloads-dir = "/abs/path/to/downloads"
 
 # Himalaya supports the multi-account
 # Each account should be inside a TOML section
@@ -54,32 +56,32 @@ downloads_dir = "/abs/path/to/downloads"
 default = true
 email = "my.email@gmail.com"
 
-imap_host = "imap.gmail.com"
-imap_port = 993
-imap_login = "p.durant@gmail.test.com"
-imap_passwd_cmd = "pass show gmail"
+imap-host = "imap.gmail.com"
+imap-port = 993
+imap-login = "test@gmail.com"
+imap-passwd_cmd = "pass show gmail"
 
-smtp_host = "smtp.gmail.com"
-smtp_port = 487
-smtp_login = "p.durant@gmail.test.com"
-smtp_passwd_cmd = "pass show gmail"
+smtp-host = "smtp.gmail.com"
+smtp-port = 487
+smtp-login = "test@gmail.com"
+smtp-passwd_cmd = "pass show gmail"
 
 [posteo]
 name = "Your overriden full name"
-downloads_dir = "/abs/path/to/overriden/downloads"
-email = "my.email@posteo.net"
+downloads-dir = "/abs/path/to/overriden/downloads"
+email = "test@posteo.net"
 
-imap_host = "posteo.de"
-imap_port = 993
-imap_login = "my.email@posteo.net"
-imap_passwd_cmd = "security find-internet-password -gs posteo -w"
+imap-host = "posteo.de"
+imap-port = 993
+imap-login = "test@posteo.net"
+imap-passwd_cmd = "security find-internet-password -gs posteo -w"
 
-smtp_host = "posteo.de"
-smtp_port = 487
-smtp_login = "my.email@posteo.net"
-smtp_passwd_cmd = "security find-internet-password -gs posteo -w"
+smtp-host = "posteo.de"
+smtp-port = 487
+smtp-login = "test@posteo.net"
+smtp-passwd_cmd = "security find-internet-password -gs posteo -w"
 
-# [other account]
+# [other accounts]
 # ...
 ```
 
@@ -101,7 +103,8 @@ FLAGS:
     -V, --version    Prints version information
 
 OPTIONS:
-    -a, --account <STRING>    Name of the config file to use
+    -a, --account <STRING>    Name of the account to use
+    -o, --output <STRING>     Format of the output to print [default: text]  [possible values: text, json]
 
 SUBCOMMANDS:
     attachments    Downloads all attachments from an email
@@ -111,7 +114,10 @@ SUBCOMMANDS:
     mailboxes      Lists all available mailboxes
     read           Reads text bodies of an email
     reply          Answers to an email
+    save           Saves a raw message in the given mailbox
     search         Lists emails matching the given IMAP query
+    send           Sends a raw message
+    template       Generates a message template
     write          Writes a new email
 ```
 
@@ -120,182 +126,80 @@ information.*
 
 ### List mailboxes
 
+Shows mailboxes in a basic table.
+
 ![image](https://user-images.githubusercontent.com/10437171/104848169-0e432000-58e4-11eb-8410-05f0404c0d99.png)
-
-```
-himalaya-mailboxes 
-Lists all available mailboxes
-
-USAGE:
-    himalaya mailboxes
-
-FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
-```
 
 *See [wiki section](https://github.com/soywod/himalaya/wiki/Usage:mailboxes)
 for more information.*
 
-### List emails
+### List messages
+
+Shows messages in a basic table.
 
 ![image](https://user-images.githubusercontent.com/10437171/104848096-aee51000-58e3-11eb-8d99-bcfab5ca28ba.png)
-
-```
-himalaya-list 
-Lists emails sorted by arrival date
-
-USAGE:
-    himalaya list [OPTIONS]
-
-FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
-
-OPTIONS:
-    -m, --mailbox <STRING>    Name of the mailbox [default: INBOX]
-    -p, --page <INT>          Page number [default: 0]
-    -s, --size <INT>          Page size [default: 10]
-```
 
 *See [wiki section](https://github.com/soywod/himalaya/wiki/Usage:list) for
 more information.*
 
-### Search emails
+### Search messages
 
-![image](https://user-images.githubusercontent.com/10437171/104848096-aee51000-58e3-11eb-8d99-bcfab5ca28ba.png)
+Shows filtered messages in a basic table. The query should follow the
+[RFC-3501](https://tools.ietf.org/html/rfc3501#section-6.4.4).
 
-```
-himalaya-search 
-Lists emails matching the given IMAP query
-
-USAGE:
-    himalaya search [OPTIONS] <QUERY>...
-
-FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
-
-OPTIONS:
-    -m, --mailbox <STRING>    Name of the mailbox [default: INBOX]
-    -p, --page <INT>          Page number [default: 0]
-    -s, --size <INT>          Page size [default: 10]
-
-ARGS:
-    <QUERY>...    IMAP query (see https://tools.ietf.org/html/rfc3501#section-6.4.4)
-```
+![image](https://user-images.githubusercontent.com/10437171/110698977-9d86f880-81ee-11eb-8990-0ca89c7d4640.png)
 
 *See [wiki section](https://github.com/soywod/himalaya/wiki/Usage:search) for
 more information.*
 
-### Download email attachments
+### Download attachments
+
+Downloads attachments in the [`downloads-dir`](#configuration).
 
 ![image](https://user-images.githubusercontent.com/10437171/104848278-890c3b00-58e4-11eb-9b5c-48807c04f762.png)
-
-```
-himalaya-attachments 
-Downloads all attachments from an email
-
-USAGE:
-    himalaya attachments [OPTIONS] <UID>
-
-FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
-
-OPTIONS:
-    -m, --mailbox <STRING>    Name of the mailbox [default: INBOX]
-
-ARGS:
-    <UID>    UID of the email
-```
 
 *See [wiki section](https://github.com/soywod/himalaya/wiki/Usage:attachments)
 for more information.*
 
-### Read email
+### Read a message
 
-```
-himalaya-read 
-Reads text bodies of an email
+Shows the text content of a message (`text/plain` if exists, otherwise
+`text/html`).
 
-USAGE:
-    himalaya read [OPTIONS] <UID>
-
-FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
-
-OPTIONS:
-    -m, --mailbox <STRING>      Name of the mailbox [default: INBOX]
-    -t, --mime-type <STRING>    MIME type to use [default: plain]  [possible values: plain, html]
-
-ARGS:
-    <UID>    UID of the email
-```
+![image](https://user-images.githubusercontent.com/10437171/110701369-5d754500-81f1-11eb-932f-94c2ca8db068.png)
 
 *See [wiki section](https://github.com/soywod/himalaya/wiki/Usage:read) for
 more information.*
 
-### Write email
+### Write a new message
 
-```
-himalaya-write 
-Writes a new email
+Opens your default editor (from the `$EDITOR` environment variable) to compose
+a new message.
 
-USAGE:
-    himalaya write
-
-FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
+```bash
+himalaya write
 ```
 
 *See [wiki section](https://github.com/soywod/himalaya/wiki/Usage:write) for
 more information.*
 
-### Reply email
+### Reply to a message
 
-```
-himalaya-reply 
-Answers to an email
+Opens your default editor to reply to a message.
 
-USAGE:
-    himalaya reply [FLAGS] [OPTIONS] <UID>
-
-FLAGS:
-    -h, --help       Prints help information
-    -a, --all        Includs all recipients
-    -V, --version    Prints version information
-
-OPTIONS:
-    -m, --mailbox <STRING>    Name of the mailbox [default: INBOX]
-
-ARGS:
-    <UID>    UID of the email
+```bash
+himalaya reply --all 5123
 ```
 
 *See [wiki section](https://github.com/soywod/himalaya/wiki/Usage:reply) for
 more information.*
 
-### Forward email
+### Forward a message
 
-```
-himalaya-forward 
-Forwards an email
+Opens your default editor to forward a message.
 
-USAGE:
-    himalaya forward [OPTIONS] <UID>
-
-FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
-
-OPTIONS:
-    -m, --mailbox <STRING>    Name of the mailbox [default: INBOX]
-
-ARGS:
-    <UID>    UID of the email
+```bash
+himalaya forward 5123
 ```
 
 *See [wiki section](https://github.com/soywod/himalaya/wiki/Usage:forward) for
@@ -306,5 +210,6 @@ more information.*
 - [IMAP RFC3501](https://tools.ietf.org/html/rfc3501)
 - [Iris](https://github.com/soywod/iris.vim), the himalaya predecessor
 - [Neomutt](https://neomutt.org/)
+- [mutt-wizard](https://github.com/LukeSmithxyz/mutt-wizard)
 - [Alpine](http://alpine.x10host.com/alpine/alpine-info/)
 - [rust-imap](https://github.com/jonhoo/rust-imap)
