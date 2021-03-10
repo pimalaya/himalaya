@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2021-03-10
+
+### Added
+
+- STARTTLS support [#32]
+- Flags [#25]
+
+### Changed
+
+- JSON support [#18]
+
 ## [0.1.0] - 2021-01-17
 
 ### Added
@@ -30,7 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.1.0...HEAD
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/soywod/himalaya/compare/v0.2.0...v0.1.0
 [0.1.0]: https://github.com/soywod/himalaya/releases/tag/v0.1.0
 
 [#1]: https://github.com/soywod/himalaya/issues/1
@@ -48,7 +60,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#15]: https://github.com/soywod/himalaya/issues/15
 [#16]: https://github.com/soywod/himalaya/issues/16
 [#17]: https://github.com/soywod/himalaya/issues/17
+[#18]: https://github.com/soywod/himalaya/issues/18
 [#19]: https://github.com/soywod/himalaya/issues/19
 [#20]: https://github.com/soywod/himalaya/issues/20
 [#21]: https://github.com/soywod/himalaya/issues/21
 [#22]: https://github.com/soywod/himalaya/issues/22
+[#25]: https://github.com/soywod/himalaya/issues/25
+[#32]: https://github.com/soywod/himalaya/issues/32

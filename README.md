@@ -29,9 +29,9 @@ time to configure. The default mapping is not intuitive when coming from the
 Vim environment. It is even scary to use at the beginning, since you are
 dealing with sensitive data!
 
-The aim of Himalaya is to extract the email logic into a simple CLI API that
-can be used either directly from the terminal or from interfaces. It gives
-users more flexibility.
+The aim of Himalaya is to extract the email logic into a simple (yet solid) CLI
+API that can be used either directly from the terminal or UIs. It gives users
+more flexibility.
 
 ## Installation
 
@@ -91,7 +91,7 @@ more information.*
 ## Usage
 
 ```
-Himalaya 0.1.0
+Himalaya 0.2.0
 soywod <clement.douin@posteo.net>
 📫 Minimalist CLI email client
 
@@ -130,7 +130,7 @@ Shows mailboxes in a basic table.
 
 ![image](https://user-images.githubusercontent.com/10437171/104848169-0e432000-58e4-11eb-8410-05f0404c0d99.png)
 
-*See [wiki section](https://github.com/soywod/himalaya/wiki/Usage:mailboxes)
+*See [wiki section](https://github.com/soywod/himalaya/wiki/Usage:list-mailboxes)
 for more information.*
 
 ### List messages
@@ -139,7 +139,7 @@ Shows messages in a basic table.
 
 ![image](https://user-images.githubusercontent.com/10437171/104848096-aee51000-58e3-11eb-8d99-bcfab5ca28ba.png)
 
-*See [wiki section](https://github.com/soywod/himalaya/wiki/Usage:list) for
+*See [wiki section](https://github.com/soywod/himalaya/wiki/Usage:list-messages) for
 more information.*
 
 ### Search messages
@@ -149,26 +149,26 @@ Shows filtered messages in a basic table. The query should follow the
 
 ![image](https://user-images.githubusercontent.com/10437171/110698977-9d86f880-81ee-11eb-8990-0ca89c7d4640.png)
 
-*See [wiki section](https://github.com/soywod/himalaya/wiki/Usage:search) for
+*See [wiki section](https://github.com/soywod/himalaya/wiki/Usage:search-messages) for
 more information.*
 
 ### Download attachments
 
-Downloads attachments in the [`downloads-dir`](#configuration).
+Downloads all attachments directly to the [`downloads-dir`](#configuration).
 
 ![image](https://user-images.githubusercontent.com/10437171/104848278-890c3b00-58e4-11eb-9b5c-48807c04f762.png)
 
-*See [wiki section](https://github.com/soywod/himalaya/wiki/Usage:attachments)
+*See [wiki section](https://github.com/soywod/himalaya/wiki/Usage:download-attachments)
 for more information.*
 
 ### Read a message
 
 Shows the text content of a message (`text/plain` if exists, otherwise
-`text/html`).
+`text/html`). Can be overriden by the `--mime-type` option.
 
 ![image](https://user-images.githubusercontent.com/10437171/110701369-5d754500-81f1-11eb-932f-94c2ca8db068.png)
 
-*See [wiki section](https://github.com/soywod/himalaya/wiki/Usage:read) for
+*See [wiki section](https://github.com/soywod/himalaya/wiki/Usage:read-a-message) for
 more information.*
 
 ### Write a new message
@@ -180,7 +180,7 @@ a new message.
 himalaya write
 ```
 
-*See [wiki section](https://github.com/soywod/himalaya/wiki/Usage:write) for
+*See [wiki section](https://github.com/soywod/himalaya/wiki/Usage:write-a-new-message) for
 more information.*
 
 ### Reply to a message
@@ -191,7 +191,7 @@ Opens your default editor to reply to a message.
 himalaya reply --all 5123
 ```
 
-*See [wiki section](https://github.com/soywod/himalaya/wiki/Usage:reply) for
+*See [wiki section](https://github.com/soywod/himalaya/wiki/Usage:reply-to-a-message) for
 more information.*
 
 ### Forward a message
@@ -202,14 +202,15 @@ Opens your default editor to forward a message.
 himalaya forward 5123
 ```
 
-*See [wiki section](https://github.com/soywod/himalaya/wiki/Usage:forward) for
+*See [wiki section](https://github.com/soywod/himalaya/wiki/Usage:forward-a-message) for
 more information.*
 
 ## Credits
 
 - [IMAP RFC3501](https://tools.ietf.org/html/rfc3501)
 - [Iris](https://github.com/soywod/iris.vim), the himalaya predecessor
-- [Neomutt](https://neomutt.org/)
-- [mutt-wizard](https://github.com/LukeSmithxyz/mutt-wizard)
-- [Alpine](http://alpine.x10host.com/alpine/alpine-info/)
-- [rust-imap](https://github.com/jonhoo/rust-imap)
+- [isync](https://isync.sourceforge.io/), an email synchronizer for offline usage
+- [NeoMutt](https://neomutt.org/), an email terminal user interface
+- [Alpine](http://alpine.x10host.com/alpine/alpine-info/), an other email terminal user interface
+- [mutt-wizard](https://github.com/LukeSmithxyz/mutt-wizard), a tool over NeoMutt and isync
+- [rust-imap](https://github.com/jonhoo/rust-imap), a rust IMAP lib

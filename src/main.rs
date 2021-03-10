@@ -129,7 +129,7 @@ fn run() -> Result<()> {
     let default_page_str = &DEFAULT_PAGE.to_string();
 
     let matches = App::new("Himalaya")
-        .version("0.1.0")
+        .version("0.2.0")
         .about("📫 Minimalist CLI email client")
         .author("soywod <clement.douin@posteo.net>")
         .setting(AppSettings::ArgRequiredElseHelp)
