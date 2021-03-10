@@ -6,6 +6,7 @@ use serde::{
     Serialize,
 };
 use std::{fmt, result};
+use uuid::Uuid;
 
 use crate::config::{Account, Config};
 use crate::table::{self, DisplayRow, DisplayTable};
@@ -63,6 +64,133 @@ impl Serialize for Tpl {
         let mut state = serializer.serialize_struct("Tpl", 1)?;
         state.serialize_field("template", &self.0)?;
         state.end()
+    }
+}
+
+// Attachments
+
+#[derive(Debug)]
+pub struct Attachment {
+    pub filename: String,
+    pub raw: Vec<u8>,
+}
+
+impl<'a> Attachment {
+    // TODO: put in common with ReadableMsg
+    pub fn from_part(part: &'a mailparse::ParsedMail) -> Self {
+        Self {
+            filename: part
+                .get_content_disposition()
+                .params
+                .get("filename")
+                .unwrap_or(&Uuid::new_v4().to_simple().to_string())
+                .to_owned(),
+            raw: part.get_body_raw().unwrap_or_default(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Attachments(pub Vec<Attachment>);
+
+impl<'a> Attachments {
+    fn extract_from_part(&'a mut self, part: &'a mailparse::ParsedMail) {
+        if part.subparts.is_empty() {
+            let ctype = part
+                .get_headers()
+                .get_first_value("content-type")
+                .unwrap_or_default();
+
+            if !ctype.starts_with("text") {
+                self.0.push(Attachment::from_part(part));
+            }
+        } else {
+            part.subparts
+                .iter()
+                .for_each(|part| self.extract_from_part(part));
+        }
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        let msg = mailparse::parse_mail(bytes)?;
+        let mut attachments = Self(vec![]);
+        attachments.extract_from_part(&msg);
+        Ok(attachments)
+    }
+}
+
+// Readable message
+
+#[derive(Debug)]
+pub struct ReadableMsg {
+    pub content: String,
+    pub has_attachment: bool,
+}
+
+impl Serialize for ReadableMsg {
+    fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        let mut state = serializer.serialize_struct("ReadableMsg", 2)?;
+        state.serialize_field("content", &self.content)?;
+        state.serialize_field("hasAttachment", if self.has_attachment { &1 } else { &0 })?;
+        state.end()
+    }
+}
+
+impl fmt::Display for ReadableMsg {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.content)
+    }
+}
+
+impl<'a> ReadableMsg {
+    fn flatten_parts(part: &'a mailparse::ParsedMail) -> Vec<&'a mailparse::ParsedMail<'a>> {
+        if part.subparts.is_empty() {
+            vec![part]
+        } else {
+            part.subparts
+                .iter()
+                .flat_map(Self::flatten_parts)
+                .collect::<Vec<_>>()
+        }
+    }
+
+    pub fn from_bytes(mime: &str, bytes: &[u8]) -> Result<Self> {
+        let msg = mailparse::parse_mail(bytes)?;
+        let (text_part, html_part, has_attachment) = Self::flatten_parts(&msg).into_iter().fold(
+            (None, None, false),
+            |(mut text_part, mut html_part, mut has_attachment), part| {
+                let ctype = part
+                    .get_headers()
+                    .get_first_value("content-type")
+                    .unwrap_or_default();
+
+                if text_part.is_none() && ctype.starts_with("text/plain") {
+                    text_part = part.get_body().ok();
+                } else {
+                    if html_part.is_none() && ctype.starts_with("text/html") {
+                        html_part = part.get_body().ok();
+                    } else {
+                        has_attachment = true
+                    };
+                };
+
+                (text_part, html_part, has_attachment)
+            },
+        );
+
+        let content = if mime == "text/plain" {
+            text_part.or(html_part).unwrap_or_default()
+        } else {
+            html_part.or(text_part).unwrap_or_default()
+        };
+
+        Ok(Self {
+            content,
+            has_attachment,
+        })
     }
 }
 
@@ -219,42 +347,12 @@ impl<'a> Msg {
         Ok(text_bodies.join("\r\n"))
     }
 
-    fn extract_attachments_into(part: &mailparse::ParsedMail, parts: &mut Vec<(String, Vec<u8>)>) {
-        match part.subparts.len() {
-            0 => {
-                let content_disp = part.get_content_disposition();
-                let content_type = part
-                    .get_headers()
-                    .get_first_value("content-type")
-                    .unwrap_or_default();
-
-                let default_attachment_name = format!("attachment-{}", parts.len());
-                let attachment_name = content_disp
-                    .params
-                    .get("filename")
-                    .unwrap_or(&default_attachment_name)
-                    .to_owned();
-
-                if !content_type.starts_with("text") {
-                    parts.push((attachment_name, part.get_body_raw().unwrap_or_default()))
-                }
-            }
-            _ => {
-                part.subparts
-                    .iter()
-                    .for_each(|part| Self::extract_attachments_into(part, parts));
-            }
-        }
-    }
-
-    pub fn extract_attachments(&self) -> Result<Vec<(String, Vec<u8>)>> {
-        let mut parts = vec![];
-        Self::extract_attachments_into(&self.parse()?, &mut parts);
-        Ok(parts)
-    }
-
     pub fn build_new_tpl(config: &Config, account: &Account) -> Result<Tpl> {
         let mut tpl = vec![];
+
+        // "Content" headers
+        tpl.push("Content-Type: text/plain; charset=utf-8".to_string());
+        tpl.push("Content-Transfer-Encoding: 8bit".to_string());
 
         // "From" header
         tpl.push(format!("From: {}", config.address(account)));
@@ -272,6 +370,10 @@ impl<'a> Msg {
         let msg = &self.parse()?;
         let headers = msg.get_headers();
         let mut tpl = vec![];
+
+        // "Content" headers
+        tpl.push("Content-Type: text/plain; charset=utf-8".to_string());
+        tpl.push("Content-Transfer-Encoding: 8bit".to_string());
 
         // "From" header
         tpl.push(format!("From: {}", config.address(account)));
@@ -312,6 +414,10 @@ impl<'a> Msg {
         let msg = &self.parse()?;
         let headers = msg.get_headers();
         let mut tpl = vec![];
+
+        // "Content" headers
+        tpl.push("Content-Type: text/plain; charset=utf-8".to_string());
+        tpl.push("Content-Transfer-Encoding: 8bit".to_string());
 
         // "From" header
         tpl.push(format!("From: {}", config.address(account)));
@@ -393,6 +499,10 @@ impl<'a> Msg {
         let msg = &self.parse()?;
         let headers = msg.get_headers();
         let mut tpl = vec![];
+
+        // "Content" headers
+        tpl.push("Content-Type: text/plain; charset=utf-8".to_string());
+        tpl.push("Content-Transfer-Encoding: 8bit".to_string());
 
         // "From" header
         tpl.push(format!("From: {}", config.address(account)));

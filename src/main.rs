@@ -8,12 +8,11 @@ mod smtp;
 mod table;
 
 use clap::{App, AppSettings, Arg, SubCommand};
-use serde_json::json;
 use std::{fmt, fs, process::exit, result};
 
 use crate::config::Config;
 use crate::imap::ImapConnector;
-use crate::msg::Msg;
+use crate::msg::{Attachments, Msg, ReadableMsg};
 use crate::output::print;
 
 const DEFAULT_PAGE_SIZE: usize = 10;
@@ -343,14 +342,15 @@ fn run() -> Result<()> {
         let config = Config::new_from_file()?;
         let account = config.find_account_by_name(account_name)?;
         let mut imap_conn = ImapConnector::new(&account)?;
+
         let mbox = matches.value_of("mailbox").unwrap();
         let uid = matches.value_of("uid").unwrap();
         let mime = format!("text/{}", matches.value_of("mime-type").unwrap());
-        let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
 
-        let text_bodies = msg.text_bodies(&mime)?;
-        print(&output_type, json!({ "content": text_bodies }))?;
+        let msg = imap_conn.read_msg(&mbox, &uid)?;
+        let msg = ReadableMsg::from_bytes(&mime, &msg)?;
 
+        print(&output_type, msg)?;
         imap_conn.logout();
     }
 
@@ -358,21 +358,38 @@ fn run() -> Result<()> {
         let config = Config::new_from_file()?;
         let account = config.find_account_by_name(account_name)?;
         let mut imap_conn = ImapConnector::new(&account)?;
+
         let mbox = matches.value_of("mailbox").unwrap();
         let uid = matches.value_of("uid").unwrap();
-        let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
-        let parts = msg.extract_attachments()?;
 
-        if parts.is_empty() {
-            println!("No attachment found for message {}", uid);
-        } else {
-            println!("{} attachment(s) found for message {}", parts.len(), uid);
-            parts.iter().for_each(|(filename, bytes)| {
-                let filepath = config.downloads_filepath(&account, &filename);
-                println!("Downloading {}…", filename);
-                fs::write(filepath, bytes).unwrap()
-            });
-            println!("Done!");
+        let msg = imap_conn.read_msg(&mbox, &uid)?;
+        let attachments = Attachments::from_bytes(&msg)?;
+
+        match output_type.as_str() {
+            "text" => {
+                println!(
+                    "{} attachment(s) found for message {}",
+                    attachments.0.len(),
+                    uid
+                );
+
+                attachments.0.iter().for_each(|attachment| {
+                    let filepath = config.downloads_filepath(&account, &attachment.filename);
+                    println!("Downloading {}…", &attachment.filename);
+                    fs::write(filepath, &attachment.raw).unwrap()
+                });
+
+                println!("Done!");
+            }
+            "json" => {
+                attachments.0.iter().for_each(|attachment| {
+                    let filepath = config.downloads_filepath(&account, &attachment.filename);
+                    fs::write(filepath, &attachment.raw).unwrap()
+                });
+
+                print!("{{}}");
+            }
+            _ => (),
         }
 
         imap_conn.logout();
