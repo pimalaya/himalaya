@@ -116,7 +116,7 @@ impl<'a> ImapConnector<'a> {
 
         let msgs = self
             .sess
-            .fetch(range, "(UID ENVELOPE INTERNALDATE)")?
+            .fetch(range, "(UID FLAGS ENVELOPE INTERNALDATE)")?
             .iter()
             .rev()
             .map(Msg::from)

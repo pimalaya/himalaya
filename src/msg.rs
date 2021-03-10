@@ -197,8 +197,28 @@ impl<'a> ReadableMsg {
 // Message
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Flag {
+    Seen,
+    Answered,
+    Flagged,
+}
+
+impl Flag {
+    fn from_imap_flag(flag: &imap::types::Flag<'_>) -> Option<Self> {
+        match flag {
+            imap::types::Flag::Seen => Some(Self::Seen),
+            imap::types::Flag::Answered => Some(Self::Answered),
+            imap::types::Flag::Flagged => Some(Self::Flagged),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
 pub struct Msg {
     pub uid: u32,
+    pub flags: Vec<Flag>,
     pub subject: String,
     pub sender: String,
     pub date: String,
@@ -211,6 +231,7 @@ impl From<Vec<u8>> for Msg {
     fn from(raw: Vec<u8>) -> Self {
         Self {
             uid: 0,
+            flags: vec![],
             subject: String::from(""),
             sender: String::from(""),
             date: String::from(""),
@@ -231,6 +252,11 @@ impl From<&imap::types::Fetch> for Msg {
             None => Self::from(fetch.body().unwrap_or_default().to_vec()),
             Some(envelope) => Self {
                 uid: fetch.uid.unwrap_or_default(),
+                flags: fetch
+                    .flags()
+                    .into_iter()
+                    .filter_map(Flag::from_imap_flag)
+                    .collect::<Vec<_>>(),
                 subject: envelope
                     .subject
                     .and_then(|subj| rfc2047_decoder::decode(subj).ok())
