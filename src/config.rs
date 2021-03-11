@@ -131,7 +131,7 @@ impl Account {
 pub struct Config {
     pub name: String,
     pub downloads_dir: Option<PathBuf>,
-    pub notification_cmd: Option<String>,
+    pub notify_cmd: Option<String>,
 
     #[serde(flatten)]
     pub accounts: HashMap<String, Account>,
@@ -214,7 +214,7 @@ impl Config {
     pub fn run_notify_cmd(&self, subject: &str, sender: &str) -> Result<()> {
         let default_cmd = format!(r#"notify-send "📫 {}" "{}""#, sender, subject);
         let cmd = self
-            .notification_cmd
+            .notify_cmd
             .as_ref()
             .map(|s| format!(r#"{} "{}" "{}""#, s, subject, sender))
             .unwrap_or(default_cmd);

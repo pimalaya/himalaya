@@ -53,17 +53,17 @@ downloads-dir = "/abs/path/to/downloads"
 
 [gmail]
 default = true
-email = "my.email@gmail.com"
+email = "your.email@gmail.com"
 
 imap-host = "imap.gmail.com"
 imap-port = 993
-imap-login = "test@gmail.com"
+imap-login = "your.email@gmail.com"
 imap-passwd-cmd = "pass show gmail"
 
 smtp-host = "smtp.gmail.com"
 smtp-port = 487
-smtp-login = "test@gmail.com"
-smtp-passwd-cmd = "security find-internet-password -gs posteo -w"
+smtp-login = "your.email@gmail.com"
+smtp-passwd-cmd = "security find-internet-password -gs gmail -w"
 ```
 
 *See the [wiki section](https://github.com/soywod/himalaya/wiki/Configuration)
@@ -171,7 +171,7 @@ himalaya idle
 ```
 
 Starts a session in idle mode (blocking). When a new message arrives, it runs
-the command `notification-cmd` defined in the [config
+the command `notify-cmd` defined in the [config
 file](https://github.com/soywod/himalaya/wiki/Configuration).
 
 Here a use case with [`systemd`](https://en.wikipedia.org/wiki/Systemd):
