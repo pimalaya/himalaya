@@ -24,21 +24,28 @@ pub enum Error {
     GetAccountNotFoundError(String),
     GetAccountDefaultNotFoundError,
     OutputError(output::Error),
+
+    // new erorrs,
+    RunNotifyCmdError(output::Error),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "config: ")?;
+        use Error::*;
 
         match self {
-            Error::IoError(err) => err.fmt(f),
-            Error::ParseTomlError(err) => err.fmt(f),
-            Error::ParseTomlAccountsError => write!(f, "no account found"),
-            Error::GetEnvVarError(err) => err.fmt(f),
-            Error::GetPathNotFoundError => write!(f, "path not found"),
-            Error::GetAccountNotFoundError(account) => write!(f, "account {} not found", account),
-            Error::GetAccountDefaultNotFoundError => write!(f, "no default account found"),
-            Error::OutputError(err) => err.fmt(f),
+            IoError(err) => err.fmt(f),
+            ParseTomlError(err) => err.fmt(f),
+            ParseTomlAccountsError => write!(f, "no account found"),
+            GetEnvVarError(err) => err.fmt(f),
+            GetPathNotFoundError => write!(f, "path not found"),
+            GetAccountNotFoundError(account) => write!(f, "account {} not found", account),
+            GetAccountDefaultNotFoundError => write!(f, "no default account found"),
+            OutputError(err) => err.fmt(f),
+            RunNotifyCmdError(err) => {
+                write!(f, "run notification cmd: ")?;
+                err.fmt(f)
+            }
         }
     }
 }
@@ -124,6 +131,7 @@ impl Account {
 pub struct Config {
     pub name: String,
     pub downloads_dir: Option<PathBuf>,
+    pub notification_cmd: Option<String>,
 
     #[serde(flatten)]
     pub accounts: HashMap<String, Account>,
@@ -201,5 +209,16 @@ impl Config {
     pub fn address(&self, account: &Account) -> String {
         let name = account.name.as_ref().unwrap_or(&self.name);
         format!("{} <{}>", name, account.email)
+    }
+
+    pub fn run_notify_cmd(&self, subject: &str, sender: &str) -> Result<()> {
+        let default_cmd = format!(r#"notify-send "📫 {}" "{}""#, sender, subject);
+        let cmd = self
+            .notification_cmd
+            .as_ref()
+            .map(|s| format!(r#"{} "{}" "{}""#, s, subject, sender))
+            .unwrap_or(default_cmd);
+        run_cmd(&cmd).map_err(Error::RunNotifyCmdError)?;
+        Ok(())
     }
 }

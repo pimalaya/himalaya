@@ -2,9 +2,11 @@ use imap;
 use native_tls::{self, TlsConnector, TlsStream};
 use std::{fmt, net::TcpStream, result};
 
-use crate::config::{self, Account};
-use crate::mbox::{Mbox, Mboxes};
-use crate::msg::{Msg, Msgs};
+use crate::{
+    config::{self, Account, Config},
+    mbox::{Mbox, Mboxes},
+    msg::{Msg, Msgs},
+};
 
 // Error wrapper
 
@@ -17,25 +19,32 @@ pub enum Error {
     ReadEmailEmptyPartError(String, String),
     ExtractAttachmentsEmptyError(String),
     ConfigError(config::Error),
+
+    // new errors
+    IdleError(imap::Error),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "imap: ")?;
+        use Error::*;
 
         match self {
-            Error::CreateTlsConnectorError(err) => err.fmt(f),
-            Error::CreateImapSession(err) => err.fmt(f),
-            Error::ParseEmailError(err) => err.fmt(f),
-            Error::ConfigError(err) => err.fmt(f),
-            Error::ReadEmailNotFoundError(uid) => {
+            CreateTlsConnectorError(err) => err.fmt(f),
+            CreateImapSession(err) => err.fmt(f),
+            ParseEmailError(err) => err.fmt(f),
+            ConfigError(err) => err.fmt(f),
+            ReadEmailNotFoundError(uid) => {
                 write!(f, "no email found for uid {}", uid)
             }
-            Error::ReadEmailEmptyPartError(uid, mime) => {
+            ReadEmailEmptyPartError(uid, mime) => {
                 write!(f, "no {} content found for uid {}", mime, uid)
             }
-            Error::ExtractAttachmentsEmptyError(uid) => {
+            ExtractAttachmentsEmptyError(uid) => {
                 write!(f, "no attachment found for uid {}", uid)
+            }
+            IdleError(err) => {
+                write!(f, "IMAP idle mode: ")?;
+                err.fmt(f)
             }
         }
     }
@@ -94,6 +103,37 @@ impl<'a> ImapConnector<'a> {
     pub fn logout(&mut self) {
         match self.sess.logout() {
             _ => (),
+        }
+    }
+
+    fn last_new_seq(&mut self) -> Result<Option<u32>> {
+        Ok(self.sess.uid_search("NEW")?.into_iter().next())
+    }
+
+    pub fn idle(&mut self, config: &Config, mbox: &str) -> Result<()> {
+        let mut prev_seq = 0;
+        self.sess.examine(mbox)?;
+
+        loop {
+            self.sess
+                .idle()
+                .and_then(|idle| idle.wait_keepalive())
+                .map_err(Error::IdleError)?;
+
+            if let Some(seq) = self.last_new_seq()? {
+                if prev_seq != seq {
+                    if let Some(msg) = self
+                        .sess
+                        .uid_fetch(seq.to_string(), "(ENVELOPE)")?
+                        .iter()
+                        .next()
+                        .map(Msg::from)
+                    {
+                        config.run_notify_cmd(&msg.subject, &msg.sender)?;
+                        prev_seq = seq;
+                    }
+                }
+            }
         }
     }
 

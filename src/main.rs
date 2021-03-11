@@ -253,6 +253,11 @@ fn run() -> Result<()> {
                         .arg(mailbox_arg()),
                 ),
         )
+        .subcommand(
+            SubCommand::with_name("idle")
+                .about("Starts the idle mode")
+                .arg(mailbox_arg()),
+        )
         .get_matches();
 
     let account_name = matches.value_of("account");
@@ -523,6 +528,14 @@ fn run() -> Result<()> {
 
         imap_conn.append_msg(mbox, &msg.to_vec()?)?;
         imap_conn.logout();
+    }
+
+    if let Some(matches) = matches.subcommand_matches("idle") {
+        let config = Config::new_from_file()?;
+        let account = config.find_account_by_name(account_name)?;
+        let mut imap_conn = ImapConnector::new(&account)?;
+        let mbox = matches.value_of("mailbox").unwrap();
+        imap_conn.idle(&config, &mbox)?;
     }
 
     Ok(())
