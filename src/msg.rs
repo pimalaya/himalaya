@@ -170,7 +170,7 @@ impl<'a> ReadableMsg {
 
 // Message
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Flag {
     Seen,
@@ -252,6 +252,30 @@ impl From<&imap::types::Fetch> for Msg {
 }
 
 impl<'a> Msg {
+    pub fn display_flags(&self) -> String {
+        let mut flags = String::new();
+
+        flags.push_str(if self.flags.contains(&Flag::Seen) {
+            " "
+        } else {
+            "✶"
+        });
+
+        flags.push_str(if self.flags.contains(&Flag::Answered) {
+            "↩"
+        } else {
+            " "
+        });
+
+        flags.push_str(if self.flags.contains(&Flag::Flagged) {
+            "!"
+        } else {
+            " "
+        });
+
+        flags
+    }
+
     pub fn parse(&'a self) -> Result<mailparse::ParsedMail<'a>> {
         Ok(mailparse::parse_mail(&self.raw)?)
     }
@@ -529,11 +553,18 @@ impl DisplayRow for Msg {
     fn to_row(&self) -> Vec<table::Cell> {
         use crate::table::*;
 
+        let unseen = if self.flags.contains(&Flag::Seen) {
+            RESET
+        } else {
+            BOLD
+        };
+
         vec![
-            Cell::new(&[RED], &self.uid.to_string()),
-            Cell::new(&[BLUE], &self.sender),
-            FlexCell::new(&[GREEN], &self.subject),
-            Cell::new(&[YELLOW], &self.date),
+            Cell::new(&[unseen.to_owned(), RED], &self.uid.to_string()),
+            Cell::new(&[unseen.to_owned(), WHITE], &self.display_flags()),
+            FlexCell::new(&[unseen.to_owned(), GREEN], &self.subject),
+            Cell::new(&[unseen.to_owned(), BLUE], &self.sender),
+            Cell::new(&[unseen.to_owned(), YELLOW], &self.date),
         ]
     }
 }
@@ -549,8 +580,9 @@ impl<'a> DisplayTable<'a, Msg> for Msgs {
 
         vec![
             Cell::new(&[BOLD, UNDERLINE, WHITE], "UID"),
-            Cell::new(&[BOLD, UNDERLINE, WHITE], "SENDER"),
+            Cell::new(&[BOLD, UNDERLINE, WHITE], "FLAGS"),
             FlexCell::new(&[BOLD, UNDERLINE, WHITE], "SUBJECT"),
+            Cell::new(&[BOLD, UNDERLINE, WHITE], "SENDER"),
             Cell::new(&[BOLD, UNDERLINE, WHITE], "DATE"),
         ]
     }
@@ -562,6 +594,6 @@ impl<'a> DisplayTable<'a, Msg> for Msgs {
 
 impl fmt::Display for Msgs {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.to_table())
+        write!(f, "\n{}", self.to_table())
     }
 }

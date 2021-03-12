@@ -58,6 +58,6 @@ impl<'a> DisplayTable<'a, Mbox> for Mboxes {
 
 impl fmt::Display for Mboxes {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.to_table())
+        write!(f, "\n{}", self.to_table())
     }
 }

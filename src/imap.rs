@@ -143,7 +143,7 @@ impl<'a> ImapConnector<'a> {
 
         let msgs = self
             .sess
-            .fetch(&range, "(UID ENVELOPE INTERNALDATE)")
+            .fetch(&range, "(UID FLAGS ENVELOPE INTERNALDATE)")
             .chain_err(|| format!("Cannot fetch range `{}`", &range))?
             .iter()
             .map(Msg::from)
