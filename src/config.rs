@@ -1,82 +1,12 @@
+use error_chain::error_chain;
 use lettre::transport::smtp::authentication::Credentials as SmtpCredentials;
 use serde::Deserialize;
-use std::{
-    collections::HashMap,
-    env, fmt,
-    fs::File,
-    io::{self, Read},
-    path::PathBuf,
-    result,
-};
+use std::{collections::HashMap, env, fs::File, io::Read, path::PathBuf};
 use toml;
 
-use crate::output::{self, run_cmd};
+use crate::output::run_cmd;
 
-// Error wrapper
-
-#[derive(Debug)]
-pub enum Error {
-    IoError(io::Error),
-    ParseTomlError(toml::de::Error),
-    ParseTomlAccountsError,
-    GetEnvVarError(env::VarError),
-    GetPathNotFoundError,
-    GetAccountNotFoundError(String),
-    GetAccountDefaultNotFoundError,
-    OutputError(output::Error),
-
-    // new erorrs,
-    RunNotifyCmdError(output::Error),
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use Error::*;
-
-        match self {
-            IoError(err) => err.fmt(f),
-            ParseTomlError(err) => err.fmt(f),
-            ParseTomlAccountsError => write!(f, "no account found"),
-            GetEnvVarError(err) => err.fmt(f),
-            GetPathNotFoundError => write!(f, "path not found"),
-            GetAccountNotFoundError(account) => write!(f, "account {} not found", account),
-            GetAccountDefaultNotFoundError => write!(f, "no default account found"),
-            OutputError(err) => err.fmt(f),
-            RunNotifyCmdError(err) => {
-                write!(f, "run notification cmd: ")?;
-                err.fmt(f)
-            }
-        }
-    }
-}
-
-impl From<io::Error> for Error {
-    fn from(err: io::Error) -> Error {
-        Error::IoError(err)
-    }
-}
-
-impl From<toml::de::Error> for Error {
-    fn from(err: toml::de::Error) -> Error {
-        Error::ParseTomlError(err)
-    }
-}
-
-impl From<env::VarError> for Error {
-    fn from(err: env::VarError) -> Error {
-        Error::GetEnvVarError(err)
-    }
-}
-
-impl From<output::Error> for Error {
-    fn from(err: output::Error) -> Error {
-        Error::OutputError(err)
-    }
-}
-
-// Result wrapper
-
-type Result<T> = result::Result<T, Error>;
+error_chain! {}
 
 // Account
 
@@ -110,17 +40,31 @@ impl Account {
     }
 
     pub fn imap_passwd(&self) -> Result<String> {
-        let passwd = run_cmd(&self.imap_passwd_cmd)?;
+        let passwd = run_cmd(&self.imap_passwd_cmd).chain_err(|| "Cannot run IMAP passwd cmd")?;
         let passwd = passwd.trim_end_matches("\n").to_owned();
 
         Ok(passwd)
     }
 
+    pub fn imap_starttls(&self) -> bool {
+        match self.imap_starttls {
+            Some(true) => true,
+            _ => false,
+        }
+    }
+
     pub fn smtp_creds(&self) -> Result<SmtpCredentials> {
-        let passwd = run_cmd(&self.smtp_passwd_cmd)?;
+        let passwd = run_cmd(&self.smtp_passwd_cmd).chain_err(|| "Cannot run SMTP passwd cmd")?;
         let passwd = passwd.trim_end_matches("\n").to_owned();
 
         Ok(SmtpCredentials::new(self.smtp_login.to_owned(), passwd))
+    }
+
+    pub fn smtp_starttls(&self) -> bool {
+        match self.smtp_starttls {
+            Some(true) => true,
+            _ => false,
+        }
     }
 }
 
@@ -139,7 +83,8 @@ pub struct Config {
 
 impl Config {
     fn path_from_xdg() -> Result<PathBuf> {
-        let path = env::var("XDG_CONFIG_HOME")?;
+        let path =
+            env::var("XDG_CONFIG_HOME").chain_err(|| "Cannot find `XDG_CONFIG_HOME` env var")?;
         let mut path = PathBuf::from(path);
         path.push("himalaya");
         path.push("config.toml");
@@ -147,8 +92,8 @@ impl Config {
         Ok(path)
     }
 
-    fn path_from_home() -> Result<PathBuf> {
-        let path = env::var("HOME")?;
+    fn path_from_xdg_alt() -> Result<PathBuf> {
+        let path = env::var("HOME").chain_err(|| "Cannot find `HOME` env var")?;
         let mut path = PathBuf::from(path);
         path.push(".config");
         path.push("himalaya");
@@ -157,10 +102,10 @@ impl Config {
         Ok(path)
     }
 
-    fn path_from_tmp() -> Result<PathBuf> {
-        let mut path = env::temp_dir();
-        path.push("himalaya");
-        path.push("config.toml");
+    fn path_from_home() -> Result<PathBuf> {
+        let path = env::var("HOME").chain_err(|| "Cannot find `HOME` env var")?;
+        let mut path = PathBuf::from(path);
+        path.push(".himalayarc");
 
         Ok(path)
     }
@@ -168,15 +113,17 @@ impl Config {
     pub fn new_from_file() -> Result<Self> {
         let mut file = File::open(
             Self::path_from_xdg()
+                .or_else(|_| Self::path_from_xdg_alt())
                 .or_else(|_| Self::path_from_home())
-                .or_else(|_| Self::path_from_tmp())
-                .or_else(|_| Err(Error::GetPathNotFoundError))?,
-        )?;
+                .chain_err(|| "Cannot find config path")?,
+        )
+        .chain_err(|| "Cannot open config file")?;
 
         let mut content = vec![];
-        file.read_to_end(&mut content)?;
+        file.read_to_end(&mut content)
+            .chain_err(|| "Cannot read config file")?;
 
-        Ok(toml::from_slice(&content)?)
+        Ok(toml::from_slice(&content).chain_err(|| "Cannot parse config file")?)
     }
 
     pub fn find_account_by_name(&self, name: Option<&str>) -> Result<&Account> {
@@ -184,13 +131,13 @@ impl Config {
             Some(name) => self
                 .accounts
                 .get(name)
-                .ok_or_else(|| Error::GetAccountNotFoundError(name.to_owned())),
+                .ok_or_else(|| format!("Cannot find account `{}`", name).into()),
             None => self
                 .accounts
                 .iter()
                 .find(|(_, account)| account.default.unwrap_or(false))
                 .map(|(_, account)| account)
-                .ok_or_else(|| Error::GetAccountDefaultNotFoundError),
+                .ok_or_else(|| "Cannot find default account".into()),
         }
     }
 
@@ -218,7 +165,9 @@ impl Config {
             .as_ref()
             .map(|s| format!(r#"{} "{}" "{}""#, s, subject, sender))
             .unwrap_or(default_cmd);
-        run_cmd(&cmd).map_err(Error::RunNotifyCmdError)?;
+
+        run_cmd(&cmd).chain_err(|| "Cannot run notify cmd")?;
+
         Ok(())
     }
 }

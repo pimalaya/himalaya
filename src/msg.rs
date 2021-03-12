@@ -1,3 +1,4 @@
+use error_chain::error_chain;
 use lettre;
 use mailparse::{self, MailHeaderMap};
 use rfc2047_decoder;
@@ -11,39 +12,12 @@ use uuid::Uuid;
 use crate::config::{Account, Config};
 use crate::table::{self, DisplayRow, DisplayTable};
 
-// Error wrapper
-
-#[derive(Debug)]
-pub enum Error {
-    ParseMsgError(mailparse::MailParseError),
-    BuildSendableMsgError(lettre::error::Error),
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "(msg): ")?;
-        match self {
-            Error::ParseMsgError(err) => err.fmt(f),
-            Error::BuildSendableMsgError(err) => err.fmt(f),
-        }
+error_chain! {
+    foreign_links {
+        Mailparse(mailparse::MailParseError);
+        Lettre(lettre::error::Error);
     }
 }
-
-impl From<mailparse::MailParseError> for Error {
-    fn from(err: mailparse::MailParseError) -> Error {
-        Error::ParseMsgError(err)
-    }
-}
-
-impl From<lettre::error::Error> for Error {
-    fn from(err: lettre::error::Error) -> Error {
-        Error::BuildSendableMsgError(err)
-    }
-}
-
-// Result wrapper
-
-type Result<T> = result::Result<T, Error>;
 
 // Template
 
