@@ -1,6 +1,6 @@
 use clap::{self, Arg, SubCommand};
 use error_chain::error_chain;
-use std::fs;
+use std::{env, fs};
 
 use crate::{
     config::{self, Config},
@@ -332,14 +332,33 @@ impl<'a> App<'a> {
             let mut imap_conn = ImapConnector::new(&account)?;
             let tpl = Msg::build_new_tpl(&config, &account)?;
             let content = input::open_editor_with_tpl(tpl.to_string().as_bytes())?;
-            let msg = Msg::from(content);
+            let mut msg = Msg::from(content);
 
-            input::ask_for_confirmation("Send the message?")?;
-
-            println!("Sending…");
-            smtp::send(&account, &msg.to_sendable_msg()?)?;
-            imap_conn.append_msg("Sent", &msg.to_vec()?)?;
-            println!("Done!");
+            loop {
+                match input::post_edit_choice() {
+                    Ok(choice) => match choice {
+                        input::Choice::Send => {
+                            println!("Sending…");
+                            smtp::send(&account, &msg.to_sendable_msg()?)?;
+                            imap_conn.append_msg("Sent", &msg.to_vec()?)?;
+                            println!("Done!");
+                            break;
+                        }
+                        input::Choice::Draft => {
+                            println!("Saving to draft…");
+                            imap_conn.append_msg("Drafts", &msg.to_vec()?)?;
+                            println!("Done!");
+                            break;
+                        }
+                        input::Choice::Edit => {
+                            let content = input::open_editor_with_draft()?;
+                            msg = Msg::from(content);
+                        }
+                        input::Choice::Quit => break,
+                    },
+                    Err(err) => eprintln!("{}", err),
+                }
+            }
 
             imap_conn.logout();
         }
@@ -395,14 +414,33 @@ impl<'a> App<'a> {
             };
 
             let content = input::open_editor_with_tpl(&tpl.to_string().as_bytes())?;
-            let msg = Msg::from(content);
+            let mut msg = Msg::from(content);
 
-            input::ask_for_confirmation("Send the message?")?;
-
-            println!("Sending…");
-            smtp::send(&account, &msg.to_sendable_msg()?)?;
-            imap_conn.append_msg("Sent", &msg.to_vec()?)?;
-            println!("Done!");
+            loop {
+                match input::post_edit_choice() {
+                    Ok(choice) => match choice {
+                        input::Choice::Send => {
+                            println!("Sending…");
+                            smtp::send(&account, &msg.to_sendable_msg()?)?;
+                            imap_conn.append_msg("Sent", &msg.to_vec()?)?;
+                            println!("Done!");
+                            break;
+                        }
+                        input::Choice::Draft => {
+                            println!("Saving to draft…");
+                            imap_conn.append_msg("Drafts", &msg.to_vec()?)?;
+                            println!("Done!");
+                            break;
+                        }
+                        input::Choice::Edit => {
+                            let content = input::open_editor_with_draft()?;
+                            msg = Msg::from(content);
+                        }
+                        input::Choice::Quit => break,
+                    },
+                    Err(err) => eprintln!("{}", err),
+                }
+            }
 
             imap_conn.logout();
         }
@@ -418,14 +456,33 @@ impl<'a> App<'a> {
             let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
             let tpl = msg.build_forward_tpl(&config, &account)?;
             let content = input::open_editor_with_tpl(&tpl.to_string().as_bytes())?;
-            let msg = Msg::from(content);
+            let mut msg = Msg::from(content);
 
-            input::ask_for_confirmation("Send the message?")?;
-
-            println!("Sending…");
-            smtp::send(&account, &msg.to_sendable_msg()?)?;
-            imap_conn.append_msg("Sent", &msg.to_vec()?)?;
-            println!("Done!");
+            loop {
+                match input::post_edit_choice() {
+                    Ok(choice) => match choice {
+                        input::Choice::Send => {
+                            println!("Sending…");
+                            smtp::send(&account, &msg.to_sendable_msg()?)?;
+                            imap_conn.append_msg("Sent", &msg.to_vec()?)?;
+                            println!("Done!");
+                            break;
+                        }
+                        input::Choice::Draft => {
+                            println!("Saving to draft…");
+                            imap_conn.append_msg("Drafts", &msg.to_vec()?)?;
+                            println!("Done!");
+                            break;
+                        }
+                        input::Choice::Edit => {
+                            let content = input::open_editor_with_draft()?;
+                            msg = Msg::from(content);
+                        }
+                        input::Choice::Quit => break,
+                    },
+                    Err(err) => eprintln!("{}", err),
+                }
+            }
 
             imap_conn.logout();
         }

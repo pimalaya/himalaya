@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - IDLE support [#29]
+- Improve choice after editing msg [#30]
 
 ### Changed
 
@@ -80,6 +81,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#22]: https://github.com/soywod/himalaya/issues/22
 [#25]: https://github.com/soywod/himalaya/issues/25
 [#29]: https://github.com/soywod/himalaya/issues/29
+[#30]: https://github.com/soywod/himalaya/issues/30
 [#32]: https://github.com/soywod/himalaya/issues/32
 [#38]: https://github.com/soywod/himalaya/issues/38
 [#39]: https://github.com/soywod/himalaya/issues/39
