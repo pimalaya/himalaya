@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Missing `FLAGS` column in messages table [#40]
+- Subtract with overflow if next page empty [#38]
 
 ## [0.2.0] - 2021-03-10
 
@@ -80,5 +81,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#25]: https://github.com/soywod/himalaya/issues/25
 [#29]: https://github.com/soywod/himalaya/issues/29
 [#32]: https://github.com/soywod/himalaya/issues/32
+[#38]: https://github.com/soywod/himalaya/issues/38
 [#39]: https://github.com/soywod/himalaya/issues/39
 [#40]: https://github.com/soywod/himalaya/issues/40

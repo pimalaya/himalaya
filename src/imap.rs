@@ -101,10 +101,16 @@ impl<'a> ImapConnector<'a> {
             .sess
             .select(mbox)
             .chain_err(|| format!("Cannot select mailbox `{}`", mbox))?
-            .exists;
+            .exists as i64;
 
-        let begin = last_seq - page * page_size;
-        let end = begin - (begin - 1).min(page_size - 1);
+        if last_seq == 0 {
+            return Err(format!("Cannot select empty mailbox `{}`", mbox).into());
+        }
+
+        // TODO: add tests, improve error management when empty page
+        let cursor = (page * page_size) as i64;
+        let begin = 1.max(last_seq - cursor);
+        let end = begin - begin.min(*page_size as i64) + 1;
         let range = format!("{}:{}", begin, end);
 
         let msgs = self
