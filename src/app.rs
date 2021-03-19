@@ -489,6 +489,7 @@ impl<'a> App<'a> {
                             println!("Sending…");
                             smtp::send(&account, &msg.to_sendable_msg()?)?;
                             imap_conn.append_msg("Sent", &msg.to_vec()?)?;
+                            imap_conn.add_flags(mbox, uid, "\\Answered")?;
                             println!("Done!");
                             break;
                         }

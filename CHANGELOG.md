@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - IDLE support [#29]
 - Improve choice after editing msg [#30]
+- Flags management [#41]
 
 ### Changed
 
@@ -86,3 +87,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#38]: https://github.com/soywod/himalaya/issues/38
 [#39]: https://github.com/soywod/himalaya/issues/39
 [#40]: https://github.com/soywod/himalaya/issues/40
+[#41]: https://github.com/soywod/himalaya/issues/41
