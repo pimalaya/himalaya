@@ -29,14 +29,14 @@ impl<'a> App<'a> {
         Arg::with_name("mailbox")
             .short("m")
             .long("mailbox")
-            .help("Name of the mailbox")
+            .help("Mailbox name")
             .value_name("STRING")
             .default_value("INBOX")
     }
 
     fn uid_arg() -> Arg<'a, 'a> {
         Arg::with_name("uid")
-            .help("UID of the email")
+            .help("Message UID")
             .value_name("UID")
             .required(true)
     }
@@ -66,17 +66,24 @@ impl<'a> App<'a> {
             .default_value("0")
     }
 
+    fn flags_arg() -> Arg<'a, 'a> {
+        Arg::with_name("flags")
+            .help("IMAP flags (see https://tools.ietf.org/html/rfc3501#page-11)")
+            .value_name("FLAGS")
+            .multiple(true)
+            .required(true)
+    }
+
     pub fn new() -> Self {
-        Self(clap::App::new("Himalaya")
+        Self(clap::App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
-        .about("📫 Minimalist CLI email client")
-        .author("soywod <clement.douin@posteo.net>")
-        .setting(clap::AppSettings::ArgRequiredElseHelp)
+        .about(env!("CARGO_PKG_DESCRIPTION"))
+        .author(env!("CARGO_PKG_AUTHORS"))
         .arg(
             Arg::with_name("output")
                 .long("output")
                 .short("o")
-                .help("Format of the output to print")
+                .help("Formats the output")
                 .value_name("STRING")
                 .possible_values(&["text", "json"])
                 .default_value("text"),
@@ -85,13 +92,46 @@ impl<'a> App<'a> {
             Arg::with_name("account")
                 .long("account")
                 .short("a")
-                .help("Name of the account to use")
+                .help("Selects a specific account")
                 .value_name("STRING"),
+        )
+        .arg(
+            Arg::with_name("mailbox")
+                .short("m")
+                .long("mailbox")
+                .help("Selects a specific mailbox")
+                .value_name("STRING")
+                .default_value("INBOX")
         )
         .subcommand(
             SubCommand::with_name("mailboxes")
-                .aliases(&["mboxes", "mbox", "mb", "m"])
+                .aliases(&["mailbox", "mboxes", "mbox", "mb", "m"])
                 .about("Lists all available mailboxes"),
+        )
+        .subcommand(
+            SubCommand::with_name("flags")
+                .aliases(&["flag", "f"])
+                .subcommand(
+                    SubCommand::with_name("set")
+                        .aliases(&["s"])
+                        .about("Replaces all message flags")
+                        .arg(Self::uid_arg())
+                        .arg(Self::flags_arg()),
+                )
+                .subcommand(
+                    SubCommand::with_name("add")
+                        .aliases(&["a"])
+                        .about("Appends flags to a message")
+                        .arg(Self::uid_arg())
+                        .arg(Self::flags_arg()),
+                )
+                .subcommand(
+                    SubCommand::with_name("remove")
+                        .aliases(&["rm", "r"])
+                        .about("Removes flags from a message")
+                        .arg(Self::uid_arg())
+                        .arg(Self::flags_arg()),
+                )
         )
         .subcommand(
             SubCommand::with_name("list")
@@ -202,8 +242,9 @@ impl<'a> App<'a> {
     pub fn run(self) -> Result<()> {
         let matches = self.0.get_matches();
 
-        let account_name = matches.value_of("account");
         let output_type = matches.value_of("output").unwrap().to_owned();
+        let account_name = matches.value_of("account");
+        let mbox = matches.value_of("mailbox").unwrap();
 
         if let Some(_) = matches.subcommand_matches("mailboxes") {
             let config = Config::new_from_file()?;
@@ -214,6 +255,30 @@ impl<'a> App<'a> {
             print(&output_type, mboxes)?;
 
             imap_conn.logout();
+        }
+
+        if let Some(matches) = matches.subcommand_matches("flags") {
+            let config = Config::new_from_file()?;
+            let account = config.find_account_by_name(account_name)?;
+            let mut imap_conn = ImapConnector::new(&account)?;
+
+            if let Some(matches) = matches.subcommand_matches("set") {
+                let uid = matches.value_of("uid").unwrap();
+                let flags = matches.value_of("flags").unwrap();
+                imap_conn.set_flags(mbox, uid, flags)?;
+            }
+
+            if let Some(matches) = matches.subcommand_matches("add") {
+                let uid = matches.value_of("uid").unwrap();
+                let flags = matches.value_of("flags").unwrap();
+                imap_conn.add_flags(mbox, uid, flags)?;
+            }
+
+            if let Some(matches) = matches.subcommand_matches("remove") {
+                let uid = matches.value_of("uid").unwrap();
+                let flags = matches.value_of("flags").unwrap();
+                imap_conn.remove_flags(mbox, uid, flags)?;
+            }
         }
 
         if let Some(matches) = matches.subcommand_matches("list") {
@@ -339,8 +404,9 @@ impl<'a> App<'a> {
                     Ok(choice) => match choice {
                         input::Choice::Send => {
                             println!("Sending…");
-                            smtp::send(&account, &msg.to_sendable_msg()?)?;
-                            imap_conn.append_msg("Sent", &msg.to_vec()?)?;
+                            let msg = msg.to_sendable_msg()?;
+                            smtp::send(&account, &msg)?;
+                            imap_conn.append_msg("Sent", &msg.formatted())?;
                             println!("Done!");
                             break;
                         }
@@ -494,9 +560,10 @@ impl<'a> App<'a> {
 
             let msg = matches.value_of("message").unwrap();
             let msg = Msg::from(msg.to_string());
+            let msg = msg.to_sendable_msg()?;
 
-            smtp::send(&account, &msg.to_sendable_msg()?)?;
-            imap_conn.append_msg("Sent", &msg.to_vec()?)?;
+            smtp::send(&account, &msg)?;
+            imap_conn.append_msg("Sent", &msg.formatted())?;
             imap_conn.logout();
         }
 

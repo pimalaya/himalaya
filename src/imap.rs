@@ -45,6 +45,42 @@ impl<'a> ImapConnector<'a> {
         }
     }
 
+    pub fn set_flags(&mut self, mbox: &str, uid_seq: &str, flags: &str) -> Result<()> {
+        self.sess
+            .select(mbox)
+            .chain_err(|| format!("Cannot select mailbox `{}`", mbox))?;
+
+        self.sess
+            .uid_store(uid_seq, format!("FLAGS ({})", flags))
+            .chain_err(|| format!("Cannot set flags `{}`", &flags))?;
+
+        Ok(())
+    }
+
+    pub fn add_flags(&mut self, mbox: &str, uid_seq: &str, flags: &str) -> Result<()> {
+        self.sess
+            .select(mbox)
+            .chain_err(|| format!("Cannot select mailbox `{}`", mbox))?;
+
+        self.sess
+            .uid_store(uid_seq, format!("+FLAGS ({})", flags))
+            .chain_err(|| format!("Cannot add flags `{}`", &flags))?;
+
+        Ok(())
+    }
+
+    pub fn remove_flags(&mut self, mbox: &str, uid_seq: &str, flags: &str) -> Result<()> {
+        self.sess
+            .select(mbox)
+            .chain_err(|| format!("Cannot select mailbox `{}`", mbox))?;
+
+        self.sess
+            .uid_store(uid_seq, format!("-FLAGS ({})", flags))
+            .chain_err(|| format!("Cannot remove flags `{}`", &flags))?;
+
+        Ok(())
+    }
+
     fn last_new_seq(&mut self) -> Result<Option<u32>> {
         Ok(self
             .sess
