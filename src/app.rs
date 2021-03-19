@@ -4,6 +4,7 @@ use std::{env, fs};
 
 use crate::{
     config::{self, Config},
+    flag::cli::{flags_matches, flags_subcommand},
     imap::{self, ImapConnector},
     input,
     msg::{self, Attachments, Msg, ReadableMsg},
@@ -66,14 +67,6 @@ impl<'a> App<'a> {
             .default_value("0")
     }
 
-    fn flags_arg() -> Arg<'a, 'a> {
-        Arg::with_name("flags")
-            .help("IMAP flags (see https://tools.ietf.org/html/rfc3501#page-11)")
-            .value_name("FLAGS")
-            .multiple(true)
-            .required(true)
-    }
-
     pub fn new() -> Self {
         Self(clap::App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
@@ -108,31 +101,7 @@ impl<'a> App<'a> {
                 .aliases(&["mailbox", "mboxes", "mbox", "mb", "m"])
                 .about("Lists all available mailboxes"),
         )
-        .subcommand(
-            SubCommand::with_name("flags")
-                .aliases(&["flag", "f"])
-                .subcommand(
-                    SubCommand::with_name("set")
-                        .aliases(&["s"])
-                        .about("Replaces all message flags")
-                        .arg(Self::uid_arg())
-                        .arg(Self::flags_arg()),
-                )
-                .subcommand(
-                    SubCommand::with_name("add")
-                        .aliases(&["a"])
-                        .about("Appends flags to a message")
-                        .arg(Self::uid_arg())
-                        .arg(Self::flags_arg()),
-                )
-                .subcommand(
-                    SubCommand::with_name("remove")
-                        .aliases(&["rm", "r"])
-                        .about("Removes flags from a message")
-                        .arg(Self::uid_arg())
-                        .arg(Self::flags_arg()),
-                )
-        )
+        .subcommand(flags_subcommand())
         .subcommand(
             SubCommand::with_name("list")
                 .aliases(&["lst", "l"])
@@ -243,12 +212,12 @@ impl<'a> App<'a> {
         let matches = self.0.get_matches();
 
         let output_type = matches.value_of("output").unwrap().to_owned();
-        let account_name = matches.value_of("account");
+        let account = matches.value_of("account");
         let mbox = matches.value_of("mailbox").unwrap();
 
         if let Some(_) = matches.subcommand_matches("mailboxes") {
             let config = Config::new_from_file()?;
-            let account = config.find_account_by_name(account_name)?;
+            let account = config.find_account_by_name(account)?;
             let mut imap_conn = ImapConnector::new(&account)?;
 
             let mboxes = imap_conn.list_mboxes()?;
@@ -258,32 +227,13 @@ impl<'a> App<'a> {
         }
 
         if let Some(matches) = matches.subcommand_matches("flags") {
-            let config = Config::new_from_file()?;
-            let account = config.find_account_by_name(account_name)?;
-            let mut imap_conn = ImapConnector::new(&account)?;
-
-            if let Some(matches) = matches.subcommand_matches("set") {
-                let uid = matches.value_of("uid").unwrap();
-                let flags = matches.value_of("flags").unwrap();
-                imap_conn.set_flags(mbox, uid, flags)?;
-            }
-
-            if let Some(matches) = matches.subcommand_matches("add") {
-                let uid = matches.value_of("uid").unwrap();
-                let flags = matches.value_of("flags").unwrap();
-                imap_conn.add_flags(mbox, uid, flags)?;
-            }
-
-            if let Some(matches) = matches.subcommand_matches("remove") {
-                let uid = matches.value_of("uid").unwrap();
-                let flags = matches.value_of("flags").unwrap();
-                imap_conn.remove_flags(mbox, uid, flags)?;
-            }
+            flags_matches(account, &mbox, &matches)
+                .chain_err(|| "Could not handle flags arg matches")?;
         }
 
         if let Some(matches) = matches.subcommand_matches("list") {
             let config = Config::new_from_file()?;
-            let account = config.find_account_by_name(account_name)?;
+            let account = config.find_account_by_name(account)?;
             let mut imap_conn = ImapConnector::new(&account)?;
 
             let mbox = matches.value_of("mailbox").unwrap();
@@ -298,7 +248,7 @@ impl<'a> App<'a> {
 
         if let Some(matches) = matches.subcommand_matches("search") {
             let config = Config::new_from_file()?;
-            let account = config.find_account_by_name(account_name)?;
+            let account = config.find_account_by_name(account)?;
             let mut imap_conn = ImapConnector::new(&account)?;
             let mbox = matches.value_of("mailbox").unwrap();
             let page_size: usize = matches.value_of("size").unwrap().parse().unwrap();
@@ -336,7 +286,7 @@ impl<'a> App<'a> {
 
         if let Some(matches) = matches.subcommand_matches("read") {
             let config = Config::new_from_file()?;
-            let account = config.find_account_by_name(account_name)?;
+            let account = config.find_account_by_name(account)?;
             let mut imap_conn = ImapConnector::new(&account)?;
 
             let mbox = matches.value_of("mailbox").unwrap();
@@ -352,7 +302,7 @@ impl<'a> App<'a> {
 
         if let Some(matches) = matches.subcommand_matches("attachments") {
             let config = Config::new_from_file()?;
-            let account = config.find_account_by_name(account_name)?;
+            let account = config.find_account_by_name(account)?;
             let mut imap_conn = ImapConnector::new(&account)?;
 
             let mbox = matches.value_of("mailbox").unwrap();
@@ -393,7 +343,7 @@ impl<'a> App<'a> {
 
         if let Some(_) = matches.subcommand_matches("write") {
             let config = Config::new_from_file()?;
-            let account = config.find_account_by_name(account_name)?;
+            let account = config.find_account_by_name(account)?;
             let mut imap_conn = ImapConnector::new(&account)?;
             let tpl = Msg::build_new_tpl(&config, &account)?;
             let content = input::open_editor_with_tpl(tpl.to_string().as_bytes())?;
@@ -431,7 +381,7 @@ impl<'a> App<'a> {
 
         if let Some(matches) = matches.subcommand_matches("template") {
             let config = Config::new_from_file()?;
-            let account = config.find_account_by_name(account_name)?;
+            let account = config.find_account_by_name(account)?;
             let mut imap_conn = ImapConnector::new(&account)?;
 
             if let Some(_) = matches.subcommand_matches("new") {
@@ -466,7 +416,7 @@ impl<'a> App<'a> {
 
         if let Some(matches) = matches.subcommand_matches("reply") {
             let config = Config::new_from_file()?;
-            let account = config.find_account_by_name(account_name)?;
+            let account = config.find_account_by_name(account)?;
             let mut imap_conn = ImapConnector::new(&account)?;
 
             let mbox = matches.value_of("mailbox").unwrap();
@@ -514,7 +464,7 @@ impl<'a> App<'a> {
 
         if let Some(matches) = matches.subcommand_matches("forward") {
             let config = Config::new_from_file()?;
-            let account = config.find_account_by_name(account_name)?;
+            let account = config.find_account_by_name(account)?;
             let mut imap_conn = ImapConnector::new(&account)?;
 
             let mbox = matches.value_of("mailbox").unwrap();
@@ -556,7 +506,7 @@ impl<'a> App<'a> {
 
         if let Some(matches) = matches.subcommand_matches("send") {
             let config = Config::new_from_file()?;
-            let account = config.find_account_by_name(account_name)?;
+            let account = config.find_account_by_name(account)?;
             let mut imap_conn = ImapConnector::new(&account)?;
 
             let msg = matches.value_of("message").unwrap();
@@ -570,7 +520,7 @@ impl<'a> App<'a> {
 
         if let Some(matches) = matches.subcommand_matches("save") {
             let config = Config::new_from_file()?;
-            let account = config.find_account_by_name(account_name)?;
+            let account = config.find_account_by_name(account)?;
             let mut imap_conn = ImapConnector::new(&account)?;
 
             let mbox = matches.value_of("mailbox").unwrap();
@@ -583,7 +533,7 @@ impl<'a> App<'a> {
 
         if let Some(matches) = matches.subcommand_matches("idle") {
             let config = Config::new_from_file()?;
-            let account = config.find_account_by_name(account_name)?;
+            let account = config.find_account_by_name(account)?;
             let mut imap_conn = ImapConnector::new(&account)?;
             let mbox = matches.value_of("mailbox").unwrap();
             imap_conn.idle(&config, &mbox)?;

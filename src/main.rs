@@ -7,6 +7,9 @@ mod msg;
 mod output;
 mod smtp;
 mod table;
+mod flag {
+    pub(crate) mod cli;
+}
 
 use crate::app::App;
 
