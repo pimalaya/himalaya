@@ -9,6 +9,7 @@ mod smtp;
 mod table;
 mod flag {
     pub(crate) mod cli;
+    pub(crate) mod model;
 }
 
 use crate::app::App;

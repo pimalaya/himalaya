@@ -7,7 +7,7 @@ use crate::{
     flag::cli::{flags_matches, flags_subcommand},
     imap::{self, ImapConnector},
     input,
-    msg::{self, Attachments, Msg, ReadableMsg},
+    msg::{self, Attachments, Msg, Msgs, ReadableMsg},
     output::{self, print},
     smtp,
 };
@@ -241,6 +241,8 @@ impl<'a> App<'a> {
             let page: u32 = matches.value_of("page").unwrap().parse().unwrap();
 
             let msgs = imap_conn.list_msgs(&mbox, &page_size, &page)?;
+            let msgs = Msgs::from(&msgs);
+
             print(&output_type, msgs)?;
 
             imap_conn.logout();
@@ -279,6 +281,8 @@ impl<'a> App<'a> {
                 .join(" ");
 
             let msgs = imap_conn.search_msgs(&mbox, &query, &page_size, &page)?;
+            let msgs = Msgs::from(&msgs);
+
             print(&output_type, msgs)?;
 
             imap_conn.logout();

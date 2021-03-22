@@ -10,6 +10,7 @@ use std::{fmt, result};
 use uuid::Uuid;
 
 use crate::config::{Account, Config};
+use crate::flag::model::{Flag, Flags};
 use crate::table::{self, DisplayRow, DisplayTable};
 
 error_chain! {
@@ -170,29 +171,29 @@ impl<'a> ReadableMsg {
 
 // Message
 
-#[derive(Debug, Serialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
-pub enum Flag {
-    Seen,
-    Answered,
-    Flagged,
-}
+// #[derive(Debug, Serialize, PartialEq)]
+// #[serde(rename_all = "lowercase")]
+// pub enum Flag {
+//     Seen,
+//     Answered,
+//     Flagged,
+// }
 
-impl Flag {
-    fn from_imap_flag(flag: &imap::types::Flag<'_>) -> Option<Self> {
-        match flag {
-            imap::types::Flag::Seen => Some(Self::Seen),
-            imap::types::Flag::Answered => Some(Self::Answered),
-            imap::types::Flag::Flagged => Some(Self::Flagged),
-            _ => None,
-        }
-    }
-}
+// impl Flag {
+//     fn from_imap_flag(flag: &imap::types::Flag<'_>) -> Option<Self> {
+//         match flag {
+//             imap::types::Flag::Seen => Some(Self::Seen),
+//             imap::types::Flag::Answered => Some(Self::Answered),
+//             imap::types::Flag::Flagged => Some(Self::Flagged),
+//             _ => None,
+//         }
+//     }
+// }
 
 #[derive(Debug, Serialize)]
-pub struct Msg {
+pub struct Msg<'m> {
     pub uid: u32,
-    pub flags: Vec<Flag>,
+    pub flags: Flags<'m>,
     pub subject: String,
     pub sender: String,
     pub date: String,
@@ -201,11 +202,11 @@ pub struct Msg {
     raw: Vec<u8>,
 }
 
-impl From<Vec<u8>> for Msg {
+impl<'m> From<Vec<u8>> for Msg<'m> {
     fn from(raw: Vec<u8>) -> Self {
         Self {
             uid: 0,
-            flags: vec![],
+            flags: Flags::new(&[]),
             subject: String::from(""),
             sender: String::from(""),
             date: String::from(""),
@@ -214,23 +215,19 @@ impl From<Vec<u8>> for Msg {
     }
 }
 
-impl From<String> for Msg {
+impl<'m> From<String> for Msg<'m> {
     fn from(raw: String) -> Self {
         Self::from(raw.as_bytes().to_vec())
     }
 }
 
-impl From<&imap::types::Fetch> for Msg {
-    fn from(fetch: &imap::types::Fetch) -> Self {
+impl<'m> From<&'m imap::types::Fetch> for Msg<'m> {
+    fn from(fetch: &'m imap::types::Fetch) -> Self {
         match fetch.envelope() {
             None => Self::from(fetch.body().unwrap_or_default().to_vec()),
             Some(envelope) => Self {
                 uid: fetch.uid.unwrap_or_default(),
-                flags: fetch
-                    .flags()
-                    .into_iter()
-                    .filter_map(Flag::from_imap_flag)
-                    .collect::<Vec<_>>(),
+                flags: Flags::new(fetch.flags()),
                 subject: envelope
                     .subject
                     .and_then(|subj| rfc2047_decoder::decode(subj).ok())
@@ -251,32 +248,8 @@ impl From<&imap::types::Fetch> for Msg {
     }
 }
 
-impl<'a> Msg {
-    pub fn display_flags(&self) -> String {
-        let mut flags = String::new();
-
-        flags.push_str(if self.flags.contains(&Flag::Seen) {
-            " "
-        } else {
-            "✶"
-        });
-
-        flags.push_str(if self.flags.contains(&Flag::Answered) {
-            "↩"
-        } else {
-            " "
-        });
-
-        flags.push_str(if self.flags.contains(&Flag::Flagged) {
-            "!"
-        } else {
-            " "
-        });
-
-        flags
-    }
-
-    pub fn parse(&'a self) -> Result<mailparse::ParsedMail<'a>> {
+impl<'m> Msg<'m> {
+    pub fn parse(&'m self) -> Result<mailparse::ParsedMail<'m>> {
         Ok(mailparse::parse_mail(&self.raw)?)
     }
 
@@ -549,7 +522,7 @@ impl<'a> Msg {
     }
 }
 
-impl DisplayRow for Msg {
+impl<'m> DisplayRow for Msg<'m> {
     fn to_row(&self) -> Vec<table::Cell> {
         use crate::table::*;
 
@@ -561,7 +534,7 @@ impl DisplayRow for Msg {
 
         vec![
             Cell::new(&[unseen.to_owned(), RED], &self.uid.to_string()),
-            Cell::new(&[unseen.to_owned(), WHITE], &self.display_flags()),
+            Cell::new(&[unseen.to_owned(), WHITE], &self.flags.to_string()),
             FlexCell::new(&[unseen.to_owned(), GREEN], &self.subject),
             Cell::new(&[unseen.to_owned(), BLUE], &self.sender),
             Cell::new(&[unseen.to_owned(), YELLOW], &self.date),
@@ -572,9 +545,9 @@ impl DisplayRow for Msg {
 // Msgs
 
 #[derive(Debug, Serialize)]
-pub struct Msgs(pub Vec<Msg>);
+pub struct Msgs<'m>(pub Vec<Msg<'m>>);
 
-impl<'a> DisplayTable<'a, Msg> for Msgs {
+impl<'m> DisplayTable<'m, Msg<'m>> for Msgs<'m> {
     fn header_row() -> Vec<table::Cell> {
         use crate::table::*;
 
@@ -587,12 +560,18 @@ impl<'a> DisplayTable<'a, Msg> for Msgs {
         ]
     }
 
-    fn rows(&self) -> &Vec<Msg> {
+    fn rows(&self) -> &Vec<Msg<'m>> {
         &self.0
     }
 }
 
-impl fmt::Display for Msgs {
+impl<'m> From<&'m imap::types::ZeroCopy<Vec<imap::types::Fetch>>> for Msgs<'m> {
+    fn from(fetches: &'m imap::types::ZeroCopy<Vec<imap::types::Fetch>>) -> Self {
+        Self(fetches.iter().map(Msg::from).collect::<Vec<_>>())
+    }
+}
+
+impl<'m> fmt::Display for Msgs<'m> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "\n{}", self.to_table())
     }

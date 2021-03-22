@@ -30,7 +30,8 @@ fn flags_arg<'a, 'b>() -> Arg<'a, 'b> {
 
 pub fn flags_subcommand<'a, 'b>() -> App<'a, 'b> {
     SubCommand::with_name("flags")
-        .aliases(&["flag", "f"])
+        .aliases(&["flag", "fg"])
+        .about("Manages flags")
         .subcommand(
             SubCommand::with_name("set")
                 .aliases(&["s"])

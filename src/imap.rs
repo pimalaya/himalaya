@@ -6,7 +6,7 @@ use std::net::TcpStream;
 use crate::{
     config::{self, Account, Config},
     mbox::{Mbox, Mboxes},
-    msg::{Msg, Msgs},
+    msg::Msg,
 };
 
 error_chain! {
@@ -21,8 +21,8 @@ pub struct ImapConnector<'a> {
     pub sess: imap::Session<TlsStream<TcpStream>>,
 }
 
-impl<'a> ImapConnector<'a> {
-    pub fn new(account: &'a Account) -> Result<Self> {
+impl<'ic> ImapConnector<'ic> {
+    pub fn new(account: &'ic Account) -> Result<Self> {
         let tls = TlsConnector::new().chain_err(|| "Cannot create TLS connector")?;
         let client = if account.imap_starttls() {
             imap::connect_starttls(account.imap_addr(), &account.imap_host, &tls)
@@ -104,17 +104,18 @@ impl<'a> ImapConnector<'a> {
 
             if let Some(seq) = self.last_new_seq()? {
                 if prev_seq != seq {
-                    if let Some(msg) = self
+                    let msgs = self
                         .sess
                         .uid_fetch(seq.to_string(), "(ENVELOPE)")
-                        .chain_err(|| "Cannot fetch enveloppe")?
+                        .chain_err(|| "Cannot fetch enveloppe")?;
+                    let msg = msgs
                         .iter()
                         .next()
-                        .map(Msg::from)
-                    {
-                        config.run_notify_cmd(&msg.subject, &msg.sender)?;
-                        prev_seq = seq;
-                    }
+                        .ok_or_else(|| "Cannot fetch first message")
+                        .map(Msg::from)?;
+
+                    config.run_notify_cmd(&msg.subject, &msg.sender)?;
+                    prev_seq = seq;
                 }
             }
         }
@@ -132,7 +133,12 @@ impl<'a> ImapConnector<'a> {
         Ok(Mboxes(mboxes))
     }
 
-    pub fn list_msgs(&mut self, mbox: &str, page_size: &u32, page: &u32) -> Result<Msgs> {
+    pub fn list_msgs(
+        &mut self,
+        mbox: &str,
+        page_size: &u32,
+        page: &u32,
+    ) -> Result<imap::types::ZeroCopy<Vec<imap::types::Fetch>>> {
         let last_seq = self
             .sess
             .select(mbox)
@@ -149,16 +155,12 @@ impl<'a> ImapConnector<'a> {
         let end = begin - begin.min(*page_size as i64) + 1;
         let range = format!("{}:{}", begin, end);
 
-        let msgs = self
+        let fetches = self
             .sess
             .fetch(range, "(UID FLAGS ENVELOPE INTERNALDATE)")
-            .chain_err(|| "Cannot fetch messages")?
-            .iter()
-            .rev()
-            .map(Msg::from)
-            .collect::<Vec<_>>();
+            .chain_err(|| "Cannot fetch messages")?;
 
-        Ok(Msgs(msgs))
+        Ok(fetches)
     }
 
     pub fn search_msgs(
@@ -167,7 +169,7 @@ impl<'a> ImapConnector<'a> {
         query: &str,
         page_size: &usize,
         page: &usize,
-    ) -> Result<Msgs> {
+    ) -> Result<imap::types::ZeroCopy<Vec<imap::types::Fetch>>> {
         self.sess
             .select(mbox)
             .chain_err(|| format!("Cannot select mailbox `{}`", mbox))?;
@@ -183,15 +185,15 @@ impl<'a> ImapConnector<'a> {
             .collect::<Vec<_>>();
         let range = uids[begin..end.min(uids.len())].join(",");
 
-        let msgs = self
+        let fetches = self
             .sess
             .fetch(&range, "(UID FLAGS ENVELOPE INTERNALDATE)")
-            .chain_err(|| format!("Cannot fetch range `{}`", &range))?
-            .iter()
-            .map(Msg::from)
-            .collect::<Vec<_>>();
+            .chain_err(|| format!("Cannot fetch range `{}`", &range))?;
+        // .iter()
+        // .map(|fetch| Msg::from(fetch))
+        // .collect::<Vec<_>>();
 
-        Ok(Msgs(msgs))
+        Ok(fetches)
     }
 
     pub fn read_msg(&mut self, mbox: &str, uid: &str) -> Result<Vec<u8>> {
