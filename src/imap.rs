@@ -5,8 +5,8 @@ use std::net::TcpStream;
 
 use crate::{
     config::{self, Account, Config},
-    mbox::{Mbox, Mboxes},
-    msg::Msg,
+    mbox::model::{Mbox, Mboxes},
+    msg::model::Msg,
 };
 
 error_chain! {

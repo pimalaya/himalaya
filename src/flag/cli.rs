@@ -23,15 +23,15 @@ fn uid_arg<'a, 'b>() -> Arg<'a, 'b> {
 fn flags_arg<'a, 'b>() -> Arg<'a, 'b> {
     Arg::with_name("flags")
         .help("IMAP flags (see https://tools.ietf.org/html/rfc3501#page-11)")
-        .value_name("FLAGS")
+        .value_name("FLAGS…")
         .multiple(true)
         .required(true)
 }
 
-pub fn flags_subcommand<'a, 'b>() -> App<'a, 'b> {
-    SubCommand::with_name("flags")
-        .aliases(&["flag", "fg"])
-        .about("Manages flags")
+pub fn flag_subcmds<'a>() -> Vec<App<'a, 'a>> {
+    vec![SubCommand::with_name("flags")
+        .aliases(&["flag"])
+        .about("Handles flags")
         .subcommand(
             SubCommand::with_name("set")
                 .aliases(&["s"])
@@ -52,31 +52,40 @@ pub fn flags_subcommand<'a, 'b>() -> App<'a, 'b> {
                 .about("Removes flags from a message")
                 .arg(uid_arg())
                 .arg(flags_arg()),
-        )
+        )]
 }
 
-pub fn flags_matches(account: Option<&str>, mbox: &str, matches: &ArgMatches) -> Result<()> {
+pub fn flag_matches(matched: bool, matches: &ArgMatches) -> Result<bool> {
+    if matched {
+        return Ok(true);
+    }
+
     let config = Config::new_from_file()?;
-    let account = config.find_account_by_name(account)?;
+    let account = config.find_account_by_name(matches.value_of("account"))?;
+    let output_fmt = matches.value_of("output").unwrap();
+    let mbox = matches.value_of("mailbox").unwrap();
     let mut imap_conn = ImapConnector::new(&account)?;
 
     if let Some(matches) = matches.subcommand_matches("set") {
         let uid = matches.value_of("uid").unwrap();
         let flags = matches.value_of("flags").unwrap();
         imap_conn.set_flags(mbox, uid, flags)?;
+        return Ok(true);
     }
 
     if let Some(matches) = matches.subcommand_matches("add") {
         let uid = matches.value_of("uid").unwrap();
         let flags = matches.value_of("flags").unwrap();
         imap_conn.add_flags(mbox, uid, flags)?;
+        return Ok(true);
     }
 
     if let Some(matches) = matches.subcommand_matches("remove") {
         let uid = matches.value_of("uid").unwrap();
         let flags = matches.value_of("flags").unwrap();
         imap_conn.remove_flags(mbox, uid, flags)?;
+        return Ok(true);
     }
 
-    Ok(())
+    Ok(false)
 }
