@@ -1,10 +1,13 @@
 mod app;
 mod config;
-mod imap;
 mod input;
 mod output;
 mod smtp;
 mod table;
+mod imap {
+    pub(crate) mod cli;
+    pub(crate) mod model;
+}
 mod flag {
     pub(crate) mod cli;
     pub(crate) mod model;

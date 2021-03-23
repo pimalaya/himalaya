@@ -1,18 +1,20 @@
-use clap::{self, Arg, SubCommand};
+use clap::{self, Arg};
 use error_chain::error_chain;
 use std::env;
 
 use crate::{
     flag::cli::{flag_matches, flag_subcmds},
+    imap::cli::{imap_matches, imap_subcmds},
     mbox::cli::{mbox_arg, mbox_matches, mbox_subcmds},
     msg::cli::{msg_matches, msg_subcmds},
 };
 
 error_chain! {
     links {
+        FlagCli(crate::flag::cli::Error, crate::flag::cli::ErrorKind);
+        ImapCli(crate::imap::cli::Error, crate::imap::cli::ErrorKind);
         MboxCli(crate::mbox::cli::Error, crate::mbox::cli::ErrorKind);
         MsgCli(crate::msg::cli::Error, crate::msg::cli::ErrorKind);
-        FlagCli(crate::flag::cli::Error, crate::flag::cli::ErrorKind);
     }
 }
 
@@ -41,11 +43,10 @@ impl<'a> App<'a> {
                     .value_name("STRING"),
             )
             .arg(mbox_arg())
-            .subcommand(SubCommand::with_name("idle").about("Spawns a blocking idle daemon"));
-
-        let app = app.subcommands(mbox_subcmds());
-        let app = app.subcommands(flag_subcmds());
-        let app = app.subcommands(msg_subcmds());
+            .subcommands(flag_subcmds())
+            .subcommands(imap_subcmds())
+            .subcommands(mbox_subcmds())
+            .subcommands(msg_subcmds());
 
         Self(app)
     }
@@ -62,17 +63,13 @@ impl<'a> App<'a> {
                 break;
             }
 
+            if imap_matches(&matches)? {
+                break;
+            }
+
             msg_matches(&matches)?;
             break;
         }
-
-        // if let Some(matches) = matches.subcommand_matches("idle") {
-        //     let config = Config::new_from_file()?;
-        //     let account = config.find_account_by_name(account)?;
-        //     let mut imap_conn = ImapConnector::new(&account)?;
-        //     let mbox = matches.value_of("mailbox").unwrap();
-        //     imap_conn.idle(&config, &mbox)?;
-        // }
 
         Ok(())
     }

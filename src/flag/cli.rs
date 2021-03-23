@@ -1,15 +1,12 @@
 use clap::{App, Arg, ArgMatches, SubCommand};
 use error_chain::error_chain;
 
-use crate::{
-    config::{self, Config},
-    imap::{self, ImapConnector},
-};
+use crate::{config::Config, imap::model::ImapConnector};
 
 error_chain! {
     links {
-        Config(config::Error, config::ErrorKind);
-        Imap(imap::Error, imap::ErrorKind);
+        Config(crate::config::Error, crate::config::ErrorKind);
+        Imap(crate::imap::model::Error, crate::imap::model::ErrorKind);
     }
 }
 
@@ -58,7 +55,6 @@ pub fn flag_subcmds<'a>() -> Vec<App<'a, 'a>> {
 pub fn flag_matches(matches: &ArgMatches) -> Result<bool> {
     let config = Config::new_from_file()?;
     let account = config.find_account_by_name(matches.value_of("account"))?;
-    let output_fmt = matches.value_of("output").unwrap();
     let mbox = matches.value_of("mailbox").unwrap();
     let mut imap_conn = ImapConnector::new(&account)?;
 
