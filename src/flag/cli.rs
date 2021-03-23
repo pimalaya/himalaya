@@ -55,11 +55,7 @@ pub fn flag_subcmds<'a>() -> Vec<App<'a, 'a>> {
         )]
 }
 
-pub fn flag_matches(matched: bool, matches: &ArgMatches) -> Result<bool> {
-    if matched {
-        return Ok(true);
-    }
-
+pub fn flag_matches(matches: &ArgMatches) -> Result<bool> {
     let config = Config::new_from_file()?;
     let account = config.find_account_by_name(matches.value_of("account"))?;
     let output_fmt = matches.value_of("output").unwrap();

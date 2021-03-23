@@ -136,8 +136,8 @@ impl<'ic> ImapConnector<'ic> {
     pub fn list_msgs(
         &mut self,
         mbox: &str,
-        page_size: &u32,
-        page: &u32,
+        page_size: &usize,
+        page: &usize,
     ) -> Result<imap::types::ZeroCopy<Vec<imap::types::Fetch>>> {
         let last_seq = self
             .sess
@@ -146,7 +146,7 @@ impl<'ic> ImapConnector<'ic> {
             .exists as i64;
 
         if last_seq == 0 {
-            return Err(format!("Cannot select empty mailbox `{}`", mbox).into());
+            return Err(format!("The `{}` mailbox is empty", mbox).into());
         }
 
         // TODO: add tests, improve error management when empty page
