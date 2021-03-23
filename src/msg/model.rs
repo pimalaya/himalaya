@@ -9,7 +9,7 @@ use serde::{
 use std::{fmt, result};
 use uuid::Uuid;
 
-use crate::config::{Account, Config};
+use crate::config::model::{Account, Config};
 use crate::flag::model::{Flag, Flags};
 use crate::table::{self, DisplayRow, DisplayTable};
 

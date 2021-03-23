@@ -4,14 +4,14 @@ use native_tls::{self, TlsConnector, TlsStream};
 use std::net::TcpStream;
 
 use crate::{
-    config::{self, Account, Config},
+    config::model::{Account, Config},
     mbox::model::{Mbox, Mboxes},
     msg::model::Msg,
 };
 
 error_chain! {
     links {
-        Config(config::Error, config::ErrorKind);
+        Config(crate::config::model::Error, crate::config::model::ErrorKind);
     }
 }
 

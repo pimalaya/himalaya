@@ -1,11 +1,11 @@
 use clap::{self, App, Arg, ArgMatches, SubCommand};
 use error_chain::error_chain;
 
-use crate::{config::Config, imap::model::ImapConnector, output::utils::print};
+use crate::{config::model::Config, imap::model::ImapConnector, output::utils::print};
 
 error_chain! {
     links {
-        Config(crate::config::Error, crate::config::ErrorKind);
+        Config(crate::config::model::Error, crate::config::model::ErrorKind);
         Imap(crate::imap::model::Error, crate::imap::model::ErrorKind);
         MsgCli(crate::msg::cli::Error, crate::msg::cli::ErrorKind);
         OutputUtils(crate::output::utils::Error, crate::output::utils::ErrorKind);

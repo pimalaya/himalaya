@@ -3,7 +3,7 @@ use error_chain::error_chain;
 use std::fs;
 
 use crate::{
-    config::Config,
+    config::model::Config,
     imap::model::ImapConnector,
     input,
     msg::model::{Attachments, Msg, Msgs, ReadableMsg},
@@ -13,7 +13,7 @@ use crate::{
 
 error_chain! {
     links {
-        Config(crate::config::Error, crate::config::ErrorKind);
+        Config(crate::config::model::Error, crate::config::model::ErrorKind);
         Imap(crate::imap::model::Error, crate::imap::model::ErrorKind);
         Input(crate::input::Error, crate::input::ErrorKind);
         MsgModel(crate::msg::model::Error, crate::msg::model::ErrorKind);
