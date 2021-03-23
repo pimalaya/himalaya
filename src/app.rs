@@ -7,6 +7,7 @@ use crate::{
     imap::cli::{imap_matches, imap_subcmds},
     mbox::cli::{mbox_arg, mbox_matches, mbox_subcmds},
     msg::cli::{msg_matches, msg_subcmds},
+    output::cli::output_args,
 };
 
 error_chain! {
@@ -26,15 +27,7 @@ impl<'a> App<'a> {
             .version(env!("CARGO_PKG_VERSION"))
             .about(env!("CARGO_PKG_DESCRIPTION"))
             .author(env!("CARGO_PKG_AUTHORS"))
-            .arg(
-                Arg::with_name("output")
-                    .long("output")
-                    .short("o")
-                    .help("Defines the output format")
-                    .value_name("STRING")
-                    .possible_values(&["plain", "json"])
-                    .default_value("plain"),
-            )
+            .args(&output_args())
             .arg(
                 Arg::with_name("account")
                     .long("account")

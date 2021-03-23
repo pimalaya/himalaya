@@ -7,7 +7,7 @@ use crate::{
     imap::model::ImapConnector,
     input,
     msg::model::{Attachments, Msg, Msgs, ReadableMsg},
-    output::print,
+    output::utils::print,
     smtp,
 };
 
@@ -17,7 +17,7 @@ error_chain! {
         Imap(crate::imap::model::Error, crate::imap::model::ErrorKind);
         Input(crate::input::Error, crate::input::ErrorKind);
         MsgModel(crate::msg::model::Error, crate::msg::model::ErrorKind);
-        Output(crate::output::Error, crate::output::ErrorKind);
+        OutputUtils(crate::output::utils::Error, crate::output::utils::ErrorKind);
         Smtp(crate::smtp::Error, crate::smtp::ErrorKind);
     }
 }

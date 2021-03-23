@@ -4,7 +4,7 @@ use serde::Deserialize;
 use std::{collections::HashMap, env, fs::File, io::Read, path::PathBuf};
 use toml;
 
-use crate::output::run_cmd;
+use crate::output::utils::run_cmd;
 
 error_chain! {}
 

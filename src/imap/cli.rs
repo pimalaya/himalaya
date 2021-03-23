@@ -20,7 +20,7 @@ pub fn imap_matches(matches: &ArgMatches) -> Result<bool> {
     let mut imap_conn = ImapConnector::new(&account)?;
     let mbox = matches.value_of("mailbox").unwrap();
 
-    if let Some(matches) = matches.subcommand_matches("idle") {
+    if let Some(_) = matches.subcommand_matches("idle") {
         imap_conn.idle(&config, &mbox)?;
         imap_conn.logout();
         return Ok(true);
