@@ -1,6 +1,7 @@
 use clap::{App, Arg, ArgMatches, SubCommand};
 use error_chain::error_chain;
 
+use crate::msg::cli::uid_arg;
 use crate::{config::model::Config, imap::model::ImapConnector};
 
 error_chain! {
@@ -8,13 +9,6 @@ error_chain! {
         Config(crate::config::model::Error, crate::config::model::ErrorKind);
         Imap(crate::imap::model::Error, crate::imap::model::ErrorKind);
     }
-}
-
-fn uid_arg<'a, 'b>() -> Arg<'a, 'b> {
-    Arg::with_name("uid")
-        .help("Message UID")
-        .value_name("UID")
-        .required(true)
 }
 
 fn flags_arg<'a, 'b>() -> Arg<'a, 'b> {

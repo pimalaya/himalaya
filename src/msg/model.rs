@@ -567,7 +567,7 @@ impl<'m> DisplayTable<'m, Msg<'m>> for Msgs<'m> {
 
 impl<'m> From<&'m imap::types::ZeroCopy<Vec<imap::types::Fetch>>> for Msgs<'m> {
     fn from(fetches: &'m imap::types::ZeroCopy<Vec<imap::types::Fetch>>) -> Self {
-        Self(fetches.iter().map(Msg::from).collect::<Vec<_>>())
+        Self(fetches.iter().rev().map(Msg::from).collect::<Vec<_>>())
     }
 }
 

@@ -1,11 +1,13 @@
 use clap::{self, App, Arg, ArgMatches, SubCommand};
 use error_chain::error_chain;
-use std::fs;
+use std::{fs, ops::Deref};
 
 use crate::{
     config::model::Config,
+    flag::model::Flag,
     imap::model::ImapConnector,
     input,
+    mbox::cli::mbox_target_arg,
     msg::model::{Attachments, Msg, Msgs, ReadableMsg},
     output::utils::print,
     smtp,
@@ -22,9 +24,9 @@ error_chain! {
     }
 }
 
-fn uid_arg<'a>() -> Arg<'a, 'a> {
+pub fn uid_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name("uid")
-        .help("Message UID")
+        .help("Specifies the targetted message")
         .value_name("UID")
         .required(true)
 }
@@ -95,16 +97,30 @@ pub fn msg_subcmds<'a>() -> Vec<App<'a, 'a>> {
             ),
         SubCommand::with_name("attachments")
             .aliases(&["attach", "att", "a"])
-            .about("Downloads all attachments from an email")
+            .about("Downloads all message attachments")
             .arg(uid_arg()),
         SubCommand::with_name("reply")
             .aliases(&["rep", "re"])
-            .about("Answers to an email")
+            .about("Answers to a message")
             .arg(uid_arg())
             .arg(reply_all_arg()),
         SubCommand::with_name("forward")
             .aliases(&["fwd", "f"])
-            .about("Forwards an email")
+            .about("Forwards a message")
+            .arg(uid_arg()),
+        SubCommand::with_name("copy")
+            .aliases(&["cp", "c"])
+            .about("Copy a message to the targetted mailbox")
+            .arg(uid_arg())
+            .arg(mbox_target_arg()),
+        SubCommand::with_name("move")
+            .aliases(&["mv", "m"])
+            .about("Move a message to the targetted mailbox")
+            .arg(uid_arg())
+            .arg(mbox_target_arg()),
+        SubCommand::with_name("delete")
+            .aliases(&["remove", "rm", "del", "d"])
+            .about("Delete a message")
             .arg(uid_arg()),
         SubCommand::with_name("template")
             .aliases(&["tpl", "t"])
@@ -243,13 +259,13 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
                             println!("Sending…");
                             let msg = msg.to_sendable_msg()?;
                             smtp::send(&account, &msg)?;
-                            imap_conn.append_msg("Sent", &msg.formatted())?;
+                            imap_conn.append_msg("Sent", &msg.formatted(), &[Flag::Seen])?;
                             println!("Done!");
                             break;
                         }
                         input::Choice::Draft => {
                             println!("Saving to draft…");
-                            imap_conn.append_msg("Drafts", &msg.to_vec()?)?;
+                            imap_conn.append_msg("Drafts", &msg.to_vec()?, &[Flag::Seen])?;
                             println!("Done!");
                             break;
                         }
@@ -294,6 +310,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
                 let tpl = msg.build_forward_tpl(&config, &account)?;
 
                 print(&output_fmt, &tpl)?;
+                break;
             }
 
             break;
@@ -318,14 +335,14 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
                         input::Choice::Send => {
                             println!("Sending…");
                             smtp::send(&account, &msg.to_sendable_msg()?)?;
-                            imap_conn.append_msg("Sent", &msg.to_vec()?)?;
+                            imap_conn.append_msg("Sent", &msg.to_vec()?, &[Flag::Seen])?;
                             imap_conn.add_flags(mbox, uid, "\\Answered")?;
                             println!("Done!");
                             break;
                         }
                         input::Choice::Draft => {
                             println!("Saving to draft…");
-                            imap_conn.append_msg("Drafts", &msg.to_vec()?)?;
+                            imap_conn.append_msg("Drafts", &msg.to_vec()?, &[Flag::Seen])?;
                             println!("Done!");
                             break;
                         }
@@ -356,13 +373,13 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
                         input::Choice::Send => {
                             println!("Sending…");
                             smtp::send(&account, &msg.to_sendable_msg()?)?;
-                            imap_conn.append_msg("Sent", &msg.to_vec()?)?;
+                            imap_conn.append_msg("Sent", &msg.to_vec()?, &[Flag::Seen])?;
                             println!("Done!");
                             break;
                         }
                         input::Choice::Draft => {
                             println!("Saving to draft…");
-                            imap_conn.append_msg("Drafts", &msg.to_vec()?)?;
+                            imap_conn.append_msg("Drafts", &msg.to_vec()?, &[Flag::Seen])?;
                             println!("Done!");
                             break;
                         }
@@ -379,13 +396,44 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
             break;
         }
 
+        if let Some(matches) = matches.subcommand_matches("copy") {
+            let uid = matches.value_of("uid").unwrap();
+            let target = matches.value_of("target").unwrap();
+
+            let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
+            let mut flags = msg.flags.deref().to_vec();
+            flags.push(Flag::Seen);
+
+            imap_conn.append_msg(target, &msg.to_vec()?, &flags)?;
+            break;
+        }
+
+        if let Some(matches) = matches.subcommand_matches("move") {
+            let uid = matches.value_of("uid").unwrap();
+            let target = matches.value_of("target").unwrap();
+
+            let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
+            let mut flags = msg.flags.deref().to_vec();
+            flags.push(Flag::Seen);
+
+            imap_conn.append_msg(target, &msg.to_vec()?, msg.flags.deref())?;
+            imap_conn.add_flags(mbox, uid, "\\Seen \\Deleted")?;
+            break;
+        }
+
+        if let Some(matches) = matches.subcommand_matches("delete") {
+            let uid = matches.value_of("uid").unwrap();
+            imap_conn.add_flags(mbox, uid, "\\Seen \\Deleted")?;
+            break;
+        }
+
         if let Some(matches) = matches.subcommand_matches("send") {
             let msg = matches.value_of("message").unwrap();
             let msg = Msg::from(msg.to_string());
             let msg = msg.to_sendable_msg()?;
 
             smtp::send(&account, &msg)?;
-            imap_conn.append_msg("Sent", &msg.formatted())?;
+            imap_conn.append_msg("Sent", &msg.formatted(), &[Flag::Seen])?;
             break;
         }
 
@@ -393,7 +441,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
             let msg = matches.value_of("message").unwrap();
             let msg = Msg::from(msg.to_string());
 
-            imap_conn.append_msg(mbox, &msg.to_vec()?)?;
+            imap_conn.append_msg(mbox, &msg.to_vec()?, &[Flag::Seen])?;
             break;
         }
 

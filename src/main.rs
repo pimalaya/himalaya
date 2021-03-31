@@ -34,7 +34,7 @@ use crate::{
     config::cli::account_arg,
     flag::cli::{flag_matches, flag_subcmds},
     imap::cli::{imap_matches, imap_subcmds},
-    mbox::cli::{mbox_arg, mbox_matches, mbox_subcmds},
+    mbox::cli::{mbox_matches, mbox_source_arg, mbox_subcmds},
     msg::cli::{msg_matches, msg_subcmds},
     output::cli::output_arg,
 };
@@ -55,7 +55,7 @@ fn run() -> Result<()> {
         .author(env!("CARGO_PKG_AUTHORS"))
         .arg(output_arg())
         .arg(account_arg())
-        .arg(mbox_arg())
+        .arg(mbox_source_arg())
         .subcommands(flag_subcmds())
         .subcommands(imap_subcmds())
         .subcommands(mbox_subcmds())

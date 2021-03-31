@@ -12,13 +12,19 @@ error_chain! {
     }
 }
 
-pub fn mbox_arg<'a>() -> Arg<'a, 'a> {
+pub fn mbox_source_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name("mailbox")
         .short("m")
         .long("mailbox")
         .help("Selects a specific mailbox")
-        .value_name("STRING")
+        .value_name("MAILBOX")
         .default_value("INBOX")
+}
+
+pub fn mbox_target_arg<'a>() -> Arg<'a, 'a> {
+    Arg::with_name("target")
+        .help("Specifies the targetted mailbox")
+        .value_name("TARGET")
 }
 
 pub fn mbox_subcmds<'a>() -> Vec<App<'a, 'a>> {

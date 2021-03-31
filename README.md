@@ -21,6 +21,9 @@ Minimalist CLI email client, written in Rust.
   * [Write a new message](#write-a-new-message)
   * [Reply to a message](#reply-to-a-message)
   * [Forward a message](#forward-a-message)
+  * [Copy a message](#copy-a-message)
+  * [Move a message](#move-a-message)
+  * [Delete a message](#delete-a-message)
   * [Listen to new messages](#listen-to-new-messages)
 * [License](https://github.com/soywod/himalaya/blob/master/LICENSE)
 * [Changelog](https://github.com/soywod/himalaya/blob/master/CHANGELOG.md)
@@ -166,6 +169,30 @@ himalaya forward 5123
 ```
 
 Opens your default editor to forward a message. 
+
+### Copy a message
+
+```bash
+himalaya copy 5123 Sent
+```
+
+Copies a message to the targetted mailbox.
+
+### Move a message
+
+```bash
+himalaya move 5123 Drafts
+```
+
+Moves a message to the targetted mailbox.
+
+### Delete a message
+
+```bash
+himalaya delete 5123
+```
+
+Moves a message.
 
 ### Listen to new messages
 

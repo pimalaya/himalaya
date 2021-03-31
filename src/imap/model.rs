@@ -5,6 +5,7 @@ use std::net::TcpStream;
 
 use crate::{
     config::model::{Account, Config},
+    flag::model::Flag,
     mbox::model::{Mbox, Mboxes},
     msg::model::Msg,
 };
@@ -203,7 +204,7 @@ impl<'ic> ImapConnector<'ic> {
 
         match self
             .sess
-            .uid_fetch(uid, "BODY[]")
+            .uid_fetch(uid, "(FLAGS BODY[])")
             .chain_err(|| "Cannot fetch bodies")?
             .first()
         {
@@ -212,10 +213,10 @@ impl<'ic> ImapConnector<'ic> {
         }
     }
 
-    pub fn append_msg(&mut self, mbox: &str, msg: &[u8]) -> Result<()> {
+    pub fn append_msg(&mut self, mbox: &str, msg: &[u8], flags: &[Flag]) -> Result<()> {
         self.sess
-            .append_with_flags(mbox, msg, &[imap::types::Flag::Seen])
-            .chain_err(|| format!("Cannot append message to `{}` with \\Seen flag", mbox))?;
+            .append_with_flags(mbox, msg, flags)
+            .chain_err(|| format!("Cannot append message to `{}`", mbox))?;
 
         Ok(())
     }
