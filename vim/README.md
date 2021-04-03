@@ -32,11 +32,11 @@ This Vim plugin is a TUI implementation for Himalaya CLI.
 
 First you need to install and configure the [himalaya
 CLI](https://github.com/soywod/himalaya#installation). Then you can install
-this plugin with your favorite plugin manager. For eg with
-[vim-plug](https://github.com/junegunn/vim-plug) add to your `.vimrc`:
+this plugin with your favorite plugin manager. For example with
+[vim-plug](https://github.com/junegunn/vim-plug), add to your `.vimrc`:
 
 ```viml
-Plug "soywod/himalaya.vim"
+Plug 'soywod/himalaya', {'rtp': 'vim'}
 ```
 
 Then:
