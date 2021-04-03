@@ -16,6 +16,7 @@ pub struct Account {
     // Override
     pub name: Option<String>,
     pub downloads_dir: Option<PathBuf>,
+    pub signature: Option<String>,
 
     // Specific
     pub default: Option<bool>,
@@ -76,6 +77,7 @@ pub struct Config {
     pub name: String,
     pub downloads_dir: Option<PathBuf>,
     pub notify_cmd: Option<String>,
+    pub signature: Option<String>,
 
     #[serde(flatten)]
     pub accounts: HashMap<String, Account>,
@@ -169,5 +171,13 @@ impl Config {
         run_cmd(&cmd).chain_err(|| "Cannot run notify cmd")?;
 
         Ok(())
+    }
+
+    pub fn signature(&self, account: &Account) -> Option<String> {
+        account
+            .signature
+            .as_ref()
+            .or_else(|| self.signature.as_ref())
+            .map(|sig| sig.to_owned())
     }
 }

@@ -360,6 +360,18 @@ impl<'m> Msg<'m> {
         // "Subject" header
         tpl.push("Subject: ".to_string());
 
+        // Separator between headers and body
+        tpl.push(String::new());
+
+        // Signature
+        if let Some(sig) = config.signature(&account) {
+            tpl.push(String::new());
+            tpl.push("--".to_string());
+            for line in sig.split("\n") {
+                tpl.push(line.to_string());
+            }
+        }
+
         Ok(Tpl(tpl.join("\r\n")))
     }
 
@@ -403,6 +415,15 @@ impl<'m> Msg<'m> {
             .collect::<Vec<String>>()
             .join("\r\n");
         tpl.push(thread);
+
+        // Signature
+        if let Some(sig) = config.signature(&account) {
+            tpl.push(String::new());
+            tpl.push("--".to_string());
+            for line in sig.split("\n") {
+                tpl.push(line.to_string());
+            }
+        }
 
         Ok(Tpl(tpl.join("\r\n")))
     }
@@ -489,6 +510,15 @@ impl<'m> Msg<'m> {
             .join("\r\n");
         tpl.push(thread);
 
+        // Signature
+        if let Some(sig) = config.signature(&account) {
+            tpl.push(String::new());
+            tpl.push("--".to_string());
+            for line in sig.split("\n") {
+                tpl.push(line.to_string());
+            }
+        }
+
         Ok(Tpl(tpl.join("\r\n")))
     }
 
@@ -517,6 +547,15 @@ impl<'m> Msg<'m> {
         // Original msg
         tpl.push("-------- Forwarded Message --------".to_string());
         tpl.push(self.text_bodies("text/plain")?);
+
+        // Signature
+        if let Some(sig) = config.signature(&account) {
+            tpl.push(String::new());
+            tpl.push("--".to_string());
+            for line in sig.split("\n") {
+                tpl.push(line.to_string());
+            }
+        }
 
         Ok(Tpl(tpl.join("\r\n")))
     }
