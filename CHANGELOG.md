@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Move feature [#31]
 - Delete feature [#36]
 - Signature support [#33]
+- Add attachment(s) to a message [#37]
 
 ### Changed
 
@@ -92,6 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#33]: https://github.com/soywod/himalaya/issues/33
 [#34]: https://github.com/soywod/himalaya/issues/34
 [#35]: https://github.com/soywod/himalaya/issues/35
+[#37]: https://github.com/soywod/himalaya/issues/37
 [#38]: https://github.com/soywod/himalaya/issues/38
 [#39]: https://github.com/soywod/himalaya/issues/39
 [#40]: https://github.com/soywod/himalaya/issues/40

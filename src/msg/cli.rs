@@ -56,6 +56,16 @@ fn page_arg<'a>() -> Arg<'a, 'a> {
         .default_value("0")
 }
 
+fn attachment_arg<'a>() -> Arg<'a, 'a> {
+    Arg::with_name("attachments")
+        .help("Adds attachment to the message")
+        .short("a")
+        .long("attachment")
+        .value_name("PATH")
+        .multiple(true)
+        .takes_value(true)
+}
+
 pub fn msg_subcmds<'a>() -> Vec<App<'a, 'a>> {
     vec![
         SubCommand::with_name("list")
@@ -75,7 +85,9 @@ pub fn msg_subcmds<'a>() -> Vec<App<'a, 'a>> {
                     .multiple(true)
                     .required(true),
             ),
-        SubCommand::with_name("write").about("Writes a new message"),
+        SubCommand::with_name("write")
+            .about("Writes a new message")
+            .arg(attachment_arg()),
         SubCommand::with_name("send")
             .about("Sends a raw message")
             .arg(Arg::with_name("message").raw(true)),
@@ -247,10 +259,16 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
             break;
         }
 
-        if let Some(_) = matches.subcommand_matches("write") {
+        if let Some(matches) = matches.subcommand_matches("write") {
+            let attachments = matches
+                .values_of("attachments")
+                .unwrap_or_default()
+                .map(String::from)
+                .collect::<Vec<_>>();
             let tpl = Msg::build_new_tpl(&config, &account)?;
             let content = input::open_editor_with_tpl(tpl.to_string().as_bytes())?;
             let mut msg = Msg::from(content);
+            msg.attachments = attachments;
 
             loop {
                 match input::post_edit_choice() {
@@ -317,6 +335,11 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         }
 
         if let Some(matches) = matches.subcommand_matches("reply") {
+            let attachments = matches
+                .values_of("attachments")
+                .unwrap_or_default()
+                .map(String::from)
+                .collect::<Vec<_>>();
             let uid = matches.value_of("uid").unwrap();
 
             let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
@@ -328,6 +351,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
 
             let content = input::open_editor_with_tpl(&tpl.to_string().as_bytes())?;
             let mut msg = Msg::from(content);
+            msg.attachments = attachments;
 
             loop {
                 match input::post_edit_choice() {
@@ -360,12 +384,18 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         }
 
         if let Some(matches) = matches.subcommand_matches("forward") {
+            let attachments = matches
+                .values_of("attachments")
+                .unwrap_or_default()
+                .map(String::from)
+                .collect::<Vec<_>>();
             let uid = matches.value_of("uid").unwrap();
 
             let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
             let tpl = msg.build_forward_tpl(&config, &account)?;
             let content = input::open_editor_with_tpl(&tpl.to_string().as_bytes())?;
             let mut msg = Msg::from(content);
+            msg.attachments = attachments;
 
             loop {
                 match input::post_edit_choice() {

@@ -6,7 +6,8 @@ use serde::{
     ser::{self, SerializeStruct},
     Serialize,
 };
-use std::{fmt, result};
+use std::{borrow::Cow, fmt, fs, path::PathBuf, result};
+use tree_magic;
 use uuid::Uuid;
 
 use crate::config::model::{Account, Config};
@@ -171,25 +172,6 @@ impl<'a> ReadableMsg {
 
 // Message
 
-// #[derive(Debug, Serialize, PartialEq)]
-// #[serde(rename_all = "lowercase")]
-// pub enum Flag {
-//     Seen,
-//     Answered,
-//     Flagged,
-// }
-
-// impl Flag {
-//     fn from_imap_flag(flag: &imap::types::Flag<'_>) -> Option<Self> {
-//         match flag {
-//             imap::types::Flag::Seen => Some(Self::Seen),
-//             imap::types::Flag::Answered => Some(Self::Answered),
-//             imap::types::Flag::Flagged => Some(Self::Flagged),
-//             _ => None,
-//         }
-//     }
-// }
-
 #[derive(Debug, Serialize)]
 pub struct Msg<'m> {
     pub uid: u32,
@@ -197,7 +179,8 @@ pub struct Msg<'m> {
     pub subject: String,
     pub sender: String,
     pub date: String,
-
+    #[serde(skip_serializing)]
+    pub attachments: Vec<String>,
     #[serde(skip_serializing)]
     raw: Vec<u8>,
 }
@@ -210,6 +193,7 @@ impl<'m> From<Vec<u8>> for Msg<'m> {
             subject: String::from(""),
             sender: String::from(""),
             date: String::from(""),
+            attachments: vec![],
             raw,
         }
     }
@@ -242,6 +226,7 @@ impl<'m> From<&'m imap::types::Fetch> for Msg<'m> {
                     .internal_date()
                     .map(|date| date.naive_local().to_string())
                     .unwrap_or_default(),
+                attachments: vec![],
                 raw: fetch.body().unwrap_or_default().to_vec(),
             },
         }
@@ -263,52 +248,85 @@ impl<'m> Msg<'m> {
     }
 
     pub fn to_sendable_msg(&self) -> Result<lettre::Message> {
-        use lettre::message::header::{ContentTransferEncoding, ContentType};
-        use lettre::message::{Message, SinglePart};
+        use lettre::message::{
+            header::*,
+            {Body, Message, MultiPart, SinglePart},
+        };
 
         let parsed = self.parse()?;
-        let msg = parsed
-            .headers
-            .iter()
-            .fold(Message::builder(), |msg, h| {
-                let value = String::from_utf8(h.get_value_raw().to_vec())
-                    .unwrap()
-                    .replace("\r", "");
+        let msg_builder = parsed.headers.iter().fold(Message::builder(), |msg, h| {
+            let value = String::from_utf8(h.get_value_raw().to_vec())
+                .unwrap()
+                .replace("\r", "");
 
-                match h.get_key().to_lowercase().as_str() {
-                    "in-reply-to" => msg.in_reply_to(value.parse().unwrap()),
-                    "from" => match value.parse() {
-                        Ok(addr) => msg.from(addr),
+            match h.get_key().to_lowercase().as_str() {
+                "in-reply-to" => msg.in_reply_to(value.parse().unwrap()),
+                "from" => match value.parse() {
+                    Ok(addr) => msg.from(addr),
+                    Err(_) => msg,
+                },
+                "to" => value
+                    .split(",")
+                    .fold(msg, |msg, addr| match addr.trim().parse() {
+                        Ok(addr) => msg.to(addr),
                         Err(_) => msg,
-                    },
-                    "to" => value
-                        .split(",")
-                        .fold(msg, |msg, addr| match addr.trim().parse() {
-                            Ok(addr) => msg.to(addr),
-                            Err(_) => msg,
-                        }),
-                    "cc" => value
-                        .split(",")
-                        .fold(msg, |msg, addr| match addr.trim().parse() {
-                            Ok(addr) => msg.cc(addr),
-                            Err(_) => msg,
-                        }),
-                    "bcc" => value
-                        .split(",")
-                        .fold(msg, |msg, addr| match addr.trim().parse() {
-                            Ok(addr) => msg.bcc(addr),
-                            Err(_) => msg,
-                        }),
-                    "subject" => msg.subject(value),
-                    _ => msg,
-                }
-            })
-            .singlepart(
-                SinglePart::builder()
-                    .header(ContentType("text/plain; charset=utf-8".parse().unwrap()))
-                    .header(ContentTransferEncoding::Base64)
-                    .body(parsed.get_body_raw()?),
-            )?;
+                    }),
+                "cc" => value
+                    .split(",")
+                    .fold(msg, |msg, addr| match addr.trim().parse() {
+                        Ok(addr) => msg.cc(addr),
+                        Err(_) => msg,
+                    }),
+                "bcc" => value
+                    .split(",")
+                    .fold(msg, |msg, addr| match addr.trim().parse() {
+                        Ok(addr) => msg.bcc(addr),
+                        Err(_) => msg,
+                    }),
+                "subject" => msg.subject(value),
+                _ => msg,
+            }
+        });
+
+        let text_part = SinglePart::builder()
+            .header(ContentType("text/plain; charset=utf-8".parse().unwrap()))
+            .header(ContentTransferEncoding::Base64)
+            .body(parsed.get_body_raw()?);
+
+        let msg = if self.attachments.is_empty() {
+            msg_builder.singlepart(text_part)
+        } else {
+            let mut parts = MultiPart::mixed().singlepart(text_part);
+
+            for attachment in &self.attachments {
+                let attachment_name = PathBuf::from(attachment);
+                let attachment_name = attachment_name
+                    .file_name()
+                    .map(|fname| fname.to_string_lossy())
+                    .unwrap_or(Cow::from(Uuid::new_v4().to_string()));
+                let attachment_content = fs::read(attachment)
+                    .chain_err(|| format!("Cannot read attachment `{}`", attachment))?;
+                let attachment_ctype = tree_magic::from_u8(&attachment_content);
+
+                parts = parts.singlepart(
+                    SinglePart::builder()
+                        .header(ContentType(attachment_ctype.parse().chain_err(|| {
+                            format!("Could not parse content type `{}`", attachment_ctype)
+                        })?))
+                        .header(ContentDisposition {
+                            disposition: DispositionType::Attachment,
+                            parameters: vec![DispositionParam::Filename(
+                                Charset::Ext("utf-8".into()),
+                                None,
+                                attachment_name.as_bytes().into(),
+                            )],
+                        })
+                        .body(Body::new(attachment_content)),
+                );
+            }
+
+            msg_builder.multipart(parts)
+        }?;
 
         Ok(msg)
     }
