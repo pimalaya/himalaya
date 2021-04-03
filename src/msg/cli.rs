@@ -58,8 +58,8 @@ fn page_arg<'a>() -> Arg<'a, 'a> {
 
 pub fn msg_subcmds<'a>() -> Vec<App<'a, 'a>> {
     vec![
-        SubCommand::with_name("messages")
-            .aliases(&["message", "msgs", "msg", "m"])
+        SubCommand::with_name("list")
+            .aliases(&["lst", "l"])
             .about("Lists all messages")
             .arg(page_size_arg())
             .arg(page_arg()),
