@@ -25,6 +25,9 @@ Minimalist CLI email client, written in Rust.
   * [Move a message](#move-a-message)
   * [Delete a message](#delete-a-message)
   * [Listen to new messages](#listen-to-new-messages)
+* [Interfaces](#interfaces)
+  * [GUI](#gui)
+  * [TUI](#tui)
 * [License](https://github.com/soywod/himalaya/blob/master/LICENSE)
 * [Changelog](https://github.com/soywod/himalaya/blob/master/CHANGELOG.md)
 * [Credits](#credits)
@@ -56,6 +59,7 @@ for other installation methods.*
 
 name = "Your full name"
 downloads-dir = "/abs/path/to/downloads"
+signature = "Regards,"
 
 [gmail]
 default = true
@@ -78,7 +82,7 @@ for all the options.*
 ## Usage
 
 ```
-Himalaya 0.2.0
+himalaya 0.2.0
 soywod <clement.douin@posteo.net>
 📫 Minimalist CLI email client
 
@@ -90,23 +94,28 @@ FLAGS:
     -V, --version    Prints version information
 
 OPTIONS:
-    -a, --account <STRING>    Name of the account to use
-    -o, --output <STRING>     Format of the output to print [possible values: text, json]
+    -a, --account <STRING>     Selects a specific account
+    -m, --mailbox <MAILBOX>    Selects a specific mailbox [default: INBOX]
+    -o, --output <STRING>      Defines the output format [default: plain]  [possible values: plain, json]
 
 SUBCOMMANDS:
-    attachments    Downloads all attachments from an email
-    forward        Forwards an email
+    attachments    Downloads all message attachments
+    copy           Copy a message to the targetted mailbox
+    delete         Delete a message
+    flags          Handles flags
+    forward        Forwards a message
     help           Prints this message or the help of the given subcommand(s)
-    idle           Starts the idle mode
-    list           Lists emails sorted by arrival date
-    mailboxes      Lists all available mailboxes
-    read           Reads text bodies of an email
-    reply          Answers to an email
-    save           Saves a raw message in the given mailbox
-    search         Lists emails matching the given IMAP query
+    idle           Spawns a blocking idle daemon
+    list           Lists all messages
+    mailboxes      Lists all mailboxes
+    move           Move a message to the targetted mailbox
+    read           Reads text bodies of a message
+    reply          Answers to a message
+    save           Saves a raw message
+    search         Lists messages matching the given IMAP query
     send           Sends a raw message
     template       Generates a message template
-    write          Writes a new email
+    write          Writes a new message
 ```
 
 *See the [wiki section](https://github.com/soywod/himalaya/wiki/Usage) for more
@@ -225,6 +234,16 @@ WantedBy=multi-user.target
 systemctl --user enable himalaya.service
 systemctl --user start  himalaya.service
 ```
+
+## Interfaces
+
+### GUI
+
+Not yet, but feel free to contribute ;)
+
+### TUI
+
+- [Vim plugin](https://github.com/soywod/himalaya.vim)
 
 ## Credits
 
