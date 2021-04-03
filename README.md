@@ -243,7 +243,7 @@ Not yet, but feel free to contribute ;)
 
 ### TUI
 
-- [Vim plugin](https://github.com/soywod/himalaya/vim)
+- [Vim plugin](https://github.com/soywod/himalaya/tree/master/vim)
 
 ## Credits
 
