@@ -37,9 +37,9 @@ pub fn mbox_matches(matches: &ArgMatches) -> Result<bool> {
     let config = Config::new_from_file()?;
     let account = config.find_account_by_name(matches.value_of("account"))?;
     let output_fmt = matches.value_of("output").unwrap();
-    let mut imap_conn = ImapConnector::new(&account)?;
 
     if let Some(_) = matches.subcommand_matches("mailboxes") {
+        let mut imap_conn = ImapConnector::new(&account)?;
         let mboxes = imap_conn.list_mboxes()?;
         print(&output_fmt, mboxes)?;
         imap_conn.logout();

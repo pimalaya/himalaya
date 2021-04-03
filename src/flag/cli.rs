@@ -50,26 +50,31 @@ pub fn flag_matches(matches: &ArgMatches) -> Result<bool> {
     let config = Config::new_from_file()?;
     let account = config.find_account_by_name(matches.value_of("account"))?;
     let mbox = matches.value_of("mailbox").unwrap();
-    let mut imap_conn = ImapConnector::new(&account)?;
 
     if let Some(matches) = matches.subcommand_matches("set") {
+        let mut imap_conn = ImapConnector::new(&account)?;
         let uid = matches.value_of("uid").unwrap();
         let flags = matches.value_of("flags").unwrap();
         imap_conn.set_flags(mbox, uid, flags)?;
+        imap_conn.logout();
         return Ok(true);
     }
 
     if let Some(matches) = matches.subcommand_matches("add") {
+        let mut imap_conn = ImapConnector::new(&account)?;
         let uid = matches.value_of("uid").unwrap();
         let flags = matches.value_of("flags").unwrap();
         imap_conn.add_flags(mbox, uid, flags)?;
+        imap_conn.logout();
         return Ok(true);
     }
 
     if let Some(matches) = matches.subcommand_matches("remove") {
+        let mut imap_conn = ImapConnector::new(&account)?;
         let uid = matches.value_of("uid").unwrap();
         let flags = matches.value_of("flags").unwrap();
         imap_conn.remove_flags(mbox, uid, flags)?;
+        imap_conn.logout();
         return Ok(true);
     }
 

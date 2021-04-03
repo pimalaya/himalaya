@@ -17,10 +17,10 @@ pub fn imap_subcmds<'a>() -> Vec<App<'a, 'a>> {
 pub fn imap_matches(matches: &ArgMatches) -> Result<bool> {
     let config = Config::new_from_file()?;
     let account = config.find_account_by_name(matches.value_of("account"))?;
-    let mut imap_conn = ImapConnector::new(&account)?;
     let mbox = matches.value_of("mailbox").unwrap();
 
     if let Some(_) = matches.subcommand_matches("idle") {
+        let mut imap_conn = ImapConnector::new(&account)?;
         imap_conn.idle(&config, &mbox)?;
         imap_conn.logout();
         return Ok(true);

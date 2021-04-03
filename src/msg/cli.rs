@@ -163,21 +163,21 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
     let account = config.find_account_by_name(matches.value_of("account"))?;
     let output_fmt = matches.value_of("output").unwrap();
     let mbox = matches.value_of("mailbox").unwrap();
-    let mut imap_conn = ImapConnector::new(&account)?;
 
     loop {
         if let Some(matches) = matches.subcommand_matches("messages") {
+            let mut imap_conn = ImapConnector::new(&account)?;
             let page_size: usize = matches.value_of("size").unwrap().parse().unwrap();
             let page: usize = matches.value_of("page").unwrap().parse().unwrap();
-
             let msgs = imap_conn.list_msgs(&mbox, &page_size, &page)?;
             let msgs = Msgs::from(&msgs);
-
             print(&output_fmt, msgs)?;
+            imap_conn.logout();
             break;
         }
 
         if let Some(matches) = matches.subcommand_matches("search") {
+            let mut imap_conn = ImapConnector::new(&account)?;
             let page_size: usize = matches.value_of("size").unwrap().parse().unwrap();
             let page: usize = matches.value_of("page").unwrap().parse().unwrap();
             let query = matches
@@ -204,26 +204,26 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
                 })
                 .1
                 .join(" ");
-
             let msgs = imap_conn.search_msgs(&mbox, &query, &page_size, &page)?;
             let msgs = Msgs::from(&msgs);
-
             print(&output_fmt, msgs)?;
+            imap_conn.logout();
             break;
         }
 
         if let Some(matches) = matches.subcommand_matches("read") {
+            let mut imap_conn = ImapConnector::new(&account)?;
             let uid = matches.value_of("uid").unwrap();
             let mime = format!("text/{}", matches.value_of("mime-type").unwrap());
-
             let msg = imap_conn.read_msg(&mbox, &uid)?;
             let msg = ReadableMsg::from_bytes(&mime, &msg)?;
-
             print(&output_fmt, msg)?;
+            imap_conn.logout();
             break;
         }
 
         if let Some(matches) = matches.subcommand_matches("attachments") {
+            let mut imap_conn = ImapConnector::new(&account)?;
             let uid = matches.value_of("uid").unwrap();
 
             let msg = imap_conn.read_msg(&mbox, &uid)?;
@@ -255,11 +255,12 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
                 }
                 _ => (),
             }
-
+            imap_conn.logout();
             break;
         }
 
         if let Some(matches) = matches.subcommand_matches("write") {
+            let mut imap_conn = ImapConnector::new(&account)?;
             let attachments = matches
                 .values_of("attachments")
                 .unwrap_or_default()
@@ -296,11 +297,12 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
                     Err(err) => eprintln!("{}", err),
                 }
             }
-
+            imap_conn.logout();
             break;
         }
 
         if let Some(matches) = matches.subcommand_matches("template") {
+            let mut imap_conn = ImapConnector::new(&account)?;
             if let Some(_) = matches.subcommand_matches("new") {
                 let tpl = Msg::build_new_tpl(&config, &account)?;
                 print(&output_fmt, &tpl)?;
@@ -330,11 +332,12 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
                 print(&output_fmt, &tpl)?;
                 break;
             }
-
+            imap_conn.logout();
             break;
         }
 
         if let Some(matches) = matches.subcommand_matches("reply") {
+            let mut imap_conn = ImapConnector::new(&account)?;
             let attachments = matches
                 .values_of("attachments")
                 .unwrap_or_default()
@@ -379,11 +382,12 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
                     Err(err) => eprintln!("{}", err),
                 }
             }
-
+            imap_conn.logout();
             break;
         }
 
         if let Some(matches) = matches.subcommand_matches("forward") {
+            let mut imap_conn = ImapConnector::new(&account)?;
             let attachments = matches
                 .values_of("attachments")
                 .unwrap_or_default()
@@ -422,68 +426,72 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
                     Err(err) => eprintln!("{}", err),
                 }
             }
-
+            imap_conn.logout();
             break;
         }
 
         if let Some(matches) = matches.subcommand_matches("copy") {
+            let mut imap_conn = ImapConnector::new(&account)?;
             let uid = matches.value_of("uid").unwrap();
             let target = matches.value_of("target").unwrap();
-
             let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
             let mut flags = msg.flags.deref().to_vec();
             flags.push(Flag::Seen);
-
             imap_conn.append_msg(target, &msg.to_vec()?, &flags)?;
+            imap_conn.logout();
             break;
         }
 
         if let Some(matches) = matches.subcommand_matches("move") {
+            let mut imap_conn = ImapConnector::new(&account)?;
             let uid = matches.value_of("uid").unwrap();
             let target = matches.value_of("target").unwrap();
-
             let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
             let mut flags = msg.flags.deref().to_vec();
             flags.push(Flag::Seen);
-
             imap_conn.append_msg(target, &msg.to_vec()?, msg.flags.deref())?;
             imap_conn.add_flags(mbox, uid, "\\Seen \\Deleted")?;
+            imap_conn.logout();
             break;
         }
 
         if let Some(matches) = matches.subcommand_matches("delete") {
+            let mut imap_conn = ImapConnector::new(&account)?;
             let uid = matches.value_of("uid").unwrap();
             imap_conn.add_flags(mbox, uid, "\\Seen \\Deleted")?;
+            imap_conn.logout();
             break;
         }
 
         if let Some(matches) = matches.subcommand_matches("send") {
+            let mut imap_conn = ImapConnector::new(&account)?;
             let msg = matches.value_of("message").unwrap();
             let msg = Msg::from(msg.to_string());
             let msg = msg.to_sendable_msg()?;
-
             smtp::send(&account, &msg)?;
             imap_conn.append_msg("Sent", &msg.formatted(), &[Flag::Seen])?;
+            imap_conn.logout();
             break;
         }
 
         if let Some(matches) = matches.subcommand_matches("save") {
+            let mut imap_conn = ImapConnector::new(&account)?;
             let msg = matches.value_of("message").unwrap();
             let msg = Msg::from(msg.to_string());
-
             imap_conn.append_msg(mbox, &msg.to_vec()?, &[Flag::Seen])?;
+            imap_conn.logout();
             break;
         }
 
         // Default case: list all messages
 
+        let mut imap_conn = ImapConnector::new(&account)?;
         let msgs = imap_conn.list_msgs(&mbox, &10, &0)?;
         let msgs = Msgs::from(&msgs);
-
         print(&output_fmt, msgs)?;
+        imap_conn.logout();
         break;
     }
 
-    imap_conn.logout();
     Ok(())
 }
