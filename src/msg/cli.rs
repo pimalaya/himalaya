@@ -86,6 +86,7 @@ pub fn msg_subcmds<'a>() -> Vec<App<'a, 'a>> {
                     .required(true),
             ),
         SubCommand::with_name("write")
+            .aliases(&["w"])
             .about("Writes a new message")
             .arg(attachment_arg()),
         SubCommand::with_name("send")
