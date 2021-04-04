@@ -8,7 +8,7 @@ nnoremap <buffer><silent>q     :bwipeout<cr>
 nnoremap <buffer><silent><cr>  :bwipeout<cr>
 nnoremap <buffer><silent><esc> :bwipeout<cr>
 
-call himalaya#shared#define_bindings([
+call himalaya#shared#bindings#define([
   \["n", "gm"  , "mbox#input"     ],
   \["n", "gp"  , "mbox#prev_page" ],
   \["n", "gn"  , "mbox#next_page" ],

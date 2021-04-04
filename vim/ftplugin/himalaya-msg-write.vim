@@ -1,5 +1,5 @@
 setlocal cursorline
-setlocal foldexpr=himalaya#shared#thread_fold(v:lnum)
+setlocal foldexpr=himalaya#shared#thread#fold(v:lnum)
 setlocal foldlevel=0
 setlocal foldlevelstart=0
 setlocal foldmethod=expr

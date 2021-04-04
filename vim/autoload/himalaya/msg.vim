@@ -1,7 +1,6 @@
-let s:print_info = function("himalaya#utils#print_msg")
-let s:print_err = function("himalaya#utils#print_err")
-let s:trim = function("himalaya#utils#trim")
-let s:cli = function("himalaya#shared#cli")
+let s:log = function("himalaya#shared#log#info")
+let s:trim = function("himalaya#shared#utils#trim")
+let s:cli = function("himalaya#shared#cli#call")
 
 let s:msg_id = 0
 let s:draft = ""
@@ -11,10 +10,10 @@ let s:draft = ""
 function! s:format_msg_for_list(msg)
   let msg = copy(a:msg)
 
-  let flag_unseen = index(msg.flags, "Seen") == -1 ? "🟓" : " "
-  let flag_replied = index(msg.flags, "Answered") == -1 ? " " : "↩"
+  let flag_new = index(msg.flags, "Seen") == -1 ? "N" : " "
   let flag_flagged = index(msg.flags, "Flagged") == -1 ? " " : "!"
-  let msg.flags = printf("%s%s%s", flag_unseen, flag_replied, flag_flagged)
+  let flag_replied = index(msg.flags, "Answered") == -1 ? " " : "R"
+  let msg.flags = printf("%s%s%s", flag_new, flag_replied, flag_flagged)
 
   return msg
 endfunction
@@ -23,14 +22,10 @@ function! himalaya#msg#list()
   try
     let mbox = himalaya#mbox#curr_mbox()
     let page = himalaya#mbox#curr_page()
-
-    call s:print_info(printf("Fetching %s messages…", tolower(mbox)))
-    let msgs = s:cli("--mailbox %s list --page %d", [shellescape(mbox), page])
-    let msgs = map(copy(msgs), "s:format_msg_for_list(v:val)")
-    call s:print_info("Done!")
-
+    let msgs = s:cli("--mailbox %s list --page %d", [shellescape(mbox), page], printf("Fetching %s messages", mbox))
+    let msgs = map(msgs, "s:format_msg_for_list(v:val)")
     let buftype = stridx(bufname("%"), "Himalaya messages") == 0 ? "file" : "edit"
-    execute printf("silent! %s Himalaya messages [%s] [page %d]", buftype, tolower(mbox), page + 1)
+    execute printf("silent! %s Himalaya messages [%s] [page %d]", buftype, mbox, page + 1)
     setlocal modifiable
     execute "%d"
     call append(0, s:render("list", msgs))
@@ -39,7 +34,9 @@ function! himalaya#msg#list()
     let &modified = 0
     execute 0
   catch
-    call s:print_err(v:exception)
+    if !empty(v:exception)
+      redraw | call himalaya#shared#log#err(v:exception)
+    endif
   endtry
 endfunction
 
@@ -47,11 +44,7 @@ function! himalaya#msg#read()
   try
     let s:msg_id = s:get_focused_msg_id()
     let mbox = himalaya#mbox#curr_mbox()
-
-    call s:print_info(printf("Fetching message %d…", s:msg_id))
-    let msg = s:cli("read %d --mailbox %s", [s:msg_id, shellescape(mbox)])
-    call s:print_info("Done!")
-
+    let msg = s:cli("--mailbox %s read %d", [shellescape(mbox), s:msg_id], printf("Fetching message %d", s:msg_id))
     let attachment = msg.hasAttachment ? " []" : ""
     execute printf("silent! edit Himalaya read message [%d]%s", s:msg_id, attachment)
     setlocal modifiable
@@ -62,16 +55,15 @@ function! himalaya#msg#read()
     let &modified = 0
     execute 0
   catch
-    call s:print_err(v:exception)
+    if !empty(v:exception)
+      redraw | call himalaya#shared#log#err(v:exception)
+    endif
   endtry
 endfunction
 
 function! himalaya#msg#write()
   try
-    call s:print_info("Fetching new template…")
-    let msg = s:cli("template new", [])
-    call s:print_info("Done!")
-
+    let msg = s:cli("template new", [], "Fetching new template")
     silent! edit Himalaya write
     call append(0, split(substitute(msg.template, "\r", "", "g"), "\n"))
     execute "$d"
@@ -79,7 +71,9 @@ function! himalaya#msg#write()
     let &modified = 0
     execute 0
   catch
-    call s:print_err(v:exception)
+    if !empty(v:exception)
+      redraw | call himalaya#shared#log#err(v:exception)
+    endif
   endtry
 endfunction
 
@@ -87,11 +81,7 @@ function! himalaya#msg#reply()
   try
     let mbox = himalaya#mbox#curr_mbox()
     let msg_id = stridx(bufname("%"), "Himalaya messages") == 0 ? s:get_focused_msg_id() : s:msg_id
-
-    call s:print_info("Fetching reply template…")
-    let msg = s:cli("template reply %d --mailbox %s", [msg_id, shellescape(mbox)])
-    call s:print_info("Done!")
-
+    let msg = s:cli("--mailbox %s template reply %d", [shellescape(mbox), msg_id], "Fetching reply template")
     execute printf("silent! edit Himalaya reply [%d]", msg_id)
     call append(0, split(substitute(msg.template, "\r", "", "g"), "\n"))
     execute "$d"
@@ -99,7 +89,9 @@ function! himalaya#msg#reply()
     let &modified = 0
     execute 0
   catch
-    call s:print_err(v:exception)
+    if !empty(v:exception)
+      redraw | call himalaya#shared#log#err(v:exception)
+    endif
   endtry
 endfunction
 
@@ -107,11 +99,7 @@ function! himalaya#msg#reply_all()
   try
     let mbox = himalaya#mbox#curr_mbox()
     let msg_id = stridx(bufname("%"), "Himalaya messages") == 0 ? s:get_focused_msg_id() : s:msg_id
-
-    call s:print_info("Fetching reply all template…")
-    let msg = s:cli("template reply %d --mailbox %s --all", [msg_id, shellescape(mbox)])
-    call s:print_info("Done!")
-
+    let msg = s:cli("--mailbox %s template reply %d --all", [shellescape(mbox), msg_id], "Fetching reply all template")
     execute printf("silent! edit Himalaya reply all [%d]", msg_id)
     call append(0, split(substitute(msg.template, "\r", "", "g"), "\n"))
     execute "$d"
@@ -119,7 +107,9 @@ function! himalaya#msg#reply_all()
     let &modified = 0
     execute 0
   catch
-    call s:print_err(v:exception)
+    if !empty(v:exception)
+      redraw | call himalaya#shared#log#err(v:exception)
+    endif
   endtry
 endfunction
 
@@ -127,11 +117,7 @@ function! himalaya#msg#forward()
   try
     let mbox = himalaya#mbox#curr_mbox()
     let msg_id = stridx(bufname("%"), "Himalaya messages") == 0 ? s:get_focused_msg_id() : s:msg_id
-
-    call s:print_info("Fetching forward template…")
-    let msg = s:cli("template forward %d --mailbox %s", [msg_id, shellescape(mbox)])
-    call s:print_info("Done!")
-
+    let msg = s:cli("--mailbox %s template forward %d", [shellescape(mbox), msg_id], "Fetching forward template")
     execute printf("silent! edit Himalaya forward [%d]", msg_id)
     call append(0, split(substitute(msg.template, "\r", "", "g"), "\n"))
     execute "$d"
@@ -139,50 +125,51 @@ function! himalaya#msg#forward()
     let &modified = 0
     execute 0
   catch
-    call s:print_err(v:exception)
+    if !empty(v:exception)
+      redraw | call himalaya#shared#log#err(v:exception)
+    endif
   endtry
 endfunction
 
 function! himalaya#msg#draft_save()
   let s:draft = join(getline(1, "$"), "\r\n")
-  call s:print_info("Draft saved!")
+  redraw | call s:log("Save draft [OK]")
   let &modified = 0
 endfunction
 
 function! himalaya#msg#draft_handle()
-  while 1
-    let choice = input("(s)end, (d)raft, (q)uit or (c)ancel? ")
-    let choice = tolower(choice)[0]
-    redraw | echo
+  try
+    while 1
+      let choice = input("(s)end, (d)raft, (q)uit or (c)ancel? ")
+      let choice = tolower(choice)[0]
+      redraw | echo
 
-    if choice == "s"
-      call s:print_info("Sending message…")
-      call s:cli("send -- %s", [shellescape(s:draft)])
-      call s:print_info("Done!")
-      return
-    elseif choice == "d"
-      call s:print_info("Saving draft…")
-      call s:cli("save --mailbox Drafts -- %s", [shellescape(s:draft)])
-      call s:print_info("Done!")
-      return
-    elseif choice == "q"
-      return
-    elseif choice == "c"
-      throw "Action canceled"
-    endif
-  endwhile
+      if choice == "s"
+        return s:cli("send -- %s", [shellescape(s:draft)], "Sending message")
+      elseif choice == "d"
+        return s:cli("--mailbox Drafts save -- %s", [shellescape(s:draft)], "Saving draft")
+      elseif choice == "q"
+        return
+      elseif choice == "c"
+        throw "Action canceled"
+      endif
+    endwhile
+  catch
+    " TODO: find a better way to prevent the buffer to close (stop the BufUnload event)
+    call himalaya#shared#log#err(v:exception)
+    throw ""
+  endtry
 endfunction
 
 function! himalaya#msg#attachments()
   try
     let mbox = himalaya#mbox#curr_mbox()
     let msg_id = stridx(bufname("%"), "Himalaya messages") == 0 ? s:get_focused_msg_id() : s:msg_id
-
-    call s:print_info("Downloading attachments…")
-    let msg = s:cli("attachments %d --mailbox %s", [msg_id, shellescape(mbox)])
-    call s:print_info("Done!")
+    let msg = s:cli("--mailbox %s attachments %d", [shellescape(mbox), msg_id], "Downloading attachments")
   catch
-    call s:print_err(v:exception)
+    if !empty(v:exception)
+      redraw | call himalaya#shared#log#err(v:exception)
+    endif
   endtry
 endfunction
 

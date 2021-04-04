@@ -9,7 +9,7 @@ syntax match hya_subject /^|.\{-}|.\{-}|.\{-}|/             contains=hya_uid,hya
 syntax match hya_sender  /^|.\{-}|.\{-}|.\{-}|.\{-}|/       contains=hya_uid,hya_flags,hya_subject,hya_sep
 syntax match hya_date    /^|.\{-}|.\{-}|.\{-}|.\{-}|.\{-}|/ contains=hya_uid,hya_flags,hya_subject,hya_sender,hya_sep
 syntax match hya_head    /.*\%1l/                           contains=hya_sep
-syntax match hya_unseen  /^|.\{-}|🟓.*$/                     contains=hya_sep
+syntax match hya_unseen  /^|.\{-}|N.*$/                     contains=hya_sep
 
 highlight default link hya_sep     VertSplit
 highlight default link hya_uid     Identifier

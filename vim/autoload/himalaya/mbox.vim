@@ -1,6 +1,4 @@
-let s:print_info = function("himalaya#utils#print_msg")
-let s:print_err = function("himalaya#utils#print_err")
-let s:cli = function("himalaya#shared#cli")
+let s:cli = function("himalaya#shared#cli#call")
 
 " Pagination
 
@@ -28,25 +26,23 @@ endfunction
 
 function! himalaya#mbox#input()
   try
-    call s:print_info("Fetching mailboxes…")
-
-    let mboxes = map(s:cli("mailboxes", []), "v:val.name")
-
-    " if &rtp =~ "fzf.vim"
-    "   call fzf#run({
-    "     \"source": mboxes,
-    "     \"sink": function("himalaya#mbox#post_input"),
-    "     \"down": "25%",
-    "   \})
-    " else
+    let mboxes = map(s:cli("mailboxes", [], "Fetching mailboxes"), "v:val.name")
+    if &rtp =~ "fzf.vim"
+      call fzf#run({
+        \"source": mboxes,
+        \"sink": function("himalaya#mbox#post_input"),
+        \"down": "25%",
+      \})
+    else
       let choice = map(copy(mboxes), "printf('%s (%d)', v:val, v:key)")
-      redraw | echo
       let choice = input(join(choice, ", ") . ": ")
       redraw | echo
       call himalaya#mbox#post_input(mboxes[choice])
-    " endif
+    endif
   catch
-    call s:print_err(v:exception)
+    if !empty(v:exception)
+      redraw | call himalaya#shared#log#err(v:exception)
+    endif
   endtry
 endfunction
 

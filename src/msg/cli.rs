@@ -302,37 +302,33 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         }
 
         if let Some(matches) = matches.subcommand_matches("template") {
-            let mut imap_conn = ImapConnector::new(&account)?;
             if let Some(_) = matches.subcommand_matches("new") {
                 let tpl = Msg::build_new_tpl(&config, &account)?;
                 print(&output_fmt, &tpl)?;
             }
 
             if let Some(matches) = matches.subcommand_matches("reply") {
+                let mut imap_conn = ImapConnector::new(&account)?;
                 let uid = matches.value_of("uid").unwrap();
-                let mbox = matches.value_of("mailbox").unwrap();
-
                 let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
                 let tpl = if matches.is_present("reply-all") {
                     msg.build_reply_all_tpl(&config, &account)?
                 } else {
                     msg.build_reply_tpl(&config, &account)?
                 };
-
                 print(&output_fmt, &tpl)?;
+                imap_conn.logout();
             }
 
             if let Some(matches) = matches.subcommand_matches("forward") {
+                let mut imap_conn = ImapConnector::new(&account)?;
                 let uid = matches.value_of("uid").unwrap();
-                let mbox = matches.value_of("mailbox").unwrap();
-
                 let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
                 let tpl = msg.build_forward_tpl(&config, &account)?;
-
                 print(&output_fmt, &tpl)?;
-                break;
+                imap_conn.logout();
             }
-            imap_conn.logout();
+
             break;
         }
 
