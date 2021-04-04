@@ -177,7 +177,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
 
     if let Some(matches) = matches.subcommand_matches("search") {
         let mut imap_conn = ImapConnector::new(&account)?;
-        let page_size: usize = matches.value_of("size").unwrap().parse().unwrap();
+        let page_size: usize = matches.value_of("page-size").unwrap().parse().unwrap();
         let page: usize = matches.value_of("page").unwrap().parse().unwrap();
         let query = matches
             .values_of("query")
