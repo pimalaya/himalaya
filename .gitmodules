@@ -1,0 +1,3 @@
+[submodule "wiki"]
+	path = wiki
+	url = git@github.com:soywod/himalaya.wiki.git
