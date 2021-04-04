@@ -27,9 +27,9 @@ function! himalaya#msg#list()
     let buftype = stridx(bufname("%"), "Himalaya messages") == 0 ? "file" : "edit"
     execute printf("silent! %s Himalaya messages [%s] [page %d]", buftype, mbox, page + 1)
     setlocal modifiable
-    execute "%d"
+    silent execute "%d"
     call append(0, s:render("list", msgs))
-    execute "$d"
+    silent execute "$d"
     setlocal filetype=himalaya-msg-list
     let &modified = 0
     execute 0
@@ -48,9 +48,9 @@ function! himalaya#msg#read()
     let attachment = msg.hasAttachment ? " []" : ""
     execute printf("silent! edit Himalaya read message [%d]%s", s:msg_id, attachment)
     setlocal modifiable
-    execute "%d"
+    silent execute "%d"
     call append(0, split(substitute(msg.content, "\r", "", "g"), "\n"))
-    execute "$d"
+    silent execute "$d"
     setlocal filetype=himalaya-msg-read
     let &modified = 0
     execute 0
@@ -66,7 +66,7 @@ function! himalaya#msg#write()
     let msg = s:cli("template new", [], "Fetching new template")
     silent! edit Himalaya write
     call append(0, split(substitute(msg.template, "\r", "", "g"), "\n"))
-    execute "$d"
+    silent execute "$d"
     setlocal filetype=himalaya-msg-write
     let &modified = 0
     execute 0
@@ -84,7 +84,7 @@ function! himalaya#msg#reply()
     let msg = s:cli("--mailbox %s template reply %d", [shellescape(mbox), msg_id], "Fetching reply template")
     execute printf("silent! edit Himalaya reply [%d]", msg_id)
     call append(0, split(substitute(msg.template, "\r", "", "g"), "\n"))
-    execute "$d"
+    silent execute "$d"
     setlocal filetype=himalaya-msg-write
     let &modified = 0
     execute 0
@@ -102,7 +102,7 @@ function! himalaya#msg#reply_all()
     let msg = s:cli("--mailbox %s template reply %d --all", [shellescape(mbox), msg_id], "Fetching reply all template")
     execute printf("silent! edit Himalaya reply all [%d]", msg_id)
     call append(0, split(substitute(msg.template, "\r", "", "g"), "\n"))
-    execute "$d"
+    silent execute "$d"
     setlocal filetype=himalaya-msg-write
     let &modified = 0
     execute 0
@@ -120,7 +120,7 @@ function! himalaya#msg#forward()
     let msg = s:cli("--mailbox %s template forward %d", [shellescape(mbox), msg_id], "Fetching forward template")
     execute printf("silent! edit Himalaya forward [%d]", msg_id)
     call append(0, split(substitute(msg.template, "\r", "", "g"), "\n"))
-    execute "$d"
+    silent execute "$d"
     setlocal filetype=himalaya-msg-write
     let &modified = 0
     execute 0
