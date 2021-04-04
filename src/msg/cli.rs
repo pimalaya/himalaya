@@ -229,7 +229,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         let attachments = Attachments::from_bytes(&msg)?;
 
         match output_fmt {
-            "text" => {
+            "plain" => {
                 println!(
                     "{} attachment(s) found for message {}",
                     attachments.0.len(),
