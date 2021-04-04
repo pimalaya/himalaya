@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2021-04-04
+
 ### Added
 
 - IDLE support [#29]
@@ -16,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Move feature [#31]
 - Delete feature [#36]
 - Signature support [#33]
-- Add attachment(s) to a message [#37]
+- Add attachment(s) to a message (CLI) [#37]
 
 ### Changed
 
@@ -61,7 +63,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.2.0...HEAD
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/soywod/himalaya/compare/v0.2.1...v0.2.0
 [0.2.0]: https://github.com/soywod/himalaya/compare/v0.2.0...v0.1.0
 [0.1.0]: https://github.com/soywod/himalaya/releases/tag/v0.1.0
 
