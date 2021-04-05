@@ -27,7 +27,7 @@ endfunction
 function! himalaya#mbox#input()
   try
     let mboxes = map(s:cli("mailboxes", [], "Fetching mailboxes"), "v:val.name")
-    if &rtp =~ "fzf.vim"
+    if &rtp =~ "fzf"
       call fzf#run({
         \"source": mboxes,
         \"sink": function("himalaya#mbox#post_input"),
