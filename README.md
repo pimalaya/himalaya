@@ -46,8 +46,8 @@ more flexibility.
 
 ## Installation
 
-```bash
-curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | bash
+```sh
+sh -c "$(curl -sSL https://github.com/soywod/himalaya/raw/master/install.sh)"
 ```
 
 *See the [wiki section](https://github.com/soywod/himalaya/wiki/Installation)
