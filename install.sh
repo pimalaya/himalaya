@@ -1,32 +1,64 @@
-#!/bin/bash
+#!/bin/sh
 
-get_os () {
-  if [[ "$OSTYPE" == "linux-gnu" ]]; then
-    echo "linux"
-  elif [[ "$OSTYPE" == "freebsd"* ]]; then
-    echo "linux"
-  elif [[ "$OSTYPE" == "darwin"* ]]; then
-    echo "macos"
-  elif [[ "$OSTYPE" == "cygwin" ]]; then
-    echo "windows"
-  elif [[ "$OSTYPE" == "msys" ]]; then
-    echo "windows"
-  elif [[ "$OSTYPE" == "win32" ]]; then
-    echo "windows"
-  else
-    return -1
-  fi
+set -eu
+
+DESTDIR="${DESTDIR:-/}"
+PREFIX="${PREFIX:-"$DESTDIR/usr/local"}"
+
+releases_url="https://github.com/soywod/himalaya/releases"
+
+uname_os() {
+  os=$(uname -s | tr '[:upper:]' '[:lower:]')
+
+  case $os in
+    msys*) os="windows" ;;
+    mingw*) os="windows" ;;
+    cygwin*) os="windows" ;;
+    win*) os="windows" ;;
+  esac
+
+  echo "$os"
 }
 
-OS=`get_os`
+get_system() {
+  case $(uname_os) in
+    linux | freebsd) system="linux" ;;
+    darwin) system="macos" ;;
+    windows) system="windows" ;;
+  esac
 
-cd /tmp
-echo "Downloading latest ${OS} release…"
-curl -sLo himalaya.tar.gz "https://github.com/soywod/himalaya/releases/latest/download/himalaya-${OS}.tar.gz"
-echo "Installing binary…"
-tar -xzf himalaya.tar.gz
-rm himalaya.tar.gz
-chmod u+x himalaya.exe
-sudo mv himalaya.exe /usr/local/bin/himalaya
+  echo "$system"
+}
 
-echo "$(himalaya --version) installed!"
+start() {
+  system=$(get_system)
+  if [ -z "$system" ]; then
+    echo "Error: Unsupported system: $system"
+    exit 1
+  fi
+
+  if ! tmpdir=$(mktemp -d); then
+    echo "Error: Failed to create tmpdir"
+    exit 1
+  else
+    trap 'rm -rf $tmpdir' EXIT
+  fi
+
+  echo "Downloading latest $system release…"
+  curl -sLo "$tmpdir/himalaya.tar.gz" "$releases_url/latest/download/himalaya-$system.tar.gz"
+
+  echo "Installing binary…"
+  tar -xzf "$tmpdir/himalaya.tar.gz" -C "$tmpdir"
+
+  if [ -w "$PREFIX" ]; then
+    mkdir -p "$PREFIX/bin"
+    install "$tmpdir/himalaya.exe" "$PREFIX/bin/himalaya"
+  else
+    sudo mkdir -p "$PREFIX/bin"
+    sudo install "$tmpdir/himalaya.exe" "$PREFIX/bin/himalaya"
+  fi
+
+  echo "$("$PREFIX/bin/himalaya" --version) installed!"
+}
+
+start
