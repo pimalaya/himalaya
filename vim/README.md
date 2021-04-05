@@ -10,6 +10,7 @@ Vim plugin for [Himalaya](https://github.com/soywod/himalaya) CLI email client.
 * [Installation](#installation)
 * [Usage](#usage)
   * [List messages view](#list-messages-view)
+  * [List mailboxes](#list-mailboxes)
   * [Read message view](#read-message-view)
   * [Write message view](#write-message-view)
 * [License](https://github.com/soywod/himalaya.vim/blob/master/LICENSE)
@@ -80,6 +81,20 @@ nmap gR   <plug>(himalaya-msg-reply-all)
 nmap gf   <plug>(himalaya-msg-forward)
 nmap ga   <plug>(himalaya-msg-attachments)
 ```
+
+### List mailboxes
+
+Default behaviour (basic prompt):
+
+![screenshot](https://user-images.githubusercontent.com/10437171/113631817-51eb3180-966a-11eb-8b13-cd1f1f2539ab.jpeg)
+
+With [telescope](https://github.com/nvim-telescope/telescope.nvim) support:
+
+![screenshot](https://user-images.githubusercontent.com/10437171/113631294-86122280-9669-11eb-8074-1c43c36b65a9.jpeg)
+
+With [fzf](https://github.com/junegunn/fzf) support:
+
+![screenshot](https://user-images.githubusercontent.com/10437171/113631382-acd05900-9669-11eb-817d-c28fd5d9574c.jpeg)
 
 ### Read message view
 

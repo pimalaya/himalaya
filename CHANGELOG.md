@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Telescope support [#61]
+
 ## [0.2.2] - 2021-04-04
 
 ### Added
@@ -113,3 +117,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#39]: https://github.com/soywod/himalaya/issues/39
 [#40]: https://github.com/soywod/himalaya/issues/40
 [#41]: https://github.com/soywod/himalaya/issues/41
+[#61]: https://github.com/soywod/himalaya/issues/61

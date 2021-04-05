@@ -1,3 +1,4 @@
+let s:dir = expand("<sfile>:h")
 let s:cli = function("himalaya#shared#cli#call")
 
 " Pagination
@@ -27,12 +28,18 @@ endfunction
 function! himalaya#mbox#input()
   try
     let mboxes = map(s:cli("mailboxes", [], "Fetching mailboxes"), "v:val.name")
-    if &rtp =~ "fzf"
+
+    if &rtp =~ "telescope"
+      execute printf("luafile %s/mbox.lua", s:dir)
+      call luaeval(printf("mbox_picker({%s})", join(map(mboxes, "string(v:val)"), ", ")))
+
+    else if &rtp =~ "fzf"
       call fzf#run({
         \"source": mboxes,
         \"sink": function("himalaya#mbox#post_input"),
         \"down": "25%",
       \})
+
     else
       let choice = map(copy(mboxes), "printf('%s (%d)', v:val, v:key)")
       let choice = input(join(choice, ", ") . ": ")
