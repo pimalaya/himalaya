@@ -33,7 +33,7 @@ function! himalaya#mbox#input()
       execute printf("luafile %s/mbox.lua", s:dir)
       call luaeval(printf("mbox_picker({%s})", join(map(mboxes, "string(v:val)"), ", ")))
 
-    else if &rtp =~ "fzf"
+    elseif &rtp =~ "fzf"
       call fzf#run({
         \"source": mboxes,
         \"sink": function("himalaya#mbox#post_input"),
