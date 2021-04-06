@@ -12,7 +12,7 @@ set -e
 case $(uname -s | tr [:upper:] [:lower:]) in
     *bsd*|linux*) os=linux ;;
     darwin*) os=macos ;;
-    cygwin*|mingw*) os=windows ;;
+    cygwin*|mingw*|win*) os=windows ;;
     *) die 'Unable to detect host operating system.' ;;
 esac
 
