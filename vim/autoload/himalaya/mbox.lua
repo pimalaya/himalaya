@@ -17,10 +17,11 @@ function mbox_picker(mboxes)
                 ordinal = entry,
                 preview_command = function(entry, bufnr)
                     vim.api.nvim_buf_call(bufnr, function()
-                        local success, _ = pcall(vim.fn['himalaya#mbox#post_input'](entry.value))
+                        local success, output = pcall(vim.fn['himalaya#mbox#post_input'], entry.value)
                         if not (success) then
                             -- TODO does not work since buffer is not modifiable
-                            -- vim.api.nvim_buf_set_lines(bufnr, 0, -1, true, {"Empty mailbox"})
+                            vim.bo.modifiable = true
+                            vim.api.nvim_buf_set_lines(bufnr, 0, -1, true, {"Error: "..output})
                         end
                     end)
                 end
