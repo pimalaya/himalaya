@@ -1,24 +1,10 @@
 #!/bin/bash
 
-get_os () {
-  if [[ "$OSTYPE" == "linux-gnu" ]]; then
-    echo "linux"
-  elif [[ "$OSTYPE" == "freebsd"* ]]; then
-    echo "linux"
-  elif [[ "$OSTYPE" == "darwin"* ]]; then
-    echo "macos"
-  elif [[ "$OSTYPE" == "cygwin" ]]; then
-    echo "windows"
-  elif [[ "$OSTYPE" == "msys" ]]; then
-    echo "windows"
-  elif [[ "$OSTYPE" == "win32" ]]; then
-    echo "windows"
-  else
-    return -1
-  fi
-}
-
-OS=`get_os`
+case $OSTYPE in
+    linux-gnu|freebsd*) OS=linux ;;
+    darwin*) OS=macos ;;
+    cygwin|msys|win32) OS=windows ;;
+esac
 
 cd /tmp
 echo "Downloading latest ${OS} release…"
