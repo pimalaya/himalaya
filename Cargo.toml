@@ -6,7 +6,7 @@ authors = ["soywod <clement.douin@posteo.net>"]
 edition = "2018"
 
 [dependencies]
-clap = "2.33.3"
+clap = {version = "2.33.3", default-features = false, features=["suggestions"]}
 error-chain = "0.12.4"
 imap = "2.4.0"
 lettre = "0.10.0-beta.3"
