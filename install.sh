@@ -1,18 +1,30 @@
-#!/bin/bash
+#!/bin/sh
 
-case $OSTYPE in
-    linux-gnu|freebsd*) OS=linux ;;
-    darwin*) OS=macos ;;
-    cygwin|msys|win32) OS=windows ;;
+REPO=https://github.com/soywod/himalaya
+
+die() {
+    printf '%s: %s\n' "${0##*/}" "$1" >&2
+    exit "${2-1}"
+}
+
+set -e
+
+case $(uname -s | tr [:upper:] [:lower:]) in
+    *bsd*|linux*) os=linux ;;
+    darwin*) os=macos ;;
+    cygwin*|mingw*) os=windows ;;
+    *) die 'Unable to detect host operating system.' ;;
 esac
 
-cd /tmp
-echo "Downloading latest ${OS} release…"
-curl -sLo himalaya.tar.gz "https://github.com/soywod/himalaya/releases/latest/download/himalaya-${OS}.tar.gz"
-echo "Installing binary…"
-tar -xzf himalaya.tar.gz
-rm himalaya.tar.gz
-chmod u+x himalaya.exe
-sudo mv himalaya.exe /usr/local/bin/himalaya
+printf 'Downloading latest %s release…\n' "$os" >&2
+trap "rm -f \"$himalaya.tar.gz\" himalaya.exe" EXIT
+curl -sSLo "$himalaya.tar.gz" \
+    "$REPO/releases/latest/download/himalaya-$os.tar.gz"
 
-echo "$(himalaya --version) installed!"
+printf 'Installing binary…\n' >&2
+tar -zx himalaya.exe -f "$himalaya.tar.gz"
+mkdir -p /usr/local/bin
+cp -f himalaya.exe /usr/local/bin/himalaya
+chmod a+rx /usr/local/bin/himalaya
+
+die "$(himalaya --version) installed!" 0
