@@ -7,4 +7,5 @@ function! himalaya#shared#log#err(msg)
   echohl ErrorMsg
   echomsg a:msg
   echohl None
+  throw a:msg
 endfunction
