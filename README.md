@@ -61,13 +61,13 @@ for other installation methods.*
 
 ### Installing using Nix
 
-If you already have Nix installed, run the following command to install himalaya:
+If you already have Nix installed (without Flakes), run the following command to install himalaya to your home directory:
 
 ```bash
 nix-env -if https://github.com/soywod/himalaya/archive/master.tar.gz
 ```
 
-If you use Nix with [Flakes](https://nixos.wiki/wiki/Flakes), you can directly run himalaya using:
+Alternatively, if you use Nix with [Flakes](https://nixos.wiki/wiki/Flakes), you can directly run himalaya without installing it anywhere:
 
 ```bash
 nix run github:soywod/himalaya
