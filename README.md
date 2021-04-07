@@ -65,13 +65,14 @@ If you already have Nix installed (without Flakes), run the following command to
 
 ```bash
 nix-env -if https://github.com/soywod/himalaya/archive/master.tar.gz
+# Or, `nix-env -if .` from within the source tree checkout
 ```
 
 Alternatively, if you use Nix with [Flakes](https://nixos.wiki/wiki/Flakes), you can directly run himalaya without installing it anywhere:
 
 ```bash
 nix run github:soywod/himalaya
-# Or, just `nix run` from within the source tree checkout
+# Or, `nix run` from within the source tree checkout
 ```
 
 ### Development using Nix
