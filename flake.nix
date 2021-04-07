@@ -3,6 +3,7 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url = "github:numtide/flake-utils";
     gitignore = { 
       url = "github:hercules-ci/gitignore"; 
@@ -14,10 +15,13 @@
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, gitignore, ... }: 
+  outputs = { self, nixpkgs, flake-utils, gitignore, rust-overlay, ... }: 
     flake-utils.lib.eachDefaultSystem (system: 
       let 
-        pkgs = import nixpkgs { inherit system; };
+        pkgs = import nixpkgs { 
+          inherit system;
+          overlays = [ rust-overlay.overlay ];
+        };
         inherit (import gitignore { inherit (pkgs) lib; }) gitignoreSource;
         himalaya = 
           pkgs.rustPlatform.buildRustPackage rec {
@@ -27,6 +31,17 @@
             nativeBuildInputs = with pkgs; [
               pkg-config 
               openssl.dev
+              (pkgs.rust-bin.stable.latest.default.override {
+                extensions = [
+                  "rust-src"
+                  "cargo"
+                  "rustc"
+                  "rls"
+                  "rust-analysis"
+                  "rustfmt"
+                  "clippy"
+                ];
+              })
             ];
             PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
             # When Cargo dependencies change, the sha here will have to be updated.
