@@ -87,9 +87,10 @@ From here, you have access to all the development tools (Rust compiler, cargo, r
 
 If you use VSCode, simply open this project folder - and accept the workspace extension recommendations.
 
-#### Updating Cargo SHA
+#### Updating Nix configuration
 
-The `cargoSha256` field in `flake.nix` should be updated whenever your Cargo dependency tree changes. To do this, run `nix-build`, and it will provide you with the new SHA that you can copy paste in `flake.nix`.
+- The `cargoSha256` field in `flake.nix` should be updated whenever your Cargo dependency tree changes. To do this, run `nix-build`, and it will provide you with the new SHA that you can copy paste in `flake.nix`.
+- Whenenver Cargo.toml gets a new version, set that version in flake.nix as well.
 
 ## Configuration
 
