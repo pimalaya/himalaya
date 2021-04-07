@@ -8,9 +8,13 @@
       url = "github:hercules-ci/gitignore"; 
       flake=false; 
     };
+    flake-compat = {
+      url = "github:edolstra/flake-compat";
+      flake = false;
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils, gitignore }: 
+  outputs = { self, nixpkgs, flake-utils, gitignore, ... }: 
     flake-utils.lib.eachDefaultSystem (system: 
       let 
         pkgs = import nixpkgs { inherit system; };
