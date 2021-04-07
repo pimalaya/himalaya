@@ -9,28 +9,31 @@ Minimalist CLI email client, written in Rust.
 
 ## Table of contents
 
-* [Motivation](#motivation)
-* [Installation](#installation)
-* [Configuration](#configuration)
-* [Usage](#usage)
-  * [List mailboxes](#list-mailboxes)
-  * [List messages](#list-messages)
-  * [Search messages](#search-messages)
-  * [Download attachments](#download-attachments)
-  * [Read a message](#read-a-message)
-  * [Write a new message](#write-a-new-message)
-  * [Reply to a message](#reply-to-a-message)
-  * [Forward a message](#forward-a-message)
-  * [Copy a message](#copy-a-message)
-  * [Move a message](#move-a-message)
-  * [Delete a message](#delete-a-message)
-  * [Listen to new messages](#listen-to-new-messages)
-* [Interfaces](#interfaces)
-  * [GUI](#gui)
-  * [TUI](#tui)
-* [License](https://github.com/soywod/himalaya/blob/master/LICENSE)
-* [Changelog](https://github.com/soywod/himalaya/blob/master/CHANGELOG.md)
-* [Credits](#credits)
+- [📫 Himalaya ![gh-actions](https://github.com/soywod/himalaya/actions?query=workflow%3Adeployment)](#-himalaya-)
+  - [Table of contents](#table-of-contents)
+  - [Motivation](#motivation)
+  - [Installation](#installation)
+  - [Nix](#nix)
+    - [Installing using Nix](#installing-using-nix)
+    - [Development using Nix](#development-using-nix)
+  - [Configuration](#configuration)
+  - [Usage](#usage)
+    - [List mailboxes](#list-mailboxes)
+    - [List messages](#list-messages)
+    - [Search messages](#search-messages)
+    - [Download attachments](#download-attachments)
+    - [Read a message](#read-a-message)
+    - [Write a new message](#write-a-new-message)
+    - [Reply to a message](#reply-to-a-message)
+    - [Forward a message](#forward-a-message)
+    - [Copy a message](#copy-a-message)
+    - [Move a message](#move-a-message)
+    - [Delete a message](#delete-a-message)
+    - [Listen to new messages](#listen-to-new-messages)
+  - [Interfaces](#interfaces)
+    - [GUI](#gui)
+    - [TUI](#tui)
+  - [Credits](#credits)
 
 ## Motivation
 
@@ -49,8 +52,43 @@ more flexibility.
 curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | bash
 ```
 
-*See the [wiki section](https://github.com/soywod/himalaya/wiki/Installation)
+Read the Nix section below for a Nix-based installation method. *See the [wiki section](https://github.com/soywod/himalaya/wiki/Installation)
 for other installation methods.*
+
+## Nix
+
+[Nix](https://serokell.io/blog/what-is-nix) users might find this section relevant.
+
+### Installing using Nix
+
+If you already have Nix installed, run the following command to install himalaya:
+
+```bash
+nix-env -if https://github.com/soywod/himalaya/archive/master.tar.gz
+```
+
+If you use Nix with [Flakes](https://nixos.wiki/wiki/Flakes), you can directly run himalaya using:
+
+```bash
+nix run github:soywod/himalaya
+# Or, just `nix run` from within the source tree checkout
+```
+
+### Development using Nix
+
+To enter a development shell,
+
+```bash
+nix develop
+```
+
+From here, you have access to all the development tools (Rust compiler, cargo, rust language server, code formatter, etc.) necessary to hack on himalaya. 
+
+If you use VSCode, simply open this project folder - and accept the workspace extension recommendations.
+
+#### Updating Cargo SHA
+
+The `cargoSha256` field in `flake.nix` should be updated whenever your Cargo dependency tree changes. To do this, run `nix-build`, and it will provide you with the new SHA that you can copy paste in `flake.nix`.
 
 ## Configuration
 
