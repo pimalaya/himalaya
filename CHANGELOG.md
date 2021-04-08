@@ -7,14 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- Unicode chars breaks the view [#71]
-- Copy/move incomplete (missing parts) [#75]
+## [0.2.3] - 2021-04-08
 
 ### Added
 
 - Telescope support [#61]
+
+### Fixed
+
+- Unicode chars breaks the view [#71]
+- Copy/move incomplete (missing parts) [#75]
 
 ## [0.2.2] - 2021-04-04
 
@@ -83,7 +85,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.2.2...HEAD
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/soywod/himalaya/compare/v0.2.3...v0.2.2
 [0.2.2]: https://github.com/soywod/himalaya/compare/v0.2.2...v0.2.1
 [0.2.1]: https://github.com/soywod/himalaya/compare/v0.2.1...v0.2.0
 [0.2.0]: https://github.com/soywod/himalaya/compare/v0.2.0...v0.1.0
