@@ -20,13 +20,15 @@
       (system:
        let 
           name = "himalaya";
+
+          # Imports
           pkgs = import nixpkgs { 
             inherit system; 
             overlays = [ 
               rust-overlay.overlay
               (self: super: {
                 # Because rust-overlay bundles multiple rust packages into one
-                # derivation, specify that mega-bundle here, so that naersk
+                # derivation, specify that mega-bundle here, so that crate2nix
                 # will use them automatically.
                 rustc = self.rust-bin.stable.latest.default;
                 cargo = self.rust-bin.stable.latest.default;
@@ -35,22 +37,28 @@
           };
           inherit (import "${crate2nix}/tools.nix" { inherit pkgs; })
             generatedCargoNix;
+
+          # Create the cargo2nix project
           project = pkgs.callPackage (generatedCargoNix {
             inherit name;
             src = ./.;
           }) {
             # Individual crate overrides go here
             # Example: https://github.com/balsoft/simple-osd-daemons/blob/6f85144934c0c1382c7a4d3a2bbb80106776e270/flake.nix#L28-L50
+            defaultCrateOverrides = pkgs.defaultCrateOverrides // {
+              # The himalaya crate itself is overriden here. Typically we
+              # configure non-Rust dependencies here.
+              ${name} = oldAttrs: {
+                inherit nativeBuildInputs;
+              } // buildEnvVars;
+            };
           };
           nativeBuildInputs = with pkgs; [ rustc cargo pkgconfig openssl.dev ];
           buildEnvVars = {
             PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
           };
-          rootCrateBuild = pkgs.lib.overrideDerivation project.rootCrate.build (oldAttrs: {
-            inherit nativeBuildInputs;
-          } // buildEnvVars);
         in rec {
-          packages.${name} = rootCrateBuild;
+          packages.${name} = project.rootCrate.build;
 
           # `nix build`
           defaultPackage = packages.${name};
