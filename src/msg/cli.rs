@@ -435,7 +435,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
         let mut flags = msg.flags.deref().to_vec();
         flags.push(Flag::Seen);
-        imap_conn.append_msg(target, &msg.to_vec()?, &flags)?;
+        imap_conn.append_msg(target, &msg.raw, &flags)?;
         imap_conn.logout();
         return Ok(());
     }
@@ -447,7 +447,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
         let mut flags = msg.flags.deref().to_vec();
         flags.push(Flag::Seen);
-        imap_conn.append_msg(target, &msg.to_vec()?, msg.flags.deref())?;
+        imap_conn.append_msg(target, &msg.raw, msg.flags.deref())?;
         imap_conn.add_flags(mbox, uid, "\\Seen \\Deleted")?;
         imap_conn.logout();
         return Ok(());

@@ -1,13 +1,12 @@
 [package]
 name = "himalaya"
 description = "📫 Minimalist CLI email client"
-# When changing the version here, also change the version in flake.nix
-version = "0.2.2"
+version = "0.2.3"
 authors = ["soywod <clement.douin@posteo.net>"]
 edition = "2018"
 
 [dependencies]
-clap = "2.33.3"
+clap = {version = "2.33.3", default-features = false, features = ["suggestions"]}
 error-chain = "0.12.4"
 imap = "2.4.0"
 lettre = "0.10.0-beta.3"
@@ -19,4 +18,5 @@ serde_json = "1.0.61"
 terminal_size = "0.1.15"
 toml = "0.5.8"
 tree_magic = "0.2.3"
+unicode-width = "0.1.7"
 uuid = { version = "0.8", features = ["v4"] }

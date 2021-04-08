@@ -182,7 +182,7 @@ pub struct Msg<'m> {
     #[serde(skip_serializing)]
     pub attachments: Vec<String>,
     #[serde(skip_serializing)]
-    raw: Vec<u8>,
+    pub raw: Vec<u8>,
 }
 
 impl<'m> From<Vec<u8>> for Msg<'m> {
