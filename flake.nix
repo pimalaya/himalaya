@@ -2,10 +2,9 @@
   description = "Minimalist CLI email client";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     rust-overlay.url = "github:oxalica/rust-overlay";
-    utils.url = "github:numtide/flake-utils";
-    naersk.url = "github:nmattia/naersk";
+    flake-utils.url = "github:numtide/flake-utils";
     gitignore = { 
       url = "github:hercules-ci/gitignore"; 
       flake=false; 
@@ -16,53 +15,44 @@
     };
   };
 
-  outputs = { self, nixpkgs, utils, rust-overlay, naersk, gitignore, ... }:
-    utils.lib.eachDefaultSystem
-      (system:
-        let 
-          pkgs = import nixpkgs {
-            inherit system;
-            overlays = [ 
-              rust-overlay.overlay
-              (self: super: {
-                # Because rust-overlay bundles multiple rust packages into one
-                # derivation, specify that mega-bundle here, so that naersk
-                # will use them automatically.
-                rustc = self.rust-bin.stable.latest.default;
-                cargo = self.rust-bin.stable.latest.default;
+  outputs = { self, nixpkgs, flake-utils, gitignore, rust-overlay, ... }: 
+    flake-utils.lib.eachDefaultSystem (system: 
+      let 
+        pkgs = import nixpkgs { 
+          inherit system;
+          overlays = [ rust-overlay.overlay ];
+        };
+        inherit (import gitignore { inherit (pkgs) lib; }) gitignoreSource;
+        himalaya = 
+          pkgs.rustPlatform.buildRustPackage rec {
+            pname = "himalaya";
+            version = "0.2.2";
+            src = gitignoreSource ./.;
+            nativeBuildInputs = with pkgs; [
+              pkg-config 
+              openssl.dev
+              (pkgs.rust-bin.stable.latest.default.override {
+                extensions = [
+                  "rust-src"
+                  "cargo"
+                  "rustc"
+                  "rls"
+                  "rust-analysis"
+                  "rustfmt"
+                  "clippy"
+                ];
               })
             ];
+            PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
+            # When Cargo dependencies change, the sha here will have to be updated.
+            # `nix-build` will give you the new sha.
+            cargoSha256 = "sha256-G0f96pZe/KkuxQiFK45namDrSnDtYYcI/Ml00rt7G5M=";
+            meta = with pkgs.stdenv.lib; {
+              description = "Minimalist CLI email client";
+              homepage = "https://github.com/soywod/himalaya";
+            };
           };
-          inherit (import gitignore { inherit (pkgs) lib; }) gitignoreSource;
-          naersk-lib = naersk.lib."${system}";
-          nativeBuildInputs = with pkgs; [
-            # List your C dependencies here
-            pkg-config
-            openssl.dev
-          ];
-          PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
-        in rec {
-          # `nix build`
-          packages.himalaya = naersk-lib.buildPackage {
-            pname = "himalaya";
-            root = gitignoreSource ./.;
-            inherit nativeBuildInputs PKG_CONFIG_PATH;
-          };
-          defaultPackage = packages.himalaya;
-
-          # `nix run`
-          apps.himalaya = utils.lib.mkApp {
-            drv = packages.himalaya;
-          };
-          defaultApp = apps.himalaya;
-
-          # `nix develop`
-          devShell = pkgs.mkShell {
-            inherit PKG_CONFIG_PATH;
-            nativeBuildInputs = 
-              nativeBuildInputs ++ (with pkgs; [ rustc cargo ]) ;
-            RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
-          };
-        }
-      );
+      in {
+        defaultPackage = himalaya;
+      });
 }
