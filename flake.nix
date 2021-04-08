@@ -47,13 +47,16 @@
             # Example: https://github.com/balsoft/simple-osd-daemons/blob/6f85144934c0c1382c7a4d3a2bbb80106776e270/flake.nix#L28-L50
             defaultCrateOverrides = pkgs.defaultCrateOverrides // {
               # The himalaya crate itself is overriden here. Typically we
-              # configure non-Rust dependencies here.
+              # configure non-Rust dependencies (see below) here.
               ${name} = oldAttrs: {
-                inherit nativeBuildInputs;
+                inherit buildInputs nativeBuildInputs;
               } // buildEnvVars;
             };
           };
-          nativeBuildInputs = with pkgs; [ rustc cargo pkgconfig openssl.dev ];
+
+          # Configuration for the non-Rust dependencies
+          buildInputs = with pkgs; [ openssl.dev ];
+          nativeBuildInputs = with pkgs; [ rustc cargo pkgconfig ];
           buildEnvVars = {
             PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
           };
@@ -72,7 +75,7 @@
 
           # `nix develop`
           devShell = pkgs.mkShell {
-            inherit nativeBuildInputs;
+            inherit buildInputs nativeBuildInputs;
             RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
           } // buildEnvVars;
         }
