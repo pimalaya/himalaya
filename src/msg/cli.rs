@@ -1,5 +1,6 @@
 use clap::{self, App, Arg, ArgMatches, SubCommand};
 use error_chain::error_chain;
+use log::{debug, error, info};
 use std::{fs, ops::Deref};
 
 use crate::{
@@ -9,7 +10,6 @@ use crate::{
     input,
     mbox::cli::mbox_target_arg,
     msg::model::{Attachments, Msg, Msgs, ReadableMsg},
-    output::utils::{print, Info},
     smtp,
 };
 
@@ -19,7 +19,6 @@ error_chain! {
         Imap(crate::imap::model::Error, crate::imap::model::ErrorKind);
         Input(crate::input::Error, crate::input::ErrorKind);
         MsgModel(crate::msg::model::Error, crate::msg::model::ErrorKind);
-        OutputUtils(crate::output::utils::Error, crate::output::utils::ErrorKind);
         Smtp(crate::smtp::Error, crate::smtp::ErrorKind);
     }
 }
@@ -162,25 +161,33 @@ pub fn msg_subcmds<'a>() -> Vec<App<'a, 'a>> {
 pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
     let config = Config::new_from_file()?;
     let account = config.find_account_by_name(matches.value_of("account"))?;
-    let output_fmt = matches.value_of("output").unwrap();
-    let silent = matches.is_present("silent");
     let mbox = matches.value_of("mailbox").unwrap();
 
     if let Some(matches) = matches.subcommand_matches("list") {
+        debug!("Subcommand matched: list");
+
         let mut imap_conn = ImapConnector::new(&account)?;
         let page_size: usize = matches.value_of("page-size").unwrap().parse().unwrap();
+        debug!("Page size: {}", &page_size);
         let page: usize = matches.value_of("page").unwrap().parse().unwrap();
+        debug!("Page: {}", &page);
+
         let msgs = imap_conn.list_msgs(&mbox, &page_size, &page)?;
         let msgs = Msgs::from(&msgs);
-        print(&output_fmt, &silent, msgs)?;
+        info!("{}", msgs);
+
         imap_conn.logout();
         return Ok(());
     }
 
     if let Some(matches) = matches.subcommand_matches("search") {
+        debug!("Subcommand matched: search");
+
         let mut imap_conn = ImapConnector::new(&account)?;
         let page_size: usize = matches.value_of("page-size").unwrap().parse().unwrap();
+        debug!("Page size: {}", &page_size);
         let page: usize = matches.value_of("page").unwrap().parse().unwrap();
+        debug!("Page: {}", &page);
         let query = matches
             .values_of("query")
             .unwrap_or_default()
@@ -205,62 +212,61 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
             })
             .1
             .join(" ");
+        debug!("Query: {}", &query);
+
         let msgs = imap_conn.search_msgs(&mbox, &query, &page_size, &page)?;
         let msgs = Msgs::from(&msgs);
-        print(&output_fmt, &silent, msgs)?;
+        info!("{}", msgs);
+
         imap_conn.logout();
         return Ok(());
     }
 
     if let Some(matches) = matches.subcommand_matches("read") {
+        debug!("Subcommand matched: read");
+
         let mut imap_conn = ImapConnector::new(&account)?;
         let uid = matches.value_of("uid").unwrap();
+        debug!("UID: {}", &uid);
         let mime = format!("text/{}", matches.value_of("mime-type").unwrap());
+        debug!("MIME: {}", &mime);
+
         let msg = imap_conn.read_msg(&mbox, &uid)?;
         let msg = ReadableMsg::from_bytes(&mime, &msg)?;
-        print(&output_fmt, &silent, msg)?;
+        info!("{}", msg);
+
         imap_conn.logout();
         return Ok(());
     }
 
     if let Some(matches) = matches.subcommand_matches("attachments") {
+        debug!("Subcommand matched: attachments");
+
         let mut imap_conn = ImapConnector::new(&account)?;
         let uid = matches.value_of("uid").unwrap();
+        debug!("UID: {}", &uid);
 
         let msg = imap_conn.read_msg(&mbox, &uid)?;
         let attachments = Attachments::from_bytes(&msg)?;
+        debug!(
+            "{} attachment(s) found for message {}",
+            attachments.0.len(),
+            uid
+        );
+        attachments.0.iter().for_each(|attachment| {
+            let filepath = config.downloads_filepath(&account, &attachment.filename);
+            debug!("Downloading {}…", &attachment.filename);
+            fs::write(filepath, &attachment.raw).unwrap()
+        });
+        info!("{} attachment(s) successfully downloaded", &uid);
 
-        match output_fmt {
-            "plain" => {
-                println!(
-                    "{} attachment(s) found for message {}",
-                    attachments.0.len(),
-                    uid
-                );
-
-                attachments.0.iter().for_each(|attachment| {
-                    let filepath = config.downloads_filepath(&account, &attachment.filename);
-                    println!("Downloading {}…", &attachment.filename);
-                    fs::write(filepath, &attachment.raw).unwrap()
-                });
-
-                println!("Done!");
-            }
-            "json" => {
-                attachments.0.iter().for_each(|attachment| {
-                    let filepath = config.downloads_filepath(&account, &attachment.filename);
-                    fs::write(filepath, &attachment.raw).unwrap()
-                });
-
-                print!("{{}}");
-            }
-            _ => (),
-        }
         imap_conn.logout();
         return Ok(());
     }
 
     if let Some(matches) = matches.subcommand_matches("write") {
+        debug!("Subcommand matched: write");
+
         let mut imap_conn = ImapConnector::new(&account)?;
         let attachments = matches
             .values_of("attachments")
@@ -276,17 +282,17 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
             match input::post_edit_choice() {
                 Ok(choice) => match choice {
                     input::Choice::Send => {
-                        println!("Sending…");
+                        debug!("Sending message…");
                         let msg = msg.to_sendable_msg()?;
                         smtp::send(&account, &msg)?;
                         imap_conn.append_msg("Sent", &msg.formatted(), &[Flag::Seen])?;
-                        println!("Done!");
+                        info!("Message successfully sent");
                         break;
                     }
                     input::Choice::Draft => {
-                        println!("Saving to draft…");
+                        debug!("Saving to draft…");
                         imap_conn.append_msg("Drafts", &msg.to_vec()?, &[Flag::Seen])?;
-                        println!("Done!");
+                        info!("Message successfully saved to Drafts");
                         break;
                     }
                     input::Choice::Edit => {
@@ -295,7 +301,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
                     }
                     input::Choice::Quit => break,
                 },
-                Err(err) => eprintln!("{}", err),
+                Err(err) => error!("{}", err),
             }
         }
         imap_conn.logout();
@@ -303,30 +309,44 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
     }
 
     if let Some(matches) = matches.subcommand_matches("template") {
+        debug!("Subcommand matched: template");
+
         if let Some(_) = matches.subcommand_matches("new") {
+            debug!("Subcommand matched: new");
+
             let tpl = Msg::build_new_tpl(&config, &account)?;
-            print(&output_fmt, &silent, &tpl)?;
+            info!("{}", tpl);
         }
 
         if let Some(matches) = matches.subcommand_matches("reply") {
+            debug!("Subcommand matched: reply");
+
             let mut imap_conn = ImapConnector::new(&account)?;
             let uid = matches.value_of("uid").unwrap();
+            debug!("UID: {}", &uid);
+
             let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
             let tpl = if matches.is_present("reply-all") {
                 msg.build_reply_all_tpl(&config, &account)?
             } else {
                 msg.build_reply_tpl(&config, &account)?
             };
-            print(&output_fmt, &silent, &tpl)?;
+            info!("{}", tpl);
+
             imap_conn.logout();
         }
 
         if let Some(matches) = matches.subcommand_matches("forward") {
+            debug!("Subcommand matched: forward");
+
             let mut imap_conn = ImapConnector::new(&account)?;
             let uid = matches.value_of("uid").unwrap();
+            debug!("UID: {}", &uid);
+
             let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
             let tpl = msg.build_forward_tpl(&config, &account)?;
-            print(&output_fmt, &silent, &tpl)?;
+            info!("{}", tpl);
+
             imap_conn.logout();
         }
 
@@ -334,6 +354,8 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
     }
 
     if let Some(matches) = matches.subcommand_matches("reply") {
+        debug!("Subcommand matched: reply");
+
         let mut imap_conn = ImapConnector::new(&account)?;
         let attachments = matches
             .values_of("attachments")
@@ -341,6 +363,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
             .map(String::from)
             .collect::<Vec<_>>();
         let uid = matches.value_of("uid").unwrap();
+        debug!("UID: {}", &uid);
 
         let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
         let tpl = if matches.is_present("reply-all") {
@@ -357,17 +380,17 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
             match input::post_edit_choice() {
                 Ok(choice) => match choice {
                     input::Choice::Send => {
-                        println!("Sending…");
+                        debug!("Sending message…");
                         smtp::send(&account, &msg.to_sendable_msg()?)?;
                         imap_conn.append_msg("Sent", &msg.to_vec()?, &[Flag::Seen])?;
                         imap_conn.add_flags(mbox, uid, "\\Answered")?;
-                        println!("Done!");
+                        info!("Message successfully sent");
                         break;
                     }
                     input::Choice::Draft => {
-                        println!("Saving to draft…");
+                        debug!("Saving draft message…");
                         imap_conn.append_msg("Drafts", &msg.to_vec()?, &[Flag::Seen])?;
-                        println!("Done!");
+                        info!("Message successfully saved to Drafts");
                         break;
                     }
                     input::Choice::Edit => {
@@ -376,7 +399,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
                     }
                     input::Choice::Quit => break,
                 },
-                Err(err) => eprintln!("{}", err),
+                Err(err) => error!("{}", err),
             }
         }
 
@@ -385,6 +408,8 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
     }
 
     if let Some(matches) = matches.subcommand_matches("forward") {
+        debug!("Subcommand matched: forward");
+
         let mut imap_conn = ImapConnector::new(&account)?;
         let attachments = matches
             .values_of("attachments")
@@ -392,6 +417,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
             .map(String::from)
             .collect::<Vec<_>>();
         let uid = matches.value_of("uid").unwrap();
+        debug!("UID: {}", &uid);
 
         let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
         let tpl = msg.build_forward_tpl(&config, &account)?;
@@ -403,16 +429,16 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
             match input::post_edit_choice() {
                 Ok(choice) => match choice {
                     input::Choice::Send => {
-                        println!("Sending…");
+                        debug!("Sending message…");
                         smtp::send(&account, &msg.to_sendable_msg()?)?;
                         imap_conn.append_msg("Sent", &msg.to_vec()?, &[Flag::Seen])?;
-                        println!("Done!");
+                        info!("Message successfully sent");
                         break;
                     }
                     input::Choice::Draft => {
-                        println!("Saving to draft…");
+                        debug!("Saving draft message…");
                         imap_conn.append_msg("Drafts", &msg.to_vec()?, &[Flag::Seen])?;
-                        println!("Done!");
+                        info!("Message successfully saved to Drafts");
                         break;
                     }
                     input::Choice::Edit => {
@@ -421,7 +447,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
                     }
                     input::Choice::Quit => break,
                 },
-                Err(err) => eprintln!("{}", err),
+                Err(err) => error!("{}", err),
             }
         }
 
@@ -430,63 +456,67 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
     }
 
     if let Some(matches) = matches.subcommand_matches("copy") {
+        debug!("Subcommand matched: copy");
+
         let mut imap_conn = ImapConnector::new(&account)?;
         let uid = matches.value_of("uid").unwrap();
+        debug!("UID: {}", &uid);
         let target = matches.value_of("target").unwrap();
+        debug!("Target: {}", &target);
+
         let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
         let mut flags = msg.flags.deref().to_vec();
         flags.push(Flag::Seen);
         imap_conn.append_msg(target, &msg.raw, &flags)?;
-        imap_conn.logout();
+        info!(
+            "Message {} successfully copied to folder `{}`",
+            &uid, &target
+        );
 
-        print(
-            &output_fmt,
-            &silent,
-            Info(format!(
-                "Message {} successfully copied to folder `{}`",
-                &uid, &target
-            )),
-        )?;
+        imap_conn.logout();
         return Ok(());
     }
 
     if let Some(matches) = matches.subcommand_matches("move") {
+        debug!("Subcommand matched: move");
+
         let mut imap_conn = ImapConnector::new(&account)?;
         let uid = matches.value_of("uid").unwrap();
+        debug!("UID: {}", &uid);
         let target = matches.value_of("target").unwrap();
+        debug!("Target: {}", &target);
+
         let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
         let mut flags = msg.flags.deref().to_vec();
         flags.push(Flag::Seen);
         imap_conn.append_msg(target, &msg.raw, msg.flags.deref())?;
         imap_conn.add_flags(mbox, uid, "\\Seen \\Deleted")?;
-        imap_conn.logout();
+        info!(
+            "Message {} successfully moved to folder `{}`",
+            &uid, &target
+        );
 
-        print(
-            &output_fmt,
-            &silent,
-            Info(format!(
-                "Message {} successfully moved to folder `{}`",
-                &uid, &target
-            )),
-        )?;
+        imap_conn.logout();
         return Ok(());
     }
 
     if let Some(matches) = matches.subcommand_matches("delete") {
+        debug!("Subcommand matched: delete");
+
         let mut imap_conn = ImapConnector::new(&account)?;
         let uid = matches.value_of("uid").unwrap();
-        imap_conn.add_flags(mbox, uid, "\\Seen \\Deleted")?;
-        imap_conn.logout();
+        debug!("UID: {}", &uid);
 
-        print(
-            &output_fmt,
-            &silent,
-            Info(format!("Message {} successfully deleted", &uid)),
-        )?;
+        imap_conn.add_flags(mbox, uid, "\\Seen \\Deleted")?;
+        info!("Message {} successfully deleted", &uid);
+
+        imap_conn.logout();
         return Ok(());
     }
 
     if let Some(matches) = matches.subcommand_matches("send") {
+        debug!("Subcommand matched: send");
+
         let mut imap_conn = ImapConnector::new(&account)?;
         let msg = matches.value_of("message").unwrap();
         let msg = Msg::from(msg.to_string());
@@ -498,6 +528,8 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
     }
 
     if let Some(matches) = matches.subcommand_matches("save") {
+        debug!("Subcommand matched: save");
+
         let mut imap_conn = ImapConnector::new(&account)?;
         let msg = matches.value_of("message").unwrap();
         let msg = Msg::from(msg.to_string());
@@ -506,11 +538,13 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         return Ok(());
     }
 
-    // Default case: list first page messages
+    debug!("Default subcommand matched: list");
+
     let mut imap_conn = ImapConnector::new(&account)?;
     let msgs = imap_conn.list_msgs(&mbox, &10, &0)?;
     let msgs = Msgs::from(&msgs);
-    print(&output_fmt, &silent, msgs)?;
+    info!("{}", &msgs);
+
     imap_conn.logout();
     Ok(())
 }

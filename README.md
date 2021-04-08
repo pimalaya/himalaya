@@ -87,17 +87,18 @@ soywod <clement.douin@posteo.net>
 📫 Minimalist CLI email client
 
 USAGE:
-    himalaya [FLAGS] [OPTIONS] [SUBCOMMAND]
+    himalaya [OPTIONS] [SUBCOMMAND]
 
 FLAGS:
     -h, --help       Prints help information
-    -s, --silent     Disables any output
     -V, --version    Prints version information
 
 OPTIONS:
     -a, --account <STRING>     Selects a specific account
+    -l, --log <LEVEL>          Defines the logs level [default: info]  [possible values: error, warn, info, debug,
+                               trace]
     -m, --mailbox <MAILBOX>    Selects a specific mailbox [default: INBOX]
-    -o, --output <STRING>      Defines the output format [default: plain]  [possible values: plain, json]
+    -o, --output <FMT>         Defines the output format [default: plain]  [possible values: plain, json]
 
 SUBCOMMANDS:
     attachments    Downloads all message attachments

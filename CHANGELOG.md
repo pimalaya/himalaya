@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Wiki entry for Gmail users [#58]
 - Info logs for copy/move/delete cmd + silent mode [#74]
 
+### Changed
+
+- Refactor output system + log levels [#74]
+
 ## [0.2.3] - 2021-04-08
 
 ### Added
