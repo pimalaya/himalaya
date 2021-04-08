@@ -9,7 +9,7 @@ use crate::{
     input,
     mbox::cli::mbox_target_arg,
     msg::model::{Attachments, Msg, Msgs, ReadableMsg},
-    output::utils::print,
+    output::utils::{print, Info},
     smtp,
 };
 
@@ -437,6 +437,14 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         flags.push(Flag::Seen);
         imap_conn.append_msg(target, &msg.raw, &flags)?;
         imap_conn.logout();
+
+        print(
+            &output_fmt,
+            Info(format!(
+                "Message {} successfully copied to folder `{}`",
+                &uid, &target
+            )),
+        )?;
         return Ok(());
     }
 
@@ -450,6 +458,14 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         imap_conn.append_msg(target, &msg.raw, msg.flags.deref())?;
         imap_conn.add_flags(mbox, uid, "\\Seen \\Deleted")?;
         imap_conn.logout();
+
+        print(
+            &output_fmt,
+            Info(format!(
+                "Message {} successfully moved to folder `{}`",
+                &uid, &target
+            )),
+        )?;
         return Ok(());
     }
 
@@ -458,6 +474,11 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         let uid = matches.value_of("uid").unwrap();
         imap_conn.add_flags(mbox, uid, "\\Seen \\Deleted")?;
         imap_conn.logout();
+
+        print(
+            &output_fmt,
+            Info(format!("Message {} successfully deleted", &uid)),
+        )?;
         return Ok(());
     }
 
