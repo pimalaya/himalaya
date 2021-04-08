@@ -36,7 +36,7 @@ use crate::{
     imap::cli::{imap_matches, imap_subcmds},
     mbox::cli::{mbox_matches, mbox_source_arg, mbox_subcmds},
     msg::cli::{msg_matches, msg_subcmds},
-    output::cli::output_arg,
+    output::cli::output_args,
 };
 
 error_chain! {
@@ -53,7 +53,7 @@ fn run() -> Result<()> {
         .version(env!("CARGO_PKG_VERSION"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .author(env!("CARGO_PKG_AUTHORS"))
-        .arg(output_arg())
+        .args(&output_args())
         .arg(account_arg())
         .arg(mbox_source_arg())
         .subcommands(flag_subcmds())

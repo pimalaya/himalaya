@@ -9,7 +9,7 @@ use crate::{
     input,
     mbox::cli::mbox_target_arg,
     msg::model::{Attachments, Msg, Msgs, ReadableMsg},
-    output::utils::print,
+    output::utils::{print, Info},
     smtp,
 };
 
@@ -163,6 +163,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
     let config = Config::new_from_file()?;
     let account = config.find_account_by_name(matches.value_of("account"))?;
     let output_fmt = matches.value_of("output").unwrap();
+    let silent = matches.is_present("silent");
     let mbox = matches.value_of("mailbox").unwrap();
 
     if let Some(matches) = matches.subcommand_matches("list") {
@@ -171,7 +172,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         let page: usize = matches.value_of("page").unwrap().parse().unwrap();
         let msgs = imap_conn.list_msgs(&mbox, &page_size, &page)?;
         let msgs = Msgs::from(&msgs);
-        print(&output_fmt, msgs)?;
+        print(&output_fmt, &silent, msgs)?;
         imap_conn.logout();
         return Ok(());
     }
@@ -206,7 +207,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
             .join(" ");
         let msgs = imap_conn.search_msgs(&mbox, &query, &page_size, &page)?;
         let msgs = Msgs::from(&msgs);
-        print(&output_fmt, msgs)?;
+        print(&output_fmt, &silent, msgs)?;
         imap_conn.logout();
         return Ok(());
     }
@@ -217,7 +218,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         let mime = format!("text/{}", matches.value_of("mime-type").unwrap());
         let msg = imap_conn.read_msg(&mbox, &uid)?;
         let msg = ReadableMsg::from_bytes(&mime, &msg)?;
-        print(&output_fmt, msg)?;
+        print(&output_fmt, &silent, msg)?;
         imap_conn.logout();
         return Ok(());
     }
@@ -304,7 +305,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
     if let Some(matches) = matches.subcommand_matches("template") {
         if let Some(_) = matches.subcommand_matches("new") {
             let tpl = Msg::build_new_tpl(&config, &account)?;
-            print(&output_fmt, &tpl)?;
+            print(&output_fmt, &silent, &tpl)?;
         }
 
         if let Some(matches) = matches.subcommand_matches("reply") {
@@ -316,7 +317,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
             } else {
                 msg.build_reply_tpl(&config, &account)?
             };
-            print(&output_fmt, &tpl)?;
+            print(&output_fmt, &silent, &tpl)?;
             imap_conn.logout();
         }
 
@@ -325,7 +326,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
             let uid = matches.value_of("uid").unwrap();
             let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
             let tpl = msg.build_forward_tpl(&config, &account)?;
-            print(&output_fmt, &tpl)?;
+            print(&output_fmt, &silent, &tpl)?;
             imap_conn.logout();
         }
 
@@ -437,6 +438,15 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         flags.push(Flag::Seen);
         imap_conn.append_msg(target, &msg.raw, &flags)?;
         imap_conn.logout();
+
+        print(
+            &output_fmt,
+            &silent,
+            Info(format!(
+                "Message {} successfully copied to folder `{}`",
+                &uid, &target
+            )),
+        )?;
         return Ok(());
     }
 
@@ -450,6 +460,15 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         imap_conn.append_msg(target, &msg.raw, msg.flags.deref())?;
         imap_conn.add_flags(mbox, uid, "\\Seen \\Deleted")?;
         imap_conn.logout();
+
+        print(
+            &output_fmt,
+            &silent,
+            Info(format!(
+                "Message {} successfully moved to folder `{}`",
+                &uid, &target
+            )),
+        )?;
         return Ok(());
     }
 
@@ -458,6 +477,12 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         let uid = matches.value_of("uid").unwrap();
         imap_conn.add_flags(mbox, uid, "\\Seen \\Deleted")?;
         imap_conn.logout();
+
+        print(
+            &output_fmt,
+            &silent,
+            Info(format!("Message {} successfully deleted", &uid)),
+        )?;
         return Ok(());
     }
 
@@ -485,7 +510,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
     let mut imap_conn = ImapConnector::new(&account)?;
     let msgs = imap_conn.list_msgs(&mbox, &10, &0)?;
     let msgs = Msgs::from(&msgs);
-    print(&output_fmt, msgs)?;
+    print(&output_fmt, &silent, msgs)?;
     imap_conn.logout();
     Ok(())
 }

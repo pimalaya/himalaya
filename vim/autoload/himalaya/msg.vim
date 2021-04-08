@@ -18,21 +18,25 @@ function! s:format_msg_for_list(msg)
   return msg
 endfunction
 
+function! himalaya#msg#list_with(mbox, page, should_throw)
+  let msgs = s:cli("--mailbox %s list --page %d", [shellescape(a:mbox), a:page], printf("Fetching %s messages", a:mbox), a:should_throw)
+  let msgs = map(msgs, "s:format_msg_for_list(v:val)")
+  let buftype = stridx(bufname("%"), "Himalaya messages") == 0 ? "file" : "edit"
+  execute printf("silent! %s Himalaya messages [%s] [page %d]", buftype, a:mbox, a:page + 1)
+  setlocal modifiable
+  silent execute "%d"
+  call append(0, s:render("list", msgs))
+  silent execute "$d"
+  setlocal filetype=himalaya-msg-list
+  let &modified = 0
+  execute 0
+endfunction
+
 function! himalaya#msg#list()
   try
     let mbox = himalaya#mbox#curr_mbox()
     let page = himalaya#mbox#curr_page()
-    let msgs = s:cli("--mailbox %s list --page %d", [shellescape(mbox), page], printf("Fetching %s messages", mbox))
-    let msgs = map(msgs, "s:format_msg_for_list(v:val)")
-    let buftype = stridx(bufname("%"), "Himalaya messages") == 0 ? "file" : "edit"
-    execute printf("silent! %s Himalaya messages [%s] [page %d]", buftype, mbox, page + 1)
-    setlocal modifiable
-    silent execute "%d"
-    call append(0, s:render("list", msgs))
-    silent execute "$d"
-    setlocal filetype=himalaya-msg-list
-    let &modified = 0
-    execute 0
+    call himalaya#msg#list_with(mbox, page, 0)
   catch
     if !empty(v:exception)
       redraw | call himalaya#shared#log#err(v:exception)
@@ -44,7 +48,7 @@ function! himalaya#msg#read()
   try
     let s:msg_id = s:get_focused_msg_id()
     let mbox = himalaya#mbox#curr_mbox()
-    let msg = s:cli("--mailbox %s read %d", [shellescape(mbox), s:msg_id], printf("Fetching message %d", s:msg_id))
+    let msg = s:cli("--mailbox %s read %d", [shellescape(mbox), s:msg_id], printf("Fetching message %d", s:msg_id), 0)
     let attachment = msg.hasAttachment ? " []" : ""
     execute printf("silent! edit Himalaya read message [%d]%s", s:msg_id, attachment)
     setlocal modifiable
@@ -63,7 +67,7 @@ endfunction
 
 function! himalaya#msg#write()
   try
-    let msg = s:cli("template new", [], "Fetching new template")
+    let msg = s:cli("template new", [], "Fetching new template", 0)
     silent! edit Himalaya write
     call append(0, split(substitute(msg.template, "\r", "", "g"), "\n"))
     silent execute "$d"
@@ -81,7 +85,7 @@ function! himalaya#msg#reply()
   try
     let mbox = himalaya#mbox#curr_mbox()
     let msg_id = stridx(bufname("%"), "Himalaya messages") == 0 ? s:get_focused_msg_id() : s:msg_id
-    let msg = s:cli("--mailbox %s template reply %d", [shellescape(mbox), msg_id], "Fetching reply template")
+    let msg = s:cli("--mailbox %s template reply %d", [shellescape(mbox), msg_id], "Fetching reply template", 0)
     execute printf("silent! edit Himalaya reply [%d]", msg_id)
     call append(0, split(substitute(msg.template, "\r", "", "g"), "\n"))
     silent execute "$d"
@@ -99,7 +103,7 @@ function! himalaya#msg#reply_all()
   try
     let mbox = himalaya#mbox#curr_mbox()
     let msg_id = stridx(bufname("%"), "Himalaya messages") == 0 ? s:get_focused_msg_id() : s:msg_id
-    let msg = s:cli("--mailbox %s template reply %d --all", [shellescape(mbox), msg_id], "Fetching reply all template")
+    let msg = s:cli("--mailbox %s template reply %d --all", [shellescape(mbox), msg_id], "Fetching reply all template", 0)
     execute printf("silent! edit Himalaya reply all [%d]", msg_id)
     call append(0, split(substitute(msg.template, "\r", "", "g"), "\n"))
     silent execute "$d"
@@ -117,7 +121,7 @@ function! himalaya#msg#forward()
   try
     let mbox = himalaya#mbox#curr_mbox()
     let msg_id = stridx(bufname("%"), "Himalaya messages") == 0 ? s:get_focused_msg_id() : s:msg_id
-    let msg = s:cli("--mailbox %s template forward %d", [shellescape(mbox), msg_id], "Fetching forward template")
+    let msg = s:cli("--mailbox %s template forward %d", [shellescape(mbox), msg_id], "Fetching forward template", 0)
     execute printf("silent! edit Himalaya forward [%d]", msg_id)
     call append(0, split(substitute(msg.template, "\r", "", "g"), "\n"))
     silent execute "$d"
@@ -145,9 +149,9 @@ function! himalaya#msg#draft_handle()
       redraw | echo
 
       if choice == "s"
-        return s:cli("send -- %s", [shellescape(s:draft)], "Sending message")
+        return s:cli("send -- %s", [shellescape(s:draft)], "Sending message", 0)
       elseif choice == "d"
-        return s:cli("--mailbox Drafts save -- %s", [shellescape(s:draft)], "Saving draft")
+        return s:cli("--mailbox Drafts save -- %s", [shellescape(s:draft)], "Saving draft", 0)
       elseif choice == "q"
         return
       elseif choice == "c"
@@ -165,7 +169,7 @@ function! himalaya#msg#attachments()
   try
     let mbox = himalaya#mbox#curr_mbox()
     let msg_id = stridx(bufname("%"), "Himalaya messages") == 0 ? s:get_focused_msg_id() : s:msg_id
-    let msg = s:cli("--mailbox %s attachments %d", [shellescape(mbox), msg_id], "Downloading attachments")
+    let msg = s:cli("--mailbox %s attachments %d", [shellescape(mbox), msg_id], "Downloading attachments", 0)
   catch
     if !empty(v:exception)
       redraw | call himalaya#shared#log#err(v:exception)

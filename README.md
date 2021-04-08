@@ -121,15 +121,16 @@ for all the options.*
 ## Usage
 
 ```
-himalaya 0.2.0
+himalaya 0.2.3
 soywod <clement.douin@posteo.net>
 📫 Minimalist CLI email client
 
 USAGE:
-    himalaya [OPTIONS] [SUBCOMMAND]
+    himalaya [FLAGS] [OPTIONS] [SUBCOMMAND]
 
 FLAGS:
     -h, --help       Prints help information
+    -s, --silent     Disables any output
     -V, --version    Prints version information
 
 OPTIONS:
