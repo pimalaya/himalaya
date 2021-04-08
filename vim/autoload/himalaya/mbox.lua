@@ -18,11 +18,13 @@ function mbox_picker(mboxes)
                 preview_command = function(entry, bufnr)
                     vim.api.nvim_buf_call(bufnr, function()
                         local page = 0 -- page 0 for preview
-                        local success, output = pcall(vim.fn['himalaya#msg#list_preview'], entry.value, page)
+                        local success, output = pcall(vim.fn['himalaya#msg#list_with'], entry.value, page)
                         if not (success) then
                             vim.cmd('redraw')
                             vim.bo.modifiable = true
-                            vim.api.nvim_buf_set_lines(bufnr, 0, -1, true, {"Error: "..output})
+                            local errors = vim.fn.split(output, '\n')
+                            errors[1] = "Errors: "..errors[1]
+                            vim.api.nvim_buf_set_lines(bufnr, 0, -1, true, errors)
                         end
                     end)
                 end

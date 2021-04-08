@@ -18,7 +18,7 @@ function! s:format_msg_for_list(msg)
   return msg
 endfunction
 
-function! himalaya#msg#list_preview(mbox, page)
+function! himalaya#msg#list_with(mbox, page)
   let msgs = s:cli("--mailbox %s list --page %d", [shellescape(a:mbox), a:page], printf("Fetching %s messages", a:mbox))
   let msgs = map(msgs, "s:format_msg_for_list(v:val)")
   let buftype = stridx(bufname("%"), "Himalaya messages") == 0 ? "file" : "edit"
@@ -36,7 +36,7 @@ function! himalaya#msg#list()
   try
     let mbox = himalaya#mbox#curr_mbox()
     let page = himalaya#mbox#curr_page()
-    call himalaya#msg#list_preview(mbox, page)
+    call himalaya#msg#list_with(mbox, page)
   catch
     if !empty(v:exception)
       redraw | call himalaya#shared#log#err(v:exception)

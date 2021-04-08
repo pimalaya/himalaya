@@ -14,8 +14,8 @@ function! himalaya#shared#cli#call(cmd, args, log)
       redraw | call himalaya#shared#log#info(printf("%s [ERR]", a:log))
       for line in split(res, "\n")
         call himalaya#shared#log#err(line)
-        throw line
       endfor
+      throw res
     endtry
   endif
 endfunction
