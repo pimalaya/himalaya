@@ -3,11 +3,9 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    rust-overlay.url = "github:oxalica/rust-overlay";
     utils.url = "github:numtide/flake-utils";
-    crate2nix = {
-      url = "github:balsoft/crate2nix/tools-nix-version-comparison";
-      flake = false;
-    };
+    naersk.url = "github:nmattia/naersk";
     gitignore = { 
       url = "github:hercules-ci/gitignore"; 
       flake=false; 
@@ -18,41 +16,51 @@
     };
   };
 
-  outputs = { self, nixpkgs, utils, gitignore, crate2nix, ... }:
+  outputs = { self, nixpkgs, utils, rust-overlay, naersk, gitignore, ... }:
     utils.lib.eachDefaultSystem
       (system:
-       let 
-          name = "himalaya";
-          pkgs = import nixpkgs { inherit system; };
-          inherit (import "${crate2nix}/tools.nix" { inherit pkgs; })
-            generatedCargoNix;
-          inherit (import gitignore { inherit (pkgs) lib; }) gitignoreSource;
-          project = pkgs.callPackage (generatedCargoNix {
-            inherit name;
-            src = gitignoreSource ./.;
-          }) {
-            # Individual crate overrides go here
-            # Example: https://github.com/balsoft/simple-osd-daemons/blob/6f85144934c0c1382c7a4d3a2bbb80106776e270/flake.nix#L28-L50
+        let 
+          pkgs = import nixpkgs {
+            inherit system;
+            overlays = [ 
+              rust-overlay.overlay
+              (self: super: {
+                # Because rust-overlay bundles multiple rust packages into one
+                # derivation, specify that mega-bundle here, so that naersk
+                # will use them automatically.
+                rustc = self.rust-bin.stable.latest.default;
+                cargo = self.rust-bin.stable.latest.default;
+              })
+            ];
           };
-          packages = builtins.mapAttrs (name: member: member.build) project.workspaceMembers;
+          inherit (import gitignore { inherit (pkgs) lib; }) gitignoreSource;
+          naersk-lib = naersk.lib."${system}";
+          nativeBuildInputs = with pkgs; [
+            # List your C dependencies here
+            pkg-config
+            openssl.dev
+          ];
+          PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
         in rec {
-          inherit packages;
-
           # `nix build`
-          defaultPackage = packages.${name};
+          packages.himalaya = naersk-lib.buildPackage {
+            pname = "himalaya";
+            root = gitignoreSource ./.;
+            inherit nativeBuildInputs PKG_CONFIG_PATH;
+          };
+          defaultPackage = packages.himalaya;
 
           # `nix run`
-          apps.${name} = utils.lib.mkApp {
-            inherit name;
-            drv = packages.${name};
+          apps.himalaya = utils.lib.mkApp {
+            drv = packages.himalaya;
           };
-          defaultApp = apps.${name};
+          defaultApp = apps.himalaya;
 
           # `nix develop`
           devShell = pkgs.mkShell {
-            PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
+            inherit PKG_CONFIG_PATH;
             nativeBuildInputs = 
-              with pkgs; [ rustc cargo pkgconfig openssl.dev ] ;
+              nativeBuildInputs ++ (with pkgs; [ rustc cargo ]) ;
             RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
           };
         }
