@@ -21,6 +21,9 @@ error_chain! {
         MsgModel(crate::msg::model::Error, crate::msg::model::ErrorKind);
         Smtp(crate::smtp::Error, crate::smtp::ErrorKind);
     }
+    foreign_links {
+        Utf8(std::string::FromUtf8Error);
+    }
 }
 
 pub fn uid_arg<'a>() -> Arg<'a, 'a> {
@@ -106,6 +109,12 @@ pub fn msg_subcmds<'a>() -> Vec<App<'a, 'a>> {
                     .value_name("STRING")
                     .possible_values(&["plain", "html"])
                     .default_value("plain"),
+            )
+            .arg(
+                Arg::with_name("raw")
+                    .help("Reads raw message")
+                    .long("raw")
+                    .short("r"),
             ),
         SubCommand::with_name("attachments")
             .aliases(&["attach", "att", "a"])
@@ -230,10 +239,19 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         debug!("UID: {}", &uid);
         let mime = format!("text/{}", matches.value_of("mime-type").unwrap());
         debug!("MIME: {}", &mime);
+        let raw = matches.is_present("raw");
+        debug!("Raw: {}", &raw);
 
         let msg = imap_conn.read_msg(&mbox, &uid)?;
-        let msg = ReadableMsg::from_bytes(&mime, &msg)?;
-        info!("{}", msg);
+        if raw {
+            let msg = String::from_utf8(msg)
+                .chain_err(|| "Could not decode raw message as utf8 string")?;
+            let msg = msg.trim_end_matches("\n");
+            info!("{}", msg);
+        } else {
+            let msg = ReadableMsg::from_bytes(&mime, &msg)?;
+            info!("{}", msg);
+        }
 
         imap_conn.logout();
         return Ok(());

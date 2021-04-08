@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Wiki entry for Gmail users [#58]
 - Info logs for copy/move/delete cmd + silent mode [#74]
+- `--raw` arg for `read` cmd [#79]
 
 ### Changed
 
@@ -139,3 +140,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#71]: https://github.com/soywod/himalaya/issues/71
 [#74]: https://github.com/soywod/himalaya/issues/74
 [#75]: https://github.com/soywod/himalaya/issues/75
+[#79]: https://github.com/soywod/himalaya/issues/79
