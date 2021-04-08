@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Wiki entry for Gmail users [#58]
+
 ## [0.2.3] - 2021-04-08
 
 ### Added
@@ -125,6 +129,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#39]: https://github.com/soywod/himalaya/issues/39
 [#40]: https://github.com/soywod/himalaya/issues/40
 [#41]: https://github.com/soywod/himalaya/issues/41
+[#58]: https://github.com/soywod/himalaya/issues/58
 [#61]: https://github.com/soywod/himalaya/issues/61
 [#71]: https://github.com/soywod/himalaya/issues/71
 [#75]: https://github.com/soywod/himalaya/issues/75
