@@ -1,5 +1,6 @@
 use std::fmt;
 use terminal_size::terminal_size;
+use unicode_width::UnicodeWidthStr;
 
 #[derive(Clone, Debug)]
 pub struct Style(u8, u8, u8);
@@ -46,8 +47,8 @@ impl Cell {
         }
     }
 
-    pub fn printable_value_len(&self) -> usize {
-        self.value.chars().collect::<Vec<_>>().len()
+    pub fn unicode_width(&self) -> usize {
+        UnicodeWidthStr::width(self.value.as_str())
     }
 
     pub fn render(&self, col_size: usize) -> String {
@@ -58,18 +59,15 @@ impl Cell {
             .collect::<Vec<_>>()
             .concat();
         let style_end = "\x1b[0m";
+        let unicode_width = self.unicode_width();
 
-        if col_size > 0 && self.printable_value_len() > col_size {
-            let value: String = self.value.chars().collect::<Vec<_>>()[0..=col_size - 2]
-                .into_iter()
-                .collect();
-
-            String::from(style_begin + &value + "… " + style_end)
+        if col_size > 0 && unicode_width > col_size {
+            String::from(style_begin + &self.value[0..=col_size - 2] + "… " + style_end)
         } else {
             let padding = if col_size == 0 {
                 "".to_string()
             } else {
-                " ".repeat(col_size - self.printable_value_len() + 1)
+                " ".repeat(col_size - unicode_width + 1)
             };
 
             String::from(style_begin + &self.value + &padding + style_end)
@@ -102,7 +100,7 @@ pub trait DisplayTable<'a, T: DisplayRow + 'a> {
         let head = Self::header_row();
 
         head.iter().for_each(|cell| {
-            col_sizes.push(cell.printable_value_len());
+            col_sizes.push(cell.unicode_width());
         });
 
         let mut table = self
@@ -110,9 +108,9 @@ pub trait DisplayTable<'a, T: DisplayRow + 'a> {
             .iter()
             .map(|item| {
                 let row = item.to_row();
-                row.iter().enumerate().for_each(|(i, cell)| {
-                    col_sizes[i] = col_sizes[i].max(cell.printable_value_len())
-                });
+                row.iter()
+                    .enumerate()
+                    .for_each(|(i, cell)| col_sizes[i] = col_sizes[i].max(cell.unicode_width()));
                 row
             })
             .collect::<Vec<_>>();

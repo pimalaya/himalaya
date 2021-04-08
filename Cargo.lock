@@ -318,6 +318,7 @@ dependencies = [
  "terminal_size",
  "toml",
  "tree_magic",
+ "unicode-width",
  "uuid",
 ]
 
