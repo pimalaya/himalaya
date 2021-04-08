@@ -87,6 +87,10 @@ From here, you have access to all the development tools (Rust compiler, cargo, r
 
 If you use VSCode, simply open this project folder - and accept the workspace extension recommendations.
 
+#### Troubleshooting Nix
+
+- See [here](https://github.com/soywod/himalaya/pull/76#discussion_r609710097) if you get the `hash mismatch in fixed-output derivation` error.
+
 ## Configuration
 
 ```toml
