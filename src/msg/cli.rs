@@ -106,7 +106,7 @@ pub fn msg_subcmds<'a>() -> Vec<App<'a, 'a>> {
                     .help("MIME type to use")
                     .short("t")
                     .long("mime-type")
-                    .value_name("STRING")
+                    .value_name("MIME")
                     .possible_values(&["plain", "html"])
                     .default_value("plain"),
             )
