@@ -17,9 +17,10 @@ function mbox_picker(mboxes)
                 ordinal = entry,
                 preview_command = function(entry, bufnr)
                     vim.api.nvim_buf_call(bufnr, function()
-                        local success, output = pcall(vim.fn['himalaya#mbox#post_input'], entry.value)
+                        local page = 0 -- page 0 for preview
+                        local success, output = pcall(vim.fn['himalaya#msg#list_preview'], entry.value, page)
                         if not (success) then
-                            -- TODO does not work since buffer is not modifiable
+                            vim.cmd('redraw')
                             vim.bo.modifiable = true
                             vim.api.nvim_buf_set_lines(bufnr, 0, -1, true, {"Error: "..output})
                         end

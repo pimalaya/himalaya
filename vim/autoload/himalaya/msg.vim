@@ -18,21 +18,25 @@ function! s:format_msg_for_list(msg)
   return msg
 endfunction
 
+function! himalaya#msg#list_preview(mbox, page)
+  let msgs = s:cli("--mailbox %s list --page %d", [shellescape(a:mbox), a:page], printf("Fetching %s messages", a:mbox))
+  let msgs = map(msgs, "s:format_msg_for_list(v:val)")
+  let buftype = stridx(bufname("%"), "Himalaya messages") == 0 ? "file" : "edit"
+  execute printf("silent! %s Himalaya messages [%s] [page %d]", buftype, a:mbox, a:page + 1)
+  setlocal modifiable
+  silent execute "%d"
+  call append(0, s:render("list", msgs))
+  silent execute "$d"
+  setlocal filetype=himalaya-msg-list
+  let &modified = 0
+  execute 0
+endfunction
+
 function! himalaya#msg#list()
   try
     let mbox = himalaya#mbox#curr_mbox()
     let page = himalaya#mbox#curr_page()
-    let msgs = s:cli("--mailbox %s list --page %d", [shellescape(mbox), page], printf("Fetching %s messages", mbox))
-    let msgs = map(msgs, "s:format_msg_for_list(v:val)")
-    let buftype = stridx(bufname("%"), "Himalaya messages") == 0 ? "file" : "edit"
-    execute printf("silent! %s Himalaya messages [%s] [page %d]", buftype, mbox, page + 1)
-    setlocal modifiable
-    silent execute "%d"
-    call append(0, s:render("list", msgs))
-    silent execute "$d"
-    setlocal filetype=himalaya-msg-list
-    let &modified = 0
-    execute 0
+    call himalaya#msg#list_preview(mbox, page)
   catch
     if !empty(v:exception)
       redraw | call himalaya#shared#log#err(v:exception)
