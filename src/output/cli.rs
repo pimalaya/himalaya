@@ -1,11 +1,17 @@
 use clap::Arg;
 
-pub fn output_arg<'a>() -> Arg<'a, 'a> {
-    Arg::with_name("output")
-        .long("output")
-        .short("o")
-        .help("Defines the output format")
-        .value_name("STRING")
-        .possible_values(&["plain", "json"])
-        .default_value("plain")
+pub fn output_args<'a>() -> Vec<Arg<'a, 'a>> {
+    vec![
+        Arg::with_name("output")
+            .long("output")
+            .short("o")
+            .help("Defines the output format")
+            .value_name("STRING")
+            .possible_values(&["plain", "json"])
+            .default_value("plain"),
+        Arg::with_name("silent")
+            .long("silent")
+            .short("s")
+            .help("Disables any output"),
+    ]
 }
