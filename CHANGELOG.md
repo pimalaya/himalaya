@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Unicode chars breaks the view [#71]
+- Copy/move incomplete (missing parts) [#75]
 
 ### Added
 
@@ -123,3 +124,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#41]: https://github.com/soywod/himalaya/issues/41
 [#61]: https://github.com/soywod/himalaya/issues/61
 [#71]: https://github.com/soywod/himalaya/issues/71
+[#75]: https://github.com/soywod/himalaya/issues/75
