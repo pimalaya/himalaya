@@ -27,7 +27,7 @@ endfunction
 
 function! himalaya#mbox#input()
   try
-    let mboxes = map(s:cli("mailboxes", [], "Fetching mailboxes"), "v:val.name")
+    let mboxes = map(s:cli("mailboxes", [], "Fetching mailboxes", 0), "v:val.name")
 
     if &rtp =~ "telescope"
       execute printf("luafile %s/mbox.lua", s:dir)

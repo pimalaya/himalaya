@@ -1,4 +1,4 @@
-function! himalaya#shared#cli#call(cmd, args, log)
+function! himalaya#shared#cli#call(cmd, args, log, should_throw)
   call himalaya#shared#log#info(printf("%s…", a:log))
   let cmd = call("printf", ["himalaya --output json " . a:cmd] + a:args)
   let res = system(cmd)
@@ -15,7 +15,9 @@ function! himalaya#shared#cli#call(cmd, args, log)
       for line in split(res, "\n")
         call himalaya#shared#log#err(line)
       endfor
-      throw ""
+      if a:should_throw
+          throw res
+      endif
     endtry
   endif
 endfunction
