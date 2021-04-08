@@ -7,6 +7,8 @@ mod config {
 }
 mod output {
     pub(crate) mod cli;
+    pub(crate) mod fmt;
+    pub(crate) mod log;
     pub(crate) mod utils;
 }
 mod imap {
@@ -28,6 +30,7 @@ mod mbox {
 
 use clap;
 use error_chain::error_chain;
+use log::{debug, error};
 use std::env;
 
 use crate::{
@@ -36,7 +39,11 @@ use crate::{
     imap::cli::{imap_matches, imap_subcmds},
     mbox::cli::{mbox_matches, mbox_source_arg, mbox_subcmds},
     msg::cli::{msg_matches, msg_subcmds},
-    output::cli::output_args,
+    output::{
+        cli::output_args,
+        fmt::OutputFmt,
+        log::{init as init_logger, LogLevel},
+    },
 };
 
 error_chain! {
@@ -45,6 +52,7 @@ error_chain! {
         ImapCli(crate::imap::cli::Error, crate::imap::cli::ErrorKind);
         MboxCli(crate::mbox::cli::Error, crate::mbox::cli::ErrorKind);
         MsgCli(crate::msg::cli::Error, crate::msg::cli::ErrorKind);
+        OutputLog(crate::output::log::Error, crate::output::log::ErrorKind);
     }
 }
 
@@ -61,6 +69,14 @@ fn run() -> Result<()> {
         .subcommands(mbox_subcmds())
         .subcommands(msg_subcmds())
         .get_matches();
+
+    let output_fmt: OutputFmt = matches.value_of("output").unwrap().into();
+    let log_level: LogLevel = matches.value_of("log").unwrap().into();
+
+    init_logger(&output_fmt, &log_level)?;
+    debug!("Logger initialized");
+    debug!("Output format: {}", &output_fmt);
+    debug!("Log level: {}", &log_level);
 
     loop {
         if mbox_matches(&matches)? {
@@ -88,8 +104,8 @@ fn main() {
         match errs.next() {
             None => (),
             Some(err) => {
-                eprintln!("{}", err);
-                errs.for_each(|err| eprintln!(" ↳ {}", err));
+                error!("{}", err);
+                errs.for_each(|err| error!(" ↳ {}", err));
             }
         }
     }

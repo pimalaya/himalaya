@@ -1,15 +1,17 @@
 [package]
 name = "himalaya"
 description = "📫 Minimalist CLI email client"
-version = "0.2.3"
+version = "0.2.4"
 authors = ["soywod <clement.douin@posteo.net>"]
 edition = "2018"
 
 [dependencies]
 clap = {version = "2.33.3", default-features = false, features = ["suggestions"]}
+env_logger = "0.8.3"
 error-chain = "0.12.4"
 imap = "2.4.0"
 lettre = "0.10.0-beta.3"
+log = "0.4.14"
 mailparse = "0.13.1"
 native-tls = "0.2"
 rfc2047-decoder = "0.1.2"

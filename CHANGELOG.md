@@ -7,10 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2021-04-09
+
 ### Added
 
 - Wiki entry for Gmail users [#58]
 - Info logs for copy/move/delete cmd + silent mode [#74]
+- `--raw` arg for `read` cmd [#79]
+
+### Changed
+
+- Refactor output system + log levels [#74]
 
 ## [0.2.3] - 2021-04-08
 
@@ -90,7 +97,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.2.3...HEAD
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/soywod/himalaya/compare/v0.2.4...v0.2.3
 [0.2.3]: https://github.com/soywod/himalaya/compare/v0.2.3...v0.2.2
 [0.2.2]: https://github.com/soywod/himalaya/compare/v0.2.2...v0.2.1
 [0.2.1]: https://github.com/soywod/himalaya/compare/v0.2.1...v0.2.0
@@ -135,3 +143,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#71]: https://github.com/soywod/himalaya/issues/71
 [#74]: https://github.com/soywod/himalaya/issues/74
 [#75]: https://github.com/soywod/himalaya/issues/75
+[#79]: https://github.com/soywod/himalaya/issues/79
