@@ -50,16 +50,13 @@
               # configure non-Rust dependencies (see below) here.
               ${name} = oldAttrs: {
                 inherit buildInputs nativeBuildInputs;
-              } // buildEnvVars;
+              };
             };
           };
 
           # Configuration for the non-Rust dependencies
           buildInputs = with pkgs; [ openssl.dev ];
           nativeBuildInputs = with pkgs; [ rustc cargo pkgconfig ];
-          buildEnvVars = {
-            PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
-          };
         in rec {
           packages.${name} = project.rootCrate.build;
 
@@ -77,7 +74,7 @@
           devShell = pkgs.mkShell {
             inherit buildInputs nativeBuildInputs;
             RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
-          } // buildEnvVars;
+          };
         }
       );
 }
