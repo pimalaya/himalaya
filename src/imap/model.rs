@@ -220,4 +220,12 @@ impl<'ic> ImapConnector<'ic> {
 
         Ok(())
     }
+
+    pub fn expunge(&mut self, mbox: &str) -> Result<()> {
+        self.sess
+            .expunge()
+            .chain_err(|| format!("Could not expunge `{}`", mbox))?;
+
+        Ok(())
+    }
 }
