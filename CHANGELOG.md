@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Expunge mbox after `move` and `delete` cmd [#83]
+
 ## [0.2.4] - 2021-04-09
 
 ### Added
@@ -144,3 +148,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#74]: https://github.com/soywod/himalaya/issues/74
 [#75]: https://github.com/soywod/himalaya/issues/75
 [#79]: https://github.com/soywod/himalaya/issues/79
+[#83]: https://github.com/soywod/himalaya/issues/83

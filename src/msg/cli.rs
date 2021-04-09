@@ -514,6 +514,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
             &uid, &target
         );
 
+        imap_conn.expunge(mbox)?;
         imap_conn.logout();
         return Ok(());
     }
@@ -528,6 +529,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         imap_conn.add_flags(mbox, uid, "\\Seen \\Deleted")?;
         info!("Message {} successfully deleted", &uid);
 
+        imap_conn.expunge(mbox)?;
         imap_conn.logout();
         return Ok(());
     }
