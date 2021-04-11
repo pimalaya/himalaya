@@ -170,6 +170,7 @@ function! himalaya#msg#attachments()
     let mbox = himalaya#mbox#curr_mbox()
     let msg_id = stridx(bufname("%"), "Himalaya messages") == 0 ? s:get_focused_msg_id() : s:msg_id
     let msg = s:cli("--mailbox %s attachments %d", [shellescape(mbox), msg_id], "Downloading attachments", 0)
+    call himalaya#shared#log#info(msg)
   catch
     if !empty(v:exception)
       redraw | call himalaya#shared#log#err(v:exception)

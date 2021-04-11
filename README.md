@@ -121,7 +121,7 @@ for all the options.*
 ## Usage
 
 ```
-himalaya 0.2.4
+himalaya 0.2.5
 soywod <clement.douin@posteo.net>
 📫 Minimalist CLI email client
 

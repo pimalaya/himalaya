@@ -2,23 +2,23 @@ if exists("b:current_syntax")
   finish
 endif
 
-syntax match hya_sep     /|/
-syntax match hya_uid     /^|.\{-}|/                         contains=hya_sep
-syntax match hya_flags   /^|.\{-}|.\{-}|/                   contains=hya_uid,hya_sep
-syntax match hya_subject /^|.\{-}|.\{-}|.\{-}|/             contains=hya_uid,hya_flags,hya_sep
-syntax match hya_sender  /^|.\{-}|.\{-}|.\{-}|.\{-}|/       contains=hya_uid,hya_flags,hya_subject,hya_sep
-syntax match hya_date    /^|.\{-}|.\{-}|.\{-}|.\{-}|.\{-}|/ contains=hya_uid,hya_flags,hya_subject,hya_sender,hya_sep
-syntax match hya_head    /.*\%1l/                           contains=hya_sep
-syntax match hya_unseen  /^|.\{-}|N.*$/                     contains=hya_sep
+syntax match hym_sep     /|/
+syntax match hym_uid     /^|.\{-}|/                         contains=hym_sep
+syntax match hym_flags   /^|.\{-}|.\{-}|/                   contains=hym_uid,hym_sep
+syntax match hym_subject /^|.\{-}|.\{-}|.\{-}|/             contains=hym_uid,hym_flags,hym_sep
+syntax match hym_sender  /^|.\{-}|.\{-}|.\{-}|.\{-}|/       contains=hym_uid,hym_flags,hym_subject,hym_sep
+syntax match hym_date    /^|.\{-}|.\{-}|.\{-}|.\{-}|.\{-}|/ contains=hym_uid,hym_flags,hym_subject,hym_sender,hym_sep
+syntax match hym_head    /.*\%1l/                           contains=hym_sep
+syntax match hym_unseen  /^|.\{-}|N.*$/                     contains=hym_sep
 
-highlight default link hya_sep     VertSplit
-highlight default link hya_uid     Identifier
-highlight default link hya_flags   Special
-highlight default link hya_subject String
-highlight default link hya_sender  Structure
-highlight default link hya_date    Constant
+highlight hym_head   term=bold,underline cterm=bold,underline gui=bold,underline
+highlight hym_unseen term=bold           cterm=bold           gui=bold
 
-highlight hya_head   term=bold,underline cterm=bold,underline gui=bold,underline
-highlight hya_unseen term=bold           cterm=bold           gui=bold
+highlight default link hym_sep     VertSplit
+highlight default link hym_uid     Identifier
+highlight default link hym_flags   Special
+highlight default link hym_subject String
+highlight default link hym_sender  Structure
+highlight default link hym_date    Constant
 
 let b:current_syntax = "himalaya-msg-list"
