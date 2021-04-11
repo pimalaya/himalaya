@@ -1,7 +1,8 @@
 use clap::{self, App, Arg, ArgMatches, SubCommand};
 use error_chain::error_chain;
+use log::debug;
 
-use crate::{config::model::Config, imap::model::ImapConnector, output::utils::print};
+use crate::{config::model::Config, imap::model::ImapConnector, info};
 
 error_chain! {
     links {
@@ -36,13 +37,14 @@ pub fn mbox_subcmds<'a>() -> Vec<App<'a, 'a>> {
 pub fn mbox_matches(matches: &ArgMatches) -> Result<bool> {
     let config = Config::new_from_file()?;
     let account = config.find_account_by_name(matches.value_of("account"))?;
-    let output_fmt = matches.value_of("output").unwrap();
-    let silent = matches.is_present("silent");
 
     if let Some(_) = matches.subcommand_matches("mailboxes") {
+        debug!("Subcommand matched: mailboxes");
+
         let mut imap_conn = ImapConnector::new(&account)?;
         let mboxes = imap_conn.list_mboxes()?;
-        print(&output_fmt, &silent, mboxes)?;
+        info!(&mboxes);
+
         imap_conn.logout();
         return Ok(true);
     }

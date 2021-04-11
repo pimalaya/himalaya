@@ -1,8 +1,18 @@
 use std::fmt;
 
+static mut OUTPUT_FMT: &'static OutputFmt = &OutputFmt::Plain;
+
+pub fn set_output_fmt(output_fmt: &'static OutputFmt) {
+    unsafe { OUTPUT_FMT = output_fmt }
+}
+
+pub unsafe fn get_output_fmt() -> &'static OutputFmt {
+    OUTPUT_FMT
+}
+
 pub enum OutputFmt {
-    Json,
     Plain,
+    Json,
 }
 
 impl From<&str> for OutputFmt {

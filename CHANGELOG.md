@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.5] - 2021-04-12
+
 ### Fixed
 
 - Expunge mbox after `move` and `delete` cmd [#83]
+- JSON output [#89]
 
 ## [0.2.4] - 2021-04-09
 
@@ -101,7 +104,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.2.4...HEAD
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.2.5...HEAD
+[0.2.5]: https://github.com/soywod/himalaya/compare/v0.2.5...v0.2.4
 [0.2.4]: https://github.com/soywod/himalaya/compare/v0.2.4...v0.2.3
 [0.2.3]: https://github.com/soywod/himalaya/compare/v0.2.3...v0.2.2
 [0.2.2]: https://github.com/soywod/himalaya/compare/v0.2.2...v0.2.1
@@ -149,3 +153,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#75]: https://github.com/soywod/himalaya/issues/75
 [#79]: https://github.com/soywod/himalaya/issues/79
 [#83]: https://github.com/soywod/himalaya/issues/83
+[#89]: https://github.com/soywod/himalaya/issues/89

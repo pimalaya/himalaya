@@ -1,8 +1,5 @@
 use error_chain::error_chain;
-use serde::{
-    ser::{self, SerializeStruct},
-    Serialize,
-};
+use serde::ser::{self, SerializeStruct};
 use std::{fmt, process::Command, result};
 
 error_chain! {
@@ -39,18 +36,4 @@ pub fn run_cmd(cmd: &str) -> Result<String> {
     }?;
 
     Ok(String::from_utf8(output.stdout)?)
-}
-
-pub fn print<T: fmt::Display + Serialize>(output_type: &str, silent: &bool, item: T) -> Result<()> {
-    if silent == &false {
-        match output_type {
-            "json" => print!(
-                "{}",
-                serde_json::to_string(&item).chain_err(|| "Could not decode JSON")?
-            ),
-            "text" | _ => println!("{}", item.to_string()),
-        }
-    }
-
-    Ok(())
 }

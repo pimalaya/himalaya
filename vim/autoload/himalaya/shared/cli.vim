@@ -9,7 +9,7 @@ function! himalaya#shared#cli#call(cmd, args, log, should_throw)
     try
       let res = eval(res)
       redraw | call himalaya#shared#log#info(printf("%s [OK]", a:log))
-      return res
+      return res.response
     catch
       redraw | call himalaya#shared#log#info(printf("%s [ERR]", a:log))
       for line in split(res, "\n")

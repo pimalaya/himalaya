@@ -1,10 +1,30 @@
 use error_chain::error_chain;
-use log::{Level, LevelFilter, Metadata, Record};
+use log::{self, Level, LevelFilter, Metadata, Record};
 use std::fmt;
 
-use super::fmt::OutputFmt;
+use super::fmt::{set_output_fmt, OutputFmt};
 
 error_chain! {}
+
+// Macros
+
+#[macro_export]
+macro_rules! info {
+    ($t:expr) => {
+        use crate::output::fmt::{get_output_fmt, OutputFmt};
+        use log::info as log_info;
+        unsafe {
+            match get_output_fmt() {
+                OutputFmt::Plain => log_info!("{}", $t.to_string()),
+                OutputFmt::Json => {
+                    // Should be safe enough to `.unwrap()` since it's
+                    // formatted by Himalaya itself
+                    log_info!("{{\"response\":{}}}", serde_json::to_string($t).unwrap())
+                }
+            };
+        }
+    };
+}
 
 // Log level struct
 
@@ -30,7 +50,7 @@ impl fmt::Display for LogLevel {
 
 // Plain logger
 
-struct PlainLogger;
+pub struct PlainLogger;
 
 impl log::Log for PlainLogger {
     fn enabled(&self, metadata: &Metadata) -> bool {
@@ -52,7 +72,7 @@ impl log::Log for PlainLogger {
 
 // JSON logger
 
-struct JsonLogger;
+pub struct JsonLogger;
 
 impl log::Log for JsonLogger {
     fn enabled(&self, metadata: &Metadata) -> bool {
@@ -64,9 +84,7 @@ impl log::Log for JsonLogger {
             if let Level::Error = record.level() {
                 eprintln!("{}", record.args());
             } else {
-                // Should be safe enough to `.unwrap()` since it's
-                // formatted by Himalaya itself
-                print!("{}", serde_json::to_string(record.args()).unwrap());
+                print!("{}", record.args());
             }
         }
     }
@@ -77,9 +95,15 @@ impl log::Log for JsonLogger {
 // Init
 
 pub fn init(fmt: &OutputFmt, level: &LogLevel) -> Result<()> {
-    log::set_boxed_logger(match fmt {
-        &OutputFmt::Json => Box::new(JsonLogger),
-        &OutputFmt::Plain => Box::new(PlainLogger),
+    log::set_logger(match fmt {
+        &OutputFmt::Plain => {
+            set_output_fmt(&OutputFmt::Plain);
+            &PlainLogger
+        }
+        &OutputFmt::Json => {
+            set_output_fmt(&OutputFmt::Json);
+            &JsonLogger
+        }
     })
     .map(|()| log::set_max_level(level.0))
     .chain_err(|| "Could not init logger")

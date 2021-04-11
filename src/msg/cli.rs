@@ -1,13 +1,13 @@
 use clap::{self, App, Arg, ArgMatches, SubCommand};
 use error_chain::error_chain;
-use log::{debug, error, info};
+use log::{debug, error};
 use std::{fs, ops::Deref};
 
 use crate::{
     config::model::Config,
     flag::model::Flag,
     imap::model::ImapConnector,
-    input,
+    info, input,
     mbox::cli::mbox_target_arg,
     msg::model::{Attachments, Msg, Msgs, ReadableMsg},
     smtp,
@@ -183,7 +183,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
 
         let msgs = imap_conn.list_msgs(&mbox, &page_size, &page)?;
         let msgs = Msgs::from(&msgs);
-        info!("{}", msgs);
+        info!(&msgs);
 
         imap_conn.logout();
         return Ok(());
@@ -225,7 +225,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
 
         let msgs = imap_conn.search_msgs(&mbox, &query, &page_size, &page)?;
         let msgs = Msgs::from(&msgs);
-        info!("{}", msgs);
+        info!(&msgs);
 
         imap_conn.logout();
         return Ok(());
@@ -247,10 +247,10 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
             let msg = String::from_utf8(msg)
                 .chain_err(|| "Could not decode raw message as utf8 string")?;
             let msg = msg.trim_end_matches("\n");
-            info!("{}", msg);
+            info!(&msg);
         } else {
             let msg = ReadableMsg::from_bytes(&mime, &msg)?;
-            info!("{}", msg);
+            info!(&msg);
         }
 
         imap_conn.logout();
@@ -268,15 +268,18 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         let attachments = Attachments::from_bytes(&msg)?;
         debug!(
             "{} attachment(s) found for message {}",
-            attachments.0.len(),
-            uid
+            &attachments.0.len(),
+            &uid
         );
         attachments.0.iter().for_each(|attachment| {
             let filepath = config.downloads_filepath(&account, &attachment.filename);
             debug!("Downloading {}…", &attachment.filename);
             fs::write(filepath, &attachment.raw).unwrap()
         });
-        info!("{} attachment(s) successfully downloaded", &uid);
+        info!(&format!(
+            "{} attachment(s) successfully downloaded",
+            &attachments.0.len()
+        ));
 
         imap_conn.logout();
         return Ok(());
@@ -333,7 +336,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
             debug!("Subcommand matched: new");
 
             let tpl = Msg::build_new_tpl(&config, &account)?;
-            info!("{}", tpl);
+            info!(&tpl);
         }
 
         if let Some(matches) = matches.subcommand_matches("reply") {
@@ -349,7 +352,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
             } else {
                 msg.build_reply_tpl(&config, &account)?
             };
-            info!("{}", tpl);
+            info!(&tpl);
 
             imap_conn.logout();
         }
@@ -363,7 +366,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
 
             let msg = Msg::from(imap_conn.read_msg(&mbox, &uid)?);
             let tpl = msg.build_forward_tpl(&config, &account)?;
-            info!("{}", tpl);
+            info!(&tpl);
 
             imap_conn.logout();
         }
@@ -486,10 +489,10 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         let mut flags = msg.flags.deref().to_vec();
         flags.push(Flag::Seen);
         imap_conn.append_msg(target, &msg.raw, &flags)?;
-        info!(
+        info!(&format!(
             "Message {} successfully copied to folder `{}`",
             &uid, &target
-        );
+        ));
 
         imap_conn.logout();
         return Ok(());
@@ -509,10 +512,10 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         flags.push(Flag::Seen);
         imap_conn.append_msg(target, &msg.raw, msg.flags.deref())?;
         imap_conn.add_flags(mbox, uid, "\\Seen \\Deleted")?;
-        info!(
+        info!(&format!(
             "Message {} successfully moved to folder `{}`",
             &uid, &target
-        );
+        ));
 
         imap_conn.expunge(mbox)?;
         imap_conn.logout();
@@ -527,7 +530,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         debug!("UID: {}", &uid);
 
         imap_conn.add_flags(mbox, uid, "\\Seen \\Deleted")?;
-        info!("Message {} successfully deleted", &uid);
+        info!(&format!("Message {} successfully deleted", &uid));
 
         imap_conn.expunge(mbox)?;
         imap_conn.logout();
@@ -563,7 +566,7 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
     let mut imap_conn = ImapConnector::new(&account)?;
     let msgs = imap_conn.list_msgs(&mbox, &10, &0)?;
     let msgs = Msgs::from(&msgs);
-    info!("{}", &msgs);
+    info!(&msgs);
 
     imap_conn.logout();
     Ok(())
