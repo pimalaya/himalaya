@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use error_chain::error_chain;
 use lettre::{self, transport::smtp::SmtpTransport, Transport};
 
@@ -21,6 +23,7 @@ pub fn send(account: &Account, msg: &lettre::Message) -> Result<()> {
 
     smtp_relay(&account.smtp_host)?
         .credentials(account.smtp_creds()?)
+        .timeout(Some(Duration::new(1000, 0)))
         .build()
         .send(msg)?;
 

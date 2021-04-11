@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- SMTP timeout [#87]
+
 ## [0.2.5] - 2021-04-12
 
 ### Fixed
@@ -153,4 +157,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#75]: https://github.com/soywod/himalaya/issues/75
 [#79]: https://github.com/soywod/himalaya/issues/79
 [#83]: https://github.com/soywod/himalaya/issues/83
+[#87]: https://github.com/soywod/himalaya/issues/87
 [#89]: https://github.com/soywod/himalaya/issues/89
