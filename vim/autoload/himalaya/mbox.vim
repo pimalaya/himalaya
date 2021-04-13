@@ -37,32 +37,32 @@ function! s:fzf_picker(mboxes)
   \})
 endfunction
 
-function! s:input_picker(mboxes)
+function! s:native_picker(mboxes)
   let choice = map(copy(a:mboxes), "printf('%s (%d)', v:val, v:key)")
   let choice = input(join(choice, ", ") . ": ")
   redraw | echo
   call himalaya#mbox#post_input(a:mboxes[choice])
 endfunction
 
-let s:pickers = {"telescope": function("s:telescope_picker"), "fzf": function("s:fzf_picker"), "input": function("s:input_picker")}
+let s:pickers = {"telescope": function("s:telescope_picker"), "fzf": function("s:fzf_picker"), "native": function("s:native_picker")}
 
 function! himalaya#mbox#input()
   try
     let mboxes = map(s:cli("mailboxes", [], "Fetching mailboxes", 0), "v:val.name")
 
-    if exists("g:himalaya_mailbox_picker") " Get use choice for picker, otherwise check runtimepath
-      let l:mailbox_picker = g:himalaya_mailbox_picker
+    if exists("g:himalaya_mailbox_picker") " Get user choice for picker, otherwise check runtimepath
+      let mbox_picker = g:himalaya_mailbox_picker
     else
       if &rtp =~ "telescope"
-        let l:mailbox_picker = "telescope"
+        let mbox_picker = "telescope"
       elseif &rtp =~ "fzf"
-        let l:mailbox_picker = "fzf"
+        let mbox_picker = "fzf"
       else
-        let l:mailbox_picker = "input"
+        let mbox_picker = "native"
       endif
     endif
 
-    call s:pickers[l:mailbox_picker](mboxes)
+    call s:pickers[mbox_picker](mboxes)
   catch
     if !empty(v:exception)
       redraw | call himalaya#shared#log#err(v:exception)
