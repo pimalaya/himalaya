@@ -21,12 +21,9 @@ pub fn send(account: &Account, msg: &lettre::Message) -> Result<()> {
         SmtpTransport::relay
     };
 
-    let builder = smtp_relay(&account.smtp_host)?;
-
-    builder
+    smtp_relay(&account.smtp_host)?
         .port(account.smtp_port)
         .credentials(account.smtp_creds()?)
-        .timeout(Some(Duration::new(1000, 0)))
         .build()
         .send(msg)?;
 
