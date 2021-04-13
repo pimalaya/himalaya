@@ -27,8 +27,11 @@ mod mbox {
     pub(crate) mod cli;
     pub(crate) mod model;
 }
+mod complete {
+    pub(crate) mod cli;
+}
 
-use clap;
+use clap::{self, App};
 use error_chain::error_chain;
 use log::{debug, error};
 use std::env;
@@ -39,6 +42,7 @@ use crate::{
     imap::cli::{imap_matches, imap_subcmds},
     mbox::cli::{mbox_matches, mbox_source_arg, mbox_subcmds},
     msg::cli::{msg_matches, msg_subcmds},
+    complete::cli::{complete_matches, complete_subcmds},
     output::{
         cli::output_args,
         fmt::OutputFmt,
@@ -56,8 +60,8 @@ error_chain! {
     }
 }
 
-fn run() -> Result<()> {
-    let matches = clap::App::new(env!("CARGO_PKG_NAME"))
+fn build_cli() -> App<'static, 'static> {
+    clap::App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .author(env!("CARGO_PKG_AUTHORS"))
@@ -68,7 +72,11 @@ fn run() -> Result<()> {
         .subcommands(imap_subcmds())
         .subcommands(mbox_subcmds())
         .subcommands(msg_subcmds())
-        .get_matches();
+        .subcommands(complete_subcmds())
+}
+
+fn run() -> Result<()> {
+    let matches = build_cli().get_matches();
 
     let output_fmt: OutputFmt = matches.value_of("output").unwrap().into();
     let log_level: LogLevel = matches.value_of("log").unwrap().into();
@@ -88,6 +96,10 @@ fn run() -> Result<()> {
         }
 
         if imap_matches(&matches)? {
+            break;
+        }
+
+        if complete_matches(build_cli(), &matches).unwrap() {
             break;
         }
 
