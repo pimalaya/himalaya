@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use error_chain::error_chain;
 use lettre::{self, transport::smtp::SmtpTransport, Transport};
 
