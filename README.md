@@ -25,6 +25,7 @@ Minimalist CLI email client, written in Rust.
   * [Move a message](#move-a-message)
   * [Delete a message](#delete-a-message)
   * [Listen to new messages](#listen-to-new-messages)
+* [Completions](#completions)
 * [Interfaces](#interfaces)
   * [GUI](#gui)
   * [TUI](#tui)
@@ -235,6 +236,32 @@ WantedBy=multi-user.target
 ```bash
 systemctl --user enable himalaya.service
 systemctl --user start  himalaya.service
+```
+
+## Completions
+
+```sh
+# For bash shells
+himalaya bash-completions
+
+# For zsh shells
+himalaya zsh-completions
+
+# For fish shells
+himalaya fish-completions
+```
+
+Those commands print the generated scripts to the stdout. You will have
+to manually save and source them. For example:
+
+```sh
+himalaya bash-completions > himalaya-completions.bash
+```
+
+```sh
+# ~/.bashrc
+
+source himalaya-completions.bash
 ```
 
 ## Interfaces

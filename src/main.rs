@@ -27,13 +27,17 @@ mod mbox {
     pub(crate) mod cli;
     pub(crate) mod model;
 }
+mod completion {
+    pub(crate) mod cli;
+}
 
-use clap;
+use clap::{self, App};
 use error_chain::error_chain;
 use log::{debug, error};
 use std::env;
 
 use crate::{
+    completion::cli::{completion_matches, completion_subcmds},
     config::cli::account_arg,
     flag::cli::{flag_matches, flag_subcmds},
     imap::cli::{imap_matches, imap_subcmds},
@@ -52,12 +56,13 @@ error_chain! {
         ImapCli(crate::imap::cli::Error, crate::imap::cli::ErrorKind);
         MboxCli(crate::mbox::cli::Error, crate::mbox::cli::ErrorKind);
         MsgCli(crate::msg::cli::Error, crate::msg::cli::ErrorKind);
+        CompletionCli(crate::completion::cli::Error, crate::completion::cli::ErrorKind);
         OutputLog(crate::output::log::Error, crate::output::log::ErrorKind);
     }
 }
 
-fn run() -> Result<()> {
-    let matches = clap::App::new(env!("CARGO_PKG_NAME"))
+fn build_cli() -> App<'static, 'static> {
+    clap::App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .author(env!("CARGO_PKG_AUTHORS"))
@@ -68,7 +73,11 @@ fn run() -> Result<()> {
         .subcommands(imap_subcmds())
         .subcommands(mbox_subcmds())
         .subcommands(msg_subcmds())
-        .get_matches();
+        .subcommands(completion_subcmds())
+}
+
+fn run() -> Result<()> {
+    let matches = build_cli().get_matches();
 
     let output_fmt: OutputFmt = matches.value_of("output").unwrap().into();
     let log_level: LogLevel = matches.value_of("log").unwrap().into();
@@ -88,6 +97,10 @@ fn run() -> Result<()> {
         }
 
         if imap_matches(&matches)? {
+            break;
+        }
+
+        if completion_matches(build_cli(), &matches)? {
             break;
         }
 
