@@ -27,7 +27,7 @@ mod mbox {
     pub(crate) mod cli;
     pub(crate) mod model;
 }
-mod complete {
+mod completion {
     pub(crate) mod cli;
 }
 
@@ -37,12 +37,12 @@ use log::{debug, error};
 use std::env;
 
 use crate::{
+    completion::cli::{completion_matches, completion_subcmds},
     config::cli::account_arg,
     flag::cli::{flag_matches, flag_subcmds},
     imap::cli::{imap_matches, imap_subcmds},
     mbox::cli::{mbox_matches, mbox_source_arg, mbox_subcmds},
     msg::cli::{msg_matches, msg_subcmds},
-    complete::cli::{complete_matches, complete_subcmds},
     output::{
         cli::output_args,
         fmt::OutputFmt,
@@ -56,6 +56,7 @@ error_chain! {
         ImapCli(crate::imap::cli::Error, crate::imap::cli::ErrorKind);
         MboxCli(crate::mbox::cli::Error, crate::mbox::cli::ErrorKind);
         MsgCli(crate::msg::cli::Error, crate::msg::cli::ErrorKind);
+        CompletionCli(crate::completion::cli::Error, crate::completion::cli::ErrorKind);
         OutputLog(crate::output::log::Error, crate::output::log::ErrorKind);
     }
 }
@@ -72,7 +73,7 @@ fn build_cli() -> App<'static, 'static> {
         .subcommands(imap_subcmds())
         .subcommands(mbox_subcmds())
         .subcommands(msg_subcmds())
-        .subcommands(complete_subcmds())
+        .subcommands(completion_subcmds())
 }
 
 fn run() -> Result<()> {
@@ -99,7 +100,7 @@ fn run() -> Result<()> {
             break;
         }
 
-        if complete_matches(build_cli(), &matches).unwrap() {
+        if completion_matches(build_cli(), &matches)? {
             break;
         }
 
