@@ -25,27 +25,44 @@ function! himalaya#mbox#curr_mbox()
   return s:curr_mbox
 endfunction
 
+function! s:telescope_picker(mboxes)
+  call luaeval('require("himalaya.mbox").mbox_picker')(a:mboxes)
+endfunction
+
+function! s:fzf_picker(mboxes)
+  call fzf#run({
+    \"source": a:mboxes,
+    \"sink": function("himalaya#mbox#post_input"),
+    \"down": "25%",
+  \})
+endfunction
+
+function! s:native_picker(mboxes)
+  let choice = map(copy(a:mboxes), "printf('%s (%d)', v:val, v:key)")
+  let choice = input(join(choice, ", ") . ": ")
+  redraw | echo
+  call himalaya#mbox#post_input(a:mboxes[choice])
+endfunction
+
+let s:pickers = {"telescope": function("s:telescope_picker"), "fzf": function("s:fzf_picker"), "native": function("s:native_picker")}
+
 function! himalaya#mbox#input()
   try
     let mboxes = map(s:cli("mailboxes", [], "Fetching mailboxes", 0), "v:val.name")
 
-    if &rtp =~ "telescope"
-      execute printf("luafile %s/mbox.lua", s:dir)
-      call luaeval(printf("mbox_picker({%s})", join(map(mboxes, "string(v:val)"), ", ")))
-
-    elseif &rtp =~ "fzf"
-      call fzf#run({
-        \"source": mboxes,
-        \"sink": function("himalaya#mbox#post_input"),
-        \"down": "25%",
-      \})
-
+    if exists("g:himalaya_mailbox_picker") " Get user choice for picker, otherwise check runtimepath
+      let mbox_picker = g:himalaya_mailbox_picker
     else
-      let choice = map(copy(mboxes), "printf('%s (%d)', v:val, v:key)")
-      let choice = input(join(choice, ", ") . ": ")
-      redraw | echo
-      call himalaya#mbox#post_input(mboxes[choice])
+      if &rtp =~ "telescope"
+        let mbox_picker = "telescope"
+      elseif &rtp =~ "fzf"
+        let mbox_picker = "fzf"
+      else
+        let mbox_picker = "native"
+      endif
     endif
+
+    call s:pickers[mbox_picker](mboxes)
   catch
     if !empty(v:exception)
       redraw | call himalaya#shared#log#err(v:exception)
