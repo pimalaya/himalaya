@@ -24,7 +24,12 @@ pub struct ImapConnector<'a> {
 
 impl<'ic> ImapConnector<'ic> {
     pub fn new(account: &'ic Account) -> Result<Self> {
-        let tls = TlsConnector::new().chain_err(|| "Cannot create TLS connector")?;
+        let tls = TlsConnector::builder()
+                .danger_accept_invalid_certs(account.imap_insecure())
+                .danger_accept_invalid_hostnames(account.imap_insecure())
+                .build()
+                .chain_err(|| "Cannot create TLS connector")?;
+
         let client = if account.imap_starttls() {
             imap::connect_starttls(account.imap_addr(), &account.imap_host, &tls)
                 .chain_err(|| "Cannot connect using STARTTLS")
