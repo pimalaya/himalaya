@@ -160,15 +160,12 @@ impl Config {
     }
 
     pub fn downloads_filepath(&self, account: &Account, filename: &str) -> PathBuf {
-        let temp_dir = env::temp_dir();
-        let mut full_path = account
+        account
             .downloads_dir
             .as_ref()
-            .unwrap_or(self.downloads_dir.as_ref().unwrap_or(&temp_dir))
-            .to_owned();
-
-        full_path.push(filename);
-        full_path
+            .unwrap_or(self.downloads_dir.as_ref().unwrap_or(&env::temp_dir()))
+            .to_owned()
+            .join(filename)
     }
 
     pub fn address(&self, account: &Account) -> String {

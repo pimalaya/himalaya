@@ -258,24 +258,25 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
     }
 
     if let Some(matches) = matches.subcommand_matches("attachments") {
-        debug!("Subcommand matched: attachments");
+        debug!("[msg::cli] subcommand matched: attachments");
 
         let mut imap_conn = ImapConnector::new(&account)?;
         let uid = matches.value_of("uid").unwrap();
-        debug!("UID: {}", &uid);
+        debug!("[msg::cli] uid: {}", &uid);
 
         let msg = imap_conn.read_msg(&mbox, &uid)?;
         let attachments = Attachments::from_bytes(&msg)?;
         debug!(
-            "{} attachment(s) found for message {}",
+            "[msg::cli] {} attachment(s) found for message {}",
             &attachments.0.len(),
             &uid
         );
-        attachments.0.iter().for_each(|attachment| {
+        for attachment in attachments.0.iter() {
             let filepath = config.downloads_filepath(&account, &attachment.filename);
-            debug!("Downloading {}…", &attachment.filename);
-            fs::write(filepath, &attachment.raw).unwrap()
-        });
+            debug!("[msg::cli] downloading {}…", &attachment.filename);
+            fs::write(&filepath, &attachment.raw)
+                .chain_err(|| format!("Could not save attachment {:?}", filepath))?;
+        }
         info!(&format!(
             "{} attachment(s) successfully downloaded",
             &attachments.0.len()
