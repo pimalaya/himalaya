@@ -302,25 +302,31 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         loop {
             match input::post_edit_choice() {
                 Ok(choice) => match choice {
-                    input::Choice::Send => {
+                    input::PostEditChoice::Send => {
                         debug!("Sending message…");
                         let msg = msg.to_sendable_msg()?;
                         smtp::send(&account, &msg)?;
                         imap_conn.append_msg("Sent", &msg.formatted(), &[Flag::Seen])?;
+                        input::remove_draft()?;
                         info!("Message successfully sent");
                         break;
                     }
-                    input::Choice::Draft => {
-                        debug!("Saving to draft…");
-                        imap_conn.append_msg("Drafts", &msg.to_vec()?, &[Flag::Seen])?;
-                        info!("Message successfully saved to Drafts");
-                        break;
-                    }
-                    input::Choice::Edit => {
+                    input::PostEditChoice::Edit => {
                         let content = input::open_editor_with_draft()?;
                         msg = Msg::from(content);
                     }
-                    input::Choice::Quit => break,
+                    input::PostEditChoice::LocalDraft => break,
+                    input::PostEditChoice::RemoteDraft => {
+                        debug!("Saving to draft…");
+                        imap_conn.append_msg("Drafts", &msg.to_vec()?, &[Flag::Seen])?;
+                        input::remove_draft()?;
+                        info!("Message successfully saved to Drafts");
+                        break;
+                    }
+                    input::PostEditChoice::Discard => {
+                        input::remove_draft()?;
+                        break;
+                    }
                 },
                 Err(err) => error!("{}", err),
             }
@@ -400,25 +406,32 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         loop {
             match input::post_edit_choice() {
                 Ok(choice) => match choice {
-                    input::Choice::Send => {
+                    input::PostEditChoice::Send => {
                         debug!("Sending message…");
-                        smtp::send(&account, &msg.to_sendable_msg()?)?;
-                        imap_conn.append_msg("Sent", &msg.to_vec()?, &[Flag::Seen])?;
+                        let msg = msg.to_sendable_msg()?;
+                        smtp::send(&account, &msg)?;
+                        imap_conn.append_msg("Sent", &msg.formatted(), &[Flag::Seen])?;
                         imap_conn.add_flags(mbox, uid, "\\Answered")?;
+                        input::remove_draft()?;
                         info!("Message successfully sent");
                         break;
                     }
-                    input::Choice::Draft => {
-                        debug!("Saving draft message…");
-                        imap_conn.append_msg("Drafts", &msg.to_vec()?, &[Flag::Seen])?;
-                        info!("Message successfully saved to Drafts");
-                        break;
-                    }
-                    input::Choice::Edit => {
+                    input::PostEditChoice::Edit => {
                         let content = input::open_editor_with_draft()?;
                         msg = Msg::from(content);
                     }
-                    input::Choice::Quit => break,
+                    input::PostEditChoice::LocalDraft => break,
+                    input::PostEditChoice::RemoteDraft => {
+                        debug!("Saving to draft…");
+                        imap_conn.append_msg("Drafts", &msg.to_vec()?, &[Flag::Seen])?;
+                        input::remove_draft()?;
+                        info!("Message successfully saved to Drafts");
+                        break;
+                    }
+                    input::PostEditChoice::Discard => {
+                        input::remove_draft()?;
+                        break;
+                    }
                 },
                 Err(err) => error!("{}", err),
             }
@@ -449,24 +462,31 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         loop {
             match input::post_edit_choice() {
                 Ok(choice) => match choice {
-                    input::Choice::Send => {
+                    input::PostEditChoice::Send => {
                         debug!("Sending message…");
-                        smtp::send(&account, &msg.to_sendable_msg()?)?;
-                        imap_conn.append_msg("Sent", &msg.to_vec()?, &[Flag::Seen])?;
+                        let msg = msg.to_sendable_msg()?;
+                        smtp::send(&account, &msg)?;
+                        imap_conn.append_msg("Sent", &msg.formatted(), &[Flag::Seen])?;
+                        input::remove_draft()?;
                         info!("Message successfully sent");
                         break;
                     }
-                    input::Choice::Draft => {
-                        debug!("Saving draft message…");
-                        imap_conn.append_msg("Drafts", &msg.to_vec()?, &[Flag::Seen])?;
-                        info!("Message successfully saved to Drafts");
-                        break;
-                    }
-                    input::Choice::Edit => {
+                    input::PostEditChoice::Edit => {
                         let content = input::open_editor_with_draft()?;
                         msg = Msg::from(content);
                     }
-                    input::Choice::Quit => break,
+                    input::PostEditChoice::LocalDraft => break,
+                    input::PostEditChoice::RemoteDraft => {
+                        debug!("Saving to draft…");
+                        imap_conn.append_msg("Drafts", &msg.to_vec()?, &[Flag::Seen])?;
+                        input::remove_draft()?;
+                        info!("Message successfully saved to Drafts");
+                        break;
+                    }
+                    input::PostEditChoice::Discard => {
+                        input::remove_draft()?;
+                        break;
+                    }
                 },
                 Err(err) => error!("{}", err),
             }
