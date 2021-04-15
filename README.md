@@ -241,21 +241,24 @@ systemctl --user start  himalaya.service
 ## Completions
 
 ```sh
-# For bash shells
-himalaya bash-completions
+Generates the completion script for the given shell
 
-# For zsh shells
-himalaya zsh-completions
+USAGE:
+    himalaya completion <shell>
 
-# For fish shells
-himalaya fish-completions
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+ARGS:
+    <shell>     [possible values: bash, zsh, fish]
 ```
 
-Those commands print the generated scripts to the stdout. You will have
+The command prints the generated script to the stdout. You will have
 to manually save and source them. For example:
 
 ```sh
-himalaya bash-completions > himalaya-completions.bash
+himalaya completion bash > himalaya-completions.bash
 ```
 
 ```sh
