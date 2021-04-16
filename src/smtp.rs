@@ -1,11 +1,8 @@
 use error_chain::error_chain;
-use lettre::{self, 
-    transport::{
-        smtp::SmtpTransport,
-        smtp::client::Tls,
-        smtp::client::TlsParameters
-    },
-    Transport
+use lettre::{
+    self,
+    transport::{smtp::client::Tls, smtp::client::TlsParameters, smtp::SmtpTransport},
+    Transport,
 };
 
 use crate::config::model::Account;
@@ -34,7 +31,11 @@ pub fn send(account: &Account, msg: &lettre::Message) -> Result<()> {
 
     smtp_relay(&account.smtp_host)?
         .port(account.smtp_port)
-        .tls(Tls::Wrapper(tls))
+        .tls(if account.smtp_starttls() {
+            Tls::Required(tls)
+        } else {
+            Tls::Wrapper(tls)
+        })
         .credentials(account.smtp_creds()?)
         .build()
         .send(msg)?;
