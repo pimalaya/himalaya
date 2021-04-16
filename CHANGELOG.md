@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Completion subcommands [#99](https://github.com/soywod/himalaya/pull/99)
 - Vim flags to enable telescope preview and to choose picker [#97](https://github.com/soywod/himalaya/pull/97)
 
+### Changed
+
+- Make `install.sh` POSIX compliant [#53](https://github.com/soywod/himalaya/pull/53)
+
 ### Fixed
 
 - SMTP port [#87]
@@ -120,7 +124,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.2.5...HEAD
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.2.6...HEAD
+[0.2.6]: https://github.com/soywod/himalaya/compare/v0.2.6...v0.2.5
 [0.2.5]: https://github.com/soywod/himalaya/compare/v0.2.5...v0.2.4
 [0.2.4]: https://github.com/soywod/himalaya/compare/v0.2.4...v0.2.3
 [0.2.3]: https://github.com/soywod/himalaya/compare/v0.2.3...v0.2.2
