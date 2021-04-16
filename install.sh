@@ -1,32 +1,39 @@
-#!/bin/bash
+#!/bin/sh
 
-get_os () {
-  if [[ "$OSTYPE" == "linux-gnu" ]]; then
-    echo "linux"
-  elif [[ "$OSTYPE" == "freebsd"* ]]; then
-    echo "linux"
-  elif [[ "$OSTYPE" == "darwin"* ]]; then
-    echo "macos"
-  elif [[ "$OSTYPE" == "cygwin" ]]; then
-    echo "windows"
-  elif [[ "$OSTYPE" == "msys" ]]; then
-    echo "windows"
-  elif [[ "$OSTYPE" == "win32" ]]; then
-    echo "windows"
-  else
-    return -1
-  fi
-}
+set -eu
 
-OS=`get_os`
+DESTDIR="${DESTDIR:-/}"
+PREFIX="${PREFIX:-"$DESTDIR/usr/local"}"
+RELEASES_URL="https://github.com/soywod/himalaya/releases"
 
-cd /tmp
-echo "Downloading latest ${OS} release…"
-curl -sLo himalaya.tar.gz "https://github.com/soywod/himalaya/releases/latest/download/himalaya-${OS}.tar.gz"
+system=$(uname -s | tr [:upper:] [:lower:])
+
+case $system in
+  msys*|mingw*|cygwin*|win*) system=windows;;
+  linux|freebsd) system=linux;;
+  darwin) system=macos;;
+  *) echo "Error: Unsupported system: $system"; exit 1;;
+esac
+
+if ! tmpdir=$(mktemp -d); then
+  echo "Error: Failed to create tmpdir"
+  exit 1
+else
+  trap "rm -rf $tmpdir" EXIT
+fi
+
+echo "Downloading latest $system release…"
+curl -sLo "$tmpdir/himalaya.tar.gz" "$RELEASES_URL/latest/download/himalaya-$system.tar.gz"
+
 echo "Installing binary…"
-tar -xzf himalaya.tar.gz
-rm himalaya.tar.gz
-chmod u+x himalaya.exe
-sudo mv himalaya.exe /usr/local/bin/himalaya
+tar -xzf "$tmpdir/himalaya.tar.gz" -C "$tmpdir"
 
-echo "$(himalaya --version) installed!"
+if [ -w "$PREFIX" ]; then
+  mkdir -p "$PREFIX/bin"
+  cp -f -- "$tmpdir/himalaya.exe" "$PREFIX/bin/himalaya"
+else
+  sudo mkdir -p "$PREFIX/bin"
+  sudo cp -f -- "$tmpdir/himalaya.exe" "$PREFIX/bin/himalaya"
+fi
+
+echo "$("$PREFIX/bin/himalaya" --version) installed!"
