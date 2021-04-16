@@ -31,6 +31,7 @@ Minimalist CLI email client, written in Rust.
   * [TUI](#tui)
 * [License](https://github.com/soywod/himalaya/blob/master/LICENSE)
 * [Changelog](https://github.com/soywod/himalaya/blob/master/CHANGELOG.md)
+* [Sponsoring](#sponsoring)
 * [Credits](#credits)
 
 ## Motivation
@@ -276,6 +277,13 @@ Not yet, but feel free to contribute ;)
 ### TUI
 
 - [Vim plugin](https://github.com/soywod/himalaya/tree/master/vim)
+
+## Sponsoring
+
+[![github](https://img.shields.io/badge/-GitHub%20Sponsors-fafbfc?logo=GitHub%20Sponsors)](https://github.com/sponsors/soywod)
+[![paypal](https://img.shields.io/badge/-PayPal-0079c1?logo=PayPal&logoColor=ffffff)](https://www.paypal.com/paypalme/soywod)
+[![ko-fi](https://img.shields.io/badge/-Ko--fi-ff5e5a?logo=Ko-fi&logoColor=ffffff)](https://ko-fi.com/soywod)
+[![buy-me-a-coffee](https://img.shields.io/badge/-Buy%20Me%20a%20Coffee-ffdd00?logo=Buy%20Me%20A%20Coffee&logoColor=000000)](https://www.buymeacoffee.com/soywod)
 
 ## Credits
 
