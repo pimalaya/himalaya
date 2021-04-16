@@ -7,9 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6] - 2021-04-17
+
+### Added
+
+- Insecure TLS option [#84] [#103](https://github.com/soywod/himalaya/pull/103) [#105](https://github.com/soywod/himalaya/pull/105)
+- Completion subcommands [#99](https://github.com/soywod/himalaya/pull/99)
+- Vim flags to enable telescope preview and to choose picker [#97](https://github.com/soywod/himalaya/pull/97)
+
 ### Changed
 
-- SMTP timeout [#87]
+- Make `install.sh` POSIX compliant [#53](https://github.com/soywod/himalaya/pull/53)
+
+### Fixed
+
+- SMTP port [#87]
+- Save msg upon error [#59]
+- Answered flag not set [#50]
+- Panic when downloads-dir does not exist [#100]
+- Idle mode incorrect new message notification [#48]
 
 ## [0.2.5] - 2021-04-12
 
@@ -108,7 +124,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.2.5...HEAD
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.2.6...HEAD
+[0.2.6]: https://github.com/soywod/himalaya/compare/v0.2.6...v0.2.5
 [0.2.5]: https://github.com/soywod/himalaya/compare/v0.2.5...v0.2.4
 [0.2.4]: https://github.com/soywod/himalaya/compare/v0.2.4...v0.2.3
 [0.2.3]: https://github.com/soywod/himalaya/compare/v0.2.3...v0.2.2
@@ -150,12 +167,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#39]: https://github.com/soywod/himalaya/issues/39
 [#40]: https://github.com/soywod/himalaya/issues/40
 [#41]: https://github.com/soywod/himalaya/issues/41
+[#48]: https://github.com/soywod/himalaya/issues/48
+[#50]: https://github.com/soywod/himalaya/issues/50
 [#58]: https://github.com/soywod/himalaya/issues/58
+[#59]: https://github.com/soywod/himalaya/issues/59
 [#61]: https://github.com/soywod/himalaya/issues/61
 [#71]: https://github.com/soywod/himalaya/issues/71
 [#74]: https://github.com/soywod/himalaya/issues/74
 [#75]: https://github.com/soywod/himalaya/issues/75
 [#79]: https://github.com/soywod/himalaya/issues/79
 [#83]: https://github.com/soywod/himalaya/issues/83
+[#84]: https://github.com/soywod/himalaya/issues/84
 [#87]: https://github.com/soywod/himalaya/issues/87
 [#89]: https://github.com/soywod/himalaya/issues/89
+[#100]: https://github.com/soywod/himalaya/issues/100

@@ -1,7 +1,8 @@
 use error_chain::error_chain;
 use imap;
+use log::{debug, trace};
 use native_tls::{self, TlsConnector, TlsStream};
-use std::net::TcpStream;
+use std::{collections::HashSet, iter::FromIterator, net::TcpStream};
 
 use crate::{
     config::model::{Account, Config},
@@ -25,10 +26,10 @@ pub struct ImapConnector<'a> {
 impl<'ic> ImapConnector<'ic> {
     pub fn new(account: &'ic Account) -> Result<Self> {
         let tls = TlsConnector::builder()
-                .danger_accept_invalid_certs(account.imap_insecure())
-                .danger_accept_invalid_hostnames(account.imap_insecure())
-                .build()
-                .chain_err(|| "Cannot create TLS connector")?;
+            .danger_accept_invalid_certs(account.imap_insecure())
+            .danger_accept_invalid_hostnames(account.imap_insecure())
+            .build()
+            .chain_err(|| "Cannot create TLS connector")?;
 
         let client = if account.imap_starttls() {
             imap::connect_starttls(account.imap_addr(), &account.imap_host, &tls)
@@ -37,6 +38,7 @@ impl<'ic> ImapConnector<'ic> {
             imap::connect(account.imap_addr(), &account.imap_host, &tls)
                 .chain_err(|| "Cannot connect using TLS")
         }?;
+
         let sess = client
             .login(&account.imap_login, &account.imap_passwd()?)
             .map_err(|res| res.0)
@@ -87,43 +89,82 @@ impl<'ic> ImapConnector<'ic> {
         Ok(())
     }
 
-    fn last_new_seq(&mut self) -> Result<Option<u32>> {
-        Ok(self
+    fn search_new_msgs(&mut self) -> Result<Vec<u32>> {
+        debug!("[imap::model::search_new_msgs] begin");
+
+        let seqs: Vec<u32> = self
             .sess
-            .uid_search("NEW")
-            .chain_err(|| "Cannot search new uids")?
+            .search("NEW")
+            .chain_err(|| "Could not search new messages")?
             .into_iter()
-            .next())
+            .collect();
+        debug!(
+            "[imap::model::search_new_msgs] found {} new messages",
+            seqs.len()
+        );
+        trace!("[imap::model::search_new_msgs] {:?}", seqs);
+
+        Ok(seqs)
     }
 
     pub fn idle(&mut self, config: &Config, mbox: &str) -> Result<()> {
-        let mut prev_seq = 0;
+        debug!("[imap::model::idle] begin");
+
+        debug!("[imap::model::idle] examine mailbox {}", mbox);
         self.sess
             .examine(mbox)
-            .chain_err(|| format!("Cannot examine mailbox `{}`", mbox))?;
+            .chain_err(|| format!("Could not examine mailbox `{}`", mbox))?;
+
+        debug!("[imap::model::idle] init message hashset");
+        let mut msg_set: HashSet<u32> = HashSet::from_iter(self.search_new_msgs()?.iter().cloned());
+        trace!("[imap::model::idle] {:?}", msg_set);
 
         loop {
+            debug!("[imap::model::idle] begin loop");
+
             self.sess
                 .idle()
                 .and_then(|idle| idle.wait_keepalive())
-                .chain_err(|| "Cannot wait in IDLE mode")?;
+                .chain_err(|| "Could not enter in idle mode")?;
 
-            if let Some(seq) = self.last_new_seq()? {
-                if prev_seq != seq {
-                    let msgs = self
-                        .sess
-                        .uid_fetch(seq.to_string(), "(ENVELOPE)")
-                        .chain_err(|| "Cannot fetch enveloppe")?;
-                    let msg = msgs
-                        .iter()
-                        .next()
-                        .ok_or_else(|| "Cannot fetch first message")
-                        .map(Msg::from)?;
+            let new_msgs: Vec<u32> = self
+                .search_new_msgs()?
+                .into_iter()
+                .filter(|seq| msg_set.get(&seq).is_none())
+                .collect();
+            debug!(
+                "[imap::model::idle] found {} new messages not in hashset",
+                new_msgs.len()
+            );
+            trace!("[imap::model::idle] {:?}", new_msgs);
 
+            if !new_msgs.is_empty() {
+                let new_msgs = new_msgs
+                    .iter()
+                    .map(|seq| seq.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",");
+                let fetches = self
+                    .sess
+                    .fetch(new_msgs, "(ENVELOPE)")
+                    .chain_err(|| "Cannot fetch new messages enveloppe")?;
+
+                for fetch in fetches.iter() {
+                    let msg = Msg::from(fetch);
                     config.run_notify_cmd(&msg.subject, &msg.sender)?;
-                    prev_seq = seq;
+                    debug!("[imap::model::idle] notify message {}", fetch.message);
+                    trace!("[imap::model::idle] {:?}", msg);
+
+                    debug!(
+                        "[imap::model::idle] insert msg {} to hashset",
+                        fetch.message
+                    );
+                    msg_set.insert(fetch.message);
+                    trace!("[imap::model::idle] {:?}", msg_set);
                 }
             }
+
+            debug!("[imap::model::idle] end loop");
         }
     }
 

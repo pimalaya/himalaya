@@ -1,5 +1,6 @@
 use clap::{self, App, ArgMatches, SubCommand};
 use error_chain::error_chain;
+use log::debug;
 
 use crate::{config::model::Config, imap::model::ImapConnector};
 
@@ -20,6 +21,7 @@ pub fn imap_matches(matches: &ArgMatches) -> Result<bool> {
     let mbox = matches.value_of("mailbox").unwrap();
 
     if let Some(_) = matches.subcommand_matches("idle") {
+        debug!("[imap::cli] idle command matched");
         let mut imap_conn = ImapConnector::new(&account)?;
         imap_conn.idle(&config, &mbox)?;
         imap_conn.logout();

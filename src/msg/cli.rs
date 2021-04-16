@@ -258,24 +258,25 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
     }
 
     if let Some(matches) = matches.subcommand_matches("attachments") {
-        debug!("Subcommand matched: attachments");
+        debug!("[msg::cli] subcommand matched: attachments");
 
         let mut imap_conn = ImapConnector::new(&account)?;
         let uid = matches.value_of("uid").unwrap();
-        debug!("UID: {}", &uid);
+        debug!("[msg::cli] uid: {}", &uid);
 
         let msg = imap_conn.read_msg(&mbox, &uid)?;
         let attachments = Attachments::from_bytes(&msg)?;
         debug!(
-            "{} attachment(s) found for message {}",
+            "[msg::cli] {} attachment(s) found for message {}",
             &attachments.0.len(),
             &uid
         );
-        attachments.0.iter().for_each(|attachment| {
+        for attachment in attachments.0.iter() {
             let filepath = config.downloads_filepath(&account, &attachment.filename);
-            debug!("Downloading {}…", &attachment.filename);
-            fs::write(filepath, &attachment.raw).unwrap()
-        });
+            debug!("[msg::cli] downloading {}…", &attachment.filename);
+            fs::write(&filepath, &attachment.raw)
+                .chain_err(|| format!("Could not save attachment {:?}", filepath))?;
+        }
         info!(&format!(
             "{} attachment(s) successfully downloaded",
             &attachments.0.len()
@@ -302,25 +303,31 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         loop {
             match input::post_edit_choice() {
                 Ok(choice) => match choice {
-                    input::Choice::Send => {
+                    input::PostEditChoice::Send => {
                         debug!("Sending message…");
                         let msg = msg.to_sendable_msg()?;
                         smtp::send(&account, &msg)?;
                         imap_conn.append_msg("Sent", &msg.formatted(), &[Flag::Seen])?;
+                        input::remove_draft()?;
                         info!("Message successfully sent");
                         break;
                     }
-                    input::Choice::Draft => {
-                        debug!("Saving to draft…");
-                        imap_conn.append_msg("Drafts", &msg.to_vec()?, &[Flag::Seen])?;
-                        info!("Message successfully saved to Drafts");
-                        break;
-                    }
-                    input::Choice::Edit => {
+                    input::PostEditChoice::Edit => {
                         let content = input::open_editor_with_draft()?;
                         msg = Msg::from(content);
                     }
-                    input::Choice::Quit => break,
+                    input::PostEditChoice::LocalDraft => break,
+                    input::PostEditChoice::RemoteDraft => {
+                        debug!("Saving to draft…");
+                        imap_conn.append_msg("Drafts", &msg.to_vec()?, &[Flag::Seen])?;
+                        input::remove_draft()?;
+                        info!("Message successfully saved to Drafts");
+                        break;
+                    }
+                    input::PostEditChoice::Discard => {
+                        input::remove_draft()?;
+                        break;
+                    }
                 },
                 Err(err) => error!("{}", err),
             }
@@ -400,25 +407,32 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         loop {
             match input::post_edit_choice() {
                 Ok(choice) => match choice {
-                    input::Choice::Send => {
+                    input::PostEditChoice::Send => {
                         debug!("Sending message…");
-                        smtp::send(&account, &msg.to_sendable_msg()?)?;
-                        imap_conn.append_msg("Sent", &msg.to_vec()?, &[Flag::Seen])?;
+                        let msg = msg.to_sendable_msg()?;
+                        smtp::send(&account, &msg)?;
+                        imap_conn.append_msg("Sent", &msg.formatted(), &[Flag::Seen])?;
                         imap_conn.add_flags(mbox, uid, "\\Answered")?;
+                        input::remove_draft()?;
                         info!("Message successfully sent");
                         break;
                     }
-                    input::Choice::Draft => {
-                        debug!("Saving draft message…");
-                        imap_conn.append_msg("Drafts", &msg.to_vec()?, &[Flag::Seen])?;
-                        info!("Message successfully saved to Drafts");
-                        break;
-                    }
-                    input::Choice::Edit => {
+                    input::PostEditChoice::Edit => {
                         let content = input::open_editor_with_draft()?;
                         msg = Msg::from(content);
                     }
-                    input::Choice::Quit => break,
+                    input::PostEditChoice::LocalDraft => break,
+                    input::PostEditChoice::RemoteDraft => {
+                        debug!("Saving to draft…");
+                        imap_conn.append_msg("Drafts", &msg.to_vec()?, &[Flag::Seen])?;
+                        input::remove_draft()?;
+                        info!("Message successfully saved to Drafts");
+                        break;
+                    }
+                    input::PostEditChoice::Discard => {
+                        input::remove_draft()?;
+                        break;
+                    }
                 },
                 Err(err) => error!("{}", err),
             }
@@ -449,24 +463,31 @@ pub fn msg_matches(matches: &ArgMatches) -> Result<()> {
         loop {
             match input::post_edit_choice() {
                 Ok(choice) => match choice {
-                    input::Choice::Send => {
+                    input::PostEditChoice::Send => {
                         debug!("Sending message…");
-                        smtp::send(&account, &msg.to_sendable_msg()?)?;
-                        imap_conn.append_msg("Sent", &msg.to_vec()?, &[Flag::Seen])?;
+                        let msg = msg.to_sendable_msg()?;
+                        smtp::send(&account, &msg)?;
+                        imap_conn.append_msg("Sent", &msg.formatted(), &[Flag::Seen])?;
+                        input::remove_draft()?;
                         info!("Message successfully sent");
                         break;
                     }
-                    input::Choice::Draft => {
-                        debug!("Saving draft message…");
-                        imap_conn.append_msg("Drafts", &msg.to_vec()?, &[Flag::Seen])?;
-                        info!("Message successfully saved to Drafts");
-                        break;
-                    }
-                    input::Choice::Edit => {
+                    input::PostEditChoice::Edit => {
                         let content = input::open_editor_with_draft()?;
                         msg = Msg::from(content);
                     }
-                    input::Choice::Quit => break,
+                    input::PostEditChoice::LocalDraft => break,
+                    input::PostEditChoice::RemoteDraft => {
+                        debug!("Saving to draft…");
+                        imap_conn.append_msg("Drafts", &msg.to_vec()?, &[Flag::Seen])?;
+                        input::remove_draft()?;
+                        info!("Message successfully saved to Drafts");
+                        break;
+                    }
+                    input::PostEditChoice::Discard => {
+                        input::remove_draft()?;
+                        break;
+                    }
                 },
                 Err(err) => error!("{}", err),
             }

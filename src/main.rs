@@ -78,14 +78,14 @@ fn build_cli() -> App<'static, 'static> {
 
 fn run() -> Result<()> {
     let matches = build_cli().get_matches();
-
     let output_fmt: OutputFmt = matches.value_of("output").unwrap().into();
     let log_level: LogLevel = matches.value_of("log").unwrap().into();
-
     init_logger(&output_fmt, &log_level)?;
-    debug!("Logger initialized");
-    debug!("Output format: {}", &output_fmt);
-    debug!("Log level: {}", &log_level);
+
+    debug!("[main] begin");
+    debug!("[main] output format: {}", &output_fmt);
+    debug!("[main] log level: {}", &log_level);
+    debug!("[main] browse matches");
 
     loop {
         if mbox_matches(&matches)? {
