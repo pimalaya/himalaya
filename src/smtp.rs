@@ -26,16 +26,16 @@ pub fn send(account: &Account, msg: &lettre::Message) -> Result<()> {
     let tls = TlsParameters::builder(account.smtp_host.to_string())
         .dangerous_accept_invalid_hostnames(account.smtp_insecure())
         .dangerous_accept_invalid_certs(account.smtp_insecure())
-        .build()
-        .unwrap();
+        .build()?;
+    let tls = if account.smtp_starttls() {
+        Tls::Required(tls)
+    } else {
+        Tls::Wrapper(tls)
+    };
 
     smtp_relay(&account.smtp_host)?
         .port(account.smtp_port)
-        .tls(if account.smtp_starttls() {
-            Tls::Required(tls)
-        } else {
-            Tls::Wrapper(tls)
-        })
+        .tls(tls)
         .credentials(account.smtp_creds()?)
         .build()
         .send(msg)?;

@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Save msg upon error [#59]
 - Answered flag not set [#50]
 - Panic when downloads-dir does not exist [#100]
+- Idle mode incorrect new message notification [#48]
 
 ### Changed
 
@@ -156,6 +157,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#39]: https://github.com/soywod/himalaya/issues/39
 [#40]: https://github.com/soywod/himalaya/issues/40
 [#41]: https://github.com/soywod/himalaya/issues/41
+[#48]: https://github.com/soywod/himalaya/issues/48
 [#50]: https://github.com/soywod/himalaya/issues/50
 [#58]: https://github.com/soywod/himalaya/issues/58
 [#59]: https://github.com/soywod/himalaya/issues/59
