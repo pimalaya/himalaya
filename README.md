@@ -3,7 +3,7 @@
 Minimalist CLI email client, written in Rust.
 
 *The project is under active development. Do not use in production before the
-`v1.0.0` (see the [roadmap](https://github.com/soywod/himalaya/projects/2)).*
+`v1.0.0` (see the [roadmap](https://github.com/soywod/himalaya/milestone/5)).*
 
 ![image](https://user-images.githubusercontent.com/10437171/104848096-aee51000-58e3-11eb-8d99-bcfab5ca28ba.png)
 
