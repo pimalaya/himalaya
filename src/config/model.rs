@@ -132,15 +132,16 @@ impl Config {
         Ok(path)
     }
 
-    pub fn new_from_file() -> Result<Self> {
-        let mut file = File::open(
-            Self::path_from_xdg()
+    pub fn new(path: Option<PathBuf>) -> Result<Self> {
+        let path = match path {
+            Some(path) => path,
+            None => Self::path_from_xdg()
                 .or_else(|_| Self::path_from_xdg_alt())
                 .or_else(|_| Self::path_from_home())
                 .chain_err(|| "Cannot find config path")?,
-        )
-        .chain_err(|| "Cannot open config file")?;
+        };
 
+        let mut file = File::open(path).chain_err(|| "Cannot open config file")?;
         let mut content = vec![];
         file.read_to_end(&mut content)
             .chain_err(|| "Cannot read config file")?;

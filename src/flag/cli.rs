@@ -11,7 +11,7 @@ error_chain! {
     }
 }
 
-fn flags_arg<'f>() -> Arg<'f, 'f> {
+fn flags_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name("flags")
         .help("IMAP flags (see https://tools.ietf.org/html/rfc3501#page-11)")
         .value_name("FLAGS…")
@@ -19,7 +19,7 @@ fn flags_arg<'f>() -> Arg<'f, 'f> {
         .required(true)
 }
 
-pub fn flag_subcmds<'f>() -> Vec<App<'f, 'f>> {
+pub fn flag_subcmds<'s>() -> Vec<App<'s, 's>> {
     vec![SubCommand::with_name("flags")
         .aliases(&["flag"])
         .about("Handles flags")

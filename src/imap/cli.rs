@@ -14,7 +14,7 @@ error_chain! {
     }
 }
 
-pub fn imap_subcmds<'a>() -> Vec<App<'a, 'a>> {
+pub fn imap_subcmds<'s>() -> Vec<App<'s, 's>> {
     vec![SubCommand::with_name("idle").about("Spawns a blocking idle daemon")]
 }
 

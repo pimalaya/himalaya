@@ -67,7 +67,7 @@ fn attachment_arg<'a>() -> Arg<'a, 'a> {
         .takes_value(true)
 }
 
-pub fn msg_subcmds<'a>() -> Vec<App<'a, 'a>> {
+pub fn msg_subcmds<'s>() -> Vec<App<'s, 's>> {
     vec![
         SubCommand::with_name("list")
             .aliases(&["lst", "l"])

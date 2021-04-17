@@ -1,7 +1,7 @@
 use clap;
 use error_chain::error_chain;
 use log::{debug, error, trace};
-use std::env;
+use std::{env, path::PathBuf};
 
 mod input;
 mod smtp;
@@ -32,13 +32,13 @@ mod mbox {
     pub(crate) mod cli;
     pub(crate) mod model;
 }
-mod completion {
+mod comp {
     pub(crate) mod cli;
 }
 
 use crate::{
-    completion::cli::{completion_matches, completion_subcmds},
-    config::{cli::account_arg, model::Config},
+    comp::cli::{comp_matches, comp_subcmds},
+    config::{cli::config_args, model::Config},
     flag::cli::{flag_matches, flag_subcmds},
     imap::cli::{imap_matches, imap_subcmds},
     mbox::cli::{mbox_matches, mbox_source_arg, mbox_subcmds},
@@ -52,7 +52,7 @@ use crate::{
 
 error_chain! {
     links {
-        CompletionCli(crate::completion::cli::Error, crate::completion::cli::ErrorKind);
+        CompletionCli(crate::comp::cli::Error, crate::comp::cli::ErrorKind);
         Config(crate::config::model::Error, crate::config::model::ErrorKind);
         FlagCli(crate::flag::cli::Error, crate::flag::cli::ErrorKind);
         ImapCli(crate::imap::cli::Error, crate::imap::cli::ErrorKind);
@@ -68,13 +68,13 @@ fn build_app<'a>() -> clap::App<'a, 'a> {
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .author(env!("CARGO_PKG_AUTHORS"))
         .args(&output_args())
-        .arg(account_arg())
+        .args(&config_args())
         .arg(mbox_source_arg())
         .subcommands(flag_subcmds())
         .subcommands(imap_subcmds())
         .subcommands(mbox_subcmds())
         .subcommands(msg_subcmds())
-        .subcommands(completion_subcmds())
+        .subcommands(comp_subcmds())
 }
 
 fn run() -> Result<()> {
@@ -83,12 +83,14 @@ fn run() -> Result<()> {
 
     let output_fmt: OutputFmt = matches.value_of("output").unwrap().into();
     let log_level: LogLevel = matches.value_of("log").unwrap().into();
+    let custom_config: Option<PathBuf> = matches.value_of("config").map(|s| s.into());
     init_logger(&output_fmt, &log_level)?;
     debug!("[main] output format: {}", output_fmt);
     debug!("[main] log level: {}", log_level);
+    debug!("[main] custom config path: {:?}", custom_config);
 
     debug!("[main] init config");
-    let config = Config::new_from_file()?;
+    let config = Config::new(custom_config)?;
     trace!("[main] {:#?}", config);
 
     let account_name = matches.value_of("account");
@@ -97,13 +99,13 @@ fn run() -> Result<()> {
     trace!("[main] {:#?}", account);
 
     let mbox = matches.value_of("mailbox").unwrap();
-    debug!("[msg::cli::matches] mailbox: {}", mbox);
+    debug!("[main] mailbox: {}", mbox);
 
     debug!("[main] begin matching");
     let _matched = mbox_matches(&account, &matches)?
         || flag_matches(&account, &mbox, &matches)?
         || imap_matches(&config, &account, &mbox, &matches)?
-        || completion_matches(build_app(), &matches)?
+        || comp_matches(build_app(), &matches)?
         || msg_matches(&config, &account, &mbox, &matches)?;
 
     Ok(())

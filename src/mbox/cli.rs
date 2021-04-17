@@ -28,7 +28,7 @@ pub fn mbox_target_arg<'a>() -> Arg<'a, 'a> {
         .value_name("TARGET")
 }
 
-pub fn mbox_subcmds<'a>() -> Vec<App<'a, 'a>> {
+pub fn mbox_subcmds<'s>() -> Vec<App<'s, 's>> {
     vec![SubCommand::with_name("mailboxes")
         .aliases(&["mailbox", "mboxes", "mbox", "m"])
         .about("Lists all mailboxes")]
