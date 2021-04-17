@@ -1,52 +1,23 @@
 # 📫 Himalaya [![gh-actions](https://github.com/soywod/himalaya/workflows/deployment/badge.svg)](https://github.com/soywod/himalaya/actions?query=workflow%3Adeployment)
 
-Minimalist CLI email client, written in Rust.
+CLI email client written in Rust.
 
 *The project is under active development. Do not use in production before the
 `v1.0.0` (see the [roadmap](https://github.com/soywod/himalaya/milestone/5)).*
 
-![image](https://user-images.githubusercontent.com/10437171/104848096-aee51000-58e3-11eb-8d99-bcfab5ca28ba.png)
-
-## Table of contents
-
-* [Motivation](#motivation)
-* [Installation](#installation)
-* [Nix](#nix)
-  * [Installing using Nix](#installing-using-nix)
-  * [Development using Nix](#development-using-nix)
-* [Configuration](#configuration)
-* [Usage](#usage)
-  * [List mailboxes](#list-mailboxes)
-  * [List messages](#list-messages)
-  * [Search messages](#search-messages)
-  * [Download attachments](#download-attachments)
-  * [Read a message](#read-a-message)
-  * [Write a new message](#write-a-new-message)
-  * [Reply to a message](#reply-to-a-message)
-  * [Forward a message](#forward-a-message)
-  * [Copy a message](#copy-a-message)
-  * [Move a message](#move-a-message)
-  * [Delete a message](#delete-a-message)
-  * [Listen to new messages](#listen-to-new-messages)
-* [Completions](#completions)
-* [Interfaces](#interfaces)
-  * [GUI](#gui)
-  * [TUI](#tui)
-* [License](https://github.com/soywod/himalaya/blob/master/LICENSE)
-* [Changelog](https://github.com/soywod/himalaya/blob/master/CHANGELOG.md)
-* [Sponsoring](#sponsoring)
-* [Credits](#credits)
+![image](https://user-images.githubusercontent.com/10437171/115128560-eba5cd80-9fde-11eb-8981-c67e7e019a43.png)
 
 ## Motivation
 
-Bringing emails to the terminal is a pain. The mainstream TUI, (neo)mutt, takes
-time to configure. The default mapping is not intuitive when coming from the
-Vim environment. It is even scary to use at the beginning, since you are
-dealing with sensitive data!
+Bringing emails to the terminal is a *pain*. First, because they are sensitive
+data. Secondly, the existing TUIs ([Mutt](http://www.mutt.org/),
+[NeoMutt](https://neomutt.org/), [Alpine](https://alpine.x10host.com/),
+[aerc](https://aerc-mail.org/)…) are really hard to configure. They require time
+and patience.
 
 The aim of Himalaya is to extract the email logic into a simple (yet solid) CLI
-API that can be used either directly from the terminal or UIs. It gives users
-more flexibility.
+API that can be used directly from the terminal, from scripts, from UIs…
+Possibilities are endless!
 
 ## Installation
 
@@ -62,44 +33,8 @@ As a regular user:
 curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | PREFIX=~/.local sh
 ```
 
-Read the Nix section below for a Nix-based installation method. *See the [wiki section](https://github.com/soywod/himalaya/wiki/Installation)
-for other installation methods.*
-
-## Nix
-
-[Nix](https://serokell.io/blog/what-is-nix) users might find this section relevant.
-
-### Installing using Nix
-
-If you already have Nix installed (without Flakes), run the following command to install himalaya to your home directory:
-
-```bash
-nix-env -if https://github.com/soywod/himalaya/archive/master.tar.gz
-# Or, `nix-env -if .` from within the source tree checkout
-```
-
-Alternatively, if you use Nix with [Flakes](https://nixos.wiki/wiki/Flakes), you can directly run himalaya without installing it anywhere:
-
-```bash
-nix run github:soywod/himalaya
-# Or, `nix run` from within the source tree checkout
-```
-
-### Development using Nix
-
-To enter a development shell,
-
-```bash
-nix develop
-```
-
-From here, you have access to all the development tools (Rust compiler, cargo, rust language server, code formatter, etc.) necessary to hack on himalaya. 
-
-If you use VSCode, simply open this project folder - and accept the workspace extension recommendations.
-
-#### Troubleshooting Nix
-
-- See [here](https://github.com/soywod/himalaya/pull/76#discussion_r609710097) if you get the `hash mismatch in fixed-output derivation` error.
+*See the [wiki](https://github.com/soywod/himalaya/wiki/Installation) for other
+installation methods.*
 
 ## Configuration
 
@@ -120,210 +55,29 @@ imap-login = "your.email@gmail.com"
 imap-passwd-cmd = "pass show gmail"
 
 smtp-host = "smtp.gmail.com"
-smtp-port = 487
+smtp-port = 465
 smtp-login = "your.email@gmail.com"
 smtp-passwd-cmd = "security find-internet-password -gs gmail -w"
 ```
 
-*See the [wiki section](https://github.com/soywod/himalaya/wiki/Configuration)
-for all the options.*
+*See the [wiki](https://github.com/soywod/himalaya/wiki/Configuration) for all
+the options.*
 
-## Usage
+## Features
 
-```
-himalaya 0.2.6
-soywod <clement.douin@posteo.net>
-📫 Minimalist CLI email client
+- Mailbox listing
+- Email listing and filtering
+- Email composition based on `$EDITOR`
+- Email manipulation (copy/move/delete)
+- Multi-accounting
+- IDLE mode for real-time notifications
+- Vim plugin
+- Completions for bash/zsh/fish
+- JSON output
+- …
 
-USAGE:
-    himalaya [OPTIONS] [SUBCOMMAND]
-
-FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
-
-OPTIONS:
-    -a, --account <STRING>     Selects a specific account
-    -l, --log <LEVEL>          Defines the logs level [default: info]  [possible values: error, warn, info, debug,
-                               trace]
-    -m, --mailbox <MAILBOX>    Selects a specific mailbox [default: INBOX]
-    -o, --output <FMT>         Defines the output format [default: plain]  [possible values: plain, json]
-
-SUBCOMMANDS:
-    attachments    Downloads all message attachments
-    copy           Copy a message to the targetted mailbox
-    delete         Delete a message
-    flags          Handles flags
-    forward        Forwards a message
-    help           Prints this message or the help of the given subcommand(s)
-    idle           Spawns a blocking idle daemon
-    list           Lists all messages
-    mailboxes      Lists all mailboxes
-    move           Move a message to the targetted mailbox
-    read           Reads text bodies of a message
-    reply          Answers to a message
-    save           Saves a raw message
-    search         Lists messages matching the given IMAP query
-    send           Sends a raw message
-    template       Generates a message template
-    write          Writes a new message
-```
-
-*See the [wiki section](https://github.com/soywod/himalaya/wiki/Usage) for more
-information about commands.*
-
-### List mailboxes
-
-![image](https://user-images.githubusercontent.com/10437171/104848169-0e432000-58e4-11eb-8410-05f0404c0d99.png)
-
-Shows mailboxes in a basic table.
-
-### List messages
-
-![image](https://user-images.githubusercontent.com/10437171/104848096-aee51000-58e3-11eb-8d99-bcfab5ca28ba.png)
-
-Shows messages in a basic table.
-
-### Search messages
-
-![image](https://user-images.githubusercontent.com/10437171/110698977-9d86f880-81ee-11eb-8990-0ca89c7d4640.png)
-
-Shows filtered messages in a basic table. The query should follow the
-[RFC-3501](https://tools.ietf.org/html/rfc3501#section-6.4.4).
-
-### Download attachments
-
-![image](https://user-images.githubusercontent.com/10437171/104848278-890c3b00-58e4-11eb-9b5c-48807c04f762.png)
-
-Downloads all attachments from a message directly to the
-[`downloads-dir`](https://github.com/soywod/himalaya/wiki/Configuration).
-
-### Read a message
-
-![image](https://user-images.githubusercontent.com/10437171/110701369-5d754500-81f1-11eb-932f-94c2ca8db068.png)
-
-Shows the text content of a message (`text/plain` if exists, otherwise
-`text/html`).
-
-### Write a new message
-
-```bash
-himalaya write
-```
-
-Opens your default editor (from the `$EDITOR` environment variable) to compose
-a new message.
-
-### Reply to a message
-
-```bash
-himalaya reply --all 5123
-```
-
-Opens your default editor to reply to a message.
-
-### Forward a message
-
-```bash
-himalaya forward 5123
-```
-
-Opens your default editor to forward a message. 
-
-### Copy a message
-
-```bash
-himalaya copy 5123 Sent
-```
-
-Copies a message to the targetted mailbox.
-
-### Move a message
-
-```bash
-himalaya move 5123 Drafts
-```
-
-Moves a message to the targetted mailbox.
-
-### Delete a message
-
-```bash
-himalaya delete 5123
-```
-
-Moves a message.
-
-### Listen to new messages
-
-```bash
-himalaya idle
-```
-
-Starts a session in idle mode (blocking). When a new message arrives, it runs
-the command `notify-cmd` defined in the [config
-file](https://github.com/soywod/himalaya/wiki/Configuration).
-
-Here a use case with [`systemd`](https://en.wikipedia.org/wiki/Systemd):
-
-```ini
-# ~/.config/systemd/user/himalaya.service
-
-[Unit]
-Description=Himalaya new messages notifier
-
-[Service]
-ExecStart=/usr/local/bin/himalaya idle
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```bash
-systemctl --user enable himalaya.service
-systemctl --user start  himalaya.service
-```
-
-## Completions
-
-```sh
-Generates the completion script for the given shell
-
-USAGE:
-    himalaya completion <shell>
-
-FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
-
-ARGS:
-    <shell>     [possible values: bash, zsh, fish]
-```
-
-The command prints the generated script to the stdout. You will have
-to manually save and source them. For example:
-
-```sh
-himalaya completion bash > himalaya-completions.bash
-```
-
-```sh
-# ~/.bashrc
-
-source himalaya-completions.bash
-```
-
-## Interfaces
-
-### GUI
-
-Not yet, but feel free to contribute ;)
-
-### TUI
-
-- [Vim plugin](https://github.com/soywod/himalaya/tree/master/vim)
+*See the [wiki](https://github.com/soywod/himalaya/wiki/Usage) for all the
+features.*
 
 ## Sponsoring
 
