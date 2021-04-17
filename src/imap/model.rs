@@ -197,10 +197,14 @@ impl<'ic> ImapConnector<'ic> {
         }
 
         // TODO: add tests, improve error management when empty page
-        let cursor = (page * page_size) as i64;
-        let begin = 1.max(last_seq - cursor);
-        let end = begin - begin.min(*page_size as i64) + 1;
-        let range = format!("{}:{}", begin, end);
+        let range = if page_size > &0 {
+            let cursor = (page * page_size) as i64;
+            let begin = 1.max(last_seq - cursor);
+            let end = begin - begin.min(*page_size as i64) + 1;
+            format!("{}:{}", begin, end)
+        } else {
+            String::from("1:*")
+        };
 
         let fetches = self
             .sess

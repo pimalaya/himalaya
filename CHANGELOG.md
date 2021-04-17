@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Default page size to config [#96]
+
 ## [0.2.6] - 2021-04-17
 
 ### Added
@@ -180,4 +184,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#84]: https://github.com/soywod/himalaya/issues/84
 [#87]: https://github.com/soywod/himalaya/issues/87
 [#89]: https://github.com/soywod/himalaya/issues/89
+[#96]: https://github.com/soywod/himalaya/issues/96
 [#100]: https://github.com/soywod/himalaya/issues/100
