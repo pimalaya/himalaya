@@ -8,6 +8,8 @@ use crate::output::utils::run_cmd;
 
 error_chain! {}
 
+const DEFAULT_PAGE_SIZE: usize = 10;
+
 // Account
 
 #[derive(Debug, Deserialize)]
@@ -17,6 +19,7 @@ pub struct Account {
     pub name: Option<String>,
     pub downloads_dir: Option<PathBuf>,
     pub signature: Option<String>,
+    pub default_page_size: Option<usize>,
 
     // Specific
     pub default: Option<bool>,
@@ -94,6 +97,7 @@ pub struct Config {
     pub downloads_dir: Option<PathBuf>,
     pub notify_cmd: Option<String>,
     pub signature: Option<String>,
+    pub default_page_size: Option<usize>,
 
     #[serde(flatten)]
     pub accounts: HashMap<String, Account>,
@@ -128,15 +132,16 @@ impl Config {
         Ok(path)
     }
 
-    pub fn new_from_file() -> Result<Self> {
-        let mut file = File::open(
-            Self::path_from_xdg()
+    pub fn new(path: Option<PathBuf>) -> Result<Self> {
+        let path = match path {
+            Some(path) => path,
+            None => Self::path_from_xdg()
                 .or_else(|_| Self::path_from_xdg_alt())
                 .or_else(|_| Self::path_from_home())
                 .chain_err(|| "Cannot find config path")?,
-        )
-        .chain_err(|| "Cannot open config file")?;
+        };
 
+        let mut file = File::open(path).chain_err(|| "Cannot open config file")?;
         let mut content = vec![];
         file.read_to_end(&mut content)
             .chain_err(|| "Cannot read config file")?;
@@ -192,5 +197,15 @@ impl Config {
             .as_ref()
             .or_else(|| self.signature.as_ref())
             .map(|sig| sig.to_owned())
+    }
+
+    pub fn default_page_size(&self, account: &Account) -> usize {
+        account
+            .default_page_size
+            .as_ref()
+            .or_else(|| self.default_page_size.as_ref())
+            .or(Some(&DEFAULT_PAGE_SIZE))
+            .unwrap()
+            .to_owned()
     }
 }

@@ -2,7 +2,10 @@ use clap::{self, App, ArgMatches, SubCommand};
 use error_chain::error_chain;
 use log::debug;
 
-use crate::{config::model::Config, imap::model::ImapConnector};
+use crate::{
+    config::model::{Account, Config},
+    imap::model::ImapConnector,
+};
 
 error_chain! {
     links {
@@ -11,22 +14,24 @@ error_chain! {
     }
 }
 
-pub fn imap_subcmds<'a>() -> Vec<App<'a, 'a>> {
+pub fn imap_subcmds<'s>() -> Vec<App<'s, 's>> {
     vec![SubCommand::with_name("idle").about("Spawns a blocking idle daemon")]
 }
 
-pub fn imap_matches(matches: &ArgMatches) -> Result<bool> {
-    let config = Config::new_from_file()?;
-    let account = config.find_account_by_name(matches.value_of("account"))?;
-    let mbox = matches.value_of("mailbox").unwrap();
-
+pub fn imap_matches(
+    config: &Config,
+    account: &Account,
+    mbox: &str,
+    matches: &ArgMatches,
+) -> Result<bool> {
     if let Some(_) = matches.subcommand_matches("idle") {
-        debug!("[imap::cli] idle command matched");
+        debug!("[imap::cli::matches] idle command matched");
         let mut imap_conn = ImapConnector::new(&account)?;
         imap_conn.idle(&config, &mbox)?;
         imap_conn.logout();
         return Ok(true);
     }
 
+    debug!("[imap::cli::matches] nothing matched");
     Ok(false)
 }

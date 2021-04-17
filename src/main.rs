@@ -1,3 +1,8 @@
+use clap;
+use error_chain::error_chain;
+use log::{debug, error, trace};
+use std::{env, path::PathBuf};
+
 mod input;
 mod smtp;
 mod table;
@@ -27,18 +32,13 @@ mod mbox {
     pub(crate) mod cli;
     pub(crate) mod model;
 }
-mod completion {
+mod comp {
     pub(crate) mod cli;
 }
 
-use clap::{self, App};
-use error_chain::error_chain;
-use log::{debug, error};
-use std::env;
-
 use crate::{
-    completion::cli::{completion_matches, completion_subcmds},
-    config::cli::account_arg,
+    comp::cli::{comp_matches, comp_subcmds},
+    config::{cli::config_args, model::Config},
     flag::cli::{flag_matches, flag_subcmds},
     imap::cli::{imap_matches, imap_subcmds},
     mbox::cli::{mbox_matches, mbox_source_arg, mbox_subcmds},
@@ -52,61 +52,61 @@ use crate::{
 
 error_chain! {
     links {
+        CompletionCli(crate::comp::cli::Error, crate::comp::cli::ErrorKind);
+        Config(crate::config::model::Error, crate::config::model::ErrorKind);
         FlagCli(crate::flag::cli::Error, crate::flag::cli::ErrorKind);
         ImapCli(crate::imap::cli::Error, crate::imap::cli::ErrorKind);
         MboxCli(crate::mbox::cli::Error, crate::mbox::cli::ErrorKind);
         MsgCli(crate::msg::cli::Error, crate::msg::cli::ErrorKind);
-        CompletionCli(crate::completion::cli::Error, crate::completion::cli::ErrorKind);
         OutputLog(crate::output::log::Error, crate::output::log::ErrorKind);
     }
 }
 
-fn build_cli() -> App<'static, 'static> {
+fn build_app<'a>() -> clap::App<'a, 'a> {
     clap::App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .author(env!("CARGO_PKG_AUTHORS"))
         .args(&output_args())
-        .arg(account_arg())
+        .args(&config_args())
         .arg(mbox_source_arg())
         .subcommands(flag_subcmds())
         .subcommands(imap_subcmds())
         .subcommands(mbox_subcmds())
         .subcommands(msg_subcmds())
-        .subcommands(completion_subcmds())
+        .subcommands(comp_subcmds())
 }
 
 fn run() -> Result<()> {
-    let matches = build_cli().get_matches();
+    let app = build_app();
+    let matches = app.get_matches();
+
     let output_fmt: OutputFmt = matches.value_of("output").unwrap().into();
     let log_level: LogLevel = matches.value_of("log").unwrap().into();
+    let custom_config: Option<PathBuf> = matches.value_of("config").map(|s| s.into());
     init_logger(&output_fmt, &log_level)?;
+    debug!("[main] output format: {}", output_fmt);
+    debug!("[main] log level: {}", log_level);
+    debug!("[main] custom config path: {:?}", custom_config);
 
-    debug!("[main] begin");
-    debug!("[main] output format: {}", &output_fmt);
-    debug!("[main] log level: {}", &log_level);
-    debug!("[main] browse matches");
+    debug!("[main] init config");
+    let config = Config::new(custom_config)?;
+    trace!("[main] {:#?}", config);
 
-    loop {
-        if mbox_matches(&matches)? {
-            break;
-        }
+    let account_name = matches.value_of("account");
+    debug!("[main] find {} account", account_name.unwrap_or("default"));
+    let account = config.find_account_by_name(account_name)?;
+    trace!("[main] {:#?}", account);
 
-        if flag_matches(&matches)? {
-            break;
-        }
+    let mbox = matches.value_of("mailbox").unwrap();
+    debug!("[main] mailbox: {}", mbox);
 
-        if imap_matches(&matches)? {
-            break;
-        }
-
-        if completion_matches(build_cli(), &matches)? {
-            break;
-        }
-
-        msg_matches(&matches)?;
-        break;
-    }
+    debug!("[main] begin matching");
+    let _matched = mbox_matches(&account, &matches)?
+        || flag_matches(&account, &mbox, &matches)?
+        || imap_matches(&config, &account, &mbox, &matches)?
+        || comp_matches(build_app(), &matches)?
+        || msg_matches(&config, &account, &mbox, &matches)?;
 
     Ok(())
 }
