@@ -72,7 +72,8 @@
 
           # `nix develop`
           devShell = pkgs.mkShell {
-            inherit buildInputs nativeBuildInputs;
+            inputsFrom = builtins.attrValues self.packages.${system};
+            buildInputs = with pkgs; [ cargo cargo-watch trunk ];
             RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
           };
         }
