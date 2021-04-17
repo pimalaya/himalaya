@@ -11,6 +11,9 @@ Minimalist CLI email client, written in Rust.
 
 * [Motivation](#motivation)
 * [Installation](#installation)
+* [Nix](#nix)
+  * [Installing using Nix](#installing-using-nix)
+  * [Development using Nix](#development-using-nix)
 * [Configuration](#configuration)
 * [Usage](#usage)
   * [List mailboxes](#list-mailboxes)
@@ -51,8 +54,44 @@ more flexibility.
 curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | sh
 ```
 
-*See the [wiki section](https://github.com/soywod/himalaya/wiki/Installation)
+Read the Nix section below for a Nix-based installation method. *See the [wiki section](https://github.com/soywod/himalaya/wiki/Installation)
 for other installation methods.*
+
+## Nix
+
+[Nix](https://serokell.io/blog/what-is-nix) users might find this section relevant.
+
+### Installing using Nix
+
+If you already have Nix installed (without Flakes), run the following command to install himalaya to your home directory:
+
+```bash
+nix-env -if https://github.com/soywod/himalaya/archive/master.tar.gz
+# Or, `nix-env -if .` from within the source tree checkout
+```
+
+Alternatively, if you use Nix with [Flakes](https://nixos.wiki/wiki/Flakes), you can directly run himalaya without installing it anywhere:
+
+```bash
+nix run github:soywod/himalaya
+# Or, `nix run` from within the source tree checkout
+```
+
+### Development using Nix
+
+To enter a development shell,
+
+```bash
+nix develop
+```
+
+From here, you have access to all the development tools (Rust compiler, cargo, rust language server, code formatter, etc.) necessary to hack on himalaya. 
+
+If you use VSCode, simply open this project folder - and accept the workspace extension recommendations.
+
+#### Troubleshooting Nix
+
+- See [here](https://github.com/soywod/himalaya/pull/76#discussion_r609710097) if you get the `hash mismatch in fixed-output derivation` error.
 
 ## Configuration
 
