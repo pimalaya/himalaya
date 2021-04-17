@@ -3,38 +3,16 @@ use error_chain::error_chain;
 use log::{debug, error, trace};
 use std::{env, path::PathBuf};
 
+mod comp;
+mod config;
+mod flag;
+mod imap;
 mod input;
+mod mbox;
+mod msg;
+mod output;
 mod smtp;
 mod table;
-mod config {
-    pub(crate) mod cli;
-    pub(crate) mod model;
-}
-mod output {
-    pub(crate) mod cli;
-    pub(crate) mod fmt;
-    pub(crate) mod log;
-    pub(crate) mod utils;
-}
-mod imap {
-    pub(crate) mod cli;
-    pub(crate) mod model;
-}
-mod flag {
-    pub(crate) mod cli;
-    pub(crate) mod model;
-}
-mod msg {
-    pub(crate) mod cli;
-    pub(crate) mod model;
-}
-mod mbox {
-    pub(crate) mod cli;
-    pub(crate) mod model;
-}
-mod comp {
-    pub(crate) mod cli;
-}
 
 use crate::{
     comp::cli::{comp_matches, comp_subcmds},
