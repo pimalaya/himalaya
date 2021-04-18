@@ -2,6 +2,11 @@
 
 set -eu
 
+die() {
+    printf '%s\n' "$1" >&2
+    exit "${2-1}"
+}
+
 DESTDIR="${DESTDIR:-/}"
 PREFIX="${PREFIX:-"$DESTDIR/usr/local"}"
 RELEASES_URL="https://github.com/soywod/himalaya/releases"
@@ -12,15 +17,11 @@ case $system in
   msys*|mingw*|cygwin*|win*) system=windows;;
   linux|freebsd) system=linux;;
   darwin) system=macos;;
-  *) echo "Error: Unsupported system: $system"; exit 1;;
+  *) die "Unsupported system: $system" ;;
 esac
 
-if ! tmpdir=$(mktemp -d); then
-  echo "Error: Failed to create tmpdir"
-  exit 1
-else
-  trap "rm -rf $tmpdir" EXIT
-fi
+tmpdir=$(mktemp -d) || die "Failed to create tmpdir"
+trap "rm -rf $tmpdir" EXIT
 
 echo "Downloading latest $system release…"
 curl -sLo "$tmpdir/himalaya.tar.gz" "$RELEASES_URL/latest/download/himalaya-$system.tar.gz"
@@ -31,4 +32,4 @@ tar -xzf "$tmpdir/himalaya.tar.gz" -C "$tmpdir"
 mkdir -p "$PREFIX/bin"
 cp -f -- "$tmpdir/himalaya.exe" "$PREFIX/bin/himalaya"
 
-printf '%s installed!\n' "$("$PREFIX/bin/himalaya" --version)"
+die "$("$PREFIX/bin/himalaya" --version) installed!" 0
