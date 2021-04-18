@@ -50,8 +50,16 @@ more flexibility.
 
 ## Installation
 
+As root, using sudo:
+
 ```sh
-curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | sh
+curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | sudo sh
+```
+
+As a regular user:
+
+```sh
+curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | PREFIX=~/.local sh
 ```
 
 Read the Nix section below for a Nix-based installation method. *See the [wiki section](https://github.com/soywod/himalaya/wiki/Installation)
