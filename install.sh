@@ -28,12 +28,7 @@ curl -sLo "$tmpdir/himalaya.tar.gz" "$RELEASES_URL/latest/download/himalaya-$sys
 echo "Installing binary…"
 tar -xzf "$tmpdir/himalaya.tar.gz" -C "$tmpdir"
 
-if [ -w "$PREFIX" ]; then
-  mkdir -p "$PREFIX/bin"
-  cp -f -- "$tmpdir/himalaya.exe" "$PREFIX/bin/himalaya"
-else
-  sudo mkdir -p "$PREFIX/bin"
-  sudo cp -f -- "$tmpdir/himalaya.exe" "$PREFIX/bin/himalaya"
-fi
+mkdir -p "$PREFIX/bin"
+cp -f -- "$tmpdir/himalaya.exe" "$PREFIX/bin/himalaya"
 
 printf '%s installed!\n' "$("$PREFIX/bin/himalaya" --version)"
