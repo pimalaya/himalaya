@@ -1,33 +1,4 @@
-# 📫 Himalaya.vim
-
-Vim plugin for [Himalaya](https://github.com/soywod/himalaya) CLI email client.
-
-![image](https://user-images.githubusercontent.com/10437171/104848096-aee51000-58e3-11eb-8d99-bcfab5ca28ba.png)
-
-## Table of contents
-
-* [Motivation](#motivation)
-* [Installation](#installation)
-* [Usage](#usage)
-  * [List messages view](#list-messages-view)
-  * [List mailboxes](#list-mailboxes)
-  * [Read message view](#read-message-view)
-  * [Write message view](#write-message-view)
-* [License](https://github.com/soywod/himalaya.vim/blob/master/LICENSE)
-* [Credits](#credits)
-
-## Motivation
-
-Bringing emails to the terminal is a pain. The mainstream TUI, (neo)mutt, takes
-time to configure. The default mapping is not intuitive when coming from the
-Vim environment. It is even scary to use at the beginning, since you are
-dealing with sensitive data!
-
-The aim of Himalaya is to extract the email logic into a simple (yet solid) CLI
-API that can be used either directly from the terminal or UIs. It gives users
-more flexibility.
-
-This Vim plugin is a TUI implementation for Himalaya CLI.
+# Vim plugin
 
 ## Installation
 
@@ -128,13 +99,3 @@ When you exit this special buffer, you will be prompted 4 choices:
 - `Draft`: saves the message into the `Drafts` mailbox
 - `Quit`: quits the buffer without saving
 - `Cancel`: goes back to the message edition
-
-## Credits
-
-- [IMAP RFC3501](https://tools.ietf.org/html/rfc3501)
-- [Iris](https://github.com/soywod/iris.vim), the himalaya predecessor
-- [isync](https://isync.sourceforge.io/), an email synchronizer for offline usage
-- [NeoMutt](https://neomutt.org/), an email terminal user interface
-- [Alpine](http://alpine.x10host.com/alpine/alpine-info/), an other email terminal user interface
-- [mutt-wizard](https://github.com/LukeSmithxyz/mutt-wizard), a tool over NeoMutt and isync
-- [rust-imap](https://github.com/jonhoo/rust-imap), a rust IMAP lib
