@@ -21,14 +21,6 @@ Possibilities are endless!
 
 ## Installation
 
-As root, using sudo:
-
-```sh
-curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | sudo sh
-```
-
-As a regular user:
-
 ```sh
 # As root:
 curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | sudo sh
@@ -37,8 +29,8 @@ curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | 
 curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | PREFIX=~/.local sh
 ```
 
-*See the [wiki](https://github.com/soywod/himalaya/wiki/Installation) for other
-installation methods.*
+*See the [wiki](https://github.com/soywod/himalaya/wiki) for other installation
+methods.*
 
 ## Configuration
 
@@ -64,8 +56,9 @@ smtp-login = "your.email@gmail.com"
 smtp-passwd-cmd = "security find-internet-password -gs gmail -w"
 ```
 
-*See the [wiki](https://github.com/soywod/himalaya/wiki/Configuration) for all
-the options.*
+*See the
+[wiki](https://github.com/soywod/himalaya/wiki/Configuration:config-file) for
+all the options.*
 
 ## Features
 
@@ -80,8 +73,7 @@ the options.*
 - JSON output
 - …
 
-*See the [wiki](https://github.com/soywod/himalaya/wiki/Usage) for all the
-features.*
+*See the [wiki](https://github.com/soywod/himalaya/wiki) for all the features.*
 
 ## Sponsoring
 
