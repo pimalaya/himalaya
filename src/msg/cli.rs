@@ -130,17 +130,17 @@ pub fn msg_subcmds<'s>() -> Vec<App<'s, 's>> {
             .arg(uid_arg()),
         SubCommand::with_name("copy")
             .aliases(&["cp", "c"])
-            .about("Copy a message to the targetted mailbox")
+            .about("Copies a message to the targetted mailbox")
             .arg(uid_arg())
             .arg(mbox_target_arg()),
         SubCommand::with_name("move")
             .aliases(&["mv", "m"])
-            .about("Move a message to the targetted mailbox")
+            .about("Moves a message to the targetted mailbox")
             .arg(uid_arg())
             .arg(mbox_target_arg()),
         SubCommand::with_name("delete")
             .aliases(&["remove", "rm", "del", "d"])
-            .about("Delete a message")
+            .about("Deletes a message")
             .arg(uid_arg()),
         SubCommand::with_name("template")
             .aliases(&["tpl", "t"])

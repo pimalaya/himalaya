@@ -30,6 +30,10 @@ curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | 
 As a regular user:
 
 ```sh
+# As root:
+curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | sudo sh
+
+# As a regular user:
 curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | PREFIX=~/.local sh
 ```
 
