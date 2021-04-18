@@ -36,4 +36,4 @@ else
   sudo cp -f -- "$tmpdir/himalaya.exe" "$PREFIX/bin/himalaya"
 fi
 
-echo "$("$PREFIX/bin/himalaya" --version) installed!"
+printf '%s installed!\n' "$("$PREFIX/bin/himalaya" --version)"
