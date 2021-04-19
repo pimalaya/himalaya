@@ -19,6 +19,7 @@ pub struct Account {
     pub name: Option<String>,
     pub downloads_dir: Option<PathBuf>,
     pub signature: Option<String>,
+    pub signature_separator: Option<String>,
     pub default_page_size: Option<usize>,
 
     // Specific
@@ -101,6 +102,7 @@ pub struct Config {
     pub downloads_dir: Option<PathBuf>,
     pub notify_cmd: Option<String>,
     pub signature: Option<String>,
+    pub signature_separator: Option<String>,
     pub default_page_size: Option<usize>,
 
     #[serde(flatten)]
@@ -212,6 +214,14 @@ impl Config {
             .signature
             .as_ref()
             .or_else(|| self.signature.as_ref())
+            .map(|sig| sig.to_owned())
+    }
+
+    pub fn signature_separator(&self, account: &Account) -> Option<String> {
+        account
+            .signature_separator
+            .as_ref()
+            .or_else(|| self.signature_separator.as_ref())
             .map(|sig| sig.to_owned())
     }
 

@@ -363,105 +363,47 @@ impl<'m> Msg<'m> {
     }
 
     pub fn build_new_tpl(config: &Config, account: &Account) -> Result<Tpl> {
-        let mut tpl = vec![];
-
-        // "Content" headers
-        tpl.push("Content-Type: text/plain; charset=utf-8".to_string());
-        tpl.push("Content-Transfer-Encoding: 8bit".to_string());
-
-        // "From" header
-        tpl.push(format!("From: {}", config.address(account)));
-
-        // "To" header
-        tpl.push("To: ".to_string());
-
-        // "Subject" header
-        tpl.push("Subject: ".to_string());
-
-        // Separator between headers and body
-        tpl.push(String::new());
-
-        // Signature
-        if let Some(sig) = config.signature(&account) {
-            tpl.push(String::new());
-            tpl.push("--".to_string());
-            for line in sig.split("\n") {
-                tpl.push(line.to_string());
-            }
-        }
-
-        Ok(Tpl(tpl.join("\r\n")))
+        let msg_spec = MsgSpec{
+            in_reply_to: None,
+            to: None,
+            cc: None,
+            subject: None,
+            default_content: None,
+        };
+        Msg::build_tpl(config, account, msg_spec)
     }
 
     pub fn build_reply_tpl(&self, config: &Config, account: &Account) -> Result<Tpl> {
         let msg = &self.parse()?;
         let headers = msg.get_headers();
-        let mut tpl = vec![];
-
-        // "Content" headers
-        tpl.push("Content-Type: text/plain; charset=utf-8".to_string());
-        tpl.push("Content-Transfer-Encoding: 8bit".to_string());
-
-        // "From" header
-        tpl.push(format!("From: {}", config.address(account)));
-
-        // "In-Reply-To" header
-        if let Some(msg_id) = headers.get_first_value("message-id") {
-            tpl.push(format!("In-Reply-To: {}", msg_id));
-        }
-
-        // "To" header
         let to = headers
-            .get_first_value("reply-to")
-            .or(headers.get_first_value("from"))
-            .unwrap_or(String::new());
-        tpl.push(format!("To: {}", to));
+                .get_first_value("reply-to")
+                .or(headers.get_first_value("from"));
+        let to = match to {
+            Some(t) => {Some(vec![t])},
+            None => {None},
+        };
 
-        // "Subject" header
-        let subject = headers.get_first_value("subject").unwrap_or(String::new());
-        tpl.push(format!("Subject: Re: {}", subject));
-
-        // Separator between headers and body
-        tpl.push(String::new());
-
-        // Original msg prepend with ">"
-        let thread = self
+        let thread = self // Original msg prepend with ">"
             .text_bodies("text/plain")?
             .replace("\r", "")
             .split("\n")
             .map(|line| format!(">{}", line))
-            .collect::<Vec<String>>()
-            .join("\r\n");
-        tpl.push(thread);
+            .collect::<Vec<String>>();
 
-        // Signature
-        if let Some(sig) = config.signature(&account) {
-            tpl.push(String::new());
-            tpl.push("--".to_string());
-            for line in sig.split("\n") {
-                tpl.push(line.to_string());
-            }
-        }
-
-        Ok(Tpl(tpl.join("\r\n")))
+        let msg_spec = MsgSpec{
+            in_reply_to: headers.get_first_value("message-id"),
+            to,
+            cc: None,
+            subject: headers.get_first_value("subject"),
+            default_content: Some(thread),
+        };
+        Msg::build_tpl(config, account, msg_spec)
     }
 
     pub fn build_reply_all_tpl(&self, config: &Config, account: &Account) -> Result<Tpl> {
         let msg = &self.parse()?;
         let headers = msg.get_headers();
-        let mut tpl = vec![];
-
-        // "Content" headers
-        tpl.push("Content-Type: text/plain; charset=utf-8".to_string());
-        tpl.push("Content-Transfer-Encoding: 8bit".to_string());
-
-        // "From" header
-        tpl.push(format!("From: {}", config.address(account)));
-
-        // "In-Reply-To" header
-        if let Some(msg_id) = headers.get_first_value("message-id") {
-            tpl.push(format!("In-Reply-To: {}", msg_id));
-        }
 
         // "To" header
         // All addresses coming from original "To" …
@@ -499,84 +441,121 @@ impl<'m> Msg<'m> {
         } else {
             reply_to
         };
-        tpl.push(format!("To: {}", vec![reply_to, to].concat().join(", ")));
 
         // "Cc" header
-        let cc = headers
+        let cc = Some(headers
             .get_all_values("cc")
             .iter()
             .flat_map(|addrs| addrs.split(","))
             .map(|addr| addr.trim().to_string())
-            .collect::<Vec<String>>();
-        if !cc.is_empty() {
-            tpl.push(format!("Cc: {}", cc.join(", ")));
-        }
-
-        // "Subject" header
-        let subject = headers.get_first_value("subject").unwrap_or(String::new());
-        tpl.push(format!("Subject: Re: {}", subject));
-
-        // Separator between headers and body
-        tpl.push(String::new());
+            .collect::<Vec<String>>());
 
         // Original msg prepend with ">"
         let thread = self
             .text_bodies("text/plain")?
             .split("\r\n")
             .map(|line| format!(">{}", line))
-            .collect::<Vec<String>>()
-            .join("\r\n");
-        tpl.push(thread);
+            .collect::<Vec<String>>();
 
-        // Signature
-        if let Some(sig) = config.signature(&account) {
-            tpl.push(String::new());
-            tpl.push("--".to_string());
-            for line in sig.split("\n") {
-                tpl.push(line.to_string());
-            }
-        }
-
-        Ok(Tpl(tpl.join("\r\n")))
+        let msg_spec = MsgSpec{
+            in_reply_to: headers.get_first_value("message-id"),
+            cc,
+            to: Some(vec![reply_to, to].concat()),
+            subject: headers.get_first_value("subject"),
+            default_content: Some(thread),
+        };
+        Msg::build_tpl(config, account, msg_spec)
     }
 
     pub fn build_forward_tpl(&self, config: &Config, account: &Account) -> Result<Tpl> {
         let msg = &self.parse()?;
         let headers = msg.get_headers();
-        let mut tpl = vec![];
 
-        // "Content" headers
+        let subject = format!("Fwd: {}", headers.get_first_value("subject").unwrap_or_else(String::new));
+        let original_msg = vec![
+            "-------- Forwarded Message --------".to_string(),
+            self.text_bodies("text/plain")?,
+        ];
+
+        let msg_spec = MsgSpec{
+            in_reply_to: None,
+            cc: None,
+            to: None,
+            subject: Some(subject),
+            default_content: Some(original_msg),
+        };
+        Msg::build_tpl(config, account, msg_spec)
+    }
+
+    fn add_content_headers(tpl: &mut Vec<String>) {
         tpl.push("Content-Type: text/plain; charset=utf-8".to_string());
         tpl.push("Content-Transfer-Encoding: 8bit".to_string());
+    }
 
-        // "From" header
-        tpl.push(format!("From: {}", config.address(account)));
+    fn add_from_header(tpl: &mut Vec<String>, from: Option<String>) {
+        tpl.push(format!("From: {}", from.unwrap_or_else(String::new)));
+    }
 
-        // "To" header
-        tpl.push("To: ".to_string());
+    fn add_in_reply_to_header(tpl: &mut Vec<String>, in_reply_to: Option<String>) {
+        if let Some(r) = in_reply_to {
+            tpl.push(format!("In-Reply-To: {}", r));
+        }
+    }
 
-        // "Subject" header
-        let subject = headers.get_first_value("subject").unwrap_or(String::new());
-        tpl.push(format!("Subject: Fwd: {}", subject));
+    fn add_cc_header(tpl: &mut Vec<String>, cc: Option<Vec<String>>) {
+        if let Some(c) = cc {
+            tpl.push(format!("Cc: {}", c.join(", ")));
+        }
+    }
 
-        // Separator between headers and body
-        tpl.push(String::new());
+    fn add_to_header(tpl: &mut Vec<String>, to: Option<Vec<String>>) {
+        tpl.push(format!("To: {}", match to {
+            Some(t) => {t.join(", ")}
+            None => {String::new()}
+        }));
+    }
 
-        // Original msg
-        tpl.push("-------- Forwarded Message --------".to_string());
-        tpl.push(self.text_bodies("text/plain")?);
+    fn add_subject_header(tpl: &mut Vec<String>, subject: Option<String>) {
+        tpl.push(format!("Subject: {}", subject.unwrap_or_else(String::new)));
+    }
 
-        // Signature
+    fn add_content(tpl: &mut Vec<String>, content: Option<Vec<String>>) {
+        if let Some(c) = content {
+            tpl.extend(c);
+        }
+    }
+
+    fn add_signature(tpl: &mut Vec<String>, config: &Config, account: &Account) {
         if let Some(sig) = config.signature(&account) {
             tpl.push(String::new());
-            tpl.push("--".to_string());
+            tpl.push(config.signature_separator(&account).unwrap_or_else(|| "--".to_string()));
             for line in sig.split("\n") {
                 tpl.push(line.to_string());
             }
         }
+    }
 
+    fn build_tpl(config: &Config, account: &Account, msg_spec: MsgSpec) -> Result<Tpl> {
+        let mut tpl = vec![];
+        Msg::add_content_headers(&mut tpl);
+        Msg::add_from_header(&mut tpl, Some(config.address(account)));
+        Msg::add_in_reply_to_header(&mut tpl, msg_spec.in_reply_to);
+        Msg::add_cc_header(&mut tpl, msg_spec.cc);
+        Msg::add_to_header(&mut tpl, msg_spec.to);
+        Msg::add_subject_header(&mut tpl, msg_spec.subject);
+        tpl.push(String::new()); // Separator between headers and body
+        Msg::add_content(&mut tpl, msg_spec.default_content);
+        Msg::add_signature(&mut tpl, config, account);
         Ok(Tpl(tpl.join("\r\n")))
     }
+}
+
+struct MsgSpec {
+    in_reply_to: Option<String>,
+    to: Option<Vec<String>>,
+    cc: Option<Vec<String>>,
+    subject: Option<String>,
+    default_content: Option<Vec<String>>,
 }
 
 impl<'m> DisplayRow for Msg<'m> {
