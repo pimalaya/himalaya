@@ -521,6 +521,7 @@ impl<'m> Msg<'m> {
 
     fn add_content(tpl: &mut Vec<String>, content: Option<Vec<String>>) {
         if let Some(c) = content {
+            tpl.push(String::new()); // Separator between headers and body
             tpl.extend(c);
         }
     }
@@ -543,7 +544,6 @@ impl<'m> Msg<'m> {
         Msg::add_cc_header(&mut tpl, msg_spec.cc);
         Msg::add_to_header(&mut tpl, msg_spec.to);
         Msg::add_subject_header(&mut tpl, msg_spec.subject);
-        tpl.push(String::new()); // Separator between headers and body
         Msg::add_content(&mut tpl, msg_spec.default_content);
         Msg::add_signature(&mut tpl, config, account);
         Ok(Tpl(tpl.join("\r\n")))
