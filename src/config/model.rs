@@ -47,7 +47,9 @@ impl Account {
 
     pub fn imap_passwd(&self) -> Result<String> {
         let passwd = run_cmd(&self.imap_passwd_cmd).chain_err(|| "Cannot run IMAP passwd cmd")?;
-        let passwd = passwd.trim_end_matches("\n").to_owned();
+        let passwd = passwd
+            .trim_end_matches(|c| c == '\r' || c == '\n')
+            .to_owned();
 
         Ok(passwd)
     }
@@ -68,7 +70,9 @@ impl Account {
 
     pub fn smtp_creds(&self) -> Result<SmtpCredentials> {
         let passwd = run_cmd(&self.smtp_passwd_cmd).chain_err(|| "Cannot run SMTP passwd cmd")?;
-        let passwd = passwd.trim_end_matches("\n").to_owned();
+        let passwd = passwd
+            .trim_end_matches(|c| c == '\r' || c == '\n')
+            .to_owned();
 
         Ok(SmtpCredentials::new(self.smtp_login.to_owned(), passwd))
     }
@@ -115,8 +119,14 @@ impl Config {
     }
 
     fn path_from_xdg_alt() -> Result<PathBuf> {
-        let path = env::var("HOME").chain_err(|| "Cannot find `HOME` env var")?;
-        let mut path = PathBuf::from(path);
+        let home_var = if cfg!(target_family = "windows") {
+            "USERPROFILE"
+        } else {
+            "HOME"
+        };
+        let mut path: PathBuf = env::var(home_var)
+            .chain_err(|| format!("Cannot find `{}` env var", home_var))?
+            .into();
         path.push(".config");
         path.push("himalaya");
         path.push("config.toml");
@@ -125,8 +135,14 @@ impl Config {
     }
 
     fn path_from_home() -> Result<PathBuf> {
-        let path = env::var("HOME").chain_err(|| "Cannot find `HOME` env var")?;
-        let mut path = PathBuf::from(path);
+        let home_var = if cfg!(target_family = "windows") {
+            "USERPROFILE"
+        } else {
+            "HOME"
+        };
+        let mut path: PathBuf = env::var(home_var)
+            .chain_err(|| format!("Cannot find `{}` env var", home_var))?
+            .into();
         path.push(".himalayarc");
 
         Ok(path)
