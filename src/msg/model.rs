@@ -529,7 +529,6 @@ impl<'m> Msg<'m> {
     fn add_signature(tpl: &mut Vec<String>, config: &Config, account: &Account) {
         if let Some(sig) = config.signature(&account) {
             tpl.push(String::new());
-            tpl.push(config.signature_separator(&account).unwrap_or_else(|| "--".to_string()));
             for line in sig.split("\n") {
                 tpl.push(line.to_string());
             }
