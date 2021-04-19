@@ -119,10 +119,14 @@ impl Config {
     }
 
     fn path_from_xdg_alt() -> Result<PathBuf> {
-        let path = env::var("HOME")
-            .or(env::var("USERPROFILE"))
-            .chain_err(|| "Cannot find `HOME` env var")?;
-        let mut path = PathBuf::from(path);
+        let home_var = if cfg!(target_family = "windows") {
+            "USERPROFILE"
+        } else {
+            "HOME"
+        };
+        let mut path: PathBuf = env::var(home_var)
+            .chain_err(|| format!("Cannot find `{}` env var", home_var))?
+            .into();
         path.push(".config");
         path.push("himalaya");
         path.push("config.toml");
@@ -131,10 +135,14 @@ impl Config {
     }
 
     fn path_from_home() -> Result<PathBuf> {
-        let path = env::var("HOME")
-            .or(env::var("USERPROFILE"))
-            .chain_err(|| "Cannot find `HOME` env var")?;
-        let mut path = PathBuf::from(path);
+        let home_var = if cfg!(target_family = "windows") {
+            "USERPROFILE"
+        } else {
+            "HOME"
+        };
+        let mut path: PathBuf = env::var(home_var)
+            .chain_err(|| format!("Cannot find `{}` env var", home_var))?
+            .into();
         path.push(".himalayarc");
 
         Ok(path)
