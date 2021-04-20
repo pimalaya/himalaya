@@ -67,7 +67,7 @@ fn run() -> Result<()> {
     debug!("[main] log level: {}", log_level);
     debug!("[main] custom config path: {:?}", custom_config);
 
-    if let Ok(_matched) = comp_matches(build_app(), &matches) {
+    if comp_matches(build_app(), &matches)? {
         return Ok(());
     }
 
