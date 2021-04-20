@@ -67,6 +67,10 @@ fn run() -> Result<()> {
     debug!("[main] log level: {}", log_level);
     debug!("[main] custom config path: {:?}", custom_config);
 
+    if comp_matches(build_app(), &matches)? {
+        return Ok(());
+    }
+
     debug!("[main] init config");
     let config = Config::new(custom_config)?;
     trace!("[main] {:#?}", config);
@@ -83,7 +87,6 @@ fn run() -> Result<()> {
     let _matched = mbox_matches(&account, &matches)?
         || flag_matches(&account, &mbox, &matches)?
         || imap_matches(&config, &account, &mbox, &matches)?
-        || comp_matches(build_app(), &matches)?
         || msg_matches(&config, &account, &mbox, &matches)?;
 
     Ok(())
