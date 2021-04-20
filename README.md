@@ -39,7 +39,10 @@ methods.*
 
 name = "Your full name"
 downloads-dir = "/abs/path/to/downloads"
-signature = "Regards,"
+signature = """
+--
+Regards,
+"""
 
 [gmail]
 default = true
