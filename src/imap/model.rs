@@ -164,6 +164,7 @@ impl<'ic> ImapConnector<'ic> {
                 }
             }
 
+            config.exec_idle_hooks()?;
             debug!("[imap::model::idle] end loop");
         }
     }

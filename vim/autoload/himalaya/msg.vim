@@ -33,15 +33,15 @@ function! himalaya#msg#list_with(mbox, page, should_throw)
 endfunction
 
 function! himalaya#msg#list()
-  try
+  " try
     let mbox = himalaya#mbox#curr_mbox()
     let page = himalaya#mbox#curr_page()
     call himalaya#msg#list_with(mbox, page, 0)
-  catch
-    if !empty(v:exception)
-      redraw | call himalaya#shared#log#err(v:exception)
-    endif
-  endtry
+  " catch
+  "   if !empty(v:exception)
+  "     redraw | call himalaya#shared#log#err(v:exception)
+  "   endif
+  " endtry
 endfunction
 
 function! himalaya#msg#read()

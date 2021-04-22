@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Default page size to config [#96]
 - Custom config path [#86]
+- Setting idle-hook-cmds
+
+### Fixed
+
+- Improve config compatibility on Windows [#111](https://github.com/soywod/himalaya/pull/111)
 
 ## [0.2.6] - 2021-04-17
 

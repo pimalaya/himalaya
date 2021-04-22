@@ -1,7 +1,8 @@
 use error_chain::error_chain;
 use lettre::transport::smtp::authentication::Credentials as SmtpCredentials;
+use log::debug;
 use serde::Deserialize;
-use std::{collections::HashMap, env, fs::File, io::Read, path::PathBuf};
+use std::{collections::HashMap, env, fs::File, io::Read, path::PathBuf, thread};
 use toml;
 
 use crate::output::utils::run_cmd;
@@ -103,6 +104,9 @@ pub struct Config {
     pub signature: Option<String>,
     pub default_page_size: Option<usize>,
 
+    #[serde(default)]
+    pub idle_hook_cmds: Vec<String>,
+
     #[serde(flatten)]
     pub accounts: HashMap<String, Account>,
 }
@@ -199,7 +203,7 @@ impl Config {
         let cmd = self
             .notify_cmd
             .as_ref()
-            .map(|s| format!(r#"{} "{}" "{}""#, s, subject, sender))
+            .map(|cmd| format!(r#"{} {:?} {:?}"#, cmd, subject, sender))
             .unwrap_or(default_cmd);
 
         run_cmd(&cmd).chain_err(|| "Cannot run notify cmd")?;
@@ -223,5 +227,20 @@ impl Config {
             .or(Some(&DEFAULT_PAGE_SIZE))
             .unwrap()
             .to_owned()
+    }
+
+    pub fn exec_idle_hooks(&self) -> Result<()> {
+        let cmds = self.idle_hook_cmds.to_owned();
+
+        thread::spawn(move || {
+            debug!("batch execution of {} cmd(s)", cmds.len());
+            cmds.iter().for_each(|cmd| {
+                debug!("execute cmd {:?}", cmd);
+                let res = run_cmd(&cmd);
+                debug!("res: {:?}", res);
+            })
+        });
+
+        Ok(())
     }
 }
