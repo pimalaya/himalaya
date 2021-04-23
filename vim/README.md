@@ -17,6 +17,12 @@ Then:
 :PlugInstall
 ```
 
+It is highly recommanded to have this option on:
+
+```viml
+set hidden
+```
+
 ## Usage
 
 ### List messages view
