@@ -1,12 +1,9 @@
 setlocal cursorline
 setlocal foldexpr=himalaya#shared#thread#fold(v:lnum)
-setlocal foldlevel=0
-setlocal foldlevelstart=0
 setlocal foldmethod=expr
-setlocal nowrap
 setlocal startofline
 
-augroup himalaya
+augroup himalaya_write
   autocmd! * <buffer>
   autocmd  BufWriteCmd <buffer> call himalaya#msg#draft_save()
   autocmd  BufUnload   <buffer> call himalaya#msg#draft_handle()
