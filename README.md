@@ -1,6 +1,6 @@
 # 📫 Himalaya [![gh-actions](https://github.com/soywod/himalaya/workflows/deployment/badge.svg)](https://github.com/soywod/himalaya/actions?query=workflow%3Adeployment)
 
-CLI email client written in Rust.
+The CLI email client.
 
 *The project is under active development. Do not use in production before the
 `v1.0.0` (see the [roadmap](https://github.com/soywod/himalaya/milestone/5)).*
