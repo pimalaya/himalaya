@@ -9,6 +9,7 @@ use serde::{
 };
 use std::{borrow::Cow, fmt, fs, path::PathBuf, result};
 use tree_magic;
+use unicode_width::UnicodeWidthStr;
 use uuid::Uuid;
 
 use crate::{
@@ -196,17 +197,35 @@ impl<'a> ReadableMsg {
 
 // Message
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct Msg<'m> {
     pub uid: u32,
     pub flags: Flags<'m>,
     pub subject: String,
     pub sender: String,
     pub date: String,
-    #[serde(skip_serializing)]
     pub attachments: Vec<String>,
-    #[serde(skip_serializing)]
     pub raw: Vec<u8>,
+}
+
+impl<'a> Serialize for Msg<'a> {
+    fn serialize<T>(&self, serializer: T) -> result::Result<T::Ok, T::Error>
+    where
+        T: ser::Serializer,
+    {
+        let mut state = serializer.serialize_struct("Msg", 7)?;
+        state.serialize_field("uid", &self.uid)?;
+        state.serialize_field("flags", &self.flags)?;
+        state.serialize_field("subject", &self.subject)?;
+        state.serialize_field(
+            "subject_len",
+            &UnicodeWidthStr::width(self.subject.as_str()),
+        )?;
+        state.serialize_field("sender", &self.sender)?;
+        state.serialize_field("sender_len", &UnicodeWidthStr::width(self.sender.as_str()))?;
+        state.serialize_field("date", &self.date)?;
+        state.end()
+    }
 }
 
 impl<'m> From<Vec<u8>> for Msg<'m> {

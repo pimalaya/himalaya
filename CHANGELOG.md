@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Improve config compatibility on Windows [#111](https://github.com/soywod/himalaya/pull/111)
+- Vim table containing emoji [#122]
 
 ## [0.2.6] - 2021-04-17
 
@@ -198,5 +199,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#89]: https://github.com/soywod/himalaya/issues/89
 [#96]: https://github.com/soywod/himalaya/issues/96
 [#100]: https://github.com/soywod/himalaya/issues/100
+[#122]: https://github.com/soywod/himalaya/issues/122
 [#125]: https://github.com/soywod/himalaya/issues/125
 [#126]: https://github.com/soywod/himalaya/issues/126

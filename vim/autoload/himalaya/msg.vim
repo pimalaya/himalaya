@@ -229,7 +229,7 @@ function! s:get_max_widths(msgs, columns)
   let max_widths = map(copy(a:columns), "strlen(s:config.labels[v:val])")
 
   for msg in a:msgs
-    let widths = map(copy(a:columns), "strlen(msg[v:val])")
+    let widths = map(copy(a:columns), "has_key(msg, v:val . '_len') ? msg[v:val . '_len'] : strlen(msg[v:val])")
     call map(max_widths, "max([widths[v:key], v:val])")
   endfor
 
