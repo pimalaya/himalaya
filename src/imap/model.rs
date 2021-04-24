@@ -25,12 +25,15 @@ pub struct ImapConnector<'a> {
 
 impl<'ic> ImapConnector<'ic> {
     pub fn new(account: &'ic Account) -> Result<Self> {
+        debug!("create TLS builder");
+        let insecure = account.imap_insecure();
         let tls = TlsConnector::builder()
-            .danger_accept_invalid_certs(account.imap_insecure())
-            .danger_accept_invalid_hostnames(account.imap_insecure())
+            .danger_accept_invalid_certs(insecure)
+            .danger_accept_invalid_hostnames(insecure)
             .build()
             .chain_err(|| "Cannot create TLS connector")?;
 
+        debug!("create client");
         let client = if account.imap_starttls() {
             imap::connect_starttls(account.imap_addr(), &account.imap_host, &tls)
                 .chain_err(|| "Cannot connect using STARTTLS")
@@ -39,6 +42,7 @@ impl<'ic> ImapConnector<'ic> {
                 .chain_err(|| "Cannot connect using TLS")
         }?;
 
+        debug!("create session");
         let sess = client
             .login(&account.imap_login, &account.imap_passwd()?)
             .map_err(|res| res.0)
@@ -48,6 +52,7 @@ impl<'ic> ImapConnector<'ic> {
     }
 
     pub fn logout(&mut self) {
+        debug!("logout");
         match self.sess.logout() {
             _ => (),
         }
@@ -108,19 +113,19 @@ impl<'ic> ImapConnector<'ic> {
     }
 
     pub fn idle(&mut self, config: &Config, mbox: &str) -> Result<()> {
-        debug!("[imap::model::idle] begin");
+        debug!("begin");
 
-        debug!("[imap::model::idle] examine mailbox {}", mbox);
+        debug!("examine mailbox {}", mbox);
         self.sess
             .examine(mbox)
             .chain_err(|| format!("Could not examine mailbox `{}`", mbox))?;
 
-        debug!("[imap::model::idle] init message hashset");
+        debug!("init message hashset");
         let mut msg_set: HashSet<u32> = HashSet::from_iter(self.search_new_msgs()?.iter().cloned());
-        trace!("[imap::model::idle] {:?}", msg_set);
+        trace!("{:?}", msg_set);
 
         loop {
-            debug!("[imap::model::idle] begin loop");
+            debug!("begin loop");
 
             self.sess
                 .idle()
@@ -132,11 +137,8 @@ impl<'ic> ImapConnector<'ic> {
                 .into_iter()
                 .filter(|seq| msg_set.get(&seq).is_none())
                 .collect();
-            debug!(
-                "[imap::model::idle] found {} new messages not in hashset",
-                new_msgs.len()
-            );
-            trace!("[imap::model::idle] {:?}", new_msgs);
+            debug!("found {} new messages not in hashset", new_msgs.len());
+            trace!("messages: {:?}", new_msgs);
 
             if !new_msgs.is_empty() {
                 let new_msgs = new_msgs
@@ -152,20 +154,17 @@ impl<'ic> ImapConnector<'ic> {
                 for fetch in fetches.iter() {
                     let msg = Msg::from(fetch);
                     config.run_notify_cmd(&msg.subject, &msg.sender)?;
-                    debug!("[imap::model::idle] notify message {}", fetch.message);
-                    trace!("[imap::model::idle] {:?}", msg);
+                    debug!("notify message {}", fetch.message);
+                    trace!("message: {:?}", msg);
 
-                    debug!(
-                        "[imap::model::idle] insert msg {} to hashset",
-                        fetch.message
-                    );
+                    debug!("insert msg {} to hashset", fetch.message);
                     msg_set.insert(fetch.message);
-                    trace!("[imap::model::idle] {:?}", msg_set);
+                    trace!("messages: {:?}", msg_set);
                 }
             }
 
             config.exec_idle_hooks()?;
-            debug!("[imap::model::idle] end loop");
+            debug!("end loop");
         }
     }
 

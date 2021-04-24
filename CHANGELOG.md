@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Custom config path [#86]
 - Setting idle-hook-cmds
 
+### Changed
+
+- Plain logger with `env_logger` [#126]
+
 ### Fixed
 
 - Improve config compatibility on Windows [#111](https://github.com/soywod/himalaya/pull/111)
@@ -193,3 +197,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#89]: https://github.com/soywod/himalaya/issues/89
 [#96]: https://github.com/soywod/himalaya/issues/96
 [#100]: https://github.com/soywod/himalaya/issues/100
+[#126]: https://github.com/soywod/himalaya/issues/126

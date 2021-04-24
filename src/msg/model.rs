@@ -11,9 +11,12 @@ use std::{borrow::Cow, fmt, fs, path::PathBuf, result};
 use tree_magic;
 use uuid::Uuid;
 
-use crate::config::model::{Account, Config};
-use crate::flag::model::{Flag, Flags};
-use crate::table::{self, DisplayRow, DisplayTable};
+use crate::{
+    config::model::{Account, Config},
+    flag::model::{Flag, Flags},
+    output::fmt::{get_output_fmt, OutputFmt, Response},
+    table::{self, DisplayRow, DisplayTable},
+};
 
 error_chain! {
     foreign_links {
@@ -29,7 +32,17 @@ pub struct Tpl(String);
 
 impl fmt::Display for Tpl {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
+        unsafe {
+            match get_output_fmt() {
+                &OutputFmt::Plain => {
+                    writeln!(f, "{}", self.0)
+                }
+                &OutputFmt::Json => {
+                    let res = serde_json::to_string(&Response::new(self)).unwrap();
+                    write!(f, "{}", res)
+                }
+            }
+        }
     }
 }
 
@@ -118,7 +131,17 @@ impl Serialize for ReadableMsg {
 
 impl fmt::Display for ReadableMsg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.content)
+        unsafe {
+            match get_output_fmt() {
+                &OutputFmt::Plain => {
+                    writeln!(f, "{}", self.content)
+                }
+                &OutputFmt::Json => {
+                    let res = serde_json::to_string(&Response::new(self)).unwrap();
+                    write!(f, "{}", res)
+                }
+            }
+        }
     }
 }
 
@@ -375,7 +398,7 @@ impl<'m> Msg<'m> {
     }
 
     pub fn build_new_tpl(config: &Config, account: &Account) -> Result<Tpl> {
-        let msg_spec = MsgSpec{
+        let msg_spec = MsgSpec {
             in_reply_to: None,
             to: None,
             cc: None,
@@ -389,11 +412,11 @@ impl<'m> Msg<'m> {
         let msg = &self.parse()?;
         let headers = msg.get_headers();
         let to = headers
-                .get_first_value("reply-to")
-                .or(headers.get_first_value("from"));
+            .get_first_value("reply-to")
+            .or(headers.get_first_value("from"));
         let to = match to {
-            Some(t) => {Some(vec![t])},
-            None => {None},
+            Some(t) => Some(vec![t]),
+            None => None,
         };
 
         let thread = self // Original msg prepend with ">"
@@ -403,7 +426,7 @@ impl<'m> Msg<'m> {
             .map(|line| format!(">{}", line))
             .collect::<Vec<String>>();
 
-        let msg_spec = MsgSpec{
+        let msg_spec = MsgSpec {
             in_reply_to: headers.get_first_value("message-id"),
             to,
             cc: None,
@@ -455,12 +478,14 @@ impl<'m> Msg<'m> {
         };
 
         // "Cc" header
-        let cc = Some(headers
-            .get_all_values("cc")
-            .iter()
-            .flat_map(|addrs| addrs.split(","))
-            .map(|addr| addr.trim().to_string())
-            .collect::<Vec<String>>());
+        let cc = Some(
+            headers
+                .get_all_values("cc")
+                .iter()
+                .flat_map(|addrs| addrs.split(","))
+                .map(|addr| addr.trim().to_string())
+                .collect::<Vec<String>>(),
+        );
 
         // Original msg prepend with ">"
         let thread = self
@@ -469,7 +494,7 @@ impl<'m> Msg<'m> {
             .map(|line| format!(">{}", line))
             .collect::<Vec<String>>();
 
-        let msg_spec = MsgSpec{
+        let msg_spec = MsgSpec {
             in_reply_to: headers.get_first_value("message-id"),
             cc,
             to: Some(vec![reply_to, to].concat()),
@@ -483,13 +508,18 @@ impl<'m> Msg<'m> {
         let msg = &self.parse()?;
         let headers = msg.get_headers();
 
-        let subject = format!("Fwd: {}", headers.get_first_value("subject").unwrap_or_else(String::new));
+        let subject = format!(
+            "Fwd: {}",
+            headers
+                .get_first_value("subject")
+                .unwrap_or_else(String::new)
+        );
         let original_msg = vec![
             "-------- Forwarded Message --------".to_string(),
             self.text_bodies("text/plain")?,
         ];
 
-        let msg_spec = MsgSpec{
+        let msg_spec = MsgSpec {
             in_reply_to: None,
             cc: None,
             to: None,
@@ -520,10 +550,17 @@ impl<'m> Msg<'m> {
     }
 
     fn add_to_header(tpl: &mut Vec<String>, to: Option<Vec<String>>) {
-        tpl.push(format!("To: {}", match to {
-            Some(t) => {t.join(", ")}
-            None => {String::new()}
-        }));
+        tpl.push(format!(
+            "To: {}",
+            match to {
+                Some(t) => {
+                    t.join(", ")
+                }
+                None => {
+                    String::new()
+                }
+            }
+        ));
     }
 
     fn add_subject_header(tpl: &mut Vec<String>, subject: Option<String>) {
@@ -619,6 +656,16 @@ impl<'m> From<&'m imap::types::ZeroCopy<Vec<imap::types::Fetch>>> for Msgs<'m> {
 
 impl<'m> fmt::Display for Msgs<'m> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "\n{}", self.to_table())
+        unsafe {
+            match get_output_fmt() {
+                &OutputFmt::Plain => {
+                    writeln!(f, "\n{}", self.to_table())
+                }
+                &OutputFmt::Json => {
+                    let res = serde_json::to_string(&Response::new(self)).unwrap();
+                    write!(f, "{}", res)
+                }
+            }
+        }
     }
 }

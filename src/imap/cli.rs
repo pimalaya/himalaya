@@ -25,13 +25,13 @@ pub fn imap_matches(
     matches: &ArgMatches,
 ) -> Result<bool> {
     if let Some(_) = matches.subcommand_matches("idle") {
-        debug!("[imap::cli::matches] idle command matched");
+        debug!("idle command matched");
         let mut imap_conn = ImapConnector::new(&account)?;
         imap_conn.idle(&config, &mbox)?;
         imap_conn.logout();
         return Ok(true);
     }
 
-    debug!("[imap::cli::matches] nothing matched");
+    debug!("nothing matched");
     Ok(false)
 }

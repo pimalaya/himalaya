@@ -43,6 +43,8 @@ pub struct Account {
 
 impl Account {
     pub fn imap_addr(&self) -> (&str, u16) {
+        debug!("host: {}", self.imap_host);
+        debug!("port: {}", self.imap_port);
         (&self.imap_host, self.imap_port)
     }
 
@@ -56,17 +58,23 @@ impl Account {
     }
 
     pub fn imap_starttls(&self) -> bool {
-        match self.imap_starttls {
+        let starttls = match self.imap_starttls {
             Some(true) => true,
             _ => false,
-        }
+        };
+
+        debug!("STARTTLS: {}", starttls);
+        starttls
     }
 
     pub fn imap_insecure(&self) -> bool {
-        match self.imap_insecure {
+        let insecure = match self.imap_insecure {
             Some(true) => true,
             _ => false,
-        }
+        };
+
+        debug!("insecure: {}", insecure);
+        insecure
     }
 
     pub fn smtp_creds(&self) -> Result<SmtpCredentials> {

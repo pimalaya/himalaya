@@ -60,30 +60,32 @@ fn run() -> Result<()> {
     let matches = app.get_matches();
 
     let output_fmt: OutputFmt = matches.value_of("output").unwrap().into();
-    let log_level: LogLevel = matches.value_of("log").unwrap().into();
-    let custom_config: Option<PathBuf> = matches.value_of("config").map(|s| s.into());
+    let log_level: LogLevel = matches.value_of("log-level").unwrap().into();
     init_logger(&output_fmt, &log_level)?;
-    debug!("[main] output format: {}", output_fmt);
-    debug!("[main] log level: {}", log_level);
-    debug!("[main] custom config path: {:?}", custom_config);
+    debug!("output format: {}", output_fmt);
+    debug!("log level: {}", log_level);
 
+    // Check completion matches before the config init
     if comp_matches(build_app(), &matches)? {
         return Ok(());
     }
 
-    debug!("[main] init config");
+    let custom_config: Option<PathBuf> = matches.value_of("config").map(|s| s.into());
+    debug!("custom config path: {:?}", custom_config);
+
+    debug!("init config");
     let config = Config::new(custom_config)?;
-    trace!("[main] {:#?}", config);
+    trace!("config: {:?}", config);
 
     let account_name = matches.value_of("account");
-    debug!("[main] find {} account", account_name.unwrap_or("default"));
+    debug!("init account: {}", account_name.unwrap_or("default"));
     let account = config.find_account_by_name(account_name)?;
-    trace!("[main] {:#?}", account);
+    trace!("account: {:?}", account);
 
     let mbox = matches.value_of("mailbox").unwrap();
-    debug!("[main] mailbox: {}", mbox);
+    debug!("mailbox: {}", mbox);
 
-    debug!("[main] begin matching");
+    debug!("begin matching");
     let _matched = mbox_matches(&account, &matches)?
         || flag_matches(&account, &mbox, &matches)?
         || imap_matches(&config, &account, &mbox, &matches)?

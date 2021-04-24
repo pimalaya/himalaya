@@ -1,11 +1,12 @@
 [package]
 name = "himalaya"
-description = "📫 Minimalist CLI email client"
+description = "📫 The CLI email client."
 version = "0.2.6"
 authors = ["soywod <clement.douin@posteo.net>"]
 edition = "2018"
 
 [dependencies]
+chrono = "0.4.19"
 clap = {version = "2.33.3", default-features = false, features = ["suggestions"]}
 env_logger = "0.8.3"
 error-chain = "0.12.4"

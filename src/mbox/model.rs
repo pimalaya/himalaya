@@ -2,7 +2,10 @@ use imap;
 use serde::Serialize;
 use std::fmt;
 
-use crate::table::{self, DisplayRow, DisplayTable};
+use crate::{
+    output::fmt::{get_output_fmt, OutputFmt, Response},
+    table::{self, DisplayRow, DisplayTable},
+};
 
 // Mbox
 
@@ -58,6 +61,16 @@ impl<'a> DisplayTable<'a, Mbox> for Mboxes {
 
 impl fmt::Display for Mboxes {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "\n{}", self.to_table())
+        unsafe {
+            match get_output_fmt() {
+                &OutputFmt::Plain => {
+                    writeln!(f, "\n{}", self.to_table())
+                }
+                &OutputFmt::Json => {
+                    let res = serde_json::to_string(&Response::new(self)).unwrap();
+                    write!(f, "{}", res)
+                }
+            }
+        }
     }
 }

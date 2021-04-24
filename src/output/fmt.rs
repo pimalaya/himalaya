@@ -1,6 +1,7 @@
+use serde::Serialize;
 use std::fmt;
 
-static mut OUTPUT_FMT: &'static OutputFmt = &OutputFmt::Plain;
+pub static mut OUTPUT_FMT: &'static OutputFmt = &OutputFmt::Plain;
 
 pub fn set_output_fmt(output_fmt: &'static OutputFmt) {
     unsafe { OUTPUT_FMT = output_fmt }
@@ -34,5 +35,31 @@ impl fmt::Display for OutputFmt {
                 OutputFmt::Plain => "PLAIN",
             },
         )
+    }
+}
+
+#[derive(Serialize)]
+pub struct Response<T: Serialize + fmt::Display> {
+    response: T,
+}
+
+impl<T: Serialize + fmt::Display> Response<T> {
+    pub fn new(response: T) -> Self {
+        Self { response }
+    }
+}
+
+impl<T: Serialize + fmt::Display> fmt::Display for Response<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        unsafe {
+            match get_output_fmt() {
+                &OutputFmt::Plain => {
+                    writeln!(f, "{}", self.response)
+                }
+                &OutputFmt::Json => {
+                    write!(f, "{}", serde_json::to_string(self).unwrap())
+                }
+            }
+        }
     }
 }

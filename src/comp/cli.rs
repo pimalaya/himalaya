@@ -15,17 +15,17 @@ pub fn comp_subcmds<'s>() -> Vec<App<'s, 's>> {
 
 pub fn comp_matches(mut app: App, matches: &ArgMatches) -> Result<bool> {
     if let Some(matches) = matches.subcommand_matches("completion") {
-        debug!("[comp::cli::matches] completion command matched");
+        debug!("completion command matched");
         let shell = match matches.value_of("shell").unwrap() {
             "fish" => Shell::Fish,
             "zsh" => Shell::Zsh,
             "bash" | _ => Shell::Bash,
         };
-        debug!("[comp::cli::matches] shell: {}", shell);
+        debug!("shell: {}", shell);
         app.gen_completions_to("himalaya", shell, &mut io::stdout());
         return Ok(true);
     };
 
-    debug!("[comp::cli::matches] nothing matched");
+    debug!("nothing matched");
     Ok(false)
 }

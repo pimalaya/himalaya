@@ -48,13 +48,13 @@ pub fn flag_subcmds<'s>() -> Vec<App<'s, 's>> {
 
 pub fn flag_matches(account: &Account, mbox: &str, matches: &ArgMatches) -> Result<bool> {
     if let Some(matches) = matches.subcommand_matches("set") {
-        debug!("[flag::cli::matches] set command matched");
+        debug!("set command matched");
 
         let uid = matches.value_of("uid").unwrap();
-        debug!("[flag::cli::matches] uid: {}", uid);
+        debug!("uid: {}", uid);
 
         let flags = matches.value_of("flags").unwrap();
-        debug!("[flag::cli::matches] flags: {}", flags);
+        debug!("flags: {}", flags);
 
         let mut imap_conn = ImapConnector::new(&account)?;
         imap_conn.set_flags(mbox, uid, flags)?;
@@ -64,13 +64,13 @@ pub fn flag_matches(account: &Account, mbox: &str, matches: &ArgMatches) -> Resu
     }
 
     if let Some(matches) = matches.subcommand_matches("add") {
-        debug!("[flag::cli::matches] add command matched");
+        debug!("add command matched");
 
         let uid = matches.value_of("uid").unwrap();
-        debug!("[flag::cli::matches] uid: {}", uid);
+        debug!("uid: {}", uid);
 
         let flags = matches.value_of("flags").unwrap();
-        debug!("[flag::cli::matches] flags: {}", flags);
+        debug!("flags: {}", flags);
 
         let mut imap_conn = ImapConnector::new(&account)?;
         imap_conn.add_flags(mbox, uid, flags)?;
@@ -80,13 +80,13 @@ pub fn flag_matches(account: &Account, mbox: &str, matches: &ArgMatches) -> Resu
     }
 
     if let Some(matches) = matches.subcommand_matches("remove") {
-        debug!("[flag::cli::matches] remove command matched");
+        debug!("remove command matched");
 
         let uid = matches.value_of("uid").unwrap();
-        debug!("[flag::cli::matches] uid: {}", uid);
+        debug!("uid: {}", uid);
 
         let flags = matches.value_of("flags").unwrap();
-        debug!("[flag::cli::matches] flags: {}", flags);
+        debug!("flags: {}", flags);
 
         let mut imap_conn = ImapConnector::new(&account)?;
         imap_conn.remove_flags(mbox, uid, flags)?;
@@ -95,6 +95,6 @@ pub fn flag_matches(account: &Account, mbox: &str, matches: &ArgMatches) -> Resu
         return Ok(true);
     }
 
-    debug!("[flag::cli::matches] nothing matched");
+    debug!("nothing matched");
     Ok(false)
 }

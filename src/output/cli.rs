@@ -9,8 +9,9 @@ pub fn output_args<'a>() -> Vec<Arg<'a, 'a>> {
             .value_name("FMT")
             .possible_values(&["plain", "json"])
             .default_value("plain"),
-        Arg::with_name("log")
-            .long("log")
+        Arg::with_name("log-level")
+            .long("log-level")
+            .alias("log")
             .short("l")
             .help("Defines the logs level")
             .value_name("LEVEL")

@@ -1,30 +1,12 @@
+use chrono::Local;
+use env_logger;
 use error_chain::error_chain;
 use log::{self, Level, LevelFilter, Metadata, Record};
-use std::fmt;
+use std::{fmt, io::Write};
 
 use super::fmt::{set_output_fmt, OutputFmt};
 
 error_chain! {}
-
-// Macros
-
-#[macro_export]
-macro_rules! info {
-    ($t:expr) => {
-        use crate::output::fmt::{get_output_fmt, OutputFmt};
-        use log::info as log_info;
-        unsafe {
-            match get_output_fmt() {
-                OutputFmt::Plain => log_info!("{}", $t.to_string()),
-                OutputFmt::Json => {
-                    // Should be safe enough to `.unwrap()` since it's
-                    // formatted by Himalaya itself
-                    log_info!("{{\"response\":{}}}", serde_json::to_string($t).unwrap())
-                }
-            };
-        }
-    };
-}
 
 // Log level struct
 
@@ -95,16 +77,32 @@ impl log::Log for JsonLogger {
 // Init
 
 pub fn init(fmt: &OutputFmt, level: &LogLevel) -> Result<()> {
-    log::set_logger(match fmt {
+    match fmt {
         &OutputFmt::Plain => {
             set_output_fmt(&OutputFmt::Plain);
-            &PlainLogger
         }
         &OutputFmt::Json => {
             set_output_fmt(&OutputFmt::Json);
-            &JsonLogger
         }
-    })
-    .map(|()| log::set_max_level(level.0))
-    .chain_err(|| "Could not init logger")
+    };
+
+    env_logger::Builder::new()
+        .format(|buf, record| {
+            if let log::Level::Info = record.metadata().level() {
+                write!(buf, "{}", record.args())
+            } else {
+                writeln!(
+                    buf,
+                    "[{} {:5} {}] {}",
+                    Local::now().format("%Y-%m-%dT%H:%M:%S"),
+                    record.metadata().level(),
+                    record.module_path().unwrap_or_default(),
+                    record.args()
+                )
+            }
+        })
+        .filter_level(level.0)
+        .init();
+
+    Ok(())
 }
