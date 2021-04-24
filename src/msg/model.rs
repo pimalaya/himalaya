@@ -1,5 +1,6 @@
 use error_chain::error_chain;
 use lettre;
+use log::warn;
 use mailparse::{self, MailHeaderMap};
 use rfc2047_decoder;
 use serde::{
@@ -253,6 +254,7 @@ impl<'m> Msg<'m> {
             {Body, Message, MultiPart, SinglePart},
         };
 
+        let mut encoding = ContentTransferEncoding::Base64;
         let parsed = self.parse()?;
         let msg_builder = parsed.headers.iter().fold(Message::builder(), |msg, h| {
             let value = String::from_utf8(h.get_value_raw().to_vec())
@@ -284,13 +286,23 @@ impl<'m> Msg<'m> {
                         Err(_) => msg,
                     }),
                 "subject" => msg.subject(value),
+                "content-transfer-encoding" => {
+                    match value.to_lowercase().as_str() {
+                        "8bit" => encoding = ContentTransferEncoding::EightBit,
+                        "7bit" => encoding = ContentTransferEncoding::SevenBit,
+                        "quoted-printable" => encoding = ContentTransferEncoding::QuotedPrintable,
+                        "base64" => encoding = ContentTransferEncoding::Base64,
+                        _ => warn!("unsupported encoding, we use base64 for your message"),
+                    }
+                    msg
+                }
                 _ => msg,
             }
         });
 
         let text_part = SinglePart::builder()
             .header(ContentType("text/plain; charset=utf-8".parse().unwrap()))
-            .header(ContentTransferEncoding::Base64)
+            .header(encoding)
             .body(parsed.get_body_raw()?);
 
         let msg = if self.attachments.is_empty() {
@@ -489,7 +501,6 @@ impl<'m> Msg<'m> {
 
     fn add_content_headers(tpl: &mut Vec<String>) {
         tpl.push("Content-Type: text/plain; charset=utf-8".to_string());
-        tpl.push("Content-Transfer-Encoding: 8bit".to_string());
     }
 
     fn add_from_header(tpl: &mut Vec<String>, from: Option<String>) {
