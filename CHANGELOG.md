@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Plain logger with `env_logger` [#126]
+- Refresh email list on load buffer [#125]
 
 ### Fixed
 
@@ -197,4 +198,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#89]: https://github.com/soywod/himalaya/issues/89
 [#96]: https://github.com/soywod/himalaya/issues/96
 [#100]: https://github.com/soywod/himalaya/issues/100
+[#125]: https://github.com/soywod/himalaya/issues/125
 [#126]: https://github.com/soywod/himalaya/issues/126

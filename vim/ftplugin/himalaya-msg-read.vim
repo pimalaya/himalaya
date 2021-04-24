@@ -4,7 +4,6 @@ setlocal cursorline
 setlocal foldexpr=himalaya#shared#thread#fold(v:lnum)
 setlocal foldmethod=expr
 setlocal nomodifiable
-setlocal startofline
 
 call himalaya#shared#bindings#define([
   \["n", "gw", "msg#write"      ],

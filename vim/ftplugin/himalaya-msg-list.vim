@@ -1,8 +1,8 @@
+setlocal bufhidden=wipe
 setlocal buftype=nofile
 setlocal cursorline
 setlocal nomodifiable
 setlocal nowrap
-setlocal startofline
 
 call himalaya#shared#bindings#define([
   \["n", "gm"  , "mbox#input"     ],

@@ -19,6 +19,7 @@ function! s:format_msg_for_list(msg)
 endfunction
 
 function! himalaya#msg#list_with(mbox, page, should_throw)
+  let pos = getpos(".")
   let msgs = s:cli("--mailbox %s list --page %d", [shellescape(a:mbox), a:page], printf("Fetching %s messages", a:mbox), a:should_throw)
   let msgs = map(msgs, "s:format_msg_for_list(v:val)")
   let buftype = stridx(bufname("%"), "Himalaya messages") == 0 ? "file" : "edit"
@@ -30,22 +31,24 @@ function! himalaya#msg#list_with(mbox, page, should_throw)
   setlocal filetype=himalaya-msg-list
   let &modified = 0
   execute 0
+  call setpos('.', pos)
 endfunction
 
 function! himalaya#msg#list()
-  " try
+  try
     let mbox = himalaya#mbox#curr_mbox()
     let page = himalaya#mbox#curr_page()
     call himalaya#msg#list_with(mbox, page, 0)
-  " catch
-  "   if !empty(v:exception)
-  "     redraw | call himalaya#shared#log#err(v:exception)
-  "   endif
-  " endtry
+  catch
+    if !empty(v:exception)
+      redraw | call himalaya#shared#log#err(v:exception)
+    endif
+  endtry
 endfunction
 
 function! himalaya#msg#read()
   try
+    let pos = getpos(".")
     let s:msg_id = s:get_focused_msg_id()
     let mbox = himalaya#mbox#curr_mbox()
     let msg = s:cli("--mailbox %s read %d", [shellescape(mbox), s:msg_id], printf("Fetching message %d", s:msg_id), 0)
@@ -58,6 +61,7 @@ function! himalaya#msg#read()
     setlocal filetype=himalaya-msg-read
     let &modified = 0
     execute 0
+    call setpos('.', pos)
   catch
     if !empty(v:exception)
       redraw | call himalaya#shared#log#err(v:exception)
@@ -67,6 +71,7 @@ endfunction
 
 function! himalaya#msg#write()
   try
+    let pos = getpos(".")
     let msg = s:cli("template new", [], "Fetching new template", 0)
     silent! edit Himalaya write
     call append(0, split(substitute(msg.template, "\r", "", "g"), "\n"))
@@ -74,6 +79,7 @@ function! himalaya#msg#write()
     setlocal filetype=himalaya-msg-write
     let &modified = 0
     execute 0
+    call setpos('.', pos)
   catch
     if !empty(v:exception)
       redraw | call himalaya#shared#log#err(v:exception)
@@ -83,6 +89,7 @@ endfunction
 
 function! himalaya#msg#reply()
   try
+    let pos = getpos(".")
     let mbox = himalaya#mbox#curr_mbox()
     let msg_id = stridx(bufname("%"), "Himalaya messages") == 0 ? s:get_focused_msg_id() : s:msg_id
     let msg = s:cli("--mailbox %s template reply %d", [shellescape(mbox), msg_id], "Fetching reply template", 0)
@@ -92,6 +99,7 @@ function! himalaya#msg#reply()
     setlocal filetype=himalaya-msg-write
     let &modified = 0
     execute 0
+    call setpos('.', pos)
   catch
     if !empty(v:exception)
       redraw | call himalaya#shared#log#err(v:exception)
@@ -101,6 +109,7 @@ endfunction
 
 function! himalaya#msg#reply_all()
   try
+    let pos = getpos(".")
     let mbox = himalaya#mbox#curr_mbox()
     let msg_id = stridx(bufname("%"), "Himalaya messages") == 0 ? s:get_focused_msg_id() : s:msg_id
     let msg = s:cli("--mailbox %s template reply %d --all", [shellescape(mbox), msg_id], "Fetching reply all template", 0)
@@ -110,6 +119,7 @@ function! himalaya#msg#reply_all()
     setlocal filetype=himalaya-msg-write
     let &modified = 0
     execute 0
+    call setpos('.', pos)
   catch
     if !empty(v:exception)
       redraw | call himalaya#shared#log#err(v:exception)
@@ -119,6 +129,7 @@ endfunction
 
 function! himalaya#msg#forward()
   try
+    let pos = getpos(".")
     let mbox = himalaya#mbox#curr_mbox()
     let msg_id = stridx(bufname("%"), "Himalaya messages") == 0 ? s:get_focused_msg_id() : s:msg_id
     let msg = s:cli("--mailbox %s template forward %d", [shellescape(mbox), msg_id], "Fetching forward template", 0)
@@ -128,6 +139,7 @@ function! himalaya#msg#forward()
     setlocal filetype=himalaya-msg-write
     let &modified = 0
     execute 0
+    call setpos('.', pos)
   catch
     if !empty(v:exception)
       redraw | call himalaya#shared#log#err(v:exception)
