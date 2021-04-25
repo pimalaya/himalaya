@@ -95,71 +95,70 @@ impl<'ic> ImapConnector<'ic> {
     }
 
     fn search_new_msgs(&mut self) -> Result<Vec<u32>> {
-        debug!("[imap::model::search_new_msgs] begin");
-
-        let seqs: Vec<u32> = self
+        let uids: Vec<u32> = self
             .sess
-            .search("NEW")
+            .uid_search("NEW")
             .chain_err(|| "Could not search new messages")?
             .into_iter()
             .collect();
-        debug!(
-            "[imap::model::search_new_msgs] found {} new messages",
-            seqs.len()
-        );
-        trace!("[imap::model::search_new_msgs] {:?}", seqs);
+        debug!("found {} new messages", uids.len());
+        trace!("uids: {:?}", uids);
 
-        Ok(seqs)
+        Ok(uids)
     }
 
     pub fn idle(&mut self, config: &Config, mbox: &str) -> Result<()> {
-        debug!("begin");
-
-        debug!("examine mailbox {}", mbox);
+        debug!("examine mailbox: {}", mbox);
         self.sess
             .examine(mbox)
             .chain_err(|| format!("Could not examine mailbox `{}`", mbox))?;
 
-        debug!("init message hashset");
-        let mut msg_set: HashSet<u32> = HashSet::from_iter(self.search_new_msgs()?.iter().cloned());
-        trace!("{:?}", msg_set);
+        debug!("init messages hashset");
+        let mut msgs_set: HashSet<u32> =
+            HashSet::from_iter(self.search_new_msgs()?.iter().cloned());
+        trace!("messages hashset: {:?}", msgs_set);
 
         loop {
             debug!("begin loop");
-
             self.sess
                 .idle()
-                .and_then(|idle| idle.wait_keepalive())
-                .chain_err(|| "Could not enter in idle mode")?;
+                .and_then(|mut idle| {
+                    idle.set_keepalive(std::time::Duration::new(300, 0));
+                    idle.wait_keepalive()
+                })
+                .chain_err(|| "Could not start the idle mode")?;
 
-            let new_msgs: Vec<u32> = self
+            let uids: Vec<u32> = self
                 .search_new_msgs()?
                 .into_iter()
-                .filter(|seq| msg_set.get(&seq).is_none())
+                .filter(|uid| msgs_set.get(&uid).is_none())
                 .collect();
-            debug!("found {} new messages not in hashset", new_msgs.len());
-            trace!("messages: {:?}", new_msgs);
+            debug!("found {} new messages not in hashset", uids.len());
+            trace!("messages hashet: {:?}", msgs_set);
 
-            if !new_msgs.is_empty() {
-                let new_msgs = new_msgs
+            if !uids.is_empty() {
+                let uids = uids
                     .iter()
-                    .map(|seq| seq.to_string())
+                    .map(|uid| uid.to_string())
                     .collect::<Vec<_>>()
                     .join(",");
                 let fetches = self
                     .sess
-                    .fetch(new_msgs, "(ENVELOPE)")
-                    .chain_err(|| "Cannot fetch new messages enveloppe")?;
+                    .uid_fetch(uids, "(ENVELOPE)")
+                    .chain_err(|| "Could not fetch new messages enveloppe")?;
 
                 for fetch in fetches.iter() {
                     let msg = Msg::from(fetch);
+                    let uid = fetch.uid.ok_or_else(|| {
+                        format!("Could not retrieve message {}'s UID", fetch.message)
+                    })?;
                     config.run_notify_cmd(&msg.subject, &msg.sender)?;
-                    debug!("notify message {}", fetch.message);
+                    debug!("notify message: {}", uid);
                     trace!("message: {:?}", msg);
 
-                    debug!("insert msg {} to hashset", fetch.message);
-                    msg_set.insert(fetch.message);
-                    trace!("messages: {:?}", msg_set);
+                    debug!("insert message {} in hashset", uid);
+                    msgs_set.insert(uid);
+                    trace!("messages hashset: {:?}", msgs_set);
                 }
             }
 
