@@ -13,6 +13,7 @@ mod msg;
 mod output;
 mod smtp;
 mod table;
+mod table2;
 
 use crate::{
     comp::cli::{comp_matches, comp_subcmds},
