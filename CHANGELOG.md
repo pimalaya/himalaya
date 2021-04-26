@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improve config compatibility on Windows [#111](https://github.com/soywod/himalaya/pull/111)
 - Vim table containing emoji [#122]
 - IDLE mode after network interruption [#123]
+- Output redirected to `stderr` [#130]
 
 ## [0.2.6] - 2021-04-17
 
@@ -207,3 +208,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#123]: https://github.com/soywod/himalaya/issues/123
 [#125]: https://github.com/soywod/himalaya/issues/125
 [#126]: https://github.com/soywod/himalaya/issues/126
+[#130]: https://github.com/soywod/himalaya/issues/130

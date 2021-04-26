@@ -1,14 +1,14 @@
 use chrono::Local;
 use env_logger;
 use error_chain::error_chain;
-use log::{self, Level, LevelFilter, Metadata, Record};
-use std::{fmt, io::Write};
+use log::{self, debug, Level, LevelFilter};
+use std::{fmt, io, io::Write, ops::Deref};
 
 use super::fmt::{set_output_fmt, OutputFmt};
 
 error_chain! {}
 
-// Log level struct
+// Log level wrapper
 
 pub struct LogLevel(pub LevelFilter);
 
@@ -26,83 +26,58 @@ impl From<&str> for LogLevel {
 
 impl fmt::Display for LogLevel {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0.to_string())
+        write!(f, "{}", self.deref())
     }
 }
 
-// Plain logger
+impl Deref for LogLevel {
+    type Target = LevelFilter;
 
-pub struct PlainLogger;
-
-impl log::Log for PlainLogger {
-    fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= Level::Trace
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
-
-    fn log(&self, record: &Record) {
-        if self.enabled(record.metadata()) {
-            if let Level::Error = record.level() {
-                eprintln!("{}", record.args());
-            } else {
-                println!("{}", record.args());
-            }
-        }
-    }
-
-    fn flush(&self) {}
-}
-
-// JSON logger
-
-pub struct JsonLogger;
-
-impl log::Log for JsonLogger {
-    fn enabled(&self, metadata: &Metadata) -> bool {
-        [Level::Error, Level::Info].contains(&metadata.level())
-    }
-
-    fn log(&self, record: &Record) {
-        if self.enabled(record.metadata()) {
-            if let Level::Error = record.level() {
-                eprintln!("{}", record.args());
-            } else {
-                print!("{}", record.args());
-            }
-        }
-    }
-
-    fn flush(&self) {}
 }
 
 // Init
 
-pub fn init(fmt: &OutputFmt, level: &LogLevel) -> Result<()> {
+pub fn init(fmt: OutputFmt, filter: LogLevel) -> Result<()> {
+    let level_filter = filter.deref();
+    let level = level_filter.to_level();
+
     match fmt {
-        &OutputFmt::Plain => {
+        OutputFmt::Plain => {
             set_output_fmt(&OutputFmt::Plain);
         }
-        &OutputFmt::Json => {
+        OutputFmt::Json => {
             set_output_fmt(&OutputFmt::Json);
         }
     };
 
     env_logger::Builder::new()
-        .format(|buf, record| {
-            if let log::Level::Info = record.metadata().level() {
-                write!(buf, "{}", record.args())
-            } else {
+        .target(env_logger::Target::Stdout)
+        .format(move |buf, record| match level {
+            None => Ok(()),
+            Some(Level::Info) => match record.metadata().level() {
+                Level::Info => write!(buf, "{}", record.args()),
+                Level::Error => writeln!(&mut io::stderr(), "{}", record.args()),
+                _ => writeln!(buf, "{}", record.args()),
+            },
+            _ => {
                 writeln!(
                     buf,
                     "[{} {:5} {}] {}",
                     Local::now().format("%Y-%m-%dT%H:%M:%S"),
                     record.metadata().level(),
                     record.module_path().unwrap_or_default(),
-                    record.args()
+                    record.args(),
                 )
             }
         })
-        .filter_level(level.0)
+        .filter_level(*level_filter)
         .init();
+
+    debug!("output format: {}", fmt);
+    debug!("log level: {}", filter);
 
     Ok(())
 }

@@ -1,7 +1,7 @@
 use clap;
 use error_chain::error_chain;
 use log::{debug, error, trace};
-use std::{env, path::PathBuf};
+use std::{env, path::PathBuf, process::exit};
 
 mod comp;
 mod config;
@@ -61,9 +61,7 @@ fn run() -> Result<()> {
 
     let output_fmt: OutputFmt = matches.value_of("output").unwrap().into();
     let log_level: LogLevel = matches.value_of("log-level").unwrap().into();
-    init_logger(&output_fmt, &log_level)?;
-    debug!("output format: {}", output_fmt);
-    debug!("log level: {}", log_level);
+    init_logger(output_fmt, log_level)?;
 
     // Check completion matches before the config init
     if comp_matches(build_app(), &matches)? {
@@ -104,5 +102,8 @@ fn main() {
                 errs.for_each(|err| error!(" ↳ {}", err));
             }
         }
+        exit(1);
+    } else {
+        exit(0);
     }
 }
