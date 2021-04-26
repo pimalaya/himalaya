@@ -28,7 +28,7 @@ where
                 .collect::<Vec<_>>(),
         );
 
-        let table_width: usize = max_col_widths.iter().sum();
+        let table_width = max_col_widths.iter().sum::<usize>() + max_col_widths.len() * 2 - 1;
 
         table
             .into_iter()
@@ -38,18 +38,25 @@ where
                     .map(|(i, mut col)| {
                         if i == Self::shrink_col_index() && table_width > Self::max_width() {
                             let shrink_width = table_width - Self::max_width();
-                            let max_col_width =
-                                max_col_widths[i] - shrink_width - (max_col_widths.len() * 2) + 1;
+                            let max_col_width = max_col_widths[i] - shrink_width;
                             if max_col_width < UnicodeWidthStr::width(col.as_str()) {
-                                let end = col
-                                    .char_indices()
-                                    .map(|(i, _)| i)
-                                    .nth(max_col_width - 1)
-                                    .unwrap();
-                                println!("end: {}", end);
-                                let mut col = col[..end].to_string();
-                                col.push_str("… ");
-                                col
+                                let mut next_col = String::new();
+                                let mut cur = 0;
+
+                                for c in col.chars() {
+                                    let unicode_width =
+                                        UnicodeWidthStr::width(c.to_string().as_str());
+                                    if cur + unicode_width >= max_col_width {
+                                        break;
+                                    }
+
+                                    cur += unicode_width;
+                                    next_col.push(c);
+                                }
+
+                                next_col.push_str("… ");
+                                next_col.push_str(&" ".repeat(max_col_width - cur - 1));
+                                next_col
                             } else {
                                 let unicode_width = UnicodeWidthStr::width(col.as_str());
                                 let repeat_len = max_col_width - unicode_width + 1;
@@ -168,15 +175,24 @@ ID   |NAME   |DESC
     #[test]
     fn shrink() {
         let items = vec![
-            Item::new(1, "aaaaaaaaa", "aa"),
-            Item::new(2, "bbbbbbbbbbbbbbbbb", "bb"),
-            Item::new(3, "c", "cc"),
+            Item::new(1, "short", "desc"),
+            Item::new(2, "loooooong", "desc"),
+            Item::new(3, "shriiiiink", "desc"),
+            Item::new(4, "shriiiiiiiiiink", "desc"),
+            Item::new(5, "😍😍😍😍", "desc"),
+            Item::new(6, "😍😍😍😍😍", "desc"),
+            Item::new(7, "!😍😍😍😍😍", "desc"),
         ];
+
         let table = "
 ID |NAME      |DESC 
-1  |aaaaaaaaa |aa   
-2  |bbbbbbbb… |bb   
-3  |c         |cc   
+1  |short     |desc 
+2  |loooooong |desc 
+3  |shriiiii… |desc 
+4  |shriiiii… |desc 
+5  |😍😍😍😍  |desc 
+6  |😍😍😍😍… |desc 
+7  |!😍😍😍…  |desc 
 ";
 
         assert_eq!(String::from(table.trim_matches('\n')), Table::build(items));
