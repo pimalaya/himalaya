@@ -7,9 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- Replace `log-level` arg by default `RUST_LOG` env var [#130]
+## [0.3.0] - 2021-04-28
 
 ### Fixed
 
@@ -18,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactor table system [#132]
 - Editon file format on Linux [#133]
 - Show email address when name not available [#131]
+
+### Removed
+
+- `--log-level|-l` arg (replaced by default `RUST_LOG` env var from `env_logger`) [#130]
 
 ## [0.2.7] - 2021-04-24
 
@@ -154,15 +156,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.2.7...HEAD
-[0.2.7]: https://github.com/soywod/himalaya/compare/v0.2.7...v0.2.6
-[0.2.6]: https://github.com/soywod/himalaya/compare/v0.2.6...v0.2.5
-[0.2.5]: https://github.com/soywod/himalaya/compare/v0.2.5...v0.2.4
-[0.2.4]: https://github.com/soywod/himalaya/compare/v0.2.4...v0.2.3
-[0.2.3]: https://github.com/soywod/himalaya/compare/v0.2.3...v0.2.2
-[0.2.2]: https://github.com/soywod/himalaya/compare/v0.2.2...v0.2.1
-[0.2.1]: https://github.com/soywod/himalaya/compare/v0.2.1...v0.2.0
-[0.2.0]: https://github.com/soywod/himalaya/compare/v0.2.0...v0.1.0
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/soywod/himalaya/compare/v0.2.7...v0.3.0
+[0.2.7]: https://github.com/soywod/himalaya/compare/v0.2.6...v0.2.7
+[0.2.6]: https://github.com/soywod/himalaya/compare/v0.2.5...v0.2.6
+[0.2.5]: https://github.com/soywod/himalaya/compare/v0.2.4...v0.2.5
+[0.2.4]: https://github.com/soywod/himalaya/compare/v0.2.3...v0.2.4
+[0.2.3]: https://github.com/soywod/himalaya/compare/v0.2.2...v0.2.3
+[0.2.2]: https://github.com/soywod/himalaya/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/soywod/himalaya/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/soywod/himalaya/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/soywod/himalaya/releases/tag/v0.1.0
 
 [#1]: https://github.com/soywod/himalaya/issues/1
