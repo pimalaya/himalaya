@@ -262,9 +262,23 @@ impl<'m> From<&'m imap::types::Fetch> for Msg<'m> {
                 sender: envelope
                     .from
                     .as_ref()
-                    .and_then(|addrs| addrs.first()?.name)
-                    .and_then(|name| rfc2047_decoder::decode(name).ok())
-                    .unwrap_or_default(),
+                    .and_then(|addrs| addrs.first())
+                    .and_then(|addr| {
+                        addr.name
+                            .and_then(|name| rfc2047_decoder::decode(name).ok())
+                            .or_else(|| {
+                                let mbox = addr
+                                    .mailbox
+                                    .and_then(|mbox| String::from_utf8(mbox.to_vec()).ok())
+                                    .unwrap_or(String::from("unknown"));
+                                let host = addr
+                                    .host
+                                    .and_then(|host| String::from_utf8(host.to_vec()).ok())
+                                    .unwrap_or(String::from("unknown"));
+                                Some(format!("{}@{}", mbox, host))
+                            })
+                    })
+                    .unwrap_or(String::from("unknown")),
                 date: fetch
                     .internal_date()
                     .map(|date| date.naive_local().to_string())

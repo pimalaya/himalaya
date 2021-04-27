@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Output redirected to `stderr` [#130]
 - Refactor table system [#132]
 - Editon file format on Linux [#133]
+- Show email address when name not available [#131]
 
 ## [0.2.6] - 2021-04-17
 
@@ -211,5 +212,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#125]: https://github.com/soywod/himalaya/issues/125
 [#126]: https://github.com/soywod/himalaya/issues/126
 [#130]: https://github.com/soywod/himalaya/issues/130
+[#131]: https://github.com/soywod/himalaya/issues/131
 [#132]: https://github.com/soywod/himalaya/issues/132
 [#133]: https://github.com/soywod/himalaya/issues/133
