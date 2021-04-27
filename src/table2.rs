@@ -1,78 +1,218 @@
+use std::fmt;
 use unicode_width::UnicodeWidthStr;
+
+#[derive(Debug)]
+pub struct Style(u8, u8, u8);
+
+impl fmt::Display for Style {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Style(color, bright, shade) = self;
+        let mut style = String::from("\x1b[");
+
+        style.push_str(&color.to_string());
+
+        if *bright > 0 {
+            style.push_str(";");
+            style.push_str(&bright.to_string());
+        };
+
+        if *shade > 0 {
+            style.push_str(";");
+            style.push_str(&shade.to_string());
+        };
+
+        style.push_str("m");
+
+        write!(f, "{}", style)
+    }
+}
+
+#[derive(Debug)]
+pub struct Cell {
+    styles: Vec<Style>,
+    value: String,
+    shrinkable: bool,
+}
+
+impl Cell {
+    pub fn new<T: AsRef<str>>(value: T) -> Self {
+        Self {
+            styles: Vec::new(),
+            value: String::from(value.as_ref()),
+            shrinkable: false,
+        }
+    }
+
+    pub fn unicode_width(&self) -> usize {
+        UnicodeWidthStr::width(self.value.as_str())
+    }
+
+    pub fn shrinkable(mut self) -> Self {
+        self.shrinkable = true;
+        self
+    }
+
+    pub fn is_shrinkable(&self) -> bool {
+        self.shrinkable
+    }
+
+    pub fn bold(mut self) -> Self {
+        self.styles.push(Style(1, 0, 0));
+        self
+    }
+
+    pub fn underline(mut self) -> Self {
+        self.styles.push(Style(4, 0, 0));
+        self
+    }
+
+    pub fn red(mut self) -> Self {
+        self.styles.push(Style(31, 0, 0));
+        self
+    }
+
+    pub fn green(mut self) -> Self {
+        self.styles.push(Style(32, 0, 0));
+        self
+    }
+
+    pub fn yellow(mut self) -> Self {
+        self.styles.push(Style(33, 0, 0));
+        self
+    }
+
+    pub fn blue(mut self) -> Self {
+        self.styles.push(Style(34, 0, 0));
+        self
+    }
+
+    pub fn white(mut self) -> Self {
+        self.styles.push(Style(37, 0, 0));
+        self
+    }
+
+    pub fn ext(mut self, shade: u8) -> Self {
+        self.styles.push(Style(38, 5, shade));
+        self
+    }
+}
+
+impl fmt::Display for Cell {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for style in &self.styles {
+            write!(f, "{}", style)?;
+        }
+
+        write!(f, "{}", self.value)?;
+
+        if !self.styles.is_empty() {
+            write!(f, "{}", Style(0, 0, 0))?;
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct Row(pub Vec<Cell>);
+
+impl Row {
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+
+    pub fn cell(mut self, cell: Cell) -> Self {
+        self.0.push(cell);
+        self
+    }
+}
 
 pub trait Table
 where
     Self: Sized,
 {
-    fn head() -> Vec<String>;
-    fn row(&self) -> Vec<String>;
-    fn shrink_col_index() -> usize;
-    fn max_width() -> usize;
-    fn build(items: Vec<Self>) -> String {
+    fn head() -> Row;
+    fn row(&self) -> Row;
+
+    fn max_width() -> usize {
+        terminal_size::terminal_size()
+            .map(|(w, _)| w.0 as usize)
+            .unwrap_or_default()
+    }
+
+    fn build(items: &[Self]) -> Vec<Vec<String>> {
         let mut table = vec![Self::head()];
-        let mut max_col_widths: Vec<usize> = table[0]
-            .iter()
-            .map(|col| UnicodeWidthStr::width(col.as_str()))
-            .collect();
+        let mut cell_widths: Vec<usize> =
+            table[0].0.iter().map(|cell| cell.unicode_width()).collect();
         table.extend(
             items
                 .iter()
                 .map(|item| {
                     let row = item.row();
-                    row.iter().enumerate().for_each(|(i, col)| {
-                        let unicode_width = UnicodeWidthStr::width(col.as_str());
-                        max_col_widths[i] = max_col_widths[i].max(unicode_width);
+                    row.0.iter().enumerate().for_each(|(i, cell)| {
+                        cell_widths[i] = cell_widths[i].max(cell.unicode_width());
                     });
                     row
                 })
                 .collect::<Vec<_>>(),
         );
 
-        let table_width = max_col_widths.iter().sum::<usize>() + max_col_widths.len() * 2 - 1;
+        let spaces_plus_separators_len = cell_widths.len() * 2 - 1;
+        let table_width = cell_widths.iter().sum::<usize>() + spaces_plus_separators_len;
 
         table
-            .into_iter()
+            .iter_mut()
             .map(|row| {
-                row.into_iter()
+                row.0
+                    .iter_mut()
                     .enumerate()
-                    .map(|(i, mut col)| {
-                        if i == Self::shrink_col_index() && table_width > Self::max_width() {
-                            let shrink_width = table_width - Self::max_width();
-                            let max_col_width = max_col_widths[i] - shrink_width;
-                            if max_col_width < UnicodeWidthStr::width(col.as_str()) {
-                                let mut next_col = String::new();
-                                let mut cur = 0;
+                    .map(|(i, cell)| {
+                        let table_is_overflowing = table_width > Self::max_width();
 
-                                for c in col.chars() {
-                                    let unicode_width =
-                                        UnicodeWidthStr::width(c.to_string().as_str());
-                                    if cur + unicode_width >= max_col_width {
+                        if table_is_overflowing && cell.is_shrinkable() {
+                            let shrink_width = table_width - Self::max_width();
+                            let cell_width = cell_widths[i] - shrink_width;
+                            let cell_is_overflowing = cell.unicode_width() > cell_width;
+
+                            if cell_is_overflowing {
+                                let mut value = String::new();
+                                let mut chars_width = 0;
+
+                                for c in cell.value.chars() {
+                                    let char_width = UnicodeWidthStr::width(c.to_string().as_str());
+                                    if chars_width + char_width >= cell_width {
                                         break;
                                     }
 
-                                    cur += unicode_width;
-                                    next_col.push(c);
+                                    chars_width += char_width;
+                                    value.push(c);
                                 }
 
-                                next_col.push_str("… ");
-                                next_col.push_str(&" ".repeat(max_col_width - cur - 1));
-                                next_col
+                                value.push_str("… ");
+                                let repeat_count = cell_width - chars_width - 1;
+                                value.push_str(&" ".repeat(repeat_count));
+                                cell.value = value;
+                                cell.to_string()
                             } else {
-                                let unicode_width = UnicodeWidthStr::width(col.as_str());
-                                let repeat_len = max_col_width - unicode_width + 1;
-                                col.push_str(&" ".repeat(repeat_len));
-                                col
+                                let repeat_len = cell_width - cell.unicode_width() + 1;
+                                cell.value.push_str(&" ".repeat(repeat_len));
+                                cell.to_string()
                             }
                         } else {
-                            let unicode_width = UnicodeWidthStr::width(col.as_str());
-                            let repeat_len = max_col_widths[i] - unicode_width + 1;
-                            col.push_str(&" ".repeat(repeat_len));
-                            col
+                            let repeat_count = cell_widths[i] - cell.unicode_width() + 1;
+                            cell.value.push_str(&" ".repeat(repeat_count));
+                            cell.to_string()
                         }
                     })
                     .collect::<Vec<_>>()
-                    .join("|")
             })
+            .collect::<Vec<_>>()
+    }
+
+    fn render(items: &[Self]) -> String {
+        Self::build(items)
+            .iter()
+            .map(|row| row.join(&Cell::new("|").ext(8).to_string()))
             .collect::<Vec<_>>()
             .join("\n")
     }
@@ -80,7 +220,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::Table;
+    use super::*;
 
     struct Item {
         id: u16,
@@ -88,35 +228,29 @@ mod tests {
         desc: String,
     }
 
-    impl Item {
-        pub fn new(id: u16, name: &str, desc: &str) -> Self {
+    impl<'a> Item {
+        pub fn new(id: u16, name: &'a str, desc: &'a str) -> Self {
             Self {
                 id,
-                name: name.to_owned(),
-                desc: desc.to_owned(),
+                name: String::from(name),
+                desc: String::from(desc),
             }
         }
     }
 
     impl Table for Item {
-        fn head() -> Vec<String> {
-            vec![
-                String::from("ID"),
-                String::from("NAME"),
-                String::from("DESC"),
-            ]
+        fn head() -> Row {
+            Row::new()
+                .cell(Cell::new("ID"))
+                .cell(Cell::new("NAME").shrinkable())
+                .cell(Cell::new("DESC"))
         }
 
-        fn row(&self) -> Vec<String> {
-            vec![
-                self.id.to_string(),
-                self.name.to_owned(),
-                self.desc.to_owned(),
-            ]
-        }
-
-        fn shrink_col_index() -> usize {
-            1
+        fn row(&self) -> Row {
+            Row::new()
+                .cell(Cell::new(self.id.to_string()))
+                .cell(Cell::new(self.name.as_str()).shrinkable())
+                .cell(Cell::new(self.desc.as_str()))
         }
 
         fn max_width() -> usize {
@@ -131,14 +265,15 @@ mod tests {
             Item::new(2, "b", "bb"),
             Item::new(3, "c", "cc"),
         ];
-        let table = "
-ID |NAME |DESC 
-1  |a    |aa   
-2  |b    |bb   
-3  |c    |cc   
-";
 
-        assert_eq!(String::from(table.trim_matches('\n')), Table::build(items));
+        let table = vec![
+            vec!["ID ", "NAME ", "DESC "],
+            vec!["1  ", "a    ", "aa   "],
+            vec!["2  ", "b    ", "bb   "],
+            vec!["3  ", "c    ", "cc   "],
+        ];
+
+        assert_eq!(table, Table::build(&items));
     }
 
     #[test]
@@ -148,28 +283,30 @@ ID |NAME |DESC
             Item::new(2222, "bbbbb", "bbbbb"),
             Item::new(3, "c", "cc"),
         ];
-        let table = "
-ID   |NAME  |DESC  
-1    |a     |aa    
-2222 |bbbbb |bbbbb 
-3    |c     |cc    
-";
 
-        assert_eq!(String::from(table.trim_matches('\n')), Table::build(items));
+        let table = vec![
+            vec!["ID   ", "NAME  ", "DESC  "],
+            vec!["1    ", "a     ", "aa    "],
+            vec!["2222 ", "bbbbb ", "bbbbb "],
+            vec!["3    ", "c     ", "cc    "],
+        ];
+
+        assert_eq!(table, Table::build(&items));
 
         let items = vec![
             Item::new(1, "a", "aa"),
             Item::new(2222, "bbbbb", "bbbbb"),
             Item::new(3, "cccccc", "cc"),
         ];
-        let table = "
-ID   |NAME   |DESC  
-1    |a      |aa    
-2222 |bbbbb  |bbbbb 
-3    |cccccc |cc    
-";
 
-        assert_eq!(String::from(table.trim_matches('\n')), Table::build(items));
+        let table = vec![
+            vec!["ID   ", "NAME   ", "DESC  "],
+            vec!["1    ", "a      ", "aa    "],
+            vec!["2222 ", "bbbbb  ", "bbbbb "],
+            vec!["3    ", "cccccc ", "cc    "],
+        ];
+
+        assert_eq!(table, Table::build(&items));
     }
 
     #[test]
@@ -184,17 +321,17 @@ ID   |NAME   |DESC
             Item::new(7, "!😍😍😍😍😍", "desc"),
         ];
 
-        let table = "
-ID |NAME      |DESC 
-1  |short     |desc 
-2  |loooooong |desc 
-3  |shriiiii… |desc 
-4  |shriiiii… |desc 
-5  |😍😍😍😍  |desc 
-6  |😍😍😍😍… |desc 
-7  |!😍😍😍…  |desc 
-";
+        let table = vec![
+            vec!["ID ", "NAME      ", "DESC "],
+            vec!["1  ", "short     ", "desc "],
+            vec!["2  ", "loooooong ", "desc "],
+            vec!["3  ", "shriiiii… ", "desc "],
+            vec!["4  ", "shriiiii… ", "desc "],
+            vec!["5  ", "😍😍😍😍  ", "desc "],
+            vec!["6  ", "😍😍😍😍… ", "desc "],
+            vec!["7  ", "!😍😍😍…  ", "desc "],
+        ];
 
-        assert_eq!(String::from(table.trim_matches('\n')), Table::build(items));
+        assert_eq!(table, Table::build(&items));
     }
 }
