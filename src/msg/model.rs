@@ -16,7 +16,7 @@ use crate::{
     config::model::{Account, Config},
     flag::model::{Flag, Flags},
     output::fmt::{get_output_fmt, OutputFmt, Response},
-    table::{self, DisplayRow, DisplayTable},
+    table::{Cell, Row, Table},
 };
 
 error_chain! {
@@ -624,23 +624,29 @@ struct MsgSpec {
     default_content: Option<Vec<String>>,
 }
 
-impl<'m> DisplayRow for Msg<'m> {
-    fn to_row(&self) -> Vec<table::Cell> {
-        use crate::table::*;
+impl<'m> Table for Msg<'m> {
+    fn head() -> Row {
+        Row::new()
+            .cell(Cell::new("UID").bold().underline().white())
+            .cell(Cell::new("FLAGS").bold().underline().white())
+            .cell(Cell::new("SUBJECT").shrinkable().bold().underline().white())
+            .cell(Cell::new("SENDER").bold().underline().white())
+            .cell(Cell::new("DATE").bold().underline().white())
+    }
 
-        let unseen = if self.flags.contains(&Flag::Seen) {
-            RESET
-        } else {
-            BOLD
-        };
-
-        vec![
-            Cell::new(&[unseen.to_owned(), RED], &self.uid.to_string()),
-            Cell::new(&[unseen.to_owned(), WHITE], &self.flags.to_string()),
-            FlexCell::new(&[unseen.to_owned(), GREEN], &self.subject),
-            Cell::new(&[unseen.to_owned(), BLUE], &self.sender),
-            Cell::new(&[unseen.to_owned(), YELLOW], &self.date),
-        ]
+    fn row(&self) -> Row {
+        let is_seen = !self.flags.contains(&Flag::Seen);
+        Row::new()
+            .cell(Cell::new(&self.uid.to_string()).bold_if(is_seen).red())
+            .cell(Cell::new(&self.flags.to_string()).bold_if(is_seen).white())
+            .cell(
+                Cell::new(&self.subject)
+                    .shrinkable()
+                    .bold_if(is_seen)
+                    .green(),
+            )
+            .cell(Cell::new(&self.sender).bold_if(is_seen).blue())
+            .cell(Cell::new(&self.date).bold_if(is_seen).yellow())
     }
 }
 
@@ -648,24 +654,6 @@ impl<'m> DisplayRow for Msg<'m> {
 
 #[derive(Debug, Serialize)]
 pub struct Msgs<'m>(pub Vec<Msg<'m>>);
-
-impl<'m> DisplayTable<'m, Msg<'m>> for Msgs<'m> {
-    fn header_row() -> Vec<table::Cell> {
-        use crate::table::*;
-
-        vec![
-            Cell::new(&[BOLD, UNDERLINE, WHITE], "UID"),
-            Cell::new(&[BOLD, UNDERLINE, WHITE], "FLAGS"),
-            FlexCell::new(&[BOLD, UNDERLINE, WHITE], "SUBJECT"),
-            Cell::new(&[BOLD, UNDERLINE, WHITE], "SENDER"),
-            Cell::new(&[BOLD, UNDERLINE, WHITE], "DATE"),
-        ]
-    }
-
-    fn rows(&self) -> &Vec<Msg<'m>> {
-        &self.0
-    }
-}
 
 impl<'m> From<&'m imap::types::ZeroCopy<Vec<imap::types::Fetch>>> for Msgs<'m> {
     fn from(fetches: &'m imap::types::ZeroCopy<Vec<imap::types::Fetch>>) -> Self {
@@ -678,7 +666,7 @@ impl<'m> fmt::Display for Msgs<'m> {
         unsafe {
             match get_output_fmt() {
                 &OutputFmt::Plain => {
-                    writeln!(f, "\n{}", self.to_table())
+                    writeln!(f, "\n{}", Table::render(&self.0))
                 }
                 &OutputFmt::Json => {
                     let res = serde_json::to_string(&Response::new(self)).unwrap();

@@ -43,11 +43,11 @@ impl<'f> ToString for Flags<'f> {
         flags.push_str(if self.0.contains(&Flag::Seen) {
             " "
         } else {
-            "🟓"
+            "✷"
         });
 
         flags.push_str(if self.0.contains(&Flag::Answered) {
-            "↩"
+            "↵"
         } else {
             " "
         });
