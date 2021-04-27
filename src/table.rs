@@ -1,30 +1,26 @@
 use std::fmt;
-use terminal_size::terminal_size;
 use unicode_width::UnicodeWidthStr;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Style(u8, u8, u8);
 
 impl fmt::Display for Style {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Style(color, bright, shade) = self;
-
-        let bright_str: String = if *bright > 0 {
-            String::from(";") + &bright.to_string()
-        } else {
-            String::from("")
-        };
-
-        let shade_str: String = if *shade > 0 {
-            String::from(";") + &shade.to_string()
-        } else {
-            String::from("")
-        };
-
         let mut style = String::from("\x1b[");
+
         style.push_str(&color.to_string());
-        style.push_str(&bright_str);
-        style.push_str(&shade_str);
+
+        if *bright > 0 {
+            style.push_str(";");
+            style.push_str(&bright.to_string());
+        };
+
+        if *shade > 0 {
+            style.push_str(";");
+            style.push_str(&shade.to_string());
+        };
+
         style.push_str("m");
 
         write!(f, "{}", style)
@@ -33,17 +29,17 @@ impl fmt::Display for Style {
 
 #[derive(Debug)]
 pub struct Cell {
-    pub styles: Vec<Style>,
-    pub value: String,
-    pub flex: bool,
+    styles: Vec<Style>,
+    value: String,
+    shrinkable: bool,
 }
 
 impl Cell {
-    pub fn new(styles: &[Style], value: &str) -> Self {
+    pub fn new<T: AsRef<str>>(value: T) -> Self {
         Self {
-            styles: styles.to_vec(),
-            value: value.trim().to_string(),
-            flex: false,
+            styles: Vec::new(),
+            value: String::from(value.as_ref()),
+            shrinkable: false,
         }
     }
 
@@ -51,209 +47,299 @@ impl Cell {
         UnicodeWidthStr::width(self.value.as_str())
     }
 
-    pub fn render(&self, col_size: usize) -> String {
-        let style_begin = self
-            .styles
-            .iter()
-            .map(|style| style.to_string())
-            .collect::<Vec<_>>()
-            .concat();
-        let style_end = "\x1b[0m";
-        let unicode_width = self.unicode_width();
+    pub fn shrinkable(mut self) -> Self {
+        self.shrinkable = true;
+        self
+    }
 
-        if col_size > 0 && unicode_width > col_size {
-            String::from(style_begin + &self.value[0..=col_size - 2] + "… " + style_end)
+    pub fn is_shrinkable(&self) -> bool {
+        self.shrinkable
+    }
+
+    pub fn bold(mut self) -> Self {
+        self.styles.push(Style(1, 0, 0));
+        self
+    }
+
+    pub fn bold_if(self, predicate: bool) -> Self {
+        if predicate {
+            self.bold()
         } else {
-            let padding = if col_size == 0 {
-                "".to_string()
-            } else {
-                " ".repeat(col_size - unicode_width + 1)
-            };
-
-            String::from(style_begin + &self.value + &padding + style_end)
+            self
         }
+    }
+
+    pub fn underline(mut self) -> Self {
+        self.styles.push(Style(4, 0, 0));
+        self
+    }
+
+    pub fn red(mut self) -> Self {
+        self.styles.push(Style(31, 0, 0));
+        self
+    }
+
+    pub fn green(mut self) -> Self {
+        self.styles.push(Style(32, 0, 0));
+        self
+    }
+
+    pub fn yellow(mut self) -> Self {
+        self.styles.push(Style(33, 0, 0));
+        self
+    }
+
+    pub fn blue(mut self) -> Self {
+        self.styles.push(Style(34, 0, 0));
+        self
+    }
+
+    pub fn white(mut self) -> Self {
+        self.styles.push(Style(37, 0, 0));
+        self
+    }
+
+    pub fn ext(mut self, shade: u8) -> Self {
+        self.styles.push(Style(38, 5, shade));
+        self
+    }
+}
+
+impl fmt::Display for Cell {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for style in &self.styles {
+            write!(f, "{}", style)?;
+        }
+
+        write!(f, "{}", self.value)?;
+
+        if !self.styles.is_empty() {
+            write!(f, "{}", Style(0, 0, 0))?;
+        }
+
+        Ok(())
     }
 }
 
 #[derive(Debug)]
-pub struct FlexCell;
+pub struct Row(pub Vec<Cell>);
 
-impl FlexCell {
-    pub fn new(styles: &[Style], value: &str) -> Cell {
-        Cell {
-            flex: true,
-            ..Cell::new(styles, value)
+impl Row {
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+
+    pub fn cell(mut self, cell: Cell) -> Self {
+        self.0.push(cell);
+        self
+    }
+}
+
+pub trait Table
+where
+    Self: Sized,
+{
+    fn head() -> Row;
+    fn row(&self) -> Row;
+
+    fn max_width() -> usize {
+        terminal_size::terminal_size()
+            .map(|(w, _)| w.0 as usize)
+            .unwrap_or_default()
+    }
+
+    fn build(items: &[Self]) -> Vec<Vec<String>> {
+        let mut table = vec![Self::head()];
+        let mut cell_widths: Vec<usize> =
+            table[0].0.iter().map(|cell| cell.unicode_width()).collect();
+        table.extend(
+            items
+                .iter()
+                .map(|item| {
+                    let row = item.row();
+                    row.0.iter().enumerate().for_each(|(i, cell)| {
+                        cell_widths[i] = cell_widths[i].max(cell.unicode_width());
+                    });
+                    row
+                })
+                .collect::<Vec<_>>(),
+        );
+
+        let spaces_plus_separators_len = cell_widths.len() * 2 - 1;
+        let table_width = cell_widths.iter().sum::<usize>() + spaces_plus_separators_len;
+
+        table
+            .iter_mut()
+            .map(|row| {
+                row.0
+                    .iter_mut()
+                    .enumerate()
+                    .map(|(i, cell)| {
+                        let table_is_overflowing = table_width > Self::max_width();
+
+                        if table_is_overflowing && cell.is_shrinkable() {
+                            let shrink_width = table_width - Self::max_width();
+                            let cell_width = cell_widths[i] - shrink_width;
+                            let cell_is_overflowing = cell.unicode_width() > cell_width;
+
+                            if cell_is_overflowing {
+                                let mut value = String::new();
+                                let mut chars_width = 0;
+
+                                for c in cell.value.chars() {
+                                    let char_width = UnicodeWidthStr::width(c.to_string().as_str());
+                                    if chars_width + char_width >= cell_width {
+                                        break;
+                                    }
+
+                                    chars_width += char_width;
+                                    value.push(c);
+                                }
+
+                                value.push_str("… ");
+                                let repeat_count = cell_width - chars_width - 1;
+                                value.push_str(&" ".repeat(repeat_count));
+                                cell.value = value;
+                                cell.to_string()
+                            } else {
+                                let repeat_len = cell_width - cell.unicode_width() + 1;
+                                cell.value.push_str(&" ".repeat(repeat_len));
+                                cell.to_string()
+                            }
+                        } else {
+                            let repeat_count = cell_widths[i] - cell.unicode_width() + 1;
+                            cell.value.push_str(&" ".repeat(repeat_count));
+                            cell.to_string()
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>()
+    }
+
+    fn render(items: &[Self]) -> String {
+        Self::build(items)
+            .iter()
+            .map(|row| row.join(&Cell::new("|").ext(8).to_string()))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct Item {
+        id: u16,
+        name: String,
+        desc: String,
+    }
+
+    impl<'a> Item {
+        pub fn new(id: u16, name: &'a str, desc: &'a str) -> Self {
+            Self {
+                id,
+                name: String::from(name),
+                desc: String::from(desc),
+            }
         }
     }
-}
 
-pub trait DisplayRow {
-    fn to_row(&self) -> Vec<Cell>;
-}
+    impl Table for Item {
+        fn head() -> Row {
+            Row::new()
+                .cell(Cell::new("ID"))
+                .cell(Cell::new("NAME").shrinkable())
+                .cell(Cell::new("DESC"))
+        }
 
-pub trait DisplayTable<'a, T: DisplayRow + 'a> {
-    fn header_row() -> Vec<Cell>;
-    fn rows(&self) -> &Vec<T>;
+        fn row(&self) -> Row {
+            Row::new()
+                .cell(Cell::new(self.id.to_string()))
+                .cell(Cell::new(self.name.as_str()).shrinkable())
+                .cell(Cell::new(self.desc.as_str()))
+        }
 
-    fn to_table(&self) -> String {
-        let mut col_sizes = vec![];
-        let head = Self::header_row();
-
-        head.iter().for_each(|cell| {
-            col_sizes.push(cell.unicode_width());
-        });
-
-        let mut table = self
-            .rows()
-            .iter()
-            .map(|item| {
-                let row = item.to_row();
-                row.iter()
-                    .enumerate()
-                    .for_each(|(i, cell)| col_sizes[i] = col_sizes[i].max(cell.unicode_width()));
-                row
-            })
-            .collect::<Vec<_>>();
-
-        table.insert(0, head);
-
-        let term_width = terminal_size().map(|size| size.0 .0).unwrap_or(0) as usize;
-        let seps_width = 2 * col_sizes.len() - 1;
-        let table_width = col_sizes.iter().sum::<usize>() + seps_width;
-        let diff_width = if table_width < term_width {
-            0
-        } else {
-            table_width - term_width
-        };
-
-        table.iter().fold(String::new(), |output, row| {
-            let row_str = row
-                .iter()
-                .enumerate()
-                .map(|(i, cell)| {
-                    if cell.flex && col_sizes[i] > diff_width {
-                        cell.render(col_sizes[i] - diff_width)
-                    } else {
-                        cell.render(col_sizes[i])
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join(&Cell::new(&[ext(8)], "|").render(0));
-
-            output + &row_str + "\n"
-        })
+        fn max_width() -> usize {
+            20
+        }
     }
-}
 
-#[allow(dead_code)]
-pub const RESET: Style = Style(0, 0, 0);
+    #[test]
+    fn row_smaller_than_head() {
+        let items = vec![
+            Item::new(1, "a", "aa"),
+            Item::new(2, "b", "bb"),
+            Item::new(3, "c", "cc"),
+        ];
 
-#[allow(dead_code)]
-pub const BOLD: Style = Style(1, 0, 0);
+        let table = vec![
+            vec!["ID ", "NAME ", "DESC "],
+            vec!["1  ", "a    ", "aa   "],
+            vec!["2  ", "b    ", "bb   "],
+            vec!["3  ", "c    ", "cc   "],
+        ];
 
-#[allow(dead_code)]
-pub const UNDERLINE: Style = Style(4, 0, 0);
+        assert_eq!(table, Table::build(&items));
+    }
 
-#[allow(dead_code)]
-pub const REVERSED: Style = Style(7, 0, 0);
+    #[test]
+    fn row_bigger_than_head() {
+        let items = vec![
+            Item::new(1, "a", "aa"),
+            Item::new(2222, "bbbbb", "bbbbb"),
+            Item::new(3, "c", "cc"),
+        ];
 
-#[allow(dead_code)]
-pub const BLACK: Style = Style(30, 0, 0);
+        let table = vec![
+            vec!["ID   ", "NAME  ", "DESC  "],
+            vec!["1    ", "a     ", "aa    "],
+            vec!["2222 ", "bbbbb ", "bbbbb "],
+            vec!["3    ", "c     ", "cc    "],
+        ];
 
-#[allow(dead_code)]
-pub const RED: Style = Style(31, 0, 0);
+        assert_eq!(table, Table::build(&items));
 
-#[allow(dead_code)]
-pub const GREEN: Style = Style(32, 0, 0);
+        let items = vec![
+            Item::new(1, "a", "aa"),
+            Item::new(2222, "bbbbb", "bbbbb"),
+            Item::new(3, "cccccc", "cc"),
+        ];
 
-#[allow(dead_code)]
-pub const YELLOW: Style = Style(33, 0, 0);
+        let table = vec![
+            vec!["ID   ", "NAME   ", "DESC  "],
+            vec!["1    ", "a      ", "aa    "],
+            vec!["2222 ", "bbbbb  ", "bbbbb "],
+            vec!["3    ", "cccccc ", "cc    "],
+        ];
 
-#[allow(dead_code)]
-pub const BLUE: Style = Style(34, 0, 0);
+        assert_eq!(table, Table::build(&items));
+    }
 
-#[allow(dead_code)]
-pub const MAGENTA: Style = Style(35, 0, 0);
+    #[test]
+    fn shrink() {
+        let items = vec![
+            Item::new(1, "short", "desc"),
+            Item::new(2, "loooooong", "desc"),
+            Item::new(3, "shriiiiink", "desc"),
+            Item::new(4, "shriiiiiiiiiink", "desc"),
+            Item::new(5, "😍😍😍😍", "desc"),
+            Item::new(6, "😍😍😍😍😍", "desc"),
+            Item::new(7, "!😍😍😍😍😍", "desc"),
+        ];
 
-#[allow(dead_code)]
-pub const CYAN: Style = Style(36, 0, 0);
+        let table = vec![
+            vec!["ID ", "NAME      ", "DESC "],
+            vec!["1  ", "short     ", "desc "],
+            vec!["2  ", "loooooong ", "desc "],
+            vec!["3  ", "shriiiii… ", "desc "],
+            vec!["4  ", "shriiiii… ", "desc "],
+            vec!["5  ", "😍😍😍😍  ", "desc "],
+            vec!["6  ", "😍😍😍😍… ", "desc "],
+            vec!["7  ", "!😍😍😍…  ", "desc "],
+        ];
 
-#[allow(dead_code)]
-pub const WHITE: Style = Style(37, 0, 0);
-
-#[allow(dead_code)]
-pub const BRIGHT_BLACK: Style = Style(30, 1, 0);
-
-#[allow(dead_code)]
-pub const BRIGHT_RED: Style = Style(31, 1, 0);
-
-#[allow(dead_code)]
-pub const BRIGHT_GREEN: Style = Style(32, 1, 0);
-
-#[allow(dead_code)]
-pub const BRIGHT_YELLOW: Style = Style(33, 1, 0);
-
-#[allow(dead_code)]
-pub const BRIGHT_BLUE: Style = Style(34, 1, 0);
-
-#[allow(dead_code)]
-pub const BRIGHT_MAGENTA: Style = Style(35, 1, 0);
-
-#[allow(dead_code)]
-pub const BRIGHT_CYAN: Style = Style(36, 1, 0);
-
-#[allow(dead_code)]
-pub const BRIGHT_WHITE: Style = Style(37, 1, 0);
-
-#[allow(dead_code)]
-pub const BG_BLACK: Style = Style(40, 0, 0);
-
-#[allow(dead_code)]
-pub const BG_RED: Style = Style(41, 0, 0);
-
-#[allow(dead_code)]
-pub const BG_GREEN: Style = Style(42, 0, 0);
-
-#[allow(dead_code)]
-pub const BG_YELLOW: Style = Style(43, 0, 0);
-
-#[allow(dead_code)]
-pub const BG_BLUE: Style = Style(44, 0, 0);
-
-#[allow(dead_code)]
-pub const BG_MAGENTA: Style = Style(45, 0, 0);
-
-#[allow(dead_code)]
-pub const BG_CYAN: Style = Style(46, 0, 0);
-
-#[allow(dead_code)]
-pub const BG_WHITE: Style = Style(47, 0, 0);
-
-#[allow(dead_code)]
-pub const BG_BRIGHT_BLACK: Style = Style(40, 1, 0);
-
-#[allow(dead_code)]
-pub const BG_BRIGHT_RED: Style = Style(41, 1, 0);
-
-#[allow(dead_code)]
-pub const BG_BRIGHT_GREEN: Style = Style(42, 1, 0);
-
-#[allow(dead_code)]
-pub const BG_BRIGHT_YELLOW: Style = Style(43, 1, 0);
-
-#[allow(dead_code)]
-pub const BG_BRIGHT_BLUE: Style = Style(44, 1, 0);
-
-#[allow(dead_code)]
-pub const BG_BRIGHT_MAGENTA: Style = Style(45, 1, 0);
-
-#[allow(dead_code)]
-pub const BG_BRIGHT_CYAN: Style = Style(46, 1, 0);
-
-#[allow(dead_code)]
-pub const BG_BRIGHT_WHITE: Style = Style(47, 1, 0);
-
-#[allow(dead_code)]
-fn ext(n: u8) -> Style {
-    Style(38, 5, n)
+        assert_eq!(table, Table::build(&items));
+    }
 }
