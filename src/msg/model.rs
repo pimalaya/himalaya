@@ -36,7 +36,7 @@ impl fmt::Display for Tpl {
         unsafe {
             match get_output_fmt() {
                 &OutputFmt::Plain => {
-                    writeln!(f, "{}", self.0)
+                    write!(f, "{}", self.0)
                 }
                 &OutputFmt::Json => {
                     let res = serde_json::to_string(&Response::new(self)).unwrap();

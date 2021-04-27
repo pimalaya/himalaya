@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - IDLE mode after network interruption [#123]
 - Output redirected to `stderr` [#130]
 - Refactor table system [#132]
+- Editon file format on Linux [#133]
 
 ## [0.2.6] - 2021-04-17
 
@@ -211,3 +212,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#126]: https://github.com/soywod/himalaya/issues/126
 [#130]: https://github.com/soywod/himalaya/issues/130
 [#132]: https://github.com/soywod/himalaya/issues/132
+[#133]: https://github.com/soywod/himalaya/issues/133
