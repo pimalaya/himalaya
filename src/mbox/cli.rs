@@ -1,20 +1,17 @@
-use clap::{self, App, Arg, ArgMatches, SubCommand};
+use clap;
 use error_chain::error_chain;
-use log::{debug, info, trace};
+use log::{debug, trace};
 
-use crate::{config::model::Account, imap::model::ImapConnector};
+use crate::{app::App, imap::model::ImapConnector};
 
 error_chain! {
     links {
-        Config(crate::config::model::Error, crate::config::model::ErrorKind);
         Imap(crate::imap::model::Error, crate::imap::model::ErrorKind);
-        MsgCli(crate::msg::cli::Error, crate::msg::cli::ErrorKind);
-        OutputUtils(crate::output::utils::Error, crate::output::utils::ErrorKind);
     }
 }
 
-pub fn mbox_source_arg<'a>() -> Arg<'a, 'a> {
-    Arg::with_name("mailbox")
+pub fn mbox_source_arg<'a>() -> clap::Arg<'a, 'a> {
+    clap::Arg::with_name("mailbox")
         .short("m")
         .long("mailbox")
         .help("Selects a specific mailbox")
@@ -22,26 +19,27 @@ pub fn mbox_source_arg<'a>() -> Arg<'a, 'a> {
         .default_value("INBOX")
 }
 
-pub fn mbox_target_arg<'a>() -> Arg<'a, 'a> {
-    Arg::with_name("target")
+pub fn mbox_target_arg<'a>() -> clap::Arg<'a, 'a> {
+    clap::Arg::with_name("target")
         .help("Specifies the targetted mailbox")
         .value_name("TARGET")
 }
 
-pub fn mbox_subcmds<'s>() -> Vec<App<'s, 's>> {
-    vec![SubCommand::with_name("mailboxes")
+pub fn mbox_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
+    vec![clap::SubCommand::with_name("mailboxes")
         .aliases(&["mailbox", "mboxes", "mbox", "m"])
         .about("Lists all mailboxes")]
 }
 
-pub fn mbox_matches(account: &Account, matches: &ArgMatches) -> Result<bool> {
-    if let Some(_) = matches.subcommand_matches("mailboxes") {
+pub fn mbox_matches(app: &App) -> Result<bool> {
+    if let Some(_) = app.arg_matches.subcommand_matches("mailboxes") {
         debug!("mailboxes command matched");
 
-        let mut imap_conn = ImapConnector::new(&account)?;
+        let mut imap_conn = ImapConnector::new(&app.account)?;
         let mboxes = imap_conn.list_mboxes()?;
-        info!("{}", mboxes);
+        debug!("found {} mailboxes", mboxes.0.len());
         trace!("mailboxes: {:?}", mboxes);
+        app.output.print(mboxes);
 
         imap_conn.logout();
         return Ok(true);

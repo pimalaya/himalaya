@@ -15,7 +15,6 @@ use uuid::Uuid;
 use crate::{
     config::model::{Account, Config},
     flag::model::{Flag, Flags},
-    output::fmt::{get_output_fmt, OutputFmt, Response},
     table::{Cell, Row, Table},
 };
 
@@ -33,17 +32,7 @@ pub struct Tpl(String);
 
 impl fmt::Display for Tpl {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        unsafe {
-            match get_output_fmt() {
-                &OutputFmt::Plain => {
-                    write!(f, "{}", self.0)
-                }
-                &OutputFmt::Json => {
-                    let res = serde_json::to_string(&Response::new(self)).unwrap();
-                    write!(f, "{}", res)
-                }
-            }
-        }
+        write!(f, "{}", self.0)
     }
 }
 
@@ -132,17 +121,7 @@ impl Serialize for ReadableMsg {
 
 impl fmt::Display for ReadableMsg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        unsafe {
-            match get_output_fmt() {
-                &OutputFmt::Plain => {
-                    writeln!(f, "{}", self.content)
-                }
-                &OutputFmt::Json => {
-                    let res = serde_json::to_string(&Response::new(self)).unwrap();
-                    write!(f, "{}", res)
-                }
-            }
-        }
+        writeln!(f, "{}", self.content)
     }
 }
 
@@ -677,16 +656,6 @@ impl<'m> From<&'m imap::types::ZeroCopy<Vec<imap::types::Fetch>>> for Msgs<'m> {
 
 impl<'m> fmt::Display for Msgs<'m> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        unsafe {
-            match get_output_fmt() {
-                &OutputFmt::Plain => {
-                    writeln!(f, "\n{}", Table::render(&self.0))
-                }
-                &OutputFmt::Json => {
-                    let res = serde_json::to_string(&Response::new(self)).unwrap();
-                    write!(f, "{}", res)
-                }
-            }
-        }
+        writeln!(f, "\n{}", Table::render(&self.0))
     }
 }

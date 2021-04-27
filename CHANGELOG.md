@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Replace `log-level` arg by default `RUST_LOG` env var [#130]
+
+### Fixed
+
+- IDLE mode after network interruption [#123]
+- Output redirected to `stderr` [#130]
+- Refactor table system [#132]
+- Editon file format on Linux [#133]
+- Show email address when name not available [#131]
+
 ## [0.2.7] - 2021-04-24
 
 ### Added
@@ -24,11 +36,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Improve config compatibility on Windows [#111](https://github.com/soywod/himalaya/pull/111)
 - Vim table containing emoji [#122]
-- IDLE mode after network interruption [#123]
-- Output redirected to `stderr` [#130]
-- Refactor table system [#132]
-- Editon file format on Linux [#133]
-- Show email address when name not available [#131]
 
 ## [0.2.6] - 2021-04-17
 

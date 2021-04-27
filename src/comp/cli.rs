@@ -13,7 +13,7 @@ pub fn comp_subcmds<'s>() -> Vec<App<'s, 's>> {
             .required(true)])]
 }
 
-pub fn comp_matches(mut app: App, matches: &ArgMatches) -> Result<bool> {
+pub fn comp_matches<'a>(app: fn() -> App<'a, 'a>, matches: &ArgMatches) -> Result<bool> {
     if let Some(matches) = matches.subcommand_matches("completion") {
         debug!("completion command matched");
         let shell = match matches.value_of("shell").unwrap() {
@@ -22,7 +22,7 @@ pub fn comp_matches(mut app: App, matches: &ArgMatches) -> Result<bool> {
             "bash" | _ => Shell::Bash,
         };
         debug!("shell: {}", shell);
-        app.gen_completions_to("himalaya", shell, &mut io::stdout());
+        app().gen_completions_to("himalaya", shell, &mut io::stdout());
         return Ok(true);
     };
 

@@ -1,11 +1,8 @@
-use clap::{self, App, ArgMatches, SubCommand};
+use clap;
 use error_chain::error_chain;
 use log::debug;
 
-use crate::{
-    config::model::{Account, Config},
-    imap::model::ImapConnector,
-};
+use crate::{app::App, imap::model::ImapConnector};
 
 error_chain! {
     links {
@@ -14,20 +11,17 @@ error_chain! {
     }
 }
 
-pub fn imap_subcmds<'s>() -> Vec<App<'s, 's>> {
-    vec![SubCommand::with_name("idle").about("Spawns a blocking idle daemon")]
+pub fn imap_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
+    vec![clap::SubCommand::with_name("idle").about("Spawns a blocking idle daemon")]
 }
 
-pub fn imap_matches(
-    config: &Config,
-    account: &Account,
-    mbox: &str,
-    matches: &ArgMatches,
-) -> Result<bool> {
-    if let Some(_) = matches.subcommand_matches("idle") {
+pub fn imap_matches(app: &App) -> Result<bool> {
+    if let Some(_) = app.arg_matches.subcommand_matches("idle") {
         debug!("idle command matched");
-        let mut imap_conn = ImapConnector::new(&account)?;
-        imap_conn.idle(&config, &mbox)?;
+
+        let mut imap_conn = ImapConnector::new(&app.account)?;
+        imap_conn.idle(&app.config, &app.mbox)?;
+
         imap_conn.logout();
         return Ok(true);
     }

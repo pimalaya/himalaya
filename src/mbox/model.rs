@@ -2,10 +2,7 @@ use imap;
 use serde::Serialize;
 use std::fmt;
 
-use crate::{
-    output::fmt::{get_output_fmt, OutputFmt, Response},
-    table::{Cell, Row, Table},
-};
+use crate::table::{Cell, Row, Table};
 
 // Mbox
 
@@ -42,7 +39,7 @@ impl Table for Mbox {
 
     fn row(&self) -> Row {
         Row::new()
-            .cell(Cell::new(&self.delim).red())
+            .cell(Cell::new(&self.delim).white())
             .cell(Cell::new(&self.name).green())
             .cell(Cell::new(&self.attributes.join(", ")).shrinkable().yellow())
     }
@@ -55,16 +52,6 @@ pub struct Mboxes(pub Vec<Mbox>);
 
 impl fmt::Display for Mboxes {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        unsafe {
-            match get_output_fmt() {
-                &OutputFmt::Plain => {
-                    writeln!(f, "\n{}", Table::render(&self.0))
-                }
-                &OutputFmt::Json => {
-                    let res = serde_json::to_string(&Response::new(self)).unwrap();
-                    write!(f, "{}", res)
-                }
-            }
-        }
+        writeln!(f, "\n{}", Table::render(&self.0))
     }
 }
