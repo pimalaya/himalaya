@@ -5,7 +5,7 @@ CLI email client written in Rust.
 *The project is under active development. Do not use in production before the
 `v1.0.0` (see the [roadmap](https://github.com/soywod/himalaya/milestone/5)).*
 
-![image](https://user-images.githubusercontent.com/10437171/115128560-eba5cd80-9fde-11eb-8981-c67e7e019a43.png)
+![image](https://user-images.githubusercontent.com/10437171/115144003-8a1b4880-a04a-11eb-80d2-245027e28591.png)
 
 ## Motivation
 
