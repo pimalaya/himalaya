@@ -1,4 +1,4 @@
-# 📫 Himalaya [![gh-actions](https://github.com/soywod/himalaya/workflows/deployment/badge.svg)](https://github.com/soywod/himalaya/actions?query=workflow%3Adeployment)
+# 📫 Himalaya [![gh-actions](https://github.com/soywod/himalaya/workflows/deployment/badge.svg)](https://github.com/soywod/himalaya/actions?query=workflow%3Adeployment) [![gh-actions](https://github.com/soywod/himalaya/workflows/tests/badge.svg)](https://github.com/soywod/himalaya/actions?query=workflow%3Atests) [![gh-actions](https://github.com/soywod/himalaya/workflows/nix-build/badge.svg)](https://github.com/soywod/himalaya/actions?query=workflow%3Anix-build)
 
 CLI email client written in Rust.
 
