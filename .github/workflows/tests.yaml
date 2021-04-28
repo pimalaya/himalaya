@@ -1,0 +1,25 @@
+name: tests
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+      - name: Check project
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+      - name: Run tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
