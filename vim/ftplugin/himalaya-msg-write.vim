@@ -1,7 +1,9 @@
 setlocal cursorline
+setlocal filetype=mail
 setlocal foldexpr=himalaya#shared#thread#fold(v:lnum)
 setlocal foldmethod=expr
 setlocal startofline
+syntax on
 
 augroup himalaya_write
   autocmd! * <buffer>
