@@ -44,26 +44,71 @@ fn mbox() {
 fn msg() {
     let account = get_account("inbox@localhost");
 
-    // Let's add message
+    // Add messages
     smtp::send(
         &account,
         &lettre::Message::builder()
-            .from("sender@localhost".parse().unwrap())
+            .from("sender-a@localhost".parse().unwrap())
             .to("inbox@localhost".parse().unwrap())
-            .subject("Very important message")
-            .singlepart(
-                lettre::message::SinglePart::builder().body("Hello, world!".as_bytes().to_vec()),
-            )
+            .subject("Subject A")
+            .singlepart(lettre::message::SinglePart::builder().body("Body A".as_bytes().to_vec()))
+            .unwrap(),
+    )
+    .unwrap();
+    smtp::send(
+        &account,
+        &lettre::Message::builder()
+            .from("\"Sender B\" <sender-b@localhost>".parse().unwrap())
+            .to("inbox@localhost".parse().unwrap())
+            .subject("Subject B")
+            .singlepart(lettre::message::SinglePart::builder().body("Body B".as_bytes().to_vec()))
             .unwrap(),
     )
     .unwrap();
 
-    // We should see the message
+    // Login
     let mut imap_conn = ImapConnector::new(&account).unwrap();
+
+    // List messages
+    // TODO: check non-existance of \Seen flag
     let msgs = imap_conn.list_msgs("INBOX", &10, &0).unwrap();
     let msgs = Msgs::from(&msgs);
-    assert_eq!(msgs.0.len(), 1);
-    let msg = msgs.0.first().unwrap();
-    assert_eq!("Very important message", msg.subject.as_str());
+    assert_eq!(msgs.0.len(), 2);
+
+    let msg_a = msgs
+        .0
+        .iter()
+        .find(|msg| msg.subject == "Subject A")
+        .unwrap();
+    assert_eq!(msg_a.subject, "Subject A");
+    assert_eq!(msg_a.sender, "sender-a@localhost");
+
+    let msg_b = msgs
+        .0
+        .iter()
+        .find(|msg| msg.subject == "Subject B")
+        .unwrap();
+    assert_eq!(msg_b.subject, "Subject B");
+    assert_eq!(msg_b.sender, "Sender B");
+
+    // TODO: search messages
+    // TODO: read message (+ \Seen flag)
+    // TODO: list message attachments
+    // TODO: add/set/remove flags
+
+    // Delete messages
+    imap_conn
+        .add_flags("INBOX", &msg_a.uid.to_string(), "\\Deleted")
+        .unwrap();
+    imap_conn
+        .add_flags("INBOX", &msg_b.uid.to_string(), "\\Deleted")
+        .unwrap();
+    imap_conn.expunge("INBOX").unwrap();
+    assert!(match imap_conn.list_msgs("INBOX", &10, &0) {
+        Err(err) => err.to_string() == "The `INBOX` mailbox is empty",
+        Ok(_) => false,
+    });
+
+    // Logout
     imap_conn.logout();
 }
