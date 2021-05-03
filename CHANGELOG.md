@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Table with subject containing `\r` or `\n`[#141]
+
 ## [0.3.0] - 2021-04-28
 
 ### Fixed
@@ -225,3 +229,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#131]: https://github.com/soywod/himalaya/issues/131
 [#132]: https://github.com/soywod/himalaya/issues/132
 [#133]: https://github.com/soywod/himalaya/issues/133
+[#141]: https://github.com/soywod/himalaya/issues/141

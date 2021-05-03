@@ -39,7 +39,9 @@ impl Cell {
     pub fn new<T: AsRef<str>>(value: T) -> Self {
         Self {
             styles: Vec::new(),
-            value: String::from(value.as_ref()),
+            value: String::from(value.as_ref())
+                .replace("\r", "")
+                .replace("\n", ""),
             shrinkable: false,
         }
     }
