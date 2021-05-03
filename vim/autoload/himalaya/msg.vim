@@ -148,7 +148,7 @@ function! himalaya#msg#forward()
 endfunction
 
 function! himalaya#msg#draft_save()
-  let s:draft = join(getline(1, "$"), "\r\n")
+  let s:draft = join(getline(1, "$"), "\n")
   redraw | call s:log("Save draft [OK]")
   let &modified = 0
 endfunction

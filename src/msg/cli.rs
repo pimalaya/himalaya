@@ -1,7 +1,11 @@
 use clap;
 use error_chain::error_chain;
 use log::{debug, error, trace};
-use std::{fs, ops::Deref};
+use std::{
+    fs,
+    io::{self, BufRead},
+    ops::Deref,
+};
 
 use crate::{
     app::App,
@@ -590,7 +594,22 @@ pub fn msg_matches(app: &App) -> Result<bool> {
         debug!("send command matched");
 
         let mut imap_conn = ImapConnector::new(&app.account)?;
-        let msg = matches.value_of("message").unwrap();
+
+        let msg = if matches.is_present("message") {
+            matches
+                .value_of("message")
+                .unwrap_or_default()
+                .replace("\r", "")
+                .replace("\n", "\r\n")
+        } else {
+            io::stdin()
+                .lock()
+                .lines()
+                .filter_map(|ln| ln.ok())
+                .map(|ln| ln.to_string())
+                .collect::<Vec<_>>()
+                .join("\r\n")
+        };
         let msg = Msg::from(msg.to_string());
         let msg = msg.to_sendable_msg()?;
         smtp::send(&app.account, &msg)?;

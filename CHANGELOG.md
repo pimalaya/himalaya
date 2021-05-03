@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Send message via stdin [#78]
+
 ### Fixed
 
 - Table with subject containing `\r` or `\n`[#141]
@@ -215,6 +219,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#71]: https://github.com/soywod/himalaya/issues/71
 [#74]: https://github.com/soywod/himalaya/issues/74
 [#75]: https://github.com/soywod/himalaya/issues/75
+[#78]: https://github.com/soywod/himalaya/issues/78
 [#79]: https://github.com/soywod/himalaya/issues/79
 [#83]: https://github.com/soywod/himalaya/issues/83
 [#84]: https://github.com/soywod/himalaya/issues/84
