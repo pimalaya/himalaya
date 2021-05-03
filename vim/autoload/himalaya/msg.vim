@@ -38,7 +38,7 @@ function! himalaya#msg#list()
   try
     let mbox = himalaya#mbox#curr_mbox()
     let page = himalaya#mbox#curr_page()
-    call himalaya#msg#list_with(mbox, page, 0)
+    call himalaya#msg#list_with(mbox, page, 1)
   catch
     if !empty(v:exception)
       redraw | call himalaya#shared#log#err(v:exception)
