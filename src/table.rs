@@ -1,3 +1,4 @@
+use log::{debug, trace};
 use std::fmt;
 use unicode_width::UnicodeWidthStr;
 
@@ -145,7 +146,7 @@ where
     fn max_width() -> usize {
         terminal_size::terminal_size()
             .map(|(w, _)| w.0 as usize)
-            .unwrap_or_default()
+            .unwrap_or(80)
     }
 
     fn build(items: &[Self]) -> Vec<Vec<String>> {
@@ -164,25 +165,38 @@ where
                 })
                 .collect::<Vec<_>>(),
         );
+        trace!("cell_widths: {:?}", cell_widths);
 
         let spaces_plus_separators_len = cell_widths.len() * 2 - 1;
         let table_width = cell_widths.iter().sum::<usize>() + spaces_plus_separators_len;
+        trace!("table_width: {}", table_width);
 
         table
             .iter_mut()
             .map(|row| {
+                debug!("processing row: {:?}", row);
                 row.0
                     .iter_mut()
                     .enumerate()
                     .map(|(i, cell)| {
-                        let table_is_overflowing = table_width > Self::max_width();
+                        debug!("processing cell: {:?}", cell);
+                        trace!("table_width: {}", table_width);
+                        trace!("max_width: {}", Self::max_width());
 
+                        let table_is_overflowing = table_width > Self::max_width();
                         if table_is_overflowing && cell.is_shrinkable() {
+                            trace!("table is overflowing and cell is shrinkable");
+
                             let shrink_width = table_width - Self::max_width();
+                            trace!("shrink_width: {}", shrink_width);
                             let cell_width = cell_widths[i] - shrink_width;
                             let cell_is_overflowing = cell.unicode_width() > cell_width;
+                            trace!("cell_width: {}", cell_width);
+                            trace!("cell unicode_width: {}", cell.unicode_width());
 
                             if cell_is_overflowing {
+                                trace!("cell is overflowing");
+
                                 let mut value = String::new();
                                 let mut chars_width = 0;
 
@@ -197,18 +211,30 @@ where
                                 }
 
                                 value.push_str("… ");
-                                let repeat_count = cell_width - chars_width - 1;
-                                value.push_str(&" ".repeat(repeat_count));
+                                trace!("chars_width: {}", chars_width);
+                                trace!("shrinked value: {}", value);
+                                let spaces_count = cell_width - chars_width - 1;
+                                trace!(
+                                    "number of spaces added to shrinked value: {}",
+                                    spaces_count
+                                );
+                                value.push_str(&" ".repeat(spaces_count));
                                 cell.value = value;
                                 cell.to_string()
                             } else {
-                                let repeat_len = cell_width - cell.unicode_width() + 1;
-                                cell.value.push_str(&" ".repeat(repeat_len));
+                                trace!("cell is not overflowing");
+                                let spaces_count = cell_width - cell.unicode_width() + 1;
+                                trace!("number of spaces added to value: {}", spaces_count);
+                                cell.value.push_str(&" ".repeat(spaces_count));
                                 cell.to_string()
                             }
                         } else {
-                            let repeat_count = cell_widths[i] - cell.unicode_width() + 1;
-                            cell.value.push_str(&" ".repeat(repeat_count));
+                            trace!("table is not overflowing or cell is not shrinkable");
+                            trace!("cell_width: {}", cell_widths[i]);
+                            trace!("cell unicode_width: {}", cell.unicode_width());
+                            let spaces_count = cell_widths[i] - cell.unicode_width() + 1;
+                            trace!("number of spaces added to value: {}", spaces_count);
+                            cell.value.push_str(&" ".repeat(spaces_count));
                             cell.to_string()
                         }
                     })
@@ -324,9 +350,10 @@ mod tests {
             Item::new(2, "loooooong", "desc"),
             Item::new(3, "shriiiiink", "desc"),
             Item::new(4, "shriiiiiiiiiink", "desc"),
-            Item::new(5, "😍😍😍😍", "desc"),
-            Item::new(6, "😍😍😍😍😍", "desc"),
-            Item::new(7, "!😍😍😍😍😍", "desc"),
+            Item::new(5, "", "desc"),
+            Item::new(6, "😍😍😍😍", "desc"),
+            Item::new(7, "😍😍😍😍😍", "desc"),
+            Item::new(8, "!😍😍😍😍😍", "desc"),
         ];
 
         let table = vec![
@@ -335,9 +362,10 @@ mod tests {
             vec!["2  ", "loooooong ", "desc "],
             vec!["3  ", "shriiiii… ", "desc "],
             vec!["4  ", "shriiiii… ", "desc "],
-            vec!["5  ", "😍😍😍😍  ", "desc "],
-            vec!["6  ", "😍😍😍😍… ", "desc "],
-            vec!["7  ", "!😍😍😍…  ", "desc "],
+            vec!["5  ", "          ", "desc "],
+            vec!["6  ", "😍😍😍😍  ", "desc "],
+            vec!["7  ", "😍😍😍😍… ", "desc "],
+            vec!["8  ", "!😍😍😍…  ", "desc "],
         ];
 
         assert_eq!(table, Table::build(&items));

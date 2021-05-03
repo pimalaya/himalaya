@@ -4,19 +4,7 @@ use error_chain::error_chain;
 use log::{debug, error, trace};
 use std::{env, path::PathBuf, process::exit};
 
-mod app;
-mod comp;
-mod config;
-mod flag;
-mod imap;
-mod input;
-mod mbox;
-mod msg;
-mod output;
-mod smtp;
-mod table;
-
-use crate::{
+use himalaya::{
     app::App,
     comp::cli::{comp_matches, comp_subcmds},
     config::{cli::config_args, model::Config},
@@ -29,12 +17,12 @@ use crate::{
 
 error_chain! {
     links {
-        CompletionCli(crate::comp::cli::Error, crate::comp::cli::ErrorKind);
-        Config(crate::config::model::Error, crate::config::model::ErrorKind);
-        FlagCli(crate::flag::cli::Error, crate::flag::cli::ErrorKind);
-        ImapCli(crate::imap::cli::Error, crate::imap::cli::ErrorKind);
-        MboxCli(crate::mbox::cli::Error, crate::mbox::cli::ErrorKind);
-        MsgCli(crate::msg::cli::Error, crate::msg::cli::ErrorKind);
+        CompletionCli(himalaya::comp::cli::Error, himalaya::comp::cli::ErrorKind);
+        Config(himalaya::config::model::Error, himalaya::config::model::ErrorKind);
+        FlagCli(himalaya::flag::cli::Error, himalaya::flag::cli::ErrorKind);
+        ImapCli(himalaya::imap::cli::Error, himalaya::imap::cli::ErrorKind);
+        MboxCli(himalaya::mbox::cli::Error, himalaya::mbox::cli::ErrorKind);
+        MsgCli(himalaya::msg::cli::Error, himalaya::msg::cli::ErrorKind);
     }
 }
 
