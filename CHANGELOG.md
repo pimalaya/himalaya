@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2021-05-04
+
 ### Added
 
 - Send message via stdin [#78]
@@ -166,7 +168,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.3.0...HEAD
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/soywod/himalaya/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/soywod/himalaya/compare/v0.2.7...v0.3.0
 [0.2.7]: https://github.com/soywod/himalaya/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/soywod/himalaya/compare/v0.2.5...v0.2.6
