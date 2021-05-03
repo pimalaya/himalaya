@@ -2,6 +2,9 @@ use log::{debug, trace};
 use std::fmt;
 use unicode_width::UnicodeWidthStr;
 
+const DEFAULT_TERM_WIDTH: usize = 80;
+const MAX_SHRINK_WIDTH: usize = 5;
+
 #[derive(Debug)]
 pub struct Style(u8, u8, u8);
 
@@ -148,7 +151,7 @@ where
     fn max_width() -> usize {
         terminal_size::terminal_size()
             .map(|(w, _)| w.0 as usize)
-            .unwrap_or(80)
+            .unwrap_or(DEFAULT_TERM_WIDTH)
     }
 
     fn build(items: &[Self]) -> Vec<Vec<String>> {
@@ -191,11 +194,15 @@ where
 
                             let shrink_width = table_width - Self::max_width();
                             trace!("shrink_width: {}", shrink_width);
-                            let cell_width = cell_widths[i] - shrink_width;
-                            let cell_is_overflowing = cell.unicode_width() > cell_width;
+                            let cell_width = if shrink_width + MAX_SHRINK_WIDTH < cell_widths[i] {
+                                cell_widths[i] - shrink_width
+                            } else {
+                                MAX_SHRINK_WIDTH
+                            };
                             trace!("cell_width: {}", cell_width);
                             trace!("cell unicode_width: {}", cell.unicode_width());
 
+                            let cell_is_overflowing = cell.unicode_width() > cell_width;
                             if cell_is_overflowing {
                                 trace!("cell is overflowing");
 
@@ -346,13 +353,13 @@ mod tests {
     }
 
     #[test]
-    fn shrink() {
+    fn basic_shrink() {
         let items = vec![
-            Item::new(1, "short", "desc"),
-            Item::new(2, "loooooong", "desc"),
-            Item::new(3, "shriiiiink", "desc"),
-            Item::new(4, "shriiiiiiiiiink", "desc"),
-            Item::new(5, "", "desc"),
+            Item::new(1, "", "desc"),
+            Item::new(2, "short", "desc"),
+            Item::new(3, "loooooong", "desc"),
+            Item::new(4, "shriiiiink", "desc"),
+            Item::new(5, "shriiiiiiiiiink", "desc"),
             Item::new(6, "😍😍😍😍", "desc"),
             Item::new(7, "😍😍😍😍😍", "desc"),
             Item::new(8, "!😍😍😍😍😍", "desc"),
@@ -360,14 +367,30 @@ mod tests {
 
         let table = vec![
             vec!["ID ", "NAME      ", "DESC "],
-            vec!["1  ", "short     ", "desc "],
-            vec!["2  ", "loooooong ", "desc "],
-            vec!["3  ", "shriiiii… ", "desc "],
+            vec!["1  ", "          ", "desc "],
+            vec!["2  ", "short     ", "desc "],
+            vec!["3  ", "loooooong ", "desc "],
             vec!["4  ", "shriiiii… ", "desc "],
-            vec!["5  ", "          ", "desc "],
+            vec!["5  ", "shriiiii… ", "desc "],
             vec!["6  ", "😍😍😍😍  ", "desc "],
             vec!["7  ", "😍😍😍😍… ", "desc "],
             vec!["8  ", "!😍😍😍…  ", "desc "],
+        ];
+
+        assert_eq!(table, Table::build(&items));
+    }
+
+    #[test]
+    fn max_shrink_width() {
+        let items = vec![
+            Item::new(1111, "shriiiiiiiink", "desc very looong"),
+            Item::new(2222, "shriiiiiiiink", "desc very loooooooooong"),
+        ];
+
+        let table = vec![
+            vec!["ID   ", "NAME  ", "DESC                    "],
+            vec!["1111 ", "shri… ", "desc very looong        "],
+            vec!["2222 ", "shri… ", "desc very loooooooooong "],
         ];
 
         assert_eq!(table, Table::build(&items));
