@@ -1,6 +1,8 @@
 extern crate himalaya;
 
-use himalaya::{config::model::Account, imap::model::ImapConnector, msg::model::Msgs, smtp};
+use himalaya::{
+    config::model::Account, imap::model::ImapConnector, mbox::model::Mboxes, msg::model::Msgs, smtp,
+};
 
 fn get_account(addr: &str) -> Account {
     Account {
@@ -29,9 +31,8 @@ fn get_account(addr: &str) -> Account {
 fn mbox() {
     let account = get_account("inbox@localhost");
     let mut imap_conn = ImapConnector::new(&account).unwrap();
-    let mboxes: Vec<String> = imap_conn
-        .list_mboxes()
-        .unwrap()
+    let names = imap_conn.list_mboxes().unwrap();
+    let mboxes: Vec<String> = Mboxes::from(&names)
         .0
         .into_iter()
         .map(|mbox| mbox.name)
