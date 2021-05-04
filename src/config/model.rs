@@ -2,7 +2,14 @@ use error_chain::error_chain;
 use lettre::transport::smtp::authentication::Credentials as SmtpCredentials;
 use log::debug;
 use serde::Deserialize;
-use std::{collections::HashMap, env, fs::File, io::Read, path::PathBuf, thread};
+use std::{
+    collections::HashMap,
+    env,
+    fs::{self, File},
+    io::Read,
+    path::PathBuf,
+    thread,
+};
 use toml;
 
 use crate::output::utils::run_cmd;
@@ -220,11 +227,13 @@ impl Config {
     }
 
     pub fn signature(&self, account: &Account) -> Option<String> {
-        account
+        let sig = account
             .signature
             .as_ref()
-            .or_else(|| self.signature.as_ref())
-            .map(|sig| sig.to_owned())
+            .or_else(|| self.signature.as_ref());
+
+        sig.and_then(|sig| fs::read_to_string(sig).ok())
+            .or_else(|| sig.map(|sig| sig.to_owned()))
     }
 
     pub fn default_page_size(&self, account: &Account) -> usize {
