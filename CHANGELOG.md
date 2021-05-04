@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Table with subject containing `\r` or `\n`[#141]
+- Table with subject containing `\r`, `\n` or `\t` [#141]
 - Overflow panic when shrink column [#138]
 - Vim plugin empty mailbox message [#136]
 

@@ -44,7 +44,8 @@ impl Cell {
             styles: Vec::new(),
             value: String::from(value.as_ref())
                 .replace("\r", "")
-                .replace("\n", ""),
+                .replace("\n", "")
+                .replace("\t", ""),
             shrinkable: false,
         }
     }
