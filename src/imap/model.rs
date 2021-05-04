@@ -7,7 +7,6 @@ use std::{collections::HashSet, iter::FromIterator, net::TcpStream};
 use crate::{
     config::model::{Account, Config},
     flag::model::Flag,
-    mbox::model::{Mbox, Mboxes},
     msg::model::Msg,
 };
 
@@ -167,16 +166,13 @@ impl<'ic> ImapConnector<'ic> {
         }
     }
 
-    pub fn list_mboxes(&mut self) -> Result<Mboxes> {
-        let mboxes = self
+    pub fn list_mboxes(&mut self) -> Result<imap::types::ZeroCopy<Vec<imap::types::Name>>> {
+        let names = self
             .sess
             .list(Some(""), Some("*"))
-            .chain_err(|| "Cannot list mailboxes")?
-            .iter()
-            .map(Mbox::from_name)
-            .collect::<Vec<_>>();
+            .chain_err(|| "Cannot list mailboxes")?;
 
-        Ok(Mboxes(mboxes))
+        Ok(names)
     }
 
     pub fn list_msgs(

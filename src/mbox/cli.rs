@@ -2,7 +2,7 @@ use clap;
 use error_chain::error_chain;
 use log::{debug, trace};
 
-use crate::{app::App, imap::model::ImapConnector};
+use crate::{app::App, imap::model::ImapConnector, mbox::model::Mboxes};
 
 error_chain! {
     links {
@@ -36,7 +36,8 @@ pub fn mbox_matches(app: &App) -> Result<bool> {
         debug!("mailboxes command matched");
 
         let mut imap_conn = ImapConnector::new(&app.account)?;
-        let mboxes = imap_conn.list_mboxes()?;
+        let names = imap_conn.list_mboxes()?;
+        let mboxes = Mboxes::from(&names);
         debug!("found {} mailboxes", mboxes.0.len());
         trace!("mailboxes: {:?}", mboxes);
         app.output.print(mboxes);
