@@ -80,7 +80,6 @@ impl<'a> Attachments {
                 .get_headers()
                 .get_first_value("content-type")
                 .unwrap_or_default();
-
             if !ctype.starts_with("text") {
                 self.0.push(Attachment::from_part(part));
             }
@@ -646,15 +645,21 @@ impl<'m> Table for Msg<'m> {
 // Msgs
 
 #[derive(Debug, Serialize)]
-pub struct Msgs<'m>(pub Vec<Msg<'m>>);
+pub struct Msgs<'a>(pub Vec<Msg<'a>>);
 
-impl<'m> From<&'m imap::types::ZeroCopy<Vec<imap::types::Fetch>>> for Msgs<'m> {
-    fn from(fetches: &'m imap::types::ZeroCopy<Vec<imap::types::Fetch>>) -> Self {
+impl<'a> From<&'a imap::types::ZeroCopy<Vec<imap::types::Fetch>>> for Msgs<'a> {
+    fn from(fetches: &'a imap::types::ZeroCopy<Vec<imap::types::Fetch>>) -> Self {
         Self(fetches.iter().rev().map(Msg::from).collect::<Vec<_>>())
     }
 }
 
-impl<'m> fmt::Display for Msgs<'m> {
+impl Msgs<'_> {
+    pub fn new() -> Self {
+        Self(vec![])
+    }
+}
+
+impl fmt::Display for Msgs<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "\n{}", Table::render(&self.0))
     }

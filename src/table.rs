@@ -256,7 +256,7 @@ where
     fn render(items: &[Self]) -> String {
         Self::build(items)
             .iter()
-            .map(|row| row.join(&Cell::new("|").ext(8).to_string()))
+            .map(|row| row.join(&Cell::new("│").ext(8).to_string()))
             .collect::<Vec<_>>()
             .join("\n")
     }

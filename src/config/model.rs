@@ -28,6 +28,7 @@ pub struct Account {
     pub downloads_dir: Option<PathBuf>,
     pub signature: Option<String>,
     pub default_page_size: Option<usize>,
+    pub watch_cmds: Option<Vec<String>>,
 
     // Specific
     pub default: Option<bool>,
@@ -118,10 +119,7 @@ pub struct Config {
     pub notify_cmd: Option<String>,
     pub signature: Option<String>,
     pub default_page_size: Option<usize>,
-
-    #[serde(default)]
-    pub idle_hook_cmds: Vec<String>,
-
+    pub watch_cmds: Option<Vec<String>>,
     #[serde(flatten)]
     pub accounts: HashMap<String, Account>,
 }
@@ -246,15 +244,21 @@ impl Config {
             .to_owned()
     }
 
-    pub fn exec_idle_hooks(&self) -> Result<()> {
-        let cmds = self.idle_hook_cmds.to_owned();
+    pub fn exec_watch_cmds(&self, account: &Account) -> Result<()> {
+        let cmds = account
+            .watch_cmds
+            .as_ref()
+            .or_else(|| self.watch_cmds.as_ref())
+            .map(|cmds| cmds.to_owned())
+            .unwrap_or_default();
+        debug!("cmds: {:?}", cmds);
 
         thread::spawn(move || {
             debug!("batch execution of {} cmd(s)", cmds.len());
             cmds.iter().for_each(|cmd| {
-                debug!("execute cmd {:?}", cmd);
-                let res = run_cmd(&cmd);
-                debug!("res: {:?}", res);
+                debug!("running command {:?}…", cmd);
+                let res = run_cmd(cmd);
+                debug!("{:?}", res);
             })
         });
 

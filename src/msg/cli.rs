@@ -187,7 +187,12 @@ pub fn msg_matches(app: &App) -> Result<bool> {
 
         let mut imap_conn = ImapConnector::new(&app.account)?;
         let msgs = imap_conn.list_msgs(&app.mbox, &page_size, &page)?;
-        let msgs = Msgs::from(&msgs);
+        let msgs = if let Some(ref fetches) = msgs {
+            Msgs::from(fetches)
+        } else {
+            Msgs::new()
+        };
+
         trace!("messages: {:?}", msgs);
         app.output.print(msgs);
 
@@ -238,7 +243,11 @@ pub fn msg_matches(app: &App) -> Result<bool> {
 
         let mut imap_conn = ImapConnector::new(&app.account)?;
         let msgs = imap_conn.search_msgs(&app.mbox, &query, &page_size, &page)?;
-        let msgs = Msgs::from(&msgs);
+        let msgs = if let Some(ref fetches) = msgs {
+            Msgs::from(fetches)
+        } else {
+            Msgs::new()
+        };
         trace!("messages: {:?}", msgs);
         app.output.print(msgs);
 
@@ -637,7 +646,11 @@ pub fn msg_matches(app: &App) -> Result<bool> {
         let mut imap_conn = ImapConnector::new(&app.account)?;
         let msgs =
             imap_conn.list_msgs(&app.mbox, &app.config.default_page_size(&app.account), &0)?;
-        let msgs = Msgs::from(&msgs);
+        let msgs = if let Some(ref fetches) = msgs {
+            Msgs::from(fetches)
+        } else {
+            Msgs::new()
+        };
         app.output.print(msgs);
 
         imap_conn.logout();
