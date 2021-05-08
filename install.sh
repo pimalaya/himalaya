@@ -31,6 +31,6 @@ echo "Installing binary…"
 tar -xzf "$tmpdir/himalaya.tar.gz" -C "$tmpdir"
 
 mkdir -p "$PREFIX/bin"
-cp -f -- "$tmpdir/himalaya.exe" "$PREFIX/bin/himalaya"
+cp -f -- "$tmpdir/himalaya*" "$PREFIX/bin/"
 
 die "$("$PREFIX/bin/himalaya" --version) installed!" 0

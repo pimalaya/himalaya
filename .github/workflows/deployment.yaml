@@ -50,10 +50,11 @@ jobs:
         with:
           command: build
           args: --release
-      - name: Rename executable
+      - name: Compress executable (unix)
         if: matrix.os_name == 'linux' || matrix.os_name == 'macos'
-        run: mv target/release/himalaya target/release/himalaya.exe
-      - name: Compress executable
+        run: tar czf himalaya.tar.gz -C target/release himalaya
+      - name: Compress executable (windows)
+        if: matrix.os_name == 'windows'
         run: tar czf himalaya.tar.gz -C target/release himalaya.exe
       - name: Upload release asset
         uses: actions/upload-release-asset@v1

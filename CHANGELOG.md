@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `notify`: Runs `notify-cmd` when a new message arrives to the server
   - `watch`: Runs `watch-cmds` when any change occurs on the server
 
+### Removed
+
+- `.exe` extension from release binaries [#144]
+
 ## [0.3.1] - 2021-05-04
 
 ### Added
@@ -259,3 +263,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#136]: https://github.com/soywod/himalaya/issues/136
 [#138]: https://github.com/soywod/himalaya/issues/138
 [#141]: https://github.com/soywod/himalaya/issues/141
+[#144]: https://github.com/soywod/himalaya/issues/144
