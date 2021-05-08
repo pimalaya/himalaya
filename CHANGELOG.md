@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Get signature from file [#135]
+- [**BREAKING**] Split `idle` command into two commands:
+  - `notify`: Runs `notify-cmd` when a new message arrives to the server
+  - `watch`: Runs `watch-cmds` when any change occurs on the server
 
 ## [0.3.1] - 2021-05-04
 

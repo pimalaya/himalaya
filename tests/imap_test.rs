@@ -12,6 +12,7 @@ fn get_account(addr: &str) -> Account {
         default_page_size: None,
         default: Some(true),
         email: addr.into(),
+        watch_cmds: None,
         imap_host: String::from("localhost"),
         imap_port: 3993,
         imap_starttls: Some(false),
@@ -73,7 +74,11 @@ fn msg() {
     // List messages
     // TODO: check non-existance of \Seen flag
     let msgs = imap_conn.list_msgs("INBOX", &10, &0).unwrap();
-    let msgs = Msgs::from(&msgs);
+    let msgs = if let Some(ref fetches) = msgs {
+        Msgs::from(fetches)
+    } else {
+        Msgs::new()
+    };
     assert_eq!(msgs.0.len(), 2);
 
     let msg_a = msgs
@@ -105,10 +110,7 @@ fn msg() {
         .add_flags("INBOX", &msg_b.uid.to_string(), "\\Deleted")
         .unwrap();
     imap_conn.expunge("INBOX").unwrap();
-    assert!(match imap_conn.list_msgs("INBOX", &10, &0) {
-        Err(err) => err.to_string() == "The `INBOX` mailbox is empty",
-        Ok(_) => false,
-    });
+    assert!(imap_conn.list_msgs("INBOX", &10, &0).unwrap().is_none());
 
     // Logout
     imap_conn.logout();
