@@ -569,7 +569,7 @@ pub fn msg_matches(app: &App) -> Result<bool> {
         let msg = Msg::from(imap_conn.read_msg(&app.mbox, &uid)?);
         let mut flags = msg.flags.deref().to_vec();
         flags.push(Flag::Seen);
-        imap_conn.append_msg(target, &msg.raw, msg.flags.deref())?;
+        imap_conn.append_msg(target, &msg.raw, &flags)?;
         imap_conn.add_flags(&app.mbox, uid, "\\Seen \\Deleted")?;
         debug!("message {} successfully moved to folder `{}`", uid, target);
         app.output.print(format!(
