@@ -251,7 +251,6 @@ impl Config {
             .or_else(|| self.watch_cmds.as_ref())
             .map(|cmds| cmds.to_owned())
             .unwrap_or_default();
-        debug!("cmds: {:?}", cmds);
 
         thread::spawn(move || {
             debug!("batch execution of {} cmd(s)", cmds.len());

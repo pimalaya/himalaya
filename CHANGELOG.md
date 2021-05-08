@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Mailbox attributes [#134]
+- Wiki entry about new messages counter [#121]
 
 ### Changed
 
@@ -239,6 +240,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#89]: https://github.com/soywod/himalaya/issues/89
 [#96]: https://github.com/soywod/himalaya/issues/96
 [#100]: https://github.com/soywod/himalaya/issues/100
+[#121]: https://github.com/soywod/himalaya/issues/121
 [#122]: https://github.com/soywod/himalaya/issues/122
 [#123]: https://github.com/soywod/himalaya/issues/123
 [#125]: https://github.com/soywod/himalaya/issues/125
