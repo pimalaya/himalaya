@@ -23,6 +23,32 @@ It is highly recommanded to have this option on:
 set hidden
 ```
 
+## Configuration
+
+### Mailbox picker provider
+
+```vim
+let g:himalaya_mailbox_picker = 'native' | 'fzf' | 'telescope'
+```
+
+Defines the provider used for picking mailboxes:
+
+- `native`: a vim native input
+- `fzf`: https://github.com/junegunn/fzf.vim
+- `telescope`: https://github.com/nvim-telescope/telescope.nvim
+
+If no value given, the first loaded (and available) provider will be used (fzf
+> telescope > native).
+
+### Telescope preview
+
+```vim
+let g:himalaya_telescope_preview_enabled = 0
+```
+
+Should enable telescope preview when picking a mailbox with the telescope
+provider.
+
 ## Usage
 
 ### List messages view
@@ -43,7 +69,10 @@ set hidden
 | Reply to the focused msg | `gr` |
 | Reply all to the focused msg | `gR` |
 | Forward the focused message | `gf` |
-| Download all focused msg attachments | `ga` |
+| Download attachments from focused message | `ga` |
+| Copy the focused message | `gC` |
+| Move the focused message | `gM` |
+| Delete the focused message(s) | `gD` |
 
 They can be customized:
 
@@ -57,6 +86,9 @@ nmap gr   <plug>(himalaya-msg-reply)
 nmap gR   <plug>(himalaya-msg-reply-all)
 nmap gf   <plug>(himalaya-msg-forward)
 nmap ga   <plug>(himalaya-msg-attachments)
+nmap gC   <plug>(himalaya-msg-copy)
+nmap gM   <plug>(himalaya-msg-move)
+nmap gD   <plug>(himalaya-msg-delete)
 ```
 
 ### List mailboxes
@@ -84,6 +116,9 @@ With [fzf](https://github.com/junegunn/fzf) support:
 | Reply all to the msg | `gR` |
 | Forward the message | `gf` |
 | Download all msg attachments | `ga` |
+| Copy the message | `gC` |
+| Move the message | `gM` |
+| Delete the message | `gD` |
 
 They can be customized:
 
@@ -93,6 +128,9 @@ nmap gr <plug>(himalaya-msg-reply)
 nmap gR <plug>(himalaya-msg-reply-all)
 nmap gf <plug>(himalaya-msg-forward)
 nmap ga <plug>(himalaya-msg-attachments)
+nmap gC <plug>(himalaya-msg-copy)
+nmap gM <plug>(himalaya-msg-move)
+nmap gD <plug>(himalaya-msg-delete)
 ```
 
 ### Write message view

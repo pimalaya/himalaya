@@ -147,7 +147,11 @@ function! himalaya#msg#forward()
   endtry
 endfunction
 
-function! himalaya#msg#copy(target_mbox)
+function! himalaya#msg#copy()
+  call himalaya#mbox#pick("himalaya#msg#_copy")
+endfunction
+
+function! himalaya#msg#_copy(target_mbox)
   try
     let pos = getpos(".")
     let msg_id = stridx(bufname("%"), "Himalaya messages") == 0 ? s:get_focused_msg_id() : s:msg_id
@@ -162,7 +166,11 @@ function! himalaya#msg#copy(target_mbox)
   endtry
 endfunction
 
-function! himalaya#msg#move(target_mbox)
+function! himalaya#msg#move()
+  call himalaya#mbox#pick("himalaya#msg#_move")
+endfunction
+
+function! himalaya#msg#_move(target_mbox)
   try
     let msg_id = stridx(bufname("%"), "Himalaya messages") == 0 ? s:get_focused_msg_id() : s:msg_id
     let choice = input(printf("Are you sure you want to move the message %d? (y/N) ", msg_id))

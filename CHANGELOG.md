@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Mailbox attributes [#134]
 - Wiki entry about new messages counter [#121]
+- Copy/move/delete a message in vim [#95]
 
 ### Changed
 
@@ -241,6 +242,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#86]: https://github.com/soywod/himalaya/issues/86
 [#87]: https://github.com/soywod/himalaya/issues/87
 [#89]: https://github.com/soywod/himalaya/issues/89
+[#95]: https://github.com/soywod/himalaya/issues/95
 [#96]: https://github.com/soywod/himalaya/issues/96
 [#100]: https://github.com/soywod/himalaya/issues/100
 [#121]: https://github.com/soywod/himalaya/issues/121

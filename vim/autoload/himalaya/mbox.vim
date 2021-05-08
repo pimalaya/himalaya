@@ -70,7 +70,11 @@ function! himalaya#mbox#pick(cb)
   endtry
 endfunction
 
-function! himalaya#mbox#set(mbox)
+function! himalaya#mbox#change()
+  call himalaya#mbox#pick("himalaya#mbox#_change")
+endfunction
+
+function! himalaya#mbox#_change(mbox)
   let s:curr_mbox = a:mbox
   let s:curr_page = 0
   call himalaya#msg#list()
