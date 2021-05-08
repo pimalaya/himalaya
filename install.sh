@@ -7,16 +7,15 @@ die() {
     exit "${2-1}"
 }
 
-DESTDIR="${DESTDIR:-/}"
+DESTDIR="${DESTDIR:-}"
 PREFIX="${PREFIX:-"$DESTDIR/usr/local"}"
 RELEASES_URL="https://github.com/soywod/himalaya/releases"
 
 system=$(uname -s | tr [:upper:] [:lower:])
-
 case $system in
-  msys*|mingw*|cygwin*|win*) system=windows;;
-  linux|freebsd) system=linux;;
-  darwin) system=macos;;
+  msys*|mingw*|cygwin*|win*) system=windows; binary=himalaya.exe;;
+  linux|freebsd) system=linux; binary=himalaya;;
+  darwin) system=macos; binary=himalaya;;
   *) die "Unsupported system: $system" ;;
 esac
 
@@ -31,6 +30,6 @@ echo "Installing binary…"
 tar -xzf "$tmpdir/himalaya.tar.gz" -C "$tmpdir"
 
 mkdir -p "$PREFIX/bin"
-cp -f -- "$tmpdir/himalaya*" "$PREFIX/bin/"
+cp -f -- "$tmpdir/$binary" "$PREFIX/bin/$binary"
 
-die "$("$PREFIX/bin/himalaya" --version) installed!" 0
+die "$("$PREFIX/bin/$binary" --version) installed!" 0
