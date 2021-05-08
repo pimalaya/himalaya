@@ -18,6 +18,27 @@ function! himalaya#mbox#next_page()
   call himalaya#msg#list()
 endfunction
 
+" Pickers
+
+function! s:telescope_picker(cb, mboxes)
+  call luaeval("require('himalaya.mbox').mbox_picker")(a:cb, a:mboxes)
+endfunction
+
+function! s:fzf_picker(cb, mboxes)
+  call fzf#run({
+    \"source": a:mboxes,
+    \"sink": a:cb,
+    \"down": "25%",
+  \})
+endfunction
+
+function! s:native_picker(cb, mboxes)
+  let choice = map(copy(a:mboxes), "printf('%s (%d)', v:val, v:key)")
+  let choice = input(join(choice, ", ") . ": ")
+  redraw | echo
+  call function(a:cb)(a:mboxes[choice])
+endfunction
+
 " Mailbox
 
 let s:curr_mbox = "INBOX"
@@ -25,49 +46,23 @@ function! himalaya#mbox#curr_mbox()
   return s:curr_mbox
 endfunction
 
-function! s:telescope_picker(mboxes)
-  call luaeval('require("himalaya.mbox").mbox_picker')(a:mboxes)
-endfunction
-
-function! s:fzf_picker(mboxes)
-  call fzf#run({
-    \"source": a:mboxes,
-    \"sink": function("himalaya#mbox#post_input"),
-    \"down": "25%",
-  \})
-endfunction
-
-function! s:native_picker(mboxes)
-  let choice = map(copy(a:mboxes), "printf('%s (%d)', v:val, v:key)")
-  let choice = input(join(choice, ", ") . ": ")
-  redraw | echo
-  call himalaya#mbox#post_input(a:mboxes[choice])
-endfunction
-
-let s:pickers = {
-  \"telescope": function("s:telescope_picker"),
-  \"fzf": function("s:fzf_picker"),
-  \"native": function("s:native_picker"),
-\}
-
-function! himalaya#mbox#input()
+function! himalaya#mbox#pick(cb)
   try
     let mboxes = map(s:cli("mailboxes", [], "Fetching mailboxes", 0), "v:val.name")
 
-    " Get user choice for picker, otherwise check runtimepath
     if exists("g:himalaya_mailbox_picker")
-      let mbox_picker = g:himalaya_mailbox_picker
+      let picker = g:himalaya_mailbox_picker
     else
       if &rtp =~ "telescope"
-        let mbox_picker = "telescope"
+        let picker = "telescope"
       elseif &rtp =~ "fzf"
-        let mbox_picker = "fzf"
+        let picker = "fzf"
       else
-        let mbox_picker = "native"
+        let picker = "native"
       endif
     endif
 
-    call s:pickers[mbox_picker](mboxes)
+    execute printf("call s:%s_picker(a:cb, mboxes)", picker)
   catch
     if !empty(v:exception)
       redraw | call himalaya#shared#log#err(v:exception)
@@ -75,7 +70,7 @@ function! himalaya#mbox#input()
   endtry
 endfunction
 
-function! himalaya#mbox#post_input(mbox)
+function! himalaya#mbox#set(mbox)
   let s:curr_mbox = a:mbox
   let s:curr_page = 0
   call himalaya#msg#list()

@@ -30,7 +30,7 @@ local function entry_maker(entry)
   }
 end
 
-M.mbox_picker = function(mboxes)
+M.mbox_picker = function(cb, mboxes)
   local finder_opts = {results = mboxes}
   local previewer = nil
   if vim.g.himalaya_telescope_preview_enabled then
@@ -45,7 +45,7 @@ M.mbox_picker = function(mboxes)
       actions.select_default:replace(function()
         local selection = action_state.get_selected_entry()
         actions.close(prompt_bufnr)
-        vim.fn['himalaya#mbox#post_input'](selection.display)
+        vim.fn[cb](selection.display)
       end)
 
       return true

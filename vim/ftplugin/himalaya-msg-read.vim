@@ -8,9 +8,9 @@ setlocal nomodifiable
 syntax on
 
 call himalaya#shared#bindings#define([
-  \["n", "gw", "msg#write"      ],
-  \["n", "gr", "msg#reply"      ],
-  \["n", "gR", "msg#reply_all"  ],
-  \["n", "gf", "msg#forward"    ],
-  \["n", "ga", "msg#attachments"],
+  \["n", "gw", "msg#write()"      ],
+  \["n", "gr", "msg#reply()"      ],
+  \["n", "gR", "msg#reply_all()"  ],
+  \["n", "gf", "msg#forward()"    ],
+  \["n", "ga", "msg#attachments()"],
 \])

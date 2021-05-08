@@ -147,6 +147,55 @@ function! himalaya#msg#forward()
   endtry
 endfunction
 
+function! himalaya#msg#copy(target_mbox)
+  try
+    let pos = getpos(".")
+    let msg_id = stridx(bufname("%"), "Himalaya messages") == 0 ? s:get_focused_msg_id() : s:msg_id
+    let source_mbox = himalaya#mbox#curr_mbox()
+    let msg = s:cli("--mailbox %s copy %d %s", [shellescape(source_mbox), msg_id, shellescape(a:target_mbox)], "Copying message", 1)
+    call himalaya#msg#list_with(source_mbox, himalaya#mbox#curr_page(), 1)
+    call setpos('.', pos)
+  catch
+    if !empty(v:exception)
+      redraw | call himalaya#shared#log#err(v:exception)
+    endif
+  endtry
+endfunction
+
+function! himalaya#msg#move(target_mbox)
+  try
+    let msg_id = stridx(bufname("%"), "Himalaya messages") == 0 ? s:get_focused_msg_id() : s:msg_id
+    let choice = input(printf("Are you sure you want to move the message %d? (y/N) ", msg_id))
+    if tolower(choice) != "y" | redraw | echo | return | endif
+    let pos = getpos(".")
+    let source_mbox = himalaya#mbox#curr_mbox()
+    let msg = s:cli("--mailbox %s move %d %s", [shellescape(source_mbox), msg_id, shellescape(a:target_mbox)], "Moving message", 1)
+    call himalaya#msg#list_with(source_mbox, himalaya#mbox#curr_page(), 1)
+    call setpos('.', pos)
+  catch
+    if !empty(v:exception)
+      redraw | call himalaya#shared#log#err(v:exception)
+    endif
+  endtry
+endfunction
+
+function! himalaya#msg#delete()
+  try
+    let msg_id = stridx(bufname("%"), "Himalaya messages") == 0 ? s:get_focused_msg_id() : s:msg_id
+    let choice = input(printf("Are you sure you want to delete the message %d? (y/N) ", msg_id))
+    if tolower(choice) != "y" | redraw | echo | return | endif
+    let pos = getpos(".")
+    let mbox = himalaya#mbox#curr_mbox()
+    let msg = s:cli("--mailbox %s delete %d", [shellescape(mbox), msg_id], "Deleting message", 1)
+    call himalaya#msg#list_with(mbox, himalaya#mbox#curr_page(), 1)
+    call setpos('.', pos)
+  catch
+    if !empty(v:exception)
+      redraw | call himalaya#shared#log#err(v:exception)
+    endif
+  endtry
+endfunction
+
 function! himalaya#msg#draft_save()
   let s:draft = join(getline(1, "$"), "\n")
   redraw | call s:log("Save draft [OK]")
