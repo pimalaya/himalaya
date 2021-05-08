@@ -166,7 +166,8 @@ function! himalaya#msg#move(target_mbox)
   try
     let msg_id = stridx(bufname("%"), "Himalaya messages") == 0 ? s:get_focused_msg_id() : s:msg_id
     let choice = input(printf("Are you sure you want to move the message %d? (y/N) ", msg_id))
-    if tolower(choice) != "y" | redraw | echo | return | endif
+    redraw | echo
+    if choice != "y" | return | endif
     let pos = getpos(".")
     let source_mbox = himalaya#mbox#curr_mbox()
     let msg = s:cli("--mailbox %s move %d %s", [shellescape(source_mbox), msg_id, shellescape(a:target_mbox)], "Moving message", 1)
@@ -179,14 +180,15 @@ function! himalaya#msg#move(target_mbox)
   endtry
 endfunction
 
-function! himalaya#msg#delete()
+function! himalaya#msg#delete() range
   try
-    let msg_id = stridx(bufname("%"), "Himalaya messages") == 0 ? s:get_focused_msg_id() : s:msg_id
-    let choice = input(printf("Are you sure you want to delete the message %d? (y/N) ", msg_id))
-    if tolower(choice) != "y" | redraw | echo | return | endif
+    let msg_ids = stridx(bufname("%"), "Himalaya messages") == 0 ? s:get_focused_msg_ids(a:firstline, a:lastline) : s:msg_id
+    let choice = input(printf("Are you sure you want to delete message(s) %s? (y/N) ", msg_ids))
+    redraw | echo
+    if choice != "y" | return | endif
     let pos = getpos(".")
     let mbox = himalaya#mbox#curr_mbox()
-    let msg = s:cli("--mailbox %s delete %d", [shellescape(mbox), msg_id], "Deleting message", 1)
+    let msg = s:cli("--mailbox %s delete %s", [shellescape(mbox), msg_ids], "Deleting message(s)", 1)
     call himalaya#msg#list_with(mbox, himalaya#mbox#curr_page(), 1)
     call setpos('.', pos)
   catch
@@ -290,5 +292,13 @@ function! s:get_focused_msg_id()
     return s:trim(split(getline("."), "|")[0])
   catch
     throw "message not found"
+  endtry
+endfunction
+
+function! s:get_focused_msg_ids(from, to)
+  try
+    return join(map(range(a:from, a:to), "s:trim(split(getline(v:val), '|')[0])"), ",")
+  catch
+    throw "messages not found"
   endtry
 endfunction

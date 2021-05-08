@@ -17,4 +17,5 @@ call himalaya#shared#bindings#define([
   \["n", "gC"  , "mbox#pick('himalaya#msg#copy')"],
   \["n", "gM"  , "mbox#pick('himalaya#msg#move')"],
   \["n", "gD"  , "msg#delete()"                  ],
+  \["v", "gD"  , "msg#delete()"                  ],
 \])
