@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `\Seen` flag when moving a message
+- Attachments arg for reply and forward commands [#109]
+
+### Changed
+
+- [**BREAKING**] Short version of reply `--all` arg is now `-A` to avoid conflicts with `--attachment|-a`
 
 ### Removed
 
@@ -260,6 +265,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#95]: https://github.com/soywod/himalaya/issues/95
 [#96]: https://github.com/soywod/himalaya/issues/96
 [#100]: https://github.com/soywod/himalaya/issues/100
+[#109]: https://github.com/soywod/himalaya/issues/109
 [#121]: https://github.com/soywod/himalaya/issues/121
 [#122]: https://github.com/soywod/himalaya/issues/122
 [#123]: https://github.com/soywod/himalaya/issues/123

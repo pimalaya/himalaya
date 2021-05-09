@@ -39,7 +39,7 @@ pub fn uid_arg<'a>() -> clap::Arg<'a, 'a> {
 fn reply_all_arg<'a>() -> clap::Arg<'a, 'a> {
     clap::Arg::with_name("reply-all")
         .help("Includes all recipients")
-        .short("a")
+        .short("A")
         .long("all")
 }
 
@@ -126,11 +126,13 @@ pub fn msg_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
             .aliases(&["rep", "re"])
             .about("Answers to a message")
             .arg(uid_arg())
-            .arg(reply_all_arg()),
+            .arg(reply_all_arg())
+            .arg(attachment_arg()),
         clap::SubCommand::with_name("forward")
             .aliases(&["fwd", "f"])
             .about("Forwards a message")
-            .arg(uid_arg()),
+            .arg(uid_arg())
+            .arg(attachment_arg()),
         clap::SubCommand::with_name("copy")
             .aliases(&["cp", "c"])
             .about("Copies a message to the targetted mailbox")
