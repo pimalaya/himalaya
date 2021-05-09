@@ -340,7 +340,7 @@ pub fn msg_matches(app: &App) -> Result<bool> {
                         debug!("sending message…");
                         let msg = msg.to_sendable_msg()?;
                         smtp::send(&app.account, &msg)?;
-                        imap_conn.append_msg("Sent", &msg.formatted(), &[Flag::Seen])?;
+                        imap_conn.append_msg("Sent", &msg.formatted(), vec![Flag::Seen])?;
                         input::remove_draft()?;
                         app.output.print("Message successfully sent");
                         break;
@@ -352,7 +352,7 @@ pub fn msg_matches(app: &App) -> Result<bool> {
                     input::PostEditChoice::LocalDraft => break,
                     input::PostEditChoice::RemoteDraft => {
                         debug!("saving to draft…");
-                        imap_conn.append_msg("Drafts", &msg.to_vec()?, &[Flag::Seen])?;
+                        imap_conn.append_msg("Drafts", &msg.to_vec()?, vec![Flag::Seen])?;
                         input::remove_draft()?;
                         app.output.print("Message successfully saved to Drafts");
                         break;
@@ -401,7 +401,7 @@ pub fn msg_matches(app: &App) -> Result<bool> {
                         debug!("sending message…");
                         let msg = msg.to_sendable_msg()?;
                         smtp::send(&app.account, &msg)?;
-                        imap_conn.append_msg("Sent", &msg.formatted(), &[Flag::Seen])?;
+                        imap_conn.append_msg("Sent", &msg.formatted(), vec![Flag::Seen])?;
                         imap_conn.add_flags(&app.mbox, uid, "\\Answered")?;
                         input::remove_draft()?;
                         app.output.print("Message successfully sent");
@@ -414,7 +414,7 @@ pub fn msg_matches(app: &App) -> Result<bool> {
                     input::PostEditChoice::LocalDraft => break,
                     input::PostEditChoice::RemoteDraft => {
                         debug!("saving to draft…");
-                        imap_conn.append_msg("Drafts", &msg.to_vec()?, &[Flag::Seen])?;
+                        imap_conn.append_msg("Drafts", &msg.to_vec()?, vec![Flag::Seen])?;
                         input::remove_draft()?;
                         app.output.print("Message successfully saved to Drafts");
                         break;
@@ -459,7 +459,7 @@ pub fn msg_matches(app: &App) -> Result<bool> {
                         debug!("sending message…");
                         let msg = msg.to_sendable_msg()?;
                         smtp::send(&app.account, &msg)?;
-                        imap_conn.append_msg("Sent", &msg.formatted(), &[Flag::Seen])?;
+                        imap_conn.append_msg("Sent", &msg.formatted(), vec![Flag::Seen])?;
                         input::remove_draft()?;
                         app.output.print("Message successfully sent");
                         break;
@@ -471,7 +471,7 @@ pub fn msg_matches(app: &App) -> Result<bool> {
                     input::PostEditChoice::LocalDraft => break,
                     input::PostEditChoice::RemoteDraft => {
                         debug!("saving to draft…");
-                        imap_conn.append_msg("Drafts", &msg.to_vec()?, &[Flag::Seen])?;
+                        imap_conn.append_msg("Drafts", &msg.to_vec()?, vec![Flag::Seen])?;
                         input::remove_draft()?;
                         app.output.print("Message successfully saved to Drafts");
                         break;
@@ -548,7 +548,7 @@ pub fn msg_matches(app: &App) -> Result<bool> {
         let msg = Msg::from(imap_conn.read_msg(&app.mbox, &uid)?);
         let mut flags = msg.flags.deref().to_vec();
         flags.push(Flag::Seen);
-        imap_conn.append_msg(target, &msg.raw, &flags)?;
+        imap_conn.append_msg(target, &msg.raw, flags)?;
         debug!("message {} successfully copied to folder `{}`", uid, target);
         app.output.print(format!(
             "Message {} successfully copied to folder `{}`",
@@ -569,9 +569,9 @@ pub fn msg_matches(app: &App) -> Result<bool> {
 
         let mut imap_conn = ImapConnector::new(&app.account)?;
         let msg = Msg::from(imap_conn.read_msg(&app.mbox, &uid)?);
-        let mut flags = msg.flags.deref().to_vec();
+        let mut flags = msg.flags.to_vec();
         flags.push(Flag::Seen);
-        imap_conn.append_msg(target, &msg.raw, &flags)?;
+        imap_conn.append_msg(target, &msg.raw, flags)?;
         imap_conn.add_flags(&app.mbox, uid, "\\Seen \\Deleted")?;
         debug!("message {} successfully moved to folder `{}`", uid, target);
         app.output.print(format!(
@@ -624,7 +624,7 @@ pub fn msg_matches(app: &App) -> Result<bool> {
         let msg = Msg::from(msg.to_string());
         let msg = msg.to_sendable_msg()?;
         smtp::send(&app.account, &msg)?;
-        imap_conn.append_msg("Sent", &msg.formatted(), &[Flag::Seen])?;
+        imap_conn.append_msg("Sent", &msg.formatted(), vec![Flag::Seen])?;
 
         imap_conn.logout();
         return Ok(true);
@@ -636,7 +636,7 @@ pub fn msg_matches(app: &App) -> Result<bool> {
         let mut imap_conn = ImapConnector::new(&app.account)?;
         let msg = matches.value_of("message").unwrap();
         let msg = Msg::from(msg.to_string());
-        imap_conn.append_msg(&app.mbox, &msg.to_vec()?, &[Flag::Seen])?;
+        imap_conn.append_msg(&app.mbox, &msg.to_vec()?, vec![Flag::Seen])?;
 
         imap_conn.logout();
         return Ok(true);

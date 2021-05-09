@@ -235,6 +235,7 @@ impl<'m> From<&'m imap::types::Fetch> for Msg<'m> {
                 flags: Flags::new(fetch.flags()),
                 subject: envelope
                     .subject
+                    .as_ref()
                     .and_then(|subj| rfc2047_decoder::decode(subj).ok())
                     .unwrap_or_default(),
                 sender: envelope
@@ -243,14 +244,17 @@ impl<'m> From<&'m imap::types::Fetch> for Msg<'m> {
                     .and_then(|addrs| addrs.first())
                     .and_then(|addr| {
                         addr.name
+                            .as_ref()
                             .and_then(|name| rfc2047_decoder::decode(name).ok())
                             .or_else(|| {
                                 let mbox = addr
                                     .mailbox
+                                    .as_ref()
                                     .and_then(|mbox| String::from_utf8(mbox.to_vec()).ok())
                                     .unwrap_or(String::from("unknown"));
                                 let host = addr
                                     .host
+                                    .as_ref()
                                     .and_then(|host| String::from_utf8(host.to_vec()).ok())
                                     .unwrap_or(String::from("unknown"));
                                 Some(format!("{}@{}", mbox, host))

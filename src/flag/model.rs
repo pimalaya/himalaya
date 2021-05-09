@@ -12,7 +12,7 @@ impl<'f> Serialize for SerializableFlag<'f> {
     where
         S: Serializer,
     {
-        serializer.serialize_str(match &self.0 {
+        serializer.serialize_str(match self.0 {
             Flag::Seen => "Seen",
             Flag::Answered => "Answered",
             Flag::Flagged => "Flagged",
@@ -21,6 +21,7 @@ impl<'f> Serialize for SerializableFlag<'f> {
             Flag::Recent => "Recent",
             Flag::MayCreate => "MayCreate",
             Flag::Custom(cow) => cow,
+            _ => "Unknown",
         })
     }
 }

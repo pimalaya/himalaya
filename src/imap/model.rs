@@ -119,7 +119,11 @@ impl<'a> ImapConnector<'a> {
                 .idle()
                 .and_then(|mut idle| {
                     idle.set_keepalive(std::time::Duration::new(keepalive, 0));
-                    idle.wait_keepalive()
+                    idle.wait_keepalive_while(|res| {
+                        // TODO: handle response
+                        trace!("idle response: {:?}", res);
+                        false
+                    })
                 })
                 .chain_err(|| "Could not start the idle mode")?;
 
@@ -173,7 +177,11 @@ impl<'a> ImapConnector<'a> {
                 .idle()
                 .and_then(|mut idle| {
                     idle.set_keepalive(std::time::Duration::new(keepalive, 0));
-                    idle.wait_keepalive()
+                    idle.wait_keepalive_while(|res| {
+                        // TODO: handle response
+                        trace!("idle response: {:?}", res);
+                        false
+                    })
                 })
                 .chain_err(|| "Could not start the idle mode")?;
             app.config.exec_watch_cmds(&app.account)?;
@@ -274,9 +282,11 @@ impl<'a> ImapConnector<'a> {
         }
     }
 
-    pub fn append_msg(&mut self, mbox: &str, msg: &[u8], flags: &[Flag]) -> Result<()> {
+    pub fn append_msg(&mut self, mbox: &str, msg: &[u8], flags: Vec<Flag>) -> Result<()> {
         self.sess
-            .append_with_flags(mbox, msg, flags)
+            .append(mbox, msg)
+            .flags(flags)
+            .finish()
             .chain_err(|| format!("Could not append message to `{}`", mbox))?;
 
         Ok(())
