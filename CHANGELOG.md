@@ -9,7 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- \Seen flag when moving a message
+- `\Seen` flag when moving a message
+
+### Removed
+
+- `Content-Type` from templates [#146]
 
 ## [0.3.2] - 2021-05-08
 
@@ -271,3 +275,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#138]: https://github.com/soywod/himalaya/issues/138
 [#141]: https://github.com/soywod/himalaya/issues/141
 [#144]: https://github.com/soywod/himalaya/issues/144
+[#146]: https://github.com/soywod/himalaya/issues/146

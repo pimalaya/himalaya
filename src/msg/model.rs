@@ -326,7 +326,7 @@ impl<'m> Msg<'m> {
                         "7bit" => encoding = ContentTransferEncoding::SevenBit,
                         "quoted-printable" => encoding = ContentTransferEncoding::QuotedPrintable,
                         "base64" => encoding = ContentTransferEncoding::Base64,
-                        _ => warn!("unsupported encoding, we use base64 for your message"),
+                        _ => warn!("unsupported encoding, default to base64"),
                     }
                     msg
                 }
@@ -351,7 +351,7 @@ impl<'m> Msg<'m> {
                     .map(|fname| fname.to_string_lossy())
                     .unwrap_or(Cow::from(Uuid::new_v4().to_string()));
                 let attachment_content = fs::read(attachment)
-                    .chain_err(|| format!("Cannot read attachment `{}`", attachment))?;
+                    .chain_err(|| format!("Could not read attachment `{}`", attachment))?;
                 let attachment_ctype = tree_magic::from_u8(&attachment_content);
 
                 parts = parts.singlepart(
@@ -540,10 +540,6 @@ impl<'m> Msg<'m> {
         Msg::build_tpl(config, account, msg_spec)
     }
 
-    fn add_content_headers(tpl: &mut Vec<String>) {
-        tpl.push("Content-Type: text/plain; charset=utf-8".to_string());
-    }
-
     fn add_from_header(tpl: &mut Vec<String>, from: Option<String>) {
         tpl.push(format!("From: {}", from.unwrap_or_else(String::new)));
     }
@@ -596,7 +592,6 @@ impl<'m> Msg<'m> {
 
     fn build_tpl(config: &Config, account: &Account, msg_spec: MsgSpec) -> Result<Tpl> {
         let mut tpl = vec![];
-        Msg::add_content_headers(&mut tpl);
         Msg::add_from_header(&mut tpl, Some(config.address(account)));
         Msg::add_in_reply_to_header(&mut tpl, msg_spec.in_reply_to);
         Msg::add_cc_header(&mut tpl, msg_spec.cc);

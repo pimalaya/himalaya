@@ -1,5 +1,3 @@
-syntax on
-
 setlocal bufhidden=wipe
 setlocal buftype=nofile
 setlocal cursorline
