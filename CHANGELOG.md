@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `\Seen` flag when moving a message
 - Attachments arg for reply and forward commands [#109]
+- Vim doc [#117]
 
 ### Changed
 
@@ -266,6 +267,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#96]: https://github.com/soywod/himalaya/issues/96
 [#100]: https://github.com/soywod/himalaya/issues/100
 [#109]: https://github.com/soywod/himalaya/issues/109
+[#117]: https://github.com/soywod/himalaya/issues/117
 [#121]: https://github.com/soywod/himalaya/issues/121
 [#122]: https://github.com/soywod/himalaya/issues/122
 [#123]: https://github.com/soywod/himalaya/issues/123

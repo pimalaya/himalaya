@@ -1,79 +1,80 @@
-*himalaya.txt* - ⏱ Minimalist task & time manager.
+*himalaya.txt* - 📫 CLI email client
                                                         
-                 _/    _/  _/      _/  _/_/_/_/    _/_/      _/_/_/   
-                _/    _/  _/_/    _/  _/        _/    _/  _/          
-               _/    _/  _/  _/  _/  _/_/_/    _/    _/  _/  _/_/     
-              _/    _/  _/    _/_/  _/        _/    _/  _/    _/      
-               _/_/    _/      _/  _/          _/_/      _/_/_/       
+    _/    _/  _/_/_/  _/      _/    _/_/    _/        _/_/  _/      _/   _/_/ 
+   _/    _/    _/    _/_/  _/_/  _/    _/  _/      _/    _/  _/  _/   _/    _/
+  _/_/_/_/    _/    _/  _/  _/  _/_/_/_/  _/      _/_/_/_/    _/     _/_/_/_/ 
+ _/    _/    _/    _/      _/  _/    _/  _/      _/    _/    _/     _/    _/  
+_/    _/  _/_/_/  _/      _/  _/    _/  _/_/_/  _/    _/    _/     _/    _/   
                                                         
 ==============================================================================
-TABLE OF CONTENTS                                             *himalaya-contents*
+TABLE OF CONTENTS                               *himalaya* *himalaya-contents*
 
-  Requirements .......................................... |himalaya-requirements|
-  Usage ........................................................ |himalaya-usage|
-  Mappings .................................................  |himalaya-mappings|
-  License .................................................... |himalaya-license|
-  Contributing .......................................... |himalaya-contributing|
-  Changelog ................................................ |himalaya-changelog|
-  Credits .................................................... |himalaya-credits|
+  Requirements ....................................... |himalaya-requirements|
+  Configuration ..................................... |himalaya-configuration|
+  Usage ..................................................... |himalaya-usage|
+  License ................................................. |himalaya-license|
 
 ==============================================================================
-REQUIREMENTS                                              *himalaya-requirements* 
+REQUIREMENTS                                           *himalaya-requirements* 
 
   - Vim or Neovim
   - Himalaya CLI {1}
-                              https://github.com/soywod/himalaya#installation {1}
+                           https://github.com/soywod/himalaya#installation {1}
 
 ==============================================================================
-USAGE                                                            *himalaya-usage* 
+CONFIGURATION                                         *himalaya-configuration* 
 
-It is recommanded to first read the Himalaya CLI documentation {1} to understand
-the concept.
+------------------------------------------------------------------------------
+MAILBOX PICKER PROVIDER
+>
+  let g:himalaya_mailbox_picker = 'native' | 'fzf' | 'telescope'
+<
+Defines the provider used for picking mailboxes:
 
-To list tasks:
+- `native`: a vim native input
+- `fzf`: https://github.com/junegunn/fzf.vim
+- `telescope`: https://github.com/nvim-telescope/telescope.nvim
+
+If no value given, the first loaded (and available) provider will be used (fzf
+> telescope > native).
+
+------------------------------------------------------------------------------
+TELESCOPE PREVIEW
+>
+  let g:himalaya_telescope_preview_enabled = 0
+<
+Should enable telescope preview when picking a mailbox with the telescope
+provider.
+
+==============================================================================
+USAGE                                                         *himalaya-usage* 
+
+It is recommanded to first read the Himalaya CLI documentation {1} to
+understand the concept and to configure it properly.
+
+Then, to list your emails:
 >
   :Himalaya
 <
-Then you can manage tasks using Vim mapping. The table will automatically
-readjust on buffer save (`:w`). See https://github.com/soywod/himalaya.vim.
+Change the current mbox                     gm
+Show previous page                          gp
+Show next page                              gn
+Read focused msg                            <Enter>
+Write a new msg                             gw
+Reply to the focused msg                    gr
+Reply all to the focused msg                gR
+Forward the focused message                 gf
+Download attachments from focused message   ga
+Copy the focused message                    gC
+Move the focused message                    gM
+Delete the focused message(s)               gD
 
-                                    https://github.com/soywod/himalaya#readme {1}
+                                 https://github.com/soywod/himalaya#readme {1}
 
 ==============================================================================
-MAPPINGS                                                      *himalaya-mappings* 
+LICENSE                                                     *himalaya-license*
 
-Here the default mappings:
-
-List done tasks             gd
-List deleted tasks          gD
-Toggle task                 <CR>
-Show task infos             {K}
-Set context                 {gc}
-Show worktime               {gw}
-Jump to the next cell       <C-n> 
-Jump to the prev cell       <C-p>
-Delete in cell              {dic}
-Change in cell              {cic}
-Visual in cell              {vic}
-
-You can customize them:
->
-  nmap gd     <plug>(himalaya-list-done)
-  nmap gD     <plug>(himalaya-list-deleted)
-  nmap <cr>   <plug>(himalaya-toggle)
-  nmap K      <plug>(himalaya-info)
-  nmap gc     <plug>(himalaya-context)
-  nmap gw     <plug>(himalaya-worktime)
-  nmap <c-n>  <plug>(himalaya-next-cell)
-  nmap <c-p>  <plug>(himalaya-prev-cell)
-  nmap dic    <plug>(himalaya-delete-in-cell)
-  nmap cic    <plug>(himalaya-change-in-cell)
-  nmap vic    <plug>(himalaya-visual-in-cell)
-<
-==============================================================================
-LICENSE                                                        *himalaya-license*
-
-Copyright © 2019-2020 Clément DOUIN <clement.douin@posteo.net>
+Copyright © 2020,2021 Clément DOUIN (AKA soywod) <clement.douin@posteo.net>
 
 All rights reserved.
 
@@ -103,47 +104,6 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-==============================================================================
-CONTRIBUTING                                              *himalaya-contributing*
-
-Report any bugs here: https://github.com/soywod/himalaya.vim/issues
-Feel free to submit pull requests: https://github.com/soywod/himalaya.vim/pulls
-
-1) Git commit messages follow the `Angular Convention` {1}, but contain only a
-subject.
->
-  - Use imperative, present tense: “change” not “changed” nor “changes”
-  - Don't capitalize first letter
-  - No dot (.) at the end
-<
-2) Vim code should be as clean as possible, variables and functions use the
-snake case convention. A line should never contain more than `80` characters.
-
-3) Tests should be added for each new functionality. Be sure to run tests
-before proposing a pull request.
-
-                https://gist.github.com/stephenparish/9941e89d80e2bc58a153 {1}
-
-==============================================================================
-CHANGELOG                                                    *himalaya-changelog*
-
-See https://github.com/soywod/himalaya.vim/blob/master/CHANGELOG.md.
-
-==============================================================================
-CREDITS                                                        *himalaya-credits*
-
-  - Taskwarrior, a task manager {1}
-  - Timewarrior, a time tracker {2}
-  - vim-taskwarrior, a Taskwarrior wrapper for vim {3}
-  - vimwiki, for the idea of managing tasks inside a buffer {4}
-  - Kronos, the Himalaya predecessor {5}
-
-                                                   https://taskwarrior.org {1}
-                                  https://taskwarrior.org/docs/timewarrior {2}
-                                https://github.com/blindFS/vim-taskwarrior {3}
-                                        https://github.com/vimwiki/vimwiki {4}
-                                      https://github.com/soywod/kronos.vim {5}
 
 ==============================================================================
 vim:tw=78:ts=4:ft=help:norl:
