@@ -339,7 +339,7 @@ impl<'m> Msg<'m> {
         });
 
         let text_part = SinglePart::builder()
-            .header(ContentType("text/plain; charset=utf-8".parse().unwrap()))
+            .header(ContentType::TEXT_PLAIN)
             .header(encoding)
             .body(parsed.get_body_raw()?);
 
@@ -360,17 +360,10 @@ impl<'m> Msg<'m> {
 
                 parts = parts.singlepart(
                     SinglePart::builder()
-                        .header(ContentType(attachment_ctype.parse().chain_err(|| {
+                        .content_type(attachment_ctype.parse().chain_err(|| {
                             format!("Could not parse content type `{}`", attachment_ctype)
-                        })?))
-                        .header(ContentDisposition {
-                            disposition: DispositionType::Attachment,
-                            parameters: vec![DispositionParam::Filename(
-                                Charset::Ext("utf-8".into()),
-                                None,
-                                attachment_name.as_bytes().into(),
-                            )],
-                        })
+                        })?)
+                        .header(ContentDisposition::attachment(&attachment_name))
                         .body(Body::new(attachment_content)),
                 );
             }
