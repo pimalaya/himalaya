@@ -223,7 +223,7 @@ fn msg_matches_list(app: &App, opt_matches: Option<&clap::ArgMatches>) -> Result
     app.output.print(msgs);
 
     imap_conn.logout();
-    return Ok(true);
+    Ok(true)
 }
 
 fn msg_matches_search(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
@@ -278,7 +278,7 @@ fn msg_matches_search(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
     app.output.print(msgs);
 
     imap_conn.logout();
-    return Ok(true);
+    Ok(true)
 }
 
 fn msg_matches_read(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
@@ -304,7 +304,7 @@ fn msg_matches_read(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
     }
 
     imap_conn.logout();
-    return Ok(true);
+    Ok(true)
 }
 
 fn msg_matches_attachments(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
@@ -340,7 +340,7 @@ fn msg_matches_attachments(app: &App, matches: &clap::ArgMatches) -> Result<bool
     ));
 
     imap_conn.logout();
-    return Ok(true);
+    Ok(true)
 }
 
 fn msg_matches_write(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
@@ -390,7 +390,7 @@ fn msg_matches_write(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
         }
     }
     imap_conn.logout();
-    return Ok(true);
+    Ok(true)
 }
 
 fn msg_matches_reply(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
@@ -453,7 +453,7 @@ fn msg_matches_reply(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
     }
 
     imap_conn.logout();
-    return Ok(true);
+    Ok(true)
 }
 
 fn msg_matches_forward(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
@@ -510,7 +510,7 @@ fn msg_matches_forward(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
     }
 
     imap_conn.logout();
-    return Ok(true);
+    Ok(true)
 }
 
 fn msg_matches_template(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
@@ -557,7 +557,7 @@ fn msg_matches_template(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
         imap_conn.logout();
     }
 
-    return Ok(true);
+    Ok(true)
 }
 
 fn msg_matches_copy(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
@@ -580,7 +580,7 @@ fn msg_matches_copy(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
     ));
 
     imap_conn.logout();
-    return Ok(true);
+    Ok(true)
 }
 
 fn msg_matches_move(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
@@ -605,7 +605,7 @@ fn msg_matches_move(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
 
     imap_conn.expunge(&app.mbox)?;
     imap_conn.logout();
-    return Ok(true);
+    Ok(true)
 }
 
 fn msg_matches_delete(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
@@ -622,7 +622,7 @@ fn msg_matches_delete(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
 
     imap_conn.expunge(&app.mbox)?;
     imap_conn.logout();
-    return Ok(true);
+    Ok(true)
 }
 
 fn msg_matches_send(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
@@ -651,7 +651,7 @@ fn msg_matches_send(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
     imap_conn.append_msg("Sent", &msg.formatted(), vec![Flag::Seen])?;
 
     imap_conn.logout();
-    return Ok(true);
+    Ok(true)
 }
 
 fn msg_matches_save(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
@@ -663,6 +663,6 @@ fn msg_matches_save(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
     imap_conn.append_msg(&app.mbox, &msg.to_vec()?, vec![Flag::Seen])?;
 
     imap_conn.logout();
-    return Ok(true);
+    Ok(true)
 }
 
