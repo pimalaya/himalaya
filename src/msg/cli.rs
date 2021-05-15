@@ -177,7 +177,6 @@ pub fn msg_matches(app: &App) -> Result<bool> {
         ("copy", Some(matches)) => msg_matches_copy(app, matches),
         ("delete", Some(matches)) => msg_matches_delete(app, matches),
         ("forward", Some(matches)) => msg_matches_forward(app, matches),
-        ("list", Some(matches)) => msg_matches_list(app, matches),
         ("move", Some(matches)) => msg_matches_move(app, matches),
         ("read", Some(matches)) => msg_matches_read(app, matches),
         ("reply", Some(matches)) => msg_matches_reply(app, matches),
@@ -186,37 +185,29 @@ pub fn msg_matches(app: &App) -> Result<bool> {
         ("send", Some(matches)) => msg_matches_send(app, matches),
         ("template", Some(matches)) => msg_matches_template(app, matches),
         ("write", Some(matches)) => msg_matches_write(app, matches),
-        (_other, _) => {
-            debug!("default list command matched");
 
-            let mut imap_conn = ImapConnector::new(&app.account)?;
-            let msgs =
-                imap_conn.list_msgs(&app.mbox, &app.config.default_page_size(&app.account), &0)?;
-            let msgs = if let Some(ref fetches) = msgs {
-                Msgs::from(fetches)
-            } else {
-                Msgs::new()
-            };
-            app.output.print(msgs);
-
-            imap_conn.logout();
-            Ok(true)
-        }
+        ("list", opt_matches) => msg_matches_list(app, opt_matches),
+        (_other, opt_matches) => msg_matches_list(app, opt_matches),
     }
 }
 
-fn msg_matches_list(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
+fn msg_matches_list(app: &App, opt_matches: Option<&clap::ArgMatches>) -> Result<bool> {
     debug!("list command matched");
 
-    let page_size: usize = matches
-        .value_of("page-size")
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(app.config.default_page_size(&app.account));
-    debug!("page size: {}", &page_size);
-    let page: usize = matches
-        .value_of("page")
-        .unwrap()
-        .parse()
+    let page_size: usize = opt_matches
+        .and_then(|matches| {
+            matches.value_of("page-size")
+            .and_then(|s| s.parse().ok())
+        })
+        .unwrap_or_else(|| app.config.default_page_size(&app.account));
+    debug!("page size: {:?}", page_size);
+    let page: usize = opt_matches
+        .and_then(|matches| {
+            matches.value_of("page")
+                .unwrap()
+                .parse()
+                .ok()
+        })
         .unwrap_or_default();
     debug!("page: {}", &page);
 
