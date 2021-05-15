@@ -172,73 +172,36 @@ pub fn msg_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
 }
 
 pub fn msg_matches(app: &App) -> Result<bool> {
-    if let Some(matches) = app.arg_matches.subcommand_matches("list") {
-        return msg_matches_list(app ,matches)
-    }
+    match app.arg_matches.subcommand() {
+        ("attachments", Some(matches)) => msg_matches_attachments(app, matches),
+        ("copy", Some(matches)) => msg_matches_copy(app, matches),
+        ("delete", Some(matches)) => msg_matches_delete(app, matches),
+        ("forward", Some(matches)) => msg_matches_forward(app, matches),
+        ("list", Some(matches)) => msg_matches_list(app, matches),
+        ("move", Some(matches)) => msg_matches_move(app, matches),
+        ("read", Some(matches)) => msg_matches_read(app, matches),
+        ("reply", Some(matches)) => msg_matches_reply(app, matches),
+        ("save", Some(matches)) => msg_matches_save(app, matches),
+        ("search", Some(matches)) => msg_matches_search(app, matches),
+        ("send", Some(matches)) => msg_matches_send(app, matches),
+        ("template", Some(matches)) => msg_matches_template(app, matches),
+        ("write", Some(matches)) => msg_matches_write(app, matches),
+        (_other, _) => {
+            debug!("default list command matched");
 
-    if let Some(matches) = app.arg_matches.subcommand_matches("search") {
-        return msg_matches_search(app, matches)
-    }
+            let mut imap_conn = ImapConnector::new(&app.account)?;
+            let msgs =
+                imap_conn.list_msgs(&app.mbox, &app.config.default_page_size(&app.account), &0)?;
+            let msgs = if let Some(ref fetches) = msgs {
+                Msgs::from(fetches)
+            } else {
+                Msgs::new()
+            };
+            app.output.print(msgs);
 
-    if let Some(matches) = app.arg_matches.subcommand_matches("read") {
-        return msg_matches_read(app, matches)
-    }
-
-    if let Some(matches) = app.arg_matches.subcommand_matches("attachments") {
-        return msg_matches_attachments(app, matches)
-    }
-
-    if let Some(matches) = app.arg_matches.subcommand_matches("write") {
-        return msg_matches_write(app, matches)
-    }
-
-    if let Some(matches) = app.arg_matches.subcommand_matches("reply") {
-        return msg_matches_reply(app, matches)
-    }
-
-    if let Some(matches) = app.arg_matches.subcommand_matches("forward") {
-        return msg_matches_forward(app, matches)
-    }
-
-    if let Some(matches) = app.arg_matches.subcommand_matches("template") {
-        return msg_matches_template(app, matches)
-    }
-
-    if let Some(matches) = app.arg_matches.subcommand_matches("copy") {
-        return msg_matches_copy(app, matches)
-    }
-
-    if let Some(matches) = app.arg_matches.subcommand_matches("move") {
-        return msg_matches_move(app, matches)
-    }
-
-    if let Some(matches) = app.arg_matches.subcommand_matches("delete") {
-        return msg_matches_delete(app, matches)
-    }
-
-    if let Some(matches) = app.arg_matches.subcommand_matches("send") {
-        return msg_matches_send(app, matches)
-    }
-
-    if let Some(matches) = app.arg_matches.subcommand_matches("save") {
-        return msg_matches_save(app, matches)
-    }
-
-    {
-        debug!("default list command matched");
-
-        let mut imap_conn = ImapConnector::new(&app.account)?;
-        let msgs =
-            imap_conn.list_msgs(&app.mbox, &app.config.default_page_size(&app.account), &0)?;
-        let msgs = if let Some(ref fetches) = msgs {
-            Msgs::from(fetches)
-        } else {
-            Msgs::new()
-        };
-        app.output.print(msgs);
-
-        imap_conn.logout();
-        Ok(true)
+            imap_conn.logout();
+            Ok(true)
+        }
     }
 }
 
