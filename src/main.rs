@@ -9,6 +9,7 @@ use himalaya::{
     comp::cli::{comp_matches, comp_subcmds},
     config::{cli::config_args, model::Config},
     flag::cli::{flag_matches, flag_subcmds},
+    himalaya_tui::himalaya_tui,
     imap::cli::{imap_matches, imap_subcmds},
     mbox::cli::{mbox_matches, mbox_source_arg, mbox_subcmds},
     msg::cli::{msg_matches, msg_subcmds},
@@ -55,23 +56,25 @@ fn run() -> Result<()> {
     }
 
     let output = Output::new(arg_matches.value_of("output").unwrap());
-    debug!("output: {:?}", output);
+    debug!("Output: {:?}", output);
 
-    debug!("init config");
+    debug!("## Init config ##");
+
     let custom_config: Option<PathBuf> = arg_matches.value_of("config").map(|s| s.into());
-    debug!("custom config path: {:?}", custom_config);
+    debug!("Custom config path: {:?}", custom_config);
+
     let config = Config::new(custom_config)?;
-    trace!("config: {:?}", config);
+    trace!("Config: {:?}", config);
 
     let account_name = arg_matches.value_of("account");
-    debug!("init account: {}", account_name.unwrap_or("default"));
+    debug!("Init account: {}", account_name.unwrap_or("default"));
     let account = config.find_account_by_name(account_name)?;
-    trace!("account: {:?}", account);
+    trace!("Account: {:?}", account);
 
     let mbox = arg_matches.value_of("mailbox").unwrap();
-    debug!("mailbox: {}", mbox);
+    debug!("Mailbox: {}", mbox);
 
-    debug!("begin matching");
+    debug!("Begin matching");
     let app = App::new(&config, &account, &output, &mbox, &arg_matches);
     let _matched =
         mbox_matches(&app)? || flag_matches(&app)? || imap_matches(&app)? || msg_matches(&app)?;

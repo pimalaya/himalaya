@@ -70,6 +70,14 @@ fn attachment_arg<'a>() -> clap::Arg<'a, 'a> {
         .takes_value(true)
 }
 
+/// Here are the most subcommands which are listed under the `SUBCOMMANDS`
+/// section. So if you execute the following:
+///
+/// ```bash
+/// himalaya --help
+/// ```
+///
+/// All subcommands under `SUBCOMMANDS` are listed in this function.
 pub fn msg_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
     vec![
         clap::SubCommand::with_name("list")
@@ -168,9 +176,27 @@ pub fn msg_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
                     .about("Generates a forward message template")
                     .arg(uid_arg()),
             ),
+        clap::SubCommand::with_name("tui").about("Start the TUI of himalaya"),
     ]
 }
 
+/// This function goes through all available subcommands which are declared in
+/// the [msg_subcmds](#msg_subcmds). It'll look which one the user applied and
+/// does the suitable associated steps.
+///
+/// # Example
+/// The user calls himalaya like this:
+///
+/// ```bash
+/// himalaya search
+/// ```
+///
+/// Than the if block with
+/// ```rust
+/// if let Some(matches) = app.arg_matches.subcommand_matches("search") {
+/// ```
+/// will be executed and the function returns.
+///
 pub fn msg_matches(app: &App) -> Result<bool> {
     if let Some(matches) = app.arg_matches.subcommand_matches("list") {
         debug!("list command matched");
@@ -639,6 +665,15 @@ pub fn msg_matches(app: &App) -> Result<bool> {
         imap_conn.append_msg(&app.mbox, &msg.to_vec()?, vec![Flag::Seen])?;
 
         imap_conn.logout();
+        return Ok(true);
+    }
+
+    if let Some(matches) = app.arg_matches.subcommand_matches("tui") {
+        debug!("TUI command matched");
+
+        println!("The TUI is currently on road and will reach himalaya soon.");
+        println!("(In other words: It's still under development)");
+
         return Ok(true);
     }
 

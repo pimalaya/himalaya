@@ -23,3 +23,5 @@ toml = "0.5.8"
 tree_magic = "0.2.3"
 unicode-width = "0.1.7"
 uuid = {version = "0.8", features = ["v4"]}
+crossterm = "0.19"
+tui = { version = "0.15", default-features = false, features = ['crossterm'] }

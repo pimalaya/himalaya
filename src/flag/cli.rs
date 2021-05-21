@@ -1,3 +1,9 @@
+//! This file includes all functions, which take care of the given arguments
+//! when calling himalya. So for example if you call himalaya like this:
+//!
+//! ```
+//! himalaya 
+
 use clap;
 use error_chain::error_chain;
 use log::debug;
