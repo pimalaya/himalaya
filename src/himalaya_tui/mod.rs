@@ -1,3 +1,5 @@
+pub mod cli;
+
 pub mod himalaya_tui {
 
     use std::io;

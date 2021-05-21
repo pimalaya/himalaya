@@ -9,7 +9,7 @@ use himalaya::{
     comp::cli::{comp_matches, comp_subcmds},
     config::{cli::config_args, model::Config},
     flag::cli::{flag_matches, flag_subcmds},
-    himalaya_tui::himalaya_tui,
+    himalaya_tui::cli::{himalaya_tui_matches, himalaya_tui_subcmds},
     imap::cli::{imap_matches, imap_subcmds},
     mbox::cli::{mbox_matches, mbox_source_arg, mbox_subcmds},
     msg::cli::{msg_matches, msg_subcmds},
@@ -35,11 +35,16 @@ fn parse_args<'a>() -> clap::App<'a, 'a> {
         .args(&output_args())
         .args(&config_args())
         .arg(mbox_source_arg())
+
+        // So in this part, we are "registing" all subcommands like the "tui"
+        // command of "himalaya tui". Each function in between the brackets of
+        // `subcommands()` includes the subcommands which suit teir category.
         .subcommands(flag_subcmds())
         .subcommands(imap_subcmds())
         .subcommands(mbox_subcmds())
         .subcommands(msg_subcmds())
         .subcommands(comp_subcmds())
+        .subcommands(himalaya_tui_subcmds())
 }
 
 fn run() -> Result<()> {
@@ -58,6 +63,7 @@ fn run() -> Result<()> {
     let output = Output::new(arg_matches.value_of("output").unwrap());
     debug!("Output: {:?}", output);
 
+    // This part will read the config file and stores it values.
     debug!("## Init config ##");
 
     let custom_config: Option<PathBuf> = arg_matches.value_of("config").map(|s| s.into());
@@ -77,7 +83,7 @@ fn run() -> Result<()> {
     debug!("Begin matching");
     let app = App::new(&config, &account, &output, &mbox, &arg_matches);
     let _matched =
-        mbox_matches(&app)? || flag_matches(&app)? || imap_matches(&app)? || msg_matches(&app)?;
+        mbox_matches(&app)? || flag_matches(&app)? || imap_matches(&app)? || msg_matches(&app)? || himalaya_tui_matches(&app)?;
 
     Ok(())
 }
