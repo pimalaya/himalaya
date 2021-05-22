@@ -9,7 +9,7 @@ use himalaya::{
     comp::cli::{comp_matches, comp_subcmds},
     config::{cli::config_args, model::Config},
     flag::cli::{flag_matches, flag_subcmds},
-    himalaya_tui::cli::{himalaya_tui_matches, himalaya_tui_subcmds},
+    tui::cli::{tui_matches, tui_subcmds},
     imap::cli::{imap_matches, imap_subcmds},
     mbox::cli::{mbox_matches, mbox_source_arg, mbox_subcmds},
     msg::cli::{msg_matches, msg_subcmds},
@@ -44,7 +44,7 @@ fn parse_args<'a>() -> clap::App<'a, 'a> {
         .subcommands(mbox_subcmds())
         .subcommands(msg_subcmds())
         .subcommands(comp_subcmds())
-        .subcommands(himalaya_tui_subcmds())
+        .subcommands(tui_subcmds())
 }
 
 fn run() -> Result<()> {
@@ -80,10 +80,24 @@ fn run() -> Result<()> {
     let mbox = arg_matches.value_of("mailbox").unwrap();
     debug!("Mailbox: {}", mbox);
 
+    // In this part, we are evaluating the given commandline arguments. For
+    // example if the user provided `himalaya tui`, the `tui_matches`
+    // function will kick in, because it included the subcommand `tui`.
     debug!("Begin matching");
     let app = App::new(&config, &account, &output, &mbox, &arg_matches);
+
+    // SUGGESTION: Improve this part, suggestion: 
+    //  1. Collect all subcommands
+    //  2. Iterate through them
+    //  3. Go through `match`
+    //  4. If somethings match => Do their stuff.
+    // does the user want to start the tui?
+    if let Ok(_) = tui_matches(&app) {
+        return Ok(())
+    }
+
     let _matched =
-        mbox_matches(&app)? || flag_matches(&app)? || imap_matches(&app)? || msg_matches(&app)? || himalaya_tui_matches(&app)?;
+        mbox_matches(&app)? || flag_matches(&app)? || imap_matches(&app)? || msg_matches(&app)?;
 
     Ok(())
 }
