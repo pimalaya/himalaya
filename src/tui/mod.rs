@@ -1,2 +1,6 @@
 pub mod cli;
 pub mod model;
+pub mod tui_account;
+pub mod block_data;
+pub mod sidebar;
+pub mod mail_list;

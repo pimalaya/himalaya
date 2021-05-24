@@ -33,7 +33,7 @@ impl<'a> ser::Serialize for SerializableAttribute<'a> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Attributes<'a>(&'a [imap::types::NameAttribute<'a>]);
 
 impl<'a> From<&'a [imap::types::NameAttribute<'a>]> for Attributes<'a> {
@@ -77,7 +77,7 @@ impl<'a> ser::Serialize for Attributes<'a> {
 
 // Mailbox
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Mbox<'a> {
     pub delim: String,
     pub name: String,

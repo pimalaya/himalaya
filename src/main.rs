@@ -92,7 +92,7 @@ fn run() -> Result<()> {
     //  3. Go through `match`
     //  4. If somethings match => Do their stuff.
     // does the user want to start the tui?
-    if let Ok(_) = tui_matches(&app) {
+    if let Ok(_) = tui_matches(&arg_matches, &config) {
         return Ok(())
     }
 

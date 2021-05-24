@@ -1,62 +1,41 @@
 use std::io;
+
+use crate::config::model::Config;
+use crate::imap::model::ImapConnector;
+
 use tui_rs::backend::{Backend, CrosstermBackend};
 use tui_rs::layout::{Constraint, Direction, Layout, Rect};
 use tui_rs::terminal::Frame;
-use tui_rs::widgets::{Block, Borders};
+use tui_rs::widgets::Block;
 use tui_rs::Terminal;
+
+use super::block_data::BlockData;
+use super::mail_list::MailList;
+use super::sidebar::Sidebar;
+// use super::tui_account::TuiAccount;
 
 // ===================
 // Structs/Traits
 // =================== */
-/// This MailFrame is added to all frames of the TUI. It should be able to
-/// customize their position and their size with the functions of this trait.
-///
-/// It has the lifetime called "frame" because we'll always use a block for
-/// each frame.
-struct MailFrame<'frame> {
-    /// This variable holds the rectangle/frame where it should be placed.
-    /// Normally it set by a rect which comes of a [Layout](struct.Layout.html).
-    rect: Rect,
-
-    /// Since each frame will inside a block, the user or you can customize how
-    /// the block should look like. You just need to set this variable with the
-    /// [set_block](struct.MailFrame.html#method.set_block) function.
-    block: Block<'frame>,
+pub struct MailFrame {
+    pub rect: Rect,
+    pub block_data: BlockData,
 }
 
-impl<'frame> MailFrame<'frame> {
-    /// Creates a new frame with the given rectangle/frame and the block for
-    /// decoration. For more information please take a look into their [their
-    /// definition](struct.MailFrame.html).
-    fn new(rect: Rect, block: Block<'frame>) -> MailFrame<'frame> {
-        MailFrame { rect, block }
+impl MailFrame {
+    pub fn new(rect: Rect, title: String) -> MailFrame {
+        MailFrame {
+            rect,
+            block_data: BlockData::new(title),
+        }
     }
 
-    fn set_rect(&mut self, rect: Rect) {
-        self.rect = rect;
-    }
-
-    /// Since each frame in the TUI is covered in a box, you can set a box how
-    /// it should look like by using this function. If you want to know how to
-    /// customize the block, take a look into its
-    /// [documentation](struct.Block.html).
-    ///
-    /// # Example
-    /// ```rust
-    /// let mut mailframe = MailFrame::new();
-    /// mailframe.set_block(Block::default());
-    /// ```
-    fn set_block(&mut self, block: Block<'frame>) {
-        self.block = block;
+    pub fn block(&self) -> Block {
+        self.block_data.clone().into()
     }
 }
 
-// ==============
-// Functions
-// ============== */
-/// This struct includes the whole information of the TUI. Starting from the
-/// sidebar to the listing of the mails. In the end, it should look like this
-/// (default):
+/// This struct is the backend of the TUI.
 ///
 ///     --- Tab 1 ---
 ///     |           |
@@ -69,58 +48,77 @@ impl<'frame> MailFrame<'frame> {
 ///     |           |                                 |
 ///     -----------------------------------------------
 ///
-pub struct TUI<'tui>
-{
-    /// This variable holds the sidebar-frame of the whole TUI
-    /// TODO: Add ascii art of the sidebar
-    sidebar: MailFrame<'tui>,
-
-    /// This variable holds the main
-    /// TODO: Add ascii art to understand better what it is
-    mail_listing: MailFrame<'tui>,
+pub struct TUI<'tui> {
+    sidebar: Sidebar<'tui>,
+    maillist: MailList,
+    // tui_accounts: Vec<TuiAccount<'tui>>,
+    tui_accounts: Vec<ImapConnector<'tui>>,
 }
 
-impl<'tui> TUI<'tui> 
-{
+impl<'tui> TUI<'tui> {
     /// Creates a new TUI struct which already sets the appropriate constraints
     /// and places the frames correctly. It'll give the sidebar and the
-    /// mail_listing a default value. The result can be seen
+    /// maillist a default value. The result can be seen
     /// [here](struct.TUI.html).
     /// TODO: Add tabs (accounts)
     pub fn new<B>(frame: &mut Frame<B>) -> TUI<'tui>
-        where B: Backend
-    {
-        // Create the two frames for the sidebar and the mails:
-        //  - One on the left (sidebar)
-        //  - One on the right (mail listing)
-        let layout = Layout::default()
-            .direction(Direction::Horizontal)
-            .margin(1)
-            .constraints(
-                [
+        where
+        B: Backend,
+        {
+            // Create the two frames for the sidebar and the mails:
+            //  - One on the left (sidebar)
+            //  - One on the right (mail listing)
+            let layout = Layout::default()
+                .direction(Direction::Horizontal)
+                .margin(1)
+                .constraints(
+                    [
                     // For the sidebar (will be the second block => Index 0)
                     Constraint::Percentage(25),
                     // For the mails (will be the second block => Index 1)
                     Constraint::Percentage(75),
-                ]
-                .as_ref(),
-            )
-            // Use the given frame size to create the two blocks
-            .split(frame.size());
+                    ]
+                    .as_ref(),
+                    )
+                // Use the given frame size to create the two blocks
+                .split(frame.size());
 
-        // Create the two desired main-frames
-        let sidebar = MailFrame::new(
-            layout[0],
-            Block::default().title("Sidebar").borders(Borders::ALL),
-        );
+            // Create the two desired main-frames
+            let frame = MailFrame::new(layout[0], String::from("Sidebar"));
+            let sidebar = Sidebar::new(frame);
 
-        let mail_listing = MailFrame::new(
-            layout[1], 
-            Block::default().title("Mails").borders(Borders::ALL));
+            let frame = MailFrame::new(layout[1], String::from("Mails"));
+            let maillist = MailList::new(frame);
 
-        TUI {
-            sidebar,
-            mail_listing,
+            TUI {
+                sidebar,
+                maillist,
+                tui_accounts: Vec::new(),
+            }
+        }
+
+    pub fn add_account(&mut self, account_name: &str, config: &'tui Config) -> Result<(), i32> {
+        let account = match config.find_account_by_name(Some(account_name)) {
+            Ok(account) => account,
+            Err(_) => return Err(-1),
+        };
+
+        let imap_conn = match ImapConnector::new(&account) {
+            Ok(connection) => connection,
+            Err(_) => return Err(-2),
+        };
+
+        self.tui_accounts.push(imap_conn);
+
+        Ok(())
+    }
+
+    pub fn set_account(&mut self, index: usize) {
+        if index < self.tui_accounts.len() {
+            let mut imap_conn = &mut self.tui_accounts[index];
+            if let Err(err) = self.sidebar.set_mailboxes(&mut imap_conn) {
+                println!("{}", err);
+            };
         }
     }
 
@@ -143,29 +141,66 @@ impl<'tui> TUI<'tui>
     /// })?;
     /// ```
     pub fn draw<B>(&self, frame: &'tui mut Frame<B>)
-        where B: Backend
-    {
-        frame.render_widget(self.sidebar.block.clone(), self.sidebar.rect);
-        frame.render_widget(self.mail_listing.block.clone(), self.mail_listing.rect);
-    }
+        where
+        B: Backend,
+        {
+            frame.render_widget(self.sidebar.widget(), self.sidebar.frame.rect);
+            frame.render_widget(self.maillist.frame.block(), self.maillist.frame.rect);
+        }
 }
 
-// Start the tui by preparing
-pub fn run_tui() -> Result<(), io::Error> {
+// ==============
+// Functions
+// ============== */
+/// Start the tui by preparing
+/// Return:
+///     -1 => Preparation gone wrong
+///     -2 => Couldn't create TUI
+pub fn run_tui(config: &Config) -> Result<(), String> {
     println!("Starting tui");
 
+    // Prepare the terminal and the account connection as well
     let stdout = io::stdout();
     let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
+    let mut terminal = match Terminal::new(backend) {
+        Ok(terminal) => terminal,
+        Err(err) => return Err(err.to_string()),
+    };
 
     // clear the terminal
-    terminal.clear()?;
+    if let Err(err) = terminal.clear() {
+        return Err(String::from("An error appeared, when trying to clear the terminal."));
+    };
+
+    // get the default account
+    let default_account = match config.find_account_by_name(None) {
+        Ok(account) => account,
+        Err(_) => {
+            return Err(String::from("Couldn't get default account"));
+        }
+    };
+
+    let default_account = match &default_account.name {
+        Some(name) => name,
+        None => return Err(String::from("Couldn't get default account")),
+    };
 
     // Draw the user interface
-    terminal.draw(|frame| {
-        let tui = TUI::new(frame);
-        tui.draw(frame);
-    })?;
+    if let Err(_) = terminal.draw(|frame| {
+        let mut tui = TUI::new(frame);
+        if let Err(code) = tui.add_account(&default_account, &config) {
+            if code == -1 {
+                println!("Bruh");
+            } else if code == -2 {
+                println!(" LOL ");
+            }
+        } else {
+            tui.set_account(0);
+            tui.draw(frame);
+        }
+    }) {
+        return Err(String::from("Couldn't draw the TUI"));
+    };
 
     Ok(())
 }

@@ -171,23 +171,6 @@ pub fn msg_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
     ]
 }
 
-/// This function goes through the available msg-subcommands which are declared
-/// in the [msg_subcmds](#msg_subcmds). It'll look which one the user applied
-/// and does the suitable associated steps.
-///
-/// # Example
-/// The user calls himalaya like this:
-///
-/// ```bash
-/// himalaya search
-/// ```
-///
-/// Than the if block with
-/// ```rust
-/// if let Some(matches) = app.arg_matches.subcommand_matches("search") {
-/// ```
-/// will be executed and the function returns.
-///
 pub fn msg_matches(app: &App) -> Result<bool> {
     if let Some(matches) = app.arg_matches.subcommand_matches("list") {
         debug!("list command matched");
