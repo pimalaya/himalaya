@@ -34,7 +34,7 @@ impl<'maillist> MailList<'maillist> {
             None => Msgs::new().0,
         };
 
-        for (index, message) in msgs.iter().enumerate() {
+        for message in msgs.iter() {
             let row = vec![
                 message.uid.to_string().clone(),
                 message.flags.to_string().clone(),
@@ -43,16 +43,24 @@ impl<'maillist> MailList<'maillist> {
                 message.subject.clone(),
             ];
 
-            if index == self.select_index {
-                self.mails.push(
-                    Row::new(row).style(Style::default().bg(Color::Cyan)),
-                );
-            } else {
-                self.mails.push(Row::new(row));
-            }
+            self.mails.push(Row::new(row));
         }
 
+        self.mark_selected_index();
+
         Ok(())
+    }
+
+    pub fn mark_selected_index(&mut self) {
+        self.mails[self.select_index] = self.mails[self.select_index]
+            .clone()
+            .style(Style::default().bg(Color::Cyan));
+    }
+
+    pub fn unmark_selected_index(&mut self) {
+        self.mails[self.select_index] = self.mails[self.select_index]
+            .clone()
+            .style(Style::default());
     }
 
     pub fn widget(&mut self) -> Table {
@@ -66,6 +74,25 @@ impl<'maillist> MailList<'maillist> {
                 Constraint::Percentage(10),
                 Constraint::Percentage(60),
             ])
+    }
+
+    pub fn move_selection(&mut self, offset: i32) {
+        self.unmark_selected_index();
+
+        // make sure that we don't get over the index borders of the vector.
+        // In other words: Prevent that the new index doesn't goes over the
+        // length of the vector.
+        self.select_index = if offset < 0 {
+            self.select_index.saturating_sub(offset.abs() as usize)
+        } else {
+            self.select_index.saturating_add(offset as usize)
+        };
+
+        if self.select_index > self.mails.len() - 1{
+            self.select_index = self.mails.len() - 1;
+        }
+
+        self.mark_selected_index();
     }
 }
 

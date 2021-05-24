@@ -193,14 +193,22 @@ impl<'tui> Tui<'tui> {
 
     pub fn eval_events(&mut self, event: Event) {
         match event {
-            // Resize event
-            Event::Resize(_, _) => self.need_redraw = true,
             Event::Key(KeyEvent {
                 modifiers: KeyModifiers::NONE,
                 code: KeyCode::Char('q'),
             }) => self.run = false,
+            Event::Key(KeyEvent {
+                modifiers: KeyModifiers::NONE,
+                code: KeyCode::Char('j'),
+            }) => self.maillist.move_selection(1),
+            Event::Key(KeyEvent {
+                modifiers: KeyModifiers::NONE,
+                code: KeyCode::Char('k'),
+            }) => self.maillist.move_selection(-1),
             _ => (),
         }
+
+        self.need_redraw = true;
     }
 
     pub fn run(&mut self, config: &'tui Config) -> Result<(), TuiError> {
@@ -223,6 +231,9 @@ impl<'tui> Tui<'tui> {
             return Err(TuiError::DefaultAccount);
         }
 
+        // cleanup the terminal first
+        terminal.clear()?;
+
         // set the terminal into raw mode
         terminal::enable_raw_mode()?;
 
@@ -235,6 +246,7 @@ impl<'tui> Tui<'tui> {
                 if let Err(_) = terminal.draw(|frame| {
                     self.draw(frame);
                 }) {
+                    terminal.clear()?;
                     self.cleanup()?;
                     return Err(TuiError::Draw);
                 };
@@ -245,6 +257,7 @@ impl<'tui> Tui<'tui> {
                 match crossterm::event::read() {
                     Ok(event) => self.eval_events(event),
                     Err(_) => {
+                        terminal.clear()?;
                         self.cleanup()?;
                         return Err(TuiError::EventKey);
                     }
@@ -252,7 +265,7 @@ impl<'tui> Tui<'tui> {
             }
 
         }
-
+        terminal.clear()?;
         return self.cleanup();
     }
 }
