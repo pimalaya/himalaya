@@ -1,15 +1,17 @@
 use crate::imap::model::ImapConnector;
-use crate::mbox::model::{Mboxes};
+use crate::mbox::model::Mboxes;
 
-use tui_rs::layout::{Constraint};
-use tui_rs::widgets::{Row, Table, Block};
+use tui_rs::layout::Constraint;
+use tui_rs::style::{Color, Style};
+use tui_rs::widgets::{Block, Row, Table};
 
-use super::mail_frame::MailFrame;
 use super::block_data::BlockData;
+use super::mail_frame::MailFrame;
 
 pub struct Sidebar {
     mailboxes: Vec<Vec<String>>,
     header: Vec<String>,
+    pub select_index: usize,
     pub block_data: BlockData,
 }
 
@@ -50,12 +52,15 @@ impl Sidebar {
         Ok(())
     }
 
-    pub fn widget(&self) -> Table
-    {
+    pub fn widget(&self) -> Table {
         let mut rows = Vec::new();
 
-        for mailbox in &self.mailboxes {
-            rows.push(Row::new(mailbox.clone()));
+        for (index, mailbox) in self.mailboxes.iter().enumerate() {
+            if index == self.select_index {
+                rows.push(Row::new(mailbox.clone()).style(Style::default().bg(Color::Cyan)));
+            } else {
+                rows.push(Row::new(mailbox.clone()));
+            }
         }
 
         Table::new(rows)
@@ -70,6 +75,7 @@ impl MailFrame for Sidebar {
         Self {
             mailboxes: Vec::new(),
             header: vec![String::from("Mailbox"), String::from("Flags")],
+            select_index: 0,
             block_data: BlockData::new(title),
         }
     }
