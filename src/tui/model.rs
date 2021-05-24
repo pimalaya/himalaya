@@ -1,6 +1,10 @@
+// ===========
+// Crates
+// =========== */
 use std::io;
+use std::time::Duration;
 
-use crate::config::model::Config;
+use crate::config::model::{Account, Config};
 use crate::imap::model::ImapConnector;
 
 use tui_rs::backend::{Backend, CrosstermBackend};
@@ -8,14 +12,42 @@ use tui_rs::layout::{Constraint, Direction, Layout};
 use tui_rs::terminal::Frame;
 use tui_rs::Terminal;
 
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::terminal;
+
 use super::mail_frame::MailFrame;
 use super::mail_list::MailList;
 use super::sidebar::Sidebar;
 
+// =====================
+// Tui return types
+// ===================== */
+pub enum TuiError {
+    TerminalPreparation(io::Error),
+    RawMode(crossterm::ErrorKind),
+    DefaultAccount,
+    EventKey,
+    Draw,
+    AddingAccount,
+    ConnectAccount,
+}
+
+impl From<io::Error> for TuiError {
+    fn from(error: io::Error) -> Self {
+        Self::TerminalPreparation(error)
+    }
+}
+
+impl From<crossterm::ErrorKind> for TuiError {
+    fn from(error: crossterm::ErrorKind) -> Self {
+        Self::RawMode(error)
+    }
+}
+
 // ===================
 // Structs/Traits
 // =================== */
-/// This struct is the backend of the TUI.
+/// This struct is the backend of the Tui.
 ///
 ///     --- Tab 1 ---
 ///     |           |
@@ -28,39 +60,49 @@ use super::sidebar::Sidebar;
 ///     |           |                                 |
 ///     -----------------------------------------------
 ///
-pub struct TUI<'tui> {
+pub struct Tui<'tui> {
     sidebar: Sidebar,
     maillist: MailList<'tui>,
     tui_accounts: Vec<ImapConnector<'tui>>,
+
+    // State variables
+    need_redraw: bool,
+    run: bool,
 }
 
-impl<'tui> TUI<'tui> {
-    /// Creates a new TUI struct which already sets the appropriate constraints
+impl<'tui> Tui<'tui> {
+    /// Creates a new Tui struct which already sets the appropriate constraints
     /// and places the frames correctly. It'll give the sidebar and the
     /// maillist a default value. The result can be seen
-    /// [here](struct.TUI.html).
+    /// [here](struct.Tui.html).
     /// TODO: Add tabs (accounts)
-    pub fn new() -> TUI<'tui> {
+    pub fn new() -> Tui<'tui> {
         // Create the two desired main-frames
         let sidebar = Sidebar::new(String::from("Sidebar"));
         let maillist = MailList::new(String::from("Mails"));
 
-        TUI {
+        Tui {
             sidebar,
             maillist,
             tui_accounts: Vec::new(),
+            need_redraw: true,
+            run: true,
         }
     }
 
-    pub fn add_account(&mut self, account_name: &str, config: &'tui Config) -> Result<(), i32> {
+    pub fn add_account(
+        &mut self,
+        account_name: &str,
+        config: &'tui Config,
+    ) -> Result<(), TuiError> {
         let account = match config.find_account_by_name(Some(account_name)) {
             Ok(account) => account,
-            Err(_) => return Err(-1),
+            Err(_) => return Err(TuiError::AddingAccount),
         };
 
         let imap_conn = match ImapConnector::new(&account) {
             Ok(connection) => connection,
-            Err(_) => return Err(-2),
+            Err(_) => return Err(TuiError::ConnectAccount),
         };
 
         self.tui_accounts.push(imap_conn);
@@ -86,7 +128,7 @@ impl<'tui> TUI<'tui> {
         }
     }
 
-    pub fn cleanup(&mut self) {
+    pub fn cleanup(&mut self) -> Result<(), TuiError> {
         // logout all accounts
         for account in &mut self.tui_accounts {
             account.logout();
@@ -94,9 +136,14 @@ impl<'tui> TUI<'tui> {
 
         // cleanup the account list
         self.tui_accounts.clear();
+
+        // We don't need the raw mode anymore
+        terminal::disable_raw_mode()?;
+
+        Ok(())
     }
 
-    /// Use this function to draw the whole TUI with the sidebar, mails and
+    /// Use this function to draw the whole Tui with the sidebar, mails and
     /// accounts.
     ///
     /// # Example:
@@ -110,7 +157,7 @@ impl<'tui> TUI<'tui> {
     ///
     /// // Draw the user interface
     /// terminal.draw(|frame| {
-    ///     let tui = TUI::new(frame);
+    ///     let tui = Tui::new(frame);
     ///     tui.draw(frame);
     /// })?;
     /// ```
@@ -138,69 +185,74 @@ impl<'tui> TUI<'tui> {
 
         frame.render_widget(self.sidebar.widget(), layout[0]);
         frame.render_widget(self.maillist.widget(), layout[1]);
+
+        // since we draw the Tui now, we don't need to draw the Tui again
+        // immediately
+        self.need_redraw = false;
     }
-}
 
-// ==============
-// Functions
-// ============== */
-/// Start the tui by preparing
-/// Return:
-///     -1 => Preparation gone wrong
-///     -2 => Couldn't create TUI
-pub fn run_tui(config: &Config) -> Result<(), String> {
-    println!("Starting tui");
-
-    // Prepare the terminal and the account connection as well
-    let stdout = io::stdout();
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = match Terminal::new(backend) {
-        Ok(terminal) => terminal,
-        Err(err) => return Err(err.to_string()),
-    };
-
-    // clear the terminal
-    if let Err(_) = terminal.clear() {
-        return Err(String::from(
-            "An error appeared, when trying to clear the terminal.",
-        ));
-    };
-
-    // get the default account
-    let default_account = match config.find_account_by_name(None) {
-        Ok(account) => account,
-        Err(_) => {
-            return Err(String::from("Couldn't get default account"));
+    pub fn eval_events(&mut self, event: Event) {
+        match event {
+            // Resize event
+            Event::Resize(_, _) => self.need_redraw = true,
+            Event::Key(KeyEvent {
+                modifiers: KeyModifiers::NONE,
+                code: KeyCode::Char('q'),
+            }) => self.run = false,
+            _ => (),
         }
-    };
+    }
 
-    let default_account = match &default_account.name {
-        Some(name) => name,
-        None => return Err(String::from("Couldn't find default account")),
-    };
+    pub fn run(&mut self, config: &'tui Config) -> Result<(), TuiError> {
+        // ----------------
+        // Preparation
+        // ---------------- */
+        // Prepare the terminal
+        let stdout = io::stdout();
+        let backend = CrosstermBackend::new(stdout);
+        let mut terminal = Terminal::new(backend)?;
 
-    let mut tui = TUI::new();
-
-    // select the default account first
-    if let Err(code) = tui.add_account(&default_account, &config) {
-        if code == -1 {
-            println!("Bruh");
-        } else if code == -2 {
-            println!(" LOL ");
+        // load the default account
+        if let Ok(Account {
+            name: Some(name), ..
+        }) = config.find_account_by_name(None)
+        {
+            self.add_account(&name, &config)?;
+            self.set_account(0);
+        } else {
+            return Err(TuiError::DefaultAccount);
         }
 
-        return Err(String::from("Couldn't load the default account."));
+        // set the terminal into raw mode
+        terminal::enable_raw_mode()?;
+
+        // ------------------
+        // Main Tui loop
+        // ------------------ */
+        while self.run {
+            // Redraw if needed
+            if self.need_redraw {
+                if let Err(_) = terminal.draw(|frame| {
+                    self.draw(frame);
+                }) {
+                    self.cleanup()?;
+                    return Err(TuiError::Draw);
+                };
+            }
+
+            // Catch any pressed keys only for all seconds
+            if crossterm::event::poll(Duration::from_millis(10))? {
+                match crossterm::event::read() {
+                    Ok(event) => self.eval_events(event),
+                    Err(_) => {
+                        self.cleanup()?;
+                        return Err(TuiError::EventKey);
+                    }
+                };
+            }
+
+        }
+
+        return self.cleanup();
     }
-    tui.set_account(0);
-
-    // Draw the user interface
-    if let Err(_) = terminal.draw(|frame| {
-        tui.draw(frame);
-        tui.cleanup();
-    }) {
-        tui.cleanup();
-        return Err(String::from("Couldn't draw the TUI"));
-    };
-
-    Ok(())
 }
