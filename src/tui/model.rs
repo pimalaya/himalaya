@@ -49,8 +49,8 @@ impl MailFrame {
 ///     -----------------------------------------------
 ///
 pub struct TUI<'tui> {
-    sidebar: Sidebar<'tui>,
-    maillist: MailList,
+    sidebar: Sidebar,
+    maillist: MailList<'tui>,
     // tui_accounts: Vec<TuiAccount<'tui>>,
     tui_accounts: Vec<ImapConnector<'tui>>,
 }
@@ -62,40 +62,40 @@ impl<'tui> TUI<'tui> {
     /// [here](struct.TUI.html).
     /// TODO: Add tabs (accounts)
     pub fn new<B>(frame: &mut Frame<B>) -> TUI<'tui>
-        where
+    where
         B: Backend,
-        {
-            // Create the two frames for the sidebar and the mails:
-            //  - One on the left (sidebar)
-            //  - One on the right (mail listing)
-            let layout = Layout::default()
-                .direction(Direction::Horizontal)
-                .margin(1)
-                .constraints(
-                    [
+    {
+        // Create the two frames for the sidebar and the mails:
+        //  - One on the left (sidebar)
+        //  - One on the right (mail listing)
+        let layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .margin(1)
+            .constraints(
+                [
                     // For the sidebar (will be the second block => Index 0)
                     Constraint::Percentage(25),
                     // For the mails (will be the second block => Index 1)
                     Constraint::Percentage(75),
-                    ]
-                    .as_ref(),
-                    )
-                // Use the given frame size to create the two blocks
-                .split(frame.size());
+                ]
+                .as_ref(),
+            )
+            // Use the given frame size to create the two blocks
+            .split(frame.size());
 
-            // Create the two desired main-frames
-            let frame = MailFrame::new(layout[0], String::from("Sidebar"));
-            let sidebar = Sidebar::new(frame);
+        // Create the two desired main-frames
+        let frame = MailFrame::new(layout[0], String::from("Sidebar"));
+        let sidebar = Sidebar::new(frame);
 
-            let frame = MailFrame::new(layout[1], String::from("Mails"));
-            let maillist = MailList::new(frame);
+        let frame = MailFrame::new(layout[1], String::from("Mails"));
+        let maillist = MailList::new(frame);
 
-            TUI {
-                sidebar,
-                maillist,
-                tui_accounts: Vec::new(),
-            }
+        TUI {
+            sidebar,
+            maillist,
+            tui_accounts: Vec::new(),
         }
+    }
 
     pub fn add_account(&mut self, account_name: &str, config: &'tui Config) -> Result<(), i32> {
         let account = match config.find_account_by_name(Some(account_name)) {
@@ -115,8 +115,17 @@ impl<'tui> TUI<'tui> {
 
     pub fn set_account(&mut self, index: usize) {
         if index < self.tui_accounts.len() {
+            // Set the mailboxes
             let mut imap_conn = &mut self.tui_accounts[index];
             if let Err(err) = self.sidebar.set_mailboxes(&mut imap_conn) {
+                println!("{}", err);
+            };
+
+            // set the mails
+            if let Err(err) = self
+                .maillist
+                .set_mails(&mut imap_conn, &self.sidebar.mailboxes()[0][0])
+            {
                 println!("{}", err);
             };
         }
@@ -141,12 +150,12 @@ impl<'tui> TUI<'tui> {
     /// })?;
     /// ```
     pub fn draw<B>(&self, frame: &'tui mut Frame<B>)
-        where
+    where
         B: Backend,
-        {
-            frame.render_widget(self.sidebar.widget(), self.sidebar.frame.rect);
-            frame.render_widget(self.maillist.frame.block(), self.maillist.frame.rect);
-        }
+    {
+        frame.render_widget(self.sidebar.widget(), self.sidebar.frame.rect);
+        frame.render_widget(self.maillist.widget(), self.maillist.frame.rect);
+    }
 }
 
 // ==============
@@ -168,8 +177,10 @@ pub fn run_tui(config: &Config) -> Result<(), String> {
     };
 
     // clear the terminal
-    if let Err(err) = terminal.clear() {
-        return Err(String::from("An error appeared, when trying to clear the terminal."));
+    if let Err(_) = terminal.clear() {
+        return Err(String::from(
+            "An error appeared, when trying to clear the terminal.",
+        ));
     };
 
     // get the default account
