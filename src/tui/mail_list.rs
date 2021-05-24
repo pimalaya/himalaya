@@ -1,34 +1,19 @@
-use super::model::MailFrame;
+use super::mail_frame::MailFrame;
+use super::block_data::BlockData;
 
 use crate::imap::model::ImapConnector;
 use crate::msg::model::Msgs;
 
-use tui_rs::widgets::{Row, Table};
-use tui_rs::layout::Constraint;
+use tui_rs::widgets::{Row, Table, Block};
+use tui_rs::layout::{ Constraint };
 
 pub struct MailList<'maillist> {
-    pub frame: MailFrame,
+    pub block_data: BlockData,
     mails: Vec<Row<'maillist>>,
     header: Row<'maillist>,
 }
 
 impl<'maillist> MailList<'maillist> {
-
-    pub fn new(frame: MailFrame) -> Self {
-        Self {
-            frame,
-            mails: Vec::new(),
-            header: Row::new(
-                vec![
-                "UID",
-                "Flags",
-                "Date",
-                "Sender",
-                "Subject",
-                ])
-                .bottom_margin(1)
-        }
-    }
 
     pub fn set_mails(&mut self, imap_conn: &mut ImapConnector, mbox: &str) -> Result<(), &str> {
 
@@ -59,9 +44,10 @@ impl<'maillist> MailList<'maillist> {
         Ok(())
     }
 
-    pub fn widget(&self) -> Table {
+    pub fn widget(&mut self) -> Table {
+
         Table::new(self.mails.clone())
-            .block(self.frame.block())
+            .block(self.block())
             .header(self.header.clone())
             .widths(&[
                 Constraint::Percentage(10),
@@ -70,5 +56,28 @@ impl<'maillist> MailList<'maillist> {
                 Constraint::Percentage(10),
                 Constraint::Percentage(60),
             ])
+    }
+}
+
+impl<'maillist> MailFrame for MailList<'maillist> {
+
+    fn new(title: String) -> Self {
+        Self {
+            block_data: BlockData::new(title),
+            mails: Vec::new(),
+            header: Row::new(
+                vec![
+                "UID",
+                "Flags",
+                "Date",
+                "Sender",
+                "Subject",
+                ])
+                .bottom_margin(1)
+        }
+    }
+
+    fn block(&self) -> Block {
+        self.block_data.clone().into()
     }
 }

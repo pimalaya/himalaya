@@ -1,26 +1,19 @@
 use crate::imap::model::ImapConnector;
-use crate::mbox::model::{Mbox, Mboxes};
+use crate::mbox::model::{Mboxes};
 
-use tui_rs::layout::Constraint;
-use tui_rs::widgets::{Row, Table};
+use tui_rs::layout::{Constraint};
+use tui_rs::widgets::{Row, Table, Block};
 
-use super::model::MailFrame;
+use super::mail_frame::MailFrame;
+use super::block_data::BlockData;
 
 pub struct Sidebar {
-    pub frame: MailFrame,
     mailboxes: Vec<Vec<String>>,
     header: Vec<String>,
+    pub block_data: BlockData,
 }
 
 impl Sidebar {
-    pub fn new(frame: MailFrame) -> Self {
-        Self {
-            frame,
-            mailboxes: Vec::new(),
-            header: vec![String::from("Mailbox"), String::from("Flags")],
-        }
-    }
-
     pub fn mailboxes(&self) -> Vec<Vec<String>> {
         self.mailboxes.clone()
     }
@@ -57,7 +50,8 @@ impl Sidebar {
         Ok(())
     }
 
-    pub fn widget(&self) -> Table {
+    pub fn widget(&self) -> Table
+    {
         let mut rows = Vec::new();
 
         for mailbox in &self.mailboxes {
@@ -65,8 +59,22 @@ impl Sidebar {
         }
 
         Table::new(rows)
-            .block(self.frame.block())
+            .block(self.block())
             .header(Row::new(self.header.clone()).bottom_margin(1))
             .widths(&[Constraint::Percentage(70), Constraint::Percentage(30)])
+    }
+}
+
+impl MailFrame for Sidebar {
+    fn new(title: String) -> Self {
+        Self {
+            mailboxes: Vec::new(),
+            header: vec![String::from("Mailbox"), String::from("Flags")],
+            block_data: BlockData::new(title),
+        }
+    }
+
+    fn block(&self) -> Block {
+        self.block_data.clone().into()
     }
 }

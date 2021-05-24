@@ -4,37 +4,17 @@ use crate::config::model::Config;
 use crate::imap::model::ImapConnector;
 
 use tui_rs::backend::{Backend, CrosstermBackend};
-use tui_rs::layout::{Constraint, Direction, Layout, Rect};
+use tui_rs::layout::{Constraint, Direction, Layout};
 use tui_rs::terminal::Frame;
-use tui_rs::widgets::Block;
 use tui_rs::Terminal;
 
-use super::block_data::BlockData;
+use super::mail_frame::MailFrame;
 use super::mail_list::MailList;
 use super::sidebar::Sidebar;
-// use super::tui_account::TuiAccount;
 
 // ===================
 // Structs/Traits
 // =================== */
-pub struct MailFrame {
-    pub rect: Rect,
-    pub block_data: BlockData,
-}
-
-impl MailFrame {
-    pub fn new(rect: Rect, title: String) -> MailFrame {
-        MailFrame {
-            rect,
-            block_data: BlockData::new(title),
-        }
-    }
-
-    pub fn block(&self) -> Block {
-        self.block_data.clone().into()
-    }
-}
-
 /// This struct is the backend of the TUI.
 ///
 ///     --- Tab 1 ---
@@ -51,7 +31,6 @@ impl MailFrame {
 pub struct TUI<'tui> {
     sidebar: Sidebar,
     maillist: MailList<'tui>,
-    // tui_accounts: Vec<TuiAccount<'tui>>,
     tui_accounts: Vec<ImapConnector<'tui>>,
 }
 
@@ -61,34 +40,10 @@ impl<'tui> TUI<'tui> {
     /// maillist a default value. The result can be seen
     /// [here](struct.TUI.html).
     /// TODO: Add tabs (accounts)
-    pub fn new<B>(frame: &mut Frame<B>) -> TUI<'tui>
-    where
-        B: Backend,
-    {
-        // Create the two frames for the sidebar and the mails:
-        //  - One on the left (sidebar)
-        //  - One on the right (mail listing)
-        let layout = Layout::default()
-            .direction(Direction::Horizontal)
-            .margin(1)
-            .constraints(
-                [
-                    // For the sidebar (will be the second block => Index 0)
-                    Constraint::Percentage(25),
-                    // For the mails (will be the second block => Index 1)
-                    Constraint::Percentage(75),
-                ]
-                .as_ref(),
-            )
-            // Use the given frame size to create the two blocks
-            .split(frame.size());
-
+    pub fn new() -> TUI<'tui> {
         // Create the two desired main-frames
-        let frame = MailFrame::new(layout[0], String::from("Sidebar"));
-        let sidebar = Sidebar::new(frame);
-
-        let frame = MailFrame::new(layout[1], String::from("Mails"));
-        let maillist = MailList::new(frame);
+        let sidebar = Sidebar::new(String::from("Sidebar"));
+        let maillist = MailList::new(String::from("Mails"));
 
         TUI {
             sidebar,
@@ -131,6 +86,16 @@ impl<'tui> TUI<'tui> {
         }
     }
 
+    pub fn cleanup(&mut self) {
+        // logout all accounts
+        for account in &mut self.tui_accounts {
+            account.logout();
+        }
+
+        // cleanup the account list
+        self.tui_accounts.clear();
+    }
+
     /// Use this function to draw the whole TUI with the sidebar, mails and
     /// accounts.
     ///
@@ -149,12 +114,30 @@ impl<'tui> TUI<'tui> {
     ///     tui.draw(frame);
     /// })?;
     /// ```
-    pub fn draw<B>(&self, frame: &'tui mut Frame<B>)
+    pub fn draw<B>(&mut self, frame: &mut Frame<B>)
     where
         B: Backend,
     {
-        frame.render_widget(self.sidebar.widget(), self.sidebar.frame.rect);
-        frame.render_widget(self.maillist.widget(), self.maillist.frame.rect);
+        // Create the two frames for the sidebar and the mails:
+        //  - One on the left (sidebar)
+        //  - One on the right (mail listing)
+        let layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .margin(1)
+            .constraints(
+                [
+                    // For the sidebar (will be the second block => Index 0)
+                    Constraint::Percentage(25),
+                    // For the mails (will be the second block => Index 1)
+                    Constraint::Percentage(75),
+                ]
+                .as_ref(),
+            )
+            // Use the given frame size to create the two blocks
+            .split(frame.size());
+
+        frame.render_widget(self.sidebar.widget(), layout[0]);
+        frame.render_widget(self.maillist.widget(), layout[1]);
     }
 }
 
@@ -193,23 +176,29 @@ pub fn run_tui(config: &Config) -> Result<(), String> {
 
     let default_account = match &default_account.name {
         Some(name) => name,
-        None => return Err(String::from("Couldn't get default account")),
+        None => return Err(String::from("Couldn't find default account")),
     };
+
+    let mut tui = TUI::new();
+
+    // select the default account first
+    if let Err(code) = tui.add_account(&default_account, &config) {
+        if code == -1 {
+            println!("Bruh");
+        } else if code == -2 {
+            println!(" LOL ");
+        }
+
+        return Err(String::from("Couldn't load the default account."));
+    }
+    tui.set_account(0);
 
     // Draw the user interface
     if let Err(_) = terminal.draw(|frame| {
-        let mut tui = TUI::new(frame);
-        if let Err(code) = tui.add_account(&default_account, &config) {
-            if code == -1 {
-                println!("Bruh");
-            } else if code == -2 {
-                println!(" LOL ");
-            }
-        } else {
-            tui.set_account(0);
-            tui.draw(frame);
-        }
+        tui.draw(frame);
+        tui.cleanup();
     }) {
+        tui.cleanup();
         return Err(String::from("Couldn't draw the TUI"));
     };
 
