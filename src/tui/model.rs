@@ -2,7 +2,7 @@
 // Crates
 // =========== */
 use std::io;
-use std::time::Duration;
+// use std::time::Duration;
 
 use crate::config::model::{Account, Config};
 use crate::imap::model::ImapConnector;
@@ -15,7 +15,6 @@ use tui_rs::Terminal;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::terminal;
 
-use super::mail_frame::MailFrame;
 use super::mail_list::MailList;
 use super::sidebar::Sidebar;
 
@@ -62,7 +61,7 @@ impl From<crossterm::ErrorKind> for TuiError {
 ///
 pub struct Tui<'tui> {
     sidebar: Sidebar,
-    maillist: MailList<'tui>,
+    maillist: MailList,
     tui_accounts: Vec<ImapConnector<'tui>>,
 
     // State variables
@@ -183,8 +182,19 @@ impl<'tui> Tui<'tui> {
             // Use the given frame size to create the two blocks
             .split(frame.size());
 
-        frame.render_widget(self.sidebar.widget(), layout[0]);
-        frame.render_widget(self.maillist.widget(), layout[1]);
+        // Display the sidebar
+        frame.render_stateful_widget(
+            self.sidebar.widget(),
+            layout[0],
+            &mut self.sidebar.state,
+        );
+
+        // Display the mails
+        frame.render_stateful_widget(
+            self.maillist.widget(),
+            layout[1],
+            &mut self.maillist.state,
+        );
 
         // since we draw the Tui now, we don't need to draw the Tui again
         // immediately
@@ -252,18 +262,17 @@ impl<'tui> Tui<'tui> {
                 };
             }
 
-            // Catch any pressed keys only for all seconds
-            if crossterm::event::poll(Duration::from_millis(10))? {
-                match crossterm::event::read() {
-                    Ok(event) => self.eval_events(event),
-                    Err(_) => {
-                        terminal.clear()?;
-                        self.cleanup()?;
-                        return Err(TuiError::EventKey);
-                    }
-                };
-            }
-
+            // Catch any pressed keys. We're blocking here because nothing else
+            // has to be down (no redraw or somehting like that)
+            // HINT: If we need to do something in parallel, use add poll.
+            match crossterm::event::read() {
+                Ok(event) => self.eval_events(event),
+                Err(_) => {
+                    terminal.clear()?;
+                    self.cleanup()?;
+                    return Err(TuiError::EventKey);
+                }
+            };
         }
         terminal.clear()?;
         return self.cleanup();

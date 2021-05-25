@@ -22,7 +22,7 @@ impl BlockData {
     }
 }
 
-impl From<BlockData> for Block<'_> {
+impl From<BlockData> for Block<'static> {
     fn from(block_data: BlockData) -> Block<'static> {
         Block::default()
             .title(block_data.title)

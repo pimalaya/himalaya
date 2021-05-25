@@ -1,21 +1,40 @@
 use super::block_data::BlockData;
-use super::mail_frame::MailFrame;
 
 use crate::imap::model::ImapConnector;
 use crate::msg::model::Msgs;
 
 use tui_rs::layout::Constraint;
 use tui_rs::style::{Color, Style};
-use tui_rs::widgets::{Block, Row, Table};
+use tui_rs::widgets::{Block, Row, Table, TableState};
 
-pub struct MailList<'maillist> {
+pub struct MailList {
     pub block_data: BlockData,
-    mails: Vec<Row<'maillist>>,
-    header: Row<'maillist>,
-    select_index: usize,
+    mails: Vec<Vec<String>>,
+    header: Vec<String>,
+
+    /// This variable/state can be modified by the UI which stores the current
+    /// selected item + offset of the previous call. For more information, take
+    /// a look at [its docs](trait.StatefulWidget.html#associatedtype.State).
+    pub state: TableState,
 }
 
-impl<'maillist> MailList<'maillist> {
+impl MailList {
+
+    pub fn new(title: String) -> Self {
+        Self {
+            block_data: BlockData::new(title),
+            mails: Vec::new(),
+            header: vec![
+                String::from("UID"),
+                String::from("Flags"),
+                String::from("Date"),
+                String::from("Sender"),
+                String::from("Subject"),
+            ],
+            state: TableState::default(),
+        }
+    }
+
     pub fn set_mails(
         &mut self,
         imap_conn: &mut ImapConnector,
@@ -36,37 +55,42 @@ impl<'maillist> MailList<'maillist> {
 
         for message in msgs.iter() {
             let row = vec![
-                message.uid.to_string().clone(),
-                message.flags.to_string().clone(),
+                message.uid.to_string(),
+                message.flags.to_string(),
                 message.date.clone(),
                 message.sender.clone(),
                 message.subject.clone(),
             ];
 
-            self.mails.push(Row::new(row));
+            self.mails.push(row);
         }
 
-        self.mark_selected_index();
+        // reset the selection
+        self.state = TableState::default();
+        self.state.select(Some(0));
 
         Ok(())
     }
 
-    pub fn mark_selected_index(&mut self) {
-        self.mails[self.select_index] = self.mails[self.select_index]
-            .clone()
-            .style(Style::default().bg(Color::Cyan));
-    }
+    // TODO: Make sure that it displays really only the needed one, not too
+    // much
+    // Idea:
+    // https://docs.rs/tui/0.15.0/tui/widgets/trait.StatefulWidget.html
+    // pub fn widget(&mut self, height: u16) -> Table {
+    pub fn widget(&self) -> Table<'static> {
 
-    pub fn unmark_selected_index(&mut self) {
-        self.mails[self.select_index] = self.mails[self.select_index]
-            .clone()
-            .style(Style::default());
-    }
+        // convert the header into a row
+        let header = Row::new(self.header.clone()).bottom_margin(1);
 
-    pub fn widget(&mut self) -> Table {
-        Table::new(self.mails.clone())
-            .block(self.block())
-            .header(self.header.clone())
+        // convert all mails into Rows
+        let mails: Vec<Row> = self.mails.iter().map(|mail| Row::new(mail.to_vec())).collect();
+
+        // get the block
+        let block = Block::from(self.block_data.clone());
+
+        Table::new(mails)
+            .block(block)
+            .header(header)
             .widths(&[
                 Constraint::Percentage(10),
                 Constraint::Percentage(10),
@@ -74,40 +98,35 @@ impl<'maillist> MailList<'maillist> {
                 Constraint::Percentage(10),
                 Constraint::Percentage(60),
             ])
+            .highlight_style(Style::default().bg(Color::Blue))
     }
 
+    /// Move the select-row according to the offset.
+    /// Positive Offset => Go down
+    /// Negative Offset => Go up
     pub fn move_selection(&mut self, offset: i32) {
-        self.unmark_selected_index();
+        let new_selection = match self.state.selected() {
+            Some(old_selection) => {
+                let mut selection = if offset < 0 {
+                    old_selection.saturating_sub(offset.abs() as usize)
+                } else {
+                    old_selection.saturating_add(offset as usize)
+                };
 
-        // make sure that we don't get over the index borders of the vector.
-        // In other words: Prevent that the new index doesn't goes over the
-        // length of the vector.
-        self.select_index = if offset < 0 {
-            self.select_index.saturating_sub(offset.abs() as usize)
-        } else {
-            self.select_index.saturating_add(offset as usize)
+                if selection > self.mails.len() - 1 {
+                    selection = self.mails.len() - 1;
+                }
+
+                selection
+            }
+            // If something goes wrong: Move the cursor to the middle
+            None => 0,
         };
 
-        if self.select_index > self.mails.len() - 1{
-            self.select_index = self.mails.len() - 1;
-        }
-
-        self.mark_selected_index();
-    }
-}
-
-impl<'maillist> MailFrame for MailList<'maillist> {
-    fn new(title: String) -> Self {
-        Self {
-            block_data: BlockData::new(title),
-            mails: Vec::new(),
-            header: Row::new(vec!["UID", "Flags", "Date", "Sender", "Subject"])
-                .bottom_margin(1),
-            select_index: 0,
-        }
+        self.state.select(Some(new_selection));
     }
 
-    fn block(&self) -> Block {
-        self.block_data.clone().into()
+    pub fn unselect(&mut self) {
+        self.state.select(None);
     }
 }
