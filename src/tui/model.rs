@@ -17,6 +17,7 @@ use crossterm::terminal;
 
 use super::mail_list::MailList;
 use super::sidebar::Sidebar;
+use super::keybindings::Keybindings;
 
 // =====================
 // Tui return types
@@ -63,6 +64,7 @@ pub struct Tui<'tui> {
     sidebar: Sidebar,
     maillist: MailList,
     tui_accounts: Vec<ImapConnector<'tui>>,
+    keybindings: Keybindings,
 
     // State variables
     need_redraw: bool,
@@ -83,6 +85,7 @@ impl<'tui> Tui<'tui> {
         Tui {
             sidebar,
             maillist,
+            keybindings: Keybindings::new(),
             tui_accounts: Vec::new(),
             need_redraw: true,
             run: true,
@@ -202,19 +205,11 @@ impl<'tui> Tui<'tui> {
     }
 
     pub fn eval_events(&mut self, event: Event) {
+        let keybindings = self.keybindings;
         match event {
-            Event::Key(KeyEvent {
-                modifiers: KeyModifiers::NONE,
-                code: KeyCode::Char('q'),
-            }) => self.run = false,
-            Event::Key(KeyEvent {
-                modifiers: KeyModifiers::NONE,
-                code: KeyCode::Char('j'),
-            }) => self.maillist.move_selection(1),
-            Event::Key(KeyEvent {
-                modifiers: KeyModifiers::NONE,
-                code: KeyCode::Char('k'),
-            }) => self.maillist.move_selection(-1),
+            keybindings.quit => self.run = false,
+            keybindings.moveDown => self.maillist.move_selection(1),
+            keybindings.moveUp => self.maillist.move_selection(-1),
             _ => (),
         }
 
