@@ -23,13 +23,14 @@ use super::sidebar::Sidebar;
 // Tui return types
 // ===================== */
 pub enum TuiError {
-    TerminalPreparation(io::Error),
-    RawMode(crossterm::ErrorKind),
-    DefaultAccount,
-    EventKey,
-    Draw,
-    AddingAccount,
     ConnectAccount,
+    Draw,
+    EventKey,
+    MailList,
+    RawMode(crossterm::ErrorKind),
+    Sidebar,
+    TerminalPreparation(io::Error),
+    UnknownAccount,
 }
 
 impl From<io::Error> for TuiError {
@@ -63,7 +64,8 @@ impl From<crossterm::ErrorKind> for TuiError {
 pub struct Tui<'tui> {
     sidebar: Sidebar,
     maillist: MailList,
-    tui_accounts: Vec<ImapConnector<'tui>>,
+    connections: Vec<ImapConnector<'tui>>,
+    config: &'tui Config,
 
     // State variables
     need_redraw: bool,
@@ -78,7 +80,7 @@ impl<'tui> Tui<'tui> {
     /// TODO: Add tabs (accounts)
     /// HINT: Think about adding all accounts immediately or storing the configs
     /// in the struct => Take ownership
-    pub fn new(config: &Config) -> Tui<'tui> {
+    pub fn new(config: &'tui Config) -> Tui<'tui> {
         // Create the two desired main-frames
         let sidebar =
             Sidebar::new(String::from("Sidebar"), &config.tui.sidebar);
@@ -88,58 +90,58 @@ impl<'tui> Tui<'tui> {
         Tui {
             sidebar,
             maillist,
-            tui_accounts: Vec::new(),
+            config: config,
+            connections: Vec::new(),
             need_redraw: true,
             run: true,
         }
     }
 
-    pub fn add_account(
-        &mut self,
-        account_name: &str,
-        config: &'tui Config,
-    ) -> Result<(), TuiError> {
-        let account = match config.find_account_by_name(Some(account_name)) {
+    pub fn set_account(&mut self, name: Option<&str>) -> Result<(), TuiError> {
+        // ----------------
+        // Get account
+        // ----------------
+        // Get the account first according to the name
+        let account = match self.config.find_account_by_name(name) {
             Ok(account) => account,
-            Err(_) => return Err(TuiError::AddingAccount),
+            Err(_) => return Err(TuiError::UnknownAccount),
         };
 
-        let imap_conn = match ImapConnector::new(&account) {
+        // ----------------------
+        // Create connection
+        // ----------------------
+        let mut imap_conn = match ImapConnector::new(&account) {
             Ok(connection) => connection,
             Err(_) => return Err(TuiError::ConnectAccount),
         };
 
-        self.tui_accounts.push(imap_conn);
-
-        Ok(())
-    }
-
-    pub fn set_account(&mut self, index: usize) {
-        if index < self.tui_accounts.len() {
-            // Set the mailboxes
-            let mut imap_conn = &mut self.tui_accounts[index];
-            if let Err(err) = self.sidebar.set_mailboxes(&mut imap_conn) {
-                println!("{}", err);
-            };
-
-            // set the mails
-            if let Err(err) = self
-                .maillist
-                .set_mails(&mut imap_conn, &self.sidebar.mailboxes()[0][0])
-            {
-                println!("{}", err);
-            };
+        // ----------------
+        // Refresh TUI
+        // ----------------
+        // Fill the frames with the information of the mail account
+        if let Err(_) = self.sidebar.set_mailboxes(&mut imap_conn) {
+            imap_conn.logout();
+            return Err(TuiError::Sidebar);
         }
+
+        if let Err(_) = self
+            .maillist
+            .set_mails(&mut imap_conn, &self.sidebar.mailboxes()[0][0])
+        {
+            imap_conn.logout();
+            return Err(TuiError::MailList);
+        }
+
+        // logout
+        imap_conn.logout();
+        Ok(())
     }
 
     pub fn cleanup(&mut self) -> Result<(), TuiError> {
         // logout all accounts
-        for account in &mut self.tui_accounts {
+        for account in &mut self.connections {
             account.logout();
         }
-
-        // cleanup the account list
-        self.tui_accounts.clear();
 
         // We don't need the raw mode anymore
         terminal::disable_raw_mode()?;
@@ -226,7 +228,7 @@ impl<'tui> Tui<'tui> {
         self.need_redraw = true;
     }
 
-    pub fn run(&mut self, config: &'tui Config) -> Result<(), TuiError> {
+    pub fn run(&mut self) -> Result<(), TuiError> {
         // ----------------
         // Preparation
         // ---------------- */
@@ -236,14 +238,8 @@ impl<'tui> Tui<'tui> {
         let mut terminal = Terminal::new(backend)?;
 
         // load the default account
-        if let Ok(Account {
-            name: Some(name), ..
-        }) = config.find_account_by_name(None)
-        {
-            self.add_account(&name, &config)?;
-            self.set_account(0);
-        } else {
-            return Err(TuiError::DefaultAccount);
+        if let Err(err) = self.set_account(None) {
+            return Err(err);
         }
 
         // cleanup the terminal first

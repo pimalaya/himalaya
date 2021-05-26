@@ -20,17 +20,16 @@ pub fn tui_matches<'func>(arg_matches: &clap::ArgMatches<'func>, config: &Config
     if let Some(_) = arg_matches.subcommand_matches("tui") {
         debug!("TUI subcommand matched => Opening TUI");
 
-        let mut tui = Tui::new(&config);
-        if let Err(err) = tui.run(&config) {
+        // Start the TUI
+        let mut tui = Tui::new(config);
+        if let Err(err) = tui.run() {
             match err {
                 TuiError::TerminalPreparation(io_err) => {
                     println!("An IO Error Happended!");
                     println!("{}", io_err);
                     panic!("Couldn't prepare the terminal for TUI.");
                 },
-                TuiError::DefaultAccount => 
-                    panic!("Couldn't load the default account."),
-                TuiError::EventKey => 
+                TuiError::EventKey =>
                     panic!("Couldn't handle the pressed keys during TUI session."),
                 TuiError::Draw =>
                     panic!("Couldn't draw the TUI."),
@@ -39,13 +38,17 @@ pub fn tui_matches<'func>(arg_matches: &clap::ArgMatches<'func>, config: &Config
                     println!("{}", err);
                     panic!("Couldn't put terminal into raw mode.");
                 },
-                TuiError::AddingAccount =>
+                TuiError::UnknownAccount =>
                     panic!("Couldn't find given account."),
                 TuiError::ConnectAccount =>
                     panic!("Couldn't connect to IMAP server with given account."),
+                TuiError::Sidebar =>
+                    panic!("Couldn't load the mailboxes into the sidebar of the given account."),
+                TuiError::MailList =>
+                    panic!("Couldn't load the mails into the mail_list frame of the given account."),
             }
         }
-    
+
         return Ok(());
     }
 

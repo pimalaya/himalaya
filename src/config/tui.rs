@@ -4,7 +4,7 @@ use serde::Deserialize;
 pub struct TuiConfig {
     pub sidebar: BlockDataConfig,
     pub mail_list: BlockDataConfig,
-    keybindings: Option<KeybindingsConfig>,
+    pub keybindings: Option<KeybindingsConfig>,
 }
 
 // #[derive(Debug, Deserialize)]
@@ -29,8 +29,6 @@ pub struct BlockDataConfig {
 }
 
 #[derive(Debug, Deserialize)]
-struct KeybindingsConfig {
-    cursor_down: Option<String>,
-    cursor_up: Option<String>,
-    quit: Option<String>,
+pub struct KeybindingsConfig {
+    pub quit: Option<String>,
 }
