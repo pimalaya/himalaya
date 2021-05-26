@@ -1,5 +1,6 @@
 use crate::imap::model::ImapConnector;
 use crate::mbox::model::Mboxes;
+use crate::config::tui::BlockDataConfig;
 
 use tui_rs::layout::Constraint;
 use tui_rs::style::{Color, Style};
@@ -16,11 +17,11 @@ pub struct Sidebar {
 }
 
 impl Sidebar {
-    pub fn new(title: String) -> Self {
+    pub fn new(title: String, config: &BlockDataConfig) -> Self {
         Self {
             mailboxes: Vec::new(),
             header: vec![String::from("Mailbox"), String::from("Flags")],
-            block_data: BlockData::new(title),
+            block_data: BlockData::new(title, config),
             state: TableState::default(),
         }
     }

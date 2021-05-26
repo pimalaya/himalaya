@@ -2,6 +2,7 @@ use super::block_data::BlockData;
 
 use crate::imap::model::ImapConnector;
 use crate::msg::model::Msgs;
+use crate::config::tui::BlockDataConfig;
 
 use tui_rs::layout::Constraint;
 use tui_rs::style::{Color, Style};
@@ -20,9 +21,9 @@ pub struct MailList {
 
 impl MailList {
 
-    pub fn new(title: String) -> Self {
+    pub fn new(title: String, config: &BlockDataConfig) -> Self {
         Self {
-            block_data: BlockData::new(title),
+            block_data: BlockData::new(title, config),
             mails: Vec::new(),
             header: vec![
                 String::from("UID"),

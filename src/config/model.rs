@@ -14,6 +14,8 @@ use toml;
 
 use crate::output::utils::run_cmd;
 
+use super::tui::TuiConfig;
+
 error_chain! {}
 
 const DEFAULT_PAGE_SIZE: usize = 10;
@@ -125,6 +127,8 @@ pub struct Config {
     pub signature: Option<String>,
     pub default_page_size: Option<usize>,
     pub watch_cmds: Option<Vec<String>>,
+    pub tui: TuiConfig,
+
     #[serde(flatten)]
     pub accounts: HashMap<String, Account>,
 }

@@ -20,7 +20,7 @@ pub fn tui_matches<'func>(arg_matches: &clap::ArgMatches<'func>, config: &Config
     if let Some(_) = arg_matches.subcommand_matches("tui") {
         debug!("TUI subcommand matched => Opening TUI");
 
-        let mut tui = Tui::new();
+        let mut tui = Tui::new(&config);
         if let Err(err) = tui.run(&config) {
             match err {
                 TuiError::TerminalPreparation(io_err) => {
