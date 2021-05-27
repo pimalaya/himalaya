@@ -13,7 +13,7 @@ use std::rc::Rc;
 // ==========
 #[derive(Debug, Deserialize, Clone)]
 pub enum KeyType {
-    Action(String),
+    Action(TuiAction),
     Key(Rc<RefCell<HashMap<Event, KeyType>>>),
 }
 
@@ -122,7 +122,7 @@ impl TuiConfig {
                     if iter.as_str().len() == 1 {
                         node.borrow_mut().insert(
                             event,
-                            KeyType::Action(action_name.0.to_string()),
+                            KeyType::Action(action_name.1.clone()),
                         );
                     }
                     // Suppose we have already stored the following keymapping:
