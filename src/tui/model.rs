@@ -1,11 +1,15 @@
 // ===========
 // Crates
 // =========== */
+use std::collections::HashMap;
 use std::io;
 // use std::time::Duration;
 
-use crate::config::model::{Account, Config};
+use serde::Deserialize;
+
+use crate::config::model::Config;
 use crate::imap::model::ImapConnector;
+use crate::config::tui;
 
 use tui_rs::backend::{Backend, CrosstermBackend};
 use tui_rs::layout::{Constraint, Direction, Layout};
@@ -19,9 +23,12 @@ use super::mail_list::MailList;
 use super::sidebar::Sidebar;
 // use super::keybindings::Keybindings;
 
-// =====================
-// Tui return types
-// ===================== */
+// ================
+// Tui - Enums
+// ================
+// -----------
+// Errors
+// -----------
 pub enum TuiError {
     ConnectAccount,
     Draw,
@@ -45,27 +52,38 @@ impl From<crossterm::ErrorKind> for TuiError {
     }
 }
 
+// ------------
+// Actions
+// ------------
+#[derive(Debug, Deserialize, Clone)]
+pub enum TuiAction {
+    Quit,
+    CursorDown,
+    CursorUp,
+}
+
 // ===================
 // Structs/Traits
 // =================== */
 /// This struct is the backend of the Tui.
 ///
-///     --- Tab 1 ---
-///     |           |
-///     -  Sidebar  -- Mail Listing -------------------
-///     |           |                                 |
-///     |           |                                 |
-///     |           |                                 |
-///     |           |                                 |
-///     |           |                                 |
-///     |           |                                 |
-///     -----------------------------------------------
+/// --- Tab 1 ---
+/// |           |
+/// -  Sidebar  -- Mail Listing -------------------
+/// |           |                                 |
+/// |           |                                 |
+/// |           |                                 |
+/// |           |                                 |
+/// |           |                                 |
+/// |           |                                 |
+/// -----------------------------------------------
 ///
 pub struct Tui<'tui> {
     sidebar: Sidebar,
     maillist: MailList,
     connections: Vec<ImapConnector<'tui>>,
     config: &'tui Config,
+    keybindings: HashMap<Event, tui::KeyType>,
 
     // State variables
     need_redraw: bool,
@@ -81,7 +99,10 @@ impl<'tui> Tui<'tui> {
     /// HINT: Think about adding all accounts immediately or storing the configs
     /// in the struct => Take ownership
     pub fn new(config: &'tui Config) -> Tui<'tui> {
-        // Create the two desired main-frames
+
+        // -----------------
+        // TUI - Frames
+        // -----------------
         let sidebar =
             Sidebar::new(String::from("Sidebar"), &config.tui.sidebar);
         let maillist =
@@ -90,8 +111,9 @@ impl<'tui> Tui<'tui> {
         Tui {
             sidebar,
             maillist,
-            config: config,
             connections: Vec::new(),
+            config: config,
+            keybindings: HashMap::new(),
             need_redraw: true,
             run: true,
         }
@@ -153,7 +175,7 @@ impl<'tui> Tui<'tui> {
     /// accounts.
     ///
     /// # Example:
-    /// ```rust
+    /// ```no_run
     /// let stdout = io::stdout();
     /// let backend = CrosstermBackend::new(stdout);
     /// let mut terminal = Terminal::new(backend)?;
@@ -207,6 +229,17 @@ impl<'tui> Tui<'tui> {
         // immediately
         self.need_redraw = false;
     }
+
+    // pub fn do_action(&mut self, action: TuiAction) {
+    //     match action {
+    //         TuiAction::Quit => self.run = false,
+    //         TuiAction::CursorDown => self.maillist.move_selection(1),
+    //         TuiAction::CursorUp => self.mailllist.move_selection(-1),
+    //         _ => (),
+    //     };
+    //
+    //     self.need_redraw = true;
+    // }
 
     pub fn eval_events(&mut self, event: Event) {
         match event {
