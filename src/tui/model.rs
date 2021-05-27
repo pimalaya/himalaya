@@ -3,7 +3,7 @@
 // =========== */
 use std::collections::HashMap;
 use std::io;
-// use std::time::Duration;
+use std::rc::Rc;
 
 use serde::Deserialize;
 
@@ -21,7 +21,6 @@ use crossterm::terminal;
 
 use super::mail_list::MailList;
 use super::sidebar::Sidebar;
-// use super::keybindings::Keybindings;
 
 // ================
 // Tui - Enums
@@ -65,25 +64,16 @@ pub enum TuiAction {
 // ===================
 // Structs/Traits
 // =================== */
-/// This struct is the backend of the Tui.
-///
-/// --- Tab 1 ---
-/// |           |
-/// -  Sidebar  -- Mail Listing -------------------
-/// |           |                                 |
-/// |           |                                 |
-/// |           |                                 |
-/// |           |                                 |
-/// |           |                                 |
-/// |           |                                 |
-/// -----------------------------------------------
-///
+/// TODO: Docu
 pub struct Tui<'tui> {
     sidebar: Sidebar,
     maillist: MailList,
     connections: Vec<ImapConnector<'tui>>,
     config: &'tui Config,
-    keybindings: HashMap<Event, tui::KeyType>,
+
+    // Keybinding
+    keybindings: Vec<tui::KeyType>,
+    // keybinding_node: Rc<HashMap<Event, tui::KeyType>>,
 
     // State variables
     need_redraw: bool,
@@ -113,7 +103,8 @@ impl<'tui> Tui<'tui> {
             maillist,
             connections: Vec::new(),
             config: config,
-            keybindings: HashMap::new(),
+            keybindings: config.tui.parse_keybindings(),
+            // keybinding_node: Rc::new(&self.keybindings),
             need_redraw: true,
             run: true,
         }
@@ -148,11 +139,11 @@ impl<'tui> Tui<'tui> {
 
         if let Err(_) = self
             .maillist
-            .set_mails(&mut imap_conn, &self.sidebar.mailboxes()[0][0])
-        {
-            imap_conn.logout();
-            return Err(TuiError::MailList);
-        }
+                .set_mails(&mut imap_conn, &self.sidebar.mailboxes()[0][0])
+                {
+                    imap_conn.logout();
+                    return Err(TuiError::MailList);
+                }
 
         // logout
         imap_conn.logout();
@@ -190,45 +181,45 @@ impl<'tui> Tui<'tui> {
     /// })?;
     /// ```
     pub fn draw<B>(&mut self, frame: &mut Frame<B>)
-    where
+        where
         B: Backend,
-    {
-        // Create the two frames for the sidebar and the mails:
-        //  - One on the left (sidebar)
-        //  - One on the right (mail listing)
-        let layout = Layout::default()
-            .direction(Direction::Horizontal)
-            .margin(1)
-            .constraints(
-                [
+        {
+            // Create the two frames for the sidebar and the mails:
+            //  - One on the left (sidebar)
+            //  - One on the right (mail listing)
+            let layout = Layout::default()
+                .direction(Direction::Horizontal)
+                .margin(1)
+                .constraints(
+                    [
                     // For the sidebar (will be the second block => Index 0)
                     Constraint::Percentage(25),
                     // For the mails (will be the second block => Index 1)
                     Constraint::Percentage(75),
-                ]
-                .as_ref(),
-            )
-            // Use the given frame size to create the two blocks
-            .split(frame.size());
+                    ]
+                    .as_ref(),
+                    )
+                // Use the given frame size to create the two blocks
+                .split(frame.size());
 
-        // Display the sidebar
-        frame.render_stateful_widget(
-            self.sidebar.widget(),
-            layout[0],
-            &mut self.sidebar.state,
-        );
+            // Display the sidebar
+            frame.render_stateful_widget(
+                self.sidebar.widget(),
+                layout[0],
+                &mut self.sidebar.state,
+                );
 
-        // Display the mails
-        frame.render_stateful_widget(
-            self.maillist.widget(),
-            layout[1],
-            &mut self.maillist.state,
-        );
+            // Display the mails
+            frame.render_stateful_widget(
+                self.maillist.widget(),
+                layout[1],
+                &mut self.maillist.state,
+                );
 
-        // since we draw the Tui now, we don't need to draw the Tui again
-        // immediately
-        self.need_redraw = false;
-    }
+            // since we draw the Tui now, we don't need to draw the Tui again
+            // immediately
+            self.need_redraw = false;
+        }
 
     // pub fn do_action(&mut self, action: TuiAction) {
     //     match action {
