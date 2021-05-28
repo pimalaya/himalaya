@@ -169,16 +169,22 @@ impl TuiConfig {
                         }
                     }
                 } else {
+
+                    // This else-clause includes two Arms which helps "node" to
+                    // travel through the keybindings-tree. So what we're doing
+                    // in this match is actually comparing each node by their
+                    // event. Why and for what reason is explained in each  arm.
+                    // Take a look there :)
                     match node.binary_search_by(|node_event| {
                         let node_event = match node_event {
                             KeyType::Action(eve, _) => eve,
                             KeyType::Key(eve, _) => eve,
                         };
 
-                        match node_event.partial_cmp(&event) {
-                            Some(output) => output,
-                            None => panic!("Bruh"),
-                        }
+                        // There shouldn't go anything wrong, since we're
+                        // comparing different events and nothing else. So this
+                        // shouldn't lead to any error.
+                        node_event.partial_cmp(&event).unwrap()
                     }) {
                         // Suppose we have already stored the following keymapping:
                         //

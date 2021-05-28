@@ -1,22 +1,22 @@
 // ===========
 // Crates
 // =========== */
-use std::collections::HashMap;
 use std::io;
 use std::rc::Rc;
 
 use serde::Deserialize;
 
 use crate::config::model::Config;
-use crate::imap::model::ImapConnector;
 use crate::config::tui;
+use crate::imap::model::ImapConnector;
 
 use tui_rs::backend::{Backend, CrosstermBackend};
 use tui_rs::layout::{Constraint, Direction, Layout};
 use tui_rs::terminal::Frame;
 use tui_rs::Terminal;
 
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+// use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::Event;
 use crossterm::terminal;
 
 use super::mail_list::MailList;
@@ -72,8 +72,8 @@ pub struct Tui<'tui> {
     config: &'tui Config,
 
     // Keybinding
-    keybindings: Vec<tui::KeyType>,
-    // keybinding_node: Rc<HashMap<Event, tui::KeyType>>,
+    keybindings: Rc<Vec<tui::KeyType>>,
+    keybinding_node: Rc<Vec<tui::KeyType>>,
 
     // State variables
     need_redraw: bool,
@@ -88,8 +88,9 @@ impl<'tui> Tui<'tui> {
     /// TODO: Add tabs (accounts)
     /// HINT: Think about adding all accounts immediately or storing the configs
     /// in the struct => Take ownership
-    pub fn new(config: &'tui Config) -> Tui<'tui> {
-
+    pub fn new(
+        config: &'tui Config,
+    ) -> Result<Tui<'tui>, tui::KeybindingError> {
         // -----------------
         // TUI - Frames
         // -----------------
@@ -98,16 +99,21 @@ impl<'tui> Tui<'tui> {
         let maillist =
             MailList::new(String::from("Mails"), &config.tui.mail_list);
 
-        Tui {
+        let keybindings_var = match config.tui.parse_keybindings() {
+            Ok(keybindings) => Rc::new(keybindings),
+            Err(err) => return Err(err),
+        };
+
+        Ok(Tui {
             sidebar,
             maillist,
             connections: Vec::new(),
             config: config,
-            keybindings: config.tui.parse_keybindings(),
-            // keybinding_node: Rc::new(&self.keybindings),
+            keybindings: Rc::clone(&keybindings_var),
+            keybinding_node: Rc::clone(&keybindings_var),
             need_redraw: true,
             run: true,
-        }
+        })
     }
 
     pub fn set_account(&mut self, name: Option<&str>) -> Result<(), TuiError> {
@@ -139,11 +145,11 @@ impl<'tui> Tui<'tui> {
 
         if let Err(_) = self
             .maillist
-                .set_mails(&mut imap_conn, &self.sidebar.mailboxes()[0][0])
-                {
-                    imap_conn.logout();
-                    return Err(TuiError::MailList);
-                }
+            .set_mails(&mut imap_conn, &self.sidebar.mailboxes()[0][0])
+        {
+            imap_conn.logout();
+            return Err(TuiError::MailList);
+        }
 
         // logout
         imap_conn.logout();
@@ -181,75 +187,123 @@ impl<'tui> Tui<'tui> {
     /// })?;
     /// ```
     pub fn draw<B>(&mut self, frame: &mut Frame<B>)
-        where
+    where
         B: Backend,
-        {
-            // Create the two frames for the sidebar and the mails:
-            //  - One on the left (sidebar)
-            //  - One on the right (mail listing)
-            let layout = Layout::default()
-                .direction(Direction::Horizontal)
-                .margin(1)
-                .constraints(
-                    [
+    {
+        // Create the two frames for the sidebar and the mails:
+        //  - One on the left (sidebar)
+        //  - One on the right (mail listing)
+        let layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .margin(1)
+            .constraints(
+                [
                     // For the sidebar (will be the second block => Index 0)
                     Constraint::Percentage(25),
                     // For the mails (will be the second block => Index 1)
                     Constraint::Percentage(75),
-                    ]
-                    .as_ref(),
-                    )
-                // Use the given frame size to create the two blocks
-                .split(frame.size());
+                ]
+                .as_ref(),
+            )
+            // Use the given frame size to create the two blocks
+            .split(frame.size());
 
-            // Display the sidebar
-            frame.render_stateful_widget(
-                self.sidebar.widget(),
-                layout[0],
-                &mut self.sidebar.state,
-                );
+        // Display the sidebar
+        frame.render_stateful_widget(
+            self.sidebar.widget(),
+            layout[0],
+            &mut self.sidebar.state,
+        );
 
-            // Display the mails
-            frame.render_stateful_widget(
-                self.maillist.widget(),
-                layout[1],
-                &mut self.maillist.state,
-                );
+        // Display the mails
+        frame.render_stateful_widget(
+            self.maillist.widget(),
+            layout[1],
+            &mut self.maillist.state,
+        );
 
-            // since we draw the Tui now, we don't need to draw the Tui again
-            // immediately
-            self.need_redraw = false;
+        // since we draw the Tui now, we don't need to draw the Tui again
+        // immediately
+        self.need_redraw = false;
+    }
+
+    pub fn do_action(&mut self, action: TuiAction) {
+        match action {
+            TuiAction::Quit => self.run = false,
+            TuiAction::CursorDown => self.maillist.move_selection(1),
+            TuiAction::CursorUp => self.maillist.move_selection(-1),
+            _ => (),
         }
 
-    // pub fn do_action(&mut self, action: TuiAction) {
-    //     match action {
-    //         TuiAction::Quit => self.run = false,
-    //         TuiAction::CursorDown => self.maillist.move_selection(1),
-    //         TuiAction::CursorUp => self.mailllist.move_selection(-1),
-    //         _ => (),
-    //     };
-    //
-    //     self.need_redraw = true;
-    // }
+        self.need_redraw = true;
+    }
 
     pub fn eval_events(&mut self, event: Event) {
-        match event {
-            Event::Key(KeyEvent {
-                modifiers: KeyModifiers::NONE,
-                code: KeyCode::Char('q'),
-            }) => self.run = false,
-            Event::Key(KeyEvent {
-                modifiers: KeyModifiers::NONE,
-                code: KeyCode::Char('j'),
-            }) => self.maillist.move_selection(1),
-            Event::Key(KeyEvent {
-                modifiers: KeyModifiers::NONE,
-                code: KeyCode::Char('k'),
-            }) => self.maillist.move_selection(-1),
-            _ => (),
-        };
+        self.keybinding_node =
+            match self.keybinding_node.binary_search_by(|node_event| {
+                let node_event = match node_event {
+                    tui::KeyType::Action(eve, _) => eve,
+                    tui::KeyType::Key(eve, _) => eve,
+                };
 
-        self.need_redraw = true;
+                // We can use "unwrap()" here because we are just comparing the
+                // events with each other. So nothing bad should happen.
+                node_event.partial_cmp(&event).unwrap()
+            }) {
+                // Ok, so let's use tree as an example:
+                //
+                //      g
+                //       \
+                //        n  <- (1) Ok(next_index) + tui::KeyType::Key
+                //       / \
+                //      a   n <- (2) Ok(next_index) + tui::KeyType::Action
+                //
+                Ok(next_index) => {
+                    match &mut self.keybinding_node[next_index] {
+                        // (1) So in this case, we are not at the end of a
+                        // keybinding yet, the user has still to press some
+                        // other keys, in order to create an action!
+                        tui::KeyType::Key(_, next_node) => {
+                            Rc::clone(&next_node)
+                        }
+
+                        // (2) We reached a leaf and can now execute the
+                        // appropriate action from it! After that, we can also
+                        // reset the the node-pointer back to the top of the
+                        // tree.
+                        tui::KeyType::Action(_, action) => {
+                            self.do_action(*action);
+                            Rc::clone(&self.keybindings)
+                        }
+                    }
+                }
+                Err(_) => {
+                    // So in this case, the use micpressed a key probably or he
+                    // pressed a keybinding which we doesn't know, so we jump back
+                    // to the top of the tree.
+                    Rc::clone(&self.keybindings)
+                }
+            };
+
+        // match event {
+        //     Event::Key(KeyEvent {
+        //         modifiers: KeyModifiers::NONE,
+        //         code: KeyCode::Char('q'),
+        //     }) => self.run = false,
+        //     Event::Key(KeyEvent {
+        //         modifiers: KeyModifiers::NONE,
+        //         code: KeyCode::Char('j'),
+        //     }) => self.maillist.move_selection(1),
+        //     Event::Key(KeyEvent {
+        //         modifiers: KeyModifiers::NONE,
+        //         code: KeyCode::Char('k'),
+        //     }) => self.maillist.move_selection(-1),
+        //     _ => (),
+        // };
+    }
+
+    pub fn reset_keybinding_stroke(&mut self) {
+        self.keybinding_node = Rc::clone(&self.keybindings);
     }
 
     pub fn run(&mut self) -> Result<(), TuiError> {

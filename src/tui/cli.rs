@@ -3,25 +3,47 @@ use clap;
 use log::debug;
 
 use crate::config::model::Config;
+use crate::config::tui::KeybindingError;
 
-use super::model::{TuiError, Tui};
+use super::model::{Tui, TuiError};
 
 /// Here are all subcommands related to the tui.
 pub fn tui_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
-    vec![
-        clap::SubCommand::with_name("tui")
-            .about("Opens himalaya with the TUI"),
-    ]
+    vec![clap::SubCommand::with_name("tui").about("Opens himalaya with the TUI")]
 }
 
 /// This function will look which subcommands (which belong to the TUI) has
 /// been added in the commandline arguments and execute the appropriate code.
-pub fn tui_matches<'func>(arg_matches: &clap::ArgMatches<'func>, config: &Config) -> Result<(), ()> {
+pub fn tui_matches<'func>(
+    arg_matches: &clap::ArgMatches<'func>,
+    config: &Config,
+) -> Result<(), ()> {
     if let Some(_) = arg_matches.subcommand_matches("tui") {
         debug!("TUI subcommand matched => Opening TUI");
 
         // Start the TUI
-        let mut tui = Tui::new(config);
+        let mut tui = match Tui::new(config) {
+            Ok(tui) => tui,
+            Err(error) => match error {
+                KeybindingError::NodeConflict(keybinding) => {
+                    println!("Keybinding conflict:");
+                    println!(
+                        "There's a similiar keybinding like: {}",
+                        keybinding
+                    );
+                    println!("Please take a look into your config again!");
+                    panic!("Keybding conflict!");
+                },
+                KeybindingError::TraverseError => {
+                    println!("The binary search failed to find the next node");
+                    println!(
+                        "of the keybinding tree! Please create a new issue!"
+                    );
+                    panic!("Node-Traversing-Error");
+                }
+            },
+        };
+
         if let Err(err) = tui.run() {
             match err {
                 TuiError::TerminalPreparation(io_err) => {
