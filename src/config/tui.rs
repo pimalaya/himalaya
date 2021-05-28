@@ -4,7 +4,9 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 use crate::tui::model::TuiAction;
 
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 // ==============
 // Constants
@@ -13,24 +15,18 @@ use std::collections::HashMap;
 // Here are all special keybindings, which we can handle. Here are all
 // special keys listed:
 // https://docs.rs/crossterm/0.19.0/crossterm/event/enum.KeyCode.html
-const SPECIALS: [&str; 15] = [
-    "BS", "CR", "Left", "Right", "Up", "Down", "Home", "End", "PageUp",
-    "PageDown", "Tab", "BackTab", "Delete", "Insert", "Esc",
-];
+// const SPECIALS: [&str; 15] = [
+//     "BS", "CR", "Left", "Right", "Up", "Down", "Home", "End", "PageUp",
+//     "PageDown", "Tab", "BackTab", "Delete", "Insert", "Esc",
+// ];
 
 // ==========
 // Enums
 // ==========
 #[derive(Debug, Deserialize, Clone)]
 pub enum KeyType {
-    Action(Event, TuiAction),
-    Key(Event, Vec<KeyType>),
-}
-
-// Errors
-pub enum KeybindingError {
-    NodeConflict(String),
-    TraverseError,
+    Action(TuiAction),
+    Key(Rc<RefCell<HashMap<Event, KeyType>>>),
 }
 
 // ============
@@ -59,7 +55,7 @@ impl TuiConfig {
     ///
     /// In other words:
     /// It will return the final "form" to lookup after a keybinding.
-    pub fn parse_keybindings(&self) -> Result<Vec<KeyType>, KeybindingError> {
+    pub fn parse_keybindings(&self) -> Rc<RefCell<HashMap<Event, KeyType>>> {
         // Here are all default keybindings stored in the following order:
         //
         //  default_actions = [
@@ -73,9 +69,6 @@ impl TuiConfig {
         //      ),
         //      ...
         //
-        //  So if you want to add more actions for the TUI or change a default
-        //  keybinding, do it in this vector.
-        //
         let default_actions = vec![
             ("quit", TuiAction::Quit, "q"),
             ("cursor_down", TuiAction::CursorDown, "j"),
@@ -84,29 +77,28 @@ impl TuiConfig {
 
         // This variable will store all keybindings which got converted into
         // <Event, Action>.
-        let mut keybindings: Vec<KeyType> = Vec::new();
+        let keybindings: Rc<RefCell<HashMap<Event, KeyType>>> =
+            Rc::new(RefCell::new(HashMap::new()));
 
         // Now iterate through all available actions and look, which one got
         // overridden.
         for action_name in default_actions {
-            // Which keybinding has to be add to the keybinding-tree?
+            // Look, if the user set a keybinding to the given action or not.
             let keybinding = match self.keybindings.get(action_name.0) {
-                // The user provided his own keybinding => Add his/her
-                // keybinding
+                // So the user provided his/her own keybinding => Parse it
                 Some(keybinding) => keybinding,
-
-                // The user didn't provide a keybinding => Use the default one.
-                None => action_name.2.clone(),
+                // Otherwise we're parsing the default keybinding
+                None => action_name.2,
             };
 
             let mut iter = keybinding.chars();
 
-            // This should rather fungate as a pointer to a node of the
-            // keybinding-tree.
-            let mut node: &mut Vec<KeyType> = &mut keybindings;
+            // This should rather fungate as a pointer which traverses through
+            // the keybinding-tree in order to add other nodes or check, which
+            // keybinding, was hit next.
+            let mut node: Rc<RefCell<HashMap<Event, KeyType>>> =
+                Rc::clone(&keybindings);
 
-            // TODO: Use a function here, which returns the given event, which
-            // has to be added to the tree instead of only one character.
             for key in iter.clone() {
                 let event =
                     TuiConfig::convert_to_event(KeyModifiers::NONE, key);
@@ -122,178 +114,76 @@ impl TuiConfig {
                 //
                 // Than we can apply the action to it.
                 if iter.as_str().len() == 1 {
-                    match node.binary_search_by(|node_event| {
-                        let node_event = match node_event {
-                            KeyType::Action(eve, _) => eve,
-                            KeyType::Key(eve, _) => eve,
-                        };
-
-                        match node_event.partial_cmp(&event) {
-                            Some(output) => output,
-                            None => {
-                                panic!("This shouldn't have happened 2...")
-                            }
-                        }
-                    }) {
-                        // "Err(...)":
-                        // According to the docs:
-                        // https://doc.rust-lang.org/std/vec/struct.Vec.html#method.binary_search_by
-                        // "binary_search_by" returns (if "Err(..)" is returned)
-                        // an index value (here: "next_index") where we can
-                        // place our item so the order of the vector doesn't
-                        // change => Let's use it!
-                        //
-                        // "Ok(...)":
-                        // Suppose we have the following keybinding tree
-                        // currently:
-                        //
-                        //      g
-                        //       \
-                        //        n
-                        //         \
-                        //          n
-                        //
-                        // And the next keybinding should be "gn". This would
-                        // lead to a collision, because we'd remove the first
-                        // "n" node! So warn the user!
-                        Ok(_) => {
-                            return Err(KeybindingError::NodeConflict(
-                                keybinding.to_string(),
-                            ))
-                        }
-                        Err(next_index) => {
-                            node.insert(
-                                next_index,
-                                KeyType::Action(event, action_name.1.clone()),
-                            );
-                        }
-                    }
-                } else {
-
-                    // This else-clause includes two Arms which helps "node" to
-                    // travel through the keybindings-tree. So what we're doing
-                    // in this match is actually comparing each node by their
-                    // event. Why and for what reason is explained in each  arm.
-                    // Take a look there :)
-                    match node.binary_search_by(|node_event| {
-                        let node_event = match node_event {
-                            KeyType::Action(eve, _) => eve,
-                            KeyType::Key(eve, _) => eve,
-                        };
-
-                        // There shouldn't go anything wrong, since we're
-                        // comparing different events and nothing else. So this
-                        // shouldn't lead to any error.
-                        node_event.partial_cmp(&event).unwrap()
-                    }) {
-                        // Suppose we have already stored the following keymapping:
-                        //
-                        //  gna
-                        //
-                        // Now we'd like to add the following keymapping:
-                        //
-                        //  gnn
-                        //
-                        // So we've to travel to node `n` first, in order to add the
-                        // second `n` to `gn`.
-                        // That's the usage of this Ok-Arm: It will bring the
-                        // node through the tree, here's an example:
-                        //
-                        // 1.
-                        //      g  <- node
-                        //       \
-                        //        n
-                        //         \
-                        //          a
-                        //
-                        // 2. after this Ok-Arm:
-                        //
-                        //      g
-                        //       \
-                        //        n <- node
-                        //         \
-                        //          a
-                        //
-                        Ok(next_index) => {
-                            node = match &mut node[next_index] {
-                                KeyType::Key(_, next_node) => next_node,
-                                // Normally this can't happen, because the
-                                // binary search *found* the next node, but just
-                                // in case...
-                                KeyType::Action(_, _) => {
-                                    return Err(KeybindingError::TraverseError)
-                                }
-                            }
-                        }
-
-                        // Suppose the user wants to have the following keymapping:
-                        //
-                        //  gnn
-                        //
-                        // But our keybinding tree looks only like that currently:
-                        //
-                        //      g
-                        //
-                        // We'd have to create the tree to g->n->n.
-                        // This Err clause is creating the missing nodes to our
-                        // needed path.
-                        // So it'll do the following (assuming our tree is like
-                        // above):
-                        //
-                        //      g
-                        //       \
-                        //        n <- create 'n' and let "node" point to it
-                        //
-                        Err(next_index) => {
-                            // The node is empty (node "g") => Just push a new
-                            // one (from our example: The first "n" node)
-                            if next_index == 0 {
-                                node.push(KeyType::Key(event, Vec::new()));
-
-                                // now point to the new node
-                                node = match &mut node[0] {
-                                    KeyType::Action(_, _) => panic!("Panik!"),
-                                    KeyType::Key(_, next_node) => next_node,
-                                };
-                            }
-                            // So there's already a node, which would look like
-                            // this:
-                            //
-                            //      g
-                            //       \
-                            //        a
-                            //
-                            // But what we want, is "gnn" => So we're creating
-                            // the first "n" here:
-                            else {
-                                let tmp_ptr = match &mut node[next_index] {
-                                    KeyType::Action(_, _) => panic!("Panik!"),
-                                    KeyType::Key(_, next_node) => next_node,
-                                };
-
-                                // Inset the new node (from our example: The
-                                // second "n" node).
-                                tmp_ptr.insert(
-                                    next_index,
-                                    KeyType::Key(event, Vec::new()),
-                                );
-
-                                // Now let "node" point to the new node
-                                node = match &mut tmp_ptr[next_index] {
-                                    KeyType::Action(_, _) => panic!("Welp..."),
-                                    KeyType::Key(_, next_node) => next_node,
-                                };
-                            }
-                        }
-                    }
+                    node.clone()
+                        .borrow_mut()
+                        .insert(event, KeyType::Action(action_name.1.clone()));
                 }
+                // Suppose we have already stored the following keymapping:
+                //
+                //  gna
+                //
+                // Now we'd like to add the following keymapping:
+                //
+                //  gnn
+                //
+                // So we've to travel to node `n` first, in order to add the
+                // second `n` to `gn`.
+                // That's the usage of this else-if-clause: It will let the
+                // `node` variable point to the first `n` so it'll look like
+                // this:
+                //
+                // 1.
+                //      g  <- node
+                //       \
+                //        n
+                //         \
+                //          a
+                //
+                // 2. (after this else-if-clause)
+                //
+                //      g
+                //       \
+                //        n <- node
+                //         \
+                //          a
+                else if let Some(KeyType::Key(sub_node)) =
+                    (*node).clone().borrow_mut().get(&event)
+                {
+                    node = Rc::clone(&sub_node);
+                }
+                // Suppose the user wants to have the following keymapping:
+                //
+                //  gnn
+                //
+                // But our keybinding tree looks only like that currently:
+                //
+                //      g
+                //
+                // We'd have to create the tree to g->n->n.
+                // This else clause is creating the missing nodes to our
+                // needed path.
+                // So it'll do the following (assuming our tree is like
+                // above):
+                //
+                //      g
+                //       \
+                //        n <- node
+                //
+                else {
+                    let new_node = Rc::new(RefCell::new(HashMap::new()));
+
+                    (*node)
+                        .borrow_mut()
+                        .insert(event, KeyType::Key(Rc::clone(&new_node)));
+
+                    node = new_node;
+                }
+
                 iter.next();
             }
         }
-        // Rc::new((*keybindings).clone().into_inner())
-        // dbg!("{:?}", keybindings.clone());
-        println!("{:?}", keybindings);
-        Ok(keybindings)
+
+        keybindings
     }
 
     /// This function converts with the given

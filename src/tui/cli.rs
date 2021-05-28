@@ -3,7 +3,6 @@ use clap;
 use log::debug;
 
 use crate::config::model::Config;
-use crate::config::tui::KeybindingError;
 
 use super::model::{Tui, TuiError};
 
@@ -22,28 +21,7 @@ pub fn tui_matches<'func>(
         debug!("TUI subcommand matched => Opening TUI");
 
         // Start the TUI
-        let mut tui = match Tui::new(config) {
-            Ok(tui) => tui,
-            Err(error) => match error {
-                KeybindingError::NodeConflict(keybinding) => {
-                    println!("Keybinding conflict:");
-                    println!(
-                        "There's a similiar keybinding like: {}",
-                        keybinding
-                    );
-                    println!("Please take a look into your config again!");
-                    panic!("Keybding conflict!");
-                },
-                KeybindingError::TraverseError => {
-                    println!("The binary search failed to find the next node");
-                    println!(
-                        "of the keybinding tree! Please create a new issue!"
-                    );
-                    panic!("Node-Traversing-Error");
-                }
-            },
-        };
-
+        let mut tui = Tui::new(config);
         if let Err(err) = tui.run() {
             match err {
                 TuiError::TerminalPreparation(io_err) => {
