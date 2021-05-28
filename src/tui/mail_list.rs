@@ -5,7 +5,7 @@ use crate::msg::model::Msgs;
 use crate::config::tui::BlockDataConfig;
 
 use tui_rs::layout::Constraint;
-use tui_rs::style::{Color, Style};
+use tui_rs::style::{Color, Style, Modifier};
 use tui_rs::widgets::{Block, Row, Table, TableState};
 
 pub struct MailList {
@@ -81,7 +81,12 @@ impl MailList {
     pub fn widget(&self) -> Table<'static> {
 
         // convert the header into a row
-        let header = Row::new(self.header.clone()).bottom_margin(1);
+        let header = Row::new(self.header.clone())
+            .bottom_margin(1)
+            .style(
+                Style::default()
+                    .add_modifier(Modifier::UNDERLINED)
+            );
 
         // convert all mails into Rows
         let mails: Vec<Row> = self.mails.iter().map(|mail| Row::new(mail.to_vec())).collect();

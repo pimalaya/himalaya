@@ -114,8 +114,7 @@ impl TuiConfig {
                 //
                 // Than we can apply the action to it.
                 if iter.as_str().len() == 1 {
-                    node.clone()
-                        .borrow_mut()
+                    node.borrow_mut()
                         .insert(event, KeyType::Action(action_name.1.clone()));
                 }
                 // Suppose we have already stored the following keymapping:
@@ -148,9 +147,9 @@ impl TuiConfig {
                 //          a
                 else if let Some(KeyType::Key(sub_node)) =
                     (*node).clone().borrow_mut().get(&event)
-                {
-                    node = Rc::clone(&sub_node);
-                }
+                    {
+                        node = Rc::clone(&sub_node);
+                    }
                 // Suppose the user wants to have the following keymapping:
                 //
                 //  gnn
@@ -171,11 +170,10 @@ impl TuiConfig {
                 //
                 else {
                     let new_node = Rc::new(RefCell::new(HashMap::new()));
-
-                    (*node)
-                        .borrow_mut()
+                
+                    node.borrow_mut()
                         .insert(event, KeyType::Key(Rc::clone(&new_node)));
-
+                
                     node = new_node;
                 }
 
