@@ -20,7 +20,7 @@ const DEFAULT_PAGE_SIZE: usize = 10;
 
 // Account
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Account {
     // Override

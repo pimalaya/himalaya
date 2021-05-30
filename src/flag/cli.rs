@@ -20,25 +20,22 @@ fn flags_arg<'a>() -> clap::Arg<'a, 'a> {
 
 pub fn flag_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
     vec![clap::SubCommand::with_name("flags")
-        .aliases(&["flag"])
         .about("Handles flags")
         .subcommand(
             clap::SubCommand::with_name("set")
-                .aliases(&["s"])
                 .about("Replaces all message flags")
                 .arg(uid_arg())
                 .arg(flags_arg()),
         )
         .subcommand(
             clap::SubCommand::with_name("add")
-                .aliases(&["a"])
                 .about("Appends flags to a message")
                 .arg(uid_arg())
                 .arg(flags_arg()),
         )
         .subcommand(
             clap::SubCommand::with_name("remove")
-                .aliases(&["rm", "r"])
+                .aliases(&["rm"])
                 .about("Removes flags from a message")
                 .arg(uid_arg())
                 .arg(flags_arg()),

@@ -13,7 +13,13 @@ use crate::{
     imap::model::ImapConnector,
     input,
     mbox::cli::mbox_target_arg,
-    msg::model::{Attachments, Msg, Msgs, ReadableMsg},
+    msg::{
+        model::{Attachments, Msg, Msgs, ReadableMsg},
+        tpl::{
+            cli::{tpl_matches, tpl_subcommand},
+            model::Tpl,
+        },
+    },
     smtp,
 };
 
@@ -22,6 +28,7 @@ error_chain! {
         Imap(crate::imap::model::Error, crate::imap::model::ErrorKind);
         Input(crate::input::Error, crate::input::ErrorKind);
         MsgModel(crate::msg::model::Error, crate::msg::model::ErrorKind);
+        TplCli(crate::msg::tpl::cli::Error, crate::msg::tpl::cli::ErrorKind);
         Smtp(crate::smtp::Error, crate::smtp::ErrorKind);
     }
     foreign_links {
@@ -67,18 +74,17 @@ fn attachment_arg<'a>() -> clap::Arg<'a, 'a> {
         .long("attachment")
         .value_name("PATH")
         .multiple(true)
-        .takes_value(true)
 }
 
 pub fn msg_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
     vec![
         clap::SubCommand::with_name("list")
-            .aliases(&["lst", "l"])
+            .aliases(&["lst"])
             .about("Lists all messages")
             .arg(page_size_arg())
             .arg(page_arg()),
         clap::SubCommand::with_name("search")
-            .aliases(&["query", "q", "s"])
+            .aliases(&["query", "q"])
             .about("Lists messages matching the given IMAP query")
             .arg(page_size_arg())
             .arg(page_arg())
@@ -90,7 +96,6 @@ pub fn msg_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
                     .required(true),
             ),
         clap::SubCommand::with_name("write")
-            .aliases(&["w"])
             .about("Writes a new message")
             .arg(attachment_arg()),
         clap::SubCommand::with_name("send")
@@ -100,7 +105,6 @@ pub fn msg_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
             .about("Saves a raw message")
             .arg(clap::Arg::with_name("message").raw(true)),
         clap::SubCommand::with_name("read")
-            .aliases(&["r"])
             .about("Reads text bodies of a message")
             .arg(uid_arg())
             .arg(
@@ -119,55 +123,33 @@ pub fn msg_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
                     .short("r"),
             ),
         clap::SubCommand::with_name("attachments")
-            .aliases(&["attach", "att", "a"])
             .about("Downloads all message attachments")
             .arg(uid_arg()),
         clap::SubCommand::with_name("reply")
-            .aliases(&["rep", "re"])
             .about("Answers to a message")
             .arg(uid_arg())
             .arg(reply_all_arg())
             .arg(attachment_arg()),
         clap::SubCommand::with_name("forward")
-            .aliases(&["fwd", "f"])
+            .aliases(&["fwd"])
             .about("Forwards a message")
             .arg(uid_arg())
             .arg(attachment_arg()),
         clap::SubCommand::with_name("copy")
-            .aliases(&["cp", "c"])
+            .aliases(&["cp"])
             .about("Copies a message to the targetted mailbox")
             .arg(uid_arg())
             .arg(mbox_target_arg()),
         clap::SubCommand::with_name("move")
-            .aliases(&["mv", "m"])
+            .aliases(&["mv"])
             .about("Moves a message to the targetted mailbox")
             .arg(uid_arg())
             .arg(mbox_target_arg()),
         clap::SubCommand::with_name("delete")
-            .aliases(&["remove", "rm", "del", "d"])
+            .aliases(&["remove", "rm"])
             .about("Deletes a message")
             .arg(uid_arg()),
-        clap::SubCommand::with_name("template")
-            .aliases(&["tpl", "t"])
-            .about("Generates a message template")
-            .subcommand(
-                clap::SubCommand::with_name("new")
-                    .aliases(&["n"])
-                    .about("Generates a new message template"),
-            )
-            .subcommand(
-                clap::SubCommand::with_name("reply")
-                    .aliases(&["rep", "r"])
-                    .about("Generates a reply message template")
-                    .arg(uid_arg())
-                    .arg(reply_all_arg()),
-            )
-            .subcommand(
-                clap::SubCommand::with_name("forward")
-                    .aliases(&["fwd", "fw", "f"])
-                    .about("Generates a forward message template")
-                    .arg(uid_arg()),
-            ),
+        tpl_subcommand(),
     ]
 }
 
@@ -183,8 +165,9 @@ pub fn msg_matches(app: &App) -> Result<bool> {
         ("save", Some(matches)) => msg_matches_save(app, matches),
         ("search", Some(matches)) => msg_matches_search(app, matches),
         ("send", Some(matches)) => msg_matches_send(app, matches),
-        ("template", Some(matches)) => msg_matches_template(app, matches),
         ("write", Some(matches)) => msg_matches_write(app, matches),
+
+        ("template", Some(matches)) => Ok(tpl_matches(app, matches)?),
 
         ("list", opt_matches) => msg_matches_list(app, opt_matches),
         (_other, opt_matches) => msg_matches_list(app, opt_matches),
@@ -195,19 +178,11 @@ fn msg_matches_list(app: &App, opt_matches: Option<&clap::ArgMatches>) -> Result
     debug!("list command matched");
 
     let page_size: usize = opt_matches
-        .and_then(|matches| {
-            matches.value_of("page-size")
-            .and_then(|s| s.parse().ok())
-        })
+        .and_then(|matches| matches.value_of("page-size").and_then(|s| s.parse().ok()))
         .unwrap_or_else(|| app.config.default_page_size(&app.account));
     debug!("page size: {:?}", page_size);
     let page: usize = opt_matches
-        .and_then(|matches| {
-            matches.value_of("page")
-                .unwrap()
-                .parse()
-                .ok()
-        })
+        .and_then(|matches| matches.value_of("page").unwrap().parse().ok())
         .unwrap_or_default();
     debug!("page: {}", &page);
 
@@ -294,8 +269,8 @@ fn msg_matches_read(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
     let mut imap_conn = ImapConnector::new(&app.account)?;
     let msg = imap_conn.read_msg(&app.mbox, &uid)?;
     if raw {
-        let msg = String::from_utf8(msg)
-            .chain_err(|| "Could not decode raw message as utf8 string")?;
+        let msg =
+            String::from_utf8(msg).chain_err(|| "Could not decode raw message as utf8 string")?;
         let msg = msg.trim_end_matches("\n");
         app.output.print(msg);
     } else {
@@ -352,7 +327,7 @@ fn msg_matches_write(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
         .unwrap_or_default()
         .map(String::from)
         .collect::<Vec<_>>();
-    let tpl = Msg::build_new_tpl(&app.config, &app.account)?;
+    let tpl = Tpl::new(&app);
     let content = input::open_editor_with_tpl(tpl.to_string().as_bytes())?;
     let mut msg = Msg::from(content);
     msg.attachments = attachments;
@@ -513,53 +488,6 @@ fn msg_matches_forward(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
     Ok(true)
 }
 
-fn msg_matches_template(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
-    debug!("template command matched");
-
-    if let Some(_) = matches.subcommand_matches("new") {
-        debug!("new command matched");
-        let tpl = Msg::build_new_tpl(&app.config, &app.account)?;
-        trace!("tpl: {:?}", tpl);
-        app.output.print(tpl);
-    }
-
-    if let Some(matches) = matches.subcommand_matches("reply") {
-        debug!("reply command matched");
-
-        let uid = matches.value_of("uid").unwrap();
-        debug!("uid: {}", uid);
-
-        let mut imap_conn = ImapConnector::new(&app.account)?;
-        let msg = Msg::from(imap_conn.read_msg(&app.mbox, &uid)?);
-        let tpl = if matches.is_present("reply-all") {
-            msg.build_reply_all_tpl(&app.config, &app.account)?
-        } else {
-            msg.build_reply_tpl(&app.config, &app.account)?
-        };
-        trace!("tpl: {:?}", tpl);
-        app.output.print(tpl);
-
-        imap_conn.logout();
-    }
-
-    if let Some(matches) = matches.subcommand_matches("forward") {
-        debug!("forward command matched");
-
-        let uid = matches.value_of("uid").unwrap();
-        debug!("uid: {}", uid);
-
-        let mut imap_conn = ImapConnector::new(&app.account)?;
-        let msg = Msg::from(imap_conn.read_msg(&app.mbox, &uid)?);
-        let tpl = msg.build_forward_tpl(&app.config, &app.account)?;
-        trace!("tpl: {:?}", tpl);
-        app.output.print(tpl);
-
-        imap_conn.logout();
-    }
-
-    Ok(true)
-}
-
 fn msg_matches_copy(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
     debug!("copy command matched");
 
@@ -665,4 +593,3 @@ fn msg_matches_save(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
     imap_conn.logout();
     Ok(true)
 }
-
