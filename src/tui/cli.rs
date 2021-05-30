@@ -21,7 +21,7 @@ pub fn tui_matches<'func>(
         debug!("TUI subcommand matched => Opening TUI");
 
         // Start the TUI
-        let mut tui = Tui::new(config);
+        let tui = Tui::new(config);
         if let Err(err) = tui.run() {
             match err {
                 TuiError::TerminalPreparation(io_err) => {

@@ -1,10 +1,7 @@
 // ===========
 // Crates
 // =========== */
-use std::collections::HashMap;
 use std::io;
-use std::rc::Rc;
-use std::cell::RefCell;
 
 use serde::Deserialize;
 
@@ -18,7 +15,6 @@ use tui_rs::terminal::Frame;
 use tui_rs::Terminal;
 
 // use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
-use crossterm::event::Event;
 use crossterm::terminal;
 
 use super::mail_list::MailList;
@@ -73,10 +69,6 @@ pub struct Tui<'tui> {
     connections: Vec<ImapConnector<'tui>>,
     config: &'tui Config,
 
-    // Keybinding
-    keybindings: Rc<RefCell<HashMap<Event, tui::KeyType>>>,
-    keybinding_node: Rc<RefCell<HashMap<Event, tui::KeyType>>>,
-
     // State variables
     need_redraw: bool,
     run: bool,
@@ -99,15 +91,11 @@ impl<'tui> Tui<'tui> {
         let maillist =
             MailList::new(String::from("Mails"), &config.tui.mail_list);
 
-        let keybindings_var = config.tui.parse_keybindings();
-
         Tui {
             sidebar,
             maillist,
             connections: Vec::new(),
             config: config,
-            keybindings: Rc::clone(&keybindings_var),
-            keybinding_node: Rc::clone(&keybindings_var),
             need_redraw: true,
             run: true,
         }
@@ -234,61 +222,44 @@ impl<'tui> Tui<'tui> {
         self.need_redraw = true;
     }
 
-    pub fn eval_events(&mut self, event: Event) {
-        // So suppose our keybinding tree looks like this:
-        //
-        //
-        //      g
-        //       \
-        //        n  <- (1) Some(tui::KeyType::Key(sub_node))
-        //       / \
-        //      a   n <- Some(tui::KeyType::Action(action))
-        //
-        self.keybinding_node =
-            match self.keybinding_node.clone().borrow().get(&event) {
-                // In this case, the user pressed probably a wrong key or
-                // he pressed a keybinding which we doesn't know, so we just
-                // jump back to the top of the tree and record the next
-                // keybinding.
-                None => Rc::clone(&self.keybindings),
+    // pub fn eval_events(
+    //     &mut self,
+    //     event: Event,
+    //     node_ptr: Rc<HashMap<Event, tui::KeyType>>,
+    // ) -> Rc<HashMap<Event, tui::KeyType>> {
+    //     // So suppose our keybinding tree looks like this:
+    //     //
+    //     //
+    //     //      g
+    //     //       \
+    //     //        n  <- (1) Some(tui::KeyType::Key(sub_node))
+    //     //       / \
+    //     //      a   n <- (2) Some(tui::KeyType::Action(action))
+    //     //
+    //     match node_ptr.get(&event) {
+    //         // In this case, the user pressed probably a wrong key or
+    //         // he pressed a keybinding which we doesn't know, so we just
+    //         // jump back to the top of the tree and record the next
+    //         // keybinding.
+    //         None => Rc::new(self.keybindings),
+    //
+    //         // (1) So in this case, we are not at the end of a
+    //         // keybinding yet, the user has still to press some
+    //         // other keys, in order to create an action!
+    //         Some(tui::KeyType::Key(sub_node)) => Rc::new(sub_node),
+    //
+    //         // (2) We reached a leaf and can now execute the
+    //         // appropriate action from it! After that, we can also
+    //         // reset the the node-pointer back to the top of the
+    //         // tree in order to record the next keybinding.
+    //         Some(tui::KeyType::Action(action)) => {
+    //             self.do_action(action.clone());
+    //             Rc::new(self.keybindings)
+    //         }
+    //     }
+    // }
 
-                // (1) So in this case, we are not at the end of a
-                // keybinding yet, the user has still to press some
-                // other keys, in order to create an action!
-                Some(tui::KeyType::Key(sub_node)) => Rc::clone(&sub_node),
-
-                // (2) We reached a leaf and can now execute the
-                // appropriate action from it! After that, we can also
-                // reset the the node-pointer back to the top of the
-                // tree in order to record the next keybinding.
-                Some(tui::KeyType::Action(action)) => {
-                    self.do_action(action.clone());
-                    Rc::clone(&self.keybindings)
-                }
-            }
-
-        // match event {
-        //     Event::Key(KeyEvent {
-        //         modifiers: KeyModifiers::NONE,
-        //         code: KeyCode::Char('q'),
-        //     }) => self.run = false,
-        //     Event::Key(KeyEvent {
-        //         modifiers: KeyModifiers::NONE,
-        //         code: KeyCode::Char('j'),
-        //     }) => self.maillist.move_selection(1),
-        //     Event::Key(KeyEvent {
-        //         modifiers: KeyModifiers::NONE,
-        //         code: KeyCode::Char('k'),
-        //     }) => self.maillist.move_selection(-1),
-        //     _ => (),
-        // };
-    }
-
-    pub fn reset_keybinding_stroke(&mut self) {
-        self.keybinding_node = Rc::clone(&self.keybindings);
-    }
-
-    pub fn run(&mut self) -> Result<(), TuiError> {
+    pub fn run(mut self) -> Result<(), TuiError> {
         // ----------------
         // Preparation
         // ---------------- */
@@ -307,6 +278,10 @@ impl<'tui> Tui<'tui> {
 
         // set the terminal into raw mode
         terminal::enable_raw_mode()?;
+
+        // Load the keybindings
+        let mut keybindings = self.config.tui.parse_keybindings();
+        let mut keybinding_ptr = &mut keybindings;
 
         // ------------------
         // Main Tui loop
@@ -327,7 +302,38 @@ impl<'tui> Tui<'tui> {
             // has to be down (no redraw or somehting like that)
             // HINT: If we need to do something in parallel, use add poll.
             match crossterm::event::read() {
-                Ok(event) => self.eval_events(event),
+                Ok(event) => {
+                    // So suppose our keybinding tree looks like this:
+                    //
+                    //
+                    //      g
+                    //       \
+                    //        n  <- (1) Some(tui::KeyType::Key(sub_node))
+                    //       / \
+                    //      a   n <- (2) Some(tui::KeyType::Action(action))
+                    //
+                    keybinding_ptr = match keybinding_ptr.get_mut(&event) {
+                        // In this case, the user pressed probably a wrong key or
+                        // he pressed a keybinding which we doesn't know, so we just
+                        // jump back to the top of the tree and record the next
+                        // keybinding.
+                        None => &mut keybindings,
+
+                        // (1) So in this case, we are not at the end of a
+                        // keybinding yet, the user has still to press some
+                        // other keys, in order to create an action!
+                        Some(tui::KeyType::Key(sub_node)) => sub_node,
+
+                        // (2) We reached a leaf and can now execute the
+                        // appropriate action from it! After that, we can also
+                        // reset the the node-pointer back to the top of the
+                        // tree in order to record the next keybinding.
+                        Some(tui::KeyType::Action(action)) => {
+                            self.do_action(action.clone());
+                            &mut keybindings
+                        }
+                    };
+                },
                 Err(_) => {
                     terminal.clear()?;
                     self.cleanup()?;

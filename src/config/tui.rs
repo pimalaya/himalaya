@@ -4,9 +4,7 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 use crate::tui::model::TuiAction;
 
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
 
 // ==============
 // Constants
@@ -26,7 +24,7 @@ use std::rc::Rc;
 #[derive(Debug, Deserialize, Clone)]
 pub enum KeyType {
     Action(TuiAction),
-    Key(Rc<RefCell<HashMap<Event, KeyType>>>),
+    Key(HashMap<Event, KeyType>),
 }
 
 // ============
@@ -55,7 +53,7 @@ impl TuiConfig {
     ///
     /// In other words:
     /// It will return the final "form" to lookup after a keybinding.
-    pub fn parse_keybindings(&self) -> Rc<RefCell<HashMap<Event, KeyType>>> {
+    pub fn parse_keybindings(&self) -> HashMap<Event, KeyType> {
         // Here are all default keybindings stored in the following order:
         //
         //  default_actions = [
@@ -77,8 +75,7 @@ impl TuiConfig {
 
         // This variable will store all keybindings which got converted into
         // <Event, Action>.
-        let keybindings: Rc<RefCell<HashMap<Event, KeyType>>> =
-            Rc::new(RefCell::new(HashMap::new()));
+        let mut keybindings: HashMap<Event, KeyType> = HashMap::new();
 
         // Now iterate through all available actions and look, which one got
         // overridden.
@@ -96,8 +93,7 @@ impl TuiConfig {
             // This should rather fungate as a pointer which traverses through
             // the keybinding-tree in order to add other nodes or check, which
             // keybinding, was hit next.
-            let mut node: Rc<RefCell<HashMap<Event, KeyType>>> =
-                Rc::clone(&keybindings);
+            let mut node: &mut HashMap<Event, KeyType> = &mut keybindings;
 
             for key in iter.clone() {
                 let event =
@@ -114,67 +110,55 @@ impl TuiConfig {
                 //
                 // Than we can apply the action to it.
                 if iter.as_str().len() == 1 {
-                    node.borrow_mut()
-                        .insert(event, KeyType::Action(action_name.1.clone()));
-                }
-                // Suppose we have already stored the following keymapping:
-                //
-                //  gna
-                //
-                // Now we'd like to add the following keymapping:
-                //
-                //  gnn
-                //
-                // So we've to travel to node `n` first, in order to add the
-                // second `n` to `gn`.
-                // That's the usage of this else-if-clause: It will let the
-                // `node` variable point to the first `n` so it'll look like
-                // this:
-                //
-                // 1.
-                //      g  <- node
-                //       \
-                //        n
-                //         \
-                //          a
-                //
-                // 2. (after this else-if-clause)
-                //
-                //      g
-                //       \
-                //        n <- node
-                //         \
-                //          a
-                else if let Some(KeyType::Key(sub_node)) =
-                    (*node).clone().borrow_mut().get(&event)
-                    {
-                        node = Rc::clone(&sub_node);
+                    node.insert(event, KeyType::Action(action_name.1.clone()));
+                } else {
+
+                    // So this if condition looks, if there's already a node for
+                    // the next key-hit. If not, create the node. For example if
+                    // we have to store this keybinding:
+                    //
+                    //  gnn
+                    // 
+                    // but our tree looks only like that currently:
+                    //
+                    //      g
+                    //
+                    // Than this if clause would create the first 'n' node:
+                    //
+                    //      g
+                    //       \
+                    //        n
+                    //
+                    if let None = node.get(&event) {
+                        node.insert(event, KeyType::Key(HashMap::new()));
                     }
-                // Suppose the user wants to have the following keymapping:
-                //
-                //  gnn
-                //
-                // But our keybinding tree looks only like that currently:
-                //
-                //      g
-                //
-                // We'd have to create the tree to g->n->n.
-                // This else clause is creating the missing nodes to our
-                // needed path.
-                // So it'll do the following (assuming our tree is like
-                // above):
-                //
-                //      g
-                //       \
-                //        n <- node
-                //
-                else {
-                    let new_node = Rc::new(RefCell::new(HashMap::new()));
-                
-                    node.borrow_mut()
-                        .insert(event, KeyType::Key(Rc::clone(&new_node)));
-                
-                    node = new_node;
+
+                    // This if clause let us move to the next node. For example:
+                    // 1. Before this if clause
+                    //
+                    //      g <- 'node' points here
+                    //       \
+                    //        n
+                    //
+                    // 2. After this if clause
+                    //
+                    //      g
+                    //       \
+                    //        n <- 'node' points here now
+                    //
+                    // We should never reach this panic-else block since we made
+                    // sure with the previous if-clause that a node exists. But
+                    // just in case, there's this panic.
+                    node = if let Some(KeyType::Key(sub_node)) =
+                        node.get_mut(&event)
+                    {
+                        sub_node
+                    } else {
+                        println!("Couldn't get to the next node of the");
+                        println!("Keybinding tree.");
+                        panic!("Incomplete Keybinding Tree.");
+                    }
+
                 }
 
                 iter.next();
