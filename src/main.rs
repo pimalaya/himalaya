@@ -9,6 +9,7 @@ use himalaya::{
     comp::cli::{comp_matches, comp_subcmds},
     config::{cli::config_args, model::Config},
     flag::cli::{flag_matches, flag_subcmds},
+    tui::cli::{tui_matches, tui_subcmds},
     imap::cli::{imap_matches, imap_subcmds},
     mbox::cli::{mbox_matches, mbox_source_arg, mbox_subcmds},
     msg::cli::{msg_matches, msg_subcmds},
@@ -35,11 +36,16 @@ fn parse_args<'a>() -> clap::App<'a, 'a> {
         .args(&output_args())
         .args(&config_args())
         .arg(mbox_source_arg())
+
+        // So in this part, we are "registing" all subcommands like the "tui"
+        // command of "himalaya tui". Each function in between the brackets of
+        // `subcommands()` includes the subcommands which suit teir category.
         .subcommands(flag_subcmds())
         .subcommands(imap_subcmds())
         .subcommands(mbox_subcmds())
         .subcommands(msg_subcmds())
         .subcommands(comp_subcmds())
+        .subcommands(tui_subcmds())
 }
 
 fn run() -> Result<()> {
@@ -56,24 +62,41 @@ fn run() -> Result<()> {
     }
 
     let output = Output::new(arg_matches.value_of("output").unwrap());
-    debug!("output: {:?}", output);
+    debug!("Output: {:?}", output);
 
-    debug!("init config");
+    // This part will read the config file and stores it values.
+    debug!("## Init config ##");
+
     let custom_config: Option<PathBuf> = arg_matches.value_of("config").map(|s| s.into());
-    debug!("custom config path: {:?}", custom_config);
+    debug!("Custom config path: {:?}", custom_config);
+
     let config = Config::new(custom_config)?;
-    trace!("config: {:?}", config);
+    trace!("Config: {:?}", config);
 
     let account_name = arg_matches.value_of("account");
-    debug!("init account: {}", account_name.unwrap_or("default"));
+    debug!("Init account: {}", account_name.unwrap_or("default"));
     let account = config.find_account_by_name(account_name)?;
-    trace!("account: {:?}", account);
+    trace!("Account: {:?}", account);
 
     let mbox = arg_matches.value_of("mailbox").unwrap();
-    debug!("mailbox: {}", mbox);
+    debug!("Mailbox: {}", mbox);
 
-    debug!("begin matching");
+    // In this part, we are evaluating the given commandline arguments. For
+    // example if the user provided `himalaya tui`, the `tui_matches`
+    // function will kick in, because it included the subcommand `tui`.
+    debug!("Begin matching");
     let app = App::new(&config, &account, &output, &mbox, &arg_matches);
+
+    // SUGGESTION: Improve this part, suggestion: 
+    //  1. Collect all subcommands
+    //  2. Iterate through them
+    //  3. Go through `match`
+    //  4. If somethings match => Do their stuff.
+    // does the user want to start the tui?
+    if let Ok(_) = tui_matches(&arg_matches, &config) {
+        return Ok(())
+    }
+
     let _matched =
         mbox_matches(&app)? || flag_matches(&app)? || imap_matches(&app)? || msg_matches(&app)?;
 

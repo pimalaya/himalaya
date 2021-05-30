@@ -198,6 +198,29 @@ impl<'a> ImapConnector<'a> {
         Ok(names)
     }
 
+    /// This function gets the mails from the provided mailbox and returns them
+    pub fn msgs(&mut self, mbox: &str) -> Result<Option<imap::types::ZeroCopy<Vec<imap::types::Fetch>>>> {
+
+        // get th mailbox from the current session.
+        let last_seq = self
+            .sess
+            .select(mbox)
+            .chain_err(|| format!("Could not select mailbox `{}`", mbox))?
+            .exists as i64;
+
+        // The last sesstion doesn't exist
+        if last_seq == 0 {
+            return Ok(None);
+        }
+
+        let fetches = self
+            .sess
+            .fetch(String::from("1:*"), "(UID FLAGS ENVELOPE INTERNALDATE)")
+            .chain_err(|| "Could not fetch messages from mailbox")?;
+
+        Ok(Some(fetches))
+    }
+
     pub fn list_msgs(
         &mut self,
         mbox: &str,
@@ -207,7 +230,7 @@ impl<'a> ImapConnector<'a> {
         let last_seq = self
             .sess
             .select(mbox)
-            .chain_err(|| format!("Could not select mailbox `{}`", mbox))?
+            .chain_err(|| format!("Could not select mailbox \"{}\"", mbox))?
             .exists as i64;
 
         if last_seq == 0 {

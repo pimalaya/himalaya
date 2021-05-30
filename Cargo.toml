@@ -16,10 +16,12 @@ log = "0.4.14"
 mailparse = "0.13.1"
 native-tls = "0.2"
 rfc2047-decoder = "0.1.2"
-serde = {version = "1.0.118", features = ["derive"]}
+serde = {version = "1.0.118", features = ["derive", "rc"]}
 serde_json = "1.0.61"
 terminal_size = "0.1.15"
 toml = "0.5.8"
 tree_magic = "0.2.3"
 unicode-width = "0.1.7"
 uuid = {version = "0.8", features = ["v4"]}
+crossterm = { version = "0.19", features = ["serde"] }
+tui_rs= { package = "tui", version = "0.15", default-features = false, features = ['crossterm'] }

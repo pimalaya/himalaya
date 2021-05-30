@@ -9,3 +9,4 @@ pub mod msg;
 pub mod output;
 pub mod smtp;
 pub mod table;
+pub mod tui;

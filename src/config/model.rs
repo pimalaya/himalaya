@@ -14,13 +14,17 @@ use toml;
 
 use crate::output::utils::run_cmd;
 
+use super::tui::TuiConfig;
+
 error_chain! {}
 
 const DEFAULT_PAGE_SIZE: usize = 10;
 
-// Account
-
-#[derive(Debug, Clone, Deserialize)]
+/// # Account
+/// This struct represents the data of an account. For more information, please
+/// take a look into its [wiki
+/// page](https://github.com/soywod/himalaya/wiki/Configuration:config-file#account-specific-settings).
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Account {
     // Override
@@ -109,8 +113,11 @@ impl Account {
     }
 }
 
-// Config
-
+/// # Config
+/// This struct holds the global settings of himalaya. Take a look into its
+/// [wiki
+/// page](https://github.com/soywod/himalaya/wiki/Configuration:config-file#global-settings)
+/// for more information.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Config {
@@ -120,11 +127,15 @@ pub struct Config {
     pub signature: Option<String>,
     pub default_page_size: Option<usize>,
     pub watch_cmds: Option<Vec<String>>,
+    pub tui: TuiConfig,
+
     #[serde(flatten)]
     pub accounts: HashMap<String, Account>,
 }
 
 impl Config {
+    /// This function will check if the config file is under
+    /// `$XDG_CONFIG_HOME/himalya/config.toml`.
     fn path_from_xdg() -> Result<PathBuf> {
         let path =
             env::var("XDG_CONFIG_HOME").chain_err(|| "Cannot find `XDG_CONFIG_HOME` env var")?;
@@ -135,6 +146,8 @@ impl Config {
         Ok(path)
     }
 
+    /// This function will check if the config file is under
+    /// `$HOME/.config/himalaya/config.toml`.
     fn path_from_xdg_alt() -> Result<PathBuf> {
         let home_var = if cfg!(target_family = "windows") {
             "USERPROFILE"
@@ -151,6 +164,8 @@ impl Config {
         Ok(path)
     }
 
+    /// This function will check the config file at
+    /// `$HOME/.himalayarc`.
     fn path_from_home() -> Result<PathBuf> {
         let home_var = if cfg!(target_family = "windows") {
             "USERPROFILE"
@@ -182,6 +197,10 @@ impl Config {
         Ok(toml::from_slice(&content).chain_err(|| "Cannot parse config file")?)
     }
 
+    /// As the function names says: It returns an an account if it could find
+    /// one.
+    /// Hint: Accountname is the name between the "[" and "]" brackets of the
+    /// config file.
     pub fn find_account_by_name(&self, name: Option<&str>) -> Result<&Account> {
         match name {
             Some(name) => self
@@ -206,11 +225,13 @@ impl Config {
             .join(filename)
     }
 
+    /// Returns the email address of the provided account.
     pub fn address(&self, account: &Account) -> String {
         let name = account.name.as_ref().unwrap_or(&self.name);
         format!("{} <{}>", name, account.email)
     }
 
+    /// Creates a notification with the given subject from the given sender.
     pub fn run_notify_cmd(&self, subject: &str, sender: &str) -> Result<()> {
         let default_cmd = format!(r#"notify-send "📫 {}" "{}""#, sender, subject);
         let cmd = self
