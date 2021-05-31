@@ -54,7 +54,9 @@ pub struct BlockDataConfig {
     pub border_color: Option<String>,
 }
 
-/// All config sections below the `[tui]` part in your `config.toml` file will
+/// All config sections below the `[tui]` part in your
+/// [config.toml](https://github.com/soywod/himalaya/wiki/Configuration:config-file)
+/// file will
 /// be stored in this struct.
 /// 
 /// # Example
@@ -67,10 +69,10 @@ pub struct BlockDataConfig {
 #[derive(Debug, Deserialize)]
 pub struct TuiConfig {
     pub sidebar: BlockDataConfig,
-    /// As explained in the [BlockDataConfig doc](struct.BlockDataConfig.html)
+    /// As explained in the [`BlockDataConfig` doc](struct.BlockDataConfig.html)
     /// each frame can be customized by this struct. For more information, take
     /// a short look into the doc of
-    /// [BlockDataConfig](struct.BlockDataConfig.html).
+    /// [`BlockDataConfig`](struct.BlockDataConfig.html).
     pub mail_list: BlockDataConfig,
 
     /// This attribute stores the loaded keybindings where:
@@ -78,7 +80,9 @@ pub struct TuiConfig {
     ///     Value = Keybinding
     ///
     /// # Example
-    /// If this is in your `config.toml` file:
+    /// If this is in your
+    /// [config.toml](https://github.com/soywod/himalaya/wiki/Configuration:config-file)
+    /// file:
     ///
     /// ```toml
     /// [tui]
@@ -86,7 +90,7 @@ pub struct TuiConfig {
     /// quit = "ddq"
     /// ```
     /// 
-    /// Than this section will be stored in this variable as follows:
+    /// Then this section will be stored in this variable as follows:
     ///
     /// ```no_run
     /// TuiConfig.keybindings = {
@@ -110,7 +114,7 @@ impl TuiConfig {
     /// quit = "d"
     /// ```
     ///
-    /// Than this function will return the a
+    /// Then this function will return the a
     /// [HashMap](https://doc.rust-lang.org/std/collections/hash_map/struct.HashMap.html)
     /// which will look as follows:
     ///
@@ -310,7 +314,7 @@ impl TuiConfig {
                 //
                 //      g
                 //
-                // Than this if clause would create the first 'n' node:
+                // Then this if clause would create the first 'n' node:
                 //
                 //      g
                 //       \
@@ -357,11 +361,11 @@ impl TuiConfig {
         keybindings
     }
 
-    /// This function converts with the given
+    /// This function converts the given
     /// [code](https://docs.rs/crossterm/0.19.0/crossterm/event/struct.KeyEvent.html#structfield.code)
     /// and
     /// [modifier](https://docs.rs/crossterm/0.19.0/crossterm/event/struct.KeyEvent.html#structfield.modifiers)
-    /// its
+    /// , to their corresponding
     /// [KeyEvent](https://docs.rs/crossterm/0.19.0/crossterm/event/struct.KeyEvent.html)
     /// .
     ///

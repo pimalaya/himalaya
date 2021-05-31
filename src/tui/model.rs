@@ -14,7 +14,6 @@ use tui_rs::layout::{Constraint, Direction, Layout};
 use tui_rs::terminal::Frame;
 use tui_rs::Terminal;
 
-// use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::terminal;
 
 use super::mail_list::MailList;
