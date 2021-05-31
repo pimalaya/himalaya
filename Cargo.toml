@@ -6,6 +6,7 @@ authors = ["soywod <clement.douin@posteo.net>"]
 edition = "2018"
 
 [dependencies]
+atty = "0.2.14"
 chrono = "0.4.19"
 clap = {version = "2.33.3", default-features = false, features = ["suggestions", "color"]}
 env_logger = "0.8.3"

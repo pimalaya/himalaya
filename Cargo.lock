@@ -305,6 +305,7 @@ dependencies = [
 name = "himalaya"
 version = "0.3.2"
 dependencies = [
+ "atty",
  "chrono",
  "clap",
  "env_logger",

@@ -1,3 +1,4 @@
+use atty::Stream;
 use clap;
 use error_chain::error_chain;
 use log::{debug, error, trace};
@@ -100,7 +101,7 @@ pub fn msg_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
             .arg(attachment_arg()),
         clap::SubCommand::with_name("send")
             .about("Sends a raw message")
-            .arg(clap::Arg::with_name("message").raw(true)),
+            .arg(clap::Arg::with_name("message").raw(true).last(true)),
         clap::SubCommand::with_name("save")
             .about("Saves a raw message")
             .arg(clap::Arg::with_name("message").raw(true)),
@@ -558,7 +559,7 @@ fn msg_matches_send(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
 
     let mut imap_conn = ImapConnector::new(&app.account)?;
 
-    let msg = if matches.is_present("message") {
+    let msg = if atty::is(Stream::Stdin) {
         matches
             .value_of("message")
             .unwrap_or_default()

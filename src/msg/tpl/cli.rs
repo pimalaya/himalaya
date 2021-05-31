@@ -1,7 +1,9 @@
+use atty::Stream;
 use clap;
 use error_chain::error_chain;
 use log::{debug, trace};
 use mailparse;
+use std::io::{self, BufRead};
 
 use crate::{app::App, imap::model::ImapConnector, msg::tpl::model::Tpl};
 
@@ -156,7 +158,17 @@ fn tpl_matches_new(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
         tpl.header(key, val);
     }
 
-    if let Some(body) = matches.value_of("body") {
+    if atty::isnt(Stream::Stdin) {
+        let body = io::stdin()
+            .lock()
+            .lines()
+            .filter_map(|ln| ln.ok())
+            .map(|ln| ln.to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+        debug!("overriden body from stdin: {:?}", body);
+        tpl.body(body);
+    } else if let Some(body) = matches.value_of("body") {
         debug!("overriden body: {:?}", body);
         tpl.body(body);
     };
