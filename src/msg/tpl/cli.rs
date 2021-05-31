@@ -107,21 +107,7 @@ pub fn tpl_args<'a>() -> Vec<clap::Arg<'a, 'a>> {
     ]
 }
 
-pub fn tpl_matches(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
-    match matches.subcommand() {
-        ("new", Some(matches)) => tpl_matches_new(app, matches),
-        ("reply", Some(matches)) => tpl_matches_reply(app, matches),
-        ("forward", Some(matches)) => tpl_matches_forward(app, matches),
-
-        // TODO: find a way to show the help message for template subcommand
-        _ => Err("Subcommand not found".into()),
-    }
-}
-
-fn tpl_matches_new(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
-    debug!("new command matched");
-    let mut tpl = Tpl::new(&app);
-
+fn override_tpl_with_args(tpl: &mut Tpl, matches: &clap::ArgMatches) {
     if let Some(from) = matches.value_of("from") {
         debug!("overriden from: {:?}", from);
         tpl.header("From", from);
@@ -177,7 +163,24 @@ fn tpl_matches_new(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
         debug!("overriden signature: {:?}", signature);
         tpl.signature(signature);
     };
+}
 
+pub fn tpl_matches(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
+    match matches.subcommand() {
+        ("new", Some(matches)) => tpl_matches_new(app, matches),
+        ("reply", Some(matches)) => tpl_matches_reply(app, matches),
+        ("forward", Some(matches)) => tpl_matches_forward(app, matches),
+
+        // TODO: find a way to show the help message for template subcommand
+        _ => Err("Subcommand not found".into()),
+    }
+}
+
+fn tpl_matches_new(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
+    debug!("new command matched");
+
+    let mut tpl = Tpl::new(&app);
+    override_tpl_with_args(&mut tpl, &matches);
     trace!("tpl: {:?}", tpl);
     app.output.print(tpl);
 
@@ -198,52 +201,7 @@ fn tpl_matches_reply(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
     } else {
         Tpl::reply_all(&app, &msg)
     };
-    if let Some(from) = matches.value_of("from") {
-        debug!("overriden from: {:?}", from);
-        tpl.header("From", from);
-    };
-
-    if let Some(subject) = matches.value_of("subject") {
-        debug!("overriden subject: {:?}", subject);
-        tpl.header("Subject", subject);
-    };
-
-    let addrs = matches.values_of("to").unwrap_or_default();
-    if addrs.len() > 0 {
-        debug!("overriden to: {:?}", addrs);
-        tpl.header("To", addrs.collect::<Vec<_>>().join(", "));
-    }
-
-    let addrs = matches.values_of("cc").unwrap_or_default();
-    if addrs.len() > 0 {
-        debug!("overriden cc: {:?}", addrs);
-        tpl.header("Cc", addrs.collect::<Vec<_>>().join(", "));
-    }
-
-    let addrs = matches.values_of("bcc").unwrap_or_default();
-    if addrs.len() > 0 {
-        debug!("overriden bcc: {:?}", addrs);
-        tpl.header("Bcc", addrs.collect::<Vec<_>>().join(", "));
-    }
-
-    for header in matches.values_of("header").unwrap_or_default() {
-        let mut header = header.split(":");
-        let key = header.next().unwrap_or_default();
-        let val = header.next().unwrap_or_default().trim_start();
-        debug!("overriden header: {}={}", key, val);
-        tpl.header(key, val);
-    }
-
-    if let Some(body) = matches.value_of("body") {
-        debug!("overriden body: {:?}", body);
-        tpl.body(body);
-    };
-
-    if let Some(signature) = matches.value_of("signature") {
-        debug!("overriden signature: {:?}", signature);
-        tpl.signature(signature);
-    };
-
+    override_tpl_with_args(&mut tpl, &matches);
     trace!("tpl: {:?}", tpl);
     app.output.print(tpl);
 
@@ -260,53 +218,7 @@ fn tpl_matches_forward(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
     let msg = &imap_conn.read_msg(&app.mbox, &uid)?;
     let msg = mailparse::parse_mail(&msg)?;
     let mut tpl = Tpl::forward(&app, &msg);
-
-    if let Some(from) = matches.value_of("from") {
-        debug!("overriden from: {:?}", from);
-        tpl.header("From", from);
-    };
-
-    if let Some(subject) = matches.value_of("subject") {
-        debug!("overriden subject: {:?}", subject);
-        tpl.header("Subject", subject);
-    };
-
-    let addrs = matches.values_of("to").unwrap_or_default();
-    if addrs.len() > 0 {
-        debug!("overriden to: {:?}", addrs);
-        tpl.header("To", addrs.collect::<Vec<_>>().join(", "));
-    }
-
-    let addrs = matches.values_of("cc").unwrap_or_default();
-    if addrs.len() > 0 {
-        debug!("overriden cc: {:?}", addrs);
-        tpl.header("Cc", addrs.collect::<Vec<_>>().join(", "));
-    }
-
-    let addrs = matches.values_of("bcc").unwrap_or_default();
-    if addrs.len() > 0 {
-        debug!("overriden bcc: {:?}", addrs);
-        tpl.header("Bcc", addrs.collect::<Vec<_>>().join(", "));
-    }
-
-    for header in matches.values_of("header").unwrap_or_default() {
-        let mut header = header.split(":");
-        let key = header.next().unwrap_or_default();
-        let val = header.next().unwrap_or_default().trim_start();
-        debug!("overriden header: {}={}", key, val);
-        tpl.header(key, val);
-    }
-
-    if let Some(body) = matches.value_of("body") {
-        debug!("overriden body: {:?}", body);
-        tpl.body(body);
-    };
-
-    if let Some(signature) = matches.value_of("signature") {
-        debug!("overriden signature: {:?}", signature);
-        tpl.signature(signature);
-    };
-
+    override_tpl_with_args(&mut tpl, &matches);
     trace!("tpl: {:?}", tpl);
     app.output.print(tpl);
 
