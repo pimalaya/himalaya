@@ -11,12 +11,10 @@ use tui_rs::backend::{Backend, CrosstermBackend};
 use tui_rs::terminal::Frame;
 use tui_rs::Terminal;
 
-use crossterm::terminal;
 use crossterm::event::Event;
+use crossterm::terminal;
 
-use crate::tui::modes:: {
-    normal::main::NormalFrame,
-};
+use crate::tui::modes::normal::main::NormalFrame;
 
 use crate::tui::modes::backend_interface::BackendInterface;
 
@@ -84,7 +82,6 @@ pub struct Tui<'tui> {
 
 impl<'tui> Tui<'tui> {
     pub fn new(config: &'tui Config) -> Tui<'tui> {
-
         let normal_mode = NormalFrame::new(&config);
 
         Tui {
@@ -104,19 +101,24 @@ impl<'tui> Tui<'tui> {
     }
 
     pub fn handle_event(&mut self, event: Event) -> Result<(), TuiError> {
-        match self.mode {
-            TuiMode::Normal => match self.normal_mode.handle_event(event) {
-                Some(BackendActions::Quit) => self.run = false,
-                Some(BackendActions::Redraw) => self.need_redraw = true,
-                Some(BackendActions::GetAccount) => {
-                    let account = match self.config.find_account_by_name(None) {
-                        Ok(account) => account,
-                        Err(_) => return Err(TuiError::ConnectAccount),
-                    };
+        // Look if it's intern
+        match event {
+            Event::Resize(_, _) => self.need_redraw = true,
+            _ => match self.mode {
+                TuiMode::Normal => match self.normal_mode.handle_event(event) {
+                    Some(BackendActions::Quit) => self.run = false,
+                    Some(BackendActions::Redraw) => self.need_redraw = true,
+                    Some(BackendActions::GetAccount) => {
+                        let account =
+                            match self.config.find_account_by_name(None) {
+                                Ok(account) => account,
+                                Err(_) => return Err(TuiError::ConnectAccount),
+                            };
 
-                    self.normal_mode.set_account(&account);
+                        self.normal_mode.set_account(&account);
+                    }
+                    None => (),
                 },
-                None => (),
             },
         }
 
@@ -124,16 +126,16 @@ impl<'tui> Tui<'tui> {
     }
 
     pub fn draw<B>(&mut self, frame: &mut Frame<B>)
-        where
-        B: Backend
-        {
-            // prepare the given frame
-            match self.mode {
-                TuiMode::Normal => self.normal_mode.draw(frame),
-            };
+    where
+        B: Backend,
+    {
+        // prepare the given frame
+        match self.mode {
+            TuiMode::Normal => self.normal_mode.draw(frame),
+        };
 
-            self.need_redraw = false;
-        }
+        self.need_redraw = false;
+    }
 
     // pub fn eval_events(
     //     &mut self,
@@ -214,7 +216,7 @@ impl<'tui> Tui<'tui> {
             // has to be down (no redraw or somehting like that)
             // HINT: If we need to do something in parallel, use add poll.
             match crossterm::event::read() {
-                Ok(event) =>  self.handle_event(event),
+                Ok(event) => self.handle_event(event),
                 Err(_) => {
                     terminal.clear()?;
                     self.cleanup()?;
