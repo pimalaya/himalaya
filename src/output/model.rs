@@ -65,3 +65,11 @@ impl Output {
         }
     }
 }
+
+impl Default for Output {
+    fn default() -> Self {
+        Self {
+            fmt: OutputFmt::Plain,
+        }
+    }
+}

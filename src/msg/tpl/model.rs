@@ -234,19 +234,19 @@ mod tests {
         let account = Account {
             name: Some(String::from("Test")),
             email: String::from("test@localhost"),
-            ..Account::new()
+            ..Account::default()
         };
         let config = Config {
             accounts: vec![(String::from("account"), account.clone())]
                 .into_iter()
                 .collect(),
-            ..Config::new()
+            ..Config::default()
         };
-        let output = Output::new("plain");
-        let mbox = String::new();
-        let arg_matches = clap::ArgMatches::new();
-        let app = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
-        let tpl = Tpl::new(&app);
+        let output = Output::default();
+        let mbox = String::default();
+        let arg_matches = clap::ArgMatches::default();
+        let ctx = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
+        let tpl = Tpl::new(&ctx);
 
         assert_eq!(
             "From: Test <test@localhost>\nTo: \nSubject: \n\n",
@@ -260,19 +260,19 @@ mod tests {
             name: Some(String::from("Test")),
             email: String::from("test@localhost"),
             signature: Some(String::from("-- \nCordialement,")),
-            ..Account::new()
+            ..Account::default()
         };
         let config = Config {
             accounts: vec![(String::from("account"), account.clone())]
                 .into_iter()
                 .collect(),
-            ..Config::new()
+            ..Config::default()
         };
-        let output = Output::new("plain");
-        let mbox = String::new();
-        let arg_matches = clap::ArgMatches::new();
-        let app = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
-        let tpl = Tpl::new(&app);
+        let output = Output::default();
+        let mbox = String::default();
+        let arg_matches = clap::ArgMatches::default();
+        let ctx = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
+        let tpl = Tpl::new(&ctx);
 
         assert_eq!(
             "From: Test <test@localhost>\nTo: \nSubject: \n\n\n\n-- \nCordialement,",
@@ -285,23 +285,23 @@ mod tests {
         let account = Account {
             name: Some(String::from("Test")),
             email: String::from("test@localhost"),
-            ..Account::new()
+            ..Account::default()
         };
         let config = Config {
             accounts: vec![(String::from("account"), account.clone())]
                 .into_iter()
                 .collect(),
-            ..Config::new()
+            ..Config::default()
         };
-        let output = Output::new("plain");
-        let mbox = String::new();
-        let arg_matches = clap::ArgMatches::new();
-        let app = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
+        let output = Output::default();
+        let mbox = String::default();
+        let arg_matches = clap::ArgMatches::default();
+        let ctx = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
         let parsed_mail = mailparse::parse_mail(
             b"Content-Type: text/plain\r\nFrom: Sender <sender@localhost>\r\nSubject: Test\r\n\r\nHello, world!",
         )
         .unwrap();
-        let tpl = Tpl::reply(&app, &parsed_mail);
+        let tpl = Tpl::reply(&ctx, &parsed_mail);
 
         assert_eq!(
             "From: Test <test@localhost>\nTo: Sender <sender@localhost>\nSubject: Re: Test\n\n>Hello, world!",
@@ -315,23 +315,23 @@ mod tests {
             name: Some(String::from("Test")),
             email: String::from("test@localhost"),
             signature: Some(String::from("-- \nCordialement,")),
-            ..Account::new()
+            ..Account::default()
         };
         let config = Config {
             accounts: vec![(String::from("account"), account.clone())]
                 .into_iter()
                 .collect(),
-            ..Config::new()
+            ..Config::default()
         };
-        let output = Output::new("plain");
-        let mbox = String::new();
-        let arg_matches = clap::ArgMatches::new();
-        let app = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
+        let output = Output::default();
+        let mbox = String::default();
+        let arg_matches = clap::ArgMatches::default();
+        let ctx = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
         let parsed_mail = mailparse::parse_mail(
             b"Content-Type: text/plain\r\nFrom: Sender <sender@localhost>\r\nSubject: Test\r\n\r\nHello, world!",
         )
         .unwrap();
-        let tpl = Tpl::reply(&app, &parsed_mail);
+        let tpl = Tpl::reply(&ctx, &parsed_mail);
 
         assert_eq!(
             "From: Test <test@localhost>\nTo: Sender <sender@localhost>\nSubject: Re: Test\n\n>Hello, world!\n\n-- \nCordialement,",
@@ -344,18 +344,18 @@ mod tests {
         let account = Account {
             name: Some(String::from("To")),
             email: String::from("to@localhost"),
-            ..Account::new()
+            ..Account::default()
         };
         let config = Config {
             accounts: vec![(String::from("account"), account.clone())]
                 .into_iter()
                 .collect(),
-            ..Config::new()
+            ..Config::default()
         };
-        let output = Output::new("plain");
-        let mbox = String::new();
-        let arg_matches = clap::ArgMatches::new();
-        let app = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
+        let output = Output::default();
+        let mbox = String::default();
+        let arg_matches = clap::ArgMatches::default();
+        let ctx = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
         let parsed_mail = mailparse::parse_mail(
             b"Message-Id: 1\r
 Content-Type: text/plain\r
@@ -367,7 +367,7 @@ Subject: Test\r
 Hello, world!",
         )
         .unwrap();
-        let tpl = Tpl::reply_all(&app, &parsed_mail);
+        let tpl = Tpl::reply_all(&ctx, &parsed_mail);
 
         assert_eq!(
             "From: To <to@localhost>
@@ -387,23 +387,23 @@ Subject: Re: Test
             name: Some(String::from("Test")),
             email: String::from("test@localhost"),
             signature: Some(String::from("-- \nCordialement,")),
-            ..Account::new()
+            ..Account::default()
         };
         let config = Config {
             accounts: vec![(String::from("account"), account.clone())]
                 .into_iter()
                 .collect(),
-            ..Config::new()
+            ..Config::default()
         };
-        let output = Output::new("plain");
-        let mbox = String::new();
-        let arg_matches = clap::ArgMatches::new();
-        let app = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
+        let output = Output::default();
+        let mbox = String::default();
+        let arg_matches = clap::ArgMatches::default();
+        let ctx = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
         let parsed_mail = mailparse::parse_mail(
             b"Content-Type: text/plain\r\nFrom: Sender <sender@localhost>\r\nSubject: Test\r\n\r\nHello, world!",
         )
         .unwrap();
-        let tpl = Tpl::reply(&app, &parsed_mail);
+        let tpl = Tpl::reply(&ctx, &parsed_mail);
 
         assert_eq!(
             "From: Test <test@localhost>\nTo: Sender <sender@localhost>\nSubject: Re: Test\n\n>Hello, world!\n\n-- \nCordialement,",
@@ -416,23 +416,23 @@ Subject: Re: Test
         let account = Account {
             name: Some(String::from("Test")),
             email: String::from("test@localhost"),
-            ..Account::new()
+            ..Account::default()
         };
         let config = Config {
             accounts: vec![(String::from("account"), account.clone())]
                 .into_iter()
                 .collect(),
-            ..Config::new()
+            ..Config::default()
         };
-        let output = Output::new("plain");
-        let mbox = String::new();
-        let arg_matches = clap::ArgMatches::new();
-        let app = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
+        let output = Output::default();
+        let mbox = String::default();
+        let arg_matches = clap::ArgMatches::default();
+        let ctx = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
         let parsed_mail = mailparse::parse_mail(
             b"Content-Type: text/plain\r\nFrom: Sender <sender@localhost>\r\nSubject: Test\r\n\r\nHello, world!",
         )
         .unwrap();
-        let tpl = Tpl::forward(&app, &parsed_mail);
+        let tpl = Tpl::forward(&ctx, &parsed_mail);
 
         assert_eq!(
             "From: Test <test@localhost>\nTo: \nSubject: Fwd: Test\n\n-------- Forwarded Message --------\nHello, world!",
@@ -446,23 +446,23 @@ Subject: Re: Test
             name: Some(String::from("Test")),
             email: String::from("test@localhost"),
             signature: Some(String::from("-- \nCordialement,")),
-            ..Account::new()
+            ..Account::default()
         };
         let config = Config {
             accounts: vec![(String::from("account"), account.clone())]
                 .into_iter()
                 .collect(),
-            ..Config::new()
+            ..Config::default()
         };
-        let output = Output::new("plain");
-        let mbox = String::new();
-        let arg_matches = clap::ArgMatches::new();
-        let app = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
+        let output = Output::default();
+        let mbox = String::default();
+        let arg_matches = clap::ArgMatches::default();
+        let ctx = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
         let parsed_mail = mailparse::parse_mail(
             b"Content-Type: text/plain\r\nFrom: Sender <sender@localhost>\r\nSubject: Test\r\n\r\nHello, world!",
         )
         .unwrap();
-        let tpl = Tpl::forward(&app, &parsed_mail);
+        let tpl = Tpl::forward(&ctx, &parsed_mail);
 
         assert_eq!(
             "From: Test <test@localhost>\nTo: \nSubject: Fwd: Test\n\n-------- Forwarded Message --------\nHello, world!\n\n-- \nCordialement,",

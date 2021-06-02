@@ -50,30 +50,6 @@ pub struct Account {
 }
 
 impl Account {
-    pub fn new() -> Self {
-        Self {
-            name: None,
-            downloads_dir: None,
-            signature: None,
-            default_page_size: None,
-            default: None,
-            email: String::new(),
-            watch_cmds: None,
-            imap_host: String::new(),
-            imap_port: 0,
-            imap_starttls: None,
-            imap_insecure: None,
-            imap_login: String::new(),
-            imap_passwd_cmd: String::new(),
-            smtp_host: String::new(),
-            smtp_port: 0,
-            smtp_starttls: None,
-            smtp_insecure: None,
-            smtp_login: String::new(),
-            smtp_passwd_cmd: String::new(),
-        }
-    }
-
     pub fn imap_addr(&self) -> (&str, u16) {
         debug!("host: {}", self.imap_host);
         debug!("port: {}", self.imap_port);
@@ -133,6 +109,32 @@ impl Account {
     }
 }
 
+impl Default for Account {
+    fn default() -> Self {
+        Self {
+            name: None,
+            downloads_dir: None,
+            signature: None,
+            default_page_size: None,
+            default: None,
+            email: String::new(),
+            watch_cmds: None,
+            imap_host: String::new(),
+            imap_port: 0,
+            imap_starttls: None,
+            imap_insecure: None,
+            imap_login: String::new(),
+            imap_passwd_cmd: String::new(),
+            smtp_host: String::new(),
+            smtp_port: 0,
+            smtp_starttls: None,
+            smtp_insecure: None,
+            smtp_login: String::new(),
+            smtp_passwd_cmd: String::new(),
+        }
+    }
+}
+
 // Config
 
 #[derive(Debug, Deserialize)]
@@ -149,18 +151,6 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new() -> Self {
-        Self {
-            name: String::new(),
-            downloads_dir: None,
-            notify_cmd: None,
-            signature: None,
-            default_page_size: None,
-            watch_cmds: None,
-            accounts: HashMap::new(),
-        }
-    }
-
     fn path_from_xdg() -> Result<PathBuf> {
         let path =
             env::var("XDG_CONFIG_HOME").chain_err(|| "Cannot find `XDG_CONFIG_HOME` env var")?;
@@ -201,7 +191,7 @@ impl Config {
         Ok(path)
     }
 
-    pub fn from_path(path: Option<PathBuf>) -> Result<Self> {
+    pub fn new(path: Option<PathBuf>) -> Result<Self> {
         let path = match path {
             Some(path) => path,
             None => Self::path_from_xdg()
@@ -298,5 +288,19 @@ impl Config {
         });
 
         Ok(())
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            downloads_dir: None,
+            notify_cmd: None,
+            signature: None,
+            default_page_size: None,
+            watch_cmds: None,
+            accounts: HashMap::new(),
+        }
     }
 }
