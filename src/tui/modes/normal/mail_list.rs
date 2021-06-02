@@ -1,5 +1,4 @@
 use crate::tui::modes::block_data::BlockData;
-
 use crate::imap::model::ImapConnector;
 use crate::msg::model::Msgs;
 use crate::config::tui::BlockDataConfig;
@@ -73,6 +72,35 @@ impl MailList {
         Ok(())
     }
 
+    /// Move the select-row according to the offset.
+    /// Positive Offset => Go down
+    /// Negative Offset => Go up
+    pub fn move_selection(&mut self, offset: i32) {
+        let new_selection = match self.state.selected() {
+            Some(old_selection) => {
+                let mut selection = if offset < 0 {
+                    old_selection.saturating_sub(offset.abs() as usize)
+                } else {
+                    old_selection.saturating_add(offset as usize)
+                };
+
+                if selection > self.mails.len() - 1 {
+                    selection = self.mails.len() - 1;
+                }
+
+                selection
+            }
+            // If something goes wrong: Move the cursor to the middle
+            None => 0,
+        };
+
+        self.state.select(Some(new_selection));
+    }
+
+    pub fn unselect(&mut self) {
+        self.state.select(None);
+    }
+
     // TODO: Make sure that it displays really only the needed one, not too
     // much
     // Idea:
@@ -107,32 +135,4 @@ impl MailList {
             .highlight_style(Style::default().bg(Color::Blue))
     }
 
-    /// Move the select-row according to the offset.
-    /// Positive Offset => Go down
-    /// Negative Offset => Go up
-    pub fn move_selection(&mut self, offset: i32) {
-        let new_selection = match self.state.selected() {
-            Some(old_selection) => {
-                let mut selection = if offset < 0 {
-                    old_selection.saturating_sub(offset.abs() as usize)
-                } else {
-                    old_selection.saturating_add(offset as usize)
-                };
-
-                if selection > self.mails.len() - 1 {
-                    selection = self.mails.len() - 1;
-                }
-
-                selection
-            }
-            // If something goes wrong: Move the cursor to the middle
-            None => 0,
-        };
-
-        self.state.select(Some(new_selection));
-    }
-
-    pub fn unselect(&mut self) {
-        self.state.select(None);
-    }
 }

@@ -12,8 +12,6 @@ use crate::tui::modes::{
     backend_interface::BackendInterface, keybinding_manager::KeybindingManager,
 };
 
-use std::collections::HashMap;
-
 use tui_rs::backend::Backend;
 use tui_rs::layout::{Constraint, Direction, Layout};
 use tui_rs::terminal::Frame;
@@ -22,11 +20,12 @@ use tui_rs::terminal::Frame;
 // Enums
 // ==========
 #[derive(Clone)]
-pub enum NormalActions {
+pub enum NormalAction {
     Quit,
     CursorDown,
     CursorUp,
     SetAccount,
+    WritingMail,
 }
 
 // ============
@@ -36,7 +35,7 @@ pub struct NormalFrame {
     sidebar: Sidebar,
     maillist: MailList,
 
-    keybinding_manager: KeybindingManager<NormalActions>,
+    keybinding_manager: KeybindingManager<NormalAction>,
 }
 
 impl NormalFrame {
@@ -51,21 +50,16 @@ impl NormalFrame {
         // Keybindings
         // ----------------
         let default_keybindings = vec![
-            ("quit", NormalActions::Quit, "q"),
-            ("cursor_down", NormalActions::CursorDown, "j"),
-            ("cursor_up", NormalActions::CursorUp, "k"),
+            ("quit", NormalAction::Quit, "q"),
+            ("cursor_down", NormalAction::CursorDown, "j"),
+            ("cursor_up", NormalAction::CursorUp, "k"),
+            ("new_mail", NormalAction::WritingMail, "m"),
         ];
 
-        let keybindings = if let Some(user_keybindings) =
+        let keybindings = TuiConfig::parse_keybindings(
+            &default_keybindings,
             config.tui.keybindings.get("normal")
-        {
-            TuiConfig::parse_keybindings(
-                &default_keybindings,
-                &user_keybindings,
-            )
-        } else {
-            TuiConfig::parse_keybindings(&default_keybindings, &HashMap::new())
-        };
+        );
 
         let keybinding_manager = KeybindingManager::new(keybindings);
 
@@ -121,16 +115,17 @@ impl BackendInterface for NormalFrame {
     fn handle_event(&mut self, event: Event) -> Option<BackendActions> {
         if let Some(action) = self.keybinding_manager.eval_event(event) {
             match action {
-                NormalActions::Quit => Some(BackendActions::Quit),
-                NormalActions::CursorUp => {
+                NormalAction::Quit => Some(BackendActions::Quit),
+                NormalAction::CursorUp => {
                     self.maillist.move_selection(-1);
                     Some(BackendActions::Redraw)
                 }
-                NormalActions::SetAccount => Some(BackendActions::GetAccount),
-                NormalActions::CursorDown => {
+                NormalAction::SetAccount => Some(BackendActions::GetAccount),
+                NormalAction::CursorDown => {
                     self.maillist.move_selection(1);
                     Some(BackendActions::Redraw)
-                }
+                },
+                NormalAction::WritingMail => Some(BackendActions::WritingMail),
             }
         } else {
             None

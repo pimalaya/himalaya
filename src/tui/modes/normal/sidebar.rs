@@ -7,6 +7,9 @@ use tui_rs::layout::Constraint;
 use tui_rs::style::{Color, Style};
 use tui_rs::widgets::{Block, Row, Table, TableState};
 
+// ============
+// Structs
+// ============
 pub struct Sidebar {
     pub block_data: BlockData,
     mailboxes: Vec<Vec<String>>,
