@@ -1,12 +1,11 @@
 use crate::imap::model::ImapConnector;
 use crate::mbox::model::Mboxes;
 use crate::config::tui::BlockDataConfig;
+use crate::tui::modes::block_data::BlockData;
 
 use tui_rs::layout::Constraint;
 use tui_rs::style::{Color, Style};
 use tui_rs::widgets::{Block, Row, Table, TableState};
-
-use super::block_data::BlockData;
 
 pub struct Sidebar {
     pub block_data: BlockData,

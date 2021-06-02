@@ -1,4 +1,4 @@
-use super::block_data::BlockData;
+use crate::tui::modes::block_data::BlockData;
 
 use crate::imap::model::ImapConnector;
 use crate::msg::model::Msgs;

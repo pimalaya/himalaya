@@ -2,17 +2,15 @@ use serde::Deserialize;
 
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
-use crate::tui::model::TuiAction;
-
 use std::collections::HashMap;
 
 // ==========
 // Enums
 // ==========
 #[derive(Debug, Deserialize, Clone)]
-pub enum KeyType {
-    Action(TuiAction),
-    Key(HashMap<Event, KeyType>),
+pub enum KeyType<Mode> {
+    Action(Mode),
+    Key(HashMap<Event, KeyType<Mode>>),
 }
 
 // ============
@@ -54,6 +52,11 @@ pub struct BlockDataConfig {
     pub border_color: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct KeybindingConfig {
+     
+}
+
 /// All config sections below the `[tui]` part in your
 /// [config.toml](https://github.com/soywod/himalaya/wiki/Configuration:config-file)
 /// file will
@@ -75,6 +78,7 @@ pub struct TuiConfig {
     /// [`BlockDataConfig`](struct.BlockDataConfig.html).
     pub mail_list: BlockDataConfig,
 
+    /// TODO: Doc
     /// This attribute stores the loaded keybindings where:
     ///     Key = Action
     ///     Value = Keybinding
@@ -96,7 +100,7 @@ pub struct TuiConfig {
     /// TuiConfig.keybindings = {
     ///     "quit" = "ddq",
     /// }
-    pub keybindings: HashMap<String, String>,
+    pub keybindings: HashMap<String, HashMap<String, String>>,
 }
 
 /// The implementation of the struct are rather used for parsing the
@@ -238,36 +242,21 @@ impl TuiConfig {
     ///
     /// # }
     /// ```
-    ///
-    pub fn parse_keybindings(&self) -> HashMap<Event, KeyType> {
-        // Here are all default keybindings stored in the following order:
-        //
-        //  default_actions = [
-        //      (
-        //          <action name from config file>,
-        //          <action name for the tui>,
-        //          <default keybinding>
-        //      ),
-        //      (
-        //          ...
-        //      ),
-        //      ...
-        //
-        let default_actions = vec![
-            ("quit", TuiAction::Quit, "q"),
-            ("cursor_down", TuiAction::CursorDown, "j"),
-            ("cursor_up", TuiAction::CursorUp, "k"),
-        ];
+    /// TODO: Doc of variables
+    pub fn parse_keybindings<ModeActions: Clone>(
+        defaults: &Vec<(&str, ModeActions, &str)>,
+        user_keybindings: &HashMap<String, String>,
+        ) -> HashMap<Event, KeyType<ModeActions>> {
 
         // This variable will store all keybindings which will get converted into
         // <Event, Action>.
-        let mut keybindings: HashMap<Event, KeyType> = HashMap::new();
+        let mut keybindings: HashMap<Event, KeyType<ModeActions>> = HashMap::new();
 
         // Now iterate through all available actions and look, which one got
         // overridden.
-        for action_name in default_actions {
+        for action_name in defaults {
             // Look, if the user set a keybinding to the given action or not.
-            let keybinding = match self.keybindings.get(action_name.0) {
+            let keybinding = match user_keybindings.get(action_name.0) {
                 // So the user provided his/her own keybinding => Parse it
                 Some(keybinding) => keybinding,
                 // Otherwise we're parsing the default keybinding
@@ -277,7 +266,7 @@ impl TuiConfig {
             // This should rather fungate as a pointer which traverses through
             // the keybinding-tree in order to add other nodes or check where to
             // go next.
-            let mut node: &mut HashMap<Event, KeyType> = &mut keybindings;
+            let mut node: &mut HashMap<Event, KeyType<ModeActions>> = &mut keybindings;
 
             // Parse each keypress into the given event
             let iter = TuiConfig::parse_keys(keybinding);
