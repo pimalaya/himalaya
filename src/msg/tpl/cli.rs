@@ -107,6 +107,17 @@ pub fn tpl_args<'a>() -> Vec<clap::Arg<'a, 'a>> {
     ]
 }
 
+pub fn tpl_matches(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
+    match matches.subcommand() {
+        ("new", Some(matches)) => tpl_matches_new(app, matches),
+        ("reply", Some(matches)) => tpl_matches_reply(app, matches),
+        ("forward", Some(matches)) => tpl_matches_forward(app, matches),
+
+        // TODO: find a way to show the help message for template subcommand
+        _ => Err("Subcommand not found".into()),
+    }
+}
+
 fn override_tpl_with_args(tpl: &mut Tpl, matches: &clap::ArgMatches) {
     if let Some(from) = matches.value_of("from") {
         debug!("overriden from: {:?}", from);
@@ -163,17 +174,6 @@ fn override_tpl_with_args(tpl: &mut Tpl, matches: &clap::ArgMatches) {
         debug!("overriden signature: {:?}", signature);
         tpl.signature(signature);
     };
-}
-
-pub fn tpl_matches(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
-    match matches.subcommand() {
-        ("new", Some(matches)) => tpl_matches_new(app, matches),
-        ("reply", Some(matches)) => tpl_matches_reply(app, matches),
-        ("forward", Some(matches)) => tpl_matches_forward(app, matches),
-
-        // TODO: find a way to show the help message for template subcommand
-        _ => Err("Subcommand not found".into()),
-    }
 }
 
 fn tpl_matches_new(app: &App, matches: &clap::ArgMatches) -> Result<bool> {

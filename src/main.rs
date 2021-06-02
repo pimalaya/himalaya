@@ -61,7 +61,7 @@ fn run() -> Result<()> {
     debug!("init config");
     let custom_config: Option<PathBuf> = arg_matches.value_of("config").map(|s| s.into());
     debug!("custom config path: {:?}", custom_config);
-    let config = Config::new(custom_config)?;
+    let config = Config::from_path(custom_config)?;
     trace!("config: {:?}", config);
 
     let account_name = arg_matches.value_of("account");

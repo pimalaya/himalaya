@@ -233,35 +233,14 @@ mod tests {
     fn new_tpl() {
         let account = Account {
             name: Some(String::from("Test")),
-            downloads_dir: None,
-            signature: None,
-            default_page_size: None,
-            default: Some(true),
             email: String::from("test@localhost"),
-            watch_cmds: None,
-            imap_host: String::new(),
-            imap_port: 0,
-            imap_starttls: None,
-            imap_insecure: None,
-            imap_login: String::new(),
-            imap_passwd_cmd: String::new(),
-            smtp_host: String::new(),
-            smtp_port: 0,
-            smtp_starttls: None,
-            smtp_insecure: None,
-            smtp_login: String::new(),
-            smtp_passwd_cmd: String::new(),
+            ..Account::new()
         };
         let config = Config {
-            name: String::new(),
-            downloads_dir: None,
-            notify_cmd: None,
-            signature: None,
-            default_page_size: None,
-            watch_cmds: None,
             accounts: vec![(String::from("account"), account.clone())]
                 .into_iter()
                 .collect(),
+            ..Config::new()
         };
         let output = Output::new("plain");
         let mbox = String::new();
@@ -279,35 +258,15 @@ mod tests {
     fn new_tpl_with_signature() {
         let account = Account {
             name: Some(String::from("Test")),
-            downloads_dir: None,
-            signature: Some(String::from("-- \nCordialement,")),
-            default_page_size: None,
-            default: Some(true),
             email: String::from("test@localhost"),
-            watch_cmds: None,
-            imap_host: String::new(),
-            imap_port: 0,
-            imap_starttls: None,
-            imap_insecure: None,
-            imap_login: String::new(),
-            imap_passwd_cmd: String::new(),
-            smtp_host: String::new(),
-            smtp_port: 0,
-            smtp_starttls: None,
-            smtp_insecure: None,
-            smtp_login: String::new(),
-            smtp_passwd_cmd: String::new(),
+            signature: Some(String::from("-- \nCordialement,")),
+            ..Account::new()
         };
         let config = Config {
-            name: String::new(),
-            downloads_dir: None,
-            notify_cmd: None,
-            signature: None,
-            default_page_size: None,
-            watch_cmds: None,
             accounts: vec![(String::from("account"), account.clone())]
                 .into_iter()
                 .collect(),
+            ..Config::new()
         };
         let output = Output::new("plain");
         let mbox = String::new();
@@ -325,35 +284,14 @@ mod tests {
     fn reply_tpl() {
         let account = Account {
             name: Some(String::from("Test")),
-            downloads_dir: None,
-            signature: None,
-            default_page_size: None,
-            default: Some(true),
             email: String::from("test@localhost"),
-            watch_cmds: None,
-            imap_host: String::new(),
-            imap_port: 0,
-            imap_starttls: None,
-            imap_insecure: None,
-            imap_login: String::new(),
-            imap_passwd_cmd: String::new(),
-            smtp_host: String::new(),
-            smtp_port: 0,
-            smtp_starttls: None,
-            smtp_insecure: None,
-            smtp_login: String::new(),
-            smtp_passwd_cmd: String::new(),
+            ..Account::new()
         };
         let config = Config {
-            name: String::new(),
-            downloads_dir: None,
-            notify_cmd: None,
-            signature: None,
-            default_page_size: None,
-            watch_cmds: None,
             accounts: vec![(String::from("account"), account.clone())]
                 .into_iter()
                 .collect(),
+            ..Config::new()
         };
         let output = Output::new("plain");
         let mbox = String::new();
@@ -375,35 +313,15 @@ mod tests {
     fn reply_tpl_with_signature() {
         let account = Account {
             name: Some(String::from("Test")),
-            downloads_dir: None,
-            signature: Some(String::from("-- \nCordialement,")),
-            default_page_size: None,
-            default: Some(true),
             email: String::from("test@localhost"),
-            watch_cmds: None,
-            imap_host: String::new(),
-            imap_port: 0,
-            imap_starttls: None,
-            imap_insecure: None,
-            imap_login: String::new(),
-            imap_passwd_cmd: String::new(),
-            smtp_host: String::new(),
-            smtp_port: 0,
-            smtp_starttls: None,
-            smtp_insecure: None,
-            smtp_login: String::new(),
-            smtp_passwd_cmd: String::new(),
+            signature: Some(String::from("-- \nCordialement,")),
+            ..Account::new()
         };
         let config = Config {
-            name: String::new(),
-            downloads_dir: None,
-            notify_cmd: None,
-            signature: None,
-            default_page_size: None,
-            watch_cmds: None,
             accounts: vec![(String::from("account"), account.clone())]
                 .into_iter()
                 .collect(),
+            ..Config::new()
         };
         let output = Output::new("plain");
         let mbox = String::new();
@@ -425,35 +343,14 @@ mod tests {
     fn reply_all_tpl() {
         let account = Account {
             name: Some(String::from("To")),
-            downloads_dir: None,
-            signature: None,
-            default_page_size: None,
-            default: Some(true),
             email: String::from("to@localhost"),
-            watch_cmds: None,
-            imap_host: String::new(),
-            imap_port: 0,
-            imap_starttls: None,
-            imap_insecure: None,
-            imap_login: String::new(),
-            imap_passwd_cmd: String::new(),
-            smtp_host: String::new(),
-            smtp_port: 0,
-            smtp_starttls: None,
-            smtp_insecure: None,
-            smtp_login: String::new(),
-            smtp_passwd_cmd: String::new(),
+            ..Account::new()
         };
         let config = Config {
-            name: String::new(),
-            downloads_dir: None,
-            notify_cmd: None,
-            signature: None,
-            default_page_size: None,
-            watch_cmds: None,
             accounts: vec![(String::from("account"), account.clone())]
                 .into_iter()
                 .collect(),
+            ..Config::new()
         };
         let output = Output::new("plain");
         let mbox = String::new();
@@ -488,35 +385,15 @@ Subject: Re: Test
     fn reply_all_tpl_with_signature() {
         let account = Account {
             name: Some(String::from("Test")),
-            downloads_dir: None,
-            signature: Some(String::from("-- \nCordialement,")),
-            default_page_size: None,
-            default: Some(true),
             email: String::from("test@localhost"),
-            watch_cmds: None,
-            imap_host: String::new(),
-            imap_port: 0,
-            imap_starttls: None,
-            imap_insecure: None,
-            imap_login: String::new(),
-            imap_passwd_cmd: String::new(),
-            smtp_host: String::new(),
-            smtp_port: 0,
-            smtp_starttls: None,
-            smtp_insecure: None,
-            smtp_login: String::new(),
-            smtp_passwd_cmd: String::new(),
+            signature: Some(String::from("-- \nCordialement,")),
+            ..Account::new()
         };
         let config = Config {
-            name: String::new(),
-            downloads_dir: None,
-            notify_cmd: None,
-            signature: None,
-            default_page_size: None,
-            watch_cmds: None,
             accounts: vec![(String::from("account"), account.clone())]
                 .into_iter()
                 .collect(),
+            ..Config::new()
         };
         let output = Output::new("plain");
         let mbox = String::new();
@@ -538,35 +415,14 @@ Subject: Re: Test
     fn forward_tpl() {
         let account = Account {
             name: Some(String::from("Test")),
-            downloads_dir: None,
-            signature: None,
-            default_page_size: None,
-            default: Some(true),
             email: String::from("test@localhost"),
-            watch_cmds: None,
-            imap_host: String::new(),
-            imap_port: 0,
-            imap_starttls: None,
-            imap_insecure: None,
-            imap_login: String::new(),
-            imap_passwd_cmd: String::new(),
-            smtp_host: String::new(),
-            smtp_port: 0,
-            smtp_starttls: None,
-            smtp_insecure: None,
-            smtp_login: String::new(),
-            smtp_passwd_cmd: String::new(),
+            ..Account::new()
         };
         let config = Config {
-            name: String::new(),
-            downloads_dir: None,
-            notify_cmd: None,
-            signature: None,
-            default_page_size: None,
-            watch_cmds: None,
             accounts: vec![(String::from("account"), account.clone())]
                 .into_iter()
                 .collect(),
+            ..Config::new()
         };
         let output = Output::new("plain");
         let mbox = String::new();
@@ -588,35 +444,15 @@ Subject: Re: Test
     fn forward_tpl_with_signature() {
         let account = Account {
             name: Some(String::from("Test")),
-            downloads_dir: None,
-            signature: Some(String::from("-- \nCordialement,")),
-            default_page_size: None,
-            default: Some(true),
             email: String::from("test@localhost"),
-            watch_cmds: None,
-            imap_host: String::new(),
-            imap_port: 0,
-            imap_starttls: None,
-            imap_insecure: None,
-            imap_login: String::new(),
-            imap_passwd_cmd: String::new(),
-            smtp_host: String::new(),
-            smtp_port: 0,
-            smtp_starttls: None,
-            smtp_insecure: None,
-            smtp_login: String::new(),
-            smtp_passwd_cmd: String::new(),
+            signature: Some(String::from("-- \nCordialement,")),
+            ..Account::new()
         };
         let config = Config {
-            name: String::new(),
-            downloads_dir: None,
-            notify_cmd: None,
-            signature: None,
-            default_page_size: None,
-            watch_cmds: None,
             accounts: vec![(String::from("account"), account.clone())]
                 .into_iter()
                 .collect(),
+            ..Config::new()
         };
         let output = Output::new("plain");
         let mbox = String::new();
