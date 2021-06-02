@@ -1,4 +1,5 @@
 use super::mail_credits::MailCredits;
+use super::attachments::Attachments;
 
 use crate::config::model::Config;
 use crate::config::tui::TuiConfig;
@@ -33,6 +34,7 @@ pub enum WritingMailAction {
 // ============
 pub struct WritingMail {
     credits: MailCredits,
+    attachments: Attachments,
     // template: Tpl,
     keybinding_manager: KeybindingManager<WritingMailAction>,
 }
@@ -61,9 +63,12 @@ impl WritingMail {
             &config.tui.mail_credits
         );
 
+        let attachments = Attachments::new(&config.tui.attachments);
+
         Self {
             // template: Tpl::new(),
             credits,
+            attachments,
             keybinding_manager: KeybindingManager::new(keybindings),
         }
     }
@@ -97,6 +102,7 @@ impl BackendInterface for WritingMail {
             .split(frame.size());
 
         frame.render_widget(self.credits.widget(), layout[0]);
+        frame.render_widget(self.attachments.widget(), layout[1]);
 
     }
 }

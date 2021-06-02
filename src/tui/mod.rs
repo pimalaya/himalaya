@@ -9,6 +9,7 @@ pub mod modes {
     }
 
     pub mod writing_mail {
+        pub mod attachments;
         pub mod mail_credits;
         pub mod main;
     }

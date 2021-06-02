@@ -65,7 +65,9 @@ pub struct BlockDataConfig {
 /// ```
 #[derive(Debug, Deserialize)]
 pub struct TuiConfig {
+    // TODO: Restruct everything here, for example a new section for each mode
     pub mail_credits: BlockDataConfig,
+    pub attachments: BlockDataConfig,
     pub sidebar: BlockDataConfig,
     /// As explained in the [`BlockDataConfig` doc](struct.BlockDataConfig.html)
     /// each frame can be customized by this struct. For more information, take
