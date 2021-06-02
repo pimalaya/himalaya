@@ -2,6 +2,7 @@ use crate::tui::modes::block_data::BlockData;
 use crate::imap::model::ImapConnector;
 use crate::msg::model::Msgs;
 use crate::config::tui::BlockDataConfig;
+use crate::tui::modes::table_state_wrapper::TableStateWrapper;
 
 use tui_rs::layout::Constraint;
 use tui_rs::style::{Color, Style, Modifier};
@@ -12,10 +13,7 @@ pub struct MailList {
     mails: Vec<Vec<String>>,
     header: Vec<String>,
 
-    /// This variable/state can be modified by the UI which stores the current
-    /// selected item + offset of the previous call. For more information, take
-    /// a look at [its docs](trait.StatefulWidget.html#associatedtype.State).
-    pub state: TableState,
+    pub state: TableStateWrapper,
 }
 
 impl MailList {
@@ -31,7 +29,7 @@ impl MailList {
                 String::from("Sender"),
                 String::from("Subject"),
             ],
-            state: TableState::default(),
+            state: TableStateWrapper::new(),
         }
     }
 
@@ -66,39 +64,18 @@ impl MailList {
         }
 
         // reset the selection
-        self.state = TableState::default();
-        self.state.select(Some(0));
+        self.state.reset();
+        self.state.update_length(self.mails.len());
 
         Ok(())
     }
 
-    /// Move the select-row according to the offset.
-    /// Positive Offset => Go down
-    /// Negative Offset => Go up
     pub fn move_selection(&mut self, offset: i32) {
-        let new_selection = match self.state.selected() {
-            Some(old_selection) => {
-                let mut selection = if offset < 0 {
-                    old_selection.saturating_sub(offset.abs() as usize)
-                } else {
-                    old_selection.saturating_add(offset as usize)
-                };
-
-                if selection > self.mails.len() - 1 {
-                    selection = self.mails.len() - 1;
-                }
-
-                selection
-            }
-            // If something goes wrong: Move the cursor to the middle
-            None => 0,
-        };
-
-        self.state.select(Some(new_selection));
+        self.state.move_selection(offset);
     }
 
-    pub fn unselect(&mut self) {
-        self.state.select(None);
+    pub fn get_state(&mut self) -> &mut TableState {
+        &mut self.state.state
     }
 
     // TODO: Make sure that it displays really only the needed one, not too

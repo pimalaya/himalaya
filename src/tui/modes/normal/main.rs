@@ -58,7 +58,7 @@ impl NormalFrame {
 
         let keybindings = TuiConfig::parse_keybindings(
             &default_keybindings,
-            config.tui.keybindings.get("normal")
+            config.tui.keybindings.get("normal"),
         );
 
         let keybinding_manager = KeybindingManager::new(keybindings);
@@ -124,7 +124,7 @@ impl BackendInterface for NormalFrame {
                 NormalAction::CursorDown => {
                     self.maillist.move_selection(1);
                     Some(BackendActions::Redraw)
-                },
+                }
                 NormalAction::WritingMail => Some(BackendActions::WritingMail),
             }
         } else {
@@ -158,14 +158,15 @@ impl BackendInterface for NormalFrame {
         frame.render_stateful_widget(
             self.sidebar.widget(),
             layout[0],
-            &mut self.sidebar.state,
+            self.sidebar.get_state(),
+            // &mut self.sidebar.state,
         );
 
         // Display the mails
         frame.render_stateful_widget(
             self.maillist.widget(),
             layout[1],
-            &mut self.maillist.state,
+            self.maillist.get_state(),
         );
     }
 }

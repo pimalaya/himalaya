@@ -2,6 +2,7 @@ use crate::imap::model::ImapConnector;
 use crate::mbox::model::Mboxes;
 use crate::config::tui::BlockDataConfig;
 use crate::tui::modes::block_data::BlockData;
+use crate::tui::modes::table_state_wrapper::TableStateWrapper;
 
 use tui_rs::layout::Constraint;
 use tui_rs::style::{Color, Style};
@@ -15,7 +16,7 @@ pub struct Sidebar {
     mailboxes: Vec<Vec<String>>,
     header: Vec<String>,
 
-    pub state: TableState,
+    pub state: TableStateWrapper,
 }
 
 impl Sidebar {
@@ -24,7 +25,7 @@ impl Sidebar {
             mailboxes: Vec::new(),
             header: vec![String::from("Mailbox"), String::from("Flags")],
             block_data: BlockData::new(title, config),
-            state: TableState::default(),
+            state: TableStateWrapper::new(),
         }
     }
 
@@ -64,36 +65,18 @@ impl Sidebar {
         }
 
         // reset the selection
-        self.state = TableState::default();
-        self.state.select(Some(0));
+        self.state.reset();
+        self.state.update_length(self.mailboxes.len());
 
         Ok(())
     }
 
     pub fn move_selection(&mut self, offset:i32) {
-        let new_selection = match self.state.selected() {
-            Some(old_selection) => {
-                let mut selection = if offset < 0 {
-                    old_selection.saturating_sub(offset.abs() as usize)
-                } else {
-                    old_selection.saturating_add(offset as usize)
-                };
-
-                if selection > self.mailboxes.len() - 1 {
-                    selection = self.mailboxes.len() - 1;
-                }
-
-                selection
-            }
-            // If something goes wrong: Move the cursor to the middle
-            None => 0,
-        };
-
-        self.state.select(Some(new_selection));
+        self.state.move_selection(offset);
     }
 
-    pub fn unselect(&mut self) {
-        self.state.select(None);
+    pub fn get_state(&mut self) -> &mut TableState {
+        &mut self.state.state
     }
 
     pub fn widget(&self) -> Table<'static> {
