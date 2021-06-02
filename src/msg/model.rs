@@ -100,23 +100,23 @@ impl<'a> Attachments {
 
 // Readable message
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct ReadableMsg {
     pub content: String,
     pub has_attachment: bool,
 }
 
-impl Serialize for ReadableMsg {
-    fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
-    where
-        S: ser::Serializer,
-    {
-        let mut state = serializer.serialize_struct("ReadableMsg", 2)?;
-        state.serialize_field("content", &self.content)?;
-        state.serialize_field("hasAttachment", if self.has_attachment { &1 } else { &0 })?;
-        state.end()
-    }
-}
+// impl Serialize for ReadableMsg {
+//     fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
+//     where
+//         S: ser::Serializer,
+//     {
+//         let mut state = serializer.serialize_struct("ReadableMsg", 2)?;
+//         state.serialize_field("content", &self.content)?;
+//         state.serialize_field("hasAttachment", if self.has_attachment { &1 } else { &0 })?;
+//         state.end()
+//     }
+// }
 
 impl fmt::Display for ReadableMsg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -374,7 +374,11 @@ impl<'m> Msg<'m> {
         Ok(msg)
     }
 
-    fn extract_text_bodies_into(part: &mailparse::ParsedMail, mime: &str, parts: &mut Vec<String>) {
+    pub fn extract_text_bodies_into(
+        part: &mailparse::ParsedMail,
+        mime: &str,
+        parts: &mut Vec<String>,
+    ) {
         match part.subparts.len() {
             0 => {
                 let content_type = part

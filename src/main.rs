@@ -32,6 +32,7 @@ fn parse_args<'a>() -> clap::App<'a, 'a> {
         .version(env!("CARGO_PKG_VERSION"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .author(env!("CARGO_PKG_AUTHORS"))
+        .setting(clap::AppSettings::InferSubcommands)
         .args(&output_args())
         .args(&config_args())
         .arg(mbox_source_arg())
