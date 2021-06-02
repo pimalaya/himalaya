@@ -36,7 +36,6 @@ pub enum KeyType<Mode> {
 /// struct into their appropriate attribute name.
 #[derive(Debug, Deserialize)]
 pub struct BlockDataConfig {
-    
     /// So this variable stores the border type which the user wants to see. All
     /// possible options can be seen here:
     /// [here](https://docs.rs/tui/0.15.0/tui/widgets/enum.BorderType.html).
@@ -52,16 +51,11 @@ pub struct BlockDataConfig {
     pub border_color: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct KeybindingConfig {
-     
-}
-
 /// All config sections below the `[tui]` part in your
 /// [config.toml](https://github.com/soywod/himalaya/wiki/Configuration:config-file)
 /// file will
 /// be stored in this struct.
-/// 
+///
 /// # Example
 /// ```toml
 /// # other settings...
@@ -93,7 +87,7 @@ pub struct TuiConfig {
     /// [tui.keybindings]
     /// quit = "ddq"
     /// ```
-    /// 
+    ///
     /// Then this section will be stored in this variable as follows:
     ///
     /// ```no_run
@@ -181,7 +175,7 @@ impl TuiConfig {
     ///
     /// We reached a leaf of the tree. Each leaf has an Action, which can be
     /// executed by the TUI, for example when scrolling up.
-    /// 
+    ///
     /// # Minimal example
     /// So this example shows you, how to work with the output of the function.
     ///
@@ -246,11 +240,11 @@ impl TuiConfig {
     pub fn parse_keybindings<ModeActions: Clone>(
         defaults: &Vec<(&str, ModeActions, &str)>,
         user_keybindings: &HashMap<String, String>,
-        ) -> HashMap<Event, KeyType<ModeActions>> {
-
-        // This variable will store all keybindings which will get converted into
-        // <Event, Action>.
-        let mut keybindings: HashMap<Event, KeyType<ModeActions>> = HashMap::new();
+    ) -> HashMap<Event, KeyType<ModeActions>> {
+        // This variable will store all keybindings which will get converted
+        // into <Event, Action>.
+        let mut keybindings: HashMap<Event, KeyType<ModeActions>> =
+            HashMap::new();
 
         // Now iterate through all available actions and look, which one got
         // overridden.
@@ -266,7 +260,8 @@ impl TuiConfig {
             // This should rather fungate as a pointer which traverses through
             // the keybinding-tree in order to add other nodes or check where to
             // go next.
-            let mut node: &mut HashMap<Event, KeyType<ModeActions>> = &mut keybindings;
+            let mut node: &mut HashMap<Event, KeyType<ModeActions>> =
+                &mut keybindings;
 
             // Parse each keypress into the given event
             let iter = TuiConfig::parse_keys(keybinding);
@@ -274,11 +269,11 @@ impl TuiConfig {
             // We are iterating through all events, except the last one, because
             // the last key will bind the action.
             // This loop just makes sure that the "path" for the keybinding
-            // exists. 
+            // exists.
             // In other words, if we'd have this keybinding: 'gnn', than:
             //  1. Split it up to 'gn' and 'n'
             //  2. Create the path in the keybinding tree for "gn" (this loop):
-            //          
+            //
             //      g
             //       \
             //        n
@@ -393,15 +388,15 @@ impl TuiConfig {
     ///
     /// assert_eq!(converted_keybinding,
     ///     vec![
-    ///         Event::Key(KeyEvent { 
+    ///         Event::Key(KeyEvent {
     ///             modifiers: KeyModifiers::CONTROL,
     ///             code: KeyCode::Char('i'),
     ///         }),
-    ///         Event::Key(KeyEvent { 
+    ///         Event::Key(KeyEvent {
     ///             modifiers: KeyModifiers::NONE,
     ///             code: KeyCode::Char('a'),
     ///         }),
-    ///         Event::Key(KeyEvent { 
+    ///         Event::Key(KeyEvent {
     ///             modifiers: KeyModifiers::NONE,
     ///             code: KeyCode::Char('j'),
     ///         }),

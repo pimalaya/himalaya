@@ -115,7 +115,7 @@ impl<'tui> Tui<'tui> {
                                 Err(_) => return Err(TuiError::ConnectAccount),
                             };
 
-                        self.normal_mode.set_account(&account);
+                        self.normal_mode.set_account(&account)?;
                     }
                     None => (),
                 },
@@ -136,43 +136,6 @@ impl<'tui> Tui<'tui> {
 
         self.need_redraw = false;
     }
-
-    // pub fn eval_events(
-    //     &mut self,
-    //     event: Event,
-    //     node_ptr: Rc<HashMap<Event, tui::KeyType>>,
-    // ) -> Rc<HashMap<Event, tui::KeyType>> {
-    //     // So suppose our keybinding tree looks like this:
-    //     //
-    //     //
-    //     //      g
-    //     //       \
-    //     //        n  <- (1) Some(tui::KeyType::Key(sub_node))
-    //     //       / \
-    //     //      a   n <- (2) Some(tui::KeyType::Action(action))
-    //     //
-    //     match node_ptr.get(&event) {
-    //         // In this case, the user pressed probably a wrong key or
-    //         // he pressed a keybinding which we doesn't know, so we just
-    //         // jump back to the top of the tree and record the next
-    //         // keybinding.
-    //         None => Rc::new(self.keybindings),
-    //
-    //         // (1) So in this case, we are not at the end of a
-    //         // keybinding yet, the user has still to press some
-    //         // other keys, in order to create an action!
-    //         Some(tui::KeyType::Key(sub_node)) => Rc::new(sub_node),
-    //
-    //         // (2) We reached a leaf and can now execute the
-    //         // appropriate action from it! After that, we can also
-    //         // reset the the node-pointer back to the top of the
-    //         // tree in order to record the next keybinding.
-    //         Some(tui::KeyType::Action(action)) => {
-    //             self.do_action(action.clone());
-    //             Rc::new(self.keybindings)
-    //         }
-    //     }
-    // }
 
     pub fn run(mut self) -> Result<(), TuiError> {
         // ----------------
@@ -195,7 +158,7 @@ impl<'tui> Tui<'tui> {
             Ok(account) => account,
             Err(_) => return Err(TuiError::UnknownAccount),
         };
-        self.normal_mode.set_account(account);
+        self.normal_mode.set_account(account)?;
 
         // ------------------
         // Main Tui loop
@@ -216,7 +179,7 @@ impl<'tui> Tui<'tui> {
             // has to be down (no redraw or somehting like that)
             // HINT: If we need to do something in parallel, use add poll.
             match crossterm::event::read() {
-                Ok(event) => self.handle_event(event),
+                Ok(event) => self.handle_event(event)?,
                 Err(_) => {
                     terminal.clear()?;
                     self.cleanup()?;

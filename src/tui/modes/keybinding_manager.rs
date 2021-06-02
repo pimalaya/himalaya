@@ -23,7 +23,7 @@ impl<ModeAction: Clone> KeybindingManager<ModeAction> {
     pub fn eval_event(&mut self, event: Event) -> Option<ModeAction> {
 
         // get the starting node
-        let mut node = if self.event_buffer.is_empty() {
+        let node = if self.event_buffer.is_empty() {
             if let Some(node) = self.keybindings.get(&event) {
                 node
             } else {
