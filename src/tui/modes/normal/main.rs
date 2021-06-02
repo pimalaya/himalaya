@@ -56,12 +56,13 @@ impl NormalFrame {
             ("cursor_up", NormalActions::CursorUp, "k"),
         ];
 
-        let keybindings 
-            = if let Some(user_keybindings) = config.tui.keybindings.get("normal") 
+        let keybindings = if let Some(user_keybindings) =
+            config.tui.keybindings.get("normal")
         {
             TuiConfig::parse_keybindings(
                 &default_keybindings,
-                &user_keybindings)
+                &user_keybindings,
+            )
         } else {
             TuiConfig::parse_keybindings(&default_keybindings, &HashMap::new())
         };
@@ -104,11 +105,11 @@ impl NormalFrame {
 
         if let Err(_) = self
             .maillist
-                .set_mails(&mut imap_conn, &self.sidebar.mailboxes()[0][0])
-                {
-                    imap_conn.logout();
-                    return Err(TuiError::MailList);
-                }
+            .set_mails(&mut imap_conn, &self.sidebar.mailboxes()[0][0])
+        {
+            imap_conn.logout();
+            return Err(TuiError::MailList);
+        }
 
         // logout
         imap_conn.logout();
@@ -137,39 +138,39 @@ impl BackendInterface for NormalFrame {
     }
 
     fn draw<B>(&mut self, frame: &mut Frame<B>)
-        where
-            B: Backend,
-        {
-            // Create the two frames for the sidebar and the mails:
-            //  - One on the left (sidebar)
-            //  - One on the right (mail listing)
-            let layout = Layout::default()
-                .direction(Direction::Horizontal)
-                .margin(1)
-                .constraints(
-                    [
+    where
+        B: Backend,
+    {
+        // Create the two frames for the sidebar and the mails:
+        //  - One on the left (sidebar)
+        //  - One on the right (mail listing)
+        let layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .margin(1)
+            .constraints(
+                [
                     // For the sidebar (will be the second block => Index 0)
                     Constraint::Percentage(25),
                     // For the mails (will be the second block => Index 1)
                     Constraint::Percentage(75),
-                    ]
-                    .as_ref(),
-                    )
-                // Use the given frame size to create the two blocks
-                .split(frame.size());
+                ]
+                .as_ref(),
+            )
+            // Use the given frame size to create the two blocks
+            .split(frame.size());
 
-            // Display the sidebar
-            frame.render_stateful_widget(
-                self.sidebar.widget(),
-                layout[0],
-                &mut self.sidebar.state,
-                );
+        // Display the sidebar
+        frame.render_stateful_widget(
+            self.sidebar.widget(),
+            layout[0],
+            &mut self.sidebar.state,
+        );
 
-            // Display the mails
-            frame.render_stateful_widget(
-                self.maillist.widget(),
-                layout[1],
-                &mut self.maillist.state,
-                );
-        }
+        // Display the mails
+        frame.render_stateful_widget(
+            self.maillist.widget(),
+            layout[1],
+            &mut self.maillist.state,
+        );
+    }
 }
