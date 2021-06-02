@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - [**BREAKING**] Short version of reply `--all` arg is now `-A` to avoid conflicts with `--attachment|-a`
+- Template management [#80]
 
 ### Removed
 
@@ -258,6 +259,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#75]: https://github.com/soywod/himalaya/issues/75
 [#78]: https://github.com/soywod/himalaya/issues/78
 [#79]: https://github.com/soywod/himalaya/issues/79
+[#80]: https://github.com/soywod/himalaya/issues/80
 [#83]: https://github.com/soywod/himalaya/issues/83
 [#84]: https://github.com/soywod/himalaya/issues/84
 [#86]: https://github.com/soywod/himalaya/issues/86
