@@ -5,7 +5,7 @@ use crate::{
     output::model::Output,
 };
 
-pub struct App<'a> {
+pub struct Ctx<'a> {
     pub config: &'a Config,
     pub account: &'a Account,
     pub output: &'a Output,
@@ -13,7 +13,7 @@ pub struct App<'a> {
     pub arg_matches: &'a clap::ArgMatches<'a>,
 }
 
-impl<'a> App<'a> {
+impl<'a> Ctx<'a> {
     pub fn new(
         config: &'a Config,
         account: &'a Account,

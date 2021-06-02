@@ -3,7 +3,7 @@ use mailparse::{self, MailHeaderMap};
 use serde::Serialize;
 use std::{collections::HashMap, fmt};
 
-use crate::{app::App, msg::model::Msg};
+use crate::{ctx::Ctx, msg::model::Msg};
 
 error_chain! {}
 
@@ -17,24 +17,24 @@ pub struct Tpl {
 }
 
 impl Tpl {
-    pub fn new(app: &App) -> Self {
+    pub fn new(ctx: &Ctx) -> Self {
         let mut headers = HashMap::new();
-        headers.insert("From".to_string(), app.config.address(app.account));
+        headers.insert("From".to_string(), ctx.config.address(ctx.account));
         headers.insert("To".to_string(), String::new());
         headers.insert("Subject".to_string(), String::new());
 
         Self {
             headers,
             body: None,
-            signature: app.config.signature(app.account),
+            signature: ctx.config.signature(ctx.account),
         }
     }
 
-    pub fn reply(app: &App, msg: &mailparse::ParsedMail) -> Self {
+    pub fn reply(ctx: &Ctx, msg: &mailparse::ParsedMail) -> Self {
         let parsed_headers = msg.get_headers();
         let mut headers = HashMap::new();
 
-        headers.insert("From".to_string(), app.config.address(app.account));
+        headers.insert("From".to_string(), ctx.config.address(ctx.account));
 
         let to = parsed_headers
             .get_first_value("reply-to")
@@ -68,15 +68,15 @@ impl Tpl {
         Self {
             headers,
             body: Some(body),
-            signature: app.config.signature(&app.account),
+            signature: ctx.config.signature(&ctx.account),
         }
     }
 
-    pub fn reply_all(app: &App, msg: &mailparse::ParsedMail) -> Self {
+    pub fn reply_all(ctx: &Ctx, msg: &mailparse::ParsedMail) -> Self {
         let parsed_headers = msg.get_headers();
         let mut headers = HashMap::new();
 
-        let from: lettre::message::Mailbox = app.config.address(app.account).parse().unwrap();
+        let from: lettre::message::Mailbox = ctx.config.address(ctx.account).parse().unwrap();
         headers.insert("From".to_string(), from.to_string());
 
         let to = parsed_headers
@@ -143,15 +143,15 @@ impl Tpl {
         Self {
             headers,
             body: Some(body),
-            signature: app.config.signature(&app.account),
+            signature: ctx.config.signature(&ctx.account),
         }
     }
 
-    pub fn forward(app: &App, msg: &mailparse::ParsedMail) -> Self {
+    pub fn forward(ctx: &Ctx, msg: &mailparse::ParsedMail) -> Self {
         let parsed_headers = msg.get_headers();
         let mut headers = HashMap::new();
 
-        headers.insert("From".to_string(), app.config.address(app.account));
+        headers.insert("From".to_string(), ctx.config.address(ctx.account));
         headers.insert("To".to_string(), String::new());
         let subject = parsed_headers
             .get_first_value("subject")
@@ -170,7 +170,7 @@ impl Tpl {
         Self {
             headers,
             body: Some(body),
-            signature: app.config.signature(&app.account),
+            signature: ctx.config.signature(&ctx.account),
         }
     }
 
@@ -223,8 +223,8 @@ impl fmt::Display for Tpl {
 #[cfg(test)]
 mod tests {
     use crate::{
-        app::App,
         config::model::{Account, Config},
+        ctx::Ctx,
         msg::tpl::model::Tpl,
         output::model::Output,
     };
@@ -245,7 +245,7 @@ mod tests {
         let output = Output::new("plain");
         let mbox = String::new();
         let arg_matches = clap::ArgMatches::new();
-        let app = App::new(&config, &account, &output, &mbox, &arg_matches);
+        let app = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
         let tpl = Tpl::new(&app);
 
         assert_eq!(
@@ -271,7 +271,7 @@ mod tests {
         let output = Output::new("plain");
         let mbox = String::new();
         let arg_matches = clap::ArgMatches::new();
-        let app = App::new(&config, &account, &output, &mbox, &arg_matches);
+        let app = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
         let tpl = Tpl::new(&app);
 
         assert_eq!(
@@ -296,7 +296,7 @@ mod tests {
         let output = Output::new("plain");
         let mbox = String::new();
         let arg_matches = clap::ArgMatches::new();
-        let app = App::new(&config, &account, &output, &mbox, &arg_matches);
+        let app = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
         let parsed_mail = mailparse::parse_mail(
             b"Content-Type: text/plain\r\nFrom: Sender <sender@localhost>\r\nSubject: Test\r\n\r\nHello, world!",
         )
@@ -326,7 +326,7 @@ mod tests {
         let output = Output::new("plain");
         let mbox = String::new();
         let arg_matches = clap::ArgMatches::new();
-        let app = App::new(&config, &account, &output, &mbox, &arg_matches);
+        let app = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
         let parsed_mail = mailparse::parse_mail(
             b"Content-Type: text/plain\r\nFrom: Sender <sender@localhost>\r\nSubject: Test\r\n\r\nHello, world!",
         )
@@ -355,7 +355,7 @@ mod tests {
         let output = Output::new("plain");
         let mbox = String::new();
         let arg_matches = clap::ArgMatches::new();
-        let app = App::new(&config, &account, &output, &mbox, &arg_matches);
+        let app = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
         let parsed_mail = mailparse::parse_mail(
             b"Message-Id: 1\r
 Content-Type: text/plain\r
@@ -398,7 +398,7 @@ Subject: Re: Test
         let output = Output::new("plain");
         let mbox = String::new();
         let arg_matches = clap::ArgMatches::new();
-        let app = App::new(&config, &account, &output, &mbox, &arg_matches);
+        let app = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
         let parsed_mail = mailparse::parse_mail(
             b"Content-Type: text/plain\r\nFrom: Sender <sender@localhost>\r\nSubject: Test\r\n\r\nHello, world!",
         )
@@ -427,7 +427,7 @@ Subject: Re: Test
         let output = Output::new("plain");
         let mbox = String::new();
         let arg_matches = clap::ArgMatches::new();
-        let app = App::new(&config, &account, &output, &mbox, &arg_matches);
+        let app = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
         let parsed_mail = mailparse::parse_mail(
             b"Content-Type: text/plain\r\nFrom: Sender <sender@localhost>\r\nSubject: Test\r\n\r\nHello, world!",
         )
@@ -457,7 +457,7 @@ Subject: Re: Test
         let output = Output::new("plain");
         let mbox = String::new();
         let arg_matches = clap::ArgMatches::new();
-        let app = App::new(&config, &account, &output, &mbox, &arg_matches);
+        let app = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
         let parsed_mail = mailparse::parse_mail(
             b"Content-Type: text/plain\r\nFrom: Sender <sender@localhost>\r\nSubject: Test\r\n\r\nHello, world!",
         )

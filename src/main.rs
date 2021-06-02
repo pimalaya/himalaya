@@ -5,7 +5,7 @@ use log::{debug, error, trace};
 use std::{env, path::PathBuf, process::exit};
 
 use himalaya::{
-    app::App,
+    ctx::Ctx,
     comp::cli::{comp_matches, comp_subcmds},
     config::{cli::config_args, model::Config},
     flag::cli::{flag_matches, flag_subcmds},
@@ -73,7 +73,7 @@ fn run() -> Result<()> {
     debug!("mailbox: {}", mbox);
 
     debug!("begin matching");
-    let app = App::new(&config, &account, &output, &mbox, &arg_matches);
+    let app = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
     let _matched =
         mbox_matches(&app)? || flag_matches(&app)? || imap_matches(&app)? || msg_matches(&app)?;
 

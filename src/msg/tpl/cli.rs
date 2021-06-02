@@ -5,7 +5,7 @@ use log::{debug, trace};
 use mailparse;
 use std::io::{self, BufRead};
 
-use crate::{app::App, imap::model::ImapConnector, msg::tpl::model::Tpl};
+use crate::{ctx::Ctx, imap::model::ImapConnector, msg::tpl::model::Tpl};
 
 error_chain! {
     links {
@@ -107,11 +107,11 @@ pub fn tpl_args<'a>() -> Vec<clap::Arg<'a, 'a>> {
     ]
 }
 
-pub fn tpl_matches(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
+pub fn tpl_matches(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     match matches.subcommand() {
-        ("new", Some(matches)) => tpl_matches_new(app, matches),
-        ("reply", Some(matches)) => tpl_matches_reply(app, matches),
-        ("forward", Some(matches)) => tpl_matches_forward(app, matches),
+        ("new", Some(matches)) => tpl_matches_new(ctx, matches),
+        ("reply", Some(matches)) => tpl_matches_reply(ctx, matches),
+        ("forward", Some(matches)) => tpl_matches_forward(ctx, matches),
 
         // TODO: find a way to show the help message for template subcommand
         _ => Err("Subcommand not found".into()),
@@ -176,51 +176,51 @@ fn override_tpl_with_args(tpl: &mut Tpl, matches: &clap::ArgMatches) {
     };
 }
 
-fn tpl_matches_new(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
+fn tpl_matches_new(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     debug!("new command matched");
 
-    let mut tpl = Tpl::new(&app);
+    let mut tpl = Tpl::new(&ctx);
     override_tpl_with_args(&mut tpl, &matches);
     trace!("tpl: {:?}", tpl);
-    app.output.print(tpl);
+    ctx.output.print(tpl);
 
     Ok(true)
 }
 
-fn tpl_matches_reply(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
+fn tpl_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     debug!("reply command matched");
 
     let uid = matches.value_of("uid").unwrap();
     debug!("uid: {}", uid);
 
-    let mut imap_conn = ImapConnector::new(&app.account)?;
-    let msg = &imap_conn.read_msg(&app.mbox, &uid)?;
+    let mut imap_conn = ImapConnector::new(&ctx.account)?;
+    let msg = &imap_conn.read_msg(&ctx.mbox, &uid)?;
     let msg = mailparse::parse_mail(&msg)?;
     let mut tpl = if matches.is_present("reply-all") {
-        Tpl::reply(&app, &msg)
+        Tpl::reply(&ctx, &msg)
     } else {
-        Tpl::reply_all(&app, &msg)
+        Tpl::reply_all(&ctx, &msg)
     };
     override_tpl_with_args(&mut tpl, &matches);
     trace!("tpl: {:?}", tpl);
-    app.output.print(tpl);
+    ctx.output.print(tpl);
 
     Ok(true)
 }
 
-fn tpl_matches_forward(app: &App, matches: &clap::ArgMatches) -> Result<bool> {
+fn tpl_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     debug!("forward command matched");
 
     let uid = matches.value_of("uid").unwrap();
     debug!("uid: {}", uid);
 
-    let mut imap_conn = ImapConnector::new(&app.account)?;
-    let msg = &imap_conn.read_msg(&app.mbox, &uid)?;
+    let mut imap_conn = ImapConnector::new(&ctx.account)?;
+    let msg = &imap_conn.read_msg(&ctx.mbox, &uid)?;
     let msg = mailparse::parse_mail(&msg)?;
-    let mut tpl = Tpl::forward(&app, &msg);
+    let mut tpl = Tpl::forward(&ctx, &msg);
     override_tpl_with_args(&mut tpl, &matches);
     trace!("tpl: {:?}", tpl);
-    app.output.print(tpl);
+    ctx.output.print(tpl);
 
     Ok(true)
 }

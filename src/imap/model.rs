@@ -4,7 +4,7 @@ use log::{debug, trace};
 use native_tls::{self, TlsConnector, TlsStream};
 use std::{collections::HashSet, iter::FromIterator, net::TcpStream};
 
-use crate::{app::App, config::model::Account, flag::model::Flag, msg::model::Msg};
+use crate::{config::model::Account, ctx::Ctx, flag::model::Flag, msg::model::Msg};
 
 error_chain! {
     links {
@@ -102,11 +102,11 @@ impl<'a> ImapConnector<'a> {
         Ok(uids)
     }
 
-    pub fn notify(&mut self, app: &App, keepalive: u64) -> Result<()> {
-        debug!("examine mailbox: {}", &app.mbox);
+    pub fn notify(&mut self, ctx: &Ctx, keepalive: u64) -> Result<()> {
+        debug!("examine mailbox: {}", &ctx.mbox);
         self.sess
-            .examine(&app.mbox)
-            .chain_err(|| format!("Could not examine mailbox `{}`", &app.mbox))?;
+            .examine(&ctx.mbox)
+            .chain_err(|| format!("Could not examine mailbox `{}`", &ctx.mbox))?;
 
         debug!("init messages hashset");
         let mut msgs_set: HashSet<u32> =
@@ -151,7 +151,7 @@ impl<'a> ImapConnector<'a> {
                     let uid = fetch.uid.ok_or_else(|| {
                         format!("Could not retrieve message {}'s UID", fetch.message)
                     })?;
-                    app.config.run_notify_cmd(&msg.subject, &msg.sender)?;
+                    ctx.config.run_notify_cmd(&msg.subject, &msg.sender)?;
                     debug!("notify message: {}", uid);
                     trace!("message: {:?}", msg);
 
@@ -165,11 +165,11 @@ impl<'a> ImapConnector<'a> {
         }
     }
 
-    pub fn watch(&mut self, app: &App, keepalive: u64) -> Result<()> {
-        debug!("examine mailbox: {}", &app.mbox);
+    pub fn watch(&mut self, ctx: &Ctx, keepalive: u64) -> Result<()> {
+        debug!("examine mailbox: {}", &ctx.mbox);
         self.sess
-            .examine(&app.mbox)
-            .chain_err(|| format!("Could not examine mailbox `{}`", &app.mbox))?;
+            .examine(&ctx.mbox)
+            .chain_err(|| format!("Could not examine mailbox `{}`", &ctx.mbox))?;
 
         loop {
             debug!("begin loop");
@@ -184,7 +184,7 @@ impl<'a> ImapConnector<'a> {
                     })
                 })
                 .chain_err(|| "Could not start the idle mode")?;
-            app.config.exec_watch_cmds(&app.account)?;
+            ctx.config.exec_watch_cmds(&ctx.account)?;
             debug!("end loop");
         }
     }
