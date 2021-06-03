@@ -7,16 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
+## [0.4.0] - 2021-06-03
 
-- `\Seen` flag when moving a message
-- Attachments arg for reply and forward commands [#109]
-- Vim doc [#117]
+### Added
+
+- Add ability to change account in with the Vim plugin [#91]
+- Add possibility to make Himalaya default email app [#160] [[#161](https://github.com/soywod/himalaya/pull/161)]
 
 ### Changed
 
 - [**BREAKING**] Short version of reply `--all` arg is now `-A` to avoid conflicts with `--attachment|-a`
 - Template management [#80]
+
+### Fixed
+
+- `\Seen` flag when moving a message
+- Attachments arg for reply and forward commands [#109]
+- Vim doc [#117]
 
 ### Removed
 
@@ -82,20 +89,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Improve config compatibility on Windows [#111](https://github.com/soywod/himalaya/pull/111)
+- Improve config compatibility on Windows [[#111](https://github.com/soywod/himalaya/pull/111)]
 - Vim table containing emoji [#122]
 
 ## [0.2.6] - 2021-04-17
 
 ### Added
 
-- Insecure TLS option [#84] [#103](https://github.com/soywod/himalaya/pull/103) [#105](https://github.com/soywod/himalaya/pull/105)
-- Completion subcommands [#99](https://github.com/soywod/himalaya/pull/99)
-- Vim flags to enable telescope preview and to choose picker [#97](https://github.com/soywod/himalaya/pull/97)
+- Insecure TLS option [#84] [#103](https://github.com/soywod/himalaya/pull/103) [[#105](https://github.com/soywod/himalaya/pull/105)]
+- Completion subcommands [[#99](https://github.com/soywod/himalaya/pull/99)]
+- Vim flags to enable telescope preview and to choose picker [[#97](https://github.com/soywod/himalaya/pull/97)]
 
 ### Changed
 
-- Make `install.sh` POSIX compliant [#53](https://github.com/soywod/himalaya/pull/53)
+- Make `install.sh` POSIX compliant [[#53](https://github.com/soywod/himalaya/pull/53)]
 
 ### Fixed
 
@@ -202,7 +209,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.3.2...HEAD
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/soywod/himalaya/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/soywod/himalaya/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/soywod/himalaya/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/soywod/himalaya/compare/v0.2.7...v0.3.0
@@ -265,6 +273,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#86]: https://github.com/soywod/himalaya/issues/86
 [#87]: https://github.com/soywod/himalaya/issues/87
 [#89]: https://github.com/soywod/himalaya/issues/89
+[#91]: https://github.com/soywod/himalaya/issues/91
 [#95]: https://github.com/soywod/himalaya/issues/95
 [#96]: https://github.com/soywod/himalaya/issues/96
 [#100]: https://github.com/soywod/himalaya/issues/100
@@ -286,3 +295,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#141]: https://github.com/soywod/himalaya/issues/141
 [#144]: https://github.com/soywod/himalaya/issues/144
 [#146]: https://github.com/soywod/himalaya/issues/146
+[#160]: https://github.com/soywod/himalaya/issues/160

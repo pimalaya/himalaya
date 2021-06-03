@@ -4,7 +4,7 @@ use log::warn;
 use mailparse::{self, MailHeaderMap};
 use rfc2047_decoder;
 use serde::{
-    ser::{self, SerializeStruct},
+    ser::{self, SerializeStruct, Serializer},
     Serialize,
 };
 use std::{borrow::Cow, fmt, fs, path::PathBuf, result};
@@ -101,22 +101,12 @@ impl<'a> Attachments {
 // Readable message
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ReadableMsg {
     pub content: String,
+    #[serde(serialize_with = "bool_to_int")]
     pub has_attachment: bool,
 }
-
-// impl Serialize for ReadableMsg {
-//     fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
-//     where
-//         S: ser::Serializer,
-//     {
-//         let mut state = serializer.serialize_struct("ReadableMsg", 2)?;
-//         state.serialize_field("content", &self.content)?;
-//         state.serialize_field("hasAttachment", if self.has_attachment { &1 } else { &0 })?;
-//         state.end()
-//     }
-// }
 
 impl fmt::Display for ReadableMsg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -658,5 +648,17 @@ impl Msgs<'_> {
 impl fmt::Display for Msgs<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "\n{}", Table::render(&self.0))
+    }
+}
+
+// Custom bool to int serializer
+
+fn bool_to_int<S>(t: &bool, s: S) -> std::result::Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    match t {
+        true => s.serialize_u8(1),
+        false => s.serialize_u8(0),
     }
 }
