@@ -9,6 +9,7 @@ pub mod modes {
     }
 
     pub mod writing_mail {
+        pub mod attachments;
         pub mod mail_credits;
         pub mod main;
     }
@@ -16,4 +17,6 @@ pub mod modes {
     pub mod backend_interface;
     pub mod block_data;
     pub mod keybinding_manager;
+    pub mod table_state_wrapper;
+    // pub mod tui_widget;
 }

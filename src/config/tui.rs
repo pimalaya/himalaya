@@ -65,6 +65,9 @@ pub struct BlockDataConfig {
 /// ```
 #[derive(Debug, Deserialize)]
 pub struct TuiConfig {
+    // TODO: Restruct everything here, for example a new section for each mode
+    pub mail_credits: BlockDataConfig,
+    pub attachments: BlockDataConfig,
     pub sidebar: BlockDataConfig,
     /// As explained in the [`BlockDataConfig` doc](struct.BlockDataConfig.html)
     /// each frame can be customized by this struct. For more information, take
@@ -239,7 +242,7 @@ impl TuiConfig {
     /// TODO: Doc of variables
     pub fn parse_keybindings<ModeActions: Clone>(
         defaults: &Vec<(&str, ModeActions, &str)>,
-        user_keybindings: &HashMap<String, String>,
+        user_keybindings: Option<&HashMap<String, String>>,
     ) -> HashMap<Event, KeyType<ModeActions>> {
         // This variable will store all keybindings which will get converted
         // into <Event, Action>.
@@ -249,13 +252,19 @@ impl TuiConfig {
         // Now iterate through all available actions and look, which one got
         // overridden.
         for action_name in defaults {
-            // Look, if the user set a keybinding to the given action or not.
-            let keybinding = match user_keybindings.get(action_name.0) {
-                // So the user provided his/her own keybinding => Parse it
-                Some(keybinding) => keybinding,
-                // Otherwise we're parsing the default keybinding
-                None => action_name.2,
-            };
+            let keybinding: &str = user_keybindings
+                // Look, if the user even provided a section with his own
+                // keybindings.
+                .and_then(|hash_map| { 
+                    hash_map
+                        .get(action_name.0)
+                        .map(|string| string.as_str())
+                })
+                // and look, if he/she added something like
+                //  quit = "q"
+                // in his/her config-section. If not, use the default keybinding
+                // in action_name.2
+                .unwrap_or(action_name.2);
 
             // This should rather fungate as a pointer which traverses through
             // the keybinding-tree in order to add other nodes or check where to
@@ -267,9 +276,9 @@ impl TuiConfig {
             let iter = TuiConfig::parse_keys(keybinding);
 
             // We are iterating through all events, except the last one, because
-            // the last key will bind the action.
-            // This loop just makes sure that the "path" for the keybinding
-            // exists.
+            // the last key will bind the action to the node.
+            // This loop just makes sure that the "path" exists for each
+            // keybinding.
             // In other words, if we'd have this keybinding: 'gnn', than:
             //  1. Split it up to 'gn' and 'n'
             //  2. Create the path in the keybinding tree for "gn" (this loop):
@@ -309,13 +318,13 @@ impl TuiConfig {
                 }
 
                 // This if clause let us move to the next node. For example:
-                // 1. Before this if clause
+                // 1: Before this if clause
                 //
                 //      g <- 'node' points here
                 //       \
                 //        n
                 //
-                // 2. After this if clause
+                // 2: After this if clause
                 //
                 //      g
                 //       \

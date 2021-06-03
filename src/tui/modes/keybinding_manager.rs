@@ -19,7 +19,6 @@ impl<ModeAction: Clone> KeybindingManager<ModeAction> {
         }
     }
 
-    // TODO: here
     pub fn eval_event(&mut self, event: Event) -> Option<ModeAction> {
 
         // get the starting node
