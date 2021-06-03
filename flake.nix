@@ -18,13 +18,13 @@
   outputs = { self, nixpkgs, utils, rust-overlay, crate2nix, ... }:
     utils.lib.eachDefaultSystem
       (system:
-       let 
+        let
           name = "himalaya";
 
           # Imports
-          pkgs = import nixpkgs { 
-            inherit system; 
-            overlays = [ 
+          pkgs = import nixpkgs {
+            inherit system;
+            overlays = [
               rust-overlay.overlay
               (self: super: {
                 # Because rust-overlay bundles multiple rust packages into one
@@ -61,8 +61,23 @@
           # Configuration for the non-Rust dependencies
           buildInputs = with pkgs; [ openssl.dev ];
           nativeBuildInputs = with pkgs; [ rustc cargo pkgconfig ];
-        in rec {
-          packages.${name} = project.rootCrate.build;
+        in
+        rec {
+          packages = {
+            ${name} = project.rootCrate.build;
+
+            "${name}-vim" = pkgs.vimUtils.buildVimPluginFrom2Nix {
+              inherit (packages.${name}) version;
+              name = "${name}-vim";
+              src = self;
+              configurePhase = "cd vim/";
+              buildInputs = [ packages.${name} ];
+              postInstall = ''
+                mkdir -p $out/bin
+                ln -s ${packages.${name}}/bin/himalaya $out/bin/himalaya
+              '';
+            };
+          };
 
           # `nix build`
           defaultPackage = packages.${name};
