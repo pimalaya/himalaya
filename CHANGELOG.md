@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2021-06-03
+
 ### Added
 
 - Add ability to change account in with the Vim plugin [#91]
@@ -207,7 +209,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.3.2...HEAD
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/soywod/himalaya/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/soywod/himalaya/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/soywod/himalaya/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/soywod/himalaya/compare/v0.2.7...v0.3.0
