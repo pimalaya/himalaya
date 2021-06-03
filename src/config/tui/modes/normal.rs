@@ -35,9 +35,12 @@ impl NormalConfig {
     fn default_keybindings() -> Vec<(&'static str, NormalAction, &'static str)> {
         vec![
             ("quit", NormalAction::Quit, "q"),
-            ("cursor_down", NormalAction::CursorDown, "j"),
-            ("cursor_up", NormalAction::CursorUp, "k"),
+            ("cursor_down", NormalAction::CursorOffset(1), "j"),
+            ("cursor_up", NormalAction::CursorOffset(-1), "k"),
             ("new_mail", NormalAction::WritingMail, "m"),
+            ("toggle_sidebar", NormalAction::ToggleSidebar, "<C-b>"),
+            ("go_top", NormalAction::CursorAbsolut(Some(0)), "gg"),
+            ("go_bottom", NormalAction::CursorAbsolut(None), "<S-g>"),
         ]
     }
 }

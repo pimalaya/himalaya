@@ -1,20 +1,19 @@
 use tui_rs::widgets::TableState;
 
 pub struct TableStateWrapper {
-    pub state: TableState,
+    pub state:    TableState,
     table_length: usize,
 }
 
 impl TableStateWrapper {
-
     pub fn new() -> Self {
         Self {
-            state: TableState::default(),
+            state:        TableState::default(),
             table_length: 0,
         }
     }
 
-    pub fn move_selection(&mut self, offset:i32) {
+    pub fn move_cursor(&mut self, offset: i32) {
         let new_selection = match self.state.selected() {
             Some(old_selection) => {
                 let mut selection = if offset < 0 {
@@ -28,12 +27,25 @@ impl TableStateWrapper {
                 }
 
                 selection
-            }
-            // If something goes wrong: Move the cursor to the middle
+            },
+            // If something goes wrong: Move the cursor to the beginning of the
+            // selections.
             None => 0,
         };
 
         self.state.select(Some(new_selection));
+    }
+
+    pub fn set_cursor(&mut self, index: Option<usize>) {
+        if let Some(index) = index {
+            if index >= self.table_length {
+                self.state.select(Some(self.table_length - 1));
+            } else {
+                self.state.select(Some(index));
+            }
+        } else {
+            self.state.select(Some(self.table_length - 1));
+        }
     }
 
     pub fn unselect(&mut self) {

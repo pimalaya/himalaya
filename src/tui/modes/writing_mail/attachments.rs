@@ -9,7 +9,6 @@ use tui_rs::widgets::{Block, Row, Table, TableState};
 // ============
 pub struct Attachments {
     block_data: BlockData,
-
     pub state: TableStateWrapper,
 }
 
@@ -34,7 +33,7 @@ impl Attachments {
         &mut self.state.state
     }
 
-    pub fn move_selection(&mut self, offset: i32) {
-        self.state.move_selection(offset);
+    pub fn move_cursor(&mut self, offset: i32) {
+        self.state.move_cursor(offset);
     }
 }

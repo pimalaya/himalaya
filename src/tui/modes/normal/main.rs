@@ -22,18 +22,21 @@ use tui_rs::terminal::Frame;
 #[derive(Clone, Debug)]
 pub enum NormalAction {
     Quit,
-    CursorDown,
-    CursorUp,
+    CursorOffset(i32),
+    CursorAbsolut(Option<usize>),
     SetAccount,
     WritingMail,
+    ToggleSidebar,
 }
 
 // ============
 // Structs
 // ============
 pub struct NormalFrame {
-    sidebar: Sidebar,
+    sidebar:  Sidebar,
     maillist: MailList,
+
+    display_sidebar: bool,
 
     keybinding_manager: KeybindingManager<NormalAction>,
 }
@@ -59,6 +62,7 @@ impl NormalFrame {
         Self {
             sidebar,
             maillist,
+            display_sidebar: true,
             keybinding_manager,
         }
     }
@@ -109,15 +113,19 @@ impl BackendInterface for NormalFrame {
         if let Some(action) = self.keybinding_manager.eval_event(event) {
             match action {
                 NormalAction::Quit => Some(BackendActions::Quit),
-                NormalAction::CursorUp => {
-                    self.maillist.move_selection(-1);
+                NormalAction::CursorOffset(offset) => {
+                    self.maillist.move_cursor(offset);
+                    Some(BackendActions::Redraw)
+                }
+                NormalAction::CursorAbsolut(index) => {
+                    self.maillist.set_cursor(index);
                     Some(BackendActions::Redraw)
                 }
                 NormalAction::SetAccount => Some(BackendActions::GetAccount),
-                NormalAction::CursorDown => {
-                    self.maillist.move_selection(1);
+                NormalAction::ToggleSidebar => {
+                    self.display_sidebar = !self.display_sidebar;
                     Some(BackendActions::Redraw)
-                }
+                },
                 NormalAction::WritingMail => Some(BackendActions::WritingMail),
             }
         } else {
@@ -129,37 +137,52 @@ impl BackendInterface for NormalFrame {
     where
         B: Backend,
     {
-        // Create the two frames for the sidebar and the mails:
-        //  - One on the left (sidebar)
-        //  - One on the right (mail listing)
-        let layout = Layout::default()
-            .direction(Direction::Horizontal)
-            .margin(1)
-            .constraints(
-                [
-                    // For the sidebar (will be the second block => Index 0)
-                    Constraint::Percentage(25),
-                    // For the mails (will be the second block => Index 1)
-                    Constraint::Percentage(75),
-                ]
-                .as_ref(),
-            )
-            // Use the given frame size to create the two blocks
-            .split(frame.size());
+        if self.display_sidebar {
+            // Create the two frames for the sidebar and the mails:
+            //  - One on the left (sidebar)
+            //  - One on the right (mail listing)
+            let layout = Layout::default()
+                .direction(Direction::Horizontal)
+                .margin(1)
+                .constraints(
+                    [
+                        // For the sidebar (will be the second block => Index
+                        // 0)
+                        Constraint::Percentage(25),
+                        // For the mails (will be the second block => Index 1)
+                        Constraint::Percentage(75),
+                    ]
+                    .as_ref(),
+                )
+                // Use the given frame size to create the two blocks
+                .split(frame.size());
 
-        // Display the sidebar
-        frame.render_stateful_widget(
-            self.sidebar.widget(),
-            layout[0],
-            self.sidebar.get_state(),
-            // &mut self.sidebar.state,
-        );
+            // Display the sidebar
+            frame.render_stateful_widget(
+                self.sidebar.widget(),
+                layout[0],
+                self.sidebar.get_state(),
+                // &mut self.sidebar.state,
+            );
 
-        // Display the mails
-        frame.render_stateful_widget(
-            self.maillist.widget(),
-            layout[1],
-            self.maillist.get_state(),
-        );
+            // Display the mails
+            frame.render_stateful_widget(
+                self.maillist.widget(),
+                layout[1],
+                self.maillist.get_state(),
+            );
+        } else {
+
+            let layout = Layout::default()
+                .margin(1)
+                .constraints([Constraint::Percentage(100)].as_ref())
+                .split(frame.size());
+
+            frame.render_stateful_widget(
+                self.maillist.widget(),
+                layout[0],
+                self.maillist.get_state(),
+            );
+        }
     }
 }

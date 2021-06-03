@@ -1,5 +1,5 @@
-use super::mail_credits::MailCredits;
 use super::attachments::Attachments;
+use super::mail_credits::MailCredits;
 
 use crate::config::model::Config;
 use crate::config::tui::tui::TuiConfig;
@@ -9,8 +9,8 @@ use crate::tui::modes::{
 };
 
 use tui_rs::backend::Backend;
+use tui_rs::layout::{Constraint, Direction, Layout};
 use tui_rs::terminal::Frame;
-use tui_rs::layout::{Layout, Direction, Constraint};
 
 use crossterm::event::Event;
 
@@ -33,9 +33,9 @@ pub enum WritingMailAction {
 // Structs
 // ============
 pub struct WritingMail {
-    credits: MailCredits,
-    attachments: Attachments,
-    // template: Tpl,
+    credits:            MailCredits,
+    attachments:        Attachments,
+    // template:           Tpl,
     keybinding_manager: KeybindingManager<WritingMailAction>,
 }
 
@@ -53,10 +53,11 @@ impl WritingMail {
 
         let credits = MailCredits::new(
             String::from("tornax07@gmail.com"),
-            &config.tui.writing_mail.mail_credits
+            &config.tui.writing_mail.mail_credits,
         );
 
-        let attachments = Attachments::new(&config.tui.writing_mail.attachments);
+        let attachments =
+            Attachments::new(&config.tui.writing_mail.attachments);
 
         Self {
             // template: Tpl::new(),
@@ -95,7 +96,10 @@ impl BackendInterface for WritingMail {
             .split(frame.size());
 
         frame.render_widget(self.credits.widget(), layout[0]);
-        frame.render_widget(self.attachments.widget(), layout[1]);
-
+        frame.render_stateful_widget(
+            self.attachments.widget(),
+            layout[1],
+            self.attachments.get_state(),
+        );
     }
 }

@@ -34,22 +34,20 @@ pub enum KeyType<Mode> {
 #[derive(Debug, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct TuiConfig {
-    pub normal: NormalConfig,
+    pub normal:       NormalConfig,
     pub writing_mail: WritingMailConfig,
 }
 
 impl Default for TuiConfig {
     fn default() -> Self {
         Self {
-            normal: NormalConfig::default(),
+            normal:       NormalConfig::default(),
             writing_mail: WritingMailConfig::default(),
         }
     }
-
 }
 
 impl TuiConfig {
-
     /// This function will go through all keybindings in  TuiConfig.keybindings
     /// and converts them to a HashMap<Event, KeyType> for the TUI.
     ///
@@ -190,7 +188,7 @@ impl TuiConfig {
     pub fn parse_keybindings<ModeActions: Clone>(
         defaults: &Vec<(&str, ModeActions, &str)>,
         user_keybindings: &HashMap<String, String>,
-        ) -> HashMap<Event, KeyType<ModeActions>> {
+    ) -> HashMap<Event, KeyType<ModeActions>> {
         // This variable will store all keybindings which will get converted
         // into <Event, Action>.
         let mut keybindings: HashMap<Event, KeyType<ModeActions>> =
@@ -202,7 +200,8 @@ impl TuiConfig {
             let keybinding: &str = if user_keybindings.is_empty() {
                 action_name.2
             } else {
-                user_keybindings.get(action_name.0)
+                user_keybindings
+                    .get(action_name.0)
                     .map(|string| string.as_str())
                     .unwrap_or(action_name.2)
             };
@@ -289,7 +288,7 @@ impl TuiConfig {
             node.insert(
                 *iter.last().unwrap(),
                 KeyType::Action(action_name.1.clone()),
-                );
+            );
         }
 
         keybindings
@@ -314,8 +313,8 @@ impl TuiConfig {
     /// // is the same as this
     /// let key_event2 = Event::Key(KeyEvent {
     ///     modifiers: KeyModifiers::NONE,
-    ///     code: KeyCode::Char('c'),
-    ///     });
+    ///     code:      KeyCode::Char('c'),
+    /// });
     ///
     /// assert_eq!(key_event, key_event2);
     /// ```
@@ -390,7 +389,23 @@ impl TuiConfig {
                     // Look if the keybinding looks like this:
                     //  <C-l> or <S-h>
                     else if iter.as_str().chars().nth(3) == Some('>') {
-                        KeyCode::Char(unparsed.chars().nth(2).unwrap())
+                        // So there's one problem with shift, if we use shift,
+                        // crossterm will also receive the capital character. So
+                        // if we'd press Shift+g we'd get "Key: G, Modifier:
+                        // Shift". So we have to make sure that the character in
+                        // <S-<char>> is uppercase if we have the shift
+                        // modifier.
+                        if modifier == KeyModifiers::SHIFT {
+                            KeyCode::Char(
+                                unparsed
+                                    .chars()
+                                    .nth(2)
+                                    .unwrap()
+                                    .to_ascii_uppercase(),
+                            )
+                        } else {
+                            KeyCode::Char(unparsed.chars().nth(2).unwrap())
+                        }
                     }
                     // Otherwise it may be a combination of a modifier + special
                     // key like these:
@@ -411,9 +426,9 @@ impl TuiConfig {
                     //     KeyCode::Char(character),
                     // ));
                     events.push(TuiConfig::convert_to_event(
-                            KeyModifiers::NONE,
-                            KeyCode::Char(character),
-                            ));
+                        KeyModifiers::NONE,
+                        KeyCode::Char(character),
+                    ));
                 }
                 // otherwise we just need to add our special keybinding and
                 // bring the iterator to the position after the closing ">".
@@ -430,9 +445,9 @@ impl TuiConfig {
             // So we just need to add the character code to it
             else {
                 events.push(TuiConfig::convert_to_event(
-                        KeyModifiers::NONE,
-                        KeyCode::Char(character),
-                        ));
+                    KeyModifiers::NONE,
+                    KeyCode::Char(character),
+                ));
             }
 
             iter_c = iter.next();

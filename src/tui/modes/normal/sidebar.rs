@@ -71,8 +71,8 @@ impl Sidebar {
         Ok(())
     }
 
-    pub fn move_selection(&mut self, offset:i32) {
-        self.state.move_selection(offset);
+    pub fn move_cursor(&mut self, offset:i32) {
+        self.state.move_cursor(offset);
     }
 
     pub fn get_state(&mut self) -> &mut TableState {
