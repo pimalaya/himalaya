@@ -1,23 +1,6 @@
 let s:dir = expand("<sfile>:h")
 let s:cli = function("himalaya#shared#cli#call")
 
-" Pagination
-
-let s:curr_page = 0
-function! himalaya#mbox#curr_page()
-  return s:curr_page
-endfunction
-
-function! himalaya#mbox#prev_page()
-  let s:curr_page = max([0, s:curr_page - 1])
-  call himalaya#msg#list()
-endfunction
-
-function! himalaya#mbox#next_page()
-  let s:curr_page = s:curr_page + 1
-  call himalaya#msg#list()
-endfunction
-
 " Pickers
 
 function! s:telescope_picker(cb, mboxes)
@@ -39,16 +22,36 @@ function! s:native_picker(cb, mboxes)
   call function(a:cb)(a:mboxes[choice])
 endfunction
 
+" Pagination
+
+let s:curr_page = 0
+
+function! himalaya#mbox#curr_page()
+  return s:curr_page
+endfunction
+
+function! himalaya#mbox#prev_page()
+  let s:curr_page = max([0, s:curr_page - 1])
+  call himalaya#msg#list()
+endfunction
+
+function! himalaya#mbox#next_page()
+  let s:curr_page = s:curr_page + 1
+  call himalaya#msg#list()
+endfunction
+
 " Mailbox
 
 let s:curr_mbox = "INBOX"
+
 function! himalaya#mbox#curr_mbox()
   return s:curr_mbox
 endfunction
 
 function! himalaya#mbox#pick(cb)
   try
-    let mboxes = map(s:cli("mailboxes", [], "Fetching mailboxes", 0), "v:val.name")
+    let account = himalaya#account#curr()
+    let mboxes = map(s:cli("--account %s mailboxes", [shellescape(account)], "Fetching mailboxes", 0), "v:val.name")
 
     if exists("g:himalaya_mailbox_picker")
       let picker = g:himalaya_mailbox_picker

@@ -210,16 +210,16 @@ impl Config {
 
     pub fn find_account_by_name(&self, name: Option<&str>) -> Result<&Account> {
         match name {
-            Some(name) => self
-                .accounts
-                .get(name)
-                .ok_or_else(|| format!("Cannot find account `{}`", name).into()),
-            None => self
+            Some("") | None => self
                 .accounts
                 .iter()
                 .find(|(_, account)| account.default.unwrap_or(false))
                 .map(|(_, account)| account)
                 .ok_or_else(|| "Cannot find default account".into()),
+            Some(name) => self
+                .accounts
+                .get(name)
+                .ok_or_else(|| format!("Cannot find account `{}`", name).into()),
         }
     }
 

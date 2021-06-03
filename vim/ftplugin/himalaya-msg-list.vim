@@ -1,4 +1,3 @@
-setlocal bufhidden=wipe
 setlocal buftype=nofile
 setlocal cursorline
 setlocal nomodifiable
