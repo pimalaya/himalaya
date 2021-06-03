@@ -24,7 +24,7 @@ const DEFAULT_PAGE_SIZE: usize = 10;
 /// This struct represents the data of an account. For more information, please
 /// take a look into its [wiki
 /// page](https://github.com/soywod/himalaya/wiki/Configuration:config-file#account-specific-settings).
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Account {
     // Override
@@ -118,6 +118,36 @@ impl Account {
 /// [wiki
 /// page](https://github.com/soywod/himalaya/wiki/Configuration:config-file#global-settings)
 /// for more information.
+=======
+impl Default for Account {
+    fn default() -> Self {
+        Self {
+            name: None,
+            downloads_dir: None,
+            signature: None,
+            default_page_size: None,
+            default: None,
+            email: String::new(),
+            watch_cmds: None,
+            imap_host: String::new(),
+            imap_port: 0,
+            imap_starttls: None,
+            imap_insecure: None,
+            imap_login: String::new(),
+            imap_passwd_cmd: String::new(),
+            smtp_host: String::new(),
+            smtp_port: 0,
+            smtp_starttls: None,
+            smtp_insecure: None,
+            smtp_login: String::new(),
+            smtp_passwd_cmd: String::new(),
+        }
+    }
+}
+
+// Config
+
+>>>>>>> 27638be387940f6f3fbf1542b96d2131967af944
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Config {
@@ -283,5 +313,19 @@ impl Config {
         });
 
         Ok(())
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            downloads_dir: None,
+            notify_cmd: None,
+            signature: None,
+            default_page_size: None,
+            watch_cmds: None,
+            accounts: HashMap::new(),
+        }
     }
 }

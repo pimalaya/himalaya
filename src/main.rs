@@ -5,7 +5,7 @@ use log::{debug, error, trace};
 use std::{env, path::PathBuf, process::exit};
 
 use himalaya::{
-    app::App,
+    ctx::Ctx,
     comp::cli::{comp_matches, comp_subcmds},
     config::{cli::config_args, model::Config},
     flag::cli::{flag_matches, flag_subcmds},
@@ -81,6 +81,7 @@ fn run() -> Result<()> {
     let mbox = arg_matches.value_of("mailbox").unwrap();
     debug!("Mailbox: {}", mbox);
 
+<<<<<<< HEAD
     // In this part, we are evaluating the given commandline arguments. For
     // example if the user provided `himalaya tui`, the `tui_matches`
     // function will kick in, because it included the subcommand `tui`.
@@ -97,6 +98,8 @@ fn run() -> Result<()> {
         return Ok(())
     }
 
+    debug!("begin matching");
+    let app = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
     let _matched =
         mbox_matches(&app)? || flag_matches(&app)? || imap_matches(&app)? || msg_matches(&app)?;
 

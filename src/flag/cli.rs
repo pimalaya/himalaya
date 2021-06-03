@@ -2,7 +2,7 @@ use clap;
 use error_chain::error_chain;
 use log::debug;
 
-use crate::{app::App, imap::model::ImapConnector, msg::cli::uid_arg};
+use crate::{ctx::Ctx, imap::model::ImapConnector, msg::cli::uid_arg};
 
 error_chain! {
     links {
@@ -42,8 +42,8 @@ pub fn flag_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
         )]
 }
 
-pub fn flag_matches(app: &App) -> Result<bool> {
-    if let Some(matches) = app.arg_matches.subcommand_matches("set") {
+pub fn flag_matches(ctx: &Ctx) -> Result<bool> {
+    if let Some(matches) = ctx.arg_matches.subcommand_matches("set") {
         debug!("set command matched");
 
         let uid = matches.value_of("uid").unwrap();
@@ -52,14 +52,14 @@ pub fn flag_matches(app: &App) -> Result<bool> {
         let flags = matches.value_of("flags").unwrap();
         debug!("flags: {}", flags);
 
-        let mut imap_conn = ImapConnector::new(&app.account)?;
-        imap_conn.set_flags(app.mbox, uid, flags)?;
+        let mut imap_conn = ImapConnector::new(&ctx.account)?;
+        imap_conn.set_flags(ctx.mbox, uid, flags)?;
 
         imap_conn.logout();
         return Ok(true);
     }
 
-    if let Some(matches) = app.arg_matches.subcommand_matches("add") {
+    if let Some(matches) = ctx.arg_matches.subcommand_matches("add") {
         debug!("add command matched");
 
         let uid = matches.value_of("uid").unwrap();
@@ -68,14 +68,14 @@ pub fn flag_matches(app: &App) -> Result<bool> {
         let flags = matches.value_of("flags").unwrap();
         debug!("flags: {}", flags);
 
-        let mut imap_conn = ImapConnector::new(&app.account)?;
-        imap_conn.add_flags(app.mbox, uid, flags)?;
+        let mut imap_conn = ImapConnector::new(&ctx.account)?;
+        imap_conn.add_flags(ctx.mbox, uid, flags)?;
 
         imap_conn.logout();
         return Ok(true);
     }
 
-    if let Some(matches) = app.arg_matches.subcommand_matches("remove") {
+    if let Some(matches) = ctx.arg_matches.subcommand_matches("remove") {
         debug!("remove command matched");
 
         let uid = matches.value_of("uid").unwrap();
@@ -84,8 +84,8 @@ pub fn flag_matches(app: &App) -> Result<bool> {
         let flags = matches.value_of("flags").unwrap();
         debug!("flags: {}", flags);
 
-        let mut imap_conn = ImapConnector::new(&app.account)?;
-        imap_conn.remove_flags(app.mbox, uid, flags)?;
+        let mut imap_conn = ImapConnector::new(&ctx.account)?;
+        imap_conn.remove_flags(ctx.mbox, uid, flags)?;
 
         imap_conn.logout();
         return Ok(true);

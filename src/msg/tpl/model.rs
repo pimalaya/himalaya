@@ -3,7 +3,7 @@ use mailparse::{self, MailHeaderMap};
 use serde::Serialize;
 use std::{collections::HashMap, fmt};
 
-use crate::{app::App, msg::model::Msg};
+use crate::{ctx::Ctx, msg::model::Msg};
 
 error_chain! {}
 
@@ -17,24 +17,24 @@ pub struct Tpl {
 }
 
 impl Tpl {
-    pub fn new(app: &App) -> Self {
+    pub fn new(ctx: &Ctx) -> Self {
         let mut headers = HashMap::new();
-        headers.insert("From".to_string(), app.config.address(app.account));
+        headers.insert("From".to_string(), ctx.config.address(ctx.account));
         headers.insert("To".to_string(), String::new());
         headers.insert("Subject".to_string(), String::new());
 
         Self {
             headers,
             body: None,
-            signature: app.config.signature(app.account),
+            signature: ctx.config.signature(ctx.account),
         }
     }
 
-    pub fn reply(app: &App, msg: &mailparse::ParsedMail) -> Self {
+    pub fn reply(ctx: &Ctx, msg: &mailparse::ParsedMail) -> Self {
         let parsed_headers = msg.get_headers();
         let mut headers = HashMap::new();
 
-        headers.insert("From".to_string(), app.config.address(app.account));
+        headers.insert("From".to_string(), ctx.config.address(ctx.account));
 
         let to = parsed_headers
             .get_first_value("reply-to")
@@ -68,15 +68,15 @@ impl Tpl {
         Self {
             headers,
             body: Some(body),
-            signature: app.config.signature(&app.account),
+            signature: ctx.config.signature(&ctx.account),
         }
     }
 
-    pub fn reply_all(app: &App, msg: &mailparse::ParsedMail) -> Self {
+    pub fn reply_all(ctx: &Ctx, msg: &mailparse::ParsedMail) -> Self {
         let parsed_headers = msg.get_headers();
         let mut headers = HashMap::new();
 
-        let from: lettre::message::Mailbox = app.config.address(app.account).parse().unwrap();
+        let from: lettre::message::Mailbox = ctx.config.address(ctx.account).parse().unwrap();
         headers.insert("From".to_string(), from.to_string());
 
         let to = parsed_headers
@@ -143,15 +143,15 @@ impl Tpl {
         Self {
             headers,
             body: Some(body),
-            signature: app.config.signature(&app.account),
+            signature: ctx.config.signature(&ctx.account),
         }
     }
 
-    pub fn forward(app: &App, msg: &mailparse::ParsedMail) -> Self {
+    pub fn forward(ctx: &Ctx, msg: &mailparse::ParsedMail) -> Self {
         let parsed_headers = msg.get_headers();
         let mut headers = HashMap::new();
 
-        headers.insert("From".to_string(), app.config.address(app.account));
+        headers.insert("From".to_string(), ctx.config.address(ctx.account));
         headers.insert("To".to_string(), String::new());
         let subject = parsed_headers
             .get_first_value("subject")
@@ -170,7 +170,7 @@ impl Tpl {
         Self {
             headers,
             body: Some(body),
-            signature: app.config.signature(&app.account),
+            signature: ctx.config.signature(&ctx.account),
         }
     }
 
@@ -223,8 +223,8 @@ impl fmt::Display for Tpl {
 #[cfg(test)]
 mod tests {
     use crate::{
-        app::App,
         config::model::{Account, Config},
+        ctx::Ctx,
         msg::tpl::model::Tpl,
         output::model::Output,
     };
@@ -233,41 +233,20 @@ mod tests {
     fn new_tpl() {
         let account = Account {
             name: Some(String::from("Test")),
-            downloads_dir: None,
-            signature: None,
-            default_page_size: None,
-            default: Some(true),
             email: String::from("test@localhost"),
-            watch_cmds: None,
-            imap_host: String::new(),
-            imap_port: 0,
-            imap_starttls: None,
-            imap_insecure: None,
-            imap_login: String::new(),
-            imap_passwd_cmd: String::new(),
-            smtp_host: String::new(),
-            smtp_port: 0,
-            smtp_starttls: None,
-            smtp_insecure: None,
-            smtp_login: String::new(),
-            smtp_passwd_cmd: String::new(),
+            ..Account::default()
         };
         let config = Config {
-            name: String::new(),
-            downloads_dir: None,
-            notify_cmd: None,
-            signature: None,
-            default_page_size: None,
-            watch_cmds: None,
             accounts: vec![(String::from("account"), account.clone())]
                 .into_iter()
                 .collect(),
+            ..Config::default()
         };
-        let output = Output::new("plain");
-        let mbox = String::new();
-        let arg_matches = clap::ArgMatches::new();
-        let app = App::new(&config, &account, &output, &mbox, &arg_matches);
-        let tpl = Tpl::new(&app);
+        let output = Output::default();
+        let mbox = String::default();
+        let arg_matches = clap::ArgMatches::default();
+        let ctx = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
+        let tpl = Tpl::new(&ctx);
 
         assert_eq!(
             "From: Test <test@localhost>\nTo: \nSubject: \n\n",
@@ -279,41 +258,21 @@ mod tests {
     fn new_tpl_with_signature() {
         let account = Account {
             name: Some(String::from("Test")),
-            downloads_dir: None,
-            signature: Some(String::from("-- \nCordialement,")),
-            default_page_size: None,
-            default: Some(true),
             email: String::from("test@localhost"),
-            watch_cmds: None,
-            imap_host: String::new(),
-            imap_port: 0,
-            imap_starttls: None,
-            imap_insecure: None,
-            imap_login: String::new(),
-            imap_passwd_cmd: String::new(),
-            smtp_host: String::new(),
-            smtp_port: 0,
-            smtp_starttls: None,
-            smtp_insecure: None,
-            smtp_login: String::new(),
-            smtp_passwd_cmd: String::new(),
+            signature: Some(String::from("-- \nCordialement,")),
+            ..Account::default()
         };
         let config = Config {
-            name: String::new(),
-            downloads_dir: None,
-            notify_cmd: None,
-            signature: None,
-            default_page_size: None,
-            watch_cmds: None,
             accounts: vec![(String::from("account"), account.clone())]
                 .into_iter()
                 .collect(),
+            ..Config::default()
         };
-        let output = Output::new("plain");
-        let mbox = String::new();
-        let arg_matches = clap::ArgMatches::new();
-        let app = App::new(&config, &account, &output, &mbox, &arg_matches);
-        let tpl = Tpl::new(&app);
+        let output = Output::default();
+        let mbox = String::default();
+        let arg_matches = clap::ArgMatches::default();
+        let ctx = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
+        let tpl = Tpl::new(&ctx);
 
         assert_eq!(
             "From: Test <test@localhost>\nTo: \nSubject: \n\n\n\n-- \nCordialement,",
@@ -325,45 +284,24 @@ mod tests {
     fn reply_tpl() {
         let account = Account {
             name: Some(String::from("Test")),
-            downloads_dir: None,
-            signature: None,
-            default_page_size: None,
-            default: Some(true),
             email: String::from("test@localhost"),
-            watch_cmds: None,
-            imap_host: String::new(),
-            imap_port: 0,
-            imap_starttls: None,
-            imap_insecure: None,
-            imap_login: String::new(),
-            imap_passwd_cmd: String::new(),
-            smtp_host: String::new(),
-            smtp_port: 0,
-            smtp_starttls: None,
-            smtp_insecure: None,
-            smtp_login: String::new(),
-            smtp_passwd_cmd: String::new(),
+            ..Account::default()
         };
         let config = Config {
-            name: String::new(),
-            downloads_dir: None,
-            notify_cmd: None,
-            signature: None,
-            default_page_size: None,
-            watch_cmds: None,
             accounts: vec![(String::from("account"), account.clone())]
                 .into_iter()
                 .collect(),
+            ..Config::default()
         };
-        let output = Output::new("plain");
-        let mbox = String::new();
-        let arg_matches = clap::ArgMatches::new();
-        let app = App::new(&config, &account, &output, &mbox, &arg_matches);
+        let output = Output::default();
+        let mbox = String::default();
+        let arg_matches = clap::ArgMatches::default();
+        let ctx = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
         let parsed_mail = mailparse::parse_mail(
             b"Content-Type: text/plain\r\nFrom: Sender <sender@localhost>\r\nSubject: Test\r\n\r\nHello, world!",
         )
         .unwrap();
-        let tpl = Tpl::reply(&app, &parsed_mail);
+        let tpl = Tpl::reply(&ctx, &parsed_mail);
 
         assert_eq!(
             "From: Test <test@localhost>\nTo: Sender <sender@localhost>\nSubject: Re: Test\n\n>Hello, world!",
@@ -375,45 +313,25 @@ mod tests {
     fn reply_tpl_with_signature() {
         let account = Account {
             name: Some(String::from("Test")),
-            downloads_dir: None,
-            signature: Some(String::from("-- \nCordialement,")),
-            default_page_size: None,
-            default: Some(true),
             email: String::from("test@localhost"),
-            watch_cmds: None,
-            imap_host: String::new(),
-            imap_port: 0,
-            imap_starttls: None,
-            imap_insecure: None,
-            imap_login: String::new(),
-            imap_passwd_cmd: String::new(),
-            smtp_host: String::new(),
-            smtp_port: 0,
-            smtp_starttls: None,
-            smtp_insecure: None,
-            smtp_login: String::new(),
-            smtp_passwd_cmd: String::new(),
+            signature: Some(String::from("-- \nCordialement,")),
+            ..Account::default()
         };
         let config = Config {
-            name: String::new(),
-            downloads_dir: None,
-            notify_cmd: None,
-            signature: None,
-            default_page_size: None,
-            watch_cmds: None,
             accounts: vec![(String::from("account"), account.clone())]
                 .into_iter()
                 .collect(),
+            ..Config::default()
         };
-        let output = Output::new("plain");
-        let mbox = String::new();
-        let arg_matches = clap::ArgMatches::new();
-        let app = App::new(&config, &account, &output, &mbox, &arg_matches);
+        let output = Output::default();
+        let mbox = String::default();
+        let arg_matches = clap::ArgMatches::default();
+        let ctx = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
         let parsed_mail = mailparse::parse_mail(
             b"Content-Type: text/plain\r\nFrom: Sender <sender@localhost>\r\nSubject: Test\r\n\r\nHello, world!",
         )
         .unwrap();
-        let tpl = Tpl::reply(&app, &parsed_mail);
+        let tpl = Tpl::reply(&ctx, &parsed_mail);
 
         assert_eq!(
             "From: Test <test@localhost>\nTo: Sender <sender@localhost>\nSubject: Re: Test\n\n>Hello, world!\n\n-- \nCordialement,",
@@ -425,40 +343,19 @@ mod tests {
     fn reply_all_tpl() {
         let account = Account {
             name: Some(String::from("To")),
-            downloads_dir: None,
-            signature: None,
-            default_page_size: None,
-            default: Some(true),
             email: String::from("to@localhost"),
-            watch_cmds: None,
-            imap_host: String::new(),
-            imap_port: 0,
-            imap_starttls: None,
-            imap_insecure: None,
-            imap_login: String::new(),
-            imap_passwd_cmd: String::new(),
-            smtp_host: String::new(),
-            smtp_port: 0,
-            smtp_starttls: None,
-            smtp_insecure: None,
-            smtp_login: String::new(),
-            smtp_passwd_cmd: String::new(),
+            ..Account::default()
         };
         let config = Config {
-            name: String::new(),
-            downloads_dir: None,
-            notify_cmd: None,
-            signature: None,
-            default_page_size: None,
-            watch_cmds: None,
             accounts: vec![(String::from("account"), account.clone())]
                 .into_iter()
                 .collect(),
+            ..Config::default()
         };
-        let output = Output::new("plain");
-        let mbox = String::new();
-        let arg_matches = clap::ArgMatches::new();
-        let app = App::new(&config, &account, &output, &mbox, &arg_matches);
+        let output = Output::default();
+        let mbox = String::default();
+        let arg_matches = clap::ArgMatches::default();
+        let ctx = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
         let parsed_mail = mailparse::parse_mail(
             b"Message-Id: 1\r
 Content-Type: text/plain\r
@@ -470,7 +367,7 @@ Subject: Test\r
 Hello, world!",
         )
         .unwrap();
-        let tpl = Tpl::reply_all(&app, &parsed_mail);
+        let tpl = Tpl::reply_all(&ctx, &parsed_mail);
 
         assert_eq!(
             "From: To <to@localhost>
@@ -488,45 +385,25 @@ Subject: Re: Test
     fn reply_all_tpl_with_signature() {
         let account = Account {
             name: Some(String::from("Test")),
-            downloads_dir: None,
-            signature: Some(String::from("-- \nCordialement,")),
-            default_page_size: None,
-            default: Some(true),
             email: String::from("test@localhost"),
-            watch_cmds: None,
-            imap_host: String::new(),
-            imap_port: 0,
-            imap_starttls: None,
-            imap_insecure: None,
-            imap_login: String::new(),
-            imap_passwd_cmd: String::new(),
-            smtp_host: String::new(),
-            smtp_port: 0,
-            smtp_starttls: None,
-            smtp_insecure: None,
-            smtp_login: String::new(),
-            smtp_passwd_cmd: String::new(),
+            signature: Some(String::from("-- \nCordialement,")),
+            ..Account::default()
         };
         let config = Config {
-            name: String::new(),
-            downloads_dir: None,
-            notify_cmd: None,
-            signature: None,
-            default_page_size: None,
-            watch_cmds: None,
             accounts: vec![(String::from("account"), account.clone())]
                 .into_iter()
                 .collect(),
+            ..Config::default()
         };
-        let output = Output::new("plain");
-        let mbox = String::new();
-        let arg_matches = clap::ArgMatches::new();
-        let app = App::new(&config, &account, &output, &mbox, &arg_matches);
+        let output = Output::default();
+        let mbox = String::default();
+        let arg_matches = clap::ArgMatches::default();
+        let ctx = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
         let parsed_mail = mailparse::parse_mail(
             b"Content-Type: text/plain\r\nFrom: Sender <sender@localhost>\r\nSubject: Test\r\n\r\nHello, world!",
         )
         .unwrap();
-        let tpl = Tpl::reply(&app, &parsed_mail);
+        let tpl = Tpl::reply(&ctx, &parsed_mail);
 
         assert_eq!(
             "From: Test <test@localhost>\nTo: Sender <sender@localhost>\nSubject: Re: Test\n\n>Hello, world!\n\n-- \nCordialement,",
@@ -538,45 +415,24 @@ Subject: Re: Test
     fn forward_tpl() {
         let account = Account {
             name: Some(String::from("Test")),
-            downloads_dir: None,
-            signature: None,
-            default_page_size: None,
-            default: Some(true),
             email: String::from("test@localhost"),
-            watch_cmds: None,
-            imap_host: String::new(),
-            imap_port: 0,
-            imap_starttls: None,
-            imap_insecure: None,
-            imap_login: String::new(),
-            imap_passwd_cmd: String::new(),
-            smtp_host: String::new(),
-            smtp_port: 0,
-            smtp_starttls: None,
-            smtp_insecure: None,
-            smtp_login: String::new(),
-            smtp_passwd_cmd: String::new(),
+            ..Account::default()
         };
         let config = Config {
-            name: String::new(),
-            downloads_dir: None,
-            notify_cmd: None,
-            signature: None,
-            default_page_size: None,
-            watch_cmds: None,
             accounts: vec![(String::from("account"), account.clone())]
                 .into_iter()
                 .collect(),
+            ..Config::default()
         };
-        let output = Output::new("plain");
-        let mbox = String::new();
-        let arg_matches = clap::ArgMatches::new();
-        let app = App::new(&config, &account, &output, &mbox, &arg_matches);
+        let output = Output::default();
+        let mbox = String::default();
+        let arg_matches = clap::ArgMatches::default();
+        let ctx = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
         let parsed_mail = mailparse::parse_mail(
             b"Content-Type: text/plain\r\nFrom: Sender <sender@localhost>\r\nSubject: Test\r\n\r\nHello, world!",
         )
         .unwrap();
-        let tpl = Tpl::forward(&app, &parsed_mail);
+        let tpl = Tpl::forward(&ctx, &parsed_mail);
 
         assert_eq!(
             "From: Test <test@localhost>\nTo: \nSubject: Fwd: Test\n\n-------- Forwarded Message --------\nHello, world!",
@@ -588,45 +444,25 @@ Subject: Re: Test
     fn forward_tpl_with_signature() {
         let account = Account {
             name: Some(String::from("Test")),
-            downloads_dir: None,
-            signature: Some(String::from("-- \nCordialement,")),
-            default_page_size: None,
-            default: Some(true),
             email: String::from("test@localhost"),
-            watch_cmds: None,
-            imap_host: String::new(),
-            imap_port: 0,
-            imap_starttls: None,
-            imap_insecure: None,
-            imap_login: String::new(),
-            imap_passwd_cmd: String::new(),
-            smtp_host: String::new(),
-            smtp_port: 0,
-            smtp_starttls: None,
-            smtp_insecure: None,
-            smtp_login: String::new(),
-            smtp_passwd_cmd: String::new(),
+            signature: Some(String::from("-- \nCordialement,")),
+            ..Account::default()
         };
         let config = Config {
-            name: String::new(),
-            downloads_dir: None,
-            notify_cmd: None,
-            signature: None,
-            default_page_size: None,
-            watch_cmds: None,
             accounts: vec![(String::from("account"), account.clone())]
                 .into_iter()
                 .collect(),
+            ..Config::default()
         };
-        let output = Output::new("plain");
-        let mbox = String::new();
-        let arg_matches = clap::ArgMatches::new();
-        let app = App::new(&config, &account, &output, &mbox, &arg_matches);
+        let output = Output::default();
+        let mbox = String::default();
+        let arg_matches = clap::ArgMatches::default();
+        let ctx = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
         let parsed_mail = mailparse::parse_mail(
             b"Content-Type: text/plain\r\nFrom: Sender <sender@localhost>\r\nSubject: Test\r\n\r\nHello, world!",
         )
         .unwrap();
-        let tpl = Tpl::forward(&app, &parsed_mail);
+        let tpl = Tpl::forward(&ctx, &parsed_mail);
 
         assert_eq!(
             "From: Test <test@localhost>\nTo: \nSubject: Fwd: Test\n\n-------- Forwarded Message --------\nHello, world!\n\n-- \nCordialement,",
