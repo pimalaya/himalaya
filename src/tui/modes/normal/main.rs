@@ -4,7 +4,7 @@ use super::sidebar::Sidebar;
 use crossterm::event::Event;
 
 use crate::config::model::{Account, Config};
-use crate::config::tui::TuiConfig;
+use crate::config::tui::tui::TuiConfig;
 use crate::imap::model::ImapConnector;
 
 use crate::tui::model::{BackendActions, TuiError};
@@ -19,7 +19,7 @@ use tui_rs::terminal::Frame;
 // ==========
 // Enums
 // ==========
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum NormalAction {
     Quit,
     CursorDown,
@@ -41,24 +41,17 @@ pub struct NormalFrame {
 impl NormalFrame {
     pub fn new(config: &Config) -> Self {
         let sidebar =
-            Sidebar::new(String::from("Sidebar"), &config.tui.sidebar);
+            Sidebar::new(String::from("Sidebar"), &config.tui.normal.sidebar);
 
         let maillist =
-            MailList::new(String::from("Mails"), &config.tui.mail_list);
+            MailList::new(String::from("Mails"), &config.tui.normal.mail_list);
 
         // ----------------
         // Keybindings
         // ----------------
-        let default_keybindings = vec![
-            ("quit", NormalAction::Quit, "q"),
-            ("cursor_down", NormalAction::CursorDown, "j"),
-            ("cursor_up", NormalAction::CursorUp, "k"),
-            ("new_mail", NormalAction::WritingMail, "m"),
-        ];
-
         let keybindings = TuiConfig::parse_keybindings(
-            &default_keybindings,
-            config.tui.keybindings.get("normal"),
+            &config.tui.normal.default_keybindings,
+            &config.tui.normal.keybindings,
         );
 
         let keybinding_manager = KeybindingManager::new(keybindings);

@@ -72,7 +72,6 @@ pub enum TuiMode {
 // ===================
 // Structs/Traits
 // =================== */
-/// TODO: Docu
 pub struct Tui<'tui> {
     config: &'tui Config,
 

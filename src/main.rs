@@ -81,12 +81,11 @@ fn run() -> Result<()> {
     let mbox = arg_matches.value_of("mailbox").unwrap();
     debug!("Mailbox: {}", mbox);
 
-<<<<<<< HEAD
     // In this part, we are evaluating the given commandline arguments. For
     // example if the user provided `himalaya tui`, the `tui_matches`
     // function will kick in, because it included the subcommand `tui`.
     debug!("Begin matching");
-    let app = App::new(&config, &account, &output, &mbox, &arg_matches);
+    let app = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
 
     // SUGGESTION: Improve this part, suggestion: 
     //  1. Collect all subcommands
@@ -94,7 +93,7 @@ fn run() -> Result<()> {
     //  3. Go through `match`
     //  4. If somethings match => Do their stuff.
     // does the user want to start the tui?
-    if let Ok(_) = tui_matches(&arg_matches, &config) {
+    if tui_matches(&arg_matches, &config).is_ok() {
         return Ok(())
     }
 

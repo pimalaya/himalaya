@@ -1,7 +1,7 @@
 use crate::tui::modes::block_data::BlockData;
 use crate::imap::model::ImapConnector;
 use crate::msg::model::Msgs;
-use crate::config::tui::BlockDataConfig;
+use crate::config::tui::block_data::BlockDataConfig;
 use crate::tui::modes::table_state_wrapper::TableStateWrapper;
 
 use tui_rs::layout::Constraint;

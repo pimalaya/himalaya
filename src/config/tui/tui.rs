@@ -4,6 +4,9 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 use std::collections::HashMap;
 
+use super::modes::normal::NormalConfig;
+use super::modes::writing_mail::WritingMailConfig;
+
 // ==========
 // Enums
 // ==========
@@ -16,45 +19,10 @@ pub enum KeyType<Mode> {
 // ============
 // Structs
 // ============
-/// This struct stores the possible values which the user can set.
-/// It's mainly a representation for the looking of each frame, like the sidebar
-/// and the mail_list frame. So if you want to change the look of these frames,
-/// than you're actually setting the values into this struct.
-///
-/// # Example
-/// This is an example for the sidebar:
-///
-/// ```toml
-/// [tui]
-/// [tui.sidebar]
-/// border_type = "Rounded"
-/// borders = "ALL"
-/// border_color = "Yellow"
-/// ```
-///
-/// So after reading the config file, these values are stored here in this
-/// struct into their appropriate attribute name.
-#[derive(Debug, Deserialize)]
-pub struct BlockDataConfig {
-    /// So this variable stores the border type which the user wants to see. All
-    /// possible options can be seen here:
-    /// [here](https://docs.rs/tui/0.15.0/tui/widgets/enum.BorderType.html).
-    pub border_type: Option<String>,
-
-    /// Which borders of the square frame should be displayed? Default: `ALL`.
-    /// For more information, take a look into their
-    /// [docs](https://docs.rs/tui/0.15.0/tui/widgets/struct.Borders.html).
-    pub borders: Option<String>,
-
-    /// This stores the color of the border which can be one of [these
-    /// variants](https://docs.rs/tui/0.15.0/tui/style/enum.Color.html#variants).
-    pub border_color: Option<String>,
-}
 
 /// All config sections below the `[tui]` part in your
 /// [config.toml](https://github.com/soywod/himalaya/wiki/Configuration:config-file)
-/// file will
-/// be stored in this struct.
+/// file will be stored in this struct.
 ///
 /// # Example
 /// ```toml
@@ -64,45 +32,24 @@ pub struct BlockDataConfig {
 /// # Everything which goes here, will be stored in the struct
 /// ```
 #[derive(Debug, Deserialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct TuiConfig {
-    // TODO: Restruct everything here, for example a new section for each mode
-    pub mail_credits: BlockDataConfig,
-    pub attachments: BlockDataConfig,
-    pub sidebar: BlockDataConfig,
-    /// As explained in the [`BlockDataConfig` doc](struct.BlockDataConfig.html)
-    /// each frame can be customized by this struct. For more information, take
-    /// a short look into the doc of
-    /// [`BlockDataConfig`](struct.BlockDataConfig.html).
-    pub mail_list: BlockDataConfig,
-
-    /// TODO: Doc
-    /// This attribute stores the loaded keybindings where:
-    ///     Key = Action
-    ///     Value = Keybinding
-    ///
-    /// # Example
-    /// If this is in your
-    /// [config.toml](https://github.com/soywod/himalaya/wiki/Configuration:config-file)
-    /// file:
-    ///
-    /// ```toml
-    /// [tui]
-    /// [tui.keybindings]
-    /// quit = "ddq"
-    /// ```
-    ///
-    /// Then this section will be stored in this variable as follows:
-    ///
-    /// ```no_run
-    /// TuiConfig.keybindings = {
-    ///     "quit" = "ddq",
-    /// }
-    pub keybindings: HashMap<String, HashMap<String, String>>,
+    pub normal: NormalConfig,
+    pub writing_mail: WritingMailConfig,
 }
 
-/// The implementation of the struct are rather used for parsing the
-/// keybindings.
+impl Default for TuiConfig {
+    fn default() -> Self {
+        Self {
+            normal: NormalConfig::default(),
+            writing_mail: WritingMailConfig::default(),
+        }
+    }
+
+}
+
 impl TuiConfig {
+
     /// This function will go through all keybindings in  TuiConfig.keybindings
     /// and converts them to a HashMap<Event, KeyType> for the TUI.
     ///
@@ -242,8 +189,8 @@ impl TuiConfig {
     /// TODO: Doc of variables
     pub fn parse_keybindings<ModeActions: Clone>(
         defaults: &Vec<(&str, ModeActions, &str)>,
-        user_keybindings: Option<&HashMap<String, String>>,
-    ) -> HashMap<Event, KeyType<ModeActions>> {
+        user_keybindings: &HashMap<String, String>,
+        ) -> HashMap<Event, KeyType<ModeActions>> {
         // This variable will store all keybindings which will get converted
         // into <Event, Action>.
         let mut keybindings: HashMap<Event, KeyType<ModeActions>> =
@@ -252,19 +199,13 @@ impl TuiConfig {
         // Now iterate through all available actions and look, which one got
         // overridden.
         for action_name in defaults {
-            let keybinding: &str = user_keybindings
-                // Look, if the user even provided a section with his own
-                // keybindings.
-                .and_then(|hash_map| { 
-                    hash_map
-                        .get(action_name.0)
-                        .map(|string| string.as_str())
-                })
-                // and look, if he/she added something like
-                //  quit = "q"
-                // in his/her config-section. If not, use the default keybinding
-                // in action_name.2
-                .unwrap_or(action_name.2);
+            let keybinding: &str = if user_keybindings.is_empty() {
+                action_name.2
+            } else {
+                user_keybindings.get(action_name.0)
+                    .map(|string| string.as_str())
+                    .unwrap_or(action_name.2)
+            };
 
             // This should rather fungate as a pointer which traverses through
             // the keybinding-tree in order to add other nodes or check where to
@@ -348,7 +289,7 @@ impl TuiConfig {
             node.insert(
                 *iter.last().unwrap(),
                 KeyType::Action(action_name.1.clone()),
-            );
+                );
         }
 
         keybindings
@@ -470,9 +411,9 @@ impl TuiConfig {
                     //     KeyCode::Char(character),
                     // ));
                     events.push(TuiConfig::convert_to_event(
-                        KeyModifiers::NONE,
-                        KeyCode::Char(character),
-                    ));
+                            KeyModifiers::NONE,
+                            KeyCode::Char(character),
+                            ));
                 }
                 // otherwise we just need to add our special keybinding and
                 // bring the iterator to the position after the closing ">".
@@ -489,9 +430,9 @@ impl TuiConfig {
             // So we just need to add the character code to it
             else {
                 events.push(TuiConfig::convert_to_event(
-                    KeyModifiers::NONE,
-                    KeyCode::Char(character),
-                ));
+                        KeyModifiers::NONE,
+                        KeyCode::Char(character),
+                        ));
             }
 
             iter_c = iter.next();

@@ -1,6 +1,6 @@
 use crate::imap::model::ImapConnector;
 use crate::mbox::model::Mboxes;
-use crate::config::tui::BlockDataConfig;
+use crate::config::tui::block_data::BlockDataConfig;
 use crate::tui::modes::block_data::BlockData;
 use crate::tui::modes::table_state_wrapper::TableStateWrapper;
 

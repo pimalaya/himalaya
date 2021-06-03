@@ -14,7 +14,7 @@ use toml;
 
 use crate::output::utils::run_cmd;
 
-use super::tui::TuiConfig;
+use super::tui::tui::TuiConfig;
 
 error_chain! {}
 
@@ -118,7 +118,6 @@ impl Account {
 /// [wiki
 /// page](https://github.com/soywod/himalaya/wiki/Configuration:config-file#global-settings)
 /// for more information.
-=======
 impl Default for Account {
     fn default() -> Self {
         Self {
@@ -147,7 +146,6 @@ impl Default for Account {
 
 // Config
 
->>>>>>> 27638be387940f6f3fbf1542b96d2131967af944
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Config {
@@ -157,6 +155,8 @@ pub struct Config {
     pub signature: Option<String>,
     pub default_page_size: Option<usize>,
     pub watch_cmds: Option<Vec<String>>,
+
+    #[serde(default)]
     pub tui: TuiConfig,
 
     #[serde(flatten)]
@@ -326,6 +326,7 @@ impl Default for Config {
             default_page_size: None,
             watch_cmds: None,
             accounts: HashMap::new(),
+            tui: TuiConfig::default(),
         }
     }
 }

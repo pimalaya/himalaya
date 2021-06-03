@@ -1,7 +1,7 @@
 use tui_rs::widgets::{Row, Table, Block};
 use tui_rs::layout::Constraint;
 
-use crate::config::tui::BlockDataConfig;
+use crate::config::tui::block_data::BlockDataConfig;
 use crate::tui::modes::block_data::BlockData;
 
 // ============

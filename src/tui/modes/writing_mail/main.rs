@@ -2,7 +2,7 @@ use super::mail_credits::MailCredits;
 use super::attachments::Attachments;
 
 use crate::config::model::Config;
-use crate::config::tui::TuiConfig;
+use crate::config::tui::tui::TuiConfig;
 use crate::tui::model::BackendActions;
 use crate::tui::modes::{
     backend_interface::BackendInterface, keybinding_manager::KeybindingManager,
@@ -19,7 +19,7 @@ use crossterm::event::Event;
 // ==========
 // Enums
 // ==========
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum WritingMailAction {
     SetBcc,
     SetCc,
@@ -44,32 +44,25 @@ impl WritingMail {
         // ----------------
         // Keybindings
         // ----------------
-        let default_keybindings = vec![
-            ("set_bcc", WritingMailAction::SetBcc, "b"),
-            ("set_cc", WritingMailAction::SetBcc, "c"),
-            ("set_in_reply_to", WritingMailAction::SetBcc, "r"),
-            ("set_subject", WritingMailAction::SetBcc, "s"),
-            ("set_to", WritingMailAction::SetBcc, "t"),
-            ("quit", WritingMailAction::Quit, "q"),
-        ];
-
         let keybindings = TuiConfig::parse_keybindings(
-            &default_keybindings,
-            config.tui.keybindings.get("writing_mail"),
+            &config.tui.writing_mail.default_keybindings,
+            &config.tui.writing_mail.keybindings,
         );
+
+        let keybinding_manager = KeybindingManager::new(keybindings);
 
         let credits = MailCredits::new(
             String::from("tornax07@gmail.com"),
-            &config.tui.mail_credits
+            &config.tui.writing_mail.mail_credits
         );
 
-        let attachments = Attachments::new(&config.tui.attachments);
+        let attachments = Attachments::new(&config.tui.writing_mail.attachments);
 
         Self {
             // template: Tpl::new(),
             credits,
             attachments,
-            keybinding_manager: KeybindingManager::new(keybindings),
+            keybinding_manager,
         }
     }
 }
