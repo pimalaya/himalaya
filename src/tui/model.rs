@@ -78,7 +78,7 @@ pub struct Tui<'tui> {
     // modes
     normal: NormalFrame,
     writer: Writer,
-    viewer: Viewer,
+    viewer: Viewer<'tui>,
 
     // State variables
     need_redraw: bool,

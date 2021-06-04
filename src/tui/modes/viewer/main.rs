@@ -31,17 +31,17 @@ pub enum ViewerAction {
 // ===========
 // Struct
 // ===========
-pub struct Viewer {
+pub struct Viewer<'viewer> {
     attachments: Attachments,
     header:      Header,
-    content:     MailContent,
+    content:     MailContent<'viewer>,
 
     show_attachments: bool,
 
     keybinding_manager: KeybindingManager<ViewerAction>,
 }
 
-impl Viewer {
+impl<'viewer> Viewer<'viewer> {
     pub fn new(config: &Config) -> Self {
         let keybindings = TuiConfig::parse_keybindings(
             &config.tui.viewer.default_keybindings,
@@ -100,7 +100,7 @@ impl Viewer {
     }
 }
 
-impl BackendInterface for Viewer {
+impl<'viewer> BackendInterface for Viewer<'viewer> {
     fn handle_event(&mut self, event: Event) -> Option<BackendActions> {
         if let Some(action) = self.keybinding_manager.eval_event(event) {
             match action {
