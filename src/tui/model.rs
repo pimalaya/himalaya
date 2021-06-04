@@ -153,7 +153,7 @@ impl<'tui> Tui<'tui> {
                                 Err(_) => return Err(TuiError::ConnectAccount),
                             };
 
-                            self.viewer.load_mail(&account, &mailbox, &uid);
+                            self.viewer.load_mail(&account, &mailbox, &uid)?;
                             self.need_redraw = true;
                         },
                     };

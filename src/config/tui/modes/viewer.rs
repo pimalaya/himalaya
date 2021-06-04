@@ -38,6 +38,8 @@ impl ViewerConfig {
         vec![
             ("quit", ViewerAction::Quit, "q"),
             ("quit", ViewerAction::Quit, "h"),
+            ("scroll_up", ViewerAction::SubOffset(1, 0), "k"),
+            ("scroll_down", ViewerAction::AddOffset(1, 0), "j"),
             ("toggle_attachment", ViewerAction::ToggleAttachment, "a"),
         ]
     }

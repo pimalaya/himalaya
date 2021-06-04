@@ -25,6 +25,8 @@ use super::mail_content::MailContent;
 #[derive(Clone, Debug)]
 pub enum ViewerAction {
     Quit,
+    AddOffset(u16, u16),
+    SubOffset(u16, u16),
     ToggleAttachment,
 }
 
@@ -49,7 +51,7 @@ impl Viewer {
         );
 
         let keybinding_manager = KeybindingManager::new(keybindings);
-        
+
         let attachments = Attachments::new(&config.tui.viewer.attachments);
         let content = MailContent::new(&config.tui.viewer.mailcontent);
         let header = Header::new(&config.tui.viewer.header);
@@ -58,7 +60,7 @@ impl Viewer {
             attachments,
             header,
             keybinding_manager,
-            show_attachments: true,
+            show_attachments: false,
             content,
         }
     }
@@ -109,6 +111,14 @@ impl BackendInterface for Viewer {
                     self.show_attachments = !self.show_attachments;
                     Some(BackendActions::Redraw)
                 },
+                ViewerAction::AddOffset(x, y) => {
+                    self.content.add_offset(x, y);
+                    Some(BackendActions::Redraw)
+                },
+                ViewerAction::SubOffset(x, y) => {
+                    self.content.sub_offset(x, y);
+                    Some(BackendActions::Redraw)
+                }
             }
         } else {
             None
@@ -139,10 +149,6 @@ impl BackendInterface for Viewer {
                 )
                 .split(layer1[0]);
 
-            // -----------------
-            // Mail content
-            // -----------------
-
             // --------------
             // Rendering
             // --------------
@@ -150,11 +156,13 @@ impl BackendInterface for Viewer {
 
             frame.render_widget(self.header.widget(), layer2[0]);
 
-            frame.render_stateful_widget(
-                self.content.widget(),
-                layer2[1],
-                self.content.get_state(),
-            );
+            // frame.render_stateful_widget(
+            //     self.content.widget(),
+            //     layer2[1],
+            //     self.content.get_state(),
+            // );
+
+            frame.render_widget(self.content.widget(), layer2[1]);
         } else {
             let layer = Layout::default()
                 .direction(Direction::Vertical)
@@ -166,11 +174,12 @@ impl BackendInterface for Viewer {
 
             frame.render_widget(self.header.widget(), layer[0]);
 
-            frame.render_stateful_widget(
-                self.content.widget(),
-                layer[1],
-                self.content.get_state(),
-            );
+            // frame.render_stateful_widget(
+            //     self.content.widget(),
+            //     layer[1],
+            //     self.content.get_state(),
+            // );
+            frame.render_widget(self.content.widget(), layer[1]);
         }
     }
 }
