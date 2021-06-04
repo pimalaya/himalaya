@@ -1,18 +1,19 @@
 // use tui_rs::widgets::{Block, List, ListItem, ListState};
 use tui_rs::layout::Alignment;
-use tui_rs::style::Style;
+use tui_rs::style::{Color, Style};
 use tui_rs::text::{Span, Spans};
-use tui_rs::widgets::{Block, ListState, Paragraph, Wrap};
+use tui_rs::widgets::{Block, Paragraph, Wrap};
 
 use crate::config::tui::block_data::BlockDataConfig;
 use crate::tui::modes::block_data::BlockData;
-use crate::tui::modes::list_state_wrapper::ListStateWrapper;
+
+use regex::Regex;
 
 // ===========
 // Struct
 // ===========
 pub struct MailContent {
-    content:        Vec<String>,
+    content:        Vec<Spans<'static>>,
     pub block_data: BlockData,
     pub x_offset:   u16,
     pub y_offset:   u16,
@@ -32,7 +33,24 @@ impl MailContent {
         self.content.clear();
 
         for line in new_content.lines() {
-            self.content.push(line.to_string());
+            let mut span_line: Vec<Span> = Vec::new();
+
+            for word in line.split_whitespace() {
+                let mut word = word.to_string();
+
+                if Regex::new(r"<\b.*\b>").unwrap().is_match(&word) {
+                    word.push(' ');
+                    span_line.push(Span::styled(
+                        word,
+                        Style::default().fg(Color::Blue),
+                    ));
+                } else {
+                    word.push(' ');
+                    span_line.push(Span::raw(word))
+                }
+            }
+
+            self.content.push(Spans::from(span_line));
         }
     }
 
@@ -49,14 +67,7 @@ impl MailContent {
     pub fn widget(&self) -> Paragraph<'static> {
         let block = Block::from(self.block_data.clone());
 
-        let text: Vec<Spans> = self
-            .content
-            .clone()
-            .iter()
-            .map(|line| Spans::from(Span::raw(line.clone())))
-            .collect();
-
-        Paragraph::new(text)
+        Paragraph::new(self.content.clone())
             .block(block)
             .alignment(Alignment::Left)
             .style(Style::default())

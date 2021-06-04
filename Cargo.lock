@@ -350,6 +350,7 @@ dependencies = [
  "log",
  "mailparse",
  "native-tls",
+ "regex",
  "rfc2047-decoder",
  "serde",
  "serde_json",

@@ -26,3 +26,4 @@ unicode-width = "0.1.7"
 uuid = {version = "0.8", features = ["v4"]}
 crossterm = { version = "0.19", features = ["serde"] }
 tui_rs= { package = "tui", version = "0.15", default-features = false, features = ['crossterm'] }
+regex = "1.5.4"

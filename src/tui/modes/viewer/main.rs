@@ -11,7 +11,6 @@ use tui_rs::backend::Backend;
 use tui_rs::layout::{Constraint, Direction, Layout};
 use tui_rs::terminal::Frame;
 use tui_rs::widgets::{Block, Borders};
-use tui_rs::widgets::{List, ListItem};
 
 use crossterm::event::Event;
 
