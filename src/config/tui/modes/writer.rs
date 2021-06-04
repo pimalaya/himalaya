@@ -13,6 +13,7 @@ use std::collections::HashMap;
 pub struct WriterConfig {
     pub header:      BlockDataConfig,
     pub attachments: BlockDataConfig,
+    pub mailcontent: BlockDataConfig,
     pub keybindings: HashMap<String, String>,
 
     #[serde(skip, default = "WriterConfig::default_keybindings")]
@@ -22,10 +23,11 @@ pub struct WriterConfig {
 impl Default for WriterConfig {
     fn default() -> Self {
         Self {
-            header: BlockDataConfig::default(),
-            attachments: BlockDataConfig::default(),
-            keybindings: HashMap::new(),
+            attachments:         BlockDataConfig::default(),
             default_keybindings: WriterConfig::default_keybindings(),
+            header:              BlockDataConfig::default(),
+            keybindings:         HashMap::new(),
+            mailcontent:         BlockDataConfig::default(),
         }
     }
 }

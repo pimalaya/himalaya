@@ -1,19 +1,23 @@
+use crate::config::model::{Account, Config};
+use crate::config::tui::tui::TuiConfig;
+use crate::imap::model::ImapConnector;
+use crate::msg::model::ReadableMsg;
+use crate::tui::model::{BackendActions, TuiError};
 use crate::tui::modes::{
     backend_interface::BackendInterface, keybinding_manager::KeybindingManager,
 };
-use crate::config::tui::tui::TuiConfig;
-use crate::config::model::Config;
-use crate::tui::model::BackendActions;
 
 use tui_rs::backend::Backend;
+use tui_rs::layout::{Constraint, Direction, Layout};
 use tui_rs::terminal::Frame;
-use tui_rs::layout::{Layout, Direction, Constraint};
 use tui_rs::widgets::{Block, Borders};
-// use tui_rs::widgets::Paragraph;
+use tui_rs::widgets::{List, ListItem};
 
 use crossterm::event::Event;
 
 use crate::tui::modes::widgets::{attachments::Attachments, header::Header};
+
+use super::mail_content::MailContent;
 
 // ==========
 // Enums
@@ -30,7 +34,7 @@ pub enum ViewerAction {
 pub struct Viewer {
     attachments: Attachments,
     header:      Header,
-    content:     Vec<String>,
+    content:     MailContent,
 
     show_attachments: bool,
 
@@ -45,14 +49,54 @@ impl Viewer {
         );
 
         let keybinding_manager = KeybindingManager::new(keybindings);
+        
+        let attachments = Attachments::new(&config.tui.viewer.attachments);
+        let content = MailContent::new(&config.tui.viewer.mailcontent);
+        let header = Header::new(&config.tui.viewer.header);
 
         Self {
-            attachments: Attachments::new(&config.tui.viewer.attachments),
-            header: Header::new(&config.tui.viewer.header),
+            attachments,
+            header,
             keybinding_manager,
             show_attachments: true,
-            content: Vec::new(),
+            content,
         }
+    }
+
+    pub fn load_mail(
+        &mut self,
+        account: &Account,
+        mbox: &str,
+        uid: &str,
+    ) -> Result<(), TuiError> {
+        let mut imap_conn = match ImapConnector::new(account) {
+            Ok(connection) => connection,
+            Err(_) => return Err(TuiError::ConnectAccount),
+        };
+
+        let msg = match imap_conn.read_msg(mbox, uid) {
+            Ok(msg) => msg,
+            Err(_) => {
+                b"Couldn't load the selected mail from the imap server..."
+                    .to_vec()
+            },
+        };
+
+        let msg = match ReadableMsg::from_bytes("text/plain", &msg) {
+            Ok(readable_msg) => readable_msg,
+            Err(_) => ReadableMsg {
+                content:        String::from(
+                    "Couldn't convert the mail to mime-type[text/plain]",
+                ),
+                has_attachment: false,
+            },
+        };
+
+        self.content.set_content(&msg.content);
+
+        imap_conn.logout();
+
+        Ok(())
     }
 }
 
@@ -61,8 +105,7 @@ impl BackendInterface for Viewer {
         if let Some(action) = self.keybinding_manager.eval_event(event) {
             match action {
                 ViewerAction::Quit => Some(BackendActions::Quit),
-                ViewerAction::ToggleAttachment => 
-                {
+                ViewerAction::ToggleAttachment => {
                     self.show_attachments = !self.show_attachments;
                     Some(BackendActions::Redraw)
                 },
@@ -77,54 +120,56 @@ impl BackendInterface for Viewer {
         B: Backend,
     {
         if self.show_attachments {
+            // ---------------------
+            // Widget positions
+            // ---------------------
             let layer1 = Layout::default()
                 .direction(Direction::Horizontal)
-                .constraints([
-                    Constraint::Percentage(70),
-                    Constraint::Percentage(30),
-                ].as_ref())
+                .constraints(
+                    [Constraint::Percentage(70), Constraint::Percentage(30)]
+                        .as_ref(),
+                )
                 .split(frame.size());
 
             let layer2 = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Percentage(25),
-                    Constraint::Percentage(75),
-                ].as_ref())
+                .constraints(
+                    [Constraint::Percentage(25), Constraint::Percentage(75)]
+                        .as_ref(),
+                )
                 .split(layer1[0]);
 
-            frame.render_widget(
-                self.attachments.widget(),
-                layer1[1]
-            );
+            // -----------------
+            // Mail content
+            // -----------------
 
-            frame.render_widget(
-                self.header.widget(),
-                layer2[0]
-            );
+            // --------------
+            // Rendering
+            // --------------
+            frame.render_widget(self.attachments.widget(), layer1[1]);
 
-            frame.render_widget(
-                Block::default().title("Content").borders(Borders::ALL),
-                layer2[1]
+            frame.render_widget(self.header.widget(), layer2[0]);
+
+            frame.render_stateful_widget(
+                self.content.widget(),
+                layer2[1],
+                self.content.get_state(),
             );
-        }
-        else {
+        } else {
             let layer = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Percentage(25),
-                    Constraint::Percentage(75),
-                ].as_ref())
+                .constraints(
+                    [Constraint::Percentage(25), Constraint::Percentage(75)]
+                        .as_ref(),
+                )
                 .split(frame.size());
 
-            frame.render_widget(
-                self.header.widget(),
-                layer[0]
-            );
+            frame.render_widget(self.header.widget(), layer[0]);
 
-            frame.render_widget(
-                Block::default().title("Content").borders(Borders::ALL),
-                layer[1]
+            frame.render_stateful_widget(
+                self.content.widget(),
+                layer[1],
+                self.content.get_state(),
             );
         }
     }

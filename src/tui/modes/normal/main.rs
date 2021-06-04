@@ -16,7 +16,7 @@ use tui_rs::terminal::Frame;
 // The widgets
 use super::mail_list::MailList;
 use super::sidebar::Sidebar;
-
+use super::widgets::mail_entry::MailEntry;
 
 // ==========
 // Enums
@@ -108,6 +108,13 @@ impl NormalFrame {
         // logout
         imap_conn.logout();
         Ok(())
+    }
+
+    pub fn get_current_mail(&self) -> (String, String) {
+        (
+            self.maillist.get_current_mail().get_uid(),
+            self.sidebar.get_current_mailbox(),
+        )
     }
 }
 

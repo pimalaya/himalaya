@@ -88,6 +88,8 @@ pub struct Tui<'tui> {
 
 impl<'tui> Tui<'tui> {
     pub fn new(config: &'tui Config) -> Tui<'tui> {
+
+        // Create all modes
         let normal = NormalFrame::new(&config);
         let writer = Writer::new(&config);
         let viewer = Viewer::new(&config);
@@ -97,9 +99,9 @@ impl<'tui> Tui<'tui> {
             viewer,
             writer,
             config: config,
-            need_redraw: true,
-            run: true,
-            mode: TuiMode::Normal,
+            need_redraw: true,  // draw the TUI
+            run: true,          // let the event loop run
+            mode: TuiMode::Normal,  // default when startup: Normal
         }
     }
 
@@ -141,6 +143,17 @@ impl<'tui> Tui<'tui> {
                         },
                         BackendActions::ViewingMail => {
                             self.mode = TuiMode::Viewing;
+
+                            let (uid, mailbox) = self.normal.get_current_mail();
+                            let account = match self
+                                .config
+                                .find_account_by_name(None)
+                            {
+                                Ok(account) => account,
+                                Err(_) => return Err(TuiError::ConnectAccount),
+                            };
+
+                            self.viewer.load_mail(&account, &mailbox, &uid);
                             self.need_redraw = true;
                         },
                     };
@@ -226,8 +239,8 @@ impl<'tui> Tui<'tui> {
             }
 
             // Catch any pressed keys. We're blocking here because nothing else
-            // has to be down (no redraw or somehting like that)
-            // HINT: If we need to do something in parallel, use add poll.
+            // has to be done (no redraw or somehting like that)
+            // HINT: If we need to do something in parallel, use poll.
             match crossterm::event::read() {
                 Ok(event) => self.handle_event(event)?,
                 Err(_) => {

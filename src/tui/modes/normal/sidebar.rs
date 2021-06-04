@@ -79,6 +79,10 @@ impl Sidebar {
         &mut self.state.state
     }
 
+    pub fn get_current_mailbox(&self) -> String {
+        self.mailboxes[self.state.get_selected_index()][0].clone()
+    }
+
     pub fn widget(&self) -> Table<'static> {
         let rows: Vec<Row> = self.mailboxes
             .iter()

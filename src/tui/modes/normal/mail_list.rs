@@ -1,35 +1,39 @@
-use crate::tui::modes::block_data::BlockData;
+use crate::config::tui::block_data::BlockDataConfig;
 use crate::imap::model::ImapConnector;
 use crate::msg::model::Msgs;
-use crate::config::tui::block_data::BlockDataConfig;
+use crate::tui::modes::block_data::BlockData;
 use crate::tui::modes::table_state_wrapper::TableStateWrapper;
 
 use tui_rs::layout::Constraint;
-use tui_rs::style::{Color, Style, Modifier};
+use tui_rs::style::{Color, Modifier, Style};
 use tui_rs::widgets::{Block, Row, Table, TableState};
 
+use super::widgets::mail_entry::MailEntry;
+
+// ============
+// Structs
+// ============
 pub struct MailList {
     pub block_data: BlockData,
-    mails: Vec<Vec<String>>,
-    header: Vec<String>,
+    mails:          Vec<MailEntry>,
+    header:         Vec<String>,
 
     pub state: TableStateWrapper,
 }
 
 impl MailList {
-
     pub fn new(title: String, config: &BlockDataConfig) -> Self {
         Self {
             block_data: BlockData::new(title, config),
-            mails: Vec::new(),
-            header: vec![
+            mails:      Vec::new(),
+            header:     vec![
                 String::from("UID"),
                 String::from("Flags"),
                 String::from("Date"),
                 String::from("Sender"),
                 String::from("Subject"),
             ],
-            state: TableStateWrapper::new(),
+            state:      TableStateWrapper::new(),
         }
     }
 
@@ -41,9 +45,7 @@ impl MailList {
         self.mails.clear();
         let msgs = match imap_conn.msgs(&mbox) {
             Ok(msgs) => msgs,
-            Err(_) => {
-                return Err("Couldn't get the messages from the mailbox.")
-            }
+            Err(_) => return Err("Couldn't get the messages from the mailbox."),
         };
 
         let msgs = match msgs {
@@ -52,15 +54,15 @@ impl MailList {
         };
 
         for message in msgs.iter() {
-            let row = vec![
+            let mail_entry = MailEntry::new(
                 message.uid.to_string(),
                 message.flags.to_string(),
                 message.date.clone(),
                 message.sender.clone(),
                 message.subject.clone(),
-            ];
+            );
 
-            self.mails.push(row);
+            self.mails.push(mail_entry);
         }
 
         // reset the selection
@@ -78,6 +80,11 @@ impl MailList {
         self.state.set_cursor(index);
     }
 
+    pub fn get_current_mail(&self) -> MailEntry {
+        // We can be sure that the mail exists
+        self.mails[self.state.get_selected_index()].clone()
+    }
+
     pub fn get_state(&mut self) -> &mut TableState {
         &mut self.state.state
     }
@@ -88,17 +95,17 @@ impl MailList {
     // https://docs.rs/tui/0.15.0/tui/widgets/trait.StatefulWidget.html
     // pub fn widget(&mut self, height: u16) -> Table {
     pub fn widget(&self) -> Table<'static> {
-
         // convert the header into a row
         let header = Row::new(self.header.clone())
             .bottom_margin(1)
-            .style(
-                Style::default()
-                    .add_modifier(Modifier::UNDERLINED)
-            );
+            .style(Style::default().add_modifier(Modifier::UNDERLINED));
 
         // convert all mails into Rows
-        let mails: Vec<Row> = self.mails.iter().map(|mail| Row::new(mail.to_vec())).collect();
+        let mails: Vec<Row> = self
+            .mails
+            .iter()
+            .map(|mail| Row::new(Vec::from(mail)))
+            .collect();
 
         // get the block
         let block = Block::from(self.block_data.clone());
@@ -115,5 +122,4 @@ impl MailList {
             ])
             .highlight_style(Style::default().bg(Color::Blue))
     }
-
 }

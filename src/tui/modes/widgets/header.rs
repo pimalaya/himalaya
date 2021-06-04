@@ -31,6 +31,9 @@ impl Header {
         }
     }
 
+    // pub fn set_header_infos(&mut self) {
+    // }
+
     pub fn widget(&self) -> Table {
         let block = Block::from(self.block_data.clone());
 

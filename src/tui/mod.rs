@@ -6,6 +6,10 @@ pub mod modes {
         pub mod mail_list;
         pub mod main;
         pub mod sidebar;
+
+        pub mod widgets {
+            pub mod mail_entry;
+        }
     }
 
     pub mod widgets {
@@ -15,6 +19,7 @@ pub mod modes {
 
     pub mod viewer {
         pub mod main;
+        pub mod mail_content;
     }
 
     pub mod writer {
@@ -25,5 +30,6 @@ pub mod modes {
     pub mod block_data;
     pub mod keybinding_manager;
     pub mod table_state_wrapper;
+    pub mod list_state_wrapper;
     // pub mod tui_widget;
 }

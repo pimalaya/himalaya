@@ -1,19 +1,19 @@
-use tui_rs::widgets::TableState;
+use tui_rs::widgets::ListState;
 
-pub struct TableStateWrapper {
-    pub state:    TableState,
-    table_length: usize,
+pub struct ListStateWrapper {
+    pub state:   ListState,
+    list_length: usize,
 }
 
-impl TableStateWrapper {
+impl ListStateWrapper {
     pub fn new() -> Self {
         Self {
-            state:        TableState::default(),
-            table_length: 0,
+            state:       ListState::default(),
+            list_length: 0,
         }
     }
 
-   pub fn move_cursor(&mut self, offset: i32) {
+    pub fn move_cursor(&mut self, offset: i32) {
         let new_selection = match self.state.selected() {
             Some(old_selection) => {
                 let mut selection = if offset < 0 {
@@ -22,8 +22,8 @@ impl TableStateWrapper {
                     old_selection.saturating_add(offset as usize)
                 };
 
-                if selection > self.table_length - 1 {
-                    selection = self.table_length - 1;
+                if selection > self.list_length - 1 {
+                    selection = self.list_length - 1;
                 }
 
                 selection
@@ -38,13 +38,13 @@ impl TableStateWrapper {
 
     pub fn set_cursor(&mut self, index: Option<usize>) {
         if let Some(index) = index {
-            if index >= self.table_length {
-                self.state.select(Some(self.table_length - 1));
+            if index >= self.list_length {
+                self.state.select(Some(self.list_length - 1));
             } else {
                 self.state.select(Some(index));
             }
         } else {
-            self.state.select(Some(self.table_length - 1));
+            self.state.select(Some(self.list_length - 1));
         }
     }
 
@@ -57,7 +57,7 @@ impl TableStateWrapper {
     }
 
     pub fn update_length(&mut self, length: usize) {
-        self.table_length = length;
+        self.list_length = length;
     }
 
     pub fn get_selected_index(&self) -> usize {

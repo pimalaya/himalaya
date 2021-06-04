@@ -13,7 +13,7 @@ use std::collections::HashMap;
 pub struct ViewerConfig {
     pub attachments: BlockDataConfig,
     pub header:      BlockDataConfig,
-    pub content:     BlockDataConfig,
+    pub mailcontent: BlockDataConfig,
     pub keybindings: HashMap<String, String>,
 
     #[serde(skip, default = "ViewerConfig::default_keybindings")]
@@ -25,7 +25,7 @@ impl Default for ViewerConfig {
         Self {
             attachments:         BlockDataConfig::default(),
             header:              BlockDataConfig::default(),
-            content:             BlockDataConfig::default(),
+            mailcontent:         BlockDataConfig::default(),
             keybindings:         HashMap::new(),
             default_keybindings: ViewerConfig::default_keybindings(),
         }
