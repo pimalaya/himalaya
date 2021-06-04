@@ -41,6 +41,7 @@ impl NormalConfig {
             ("toggle_sidebar", NormalAction::ToggleSidebar, "<C-b>"),
             ("go_top", NormalAction::CursorAbsolut(Some(0)), "gg"),
             ("go_bottom", NormalAction::CursorAbsolut(None), "<S-g>"),
+            ("viewer", NormalAction::ViewingMail, "l"),
         ]
     }
 }

@@ -1,6 +1,3 @@
-use super::mail_list::MailList;
-use super::sidebar::Sidebar;
-
 use crossterm::event::Event;
 
 use crate::config::model::{Account, Config};
@@ -16,6 +13,11 @@ use tui_rs::backend::Backend;
 use tui_rs::layout::{Constraint, Direction, Layout};
 use tui_rs::terminal::Frame;
 
+// The widgets
+use super::mail_list::MailList;
+use super::sidebar::Sidebar;
+
+
 // ==========
 // Enums
 // ==========
@@ -26,6 +28,7 @@ pub enum NormalAction {
     CursorAbsolut(Option<usize>),
     SetAccount,
     WritingMail,
+    ViewingMail,
     ToggleSidebar,
 }
 
@@ -116,17 +119,18 @@ impl BackendInterface for NormalFrame {
                 NormalAction::CursorOffset(offset) => {
                     self.maillist.move_cursor(offset);
                     Some(BackendActions::Redraw)
-                }
+                },
                 NormalAction::CursorAbsolut(index) => {
                     self.maillist.set_cursor(index);
                     Some(BackendActions::Redraw)
-                }
+                },
                 NormalAction::SetAccount => Some(BackendActions::GetAccount),
                 NormalAction::ToggleSidebar => {
                     self.display_sidebar = !self.display_sidebar;
                     Some(BackendActions::Redraw)
                 },
                 NormalAction::WritingMail => Some(BackendActions::WritingMail),
+                NormalAction::ViewingMail => Some(BackendActions::ViewingMail),
             }
         } else {
             None
@@ -164,7 +168,6 @@ impl BackendInterface for NormalFrame {
                 self.sidebar.get_state(),
                 // &mut self.sidebar.state,
             );
-
             // Display the mails
             frame.render_stateful_widget(
                 self.maillist.widget(),
@@ -172,7 +175,6 @@ impl BackendInterface for NormalFrame {
                 self.maillist.get_state(),
             );
         } else {
-
             let layout = Layout::default()
                 .margin(1)
                 .constraints([Constraint::Percentage(100)].as_ref())

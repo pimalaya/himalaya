@@ -8,6 +8,7 @@ pub mod tui {
 
     pub mod modes {
         pub mod normal;
-        pub mod writing_mail;
+        pub mod viewer;
+        pub mod writer;
     }
 }

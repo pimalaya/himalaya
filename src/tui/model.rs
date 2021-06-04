@@ -5,8 +5,6 @@ use std::io;
 
 use serde::Deserialize;
 
-use crate::config::model::Config;
-
 use tui_rs::backend::{Backend, CrosstermBackend};
 use tui_rs::terminal::Frame;
 use tui_rs::Terminal;
@@ -14,12 +12,12 @@ use tui_rs::Terminal;
 use crossterm::event::Event;
 use crossterm::terminal;
 
-use crate::tui::modes:: {
-    normal::main::NormalFrame,
-    writing_mail::main::WritingMail,
+use crate::tui::modes::{
+    backend_interface::BackendInterface, normal::main::NormalFrame,
+    viewer::main::Viewer, writer::main::Writer,
 };
 
-use crate::tui::modes::backend_interface::BackendInterface;
+use crate::config::model::Config;
 
 // ================
 // Tui - Enums
@@ -59,6 +57,7 @@ pub enum BackendActions {
     Redraw,
     GetAccount,
     WritingMail,
+    ViewingMail,
 }
 
 // ----------
@@ -66,7 +65,8 @@ pub enum BackendActions {
 // ----------
 pub enum TuiMode {
     Normal,
-    WritingMail,
+    Writing,
+    Viewing,
 }
 
 // ===================
@@ -76,23 +76,26 @@ pub struct Tui<'tui> {
     config: &'tui Config,
 
     // modes
-    normal_mode: NormalFrame,
-    writing_mail: WritingMail,
+    normal: NormalFrame,
+    writer: Writer,
+    viewer: Viewer,
 
     // State variables
     need_redraw: bool,
-    run: bool,
-    mode: TuiMode,
+    run:         bool,
+    mode:        TuiMode,
 }
 
 impl<'tui> Tui<'tui> {
     pub fn new(config: &'tui Config) -> Tui<'tui> {
-        let normal_mode = NormalFrame::new(&config);
-        let writing_mail = WritingMail::new(&config);
+        let normal = NormalFrame::new(&config);
+        let writer = Writer::new(&config);
+        let viewer = Viewer::new(&config);
 
         Tui {
-            normal_mode,
-            writing_mail,
+            normal,
+            viewer,
+            writer,
             config: config,
             need_redraw: true,
             run: true,
@@ -108,41 +111,65 @@ impl<'tui> Tui<'tui> {
     }
 
     pub fn handle_event(&mut self, event: Event) -> Result<(), TuiError> {
-        // Look if it's intern
-        match event {
-            Event::Resize(_, _) => self.need_redraw = true,
-            _ => match self.mode {
-                // Normal - Mode
-                TuiMode::Normal => match self.normal_mode.handle_event(event) {
-                    Some(BackendActions::Quit) => self.run = false,
-                    Some(BackendActions::Redraw) => self.need_redraw = true,
-                    Some(BackendActions::GetAccount) => {
-                        let account =
-                            match self.config.find_account_by_name(None) {
+        // We treat resizeing as a special treat
+        if let Event::Resize(_, _) = event {
+            self.need_redraw = true;
+            return Ok(());
+        }
+
+        match self.mode {
+            // Normal - Mode
+            TuiMode::Normal => {
+                if let Some(action) = self.normal.handle_event(event) {
+                    match action {
+                        BackendActions::Quit => self.run = false,
+                        BackendActions::Redraw => self.need_redraw = true,
+                        BackendActions::GetAccount => {
+                            let account = match self
+                                .config
+                                .find_account_by_name(None)
+                            {
                                 Ok(account) => account,
                                 Err(_) => return Err(TuiError::ConnectAccount),
                             };
 
-                        self.normal_mode.set_account(&account)?;
-                    }
-                    Some(BackendActions::WritingMail) => {
-                        self.mode = TuiMode::WritingMail;
-                        self.need_redraw = true;
-                    },
-                    None => (),
-                },
-                // Writing Mail - Mode
-                TuiMode::WritingMail => match self.writing_mail.handle_event(event) {
-                    Some(BackendActions::Redraw) => self.need_redraw = true,
-                    Some(BackendActions::Quit) => {
-                        self.mode = TuiMode::Normal;
-                        self.need_redraw = true;
-                    }
-                    _ => (),
-                },
+                            self.normal.set_account(&account)?;
+                        },
+                        BackendActions::WritingMail => {
+                            self.mode = TuiMode::Writing;
+                            self.need_redraw = true;
+                        },
+                        BackendActions::ViewingMail => {
+                            self.mode = TuiMode::Viewing;
+                            self.need_redraw = true;
+                        },
+                    };
+                };
             },
-        }
-
+            TuiMode::Writing => {
+                if let Some(action) = self.writer.handle_event(event) {
+                    match action {
+                        BackendActions::Quit => {
+                            self.mode = TuiMode::Normal;
+                            self.need_redraw = true;
+                        },
+                        _ => (),
+                    }
+                }
+            },
+            TuiMode::Viewing => {
+                if let Some(action) = self.viewer.handle_event(event) {
+                    match action {
+                        BackendActions::Quit => {
+                            self.mode = TuiMode::Normal;
+                            self.need_redraw = true;
+                        },
+                        BackendActions::Redraw => self.need_redraw = true,
+                        _ => (),
+                    }
+                }
+            },
+        };
         Ok(())
     }
 
@@ -152,8 +179,9 @@ impl<'tui> Tui<'tui> {
     {
         // prepare the given frame
         match self.mode {
-            TuiMode::Normal => self.normal_mode.draw(frame),
-            TuiMode::WritingMail => self.writing_mail.draw(frame),
+            TuiMode::Normal => self.normal.draw(frame),
+            TuiMode::Writing => self.writer.draw(frame),
+            TuiMode::Viewing => self.viewer.draw(frame),
         };
 
         self.need_redraw = false;
@@ -180,7 +208,7 @@ impl<'tui> Tui<'tui> {
             Ok(account) => account,
             Err(_) => return Err(TuiError::UnknownAccount),
         };
-        self.normal_mode.set_account(account)?;
+        self.normal.set_account(account)?;
 
         // ------------------
         // Main Tui loop
@@ -206,9 +234,8 @@ impl<'tui> Tui<'tui> {
                     terminal.clear()?;
                     self.cleanup()?;
                     return Err(TuiError::EventKey);
-                }
+                },
             };
-
         }
         terminal.clear()?;
         return self.cleanup();

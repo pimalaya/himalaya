@@ -8,9 +8,16 @@ pub mod modes {
         pub mod sidebar;
     }
 
-    pub mod writing_mail {
+    pub mod widgets {
         pub mod attachments;
-        pub mod mail_credits;
+        pub mod header;
+    }
+
+    pub mod viewer {
+        pub mod main;
+    }
+
+    pub mod writer {
         pub mod main;
     }
 

@@ -5,7 +5,8 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use std::collections::HashMap;
 
 use super::modes::normal::NormalConfig;
-use super::modes::writing_mail::WritingMailConfig;
+use super::modes::viewer::ViewerConfig;
+use super::modes::writer::WriterConfig;
 
 // ==========
 // Enums
@@ -34,15 +35,17 @@ pub enum KeyType<Mode> {
 #[derive(Debug, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct TuiConfig {
-    pub normal:       NormalConfig,
-    pub writing_mail: WritingMailConfig,
+    pub normal: NormalConfig,
+    pub viewer: ViewerConfig,
+    pub writer: WriterConfig,
 }
 
 impl Default for TuiConfig {
     fn default() -> Self {
         Self {
-            normal:       NormalConfig::default(),
-            writing_mail: WritingMailConfig::default(),
+            normal: NormalConfig::default(),
+            viewer: ViewerConfig::default(),
+            writer: WriterConfig::default(),
         }
     }
 }
