@@ -9,7 +9,7 @@ syntax match hym_subject /^|.\{-}|.\{-}|.\{-}|/             contains=hym_uid,hym
 syntax match hym_sender  /^|.\{-}|.\{-}|.\{-}|.\{-}|/       contains=hym_uid,hym_flags,hym_subject,hym_sep
 syntax match hym_date    /^|.\{-}|.\{-}|.\{-}|.\{-}|.\{-}|/ contains=hym_uid,hym_flags,hym_subject,hym_sender,hym_sep
 syntax match hym_head    /.*\%1l/                           contains=hym_sep
-syntax match hym_unseen  /^|.\{-}|N.*$/                     contains=hym_sep
+syntax match hym_unseen  /^|.\{-}|✷.*$/                     contains=hym_sep
 
 highlight hym_head   term=bold,underline cterm=bold,underline gui=bold,underline
 highlight hym_unseen term=bold           cterm=bold           gui=bold
