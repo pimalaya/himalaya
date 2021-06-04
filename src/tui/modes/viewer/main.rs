@@ -10,7 +10,6 @@ use crate::tui::modes::{
 use tui_rs::backend::Backend;
 use tui_rs::layout::{Constraint, Direction, Layout};
 use tui_rs::terminal::Frame;
-use tui_rs::widgets::{Block, Borders};
 
 use crossterm::event::Event;
 
@@ -117,7 +116,7 @@ impl BackendInterface for Viewer {
                 ViewerAction::SubOffset(x, y) => {
                     self.content.sub_offset(x, y);
                     Some(BackendActions::Redraw)
-                }
+                },
             }
         } else {
             None
