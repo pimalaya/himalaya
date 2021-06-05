@@ -1,7 +1,7 @@
 use crate::config::tui::block_data::BlockDataConfig;
 use crate::tui::modes::block_data::BlockData;
-// use crate::tui::modes::table_table_state_wrapper::TableStateWrapper;
-use crate::tui::modes::table_state_wrapper::TableStateWrapper;
+// use crate::tui::modes::state_wrappers::TableStateWrapper;
+use crate::tui::modes::state_wrappers::TableStateWrapper;
 
 use tui_rs::widgets::{Block, Row, Table, TableState};
 

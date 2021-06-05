@@ -2,7 +2,7 @@ use crate::imap::model::ImapConnector;
 use crate::mbox::model::Mboxes;
 use crate::config::tui::block_data::BlockDataConfig;
 use crate::tui::modes::block_data::BlockData;
-use crate::tui::modes::table_state_wrapper::TableStateWrapper;
+use crate::tui::modes::state_wrappers::{TableStateWrapper, TableWrapperFuncs};
 
 use tui_rs::layout::Constraint;
 use tui_rs::style::{Color, Style};
@@ -71,14 +71,6 @@ impl Sidebar {
         Ok(())
     }
 
-    pub fn move_cursor(&mut self, offset:i32) {
-        self.state.move_cursor(offset);
-    }
-
-    pub fn get_state(&mut self) -> &mut TableState {
-        &mut self.state.state
-    }
-
     pub fn get_current_mailbox(&self) -> String {
         self.mailboxes[self.state.get_selected_index()][0].clone()
     }
@@ -97,5 +89,19 @@ impl Sidebar {
             .header(header)
             .widths(&[Constraint::Percentage(70), Constraint::Percentage(30)])
             .highlight_style(Style::default().bg(Color::Blue))
+    }
+}
+
+impl TableWrapperFuncs for Sidebar {
+    fn move_cursor(&mut self, offset:i32) {
+        self.state.move_cursor(offset);
+    }
+
+    fn get_state(&mut self) -> &mut TableState {
+        &mut self.state.state
+    }
+    
+    fn set_cursor(&mut self, index: Option<usize>) {
+        self.state.set_cursor(index);
     }
 }

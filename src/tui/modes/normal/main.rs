@@ -3,6 +3,7 @@ use crossterm::event::Event;
 use crate::config::model::{Account, Config};
 use crate::config::tui::tui::TuiConfig;
 use crate::imap::model::ImapConnector;
+use crate::tui::modes::state_wrappers::TableWrapperFuncs;
 
 use crate::tui::model::{BackendActions, TuiError};
 use crate::tui::modes::{

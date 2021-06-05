@@ -2,7 +2,7 @@ use crate::config::tui::block_data::BlockDataConfig;
 use crate::imap::model::ImapConnector;
 use crate::msg::model::Msgs;
 use crate::tui::modes::block_data::BlockData;
-use crate::tui::modes::table_state_wrapper::TableStateWrapper;
+use crate::tui::modes::state_wrappers::{TableStateWrapper, TableWrapperFuncs};
 
 use tui_rs::layout::Constraint;
 use tui_rs::style::{Color, Modifier, Style};
@@ -72,21 +72,9 @@ impl MailList {
         Ok(())
     }
 
-    pub fn move_cursor(&mut self, offset: i32) {
-        self.state.move_cursor(offset);
-    }
-
-    pub fn set_cursor(&mut self, index: Option<usize>) {
-        self.state.set_cursor(index);
-    }
-
     pub fn get_current_mail(&self) -> MailEntry {
         // We can be sure that the mail exists
         self.mails[self.state.get_selected_index()].clone()
-    }
-
-    pub fn get_state(&mut self) -> &mut TableState {
-        &mut self.state.state
     }
 
     // TODO: Make sure that it displays really only the needed one, not too
@@ -121,5 +109,20 @@ impl MailList {
                 Constraint::Percentage(60),
             ])
             .highlight_style(Style::default().bg(Color::Blue))
+    }
+}
+
+impl TableWrapperFuncs for MailList {
+
+    fn move_cursor(&mut self, offset: i32) {
+        self.state.move_cursor(offset);
+    }
+
+    fn set_cursor(&mut self, index: Option<usize>) {
+        self.state.set_cursor(index);
+    }
+
+    fn get_state(&mut self) -> &mut TableState {
+        &mut self.state.state
     }
 }
