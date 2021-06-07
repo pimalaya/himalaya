@@ -12,7 +12,7 @@
 //! appropriate wrapper.
 //!
 //! Each struct has a little API to interact with the actual states provided by
-//! [tui-rs] which are given in the [trait].
+//! [tui-rs]. Just take a look into the description of the methods.
 //!
 //! # Example
 //! ```rust
@@ -37,21 +37,6 @@
 //!     // Now the functions for our current widget like the constructor and so
 //!     // on
 //! }
-//!
-//! // The explanation of each field, can be looked up in the trait.
-//! impl TableWrapperFuncs for TuiWidget {
-//!     fn move_cursor(&mut self, offset: i32) {
-//!         self.state.move_cursor(offset);
-//!     }
-//!
-//!     fn get_state(&mut self) -> &mut TableState {
-//!         &mut self.state.state
-//!     }
-//!
-//!     fn set_cursor(&mut self, index: Option<usize>) {
-//!         self.state.set_cursor(index);
-//!     }
-//! }
 //! ```
 //! That's it!
 //!
@@ -60,7 +45,6 @@
 //! [tui-rs]: <https://github.com/fdehau/tui-rs>
 //! [ListState]: <https://docs.rs/tui/0.15.0/tui/widgets/struct.ListState.html>
 //! [TableState]: <https://docs.rs/tui/0.15.0/tui/widgets/struct.TableState.html>
-//! [trait]: trait.TableWrapperFuncs.html
 
 use tui_rs::widgets::{ListState, TableState};
 
@@ -98,12 +82,24 @@ impl ListStateWrapper {
     
     /// As all constructors do: Create a new instance of the struct. Our
     /// [ListStateWrapper.state] is gonna be the default value of `ListState`.
+    /// You can optionally add the size of the list to the constructor or give
+    /// `None` which will set the length of the list to 0. You'll need to update
+    /// the length later than!
     ///
     /// [ListStateWrapper.state]: struct@ListStateWrapper
-    pub fn new() -> Self {
+    pub fn new(list_length: Option<usize>) -> Self {
+
+        let list_length = match list_length {
+            Some(size) => size,
+            None => 0,
+        };
+
+        let mut state = ListState::default();
+        state.select(Some(0));
+
         Self {
-            state:       ListState::default(),
-            list_length: 0,
+            state,
+            list_length,
         }
     }
 
@@ -115,9 +111,9 @@ impl ListStateWrapper {
     /// # Note
     /// This function makes sure, that the index doesn't go below `0` and
     /// greater than the length of our list. You can set the length of the list
-    /// by using the [`update_length`] function.
+    /// by using the [`set_length`] function.
     ///
-    /// [`update_length`]: struct.ListStateWrapper.html#method.update_length
+    /// [`set_length`]: struct.ListStateWrapper.html#method.set_length
     pub fn move_cursor(&mut self, offset: i32) {
         let new_selection = match self.state.selected() {
 
@@ -185,7 +181,7 @@ impl ListStateWrapper {
 
     /// If the size of you list changed, call this function it will adjust the
     /// top border which the index can achieve.
-    pub fn update_length(&mut self, length: usize) {
+    pub fn set_length(&mut self, length: usize) {
         self.list_length = length;
     }
 
@@ -193,6 +189,29 @@ impl ListStateWrapper {
     /// in order to know where the user is currently.
     pub fn get_selected_index(&self) -> usize {
         self.state.selected().unwrap_or(0)
+    }
+
+    /// Get the low-level state of the ListState. This is mainly used, if you
+    /// want to render the widget. 
+    ///
+    /// # Example
+    /// ```rust
+    /// let tui_widget = TuiWidget::new();
+    ///
+    /// // draw our widget
+    /// frame.render_stateful_widget(
+    ///     // get the widget which should be displayed
+    ///     tui_widget.widget(),
+    ///
+    ///     // get the "frame"/"rect" where the widget has to be placed
+    ///     Rect::new(0, 0, 100, 100),
+    ///
+    ///     // get the state which is gonna be adjusted according to the cursor
+    ///     tui_widget.get_state(),
+    /// );
+    /// ```
+    pub fn get_state(&mut self) -> &mut ListState {
+        &mut self.state
     }
 }
 
@@ -222,10 +241,19 @@ pub struct TableStateWrapper {
 // If you're looking for the comments of the code, take a look into the
 // ListStateWrapper. Each comment is suitable to this struct as well.
 impl TableStateWrapper {
-    pub fn new() -> Self {
+    pub fn new(table_length: Option<usize>) -> Self {
+
+        let table_length = match table_length {
+            Some(size) => size,
+            None => 0,
+        };
+
+        let mut state = TableState::default();
+        state.select(Some(0));
+
         Self {
-            state:        TableState::default(),
-            table_length: 0,
+            state,
+            table_length,
         }
     }
 
@@ -267,88 +295,19 @@ impl TableStateWrapper {
     }
 
     pub fn reset(&mut self) {
-        self.state.select(Some(0));
+        self.state = TableState::default();
+        self.table_length = 0;
     }
 
-    pub fn update_length(&mut self, length: usize) {
+    pub fn set_length(&mut self, length: usize) {
         self.table_length = length;
     }
 
     pub fn get_selected_index(&self) -> usize {
         self.state.selected().unwrap_or(0)
     }
-}
 
-// ========================
-// State-Wrapper-Trait
-// ========================
-/// Functions which each widget **must** implement if they want to use one of
-/// the wrappers.
-///
-/// These functions act only like a "high-level API" for the functions of each
-/// wrapper.
-///
-/// # Note
-/// So again: This trait is **almost the same** as [TableWrapperFuncs]. The only
-/// difference is the return type of [`get_state`].
-///
-/// # Explanation
-/// Each widget which wants to use one of the wrappers *has to* use their
-/// appropriate traits in order to interact with the "low-level" version of
-/// their states.
-/// 
-/// # Example
-/// Example can bee seen in the [state_wrappers] section.
-///
-/// [TableWrapperFuncs]: trait@TableWrapperFuncs
-/// [`get_state`]: trait.ListWrapperFuncs.html#tymethod.get_state
-/// [state_wrappers]: <./index.html>
-pub trait ListWrapperFuncs {
-
-    /// This will move the cursor relatively from the current position. So if
-    /// you use `5` as an argument here, you'll move the cursor 5 entrys back
-    /// **or** further from the current position, depending on how you sorted
-    /// your list.
-    fn move_cursor(&mut self, offset: i32);
-
-    /// This works almost the same as [move_cursor] but instead of providing a
-    /// relative offset, `index` is an *absolute* index value. Setting `index`
-    /// to [`None`] will move the cursor to the *end* of the list.
-    ///
-    /// [move_cursor]: <trait.ListWrapperFuncs.html#tymethod.move_cursor>
-    /// [`None`]: <https://doc.rust-lang.org/std/option/enum.Option.html#variant.None>
-    fn set_cursor(&mut self, index: Option<usize>);
-
-    /// Get the low-level state of the ListState. This is mainly used, if you
-    /// want to render widget. 
-    ///
-    /// # Example
-    /// ```rust
-    /// let tui_widget = TuiWidget::new();
-    ///
-    /// // draw our widget
-    /// frame.render_stateful_widget(
-    ///     // get the widget which should be displayed
-    ///     tui_widget.widget(),
-    ///
-    ///     // get the "frame"/"rect" where the widget has to be placed
-    ///     Rect::new(0, 0, 100, 100),
-    ///
-    ///     // get the state which is gonna be adjusted according to the cursor
-    ///     tui_widget.get_state(),
-    /// );
-    /// ```
-    fn get_state(&mut self) -> &mut ListState;
-}
-
-/// Must-have functions if a widget wants to use the TableStateWrapper.
-///
-/// This is **almost the same** as the [ListWrapperFuncs] trait, so take a look
-/// there for the documentation.
-///
-/// [ListWrapperFuncs]: trait@ListWrapperFuncs
-pub trait TableWrapperFuncs {
-    fn move_cursor(&mut self, offset: i32);
-    fn set_cursor(&mut self, index: Option<usize>);
-    fn get_state(&mut self) -> &mut TableState;
+    pub fn get_state(&mut self) -> &mut TableState {
+        &mut self.state
+    }
 }

@@ -1,36 +1,20 @@
 use crate::config::tui::block_data::BlockDataConfig;
 use crate::tui::modes::block_data::BlockData;
-// use crate::tui::modes::state_wrappers::TableStateWrapper;
-use crate::tui::modes::state_wrappers::TableStateWrapper;
 
-use tui_rs::widgets::{Block, Row, Table, TableState};
+use tui_rs::widgets::{Block, Row, Table};
 
 // ============
 // Structs
 // ============
 pub struct Attachments {
     pub block_data: BlockData,
-
-    header: Vec<String>,
-
-    pub state: TableStateWrapper,
 }
 
 impl Attachments {
     pub fn new(config: &BlockDataConfig) -> Self {
         Self {
             block_data: BlockData::new(String::from("Attachments"), config),
-            state:      TableStateWrapper::new(),
-            header:     Vec::new(),
         }
-    }
-
-    pub fn move_cursor(&mut self, offset: i32) {
-        self.state.move_cursor(offset);
-    }
-
-    pub fn get_n(&mut self) -> &mut TableState {
-        &mut self.state.state
     }
 
     pub fn widget(&self) -> Table<'static> {

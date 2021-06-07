@@ -31,3 +31,17 @@ pub mod modes {
     pub mod keybinding_manager;
     pub mod state_wrappers;
 }
+
+pub mod tabs {
+    pub mod account_tab;
+    pub mod main;
+    pub mod data {
+        pub mod normal_data;
+        pub mod viewer_data;
+        pub mod writer_data;
+
+        pub mod shared_widgets {
+            pub mod header;
+        }
+    }
+}

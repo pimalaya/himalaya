@@ -1,13 +1,14 @@
 use crossterm::event::Event;
 
 use tui_rs::backend::Backend;
-use tui_rs::layout::{Constraint, Direction, Layout};
+use tui_rs::layout::{Constraint, Direction, Layout, Rect};
 use tui_rs::terminal::Frame;
 
 use crate::config::model::Config;
 use crate::config::tui::tui::TuiConfig;
 use crate::tui::model::BackendActions;
 use crate::tui::modes::widgets::{attachments::Attachments, header::Header};
+use crate::tui::tabs::account_tab::AccountTab;
 
 use crate::tui::modes::{
     backend_interface::BackendInterface, keybinding_manager::KeybindingManager,
@@ -53,7 +54,11 @@ impl Writer {
 }
 
 impl BackendInterface for Writer {
-    fn handle_event(&mut self, event: Event) -> Option<BackendActions> {
+    fn handle_event<'event>(
+        &mut self,
+        event: Event,
+        account: &mut AccountTab<'event>,
+    ) -> Option<BackendActions> {
         if let Some(action) = self.keybinding_manager.eval_event(event) {
             match action {
                 WriterAction::Quit => Some(BackendActions::Quit),
@@ -64,8 +69,12 @@ impl BackendInterface for Writer {
         }
     }
 
-    fn draw<B>(&mut self, frame: &mut Frame<B>)
-    where
+    fn draw<'draw, B>(
+        &mut self,
+        frame: &mut Frame<B>,
+        free_space: Rect,
+        account: &mut AccountTab<'draw>,
+    ) where
         B: Backend,
     {
         let layout = Layout::default()
@@ -75,7 +84,7 @@ impl BackendInterface for Writer {
                 [Constraint::Percentage(25), Constraint::Percentage(75)]
                     .as_ref(),
             )
-            .split(frame.size());
+            .split(free_space);
 
         frame.render_widget(self.header.widget(), layout[0]);
         frame.render_widget(self.attachments.widget(), layout[1]);

@@ -1,23 +1,21 @@
 use crossterm::event::Event;
 
-use crate::config::model::{Account, Config};
+use crate::config::model::Config;
 use crate::config::tui::tui::TuiConfig;
-use crate::imap::model::ImapConnector;
-use crate::tui::modes::state_wrappers::TableWrapperFuncs;
+use crate::tui::tabs::account_tab::AccountTab;
 
-use crate::tui::model::{BackendActions, TuiError};
+use crate::tui::model::BackendActions;
 use crate::tui::modes::{
     backend_interface::BackendInterface, keybinding_manager::KeybindingManager,
 };
 
 use tui_rs::backend::Backend;
-use tui_rs::layout::{Constraint, Direction, Layout};
+use tui_rs::layout::{Constraint, Direction, Layout, Rect};
 use tui_rs::terminal::Frame;
 
 // The widgets
 use super::mail_list::MailList;
 use super::sidebar::Sidebar;
-use super::widgets::mail_entry::MailEntry;
 
 // ==========
 // Enums
@@ -39,8 +37,6 @@ pub enum NormalAction {
 pub struct NormalFrame {
     sidebar:  Sidebar,
     maillist: MailList,
-
-    display_sidebar: bool,
 
     keybinding_manager: KeybindingManager<NormalAction>,
 }
@@ -66,75 +62,35 @@ impl NormalFrame {
         Self {
             sidebar,
             maillist,
-            display_sidebar: true,
             keybinding_manager,
         }
     }
 
-    pub fn set_account(&mut self, account: &Account) -> Result<(), TuiError> {
-        // ----------------
-        // Get account
-        // ----------------
-        // Get the account first according to the name
-        // let account = match &config.find_account_by_name(name) {
-        //     Ok(account) => account,
-        //     Err(_) => return Err(TuiError::UnknownAccount),
-        // };
-
-        // ----------------------
-        // Create connection
-        // ----------------------
-        let mut imap_conn = match ImapConnector::new(&account) {
-            Ok(connection) => connection,
-            Err(_) => return Err(TuiError::ConnectAccount),
-        };
-
-        // ----------------
-        // Refresh TUI
-        // ----------------
-        // Fill the frames with the information of the mail account
-        if let Err(_) = self.sidebar.set_mailboxes(&mut imap_conn) {
-            imap_conn.logout();
-            return Err(TuiError::Sidebar);
-        }
-
-        if let Err(_) = self
-            .maillist
-            .set_mails(&mut imap_conn, &self.sidebar.mailboxes()[0][0])
-        {
-            imap_conn.logout();
-            return Err(TuiError::MailList);
-        }
-
-        // logout
-        imap_conn.logout();
-        Ok(())
-    }
-
-    pub fn get_current_mail(&self) -> (String, String) {
-        (
-            self.maillist.get_current_mail().get_uid(),
-            self.sidebar.get_current_mailbox(),
-        )
-    }
 }
 
 impl BackendInterface for NormalFrame {
-    fn handle_event(&mut self, event: Event) -> Option<BackendActions> {
+    fn handle_event<'event>(
+        &mut self,
+        event: Event,
+        account: &mut AccountTab<'event>,
+    ) -> Option<BackendActions> {
+
+        let mut account = &mut account.normal;
+
         if let Some(action) = self.keybinding_manager.eval_event(event) {
             match action {
                 NormalAction::Quit => Some(BackendActions::Quit),
                 NormalAction::CursorOffset(offset) => {
-                    self.maillist.move_cursor(offset);
+                    account.move_mail_list_cursor(offset);
                     Some(BackendActions::Redraw)
                 },
                 NormalAction::CursorAbsolut(index) => {
-                    self.maillist.set_cursor(index);
+                    account.set_mail_list_cursor(index);
                     Some(BackendActions::Redraw)
                 },
                 NormalAction::SetAccount => Some(BackendActions::GetAccount),
                 NormalAction::ToggleSidebar => {
-                    self.display_sidebar = !self.display_sidebar;
+                    account.display_sidebar = !account.display_sidebar;
                     Some(BackendActions::Redraw)
                 },
                 NormalAction::WritingMail => Some(BackendActions::WritingMail),
@@ -145,11 +101,13 @@ impl BackendInterface for NormalFrame {
         }
     }
 
-    fn draw<B>(&mut self, frame: &mut Frame<B>)
+    fn draw<'draw, B>(&mut self, frame: &mut Frame<B>, free_space: Rect, account: &mut AccountTab<'draw>)
     where
         B: Backend,
     {
-        if self.display_sidebar {
+        let account = &mut account.normal;
+        
+        if account.display_sidebar {
             // Create the two frames for the sidebar and the mails:
             //  - One on the left (sidebar)
             //  - One on the right (mail listing)
@@ -167,20 +125,19 @@ impl BackendInterface for NormalFrame {
                     .as_ref(),
                 )
                 // Use the given frame size to create the two blocks
-                .split(frame.size());
+                .split(free_space);
 
             // Display the sidebar
             frame.render_stateful_widget(
-                self.sidebar.widget(),
+                self.sidebar.widget(&account.mboxes),
                 layout[0],
-                self.sidebar.get_state(),
-                // &mut self.sidebar.state,
+                account.sidebar_state.get_state(),
             );
             // Display the mails
             frame.render_stateful_widget(
-                self.maillist.widget(),
+                self.maillist.widget(&account.msgs),
                 layout[1],
-                self.maillist.get_state(),
+                account.mail_list_state.get_state(),
             );
         } else {
             let layout = Layout::default()
@@ -189,9 +146,9 @@ impl BackendInterface for NormalFrame {
                 .split(frame.size());
 
             frame.render_stateful_widget(
-                self.maillist.widget(),
+                self.maillist.widget(&account.msgs),
                 layout[0],
-                self.maillist.get_state(),
+                account.mail_list_state.get_state(),
             );
         }
     }

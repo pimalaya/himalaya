@@ -46,6 +46,11 @@ pub fn tui_matches<'func>(
                     panic!("Couldn't load the mailboxes into the sidebar of the given account."),
                 TuiError::MailList =>
                     panic!("Couldn't load the mails into the mail_list frame of the given account."),
+                TuiError::GetMailboxes =>
+                    panic!("Could't get the mailboxes of account"),
+
+                TuiError::GetMails =>
+                    panic!("Couldn't get the mails of mailbox"),
             }
         }
 

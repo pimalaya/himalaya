@@ -8,6 +8,8 @@ use super::modes::normal::NormalConfig;
 use super::modes::viewer::ViewerConfig;
 use super::modes::writer::WriterConfig;
 
+use crate::config::tui::block_data::BlockDataConfig;
+
 // ==========
 // Enums
 // ==========
@@ -38,6 +40,7 @@ pub struct TuiConfig {
     pub normal: NormalConfig,
     pub viewer: ViewerConfig,
     pub writer: WriterConfig,
+    pub account_block: BlockDataConfig,
 }
 
 impl Default for TuiConfig {
@@ -46,6 +49,7 @@ impl Default for TuiConfig {
             normal: NormalConfig::default(),
             viewer: ViewerConfig::default(),
             writer: WriterConfig::default(),
+            account_block: BlockDataConfig::default(),
         }
     }
 }

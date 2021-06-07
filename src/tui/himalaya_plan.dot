@@ -1,0 +1,80 @@
+digraph G {
+
+    { 
+        node [shape=record];
+        Accounts [
+            label = "{
+                <Account1> Account\ 1|Mode|Normal Data|Viewer Data|<acc1_writer> Writer Data}
+                |{<Account2> Account\ 2|Mode|Normal Data|Viewer Data|Writer Data}"
+        ];
+
+        Backend [
+            label = "{Backend
+                |{<account_index> account_index}
+                |{mode = Normal}
+                |{<change_acc> changed_account: bool}
+                |{keybinding manager}}"
+        ];
+
+        Viewer [
+            label = "{Viewer|{<la> load_account()}|{widget()}}"
+        ];
+
+        Writer [
+            label = "{Writer|{<la> load_account()}|{widget()}}"
+        ];
+
+        Normal [
+            label = "{Normal|{<la> load_account()}|{widget()}}"
+        ];
+    }
+
+    Backend:change_acc -> Viewer:la:w;
+    Backend:change_acc -> Writer:la:w;
+    Backend:change_acc -> Normal:la:w;
+
+    User -> Backend [label = " I/O"];
+
+    Backend:account_index -> Accounts:Account1 [
+        label = "Get information",
+    ];
+
+    Accounts:acc1_writer:s -> Modes [
+        label = "Normal Data",
+    ];
+
+    Backend:e -> Modes [
+        headlabel = " KeyEvent",
+        taillabel = "Action",
+        dir = both,
+        minlen = 2,
+    ];
+
+    Modes -> Viewer [
+        headlabel = "KeyEvent", 
+        taillabel = "Action",
+        fontsize = 10,
+        labeldistance=3,
+        dir = both,
+        minlen = 2,
+    ];
+
+    Modes -> Writer [
+        headlabel = "KeyEvent",
+        taillabel = "Action",
+        fontsize = 10,
+        labeldistance = 3,
+        dir = both,
+        minlen = 2,
+    ];
+
+    Modes -> Normal [
+        taillabel = "Action",
+        headlabel = "KeyEvent",
+        fontsize = 10,
+        labeldistance = 3,
+        dir = both,
+        labelangle = 40,
+        minlen = 2,
+    ];
+}
