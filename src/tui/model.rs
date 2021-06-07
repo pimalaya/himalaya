@@ -227,7 +227,7 @@ impl<'tui> Tui<'tui> {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints(
-                [Constraint::Percentage(10), Constraint::Percentage(90)]
+                [Constraint::Length(3), Constraint::Length(10)]
                     .as_ref(),
             )
             .margin(1)

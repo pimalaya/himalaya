@@ -113,7 +113,6 @@ impl BackendInterface for NormalFrame {
             //  - One on the right (mail listing)
             let layout = Layout::default()
                 .direction(Direction::Horizontal)
-                .margin(1)
                 .constraints(
                     [
                         // For the sidebar (will be the second block => Index
