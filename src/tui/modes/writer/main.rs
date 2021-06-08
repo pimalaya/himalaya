@@ -78,10 +78,9 @@ impl BackendInterface for Writer {
         B: Backend,
     {
         let layout = Layout::default()
-            .margin(1)
             .direction(Direction::Vertical)
             .constraints(
-                [Constraint::Percentage(25), Constraint::Percentage(75)]
+                [Constraint::Length(8), Constraint::Length(100)]
                     .as_ref(),
             )
             .split(free_space);

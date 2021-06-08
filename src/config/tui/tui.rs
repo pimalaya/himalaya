@@ -488,8 +488,8 @@ impl TuiConfig {
 
     pub fn default_keybindings() -> Vec<(&'static str, BackendActions, &'static str)> {
         vec![
-            ("account_forward", BackendActions::GotoAccount(1), "gt"),
-            ("account_backward", BackendActions::GotoAccount(-1), "g<S-t>"),
+            ("account_forward", BackendActions::GotoAccount(1), "<C-j>"),
+            ("account_backward", BackendActions::GotoAccount(-1), "<C-k>"),
         ]
     }
 }
