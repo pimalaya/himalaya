@@ -107,7 +107,7 @@ impl BackendInterface for Viewer {
             let layer2 = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints(
-                    [Constraint::Length(8), Constraint::Length(100)]
+                    [Constraint::Length(8), Constraint::Length(90)]
                         .as_ref(),
                 )
                 .split(layer1[0]);

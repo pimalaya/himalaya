@@ -84,9 +84,10 @@ impl ListStateWrapper {
     /// [ListStateWrapper.state] is gonna be the default value of `ListState`.
     /// You can optionally add the size of the list to the constructor or give
     /// `None` which will set the length of the list to 0. You'll need to update
-    /// the length later than!
+    /// the length by the [`set_length()`] function later than!
     ///
     /// [ListStateWrapper.state]: struct@ListStateWrapper
+    /// [set_length()]: struct.ListStateWrapper.html#method.set_length
     pub fn new(list_length: Option<usize>) -> Self {
 
         let list_length = match list_length {
@@ -179,8 +180,12 @@ impl ListStateWrapper {
         self.state.select(Some(0));
     }
 
-    /// If the size of you list changed, call this function it will adjust the
-    /// top border which the index can achieve.
+    /// If the size of your list changed, call this function. This will refresh
+    /// the max-length value for our wrapper, which is used for example in the 
+    /// [`move_cursor`] function to make sure, that the given index doesn't
+    /// exceed the length of the list.
+    ///
+    /// [`move_cursor`]: struct.ListStateWrapper.html#method.move_cursor 
     pub fn set_length(&mut self, length: usize) {
         self.list_length = length;
     }
@@ -206,7 +211,8 @@ impl ListStateWrapper {
     ///     // get the "frame"/"rect" where the widget has to be placed
     ///     Rect::new(0, 0, 100, 100),
     ///
-    ///     // get the state which is gonna be adjusted according to the cursor
+    ///     // (THIS FUNCTION) get the state which is gonna be adjusted
+    ///     // according to the cursor
     ///     tui_widget.get_state(),
     /// );
     /// ```

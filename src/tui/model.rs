@@ -22,7 +22,9 @@ use crate::tui::modes::{
 };
 
 use crate::config::model::Config;
+use crate::config::tui::tui::TuiConfig;
 use crate::tui::modes::block_data::BlockData;
+use crate::tui::modes::keybinding_manager::KeybindingManager;
 use crate::tui::tabs::account_tab::AccountTab;
 
 // ================
@@ -64,9 +66,9 @@ impl From<crossterm::ErrorKind> for TuiError {
 pub enum BackendActions {
     Quit,
     Redraw,
-    GetAccount,
     WritingMail,
     ViewingMail,
+    GotoAccount(i32),
 }
 
 // ----------
@@ -88,6 +90,9 @@ pub struct Tui<'tui> {
     accounts:      Vec<AccountTab<'tui>>,
     account_index: usize,
     account_block: BlockData,
+
+    // global keybindings
+    keybinding_manager: KeybindingManager<BackendActions>,
 
     // modes
     normal: NormalFrame,
@@ -117,6 +122,13 @@ impl<'tui> Tui<'tui> {
             })
             .collect();
 
+        let keybindings = TuiConfig::parse_keybindings(
+            &config.tui.default_keybindings,
+            &config.tui.keybindings,
+        );
+
+        let keybinding_manager = KeybindingManager::new(keybindings);
+
         Tui {
             normal,
             viewer,
@@ -126,6 +138,7 @@ impl<'tui> Tui<'tui> {
                 String::from("Accounts"),
                 &config.tui.account_block,
             ),
+            keybinding_manager,
             writer,
             config: config,
             need_redraw: true,     // draw the TUI
@@ -147,53 +160,71 @@ impl<'tui> Tui<'tui> {
             self.need_redraw = true;
             return Ok(());
         }
+        // Look, if the event is a global kebyinding
+        else if let Some(action) = self.keybinding_manager.eval_event(event) {
+            match action {
+                BackendActions::GotoAccount(offset) => {
+                    if offset > 0 {
+                        self.account_index = self
+                            .account_index
+                            .saturating_add(offset.abs() as usize);
+                        // make sure that we didn't exceed the buffer
+                        if self.account_index > self.accounts.len() - 1 {
+                            self.account_index = self.accounts.len() - 1;
+                        }
+                    } else {
+                        self.account_index = self
+                            .account_index
+                            .saturating_sub(offset.abs() as usize);
+                    }
 
-        match self.mode {
+                    self.need_redraw = true;
+                },
+                _ => (),
+            }
+
+            // So it was indeed a global keybinding! So we can skip to look,
+            // if the keybinding was for a mode.
+            return Ok(());
+        }
+
+        let mut account_tab = &mut self.accounts[self.account_index];
+
+        match account_tab.mode {
             // Normal - Mode
             TuiMode::Normal => {
-                if let Some(action) = self
-                    .normal
-                    .handle_event(event, &mut self.accounts[self.account_index])
-                {
+                if let Some(action) = self.normal.handle_event(event, account_tab) {
                     match action {
                         BackendActions::Quit => self.run = false,
                         BackendActions::Redraw => self.need_redraw = true,
-                        BackendActions::GetAccount => (),
                         BackendActions::WritingMail => {
-                            self.mode = TuiMode::Writing;
+                            account_tab.mode = TuiMode::Writing;
                             self.need_redraw = true;
                         },
                         BackendActions::ViewingMail => {
-                            self.mode = TuiMode::Viewing;
+                            account_tab.mode = TuiMode::Viewing;
                             self.need_redraw = true;
 
-                            let uid = self.accounts[self.account_index]
-                                .normal
-                                .get_current_mail_uid();
+                            let uid = account_tab.normal.get_current_mail_uid();
 
-                            let mbox = self.accounts[self.account_index]
-                                .normal
-                                .get_current_mailbox_name();
+                            let mbox =
+                                account_tab.normal.get_current_mailbox_name();
 
-                            let account_tab =
-                                &mut self.accounts[self.account_index];
                             account_tab.viewer.set_content(
                                 &account_tab.account,
                                 &mbox,
                                 &uid,
                             )?;
                         },
+                        _ => (),
                     };
                 };
             },
             TuiMode::Writing => {
-                if let Some(action) = self
-                    .writer
-                    .handle_event(event, &mut self.accounts[self.account_index])
-                {
+                if let Some(action) = self.writer.handle_event(event, account_tab) {
                     match action {
                         BackendActions::Quit => {
-                            self.mode = TuiMode::Normal;
+                            account_tab.mode = TuiMode::Normal;
                             self.need_redraw = true;
                         },
                         _ => (),
@@ -201,13 +232,10 @@ impl<'tui> Tui<'tui> {
                 }
             },
             TuiMode::Viewing => {
-                if let Some(action) = self
-                    .viewer
-                    .handle_event(event, &mut self.accounts[self.account_index])
-                {
+                if let Some(action) = self.viewer.handle_event(event, account_tab) {
                     match action {
                         BackendActions::Quit => {
-                            self.mode = TuiMode::Normal;
+                            account_tab.mode = TuiMode::Normal;
                             self.need_redraw = true;
                         },
                         BackendActions::Redraw => self.need_redraw = true,
@@ -227,8 +255,7 @@ impl<'tui> Tui<'tui> {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints(
-                [Constraint::Length(3), Constraint::Length(10)]
-                    .as_ref(),
+                [Constraint::Length(3), Constraint::Length(90)].as_ref(),
             )
             .margin(1)
             .split(frame.size());
@@ -236,14 +263,18 @@ impl<'tui> Tui<'tui> {
         frame.render_widget(self.get_user_tabs(), layout[0]);
 
         // prepare the given frame
-        match self.mode {
+        match self.accounts[self.account_index].mode {
             TuiMode::Normal => self.normal.draw(
                 frame,
                 layout[1],
                 &mut self.accounts[self.account_index],
             ),
-            // TuiMode::Writing => self.writer.draw(frame),
             TuiMode::Viewing => self.viewer.draw(
+                frame,
+                layout[1],
+                &mut self.accounts[self.account_index],
+            ),
+            TuiMode::Writing => self.writer.draw(
                 frame,
                 layout[1],
                 &mut self.accounts[self.account_index],

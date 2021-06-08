@@ -9,6 +9,7 @@ use super::modes::viewer::ViewerConfig;
 use super::modes::writer::WriterConfig;
 
 use crate::config::tui::block_data::BlockDataConfig;
+use crate::tui::model::BackendActions;
 
 // ==========
 // Enums
@@ -41,6 +42,10 @@ pub struct TuiConfig {
     pub viewer: ViewerConfig,
     pub writer: WriterConfig,
     pub account_block: BlockDataConfig,
+    pub keybindings: HashMap<String, String>,
+
+    #[serde(skip, default = "TuiConfig::default_keybindings")]
+    pub default_keybindings: Vec<(&'static str, BackendActions, &'static str)>,
 }
 
 impl Default for TuiConfig {
@@ -50,6 +55,8 @@ impl Default for TuiConfig {
             viewer: ViewerConfig::default(),
             writer: WriterConfig::default(),
             account_block: BlockDataConfig::default(),
+            keybindings: HashMap::new(),
+            default_keybindings: TuiConfig::default_keybindings(),
         }
     }
 }
@@ -198,8 +205,7 @@ impl TuiConfig {
     ) -> HashMap<Event, KeyType<ModeActions>> {
         // This variable will store all keybindings which will get converted
         // into <Event, Action>.
-        let mut keybindings: HashMap<Event, KeyType<ModeActions>> =
-            HashMap::new();
+        let mut keybindings: HashMap<Event, KeyType<ModeActions>> = HashMap::new();
 
         // Now iterate through all available actions and look, which one got
         // overridden.
@@ -216,8 +222,7 @@ impl TuiConfig {
             // This should rather fungate as a pointer which traverses through
             // the keybinding-tree in order to add other nodes or check where to
             // go next.
-            let mut node: &mut HashMap<Event, KeyType<ModeActions>> =
-                &mut keybindings;
+            let mut node: &mut HashMap<Event, KeyType<ModeActions>> = &mut keybindings;
 
             // Parse each keypress into the given event
             let iter = TuiConfig::parse_keys(keybinding);
@@ -280,14 +285,13 @@ impl TuiConfig {
                 // We should never reach this panic-else block since we made
                 // sure with the previous if-clause that a node exists. But
                 // just in case, there's this panic.
-                node =
-                    if let Some(KeyType::Key(sub_node)) = node.get_mut(&event) {
-                        sub_node
-                    } else {
-                        println!("Couldn't get to the next node of the");
-                        println!("Keybinding tree.");
-                        panic!("Incomplete Keybinding Tree.");
-                    }
+                node = if let Some(KeyType::Key(sub_node)) = node.get_mut(&event) {
+                    sub_node
+                } else {
+                    println!("Couldn't get to the next node of the");
+                    println!("Keybinding tree.");
+                    panic!("Incomplete Keybinding Tree.");
+                }
             }
 
             // So we created the path to our keybinding, now we just need to add
@@ -403,13 +407,7 @@ impl TuiConfig {
                         // <S-<char>> is uppercase if we have the shift
                         // modifier.
                         if modifier == KeyModifiers::SHIFT {
-                            KeyCode::Char(
-                                unparsed
-                                    .chars()
-                                    .nth(2)
-                                    .unwrap()
-                                    .to_ascii_uppercase(),
-                            )
+                            KeyCode::Char(unparsed.chars().nth(2).unwrap().to_ascii_uppercase())
                         } else {
                             KeyCode::Char(unparsed.chars().nth(2).unwrap())
                         }
@@ -486,5 +484,12 @@ impl TuiConfig {
             "Esc>" => KeyCode::Esc,
             _ => KeyCode::Null,
         }
+    }
+
+    pub fn default_keybindings() -> Vec<(&'static str, BackendActions, &'static str)> {
+        vec![
+            ("account_forward", BackendActions::GotoAccount(1), "gt"),
+            ("account_backward", BackendActions::GotoAccount(-1), "g<S-t>"),
+        ]
     }
 }

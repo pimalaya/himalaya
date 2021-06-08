@@ -25,7 +25,6 @@ pub enum NormalAction {
     Quit,
     CursorOffset(i32),
     CursorAbsolut(Option<usize>),
-    SetAccount,
     WritingMail,
     ViewingMail,
     ToggleSidebar,
@@ -88,7 +87,6 @@ impl BackendInterface for NormalFrame {
                     account.set_mail_list_cursor(index);
                     Some(BackendActions::Redraw)
                 },
-                NormalAction::SetAccount => Some(BackendActions::GetAccount),
                 NormalAction::ToggleSidebar => {
                     account.display_sidebar = !account.display_sidebar;
                     Some(BackendActions::Redraw)
