@@ -125,7 +125,7 @@ impl<'a> ImapConnector<'a> {
                         false
                     })
                 })
-                .chain_err(|| "Could not start the idle mode")?;
+            .chain_err(|| "Could not start the idle mode")?;
 
             let uids: Vec<u32> = self
                 .search_new_msgs()?
@@ -183,7 +183,7 @@ impl<'a> ImapConnector<'a> {
                         false
                     })
                 })
-                .chain_err(|| "Could not start the idle mode")?;
+            .chain_err(|| "Could not start the idle mode")?;
             ctx.config.exec_watch_cmds(&ctx.account)?;
             debug!("end loop");
         }
@@ -203,7 +203,7 @@ impl<'a> ImapConnector<'a> {
         mbox: &str,
         page_size: &usize,
         page: &usize,
-    ) -> Result<Option<imap::types::ZeroCopy<Vec<imap::types::Fetch>>>> {
+        ) -> Result<Option<imap::types::ZeroCopy<Vec<imap::types::Fetch>>>> {
         let last_seq = self
             .sess
             .select(mbox)
@@ -238,7 +238,7 @@ impl<'a> ImapConnector<'a> {
         query: &str,
         page_size: &usize,
         page: &usize,
-    ) -> Result<Option<imap::types::ZeroCopy<Vec<imap::types::Fetch>>>> {
+        ) -> Result<Option<imap::types::ZeroCopy<Vec<imap::types::Fetch>>>> {
         self.sess
             .select(mbox)
             .chain_err(|| format!("Could not select mailbox `{}`", mbox))?;
@@ -276,10 +276,10 @@ impl<'a> ImapConnector<'a> {
             .uid_fetch(uid, "(FLAGS BODY[])")
             .chain_err(|| "Could not fetch bodies")?
             .first()
-        {
-            None => Err(format!("Could not find message `{}`", uid).into()),
-            Some(fetch) => Ok(fetch.body().unwrap_or(&[]).to_vec()),
-        }
+            {
+                None => Err(format!("Could not find message `{}`", uid).into()),
+                Some(fetch) => Ok(fetch.body().unwrap_or(&[]).to_vec()),
+            }
     }
 
     pub fn append_msg(&mut self, mbox: &str, msg: &[u8], flags: Vec<Flag>) -> Result<()> {
