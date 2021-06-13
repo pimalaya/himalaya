@@ -2,6 +2,9 @@
 // ============
 // Structs
 // ============
+/// This struct stores the information from an attachment:
+///     1. It's filename
+///     2. It's content
 pub struct Attachment {
     pub filename: String,
     pub body_raw: Vec<u8>,

@@ -3,6 +3,12 @@ use std::borrow::Cow;
 // ============
 // Structs
 // ============
+/// This struct is a wrapper for the [Envelope
+/// struct](https://docs.rs/imap-proto/0.14.3/imap_proto/types/struct.Envelope.html)
+/// of the [imap_proto](https://docs.rs/imap-proto/0.14.3/imap_proto/index.html)
+/// crate. It's should mainly help to interact with the mails by using more
+/// common data types like `Vec` or `String` since a `[u8]` array is a little
+/// bit limited to use.
 pub struct Envelope {
     pub date: String,
     pub subject: String,
