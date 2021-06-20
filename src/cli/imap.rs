@@ -11,7 +11,13 @@ error_chain! {
     }
 }
 
-pub fn imap_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
+// ===================
+// Main Functions
+// ===================
+/// Provides the following **subcommands**:
+/// - `notify`
+/// - `watch`
+pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
     vec![
         clap::SubCommand::with_name("notify")
             .about("Notifies when new messages arrive in the given mailbox")
@@ -37,7 +43,7 @@ pub fn imap_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
     ]
 }
 
-pub fn imap_matches(ctx: &Ctx) -> Result<bool> {
+pub fn matches(ctx: &Ctx) -> Result<bool> {
     if let Some(matches) = ctx.arg_matches.subcommand_matches("notify") {
         debug!("notify command matched");
 

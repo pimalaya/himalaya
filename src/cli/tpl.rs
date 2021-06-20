@@ -17,21 +17,10 @@ error_chain! {
     }
 }
 
-pub fn uid_arg<'a>() -> clap::Arg<'a, 'a> {
-    clap::Arg::with_name("uid")
-        .help("Specifies the targetted message")
-        .value_name("UID")
-        .required(true)
-}
-
-fn reply_all_arg<'a>() -> clap::Arg<'a, 'a> {
-    clap::Arg::with_name("reply-all")
-        .help("Includes all recipients")
-        .short("A")
-        .long("all")
-}
-
-pub fn tpl_subcommand<'a>() -> clap::App<'a, 'a> {
+// ===================
+// Main Functions
+// ===================
+pub fn subcmds<'a>() -> clap::App<'a, 'a> {
     clap::SubCommand::with_name("template")
         .aliases(&["tpl"])
         .about("Generates a message template")
@@ -57,6 +46,35 @@ pub fn tpl_subcommand<'a>() -> clap::App<'a, 'a> {
                 .args(&tpl_args()),
         )
 }
+
+pub fn matches(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
+    match matches.subcommand() {
+        ("new", Some(matches)) => tpl_matches_new(ctx, matches),
+        ("reply", Some(matches)) => tpl_matches_reply(ctx, matches),
+        ("forward", Some(matches)) => tpl_matches_forward(ctx, matches),
+
+        // TODO: find a way to show the help message for template subcommand
+        _ => Err("Subcommand not found".into()),
+    }
+}
+
+// ==================
+// Arg Functions
+// ==================
+pub fn uid_arg<'a>() -> clap::Arg<'a, 'a> {
+    clap::Arg::with_name("uid")
+        .help("Specifies the targetted message")
+        .value_name("UID")
+        .required(true)
+}
+
+fn reply_all_arg<'a>() -> clap::Arg<'a, 'a> {
+    clap::Arg::with_name("reply-all")
+        .help("Includes all recipients")
+        .short("A")
+        .long("all")
+}
+
 
 pub fn tpl_args<'a>() -> Vec<clap::Arg<'a, 'a>> {
     vec![
@@ -107,17 +125,8 @@ pub fn tpl_args<'a>() -> Vec<clap::Arg<'a, 'a>> {
     ]
 }
 
-pub fn tpl_matches(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
-    match matches.subcommand() {
-        ("new", Some(matches)) => tpl_matches_new(ctx, matches),
-        ("reply", Some(matches)) => tpl_matches_reply(ctx, matches),
-        ("forward", Some(matches)) => tpl_matches_forward(ctx, matches),
-
-        // TODO: find a way to show the help message for template subcommand
-        _ => Err("Subcommand not found".into()),
-    }
-}
-
+/// This function fills the data for the template structre with the given
+/// argument values.
 fn override_tpl_with_args(tpl: &mut Tpl, matches: &clap::ArgMatches) {
     if let Some(from) = matches.value_of("from") {
         debug!("overriden from: {:?}", from);
@@ -176,6 +185,9 @@ fn override_tpl_with_args(tpl: &mut Tpl, matches: &clap::ArgMatches) {
     };
 }
 
+// ==================
+// Match Actions
+// ==================
 fn tpl_matches_new(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     debug!("new command matched");
 

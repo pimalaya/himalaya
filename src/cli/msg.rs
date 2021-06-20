@@ -9,15 +9,15 @@ use std::{
 };
 
 use crate::{
+    cli,
     ctx::Ctx,
     flag::model::Flag,
     imap::model::ImapConnector,
     input,
-    mbox::cli::mbox_target_arg,
     msg::{
         model::{Attachments, Msg, Msgs, ReadableMsg},
         tpl::{
-            cli::{tpl_matches, tpl_subcommand},
+            // cli::{tpl_matches, tpl_subcommand},
             model::Tpl,
         },
     },
@@ -29,7 +29,7 @@ error_chain! {
         Imap(crate::imap::model::Error, crate::imap::model::ErrorKind);
         Input(crate::input::Error, crate::input::ErrorKind);
         MsgModel(crate::msg::model::Error, crate::msg::model::ErrorKind);
-        TplCli(crate::msg::tpl::cli::Error, crate::msg::tpl::cli::ErrorKind);
+        TplCli(crate::cli::tpl::Error, crate::cli::tpl::ErrorKind);
         Smtp(crate::smtp::Error, crate::smtp::ErrorKind);
     }
     foreign_links {
@@ -37,47 +37,23 @@ error_chain! {
     }
 }
 
-pub fn uid_arg<'a>() -> clap::Arg<'a, 'a> {
-    clap::Arg::with_name("uid")
-        .help("Specifies the targetted message")
-        .value_name("UID")
-        .required(true)
-}
-
-fn reply_all_arg<'a>() -> clap::Arg<'a, 'a> {
-    clap::Arg::with_name("reply-all")
-        .help("Includes all recipients")
-        .short("A")
-        .long("all")
-}
-
-fn page_size_arg<'a>() -> clap::Arg<'a, 'a> {
-    clap::Arg::with_name("page-size")
-        .help("Page size")
-        .short("s")
-        .long("size")
-        .value_name("INT")
-}
-
-fn page_arg<'a>() -> clap::Arg<'a, 'a> {
-    clap::Arg::with_name("page")
-        .help("Page number")
-        .short("p")
-        .long("page")
-        .value_name("INT")
-        .default_value("0")
-}
-
-fn attachment_arg<'a>() -> clap::Arg<'a, 'a> {
-    clap::Arg::with_name("attachments")
-        .help("Adds attachment to the message")
-        .short("a")
-        .long("attachment")
-        .value_name("PATH")
-        .multiple(true)
-}
-
-pub fn msg_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
+// ===================
+// Main Functions
+// ===================
+/// Provides the following subcommands:
+/// - `list`
+/// - `search`
+/// - `write`
+/// - `send`
+/// - `save`
+/// - `read`
+/// - `attachments`
+/// - `reply`
+/// - `forward`
+/// - `copy`
+/// - `move`
+/// - `delete`
+pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
     vec![
         clap::SubCommand::with_name("list")
             .aliases(&["lst"])
@@ -140,21 +116,21 @@ pub fn msg_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
             .aliases(&["cp"])
             .about("Copies a message to the targetted mailbox")
             .arg(uid_arg())
-            .arg(mbox_target_arg()),
+            .arg(cli::mbox::target_arg()),
         clap::SubCommand::with_name("move")
             .aliases(&["mv"])
             .about("Moves a message to the targetted mailbox")
             .arg(uid_arg())
-            .arg(mbox_target_arg()),
+            .arg(cli::mbox::target_arg()),
         clap::SubCommand::with_name("delete")
             .aliases(&["remove", "rm"])
             .about("Deletes a message")
             .arg(uid_arg()),
-        tpl_subcommand(),
+        cli::tpl::subcmds(),
     ]
 }
 
-pub fn msg_matches(ctx: &Ctx) -> Result<bool> {
+pub fn matches(ctx: &Ctx) -> Result<bool> {
     match ctx.arg_matches.subcommand() {
         ("attachments", Some(matches)) => msg_matches_attachments(ctx, matches),
         ("copy", Some(matches)) => msg_matches_copy(ctx, matches),
@@ -168,13 +144,60 @@ pub fn msg_matches(ctx: &Ctx) -> Result<bool> {
         ("send", Some(matches)) => msg_matches_send(ctx, matches),
         ("write", Some(matches)) => msg_matches_write(ctx, matches),
 
-        ("template", Some(matches)) => Ok(tpl_matches(ctx, matches)?),
+        ("template", Some(matches)) => Ok(cli::tpl::matches(ctx, matches)?),
 
         ("list", opt_matches) => msg_matches_list(ctx, opt_matches),
         (_other, opt_matches) => msg_matches_list(ctx, opt_matches),
     }
 }
 
+
+// ==================
+// Arg Functions
+// ==================
+pub fn uid_arg<'a>() -> clap::Arg<'a, 'a> {
+    clap::Arg::with_name("uid")
+        .help("Specifies the targetted message")
+        .value_name("UID")
+        .required(true)
+}
+
+fn reply_all_arg<'a>() -> clap::Arg<'a, 'a> {
+    clap::Arg::with_name("reply-all")
+        .help("Includes all recipients")
+        .short("A")
+        .long("all")
+}
+
+fn page_size_arg<'a>() -> clap::Arg<'a, 'a> {
+    clap::Arg::with_name("page-size")
+        .help("Page size")
+        .short("s")
+        .long("size")
+        .value_name("INT")
+}
+
+fn page_arg<'a>() -> clap::Arg<'a, 'a> {
+    clap::Arg::with_name("page")
+        .help("Page number")
+        .short("p")
+        .long("page")
+        .value_name("INT")
+        .default_value("0")
+}
+
+fn attachment_arg<'a>() -> clap::Arg<'a, 'a> {
+    clap::Arg::with_name("attachments")
+        .help("Adds attachment to the message")
+        .short("a")
+        .long("attachment")
+        .value_name("PATH")
+        .multiple(true)
+}
+
+// ==================
+// Match Actions
+// ==================
 fn msg_matches_list(ctx: &Ctx, opt_matches: Option<&clap::ArgMatches>) -> Result<bool> {
     debug!("list command matched");
 

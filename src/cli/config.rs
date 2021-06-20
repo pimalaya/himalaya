@@ -1,6 +1,12 @@
 use clap::Arg;
 
-pub fn config_args<'a>() -> Vec<Arg<'a, 'a>> {
+// ===================
+// Main-Functions
+// ===================
+/// Provides the following options:
+/// - `-c, --config`
+/// - `-a, --account`
+pub fn options<'option>() -> Vec<Arg<'option, 'option>> {
     vec![
         Arg::with_name("config")
             .long("config")

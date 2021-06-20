@@ -10,28 +10,27 @@ error_chain! {
     }
 }
 
-pub fn mbox_source_arg<'a>() -> clap::Arg<'a, 'a> {
-    clap::Arg::with_name("mailbox")
-        .short("m")
-        .long("mailbox")
-        .help("Selects a specific mailbox")
-        .value_name("MAILBOX")
-        .default_value("INBOX")
+// ===================
+// Main Functions
+// ===================
+pub fn options<'options>() -> Vec<clap::Arg<'options, 'options>> {
+    vec![
+        clap::Arg::with_name("mailbox")
+            .short("m")
+            .long("mailbox")
+            .help("Selects a specific mailbox")
+            .value_name("MAILBOX")
+            .default_value("INBOX"),
+    ]
 }
 
-pub fn mbox_target_arg<'a>() -> clap::Arg<'a, 'a> {
-    clap::Arg::with_name("target")
-        .help("Specifies the targetted mailbox")
-        .value_name("TARGET")
-}
-
-pub fn mbox_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
+pub fn subcmds<'subcmds>() -> Vec<clap::App<'subcmds, 'subcmds>> {
     vec![clap::SubCommand::with_name("mailboxes")
         .aliases(&["mailbox", "mboxes", "mbox", "m"])
         .about("Lists all mailboxes")]
 }
 
-pub fn mbox_matches(ctx: &Ctx) -> Result<bool> {
+pub fn matches(ctx: &Ctx) -> Result<bool> {
     if let Some(_) = ctx.arg_matches.subcommand_matches("mailboxes") {
         debug!("mailboxes command matched");
 
@@ -48,4 +47,13 @@ pub fn mbox_matches(ctx: &Ctx) -> Result<bool> {
 
     debug!("nothing matched");
     Ok(false)
+}
+
+// ==================
+// Arg functions
+// ==================
+pub fn target_arg<'target>() -> clap::Arg<'target, 'target> {
+    clap::Arg::with_name("target")
+        .help("Specifies the targetted mailbox")
+        .value_name("TARGET")
 }

@@ -1,6 +1,12 @@
 use clap::Arg;
 
-pub fn output_args<'a>() -> Vec<Arg<'a, 'a>> {
+// ==============
+// Functions
+// ==============
+/// Provides the following **options**:
+/// - `-o, --output`
+/// - `-l, --log-level`
+pub fn options<'a>() -> Vec<Arg<'a, 'a>> {
     vec![
         Arg::with_name("output")
             .long("output")
