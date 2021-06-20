@@ -61,6 +61,7 @@ pub fn matches(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 // ==================
 // Arg Functions
 // ==================
+/// Returns the `<UID>` argument
 pub fn uid_arg<'a>() -> clap::Arg<'a, 'a> {
     clap::Arg::with_name("uid")
         .help("Specifies the targetted message")
@@ -68,6 +69,7 @@ pub fn uid_arg<'a>() -> clap::Arg<'a, 'a> {
         .required(true)
 }
 
+/// Returns the `-A, --all` flag
 fn reply_all_arg<'a>() -> clap::Arg<'a, 'a> {
     clap::Arg::with_name("reply-all")
         .help("Includes all recipients")
@@ -76,6 +78,8 @@ fn reply_all_arg<'a>() -> clap::Arg<'a, 'a> {
 }
 
 
+/// Returns the different options for the template like `-b, -bcc` for setting
+/// the BCC header
 pub fn tpl_args<'a>() -> Vec<clap::Arg<'a, 'a>> {
     vec![
         clap::Arg::with_name("subject")

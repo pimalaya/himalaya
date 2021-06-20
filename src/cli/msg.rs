@@ -155,6 +155,7 @@ pub fn matches(ctx: &Ctx) -> Result<bool> {
 // ==================
 // Arg Functions
 // ==================
+/// Returns the `<UID>` argument
 pub fn uid_arg<'a>() -> clap::Arg<'a, 'a> {
     clap::Arg::with_name("uid")
         .help("Specifies the targetted message")
@@ -162,6 +163,7 @@ pub fn uid_arg<'a>() -> clap::Arg<'a, 'a> {
         .required(true)
 }
 
+/// Returns the `-A, --all` flag
 fn reply_all_arg<'a>() -> clap::Arg<'a, 'a> {
     clap::Arg::with_name("reply-all")
         .help("Includes all recipients")
@@ -169,6 +171,7 @@ fn reply_all_arg<'a>() -> clap::Arg<'a, 'a> {
         .long("all")
 }
 
+/// Returns the `-s, --size` option
 fn page_size_arg<'a>() -> clap::Arg<'a, 'a> {
     clap::Arg::with_name("page-size")
         .help("Page size")
@@ -177,6 +180,7 @@ fn page_size_arg<'a>() -> clap::Arg<'a, 'a> {
         .value_name("INT")
 }
 
+/// Returns the `-p, --page` option
 fn page_arg<'a>() -> clap::Arg<'a, 'a> {
     clap::Arg::with_name("page")
         .help("Page number")
@@ -186,6 +190,7 @@ fn page_arg<'a>() -> clap::Arg<'a, 'a> {
         .default_value("0")
 }
 
+/// returns the `-a, --attachment` option
 fn attachment_arg<'a>() -> clap::Arg<'a, 'a> {
     clap::Arg::with_name("attachments")
         .help("Adds attachment to the message")

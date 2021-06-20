@@ -31,7 +31,6 @@ pub mod table;
 /// [`himalaya::cli::mbox::target_arg`] is for examply used for the `himalaya
 /// copy` and `himalaya move` subcommand.
 ///
-///
 /// ## Example
 /// ```rust
 /// use himalaya::cli;

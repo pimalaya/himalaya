@@ -52,6 +52,7 @@ pub fn matches(ctx: &Ctx) -> Result<bool> {
 // ==================
 // Arg functions
 // ==================
+/// Returns the `[TARGET]` argument
 pub fn target_arg<'target>() -> clap::Arg<'target, 'target> {
     clap::Arg::with_name("target")
         .help("Specifies the targetted mailbox")

@@ -100,6 +100,7 @@ pub fn matches(ctx: &Ctx) -> Result<bool> {
 // ==================
 // Arg functions
 // ==================
+/// Returns the `<FLAGS>` argument.
 fn flags_arg<'a>() -> clap::Arg<'a, 'a> {
     clap::Arg::with_name("flags")
         .help("IMAP flags (see https://tools.ietf.org/html/rfc3501#page-11)")
