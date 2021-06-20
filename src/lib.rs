@@ -26,8 +26,9 @@ pub mod table;
 ///
 /// # The `*_arg` functions
 /// There are also other functions with the `_arg` prefix. These are used to add
-/// some `<ARG>` arguments. They are not in the `options` function because they
-/// are meant to be used multiple times in combination with subcommands. The
+/// some `<ARG>` arguments, `--<option> <val>` option or `--<flag>` flags. They
+/// are not in the `options` function because they are meant to be used multiple
+/// times in combination with subcommands. The
 /// [`himalaya::cli::mbox::target_arg`] is for examply used for the `himalaya
 /// copy` and `himalaya move` subcommand.
 ///
