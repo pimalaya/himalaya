@@ -1,7 +1,11 @@
 extern crate himalaya;
 
 use himalaya::{
-    config::model::Account, imap::model::ImapConnector, mbox::model::Mboxes, msg::model::Msgs, smtp,
+    config::model::Account,
+    imap::model::ImapConnector,
+    mbox::model::Mboxes,
+    msg::model::Msgs,
+    smtp,
 };
 
 fn get_account(addr: &str) -> Account {
@@ -50,23 +54,23 @@ fn msg() {
     smtp::send(
         &account,
         &lettre::Message::builder()
-            .from("sender-a@localhost".parse().unwrap())
-            .to("inbox@localhost".parse().unwrap())
-            .subject("Subject A")
-            .singlepart(lettre::message::SinglePart::builder().body("Body A".as_bytes().to_vec()))
-            .unwrap(),
-    )
-    .unwrap();
+        .from("sender-a@localhost".parse().unwrap())
+        .to("inbox@localhost".parse().unwrap())
+        .subject("Subject A")
+        .singlepart(lettre::message::SinglePart::builder().body("Body A".as_bytes().to_vec()))
+        .unwrap(),
+        )
+        .unwrap();
     smtp::send(
         &account,
         &lettre::Message::builder()
-            .from("\"Sender B\" <sender-b@localhost>".parse().unwrap())
-            .to("inbox@localhost".parse().unwrap())
-            .subject("Subject B")
-            .singlepart(lettre::message::SinglePart::builder().body("Body B".as_bytes().to_vec()))
-            .unwrap(),
-    )
-    .unwrap();
+        .from("\"Sender B\" <sender-b@localhost>".parse().unwrap())
+        .to("inbox@localhost".parse().unwrap())
+        .subject("Subject B")
+        .singlepart(lettre::message::SinglePart::builder().body("Body B".as_bytes().to_vec()))
+        .unwrap(),
+        )
+        .unwrap();
 
     // Login
     let mut imap_conn = ImapConnector::new(&account).unwrap();
