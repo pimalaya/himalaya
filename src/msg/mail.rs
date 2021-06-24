@@ -258,12 +258,24 @@ impl<'mail> Mail<'mail> {
         // ---------------------
         // add "from"
         for mailaddress in &self.envelope.from {
-            msg = msg.from(mailaddress.parse().unwrap());
+            msg = msg.from(match mailaddress.parse() {
+                Ok(msg) => msg,
+                Err(_) => {
+                    error_msg_forgot_header("From");
+                    return Err(MailError::MakingSendable);
+                }
+            });
         }
 
         // add "to"
         for mailaddress in &self.envelope.to {
-            msg = msg.to(mailaddress.parse().unwrap());
+            msg = msg.to(match mailaddress.parse() {
+                Ok(msg) => msg,
+                Err(_) => {
+                    error_msg_forgot_header("To");
+                    return Err(MailError::MakingSendable);
+                }
+            });
         }
 
         // --------------------
@@ -271,33 +283,63 @@ impl<'mail> Mail<'mail> {
         // --------------------
         // add "sender"
         if let Some(sender) = &self.envelope.sender {
-            msg = msg.sender(sender.parse().unwrap());
+            msg = msg.sender(match sender.parse() {
+                Ok(msg) => msg,
+                Err(_) => {
+                    error_msg_forgot_header("Sender");
+                    return Err(MailError::MakingSendable);
+                }
+            });
         }
 
         // add "reply-to"
         if let Some(reply_to) = &self.envelope.reply_to {
             for mailaddress in reply_to {
-                msg = msg.reply_to(mailaddress.parse().unwrap());
+                msg = msg.reply_to(match mailaddress.parse() {
+                    Ok(msg) => msg,
+                    Err(_) => {
+                        error_msg_forgot_header("Reply-To");
+                        return Err(MailError::MakingSendable);
+                    }
+                });
             }
         }
 
         // add "cc"
         if let Some(cc) = &self.envelope.cc {
             for mailaddress in cc {
-                msg = msg.cc(mailaddress.parse().unwrap());
+                msg = msg.cc(match mailaddress.parse() {
+                    Ok(msg) => msg,
+                    Err(_) => {
+                        error_msg_forgot_header("Cc");
+                        return Err(MailError::MakingSendable);
+                    }
+                });
             }
         }
 
         // add "bcc"
         if let Some(bcc) = &self.envelope.bcc {
             for mailaddress in bcc {
-                msg = msg.bcc(mailaddress.parse().unwrap());
+                msg = msg.bcc(match mailaddress.parse() {
+                    Ok(msg) => msg,
+                    Err(_) => {
+                        error_msg_forgot_header("Bcc");
+                        return Err(MailError::MakingSendable);
+                    }
+                });
             }
         }
 
         // add "in_reply_to"
         if let Some(in_reply_to) = &self.envelope.in_reply_to {
-            msg = msg.in_reply_to(in_reply_to.clone());
+            msg = msg.in_reply_to(match in_reply_to.parse() {
+                Ok(msg) => msg,
+                Err(_) => {
+                    error_msg_forgot_header("In-Reply-To");
+                    return Err(MailError::MakingSendable);
+                }
+            });
         }
 
         // -----------------------
@@ -340,9 +382,8 @@ impl<'mail> Mail<'mail> {
         match msg.multipart(msg_parts) {
             Ok(msg_prepared) => Ok(msg_prepared),
             Err(err) => {
-                println!("{}", String::from_utf8(self.attachments[0].body_raw.clone()).unwrap());
                 println!("{}", err);
-                panic!("Why");
+                Err(MailError::MakingSendable)
             }
         }
     }
@@ -415,4 +456,23 @@ impl<'mail> TryFrom<&'mail Fetch> for Mail<'mail> {
             parsed: Some(parsed),
         })
     }
+}
+
+// =====================
+// Helper Functions
+// =====================
+/// # Usages
+/// It's only used in the `Mail::to_sendable_msg` function and is called, if the
+/// user forgot to enter a value into a header.
+///
+/// # Example
+/// If you run `error_msg_forgot_header("From")`, then this message will be
+/// printed out in the console:
+///
+///     [ERROR] Value is missing in the 'From:' header!
+///     Please edit your mail again and enter a value in it!
+///
+fn error_msg_forgot_header(header_name: &str) {
+    println!("[ERROR] Value is missing in the '{}:' header!", header_name);
+    println!("Please edit your mail again and enter a value in it!");
 }
