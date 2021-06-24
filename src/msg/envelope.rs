@@ -29,7 +29,7 @@ pub struct Envelope {
     pub date:           Option<String>,
     pub in_reply_to:    Option<String>,
     pub reply_to:       Option<Vec<String>>,
-    pub sender:         Option<Vec<String>>,
+    pub sender:         Option<String>,
     pub signature:      Option<String>,
     pub subject:        Option<String>,
 }
@@ -89,8 +89,18 @@ impl From<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
                 convert_vec_address_to_string(from_envelope.from.as_ref())
                 .unwrap_or(Vec::new());
 
+            // since we get a vector here, we just need the first value, because
+            // there should be only one sender, otherwise we'll pass an empty
+            // string there
             let sender =
                 convert_vec_address_to_string(from_envelope.sender.as_ref());
+            // pick up the first element (if it exists) otherwise just set it
+            // to None because we might don't need it
+            let sender = match sender {
+                Some(tmp_sender) =>
+                    Some(tmp_sender.iter().next().unwrap_or(&String::new()).to_string()),
+                None => None
+            };
 
             let reply_to =
                 convert_vec_address_to_string(from_envelope.reply_to.as_ref());
@@ -185,7 +195,7 @@ impl fmt::Display for Envelope {
 
         // Sender
         if let Some(sender) = &self.sender {
-            result.push_str(&merge_addresses_to_one_line( "Sender", &sender));
+            result.push_str(&format!("Sender: {}", sender));
         }
 
         // reply_to

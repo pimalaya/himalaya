@@ -195,97 +195,97 @@ fn attachment_arg<'a>() -> clap::Arg<'a, 'a> {
 // Match functions
 // ====================
 fn msg_matches_test(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
-    println!("Test success!");
-
-    // prepare the imap server to update the status (for example if the user
-    // wants to send the mail)
-    let mut imap_conn = ImapConnector::new(&ctx.account)?;
-
-    // -----------------------------
-    // Prepare the general mail
-    // -----------------------------
-    let mut mail = Mail::new_with_envelope(
-        &ctx.account,
-        Envelope {
-            subject: Some(String::from("My subject")),
-            to: vec![String::from("TornaxO7 <tornax07@gmail.com>")],
-            .. Envelope::default()
-        });
-
-    // ----------------
-    // Attachments
-    // ----------------
-    // Parse the paths from the commandline first
-    let attachment_paths: Vec<&str> = matches
-        // get the provided arguments after the `--attachments` arg
-        // for example if the user called it like that:
-        //
-        //  himalaya --attachments path1 path2 path3
-        //
-        // than we will put them all in a vector
-        .values_of("attachments")
-        .unwrap_or_default()
-        .collect();
-
-    // now iterate over each path and add the attachments
-    attachment_paths.iter().for_each(|path| mail.add_attachment(path));
-
-    // ---------------------
-    // User Interaction
-    // ---------------------
-    // Now ask the user what we should do now
-    loop {
-        match input::post_edit_choice() {
-            Ok(choice) => match choice {
-                input::PostEditChoice::Send => {
-                    debug!("sending message…");
-
-                    // prepare the mail to be send
-                    let sendable = match mail.to_sendable_msg() {
-                        Ok(sendable) => sendable,
-                        Err(_) => return Ok(false),
-                    };
-                    smtp::send(&ctx.account, &sendable)?;
-
-                    // let the server know, that the user sent a mail
-                    imap_conn.append_msg("Sent", &sendable.formatted(), vec![Flag::Seen])?;
-
-                    // remove the draft, since we sent it
-                    input::remove_draft()?;
-                    ctx.output.print("Message successfully sent");
-                    break;
-                }
-                // edit the body of the mail
-                input::PostEditChoice::Edit => mail.edit_body(),
-                input::PostEditChoice::LocalDraft => break,
-                input::PostEditChoice::RemoteDraft => {
-                    debug!("saving to draft…");
-                    match mail.into_bytes() {
-                        Ok(parsed) => {
-                            imap_conn.append_msg("Drafts", &parsed, vec![Flag::Seen])?;
-                            input::remove_draft()?;
-                            ctx.output.print("Message successfully saved to Drafts");
-                        },
-                        Err(_) =>
-                            ctx.output.print("Couldn't save it to the server..."),
-                    };
-                    break;
-                }
-                input::PostEditChoice::Discard => {
-                    input::remove_draft()?;
-                    break;
-                }
-            },
-            Err(err) => error!("{}", err),
-        }
-    }
-
-    // be a good boi/gril and say "bye" to the server
-    imap_conn.logout();
-
-    println!("Yes");
-    // println!("{}", mail.envelope);
-
+    // println!("Test success!");
+    //
+    // // prepare the imap server to update the status (for example if the user
+    // // wants to send the mail)
+    // let mut imap_conn = ImapConnector::new(&ctx.account)?;
+    //
+    // // -----------------------------
+    // // Prepare the general mail
+    // // -----------------------------
+    // let mut mail = Mail::new_with_envelope(
+    //     &ctx.account,
+    //     Envelope {
+    //         subject: Some(String::from("My subject")),
+    //         to: vec![String::from("TornaxO7 <tornax07@gmail.com>")],
+    //         .. Envelope::default()
+    //     });
+    //
+    // // ----------------
+    // // Attachments
+    // // ----------------
+    // // Parse the paths from the commandline first
+    // let attachment_paths: Vec<&str> = matches
+    //     // get the provided arguments after the `--attachments` arg
+    //     // for example if the user called it like that:
+    //     //
+    //     //  himalaya --attachments path1 path2 path3
+    //     //
+    //     // than we will put them all in a vector
+    //     .values_of("attachments")
+    //     .unwrap_or_default()
+    //     .collect();
+    //
+    // // now iterate over each path and add the attachments
+    // attachment_paths.iter().for_each(|path| mail.add_attachment(path));
+    //
+    // // ---------------------
+    // // User Interaction
+    // // ---------------------
+    // // Now ask the user what we should do now
+    // loop {
+    //     match input::post_edit_choice() {
+    //         Ok(choice) => match choice {
+    //             input::PostEditChoice::Send => {
+    //                 debug!("sending message…");
+    //
+    //                 // prepare the mail to be send
+    //                 let sendable = match mail.to_sendable_msg() {
+    //                     Ok(sendable) => sendable,
+    //                     Err(_) => return Ok(false),
+    //                 };
+    //                 smtp::send(&ctx.account, &sendable)?;
+    //
+    //                 // let the server know, that the user sent a mail
+    //                 imap_conn.append_msg("Sent", &sendable.formatted(), vec![Flag::Seen])?;
+    //
+    //                 // remove the draft, since we sent it
+    //                 input::remove_draft()?;
+    //                 ctx.output.print("Message successfully sent");
+    //                 break;
+    //             }
+    //             // edit the body of the mail
+    //             input::PostEditChoice::Edit => mail.edit_body(),
+    //             input::PostEditChoice::LocalDraft => break,
+    //             input::PostEditChoice::RemoteDraft => {
+    //                 debug!("saving to draft…");
+    //                 match mail.into_bytes() {
+    //                     Ok(parsed) => {
+    //                         imap_conn.append_msg("Drafts", &parsed, vec![Flag::Seen])?;
+    //                         input::remove_draft()?;
+    //                         ctx.output.print("Message successfully saved to Drafts");
+    //                     },
+    //                     Err(_) =>
+    //                         ctx.output.print("Couldn't save it to the server..."),
+    //                 };
+    //                 break;
+    //             }
+    //             input::PostEditChoice::Discard => {
+    //                 input::remove_draft()?;
+    //                 break;
+    //             }
+    //         },
+    //         Err(err) => error!("{}", err),
+    //     }
+    // }
+    //
+    // // be a good boi/gril and say "bye" to the server
+    // imap_conn.logout();
+    //
+    // println!("Yes");
+    // // println!("{}", mail.envelope);
+    //
     Ok(true)
 }
 
@@ -451,42 +451,92 @@ fn msg_matches_attachments(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool
 
 fn msg_matches_write(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     debug!("write command matched");
-    println!("Hello there");
 
+    // prepare the imap server to update the status (for example if the user
+    // wants to send the mail)
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
-    let attachments = matches
+
+    // -----------------------------
+    // Prepare the general mail
+    // -----------------------------
+    // TODO: Make the header starting customizeable like from template
+    let mut mail = Mail::new_with_envelope(
+        &ctx.account,
+        Envelope {
+            subject: Some(String::new()),
+            to: Vec::new(),
+            .. Envelope::default()
+        });
+
+    // ----------------
+    // Attachments
+    // ----------------
+    // Parse the paths from the commandline first
+    let attachment_paths: Vec<&str> = matches
+        // get the provided arguments after the `--attachments` arg
+        // for example if the user called it like that:
+        //
+        //  himalaya --attachments path1 path2 path3
+        //
+        // than we will put them all in a vector
         .values_of("attachments")
         .unwrap_or_default()
-        .map(String::from)
-        .collect::<Vec<_>>();
+        .collect();
 
-    let tpl = Tpl::new(&ctx);
-    let content = input::open_editor_with_tpl(tpl.to_string().as_bytes())?;
-    let mut msg = Msg::from(content);
-    msg.attachments = attachments;
+    // now iterate over each path and add the attachments
+    attachment_paths.iter().for_each(|path| mail.add_attachment(path));
 
+    // ---------------------
+    // User Interaction
+    // ---------------------
+    // Now ask the user what we should do now
     loop {
         match input::post_edit_choice() {
             Ok(choice) => match choice {
                 input::PostEditChoice::Send => {
                     debug!("sending message…");
-                    let msg = msg.to_sendable_msg()?;
-                    smtp::send(&ctx.account, &msg)?;
-                    imap_conn.append_msg("Sent", &msg.formatted(), vec![Flag::Seen])?;
+
+                    // prepare the mail to be send
+                    let sendable = match mail.to_sendable_msg() {
+                        Ok(sendable) => sendable,
+                        Err(_) => return Ok(false),
+                    };
+                    smtp::send(&ctx.account, &sendable)?;
+
+                    // let the server know, that the user sent a mail
+                    imap_conn.append_msg("Sent", &sendable.formatted(), vec![Flag::Seen])?;
+
+                    // remove the draft, since we sent it
                     input::remove_draft()?;
                     ctx.output.print("Message successfully sent");
                     break;
                 }
+                // edit the body of the mail
                 input::PostEditChoice::Edit => {
-                    let content = input::open_editor_with_draft()?;
-                    msg = Msg::from(content);
-                }
+                    // Did something goes wrong when the user changed the
+                    // content?
+                    if let Err(err) = mail.edit_body() {
+                        println!("[ERROR] {}", err);
+                        println!(
+                            concat!(
+                                "Please try to fix the problem by editing",
+                                "the mail again."
+                            )
+                        );
+                    }
+                },
                 input::PostEditChoice::LocalDraft => break,
                 input::PostEditChoice::RemoteDraft => {
                     debug!("saving to draft…");
-                    imap_conn.append_msg("Drafts", &msg.to_vec()?, vec![Flag::Seen])?;
-                    input::remove_draft()?;
-                    ctx.output.print("Message successfully saved to Drafts");
+                    match mail.into_bytes() {
+                        Ok(parsed) => {
+                            imap_conn.append_msg("Drafts", &parsed, vec![Flag::Seen])?;
+                            input::remove_draft()?;
+                            ctx.output.print("Message successfully saved to Drafts");
+                        },
+                        Err(_) =>
+                            ctx.output.print("Couldn't save it to the server..."),
+                    };
                     break;
                 }
                 input::PostEditChoice::Discard => {
@@ -497,7 +547,13 @@ fn msg_matches_write(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
             Err(err) => error!("{}", err),
         }
     }
+
+    // be a good boi/gril and say "bye" to the server
     imap_conn.logout();
+
+    println!("Yes");
+    // println!("{}", mail.envelope);
+
     Ok(true)
 }
 

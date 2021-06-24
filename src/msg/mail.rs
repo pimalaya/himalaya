@@ -3,7 +3,7 @@ use super::envelope::Envelope;
 
 use imap::types::{Flag, Fetch};
 
-use mailparse::{self, ParsedMail};
+use mailparse::{self, ParsedMail, MailParseError};
 
 use crate::config::model::Account;
 use crate::input;
@@ -16,7 +16,7 @@ use lettre::message::{
 };
 
 use std::convert::TryFrom;
-use std::fmt;
+use std::collections::HashMap;
 
 // ===============
 // Error enum
@@ -85,7 +85,7 @@ impl<'mail> Mail<'mail> {
             "",
             "text/plain",
             envelope.to_string().into_bytes(),
-        );
+            );
 
         Self {
             attachments: vec![body],
@@ -109,11 +109,14 @@ impl<'mail> Mail<'mail> {
     /// Let the user change the content of the mail. This function will change
     /// the first value of the `Mail.attachments` vector, since the first value
     /// of this vector represents the content of the mail.
-    /// 
+    ///
     /// # Hint
     /// It *won't* change/update/set `Mail.parsed`!
-    pub fn edit_body(&mut self) {
+    pub fn edit_body(&mut self) -> Result<(), MailParseError> {
 
+        // ----------------
+        // Update body
+        // ----------------
         // get the old body of the mail
         let body = self.attachments[0].body_raw.clone();
 
@@ -123,6 +126,96 @@ impl<'mail> Mail<'mail> {
             Ok(content) => content.into_bytes(),
             Err(_) => String::from("").into_bytes(),
         };
+
+        // ------------------------
+        // Reevaluate Envelope
+        // ------------------------
+        // Since the user changed the content of the mail, he/she could also
+        // change the headers by adding addresses for example to the `Cc:`
+        // header, as a result, we have to update our envelope-status as well!
+
+        // TODO: Reparse the mail and update the headers
+        let parsed = match mailparse::parse_mail(&self.attachments[0].body_raw) {
+            Ok(parsed) => parsed,
+            Err(err) => return Err(err),
+        };
+
+        // now look which headers are given and update the values of the
+        // envelope struct. We are creating a new envelope-template for that and
+        // take only the important values with us which the user can't provide
+        let mut new_envelope = Envelope {
+            signature: self.envelope.signature.clone(),
+            message_id: self.envelope.message_id,
+            ..Envelope::default()
+        };
+        let header_iter = parsed.headers.iter();
+        for header in header_iter {
+
+            // get the value of the header. For example if we have this header:
+            //
+            //  Subject: I use Arch btw
+            //
+            // than `value` would be like that: `let value = "I use Arch btw".to_string()
+            let value = header.get_value().replace("\r", "");
+            let header_name = header.get_key().to_lowercase();
+            let header_name = header_name.as_str();
+
+            // now go through all headers and look
+            match header_name {
+                "from" =>
+                    new_envelope.from = value.rsplit(',').map(|addr| addr.to_string()).collect(),
+
+                "to" =>
+                    new_envelope.to = value.rsplit(',').map(|addr| addr.to_string()).collect(),
+
+                "bcc" =>
+                    new_envelope.bcc = Some(value.rsplit(',').map(|addr| addr.to_string()).collect()),
+
+                "cc" =>
+                    new_envelope.cc = Some(value.rsplit(',').map(|addr| addr.to_string()).collect()),
+
+                "in_reply_to" =>
+                    new_envelope.in_reply_to = Some(value),
+
+                "reply_to" =>
+                    new_envelope.reply_to = Some(value.rsplit(',').map(|addr| addr.to_string()).collect()),
+
+                "sender" =>
+                    new_envelope.sender = Some(value),
+
+                "subject" =>
+                    new_envelope.subject = Some(value),
+
+                    // it's a custom header => Add it to our
+                    // custom-header-hash-map
+                _ => {
+                    let custom_header = header.get_key();
+
+                    // If we don't have a HashMap yet => Create one! Otherwise
+                    // we'll keep using it, because why should we reset its
+                    // values again?
+                    if let None = new_envelope.custom_headers {
+                        new_envelope.custom_headers = Some(HashMap::new());
+                    }
+
+                    // we can unwrap for sure, because with the if-condition
+                    // above, we made sure, that the HashMap exists
+                    let mut updated_hashmap = new_envelope.custom_headers.unwrap();
+
+                    // now add the custom header to the hash table ..
+                    updated_hashmap.insert(
+                        custom_header, value.rsplit(',').map(|addr| addr.to_string()).collect());
+
+                    // .. and apply the updated hashmap to the envelope struct
+                    new_envelope.custom_headers = Some(updated_hashmap);
+                },
+            }
+        }
+
+        // apply the new envelope headers
+        self.envelope = new_envelope;
+
+        Ok(())
     }
 
     // TODO: Error handling
@@ -178,9 +271,7 @@ impl<'mail> Mail<'mail> {
         // --------------------
         // add "sender"
         if let Some(sender) = &self.envelope.sender {
-            for mailaddress in sender {
-                msg = msg.sender(mailaddress.parse().unwrap());
-            }
+            msg = msg.sender(sender.parse().unwrap());
         }
 
         // add "reply-to"
@@ -246,7 +337,14 @@ impl<'mail> Mail<'mail> {
 
         // Last but not least: Add the attachments to the header of the mail and
         // return the finished mail!
-        Ok(msg.multipart(msg_parts).unwrap())
+        match msg.multipart(msg_parts) {
+            Ok(msg_prepared) => Ok(msg_prepared),
+            Err(err) => {
+                println!("{}", String::from_utf8(self.attachments[0].body_raw.clone()).unwrap());
+                println!("{}", err);
+                panic!("Why");
+            }
+        }
     }
 }
 
