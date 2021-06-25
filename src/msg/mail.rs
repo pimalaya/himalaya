@@ -1,22 +1,24 @@
 use super::attachment::Attachment;
 use super::envelope::Envelope;
 
-use imap::types::{Flag, Fetch};
+use imap::types::{Fetch, Flag, ZeroCopy};
 
-use mailparse::{self, ParsedMail, MailParseError};
+use mailparse::{self, MailParseError};
 
 use crate::config::model::Account;
+use crate::flag::model::Flags;
 use crate::input;
+use crate::table::{Cell, Row, Table};
+
+use serde::Serialize;
 
 use lettre::message::{
-    Message,
-    MultiPart,
-    SinglePart,
-    Attachment as lettre_Attachment,
+    Attachment as lettre_Attachment, Message, MultiPart, SinglePart,
 };
 
-use std::convert::TryFrom;
 use std::collections::HashMap;
+use std::convert::{From, TryFrom};
+use std::fmt;
 
 // ===============
 // Error enum
@@ -25,7 +27,6 @@ use std::collections::HashMap;
 /// mail from the given fetch.
 #[derive(Debug)]
 pub enum MailError {
-
     /// An error appeared, when it tried to parse the body of the mail!
     ParseBody,
 
@@ -33,29 +34,32 @@ pub enum MailError {
     ParseAttachment,
 
     MakingSendable,
+
+    ParseFetch,
 }
 
-// ============
-// Structs
-// ============
-#[derive(Debug)]
+// =========
+// Mail
+// =========
+#[derive(Debug, Serialize)]
 pub struct Mail<'mail> {
-
     /// All added attachments are listed in this vector.
     pub attachments: Vec<Attachment>,
 
     /// The flags for this mail.
-    pub flags: Vec<Flag<'mail>>,
+    pub flags: Flags<'mail>,
 
     /// All information of the envelope (sender, from, to and so on)
     pub envelope: Envelope,
 
-    /// The parsed content of the mail which shoud make it easier to access
-    pub parsed: Option<ParsedMail<'mail>>,
+    /// The UID of the mail. It's only set from the server. So that's why it's
+    /// not public: To avoid that it's set manually!
+    uid: Option<u32>,
+
+    date: Option<String>,
 }
 
 impl<'mail> Mail<'mail> {
-
     pub fn new(account: &Account) -> Self {
         Self::new_with_envelope(account, Envelope::default())
     }
@@ -64,9 +68,7 @@ impl<'mail> Mail<'mail> {
         // --------------------------
         // Envelope credentials
         // --------------------------
-        let name = account.name
-            .clone()
-            .unwrap_or(String::new());
+        let name = account.name.clone().unwrap_or(String::new());
 
         // set the data of the envelope
         let envelope = Envelope {
@@ -85,13 +87,15 @@ impl<'mail> Mail<'mail> {
             "",
             "text/plain",
             envelope.to_string().into_bytes(),
-            );
+        );
 
         Self {
             attachments: vec![body],
-            flags: Vec::new(),
+            flags: Flags::new(&[]),
             envelope,
-            parsed: None,
+            // since the uid is set from the server, we will just set it to None
+            uid: None,
+            date: None,
         }
     }
 
@@ -103,7 +107,7 @@ impl<'mail> Mail<'mail> {
             Err(_) => return Err(MailError::MakingSendable),
         };
 
-        return Ok(parsed.formatted())
+        return Ok(parsed.formatted());
     }
 
     /// Let the user change the content of the mail. This function will change
@@ -113,7 +117,6 @@ impl<'mail> Mail<'mail> {
     /// # Hint
     /// It *won't* change/update/set `Mail.parsed`!
     pub fn edit_body(&mut self) -> Result<(), MailParseError> {
-
         // ----------------
         // Update body
         // ----------------
@@ -122,7 +125,8 @@ impl<'mail> Mail<'mail> {
 
         // TODO: Error handling
         // store the changes of the body
-        self.attachments[0].body_raw = match input::open_editor_with_tpl(&body) {
+        self.attachments[0].body_raw = match input::open_editor_with_tpl(&body)
+        {
             Ok(content) => content.into_bytes(),
             Err(_) => String::from("").into_bytes(),
         };
@@ -135,7 +139,8 @@ impl<'mail> Mail<'mail> {
         // header, as a result, we have to update our envelope-status as well!
 
         // TODO: Reparse the mail and update the headers
-        let parsed = match mailparse::parse_mail(&self.attachments[0].body_raw) {
+        let parsed = match mailparse::parse_mail(&self.attachments[0].body_raw)
+        {
             Ok(parsed) => parsed,
             Err(err) => return Err(err),
         };
@@ -145,49 +150,67 @@ impl<'mail> Mail<'mail> {
         // take only the important values with us which the user can't provide
         let mut new_envelope = Envelope {
             signature: self.envelope.signature.clone(),
-            message_id: self.envelope.message_id,
             ..Envelope::default()
         };
         let header_iter = parsed.headers.iter();
         for header in header_iter {
-
             // get the value of the header. For example if we have this header:
             //
             //  Subject: I use Arch btw
             //
-            // than `value` would be like that: `let value = "I use Arch btw".to_string()
+            // than `value` would be like that: `let value = "I use Arch
+            // btw".to_string()
             let value = header.get_value().replace("\r", "");
             let header_name = header.get_key().to_lowercase();
             let header_name = header_name.as_str();
 
-            // now go through all headers and look
+            // now go through all headers and look which values they have.
             match header_name {
-                "from" =>
-                    new_envelope.from = value.rsplit(',').map(|addr| addr.to_string()).collect(),
+                "from" => {
+                    new_envelope.from =
+                        value.rsplit(',').map(|addr| addr.to_string()).collect()
+                }
 
-                "to" =>
-                    new_envelope.to = value.rsplit(',').map(|addr| addr.to_string()).collect(),
+                "to" => {
+                    new_envelope.to =
+                        value.rsplit(',').map(|addr| addr.to_string()).collect()
+                }
 
-                "bcc" =>
-                    new_envelope.bcc = Some(value.rsplit(',').map(|addr| addr.to_string()).collect()),
+                "bcc" => {
+                    new_envelope.bcc = Some(
+                        value
+                            .rsplit(',')
+                            .map(|addr| addr.to_string())
+                            .collect(),
+                    )
+                }
 
-                "cc" =>
-                    new_envelope.cc = Some(value.rsplit(',').map(|addr| addr.to_string()).collect()),
+                "cc" => {
+                    new_envelope.cc = Some(
+                        value
+                            .rsplit(',')
+                            .map(|addr| addr.to_string())
+                            .collect(),
+                    )
+                }
 
-                "in_reply_to" =>
-                    new_envelope.in_reply_to = Some(value),
+                "in_reply_to" => new_envelope.in_reply_to = Some(value),
 
-                "reply_to" =>
-                    new_envelope.reply_to = Some(value.rsplit(',').map(|addr| addr.to_string()).collect()),
+                "reply_to" => {
+                    new_envelope.reply_to = Some(
+                        value
+                            .rsplit(',')
+                            .map(|addr| addr.to_string())
+                            .collect(),
+                    )
+                }
 
-                "sender" =>
-                    new_envelope.sender = Some(value),
+                "sender" => new_envelope.sender = Some(value),
 
-                "subject" =>
-                    new_envelope.subject = Some(value),
+                "subject" => new_envelope.subject = Some(value),
 
-                    // it's a custom header => Add it to our
-                    // custom-header-hash-map
+                // it's a custom header => Add it to our
+                // custom-header-hash-map
                 _ => {
                     let custom_header = header.get_key();
 
@@ -200,15 +223,21 @@ impl<'mail> Mail<'mail> {
 
                     // we can unwrap for sure, because with the if-condition
                     // above, we made sure, that the HashMap exists
-                    let mut updated_hashmap = new_envelope.custom_headers.unwrap();
+                    let mut updated_hashmap =
+                        new_envelope.custom_headers.unwrap();
 
                     // now add the custom header to the hash table ..
                     updated_hashmap.insert(
-                        custom_header, value.rsplit(',').map(|addr| addr.to_string()).collect());
+                        custom_header,
+                        value
+                            .rsplit(',')
+                            .map(|addr| addr.to_string())
+                            .collect(),
+                    );
 
                     // .. and apply the updated hashmap to the envelope struct
                     new_envelope.custom_headers = Some(updated_hashmap);
-                },
+                }
             }
         }
 
@@ -225,28 +254,10 @@ impl<'mail> Mail<'mail> {
         }
     }
 
-    pub fn get_flags_as_string(&self) -> String {
-        let mut flags = String::new();
-        let flag_symbols = vec![
-            (Flag::Seen, '*'),
-            (Flag::Answered, '↵'),
-            (Flag::Flagged, '!')
-        ];
-
-        for symbol in &flag_symbols {
-            if self.flags.contains(&symbol.0) {
-                flags.push(symbol.1);
-            }
-        }
-
-        flags
-    }
-
     /// This function will use the information of the `Mail` struct and creates
     /// a sendable mail. It uses the `Mail.envelope` and `Mail.attachments`
     /// fields
     pub fn to_sendable_msg(&self) -> Result<Message, MailError> {
-
         // ===================
         // Header of Mail
         // ===================
@@ -351,7 +362,9 @@ impl<'mail> Mail<'mail> {
         // we will use this variable to iterate through our attachments
         let mut attachment_iter = self.attachments.iter();
 
-        // get the content of the mail. Parse it and get the body afterwards
+        // get the content of the mail. Parse it and get the body afterwards.
+        // Remember: The first value in the vector represents the body of the
+        // mail, that's why we can just do `.next().unwrap()` to get the mail
         let mail_content = attachment_iter.next().unwrap();
         let body = mailparse::parse_mail(&mail_content.body_raw).unwrap();
         let body = body.get_body_raw().unwrap();
@@ -367,11 +380,14 @@ impl<'mail> Mail<'mail> {
 
         // afterwards, add the rest of the attachments
         for attachment in attachment_iter {
-
-            // Get the values of the attachment and convert them
-            let msg_attachment = lettre_Attachment::new(attachment.filename.clone());
+            // Get the values of the attachment and convert them to the
+            // Attachment-Struct of lettre.
+            let msg_attachment =
+                lettre_Attachment::new(attachment.filename.clone());
             let msg_attachment = msg_attachment.body(
-                attachment.body_raw.clone(), attachment.content_type.clone());
+                attachment.body_raw.clone(),
+                attachment.content_type.clone(),
+            );
 
             // add the attachment to our attachment-list
             msg_parts = msg_parts.singlepart(msg_attachment);
@@ -387,74 +403,194 @@ impl<'mail> Mail<'mail> {
             }
         }
     }
+
+    /// Returns the uid of the mail.
+    ///
+    /// # Hint
+    /// The uid is only set from the server! So you can only get a `Some(...)`
+    /// from this function, if it's a fetched mail otherwise you'll get `None`.
+    pub fn get_uid(&self) -> Option<u32> {
+        self.uid
+    }
 }
 
-// ==================
-// Common Traits
-// ==================
+// -----------
+// Traits
+// -----------
 impl<'mail> Default for Mail<'mail> {
     fn default() -> Self {
         Self {
             attachments: Vec::new(),
-            flags: Vec::new(),
-            envelope: Envelope::default(),
-            parsed: None
+            flags:       Flags::new(&[]),
+            envelope:    Envelope::default(),
+            uid:         None,
+            date: None,
         }
     }
 }
 
-// impl<'mail> fmt::Display for Mail<'mail> {
-//     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-//         let result = String::new();
-//
-//         // ------------
-//         // Headers
-//         // ------------
-//
-//         write!(formatter, "{}", result)
-//     }
-// }
+impl<'mail> Table for Mail<'mail> {
+    fn head() -> Row {
+        Row::new()
+            .cell(Cell::new("UID").bold().underline().white())
+            .cell(Cell::new("FLAGS").bold().underline().white())
+            .cell(Cell::new("SUBJECT").shrinkable().bold().underline().white())
+            .cell(Cell::new("SENDER").bold().underline().white())
+            .cell(Cell::new("DATE").bold().underline().white())
+    }
 
-// ===========
+    fn row(&self) -> Row {
+        let is_seen = !self.flags.contains(&Flag::Seen);
+
+        // The data which will be shown in the row
+        let uid = self.get_uid().unwrap_or(0);
+        let flags = self.flags.to_string();
+        let subject = self.envelope.subject.clone().unwrap_or(String::new());
+        let sender = self.envelope.sender.clone().unwrap_or(String::new());
+        let date = self.date.clone().unwrap_or(String::new());
+
+        Row::new()
+            .cell(Cell::new(&uid.to_string()).bold_if(is_seen).red())
+            .cell(Cell::new(&flags).bold_if(is_seen).white())
+            .cell(Cell::new(&subject).shrinkable().bold_if(is_seen).green())
+            .cell(Cell::new(&sender).bold_if(is_seen).blue())
+            .cell(Cell::new(&date).bold_if(is_seen).yellow())
+    }
+}
+
+// -----------
 // From's
-// ===========
-impl<'mail> TryFrom<&'mail Fetch> for Mail<'mail> {
+// -----------
+/// Load the data from a fetched mail and store them in the mail-struct.
+/// Please make sure that the fetch includes the following query:
+///
+///     - UID
+///     - FLAGS
+///     - ENVELOPE
+///     - INTERNALDATE
+///     - BODY[] (optional)
+impl<'mail> From<&'mail Fetch> for Mail<'mail> {
+    fn from(fetch: &'mail Fetch) -> Mail {
+        // -----------------
+        // Preparations
+        // -----------------
+        // We're preparing the variables first, which will hold the data of the
+        // fetched mail.
 
-    type Error = MailError;
-
-    fn try_from(fetch: &'mail Fetch) -> Result<Mail, MailError> {
-
-        // Here will be all attachments stored
+        // Here will be all attachments stored (including the body of the mail
+        // as the first value of this vector)
         let mut attachments = Vec::new();
 
         // Get the flags of the mail
-        let flags = fetch.flags().to_vec();
+        let flags = Flags::new(fetch.flags());
 
         // Well, get the data of the envelope from the mail
         let envelope = Envelope::from(fetch.envelope());
 
-        // Get the parsed-version of the mail
-        let parsed = match mailparse::parse_mail(fetch.body().unwrap_or(&[b' '])) {
-            Ok(parsed) => parsed,
-            Err(_) => return Err(MailError::ParseBody),
-        };
+        // Get the uid of the fetched mail
+        let uid = fetch.uid;
 
-        // Go through all subparts of the mail and look if they are attachments.
-        // If they are attachments:
-        //  1. Get their filename
-        //  2. Get the content of the attachment
-        for subpart in &parsed.subparts {
-            if let Ok(attachment) = Attachment::try_from(subpart) {
-                attachments.push(attachment);
+        let date = fetch
+            .internal_date()
+            .map(|date| date.naive_local().to_string());
+
+        // Get the content of the mail. Here we have to look (important!) if
+        // the fetch even includes a body or not, since the `BODY[]` query is
+        // only *optional*!
+        let parsed =
+            // the empty array represents an invalid body, so we can enter the
+            // `Err` arm if the body-query wasn't applied
+            match mailparse::parse_mail(fetch.body().unwrap_or(&[b' '])) {
+                Ok(parsed) => Some(parsed),
+                Err(_) => None,
+            };
+
+        // ---------------------------------
+        // Storing the information (body)
+        // ---------------------------------
+        // We have to add at least one attachment, which should represent the
+        // body of the mail. Since the body-query is only optional, we might
+        // need to add an "empty" attachment.
+        if let Some(parsed) = parsed {
+            // Ok, so the body-query was applied to the fetch! Let's extract the
+            // body then!
+            match Attachment::try_from(&parsed) {
+                Ok(mail_body) => attachments.push(mail_body),
+                Err(_) => {
+                    // Ok, so this shouldn't happen in general: We failed to get
+                    // the body of the mail! Let's create a dummy with the
+                    // content that it failed to load the body
+                    let attachment_dummy = Attachment::new(
+                        "",
+                        "text/plain",
+                        b"Couldn't get the body of the mail.".to_vec(),
+                    );
+
+                    attachments.push(attachment_dummy);
+                }
+            };
+
+            // Go through all subparts of the mail and look if they are
+            // attachments. If they are attachments:
+            //  1. Get their filename
+            //  2. Get the content of the attachment
+            for subpart in &parsed.subparts {
+                if let Ok(attachment) = Attachment::try_from(subpart) {
+                    attachments.push(attachment);
+                }
             }
+        } else {
+            // So the body-query wasn't applied. As a result we're gonna add an
+            // empty body here, just for completeness and to make sure that each
+            // access to the attachments-vector isn't invalid.
+            attachments.push(Attachment::new("", "text/plain", Vec::new()));
         }
 
-        Ok(Self {
+        Self {
             attachments,
             flags,
             envelope,
-            parsed: Some(parsed),
-        })
+            uid,
+            date,
+        }
+    }
+}
+
+// ==========
+// Mails
+// ==========
+/// This is just a type-safety which represents a vector of mails.
+#[derive(Debug, Serialize)]
+pub struct Mails<'mails>(pub Vec<Mail<'mails>>);
+
+impl<'mails> Mails<'mails> {
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+}
+
+// -----------
+// Traits
+// -----------
+impl<'mails> fmt::Display for Mails<'mails> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(formatter, "\n{}", Table::render(&self.0))
+    }
+}
+
+// -----------
+// From's
+// -----------
+impl<'mails> From<&'mails ZeroCopy<Vec<Fetch>>> for Mails<'mails> {
+    fn from(fetches: &'mails ZeroCopy<Vec<Fetch>>) -> Self {
+        // the content of the Mails-struct
+        let mut mails = Vec::new();
+
+        for fetch in fetches.iter().rev() {
+            mails.push(Mail::from(fetch));
+        }
+
+        Self(mails)
     }
 }
 
@@ -471,7 +607,6 @@ impl<'mail> TryFrom<&'mail Fetch> for Mail<'mail> {
 ///
 ///     [ERROR] Value is missing in the 'From:' header!
 ///     Please edit your mail again and enter a value in it!
-///
 fn error_msg_forgot_header(header_name: &str) {
     println!("[ERROR] Value is missing in the '{}:' header!", header_name);
     println!("Please edit your mail again and enter a value in it!");

@@ -428,7 +428,7 @@ dependencies = [
  "error-chain",
  "imap",
  "imap-proto",
- "lettre 0.10.0-rc.1",
+ "lettre 0.10.0-rc.3",
  "lettre_email",
  "log",
  "mailparse",
@@ -545,9 +545,7 @@ dependencies = [
 
 [[package]]
 name = "lettre"
-version = "0.10.0-rc.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4be4ff7e8bcb0e0c6902815554a286889b0e99b4ea6e898afb7b9f53174b1929"
+version = "0.10.0-rc.3"
 dependencies = [
  "base64 0.13.0",
  "fastrand",
@@ -561,6 +559,7 @@ dependencies = [
  "quoted_printable",
  "r2d2",
  "regex",
+ "serde",
 ]
 
 [[package]]

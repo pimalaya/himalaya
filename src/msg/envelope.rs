@@ -2,6 +2,10 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt;
 
+use serde::Serialize;
+
+use rfc2047_decoder;
+
 // ============
 // Structs
 // ============
@@ -11,13 +15,12 @@ use std::fmt;
 /// crate. It's should mainly help to interact with the mails by using more
 /// common data types like `Vec` or `String` since a `[u8]` array is a little
 /// bit limited to use.
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Envelope {
     // ----------------
     // Must-Fields
     // ----------------
     pub from:           Vec<String>,
-    pub message_id:     u32,
     pub to:             Vec<String>,
 
     // --------------------
@@ -26,7 +29,6 @@ pub struct Envelope {
     pub bcc:            Option<Vec<String>>,
     pub cc:             Option<Vec<String>>,
     pub custom_headers: Option<HashMap<String, Vec<String>>>,
-    pub date:           Option<String>,
     pub in_reply_to:    Option<String>,
     pub reply_to:       Option<Vec<String>>,
     pub sender:         Option<String>,
@@ -57,14 +59,12 @@ impl Default for Envelope {
         Self {
             // must-fields
             from:           Vec::new(),
-            message_id:     0,
             to:             Vec::new(),
 
             // optional fields
             bcc:            None,
             cc:             None,
             custom_headers: None,
-            date:           None,
             in_reply_to:    None,
             reply_to:       None,
             sender:         None,
@@ -80,10 +80,10 @@ impl Default for Envelope {
 impl From<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
     fn from(from_envelope: Option<&imap_proto::types::Envelope<'_>>) -> Self {
         if let Some(from_envelope) = from_envelope {
-            let date = convert_cow_u8_to_string(from_envelope.date.as_ref());
-
-            let subject =
-                convert_cow_u8_to_string(from_envelope.subject.as_ref());
+            let subject = from_envelope
+                .subject
+                .as_ref()
+                .and_then(|subj| rfc2047_decoder::decode(subj).ok());
 
             let from =
                 convert_vec_address_to_string(from_envelope.from.as_ref())
@@ -113,14 +113,7 @@ impl From<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
             let in_reply_to =
                 convert_cow_u8_to_string(from_envelope.in_reply_to.as_ref());
 
-            let message_id: u32 =
-                convert_cow_u8_to_string(from_envelope.message_id.as_ref())
-                .expect("Couldn't get the UID of the mail.")
-                .parse()
-                .expect("Coudln't parse the UID of the mail.");
-
             Self {
-                date,
                 subject,
                 from,
                 sender,
@@ -131,7 +124,6 @@ impl From<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
                 in_reply_to,
                 custom_headers: None,
                 signature: None,
-                message_id,
             }
         } else {
             Envelope::default()
@@ -181,11 +173,6 @@ impl fmt::Display for Envelope {
         // Subject
         if let Some(subject) = &self.subject {
             result.push_str(&format!("Subject: {}\n", subject));
-        }
-
-        // date
-        if let Some(date) = &self.date {
-            result.push_str(&format!("Date: {}\n", date));
         }
 
         // in reply to

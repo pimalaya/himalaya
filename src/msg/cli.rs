@@ -15,14 +15,10 @@ use crate::{
     input,
     mbox::cli::mbox_target_arg,
     msg::{
-        model::{Attachments, Msg, Msgs, ReadableMsg},
-        tpl::{
-            cli::{tpl_matches, tpl_subcommand},
-            model::Tpl,
-        },
-        mail::Mail,
         envelope::Envelope,
-        attachment::Attachment,
+        mail::{Mail, Mails},
+        model::{Attachments, Msg, Msgs, ReadableMsg},
+        tpl::cli::{tpl_matches, tpl_subcommand},
     },
     smtp,
 };
@@ -140,13 +136,10 @@ pub fn msg_matches(ctx: &Ctx) -> Result<bool> {
 
         ("template", Some(matches)) => Ok(tpl_matches(ctx, matches)?),
 
-        ("test", Some(matches)) => msg_matches_test(ctx, matches),
-
         ("list", opt_matches) => msg_matches_list(ctx, opt_matches),
         (_other, opt_matches) => msg_matches_list(ctx, opt_matches),
     }
 }
-
 
 // =======================
 // Argument Functions
@@ -194,15 +187,16 @@ fn attachment_arg<'a>() -> clap::Arg<'a, 'a> {
 // ====================
 // Match functions
 // ====================
-fn msg_matches_test(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
-    Ok(true)
-}
-
-fn msg_matches_list(ctx: &Ctx, opt_matches: Option<&clap::ArgMatches>) -> Result<bool> {
+fn msg_matches_list(
+    ctx: &Ctx,
+    opt_matches: Option<&clap::ArgMatches>,
+) -> Result<bool> {
     debug!("list command matched");
 
     let page_size: usize = opt_matches
-        .and_then(|matches| matches.value_of("page-size").and_then(|s| s.parse().ok()))
+        .and_then(|matches| {
+            matches.value_of("page-size").and_then(|s| s.parse().ok())
+        })
         .unwrap_or_else(|| ctx.config.default_page_size(&ctx.account));
     debug!("page size: {:?}", page_size);
     let page: usize = opt_matches
@@ -213,9 +207,11 @@ fn msg_matches_list(ctx: &Ctx, opt_matches: Option<&clap::ArgMatches>) -> Result
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let msgs = imap_conn.list_msgs(&ctx.mbox, &page_size, &page)?;
     let msgs = if let Some(ref fetches) = msgs {
-        Msgs::from(fetches)
+        Mails::from(fetches)
+        // Msgs::from(fetches)
     } else {
-        Msgs::new()
+        // Msgs::new()
+        Mails::new()
     };
 
     trace!("messages: {:?}", msgs);
@@ -262,7 +258,7 @@ fn msg_matches_search(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
                 }
             }
         })
-    .1
+        .1
         .join(" ");
     debug!("query: {}", &page);
 
@@ -293,8 +289,8 @@ fn msg_matches_read(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
     if raw {
-        let msg =
-            String::from_utf8(msg).chain_err(|| "Could not decode raw message as utf8 string")?;
+        let msg = String::from_utf8(msg)
+            .chain_err(|| "Could not decode raw message as utf8 string")?;
         let msg = msg.trim_end_matches("\n");
         ctx.output.print(msg);
     } else {
@@ -306,7 +302,10 @@ fn msg_matches_read(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     Ok(true)
 }
 
-fn msg_matches_attachments(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
+fn msg_matches_attachments(
+    ctx: &Ctx,
+    matches: &clap::ArgMatches,
+) -> Result<bool> {
     debug!("attachments command matched");
 
     let uid = matches.value_of("uid").unwrap();
@@ -319,31 +318,32 @@ fn msg_matches_attachments(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool
         "{} attachment(s) found for message {}",
         &attachments.0.len(),
         &uid
-        );
+    );
     for attachment in attachments.0.iter() {
         let filepath = ctx
             .config
             .downloads_filepath(&ctx.account, &attachment.filename);
         debug!("downloading {}…", &attachment.filename);
-        fs::write(&filepath, &attachment.raw)
-            .chain_err(|| format!("Could not save attachment {:?}", filepath))?;
+        fs::write(&filepath, &attachment.raw).chain_err(|| {
+            format!("Could not save attachment {:?}", filepath)
+        })?;
     }
 
     debug!(
         "{} attachment(s) successfully downloaded",
         &attachments.0.len()
-        );
+    );
     ctx.output.print(format!(
-            "{} attachment(s) successfully downloaded",
-            &attachments.0.len()
-            ));
+        "{} attachment(s) successfully downloaded",
+        &attachments.0.len()
+    ));
 
     imap_conn.logout();
     Ok(true)
 }
 
-// fn msg_matches_write_test(ctx: &Ctx, matches: &clap::ArgMatches)-> Result<bool> {
-//     debug!("[Testing] Write matches");
+// fn msg_matches_write_test(ctx: &Ctx, matches: &clap::ArgMatches)->
+// Result<bool> {     debug!("[Testing] Write matches");
 //
 //     //
 //     let attachments: Vec<Attachment> = vec![
@@ -374,8 +374,9 @@ fn msg_matches_write(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
         Envelope {
             subject: Some(String::new()),
             to: Vec::new(),
-            .. Envelope::default()
-        });
+            ..Envelope::default()
+        },
+    );
 
     // ----------------
     // Attachments
@@ -393,7 +394,9 @@ fn msg_matches_write(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
         .collect();
 
     // now iterate over each path and add the attachments
-    attachment_paths.iter().for_each(|path| mail.add_attachment(path));
+    attachment_paths
+        .iter()
+        .for_each(|path| mail.add_attachment(path));
 
     // ---------------------
     // User Interaction
@@ -420,7 +423,11 @@ fn msg_matches_write(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
                     // which creates a conflict, fix this!
 
                     // let the server know, that the user sent a mail
-                    imap_conn.append_msg("Sent", &sendable.formatted(), vec![Flag::Seen])?;
+                    imap_conn.append_msg(
+                        "Sent",
+                        &sendable.formatted(),
+                        vec![Flag::Seen],
+                    )?;
 
                     // remove the draft, since we sent it
                     input::remove_draft()?;
@@ -433,25 +440,29 @@ fn msg_matches_write(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
                     // content?
                     if let Err(err) = mail.edit_body() {
                         println!("[ERROR] {}", err);
-                        println!(
-                            concat!(
-                                "Please try to fix the problem by editing",
-                                "the mail again."
-                            )
-                        );
+                        println!(concat!(
+                            "Please try to fix the problem by editing",
+                            "the mail again."
+                        ));
                     }
-                },
+                }
                 input::PostEditChoice::LocalDraft => break,
                 input::PostEditChoice::RemoteDraft => {
                     debug!("saving to draft…");
                     match mail.into_bytes() {
                         Ok(parsed) => {
-                            imap_conn.append_msg("Drafts", &parsed, vec![Flag::Seen])?;
+                            imap_conn.append_msg(
+                                "Drafts",
+                                &parsed,
+                                vec![Flag::Seen],
+                            )?;
                             input::remove_draft()?;
-                            ctx.output.print("Message successfully saved to Drafts");
-                        },
-                        Err(_) =>
-                            ctx.output.print("Couldn't save it to the server..."),
+                            ctx.output
+                                .print("Message successfully saved to Drafts");
+                        }
+                        Err(_) => ctx
+                            .output
+                            .print("Couldn't save it to the server..."),
                     };
                     break;
                 }
@@ -505,7 +516,11 @@ fn msg_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
                     debug!("sending message…");
                     let msg = msg.to_sendable_msg()?;
                     smtp::send(&ctx.account, &msg)?;
-                    imap_conn.append_msg("Sent", &msg.formatted(), vec![Flag::Seen])?;
+                    imap_conn.append_msg(
+                        "Sent",
+                        &msg.formatted(),
+                        vec![Flag::Seen],
+                    )?;
                     imap_conn.add_flags(&ctx.mbox, uid, "\\Answered")?;
                     input::remove_draft()?;
                     ctx.output.print("Message successfully sent");
@@ -518,7 +533,11 @@ fn msg_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
                 input::PostEditChoice::LocalDraft => break,
                 input::PostEditChoice::RemoteDraft => {
                     debug!("saving to draft…");
-                    imap_conn.append_msg("Drafts", &msg.to_vec()?, vec![Flag::Seen])?;
+                    imap_conn.append_msg(
+                        "Drafts",
+                        &msg.to_vec()?,
+                        vec![Flag::Seen],
+                    )?;
                     input::remove_draft()?;
                     ctx.output.print("Message successfully saved to Drafts");
                     break;
@@ -563,7 +582,11 @@ fn msg_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
                     debug!("sending message…");
                     let msg = msg.to_sendable_msg()?;
                     smtp::send(&ctx.account, &msg)?;
-                    imap_conn.append_msg("Sent", &msg.formatted(), vec![Flag::Seen])?;
+                    imap_conn.append_msg(
+                        "Sent",
+                        &msg.formatted(),
+                        vec![Flag::Seen],
+                    )?;
                     input::remove_draft()?;
                     ctx.output.print("Message successfully sent");
                     break;
@@ -575,7 +598,11 @@ fn msg_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
                 input::PostEditChoice::LocalDraft => break,
                 input::PostEditChoice::RemoteDraft => {
                     debug!("saving to draft…");
-                    imap_conn.append_msg("Drafts", &msg.to_vec()?, vec![Flag::Seen])?;
+                    imap_conn.append_msg(
+                        "Drafts",
+                        &msg.to_vec()?,
+                        vec![Flag::Seen],
+                    )?;
                     input::remove_draft()?;
                     ctx.output.print("Message successfully saved to Drafts");
                     break;
@@ -608,9 +635,9 @@ fn msg_matches_copy(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     imap_conn.append_msg(target, &msg.raw, flags)?;
     debug!("message {} successfully copied to folder `{}`", uid, target);
     ctx.output.print(format!(
-            "Message {} successfully copied to folder `{}`",
-            uid, target
-            ));
+        "Message {} successfully copied to folder `{}`",
+        uid, target
+    ));
 
     imap_conn.logout();
     Ok(true)
@@ -632,9 +659,9 @@ fn msg_matches_move(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     imap_conn.add_flags(&ctx.mbox, uid, "\\Seen \\Deleted")?;
     debug!("message {} successfully moved to folder `{}`", uid, target);
     ctx.output.print(format!(
-            "Message {} successfully moved to folder `{}`",
-            uid, target
-            ));
+        "Message {} successfully moved to folder `{}`",
+        uid, target
+    ));
 
     imap_conn.expunge(&ctx.mbox)?;
     imap_conn.logout();
