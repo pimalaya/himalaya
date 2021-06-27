@@ -4,7 +4,9 @@ use log::{debug, trace};
 use native_tls::{self, TlsConnector, TlsStream};
 use std::{collections::HashSet, iter::FromIterator, net::TcpStream};
 
-use crate::{config::model::Account, ctx::Ctx, flag::model::Flag, msg::model::Msg};
+use crate::{
+    config::model::Account, ctx::Ctx, flag::model::Flag, msg::model::Msg,
+};
 
 error_chain! {
     links {
@@ -15,7 +17,7 @@ error_chain! {
 #[derive(Debug)]
 pub struct ImapConnector<'a> {
     pub account: &'a Account,
-    pub sess: imap::Session<TlsStream<TcpStream>>,
+    pub sess:    imap::Session<TlsStream<TcpStream>>,
 }
 
 impl<'a> ImapConnector<'a> {
@@ -30,8 +32,12 @@ impl<'a> ImapConnector<'a> {
 
         debug!("create client");
         let client = if account.imap_starttls() {
-            imap::connect_starttls(account.imap_addr(), &account.imap_host, &tls)
-                .chain_err(|| "Could not connect using STARTTLS")
+            imap::connect_starttls(
+                account.imap_addr(),
+                &account.imap_host,
+                &tls,
+            )
+            .chain_err(|| "Could not connect using STARTTLS")
         } else {
             imap::connect(account.imap_addr(), &account.imap_host, &tls)
                 .chain_err(|| "Could not connect using TLS")
@@ -53,7 +59,12 @@ impl<'a> ImapConnector<'a> {
         }
     }
 
-    pub fn set_flags(&mut self, mbox: &str, uid_seq: &str, flags: &str) -> Result<()> {
+    pub fn set_flags(
+        &mut self,
+        mbox: &str,
+        uid_seq: &str,
+        flags: &str,
+    ) -> Result<()> {
         self.sess
             .select(mbox)
             .chain_err(|| format!("Could not select mailbox `{}`", mbox))?;
@@ -65,7 +76,12 @@ impl<'a> ImapConnector<'a> {
         Ok(())
     }
 
-    pub fn add_flags(&mut self, mbox: &str, uid_seq: &str, flags: &str) -> Result<()> {
+    pub fn add_flags(
+        &mut self,
+        mbox: &str,
+        uid_seq: &str,
+        flags: &str,
+    ) -> Result<()> {
         self.sess
             .select(mbox)
             .chain_err(|| format!("Could not select mailbox `{}`", mbox))?;
@@ -77,7 +93,12 @@ impl<'a> ImapConnector<'a> {
         Ok(())
     }
 
-    pub fn remove_flags(&mut self, mbox: &str, uid_seq: &str, flags: &str) -> Result<()> {
+    pub fn remove_flags(
+        &mut self,
+        mbox: &str,
+        uid_seq: &str,
+        flags: &str,
+    ) -> Result<()> {
         self.sess
             .select(mbox)
             .chain_err(|| format!("Could not select mailbox `{}`", mbox))?;
@@ -104,9 +125,9 @@ impl<'a> ImapConnector<'a> {
 
     pub fn notify(&mut self, ctx: &Ctx, keepalive: u64) -> Result<()> {
         debug!("examine mailbox: {}", &ctx.mbox);
-        self.sess
-            .examine(&ctx.mbox)
-            .chain_err(|| format!("Could not examine mailbox `{}`", &ctx.mbox))?;
+        self.sess.examine(&ctx.mbox).chain_err(|| {
+            format!("Could not examine mailbox `{}`", &ctx.mbox)
+        })?;
 
         debug!("init messages hashset");
         let mut msgs_set: HashSet<u32> =
@@ -149,7 +170,10 @@ impl<'a> ImapConnector<'a> {
                 for fetch in fetches.iter() {
                     let msg = Msg::from(fetch);
                     let uid = fetch.uid.ok_or_else(|| {
-                        format!("Could not retrieve message {}'s UID", fetch.message)
+                        format!(
+                            "Could not retrieve message {}'s UID",
+                            fetch.message
+                        )
                     })?;
                     ctx.config.run_notify_cmd(&msg.subject, &msg.sender)?;
                     debug!("notify message: {}", uid);
@@ -167,9 +191,9 @@ impl<'a> ImapConnector<'a> {
 
     pub fn watch(&mut self, ctx: &Ctx, keepalive: u64) -> Result<()> {
         debug!("examine mailbox: {}", &ctx.mbox);
-        self.sess
-            .examine(&ctx.mbox)
-            .chain_err(|| format!("Could not examine mailbox `{}`", &ctx.mbox))?;
+        self.sess.examine(&ctx.mbox).chain_err(|| {
+            format!("Could not examine mailbox `{}`", &ctx.mbox)
+        })?;
 
         loop {
             debug!("begin loop");
@@ -189,7 +213,9 @@ impl<'a> ImapConnector<'a> {
         }
     }
 
-    pub fn list_mboxes(&mut self) -> Result<imap::types::ZeroCopy<Vec<imap::types::Name>>> {
+    pub fn list_mboxes(
+        &mut self,
+    ) -> Result<imap::types::ZeroCopy<Vec<imap::types::Name>>> {
         let names = self
             .sess
             .list(Some(""), Some("*"))
@@ -248,7 +274,9 @@ impl<'a> ImapConnector<'a> {
         let uids: Vec<String> = self
             .sess
             .search(query)
-            .chain_err(|| format!("Could not search in `{}` with query `{}`", mbox, query))?
+            .chain_err(|| {
+                format!("Could not search in `{}` with query `{}`", mbox, query)
+            })?
             .iter()
             .map(|seq| seq.to_string())
             .collect();
@@ -266,7 +294,27 @@ impl<'a> ImapConnector<'a> {
         Ok(Some(fetches))
     }
 
-    pub fn read_msg(&mut self, mbox: &str, uid: &str) -> Result<Vec<u8>> {
+    // pub fn read_msg(&mut self, mbox: &str, uid: &str) -> Result<Vec<u8>> {
+    //     self.sess
+    //         .select(mbox)
+    //         .chain_err(|| format!("Could not select mailbox `{}`", mbox))?;
+    //
+    //     match self
+    //         .sess
+    //         .uid_fetch(uid, "(FLAGS BODY[])")
+    //         .chain_err(|| "Could not fetch bodies")?
+    //         .first()
+    //     {
+    //         None => Err(format!("Could not find message `{}`", uid).into()),
+    //         Some(fetch) => Ok(fetch.body().unwrap_or(&[]).to_vec()),
+    //     }
+    // }
+
+    pub fn read_msg(
+        &mut self,
+        mbox: &str,
+        uid: &str,
+    ) -> Result<imap::types::Fetch> {
         self.sess
             .select(mbox)
             .chain_err(|| format!("Could not select mailbox `{}`", mbox))?;
@@ -278,11 +326,16 @@ impl<'a> ImapConnector<'a> {
             .first()
         {
             None => Err(format!("Could not find message `{}`", uid).into()),
-            Some(fetch) => Ok(fetch.body().unwrap_or(&[]).to_vec()),
+            Some(fetch) => Ok(*fetch),
         }
     }
 
-    pub fn append_msg(&mut self, mbox: &str, msg: &[u8], flags: Vec<Flag>) -> Result<()> {
+    pub fn append_msg(
+        &mut self,
+        mbox: &str,
+        msg: &[u8],
+        flags: Vec<Flag>,
+    ) -> Result<()> {
         self.sess
             .append(mbox, msg)
             .flags(flags)

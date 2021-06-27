@@ -4,6 +4,8 @@ use std::fmt;
 
 use serde::Serialize;
 
+use crate::config::model::Account;
+
 use rfc2047_decoder;
 
 // ============
@@ -20,8 +22,8 @@ pub struct Envelope {
     // ----------------
     // Must-Fields
     // ----------------
-    pub from:           Vec<String>,
-    pub to:             Vec<String>,
+    pub from: Vec<String>,
+    pub to:   Vec<String>,
 
     // --------------------
     // Optional fields
@@ -30,6 +32,7 @@ pub struct Envelope {
     pub cc:             Option<Vec<String>>,
     pub custom_headers: Option<HashMap<String, Vec<String>>>,
     pub in_reply_to:    Option<String>,
+    pub message_id:     Option<String>,
     pub reply_to:       Option<Vec<String>>,
     pub sender:         Option<String>,
     pub signature:      Option<String>,
@@ -41,14 +44,65 @@ impl Envelope {
         Envelope::default()
     }
 
-    // pub fn set_from(&mut self, account: &Account) {
-    //     // This does the following for example:
-    //     //
-    //     //  self.from = vec!["TornaxO7 <tornax07@gmail.com>"];
-    //     self.from = vec![
-    //         format!("{} <{}>", account.name.as_ref().unwrap_or(&String::new()), account.email)
-    //     ];
-    // }
+    /// This is a little helper-function like which uses the the name and email
+    /// of the account to create a valid address for the header.
+    ///
+    /// # Example
+    ///
+    /// ## With name
+    /// Suppose the name field in the account struct *has* a value:
+    ///
+    /// ```rust
+    /// use himalaya::config::model::Account;
+    /// use himalaya::msg::envelope::Envelope;
+    ///
+    /// fn main() {
+    ///     let account = Account {
+    ///         // we just need those two values
+    ///         name: Some(String::from("Name")),
+    ///         email: String::from("BestEmail@Ever.lol"),
+    ///         ..Account::default()
+    ///     };
+    ///
+    ///     // get the address of the account
+    ///     let address = Envelope::convert_to_address(&account);
+    ///
+    ///     assert_eq!("Name <BestEmail@Ever.lol>".to_string(), address);
+    /// }
+    /// ```
+    ///
+    /// ## Without name
+    /// Suppose the name field in the account-struct *hasn't* a value:
+    ///
+    /// ```rust
+    /// use himalaya::config::model::Account;
+    /// use himalaya::msg::envelope::Envelope;
+    ///
+    /// fn main() {
+    ///     let account = Account {
+    ///         // we just need those two values
+    ///         name: None,
+    ///         email: String::from("BestEmail@Ever.lol"),
+    ///         ..Account::default()
+    ///     };
+    ///
+    ///     // get the address of the account
+    ///     let address = Envelope::convert_to_address(&account);
+    ///
+    ///     assert_eq!("<BestEmail@Ever.lol>".to_string(), address);
+    /// }
+    /// ```
+    pub fn convert_to_address(account: &Account) -> String {
+        if let Some(name) = account.name {
+            format!(
+                "{} <{}>",
+                account.name.as_ref().unwrap(),
+                account.email
+            )
+        } else {
+            format!("<{}>", account.email)
+        }
+    }
 }
 
 // ===========================
@@ -58,14 +112,15 @@ impl Default for Envelope {
     fn default() -> Self {
         Self {
             // must-fields
-            from:           Vec::new(),
-            to:             Vec::new(),
+            from: Vec::new(),
+            to:   Vec::new(),
 
             // optional fields
             bcc:            None,
             cc:             None,
             custom_headers: None,
             in_reply_to:    None,
+            message_id:     None,
             reply_to:       None,
             sender:         None,
             signature:      None,
@@ -87,7 +142,7 @@ impl From<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
 
             let from =
                 convert_vec_address_to_string(from_envelope.from.as_ref())
-                .unwrap_or(Vec::new());
+                    .unwrap_or(Vec::new());
 
             // since we get a vector here, we just need the first value, because
             // there should be only one sender, otherwise we'll pass an empty
@@ -97,10 +152,18 @@ impl From<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
             // pick up the first element (if it exists) otherwise just set it
             // to None because we might don't need it
             let sender = match sender {
-                Some(tmp_sender) =>
-                    Some(tmp_sender.iter().next().unwrap_or(&String::new()).to_string()),
-                None => None
+                Some(tmp_sender) => Some(
+                    tmp_sender
+                        .iter()
+                        .next()
+                        .unwrap_or(&String::new())
+                        .to_string(),
+                ),
+                None => None,
             };
+
+            let message_id =
+                convert_cow_u8_to_string(from_envelope.message_id.as_ref());
 
             let reply_to =
                 convert_vec_address_to_string(from_envelope.reply_to.as_ref());
@@ -117,6 +180,7 @@ impl From<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
                 subject,
                 from,
                 sender,
+                message_id,
                 reply_to,
                 to,
                 cc,
@@ -148,10 +212,8 @@ impl From<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
 ///     Date: 11-11-1111
 ///     Subject: Himalaya is cool
 ///     ...
-///
 impl fmt::Display for Envelope {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-
         // Here will be the body content stored (as shown in the example)
         let mut result = String::new();
 
@@ -185,9 +247,15 @@ impl fmt::Display for Envelope {
             result.push_str(&format!("Sender: {}", sender));
         }
 
+        // Message-ID
+        if let Some(message_id) = &self.message_id {
+            result.push_str(&format!("Message-ID: {}\n", message_id));
+        }
+
         // reply_to
         if let Some(reply_to) = &self.reply_to {
-            result.push_str(&merge_addresses_to_one_line("Reply-To", &reply_to));
+            result
+                .push_str(&merge_addresses_to_one_line("Reply-To", &reply_to));
         }
 
         // cc
@@ -223,7 +291,9 @@ impl fmt::Display for Envelope {
 // ---------------------
 // Helper functions
 // ---------------------
-fn convert_cow_u8_to_string<'val>(value: Option<&Cow<'val, [u8]>>) -> Option<String> {
+fn convert_cow_u8_to_string<'val>(
+    value: Option<&Cow<'val, [u8]>>,
+) -> Option<String> {
     if let Some(value) = value {
         // convert the `[u8]` list into a vector and try to get a string out of
         // it.
@@ -239,25 +309,24 @@ fn convert_cow_u8_to_string<'val>(value: Option<&Cow<'val, [u8]>>) -> Option<Str
 
 fn convert_vec_address_to_string<'val>(
     value: Option<&Vec<imap_proto::types::Address<'val>>>,
-    ) -> Option<Vec<String>> {
-
+) -> Option<Vec<String>> {
     if let Some(value) = value {
         let value = value
             .iter()
             .map(|address| {
                 // try to get the name of the mail-address
-                let address_name = convert_cow_u8_to_string(address.name.as_ref());
+                let address_name =
+                    convert_cow_u8_to_string(address.name.as_ref());
 
                 match address_name {
                     Some(address_name) => address_name,
                     None => String::new(),
                 }
             })
-        .collect();
+            .collect();
 
         Some(value)
-    }
-    else {
+    } else {
         None
     }
 }
@@ -275,11 +344,17 @@ fn convert_vec_address_to_string<'val>(
 ///
 /// let cc_header = merge_addresses_to_one_line("Cc", &mail_addresses);
 ///
-/// assert_eq!(cc_header, "Cc: TornaxO7 <tornax07@gmail.com>, Soywod
-/// <clement.douin@posteo.net>".to_string());
+/// assert_eq!(
+///     cc_header,
+///     "Cc: TornaxO7 <tornax07@gmail.com>, Soywod
+/// <clement.douin@posteo.net>"
+///         .to_string()
+/// );
 /// ```
-fn merge_addresses_to_one_line(header: &str, addresses: &Vec<String>) -> String {
-
+fn merge_addresses_to_one_line(
+    header: &str,
+    addresses: &Vec<String>,
+) -> String {
     let mut output = header.to_string();
     let mut address_iter = addresses.iter();
 

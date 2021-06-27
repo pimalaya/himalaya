@@ -435,6 +435,7 @@ impl<'m> Msg<'m> {
             subject: headers.get_first_value("subject"),
             default_content: Some(thread),
         };
+    
         Msg::build_tpl(config, account, msg_spec)
     }
 
@@ -461,6 +462,7 @@ impl<'m> Msg<'m> {
                     }
                 }
             });
+
         // … and the ones coming from either "Reply-To" or "From"
         let reply_to = headers
             .get_all_values("reply-to")

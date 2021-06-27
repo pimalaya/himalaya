@@ -13,7 +13,7 @@ use crate::table::{Cell, Row, Table};
 use serde::Serialize;
 
 use lettre::message::{
-    Attachment as lettre_Attachment, Message, MultiPart, SinglePart,
+    Attachment as lettre_Attachment, Message, MultiPart, SinglePart, Mailbox,
 };
 
 use std::collections::HashMap;
@@ -44,7 +44,7 @@ pub enum MailError {
 #[derive(Debug, Serialize)]
 pub struct Mail<'mail> {
     /// All added attachments are listed in this vector.
-    pub attachments: Vec<Attachment>,
+    attachments: Vec<Attachment>,
 
     /// The flags for this mail.
     pub flags: Flags<'mail>,
@@ -87,7 +87,7 @@ impl<'mail> Mail<'mail> {
             "",
             "text/plain",
             envelope.to_string().into_bytes(),
-        );
+            );
 
         Self {
             attachments: vec![body],
@@ -99,6 +99,118 @@ impl<'mail> Mail<'mail> {
         }
     }
 
+    pub fn change_to_reply(&mut self, account: &Account, reply_all: bool) {
+        // ------------------
+        // Adjust header
+        // ------------------
+        // Pick up the current subject of the mail
+        let old_subject = self.envelope.subject.unwrap_or(String::new());
+
+        // The new fields
+        let mut to = Vec::new();
+        let mut cc = None;
+
+        // If we have to reply everyone, then we're not only replying to the
+        // addresses in the `Reply-To` or `From:` field, we're also replying to
+        // the addresses in the `To:` field and the `Cc: ` field.
+        if reply_all {
+
+            // the email addr parsed of the user
+            let email_addr: lettre::Address = account.email.parse().unwrap();
+
+            // Reply to all mail-addresses in the `To:` field, except the
+            // mail-address of the current user who wants to write this
+            // reply-message
+            for addr in self.envelope.to.iter() {
+                // each email address in the to field should be valid, why
+                // should be in this header than?
+                let addr_parsed: Mailbox = addr.parse().unwrap();
+
+                // make sure that the address is not the mail of the current
+                // user, because why should he/she wants to have the mail which
+                // he/her just sent by themself?
+                if addr_parsed.email != email_addr {
+                    to.push(addr);
+                }
+            }
+
+            // Also use the addresses in the "Cc:" field
+            cc = self.envelope.cc.clone();
+        }
+
+        // Now add the addresses in the `Reply-To:` Field or from the `From:`
+        // field.
+        if let Some(reply_to) = &self.envelope.reply_to {
+            to.append(&mut reply_to.clone());
+        }
+        else {
+            // if the "Reply-To" wasn't set from the sender, then we're just
+            // replying to the addresses in the "From:" field
+            to.append(&mut self.envelope.from.clone());
+        };
+
+        // the message id of the mail.
+        let message_id = self.envelope.message_id.unwrap_or(String::new());
+
+        let new_envelope = Envelope {
+            from: Envelope::convert_to_address(account),
+            to,
+            cc,
+            subject: format!("Re: {}", old_subject),
+            in_reply_to: Some(message_id),
+            // and clear the rest of the fields
+            .. Envelope::default()
+        };
+
+        self.envelope = new_envelope;
+
+        // -----------------------
+        // Remove Attachments
+        // -----------------------
+        // Remove all attachments, after the first attachment, because the first
+        // attachment includes the content of our mail!
+        self.attachments = self.attachments.drain(1..).to_vec();
+
+        // -------------------------
+        // Prepare body of mail
+        // -------------------------
+        // comment "out" the body of the mail, by adding the `>` characters to
+        // each line which includes a string.
+        let new_body: Vec<u8> = String::from_utf8(self.attachments[0].body_raw)
+            .unwrap()
+            .split('\n')
+            .map(|line| format!("> {}", line))
+            .collect();
+
+        // now apply our new body
+        self.attachments[0].body_raw = new_body.into_bytes();
+    }
+
+    pub fn change_to_forwarding(&mut self, ctx: &Ctx) {
+
+        // -----------
+        // Header
+        // -----------
+        let old_subject = self.envelope.subject.unwrap_or(String::new());
+
+        self.envelope = Envelope {
+            subject: format!("Fwd: {}", old_subject),
+            // and use the rest of the headers
+            .. self.envelope,
+        };
+
+        // ---------
+        // Body
+        // ---------
+        // apply a line which should indicate where the forwarded message begins
+        let new_body = String::from_utf8(self.attachments[0].body_raw).unwrap();
+        let new_body = format!("\r\n---------- Forwarded Message ----------\r\n{}",
+                               new_body);
+
+        self.attachments[0].body_raw = new_body.into_bytes();
+
+    }
+
     /// Converts the whole mail into a vector of bytes.
     pub fn into_bytes(&self) -> Result<Vec<u8>, MailError> {
         // parse the whole mail first
@@ -108,6 +220,14 @@ impl<'mail> Mail<'mail> {
         };
 
         return Ok(parsed.formatted());
+    }
+
+    /// Returns an iterator which points to all attachments of the mail.
+    pub fn get_attachments(&'mail self) -> impl Iterator<Item = &'mail Attachment> {
+        // we are skipping the first attachment, because remember: The first
+        // attachment is always the body of the mail! The rest in the vector are
+        // other attachments, like images or something like that.
+        self.attachments.iter().skip(1)
     }
 
     /// Let the user change the content of the mail. This function will change
@@ -179,19 +299,19 @@ impl<'mail> Mail<'mail> {
                 "bcc" => {
                     new_envelope.bcc = Some(
                         value
-                            .rsplit(',')
-                            .map(|addr| addr.to_string())
-                            .collect(),
-                    )
+                        .rsplit(',')
+                        .map(|addr| addr.to_string())
+                        .collect(),
+                        )
                 }
 
                 "cc" => {
                     new_envelope.cc = Some(
                         value
-                            .rsplit(',')
-                            .map(|addr| addr.to_string())
-                            .collect(),
-                    )
+                        .rsplit(',')
+                        .map(|addr| addr.to_string())
+                        .collect(),
+                        )
                 }
 
                 "in_reply_to" => new_envelope.in_reply_to = Some(value),
@@ -199,10 +319,10 @@ impl<'mail> Mail<'mail> {
                 "reply_to" => {
                     new_envelope.reply_to = Some(
                         value
-                            .rsplit(',')
-                            .map(|addr| addr.to_string())
-                            .collect(),
-                    )
+                        .rsplit(',')
+                        .map(|addr| addr.to_string())
+                        .collect(),
+                        )
                 }
 
                 "sender" => new_envelope.sender = Some(value),
@@ -230,10 +350,10 @@ impl<'mail> Mail<'mail> {
                     updated_hashmap.insert(
                         custom_header,
                         value
-                            .rsplit(',')
-                            .map(|addr| addr.to_string())
-                            .collect(),
-                    );
+                        .rsplit(',')
+                        .map(|addr| addr.to_string())
+                        .collect(),
+                        );
 
                     // .. and apply the updated hashmap to the envelope struct
                     new_envelope.custom_headers = Some(updated_hashmap);
@@ -387,7 +507,7 @@ impl<'mail> Mail<'mail> {
             let msg_attachment = msg_attachment.body(
                 attachment.body_raw.clone(),
                 attachment.content_type.clone(),
-            );
+                );
 
             // add the attachment to our attachment-list
             msg_parts = msg_parts.singlepart(msg_attachment);
@@ -424,8 +544,17 @@ impl<'mail> Default for Mail<'mail> {
             flags:       Flags::new(&[]),
             envelope:    Envelope::default(),
             uid:         None,
-            date: None,
+            date:        None,
         }
+    }
+}
+
+impl<'mail> fmt::Display for Mail<'mail> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+
+        let body = String::from_utf8(&self.attachments[0]);
+
+        writeln!(formatter, "{}\n{}", self.envelope, body);
     }
 }
 
@@ -464,11 +593,11 @@ impl<'mail> Table for Mail<'mail> {
 /// Load the data from a fetched mail and store them in the mail-struct.
 /// Please make sure that the fetch includes the following query:
 ///
-///     - UID
-///     - FLAGS
-///     - ENVELOPE
+///     - UID      (optional)
+///     - FLAGS    (optional)
+///     - ENVELOPE (optional)
 ///     - INTERNALDATE
-///     - BODY[] (optional)
+///     - BODY[]   (optional)
 impl<'mail> From<&'mail Fetch> for Mail<'mail> {
     fn from(fetch: &'mail Fetch) -> Mail {
         // -----------------
@@ -524,7 +653,7 @@ impl<'mail> From<&'mail Fetch> for Mail<'mail> {
                         "",
                         "text/plain",
                         b"Couldn't get the body of the mail.".to_vec(),
-                    );
+                        );
 
                     attachments.push(attachment_dummy);
                 }

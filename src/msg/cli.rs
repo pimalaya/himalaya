@@ -15,6 +15,7 @@ use crate::{
     input,
     mbox::cli::mbox_target_arg,
     msg::{
+        attachment::Attachment,
         envelope::Envelope,
         mail::{Mail, Mails},
         model::{Attachments, Msg, Msgs, ReadableMsg},
@@ -208,9 +209,7 @@ fn msg_matches_list(
     let msgs = imap_conn.list_msgs(&ctx.mbox, &page_size, &page)?;
     let msgs = if let Some(ref fetches) = msgs {
         Mails::from(fetches)
-        // Msgs::from(fetches)
     } else {
-        // Msgs::new()
         Mails::new()
     };
 
@@ -265,9 +264,9 @@ fn msg_matches_search(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let msgs = imap_conn.search_msgs(&ctx.mbox, &query, &page_size, &page)?;
     let msgs = if let Some(ref fetches) = msgs {
-        Msgs::from(fetches)
+        Mails::from(fetches)
     } else {
-        Msgs::new()
+        Mails::new()
     };
     trace!("messages: {:?}", msgs);
     ctx.output.print(msgs);
@@ -287,14 +286,12 @@ fn msg_matches_read(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     debug!("raw: {}", raw);
 
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
-    let msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
+    let fetch = imap_conn.read_msg(&ctx.mbox, &uid)?;
     if raw {
-        let msg = String::from_utf8(msg)
-            .chain_err(|| "Could not decode raw message as utf8 string")?;
-        let msg = msg.trim_end_matches("\n");
+        let msg = Mail::from(&fetch);
         ctx.output.print(msg);
     } else {
-        let msg = ReadableMsg::from_bytes(&mime, &msg)?;
+        let msg = Mail::from(&fetch);
         ctx.output.print(msg);
     }
 
@@ -311,31 +308,40 @@ fn msg_matches_attachments(
     let uid = matches.value_of("uid").unwrap();
     debug!("uid: {}", &uid);
 
+    // get the mail and than it's attachments
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
-    let msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
-    let attachments = Attachments::from_bytes(&msg)?;
+    let fetch = imap_conn.read_msg(&ctx.mbox, &uid)?;
+    let mail = Mail::from(&fetch);
+    let attachments: Vec<&Attachment> = mail.get_attachments().collect();
+
     debug!(
         "{} attachment(s) found for message {}",
-        &attachments.0.len(),
+        &attachments.len(),
         &uid
     );
-    for attachment in attachments.0.iter() {
+
+    // Iterate through all attachments and download them to the download
+    // directory of the account.
+    for attachment in &attachments {
         let filepath = ctx
             .config
             .downloads_filepath(&ctx.account, &attachment.filename);
+
         debug!("downloading {}…", &attachment.filename);
-        fs::write(&filepath, &attachment.raw).chain_err(|| {
+
+        fs::write(&filepath, &attachment.body_raw).chain_err(|| {
             format!("Could not save attachment {:?}", filepath)
         })?;
     }
 
     debug!(
         "{} attachment(s) successfully downloaded",
-        &attachments.0.len()
+        &attachments.len()
     );
+
     ctx.output.print(format!(
         "{} attachment(s) successfully downloaded",
-        &attachments.0.len()
+        &attachments.len()
     ));
 
     imap_conn.logout();
@@ -401,85 +407,13 @@ fn msg_matches_write(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     // ---------------------
     // User Interaction
     // ---------------------
-    // Now ask the user what we should do now
-    loop {
-        match input::post_edit_choice() {
-            Ok(choice) => match choice {
-                input::PostEditChoice::Send => {
-                    debug!("sending message…");
+    mail_interaction(&ctx, &mail, &imap_conn);
 
-                    // prepare the mail to be send
-                    let sendable = match mail.to_sendable_msg() {
-                        Ok(sendable) => sendable,
-                        // In general if an error occured, then this is normally
-                        // due to a missing value of a header. So let's give the
-                        // user another try and give him/her the chance to fix
-                        // that :)
-                        Err(_) => continue,
-                    };
-                    smtp::send(&ctx.account, &sendable)?;
-
-                    // TODO: Gmail sent mailboxes are called `[Gmail]/Sent`
-                    // which creates a conflict, fix this!
-
-                    // let the server know, that the user sent a mail
-                    imap_conn.append_msg(
-                        "Sent",
-                        &sendable.formatted(),
-                        vec![Flag::Seen],
-                    )?;
-
-                    // remove the draft, since we sent it
-                    input::remove_draft()?;
-                    ctx.output.print("Message successfully sent");
-                    break;
-                }
-                // edit the body of the mail
-                input::PostEditChoice::Edit => {
-                    // Did something goes wrong when the user changed the
-                    // content?
-                    if let Err(err) = mail.edit_body() {
-                        println!("[ERROR] {}", err);
-                        println!(concat!(
-                            "Please try to fix the problem by editing",
-                            "the mail again."
-                        ));
-                    }
-                }
-                input::PostEditChoice::LocalDraft => break,
-                input::PostEditChoice::RemoteDraft => {
-                    debug!("saving to draft…");
-                    match mail.into_bytes() {
-                        Ok(parsed) => {
-                            imap_conn.append_msg(
-                                "Drafts",
-                                &parsed,
-                                vec![Flag::Seen],
-                            )?;
-                            input::remove_draft()?;
-                            ctx.output
-                                .print("Message successfully saved to Drafts");
-                        }
-                        Err(_) => ctx
-                            .output
-                            .print("Couldn't save it to the server..."),
-                    };
-                    break;
-                }
-                input::PostEditChoice::Discard => {
-                    input::remove_draft()?;
-                    break;
-                }
-            },
-            Err(err) => error!("{}", err),
-        }
-    }
-
-    // be a good boi/gril and say "bye" to the server
+    // ------------
+    // Cleanup
+    // ------------
+    // let's be nice to the server and say "bye" to the server
     imap_conn.logout();
-
-    println!("Yes");
-    // println!("{}", mail.envelope);
 
     Ok(true)
 }
@@ -487,70 +421,53 @@ fn msg_matches_write(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 fn msg_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     debug!("reply command matched");
 
+    // -----------------
+    // Preparations
+    // -----------------
+    // Fetch the mail first, which should be replied to
+    let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let uid = matches.value_of("uid").unwrap();
+    let fetch = imap_conn.read_msg(&ctx.mbox, &uid)?;
+    let mut msg = Mail::from(&fetch);
+
     debug!("uid: {}", uid);
-    let attachments = matches
+
+    // ---------------------------
+    // Adjust content of mail
+    // ---------------------------
+    // Now let the user edit the content of the mail and adjust the header of
+    // the mail
+    let old_sender = msg.envelope.from.clone();
+
+    // Change the mail to a reply-mail.
+    if matches.is_present("reply-all") {
+        msg.change_to_reply(&ctx.account, true);
+    } else {
+        msg.change_to_reply(&ctx.account, false);
+    }
+
+    // ----------------
+    // Attachments
+    // ----------------
+    // Apply the given attachments to the reply-mail.
+    let mut attachments: Vec<&str> = matches
         .values_of("attachments")
         .unwrap_or_default()
-        .map(String::from)
-        .collect::<Vec<_>>();
+        .collect();
+
+    attachments.iter().for_each(|path| msg.add_attachment(path));
+
     debug!("found {} attachments", attachments.len());
     trace!("attachments: {:?}", attachments);
 
-    let mut imap_conn = ImapConnector::new(&ctx.account)?;
-    let msg = Msg::from(imap_conn.read_msg(&ctx.mbox, &uid)?);
-    let tpl = if matches.is_present("reply-all") {
-        msg.build_reply_all_tpl(&ctx.config, &ctx.account)?
-    } else {
-        msg.build_reply_tpl(&ctx.config, &ctx.account)?
-    };
+    // ---------------------
+    // User interaction
+    // ---------------------
+    mail_interaction(&ctx, &msg, &imap_conn);
 
-    let content = input::open_editor_with_tpl(&tpl.to_string().as_bytes())?;
-    let mut msg = Msg::from(content);
-    msg.attachments = attachments;
-
-    loop {
-        match input::post_edit_choice() {
-            Ok(choice) => match choice {
-                input::PostEditChoice::Send => {
-                    debug!("sending message…");
-                    let msg = msg.to_sendable_msg()?;
-                    smtp::send(&ctx.account, &msg)?;
-                    imap_conn.append_msg(
-                        "Sent",
-                        &msg.formatted(),
-                        vec![Flag::Seen],
-                    )?;
-                    imap_conn.add_flags(&ctx.mbox, uid, "\\Answered")?;
-                    input::remove_draft()?;
-                    ctx.output.print("Message successfully sent");
-                    break;
-                }
-                input::PostEditChoice::Edit => {
-                    let content = input::open_editor_with_draft()?;
-                    msg = Msg::from(content);
-                }
-                input::PostEditChoice::LocalDraft => break,
-                input::PostEditChoice::RemoteDraft => {
-                    debug!("saving to draft…");
-                    imap_conn.append_msg(
-                        "Drafts",
-                        &msg.to_vec()?,
-                        vec![Flag::Seen],
-                    )?;
-                    input::remove_draft()?;
-                    ctx.output.print("Message successfully saved to Drafts");
-                    break;
-                }
-                input::PostEditChoice::Discard => {
-                    input::remove_draft()?;
-                    break;
-                }
-            },
-            Err(err) => error!("{}", err),
-        }
-    }
-
+    // ------------
+    // Cleanup
+    // ------------
     imap_conn.logout();
     Ok(true)
 }
@@ -558,65 +475,44 @@ fn msg_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 fn msg_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     debug!("forward command matched");
 
+    // ----------------
+    // Preparation
+    // ----------------
+    let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let uid = matches.value_of("uid").unwrap();
+    let fetch = imap_conn.read_msg(&ctx.mbox, &uid)?;
+    let mut msg = Mail::from(&fetch);
+
     debug!("uid: {}", uid);
-    let attachments = matches
+
+    // ---------------------------
+    // Adjust content of mail
+    // ---------------------------
+    msg.change_to_forwarding(&ctx);
+
+    // ----------------
+    // Attachments
+    // ----------------
+    let mut attachments: Vec<&str> = matches
         .values_of("attachments")
         .unwrap_or_default()
-        .map(String::from)
-        .collect::<Vec<_>>();
+        .collect();
+
+    attachments.iter().for_each(|path| msg.add_attachment(path));
+
     debug!("found {} attachments", attachments.len());
     trace!("attachments: {:?}", attachments);
 
-    let mut imap_conn = ImapConnector::new(&ctx.account)?;
-    let msg = Msg::from(imap_conn.read_msg(&ctx.mbox, &uid)?);
-    let tpl = msg.build_forward_tpl(&ctx.config, &ctx.account)?;
-    let content = input::open_editor_with_tpl(&tpl.to_string().as_bytes())?;
-    let mut msg = Msg::from(content);
-    msg.attachments = attachments;
+    // ---------------------
+    // User interaction
+    // ---------------------
+    mail_interaction(&ctx, &msg, &imap_conn);
 
-    loop {
-        match input::post_edit_choice() {
-            Ok(choice) => match choice {
-                input::PostEditChoice::Send => {
-                    debug!("sending message…");
-                    let msg = msg.to_sendable_msg()?;
-                    smtp::send(&ctx.account, &msg)?;
-                    imap_conn.append_msg(
-                        "Sent",
-                        &msg.formatted(),
-                        vec![Flag::Seen],
-                    )?;
-                    input::remove_draft()?;
-                    ctx.output.print("Message successfully sent");
-                    break;
-                }
-                input::PostEditChoice::Edit => {
-                    let content = input::open_editor_with_draft()?;
-                    msg = Msg::from(content);
-                }
-                input::PostEditChoice::LocalDraft => break,
-                input::PostEditChoice::RemoteDraft => {
-                    debug!("saving to draft…");
-                    imap_conn.append_msg(
-                        "Drafts",
-                        &msg.to_vec()?,
-                        vec![Flag::Seen],
-                    )?;
-                    input::remove_draft()?;
-                    ctx.output.print("Message successfully saved to Drafts");
-                    break;
-                }
-                input::PostEditChoice::Discard => {
-                    input::remove_draft()?;
-                    break;
-                }
-            },
-            Err(err) => error!("{}", err),
-        }
-    }
-
+    // ------------
+    // Cleanup
+    // ------------
     imap_conn.logout();
+
     Ok(true)
 }
 
@@ -723,5 +619,85 @@ fn msg_matches_save(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     imap_conn.append_msg(&ctx.mbox, &msg.to_vec()?, vec![Flag::Seen])?;
 
     imap_conn.logout();
+    Ok(true)
+}
+
+// =====================
+// Helper functions
+// =====================
+fn mail_interaction(ctx: &Ctx, mail: &Mail, imap_conn: &ImapConnector) -> Result<bool> {
+    loop {
+        match input::post_edit_choice() {
+            Ok(choice) => match choice {
+                input::PostEditChoice::Send => {
+                    debug!("sending message…");
+
+                    // prepare the mail to be send
+                    let sendable = match mail.to_sendable_msg() {
+                        Ok(sendable) => sendable,
+                        // In general if an error occured, then this is normally
+                        // due to a missing value of a header. So let's give the
+                        // user another try and give him/her the chance to fix
+                        // that :)
+                        Err(_) => continue,
+                    };
+                    smtp::send(&ctx.account, &sendable)?;
+
+                    // TODO: Gmail sent mailboxes are called `[Gmail]/Sent`
+                    // which creates a conflict, fix this!
+
+                    // let the server know, that the user sent a mail
+                    imap_conn.append_msg(
+                        "Sent",
+                        &sendable.formatted(),
+                        vec![Flag::Seen],
+                    )?;
+
+                    // remove the draft, since we sent it
+                    input::remove_draft()?;
+                    ctx.output.print("Message successfully sent");
+                    break;
+                }
+                // edit the body of the mail
+                input::PostEditChoice::Edit => {
+                    // Did something goes wrong when the user changed the
+                    // content?
+                    if let Err(err) = mail.edit_body() {
+                        println!("[ERROR] {}", err);
+                        println!(concat!(
+                            "Please try to fix the problem by editing",
+                            "the mail again."
+                        ));
+                    }
+                }
+                input::PostEditChoice::LocalDraft => break,
+                input::PostEditChoice::RemoteDraft => {
+                    debug!("saving to draft…");
+                    match mail.into_bytes() {
+                        Ok(parsed) => {
+                            imap_conn.append_msg(
+                                "Drafts",
+                                &parsed,
+                                vec![Flag::Seen],
+                            )?;
+                            input::remove_draft()?;
+                            ctx.output
+                                .print("Message successfully saved to Drafts");
+                        }
+                        Err(_) => ctx
+                            .output
+                            .print("Couldn't save it to the server..."),
+                    };
+                    break;
+                }
+                input::PostEditChoice::Discard => {
+                    input::remove_draft()?;
+                    break;
+                }
+            },
+            Err(err) => error!("{}", err),
+        }
+    }
+
     Ok(true)
 }
