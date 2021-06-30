@@ -33,14 +33,6 @@ curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | 
 curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | PREFIX=~/.local sh
 ```
 
-### Install via brew
-
-If you're macOS user and using [Homebrew](https://brew.sh/), you can install via brew command:
-
-```sh
-$ brew install himalaya
-```
-
 *See the [wiki](https://github.com/soywod/himalaya/wiki) for other installation
 methods.*
 
