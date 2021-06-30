@@ -7,7 +7,7 @@ use std::{collections::HashSet, iter::FromIterator, net::TcpStream};
 use crate::config::model::Account;
 use crate::ctx::Ctx;
 use imap::types::Flag;
-use crate::msg::model::Mail;
+use crate::msg::model::Msg;
 
 error_chain! {
     links {
@@ -150,7 +150,7 @@ impl<'a> ImapConnector<'a> {
                     .chain_err(|| "Could not fetch new messages enveloppe")?;
 
                 for fetch in fetches.iter() {
-                    let msg = Mail::from(fetch);
+                    let msg = Msg::from(fetch);
                     let uid = fetch.uid.ok_or_else(|| {
                         format!("Could not retrieve message {}'s UID", fetch.message)
                     })?;
@@ -287,7 +287,7 @@ impl<'a> ImapConnector<'a> {
     //     }
     // }
 
-    pub fn read_msg(&mut self, mbox: &str, uid: &str) -> Result<Mail> {
+    pub fn read_msg(&mut self, mbox: &str, uid: &str) -> Result<Msg> {
         self.sess
             .select(mbox)
             .chain_err(|| format!("Could not select mailbox `{}`", mbox))?;
@@ -299,7 +299,7 @@ impl<'a> ImapConnector<'a> {
             .first()
         {
             None => Err(format!("Could not find message `{}`", uid).into()),
-            Some(fetch) => Ok(Mail::from(fetch)),
+            Some(fetch) => Ok(Msg::from(fetch)),
         }
     }
 

@@ -17,7 +17,7 @@ use crate::{
     msg::{
         attachment::Attachment,
         envelope::Envelope,
-        model::{Mail, Mails},
+        model::{Msg, Msgs},
     },
     smtp,
 };
@@ -198,9 +198,9 @@ fn msg_matches_list(ctx: &Ctx, opt_matches: Option<&clap::ArgMatches>) -> Result
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let msgs = imap_conn.list_msgs(&ctx.mbox, &page_size, &page)?;
     let msgs = if let Some(ref fetches) = msgs {
-        Mails::from(fetches)
+        Msgs::from(fetches)
     } else {
-        Mails::new()
+        Msgs::new()
     };
 
     trace!("messages: {:?}", msgs);
@@ -254,9 +254,9 @@ fn msg_matches_search(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let msgs = imap_conn.search_msgs(&ctx.mbox, &query, &page_size, &page)?;
     let msgs = if let Some(ref fetches) = msgs {
-        Mails::from(fetches)
+        Msgs::from(fetches)
     } else {
-        Mails::new()
+        Msgs::new()
     };
     trace!("messages: {:?}", msgs);
     ctx.output.print(msgs);
@@ -361,7 +361,7 @@ fn msg_matches_write(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     // Prepare the general mail
     // -----------------------------
     // TODO: Make the header starting customizeable like from template
-    let mut mail = Mail::new_with_envelope(
+    let mut mail = Msg::new_with_envelope(
         &ctx.account,
         Envelope {
             subject: Some(String::new()),
@@ -621,7 +621,7 @@ fn msg_matches_send(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
             .join("\r\n")
     };
 
-    let msg = match Mail::new_with_pre_body(&ctx.account, msg.into_bytes()) {
+    let msg = match Msg::new_with_pre_body(&ctx.account, msg.into_bytes()) {
         Ok(msg) => msg,
         Err(_) => return Ok(false),
     };
@@ -643,7 +643,7 @@ fn msg_matches_save(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let msg = matches.value_of("message").unwrap();
-    let msg = match Mail::new_with_pre_body(&ctx.account, msg.to_string().into_bytes()) {
+    let msg = match Msg::new_with_pre_body(&ctx.account, msg.to_string().into_bytes()) {
         Ok(mail) => mail,
         Err(_) => return Ok(false),
     };
@@ -661,7 +661,7 @@ fn msg_matches_save(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 // =====================
 // Helper functions
 // =====================
-fn mail_interaction(ctx: &Ctx, mail: &mut Mail, imap_conn: &mut ImapConnector) -> Result<bool> {
+fn mail_interaction(ctx: &Ctx, mail: &mut Msg, imap_conn: &mut ImapConnector) -> Result<bool> {
     loop {
         match input::post_edit_choice() {
             Ok(choice) => match choice {

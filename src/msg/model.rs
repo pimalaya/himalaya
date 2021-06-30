@@ -54,10 +54,10 @@ error_chain! {
 }
 
 // =========
-// Mail
+// Msg
 // =========
 #[derive(Debug, Serialize)]
-pub struct Mail {
+pub struct Msg {
     /// All added attachments are listed in this vector.
     attachments: Vec<Attachment>,
 
@@ -75,7 +75,7 @@ pub struct Mail {
     date: Option<String>,
 }
 
-impl Mail {
+impl Msg {
     pub fn new(account: &Account) -> Self {
         Self::new_with_envelope(account, Envelope::default())
     }
@@ -241,11 +241,11 @@ impl Mail {
     }
 
     /// Let the user change the content of the mail. This function will change
-    /// the first value of the `Mail.attachments` vector, since the first value
+    /// the first value of the `Msg.attachments` vector, since the first value
     /// of this vector represents the content of the mail.
     ///
     /// # Hint
-    /// It *won't* change/update/set `Mail.parsed`!
+    /// It *won't* change/update/set `Msg.parsed`!
     pub fn edit_body(&mut self) -> Result<()> {
         // ----------------
         // Update body
@@ -286,12 +286,12 @@ impl Mail {
         }
     }
 
-    /// This function will use the information of the `Mail` struct and creates
-    /// a sendable mail. It uses the `Mail.envelope` and `Mail.attachments`
+    /// This function will use the information of the `Msg` struct and creates
+    /// a sendable mail. It uses the `Msg.envelope` and `Msg.attachments`
     /// fields
     pub fn to_sendable_msg(&self) -> Result<Message> {
         // ===================
-        // Header of Mail
+        // Header of Msg
         // ===================
         // This variable will hold all information of our mail
         let mut msg = Message::builder();
@@ -518,7 +518,7 @@ impl Mail {
 // -----------
 // Traits
 // -----------
-impl Default for Mail {
+impl Default for Msg {
     fn default() -> Self {
         Self {
             attachments: Vec::new(),
@@ -530,7 +530,7 @@ impl Default for Mail {
     }
 }
 
-impl fmt::Display for Mail {
+impl fmt::Display for Msg {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         let body = match String::from_utf8(self.attachments[0].body_raw.clone()) {
             Ok(string) => string,
@@ -545,7 +545,7 @@ impl fmt::Display for Mail {
     }
 }
 
-impl Table for Mail {
+impl Table for Msg {
     fn head() -> Row {
         Row::new()
             .cell(Cell::new("UID").bold().underline().white())
@@ -586,8 +586,8 @@ impl Table for Mail {
 ///     - INTERNALDATE
 ///     - BODY[]   (optional)
 ///
-impl From<&Fetch> for Mail {
-    fn from(fetch: &Fetch) -> Mail {
+impl From<&Fetch> for Msg {
+    fn from(fetch: &Fetch) -> Msg {
         // -----------------
         // Preparations
         // -----------------
@@ -674,13 +674,13 @@ impl From<&Fetch> for Mail {
 }
 
 // ==========
-// Mails
+// Msgs
 // ==========
 /// This is just a type-safety which represents a vector of mails.
 #[derive(Debug, Serialize)]
-pub struct Mails(pub Vec<Mail>);
+pub struct Msgs(pub Vec<Msg>);
 
-impl Mails {
+impl Msgs {
     pub fn new() -> Self {
         Self(Vec::new())
     }
@@ -689,7 +689,7 @@ impl Mails {
 // -----------
 // Traits
 // -----------
-impl fmt::Display for Mails {
+impl fmt::Display for Msgs {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "\n{}", Table::render(&self.0))
     }
@@ -698,13 +698,13 @@ impl fmt::Display for Mails {
 // -----------
 // From's
 // -----------
-impl<'mails> From<&'mails ZeroCopy<Vec<Fetch>>> for Mails {
+impl<'mails> From<&'mails ZeroCopy<Vec<Fetch>>> for Msgs {
     fn from(fetches: &'mails ZeroCopy<Vec<Fetch>>) -> Self {
-        // the content of the Mails-struct
+        // the content of the Msgs-struct
         let mut mails = Vec::new();
 
         for fetch in fetches.iter().rev() {
-            mails.push(Mail::from(fetch));
+            mails.push(Msg::from(fetch));
         }
 
         Self(mails)
