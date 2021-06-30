@@ -110,10 +110,6 @@ pub fn msg_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
             .aliases(&["remove", "rm"])
             .about("Deletes a message")
             .arg(uid_arg()),
-        // tpl_subcommand(),
-        clap::SubCommand::with_name("test")
-            .about("Testing subcommand for the new mail struct")
-            .arg(attachment_arg()),
     ]
 }
 
