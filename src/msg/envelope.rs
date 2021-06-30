@@ -21,7 +21,7 @@ error_chain! { }
 /// crate. It's should mainly help to interact with the mails by using more
 /// common data types like `Vec` or `String` since a `[u8]` array is a little
 /// bit limited to use.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Envelope {
     // ----------------
     // Must-Fields
@@ -110,47 +110,47 @@ impl Envelope {
 
 
     pub fn get_from(&self) -> Vec<String> {
-        self.from
+        self.from.clone()
     }
 
     pub fn get_to(&self) -> Vec<String> {
-        self.to
+        self.to.clone()
     }
 
     pub fn get_bcc(&self) -> Vec<String> {
-        self.bcc.unwrap_or(Vec::new())
+        self.bcc.clone().unwrap_or(Vec::new())
     }
 
     pub fn get_cc(&self) -> Vec<String> {
-        self.cc.unwrap_or(Vec::new())
+        self.cc.clone().unwrap_or(Vec::new())
     }
 
     pub fn get_custom_headers(&self) -> HashMap<String, Vec<String>> {
-        self.custom_headers.unwrap_or(HashMap::new())
+        self.custom_headers.clone().unwrap_or(HashMap::new())
     }
 
     pub fn get_in_reply_to(&self) -> String {
-        self.in_reply_to.unwrap_or_default()
+        self.in_reply_to.clone().unwrap_or_default()
     }
 
     pub fn get_message_id(&self) -> String {
-        self.message_id.unwrap_or_default()
+        self.message_id.clone().unwrap_or_default()
     }
 
     pub fn get_reply_to(&self) -> Vec<String> {
-        self.reply_to.unwrap_or(Vec::new())
+        self.reply_to.clone().unwrap_or(Vec::new())
     }
 
     pub fn get_sender(&self) -> String {
-        self.sender.unwrap_or_default()
+        self.sender.clone().unwrap_or_default()
     }
 
     pub fn get_signature(&self) -> String {
-        self.sender.unwrap_or_default()
+        self.sender.clone().unwrap_or_default()
     }
 
     pub fn get_subject(&self) -> String {
-        self.subject.unwrap_or_default()
+        self.subject.clone().unwrap_or_default()
     }
 }
 

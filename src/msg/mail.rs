@@ -5,9 +5,9 @@ use imap::types::{Fetch, Flag, ZeroCopy};
 
 use mailparse;
 
-use crate:: {
+use crate::{
     config::model::Account,
-    flag::model::{Flags},
+    flag::model::Flags,
     input,
     table::{Cell, Row, Table},
 };
@@ -25,11 +25,11 @@ use error_chain::error_chain;
 error_chain! {
     errors {
         // An error appeared, when it tried to parse the body of the mail!
-        ParseBody (err: &'static str) {
+        ParseBody (err: String) {
             description("Couldn't get the body of the parsed mail."),
             display("Couldn't get the body of the parsed mail: {}", err),
         }
-        
+
         /// Is mainly used in the "to_sendable_msg" function
         ForgotHeader(missing_header: &'static str) {
             description(
@@ -116,9 +116,8 @@ impl Mail {
 
         let parsed = mailparse::parse_mail(&raw)?;
 
-        mail.attachments.push(Attachment::new(
-                "", "text/plain", parsed.get_body_raw()?
-        ));
+        mail.attachments
+            .push(Attachment::new("", "text/plain", parsed.get_body_raw()?));
 
         Ok(mail)
     }
@@ -128,7 +127,7 @@ impl Mail {
         // Adjust header
         // ------------------
         // Pick up the current subject of the mail
-        let old_subject = self.envelope.subject.unwrap_or(String::new());
+        let old_subject = self.envelope.subject.clone().unwrap_or(String::new());
 
         // The new fields
         let mut to: Vec<String> = Vec::new();
@@ -172,7 +171,7 @@ impl Mail {
         };
 
         // the message id of the mail.
-        let message_id = self.envelope.message_id.unwrap_or(String::new());
+        let message_id = self.envelope.message_id.clone().unwrap_or(String::new());
 
         let new_envelope = Envelope {
             from: vec![Envelope::convert_to_address(&account)],
@@ -190,14 +189,14 @@ impl Mail {
         // Remove Attachments
         // -----------------------
         // keep only the body of the mail!
-        self.attachments = vec![self.attachments[0]];
+        self.attachments = vec![self.attachments[0].clone()];
 
         // -------------------------
         // Prepare body of mail
         // -------------------------
         // comment "out" the body of the mail, by adding the `>` characters to
         // each line which includes a string.
-        let new_body: String = String::from_utf8(self.attachments[0].body_raw)
+        let new_body: String = String::from_utf8(self.attachments[0].body_raw.clone())
             .unwrap()
             .split('\n')
             .map(|line| format!("> {}", line))
@@ -212,23 +211,23 @@ impl Mail {
         // -----------
         // Header
         // -----------
-        let old_subject = self.envelope.subject.unwrap_or(String::new());
+        let old_subject = self.envelope.subject.clone().unwrap_or(String::new());
 
         self.envelope = Envelope {
             subject: Some(format!("Fwd: {}", old_subject)),
             // and use the rest of the headers
-            ..self.envelope
+            ..self.envelope.clone()
         };
 
         // ---------
         // Body
         // ---------
         // apply a line which should indicate where the forwarded message begins
-        let new_body = String::from_utf8(self.attachments[0].body_raw).unwrap();
+        let new_body = String::from_utf8(self.attachments[0].body_raw.clone()).unwrap();
         let new_body = format!(
             "\r\n---------- Forwarded Message ----------\r\n{}",
             new_body
-            );
+        );
 
         self.attachments[0].body_raw = new_body.into_bytes();
     }
@@ -269,7 +268,7 @@ impl Mail {
         // now look which headers are given and update the values of the
         // envelope struct. We are creating a new envelope-template for that and
         // take only the important values with us which the user can't provide
-        let mut new_envelope = Envelope {
+        let new_envelope = Envelope {
             signature: self.envelope.signature.clone(),
             ..Self::parse_envelope(&parsed)
         };
@@ -472,7 +471,7 @@ impl Mail {
                     updated_hashmap.insert(
                         custom_header,
                         value.rsplit(',').map(|addr| addr.to_string()).collect(),
-                        );
+                    );
 
                     // .. and apply the updated hashmap to the envelope struct
                     new_envelope.custom_headers = Some(updated_hashmap);
@@ -493,9 +492,9 @@ impl Mail {
     }
 
     pub fn get_body(&self) -> Result<String> {
-        match String::from_utf8(self.attachments[0].body_raw) {
+        match String::from_utf8(self.attachments[0].body_raw.clone()) {
             Ok(body) => Ok(body),
-            Err(err) => Err(ErrorKind::ParseBody(&err.to_string()).into())
+            Err(err) => Err(ErrorKind::ParseBody(err.to_string()).into()),
         }
     }
 
@@ -533,13 +532,13 @@ impl Default for Mail {
 
 impl fmt::Display for Mail {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        let body = match String::from_utf8(self.attachments[0].body_raw) {
+        let body = match String::from_utf8(self.attachments[0].body_raw.clone()) {
             Ok(string) => string,
             Err(err) => {
                 println!("[Error] Couldn't convert the body of the mail into a string:");
                 println!("{}", err);
                 String::from("Couldn't convert the body of the mail into a string.")
-            },
+            }
         };
 
         writeln!(formatter, "{}\n{}", self.envelope, body)
@@ -642,7 +641,7 @@ impl From<&Fetch> for Mail {
                         "",
                         "text/plain",
                         b"Couldn't get the body of the mail.".to_vec(),
-                        );
+                    );
 
                     attachments.push(attachment_dummy);
                 }

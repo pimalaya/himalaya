@@ -1,11 +1,10 @@
 pub(crate) use imap::types::Flag;
 use serde::ser::{Serialize, SerializeSeq, Serializer};
 
-use std::ops::Deref;
 use std::borrow::Cow;
+use std::ops::Deref;
 
-// Serializable wrapper for `imap::types::Flag`
-
+/// Serializable wrapper for `imap::types::Flag`
 #[derive(Debug, PartialEq)]
 struct SerializableFlag<'flag>(&'flag imap::types::Flag<'flag>);
 
@@ -28,20 +27,18 @@ impl<'flag> Serialize for SerializableFlag<'flag> {
         }
 }
 
-// Flags
-
+/// This struct type includes all flags which belong to a given mail.
 #[derive(Debug, PartialEq)]
 pub struct Flags(Vec<Flag<'static>>);
 
 impl Flags {
-    pub fn new(flags: &[imap::types::Flag<'_>]) -> Self {
-        Self(flags
-             .iter()
-             .map(|flag| match flag {
-                 Flag::Custom(cow) => Flag::Custom(Cow::Owned(cow.to_string())),
-                 match_flag => *match_flag,
-             })
-             .collect::<Vec<Flag<'static>>>())
+    pub fn new<'new>(flags: &[imap::types::Flag<'new>]) -> Self {
+        Self(
+            flags
+            .iter()
+            .map(|flag| convert_to_static(flag).unwrap())
+            .collect::<Vec<Flag<'static>>>(),
+            )
     }
 }
 
@@ -92,4 +89,23 @@ impl Serialize for Flags {
 
             seq.end()
         }
+}
+
+// =====================
+// Helper Functions
+// =====================
+/// HINT: This function is only needed as long this pull request hasn't been
+/// merged yet: https://github.com/jonhoo/rust-imap/pull/206
+fn convert_to_static<'func>(flag: &'func Flag) -> Result<Flag<'static>, ()> {
+    match flag {
+        Flag::Seen => Ok(Flag::Seen),
+        Flag::Answered => Ok(Flag::Answered),
+        Flag::Flagged => Ok(Flag::Flagged),
+        Flag::Deleted => Ok(Flag::Deleted),
+        Flag::Draft => Ok(Flag::Draft),
+        Flag::Recent => Ok(Flag::Recent),
+        Flag::MayCreate => Ok(Flag::MayCreate),
+        Flag::Custom(cow) => Ok(Flag::Custom(Cow::Owned(cow.to_string()))),
+        &_ => Err(())
+    }
 }

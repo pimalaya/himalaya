@@ -137,7 +137,6 @@ pub fn msg_matches(ctx: &Ctx) -> Result<bool> {
         ("write", Some(matches)) => msg_matches_write(ctx, matches),
 
         // ("template", Some(matches)) => Ok(tpl_matches(ctx, matches)?),
-
         ("list", opt_matches) => msg_matches_list(ctx, opt_matches),
         (_other, opt_matches) => msg_matches_list(ctx, opt_matches),
     }
@@ -399,7 +398,7 @@ fn msg_matches_write(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     // ---------------------
     // User Interaction
     // ---------------------
-    mail_interaction(&ctx, &mail, &imap_conn);
+    mail_interaction(&ctx, &mut mail, &mut imap_conn)?;
 
     // ------------
     // Cleanup
@@ -437,7 +436,7 @@ fn msg_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     // Attachments
     // ----------------
     // Apply the given attachments to the reply-mail.
-    let mut attachments: Vec<&str> = matches
+    let attachments: Vec<&str> = matches
         .values_of("attachments")
         .unwrap_or_default()
         .collect();
@@ -450,7 +449,7 @@ fn msg_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     // ---------------------
     // User interaction
     // ---------------------
-    mail_interaction(&ctx, &msg, &imap_conn);
+    mail_interaction(&ctx, &mut msg, &mut imap_conn)?;
 
     // ------------
     // Cleanup
@@ -467,7 +466,7 @@ fn msg_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     // ----------------
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let uid = matches.value_of("uid").unwrap();
-    let msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
+    let mut msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
 
     debug!("Uid: {}", uid);
 
@@ -479,7 +478,7 @@ fn msg_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     // ----------------
     // Attachments
     // ----------------
-    let mut attachments: Vec<&str> = matches
+    let attachments: Vec<&str> = matches
         .values_of("attachments")
         .unwrap_or_default()
         .collect();
@@ -492,7 +491,7 @@ fn msg_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     // ---------------------
     // User interaction
     // ---------------------
-    mail_interaction(&ctx, &msg, &imap_conn);
+    mail_interaction(&ctx, &mut msg, &mut imap_conn)?;
 
     // ------------
     // Cleanup
@@ -638,7 +637,7 @@ fn msg_matches_send(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     };
 
     smtp::send(&ctx.account, &msg)?;
-    imap_conn.append_msg("Sent", &msg.formatted(), vec![imap::types::Flag::Seen])?;
+    imap_conn.append_msg("Sent", &msg.formatted(), vec![Flag::Seen])?;
     imap_conn.logout();
 
     Ok(true)
@@ -654,7 +653,11 @@ fn msg_matches_save(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
         Err(_) => return Ok(false),
     };
 
-    imap_conn.append_msg(&ctx.mbox, &msg.into_bytes().unwrap(), vec![imap::types::Flag::Seen])?;
+    imap_conn.append_msg(
+        &ctx.mbox,
+        &msg.into_bytes().unwrap(),
+        vec![Flag::Seen],
+    )?;
     imap_conn.logout();
 
     Ok(true)
@@ -663,7 +666,7 @@ fn msg_matches_save(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 // =====================
 // Helper functions
 // =====================
-fn mail_interaction(ctx: &Ctx, mail: &Mail, imap_conn: &ImapConnector) -> Result<bool> {
+fn mail_interaction(ctx: &Ctx, mail: &mut Mail, imap_conn: &mut ImapConnector) -> Result<bool> {
     loop {
         match input::post_edit_choice() {
             Ok(choice) => match choice {
@@ -685,7 +688,11 @@ fn mail_interaction(ctx: &Ctx, mail: &Mail, imap_conn: &ImapConnector) -> Result
                     // which creates a conflict, fix this!
 
                     // let the server know, that the user sent a mail
-                    imap_conn.append_msg("Sent", &sendable.formatted(), vec![imap::types::Flag::Seen])?;
+                    imap_conn.append_msg(
+                        "Sent",
+                        &sendable.formatted(),
+                        vec![imap::types::Flag::Seen],
+                    )?;
 
                     // remove the draft, since we sent it
                     input::remove_draft()?;
@@ -709,7 +716,11 @@ fn mail_interaction(ctx: &Ctx, mail: &Mail, imap_conn: &ImapConnector) -> Result
                     debug!("Saving to draft…");
                     match mail.into_bytes() {
                         Ok(parsed) => {
-                            imap_conn.append_msg("Drafts", &parsed, vec![imap::types::Flag::Seen])?;
+                            imap_conn.append_msg(
+                                "Drafts",
+                                &parsed,
+                                vec![imap::types::Flag::Seen],
+                            )?;
                             input::remove_draft()?;
                             ctx.output.print("Message successfully saved to Drafts");
                         }
