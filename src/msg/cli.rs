@@ -17,9 +17,7 @@ use crate::{
     msg::{
         attachment::Attachment,
         envelope::Envelope,
-        mail::{Mail, Mails},
-        // model::{Attachments, Msg, Msgs, ReadableMsg},
-        // tpl::cli::{tpl_matches, tpl_subcommand},
+        model::{Mail, Mails},
     },
     smtp,
 };
@@ -28,11 +26,8 @@ error_chain! {
     links {
         Imap(crate::imap::model::Error, crate::imap::model::ErrorKind);
         Input(crate::input::Error, crate::input::ErrorKind);
-        // MsgModel(crate::msg::model::Error, crate::msg::model::ErrorKind);
-        MsgModel(super::mail::Error, super::mail::ErrorKind);
-        // TplCli(crate::msg::tpl::cli::Error, crate::msg::tpl::cli::ErrorKind);
+        MsgModel(super::model::Error, super::model::ErrorKind);
         Smtp(crate::smtp::Error, crate::smtp::ErrorKind);
-        // MailModel(crate::msg::mail::Error, crate::msg::mail::ErrorKind);
     }
     foreign_links {
         Utf8(std::string::FromUtf8Error);

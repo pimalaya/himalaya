@@ -7,7 +7,7 @@ use std::{collections::HashSet, iter::FromIterator, net::TcpStream};
 use crate::config::model::Account;
 use crate::ctx::Ctx;
 use imap::types::Flag;
-use crate::msg::mail::Mail;
+use crate::msg::model::Mail;
 
 error_chain! {
     links {
