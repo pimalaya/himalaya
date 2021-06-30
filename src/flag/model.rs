@@ -1,43 +1,51 @@
 pub(crate) use imap::types::Flag;
 use serde::ser::{Serialize, SerializeSeq, Serializer};
+
 use std::ops::Deref;
+use std::borrow::Cow;
 
 // Serializable wrapper for `imap::types::Flag`
 
 #[derive(Debug, PartialEq)]
-struct SerializableFlag<'f>(&'f imap::types::Flag<'f>);
+struct SerializableFlag<'flag>(&'flag imap::types::Flag<'flag>);
 
-impl<'f> Serialize for SerializableFlag<'f> {
+impl<'flag> Serialize for SerializableFlag<'flag> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(match self.0 {
-            Flag::Seen => "Seen",
-            Flag::Answered => "Answered",
-            Flag::Flagged => "Flagged",
-            Flag::Deleted => "Deleted",
-            Flag::Draft => "Draft",
-            Flag::Recent => "Recent",
-            Flag::MayCreate => "MayCreate",
-            Flag::Custom(cow) => cow,
-            _ => "Unknown",
-        })
-    }
+        where
+            S: Serializer,
+        {
+            serializer.serialize_str(match self.0 {
+                Flag::Seen => "Seen",
+                Flag::Answered => "Answered",
+                Flag::Flagged => "Flagged",
+                Flag::Deleted => "Deleted",
+                Flag::Draft => "Draft",
+                Flag::Recent => "Recent",
+                Flag::MayCreate => "MayCreate",
+                Flag::Custom(cow) => cow,
+                _ => "Unknown",
+            })
+        }
 }
 
 // Flags
 
 #[derive(Debug, PartialEq)]
-pub struct Flags<'f>(&'f [Flag<'f>]);
+pub struct Flags(Vec<Flag<'static>>);
 
-impl<'f> Flags<'f> {
-    pub fn new(flags: &'f [imap::types::Flag<'f>]) -> Self {
-        Self(flags)
+impl Flags {
+    pub fn new(flags: &[imap::types::Flag<'_>]) -> Self {
+        Self(flags
+             .iter()
+             .map(|flag| match flag {
+                 Flag::Custom(cow) => Flag::Custom(Cow::Owned(cow.to_string())),
+                 match_flag => *match_flag,
+             })
+             .collect::<Vec<Flag<'static>>>())
     }
 }
 
-impl<'f> ToString for Flags<'f> {
+impl ToString for Flags {
     fn to_string(&self) -> String {
         let mut flags = String::new();
 
@@ -63,25 +71,25 @@ impl<'f> ToString for Flags<'f> {
     }
 }
 
-impl<'f> Deref for Flags<'f> {
-    type Target = &'f [Flag<'f>];
+impl Deref for Flags {
+    type Target = Vec<Flag<'static>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<'f> Serialize for Flags<'f> {
+impl Serialize for Flags {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut seq = serializer.serialize_seq(Some(self.0.len()))?;
+        where
+            S: Serializer,
+        {
+            let mut seq = serializer.serialize_seq(Some(self.0.len()))?;
 
-        for flag in self.0 {
-            seq.serialize_element(&SerializableFlag(flag))?;
+            for flag in &self.0 {
+                seq.serialize_element(&SerializableFlag(flag))?;
+            }
+
+            seq.end()
         }
-
-        seq.end()
-    }
 }

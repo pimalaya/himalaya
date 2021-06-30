@@ -8,6 +8,10 @@ use crate::config::model::Account;
 
 use rfc2047_decoder;
 
+use error_chain::error_chain;
+
+error_chain! { }
+
 // ============
 // Structs
 // ============
@@ -21,7 +25,7 @@ use rfc2047_decoder;
 pub struct Envelope {
     // ----------------
     // Must-Fields
-    // ----------------
+    // ---------------
     pub from: Vec<String>,
     pub to:   Vec<String>,
 
@@ -93,15 +97,60 @@ impl Envelope {
     /// }
     /// ```
     pub fn convert_to_address(account: &Account) -> String {
-        if let Some(name) = account.name {
+        if let Some(name) = &account.name {
             format!(
                 "{} <{}>",
-                account.name.as_ref().unwrap(),
+                name,
                 account.email
             )
         } else {
             format!("<{}>", account.email)
         }
+    }
+
+
+    pub fn get_from(&self) -> Vec<String> {
+        self.from
+    }
+
+    pub fn get_to(&self) -> Vec<String> {
+        self.to
+    }
+
+    pub fn get_bcc(&self) -> Vec<String> {
+        self.bcc.unwrap_or(Vec::new())
+    }
+
+    pub fn get_cc(&self) -> Vec<String> {
+        self.cc.unwrap_or(Vec::new())
+    }
+
+    pub fn get_custom_headers(&self) -> HashMap<String, Vec<String>> {
+        self.custom_headers.unwrap_or(HashMap::new())
+    }
+
+    pub fn get_in_reply_to(&self) -> String {
+        self.in_reply_to.unwrap_or_default()
+    }
+
+    pub fn get_message_id(&self) -> String {
+        self.message_id.unwrap_or_default()
+    }
+
+    pub fn get_reply_to(&self) -> Vec<String> {
+        self.reply_to.unwrap_or(Vec::new())
+    }
+
+    pub fn get_sender(&self) -> String {
+        self.sender.unwrap_or_default()
+    }
+
+    pub fn get_signature(&self) -> String {
+        self.sender.unwrap_or_default()
+    }
+
+    pub fn get_subject(&self) -> String {
+        self.subject.unwrap_or_default()
     }
 }
 
@@ -207,11 +256,12 @@ impl From<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
 ///         ...
 ///     }
 ///
-/// Than this will return:
+/// Then this will return:
 ///
 ///     Date: 11-11-1111
 ///     Subject: Himalaya is cool
 ///     ...
+///
 impl fmt::Display for Envelope {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         // Here will be the body content stored (as shown in the example)

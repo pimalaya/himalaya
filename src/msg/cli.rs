@@ -5,12 +5,12 @@ use log::{debug, error, trace};
 use std::{
     fs,
     io::{self, BufRead},
-    ops::Deref,
 };
+
+use imap::types::Flag;
 
 use crate::{
     ctx::Ctx,
-    flag::model::Flag,
     imap::model::ImapConnector,
     input,
     mbox::cli::mbox_target_arg,
@@ -18,8 +18,8 @@ use crate::{
         attachment::Attachment,
         envelope::Envelope,
         mail::{Mail, Mails},
-        model::{Attachments, Msg, Msgs, ReadableMsg},
-        tpl::cli::{tpl_matches, tpl_subcommand},
+        // model::{Attachments, Msg, Msgs, ReadableMsg},
+        // tpl::cli::{tpl_matches, tpl_subcommand},
     },
     smtp,
 };
@@ -28,8 +28,9 @@ error_chain! {
     links {
         Imap(crate::imap::model::Error, crate::imap::model::ErrorKind);
         Input(crate::input::Error, crate::input::ErrorKind);
-        MsgModel(crate::msg::model::Error, crate::msg::model::ErrorKind);
-        TplCli(crate::msg::tpl::cli::Error, crate::msg::tpl::cli::ErrorKind);
+        // MsgModel(crate::msg::model::Error, crate::msg::model::ErrorKind);
+        MsgModel(super::mail::Error, super::mail::ErrorKind);
+        // TplCli(crate::msg::tpl::cli::Error, crate::msg::tpl::cli::ErrorKind);
         Smtp(crate::smtp::Error, crate::smtp::ErrorKind);
         // MailModel(crate::msg::mail::Error, crate::msg::mail::ErrorKind);
     }
@@ -48,77 +49,77 @@ pub fn msg_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
             .about("Lists all messages")
             .arg(page_size_arg())
             .arg(page_arg()),
-            clap::SubCommand::with_name("search")
-                .aliases(&["query", "q"])
-                .about("Lists messages matching the given IMAP query")
-                .arg(page_size_arg())
-                .arg(page_arg())
-                .arg(
-                    clap::Arg::with_name("query")
+        clap::SubCommand::with_name("search")
+            .aliases(&["query", "q"])
+            .about("Lists messages matching the given IMAP query")
+            .arg(page_size_arg())
+            .arg(page_arg())
+            .arg(
+                clap::Arg::with_name("query")
                     .help("IMAP query (see https://tools.ietf.org/html/rfc3501#section-6.4.4)")
                     .value_name("QUERY")
                     .multiple(true)
                     .required(true),
-                    ),
-                    clap::SubCommand::with_name("write")
-                        .about("Writes a new message")
-                        .arg(attachment_arg()),
-                        clap::SubCommand::with_name("send")
-                            .about("Sends a raw message")
-                            .arg(clap::Arg::with_name("message").raw(true).last(true)),
-                            clap::SubCommand::with_name("save")
-                                .about("Saves a raw message")
-                                .arg(clap::Arg::with_name("message").raw(true)),
-                                clap::SubCommand::with_name("read")
-                                    .about("Reads text bodies of a message")
-                                    .arg(uid_arg())
-                                    .arg(
-                                        clap::Arg::with_name("mime-type")
-                                        .help("MIME type to use")
-                                        .short("t")
-                                        .long("mime-type")
-                                        .value_name("MIME")
-                                        .possible_values(&["plain", "html"])
-                                        .default_value("plain"),
-                                        )
-                                    .arg(
-                                        clap::Arg::with_name("raw")
-                                        .help("Reads raw message")
-                                        .long("raw")
-                                        .short("r"),
-                                        ),
-                                        clap::SubCommand::with_name("attachments")
-                                            .about("Downloads all message attachments")
-                                            .arg(uid_arg()),
-                                            clap::SubCommand::with_name("reply")
-                                                .about("Answers to a message")
-                                                .arg(uid_arg())
-                                                .arg(reply_all_arg())
-                                                .arg(attachment_arg()),
-                                                clap::SubCommand::with_name("forward")
-                                                    .aliases(&["fwd"])
-                                                    .about("Forwards a message")
-                                                    .arg(uid_arg())
-                                                    .arg(attachment_arg()),
-                                                    clap::SubCommand::with_name("copy")
-                                                        .aliases(&["cp"])
-                                                        .about("Copies a message to the targetted mailbox")
-                                                        .arg(uid_arg())
-                                                        .arg(mbox_target_arg()),
-                                                        clap::SubCommand::with_name("move")
-                                                            .aliases(&["mv"])
-                                                            .about("Moves a message to the targetted mailbox")
-                                                            .arg(uid_arg())
-                                                            .arg(mbox_target_arg()),
-                                                            clap::SubCommand::with_name("delete")
-                                                                .aliases(&["remove", "rm"])
-                                                                .about("Deletes a message")
-                                                                .arg(uid_arg()),
-                                                                tpl_subcommand(),
-                                                                clap::SubCommand::with_name("test")
-                                                                    .about("Testing subcommand for the new mail struct")
-                                                                    .arg(attachment_arg()),
-                                                                ]
+            ),
+        clap::SubCommand::with_name("write")
+            .about("Writes a new message")
+            .arg(attachment_arg()),
+        clap::SubCommand::with_name("send")
+            .about("Sends a raw message")
+            .arg(clap::Arg::with_name("message").raw(true).last(true)),
+        clap::SubCommand::with_name("save")
+            .about("Saves a raw message")
+            .arg(clap::Arg::with_name("message").raw(true)),
+        clap::SubCommand::with_name("read")
+            .about("Reads text bodies of a message")
+            .arg(uid_arg())
+            .arg(
+                clap::Arg::with_name("mime-type")
+                    .help("MIME type to use")
+                    .short("t")
+                    .long("mime-type")
+                    .value_name("MIME")
+                    .possible_values(&["plain", "html"])
+                    .default_value("plain"),
+            )
+            .arg(
+                clap::Arg::with_name("raw")
+                    .help("Reads raw message")
+                    .long("raw")
+                    .short("r"),
+            ),
+        clap::SubCommand::with_name("attachments")
+            .about("Downloads all message attachments")
+            .arg(uid_arg()),
+        clap::SubCommand::with_name("reply")
+            .about("Answers to a message")
+            .arg(uid_arg())
+            .arg(reply_all_arg())
+            .arg(attachment_arg()),
+        clap::SubCommand::with_name("forward")
+            .aliases(&["fwd"])
+            .about("Forwards a message")
+            .arg(uid_arg())
+            .arg(attachment_arg()),
+        clap::SubCommand::with_name("copy")
+            .aliases(&["cp"])
+            .about("Copies a message to the targetted mailbox")
+            .arg(uid_arg())
+            .arg(mbox_target_arg()),
+        clap::SubCommand::with_name("move")
+            .aliases(&["mv"])
+            .about("Moves a message to the targetted mailbox")
+            .arg(uid_arg())
+            .arg(mbox_target_arg()),
+        clap::SubCommand::with_name("delete")
+            .aliases(&["remove", "rm"])
+            .about("Deletes a message")
+            .arg(uid_arg()),
+        // tpl_subcommand(),
+        clap::SubCommand::with_name("test")
+            .about("Testing subcommand for the new mail struct")
+            .arg(attachment_arg()),
+    ]
 }
 
 pub fn msg_matches(ctx: &Ctx) -> Result<bool> {
@@ -135,7 +136,7 @@ pub fn msg_matches(ctx: &Ctx) -> Result<bool> {
         ("send", Some(matches)) => msg_matches_send(ctx, matches),
         ("write", Some(matches)) => msg_matches_write(ctx, matches),
 
-        ("template", Some(matches)) => Ok(tpl_matches(ctx, matches)?),
+        // ("template", Some(matches)) => Ok(tpl_matches(ctx, matches)?),
 
         ("list", opt_matches) => msg_matches_list(ctx, opt_matches),
         (_other, opt_matches) => msg_matches_list(ctx, opt_matches),
@@ -188,22 +189,17 @@ fn attachment_arg<'a>() -> clap::Arg<'a, 'a> {
 // ====================
 // Match functions
 // ====================
-fn msg_matches_list(
-    ctx: &Ctx,
-    opt_matches: Option<&clap::ArgMatches>,
-) -> Result<bool> {
-    debug!("list command matched");
+fn msg_matches_list(ctx: &Ctx, opt_matches: Option<&clap::ArgMatches>) -> Result<bool> {
+    debug!("List command matched");
 
     let page_size: usize = opt_matches
-        .and_then(|matches| {
-            matches.value_of("page-size").and_then(|s| s.parse().ok())
-        })
+        .and_then(|matches| matches.value_of("page-size").and_then(|s| s.parse().ok()))
         .unwrap_or_else(|| ctx.config.default_page_size(&ctx.account));
-    debug!("page size: {:?}", page_size);
+    debug!("Page size: {:?}", page_size);
     let page: usize = opt_matches
         .and_then(|matches| matches.value_of("page").unwrap().parse().ok())
         .unwrap_or_default();
-    debug!("page: {}", &page);
+    debug!("Page: {}", &page);
 
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let msgs = imap_conn.list_msgs(&ctx.mbox, &page_size, &page)?;
@@ -221,19 +217,19 @@ fn msg_matches_list(
 }
 
 fn msg_matches_search(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
-    debug!("search command matched");
+    debug!("Search command matched");
 
     let page_size: usize = matches
         .value_of("page-size")
         .and_then(|s| s.parse().ok())
         .unwrap_or(ctx.config.default_page_size(&ctx.account));
-    debug!("page size: {}", &page_size);
+    debug!("Page size: {}", &page_size);
     let page: usize = matches
         .value_of("page")
         .unwrap()
         .parse()
         .unwrap_or_default();
-    debug!("page: {}", &page);
+    debug!("Page: {}", &page);
 
     let query = matches
         .values_of("query")
@@ -259,7 +255,7 @@ fn msg_matches_search(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
         })
         .1
         .join(" ");
-    debug!("query: {}", &page);
+    debug!("Query: {}", &page);
 
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let msgs = imap_conn.search_msgs(&ctx.mbox, &query, &page_size, &page)?;
@@ -276,22 +272,23 @@ fn msg_matches_search(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 }
 
 fn msg_matches_read(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
-    debug!("read command matched");
+    debug!("Read command matched");
 
     let uid = matches.value_of("uid").unwrap();
-    debug!("uid: {}", uid);
+    debug!("Uid: {}", uid);
     let mime = format!("text/{}", matches.value_of("mime-type").unwrap());
-    debug!("mime: {}", mime);
+    debug!("Mime: {}", mime);
     let raw = matches.is_present("raw");
-    debug!("raw: {}", raw);
+    debug!("Raw: {}", raw);
 
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
-    let fetch = imap_conn.read_msg(&ctx.mbox, &uid)?;
+    let msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
+
+    let msg = msg.get_body().unwrap();
+
     if raw {
-        let msg = Mail::from(&fetch);
-        ctx.output.print(msg);
+        ctx.output.print(msg.trim_end_matches("\n"));
     } else {
-        let msg = Mail::from(&fetch);
         ctx.output.print(msg);
     }
 
@@ -299,20 +296,16 @@ fn msg_matches_read(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     Ok(true)
 }
 
-fn msg_matches_attachments(
-    ctx: &Ctx,
-    matches: &clap::ArgMatches,
-) -> Result<bool> {
-    debug!("attachments command matched");
+fn msg_matches_attachments(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
+    debug!("Attachments command matched");
 
     let uid = matches.value_of("uid").unwrap();
-    debug!("uid: {}", &uid);
+    debug!("Uid: {}", &uid);
 
     // get the mail and than it's attachments
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
-    let fetch = imap_conn.read_msg(&ctx.mbox, &uid)?;
-    let mail = Mail::from(&fetch);
-    let attachments: Vec<&Attachment> = mail.get_attachments().collect();
+    let msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
+    let attachments: Vec<&Attachment> = msg.get_attachments().collect();
 
     debug!(
         "{} attachment(s) found for message {}",
@@ -327,11 +320,10 @@ fn msg_matches_attachments(
             .config
             .downloads_filepath(&ctx.account, &attachment.filename);
 
-        debug!("downloading {}…", &attachment.filename);
+        debug!("Downloading {}…", &attachment.filename);
 
-        fs::write(&filepath, &attachment.body_raw).chain_err(|| {
-            format!("Could not save attachment {:?}", filepath)
-        })?;
+        fs::write(&filepath, &attachment.body_raw)
+            .chain_err(|| format!("Could not save attachment {:?}", filepath))?;
     }
 
     debug!(
@@ -365,7 +357,7 @@ fn msg_matches_attachments(
 // }
 
 fn msg_matches_write(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
-    debug!("write command matched");
+    debug!("Write command matched");
 
     // prepare the imap server to update the status (for example if the user
     // wants to send the mail)
@@ -419,7 +411,7 @@ fn msg_matches_write(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 }
 
 fn msg_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
-    debug!("reply command matched");
+    debug!("Reply command matched");
 
     // -----------------
     // Preparations
@@ -427,18 +419,13 @@ fn msg_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     // Fetch the mail first, which should be replied to
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let uid = matches.value_of("uid").unwrap();
-    let fetch = imap_conn.read_msg(&ctx.mbox, &uid)?;
-    let mut msg = Mail::from(&fetch);
+    let mut msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
 
-    debug!("uid: {}", uid);
+    debug!("Uid: {}", uid);
 
     // ---------------------------
     // Adjust content of mail
     // ---------------------------
-    // Now let the user edit the content of the mail and adjust the header of
-    // the mail
-    let old_sender = msg.envelope.from.clone();
-
     // Change the mail to a reply-mail.
     if matches.is_present("reply-all") {
         msg.change_to_reply(&ctx.account, true);
@@ -457,7 +444,7 @@ fn msg_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 
     attachments.iter().for_each(|path| msg.add_attachment(path));
 
-    debug!("found {} attachments", attachments.len());
+    debug!("Found {} attachments", attachments.len());
     trace!("attachments: {:?}", attachments);
 
     // ---------------------
@@ -473,22 +460,21 @@ fn msg_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 }
 
 fn msg_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
-    debug!("forward command matched");
+    debug!("Forward command matched");
 
     // ----------------
     // Preparation
     // ----------------
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let uid = matches.value_of("uid").unwrap();
-    let fetch = imap_conn.read_msg(&ctx.mbox, &uid)?;
-    let mut msg = Mail::from(&fetch);
+    let msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
 
-    debug!("uid: {}", uid);
+    debug!("Uid: {}", uid);
 
     // ---------------------------
     // Adjust content of mail
     // ---------------------------
-    msg.change_to_forwarding(&ctx);
+    msg.change_to_forwarding();
 
     // ----------------
     // Attachments
@@ -500,7 +486,7 @@ fn msg_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 
     attachments.iter().for_each(|path| msg.add_attachment(path));
 
-    debug!("found {} attachments", attachments.len());
+    debug!("Found {} attachments", attachments.len());
     trace!("attachments: {:?}", attachments);
 
     // ---------------------
@@ -517,72 +503,111 @@ fn msg_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 }
 
 fn msg_matches_copy(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
-    debug!("copy command matched");
+    debug!("Copy command matched");
 
-    let uid = matches.value_of("uid").unwrap();
-    debug!("uid: {}", &uid);
-    let target = matches.value_of("target").unwrap();
-    debug!("target: {}", &target);
-
+    // -----------------
+    // Preparations
+    // -----------------
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
-    let msg = Msg::from(imap_conn.read_msg(&ctx.mbox, &uid)?);
-    let mut flags = msg.flags.deref().to_vec();
+    let uid = matches.value_of("uid").unwrap();
+    let target = matches.value_of("target").unwrap();
+    let msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
+
+    debug!("Uid: {}", &uid);
+    debug!("Target: {}", &target);
+
+    // ------------
+    // Changes
+    // ------------
+    // before sending it, mark the new message as seen
+    let mut flags = msg.get_flags();
     flags.push(Flag::Seen);
-    imap_conn.append_msg(target, &msg.raw, flags)?;
-    debug!("message {} successfully copied to folder `{}`", uid, target);
+
+    imap_conn.append_msg(target, &msg.into_bytes().unwrap(), flags)?;
+
+    debug!("Message {} successfully copied to folder `{}`", uid, target);
+
     ctx.output.print(format!(
         "Message {} successfully copied to folder `{}`",
         uid, target
     ));
 
+    // ------------
+    // Cleanup
+    // ------------
     imap_conn.logout();
     Ok(true)
 }
 
 fn msg_matches_move(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
-    debug!("move command matched");
+    debug!("Move command matched");
 
-    let uid = matches.value_of("uid").unwrap();
-    debug!("uid: {}", &uid);
-    let target = matches.value_of("target").unwrap();
-    debug!("target: {}", &target);
-
+    // -----------------
+    // Preparations
+    // -----------------
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
-    let msg = Msg::from(imap_conn.read_msg(&ctx.mbox, &uid)?);
-    let mut flags = msg.flags.to_vec();
+    let uid = matches.value_of("uid").unwrap();
+    let target = matches.value_of("target").unwrap();
+    let msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
+
+    debug!("Uid: {}", &uid);
+    debug!("Target: {}", &target);
+
+    // -----------
+    // Action
+    // -----------
+    // create the mail in the target-mailbox
+    let mut flags = msg.get_flags();
     flags.push(Flag::Seen);
-    imap_conn.append_msg(target, &msg.raw, flags)?;
-    imap_conn.add_flags(&ctx.mbox, uid, "\\Seen \\Deleted")?;
-    debug!("message {} successfully moved to folder `{}`", uid, target);
+    imap_conn.append_msg(target, &msg.into_bytes().unwrap(), flags)?;
+
+    debug!("Message {} successfully moved to folder `{}`", uid, target);
     ctx.output.print(format!(
         "Message {} successfully moved to folder `{}`",
         uid, target
     ));
 
+    // mark the current mail in the current mailbox as deleted
+    imap_conn.add_flags(&ctx.mbox, uid, "\\Seen \\Deleted")?;
+
+    // remove the current mail from the current mailbox
     imap_conn.expunge(&ctx.mbox)?;
+
+    // be nice to the server and say "bye" ;)
     imap_conn.logout();
     Ok(true)
 }
 
 fn msg_matches_delete(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
-    debug!("delete command matched");
+    debug!("Delete command matched");
 
-    let uid = matches.value_of("uid").unwrap();
-    debug!("uid: {}", &uid);
-
+    // -----------------
+    // Preparations
+    // -----------------
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
+    let uid = matches.value_of("uid").unwrap();
+
+    debug!("Uid: {}", &uid);
+
+    // -----------
+    // Delete
+    // -----------
     imap_conn.add_flags(&ctx.mbox, uid, "\\Seen \\Deleted")?;
-    debug!("message {} successfully deleted", uid);
+    imap_conn.expunge(&ctx.mbox)?;
+
+    debug!("Message {} successfully deleted", uid);
     ctx.output
         .print(format!("Message {} successfully deleted", uid));
 
-    imap_conn.expunge(&ctx.mbox)?;
+    // ------------
+    // Cleanup
+    // ------------
     imap_conn.logout();
     Ok(true)
 }
 
 fn msg_matches_send(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
-    debug!("send command matched");
+    debug!("Send command matched");
 
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
 
@@ -598,27 +623,40 @@ fn msg_matches_send(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
             .lines()
             .filter_map(|ln| ln.ok())
             .map(|ln| ln.to_string())
-            .collect::<Vec<_>>()
+            .collect::<Vec<String>>()
             .join("\r\n")
     };
-    let msg = Msg::from(msg.to_string());
-    let msg = msg.to_sendable_msg()?;
-    smtp::send(&ctx.account, &msg)?;
-    imap_conn.append_msg("Sent", &msg.formatted(), vec![Flag::Seen])?;
 
+    let msg = match Mail::new_with_pre_body(&ctx.account, msg.into_bytes()) {
+        Ok(msg) => msg,
+        Err(_) => return Ok(false),
+    };
+
+    let msg = match msg.to_sendable_msg() {
+        Ok(sendable) => sendable,
+        Err(_) => return Ok(false),
+    };
+
+    smtp::send(&ctx.account, &msg)?;
+    imap_conn.append_msg("Sent", &msg.formatted(), vec![imap::types::Flag::Seen])?;
     imap_conn.logout();
+
     Ok(true)
 }
 
 fn msg_matches_save(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
-    debug!("save command matched");
+    debug!("Save command matched");
 
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let msg = matches.value_of("message").unwrap();
-    let msg = Msg::from(msg.to_string());
-    imap_conn.append_msg(&ctx.mbox, &msg.to_vec()?, vec![Flag::Seen])?;
+    let msg = match Mail::new_with_pre_body(&ctx.account, msg.to_string().into_bytes()) {
+        Ok(mail) => mail,
+        Err(_) => return Ok(false),
+    };
 
+    imap_conn.append_msg(&ctx.mbox, &msg.into_bytes().unwrap(), vec![imap::types::Flag::Seen])?;
     imap_conn.logout();
+
     Ok(true)
 }
 
@@ -630,7 +668,7 @@ fn mail_interaction(ctx: &Ctx, mail: &Mail, imap_conn: &ImapConnector) -> Result
         match input::post_edit_choice() {
             Ok(choice) => match choice {
                 input::PostEditChoice::Send => {
-                    debug!("sending message…");
+                    debug!("Sending message…");
 
                     // prepare the mail to be send
                     let sendable = match mail.to_sendable_msg() {
@@ -647,11 +685,7 @@ fn mail_interaction(ctx: &Ctx, mail: &Mail, imap_conn: &ImapConnector) -> Result
                     // which creates a conflict, fix this!
 
                     // let the server know, that the user sent a mail
-                    imap_conn.append_msg(
-                        "Sent",
-                        &sendable.formatted(),
-                        vec![Flag::Seen],
-                    )?;
+                    imap_conn.append_msg("Sent", &sendable.formatted(), vec![imap::types::Flag::Seen])?;
 
                     // remove the draft, since we sent it
                     input::remove_draft()?;
@@ -672,21 +706,14 @@ fn mail_interaction(ctx: &Ctx, mail: &Mail, imap_conn: &ImapConnector) -> Result
                 }
                 input::PostEditChoice::LocalDraft => break,
                 input::PostEditChoice::RemoteDraft => {
-                    debug!("saving to draft…");
+                    debug!("Saving to draft…");
                     match mail.into_bytes() {
                         Ok(parsed) => {
-                            imap_conn.append_msg(
-                                "Drafts",
-                                &parsed,
-                                vec![Flag::Seen],
-                            )?;
+                            imap_conn.append_msg("Drafts", &parsed, vec![imap::types::Flag::Seen])?;
                             input::remove_draft()?;
-                            ctx.output
-                                .print("Message successfully saved to Drafts");
+                            ctx.output.print("Message successfully saved to Drafts");
                         }
-                        Err(_) => ctx
-                            .output
-                            .print("Couldn't save it to the server..."),
+                        Err(_) => ctx.output.print("Couldn't save it to the server..."),
                     };
                     break;
                 }

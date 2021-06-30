@@ -168,7 +168,7 @@ impl<'a> ReadableMsg {
 #[derive(Debug)]
 pub struct Msg<'m> {
     pub uid: u32,
-    pub flags: Flags<'m>,
+    pub flags: Flags,
     pub subject: String,
     pub sender: String,
     pub date: String,
@@ -200,7 +200,7 @@ impl<'m> From<Vec<u8>> for Msg<'m> {
     fn from(raw: Vec<u8>) -> Self {
         Self {
             uid: 0,
-            flags: Flags::new(&[]),
+            flags: Flags::new(Vec::new()),
             subject: String::from(""),
             sender: String::from(""),
             date: String::from(""),
@@ -222,7 +222,7 @@ impl<'m> From<&'m imap::types::Fetch> for Msg<'m> {
             None => Self::from(fetch.body().unwrap_or_default().to_vec()),
             Some(envelope) => Self {
                 uid: fetch.uid.unwrap_or_default(),
-                flags: Flags::new(fetch.flags()),
+                flags: Flags::new(fetch.flags().to_vec()),
                 subject: envelope
                     .subject
                     .as_ref()
