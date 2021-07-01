@@ -233,7 +233,7 @@ impl Msg {
     }
 
     /// Converts the whole mail into a vector of bytes.
-    pub fn into_bytes(&self) -> Result<Vec<u8>> {
+    pub fn into_bytes(&mut self) -> Result<Vec<u8>> {
         // parse the whole mail first
         let parsed = self.to_sendable_msg()?;
 
@@ -255,28 +255,13 @@ impl Msg {
 
         // store the changes of the body
         let content = input::open_editor_with_tpl(&body)?;
-        self.attachments[0].body_raw = content.into_bytes();
-
-        // ------------------------
-        // Reevaluate Envelope
-        // ------------------------
-        // Since the user changed the content of the mail, he/she could also
-        // change the headers by adding addresses for example to the `Cc:`
-        // header, as a result, we have to update our envelope-status as well!
-        let parsed = mailparse::parse_mail(&self.attachments[0].body_raw)?;
-
-        // now look which headers are given and update the values of the
-        // envelope struct. We are creating a new envelope-template for that and
-        // take only the important values with us which the user can't provide
-        let new_envelope = Envelope {
-            signature: self.envelope.signature.clone(),
-            ..Self::parse_envelope(&parsed)
-        };
-
-        // apply the new envelope headers
-        self.envelope = new_envelope;
+        self.set_body(content.into_bytes());
 
         Ok(())
+    }
+
+    pub fn set_body(&mut self, body_raw: Vec<u8>) {
+        self.attachments[0].body_raw = body_raw;
     }
 
     // Add an attachment to the mail from the given path
@@ -286,10 +271,29 @@ impl Msg {
         }
     }
 
+    pub fn add_flag(&mut self, flag: Flag<'static>) {
+        self.flags.push(flag);
+    }
+
     /// This function will use the information of the `Msg` struct and creates
     /// a sendable mail. It uses the `Msg.envelope` and `Msg.attachments`
     /// fields
-    pub fn to_sendable_msg(&self) -> Result<Message> {
+    pub fn to_sendable_msg(&mut self) -> Result<Message> {
+
+        // ==============
+        // Preparing
+        // ==============
+        // Refresh the states of the envelope first before we're using them to
+        // create the mail/msg.
+        let parsed = mailparse::parse_mail(&self.attachments[0].body_raw)?;
+        let refreshed_envelope = Envelope {
+            // mailparse can't detect what the siganture is, so we just use the
+            // old one again
+            signature: self.envelope.signature.clone(),
+            .. Self::parse_envelope(&parsed)
+        };
+        self.envelope = refreshed_envelope;
+
         // ===================
         // Header of Msg
         // ===================

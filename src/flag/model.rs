@@ -2,7 +2,7 @@ pub(crate) use imap::types::Flag;
 use serde::ser::{Serialize, SerializeSeq, Serializer};
 
 use std::borrow::Cow;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 /// Serializable wrapper for `imap::types::Flag`
 #[derive(Debug, PartialEq)]
@@ -28,6 +28,7 @@ impl<'flag> Serialize for SerializableFlag<'flag> {
 }
 
 /// This struct type includes all flags which belong to a given mail.
+/// TODO: Use HashSet instead of vector
 #[derive(Debug, PartialEq)]
 pub struct Flags(Vec<Flag<'static>>);
 
@@ -54,8 +55,6 @@ impl ToString for Flags {
 
         flags.push_str(if self.0.contains(&Flag::Answered) {
             "↵"
-        } else {
-            " "
         });
 
         flags.push_str(if self.0.contains(&Flag::Flagged) {
@@ -73,6 +72,12 @@ impl Deref for Flags {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl DerefMut for Flags {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 

@@ -3,6 +3,7 @@ use clap;
 use error_chain::error_chain;
 use log::{debug, error, trace};
 use std::{
+    collections::HashMap,
     fs,
     io::{self, BufRead},
 };
@@ -110,6 +111,30 @@ pub fn msg_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
             .aliases(&["remove", "rm"])
             .about("Deletes a message")
             .arg(uid_arg()),
+        clap::SubCommand::with_name("template")
+            .aliases(&["tpl"])
+            .about("Generates a message template")
+            .subcommand(
+                clap::SubCommand::with_name("new")
+                    .aliases(&["n"])
+                    .about("Generates a new message template")
+                    .args(&tpl_args()),
+            )
+            .subcommand(
+                clap::SubCommand::with_name("reply")
+                    .aliases(&["rep", "r"])
+                    .about("Generates a reply message template")
+                    .arg(uid_arg())
+                    .arg(reply_all_arg())
+                    .args(&tpl_args()),
+            )
+            .subcommand(
+                clap::SubCommand::with_name("forward")
+                    .aliases(&["fwd", "fw", "f"])
+                    .about("Generates a forward message template")
+                    .arg(uid_arg())
+                    .args(&tpl_args()),
+            ),
     ]
 }
 
@@ -127,7 +152,7 @@ pub fn msg_matches(ctx: &Ctx) -> Result<bool> {
         ("send", Some(matches)) => msg_matches_send(ctx, matches),
         ("write", Some(matches)) => msg_matches_write(ctx, matches),
 
-        // ("template", Some(matches)) => Ok(tpl_matches(ctx, matches)?),
+        ("template", Some(matches)) => Ok(msg_matches_tpl(ctx, matches)?),
         ("list", opt_matches) => msg_matches_list(ctx, opt_matches),
         (_other, opt_matches) => msg_matches_list(ctx, opt_matches),
     }
@@ -174,6 +199,56 @@ fn attachment_arg<'a>() -> clap::Arg<'a, 'a> {
         .long("attachment")
         .value_name("PATH")
         .multiple(true)
+}
+
+pub fn tpl_args<'a>() -> Vec<clap::Arg<'a, 'a>> {
+    vec![
+        clap::Arg::with_name("subject")
+            .help("Overrides the Subject header")
+            .short("s")
+            .long("subject")
+            .value_name("STRING"),
+        clap::Arg::with_name("from")
+            .help("Overrides the From header")
+            .short("f")
+            .long("from")
+            .value_name("ADDR")
+            .multiple(true),
+        clap::Arg::with_name("to")
+            .help("Overrides the To header")
+            .short("t")
+            .long("to")
+            .value_name("ADDR")
+            .multiple(true),
+        clap::Arg::with_name("cc")
+            .help("Overrides the Cc header")
+            .short("c")
+            .long("cc")
+            .value_name("ADDR")
+            .multiple(true),
+        clap::Arg::with_name("bcc")
+            .help("Overrides the Bcc header")
+            .short("b")
+            .long("bcc")
+            .value_name("ADDR")
+            .multiple(true),
+        clap::Arg::with_name("header")
+            .help("Overrides a specific header")
+            .short("h")
+            .long("header")
+            .value_name("KEY: VAL")
+            .multiple(true),
+        clap::Arg::with_name("body")
+            .help("Overrides the body")
+            .short("B")
+            .long("body")
+            .value_name("STRING"),
+        clap::Arg::with_name("signature")
+            .help("Overrides the signature")
+            .short("S")
+            .long("signature")
+            .value_name("STRING"),
+    ]
 }
 
 // ====================
@@ -501,7 +576,7 @@ fn msg_matches_copy(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let uid = matches.value_of("uid").unwrap();
     let target = matches.value_of("target").unwrap();
-    let msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
+    let mut msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
 
     debug!("Uid: {}", &uid);
     debug!("Target: {}", &target);
@@ -510,10 +585,9 @@ fn msg_matches_copy(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     // Changes
     // ------------
     // before sending it, mark the new message as seen
-    let mut flags = msg.get_flags();
-    flags.push(Flag::Seen);
+    msg.add_flag(Flag::Seen);
 
-    imap_conn.append_msg(target, &msg.into_bytes().unwrap(), flags)?;
+    imap_conn.append_msg(target, &mut msg)?;
 
     debug!("Message {} successfully copied to folder `{}`", uid, target);
 
@@ -538,7 +612,7 @@ fn msg_matches_move(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let uid = matches.value_of("uid").unwrap();
     let target = matches.value_of("target").unwrap();
-    let msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
+    let mut msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
 
     debug!("Uid: {}", &uid);
     debug!("Target: {}", &target);
@@ -547,9 +621,9 @@ fn msg_matches_move(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     // Action
     // -----------
     // create the mail in the target-mailbox
-    let mut flags = msg.get_flags();
-    flags.push(Flag::Seen);
-    imap_conn.append_msg(target, &msg.into_bytes().unwrap(), flags)?;
+    msg.add_flag(Flag::Seen);
+
+    imap_conn.append_msg(target, &mut msg)?;
 
     debug!("Message {} successfully moved to folder `{}`", uid, target);
     ctx.output.print(format!(
@@ -617,18 +691,25 @@ fn msg_matches_send(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
             .join("\r\n")
     };
 
-    let msg = match Msg::new_with_pre_body(&ctx.account, msg.into_bytes()) {
+    let mut msg = match Msg::new_with_pre_body(&ctx.account, msg.into_bytes()) {
         Ok(msg) => msg,
         Err(_) => return Ok(false),
     };
 
-    let msg = match msg.to_sendable_msg() {
-        Ok(sendable) => sendable,
-        Err(_) => return Ok(false),
-    };
+    // send the message/mail
+    {
+        let sendable = match msg.to_sendable_msg() {
+            Ok(sendable) => sendable,
+            Err(_) => return Ok(false),
+        };
 
-    smtp::send(&ctx.account, &msg)?;
-    imap_conn.append_msg("Sent", &msg.formatted(), vec![Flag::Seen])?;
+        smtp::send(&ctx.account, &sendable)?;
+    }
+
+    // add the message/mail to the Sent-Mailbox of the user
+    msg.add_flag(Flag::Seen);
+    imap_conn.append_msg("Sent", &mut msg)?;
+
     imap_conn.logout();
 
     Ok(true)
@@ -639,25 +720,180 @@ fn msg_matches_save(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let msg = matches.value_of("message").unwrap();
-    let msg = match Msg::new_with_pre_body(&ctx.account, msg.to_string().into_bytes()) {
+    let mut msg = match Msg::new_with_pre_body(&ctx.account, msg.to_string().into_bytes()) {
         Ok(mail) => mail,
         Err(_) => return Ok(false),
     };
 
-    imap_conn.append_msg(
-        &ctx.mbox,
-        &msg.into_bytes().unwrap(),
-        vec![Flag::Seen],
-    )?;
+    msg.add_flag(Flag::Seen);
+    imap_conn.append_msg(&ctx.mbox, &mut msg)?;
+
     imap_conn.logout();
 
     Ok(true)
 }
 
+pub fn msg_matches_tpl(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
+    match matches.subcommand() {
+        ("new", Some(matches)) => tpl_matches_new(ctx, matches),
+        ("reply", Some(matches)) => tpl_matches_reply(ctx, matches),
+        ("forward", Some(matches)) => tpl_matches_forward(ctx, matches),
+
+        // TODO: find a way to show the help message for template subcommand
+        _ => Err("Subcommand not found".into()),
+    }
+}
+
 // =====================
 // Helper functions
 // =====================
-fn mail_interaction(ctx: &Ctx, mail: &mut Msg, imap_conn: &mut ImapConnector) -> Result<bool> {
+// ------------------------
+// Template Subcommand
+// ------------------------
+// These functions are more used for the "template" subcommand
+fn override_msg_with_args(msg: &mut Msg, matches: &clap::ArgMatches) {
+    // ---------------------------
+    // Collecting credentials
+    // ---------------------------
+    let from: Vec<String> = match matches.values_of("from") {
+        Some(from) => from.map(|arg| arg.to_string()).collect(),
+        None => Vec::new(),
+    };
+
+    let to: Vec<String> = match matches.values_of("to") {
+        Some(to) => to.map(|arg| arg.to_string()).collect(),
+        None => Vec::new(),
+    };
+
+    let subject = matches
+        .value_of("subject")
+        .and_then(|subject| Some(subject.to_string()));
+
+    let cc: Option<Vec<String>> = matches
+        .values_of("cc")
+        .and_then(|cc| Some(cc.map(|arg| arg.to_string()).collect()));
+
+    let bcc: Option<Vec<String>> = matches
+        .values_of("bcc")
+        .and_then(|bcc| Some(bcc.map(|arg| arg.to_string()).collect()));
+
+    let signature = matches
+        .value_of("signature")
+        .and_then(|signature| Some(signature.to_string()));
+
+    let custom_headers: Option<HashMap<String, Vec<String>>> = {
+        if let Some(matched_headers) = matches.values_of("header") {
+            let mut custom_headers: HashMap<String, Vec<String>> = HashMap::new();
+
+            // collect the custom headers
+            for header in matched_headers {
+                let mut header = header.split(":");
+                let key = header.next().unwrap_or_default();
+                let val = header.next().unwrap_or_default().trim_start();
+
+                debug!("overriden header: {}={}", key, val);
+
+                custom_headers.insert(key.to_string(), vec![val.to_string()]);
+            }
+
+            Some(custom_headers)
+        } else {
+            None
+        }
+    };
+
+    // get the body of the mail
+    let body = {
+        if atty::isnt(Stream::Stdin) {
+            let body = io::stdin()
+                .lock()
+                .lines()
+                .filter_map(|line| line.ok())
+                .map(|line| line.to_string())
+                .collect::<Vec<String>>()
+                .join("\n");
+            debug!("Overriden body from stdin: {:?}", body);
+            body
+        } else if let Some(body) = matches.value_of("body") {
+            debug!("Overriden body: {:?}", body);
+            body.to_string()
+        } else {
+            String::new()
+        }
+    };
+
+    // --------------------------
+    // Creating and printing
+    // --------------------------
+    let envelope = Envelope {
+        from,
+        subject,
+        to,
+        cc,
+        bcc,
+        signature,
+        custom_headers,
+        ..msg.envelope.clone()
+    };
+
+    msg.envelope = envelope;
+    msg.set_body(body.into_bytes());
+
+    println!("{}", msg);
+}
+
+fn tpl_matches_new(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
+    debug!("new command matched");
+
+    let mut msg = Msg::new(&ctx.account);
+    override_msg_with_args(&mut msg, &matches);
+    trace!("Message: {:?}", msg);
+    ctx.output.print(msg);
+
+    Ok(true)
+}
+
+fn tpl_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
+    debug!("reply command matched");
+
+    let uid = matches.value_of("uid").unwrap();
+    debug!("uid: {}", uid);
+
+    let mut imap_conn = ImapConnector::new(&ctx.account)?;
+    let mut msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
+
+    if matches.is_present("reply-all") {
+        msg.change_to_reply(&ctx.account, false);
+    } else {
+        msg.change_to_reply(&ctx.account, true);
+    }
+
+    override_msg_with_args(&mut msg, &matches);
+    trace!("Message: {:?}", msg);
+    ctx.output.print(msg);
+
+    Ok(true)
+}
+
+fn tpl_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
+    debug!("forward command matched");
+
+    let uid = matches.value_of("uid").unwrap();
+    debug!("uid: {}", uid);
+
+    let mut imap_conn = ImapConnector::new(&ctx.account)?;
+    let mut msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
+    msg.change_to_forwarding();
+
+    override_msg_with_args(&mut msg, &matches);
+
+    trace!("Message: {:?}", msg);
+    ctx.output.print(msg);
+
+    Ok(true)
+}
+
+fn mail_interaction(ctx: &Ctx, msg: &mut Msg, imap_conn: &mut ImapConnector) -> Result<bool> {
     loop {
         match input::post_edit_choice() {
             Ok(choice) => match choice {
@@ -665,7 +901,7 @@ fn mail_interaction(ctx: &Ctx, mail: &mut Msg, imap_conn: &mut ImapConnector) ->
                     debug!("Sending message…");
 
                     // prepare the mail to be send
-                    let sendable = match mail.to_sendable_msg() {
+                    let sendable = match msg.to_sendable_msg() {
                         Ok(sendable) => sendable,
                         // In general if an error occured, then this is normally
                         // due to a missing value of a header. So let's give the
@@ -679,11 +915,8 @@ fn mail_interaction(ctx: &Ctx, mail: &mut Msg, imap_conn: &mut ImapConnector) ->
                     // which creates a conflict, fix this!
 
                     // let the server know, that the user sent a mail
-                    imap_conn.append_msg(
-                        "Sent",
-                        &sendable.formatted(),
-                        vec![imap::types::Flag::Seen],
-                    )?;
+                    msg.add_flag(Flag::Seen);
+                    imap_conn.append_msg("Sent", msg)?;
 
                     // remove the draft, since we sent it
                     input::remove_draft()?;
@@ -694,7 +927,7 @@ fn mail_interaction(ctx: &Ctx, mail: &mut Msg, imap_conn: &mut ImapConnector) ->
                 input::PostEditChoice::Edit => {
                     // Did something goes wrong when the user changed the
                     // content?
-                    if let Err(err) = mail.edit_body() {
+                    if let Err(err) = msg.edit_body() {
                         println!("[ERROR] {}", err);
                         println!(concat!(
                             "Please try to fix the problem by editing",
@@ -705,17 +938,19 @@ fn mail_interaction(ctx: &Ctx, mail: &mut Msg, imap_conn: &mut ImapConnector) ->
                 input::PostEditChoice::LocalDraft => break,
                 input::PostEditChoice::RemoteDraft => {
                     debug!("Saving to draft…");
-                    match mail.into_bytes() {
-                        Ok(parsed) => {
-                            imap_conn.append_msg(
-                                "Drafts",
-                                &parsed,
-                                vec![imap::types::Flag::Seen],
-                            )?;
+
+                    // TODO: Here
+                    msg.add_flag(Flag::Seen);
+
+                    match imap_conn.append_msg("Drafts", msg) {
+                        Ok(_) => {
                             input::remove_draft()?;
                             ctx.output.print("Message successfully saved to Drafts");
+                        },
+                        Err(err) => {
+                            ctx.output.print("Couldn't save it to the server...");
+                            return Err(err.into());
                         }
-                        Err(_) => ctx.output.print("Couldn't save it to the server..."),
                     };
                     break;
                 }

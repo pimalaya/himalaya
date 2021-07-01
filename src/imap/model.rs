@@ -6,12 +6,12 @@ use std::{collections::HashSet, iter::FromIterator, net::TcpStream};
 
 use crate::config::model::Account;
 use crate::ctx::Ctx;
-use imap::types::Flag;
 use crate::msg::model::Msg;
 
 error_chain! {
     links {
         Config(crate::config::model::Error, crate::config::model::ErrorKind);
+        MessageError(crate::msg::model::Error, crate::msg::model::ErrorKind);
     }
 }
 
@@ -303,9 +303,13 @@ impl<'a> ImapConnector<'a> {
         }
     }
 
-    pub fn append_msg(&mut self, mbox: &str, msg: &[u8], flags: Vec<Flag>) -> Result<()> {
+    pub fn append_msg(&mut self, mbox: &str, msg: &mut Msg) -> Result<()> {
+
+        let body = msg.into_bytes()?;
+        let flags = msg.get_flags();
+
         self.sess
-            .append(mbox, msg)
+            .append(mbox, &body)
             .flags(flags)
             .finish()
             .chain_err(|| format!("Could not append message to `{}`", mbox))?;
