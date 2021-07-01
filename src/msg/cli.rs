@@ -838,8 +838,6 @@ fn override_msg_with_args(msg: &mut Msg, matches: &clap::ArgMatches) {
 
     msg.envelope = envelope;
     msg.set_body(body.into_bytes());
-
-    println!("{}", msg);
 }
 
 fn tpl_matches_new(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
