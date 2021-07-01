@@ -16,7 +16,7 @@ use serde::Serialize;
 
 use lettre::message::{Attachment as lettre_Attachment, Mailbox, Message, MultiPart, SinglePart};
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::convert::{From, TryFrom};
 use std::fmt;
 
@@ -272,7 +272,7 @@ impl Msg {
     }
 
     pub fn add_flag(&mut self, flag: Flag<'static>) {
-        self.flags.push(flag);
+        self.flags.insert(flag);
     }
 
     /// This function will use the information of the `Msg` struct and creates
@@ -510,11 +510,11 @@ impl Msg {
         self.attachments.iter().skip(1)
     }
 
-    pub fn get_flags(&self) -> Vec<Flag<'static>> {
+    pub fn get_flags(&self) -> HashSet<Flag<'static>> {
         self.flags.clone()
     }
 
-    pub fn get_flags_as_ref(&self) -> &Vec<Flag> {
+    pub fn get_flags_as_ref(&self) -> &HashSet<Flag> {
         &self.flags
     }
 }

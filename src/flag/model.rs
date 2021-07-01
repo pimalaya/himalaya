@@ -3,6 +3,7 @@ use serde::ser::{Serialize, SerializeSeq, Serializer};
 
 use std::borrow::Cow;
 use std::ops::{Deref, DerefMut};
+use std::collections::HashSet;
 
 /// Serializable wrapper for `imap::types::Flag`
 #[derive(Debug, PartialEq)]
@@ -30,7 +31,7 @@ impl<'flag> Serialize for SerializableFlag<'flag> {
 /// This struct type includes all flags which belong to a given mail.
 /// TODO: Use HashSet instead of vector
 #[derive(Debug, PartialEq)]
-pub struct Flags(Vec<Flag<'static>>);
+pub struct Flags(HashSet<Flag<'static>>);
 
 impl Flags {
     pub fn new<'new>(flags: &[imap::types::Flag<'new>]) -> Self {
@@ -38,7 +39,7 @@ impl Flags {
             flags
             .iter()
             .map(|flag| convert_to_static(flag).unwrap())
-            .collect::<Vec<Flag<'static>>>(),
+            .collect::<HashSet<Flag<'static>>>(),
             )
     }
 }
@@ -55,6 +56,8 @@ impl ToString for Flags {
 
         flags.push_str(if self.0.contains(&Flag::Answered) {
             "↵"
+        } else {
+            " "
         });
 
         flags.push_str(if self.0.contains(&Flag::Flagged) {
@@ -68,7 +71,7 @@ impl ToString for Flags {
 }
 
 impl Deref for Flags {
-    type Target = Vec<Flag<'static>>;
+    type Target = HashSet<Flag<'static>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
