@@ -152,6 +152,70 @@ impl Envelope {
     pub fn get_subject(&self) -> String {
         self.subject.clone().unwrap_or_default()
     }
+
+    pub fn get_header_as_string(&self) -> String {
+        let mut header = String::new();
+
+        // ---------------------
+        // Must-Have-Fields
+        // ---------------------
+        // the "From: " header
+        header.push_str(&merge_addresses_to_one_line("From", &self.from));
+
+        // the "To: " header
+        header.push_str(&merge_addresses_to_one_line("To", &self.to));
+
+        // --------------------
+        // Optional fields
+        // --------------------
+        // Here we are adding only the header parts which have a value (are not
+        // None). That's why we are always checking here with "if let Some()".
+
+        // Subject
+        if let Some(subject) = &self.subject {
+            header.push_str(&format!("Subject: {}\n", subject));
+        }
+
+        // in reply to
+        if let Some(in_reply_to) = &self.in_reply_to {
+            header.push_str(&format!("In-Reply-To: {}\n", in_reply_to));
+        }
+
+        // Sender
+        if let Some(sender) = &self.sender {
+            header.push_str(&format!("Sender: {}", sender));
+        }
+
+        // Message-ID
+        if let Some(message_id) = &self.message_id {
+            header.push_str(&format!("Message-ID: {}\n", message_id));
+        }
+
+        // reply_to
+        if let Some(reply_to) = &self.reply_to {
+            header
+                .push_str(&merge_addresses_to_one_line("Reply-To", &reply_to));
+        }
+
+        // cc
+        if let Some(cc) = &self.cc {
+            header.push_str(&merge_addresses_to_one_line("Cc", &cc));
+        }
+
+        // bcc
+        if let Some(bcc) = &self.bcc {
+            header.push_str(&merge_addresses_to_one_line("Bcc", &bcc));
+        }
+
+        // custom headers
+        if let Some(custom_headers) = &self.custom_headers {
+            for (key, value) in custom_headers.iter() {
+                header.push_str(&merge_addresses_to_one_line(key, &value));
+            }
+        }
+
+        header
+    }
 }
 
 // ===========================
@@ -264,77 +328,15 @@ impl From<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
 ///
 impl fmt::Display for Envelope {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        // Here will be the body content stored (as shown in the example)
-        let mut result = String::new();
+        let mut header = self.get_header_as_string();
 
-        // ---------------------
-        // Must-Have-Fields
-        // ---------------------
-        // the "From: " header
-        result.push_str(&merge_addresses_to_one_line("From", &self.from));
-
-        // the "To: " header
-        result.push_str(&merge_addresses_to_one_line("To", &self.to));
-
-        // --------------------
-        // Optional fields
-        // --------------------
-        // Here we are adding only the header parts which have a value (are not
-        // None). That's why we are always checking here with "if let Some()".
-
-        // Subject
-        if let Some(subject) = &self.subject {
-            result.push_str(&format!("Subject: {}\n", subject));
-        }
-
-        // in reply to
-        if let Some(in_reply_to) = &self.in_reply_to {
-            result.push_str(&format!("In-Reply-To: {}\n", in_reply_to));
-        }
-
-        // Sender
-        if let Some(sender) = &self.sender {
-            result.push_str(&format!("Sender: {}", sender));
-        }
-
-        // Message-ID
-        if let Some(message_id) = &self.message_id {
-            result.push_str(&format!("Message-ID: {}\n", message_id));
-        }
-
-        // reply_to
-        if let Some(reply_to) = &self.reply_to {
-            result
-                .push_str(&merge_addresses_to_one_line("Reply-To", &reply_to));
-        }
-
-        // cc
-        if let Some(cc) = &self.cc {
-            result.push_str(&merge_addresses_to_one_line("Cc", &cc));
-        }
-
-        // bcc
-        if let Some(bcc) = &self.bcc {
-            result.push_str(&merge_addresses_to_one_line("Bcc", &bcc));
-        }
-
-        // custom headers
-        if let Some(custom_headers) = &self.custom_headers {
-            for (key, value) in custom_headers.iter() {
-                result.push_str(&merge_addresses_to_one_line(key, &value));
-            }
-        }
-
-        // ---------
-        // Rest
-        // ---------
         // now add some space between the header and the signature
-        result.push_str("\n\n\n");
+        header.push_str("\n\n\n");
 
         // and add the signature in the end
-        result.push_str(&self.signature.clone().unwrap_or(String::new()));
+        header.push_str(&self.signature.clone().unwrap_or(String::new()));
 
-        write!(formatter, "{}", result)
+        write!(formatter, "{}", header)
     }
 }
 

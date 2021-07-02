@@ -20,6 +20,8 @@ use std::collections::{HashMap, HashSet};
 use std::convert::{From, TryFrom};
 use std::fmt;
 
+use colorful::Colorful;
+
 use error_chain::error_chain;
 
 error_chain! {
@@ -31,13 +33,17 @@ error_chain! {
         }
 
         /// Is mainly used in the "to_sendable_msg" function
-        ForgotHeader(missing_header: &'static str) {
-            description(
-                concat![
-                "Couldn't parse the mail to a sendable mail ",
-                "because a header is missing.",
-            ]),
-            display("Missing header: '{}'", missing_header),
+        Header(error_msg: String, header_name: &'static str, header_input: String) {
+
+            description("An error happened, when trying to parse a header-field."),
+            display(concat![
+                    "[{}] {}\n",
+                    "Header-Field-Name: '{}'\n",
+                    "The word which let this error occur: '{}'"], 
+                    "Error".red(),
+                    error_msg.clone().light_red(),
+                    header_name.light_blue(),
+                    header_input.clone().light_cyan()),
         }
     }
 
@@ -50,6 +56,7 @@ error_chain! {
     foreign_links {
         MailParse(mailparse::MailParseError);
         Lettre(lettre::error::Error);
+        LettreAddress(lettre::address::AddressError);
     }
 }
 
@@ -279,7 +286,6 @@ impl Msg {
     /// a sendable mail. It uses the `Msg.envelope` and `Msg.attachments`
     /// fields
     pub fn to_sendable_msg(&mut self) -> Result<Message> {
-
         // ==============
         // Preparing
         // ==============
@@ -290,9 +296,11 @@ impl Msg {
             // mailparse can't detect what the siganture is, so we just use the
             // old one again
             signature: self.envelope.signature.clone(),
-            .. Self::parse_envelope(&parsed)
+            ..Self::parse_envelope(&parsed)
         };
         self.envelope = refreshed_envelope;
+
+        dbg!("{:?}", &self.envelope);
 
         // ===================
         // Header of Msg
@@ -307,7 +315,8 @@ impl Msg {
         for mailaddress in &self.envelope.from {
             msg = msg.from(match mailaddress.parse() {
                 Ok(from) => from,
-                Err(_) => return Err(ErrorKind::ForgotHeader("From").into()),
+                Err(err) => return Err(ErrorKind::Header(
+                        err.to_string(), "From", mailaddress.to_string()).into()),
             });
         }
 
@@ -315,7 +324,8 @@ impl Msg {
         for mailaddress in &self.envelope.to {
             msg = msg.to(match mailaddress.parse() {
                 Ok(to) => to,
-                Err(_) => return Err(ErrorKind::ForgotHeader("To").into()),
+                Err(err) => return Err(ErrorKind::Header(
+                        err.to_string(), "To", mailaddress.to_string()).into()),
             });
         }
 
@@ -326,7 +336,8 @@ impl Msg {
         if let Some(sender) = &self.envelope.sender {
             msg = msg.sender(match sender.parse() {
                 Ok(sender) => sender,
-                Err(_) => return Err(ErrorKind::ForgotHeader("Sender").into()),
+                Err(err) => return Err(ErrorKind::Header(
+                        err.to_string(), "Sender", sender.to_string()).into()),
             });
         }
 
@@ -335,7 +346,8 @@ impl Msg {
             for mailaddress in reply_to {
                 msg = msg.reply_to(match mailaddress.parse() {
                     Ok(reply_to) => reply_to,
-                    Err(_) => return Err(ErrorKind::ForgotHeader("Reply-to").into()),
+                    Err(err) => return Err(ErrorKind::Header(
+                            err.to_string(), "Reply-to", mailaddress.to_string()).into()),
                 });
             }
         }
@@ -345,7 +357,8 @@ impl Msg {
             for mailaddress in cc {
                 msg = msg.cc(match mailaddress.parse() {
                     Ok(cc) => cc,
-                    Err(_) => return Err(ErrorKind::ForgotHeader("Cc").into()),
+                    Err(err) => return Err(ErrorKind::Header(
+                            err.to_string(), "Cc", mailaddress.to_string()).into()),
                 });
             }
         }
@@ -355,7 +368,8 @@ impl Msg {
             for mailaddress in bcc {
                 msg = msg.bcc(match mailaddress.parse() {
                     Ok(bcc) => bcc,
-                    Err(_) => return Err(ErrorKind::ForgotHeader("Bcc").into()),
+                    Err(err) => return Err(ErrorKind::Header(
+                            err.to_string(), "Bcc", mailaddress.to_string()).into()),
                 });
             }
         }
@@ -364,7 +378,8 @@ impl Msg {
         if let Some(in_reply_to) = &self.envelope.in_reply_to {
             msg = msg.in_reply_to(match in_reply_to.parse() {
                 Ok(in_reply_to) => in_reply_to,
-                Err(_) => return Err(ErrorKind::ForgotHeader("In-Reply-To").into()),
+                Err(err) => return Err(
+                    ErrorKind::Header(err.to_string(), "In-Reply-To", in_reply_to.to_string()).into()),
             });
         }
 
@@ -545,7 +560,13 @@ impl fmt::Display for Msg {
             }
         };
 
-        writeln!(formatter, "{}\n{}", self.envelope, body)
+        // the signature
+        let signature = &self.envelope.signature.clone().unwrap_or(String::new());
+
+        writeln!(formatter, "{}\n{}\n{}", 
+                 self.envelope.get_header_as_string(),
+                 body,
+                 signature)
     }
 }
 

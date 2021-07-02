@@ -691,20 +691,14 @@ fn msg_matches_send(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
             .join("\r\n")
     };
 
-    let mut msg = match Msg::new_with_pre_body(&ctx.account, msg.into_bytes()) {
-        Ok(msg) => msg,
-        Err(_) => return Ok(false),
-    };
+    let mut msg = Msg::new_with_pre_body(&ctx.account, msg.into_bytes())?;
 
     // send the message/mail
-    {
-        let sendable = match msg.to_sendable_msg() {
-            Ok(sendable) => sendable,
-            Err(_) => return Ok(false),
-        };
+    let sendable = msg.to_sendable_msg()?;
 
-        smtp::send(&ctx.account, &sendable)?;
-    }
+    debug!("Message sent!");
+
+    smtp::send(&ctx.account, &sendable)?;
 
     // add the message/mail to the Sent-Mailbox of the user
     msg.add_flag(Flag::Seen);
@@ -757,7 +751,7 @@ fn override_msg_with_args(msg: &mut Msg, matches: &clap::ArgMatches) {
     // ---------------------------
     let from: Vec<String> = match matches.values_of("from") {
         Some(from) => from.map(|arg| arg.to_string()).collect(),
-        None => Vec::new(),
+        None => msg.envelope.from.clone(),
     };
 
     let to: Vec<String> = match matches.values_of("to") {
@@ -779,7 +773,8 @@ fn override_msg_with_args(msg: &mut Msg, matches: &clap::ArgMatches) {
 
     let signature = matches
         .value_of("signature")
-        .and_then(|signature| Some(signature.to_string()));
+        .and_then(|signature| Some(signature.to_string()))
+        .or(msg.envelope.signature.clone());
 
     let custom_headers: Option<HashMap<String, Vec<String>>> = {
         if let Some(matched_headers) = matches.values_of("header") {
@@ -944,7 +939,7 @@ fn mail_interaction(ctx: &Ctx, msg: &mut Msg, imap_conn: &mut ImapConnector) -> 
                         Ok(_) => {
                             input::remove_draft()?;
                             ctx.output.print("Message successfully saved to Drafts");
-                        },
+                        }
                         Err(err) => {
                             ctx.output.print("Couldn't save it to the server...");
                             return Err(err.into());
