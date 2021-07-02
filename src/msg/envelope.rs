@@ -308,6 +308,82 @@ impl From<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
     }
 }
 
+impl<'from> From<&mailparse::ParsedMail<'from>> for Envelope {
+    fn from(parsed_mail: &mailparse::ParsedMail<'from>) -> Self {
+        let mut new_envelope = Envelope::default();
+
+        let header_iter = parsed_mail.headers.iter();
+        for header in header_iter {
+            // get the value of the header. For example if we have this header:
+            //
+            //  Subject: I use Arch btw
+            //
+            // than `value` would be like that: `let value = "I use Arch
+            // btw".to_string()
+            let value = header.get_value().replace("\r", "");
+            let header_name = header.get_key().to_lowercase();
+            let header_name = header_name.as_str();
+
+            // now go through all headers and look which values they have.
+            match header_name {
+                "from" => {
+                    new_envelope.from = value.rsplit(',').map(|addr| addr.to_string()).collect()
+                }
+
+                "to" => new_envelope.to = value.rsplit(',').map(|addr| addr.to_string()).collect(),
+
+                "bcc" => {
+                    new_envelope.bcc =
+                        Some(value.rsplit(',').map(|addr| addr.to_string()).collect())
+                }
+
+                "cc" => {
+                    new_envelope.cc = Some(value.rsplit(',').map(|addr| addr.to_string()).collect())
+                }
+
+                "in_reply_to" => new_envelope.in_reply_to = Some(value),
+
+                "reply_to" => {
+                    new_envelope.reply_to =
+                        Some(value.rsplit(',').map(|addr| addr.to_string()).collect())
+                }
+
+                "sender" => new_envelope.sender = Some(value),
+
+                "subject" => new_envelope.subject = Some(value),
+
+                // it's a custom header => Add it to our
+                // custom-header-hash-map
+                _ => {
+                    let custom_header = header.get_key();
+
+                    // If we don't have a HashMap yet => Create one! Otherwise
+                    // we'll keep using it, because why should we reset its
+                    // values again?
+                    if let None = new_envelope.custom_headers {
+                        new_envelope.custom_headers = Some(HashMap::new());
+                    }
+
+                    // we can unwrap for sure, because with the if-condition
+                    // above, we made sure, that the HashMap exists
+                    let mut updated_hashmap = new_envelope.custom_headers.unwrap();
+
+                    // now add the custom header to the hash table ..
+                    updated_hashmap.insert(
+                        custom_header,
+                        value.rsplit(',').map(|addr| addr.to_string()).collect(),
+                    );
+
+                    // .. and apply the updated hashmap to the envelope struct
+                    new_envelope.custom_headers = Some(updated_hashmap);
+                }
+            }
+        }
+
+        new_envelope
+    }
+}
+
 // ==================
 // Common Traits
 // ==================

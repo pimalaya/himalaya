@@ -2,10 +2,12 @@ use atty::Stream;
 use clap;
 use error_chain::error_chain;
 use log::{debug, error, trace};
+
 use std::{
     collections::HashMap,
     fs,
     io::{self, BufRead},
+    convert::TryFrom,
 };
 
 use imap::types::Flag;
@@ -675,7 +677,7 @@ fn msg_matches_send(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
 
-    let msg = if atty::is(Stream::Stdin) {
+    let msg: String = if atty::is(Stream::Stdin) {
         matches
             .value_of("message")
             .unwrap_or_default()
@@ -691,7 +693,7 @@ fn msg_matches_send(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
             .join("\r\n")
     };
 
-    let mut msg = Msg::new_with_pre_body(&ctx.account, msg.into_bytes())?;
+    let mut msg = Msg::try_from(msg.as_str())?;
 
     // send the message/mail
     let sendable = msg.to_sendable_msg()?;
@@ -713,11 +715,9 @@ fn msg_matches_save(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     debug!("Save command matched");
 
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
-    let msg = matches.value_of("message").unwrap();
-    let mut msg = match Msg::new_with_pre_body(&ctx.account, msg.to_string().into_bytes()) {
-        Ok(mail) => mail,
-        Err(_) => return Ok(false),
-    };
+    let msg: &str = matches.value_of("message").unwrap();
+
+    let mut msg = Msg::try_from(msg)?;
 
     msg.add_flag(Flag::Seen);
     imap_conn.append_msg(&ctx.mbox, &mut msg)?;
@@ -839,7 +839,9 @@ fn tpl_matches_new(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     debug!("new command matched");
 
     let mut msg = Msg::new(&ctx.account);
+
     override_msg_with_args(&mut msg, &matches);
+
     trace!("Message: {:?}", msg);
     ctx.output.print(msg);
 

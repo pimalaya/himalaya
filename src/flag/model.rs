@@ -29,7 +29,6 @@ impl<'flag> Serialize for SerializableFlag<'flag> {
 }
 
 /// This struct type includes all flags which belong to a given mail.
-/// TODO: Use HashSet instead of vector
 #[derive(Debug, PartialEq)]
 pub struct Flags(HashSet<Flag<'static>>);
 

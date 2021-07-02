@@ -16,7 +16,7 @@ use serde::Serialize;
 
 use lettre::message::{Attachment as lettre_Attachment, Mailbox, Message, MultiPart, SinglePart};
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::convert::{From, TryFrom};
 use std::fmt;
 
@@ -39,7 +39,7 @@ error_chain! {
             display(concat![
                     "[{}] {}\n",
                     "Header-Field-Name: '{}'\n",
-                    "The word which let this error occur: '{}'"], 
+                    "The word which let this error occur: '{}'"],
                     "Error".red(),
                     error_msg.clone().light_red(),
                     header_name.light_blue(),
@@ -116,17 +116,6 @@ impl Msg {
             uid: None,
             date: None,
         }
-    }
-
-    pub fn new_with_pre_body(account: &Account, raw: Vec<u8>) -> Result<Self> {
-        let mut mail = Self::new(&account);
-
-        let parsed = mailparse::parse_mail(&raw)?;
-
-        mail.attachments
-            .push(Attachment::new("", "text/plain", parsed.get_body_raw()?));
-
-        Ok(mail)
     }
 
     pub fn change_to_reply(&mut self, account: &Account, reply_all: bool) {
@@ -291,12 +280,15 @@ impl Msg {
         // ==============
         // Refresh the states of the envelope first before we're using them to
         // create the mail/msg.
-        let parsed = mailparse::parse_mail(&self.attachments[0].body_raw)?;
+        dbg!("{:?}", &self.attachments[0]);
+        let parsed = mailparse::parse_mail(&self.attachments[0].body_raw)
+            .chain_err(|| format!("[{}]: {}", "Sendable".red(), "Couldn't parse body.".blue()))?;
+
         let refreshed_envelope = Envelope {
             // mailparse can't detect what the siganture is, so we just use the
             // old one again
             signature: self.envelope.signature.clone(),
-            ..Self::parse_envelope(&parsed)
+            ..Envelope::from(&parsed)
         };
         self.envelope = refreshed_envelope;
 
@@ -315,8 +307,11 @@ impl Msg {
         for mailaddress in &self.envelope.from {
             msg = msg.from(match mailaddress.parse() {
                 Ok(from) => from,
-                Err(err) => return Err(ErrorKind::Header(
-                        err.to_string(), "From", mailaddress.to_string()).into()),
+                Err(err) => {
+                    return Err(
+                        ErrorKind::Header(err.to_string(), "From", mailaddress.to_string()).into(),
+                    )
+                }
             });
         }
 
@@ -324,8 +319,11 @@ impl Msg {
         for mailaddress in &self.envelope.to {
             msg = msg.to(match mailaddress.parse() {
                 Ok(to) => to,
-                Err(err) => return Err(ErrorKind::Header(
-                        err.to_string(), "To", mailaddress.to_string()).into()),
+                Err(err) => {
+                    return Err(
+                        ErrorKind::Header(err.to_string(), "To", mailaddress.to_string()).into(),
+                    )
+                }
             });
         }
 
@@ -336,8 +334,11 @@ impl Msg {
         if let Some(sender) = &self.envelope.sender {
             msg = msg.sender(match sender.parse() {
                 Ok(sender) => sender,
-                Err(err) => return Err(ErrorKind::Header(
-                        err.to_string(), "Sender", sender.to_string()).into()),
+                Err(err) => {
+                    return Err(
+                        ErrorKind::Header(err.to_string(), "Sender", sender.to_string()).into(),
+                    )
+                }
             });
         }
 
@@ -346,8 +347,14 @@ impl Msg {
             for mailaddress in reply_to {
                 msg = msg.reply_to(match mailaddress.parse() {
                     Ok(reply_to) => reply_to,
-                    Err(err) => return Err(ErrorKind::Header(
-                            err.to_string(), "Reply-to", mailaddress.to_string()).into()),
+                    Err(err) => {
+                        return Err(ErrorKind::Header(
+                            err.to_string(),
+                            "Reply-to",
+                            mailaddress.to_string(),
+                        )
+                        .into())
+                    }
                 });
             }
         }
@@ -357,8 +364,14 @@ impl Msg {
             for mailaddress in cc {
                 msg = msg.cc(match mailaddress.parse() {
                     Ok(cc) => cc,
-                    Err(err) => return Err(ErrorKind::Header(
-                            err.to_string(), "Cc", mailaddress.to_string()).into()),
+                    Err(err) => {
+                        return Err(ErrorKind::Header(
+                            err.to_string(),
+                            "Cc",
+                            mailaddress.to_string(),
+                        )
+                        .into())
+                    }
                 });
             }
         }
@@ -368,8 +381,14 @@ impl Msg {
             for mailaddress in bcc {
                 msg = msg.bcc(match mailaddress.parse() {
                     Ok(bcc) => bcc,
-                    Err(err) => return Err(ErrorKind::Header(
-                            err.to_string(), "Bcc", mailaddress.to_string()).into()),
+                    Err(err) => {
+                        return Err(ErrorKind::Header(
+                            err.to_string(),
+                            "Bcc",
+                            mailaddress.to_string(),
+                        )
+                        .into())
+                    }
                 });
             }
         }
@@ -378,8 +397,14 @@ impl Msg {
         if let Some(in_reply_to) = &self.envelope.in_reply_to {
             msg = msg.in_reply_to(match in_reply_to.parse() {
                 Ok(in_reply_to) => in_reply_to,
-                Err(err) => return Err(
-                    ErrorKind::Header(err.to_string(), "In-Reply-To", in_reply_to.to_string()).into()),
+                Err(err) => {
+                    return Err(ErrorKind::Header(
+                        err.to_string(),
+                        "In-Reply-To",
+                        in_reply_to.to_string(),
+                    )
+                    .into())
+                }
             });
         }
 
@@ -423,82 +448,6 @@ impl Msg {
         // Last but not least: Add the attachments to the header of the mail and
         // return the finished mail!
         Ok(msg.multipart(msg_parts)?)
-    }
-
-    /// This function will fetch the relevant information of the parsed mail for
-    /// the envelopea and returns them.
-    fn parse_envelope(parsed_mail: &mailparse::ParsedMail) -> Envelope {
-        let mut new_envelope = Envelope::default();
-
-        let header_iter = parsed_mail.headers.iter();
-        for header in header_iter {
-            // get the value of the header. For example if we have this header:
-            //
-            //  Subject: I use Arch btw
-            //
-            // than `value` would be like that: `let value = "I use Arch
-            // btw".to_string()
-            let value = header.get_value().replace("\r", "");
-            let header_name = header.get_key().to_lowercase();
-            let header_name = header_name.as_str();
-
-            // now go through all headers and look which values they have.
-            match header_name {
-                "from" => {
-                    new_envelope.from = value.rsplit(',').map(|addr| addr.to_string()).collect()
-                }
-
-                "to" => new_envelope.to = value.rsplit(',').map(|addr| addr.to_string()).collect(),
-
-                "bcc" => {
-                    new_envelope.bcc =
-                        Some(value.rsplit(',').map(|addr| addr.to_string()).collect())
-                }
-
-                "cc" => {
-                    new_envelope.cc = Some(value.rsplit(',').map(|addr| addr.to_string()).collect())
-                }
-
-                "in_reply_to" => new_envelope.in_reply_to = Some(value),
-
-                "reply_to" => {
-                    new_envelope.reply_to =
-                        Some(value.rsplit(',').map(|addr| addr.to_string()).collect())
-                }
-
-                "sender" => new_envelope.sender = Some(value),
-
-                "subject" => new_envelope.subject = Some(value),
-
-                // it's a custom header => Add it to our
-                // custom-header-hash-map
-                _ => {
-                    let custom_header = header.get_key();
-
-                    // If we don't have a HashMap yet => Create one! Otherwise
-                    // we'll keep using it, because why should we reset its
-                    // values again?
-                    if let None = new_envelope.custom_headers {
-                        new_envelope.custom_headers = Some(HashMap::new());
-                    }
-
-                    // we can unwrap for sure, because with the if-condition
-                    // above, we made sure, that the HashMap exists
-                    let mut updated_hashmap = new_envelope.custom_headers.unwrap();
-
-                    // now add the custom header to the hash table ..
-                    updated_hashmap.insert(
-                        custom_header,
-                        value.rsplit(',').map(|addr| addr.to_string()).collect(),
-                    );
-
-                    // .. and apply the updated hashmap to the envelope struct
-                    new_envelope.custom_headers = Some(updated_hashmap);
-                }
-            }
-        }
-
-        new_envelope
     }
 
     /// Returns the uid of the mail.
@@ -563,10 +512,13 @@ impl fmt::Display for Msg {
         // the signature
         let signature = &self.envelope.signature.clone().unwrap_or(String::new());
 
-        writeln!(formatter, "{}\n{}\n{}", 
-                 self.envelope.get_header_as_string(),
-                 body,
-                 signature)
+        writeln!(
+            formatter,
+            "{}\n{}\n{}",
+            self.envelope.get_header_as_string(),
+            body,
+            signature
+        )
     }
 }
 
@@ -698,6 +650,28 @@ impl From<&Fetch> for Msg {
     }
 }
 
+impl TryFrom<&str> for Msg {
+    type Error = Error;
+
+    fn try_from(str_msg: &str) -> Result<Self> {
+        let parsed = mailparse::parse_mail(str_msg.as_bytes())?;
+
+        // get the envelope first
+        let envelope = Envelope::from(&parsed);
+
+        let mut msg = Msg::default();
+        msg.envelope = envelope;
+
+        // afterwards apply the content of the mail
+        let body_attachment = Attachment::new(
+            "", "text/plain", str_msg.as_bytes().to_vec());
+
+        msg.attachments.push(body_attachment);
+
+        Ok(msg)
+    }
+}
+
 // ==========
 // Msgs
 // ==========
@@ -708,15 +682,6 @@ pub struct Msgs(pub Vec<Msg>);
 impl Msgs {
     pub fn new() -> Self {
         Self(Vec::new())
-    }
-}
-
-// -----------
-// Traits
-// -----------
-impl fmt::Display for Msgs {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(formatter, "\n{}", Table::render(&self.0))
     }
 }
 
@@ -733,5 +698,14 @@ impl<'mails> From<&'mails ZeroCopy<Vec<Fetch>>> for Msgs {
         }
 
         Self(mails)
+    }
+}
+
+// -----------
+// Traits
+// -----------
+impl fmt::Display for Msgs {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(formatter, "\n{}", Table::render(&self.0))
     }
 }
