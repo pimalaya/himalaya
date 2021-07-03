@@ -1,10 +1,11 @@
-extern crate himalaya;
-
 use std::convert::TryFrom;
 
 use himalaya::{
     config::model::Account, imap::model::ImapConnector, mbox::model::Mboxes, msg::model::Msgs, smtp,
 };
+
+use lettre::message::SinglePart;
+use lettre::Message;
 
 fn get_account(addr: &str) -> Account {
     Account {
@@ -68,31 +69,28 @@ fn msg() {
             .unwrap();
     }
     imap_conn.expunge("INBOX").unwrap();
+    assert!(imap_conn.list_msgs("INBOX", &10, &0).unwrap().is_none());
 
     // ============
     // Testing
     // ============
     // Add messages
-    smtp::send(
-        &account,
-        &lettre::Message::builder()
+    let message_a = Message::builder()
             .from("sender-a@localhost".parse().unwrap())
             .to("inbox@localhost".parse().unwrap())
             .subject("Subject A")
-            .singlepart(lettre::message::SinglePart::builder().body("Body A".as_bytes().to_vec()))
-            .unwrap(),
-    )
-    .unwrap();
-    smtp::send(
-        &account,
-        &lettre::Message::builder()
-            .from("\"Sender B\" <sender-b@localhost>".parse().unwrap())
+            .singlepart(SinglePart::builder().body("Body A".as_bytes().to_vec()))
+            .unwrap();
+
+    let message_b = Message::builder()
+            .from("Sender B <sender-b@localhost>".parse().unwrap())
             .to("inbox@localhost".parse().unwrap())
             .subject("Subject B")
-            .singlepart(lettre::message::SinglePart::builder().body("Body B".as_bytes().to_vec()))
-            .unwrap(),
-    )
-    .unwrap();
+            .singlepart(SinglePart::builder().body("Body B".as_bytes().to_vec()))
+            .unwrap();
+
+    smtp::send(&account, &message_a).unwrap();
+    smtp::send(&account, &message_b).unwrap();
 
     // List messages
     // TODO: check non-existance of \Seen flag
@@ -105,32 +103,28 @@ fn msg() {
 
     // make sure that there are both mails which we sended
     assert_eq!(msgs.0.len(), 2);
-    dbg!("{:?}", &msgs);
 
     let msg_a = msgs
         .0
         .iter()
-        .find(|msg| msg.envelope.subject.clone().unwrap() == "Subject A")
+        .find(|msg| msg.envelope.get_subject() == "Subject A")
         .unwrap();
 
-    dbg!("{:?}", &msg_a);
-
-    assert_eq!(msg_a.envelope.subject.clone().unwrap(), "Subject A");
-    assert_eq!(msg_a.envelope.sender.clone().unwrap(), "sender-a@localhost");
+    assert_eq!(msg_a.envelope.get_subject(), "Subject A");
+    assert_eq!(&msg_a.envelope.get_from()[0], "sender-a@localhost");
 
     let msg_b = msgs
         .0
         .iter()
         .find(|msg| msg.envelope.subject.clone().unwrap() == "Subject B")
         .unwrap();
-    assert_eq!(msg_b.envelope.subject.clone().unwrap(), "Subject B");
-    assert_eq!(msg_b.envelope.sender.clone().unwrap(), "Sender B");
+    assert_eq!(msg_b.envelope.get_subject(), "Subject B");
+    assert_eq!(&msg_b.envelope.get_from()[0], "Sender B <sender-b@localhost>");
 
     // TODO: search messages
     // TODO: read message (+ \Seen flag)
     // TODO: list message attachments
     // TODO: add/set/remove flags
-    assert!(imap_conn.list_msgs("INBOX", &10, &0).unwrap().is_none());
 
     // Logout
     imap_conn.logout();

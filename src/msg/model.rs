@@ -2,6 +2,8 @@ use super::attachment::Attachment;
 use super::envelope::Envelope;
 use super::body::Body;
 
+use log::debug;
+
 use imap::types::{Fetch, Flag, ZeroCopy};
 
 use mailparse;
@@ -565,8 +567,14 @@ impl TryFrom<&Fetch> for Msg {
             // the empty array represents an invalid body, so we can enter the
             // `Err` arm if the body-query wasn't applied
             match mailparse::parse_mail(fetch.body().unwrap_or(&[b' '])) {
-                Ok(parsed) => Some(parsed),
-                Err(_) => None,
+                Ok(parsed) => {
+                    debug!("Fetch has a body to parse.");
+                    Some(parsed)
+                },
+                Err(_) => {
+                    debug!("Fetch hasn't a body to parse.");
+                    None
+                },
             };
 
         // ---------------------------------

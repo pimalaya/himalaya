@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt;
 
+use log::debug;
+
 use serde::Serialize;
 
 use crate::config::model::Account;
@@ -259,16 +261,18 @@ impl TryFrom<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
 
     fn try_from(from_envelope: Option<&imap_proto::types::Envelope<'_>>) -> Result<Self> {
         if let Some(from_envelope) = from_envelope {
-            
+            debug!("Fetch has an envelope.");
+
             let subject = from_envelope
                 .subject
                 .as_ref()
                 .and_then(|subj| rfc2047_decoder::decode(subj).ok());
-            
+
             use std::io::Write;
             let mut file = std::fs::File::create("/home/tornax/himalaya.json").unwrap();
             writeln!(&mut file, "{:?}", from_envelope).unwrap();
 
+            println!("{:?}", from_envelope.from.as_ref().unwrap());
             let from = match convert_vec_address_to_string(from_envelope.from.as_ref())? {
                 Some(from) => from,
                 None => return Err(ErrorKind::FromConvertion.into()),
@@ -318,6 +322,7 @@ impl TryFrom<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
                 signature: None,
             })
         } else {
+            debug!("Fetch doesn't have an envelope.");
             Ok(Envelope::default())
         }
     }
@@ -445,20 +450,53 @@ fn convert_cow_u8_to_string<'val>(value: Option<&Cow<'val, [u8]>>) -> Result<Opt
 }
 
 fn convert_vec_address_to_string<'val>(
-    value: Option<&Vec<imap_proto::types::Address<'val>>>,
+    addresses: Option<&Vec<imap_proto::types::Address<'val>>>,
 ) -> Result<Option<Vec<String>>> {
-    if let Some(value) = value {
-        let mut values: Vec<String> = Vec::new();
+    if let Some(addresses) = addresses {
+        let mut parsed_addresses: Vec<String> = Vec::new();
 
-        for address in value.iter() {
-            // try to get the name of the mail-address
-            let address_name = convert_cow_u8_to_string(address.name.as_ref())?;
+        for address in addresses.iter() {
+            // This variable will hold the parsed version of the Address-struct,
+            // like this:
+            //
+            //  "Name <mail@host>"
+            let mut parsed_address = String::new();
+
+            // -------------------
+            // Get the fields
+            // -------------------
+            // add the name field (if it exists)
+            if let Some(name) = convert_cow_u8_to_string(address.name.as_ref())? {
+                parsed_address.push_str(&name);
+            }
+
+            // add the mailaddress
+            if let Some(mailbox) = convert_cow_u8_to_string(address.mailbox.as_ref())? {
+                if let Some(host) = convert_cow_u8_to_string(address.host.as_ref())? {
+
+                    let mail_address = format!("{}@{}", mailbox, host);
+
+                    if parsed_address.is_empty() {
+                        // if there's no name, let `parsed_address` look like this:
+                        //
+                        //  parsed_address = "mail@host"
+                        parsed_address.push_str(&mail_address);
+                    } else {
+                        // wrap the mailbox between the `<`,`>` brackets to show, that
+                        // the mailbox belongs to the name, so it should look like
+                        // this in the afterwards:
+                        //
+                        //  parsed_address = "Name <mail@host>"
+                        parsed_address.push_str(&format!(" <{}>", mail_address));
+                    }
+                }
+            }
 
             // address will be of type Option<String>
-            values.push(address_name.unwrap_or_default());
+            parsed_addresses.push(parsed_address);
         }
 
-        Ok(Some(values))
+        Ok(Some(parsed_addresses))
     } else {
         Ok(None)
     }

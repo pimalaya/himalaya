@@ -31,4 +31,4 @@ uuid = {version = "0.8", features = ["v4"]}
 colorful = "0.2.1"
 
 [profile.dev]
-debug = true
+debug = false
