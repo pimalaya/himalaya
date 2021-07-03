@@ -1,5 +1,6 @@
 use super::attachment::Attachment;
 use super::envelope::Envelope;
+use super::body::Body;
 
 use imap::types::{Fetch, Flag, ZeroCopy};
 
@@ -75,6 +76,9 @@ pub struct Msg {
     // envelope: HashMap<HeaderName, Vec<String>>,
     pub envelope: Envelope,
 
+    /// This variable stores the body of the msg.
+    body: Body,
+
     /// The UID of the mail. It's only set from the server. So that's why it's
     /// not public: To avoid that it's set manually!
     uid: Option<u32>,
@@ -105,13 +109,13 @@ impl Msg {
         // ---------------------
         // Body credentials
         // ---------------------
-        // provide an empty body
-        let body = Attachment::new("", "text/plain", envelope.to_string().into_bytes());
+        let body = Body::from(account.signature.clone().unwrap_or_default());
 
         Self {
-            attachments: vec![body],
+            attachments: Vec::new(),
             flags: Flags::new(&[]),
             envelope,
+            body,
             // since the uid is set from the server, we will just set it to None
             uid: None,
             date: None,
@@ -181,26 +185,22 @@ impl Msg {
 
         self.envelope = new_envelope;
 
-        // -----------------------
-        // Remove Attachments
-        // -----------------------
-        // keep only the body of the mail!
-        self.attachments = vec![self.attachments[0].clone()];
+        // remove the attachments
+        self.attachments.clear();
 
         // -------------------------
         // Prepare body of mail
         // -------------------------
         // comment "out" the body of the mail, by adding the `>` characters to
         // each line which includes a string.
-        let new_body: String = String::from_utf8(self.attachments[0].body_raw.clone())
-            .unwrap()
+        let new_body: String = self.body.clone()
             .split('\n')
             .map(|line| format!("> {}", line))
             .collect::<Vec<String>>()
             .concat();
 
         // now apply our new body
-        self.attachments[0].body_raw = new_body.into_bytes();
+        self.body = Body::from(new_body);
     }
 
     pub fn change_to_forwarding(&mut self) {
@@ -219,13 +219,10 @@ impl Msg {
         // Body
         // ---------
         // apply a line which should indicate where the forwarded message begins
-        let new_body = String::from_utf8(self.attachments[0].body_raw.clone()).unwrap();
-        let new_body = format!(
+        self.body = Body::from(format!(
             "\r\n---------- Forwarded Message ----------\r\n{}",
-            new_body
-        );
-
-        self.attachments[0].body_raw = new_body.into_bytes();
+            &self.body,
+        ));
     }
 
     /// Converts the whole mail into a vector of bytes.
@@ -236,31 +233,45 @@ impl Msg {
         return Ok(parsed.formatted());
     }
 
-    /// Let the user change the content of the mail. This function will change
-    /// the first value of the `Msg.attachments` vector, since the first value
-    /// of this vector represents the content of the mail.
-    ///
-    /// # Hint
-    /// It *won't* change/update/set `Msg.parsed`!
     pub fn edit_body(&mut self) -> Result<()> {
-        // ----------------
-        // Update body
-        // ----------------
-        // get the old body of the mail
-        let body = self.attachments[0].body_raw.clone();
 
-        // store the changes of the body
-        let content = input::open_editor_with_tpl(&body)?;
-        self.set_body(content.into_bytes());
+        // First of all, we need to create our template for the user. This
+        // means, that the header needs to be added as well!
+        let body = format!("{}\n{}", 
+                self.envelope.get_header_as_string(),
+                self.body);
+
+        // let's change the body!
+        let body = input::open_editor_with_tpl(body.as_bytes())?;
+
+        // now we have to split whole mail into their headers and the body
+        self.parse_from_str(&body)?;
 
         Ok(())
     }
 
-    pub fn set_body(&mut self, body_raw: Vec<u8>) {
-        self.attachments[0].body_raw = body_raw;
+    pub fn parse_from_str(&mut self, content: &str) -> Result<()> {
+        let parsed = mailparse::parse_mail(content.as_bytes())?;
+
+        self.envelope = Envelope::from(&parsed);
+       
+        if let Ok(body) = parsed.get_body() {
+            self.body = Body::from(body);
+        }
+
+        Ok(())
+    }
+
+    pub fn set_body(&mut self, body: Body) {
+        self.body = body;
+    }
+
+    pub fn set_envelope(&mut self, envelope: Envelope) {
+        self.envelope = envelope;
     }
 
     // Add an attachment to the mail from the given path
+    // TODO: Error handling
     pub fn add_attachment(&mut self, path: &str) {
         if let Ok(new_attachment) = Attachment::try_from(path) {
             self.attachments.push(new_attachment);
@@ -275,25 +286,6 @@ impl Msg {
     /// a sendable mail. It uses the `Msg.envelope` and `Msg.attachments`
     /// fields
     pub fn to_sendable_msg(&mut self) -> Result<Message> {
-        // ==============
-        // Preparing
-        // ==============
-        // Refresh the states of the envelope first before we're using them to
-        // create the mail/msg.
-        dbg!("{:?}", &self.attachments[0]);
-        let parsed = mailparse::parse_mail(&self.attachments[0].body_raw)
-            .chain_err(|| format!("[{}]: {}", "Sendable".red(), "Couldn't parse body.".blue()))?;
-
-        let refreshed_envelope = Envelope {
-            // mailparse can't detect what the siganture is, so we just use the
-            // old one again
-            signature: self.envelope.signature.clone(),
-            ..Envelope::from(&parsed)
-        };
-        self.envelope = refreshed_envelope;
-
-        dbg!("{:?}", &self.envelope);
-
         // ===================
         // Header of Msg
         // ===================
@@ -414,27 +406,17 @@ impl Msg {
         // In this part, we'll add the content of the mail. This means the body
         // and the attachments of the mail.
 
-        // we will use this variable to iterate through our attachments
-        let mut attachment_iter = self.attachments.iter();
-
-        // get the content of the mail. Parse it and get the body afterwards.
-        // Remember: The first value in the vector represents the body of the
-        // mail, that's why we can just do `.next().unwrap()` to get the mail
-        let mail_content = attachment_iter.next().unwrap();
-        let body = mailparse::parse_mail(&mail_content.body_raw)?;
-        let body = body.get_body_raw().unwrap();
-
         // this variable will store all "sections" or attachments of the mail
         let mut msg_parts = MultiPart::mixed().build();
 
+        // -- Body --
         // add the body of the mail first
-        let msg_body = SinglePart::builder()
-            .header(mail_content.content_type.clone())
-            .body(body.clone());
+        let msg_body = SinglePart::plain(self.body.get_content());
         msg_parts = msg_parts.singlepart(msg_body);
 
+        // -- Attachments --
         // afterwards, add the rest of the attachments
-        for attachment in attachment_iter {
+        for attachment in self.attachments.iter() {
             // Get the values of the attachment and convert them to the
             // Attachment-Struct of lettre.
             let msg_attachment = lettre_Attachment::new(attachment.filename.clone());
@@ -459,19 +441,13 @@ impl Msg {
         self.uid
     }
 
-    pub fn get_body(&self) -> Result<String> {
-        match String::from_utf8(self.attachments[0].body_raw.clone()) {
-            Ok(body) => Ok(body),
-            Err(err) => Err(ErrorKind::ParseBody(err.to_string()).into()),
-        }
+    pub fn get_body(&self) -> Body {
+        self.body.clone()
     }
 
     /// Returns an iterator which points to all attachments of the mail.
     pub fn get_attachments(&self) -> impl Iterator<Item = &Attachment> {
-        // we are skipping the first attachment, because remember: The first
-        // attachment is always the body of the mail! The rest in the vector are
-        // other attachments, like images or something like that.
-        self.attachments.iter().skip(1)
+        self.attachments.iter()
     }
 
     pub fn get_flags(&self) -> HashSet<Flag<'static>> {
@@ -492,6 +468,7 @@ impl Default for Msg {
             attachments: Vec::new(),
             flags: Flags::new(&[]),
             envelope: Envelope::default(),
+            body: Body::default(),
             uid: None,
             date: None,
         }
@@ -500,24 +477,12 @@ impl Default for Msg {
 
 impl fmt::Display for Msg {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        let body = match String::from_utf8(self.attachments[0].body_raw.clone()) {
-            Ok(string) => string,
-            Err(err) => {
-                println!("[Error] Couldn't convert the body of the mail into a string:");
-                println!("{}", err);
-                String::from("Couldn't convert the body of the mail into a string.")
-            }
-        };
-
-        // the signature
-        let signature = &self.envelope.signature.clone().unwrap_or(String::new());
 
         writeln!(
             formatter,
-            "{}\n{}\n{}",
+            "{}\n{}",
             self.envelope.get_header_as_string(),
-            body,
-            signature
+            self.body,
         )
     }
 }
@@ -571,8 +536,7 @@ impl From<&Fetch> for Msg {
         // We're preparing the variables first, which will hold the data of the
         // fetched mail.
 
-        // Here will be all attachments stored (including the body of the mail
-        // as the first value of this vector)
+        // Here will be all attachments stored
         let mut attachments = Vec::new();
 
         // Get the flags of the mail
@@ -602,27 +566,13 @@ impl From<&Fetch> for Msg {
         // ---------------------------------
         // Storing the information (body)
         // ---------------------------------
-        // We have to add at least one attachment, which should represent the
-        // body of the mail. Since the body-query is only optional, we might
-        // need to add an "empty" attachment.
+        let mut body = String::new();
         if let Some(parsed) = parsed {
-            // Ok, so the body-query was applied to the fetch! Let's extract the
-            // body then!
-            match Attachment::from_parsed_mail(&parsed) {
-                Some(mail_body) => attachments.push(mail_body),
-                None => {
-                    // Ok, so this shouldn't happen in general: We failed to get
-                    // the body of the mail! Let's create a dummy with the
-                    // content that it failed to load the body
-                    let attachment_dummy = Attachment::new(
-                        "",
-                        "text/plain",
-                        b"Couldn't get the body of the mail.".to_vec(),
-                    );
 
-                    attachments.push(attachment_dummy);
-                }
-            };
+            // Apply the body (if there exists one)
+            if let Ok(parsed_body) = parsed.get_body() {
+                body = parsed_body;
+            }
 
             // Go through all subparts of the mail and look if they are
             // attachments. If they are attachments:
@@ -633,17 +583,13 @@ impl From<&Fetch> for Msg {
                     attachments.push(attachment);
                 }
             }
-        } else {
-            // So the body-query wasn't applied. As a result we're gonna add an
-            // empty body here, just for completeness and to make sure that each
-            // access to the attachments-vector isn't invalid.
-            attachments.push(Attachment::new("", "text/plain", Vec::new()));
         }
 
         Self {
             attachments,
             flags,
             envelope,
+            body: Body::from(body),
             uid,
             date,
         }
@@ -653,20 +599,9 @@ impl From<&Fetch> for Msg {
 impl TryFrom<&str> for Msg {
     type Error = Error;
 
-    fn try_from(str_msg: &str) -> Result<Self> {
-        let parsed = mailparse::parse_mail(str_msg.as_bytes())?;
-
-        // get the envelope first
-        let envelope = Envelope::from(&parsed);
-
+    fn try_from(content: &str) -> Result<Self> {
         let mut msg = Msg::default();
-        msg.envelope = envelope;
-
-        // afterwards apply the content of the mail
-        let body_attachment = Attachment::new(
-            "", "text/plain", str_msg.as_bytes().to_vec());
-
-        msg.attachments.push(body_attachment);
+        msg.parse_from_str(content)?;
 
         Ok(msg)
     }

@@ -1,3 +1,8 @@
+use super::envelope::Envelope;
+use super::attachment::Attachment;
+use super::model::{Msg, Msgs};
+use super::body::Body;
+
 use atty::Stream;
 use clap;
 use error_chain::error_chain;
@@ -17,11 +22,6 @@ use crate::{
     imap::model::ImapConnector,
     input,
     mbox::cli::mbox_target_arg,
-    msg::{
-        attachment::Attachment,
-        envelope::Envelope,
-        model::{Msg, Msgs},
-    },
     smtp,
 };
 
@@ -351,7 +351,7 @@ fn msg_matches_read(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
 
-    let msg = msg.get_body().unwrap();
+    let msg = msg.get_body();
 
     if raw {
         ctx.output.print(msg.trim_end_matches("\n"));
@@ -817,6 +817,8 @@ fn override_msg_with_args(msg: &mut Msg, matches: &clap::ArgMatches) {
         }
     };
 
+    let body = Body::new_with_string(body);
+
     // --------------------------
     // Creating and printing
     // --------------------------
@@ -831,8 +833,8 @@ fn override_msg_with_args(msg: &mut Msg, matches: &clap::ArgMatches) {
         ..msg.envelope.clone()
     };
 
-    msg.envelope = envelope;
-    msg.set_body(body.into_bytes());
+    msg.set_envelope(envelope);
+    msg.set_body(body);
 }
 
 fn tpl_matches_new(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
