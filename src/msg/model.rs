@@ -291,8 +291,11 @@ impl<'m> Msg<'m> {
 
             match h.get_key().to_lowercase().as_str() {
                 "in-reply-to" => msg.in_reply_to(value.parse().unwrap()),
-                "from" => match value.parse() {
-                    Ok(addr) => msg.from(addr),
+                "from" => match value.parse::<lettre::message::Mailbox>() {
+                    Ok(addr) => {
+                        let msg_id = format!("{}@{}", Uuid::new_v4().to_string(), addr.email.domain());
+                        msg.from(addr).message_id(Some(msg_id))
+                    }
                     Err(_) => msg,
                 },
                 "to" => value
