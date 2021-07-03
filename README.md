@@ -1,4 +1,8 @@
-# 📫 Himalaya [![gh-actions](https://github.com/soywod/himalaya/workflows/deployment/badge.svg)](https://github.com/soywod/himalaya/actions?query=workflow%3Adeployment) [![gh-actions](https://github.com/soywod/himalaya/workflows/tests/badge.svg)](https://github.com/soywod/himalaya/actions?query=workflow%3Atests) [![gh-actions](https://github.com/soywod/himalaya/workflows/nix-build/badge.svg)](https://github.com/soywod/himalaya/actions?query=workflow%3Anix-build)
+# 📫 Himalaya
+[![gh-actions](https://github.com/soywod/himalaya/workflows/deployment/badge.svg)](https://github.com/soywod/himalaya/actions?query=workflow%3Adeployment)
+[![gh-actions](https://github.com/soywod/himalaya/workflows/tests/badge.svg)](https://github.com/soywod/himalaya/actions?query=workflow%3Atests)
+[![gh-actions](https://github.com/soywod/himalaya/workflows/nix-build/badge.svg)](https://github.com/soywod/himalaya/actions?query=workflow%3Anix-build)
+[![Homebrew](https://img.shields.io/badge/dynamic/json.svg?url=https://formulae.brew.sh/api/formula/himalaya.json&query=$.versions.stable&label=homebrew)](https://formulae.brew.sh/formula/himalaya)
 
 CLI email client written in Rust.
 
