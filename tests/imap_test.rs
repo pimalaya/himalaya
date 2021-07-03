@@ -1,11 +1,9 @@
 extern crate himalaya;
 
+use std::convert::TryFrom;
+
 use himalaya::{
-    config::model::Account,
-    imap::model::ImapConnector,
-    mbox::model::Mboxes,
-    msg::model::Msgs,
-    smtp,
+    config::model::Account, imap::model::ImapConnector, mbox::model::Mboxes, msg::model::Msgs, smtp,
 };
 
 fn get_account(addr: &str) -> Account {
@@ -48,72 +46,90 @@ fn mbox() {
 
 #[test]
 fn msg() {
+    // =================
+    // Preparations
+    // =================
     let account = get_account("inbox@localhost");
 
+    // Login
+    let mut imap_conn = ImapConnector::new(&account).unwrap();
+
+    // remove all previous mails first
+    let fetches = imap_conn.list_msgs("INBOX", &10, &0).unwrap();
+    let msgs = if let Some(ref fetches) = fetches {
+        Msgs::try_from(fetches).unwrap()
+    } else {
+        Msgs::new()
+    };
+
+    for msg in msgs.0.iter() {
+        imap_conn
+            .add_flags("INBOX", &msg.get_uid().unwrap().to_string(), "\\Deleted")
+            .unwrap();
+    }
+    imap_conn.expunge("INBOX").unwrap();
+
+    // ============
+    // Testing
+    // ============
     // Add messages
     smtp::send(
         &account,
         &lettre::Message::builder()
-        .from("sender-a@localhost".parse().unwrap())
-        .to("inbox@localhost".parse().unwrap())
-        .subject("Subject A")
-        .singlepart(lettre::message::SinglePart::builder().body("Body A".as_bytes().to_vec()))
-        .unwrap(),
-        )
-        .unwrap();
+            .from("sender-a@localhost".parse().unwrap())
+            .to("inbox@localhost".parse().unwrap())
+            .subject("Subject A")
+            .singlepart(lettre::message::SinglePart::builder().body("Body A".as_bytes().to_vec()))
+            .unwrap(),
+    )
+    .unwrap();
     smtp::send(
         &account,
         &lettre::Message::builder()
-        .from("\"Sender B\" <sender-b@localhost>".parse().unwrap())
-        .to("inbox@localhost".parse().unwrap())
-        .subject("Subject B")
-        .singlepart(lettre::message::SinglePart::builder().body("Body B".as_bytes().to_vec()))
-        .unwrap(),
-        )
-        .unwrap();
-
-    // Login
-    let mut imap_conn = ImapConnector::new(&account).unwrap();
+            .from("\"Sender B\" <sender-b@localhost>".parse().unwrap())
+            .to("inbox@localhost".parse().unwrap())
+            .subject("Subject B")
+            .singlepart(lettre::message::SinglePart::builder().body("Body B".as_bytes().to_vec()))
+            .unwrap(),
+    )
+    .unwrap();
 
     // List messages
     // TODO: check non-existance of \Seen flag
     let msgs = imap_conn.list_msgs("INBOX", &10, &0).unwrap();
     let msgs = if let Some(ref fetches) = msgs {
-        Msgs::from(fetches)
+        Msgs::try_from(fetches).unwrap()
     } else {
         Msgs::new()
     };
+
+    // make sure that there are both mails which we sended
     assert_eq!(msgs.0.len(), 2);
+    dbg!("{:?}", &msgs);
 
     let msg_a = msgs
         .0
         .iter()
-        .find(|msg| msg.subject == "Subject A")
+        .find(|msg| msg.envelope.subject.clone().unwrap() == "Subject A")
         .unwrap();
-    assert_eq!(msg_a.subject, "Subject A");
-    assert_eq!(msg_a.sender, "sender-a@localhost");
+
+    dbg!("{:?}", &msg_a);
+
+    assert_eq!(msg_a.envelope.subject.clone().unwrap(), "Subject A");
+    assert_eq!(msg_a.envelope.sender.clone().unwrap(), "sender-a@localhost");
 
     let msg_b = msgs
         .0
         .iter()
-        .find(|msg| msg.subject == "Subject B")
+        .find(|msg| msg.envelope.subject.clone().unwrap() == "Subject B")
         .unwrap();
-    assert_eq!(msg_b.subject, "Subject B");
-    assert_eq!(msg_b.sender, "Sender B");
+    assert_eq!(msg_b.envelope.subject.clone().unwrap(), "Subject B");
+    assert_eq!(msg_b.envelope.sender.clone().unwrap(), "Sender B");
 
     // TODO: search messages
     // TODO: read message (+ \Seen flag)
     // TODO: list message attachments
     // TODO: add/set/remove flags
-
-    // Delete messages
-    imap_conn
-        .add_flags("INBOX", &msg_a.uid.to_string(), "\\Deleted")
-        .unwrap();
-    imap_conn
-        .add_flags("INBOX", &msg_b.uid.to_string(), "\\Deleted")
-        .unwrap();
-    imap_conn.expunge("INBOX").unwrap();
     assert!(imap_conn.list_msgs("INBOX", &10, &0).unwrap().is_none());
 
     // Logout

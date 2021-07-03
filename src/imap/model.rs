@@ -2,7 +2,7 @@ use error_chain::error_chain;
 use imap;
 use log::{debug, trace};
 use native_tls::{self, TlsConnector, TlsStream};
-use std::{collections::HashSet, iter::FromIterator, net::TcpStream};
+use std::{collections::HashSet, convert::TryFrom, iter::FromIterator, net::TcpStream};
 
 use crate::config::model::Account;
 use crate::ctx::Ctx;
@@ -150,12 +150,13 @@ impl<'a> ImapConnector<'a> {
                     .chain_err(|| "Could not fetch new messages enveloppe")?;
 
                 for fetch in fetches.iter() {
-                    let msg = Msg::from(fetch);
+                    let msg = Msg::try_from(fetch)?;
                     let uid = fetch.uid.ok_or_else(|| {
                         format!("Could not retrieve message {}'s UID", fetch.message)
                     })?;
 
-                    ctx.config.run_notify_cmd(&msg.envelope.get_subject(), &msg.envelope.get_sender())?;
+                    ctx.config
+                        .run_notify_cmd(&msg.envelope.get_subject(), &msg.envelope.get_sender())?;
 
                     debug!("notify message: {}", uid);
                     trace!("message: {:?}", msg);
@@ -299,12 +300,11 @@ impl<'a> ImapConnector<'a> {
             .first()
         {
             None => Err(format!("Could not find message `{}`", uid).into()),
-            Some(fetch) => Ok(Msg::from(fetch)),
+            Some(fetch) => Ok(Msg::try_from(fetch)?),
         }
     }
 
     pub fn append_msg(&mut self, mbox: &str, msg: &mut Msg) -> Result<()> {
-
         let body = msg.into_bytes()?;
         let flags = msg.get_flags();
 

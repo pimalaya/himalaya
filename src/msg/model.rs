@@ -493,7 +493,7 @@ impl Table for Msg {
             .cell(Cell::new("UID").bold().underline().white())
             .cell(Cell::new("FLAGS").bold().underline().white())
             .cell(Cell::new("SUBJECT").shrinkable().bold().underline().white())
-            .cell(Cell::new("SENDER").bold().underline().white())
+            .cell(Cell::new("FROM").bold().underline().white())
             .cell(Cell::new("DATE").bold().underline().white())
     }
 
@@ -503,15 +503,19 @@ impl Table for Msg {
         // The data which will be shown in the row
         let uid = self.get_uid().unwrap_or(0);
         let flags = self.flags.to_string();
-        let subject = self.envelope.subject.clone().unwrap_or(String::new());
-        let sender = self.envelope.sender.clone().unwrap_or(String::new());
+        let subject = self.envelope.get_subject();
+        let mut from = String::new();
         let date = self.date.clone().unwrap_or(String::new());
+
+        for from_addr in self.envelope.get_from().iter() {
+            from.push_str(&from_addr);
+        }
 
         Row::new()
             .cell(Cell::new(&uid.to_string()).bold_if(is_seen).red())
             .cell(Cell::new(&flags).bold_if(is_seen).white())
             .cell(Cell::new(&subject).shrinkable().bold_if(is_seen).green())
-            .cell(Cell::new(&sender).bold_if(is_seen).blue())
+            .cell(Cell::new(&from).bold_if(is_seen).blue())
             .cell(Cell::new(&date).bold_if(is_seen).yellow())
     }
 }
@@ -528,8 +532,10 @@ impl Table for Msg {
 ///     - INTERNALDATE
 ///     - BODY[]   (optional)
 ///
-impl From<&Fetch> for Msg {
-    fn from(fetch: &Fetch) -> Msg {
+impl TryFrom<&Fetch> for Msg {
+    type Error = Error;
+
+    fn try_from(fetch: &Fetch) -> Result<Msg> {
         // -----------------
         // Preparations
         // -----------------
@@ -543,7 +549,7 @@ impl From<&Fetch> for Msg {
         let flags = Flags::new(fetch.flags());
 
         // Well, get the data of the envelope from the mail
-        let envelope = Envelope::from(fetch.envelope());
+        let envelope = Envelope::try_from(fetch.envelope())?;
 
         // Get the uid of the fetched mail
         let uid = fetch.uid;
@@ -585,14 +591,14 @@ impl From<&Fetch> for Msg {
             }
         }
 
-        Self {
+        Ok(Self {
             attachments,
             flags,
             envelope,
             body: Body::from(body),
             uid,
             date,
-        }
+        })
     }
 }
 
@@ -623,16 +629,18 @@ impl Msgs {
 // -----------
 // From's
 // -----------
-impl<'mails> From<&'mails ZeroCopy<Vec<Fetch>>> for Msgs {
-    fn from(fetches: &'mails ZeroCopy<Vec<Fetch>>) -> Self {
+impl<'mails> TryFrom<&'mails ZeroCopy<Vec<Fetch>>> for Msgs {
+    type Error = Error;
+
+    fn try_from(fetches: &'mails ZeroCopy<Vec<Fetch>>) -> Result<Self> {
         // the content of the Msgs-struct
         let mut mails = Vec::new();
 
         for fetch in fetches.iter().rev() {
-            mails.push(Msg::from(fetch));
+            mails.push(Msg::try_from(fetch)?);
         }
 
-        Self(mails)
+        Ok(Self(mails))
     }
 }
 

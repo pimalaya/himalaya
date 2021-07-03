@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::fmt;
 
 use serde::Serialize;
@@ -10,7 +11,21 @@ use rfc2047_decoder;
 
 use error_chain::error_chain;
 
-error_chain! { }
+error_chain! {
+    errors {
+        FromConvertion {
+            display("Couldn't get the data from the 'From:' field."),
+        }
+
+        ToConvertion {
+            display("Couldn't get the data from the 'To:' field."),
+        }
+    }
+
+    foreign_links {
+        StringFromUtf8(std::string::FromUtf8Error);
+    }
+}
 
 // ============
 // Structs
@@ -27,20 +42,20 @@ pub struct Envelope {
     // Must-Fields
     // ---------------
     pub from: Vec<String>,
-    pub to:   Vec<String>,
+    pub to: Vec<String>,
 
     // --------------------
     // Optional fields
     // --------------------
-    pub bcc:            Option<Vec<String>>,
-    pub cc:             Option<Vec<String>>,
+    pub bcc: Option<Vec<String>>,
+    pub cc: Option<Vec<String>>,
     pub custom_headers: Option<HashMap<String, Vec<String>>>,
-    pub in_reply_to:    Option<String>,
-    pub message_id:     Option<String>,
-    pub reply_to:       Option<Vec<String>>,
-    pub sender:         Option<String>,
-    pub signature:      Option<String>,
-    pub subject:        Option<String>,
+    pub in_reply_to: Option<String>,
+    pub message_id: Option<String>,
+    pub reply_to: Option<Vec<String>>,
+    pub sender: Option<String>,
+    pub signature: Option<String>,
+    pub subject: Option<String>,
 }
 
 impl Envelope {
@@ -98,16 +113,11 @@ impl Envelope {
     /// ```
     pub fn convert_to_address(account: &Account) -> String {
         if let Some(name) = &account.name {
-            format!(
-                "{} <{}>",
-                name,
-                account.email
-            )
+            format!("{} <{}>", name, account.email)
         } else {
             format!("<{}>", account.email)
         }
     }
-
 
     pub fn get_from(&self) -> Vec<String> {
         self.from.clone()
@@ -193,8 +203,7 @@ impl Envelope {
 
         // reply_to
         if let Some(reply_to) = &self.reply_to {
-            header
-                .push_str(&merge_addresses_to_one_line("Reply-To", &reply_to));
+            header.push_str(&merge_addresses_to_one_line("Reply-To", &reply_to));
         }
 
         // cc
@@ -226,18 +235,18 @@ impl Default for Envelope {
         Self {
             // must-fields
             from: Vec::new(),
-            to:   Vec::new(),
+            to: Vec::new(),
 
             // optional fields
-            bcc:            None,
-            cc:             None,
+            bcc: None,
+            cc: None,
             custom_headers: None,
-            in_reply_to:    None,
-            message_id:     None,
-            reply_to:       None,
-            sender:         None,
-            signature:      None,
-            subject:        None,
+            in_reply_to: None,
+            message_id: None,
+            reply_to: None,
+            sender: None,
+            signature: None,
+            subject: None,
         }
     }
 }
@@ -245,23 +254,30 @@ impl Default for Envelope {
 // =========================
 // From implementations
 // =========================
-impl From<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
-    fn from(from_envelope: Option<&imap_proto::types::Envelope<'_>>) -> Self {
+impl TryFrom<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
+    type Error = Error;
+
+    fn try_from(from_envelope: Option<&imap_proto::types::Envelope<'_>>) -> Result<Self> {
         if let Some(from_envelope) = from_envelope {
+            
             let subject = from_envelope
                 .subject
                 .as_ref()
                 .and_then(|subj| rfc2047_decoder::decode(subj).ok());
+            
+            use std::io::Write;
+            let mut file = std::fs::File::create("/home/tornax/himalaya.json").unwrap();
+            writeln!(&mut file, "{:?}", from_envelope).unwrap();
 
-            let from =
-                convert_vec_address_to_string(from_envelope.from.as_ref())
-                    .unwrap_or(Vec::new());
+            let from = match convert_vec_address_to_string(from_envelope.from.as_ref())? {
+                Some(from) => from,
+                None => return Err(ErrorKind::FromConvertion.into()),
+            };
 
             // since we get a vector here, we just need the first value, because
             // there should be only one sender, otherwise we'll pass an empty
             // string there
-            let sender =
-                convert_vec_address_to_string(from_envelope.sender.as_ref());
+            let sender = convert_vec_address_to_string(from_envelope.sender.as_ref())?;
             // pick up the first element (if it exists) otherwise just set it
             // to None because we might don't need it
             let sender = match sender {
@@ -275,21 +291,20 @@ impl From<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
                 None => None,
             };
 
-            let message_id =
-                convert_cow_u8_to_string(from_envelope.message_id.as_ref());
+            let message_id = convert_cow_u8_to_string(from_envelope.message_id.as_ref())?;
 
-            let reply_to =
-                convert_vec_address_to_string(from_envelope.reply_to.as_ref());
+            let reply_to = convert_vec_address_to_string(from_envelope.reply_to.as_ref())?;
 
-            let to = convert_vec_address_to_string(from_envelope.to.as_ref())
-                .unwrap_or(Vec::new());
-            let cc = convert_vec_address_to_string(from_envelope.cc.as_ref());
-            let bcc = convert_vec_address_to_string(from_envelope.bcc.as_ref());
+            let to = match convert_vec_address_to_string(from_envelope.to.as_ref())? {
+                Some(to) => to,
+                None => return Err(ErrorKind::ToConvertion.into()),
+            };
+            let cc = convert_vec_address_to_string(from_envelope.cc.as_ref())?;
+            let bcc = convert_vec_address_to_string(from_envelope.bcc.as_ref())?;
 
-            let in_reply_to =
-                convert_cow_u8_to_string(from_envelope.in_reply_to.as_ref());
+            let in_reply_to = convert_cow_u8_to_string(from_envelope.in_reply_to.as_ref())?;
 
-            Self {
+            Ok(Self {
                 subject,
                 from,
                 sender,
@@ -301,9 +316,9 @@ impl From<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
                 in_reply_to,
                 custom_headers: None,
                 signature: None,
-            }
+            })
         } else {
-            Envelope::default()
+            Ok(Envelope::default())
         }
     }
 }
@@ -419,43 +434,33 @@ impl fmt::Display for Envelope {
 // ---------------------
 // Helper functions
 // ---------------------
-fn convert_cow_u8_to_string<'val>(
-    value: Option<&Cow<'val, [u8]>>,
-) -> Option<String> {
+fn convert_cow_u8_to_string<'val>(value: Option<&Cow<'val, [u8]>>) -> Result<Option<String>> {
     if let Some(value) = value {
         // convert the `[u8]` list into a vector and try to get a string out of
-        // it.
-        match String::from_utf8(value.to_vec()) {
-            // if everything worked fine, return the content of the list
-            Ok(content) => Some(content),
-            Err(_) => None,
-        }
+        // it. If everything worked fine, return the content of the list
+        Ok(Some(String::from_utf8(value.to_vec())?))
     } else {
-        None
+        Ok(None)
     }
 }
 
 fn convert_vec_address_to_string<'val>(
     value: Option<&Vec<imap_proto::types::Address<'val>>>,
-) -> Option<Vec<String>> {
+) -> Result<Option<Vec<String>>> {
     if let Some(value) = value {
-        let value = value
-            .iter()
-            .map(|address| {
-                // try to get the name of the mail-address
-                let address_name =
-                    convert_cow_u8_to_string(address.name.as_ref());
+        let mut values: Vec<String> = Vec::new();
 
-                match address_name {
-                    Some(address_name) => address_name,
-                    None => String::new(),
-                }
-            })
-            .collect();
+        for address in value.iter() {
+            // try to get the name of the mail-address
+            let address_name = convert_cow_u8_to_string(address.name.as_ref())?;
 
-        Some(value)
+            // address will be of type Option<String>
+            values.push(address_name.unwrap_or_default());
+        }
+
+        Ok(Some(values))
     } else {
-        None
+        Ok(None)
     }
 }
 
@@ -479,10 +484,7 @@ fn convert_vec_address_to_string<'val>(
 ///         .to_string()
 /// );
 /// ```
-fn merge_addresses_to_one_line(
-    header: &str,
-    addresses: &Vec<String>,
-) -> String {
+fn merge_addresses_to_one_line(header: &str, addresses: &Vec<String>) -> String {
     let mut output = header.to_string();
     let mut address_iter = addresses.iter();
 

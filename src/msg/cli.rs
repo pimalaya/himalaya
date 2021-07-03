@@ -271,12 +271,13 @@ fn msg_matches_list(ctx: &Ctx, opt_matches: Option<&clap::ArgMatches>) -> Result
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let msgs = imap_conn.list_msgs(&ctx.mbox, &page_size, &page)?;
     let msgs = if let Some(ref fetches) = msgs {
-        Msgs::from(fetches)
+        Msgs::try_from(fetches)?
     } else {
         Msgs::new()
     };
 
     trace!("messages: {:?}", msgs);
+
     ctx.output.print(msgs);
 
     imap_conn.logout();
@@ -327,7 +328,7 @@ fn msg_matches_search(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let msgs = imap_conn.search_msgs(&ctx.mbox, &query, &page_size, &page)?;
     let msgs = if let Some(ref fetches) = msgs {
-        Msgs::from(fetches)
+        Msgs::try_from(fetches)?
     } else {
         Msgs::new()
     };
