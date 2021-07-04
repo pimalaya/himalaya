@@ -548,7 +548,7 @@ impl TryFrom<&Fetch> for Msg {
             .map(|date| date.naive_local().to_string());
 
         // IDEA: Store raw body here
-        println!("{}", String::from_utf8(fetch.body().unwrap().to_vec()).unwrap());
+        // println!("{}", String::from_utf8(fetch.body().unwrap().to_vec()).unwrap());
 
         // Get the content of the mail. Here we have to look (important!) if
         // the fetch even includes a body or not, since the `BODY[]` query is

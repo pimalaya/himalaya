@@ -411,22 +411,6 @@ fn msg_matches_attachments(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool
     Ok(true)
 }
 
-// fn msg_matches_write_test(ctx: &Ctx, matches: &clap::ArgMatches)->
-// Result<bool> {     debug!("[Testing] Write matches");
-//
-//     //
-//     let attachments: Vec<Attachment> = vec![
-//         // this adds the body of the mail
-//         Attachment::new(
-//             "",
-//             "text/plain",
-//             input::open_editor_with_tpl(&[])?.into_bytes()),
-//     ];
-//
-//     Ok(true)
-//
-// }
-
 fn msg_matches_write(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     debug!("Write command matched");
 

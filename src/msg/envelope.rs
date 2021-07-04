@@ -39,8 +39,8 @@ error_chain! {
 /// # fn main() {
 ///
 /// let envelope = Envelope {
-///     from: vec![String::from("From <address@example.com>"],
-///     to: vec![String::from("To <address@to.com>"],
+///     from: vec![String::from("From <address@example.com>")],
+///     to: vec![String::from("To <address@to.com>")],
 ///     .. Envelope::default()
 /// };
 ///
