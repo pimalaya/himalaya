@@ -20,18 +20,10 @@ error_chain!{
 // ============
 // Structs
 // ============
-#[derive(Clone, Serialize, Debug)]
+#[derive(Clone, Serialize, Debug, PartialEq, Eq)]
 pub struct Body(String);
 
 impl Body {
-    pub fn new(content: &str) -> Self {
-        Self(content.to_string())
-    }
-
-    pub fn new_with_string(content: String) -> Self {
-        Self(content)
-    }
-
     pub fn get_content(&self) -> String {
         self.0.clone()
     }

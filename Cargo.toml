@@ -18,7 +18,7 @@ lettre = { git = "https://github.com/TornaxO7/lettre", branch = "content_type_se
 lettre_email = "0.9.4"
 log = "0.4.14"
 imap-proto = "0.14.3"
-mailparse = "0.13.1"
+mailparse = "0.13.4"
 native-tls = "0.2"
 rfc2047-decoder = "0.1.2"
 serde = {version = "1.0.118", features = ["derive"]}

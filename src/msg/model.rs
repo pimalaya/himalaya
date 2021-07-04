@@ -1,6 +1,6 @@
 use super::attachment::Attachment;
-use super::envelope::Envelope;
 use super::body::Body;
+use super::envelope::Envelope;
 
 use log::debug;
 
@@ -25,9 +25,7 @@ use std::fmt;
 
 use colorful::Colorful;
 
-use error_chain::error_chain;
-
-error_chain! {
+error_chain::error_chain! {
     errors {
         // An error appeared, when it tried to parse the body of the mail!
         ParseBody (err: String) {
@@ -66,7 +64,7 @@ error_chain! {
 // =========
 // Msg
 // =========
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct Msg {
     /// All added attachments are listed in this vector.
     attachments: Vec<Attachment>,
@@ -195,7 +193,9 @@ impl Msg {
         // -------------------------
         // comment "out" the body of the mail, by adding the `>` characters to
         // each line which includes a string.
-        let new_body: String = self.body.clone()
+        let new_body: String = self
+            .body
+            .clone()
             .split('\n')
             .map(|line| format!("> {}", line))
             .collect::<Vec<String>>()
@@ -236,12 +236,9 @@ impl Msg {
     }
 
     pub fn edit_body(&mut self) -> Result<()> {
-
         // First of all, we need to create our template for the user. This
         // means, that the header needs to be added as well!
-        let body = format!("{}\n{}", 
-                self.envelope.get_header_as_string(),
-                self.body);
+        let body = format!("{}\n{}", self.envelope.get_header_as_string(), self.body);
 
         // let's change the body!
         let body = input::open_editor_with_tpl(body.as_bytes())?;
@@ -256,7 +253,7 @@ impl Msg {
         let parsed = mailparse::parse_mail(content.as_bytes())?;
 
         self.envelope = Envelope::from(&parsed);
-       
+
         if let Ok(body) = parsed.get_body() {
             self.body = Body::from(body);
         }
@@ -479,7 +476,6 @@ impl Default for Msg {
 
 impl fmt::Display for Msg {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-
         writeln!(
             formatter,
             "{}\n{}",
@@ -583,17 +579,31 @@ impl TryFrom<&Fetch> for Msg {
         let mut body = String::new();
         if let Some(parsed) = parsed {
 
-            // Apply the body (if there exists one)
-            if let Ok(parsed_body) = parsed.get_body() {
-                body = parsed_body;
+            // Ok, so some mails have their mody wrapped in a multipart, some
+            // don't. This condition hits, if the body isn't in a multipart
+            if parsed.ctype.mimetype == "text/plain" {
+                // Apply the body (if there exists one)
+                if let Ok(parsed_body) = parsed.get_body() {
+                    debug!("Stored the body of the mail.");
+                    body = parsed_body;
+                }
             }
 
-            // Go through all subparts of the mail and look if they are
-            // attachments. If they are attachments:
-            //  1. Get their filename
-            //  2. Get the content of the attachment
+            // Here we're going through the multi-/subparts of the mail
             for subpart in &parsed.subparts {
-                if let Some(attachment) = Attachment::from_parsed_mail(subpart) {
+                
+                // now it might happen, that the body is *in* a multipart, if
+                // that's the case, look, if we've already applied a body
+                // (body.is_empty()) and set it, if needed
+                if body.is_empty() && subpart.ctype.mimetype == "text/plain" {
+                    if let Ok(subpart_body) = subpart.get_body() {
+                        body = subpart_body;
+                    }
+                }
+
+                // otherise it's a normal attachment, like a PNG file or
+                // something like that
+                else if let Some(attachment) = Attachment::from_parsed_mail(subpart) {
                     attachments.push(attachment);
                 }
             }

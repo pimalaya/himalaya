@@ -23,7 +23,7 @@ error_chain! {
 /// This struct stores the information from an attachment:
 ///     1. It's filename
 ///     2. It's content
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
 pub struct Attachment {
     pub filename: String,
     pub content_type: ContentType,

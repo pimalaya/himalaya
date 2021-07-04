@@ -7,33 +7,9 @@ use himalaya::{
 use lettre::message::SinglePart;
 use lettre::Message;
 
-fn get_account(addr: &str) -> Account {
-    Account {
-        name: None,
-        downloads_dir: None,
-        signature: None,
-        default_page_size: None,
-        default: Some(true),
-        email: addr.into(),
-        watch_cmds: None,
-        imap_host: String::from("localhost"),
-        imap_port: 3993,
-        imap_starttls: Some(false),
-        imap_insecure: Some(true),
-        imap_login: addr.into(),
-        imap_passwd_cmd: String::from("echo 'password'"),
-        smtp_host: String::from("localhost"),
-        smtp_port: 3465,
-        smtp_starttls: Some(false),
-        smtp_insecure: Some(true),
-        smtp_login: addr.into(),
-        smtp_passwd_cmd: String::from("echo 'password'"),
-    }
-}
-
 #[test]
 fn mbox() {
-    let account = get_account("inbox@localhost");
+    let account = Account::new("inbox@localhost");
     let mut imap_conn = ImapConnector::new(&account).unwrap();
     let names = imap_conn.list_mboxes().unwrap();
     let mboxes: Vec<String> = Mboxes::from(&names)
@@ -50,7 +26,8 @@ fn msg() {
     // =================
     // Preparations
     // =================
-    let account = get_account("inbox@localhost");
+    // Get the test-account and clean up the server.
+    let account = Account::new("inbox@localhost");
 
     // Login
     let mut imap_conn = ImapConnector::new(&account).unwrap();
@@ -63,12 +40,15 @@ fn msg() {
         Msgs::new()
     };
 
+    // mark all mails as deleted
     for msg in msgs.0.iter() {
         imap_conn
             .add_flags("INBOX", &msg.get_uid().unwrap().to_string(), "\\Deleted")
             .unwrap();
     }
     imap_conn.expunge("INBOX").unwrap();
+
+    // make sure, that they are *really* deleted
     assert!(imap_conn.list_msgs("INBOX", &10, &0).unwrap().is_none());
 
     // ============
@@ -92,7 +72,9 @@ fn msg() {
     smtp::send(&account, &message_a).unwrap();
     smtp::send(&account, &message_b).unwrap();
 
-    // List messages
+    // ---------------------
+    // Get the messages
+    // ---------------------
     // TODO: check non-existance of \Seen flag
     let msgs = imap_conn.list_msgs("INBOX", &10, &0).unwrap();
     let msgs = if let Some(ref fetches) = msgs {
@@ -110,14 +92,19 @@ fn msg() {
         .find(|msg| msg.envelope.get_subject() == "Subject A")
         .unwrap();
 
-    assert_eq!(msg_a.envelope.get_subject(), "Subject A");
-    assert_eq!(&msg_a.envelope.get_from()[0], "sender-a@localhost");
-
     let msg_b = msgs
         .0
         .iter()
         .find(|msg| msg.envelope.subject.clone().unwrap() == "Subject B")
         .unwrap();
+
+    // ------------
+    // Checkup
+    // ------------
+    // look, if we received the correct credentials of the msgs.
+    assert_eq!(msg_a.envelope.get_subject(), "Subject A");
+    assert_eq!(&msg_a.envelope.get_from()[0], "sender-a@localhost");
+
     assert_eq!(msg_b.envelope.get_subject(), "Subject B");
     assert_eq!(&msg_b.envelope.get_from()[0], "Sender B <sender-b@localhost>");
 

@@ -107,6 +107,30 @@ impl Account {
             _ => false,
         }
     }
+
+    pub fn new(email_addr: &str) -> Self {
+        Self {
+            name: Some(String::from("Account Name")),
+            downloads_dir: Some(PathBuf::from(r"/tmp")),
+            signature: Some(String::from("Account Signature")),
+            default_page_size: Some(42),
+            default: Some(true),
+            email: email_addr.into(),
+            watch_cmds: Some(vec!["mbsync".to_string(), "-a".to_string()]),
+            imap_host: String::from("localhost"),
+            imap_port: 3993,
+            imap_starttls: Some(false),
+            imap_insecure: Some(true),
+            imap_login: email_addr.into(),
+            imap_passwd_cmd: String::from("echo 'password'"),
+            smtp_host: String::from("localhost"),
+            smtp_port: 3465,
+            smtp_starttls: Some(false),
+            smtp_insecure: Some(true),
+            smtp_login: email_addr.into(),
+            smtp_passwd_cmd: String::from("echo 'password'"),
+        }
+    }
 }
 
 impl Default for Account {

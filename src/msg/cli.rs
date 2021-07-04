@@ -163,6 +163,8 @@ pub fn msg_matches(ctx: &Ctx) -> Result<bool> {
 // =======================
 // Argument Functions
 // =======================
+/// Returns an Clap-Argument to be able to use `<UID>` in the commandline like
+/// for the `himalaya read` subcommand.
 pub fn uid_arg<'a>() -> clap::Arg<'a, 'a> {
     clap::Arg::with_name("uid")
         .help("Specifies the targetted message")
@@ -203,7 +205,7 @@ fn attachment_arg<'a>() -> clap::Arg<'a, 'a> {
         .multiple(true)
 }
 
-pub fn tpl_args<'a>() -> Vec<clap::Arg<'a, 'a>> {
+fn tpl_args<'a>() -> Vec<clap::Arg<'a, 'a>> {
     vec![
         clap::Arg::with_name("subject")
             .help("Overrides the Subject header")
@@ -350,7 +352,7 @@ fn msg_matches_read(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     debug!("Raw: {}", raw);
 
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
-    let msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
+    let msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
 
     let msg = msg.get_body();
 
@@ -372,7 +374,7 @@ fn msg_matches_attachments(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool
 
     // get the mail and than it's attachments
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
-    let msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
+    let msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
     let attachments: Vec<&Attachment> = msg.get_attachments().collect();
 
     debug!(
@@ -487,7 +489,7 @@ fn msg_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     // Fetch the mail first, which should be replied to
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let uid = matches.value_of("uid").unwrap();
-    let mut msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
+    let mut msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
 
     debug!("Uid: {}", uid);
 
@@ -535,7 +537,7 @@ fn msg_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     // ----------------
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let uid = matches.value_of("uid").unwrap();
-    let mut msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
+    let mut msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
 
     debug!("Uid: {}", uid);
 
@@ -579,7 +581,7 @@ fn msg_matches_copy(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let uid = matches.value_of("uid").unwrap();
     let target = matches.value_of("target").unwrap();
-    let mut msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
+    let mut msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
 
     debug!("Uid: {}", &uid);
     debug!("Target: {}", &target);
@@ -615,7 +617,7 @@ fn msg_matches_move(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let uid = matches.value_of("uid").unwrap();
     let target = matches.value_of("target").unwrap();
-    let mut msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
+    let mut msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
 
     debug!("Uid: {}", &uid);
     debug!("Target: {}", &target);
@@ -818,7 +820,7 @@ fn override_msg_with_args(msg: &mut Msg, matches: &clap::ArgMatches) {
         }
     };
 
-    let body = Body::new_with_string(body);
+    let body = Body::from(body);
 
     // --------------------------
     // Creating and printing
@@ -858,7 +860,7 @@ fn tpl_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     debug!("uid: {}", uid);
 
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
-    let mut msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
+    let mut msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
 
     if matches.is_present("reply-all") {
         msg.change_to_reply(&ctx.account, false);
@@ -880,7 +882,7 @@ fn tpl_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     debug!("uid: {}", uid);
 
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
-    let mut msg = imap_conn.read_msg(&ctx.mbox, &uid)?;
+    let mut msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
     msg.change_to_forwarding();
 
     override_msg_with_args(&mut msg, &matches);

@@ -15,12 +15,8 @@ use error_chain::error_chain;
 
 error_chain! {
     errors {
-        FromConvertion {
-            display("Couldn't get the data from the 'From:' field."),
-        }
-
-        ToConvertion {
-            display("Couldn't get the data from the 'To:' field."),
+        Convertion(field: &'static str) {
+            display("Couldn't get the data from the '{}:' field.", field),
         }
     }
 
@@ -38,7 +34,7 @@ error_chain! {
 /// crate. It's should mainly help to interact with the mails by using more
 /// common data types like `Vec` or `String` since a `[u8]` array is a little
 /// bit limited to use.
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
 pub struct Envelope {
     // ----------------
     // Must-Fields
@@ -268,14 +264,9 @@ impl TryFrom<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
                 .as_ref()
                 .and_then(|subj| rfc2047_decoder::decode(subj).ok());
 
-            use std::io::Write;
-            let mut file = std::fs::File::create("/home/tornax/himalaya.json").unwrap();
-            writeln!(&mut file, "{:?}", from_envelope).unwrap();
-
-            println!("{:?}", from_envelope.from.as_ref().unwrap());
             let from = match convert_vec_address_to_string(from_envelope.from.as_ref())? {
                 Some(from) => from,
-                None => return Err(ErrorKind::FromConvertion.into()),
+                None => return Err(ErrorKind::Convertion("From").into()),
             };
 
             // since we get a vector here, we just need the first value, because
@@ -301,7 +292,7 @@ impl TryFrom<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
 
             let to = match convert_vec_address_to_string(from_envelope.to.as_ref())? {
                 Some(to) => to,
-                None => return Err(ErrorKind::ToConvertion.into()),
+                None => return Err(ErrorKind::Convertion("To").into()),
             };
             let cc = convert_vec_address_to_string(from_envelope.cc.as_ref())?;
             let bcc = convert_vec_address_to_string(from_envelope.bcc.as_ref())?;

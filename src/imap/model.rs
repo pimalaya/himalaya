@@ -272,7 +272,7 @@ impl<'a> ImapConnector<'a> {
         Ok(Some(fetches))
     }
 
-    // pub fn read_msg(&mut self, mbox: &str, uid: &str) -> Result<Vec<u8>> {
+    // pub fn get_msg(&mut self, mbox: &str, uid: &str) -> Result<Vec<u8>> {
     //     self.sess
     //         .select(mbox)
     //         .chain_err(|| format!("Could not select mailbox `{}`", mbox))?;
@@ -288,7 +288,7 @@ impl<'a> ImapConnector<'a> {
     //     }
     // }
 
-    pub fn read_msg(&mut self, mbox: &str, uid: &str) -> Result<Msg> {
+    pub fn get_msg(&mut self, mbox: &str, uid: &str) -> Result<Msg> {
         self.sess
             .select(mbox)
             .chain_err(|| format!("Could not select mailbox `{}`", mbox))?;
