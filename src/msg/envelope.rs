@@ -7,8 +7,6 @@ use log::debug;
 
 use serde::Serialize;
 
-use crate::config::model::Account;
-
 use rfc2047_decoder;
 
 use error_chain::error_chain;
@@ -28,17 +26,19 @@ error_chain! {
 // ============
 // Structs
 // ============
-/// This struct is a wrapper for the [Envelope
-/// struct](https://docs.rs/imap-proto/0.14.3/imap_proto/types/struct.Envelope.html)
-/// of the [imap_proto](https://docs.rs/imap-proto/0.14.3/imap_proto/index.html)
+/// This struct is a wrapper for the [Envelope struct] of the [imap_proto]
 /// crate. It's should mainly help to interact with the mails by using more
 /// common data types like `Vec` or `String` since a `[u8]` array is a little
 /// bit limited to use.
+///
+/// [Envelope struct]: https://docs.rs/imap-proto/0.14.3/imap_proto/types/struct.Envelope.html
+/// [imap_proto]: https://docs.rs/imap-proto/0.14.3/imap_proto/index.html
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
 pub struct Envelope {
     // ----------------
     // Must-Fields
     // ---------------
+    // These fields are the mininum needed to send a mail.
     pub from: Vec<String>,
     pub to: Vec<String>,
 
@@ -57,110 +57,98 @@ pub struct Envelope {
 }
 
 impl Envelope {
+    /// Returns an empty and new Envelope.
+    ///
+    /// # Example
+    /// ```
+    /// # use himalaya::msg::envelope::Envelope;
+    /// # fn main() {
+    /// let new_envelope = Envelope::new();
+    /// let default_envelope = Envelope::default();
+    ///
+    /// // both are the same
+    /// assert_eq!(new_envelope, default_envelope);
+    /// # }
+    /// ```
+    ///
+    /// # Attribute values
+    /// Envelope will have the following values when creating it through this
+    /// constructor:
+    ///
+    /// <details>
+    ///
+    /// ```no_run
+    /// # use himalaya::msg::envelope::Envelope;
+    /// Envelope {
+    ///     from:           Vec::new(),
+    ///     to:             Vec::new(),
+    ///     bcc:            None,
+    ///     cc:             None,
+    ///     custom_headers: None,
+    ///     in_reply_to:    None,
+    ///     message_id:     None,
+    ///     reply_to:       None,
+    ///     sender:         None,
+    ///     signature:      None,
+    ///     subject:        None,
+    /// };
+    /// ```
+    ///
+    /// </details>
+    ///
     pub fn new() -> Self {
         Envelope::default()
     }
 
-    /// This is a little helper-function like which uses the the name and email
-    /// of the account to create a valid address for the header.
+    /// This method works similiar to the [`Display Trait`] but it will only
+    /// convert the header into a string **without** the signature.
     ///
     /// # Example
     ///
-    /// ## With name
-    /// Suppose the name field in the account struct *has* a value:
+    /// <details>
     ///
-    /// ```rust
-    /// use himalaya::config::model::Account;
-    /// use himalaya::msg::envelope::Envelope;
+    /// ```
+    /// # use himalaya::msg::envelope::Envelope;
+    /// # use std::collections::HashMap;
+    /// # fn main() {
+    /// // our envelope
+    /// let envelope = Envelope {
+    ///     from:           vec!["TornaxO7 <tornax07@gmail.com>".to_string()],
+    ///     to:             vec!["Soywod <clement.douin@posteo.net>".to_string()],
+    ///     bcc:            Some(vec!["ThirdOne <some@mail.net>".to_string()]),
+    ///     cc:             Some(vec!["CcAccount <cc@ccmail.net>".to_string()]),
+    ///     custom_headers: None,
+    ///     in_reply_to:    Some("MessageID of received mail".to_string()),
+    ///     message_id:     Some("123456789".to_string()),
+    ///     reply_to:       Some(vec!["reply@mail.net".to_string()]),
+    ///     sender:         Some("himalaya@secretary.net".to_string()),
+    ///     signature:      Some("Signature of Envelope".to_string()),
+    ///     subject:        Some("Himalaya is cool".to_string()),
+    /// };
     ///
-    /// fn main() {
-    ///     let account = Account {
-    ///         // we just need those two values
-    ///         name: Some(String::from("Name")),
-    ///         email: String::from("BestEmail@Ever.lol"),
-    ///         ..Account::default()
-    ///     };
+    /// // get the header
+    /// let envelope_string = envelope.get_header_as_string();
     ///
-    ///     // get the address of the account
-    ///     let address = Envelope::convert_to_address(&account);
+    /// // how the header part should look like
+    /// let expected_output = concat![
+    ///     "From: TornaxO7 <tornax07@gmail.com>\n",
+    ///     "To: Soywod <clement.douin@posteo.net>\n",
+    ///     "Subject: Himalaya is cool\n",
+    ///     "In-Reply-To: MessageID of received mail\n",
+    ///     "Sender: himalaya@secretary.net\n",
+    ///     "Message-ID: 123456789\n",
+    ///     "Reply-To: reply@mail.net\n",
+    ///     "Cc: CcAccount <cc@ccmail.net>\n",
+    ///     "Bcc: ThirdOne <some@mail.net>\n",
+    /// ];
     ///
-    ///     assert_eq!("Name <BestEmail@Ever.lol>".to_string(), address);
-    /// }
+    /// assert_eq!(envelope_string, expected_output);
+    /// # }
     /// ```
     ///
-    /// ## Without name
-    /// Suppose the name field in the account-struct *hasn't* a value:
+    /// </details>
     ///
-    /// ```rust
-    /// use himalaya::config::model::Account;
-    /// use himalaya::msg::envelope::Envelope;
-    ///
-    /// fn main() {
-    ///     let account = Account {
-    ///         // we just need those two values
-    ///         name: None,
-    ///         email: String::from("BestEmail@Ever.lol"),
-    ///         ..Account::default()
-    ///     };
-    ///
-    ///     // get the address of the account
-    ///     let address = Envelope::convert_to_address(&account);
-    ///
-    ///     assert_eq!("<BestEmail@Ever.lol>".to_string(), address);
-    /// }
-    /// ```
-    pub fn convert_to_address(account: &Account) -> String {
-        if let Some(name) = &account.name {
-            format!("{} <{}>", name, account.email)
-        } else {
-            format!("<{}>", account.email)
-        }
-    }
-
-    pub fn get_from(&self) -> Vec<String> {
-        self.from.clone()
-    }
-
-    pub fn get_to(&self) -> Vec<String> {
-        self.to.clone()
-    }
-
-    pub fn get_bcc(&self) -> Vec<String> {
-        self.bcc.clone().unwrap_or(Vec::new())
-    }
-
-    pub fn get_cc(&self) -> Vec<String> {
-        self.cc.clone().unwrap_or(Vec::new())
-    }
-
-    pub fn get_custom_headers(&self) -> HashMap<String, Vec<String>> {
-        self.custom_headers.clone().unwrap_or(HashMap::new())
-    }
-
-    pub fn get_in_reply_to(&self) -> String {
-        self.in_reply_to.clone().unwrap_or_default()
-    }
-
-    pub fn get_message_id(&self) -> String {
-        self.message_id.clone().unwrap_or_default()
-    }
-
-    pub fn get_reply_to(&self) -> Vec<String> {
-        self.reply_to.clone().unwrap_or(Vec::new())
-    }
-
-    pub fn get_sender(&self) -> String {
-        self.sender.clone().unwrap_or_default()
-    }
-
-    pub fn get_signature(&self) -> String {
-        self.sender.clone().unwrap_or_default()
-    }
-
-    pub fn get_subject(&self) -> String {
-        self.subject.clone().unwrap_or_default()
-    }
-
+    /// [`Display Trait`]: https://doc.rust-lang.org/std/fmt/trait.Display.html
     pub fn get_header_as_string(&self) -> String {
         let mut header = String::new();
 
@@ -191,7 +179,7 @@ impl Envelope {
 
         // Sender
         if let Some(sender) = &self.sender {
-            header.push_str(&format!("Sender: {}", sender));
+            header.push_str(&format!("Sender: {}\n", sender));
         }
 
         // Message-ID
@@ -228,6 +216,25 @@ impl Envelope {
 // ===========================
 // Default implementation
 // ===========================
+/// Returns an Envelope with the following values:
+///
+/// ```no_run
+/// # use himalaya::msg::envelope::Envelope;
+/// Envelope {
+///     from:           Vec::new(),
+///     to:             Vec::new(),
+///     bcc:            None,
+///     cc:             None,
+///     custom_headers: None,
+///     in_reply_to:    None,
+///     message_id:     None,
+///     reply_to:       None,
+///     sender:         None,
+///     signature:      None,
+///     subject:        None,
+/// };
+/// ```
+///
 impl Default for Envelope {
     fn default() -> Self {
         Self {
@@ -398,20 +405,40 @@ impl<'from> From<&mailparse::ParsedMail<'from>> for Envelope {
 // ==================
 // Common Traits
 // ==================
-/// This trait just returns a string-header. So for example if our envelope is
-/// like this:
+/// This trait just returns the envelope but as a string. But be careful! **The
+/// signature is printed as well!!!**, so it isn't really useable to create the
+/// content of a mail! Use [get_header_as_string] instead!
 ///
-///     Envelope {
-///         date: 11.11.1111,
-///         subject: String::from("Himalaya is cool"),
-///         ...
-///     }
+/// # Example
 ///
-/// Then this will return:
+/// ```
+/// # use himalaya::msg::envelope::Envelope;
+/// # fn main() {
+/// let envelope = Envelope {
+///     subject: Some(String::from("Himalaya is cool")),
+///     to: vec![String::from("Soywod <clement.douin@posteo.net>")],
+///     from: vec![String::from("TornaxO7 <tornax07@gmail.com>")],
+///     signature: Some(String::from("Signature of Envelope")),
+///     .. Envelope::default()
+/// };
 ///
-///     Date: 11-11-1111
-///     Subject: Himalaya is cool
-///     ...
+/// // use the `fmt::Display` trait
+/// let envelope_output = format!("{}", envelope);
+///
+/// // How the output of the `fmt::Display` trait should look like
+/// let expected_output = concat![
+///     "From: TornaxO7 <tornax07@gmail.com>\n",
+///     "To: Soywod <clement.douin@posteo.net>\n",
+///     "Subject: Himalaya is cool\n",
+///     "\n\n\n",
+///     "Signature of Envelope",
+/// ];
+///
+/// assert_eq!(envelope_output, expected_output);
+/// # }
+/// ```
+///
+/// [get_header_as_string]: struct.Envelope.html#method.get_header_as_string
 ///
 impl fmt::Display for Envelope {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -430,6 +457,9 @@ impl fmt::Display for Envelope {
 // ---------------------
 // Helper functions
 // ---------------------
+/// This function is mainly used for the `imap_proto::types::Address` struct to
+/// convert one field into a String. Take a look into the
+/// `test_convert_cow_u8_to_string` test function to see it in action.
 fn convert_cow_u8_to_string<'val>(value: Option<&Cow<'val, [u8]>>) -> Result<Option<String>> {
     if let Some(value) = value {
         // convert the `[u8]` list into a vector and try to get a string out of
@@ -440,6 +470,13 @@ fn convert_cow_u8_to_string<'val>(value: Option<&Cow<'val, [u8]>>) -> Result<Opt
     }
 }
 
+/// This function is mainly used for the `imap_proto::types::Address` struct as
+/// well to change the Address into an address-string like this: 
+/// `TornaxO7 <tornax07@gmail.com>`.
+///
+/// If you provide two addresses as the function argument, then this functions
+/// returns their "parsed" address in the same order. Take a look into the
+/// `test_convert_vec_address_to_string` for an example.
 fn convert_vec_address_to_string<'val>(
     addresses: Option<&Vec<imap_proto::types::Address<'val>>>,
 ) -> Result<Option<Vec<String>>> {
@@ -464,7 +501,6 @@ fn convert_vec_address_to_string<'val>(
             // add the mailaddress
             if let Some(mailbox) = convert_cow_u8_to_string(address.mailbox.as_ref())? {
                 if let Some(host) = convert_cow_u8_to_string(address.host.as_ref())? {
-
                     let mail_address = format!("{}@{}", mailbox, host);
 
                     if parsed_address.is_empty() {
@@ -494,25 +530,8 @@ fn convert_vec_address_to_string<'val>(
 }
 
 /// This function is used, in order to merge multiple mail accounts into one
-/// line. For example if you have multiple mails for the `Cc: ` header part,
-/// than you can do the following:
-///
-/// ```rust
-/// // our mail addresses for the "Cc" header
-/// let mail_addresses = vec![
-///     "TornaxO7 <tornax07@gmail.com>",
-///     "Soywod <clement.douin@posteo.net>",
-/// ];
-///
-/// let cc_header = merge_addresses_to_one_line("Cc", &mail_addresses);
-///
-/// assert_eq!(
-///     cc_header,
-///     "Cc: TornaxO7 <tornax07@gmail.com>, Soywod
-/// <clement.douin@posteo.net>"
-///         .to_string()
-/// );
-/// ```
+/// line. Take a look into the `test_merge_addresses_to_one_line` test-function
+/// to see an example how to use it.
 fn merge_addresses_to_one_line(header: &str, addresses: &Vec<String>) -> String {
     let mut output = header.to_string();
     let mut address_iter = addresses.iter();
@@ -533,4 +552,95 @@ fn merge_addresses_to_one_line(header: &str, addresses: &Vec<String>) -> String 
     output.push('\n');
 
     output
+}
+
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    fn test_merge_addresses_to_one_line() {
+        use super::merge_addresses_to_one_line;
+        // In this function, we want to create the following Cc header:
+        //
+        //  Cc: TornaxO7 <tornax07@gmail.com>, Soywod <clement.douin@posteo.net>
+        //
+        // by a vector of email-addresses.
+
+        // our mail addresses for the "Cc" header
+        let mail_addresses = vec![
+            "TornaxO7 <tornax07@gmail.com>".to_string(),
+            "Soywod <clement.douin@posteo.net>".to_string(),
+        ];
+
+        let cc_header = merge_addresses_to_one_line("Cc", &mail_addresses);
+
+        let expected_output = concat![
+            "Cc: TornaxO7 <tornax07@gmail.com>",
+            ",",
+            " Soywod <clement.douin@posteo.net>\n",
+        ];
+
+        assert_eq!(cc_header, expected_output);
+    }
+
+    #[test]
+    fn test_convert_cow_u8_to_string() {
+        use super::convert_cow_u8_to_string;
+        use std::borrow::Cow;
+
+        let output1 = convert_cow_u8_to_string(None);
+        let output2 = convert_cow_u8_to_string(Some(&Cow::Owned(b"Test".to_vec())));
+
+        // test output1
+        if let Ok(output1) = output1 {
+            assert!(output1.is_none());
+        } else {
+            assert!(false);
+        }
+
+        // test output2
+        if let Ok(output2) = output2 {
+            if let Some(string) = output2 {
+                assert_eq!(String::from("Test"), string);
+            } else {
+                assert!(false);
+            }
+        } else {
+            assert!(false);
+        }
+    }
+
+    #[test]
+    fn test_convert_vec_address_to_string() {
+        use super::convert_vec_address_to_string;
+        use imap_proto::types::Address;
+        use std::borrow::Cow;
+
+        let addresses = vec![
+            Address {
+                name: Some(Cow::Owned(b"Name1".to_vec())),
+                adl: None,
+                mailbox: Some(Cow::Owned(b"Mailbox1".to_vec())),
+                host: Some(Cow::Owned(b"Host1".to_vec())),
+            },
+            Address {
+                name: None,
+                adl: None,
+                mailbox: Some(Cow::Owned(b"Mailbox2".to_vec())),
+                host: Some(Cow::Owned(b"Host2".to_vec())),
+            },
+        ];
+
+        // the expected addresses
+        let expected_output = vec![
+            String::from("Name1 <Mailbox1@Host1>"),
+            String::from("Mailbox2@Host2"),
+        ];
+
+        if let Ok(converted) = convert_vec_address_to_string(Some(&addresses)) {
+            assert_eq!(converted, Some(expected_output));
+        } else {
+            assert!(false);
+        }
+    }
 }

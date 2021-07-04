@@ -173,7 +173,7 @@ impl Msg {
         let message_id = self.envelope.message_id.clone().unwrap_or(String::new());
 
         let new_envelope = Envelope {
-            from: vec![Envelope::convert_to_address(&account)],
+            from: vec![account.get_full_address()],
             to,
             cc,
             subject: Some(format!("Re: {}", old_subject)),
@@ -492,11 +492,11 @@ impl Table for Msg {
         // The data which will be shown in the row
         let uid = self.get_uid().unwrap_or(0);
         let flags = self.flags.to_string();
-        let subject = self.envelope.get_subject();
+        let subject = self.envelope.subject.clone().unwrap_or_default();
         let mut from = String::new();
         let date = self.date.clone().unwrap_or(String::new());
 
-        for from_addr in self.envelope.get_from().iter() {
+        for from_addr in self.envelope.from.iter() {
             from.push_str(&from_addr);
         }
 
@@ -515,11 +515,11 @@ impl Table for Msg {
 /// Load the data from a fetched mail and store them in the mail-struct.
 /// Please make sure that the fetch includes the following query:
 ///
-///     - UID      (optional)
-///     - FLAGS    (optional)
-///     - ENVELOPE (optional)
-///     - INTERNALDATE
-///     - BODY[]   (optional)
+/// - UID      (optional)
+/// - FLAGS    (optional)
+/// - ENVELOPE (optional)
+/// - INTERNALDATE
+/// - BODY[]   (optional)
 ///
 impl TryFrom<&Fetch> for Msg {
     type Error = Error;

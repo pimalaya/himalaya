@@ -89,7 +89,7 @@ fn msg() {
     let msg_a = msgs
         .0
         .iter()
-        .find(|msg| msg.envelope.get_subject() == "Subject A")
+        .find(|msg| msg.envelope.subject.clone().unwrap() == "Subject A")
         .unwrap();
 
     let msg_b = msgs
@@ -102,11 +102,11 @@ fn msg() {
     // Checkup
     // ------------
     // look, if we received the correct credentials of the msgs.
-    assert_eq!(msg_a.envelope.get_subject(), "Subject A");
-    assert_eq!(&msg_a.envelope.get_from()[0], "sender-a@localhost");
+    assert_eq!(msg_a.envelope.subject.clone().unwrap_or_default(), "Subject A");
+    assert_eq!(&msg_a.envelope.from[0], "sender-a@localhost");
 
-    assert_eq!(msg_b.envelope.get_subject(), "Subject B");
-    assert_eq!(&msg_b.envelope.get_from()[0], "Sender B <sender-b@localhost>");
+    assert_eq!(msg_b.envelope.subject.clone().unwrap_or_default(), "Subject B");
+    assert_eq!(&msg_b.envelope.from[0], "Sender B <sender-b@localhost>");
 
     // TODO: search messages
     // TODO: read message (+ \Seen flag)

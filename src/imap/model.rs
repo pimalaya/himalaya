@@ -155,8 +155,8 @@ impl<'a> ImapConnector<'a> {
                         format!("Could not retrieve message {}'s UID", fetch.message)
                     })?;
 
-                    ctx.config
-                        .run_notify_cmd(&msg.envelope.get_subject(), &msg.envelope.get_sender())?;
+                    let subject = msg.envelope.subject.clone().unwrap_or_default();
+                    ctx.config.run_notify_cmd(&subject, &msg.envelope.from[0])?;
 
                     debug!("notify message: {}", uid);
                     trace!("message: {:?}", msg);

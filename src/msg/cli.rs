@@ -165,7 +165,7 @@ pub fn msg_matches(ctx: &Ctx) -> Result<bool> {
 // =======================
 /// Returns an Clap-Argument to be able to use `<UID>` in the commandline like
 /// for the `himalaya read` subcommand.
-pub fn uid_arg<'a>() -> clap::Arg<'a, 'a> {
+pub(crate) fn uid_arg<'a>() -> clap::Arg<'a, 'a> {
     clap::Arg::with_name("uid")
         .help("Specifies the targetted message")
         .value_name("UID")

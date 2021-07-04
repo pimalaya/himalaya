@@ -108,6 +108,58 @@ impl Account {
         }
     }
 
+    /// This is a little helper-function like which uses the the name and email
+    /// of the account to create a valid address for the header.
+    ///
+    /// # Example 1: With name
+    /// Suppose the name field in the account struct *has* a value:
+    ///
+    /// ```rust
+    /// use himalaya::config::model::Account;
+    ///
+    /// fn main() {
+    ///     let account = Account {
+    ///         // we just need those two values
+    ///         name: Some(String::from("Name")),
+    ///         email: String::from("BestEmail@Ever.lol"),
+    ///         ..Account::default()
+    ///     };
+    ///
+    ///     // get the address of the account
+    ///     let address = account.get_full_address();
+    ///
+    ///     assert_eq!("Name <BestEmail@Ever.lol>".to_string(), address);
+    /// }
+    /// ```
+    ///
+    /// # Example 2: Without name
+    /// Suppose the name field in the account-struct *hasn't* a value:
+    ///
+    /// ```rust
+    /// use himalaya::config::model::Account;
+    ///
+    /// fn main() {
+    ///     let account = Account {
+    ///         // we just need those two values
+    ///         name: None,
+    ///         email: String::from("BestEmail@Ever.lol"),
+    ///         ..Account::default()
+    ///     };
+    ///
+    ///     // get the address of the account
+    ///     let address = account.get_full_address();
+    ///
+    ///     assert_eq!("BestEmail@Ever.lol".to_string(), address);
+    /// }
+    /// ```
+    pub fn get_full_address(&self) -> String {
+        if let Some(name) = &self.name {
+            format!("{} <{}>", name, self.email)
+        } else {
+            format!("{}", self.email)
+        }
+    }
+
     pub fn new(email_addr: &str) -> Self {
         Self {
             name: Some(String::from("Account Name")),
