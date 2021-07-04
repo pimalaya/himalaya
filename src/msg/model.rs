@@ -58,18 +58,21 @@ error_chain::error_chain! {
         MailParse(mailparse::MailParseError);
         Lettre(lettre::error::Error);
         LettreAddress(lettre::address::AddressError);
+        FromUtf8Error(std::string::FromUtf8Error);
     }
 }
 
 // =========
 // Msg
 // =========
+/// This struct represents a whole mail/msg with its attachments, body-content
+/// and its envelope.
 #[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct Msg {
     /// All added attachments are listed in this vector.
     pub attachments: Vec<Attachment>,
 
-    /// The flags for this mail.
+    /// The flags of this mail.
     pub flags: Flags,
 
     /// All information of the envelope (sender, from, to and so on)
@@ -82,10 +85,67 @@ pub struct Msg {
     /// The UID of the mail. It's only set from the server!
     uid: Option<u32>,
 
+    /// The origination date field. Read [the RFC here] here for more
+    /// information.
+    ///
+    /// [the RFC here]:
+    /// https://www.rfc-editor.org/rfc/rfc5322.html#section-3.6.1
     date: Option<String>,
+
+    /// The msg but in raw.
+    raw: Vec<u8>,
 }
 
 impl Msg {
+    /// Creates a completely new msg where two header fields are set:
+    /// - [`from`]
+    /// - and [`signature`]
+    ///
+    /// [`from`]: struct.Envelope.html##structfield.from
+    /// [`signature`]: struct.Envelope.html##structfield.signature
+    ///
+    /// # Example
+    /// ```
+    /// # use himalaya::msg::model::Msg;
+    /// # use himalaya::msg::envelope::Envelope;
+    /// # use himalaya::config::model::Account;
+    /// # fn main() {
+    ///
+    /// // -------------
+    /// // Accounts
+    /// // -------------
+    /// let account1 = Account {
+    ///     name: Some(String::from("Soywod")),
+    ///     email: String::from("clement.douin@posteo.net"),
+    ///     .. Account::default()
+    /// };
+    ///
+    /// let account2 = Account {
+    ///     name: None,
+    ///     email: String::from("tornax07@gmail.com"),
+    ///     .. Account::default()
+    /// };
+    ///
+    /// // ------------------
+    /// // Start Testing
+    /// // ------------------
+    /// let msg1 = Msg::new(&account1);
+    /// let msg2 = Msg::new(&account2);
+    ///
+    /// let expected_envelope1 = Envelope {
+    ///     from: vec![String::from("Soywod <clement.douin@posteo.net>")],
+    ///     .. Envelope::default()
+    /// };
+    ///
+    /// let expected_envelope2 = Envelope {
+    ///     from: vec![String::from("tornax07@gmail.com")],
+    ///     .. Envelope::default()
+    /// };
+    ///
+    /// assert_eq!(msg1.envelope, expected_envelope1);
+    /// assert_eq!(msg2.envelope, expected_envelope2);
+    /// # }
+    /// ```
     pub fn new(account: &Account) -> Self {
         Self::new_with_envelope(account, Envelope::default())
     }
@@ -94,12 +154,9 @@ impl Msg {
         // --------------------------
         // Envelope credentials
         // --------------------------
-        let name = account.name.clone().unwrap_or(String::new());
-
-        // set the data of the envelope
         let envelope = Envelope {
             // "from" and "signature" will be always set automatically for you
-            from: vec![format!("{} <{}>", name, account.email)],
+            from: vec![account.get_full_address()],
             signature: account.signature.clone(),
             // override some fields if you want to use them
             ..envelope
@@ -118,6 +175,7 @@ impl Msg {
             // since the uid is set from the server, we will just set it to None
             uid: None,
             date: None,
+            raw: Vec::new(),
         }
     }
 
@@ -447,6 +505,17 @@ impl Msg {
     pub fn get_flags_as_ref(&self) -> &HashSet<Flag> {
         &self.flags
     }
+
+    pub fn get_raw(&self) -> Result<String> {
+        let raw_message = String::from_utf8(self.raw.clone()).chain_err(|| {
+            format!(
+                "[{}]: Couldn't get the raw body of the msg/mail.",
+                "Error".red()
+            )
+        })?;
+
+        Ok(raw_message)
+    }
 }
 
 // -----------
@@ -461,6 +530,7 @@ impl Default for Msg {
             body: Body::default(),
             uid: None,
             date: None,
+            raw: Vec::new(),
         }
     }
 }
@@ -549,6 +619,10 @@ impl TryFrom<&Fetch> for Msg {
 
         // IDEA: Store raw body here
         // println!("{}", String::from_utf8(fetch.body().unwrap().to_vec()).unwrap());
+        let raw = match fetch.body() {
+            Some(body) => body.to_vec(),
+            None => Vec::new(),
+        };
 
         // Get the content of the mail. Here we have to look (important!) if
         // the fetch even includes a body or not, since the `BODY[]` query is
@@ -556,7 +630,7 @@ impl TryFrom<&Fetch> for Msg {
         let parsed =
             // the empty array represents an invalid body, so we can enter the
             // `Err` arm if the body-query wasn't applied
-            match mailparse::parse_mail(fetch.body().unwrap_or(&[b' '])) {
+            match mailparse::parse_mail(raw.as_slice()) {
                 Ok(parsed) => {
                     debug!("Fetch has a body to parse.");
                     Some(parsed)
@@ -572,7 +646,6 @@ impl TryFrom<&Fetch> for Msg {
         // ---------------------------------
         let mut body = String::new();
         if let Some(parsed) = parsed {
-
             // Ok, so some mails have their mody wrapped in a multipart, some
             // don't. This condition hits, if the body isn't in a multipart
             if parsed.ctype.mimetype == "text/plain" {
@@ -585,7 +658,6 @@ impl TryFrom<&Fetch> for Msg {
 
             // Here we're going through the multi-/subparts of the mail
             for subpart in &parsed.subparts {
-                
                 // now it might happen, that the body is *in* a multipart, if
                 // that's the case, look, if we've already applied a body
                 // (body.is_empty()) and set it, if needed
@@ -594,7 +666,6 @@ impl TryFrom<&Fetch> for Msg {
                         body = subpart_body;
                     }
                 }
-
                 // otherise it's a normal attachment, like a PNG file or
                 // something like that
                 else if let Some(attachment) = Attachment::from_parsed_mail(subpart) {
@@ -610,6 +681,7 @@ impl TryFrom<&Fetch> for Msg {
             body: Body::from(body),
             uid,
             date,
+            raw,
         })
     }
 }
