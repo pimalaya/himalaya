@@ -20,17 +20,33 @@ error_chain! {
 // ============
 // Structs
 // ============
-/// This struct stores the information from an attachment:
-///     1. It's filename
-///     2. It's content
+/// This struct represents an attachment.
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
 pub struct Attachment {
+
+    /// Holds the filename of an attachment.
     pub filename: String,
+
+    /// Holds the mime-type of the attachment. For example `text/plain`.
     pub content_type: ContentType,
+
+    /// Holds the data of the attachment.
     pub body_raw: Vec<u8>,
 }
 
 impl Attachment {
+
+    /// Creates a new attachment.
+    ///
+    /// # Example
+    /// ```
+    /// # use himalaya::msg::attachment::Attachment;
+    /// let attachment = Attachment::new(
+    ///     "VIP Text", 
+    ///     "text/plain", 
+    ///     "Some very important text".as_bytes().to_vec());
+    ///
+    /// ```
     pub fn new(filename: &str, content_type: &str, body_raw: Vec<u8>) -> Self {
         // Use the mime type `text/plain` per default
         let content_type: ContentType = match content_type.parse() {
@@ -46,8 +62,22 @@ impl Attachment {
     }
 
     /// This from function extracts one attachment of a parsed mail.
-    /// If it can't create an attachment with the given parsed mail, than it will
+    /// If it couldn't create an attachment with the given parsed mail, than it will
     /// return `None`.
+    ///
+    /// # Example
+    /// ```
+    /// use himalaya::msg::attachment::Attachment;
+    ///
+    /// let parsed = mailparse::parse_mail(concat![
+    ///     "Content-Type: text/plain; charset=utf-8\n",
+    ///     "Content-Transfer-Encoding: quoted-printable\n",
+    ///     "\n",
+    ///     "A plaintext attachment.",
+    /// ].as_bytes()).unwrap();
+    ///
+    /// let attachment = Attachment::from_parsed_mail(&parsed);
+    /// ```
     pub fn from_parsed_mail(parsed_mail: &ParsedMail) -> Option<Self> {
         if parsed_mail.get_content_disposition().disposition == DispositionType::Attachment {
             let disposition = parsed_mail.get_content_disposition();
@@ -75,6 +105,18 @@ impl Attachment {
 // ===========
 // Traits
 // ===========
+/// Creates an Attachment with the follwing values:
+///
+/// ```no_run
+/// # use himalaya::msg::attachment::Attachment;
+/// use lettre::message::header::ContentType;
+///
+/// let attachment = Attachment {
+///     filename:     String::new(),
+///     content_type: ContentType::TEXT_PLAIN,
+///     body_raw:     Vec::new(),
+/// };
+/// ```
 impl Default for Attachment {
     fn default() -> Self {
         Self {
@@ -88,8 +130,16 @@ impl Default for Attachment {
 // =========================
 // From Implementations
 // =========================
-/// Reads the file from the given path and parses it to an attachment, which
-/// will be returned.
+/// Tries to convert the given file (by the given path) into an attachment.
+/// It'll try to detect the mime-type/data-type automatically.
+///
+/// # Example
+/// ```no_run
+/// use himalaya::msg::attachment::Attachment;
+/// use std::convert::TryFrom;
+///
+/// let attachment = Attachment::try_from("/some/path.png");
+/// ```
 impl<'from> TryFrom<&'from str> for Attachment {
     type Error = Error;
 

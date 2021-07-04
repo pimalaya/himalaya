@@ -354,10 +354,11 @@ fn msg_matches_read(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
 
-    let msg = msg.get_body();
+    let msg = msg.body;
 
+    // TODO: Raw implementation
     if raw {
-        ctx.output.print(msg.trim_end_matches("\n"));
+        ctx.output.print(msg.trim_end_matches('\n'));
     } else {
         ctx.output.print(msg);
     }

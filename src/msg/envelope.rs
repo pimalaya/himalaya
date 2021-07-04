@@ -31,6 +31,25 @@ error_chain! {
 /// common data types like `Vec` or `String` since a `[u8]` array is a little
 /// bit limited to use.
 ///
+/// # Usage
+/// The general idea is, that you create a new instance like that:
+///
+/// ```
+/// use himalaya::msg::envelope::Envelope;
+/// # fn main() {
+///
+/// let envelope = Envelope {
+///     from: vec![String::from("From <address@example.com>"],
+///     to: vec![String::from("To <address@to.com>"],
+///     .. Envelope::default()
+/// };
+///
+/// # }
+/// ```
+///
+/// We don't have a build-pattern here, because this is easy as well and we
+/// don't need a dozens of functions, just to set some values.
+///
 /// [Envelope struct]: https://docs.rs/imap-proto/0.14.3/imap_proto/types/struct.Envelope.html
 /// [imap_proto]: https://docs.rs/imap-proto/0.14.3/imap_proto/index.html
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
@@ -57,49 +76,6 @@ pub struct Envelope {
 }
 
 impl Envelope {
-    /// Returns an empty and new Envelope.
-    ///
-    /// # Example
-    /// ```
-    /// # use himalaya::msg::envelope::Envelope;
-    /// # fn main() {
-    /// let new_envelope = Envelope::new();
-    /// let default_envelope = Envelope::default();
-    ///
-    /// // both are the same
-    /// assert_eq!(new_envelope, default_envelope);
-    /// # }
-    /// ```
-    ///
-    /// # Attribute values
-    /// Envelope will have the following values when creating it through this
-    /// constructor:
-    ///
-    /// <details>
-    ///
-    /// ```no_run
-    /// # use himalaya::msg::envelope::Envelope;
-    /// Envelope {
-    ///     from:           Vec::new(),
-    ///     to:             Vec::new(),
-    ///     bcc:            None,
-    ///     cc:             None,
-    ///     custom_headers: None,
-    ///     in_reply_to:    None,
-    ///     message_id:     None,
-    ///     reply_to:       None,
-    ///     sender:         None,
-    ///     signature:      None,
-    ///     subject:        None,
-    /// };
-    /// ```
-    ///
-    /// </details>
-    ///
-    pub fn new() -> Self {
-        Envelope::default()
-    }
-
     /// This method works similiar to the [`Display Trait`] but it will only
     /// convert the header into a string **without** the signature.
     ///
