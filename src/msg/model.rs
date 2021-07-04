@@ -67,20 +67,19 @@ error_chain::error_chain! {
 #[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct Msg {
     /// All added attachments are listed in this vector.
-    attachments: Vec<Attachment>,
+    pub attachments: Vec<Attachment>,
 
     /// The flags for this mail.
-    flags: Flags,
+    pub flags: Flags,
 
     /// All information of the envelope (sender, from, to and so on)
     // envelope: HashMap<HeaderName, Vec<String>>,
     pub envelope: Envelope,
 
     /// This variable stores the body of the msg.
-    body: Body,
+    pub body: Body,
 
-    /// The UID of the mail. It's only set from the server. So that's why it's
-    /// not public: To avoid that it's set manually!
+    /// The UID of the mail. It's only set from the server!
     uid: Option<u32>,
 
     date: Option<String>,
@@ -259,14 +258,6 @@ impl Msg {
         }
 
         Ok(())
-    }
-
-    pub fn set_body(&mut self, body: Body) {
-        self.body = body;
-    }
-
-    pub fn set_envelope(&mut self, envelope: Envelope) {
-        self.envelope = envelope;
     }
 
     // Add an attachment to the mail from the given path
