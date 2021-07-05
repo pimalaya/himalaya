@@ -1,5 +1,4 @@
 use super::envelope::Envelope;
-use super::attachment::Attachment;
 use super::model::{Msg, Msgs};
 use super::body::Body;
 
@@ -373,7 +372,7 @@ fn msg_matches_attachments(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool
     // get the mail and than it's attachments
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
-    let attachments: Vec<&Attachment> = msg.get_attachments().collect();
+    let attachments = msg.attachments.clone();
 
     debug!(
         "{} attachment(s) found for message {}",
@@ -480,9 +479,9 @@ fn msg_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     // ---------------------------
     // Change the mail to a reply-mail.
     if matches.is_present("reply-all") {
-        msg.change_to_reply(&ctx.account, true);
+        msg.change_to_reply(&ctx.account, true)?;
     } else {
-        msg.change_to_reply(&ctx.account, false);
+        msg.change_to_reply(&ctx.account, false)?;
     }
 
     // ----------------
@@ -572,7 +571,7 @@ fn msg_matches_copy(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     // Changes
     // ------------
     // before sending it, mark the new message as seen
-    msg.add_flag(Flag::Seen);
+    msg.flags.insert(Flag::Seen);
 
     imap_conn.append_msg(target, &mut msg)?;
 
@@ -608,7 +607,7 @@ fn msg_matches_move(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     // Action
     // -----------
     // create the mail in the target-mailbox
-    msg.add_flag(Flag::Seen);
+    msg.flags.insert(Flag::Seen);
 
     imap_conn.append_msg(target, &mut msg)?;
 
@@ -688,7 +687,7 @@ fn msg_matches_send(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     smtp::send(&ctx.account, &sendable)?;
 
     // add the message/mail to the Sent-Mailbox of the user
-    msg.add_flag(Flag::Seen);
+    msg.flags.insert(Flag::Seen);
     imap_conn.append_msg("Sent", &mut msg)?;
 
     imap_conn.logout();
@@ -704,7 +703,7 @@ fn msg_matches_save(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 
     let mut msg = Msg::try_from(msg)?;
 
-    msg.add_flag(Flag::Seen);
+    msg.flags.insert(Flag::Seen);
     imap_conn.append_msg(&ctx.mbox, &mut msg)?;
 
     imap_conn.logout();
@@ -845,9 +844,9 @@ fn tpl_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     let mut msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
 
     if matches.is_present("reply-all") {
-        msg.change_to_reply(&ctx.account, false);
+        msg.change_to_reply(&ctx.account, false)?;
     } else {
-        msg.change_to_reply(&ctx.account, true);
+        msg.change_to_reply(&ctx.account, true)?;
     }
 
     override_msg_with_args(&mut msg, &matches);
@@ -897,7 +896,7 @@ fn mail_interaction(ctx: &Ctx, msg: &mut Msg, imap_conn: &mut ImapConnector) -> 
                     // which creates a conflict, fix this!
 
                     // let the server know, that the user sent a mail
-                    msg.add_flag(Flag::Seen);
+                    msg.flags.insert(Flag::Seen);
                     imap_conn.append_msg("Sent", msg)?;
 
                     // remove the draft, since we sent it
@@ -922,7 +921,7 @@ fn mail_interaction(ctx: &Ctx, msg: &mut Msg, imap_conn: &mut ImapConnector) -> 
                     debug!("Saving to draft…");
 
                     // TODO: Here
-                    msg.add_flag(Flag::Seen);
+                    msg.flags.insert(Flag::Seen);
 
                     match imap_conn.append_msg("Drafts", msg) {
                         Ok(_) => {

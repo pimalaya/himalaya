@@ -306,7 +306,7 @@ impl<'a> ImapConnector<'a> {
 
     pub fn append_msg(&mut self, mbox: &str, msg: &mut Msg) -> Result<()> {
         let body = msg.into_bytes()?;
-        let flags = msg.get_flags();
+        let flags: HashSet<imap::types::Flag<'static>> = (*msg.flags).clone();
 
         self.sess
             .append(mbox, &body)

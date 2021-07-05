@@ -6,7 +6,7 @@ use std::ops::{Deref, DerefMut};
 use std::collections::HashSet;
 
 /// Serializable wrapper for `imap::types::Flag`
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 struct SerializableFlag<'flag>(&'flag imap::types::Flag<'flag>);
 
 impl<'flag> Serialize for SerializableFlag<'flag> {
@@ -29,7 +29,7 @@ impl<'flag> Serialize for SerializableFlag<'flag> {
 }
 
 /// This struct type includes all flags which belong to a given mail.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Flags(HashSet<Flag<'static>>);
 
 impl Flags {
