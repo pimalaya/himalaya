@@ -346,11 +346,7 @@ impl Msg {
         ));
     }
 
-    /// Converts the mail into a **sendable message** (by calling the
-    /// [`to_sendable_msg`] function) and converts it **afterwards** into a
-    /// vector of bytes.
-    ///
-    /// [`to_sendable_msg`]: struct.Msg.html#method.to_sendable_msg
+    /// Returns the bytes of the *sendable message* of the struct!
     pub fn into_bytes(&mut self) -> Result<Vec<u8>> {
         // parse the whole mail first
         let parsed = self.to_sendable_msg()?;
@@ -421,6 +417,43 @@ impl Msg {
         Ok(())
     }
 
+    /// Read the string of the argument `content` and store it's values into the
+    /// struct. It stores the envelope-fields and the body of the mail.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use himalaya::msg::model::Msg;
+    /// use himalaya::config::model::Account;
+    ///
+    /// fn main() {
+    ///     let content = concat![
+    ///         "Subject: Himalaya is nice\n",
+    ///         "To: Soywod <clement.douin@posteo.net>\n",
+    ///         "From: TornaxO7 <tornax07@gmail.com>\n",
+    ///         "Bcc: third_person@mail.com,rofl@yeet.com\n",
+    ///         "\n",
+    ///         "You should use himalaya, it's a nice program :D\n",
+    ///         "\n",
+    ///         "Sincereley\n",
+    ///     ];
+    ///
+    ///     let account = Account::new(Some("Username"), "some@mail.com");
+    ///
+    ///     // create the message
+    ///     let mut msg = Msg::new(&account);
+    ///
+    ///     // store the information given by the `content` variable which
+    ///     // represents our current mail/msg
+    ///     msg.parse_from_str(content);
+    /// }
+    /// ```
+    ///
+    /// # General Usage
+    /// It's only used in the [`Msg.edit_body()`] function, since the user
+    /// applies his/her changes into a file which is gonna be read by this
+    /// frunction.
+    ///
     pub fn parse_from_str(&mut self, content: &str) -> Result<()> {
         let parsed = mailparse::parse_mail(content.as_bytes())?;
 
@@ -433,8 +466,24 @@ impl Msg {
         Ok(())
     }
 
-    // Add an attachment to the mail from the given path
-    // TODO: Error handling
+    /// Add an attachment to the mail from the local machine by the given path.
+    ///
+    /// # Example
+    /// ```
+    /// use himalaya::config::model::Account;
+    /// use himalaya::msg::model::Msg;
+    /// use himalaya::msg::envelope::Envelope;
+    ///
+    /// fn main( ) {
+    ///     let account = Account::new(Some("Name"), "address@mail.com");
+    ///     let mut msg = Msg::new(&account);
+    ///
+    ///     // suppose we have a Screenshot saved in our home directory
+    ///     msg.add_attachment("~/Screenshot.png");
+    /// }
+    /// ```
+    ///
+    /// TODO: Error handling
     pub fn add_attachment(&mut self, path: &str) {
         if let Ok(new_attachment) = Attachment::try_from(path) {
             self.attachments.push(new_attachment);
@@ -442,8 +491,49 @@ impl Msg {
     }
 
     /// This function will use the information of the `Msg` struct and creates
-    /// a sendable mail. It uses the `Msg.envelope` and `Msg.attachments`
-    /// fields
+    /// a sendable mail/msg with it. It uses the `Msg.envelope` and
+    /// `Msg.attachments` fields for that.
+    ///
+    /// # Example
+    /// ```no_run
+    /// use himalaya::config::model::Account;
+    /// use himalaya::smtp;
+    ///
+    /// use himalaya::msg::{
+    ///     model::Msg,
+    ///     envelope::Envelope,
+    ///     body::Body,
+    /// };
+    ///
+    /// use himalaya::imap::model::ImapConnector;
+    ///
+    /// use imap::types::Flag;
+    ///
+    /// fn main() {
+    ///     let account = Account::new(Some("Name"), "name@mail.net");
+    ///     let mut imap_conn = ImapConnector::new(&account).unwrap();
+    ///     let mut msg = Msg::new_with_envelope(
+    ///         &account,
+    ///         Envelope {
+    ///             to: vec!["someone <mail@address.net>".to_string()],
+    ///             .. Envelope::default()
+    ///         }
+    ///     );
+    ///
+    ///     msg.body = Body::from("A little text.");
+    ///     let sendable_msg = msg.to_sendable_msg().unwrap();
+    ///
+    ///     // now send the msg. Hint: Do the appropriate error handling here!
+    ///     smtp::send(&account, &sendable_msg).unwrap();
+    ///
+    ///     // also say to the server of the account user, that we've just sent
+    ///     // new message
+    ///     msg.flags.insert(Flag::Seen);
+    ///     imap_conn.append_msg("Sent", &mut msg).unwrap();
+    ///
+    ///     imap_conn.logout();
+    /// }
+    /// ```
     pub fn to_sendable_msg(&mut self) -> Result<Message> {
         // ===================
         // Header of Msg
@@ -600,7 +690,12 @@ impl Msg {
         self.uid
     }
 
+    /// It returns the raw version of the Message. In general it's the structure
+    /// how you get it if you get the data from the fetch. It's the output if
+    /// you read a message with the `--raw` flag like this: `himalaya read
+    /// --raw <UID>`.
     pub fn get_raw(&self) -> Result<String> {
+
         let raw_message = String::from_utf8(self.raw.clone()).chain_err(|| {
             format!(
                 "[{}]: Couldn't get the raw body of the msg/mail.",
@@ -794,7 +889,7 @@ impl TryFrom<&str> for Msg {
 // ==========
 // Msgs
 // ==========
-/// This is just a type-safety which represents a vector of mails.
+/// A Type-Safety struct which stores a vector of Messages.
 #[derive(Debug, Serialize)]
 pub struct Msgs(pub Vec<Msg>);
 
@@ -1097,10 +1192,7 @@ mod tests {
             },
         );
 
-        msg.body = Body::from(concat![
-            "The body text, nice!\n",
-            "Himalaya is nice!",
-        ]);
+        msg.body = Body::from(concat!["The body text, nice!\n", "Himalaya is nice!",]);
 
         // ---------------------
         // Expected Results
@@ -1111,14 +1203,14 @@ mod tests {
                 sender: Some(String::from("Name <some@address.asdf>")),
                 signature: Some(String::from("Account Signature")),
                 subject: Some(String::from("Fwd: Test subject")),
-                .. Envelope::default()
+                ..Envelope::default()
             },
             body: Body::from(concat![
                 "\r\n---------- Forwarded Message ----------\r\n",
                 "The body text, nice!\n",
                 "Himalaya is nice!\n",
             ]),
-            .. Msg::default()
+            ..Msg::default()
         };
 
         // ----------
@@ -1140,7 +1232,7 @@ mod tests {
                 bcc: Some(Vec::new()),
                 cc: Some(Vec::new()),
                 subject: Some(String::new()),
-                .. Envelope::default()
+                ..Envelope::default()
             },
         );
 
@@ -1155,10 +1247,10 @@ mod tests {
                 subject: Some(String::from("")),
                 bcc: Some(vec![String::from("")]),
                 cc: Some(vec![String::from("")]),
-                .. Envelope::default()
+                ..Envelope::default()
             },
             body: Body::from("Account Signature\n"),
-            .. Msg::default()
+            ..Msg::default()
         };
 
         // ----------
@@ -1170,16 +1262,83 @@ mod tests {
 
     #[test]
     fn test_parse_from_str() {
+        use std::collections::HashMap;
+
         // -----------------
         // Preparations
         // -----------------
         let account = Account::new(Some("Name"), "some@address.asdf");
-        let msg = Msg::new(&account);
+        let msg_template = Msg::new(&account);
 
-        let new_content = concat![
+        let normal_content = concat![
             "From: Some <user@mail.sf>\n",
-            "Suject: Awesome Subject\n",
-            "Bcc: mail1@rofl.lol, name <rofl@lol.asdf>\n",
+            "Subject: Awesome Subject\n",
+            "Bcc: mail1@rofl.lol,name <rofl@lol.asdf>\n",
+            "To: To <name@mail.rofl>\n",
+            "\n",
+            "Account Signature\n",
         ];
+
+        let content_with_custom_headers = concat![
+            "From: Some <user@mail.sf>\n",
+            "Subject: Awesome Subject\n",
+            "Bcc: mail1@rofl.lol,name <rofl@lol.asdf>\n",
+            "To: To <name@mail.rofl>\n",
+            "CustomHeader1: Value1\n",
+            "CustomHeader2: Value2\n",
+            "\n",
+            "Account Signature\n",
+        ];
+
+        // ---------------------
+        // Expected outputs
+        // ---------------------
+        let expect = Msg {
+            envelope: Envelope {
+                from: vec![String::from("Some <user@mail.sf>")],
+                subject: Some(String::from("Awesome Subject")),
+                bcc: Some(vec![
+                    String::from("name <rofl@lol.asdf>"),
+                    String::from("mail1@rofl.lol"),
+                ]),
+                to: vec![String::from("To <name@mail.rofl>")],
+                ..Envelope::default()
+            },
+            body: Body::from("Account Signature\n"),
+            ..Msg::default()
+        };
+
+        // -- with custom headers --
+        let mut custom_headers: HashMap<String, Vec<String>> = HashMap::new();
+        custom_headers.insert("CustomHeader1".to_string(), vec!["Value1".to_string()]);
+        custom_headers.insert("CustomHeader2".to_string(), vec!["Value2".to_string()]);
+
+        let expect_custom_header = Msg {
+            envelope: Envelope {
+                from: vec![String::from("Some <user@mail.sf>")],
+                subject: Some(String::from("Awesome Subject")),
+                bcc: Some(vec![
+                    String::from("name <rofl@lol.asdf>"),
+                    String::from("mail1@rofl.lol"),
+                ]),
+                to: vec![String::from("To <name@mail.rofl>")],
+                custom_headers: Some(custom_headers),
+                ..Envelope::default()
+            },
+            body: Body::from("Account Signature\n"),
+            ..Msg::default()
+        };
+
+        // ------------
+        // Testing
+        // ------------
+        let mut msg1 = msg_template.clone();
+        let mut msg2 = msg_template.clone();
+
+        msg1.parse_from_str(normal_content).unwrap();
+        msg2.parse_from_str(content_with_custom_headers).unwrap();
+
+        assert_eq!(msg1, expect);
+        assert_eq!(msg2, expect_custom_header);
     }
 }

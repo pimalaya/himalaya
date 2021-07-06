@@ -29,6 +29,9 @@ impl<'flag> Serialize for SerializableFlag<'flag> {
 }
 
 /// This struct type includes all flags which belong to a given mail.
+/// It's used in the [`Msg.flags`] attribute field of the `Msg` struct.
+///
+/// [`Msg.flags`]: struct.Msg.html#structfield.flags
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Flags(HashSet<Flag<'static>>);
 
