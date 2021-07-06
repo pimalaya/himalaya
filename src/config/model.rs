@@ -160,9 +160,9 @@ impl Account {
         }
     }
 
-    pub fn new(email_addr: &str) -> Self {
+    pub fn new(name: Option<&str>, email_addr: &str) -> Self {
         Self {
-            name: Some(String::from("Account Name")),
+            name: name.and_then(|name| Some(name.to_string())),
             downloads_dir: Some(PathBuf::from(r"/tmp")),
             signature: Some(String::from("Account Signature")),
             default_page_size: Some(42),

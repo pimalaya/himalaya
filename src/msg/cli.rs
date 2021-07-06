@@ -525,7 +525,7 @@ fn msg_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     // ---------------------------
     // Adjust content of mail
     // ---------------------------
-    msg.change_to_forwarding();
+    msg.change_to_forwarding(ctx.account);
 
     // ----------------
     // Attachments
@@ -864,7 +864,7 @@ fn tpl_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let mut msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
-    msg.change_to_forwarding();
+    msg.change_to_forwarding(ctx.account);
 
     override_msg_with_args(&mut msg, &matches);
 

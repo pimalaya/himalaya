@@ -11,9 +11,11 @@ use mailparse;
 use crate::{
     config::model::Account,
     flag::model::Flags,
-    input,
     table::{Cell, Row, Table},
 };
+
+#[cfg(not(test))]
+use crate::input;
 
 use serde::Serialize;
 
@@ -115,17 +117,8 @@ impl Msg {
     /// // -------------
     /// // Accounts
     /// // -------------
-    /// let account1 = Account {
-    ///     name: Some(String::from("Soywod")),
-    ///     email: String::from("clement.douin@posteo.net"),
-    ///     .. Account::default()
-    /// };
-    ///
-    /// let account2 = Account {
-    ///     name: None,
-    ///     email: String::from("tornax07@gmail.com"),
-    ///     .. Account::default()
-    /// };
+    /// let account1 = Account::new(Some("Soywod"), "clement.douin@posteo.net");
+    /// let account2 = Account::new(None, "tornax07@gmail.com");
     ///
     /// // ---------------------
     /// // Creating message
@@ -135,11 +128,14 @@ impl Msg {
     ///
     /// let expected_envelope1 = Envelope {
     ///     from: vec![String::from("Soywod <clement.douin@posteo.net>")],
+    ///     // the signature of the account is stored as well
+    ///     signature: Some(String::from("Account Signature")),
     ///     .. Envelope::default()
     /// };
     ///
     /// let expected_envelope2 = Envelope {
     ///     from: vec![String::from("tornax07@gmail.com")],
+    ///     signature: Some(String::from("Account Signature")),
     ///     .. Envelope::default()
     /// };
     ///
@@ -165,22 +161,16 @@ impl Msg {
         // Envelope credentials
         // --------------------------
         if envelope.from.is_empty() {
-            envelope = Envelope {
-                from: vec![account.get_full_address()],
-                ..envelope
-            };
+            envelope.from = vec![account.get_full_address()];
         }
 
-        let envelope = Envelope {
-            signature: account.signature.clone(),
-            // override some fields if you want to use them
-            ..envelope
-        };
-
+        if let None = envelope.signature {
+            envelope.signature = account.signature.clone();
+        }
         // ---------------------
         // Body credentials
         // ---------------------
-        let body = Body::from(account.signature.clone().unwrap_or_default());
+        let body = Body::from(envelope.signature.clone().unwrap_or_default());
 
         Self {
             attachments: Vec::new(),
@@ -299,7 +289,41 @@ impl Msg {
         Ok(())
     }
 
-    pub fn change_to_forwarding(&mut self) {
+    /// Changes the msg/mail to a forwarding msg/mail.
+    ///
+    /// # Changes
+    /// Calling this function will change apply the following to the current
+    /// message:
+    ///
+    /// - `Subject:`: `"Fwd: "` will be added in front of the "old" subject
+    /// - `"---------- Forwarded Message ----------"` will be added on top of
+    ///     the body.
+    ///
+    /// # Example
+    /// ```text
+    /// Subject: Test subject
+    /// ...
+    ///
+    /// Hi,
+    /// I use Himalaya
+    ///
+    /// Sincerely
+    /// ```
+    ///
+    /// will be changed to
+    ///
+    /// ```text
+    /// Subject: Fwd: Test subject
+    /// Sender: <Your@address>
+    /// ...
+    ///
+    /// > Hi,
+    /// > I use Himalaya
+    /// >
+    /// > Sincereley
+    /// ```
+    ///
+    pub fn change_to_forwarding(&mut self, account: &Account) {
         // -----------
         // Header
         // -----------
@@ -307,6 +331,7 @@ impl Msg {
 
         self.envelope = Envelope {
             subject: Some(format!("Fwd: {}", old_subject)),
+            sender: Some(account.get_full_address()),
             // and use the rest of the headers
             ..self.envelope.clone()
         };
@@ -321,7 +346,11 @@ impl Msg {
         ));
     }
 
-    /// Converts the whole mail into a vector of bytes.
+    /// Converts the mail into a **sendable message** (by calling the
+    /// [`to_sendable_msg`] function) and converts it **afterwards** into a
+    /// vector of bytes.
+    ///
+    /// [`to_sendable_msg`]: struct.Msg.html#method.to_sendable_msg
     pub fn into_bytes(&mut self) -> Result<Vec<u8>> {
         // parse the whole mail first
         let parsed = self.to_sendable_msg()?;
@@ -329,12 +358,61 @@ impl Msg {
         return Ok(parsed.formatted());
     }
 
+    /// Let the user edit the body of the mail.
+    ///
+    /// It'll enter the headers of the envelope into the draft-file *if they're
+    /// not [`None`]!*.
+    ///
+    /// # Example
+    /// ```no_run
+    /// use himalaya::msg::model::Msg;
+    /// use himalaya::config::model::Account;
+    ///
+    /// fn main() {
+    ///     let account = Account::new(Some("Name"), "some@mail.asdf");
+    ///     let mut msg = Msg::new(&account);
+    ///
+    ///     // In this case, only the header fields "From:" and "To:" are gonna
+    ///     // be editable, because the other envelope fields are set to "None"
+    ///     // per default!
+    ///     msg.edit_body().unwrap();
+    /// }
+    /// ```
+    ///
+    /// Now enable some headers:
+    ///
+    /// ```no_run
+    /// use himalaya::msg::{model::Msg, envelope::Envelope};
+    /// use himalaya::config::model::Account;
+    ///
+    /// fn main() {
+    ///     let account = Account::new(Some("Name"), "some@mail.asdf");
+    ///     let mut msg = Msg::new_with_envelope(
+    ///         &account,
+    ///         Envelope {
+    ///             bcc: Some(Vec::new()),
+    ///             cc: Some(Vec::new()),
+    ///             .. Envelope::default()
+    ///         });
+    ///
+    ///     // The "Bcc:" and "Cc:" header fields are gonna be editable as well
+    ///     msg.edit_body().unwrap();
+    /// }
+    /// ```
+    ///
+    /// # Errors
+    /// In generel an error should appear if
+    /// - The draft or changes couldn't be saved
+    /// - The changed mail can't be parsed! (You wrote some things wrong...)
     pub fn edit_body(&mut self) -> Result<()> {
         // First of all, we need to create our template for the user. This
         // means, that the header needs to be added as well!
         let body = format!("{}\n{}", self.envelope.get_header_as_string(), self.body);
 
-        // let's change the body!
+        // let's change the body! We don't let this line compile, if we're doing
+        // tests, because we just need to look, if the headers are set
+        // correctly
+        #[cfg(not(test))]
         let body = input::open_editor_with_tpl(body.as_bytes())?;
 
         // now we have to split whole mail into their headers and the body
@@ -753,31 +831,20 @@ impl fmt::Display for Msgs {
     }
 }
 
-// ==========
-// Tests
-// ==========
 #[cfg(test)]
 mod tests {
-
     use crate::config::model::Account;
+    use crate::msg::body::Body;
     use crate::msg::envelope::Envelope;
     use crate::msg::model::Msg;
-
-    fn get_account(name: Option<&str>, email: &str) -> Account {
-        Account {
-            name: name.and_then(|name| Some(name.to_string())),
-            email: email.to_string(),
-            ..Account::default()
-        }
-    }
 
     #[test]
     fn test_new() {
         // -------------
         // Accounts
         // -------------
-        let account1 = get_account(Some("Soywod"), "clement.douin@posteo.net");
-        let account2 = get_account(None, "tornax07@gmail.com");
+        let account1 = Account::new(Some("Soywod"), "clement.douin@posteo.net");
+        let account2 = Account::new(None, "tornax07@gmail.com");
 
         // ---------------------
         // Creating message
@@ -785,16 +852,24 @@ mod tests {
         let msg1 = Msg::new(&account1);
         let msg2 = Msg::new(&account2);
 
+        // ---------------------
+        // Expected outputs
+        // ---------------------
         let expected_envelope1 = Envelope {
             from: vec![String::from("Soywod <clement.douin@posteo.net>")],
+            signature: Some(String::from("Account Signature")),
             ..Envelope::default()
         };
 
         let expected_envelope2 = Envelope {
             from: vec![String::from("tornax07@gmail.com")],
+            signature: Some(String::from("Account Signature")),
             ..Envelope::default()
         };
 
+        // ----------
+        // Tests
+        // ----------
         assert_eq!(msg1.envelope, expected_envelope1);
         assert_eq!(msg2.envelope, expected_envelope2);
 
@@ -803,13 +878,68 @@ mod tests {
     }
 
     #[test]
-    fn test_change_to_reply() {
-        use crate::msg::body::Body;
+    fn test_new_with_envelope() {
+        let account = Account::new(Some("Name"), "test@mail.asdf");
 
+        // ------------------
+        // Test-Messages
+        // ------------------
+        let msg_with_custom_from = Msg::new_with_envelope(
+            &account,
+            Envelope {
+                from: vec![String::from("Someone <Else@mail.asdf>")],
+                ..Envelope::default()
+            },
+        );
+
+        let msg_with_custom_signature = Msg::new_with_envelope(
+            &account,
+            Envelope {
+                signature: Some(String::from("Awesome Signature!")),
+                ..Envelope::default()
+            },
+        );
+
+        // -----------------
+        // Expectations
+        // -----------------
+        let expected_with_custom_from = Msg {
+            envelope: Envelope {
+                // the Msg::new_with_envelope function should use the from
+                // address in the envelope struct, not the from address of the
+                // account
+                from: vec![String::from("Someone <Else@mail.asdf>")],
+                signature: Some(String::from("Account Signature")),
+                ..Envelope::default()
+            },
+            // The signature should be added automatically
+            body: Body::from("Account Signature"),
+            ..Msg::default()
+        };
+
+        let expected_with_custom_signature = Msg {
+            envelope: Envelope {
+                from: vec![String::from("Name <test@mail.asdf>")],
+                signature: Some(String::from("Awesome Signature!")),
+                ..Envelope::default()
+            },
+            body: Body::from("Awesome Signature!"),
+            ..Msg::default()
+        };
+
+        // ------------
+        // Testing
+        // ------------
+        assert_eq!(msg_with_custom_from, expected_with_custom_from);
+        assert_eq!(msg_with_custom_signature, expected_with_custom_signature);
+    }
+
+    #[test]
+    fn test_change_to_reply() {
         // -----------------
         // Preparations
         // -----------------
-        let account = get_account(Some("Name"), "some@address.asdf");
+        let account = Account::new(Some("Name"), "some@address.asdf");
         let mut msg_normal = Msg::new_with_envelope(
             &account,
             Envelope {
@@ -957,6 +1087,99 @@ mod tests {
         // -----------------
         // Preparations
         // -----------------
-        let account = get_account(Some("Name"), "some@address.asdf");
+        let account = Account::new(Some("Name"), "some@address.asdf");
+        let mut msg = Msg::new_with_envelope(
+            &account,
+            Envelope {
+                from: vec![String::from("ThirdPerson <some@mail.asdf>")],
+                subject: Some(String::from("Test subject")),
+                ..Envelope::default()
+            },
+        );
+
+        msg.body = Body::from(concat![
+            "The body text, nice!\n",
+            "Himalaya is nice!",
+        ]);
+
+        // ---------------------
+        // Expected Results
+        // ---------------------
+        let expected_msg = Msg {
+            envelope: Envelope {
+                from: vec![String::from("ThirdPerson <some@mail.asdf>")],
+                sender: Some(String::from("Name <some@address.asdf>")),
+                signature: Some(String::from("Account Signature")),
+                subject: Some(String::from("Fwd: Test subject")),
+                .. Envelope::default()
+            },
+            body: Body::from(concat![
+                "\r\n---------- Forwarded Message ----------\r\n",
+                "The body text, nice!\n",
+                "Himalaya is nice!\n",
+            ]),
+            .. Msg::default()
+        };
+
+        // ----------
+        // Tests
+        // ----------
+        msg.change_to_forwarding(&account);
+        assert_eq!(msg, expected_msg);
+    }
+
+    #[test]
+    fn test_edit_body() {
+        // -----------------
+        // Preparations
+        // -----------------
+        let account = Account::new(Some("Name"), "some@address.asdf");
+        let mut msg = Msg::new_with_envelope(
+            &account,
+            Envelope {
+                bcc: Some(Vec::new()),
+                cc: Some(Vec::new()),
+                subject: Some(String::new()),
+                .. Envelope::default()
+            },
+        );
+
+        // ---------------------
+        // Expected Results
+        // ---------------------
+        let expected_msg = Msg {
+            envelope: Envelope {
+                from: vec![String::from("Name <some@address.asdf>")],
+                to: vec![String::from("")],
+                // these fields should exist now
+                subject: Some(String::from("")),
+                bcc: Some(vec![String::from("")]),
+                cc: Some(vec![String::from("")]),
+                .. Envelope::default()
+            },
+            body: Body::from("Account Signature\n"),
+            .. Msg::default()
+        };
+
+        // ----------
+        // Tests
+        // ----------
+        msg.edit_body().unwrap();
+        assert_eq!(msg, expected_msg);
+    }
+
+    #[test]
+    fn test_parse_from_str() {
+        // -----------------
+        // Preparations
+        // -----------------
+        let account = Account::new(Some("Name"), "some@address.asdf");
+        let msg = Msg::new(&account);
+
+        let new_content = concat![
+            "From: Some <user@mail.sf>\n",
+            "Suject: Awesome Subject\n",
+            "Bcc: mail1@rofl.lol, name <rofl@lol.asdf>\n",
+        ];
     }
 }

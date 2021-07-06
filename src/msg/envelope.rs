@@ -530,6 +530,10 @@ fn merge_addresses_to_one_line(header: &str, addresses: &Vec<String>) -> String 
     output
 }
 
+// ==========
+// Tests
+// ==========
+/// This tests only test the helper functions.
 #[cfg(test)]
 mod tests {
 

@@ -9,7 +9,7 @@ use lettre::Message;
 
 #[test]
 fn mbox() {
-    let account = Account::new("inbox@localhost");
+    let account = Account::new(Some("AccountName"), "inbox@localhost");
     let mut imap_conn = ImapConnector::new(&account).unwrap();
     let names = imap_conn.list_mboxes().unwrap();
     let mboxes: Vec<String> = Mboxes::from(&names)
@@ -27,7 +27,7 @@ fn msg() {
     // Preparations
     // =================
     // Get the test-account and clean up the server.
-    let account = Account::new("inbox@localhost");
+    let account = Account::new(Some("AccountName"), "inbox@localhost");
 
     // Login
     let mut imap_conn = ImapConnector::new(&account).unwrap();
