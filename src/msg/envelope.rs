@@ -522,7 +522,7 @@ fn merge_addresses_to_one_line(header: &str, addresses: &Vec<String>) -> String 
     // add the rest of the emails. It should look like this after the for_each:
     //
     //  Addr1, Addr2, Addr2, ...
-    address_iter.for_each(|address| output.push_str(&format!(", {}", address)));
+    address_iter.for_each(|address| output.push_str(&format!(",{}", address)));
 
     // end the header-line by using a newline character
     output.push('\n');
@@ -557,7 +557,7 @@ mod tests {
         let expected_output = concat![
             "Cc: TornaxO7 <tornax07@gmail.com>",
             ",",
-            " Soywod <clement.douin@posteo.net>\n",
+            "Soywod <clement.douin@posteo.net>\n",
         ];
 
         assert_eq!(cc_header, expected_output);

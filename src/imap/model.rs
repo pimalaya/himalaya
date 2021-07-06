@@ -295,7 +295,7 @@ impl<'a> ImapConnector<'a> {
 
         match self
             .sess
-            .uid_fetch(uid, "(FLAGS BODY[])")
+            .uid_fetch(uid, "(FLAGS BODY[] ENVELOPE INTERNALDATE)")
             .chain_err(|| "Could not fetch bodies")?
             .first()
         {
@@ -307,6 +307,8 @@ impl<'a> ImapConnector<'a> {
     pub fn append_msg(&mut self, mbox: &str, msg: &mut Msg) -> Result<()> {
         let body = msg.into_bytes()?;
         let flags: HashSet<imap::types::Flag<'static>> = (*msg.flags).clone();
+
+        println!("{:?}", body);
 
         self.sess
             .append(mbox, &body)

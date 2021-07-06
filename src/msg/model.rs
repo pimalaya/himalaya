@@ -678,7 +678,8 @@ impl Msg {
 
         // Last but not least: Add the attachments to the header of the mail and
         // return the finished mail!
-        Ok(msg.multipart(msg_parts)?)
+        Ok(msg.multipart(msg_parts)
+           .chain_err(|| format!("-- Current Message --\n{}", self))?)
     }
 
     /// Returns the uid of the mail.
