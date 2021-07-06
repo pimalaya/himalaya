@@ -341,7 +341,7 @@ impl Msg {
         // ---------
         // apply a line which should indicate where the forwarded message begins
         self.body = Body::from(format!(
-            "\r\n---------- Forwarded Message ----------\r\n{}",
+            "\n---------- Forwarded Message ----------\n{}",
             &self.body,
         ));
     }
@@ -455,7 +455,8 @@ impl Msg {
     /// frunction.
     ///
     pub fn parse_from_str(&mut self, content: &str) -> Result<()> {
-        let parsed = mailparse::parse_mail(content.as_bytes())?;
+        let parsed = mailparse::parse_mail(content.as_bytes())
+            .chain_err(|| format!("How the message looks like currently:\n{}", self))?;
 
         self.envelope = Envelope::from(&parsed);
 
@@ -571,27 +572,15 @@ impl Msg {
         // --------------------
         // Optional fields
         // --------------------
-        // add "sender"
-        if let Some(sender) = &self.envelope.sender {
-            msg = msg.sender(match sender.parse() {
-                Ok(sender) => sender,
-                Err(err) => {
-                    return Err(
-                        ErrorKind::Header(err.to_string(), "Sender", sender.to_string()).into(),
-                    )
-                }
-            });
-        }
-
-        // add "reply-to"
-        if let Some(reply_to) = &self.envelope.reply_to {
-            for mailaddress in reply_to {
-                msg = msg.reply_to(match mailaddress.parse() {
-                    Ok(reply_to) => reply_to,
+        // add "bcc"
+        if let Some(bcc) = &self.envelope.bcc {
+            for mailaddress in bcc {
+                msg = msg.bcc(match mailaddress.parse() {
+                    Ok(bcc) => bcc,
                     Err(err) => {
                         return Err(ErrorKind::Header(
                             err.to_string(),
-                            "Reply-to",
+                            "Bcc",
                             mailaddress.to_string(),
                         )
                         .into())
@@ -617,23 +606,6 @@ impl Msg {
             }
         }
 
-        // add "bcc"
-        if let Some(bcc) = &self.envelope.bcc {
-            for mailaddress in bcc {
-                msg = msg.bcc(match mailaddress.parse() {
-                    Ok(bcc) => bcc,
-                    Err(err) => {
-                        return Err(ErrorKind::Header(
-                            err.to_string(),
-                            "Bcc",
-                            mailaddress.to_string(),
-                        )
-                        .into())
-                    }
-                });
-            }
-        }
-
         // add "in_reply_to"
         if let Some(in_reply_to) = &self.envelope.in_reply_to {
             msg = msg.in_reply_to(match in_reply_to.parse() {
@@ -647,6 +619,43 @@ impl Msg {
                     .into())
                 }
             });
+        }
+
+        // add message-id if it exists
+        msg = msg.message_id(self.envelope.message_id.clone());
+
+        // add "reply-to"
+        if let Some(reply_to) = &self.envelope.reply_to {
+            for mailaddress in reply_to {
+                msg = msg.reply_to(match mailaddress.parse() {
+                    Ok(reply_to) => reply_to,
+                    Err(err) => {
+                        return Err(ErrorKind::Header(
+                            err.to_string(),
+                            "Reply-to",
+                            mailaddress.to_string(),
+                        )
+                        .into())
+                    }
+                });
+            }
+        }
+
+        // add "sender"
+        if let Some(sender) = &self.envelope.sender {
+            msg = msg.sender(match sender.parse() {
+                Ok(sender) => sender,
+                Err(err) => {
+                    return Err(
+                        ErrorKind::Header(err.to_string(), "Sender", sender.to_string()).into(),
+                    )
+                }
+            });
+        }
+
+        // add subject
+        if let Some(subject) = &self.envelope.subject {
+            msg = msg.subject(subject);
         }
 
         // -----------------------
@@ -807,7 +816,6 @@ impl TryFrom<&Fetch> for Msg {
             .internal_date()
             .map(|date| date.naive_local().to_string());
 
-        // IDEA: Store raw body here
         // println!("{}", String::from_utf8(fetch.body().unwrap().to_vec()).unwrap());
         let raw = match fetch.body() {
             Some(body) => body.to_vec(),
@@ -1207,7 +1215,7 @@ mod tests {
                 ..Envelope::default()
             },
             body: Body::from(concat![
-                "\r\n---------- Forwarded Message ----------\r\n",
+                "\n---------- Forwarded Message ----------\n",
                 "The body text, nice!\n",
                 "Himalaya is nice!\n",
             ]),

@@ -920,7 +920,6 @@ fn mail_interaction(ctx: &Ctx, msg: &mut Msg, imap_conn: &mut ImapConnector) -> 
                 input::PostEditChoice::RemoteDraft => {
                     debug!("Saving to draft…");
 
-                    // TODO: Here
                     msg.flags.insert(Flag::Seen);
 
                     match imap_conn.append_msg("Drafts", msg) {

@@ -308,8 +308,6 @@ impl<'a> ImapConnector<'a> {
         let body = msg.into_bytes()?;
         let flags: HashSet<imap::types::Flag<'static>> = (*msg.flags).clone();
 
-        println!("{:?}", body);
-
         self.sess
             .append(mbox, &body)
             .flags(flags)
