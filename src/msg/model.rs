@@ -421,7 +421,6 @@ impl Msg {
     /// struct. It stores the envelope-fields and the body of the mail.
     ///
     /// # Example
-    ///
     /// ```
     /// use himalaya::msg::model::Msg;
     /// use himalaya::config::model::Account;
@@ -448,12 +447,6 @@ impl Msg {
     ///     msg.parse_from_str(content);
     /// }
     /// ```
-    ///
-    /// # General Usage
-    /// It's only used in the [`Msg.edit_body()`] function, since the user
-    /// applies his/her changes into a file which is gonna be read by this
-    /// frunction.
-    ///
     pub fn parse_from_str(&mut self, content: &str) -> Result<()> {
         let parsed = mailparse::parse_mail(content.as_bytes())
             .chain_err(|| format!("How the message looks like currently:\n{}", self))?;
