@@ -6,29 +6,38 @@ authors = ["soywod <clement.douin@posteo.net>"]
 edition = "2018"
 
 [dependencies]
-atty = "0.2.14"
-chrono = "0.4.19"
-clap = {version = "2.33.3", default-features = false, features = ["suggestions", "color"]}
+# Debugging and error handling
 env_logger = "0.8.3"
 error-chain = "0.12.4"
+log = "0.4.14"
+
+# Sending, reading and creating messages/mails
 imap = "3.0.0-alpha.3"
+imap-proto = "0.14.3"
+mailparse = "0.13.4"
 # lettre = { version = "0.10.0-rc.1", features = ["serde"] }
 # Hint: This commit includes the se- and deserialization of the ContentType
 lettre = { git = "https://github.com/TornaxO7/lettre", branch = "content_type_serde", features = ["serde"] }
 lettre_email = "0.9.4"
-log = "0.4.14"
-imap-proto = "0.14.3"
-mailparse = "0.13.4"
 native-tls = "0.2"
 rfc2047-decoder = "0.1.2"
+tree_magic = "0.2.3"
+
+# Serialization
 serde = {version = "1.0.118", features = ["derive"]}
 serde_json = "1.0.61"
+
+# UI
 terminal_size = "0.1.15"
+colorful = "0.2.1"
+clap = {version = "2.33.3", default-features = false, features = ["suggestions", "color"]}
+
+# Rest
 toml = "0.5.8"
-tree_magic = "0.2.3"
 unicode-width = "0.1.7"
 uuid = {version = "0.8", features = ["v4"]}
-colorful = "0.2.1"
+atty = "0.2.14"
+chrono = "0.4.19"
 
 [profile.dev]
 debug = false
