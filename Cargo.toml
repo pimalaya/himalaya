@@ -39,5 +39,3 @@ uuid = {version = "0.8", features = ["v4"]}
 atty = "0.2.14"
 chrono = "0.4.19"
 
-[profile.dev]
-debug = false
