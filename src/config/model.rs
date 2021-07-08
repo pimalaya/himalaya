@@ -109,7 +109,8 @@ impl Account {
     }
 
     /// This is a little helper-function like which uses the the name and email
-    /// of the account to create a valid address for the header.
+    /// of the account to create a valid address for the header of the envelope
+    /// of an msg.
     ///
     /// # Example 1: With name
     /// Suppose the name field in the account struct *has* a value:
