@@ -2,30 +2,31 @@ pub(crate) use imap::types::Flag;
 use serde::ser::{Serialize, SerializeSeq, Serializer};
 
 use std::borrow::Cow;
-use std::ops::{Deref, DerefMut};
 use std::collections::HashSet;
+use std::ops::{Deref, DerefMut};
 
 /// Serializable wrapper for `imap::types::Flag`
 #[derive(Debug, PartialEq, Eq, Clone)]
 struct SerializableFlag<'flag>(&'flag imap::types::Flag<'flag>);
 
 impl<'flag> Serialize for SerializableFlag<'flag> {
+
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
-        {
-            serializer.serialize_str(match self.0 {
-                Flag::Seen => "Seen",
-                Flag::Answered => "Answered",
-                Flag::Flagged => "Flagged",
-                Flag::Deleted => "Deleted",
-                Flag::Draft => "Draft",
-                Flag::Recent => "Recent",
-                Flag::MayCreate => "MayCreate",
-                Flag::Custom(cow) => cow,
-                _ => "Unknown",
-            })
-        }
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(match self.0 {
+            Flag::Seen => "Seen",
+            Flag::Answered => "Answered",
+            Flag::Flagged => "Flagged",
+            Flag::Deleted => "Deleted",
+            Flag::Draft => "Draft",
+            Flag::Recent => "Recent",
+            Flag::MayCreate => "MayCreate",
+            Flag::Custom(cow) => cow,
+            _ => "Unknown",
+        })
+    }
 }
 
 /// This struct type includes all flags which belong to a given mail.
@@ -39,10 +40,10 @@ impl Flags {
     pub fn new<'new>(flags: &[imap::types::Flag<'new>]) -> Self {
         Self(
             flags
-            .iter()
-            .map(|flag| convert_to_static(flag).unwrap())
-            .collect::<HashSet<Flag<'static>>>(),
-            )
+                .iter()
+                .map(|flag| convert_to_static(flag).unwrap())
+                .collect::<HashSet<Flag<'static>>>(),
+        )
     }
 }
 
@@ -95,17 +96,17 @@ impl Default for Flags {
 
 impl Serialize for Flags {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
-        {
-            let mut seq = serializer.serialize_seq(Some(self.0.len()))?;
+    where
+        S: Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(self.0.len()))?;
 
-            for flag in &self.0 {
-                seq.serialize_element(&SerializableFlag(flag))?;
-            }
-
-            seq.end()
+        for flag in &self.0 {
+            seq.serialize_element(&SerializableFlag(flag))?;
         }
+
+        seq.end()
+    }
 }
 
 // == Helper Functions ==
@@ -121,6 +122,6 @@ fn convert_to_static<'func>(flag: &'func Flag) -> Result<Flag<'static>, ()> {
         Flag::Recent => Ok(Flag::Recent),
         Flag::MayCreate => Ok(Flag::MayCreate),
         Flag::Custom(cow) => Ok(Flag::Custom(Cow::Owned(cow.to_string()))),
-        &_ => Err(())
+        &_ => Err(()),
     }
 }
