@@ -27,7 +27,7 @@ pub mod cli;
 pub mod model;
 
 /// This module is used in the `Msg` struct, which should represent an
-/// attachment of a mail.
+/// attachment of a msg.
 pub mod attachment;
 
 /// This module is used in the `Msg` struct, which should represent the envelope
@@ -35,5 +35,5 @@ pub mod attachment;
 pub mod envelope;
 
 /// This module is used in the `Msg` struct, which should represent the body of
-/// a mail; The part where you're writing some text like `Dear Mr. LMAO`.
+/// a msg; The part where you're writing some text like `Dear Mr. LMAO`.
 pub mod body;

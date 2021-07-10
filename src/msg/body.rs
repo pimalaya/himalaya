@@ -13,7 +13,7 @@ error_chain!{
 }
 
 // == Structs ==
-/// This struct represents the body/content of a mail/msg. For example:
+/// This struct represents the body/content of a msg. For example:
 ///
 /// ```text
 /// Dear Mr. Boss,
@@ -22,7 +22,7 @@ error_chain!{
 /// Sincerely
 /// ```
 /// 
-/// This part of the msg/mail would be stored in this struct.
+/// This part of the msg/msg would be stored in this struct.
 #[derive(Clone, Serialize, Debug, PartialEq, Eq)]
 pub struct Body(String);
 

@@ -55,7 +55,7 @@ pub struct Envelope {
     // ----------------
     // Must-Fields
     // ---------------
-    // These fields are the mininum needed to send a mail.
+    // These fields are the mininum needed to send a msg.
     pub from: Vec<String>,
     pub to: Vec<String>,
 
@@ -89,12 +89,12 @@ impl Envelope {
     /// let envelope = Envelope {
     ///     from:           vec!["TornaxO7 <tornax07@gmail.com>".to_string()],
     ///     to:             vec!["Soywod <clement.douin@posteo.net>".to_string()],
-    ///     bcc:            Some(vec!["ThirdOne <some@mail.net>".to_string()]),
+    ///     bcc:            Some(vec!["ThirdOne <some@msg.net>".to_string()]),
     ///     cc:             Some(vec!["CcAccount <cc@ccmail.net>".to_string()]),
     ///     custom_headers: None,
     ///     in_reply_to:    Some("1234@local.machine.example".to_string()),
     ///     message_id:     Some("123456789".to_string()),
-    ///     reply_to:       Some(vec!["reply@mail.net".to_string()]),
+    ///     reply_to:       Some(vec!["reply@msg.net".to_string()]),
     ///     sender:         Some("himalaya@secretary.net".to_string()),
     ///     signature:      Some("Signature of Envelope".to_string()),
     ///     subject:        Some("Himalaya is cool".to_string()),
@@ -111,9 +111,9 @@ impl Envelope {
     ///     "In-Reply-To: 1234@local.machine.example\n",
     ///     "Sender: himalaya@secretary.net\n",
     ///     "Message-ID: 123456789\n",
-    ///     "Reply-To: reply@mail.net\n",
+    ///     "Reply-To: reply@msg.net\n",
     ///     "Cc: CcAccount <cc@ccmail.net>\n",
-    ///     "Bcc: ThirdOne <some@mail.net>\n",
+    ///     "Bcc: ThirdOne <some@msg.net>\n",
     ///     "References: <123@host1>,
     /// ];
     ///
@@ -371,7 +371,7 @@ impl<'from> From<&mailparse::ParsedMail<'from>> for Envelope {
 // -- Common Traits --
 /// This trait just returns the envelope but as a string. But be careful! **The
 /// signature is printed as well!!!**, so it isn't really useable to create the
-/// content of a mail! Use [get_header_as_string] instead!
+/// content of a msg! Use [get_header_as_string] instead!
 ///
 /// # Example
 ///
@@ -451,7 +451,7 @@ fn convert_vec_address_to_string<'val>(
             // This variable will hold the parsed version of the Address-struct,
             // like this:
             //
-            //  "Name <mail@host>"
+            //  "Name <msg@host>"
             let mut parsed_address = String::new();
 
             // -------------------
@@ -470,14 +470,14 @@ fn convert_vec_address_to_string<'val>(
                     if parsed_address.is_empty() {
                         // if there's no name, let `parsed_address` look like this:
                         //
-                        //  parsed_address = "mail@host"
+                        //  parsed_address = "msg@host"
                         parsed_address.push_str(&mail_address);
                     } else {
                         // wrap the mailbox between the `<`,`>` brackets to show, that
                         // the mailbox belongs to the name, so it should look like
                         // this in the afterwards:
                         //
-                        //  parsed_address = "Name <mail@host>"
+                        //  parsed_address = "Name <msg@host>"
                         parsed_address.push_str(&format!(" <{}>", mail_address));
                     }
                 }
@@ -493,7 +493,7 @@ fn convert_vec_address_to_string<'val>(
     }
 }
 
-/// This function is used, in order to merge multiple mail accounts into one
+/// This function is used, in order to merge multiple msg accounts into one
 /// line. Take a look into the `test_merge_addresses_to_one_line` test-function
 /// to see an example how to use it.
 fn merge_addresses_to_one_line(header: &str, addresses: &Vec<String>, separator: char) -> String {
@@ -503,7 +503,7 @@ fn merge_addresses_to_one_line(header: &str, addresses: &Vec<String>, separator:
     // Convert the header to this (for example): `Cc: `
     output.push_str(": ");
 
-    // the first email doesn't need a comma before, so we should append the mail
+    // the first emsg doesn't need a comma before, so we should append the msg
     // to it
     output.push_str(address_iter.next().unwrap_or(&String::new()));
 
@@ -534,7 +534,7 @@ mod tests {
         //
         // by a vector of email-addresses.
 
-        // our mail addresses for the "Cc" header
+        // our msg addresses for the "Cc" header
         let mail_addresses = vec![
             "TornaxO7 <tornax07@gmail.com>".to_string(),
             "Soywod <clement.douin@posteo.net>".to_string(),

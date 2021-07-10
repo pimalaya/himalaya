@@ -363,7 +363,7 @@ fn msg_matches_attachments(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool
     let uid = matches.value_of("uid").unwrap();
     debug!("uid: {}", &uid);
 
-    // get the mail and than it's attachments
+    // get the msg and than it's attachments
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
     let attachments = msg.attachments.clone();
@@ -406,7 +406,7 @@ fn msg_matches_write(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
 
-    // create the new mail
+    // create the new msg
     // TODO: Make the header starting customizeable like from template
     let mut msg = Msg::new_with_envelope(
         &ctx.account,
@@ -445,14 +445,14 @@ fn msg_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 
     debug!("uid: {}", uid);
 
-    // Change the mail to a reply-mail.
+    // Change the msg to a reply-msg.
     if matches.is_present("reply-all") {
         msg.change_to_reply(&ctx.account, true)?;
     } else {
         msg.change_to_reply(&ctx.account, false)?;
     }
 
-    // Apply the given attachments to the reply-mail.
+    // Apply the given attachments to the reply-msg.
     let attachments: Vec<&str> = matches
         .values_of("attachments")
         .unwrap_or_default()
@@ -472,7 +472,7 @@ fn msg_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 fn msg_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     debug!("forward command matched");
 
-    // fetch the mail
+    // fetch the msg
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let uid = matches.value_of("uid").unwrap();
     let mut msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
@@ -531,7 +531,7 @@ fn msg_matches_copy(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 fn msg_matches_move(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     debug!("move command matched");
 
-    // fetch the mail which should be moved
+    // fetch the msg which should be moved
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let uid = matches.value_of("uid").unwrap();
     let target = matches.value_of("target").unwrap();
@@ -540,7 +540,7 @@ fn msg_matches_move(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     debug!("uid: {}", &uid);
     debug!("target: {}", &target);
 
-    // create the mail in the target-mailbox
+    // create the msg in the target-msgbox
     msg.flags.insert(Flag::Seen);
     imap_conn.append_msg(target, &mut msg)?;
 
@@ -599,12 +599,12 @@ fn msg_matches_send(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 
     let mut msg = Msg::try_from(msg.as_str())?;
 
-    // send the message/mail
+    // send the message/msg
     let sendable = msg.to_sendable_msg()?;
     smtp::send(&ctx.account, &sendable)?;
     debug!("message sent!");
 
-    // add the message/mail to the Sent-Mailbox of the user
+    // add the message/msg to the Sent-Mailbox of the user
     msg.flags.insert(Flag::Seen);
     imap_conn.append_msg("Sent", &mut msg)?;
 
@@ -790,7 +790,7 @@ fn msg_interaction(ctx: &Ctx, msg: &mut Msg, imap_conn: &mut ImapConnector) -> R
                 input::PostEditChoice::Send => {
                     debug!("sending message…");
 
-                    // prepare the mail to be send
+                    // prepare the msg to be send
                     let sendable = match msg.to_sendable_msg() {
                         Ok(sendable) => sendable,
                         // In general if an error occured, then this is normally
@@ -804,7 +804,7 @@ fn msg_interaction(ctx: &Ctx, msg: &mut Msg, imap_conn: &mut ImapConnector) -> R
                     // TODO: Gmail sent mailboxes are called `[Gmail]/Sent`
                     // which creates a conflict, fix this!
 
-                    // let the server know, that the user sent a mail
+                    // let the server know, that the user sent a msg
                     msg.flags.insert(Flag::Seen);
                     imap_conn.append_msg("Sent", msg)?;
 
@@ -813,7 +813,7 @@ fn msg_interaction(ctx: &Ctx, msg: &mut Msg, imap_conn: &mut ImapConnector) -> R
                     ctx.output.print("Message successfully sent");
                     break;
                 }
-                // edit the body of the mail
+                // edit the body of the msg
                 input::PostEditChoice::Edit => {
                     // Did something goes wrong when the user changed the
                     // content?
@@ -821,7 +821,7 @@ fn msg_interaction(ctx: &Ctx, msg: &mut Msg, imap_conn: &mut ImapConnector) -> R
                         println!("[ERROR] {}", err);
                         println!(concat!(
                             "Please try to fix the problem by editing",
-                            "the mail again."
+                            "the msg again."
                         ));
                     }
                 }

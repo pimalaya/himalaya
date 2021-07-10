@@ -59,8 +59,8 @@ impl Attachment {
         }
     }
 
-    /// This from function extracts one attachment of a parsed mail.
-    /// If it couldn't create an attachment with the given parsed mail, than it will
+    /// This from function extracts one attachment of a parsed msg.
+    /// If it couldn't create an attachment with the given parsed msg, than it will
     /// return `None`.
     ///
     /// # Example
