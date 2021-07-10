@@ -10,7 +10,6 @@ use std::ops::{Deref, DerefMut};
 struct SerializableFlag<'flag>(&'flag imap::types::Flag<'flag>);
 
 impl<'flag> Serialize for SerializableFlag<'flag> {
-
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
