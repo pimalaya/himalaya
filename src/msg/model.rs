@@ -602,6 +602,24 @@ impl Msg {
         }
 
         // add message-id if it exists
+        msg = match self.envelope.message_id.clone() {
+            Some(message_id) => msg.message_id(Some(message_id)),
+            None => {
+
+                // extract the domain like "gmail.com"
+                let mailbox: lettre::message::Mailbox =
+                    self.envelope.from[0].parse()?;
+                let domain = mailbox.email.domain();
+
+                let new_msg_id = format!(
+                    "<{}@{}>",
+                    uuid::Uuid::new_v4().to_string(),
+                    domain
+                    );
+
+                msg.message_id(Some(new_msg_id))
+            },
+        };
         msg = msg.message_id(self.envelope.message_id.clone());
 
         // add "reply-to"
