@@ -46,12 +46,7 @@ impl Flags {
     }
 }
 
-// ===========
-// Traits
-// ===========
-// ------------------
-// Common traits
-// ------------------
+// == Traits ==
 impl ToString for Flags {
     fn to_string(&self) -> String {
         let mut flags = String::new();
@@ -113,9 +108,7 @@ impl Serialize for Flags {
         }
 }
 
-// =====================
-// Helper Functions
-// =====================
+// == Helper Functions ==
 /// HINT: This function is only needed as long this pull request hasn't been
 /// merged yet: https://github.com/jonhoo/rust-imap/pull/206
 fn convert_to_static<'func>(flag: &'func Flag) -> Result<Flag<'static>, ()> {

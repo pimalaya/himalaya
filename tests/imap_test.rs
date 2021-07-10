@@ -23,9 +23,9 @@ fn mbox() {
 
 #[test]
 fn msg() {
-    // =================
+    
     // Preparations
-    // =================
+    
     // Get the test-account and clean up the server.
     let account = Account::new(Some("AccountName"), "inbox@localhost");
 

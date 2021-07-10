@@ -23,9 +23,7 @@ error_chain! {
     }
 }
 
-// ============
-// Structs
-// ============
+// == Structs ==
 /// This struct is a wrapper for the [Envelope struct] of the [imap_proto]
 /// crate. It's should mainly help to interact with the mails by using more
 /// common data types like `Vec` or `String` since a `[u8]` array is a little
@@ -64,15 +62,15 @@ pub struct Envelope {
     // --------------------
     // Optional fields
     // --------------------
-    pub bcc: Option<Vec<String>>,
-    pub cc: Option<Vec<String>>,
+    pub bcc:            Option<Vec<String>>,
+    pub cc:             Option<Vec<String>>,
     pub custom_headers: Option<HashMap<String, Vec<String>>>,
-    pub in_reply_to: Option<String>,
-    pub message_id: Option<String>,
-    pub reply_to: Option<Vec<String>>,
-    pub sender: Option<String>,
-    pub signature: Option<String>,
-    pub subject: Option<String>,
+    pub in_reply_to:    Option<String>,
+    pub message_id:     Option<String>,
+    pub reply_to:       Option<Vec<String>>,
+    pub sender:         Option<String>,
+    pub signature:      Option<String>,
+    pub subject:        Option<String>,
 }
 
 impl Envelope {
@@ -94,7 +92,7 @@ impl Envelope {
     ///     bcc:            Some(vec!["ThirdOne <some@mail.net>".to_string()]),
     ///     cc:             Some(vec!["CcAccount <cc@ccmail.net>".to_string()]),
     ///     custom_headers: None,
-    ///     in_reply_to:    Some("MessageID of received mail".to_string()),
+    ///     in_reply_to:    Some("1234@local.machine.example".to_string()),
     ///     message_id:     Some("123456789".to_string()),
     ///     reply_to:       Some(vec!["reply@mail.net".to_string()]),
     ///     sender:         Some("himalaya@secretary.net".to_string()),
@@ -110,12 +108,13 @@ impl Envelope {
     ///     "From: TornaxO7 <tornax07@gmail.com>\n",
     ///     "To: Soywod <clement.douin@posteo.net>\n",
     ///     "Subject: Himalaya is cool\n",
-    ///     "In-Reply-To: MessageID of received mail\n",
+    ///     "In-Reply-To: 1234@local.machine.example\n",
     ///     "Sender: himalaya@secretary.net\n",
     ///     "Message-ID: 123456789\n",
     ///     "Reply-To: reply@mail.net\n",
     ///     "Cc: CcAccount <cc@ccmail.net>\n",
     ///     "Bcc: ThirdOne <some@mail.net>\n",
+    ///     "References: <123@host1>,
     /// ];
     ///
     /// assert_eq!(envelope_string, expected_output);
@@ -132,10 +131,10 @@ impl Envelope {
         // Must-Have-Fields
         // ---------------------
         // the "From: " header
-        header.push_str(&merge_addresses_to_one_line("From", &self.from));
+        header.push_str(&merge_addresses_to_one_line("From", &self.from, ','));
 
         // the "To: " header
-        header.push_str(&merge_addresses_to_one_line("To", &self.to));
+        header.push_str(&merge_addresses_to_one_line("To", &self.to, ','));
 
         // --------------------
         // Optional fields
@@ -165,23 +164,23 @@ impl Envelope {
 
         // reply_to
         if let Some(reply_to) = &self.reply_to {
-            header.push_str(&merge_addresses_to_one_line("Reply-To", &reply_to));
+            header.push_str(&merge_addresses_to_one_line("Reply-To", &reply_to, ','));
         }
 
         // cc
         if let Some(cc) = &self.cc {
-            header.push_str(&merge_addresses_to_one_line("Cc", &cc));
+            header.push_str(&merge_addresses_to_one_line("Cc", &cc, ','));
         }
 
         // bcc
         if let Some(bcc) = &self.bcc {
-            header.push_str(&merge_addresses_to_one_line("Bcc", &bcc));
+            header.push_str(&merge_addresses_to_one_line("Bcc", &bcc, ','));
         }
 
         // custom headers
         if let Some(custom_headers) = &self.custom_headers {
             for (key, value) in custom_headers.iter() {
-                header.push_str(&merge_addresses_to_one_line(key, &value));
+                header.push_str(&merge_addresses_to_one_line(key, &value, ','));
             }
         }
 
@@ -189,9 +188,7 @@ impl Envelope {
     }
 }
 
-// ===========================
-// Default implementation
-// ===========================
+// == Default implementation ==
 /// Returns an Envelope with the following values:
 ///
 /// ```no_run
@@ -232,9 +229,7 @@ impl Default for Envelope {
     }
 }
 
-// =========================
-// From implementations
-// =========================
+// == From implementations ==
 impl TryFrom<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
     type Error = Error;
 
@@ -270,16 +265,13 @@ impl TryFrom<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
             };
 
             let message_id = convert_cow_u8_to_string(from_envelope.message_id.as_ref())?;
-
             let reply_to = convert_vec_address_to_string(from_envelope.reply_to.as_ref())?;
-
             let to = match convert_vec_address_to_string(from_envelope.to.as_ref())? {
                 Some(to) => to,
                 None => return Err(ErrorKind::Convertion("To").into()),
             };
             let cc = convert_vec_address_to_string(from_envelope.cc.as_ref())?;
             let bcc = convert_vec_address_to_string(from_envelope.bcc.as_ref())?;
-
             let in_reply_to = convert_cow_u8_to_string(from_envelope.in_reply_to.as_ref())?;
 
             Ok(Self {
@@ -334,17 +326,15 @@ impl<'from> From<&mailparse::ParsedMail<'from>> for Envelope {
                 "cc" => {
                     new_envelope.cc = Some(value.rsplit(',').map(|addr| addr.to_string()).collect())
                 }
-
                 "in_reply_to" => new_envelope.in_reply_to = Some(value),
-
                 "reply_to" => {
                     new_envelope.reply_to =
                         Some(value.rsplit(',').map(|addr| addr.to_string()).collect())
                 }
 
                 "sender" => new_envelope.sender = Some(value),
-
                 "subject" => new_envelope.subject = Some(value),
+                "message-id" => new_envelope.message_id = Some(value),
 
                 // it's a custom header => Add it to our
                 // custom-header-hash-map
@@ -378,9 +368,7 @@ impl<'from> From<&mailparse::ParsedMail<'from>> for Envelope {
     }
 }
 
-// ==================
-// Common Traits
-// ==================
+// -- Common Traits --
 /// This trait just returns the envelope but as a string. But be careful! **The
 /// signature is printed as well!!!**, so it isn't really useable to create the
 /// content of a mail! Use [get_header_as_string] instead!
@@ -508,7 +496,7 @@ fn convert_vec_address_to_string<'val>(
 /// This function is used, in order to merge multiple mail accounts into one
 /// line. Take a look into the `test_merge_addresses_to_one_line` test-function
 /// to see an example how to use it.
-fn merge_addresses_to_one_line(header: &str, addresses: &Vec<String>) -> String {
+fn merge_addresses_to_one_line(header: &str, addresses: &Vec<String>, separator: char) -> String {
     let mut output = header.to_string();
     let mut address_iter = addresses.iter();
 
@@ -522,7 +510,7 @@ fn merge_addresses_to_one_line(header: &str, addresses: &Vec<String>) -> String 
     // add the rest of the emails. It should look like this after the for_each:
     //
     //  Addr1, Addr2, Addr2, ...
-    address_iter.for_each(|address| output.push_str(&format!(",{}", address)));
+    address_iter.for_each(|address| output.push_str(&format!("{}{}", separator, address)));
 
     // end the header-line by using a newline character
     output.push('\n');
@@ -552,7 +540,7 @@ mod tests {
             "Soywod <clement.douin@posteo.net>".to_string(),
         ];
 
-        let cc_header = merge_addresses_to_one_line("Cc", &mail_addresses);
+        let cc_header = merge_addresses_to_one_line("Cc", &mail_addresses, ',');
 
         let expected_output = concat![
             "Cc: TornaxO7 <tornax07@gmail.com>",

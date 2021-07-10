@@ -17,9 +17,7 @@ error_chain! {
     }
 }
 
-// ============
-// Structs
-// ============
+// == Structs ==
 /// This struct represents an attachment.
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
 pub struct Attachment {
@@ -80,17 +78,12 @@ impl Attachment {
     /// ```
     pub fn from_parsed_mail(parsed_mail: &ParsedMail) -> Option<Self> {
         if parsed_mail.get_content_disposition().disposition == DispositionType::Attachment {
+
             let disposition = parsed_mail.get_content_disposition();
-
-            // get the filename of the attachment
             let filename = disposition.params.get("filename").unwrap().to_string();
-
-            // get the body of the attachment
             let body_raw = parsed_mail.get_body_raw().unwrap_or(Vec::new());
-            // now we need to find out, which mime-type it has.
             let content_type: ContentType = tree_magic::from_u8(&body_raw).parse().unwrap();
 
-            // now we have all needed information!
             return Some(Self {
                 filename,
                 content_type,
@@ -102,9 +95,7 @@ impl Attachment {
     }
 }
 
-// ===========
-// Traits
-// ===========
+// == Traits ==
 /// Creates an Attachment with the follwing values:
 ///
 /// ```no_run
@@ -127,9 +118,7 @@ impl Default for Attachment {
     }
 }
 
-// =========================
-// From Implementations
-// =========================
+// -- From Implementations --
 /// Tries to convert the given file (by the given path) into an attachment.
 /// It'll try to detect the mime-type/data-type automatically.
 ///
@@ -144,36 +133,24 @@ impl<'from> TryFrom<&'from str> for Attachment {
     type Error = Error;
 
     fn try_from(path: &'from str) -> Result<Self> {
-        // -----------------
-        // Preparations
-        // -----------------
-        // Get the path first
         let path = Path::new(path);
 
-        // -------------------------------
-        // Get attachment information
-        // -------------------------------
-        // get the filename.
+        // -- Get attachment information --
         let filename = if let Some(filename) = path.file_name() {
             filename
-                // convert `&OsStr` to `Option<&str>`
+                // `&OsStr` -> `Option<&str>`
                 .to_str()
                 // get rid of the `Option` wrapper
                 .unwrap_or(&String::new())
-                // and get the string
                 .to_string()
         } else {
-            // well just return an empty string than...
+            // use an empty string
             String::new()
         };
 
-        // Open and read the content of the file (if possible)
         let file_content = fs::read(&path)?;
-
-        // Get the filetype
         let content_type: ContentType = tree_magic::from_filepath(&path).parse()?;
 
-        // Now we have all needed information
         Ok(Self {
             filename,
             content_type,

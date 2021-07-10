@@ -272,22 +272,6 @@ impl<'a> ImapConnector<'a> {
         Ok(Some(fetches))
     }
 
-    // pub fn get_msg(&mut self, mbox: &str, uid: &str) -> Result<Vec<u8>> {
-    //     self.sess
-    //         .select(mbox)
-    //         .chain_err(|| format!("Could not select mailbox `{}`", mbox))?;
-    //
-    //     match self
-    //         .sess
-    //         .uid_fetch(uid, "(FLAGS BODY[])")
-    //         .chain_err(|| "Could not fetch bodies")?
-    //         .first()
-    //     {
-    //         None => Err(format!("Could not find message `{}`", uid).into()),
-    //         Some(fetch) => Ok(fetch.body().unwrap_or(&[]).to_vec()),
-    //     }
-    // }
-
     pub fn get_msg(&mut self, mbox: &str, uid: &str) -> Result<Msg> {
         self.sess
             .select(mbox)

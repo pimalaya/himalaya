@@ -1,6 +1,3 @@
-// ===========
-// Usages
-// ===========
 use error_chain::error_chain;
 
 use std::ops::{Deref, DerefMut};
@@ -8,18 +5,14 @@ use std::fmt;
 
 use serde::Serialize;
 
-// ===========
-// Macros
-// ===========
+// == Macros ==
 error_chain!{
     foreign_links {
          ParseContentType(lettre::message::header::ContentTypeErr);
     }
 }
 
-// ============
-// Structs
-// ============
+// == Structs ==
 /// This struct represents the body/content of a mail/msg. For example:
 ///
 /// ```text
@@ -59,12 +52,7 @@ impl Body {
     }
 }
 
-// ===========
-// Traits
-// ===========
-// ------------
-// Commons
-// ------------
+// == Traits ==
 impl Default for Body {
     fn default() -> Self {
         Self(String::new())
@@ -91,9 +79,7 @@ impl DerefMut for Body {
     }
 }
 
-// -----------
-// From's
-// -----------
+// -- From's --
 /// Give in a `&str` to create a new instance of `Body`.
 ///
 /// # Example
