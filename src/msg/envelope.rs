@@ -114,7 +114,6 @@ impl Envelope {
     ///     "Reply-To: reply@msg.net\n",
     ///     "Cc: CcAccount <cc@ccmail.net>\n",
     ///     "Bcc: ThirdOne <some@msg.net>\n",
-    ///     "References: <123@host1>,
     /// ];
     ///
     /// assert_eq!(envelope_string, expected_output);

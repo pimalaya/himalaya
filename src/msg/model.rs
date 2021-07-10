@@ -209,10 +209,24 @@ impl Msg {
     ///
     /// [Here]: https://www.rfc-editor.org/rfc/rfc5322.html#page-46
     ///
-    /// TODO: References field is missing, but the imap-crate can't implement it currently.
+    /// TODO: References field is missing, but the imap-crate can't implement it
+    /// currently.
     pub fn change_to_reply(&mut self, account: &Account, reply_all: bool) -> Result<()> {
         // -- Adjust header --
-        let old_subject = self.envelope.subject.clone().unwrap_or(String::new());
+        let subject = if let Some(subject) = self.envelope.subject.clone() {
+
+            // avoid creating a subject like this (if you reply to a reply):
+            //  
+            //  Re: Re: My subject
+            if !subject.starts_with("Re:") {
+                format!("Re: {}", subject)
+            } else {
+                subject
+            }
+
+        } else {
+            String::new()
+        };
 
         // The new fields
         let mut to: Vec<String> = Vec::new();
@@ -249,7 +263,7 @@ impl Msg {
             from: vec![account.get_full_address()],
             to,
             cc,
-            subject: Some(format!("Re: {}", old_subject)),
+            subject: Some(subject),
             in_reply_to: self.envelope.message_id.clone(),
             // and clear the rest of the fields
             ..Envelope::default()
@@ -966,8 +980,6 @@ mod tests {
         // accounts for the rfc test
         let john_doe = Account::new(Some("John Doe"), "jdoe@machine.example");
         let mary_smith = Account::new(Some("Mary Smith"), "mary@example.net");
-        let mary_smith_personal =
-            Account::new(Some("'Mary Smith: Personal Account'"), "smith@home.example");
 
         // -- for general tests --
         let account = Account::new(Some("Name"), "some@address.asdf");
@@ -975,7 +987,7 @@ mod tests {
         // -- rfc test --
         // in this test, we are gonna reproduce the same situation as shown
         // here: https://datatracker.ietf.org/doc/html/rfc5322#appendix-A.2
-        let mut msg_rfc_test = Msg {
+        let msg_rfc_test = Msg {
             envelope: Envelope {
                 from: vec!["John Doe <jdoe@machine.example>".to_string()],
                 to: vec!["Mary Smith <mary@example.net>".to_string()],
@@ -1028,13 +1040,11 @@ mod tests {
                 subject: Some("Re: Saying Hello".to_string()),
                 message_id: Some("<3456@example.net>".to_string()),
                 in_reply_to: Some("<1234@local.machine.example>".to_string()),
-                references: Some(vec!["<1234@local.machine.example>".to_string()]),
                 ..Envelope::default()
             },
             body: Body::from(concat![
                 "> This is a message just to say hello.\n",
                 "> So, \"Hello\".\n",
-                "This is a reply to your hello.",
             ]),
             ..Msg::default()
         };
@@ -1047,17 +1057,12 @@ mod tests {
                 subject: Some("Re: Saying Hello".to_string()),
                 message_id: Some("<abcd.1234@local.machine.test>".to_string()),
                 in_reply_to: Some("<3456@example.net>".to_string()),
-                references: Some(vec![
-                    "<1234@local.machine.example>".to_string(),
-                    "<3456@example.net>".to_string(),
-                ]),
                 ..Envelope::default()
             },
             body: Body::from(concat![
                 "> > This is a message just to say hello.\n",
                 "> > So, \"Hello\".\n",
-                "> This is a reply to your hello.\n",
-                "This is a reply to your reply.",
+                "> \n",
             ]),
             ..Msg::default()
         };
@@ -1080,7 +1085,7 @@ mod tests {
                 ..Envelope::default()
             },
             body: Body::from(concat![
-                "> I can just recommend you to use himalaya!\n",
+                "> A body test\n",
                 "> \n",
                 "> Sincereley\n",
             ]),
@@ -1091,23 +1096,30 @@ mod tests {
         // -- rfc test --
         // represents the message for the first reply
         let mut rfc_reply_1 = msg_rfc_test.clone();
-        rfc_reply_1.change_to_reply(&mary_smith, false);
+        rfc_reply_1.change_to_reply(&mary_smith, false).unwrap();
 
         // the user would enter this normally
-        rfc_reply_1.envelope.reply_to = Some(vec![
-            "'Mary Smith: Personal Account' <smith@home.example>".to_string(),
-        ]);
+        rfc_reply_1.envelope = Envelope {
+            message_id: Some("<3456@example.net>".to_string()),
+            reply_to: Some(vec![
+                "\"Mary Smith: Personal Account\" <smith@home.example>".to_string(),
+            ]),
+            ..rfc_reply_1.envelope.clone()
+        };
 
         // represents the message for the reply to the reply
         let mut rfc_reply_2 = rfc_reply_1.clone();
-        rfc_reply_2.envelope.reply_to = None;
-        rfc_reply_2.change_to_reply(&john_doe, false);
+        rfc_reply_2.change_to_reply(&john_doe, false).unwrap();
+        rfc_reply_2.envelope = Envelope {
+            message_id: Some("<abcd.1234@local.machine.test>".to_string()),
+            .. rfc_reply_2.envelope.clone()
+        };
 
         assert_eq!(rfc_reply_1, expected_rfc1);
         assert_eq!(rfc_reply_2, expected_rfc2);
 
         // -- custom tests -—
-        msg_reply_all.change_to_reply(&account, false);
+        msg_reply_all.change_to_reply(&account, true).unwrap();
         assert_eq!(msg_reply_all, expected_reply_all);
     }
 
