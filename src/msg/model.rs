@@ -612,7 +612,7 @@ impl Msg {
                 let domain = mailbox.email.domain();
 
                 let new_msg_id = format!(
-                    "<{}@{}>",
+                    "{}@{}",
                     uuid::Uuid::new_v4().to_string(),
                     domain
                     );
