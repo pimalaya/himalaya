@@ -5,13 +5,9 @@ use log::{debug, error, trace};
 use std::{env, path::PathBuf, process::exit};
 
 use himalaya::{
-    ctx::Ctx,
-    comp::cli::{comp_matches, comp_subcmds},
     config::{cli::config_args, model::Config},
-    flag::cli::{flag_matches, flag_subcmds},
-    imap::cli::{imap_matches, imap_subcmds},
-    mbox::cli::{mbox_matches, mbox_source_arg, mbox_subcmds},
-    msg::cli::{msg_matches, msg_subcmds},
+    ctx::Ctx,
+    flag, imap, mbox, msg, comp,
     output::{cli::output_args, model::Output},
 };
 
@@ -34,12 +30,12 @@ fn parse_args<'a>() -> clap::App<'a, 'a> {
         .setting(clap::AppSettings::InferSubcommands)
         .args(&output_args())
         .args(&config_args())
-        .arg(mbox_source_arg())
-        .subcommands(flag_subcmds())
-        .subcommands(imap_subcmds())
-        .subcommands(mbox_subcmds())
-        .subcommands(msg_subcmds())
-        .subcommands(comp_subcmds())
+        .arg(mbox::cli::source_arg())
+        .subcommands(flag::cli::subcmds())
+        .subcommands(imap::cli::subcmds())
+        .subcommands(mbox::cli::subcmds())
+        .subcommands(msg::cli::subcmds())
+        .subcommands(comp::cli::subcmds())
 }
 
 fn run() -> Result<()> {
@@ -51,7 +47,7 @@ fn run() -> Result<()> {
     let arg_matches = args.get_matches();
 
     // Check completion before init config
-    if comp_matches(parse_args, &arg_matches)? {
+    if comp::cli::matches(parse_args, &arg_matches)? {
         return Ok(());
     }
 
@@ -74,8 +70,10 @@ fn run() -> Result<()> {
 
     debug!("begin matching");
     let app = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
-    let _matched =
-        mbox_matches(&app)? || flag_matches(&app)? || imap_matches(&app)? || msg_matches(&app)?;
+    let _matched = mbox::cli::matches(&app)?
+        || flag::cli::matches(&app)?
+        || imap::cli::matches(&app)?
+        || msg::cli::matches(&app)?;
 
     Ok(())
 }

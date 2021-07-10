@@ -11,7 +11,7 @@ error_chain! {
     }
 }
 
-pub fn imap_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
+pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
     vec![
         clap::SubCommand::with_name("notify")
             .about("Notifies when new messages arrive in the given mailbox")
@@ -37,17 +37,17 @@ pub fn imap_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
     ]
 }
 
-pub fn imap_matches(ctx: &Ctx) -> Result<bool> {
+pub fn matches(ctx: &Ctx) -> Result<bool> {
     if let Some(matches) = ctx.arg_matches.subcommand_matches("notify") {
         debug!("notify command matched");
 
         let keepalive = clap::value_t_or_exit!(matches.value_of("keepalive"), u64);
         debug!("keepalive: {}", &keepalive);
 
-        let mut imap_conn = ImapConnector::new(&ctx.account)?;
-        imap_conn.notify(&ctx, keepalive)?;
+        let mut conn = ImapConnector::new(&ctx.account)?;
+        conn.notify(&ctx, keepalive)?;
 
-        imap_conn.logout();
+        conn.logout();
         return Ok(true);
     }
 
@@ -57,10 +57,10 @@ pub fn imap_matches(ctx: &Ctx) -> Result<bool> {
         let keepalive = clap::value_t_or_exit!(matches.value_of("keepalive"), u64);
         debug!("keepalive: {}", &keepalive);
 
-        let mut imap_conn = ImapConnector::new(&ctx.account)?;
-        imap_conn.watch(&ctx, keepalive)?;
+        let mut conn = ImapConnector::new(&ctx.account)?;
+        conn.watch(&ctx, keepalive)?;
 
-        imap_conn.logout();
+        conn.logout();
         return Ok(true);
     }
 

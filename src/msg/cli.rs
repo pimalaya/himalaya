@@ -37,7 +37,7 @@ error_chain! {
 }
 
 // == Main-Functions ==
-pub fn msg_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
+pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
     vec![
         clap::SubCommand::with_name("list")
             .aliases(&["lst"])
@@ -137,7 +137,7 @@ pub fn msg_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
     ]
 }
 
-pub fn msg_matches(ctx: &Ctx) -> Result<bool> {
+pub fn matches(ctx: &Ctx) -> Result<bool> {
     match ctx.arg_matches.subcommand() {
         ("attachments", Some(matches)) => msg_matches_attachments(ctx, matches),
         ("copy", Some(matches)) => msg_matches_copy(ctx, matches),

@@ -1,7 +1,5 @@
 //! This module holds everything which is related to a **Msg**/**Mail**. Here are
 //! structs which **represent the data** in Msgs/Mails.
-//!
-//! # Example
 
 /// Includes the following subcommands:
 /// - `list`

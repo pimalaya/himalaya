@@ -18,7 +18,7 @@ fn flags_arg<'a>() -> clap::Arg<'a, 'a> {
         .required(true)
 }
 
-pub fn flag_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
+pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
     vec![clap::SubCommand::with_name("flags")
         .about("Handles flags")
         .subcommand(
@@ -42,7 +42,7 @@ pub fn flag_subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
         )]
 }
 
-pub fn flag_matches(ctx: &Ctx) -> Result<bool> {
+pub fn matches(ctx: &Ctx) -> Result<bool> {
     if let Some(matches) = ctx.arg_matches.subcommand_matches("set") {
         debug!("set command matched");
 

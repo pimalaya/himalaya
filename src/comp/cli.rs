@@ -5,7 +5,8 @@ use std::io;
 
 error_chain! {}
 
-pub fn comp_subcmds<'s>() -> Vec<App<'s, 's>> {
+// == Main functions ==
+pub fn subcmds<'s>() -> Vec<App<'s, 's>> {
     vec![SubCommand::with_name("completion")
         .about("Generates the completion script for the given shell")
         .args(&[Arg::with_name("shell")
@@ -13,7 +14,7 @@ pub fn comp_subcmds<'s>() -> Vec<App<'s, 's>> {
             .required(true)])]
 }
 
-pub fn comp_matches<'a>(app: fn() -> App<'a, 'a>, matches: &ArgMatches) -> Result<bool> {
+pub fn matches<'a>(app: fn() -> App<'a, 'a>, matches: &ArgMatches) -> Result<bool> {
     if let Some(matches) = matches.subcommand_matches("completion") {
         debug!("completion command matched");
         let shell = match matches.value_of("shell").unwrap() {
