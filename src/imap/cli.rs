@@ -44,10 +44,10 @@ pub fn matches(ctx: &Ctx) -> Result<bool> {
         let keepalive = clap::value_t_or_exit!(matches.value_of("keepalive"), u64);
         debug!("keepalive: {}", &keepalive);
 
-        let mut conn = ImapConnector::new(&ctx.account)?;
-        conn.notify(&ctx, keepalive)?;
+        let mut imap_conn = ImapConnector::new(&ctx.account)?;
+        imap_conn.notify(&ctx, keepalive)?;
 
-        conn.logout();
+        imap_conn.logout();
         return Ok(true);
     }
 
@@ -57,10 +57,10 @@ pub fn matches(ctx: &Ctx) -> Result<bool> {
         let keepalive = clap::value_t_or_exit!(matches.value_of("keepalive"), u64);
         debug!("keepalive: {}", &keepalive);
 
-        let mut conn = ImapConnector::new(&ctx.account)?;
-        conn.watch(&ctx, keepalive)?;
+        let mut imap_conn = ImapConnector::new(&ctx.account)?;
+        imap_conn.watch(&ctx, keepalive)?;
 
-        conn.logout();
+        imap_conn.logout();
         return Ok(true);
     }
 
