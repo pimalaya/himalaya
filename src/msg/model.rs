@@ -208,6 +208,8 @@ impl Msg {
     /// like.
     ///
     /// [Here]: https://www.rfc-editor.org/rfc/rfc5322.html#page-46
+    ///
+    /// TODO: References field is missing, but the imap-crate can't implement it currently.
     pub fn change_to_reply(&mut self, account: &Account, reply_all: bool) -> Result<()> {
         // -- Adjust header --
         let old_subject = self.envelope.subject.clone().unwrap_or(String::new());
@@ -253,9 +255,6 @@ impl Msg {
             ..Envelope::default()
         };
 
-        self.envelope = new_envelope;
-        self.attachments.clear();
-
         // comment "out" the body of the mail, by adding the `>` characters to
         // each line which includes a string.
         let new_body: String = self
@@ -266,8 +265,9 @@ impl Msg {
             .collect::<Vec<String>>()
             .concat();
 
-        // now apply our new body
         self.body = Body::from(new_body);
+        self.envelope = new_envelope;
+        self.attachments.clear();
 
         Ok(())
     }
