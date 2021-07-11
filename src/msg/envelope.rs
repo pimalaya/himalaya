@@ -52,16 +52,12 @@ error_chain! {
 /// [imap_proto]: https://docs.rs/imap-proto/0.14.3/imap_proto/index.html
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
 pub struct Envelope {
-    // ----------------
-    // Must-Fields
-    // ---------------
+    // -- Must-Fields --
     // These fields are the mininum needed to send a msg.
     pub from: Vec<String>,
     pub to: Vec<String>,
 
-    // --------------------
-    // Optional fields
-    // --------------------
+    // -- Optional fields --
     pub bcc:            Option<Vec<String>>,
     pub cc:             Option<Vec<String>>,
     pub custom_headers: Option<HashMap<String, Vec<String>>>,
@@ -126,18 +122,14 @@ impl Envelope {
     pub fn get_header_as_string(&self) -> String {
         let mut header = String::new();
 
-        // ---------------------
-        // Must-Have-Fields
-        // ---------------------
+        // -- Must-Have-Fields --
         // the "From: " header
         header.push_str(&merge_addresses_to_one_line("From", &self.from, ','));
 
         // the "To: " header
         header.push_str(&merge_addresses_to_one_line("To", &self.to, ','));
 
-        // --------------------
-        // Optional fields
-        // --------------------
+        // -- Optional fields --
         // Here we are adding only the header parts which have a value (are not
         // None). That's why we are always checking here with "if let Some()".
 
@@ -417,9 +409,7 @@ impl fmt::Display for Envelope {
     }
 }
 
-// ---------------------
-// Helper functions
-// ---------------------
+// -- Helper functions --
 /// This function is mainly used for the `imap_proto::types::Address` struct to
 /// convert one field into a String. Take a look into the
 /// `test_convert_cow_u8_to_string` test function to see it in action.
@@ -453,9 +443,7 @@ fn convert_vec_address_to_string<'val>(
             //  "Name <msg@host>"
             let mut parsed_address = String::new();
 
-            // -------------------
-            // Get the fields
-            // -------------------
+            // -- Get the fields --
             // add the name field (if it exists)
             if let Some(name) = convert_cow_u8_to_string(address.name.as_ref())? {
                 parsed_address.push_str(&name);

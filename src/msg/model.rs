@@ -320,9 +320,7 @@ impl Msg {
     /// > Sincereley
     /// ```
     pub fn change_to_forwarding(&mut self, account: &Account) {
-        // -----------
-        // Header
-        // -----------
+        // -- Header --
         let old_subject = self.envelope.subject.clone().unwrap_or(String::new());
 
         self.envelope = Envelope {
@@ -474,7 +472,7 @@ impl Msg {
     /// }
     /// ```
     ///
-    /// TODO: Error handling
+    /// THOUGHT: Error handling?
     pub fn add_attachment(&mut self, path: &str) {
         if let Ok(new_attachment) = Attachment::try_from(path) {
             self.attachments.push(new_attachment);
@@ -675,8 +673,6 @@ impl Msg {
             msg_parts = msg_parts.singlepart(msg_attachment);
         }
 
-        // Last but not least: Add the attachments to the header of the msg and
-        // return the finished msg!
         Ok(msg
             .multipart(msg_parts)
             .chain_err(|| format!("-- Current Message --\n{}", self))?)

@@ -51,9 +51,7 @@ fn msg() {
     // make sure, that they are *really* deleted
     assert!(imap_conn.list_msgs("INBOX", &10, &0).unwrap().is_none());
 
-    // ============
-    // Testing
-    // ============
+    // == Testing ==
     // Add messages
     let message_a = Message::builder()
             .from("sender-a@localhost".parse().unwrap())
@@ -72,9 +70,7 @@ fn msg() {
     smtp::send(&account, &message_a).unwrap();
     smtp::send(&account, &message_b).unwrap();
 
-    // ---------------------
-    // Get the messages
-    // ---------------------
+    // -- Get the messages --
     // TODO: check non-existance of \Seen flag
     let msgs = imap_conn.list_msgs("INBOX", &10, &0).unwrap();
     let msgs = if let Some(ref fetches) = msgs {
@@ -98,9 +94,7 @@ fn msg() {
         .find(|msg| msg.envelope.subject.clone().unwrap() == "Subject B")
         .unwrap();
 
-    // ------------
-    // Checkup
-    // ------------
+    // -- Checkup --
     // look, if we received the correct credentials of the msgs.
     assert_eq!(msg_a.envelope.subject.clone().unwrap_or_default(), "Subject A");
     assert_eq!(&msg_a.envelope.from[0], "sender-a@localhost");
