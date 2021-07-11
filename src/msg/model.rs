@@ -620,7 +620,6 @@ impl Msg {
                 msg.message_id(Some(new_msg_id))
             },
         };
-        msg = msg.message_id(self.envelope.message_id.clone());
 
         // add "reply-to"
         if let Some(reply_to) = &self.envelope.reply_to {
