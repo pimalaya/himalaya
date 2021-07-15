@@ -24,8 +24,6 @@ use crate::{
     smtp,
 };
 
-use colorful::Colorful;
-
 error_chain! {
     links {
         Imap(crate::imap::model::Error, crate::imap::model::ErrorKind);
@@ -806,7 +804,7 @@ fn msg_interaction(ctx: &Ctx, msg: &mut Msg, imap_conn: &mut ImapConnector) -> R
                         // user another try and give him/her the chance to fix
                         // that :)
                         Err(err) => {
-                            println!("[{}]: {}", "Error".red(), err);
+                            println!("{}", err);
                             println!("Please reedit your msg to make it to a sendable message!");
                             continue;
                         },
