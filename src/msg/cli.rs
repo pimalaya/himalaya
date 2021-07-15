@@ -24,6 +24,8 @@ use crate::{
     smtp,
 };
 
+use colorful::Colorful;
+
 error_chain! {
     links {
         Imap(crate::imap::model::Error, crate::imap::model::ErrorKind);
@@ -783,7 +785,13 @@ fn tpl_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     Ok(true)
 }
 
+/// This function opens the prompt to do some actions to the msg like sending, editing it again and
+/// so on.
 fn msg_interaction(ctx: &Ctx, msg: &mut Msg, imap_conn: &mut ImapConnector) -> Result<bool> {
+
+    // let the user change the body a little bit first, before opening the prompt
+    msg.edit_body()?;
+
     loop {
         match input::post_edit_choice() {
             Ok(choice) => match choice {
@@ -797,7 +805,11 @@ fn msg_interaction(ctx: &Ctx, msg: &mut Msg, imap_conn: &mut ImapConnector) -> R
                         // due to a missing value of a header. So let's give the
                         // user another try and give him/her the chance to fix
                         // that :)
-                        Err(_) => continue,
+                        Err(err) => {
+                            println!("[{}]: {}", "Error".red(), err);
+                            println!("Please reedit your msg to make it to a sendable message!");
+                            continue;
+                        },
                     };
                     smtp::send(&ctx.account, &sendable)?;
 
