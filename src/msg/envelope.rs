@@ -295,8 +295,7 @@ impl<'from> From<&mailparse::ParsedMail<'from>> for Envelope {
             //
             //  Subject: I use Arch btw
             //
-            // than `value` would be like that: `let value = "I use Arch
-            // btw".to_string()
+            // than `value` would be like that: `let value = "I use Arch btw".to_string()`
             let value = header.get_value().replace("\r", "");
             let header_name = header.get_key().to_lowercase();
             let header_name = header_name.as_str();
@@ -304,23 +303,23 @@ impl<'from> From<&mailparse::ParsedMail<'from>> for Envelope {
             // now go through all headers and look which values they have.
             match header_name {
                 "from" => {
-                    new_envelope.from = value.rsplit(',').map(|addr| addr.to_string()).collect()
+                    new_envelope.from = value.rsplit(',').map(|addr| addr.trim().to_string()).collect()
                 }
 
-                "to" => new_envelope.to = value.rsplit(',').map(|addr| addr.to_string()).collect(),
+                "to" => new_envelope.to = value.rsplit(',').map(|addr| addr.trim().to_string()).collect(),
 
                 "bcc" => {
                     new_envelope.bcc =
-                        Some(value.rsplit(',').map(|addr| addr.to_string()).collect())
+                        Some(value.rsplit(',').map(|addr| addr.trim().to_string()).collect())
                 }
 
                 "cc" => {
-                    new_envelope.cc = Some(value.rsplit(',').map(|addr| addr.to_string()).collect())
+                    new_envelope.cc = Some(value.rsplit(',').map(|addr| addr.trim().to_string()).collect())
                 }
                 "in_reply_to" => new_envelope.in_reply_to = Some(value),
                 "reply_to" => {
                     new_envelope.reply_to =
-                        Some(value.rsplit(',').map(|addr| addr.to_string()).collect())
+                        Some(value.rsplit(',').map(|addr| addr.trim().to_string()).collect())
                 }
 
                 "sender" => new_envelope.sender = Some(value),
@@ -346,7 +345,7 @@ impl<'from> From<&mailparse::ParsedMail<'from>> for Envelope {
                     // now add the custom header to the hash table ..
                     updated_hashmap.insert(
                         custom_header,
-                        value.rsplit(',').map(|addr| addr.to_string()).collect(),
+                        value.rsplit(',').map(|addr| addr.trim().to_string()).collect(),
                     );
 
                     // .. and apply the updated hashmap to the envelope struct
@@ -444,7 +443,8 @@ fn convert_vec_address_to_string<'val>(
             let mut parsed_address = String::new();
 
             // -- Get the fields --
-            // add the name field (if it exists)
+            // add the name field (if it exists) like this:
+            // "Name"
             if let Some(name) = convert_cow_u8_to_string(address.name.as_ref())? {
                 parsed_address.push_str(&name);
             }
@@ -452,7 +452,7 @@ fn convert_vec_address_to_string<'val>(
             // add the mailaddress
             if let Some(mailbox) = convert_cow_u8_to_string(address.mailbox.as_ref())? {
                 if let Some(host) = convert_cow_u8_to_string(address.host.as_ref())? {
-                    let mail_address = format!("{}@{}", mailbox, host);
+                    let mail_address = format!("{}@{}", mailbox, host).trim();
 
                     if parsed_address.is_empty() {
                         // if there's no name, let `parsed_address` look like this:
@@ -462,7 +462,7 @@ fn convert_vec_address_to_string<'val>(
                     } else {
                         // wrap the mailbox between the `<`,`>` brackets to show, that
                         // the mailbox belongs to the name, so it should look like
-                        // this in the afterwards:
+                        // this afterwards:
                         //
                         //  parsed_address = "Name <msg@host>"
                         parsed_address.push_str(&format!(" <{}>", mail_address));
