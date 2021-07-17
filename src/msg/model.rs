@@ -448,9 +448,10 @@ impl Msg {
 
         self.envelope = Envelope::from(&parsed);
 
-        if let Ok(body) = parsed.get_body() {
-            self.body = Body::from(body);
-        }
+        match parsed.get_body() {
+            Ok(body) => self.body = Body::from(body),
+            Err(err) => return Err(ErrorKind::ParseBody(err.to_string()).into()),
+        };
 
         Ok(())
     }
@@ -539,7 +540,7 @@ impl Msg {
 
         // add "to"
         for mailaddress in &self.envelope.to {
-            msg = msg.to(match mailaddress.parse() {
+            msg = msg.to(match mailaddress.trim().parse() {
                 Ok(to) => to,
                 Err(err) => {
                     return Err(
