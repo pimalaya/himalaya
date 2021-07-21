@@ -540,7 +540,7 @@ impl Msg {
 
         // add "to"
         for mailaddress in &self.envelope.to {
-            msg = msg.to(match mailaddress.trim().parse() {
+            msg = msg.to(match mailaddress.parse() {
                 Ok(to) => to,
                 Err(err) => {
                     return Err(

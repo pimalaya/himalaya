@@ -452,20 +452,23 @@ fn convert_vec_address_to_string<'val>(
             // add the mailaddress
             if let Some(mailbox) = convert_cow_u8_to_string(address.mailbox.as_ref())? {
                 if let Some(host) = convert_cow_u8_to_string(address.host.as_ref())? {
-                    let mail_address = format!("{}@{}", mailbox, host).trim();
+                    let mail_address = format!("{}@{}", mailbox, host);
+
+                    // some mail clients add a trailing space, after the address 
+                    let trimmed = mail_address.trim();
 
                     if parsed_address.is_empty() {
                         // if there's no name, let `parsed_address` look like this:
                         //
                         //  parsed_address = "msg@host"
-                        parsed_address.push_str(&mail_address);
+                        parsed_address.push_str(&trimmed);
                     } else {
                         // wrap the mailbox between the `<`,`>` brackets to show, that
                         // the mailbox belongs to the name, so it should look like
                         // this afterwards:
                         //
                         //  parsed_address = "Name <msg@host>"
-                        parsed_address.push_str(&format!(" <{}>", mail_address));
+                        parsed_address.push_str(&format!(" <{}>", trimmed));
                     }
                 }
             }
