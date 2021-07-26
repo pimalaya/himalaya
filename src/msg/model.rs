@@ -793,7 +793,7 @@ impl TryFrom<&Fetch> for Msg {
             Some(body) => body.to_vec(),
             None => Vec::new(),
         };
-
+      
         // Get the content of the msg. Here we have to look (important!) if
         // the fetch even includes a body or not, since the `BODY[]` query is
         // only *optional*!
