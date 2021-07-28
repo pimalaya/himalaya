@@ -83,11 +83,13 @@ impl Envelope {
     /// ```
     /// # use himalaya::msg::envelope::Envelope;
     /// # use std::collections::HashMap;
+    /// # use lettre::message::header::ContentTransferEncoding;
     /// # fn main() {
     /// // our envelope
     /// let envelope = Envelope {
     ///     from:           vec!["TornaxO7 <tornax07@gmail.com>".to_string()],
     ///     to:             vec!["Soywod <clement.douin@posteo.net>".to_string()],
+    ///     encoding:       ContentTransferEncoding::Base64,
     ///     bcc:            Some(vec!["ThirdOne <some@msg.net>".to_string()]),
     ///     cc:             Some(vec!["CcAccount <cc@ccmail.net>".to_string()]),
     ///     custom_headers: None,
@@ -187,9 +189,11 @@ impl Envelope {
 ///
 /// ```no_run
 /// # use himalaya::msg::envelope::Envelope;
+/// # use lettre::message::header::ContentTransferEncoding;
 /// Envelope {
 ///     from:           Vec::new(),
 ///     to:             Vec::new(),
+///     encoding:       ContentTransferEncoding::Base64,
 ///     bcc:            None,
 ///     cc:             None,
 ///     custom_headers: None,
