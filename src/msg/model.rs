@@ -20,7 +20,8 @@ use crate::input;
 use serde::Serialize;
 
 use lettre::message::{
-    header::ContentType, Attachment as lettre_Attachment, Mailbox, Message, MultiPart, SinglePart, header::ContentTransferEncoding
+    header::ContentTransferEncoding, header::ContentType, Attachment as lettre_Attachment, Mailbox,
+    Message, MultiPart, SinglePart,
 };
 
 use std::convert::{From, TryFrom};
@@ -669,6 +670,8 @@ impl Msg {
 
         Ok(msg
             .multipart(msg_parts)
+            // whenever an error appears, print out the messge as well to see what might be the
+            // error
             .chain_err(|| format!("-- Current Message --\n{}", self))?)
     }
 
@@ -710,7 +713,8 @@ impl Default for Msg {
             flags:       Flags::new(&[]),
             envelope:    Envelope::default(),
             body:        Body::default(),
-            // since the uid is set from the server, we will just set it to None
+            // the uid is generated in the "to_sendable_msg" function if the server didn't apply a
+            // message id to it.
             uid:         None,
             date:        None,
             raw:         Vec::new(),
@@ -814,7 +818,8 @@ impl TryFrom<&Fetch> for Msg {
         let mut body = String::new();
         if let Some(parsed) = parsed {
             // Ok, so some mails have their mody wrapped in a multipart, some
-            // don't. This condition hits, if the body isn't in a multipart
+            // don't. This condition hits, if the body isn't in a multipart, so we can
+            // immediately fetch the body from the first part of the mail.
             if parsed.ctype.mimetype == "text/plain" {
                 // Apply the body (if there exists one)
                 if let Ok(parsed_body) = parsed.get_body() {
@@ -836,6 +841,15 @@ impl TryFrom<&Fetch> for Msg {
                 // something like that
                 else if let Some(attachment) = Attachment::from_parsed_mail(subpart) {
                     attachments.push(attachment);
+                }
+                // this shouldn't happen, since this would mean, that's neither an attachment nor
+                // the body of the mail but something else. Log that!
+                else {
+                    println!(
+                        "[{}] Unknown attachment with the following mime-type: {}\n",
+                        "Warning".yellow(),
+                        subpart.ctype.mimetype,
+                    );
                 }
             }
         }
