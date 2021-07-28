@@ -583,7 +583,7 @@ dependencies = [
 [[package]]
 name = "lettre"
 version = "0.10.0-rc.3"
-source = "git+https://github.com/lettre/lettre?rev=e875d9ff6464a1a555570f5a16c4acf6860d0524#e875d9ff6464a1a555570f5a16c4acf6860d0524"
+source = "git+https://github.com/TornaxO7/lettre/?branch=ContentTransferEncoding#af69dfadc9f5a19be8599811195ce0a536ef474c"
 dependencies = [
  "base64 0.13.0",
  "fastrand",

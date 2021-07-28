@@ -17,7 +17,7 @@ imap-proto = "0.14.3"
 mailparse = "0.13.4"
 # lettre = { version = "0.10.0-rc.1", features = ["serde"] }
 # Hint: This commit includes the se- and deserialization of the ContentType
-lettre = { git = "https://github.com/lettre/lettre", rev = "e875d9ff6464a1a555570f5a16c4acf6860d0524", features = ["serde"] }
+lettre = { git = "https://github.com/TornaxO7/lettre/", branch = "ContentTransferEncoding", features = ["serde"] }
 lettre_email = "0.9.4"
 native-tls = "0.2"
 rfc2047-decoder = "0.1.2"

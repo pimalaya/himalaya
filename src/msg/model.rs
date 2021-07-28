@@ -19,7 +19,9 @@ use crate::input;
 
 use serde::Serialize;
 
-use lettre::message::{Attachment as lettre_Attachment, Mailbox, Message, MultiPart, SinglePart};
+use lettre::message::{
+    header::ContentType, Attachment as lettre_Attachment, Mailbox, Message, MultiPart, SinglePart, header::ContentTransferEncoding
+};
 
 use std::convert::{From, TryFrom};
 use std::fmt;
@@ -164,14 +166,9 @@ impl Msg {
         let body = Body::from(envelope.signature.clone().unwrap_or_default());
 
         Self {
-            attachments: Vec::new(),
-            flags: Flags::new(&[]),
             envelope,
             body,
-            // since the uid is set from the server, we will just set it to None
-            uid: None,
-            date: None,
-            raw: Vec::new(),
+            ..Self::default()
         }
     }
 
@@ -214,16 +211,14 @@ impl Msg {
     pub fn change_to_reply(&mut self, account: &Account, reply_all: bool) -> Result<()> {
         // -- Adjust header --
         let subject = if let Some(subject) = self.envelope.subject.clone() {
-
             // avoid creating a subject like this (if you reply to a reply):
-            //  
+            //
             //  Re: Re: My subject
             if !subject.starts_with("Re:") {
                 format!("Re: {}", subject)
             } else {
                 subject
             }
-
         } else {
             String::new()
         };
@@ -604,20 +599,15 @@ impl Msg {
         msg = match self.envelope.message_id.clone() {
             Some(message_id) => msg.message_id(Some(message_id)),
             None => {
-
                 // extract the domain like "gmail.com"
-                let mailbox: lettre::message::Mailbox =
-                    self.envelope.from[0].parse()?;
+                let mailbox: lettre::message::Mailbox = self.envelope.from[0].parse()?;
                 let domain = mailbox.email.domain();
 
-                let new_msg_id = format!(
-                    "{}@{}",
-                    uuid::Uuid::new_v4().to_string(),
-                    domain
-                    );
+                // generate a new UUID
+                let new_msg_id = format!("{}@{}", uuid::Uuid::new_v4().to_string(), domain);
 
                 msg.message_id(Some(new_msg_id))
-            },
+            }
         };
 
         // add "reply-to"
@@ -662,7 +652,10 @@ impl Msg {
         let mut msg_parts = MultiPart::mixed().build();
 
         // -- Body --
-        let msg_body = SinglePart::plain(self.body.get_content());
+        let msg_body = SinglePart::builder()
+            .header(ContentType::TEXT_PLAIN)
+            .header(self.envelope.encoding)
+            .body(self.body.get_content());
         msg_parts = msg_parts.singlepart(msg_body);
 
         // -- Attachments --
@@ -702,6 +695,11 @@ impl Msg {
 
         Ok(raw_message)
     }
+
+    /// Returns the [`ContentTransferEncoding`] of the body.
+    pub fn get_encoding(&self) -> ContentTransferEncoding {
+        self.envelope.encoding
+    }
 }
 
 // -- Traits --
@@ -712,6 +710,7 @@ impl Default for Msg {
             flags:       Flags::new(&[]),
             envelope:    Envelope::default(),
             body:        Body::default(),
+            // since the uid is set from the server, we will just set it to None
             uid:         None,
             date:        None,
             raw:         Vec::new(),
@@ -793,7 +792,7 @@ impl TryFrom<&Fetch> for Msg {
             Some(body) => body.to_vec(),
             None => Vec::new(),
         };
-      
+
         // Get the content of the msg. Here we have to look (important!) if
         // the fetch even includes a body or not, since the `BODY[]` query is
         // only *optional*!
@@ -1098,11 +1097,7 @@ mod tests {
                 subject: Some("Re: Have you heard of himalaya?".to_string()),
                 ..Envelope::default()
             },
-            body: Body::from(concat![
-                "> A body test\n",
-                "> \n",
-                "> Sincereley\n",
-            ]),
+            body: Body::from(concat!["> A body test\n", "> \n", "> Sincereley\n",]),
             ..Msg::default()
         };
 
@@ -1126,7 +1121,7 @@ mod tests {
         rfc_reply_2.change_to_reply(&john_doe, false).unwrap();
         rfc_reply_2.envelope = Envelope {
             message_id: Some("<abcd.1234@local.machine.test>".to_string()),
-            .. rfc_reply_2.envelope.clone()
+            ..rfc_reply_2.envelope.clone()
         };
 
         assert_eq!(rfc_reply_1, expected_rfc1);

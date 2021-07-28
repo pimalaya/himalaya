@@ -3,13 +3,15 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt;
 
-use log::debug;
+use log::{debug, warn};
 
 use serde::Serialize;
 
 use rfc2047_decoder;
 
 use error_chain::error_chain;
+
+use lettre::message::header::ContentTransferEncoding;
 
 error_chain! {
     errors {
@@ -39,7 +41,7 @@ error_chain! {
 /// let envelope = Envelope {
 ///     from: vec![String::from("From <address@example.com>")],
 ///     to: vec![String::from("To <address@to.com>")],
-///     .. Envelope::default()
+///     ..Envelope::default()
 /// };
 ///
 /// # }
@@ -54,8 +56,9 @@ error_chain! {
 pub struct Envelope {
     // -- Must-Fields --
     // These fields are the mininum needed to send a msg.
-    pub from: Vec<String>,
-    pub to: Vec<String>,
+    pub from:     Vec<String>,
+    pub to:       Vec<String>,
+    pub encoding: ContentTransferEncoding,
 
     // -- Optional fields --
     pub bcc:            Option<Vec<String>>,
@@ -198,24 +201,24 @@ impl Envelope {
 ///     subject:        None,
 /// };
 /// ```
-///
 impl Default for Envelope {
     fn default() -> Self {
         Self {
             // must-fields
-            from: Vec::new(),
-            to: Vec::new(),
+            from:     Vec::new(),
+            to:       Vec::new(),
+            encoding: ContentTransferEncoding::Base64,
 
             // optional fields
-            bcc: None,
-            cc: None,
+            bcc:            None,
+            cc:             None,
             custom_headers: None,
-            in_reply_to: None,
-            message_id: None,
-            reply_to: None,
-            sender: None,
-            signature: None,
-            subject: None,
+            in_reply_to:    None,
+            message_id:     None,
+            reply_to:       None,
+            sender:         None,
+            signature:      None,
+            subject:        None,
         }
     }
 }
@@ -277,6 +280,7 @@ impl TryFrom<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
                 in_reply_to,
                 custom_headers: None,
                 signature: None,
+                encoding: ContentTransferEncoding::Base64,
             })
         } else {
             debug!("Fetch doesn't have an envelope.");
@@ -303,28 +307,60 @@ impl<'from> From<&mailparse::ParsedMail<'from>> for Envelope {
             // now go through all headers and look which values they have.
             match header_name {
                 "from" => {
-                    new_envelope.from = value.rsplit(',').map(|addr| addr.trim().to_string()).collect()
+                    new_envelope.from = value
+                        .rsplit(',')
+                        .map(|addr| addr.trim().to_string())
+                        .collect()
                 }
 
-                "to" => new_envelope.to = value.rsplit(',').map(|addr| addr.trim().to_string()).collect(),
+                "to" => {
+                    new_envelope.to = value
+                        .rsplit(',')
+                        .map(|addr| addr.trim().to_string())
+                        .collect()
+                }
 
                 "bcc" => {
-                    new_envelope.bcc =
-                        Some(value.rsplit(',').map(|addr| addr.trim().to_string()).collect())
+                    new_envelope.bcc = Some(
+                        value
+                            .rsplit(',')
+                            .map(|addr| addr.trim().to_string())
+                            .collect(),
+                    )
                 }
 
                 "cc" => {
-                    new_envelope.cc = Some(value.rsplit(',').map(|addr| addr.trim().to_string()).collect())
+                    new_envelope.cc = Some(
+                        value
+                            .rsplit(',')
+                            .map(|addr| addr.trim().to_string())
+                            .collect(),
+                    )
                 }
                 "in_reply_to" => new_envelope.in_reply_to = Some(value),
                 "reply_to" => {
-                    new_envelope.reply_to =
-                        Some(value.rsplit(',').map(|addr| addr.trim().to_string()).collect())
+                    new_envelope.reply_to = Some(
+                        value
+                            .rsplit(',')
+                            .map(|addr| addr.trim().to_string())
+                            .collect(),
+                    )
                 }
 
                 "sender" => new_envelope.sender = Some(value),
                 "subject" => new_envelope.subject = Some(value),
                 "message-id" => new_envelope.message_id = Some(value),
+                "content-transfer-encoding" => {
+                    match value.to_lowercase().as_str() {
+                        "8bit" => new_envelope.encoding = ContentTransferEncoding::EightBit,
+                        "7bit" => new_envelope.encoding = ContentTransferEncoding::SevenBit,
+                        "quoted-printable" => {
+                            new_envelope.encoding = ContentTransferEncoding::QuotedPrintable
+                        }
+                        "base64" => new_envelope.encoding = ContentTransferEncoding::Base64,
+                        _ => warn!("Unsupported encoding, default to QuotedPrintable"),
+                    };
+                }
 
                 // it's a custom header => Add it to our
                 // custom-header-hash-map
@@ -345,7 +381,10 @@ impl<'from> From<&mailparse::ParsedMail<'from>> for Envelope {
                     // now add the custom header to the hash table ..
                     updated_hashmap.insert(
                         custom_header,
-                        value.rsplit(',').map(|addr| addr.trim().to_string()).collect(),
+                        value
+                            .rsplit(',')
+                            .map(|addr| addr.trim().to_string())
+                            .collect(),
                     );
 
                     // .. and apply the updated hashmap to the envelope struct
@@ -373,7 +412,7 @@ impl<'from> From<&mailparse::ParsedMail<'from>> for Envelope {
 ///     to: vec![String::from("Soywod <clement.douin@posteo.net>")],
 ///     from: vec![String::from("TornaxO7 <tornax07@gmail.com>")],
 ///     signature: Some(String::from("Signature of Envelope")),
-///     .. Envelope::default()
+///     ..Envelope::default()
 /// };
 ///
 /// // use the `fmt::Display` trait
@@ -393,7 +432,6 @@ impl<'from> From<&mailparse::ParsedMail<'from>> for Envelope {
 /// ```
 ///
 /// [get_header_as_string]: struct.Envelope.html#method.get_header_as_string
-///
 impl fmt::Display for Envelope {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         let mut header = self.get_header_as_string();
@@ -423,7 +461,7 @@ fn convert_cow_u8_to_string<'val>(value: Option<&Cow<'val, [u8]>>) -> Result<Opt
 }
 
 /// This function is mainly used for the `imap_proto::types::Address` struct as
-/// well to change the Address into an address-string like this: 
+/// well to change the Address into an address-string like this:
 /// `TornaxO7 <tornax07@gmail.com>`.
 ///
 /// If you provide two addresses as the function argument, then this functions
@@ -454,7 +492,7 @@ fn convert_vec_address_to_string<'val>(
                 if let Some(host) = convert_cow_u8_to_string(address.host.as_ref())? {
                     let mail_address = format!("{}@{}", mailbox, host);
 
-                    // some mail clients add a trailing space, after the address 
+                    // some mail clients add a trailing space, after the address
                     let trimmed = mail_address.trim();
 
                     if parsed_address.is_empty() {
@@ -576,16 +614,16 @@ mod tests {
 
         let addresses = vec![
             Address {
-                name: Some(Cow::Owned(b"Name1".to_vec())),
-                adl: None,
+                name:    Some(Cow::Owned(b"Name1".to_vec())),
+                adl:     None,
                 mailbox: Some(Cow::Owned(b"Mailbox1".to_vec())),
-                host: Some(Cow::Owned(b"Host1".to_vec())),
+                host:    Some(Cow::Owned(b"Host1".to_vec())),
             },
             Address {
-                name: None,
-                adl: None,
+                name:    None,
+                adl:     None,
                 mailbox: Some(Cow::Owned(b"Mailbox2".to_vec())),
-                host: Some(Cow::Owned(b"Host2".to_vec())),
+                host:    Some(Cow::Owned(b"Host2".to_vec())),
             },
         ];
 
