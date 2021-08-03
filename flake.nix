@@ -21,6 +21,8 @@
         let
           name = "himalaya";
 
+          version = "0.4.0";
+
           # Imports
           pkgs = import nixpkgs {
             inherit system;
@@ -70,8 +72,9 @@
               inherit (packages.${name}) version;
               name = "${name}-vim";
               src = self;
-              configurePhase = "cd vim/";
               buildInputs = [ packages.${name} ];
+              dontConfigure = false;
+              configurePhase = "cd vim/";
               postInstall = ''
                 mkdir -p $out/bin
                 ln -s ${packages.${name}}/bin/himalaya $out/bin/himalaya
