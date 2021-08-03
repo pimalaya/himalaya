@@ -41,26 +41,24 @@
             generatedCargoNix;
 
           # Create the cargo2nix project
-          project = pkgs.callPackage
-            (generatedCargoNix {
-              inherit name;
-              src = ./.;
-            })
-            {
-              # Individual crate overrides go here
-              # Example: https://github.com/balsoft/simple-osd-daemons/blob/6f85144934c0c1382c7a4d3a2bbb80106776e270/flake.nix#L28-L50
-              defaultCrateOverrides = pkgs.defaultCrateOverrides // {
-                # The himalaya crate itself is overriden here. Typically we
-                # configure non-Rust dependencies (see below) here.
-                ${name} = oldAttrs: {
-                  inherit buildInputs nativeBuildInputs;
-                  postInstall = ''
-                    mkdir -p $out/share/applications/
-                    cp assets/himalaya.desktop $out/share/applications/
-                  '';
-                };
+          project = pkgs.callPackage (generatedCargoNix {
+            inherit name;
+            src = ./.;
+          }) {
+            # Individual crate overrides go here
+            # Example: https://github.com/balsoft/simple-osd-daemons/blob/6f85144934c0c1382c7a4d3a2bbb80106776e270/flake.nix#L28-L50
+            defaultCrateOverrides = pkgs.defaultCrateOverrides // {
+              # The himalaya crate itself is overriden here. Typically we
+              # configure non-Rust dependencies (see below) here.
+              ${name} = oldAttrs: {
+                inherit buildInputs nativeBuildInputs;
+                postInstall = ''
+                  mkdir -p $out/share/applications/
+                  cp assets/himalaya.desktop $out/share/applications/
+                '';
               };
             };
+          };
 
           # Configuration for the non-Rust dependencies
           buildInputs = with pkgs; [ openssl.dev ];
@@ -75,14 +73,8 @@
               name = "${name}-vim";
               src = self;
               buildInputs = [ packages.${name} ];
+              dontConfigure = false;
               configurePhase = "cd vim/";
-              #unpackPhase = ''
-              #  echo "-- UNPACK PHASE --------------------------"
-              #  ls -alt
-              #  rm -v !"vim/"
-              #  cp -vaR vim/. .
-              #  rmdir vim/
-              #'';
               postInstall = ''
                 mkdir -p $out/bin
                 ln -s ${packages.${name}}/bin/himalaya $out/bin/himalaya
