@@ -21,8 +21,6 @@
         let
           name = "himalaya";
 
-          version = "0.4.0";
-
           # Imports
           pkgs = import nixpkgs {
             inherit system;
