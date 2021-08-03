@@ -14,6 +14,7 @@ pub struct Tpl {
     headers: HashMap<String, String>,
     body: Option<String>,
     signature: Option<String>,
+    raw: String,
 }
 
 impl Tpl {
@@ -23,11 +24,14 @@ impl Tpl {
         headers.insert("To".to_string(), String::new());
         headers.insert("Subject".to_string(), String::new());
 
-        Self {
+        let mut tpl = Self {
             headers,
             body: None,
             signature: ctx.config.signature(ctx.account),
-        }
+            raw: String::new(),
+        };
+        tpl.raw = tpl.to_string();
+        tpl
     }
 
     pub fn reply(ctx: &Ctx, msg: &mailparse::ParsedMail) -> Self {
@@ -65,11 +69,14 @@ impl Tpl {
             .collect::<Vec<String>>()
             .join("\n");
 
-        Self {
+        let mut tpl = Self {
             headers,
             body: Some(body),
             signature: ctx.config.signature(&ctx.account),
-        }
+            raw: String::new(),
+        };
+        tpl.raw = tpl.to_string();
+        tpl
     }
 
     pub fn reply_all(ctx: &Ctx, msg: &mailparse::ParsedMail) -> Self {
@@ -140,11 +147,14 @@ impl Tpl {
             .collect::<Vec<String>>()
             .join("\n");
 
-        Self {
+        let mut tpl = Self {
             headers,
             body: Some(body),
             signature: ctx.config.signature(&ctx.account),
-        }
+            raw: String::new(),
+        };
+        tpl.raw = tpl.to_string();
+        tpl
     }
 
     pub fn forward(ctx: &Ctx, msg: &mailparse::ParsedMail) -> Self {
@@ -167,11 +177,14 @@ impl Tpl {
         let mut body = String::from("-------- Forwarded Message --------\n");
         body.push_str(&parts.join("\r\n\r\n").replace("\r", ""));
 
-        Self {
+        let mut tpl = Self {
             headers,
             body: Some(body),
             signature: ctx.config.signature(&ctx.account),
-        }
+            raw: String::new(),
+        };
+        tpl.raw = tpl.to_string();
+        tpl
     }
 
     pub fn header<K: ToString, V: ToString>(&mut self, key: K, val: V) -> &Self {

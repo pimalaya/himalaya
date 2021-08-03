@@ -559,7 +559,7 @@ fn msg_matches_send(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
 
-    let msg = if atty::is(Stream::Stdin) {
+    let msg = if atty::is(Stream::Stdin) || ctx.output.is_json() {
         matches
             .value_of("message")
             .unwrap_or_default()

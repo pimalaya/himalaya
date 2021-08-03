@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- New/reply/forward from Vim plugin since Tpl refactor [#176]
+
 ## [0.4.0] - 2021-06-03
 
 ### Added
@@ -296,3 +300,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#144]: https://github.com/soywod/himalaya/issues/144
 [#146]: https://github.com/soywod/himalaya/issues/146
 [#160]: https://github.com/soywod/himalaya/issues/160
+[#176]: https://github.com/soywod/himalaya/issues/176

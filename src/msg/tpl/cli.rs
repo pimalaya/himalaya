@@ -118,7 +118,7 @@ pub fn tpl_matches(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     }
 }
 
-fn override_tpl_with_args(tpl: &mut Tpl, matches: &clap::ArgMatches) {
+fn override_tpl_with_args(ctx: &Ctx, tpl: &mut Tpl, matches: &clap::ArgMatches) {
     if let Some(from) = matches.value_of("from") {
         debug!("overriden from: {:?}", from);
         tpl.header("From", from);
@@ -155,7 +155,7 @@ fn override_tpl_with_args(tpl: &mut Tpl, matches: &clap::ArgMatches) {
         tpl.header(key, val);
     }
 
-    if atty::isnt(Stream::Stdin) {
+    if atty::isnt(Stream::Stdin) && ctx.output.is_plain() {
         let body = io::stdin()
             .lock()
             .lines()
@@ -180,7 +180,7 @@ fn tpl_matches_new(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     debug!("new command matched");
 
     let mut tpl = Tpl::new(&ctx);
-    override_tpl_with_args(&mut tpl, &matches);
+    override_tpl_with_args(&ctx, &mut tpl, &matches);
     trace!("tpl: {:?}", tpl);
     ctx.output.print(tpl);
 
@@ -197,11 +197,11 @@ fn tpl_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     let msg = &imap_conn.read_msg(&ctx.mbox, &uid)?;
     let msg = mailparse::parse_mail(&msg)?;
     let mut tpl = if matches.is_present("reply-all") {
-        Tpl::reply(&ctx, &msg)
-    } else {
         Tpl::reply_all(&ctx, &msg)
+    } else {
+        Tpl::reply(&ctx, &msg)
     };
-    override_tpl_with_args(&mut tpl, &matches);
+    override_tpl_with_args(&ctx, &mut tpl, &matches);
     trace!("tpl: {:?}", tpl);
     ctx.output.print(tpl);
 
@@ -218,7 +218,7 @@ fn tpl_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     let msg = &imap_conn.read_msg(&ctx.mbox, &uid)?;
     let msg = mailparse::parse_mail(&msg)?;
     let mut tpl = Tpl::forward(&ctx, &msg);
-    override_tpl_with_args(&mut tpl, &matches);
+    override_tpl_with_args(&ctx, &mut tpl, &matches);
     trace!("tpl: {:?}", tpl);
     ctx.output.print(tpl);
 
