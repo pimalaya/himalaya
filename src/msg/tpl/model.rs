@@ -214,6 +214,7 @@ impl Tpl {
             }
         }
 
+        headers.insert(String::from("From"), ctx.config.address(ctx.account));
         headers.insert(String::from("To"), url.path().to_string());
         headers.insert(String::from("Subject"), subject.into());
         if !cc.is_empty() {
