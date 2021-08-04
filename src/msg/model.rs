@@ -293,7 +293,8 @@ impl<'m> Msg<'m> {
                 "in-reply-to" => msg.in_reply_to(value.parse().unwrap()),
                 "from" => match value.parse::<lettre::message::Mailbox>() {
                     Ok(addr) => {
-                        let msg_id = format!("{}@{}", Uuid::new_v4().to_string(), addr.email.domain());
+                        let msg_id =
+                            format!("{}@{}", Uuid::new_v4().to_string(), addr.email.domain());
                         msg.from(addr).message_id(Some(msg_id))
                     }
                     Err(_) => msg,
@@ -435,7 +436,9 @@ impl<'m> Msg<'m> {
             in_reply_to: headers.get_first_value("message-id"),
             to,
             cc: None,
-            subject: headers.get_first_value("subject"),
+            subject: headers
+                .get_first_value("subject")
+                .map(|s| format!("Re: {}", s)),
             default_content: Some(thread),
         };
         Msg::build_tpl(config, account, msg_spec)
@@ -503,7 +506,9 @@ impl<'m> Msg<'m> {
             in_reply_to: headers.get_first_value("message-id"),
             cc,
             to: Some(vec![reply_to, to].concat()),
-            subject: headers.get_first_value("subject"),
+            subject: headers
+                .get_first_value("subject")
+                .map(|s| format!("Re: {}", s)),
             default_content: Some(thread),
         };
         Msg::build_tpl(config, account, msg_spec)
