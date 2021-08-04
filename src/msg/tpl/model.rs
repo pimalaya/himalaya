@@ -319,7 +319,7 @@ mod tests {
         let account = Account {
             name: Some(String::from("Test")),
             email: String::from("test@localhost"),
-            signature: Some(String::from("-- \nCordialement,")),
+            signature: Some(String::from("Cordialement,")),
             ..Account::default()
         };
         let config = Config {
@@ -374,7 +374,8 @@ mod tests {
         let account = Account {
             name: Some(String::from("Test")),
             email: String::from("test@localhost"),
-            signature: Some(String::from("-- \nCordialement,")),
+            signature_delimiter: Some(String::from("~~\n")),
+            signature: Some(String::from("Cordialement,")),
             ..Account::default()
         };
         let config = Config {
@@ -394,7 +395,7 @@ mod tests {
         let tpl = Tpl::reply(&ctx, &parsed_mail);
 
         assert_eq!(
-            "From: Test <test@localhost>\nTo: Sender <sender@localhost>\nSubject: Re: Test\n\n>Hello, world!\n\n-- \nCordialement,",
+            "From: Test <test@localhost>\nTo: Sender <sender@localhost>\nSubject: Re: Test\n\n>Hello, world!\n\n~~\nCordialement,",
             tpl.to_string()
         );
     }
@@ -446,7 +447,7 @@ Subject: Re: Test
         let account = Account {
             name: Some(String::from("Test")),
             email: String::from("test@localhost"),
-            signature: Some(String::from("-- \nCordialement,")),
+            signature: Some(String::from("Cordialement,")),
             ..Account::default()
         };
         let config = Config {
@@ -505,7 +506,7 @@ Subject: Re: Test
         let account = Account {
             name: Some(String::from("Test")),
             email: String::from("test@localhost"),
-            signature: Some(String::from("-- \nCordialement,")),
+            signature: Some(String::from("Cordialement,")),
             ..Account::default()
         };
         let config = Config {

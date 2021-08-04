@@ -8,6 +8,7 @@ fn get_account(addr: &str) -> Account {
     Account {
         name: None,
         downloads_dir: None,
+        signature_delimiter: None,
         signature: None,
         default_page_size: None,
         default: Some(true),

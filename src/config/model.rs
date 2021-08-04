@@ -26,6 +26,7 @@ pub struct Account {
     // Override
     pub name: Option<String>,
     pub downloads_dir: Option<PathBuf>,
+    pub signature_delimiter: Option<String>,
     pub signature: Option<String>,
     pub default_page_size: Option<usize>,
     pub watch_cmds: Option<Vec<String>>,
@@ -114,6 +115,7 @@ impl Default for Account {
         Self {
             name: None,
             downloads_dir: None,
+            signature_delimiter: None,
             signature: None,
             default_page_size: None,
             default: None,
@@ -143,6 +145,7 @@ pub struct Config {
     pub name: String,
     pub downloads_dir: Option<PathBuf>,
     pub notify_cmd: Option<String>,
+    pub signature_delimiter: Option<String>,
     pub signature: Option<String>,
     pub default_page_size: Option<usize>,
     pub watch_cmds: Option<Vec<String>>,
@@ -251,6 +254,12 @@ impl Config {
     }
 
     pub fn signature(&self, account: &Account) -> Option<String> {
+        let default_sig_delim = String::from("-- \n");
+        let sig_delim = account
+            .signature_delimiter
+            .as_ref()
+            .or_else(|| self.signature_delimiter.as_ref())
+            .unwrap_or(&default_sig_delim);
         let sig = account
             .signature
             .as_ref()
@@ -258,6 +267,7 @@ impl Config {
 
         sig.and_then(|sig| fs::read_to_string(sig).ok())
             .or_else(|| sig.map(|sig| sig.to_owned()))
+            .map(|sig| String::new() + sig_delim + sig.as_ref())
     }
 
     pub fn default_page_size(&self, account: &Account) -> usize {
@@ -297,6 +307,7 @@ impl Default for Config {
             name: String::new(),
             downloads_dir: None,
             notify_cmd: None,
+            signature_delimiter: None,
             signature: None,
             default_page_size: None,
             watch_cmds: None,
