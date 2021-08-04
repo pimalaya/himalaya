@@ -1,17 +1,18 @@
-use clap;
+use clap::{self, ArgMatches};
 use env_logger;
 use error_chain::error_chain;
 use log::{debug, error, trace};
 use std::{env, path::PathBuf, process::exit};
+use url::{self, Url};
 
 use himalaya::{
-    ctx::Ctx,
     comp::cli::{comp_matches, comp_subcmds},
     config::{cli::config_args, model::Config},
+    ctx::Ctx,
     flag::cli::{flag_matches, flag_subcmds},
     imap::cli::{imap_matches, imap_subcmds},
     mbox::cli::{mbox_matches, mbox_source_arg, mbox_subcmds},
-    msg::cli::{msg_matches, msg_subcmds},
+    msg::cli::{msg_matches, msg_matches_mailto, msg_subcmds},
     output::{cli::output_args, model::Output},
 };
 
@@ -23,6 +24,9 @@ error_chain! {
         ImapCli(himalaya::imap::cli::Error, himalaya::imap::cli::ErrorKind);
         MboxCli(himalaya::mbox::cli::Error, himalaya::mbox::cli::ErrorKind);
         MsgCli(himalaya::msg::cli::Error, himalaya::msg::cli::ErrorKind);
+    }
+    foreign_links {
+        Url(url::ParseError);
     }
 }
 
@@ -46,6 +50,18 @@ fn run() -> Result<()> {
     env_logger::init_from_env(
         env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "off"),
     );
+
+    let raw_args: Vec<String> = env::args().collect();
+    if raw_args.len() > 1 && raw_args[1].starts_with("mailto:") {
+        let config = Config::new(None)?;
+        let account = config.find_account_by_name(None)?;
+        let output = Output::new("plain");
+        let mbox = "INBOX";
+        let arg_matches = ArgMatches::default();
+        let app = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
+        let url = Url::parse(&raw_args[1])?;
+        return Ok(msg_matches_mailto(&app, &url)?);
+    }
 
     let args = parse_args();
     let arg_matches = args.get_matches();

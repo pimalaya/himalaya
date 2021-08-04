@@ -1,7 +1,8 @@
 use error_chain::error_chain;
 use mailparse::{self, MailHeaderMap};
 use serde::Serialize;
-use std::{collections::HashMap, fmt};
+use std::{borrow::Cow, collections::HashMap, fmt};
+use url::Url;
 
 use crate::{ctx::Ctx, msg::model::Msg};
 
@@ -180,6 +181,51 @@ impl Tpl {
         let mut tpl = Self {
             headers,
             body: Some(body),
+            signature: ctx.config.signature(&ctx.account),
+            raw: String::new(),
+        };
+        tpl.raw = tpl.to_string();
+        tpl
+    }
+
+    pub fn mailto(ctx: &Ctx, url: &Url) -> Self {
+        let mut headers = HashMap::new();
+
+        let mut cc = Vec::new();
+        let mut bcc = Vec::new();
+        let mut subject = Cow::default();
+        let mut body = Cow::default();
+
+        for (key, val) in url.query_pairs() {
+            match key.as_bytes() {
+                b"cc" => {
+                    cc.push(val);
+                }
+                b"bcc" => {
+                    bcc.push(val);
+                }
+                b"subject" => {
+                    subject = val;
+                }
+                b"body" => {
+                    body = val;
+                }
+                _ => (),
+            }
+        }
+
+        headers.insert(String::from("To"), url.path().to_string());
+        headers.insert(String::from("Subject"), subject.into());
+        if !cc.is_empty() {
+            headers.insert(String::from("Cc"), cc.join(", "));
+        }
+        if !bcc.is_empty() {
+            headers.insert(String::from("Bcc"), cc.join(", "));
+        }
+
+        let mut tpl = Self {
+            headers,
+            body: Some(body.into()),
             signature: ctx.config.signature(&ctx.account),
             raw: String::new(),
         };

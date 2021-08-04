@@ -7,6 +7,7 @@ use std::{
     io::{self, BufRead},
     ops::Deref,
 };
+use url::Url;
 
 use crate::{
     ctx::Ctx,
@@ -593,4 +594,48 @@ fn msg_matches_save(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 
     imap_conn.logout();
     Ok(true)
+}
+
+pub fn msg_matches_mailto(ctx: &Ctx, url: &Url) -> Result<()> {
+    debug!("mailto command matched");
+
+    let mut imap_conn = ImapConnector::new(&ctx.account)?;
+    let tpl = Tpl::mailto(&ctx, &url);
+    let content = input::open_editor_with_tpl(tpl.to_string().as_bytes())?;
+    let mut msg = Msg::from(content);
+
+    loop {
+        match input::post_edit_choice() {
+            Ok(choice) => match choice {
+                input::PostEditChoice::Send => {
+                    debug!("sending message…");
+                    let msg = msg.to_sendable_msg()?;
+                    smtp::send(&ctx.account, &msg)?;
+                    imap_conn.append_msg("Sent", &msg.formatted(), vec![Flag::Seen])?;
+                    input::remove_draft()?;
+                    ctx.output.print("Message successfully sent");
+                    break;
+                }
+                input::PostEditChoice::Edit => {
+                    let content = input::open_editor_with_draft()?;
+                    msg = Msg::from(content);
+                }
+                input::PostEditChoice::LocalDraft => break,
+                input::PostEditChoice::RemoteDraft => {
+                    debug!("saving to draft…");
+                    imap_conn.append_msg("Drafts", &msg.to_vec()?, vec![Flag::Seen])?;
+                    input::remove_draft()?;
+                    ctx.output.print("Message successfully saved to Drafts");
+                    break;
+                }
+                input::PostEditChoice::Discard => {
+                    input::remove_draft()?;
+                    break;
+                }
+            },
+            Err(err) => error!("{}", err),
+        }
+    }
+    imap_conn.logout();
+    Ok(())
 }
