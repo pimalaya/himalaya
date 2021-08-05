@@ -2,6 +2,7 @@ use error_chain::error_chain;
 use lettre::transport::smtp::authentication::Credentials as SmtpCredentials;
 use log::debug;
 use serde::Deserialize;
+use shellexpand;
 use std::{
     collections::HashMap,
     env,
@@ -230,8 +231,17 @@ impl Config {
         account
             .downloads_dir
             .as_ref()
-            .unwrap_or(self.downloads_dir.as_ref().unwrap_or(&env::temp_dir()))
-            .to_owned()
+            .and_then(|dir| dir.to_str())
+            .and_then(|dir| shellexpand::full(dir).ok())
+            .map(|dir| PathBuf::from(dir.to_string()))
+            .unwrap_or(
+                self.downloads_dir
+                    .as_ref()
+                    .and_then(|dir| dir.to_str())
+                    .and_then(|dir| shellexpand::full(dir).ok())
+                    .map(|dir| PathBuf::from(dir.to_string()))
+                    .unwrap_or(env::temp_dir()),
+            )
             .join(filename)
     }
 
@@ -264,8 +274,9 @@ impl Config {
             .signature
             .as_ref()
             .or_else(|| self.signature.as_ref());
-
-        sig.and_then(|sig| fs::read_to_string(sig).ok())
+        sig.and_then(|sig| shellexpand::full(sig).ok())
+            .map(|sig| sig.to_string())
+            .and_then(|sig| fs::read_to_string(sig).ok())
             .or_else(|| sig.map(|sig| sig.to_owned()))
             .map(|sig| String::new() + sig_delim + sig.as_ref())
     }
