@@ -74,7 +74,7 @@ fn msg() {
 
     // List messages
     // TODO: check non-existance of \Seen flag
-    let msgs = imap_conn.list_msgs("INBOX", &10, &0).unwrap();
+    let msgs = imap_conn.list_msgs("INBOX", &10, &1).unwrap();
     let msgs = if let Some(ref fetches) = msgs {
         Msgs::from(fetches)
     } else {
@@ -111,7 +111,7 @@ fn msg() {
         .add_flags("INBOX", &msg_b.uid.to_string(), "\\Deleted")
         .unwrap();
     imap_conn.expunge("INBOX").unwrap();
-    assert!(imap_conn.list_msgs("INBOX", &10, &0).unwrap().is_none());
+    assert!(imap_conn.list_msgs("INBOX", &10, &1).unwrap().is_none());
 
     // Logout
     imap_conn.logout();

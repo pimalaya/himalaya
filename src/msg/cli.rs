@@ -66,7 +66,7 @@ fn page_arg<'a>() -> clap::Arg<'a, 'a> {
         .short("p")
         .long("page")
         .value_name("INT")
-        .default_value("0")
+        .default_value("1")
 }
 
 fn attachment_arg<'a>() -> clap::Arg<'a, 'a> {
@@ -185,6 +185,7 @@ fn msg_matches_list(ctx: &Ctx, opt_matches: Option<&clap::ArgMatches>) -> Result
     debug!("page size: {:?}", page_size);
     let page: usize = opt_matches
         .and_then(|matches| matches.value_of("page").unwrap().parse().ok())
+        .map(|page| 1.max(page) - 1)
         .unwrap_or_default();
     debug!("page: {}", &page);
 
@@ -215,7 +216,8 @@ fn msg_matches_search(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
         .value_of("page")
         .unwrap()
         .parse()
-        .unwrap_or_default();
+        .map(|page| 1.max(page) - 1)
+        .unwrap_or(1);
     debug!("page: {}", &page);
 
     let query = matches
