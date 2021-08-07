@@ -331,18 +331,19 @@ impl Msg {
             ..self.envelope.clone()
         };
 
-        // -- Body --
-        // apply a line which should indicate where the forwarded message begins
-        let mut body = format!(
-            "\n---------- Forwarded Message ----------\n{}",
-            &self.body,
-        );
+        let mut body = String::new();
 
-        // also add your signature
         if let Some(signature) = &account.signature {
             body.push_str(signature);
         }
-        
+
+        // -- Body --
+        // apply a line which should indicate where the forwarded message begins
+        body.push_str(&format!(
+            "\n---------- Forwarded Message ----------\n{}",
+            &self.body,
+        ));
+
         self.body = Body::from(body);
     }
 
