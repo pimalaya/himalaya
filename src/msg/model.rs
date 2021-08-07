@@ -174,8 +174,6 @@ impl Msg {
     }
 
     /// Converts the message into a Reply message. It'll set the headers
-    /// differently depending on the value of `reply_all`.
-    ///
     /// An [`Account`] struct is needed to set the `From:` field.
     ///
     /// # Changes
