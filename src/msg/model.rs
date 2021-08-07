@@ -85,7 +85,8 @@ pub struct Msg {
     /// This variable stores the body of the msg.
     pub body: Body,
 
-    /// The UID of the msg. It's only set from the server!
+    /// The UID of the msg. In general, a message should already have one, unless you're writing a
+    /// new message, then we're generating it.
     uid: Option<u32>,
 
     /// The origination date field. Read [the RFC here] here for more
@@ -265,13 +266,19 @@ impl Msg {
 
         // comment "out" the body of the msg, by adding the `>` characters to
         // each line which includes a string.
-        let new_body: String = self
+        let mut new_body: String = self
             .body
             .clone()
             .split('\n')
             .map(|line| format!("> {}\n", line))
             .collect::<Vec<String>>()
             .concat();
+
+        // also add the the signature in the end
+        new_body.push('\n');
+        if let Some(signature) = &account.signature {
+            new_body.push_str(signature)
+        }
 
         self.body = Body::from(new_body);
         self.envelope = new_envelope;
@@ -324,14 +331,19 @@ impl Msg {
             ..self.envelope.clone()
         };
 
-        // ---------
-        // Body
-        // ---------
+        // -- Body --
         // apply a line which should indicate where the forwarded message begins
-        self.body = Body::from(format!(
+        let mut body = format!(
             "\n---------- Forwarded Message ----------\n{}",
             &self.body,
-        ));
+        );
+
+        // also add your signature
+        if let Some(signature) = &account.signature {
+            body.push_str(signature);
+        }
+        
+        self.body = Body::from(body);
     }
 
     /// Returns the bytes of the *sendable message* of the struct!
