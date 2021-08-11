@@ -165,7 +165,7 @@ impl Account {
         Self {
             name: name.and_then(|name| Some(name.to_string())),
             downloads_dir: Some(PathBuf::from(r"/tmp")),
-            signature: Some(String::from("Account Signature")),
+            signature: None,
             default_page_size: Some(42),
             default: Some(true),
             email: email_addr.into(),
@@ -183,6 +183,60 @@ impl Account {
             smtp_login: email_addr.into(),
             smtp_passwd_cmd: String::from("echo 'password'"),
         }
+    }
+
+    /// Creates a new account with a custom signature. Passing `None` to `signature` sets the
+    /// signature to `Account Signature`.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use himalaya::config::model::Account;
+    ///
+    /// fn main() {
+    ///
+    ///     // the testing accounts
+    ///     let account_with_custom_signature = Account::new_with_signature(
+    ///         Some("Email name"),
+    ///         "some@mail.com",
+    ///         Some("Custom signature! :)")
+    ///     );
+    ///
+    ///     let account_with_default_signature = Account::new_with_signature(
+    ///         Some("Email name"),
+    ///         "some@mail.com",
+    ///         None
+    ///     );
+    ///
+    ///     // How they should look like
+    ///     let account_comp1 = Account {
+    ///         name: Some("Email name".to_string()),
+    ///         email: "some@mail.com".to_string(),
+    ///         signature: Some("Custom signature! :)".to_string()),
+    ///         .. Account::default()
+    ///     };
+    ///
+    ///     let account_cmp2 = Account {
+    ///         name: Some("Email name".to_string()),
+    ///         email: "some@mail.com".to_string(),
+    ///         signature: Some("Account Signature"),
+    ///         .. Account::default()
+    ///     };
+    ///
+    ///     assert_eq!(account_with_custom_signature, account_cmp1);
+    ///     assert_eq!(account_with_default_signature, account_cmp2);
+    /// }
+    /// ```
+    pub fn new_with_signature(name: Option<&str>, email_addr: &str, signature: Option<&str>) -> Self {
+        let mut account = Account::new(name, email_addr);
+
+        // Use the default signature "Account Signature", if the programmer didn't provide a custom
+        // one.
+        if let Some(signature) = signature {
+            account.signature = Some(signature.to_string());
+        } else {
+            account.signature = Some(String::from("Account Signature"));
+        }
+        account
     }
 }
 

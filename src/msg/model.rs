@@ -83,6 +83,7 @@ pub struct Msg {
     pub envelope: Envelope,
 
     /// This variable stores the body of the msg.
+    /// This includes the general content text and the signature.
     pub body: Body,
 
     /// The UID of the msg. In general, a message should already have one, unless you're writing a
@@ -273,10 +274,12 @@ impl Msg {
             .map(|line| format!("> {}\n", line))
             .collect::<Vec<String>>()
             .concat();
+        // remove the last '\n'
+        new_body.pop();
 
         // also add the the signature in the end
-        new_body.push('\n');
         if let Some(signature) = &account.signature {
+            new_body.push('\n');
             new_body.push_str(signature)
         }
 
@@ -318,7 +321,7 @@ impl Msg {
     /// > Hi,
     /// > I use Himalaya
     /// >
-    /// > Sincereley
+    /// > Sincerely
     /// ```
     pub fn change_to_forwarding(&mut self, account: &Account) {
         // -- Header --
@@ -335,14 +338,15 @@ impl Msg {
 
         if let Some(signature) = &account.signature {
             body.push_str(signature);
+            body.push('\n')
         }
 
         // -- Body --
         // apply a line which should indicate where the forwarded message begins
         body.push_str(&format!(
-            "\n---------- Forwarded Message ----------\n{}",
-            &self.body,
-        ));
+                "\n---------- Forwarded Message ----------\n{}",
+                &self.body,
+                ));
 
         self.body = Body::from(body);
     }
@@ -405,16 +409,16 @@ impl Msg {
     pub fn edit_body(&mut self) -> Result<()> {
         // First of all, we need to create our template for the user. This
         // means, that the header needs to be added as well!
-        let body = format!("{}\n{}", self.envelope.get_header_as_string(), self.body);
+        let msg = format!("{}\n{}", self.envelope.get_header_as_string(), self.body);
 
         // We don't let this line compile, if we're doing
         // tests, because we just need to look, if the headers are set
         // correctly
         #[cfg(not(test))]
-        let body = input::open_editor_with_tpl(body.as_bytes())?;
+        let msg = input::open_editor_with_tpl(msg.as_bytes())?;
 
         // refresh the state of the msg
-        self.parse_from_str(&body)?;
+        self.parse_from_str(&msg)?;
 
         Ok(())
     }
@@ -436,7 +440,7 @@ impl Msg {
     ///         "\n",
     ///         "You should use himalaya, it's a nice program :D\n",
     ///         "\n",
-    ///         "Sincereley\n",
+    ///         "Sincerely\n",
     ///     ];
     ///
     ///     let account = Account::new(Some("Username"), "some@msg.com");
@@ -540,7 +544,7 @@ impl Msg {
                 Err(err) => {
                     return Err(
                         ErrorKind::Header(err.to_string(), "From", mailaddress.to_string()).into(),
-                    )
+                        )
                 }
             });
         }
@@ -552,7 +556,7 @@ impl Msg {
                 Err(err) => {
                     return Err(
                         ErrorKind::Header(err.to_string(), "To", mailaddress.to_string()).into(),
-                    )
+                        )
                 }
             });
         }
@@ -565,11 +569,11 @@ impl Msg {
                     Ok(bcc) => bcc,
                     Err(err) => {
                         return Err(ErrorKind::Header(
-                            err.to_string(),
-                            "Bcc",
-                            mailaddress.to_string(),
-                        )
-                        .into())
+                                err.to_string(),
+                                "Bcc",
+                                mailaddress.to_string(),
+                                )
+                            .into())
                     }
                 });
             }
@@ -582,11 +586,11 @@ impl Msg {
                     Ok(cc) => cc,
                     Err(err) => {
                         return Err(ErrorKind::Header(
-                            err.to_string(),
-                            "Cc",
-                            mailaddress.to_string(),
-                        )
-                        .into())
+                                err.to_string(),
+                                "Cc",
+                                mailaddress.to_string(),
+                                )
+                            .into())
                     }
                 });
             }
@@ -598,11 +602,11 @@ impl Msg {
                 Ok(in_reply_to) => in_reply_to,
                 Err(err) => {
                     return Err(ErrorKind::Header(
-                        err.to_string(),
-                        "In-Reply-To",
-                        in_reply_to.to_string(),
-                    )
-                    .into())
+                            err.to_string(),
+                            "In-Reply-To",
+                            in_reply_to.to_string(),
+                            )
+                        .into())
                 }
             });
         }
@@ -629,11 +633,11 @@ impl Msg {
                     Ok(reply_to) => reply_to,
                     Err(err) => {
                         return Err(ErrorKind::Header(
-                            err.to_string(),
-                            "Reply-to",
-                            mailaddress.to_string(),
-                        )
-                        .into())
+                                err.to_string(),
+                                "Reply-to",
+                                mailaddress.to_string(),
+                                )
+                            .into())
                     }
                 });
             }
@@ -646,7 +650,7 @@ impl Msg {
                 Err(err) => {
                     return Err(
                         ErrorKind::Header(err.to_string(), "Sender", sender.to_string()).into(),
-                    )
+                        )
                 }
             });
         }
@@ -680,10 +684,10 @@ impl Msg {
         }
 
         Ok(msg
-            .multipart(msg_parts)
-            // whenever an error appears, print out the messge as well to see what might be the
-            // error
-            .chain_err(|| format!("-- Current Message --\n{}", self))?)
+           .multipart(msg_parts)
+           // whenever an error appears, print out the messge as well to see what might be the
+           // error
+           .chain_err(|| format!("-- Current Message --\n{}", self))?)
     }
 
     /// Returns the uid of the msg.
@@ -704,7 +708,7 @@ impl Msg {
             format!(
                 "[{}]: Couldn't get the raw body of the msg/msg.",
                 "Error".red()
-            )
+                )
         })?;
 
         Ok(raw_message)
@@ -740,7 +744,7 @@ impl fmt::Display for Msg {
             "{}\n{}",
             self.envelope.get_header_as_string(),
             self.body,
-        )
+            )
     }
 }
 
@@ -860,7 +864,7 @@ impl TryFrom<&Fetch> for Msg {
                         "[{}] Unknown attachment with the following mime-type: {}\n",
                         "Warning".yellow(),
                         subpart.ctype.mimetype,
-                    );
+                        );
                 }
             }
         }
@@ -932,8 +936,8 @@ mod tests {
     #[test]
     fn test_new() {
         // -- Accounts -
-        let account1 = Account::new(Some("Soywod"), "clement.douin@posteo.net");
-        let account2 = Account::new(None, "tornax07@gmail.com");
+        let account1 = Account::new_with_signature(Some("Soywod"), "clement.douin@posteo.net", None);
+        let account2 = Account::new_with_signature(None, "tornax07@gmail.com", None);
 
         // -- Creating message --
         let msg1 = Msg::new(&account1);
@@ -963,6 +967,7 @@ mod tests {
     #[test]
     fn test_new_with_envelope() {
         let account = Account::new(Some("Name"), "test@msg.asdf");
+        let account_with_signature = Account::new_with_signature(Some("Name"), "test@msg.asdf", Some("lol"));
 
         // -- Test-Messages --
         let msg_with_custom_from = Msg::new_with_envelope(
@@ -971,15 +976,12 @@ mod tests {
                 from: vec![String::from("Someone <Else@msg.asdf>")],
                 ..Envelope::default()
             },
-        );
+            );
 
         let msg_with_custom_signature = Msg::new_with_envelope(
-            &account,
-            Envelope {
-                signature: Some(String::from("Awesome Signature!")),
-                ..Envelope::default()
-            },
-        );
+            &account_with_signature,
+            Envelope::default()
+            );
 
         // -- Expectations --
         let expected_with_custom_from = Msg {
@@ -988,43 +990,43 @@ mod tests {
                 // address in the envelope struct, not the from address of the
                 // account
                 from: vec![String::from("Someone <Else@msg.asdf>")],
-                signature: Some(String::from("Account Signature")),
                 ..Envelope::default()
             },
             // The signature should be added automatically
-            body: Body::from("Account Signature"),
+            body: Body::from(""),
             ..Msg::default()
         };
 
         let expected_with_custom_signature = Msg {
             envelope: Envelope {
                 from: vec![String::from("Name <test@msg.asdf>")],
-                signature: Some(String::from("Awesome Signature!")),
+                signature: Some(String::from("lol")),
                 ..Envelope::default()
             },
-            body: Body::from("Awesome Signature!"),
+            body: Body::from("lol"),
             ..Msg::default()
         };
 
         // -- Testing --
-        assert_eq!(msg_with_custom_from, expected_with_custom_from);
-        assert_eq!(msg_with_custom_signature, expected_with_custom_signature);
+        assert_eq!(msg_with_custom_from, expected_with_custom_from,
+                   "Left: {:?}, Right: {:?}", 
+                   dbg!(&msg_with_custom_from), dbg!(&expected_with_custom_from));
+        assert_eq!(msg_with_custom_signature, expected_with_custom_signature,
+                   "Left: {:?}, Right: {:?}",
+                   dbg!(&msg_with_custom_signature), dbg!(&expected_with_custom_signature));
     }
 
     #[test]
     fn test_change_to_reply() {
+        // in this test, we are gonna reproduce the same situation as shown
+        // here: https://datatracker.ietf.org/doc/html/rfc5322#appendix-A.2
+
         // == Preparations ==
         // -- rfc test --
         // accounts for the rfc test
         let john_doe = Account::new(Some("John Doe"), "jdoe@machine.example");
         let mary_smith = Account::new(Some("Mary Smith"), "mary@example.net");
 
-        // -- for general tests --
-        let account = Account::new(Some("Name"), "some@address.asdf");
-
-        // -- rfc test --
-        // in this test, we are gonna reproduce the same situation as shown
-        // here: https://datatracker.ietf.org/doc/html/rfc5322#appendix-A.2
         let msg_rfc_test = Msg {
             envelope: Envelope {
                 from: vec!["John Doe <jdoe@machine.example>".to_string()],
@@ -1034,11 +1036,14 @@ mod tests {
                 ..Envelope::default()
             },
             body: Body::from(concat![
-                "This is a message just to say hello.\n",
-                "So, \"Hello\".",
+                             "This is a message just to say hello.\n",
+                             "So, \"Hello\".",
             ]),
             ..Msg::default()
         };
+
+        // -- for general tests --
+        let account = Account::new(Some("Name"), "some@address.asdf");
 
         // -- for reply_all --
         // a custom test to look what happens, if we want to reply to all addresses.
@@ -1053,15 +1058,15 @@ mod tests {
                     "Name <some@address.asdf>".to_string(),
                 ],
                 cc: Some(vec![
-                    "test@testing".to_string(),
-                    "test2@testing".to_string(),
+                         "test@testing".to_string(),
+                         "test2@testing".to_string(),
                 ]),
                 message_id: Some("RandomID123".to_string()),
                 reply_to: Some(vec!["Reply@Mail.rofl".to_string()]),
                 subject: Some("Have you heard of himalaya?".to_string()),
                 ..Envelope::default()
             },
-            body: Body::from(concat!["A body test\n", "\n", "Sincereley",]),
+            body: Body::from(concat!["A body test\n", "\n", "Sincerely",]),
             ..Msg::default()
         };
 
@@ -1073,7 +1078,7 @@ mod tests {
                 from: vec!["Mary Smith <mary@example.net>".to_string()],
                 to: vec!["John Doe <jdoe@machine.example>".to_string()],
                 reply_to: Some(vec![
-                    "\"Mary Smith: Personal Account\" <smith@home.example>".to_string(),
+                               "\"Mary Smith: Personal Account\" <smith@home.example>".to_string(),
                 ]),
                 subject: Some("Re: Saying Hello".to_string()),
                 message_id: Some("<3456@example.net>".to_string()),
@@ -1081,8 +1086,8 @@ mod tests {
                 ..Envelope::default()
             },
             body: Body::from(concat![
-                "> This is a message just to say hello.\n",
-                "> So, \"Hello\".\n",
+                             "> This is a message just to say hello.\n",
+                             "> So, \"Hello\".",
             ]),
             ..Msg::default()
         };
@@ -1098,9 +1103,8 @@ mod tests {
                 ..Envelope::default()
             },
             body: Body::from(concat![
-                "> > This is a message just to say hello.\n",
-                "> > So, \"Hello\".\n",
-                "> \n",
+                             "> > This is a message just to say hello.\n",
+                             "> > So, \"Hello\".",
             ]),
             ..Msg::default()
         };
@@ -1115,14 +1119,18 @@ mod tests {
                     "Reply@Mail.rofl".to_string(),
                 ],
                 cc: Some(vec![
-                    "test@testing".to_string(),
-                    "test2@testing".to_string(),
+                         "test@testing".to_string(),
+                         "test2@testing".to_string(),
                 ]),
                 in_reply_to: Some("RandomID123".to_string()),
                 subject: Some("Re: Have you heard of himalaya?".to_string()),
                 ..Envelope::default()
             },
-            body: Body::from(concat!["> A body test\n", "> \n", "> Sincereley\n",]),
+            body: Body::from(concat![
+                             "> A body test\n",
+                             "> \n",
+                             "> Sincerely"
+            ]),
             ..Msg::default()
         };
 
@@ -1136,7 +1144,7 @@ mod tests {
         rfc_reply_1.envelope = Envelope {
             message_id: Some("<3456@example.net>".to_string()),
             reply_to: Some(vec![
-                "\"Mary Smith: Personal Account\" <smith@home.example>".to_string(),
+                           "\"Mary Smith: Personal Account\" <smith@home.example>".to_string(),
             ]),
             ..rfc_reply_1.envelope.clone()
         };
@@ -1149,18 +1157,25 @@ mod tests {
             ..rfc_reply_2.envelope.clone()
         };
 
-        assert_eq!(rfc_reply_1, expected_rfc1);
-        assert_eq!(rfc_reply_2, expected_rfc2);
+        assert_eq!(rfc_reply_1, expected_rfc1,
+                   "Left: {:?}, Right: {:?}",
+                   dbg!(&rfc_reply_1), dbg!(&expected_rfc1));
+
+        assert_eq!(rfc_reply_2, expected_rfc2,
+                   "Left: {:?}, Right: {:?}",
+                   dbg!(&rfc_reply_2), dbg!(&expected_rfc2));
 
         // -- custom tests -—
         msg_reply_all.change_to_reply(&account, true).unwrap();
-        assert_eq!(msg_reply_all, expected_reply_all);
+        assert_eq!(msg_reply_all, expected_reply_all,
+                   "Left: {:?}, Right: {:?}",
+                   dbg!(&msg_reply_all), dbg!(&expected_reply_all));
     }
 
     #[test]
     fn test_change_to_forwarding() {
         // == Preparations ==
-        let account = Account::new(Some("Name"), "some@address.asdf");
+        let account = Account::new_with_signature(Some("Name"), "some@address.asdf", Some("lol"));
         let mut msg = Msg::new_with_envelope(
             &account,
             Envelope {
@@ -1168,7 +1183,7 @@ mod tests {
                 subject: Some(String::from("Test subject")),
                 ..Envelope::default()
             },
-        );
+            );
 
         msg.body = Body::from(concat!["The body text, nice!\n", "Himalaya is nice!",]);
 
@@ -1177,27 +1192,31 @@ mod tests {
             envelope: Envelope {
                 from: vec![String::from("ThirdPerson <some@msg.asdf>")],
                 sender: Some(String::from("Name <some@address.asdf>")),
-                signature: Some(String::from("Account Signature")),
+                signature: Some(String::from("lol")),
                 subject: Some(String::from("Fwd: Test subject")),
                 ..Envelope::default()
             },
             body: Body::from(concat![
-                "\n---------- Forwarded Message ----------\n",
-                "The body text, nice!\n",
-                "Himalaya is nice!\n",
+                             "lol\n",
+                             "\n",
+                             "---------- Forwarded Message ----------\n",
+                             "The body text, nice!\n",
+                             "Himalaya is nice!\n",
             ]),
             ..Msg::default()
         };
 
         // == Tests ==
         msg.change_to_forwarding(&account);
-        assert_eq!(msg, expected_msg);
+        assert_eq!(msg, expected_msg,
+                   "Left: {:?}, Right: {:?}",
+                   dbg!(&msg), dbg!(&expected_msg));
     }
 
     #[test]
     fn test_edit_body() {
         // == Preparations ==
-        let account = Account::new(Some("Name"), "some@address.asdf");
+        let account = Account::new_with_signature(Some("Name"), "some@address.asdf", None);
         let mut msg = Msg::new_with_envelope(
             &account,
             Envelope {
@@ -1206,7 +1225,7 @@ mod tests {
                 subject: Some(String::new()),
                 ..Envelope::default()
             },
-        );
+            );
 
         // == Expected Results ==
         let expected_msg = Msg {
@@ -1225,7 +1244,9 @@ mod tests {
 
         // == Tests ==
         msg.edit_body().unwrap();
-        assert_eq!(msg, expected_msg);
+        assert_eq!(msg, expected_msg,
+                   "Left: {:?}, Right: {:?}",
+                   dbg!(&msg), dbg!(&expected_msg));
     }
 
     #[test]
@@ -1233,7 +1254,7 @@ mod tests {
         use std::collections::HashMap;
 
         // == Preparations ==
-        let account = Account::new(Some("Name"), "some@address.asdf");
+        let account = Account::new_with_signature(Some("Name"), "some@address.asdf", None);
         let msg_template = Msg::new(&account);
 
         let normal_content = concat![
@@ -1262,8 +1283,8 @@ mod tests {
                 from: vec![String::from("Some <user@msg.sf>")],
                 subject: Some(String::from("Awesome Subject")),
                 bcc: Some(vec![
-                    String::from("name <rofl@lol.asdf>"),
-                    String::from("mail1@rofl.lol"),
+                          String::from("name <rofl@lol.asdf>"),
+                          String::from("mail1@rofl.lol"),
                 ]),
                 to: vec![String::from("To <name@msg.rofl>")],
                 ..Envelope::default()
@@ -1282,8 +1303,8 @@ mod tests {
                 from: vec![String::from("Some <user@msg.sf>")],
                 subject: Some(String::from("Awesome Subject")),
                 bcc: Some(vec![
-                    String::from("name <rofl@lol.asdf>"),
-                    String::from("mail1@rofl.lol"),
+                          String::from("name <rofl@lol.asdf>"),
+                          String::from("mail1@rofl.lol"),
                 ]),
                 to: vec![String::from("To <name@msg.rofl>")],
                 custom_headers: Some(custom_headers),
@@ -1300,7 +1321,12 @@ mod tests {
         msg1.parse_from_str(normal_content).unwrap();
         msg2.parse_from_str(content_with_custom_headers).unwrap();
 
-        assert_eq!(msg1, expect);
-        assert_eq!(msg2, expect_custom_header);
+        assert_eq!(msg1, expect,
+                   "Left: {:?}, Right: {:?}",
+                   dbg!(&msg1), dbg!(&expect));
+
+        assert_eq!(msg2, expect_custom_header,
+                   "Left: {:?}, Right: {:?}",
+                   dbg!(&msg2), dbg!(&expect_custom_header));
     }
 }
