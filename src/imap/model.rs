@@ -25,20 +25,21 @@ impl<'a> ImapConnector<'a> {
     pub fn new(account: &'a Account) -> Result<Self> {
         debug!("create TLS builder");
         let insecure = account.imap_insecure();
-        let tls = TlsConnector::builder()
+        let ssl_conn = TlsConnector::builder()
             .danger_accept_invalid_certs(insecure)
             .danger_accept_invalid_hostnames(insecure)
             .build()
             .chain_err(|| "Could not create TLS connector")?;
 
         debug!("create client");
-        let client = if account.imap_starttls() {
-            imap::connect_starttls(account.imap_addr(), &account.imap_host, &tls)
-                .chain_err(|| "Could not connect using STARTTLS")
-        } else {
-            imap::connect(account.imap_addr(), &account.imap_host, &tls)
-                .chain_err(|| "Could not connect using TLS")
-        }?;
+        let mut client_builder = imap::ClientBuilder::new(&account.imap_host, account.imap_port);
+        if account.imap_starttls() {
+            debug!("enable STARTTLS");
+            client_builder.starttls();
+        }
+        let client = client_builder
+            .connect(|domain, tcp| Ok(TlsConnector::connect(&ssl_conn, domain, tcp)?))
+            .chain_err(|| "Could not connect to IMAP server")?;
 
         debug!("create session");
         let sess = client

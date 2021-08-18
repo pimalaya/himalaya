@@ -86,7 +86,7 @@ function! himalaya#msg#write()
     let account = himalaya#account#curr()
     let msg = s:cli("--account %s template new", [shellescape(account)], "Fetching new template", 0)
     silent! edit Himalaya write
-    call append(0, split(substitute(msg.template, "\r", "", "g"), "\n"))
+    call append(0, split(substitute(msg.raw, "\r", "", "g"), "\n"))
     silent execute "$d"
     setlocal filetype=himalaya-msg-write
     let &modified = 0
@@ -112,7 +112,7 @@ function! himalaya#msg#reply()
       \0,
     \)
     execute printf("silent! edit Himalaya reply [%d]", msg_id)
-    call append(0, split(substitute(msg.template, "\r", "", "g"), "\n"))
+    call append(0, split(substitute(msg.raw, "\r", "", "g"), "\n"))
     silent execute "$d"
     setlocal filetype=himalaya-msg-write
     let &modified = 0
@@ -138,7 +138,7 @@ function! himalaya#msg#reply_all()
       \0
     \)
     execute printf("silent! edit Himalaya reply all [%d]", msg_id)
-    call append(0, split(substitute(msg.template, "\r", "", "g"), "\n"))
+    call append(0, split(substitute(msg.raw, "\r", "", "g"), "\n"))
     silent execute "$d"
     setlocal filetype=himalaya-msg-write
     let &modified = 0
@@ -164,7 +164,7 @@ function! himalaya#msg#forward()
       \0
     \)
     execute printf("silent! edit Himalaya forward [%d]", msg_id)
-    call append(0, split(substitute(msg.template, "\r", "", "g"), "\n"))
+    call append(0, split(substitute(msg.raw, "\r", "", "g"), "\n"))
     silent execute "$d"
     setlocal filetype=himalaya-msg-write
     let &modified = 0

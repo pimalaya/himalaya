@@ -2,6 +2,7 @@ use error_chain::error_chain;
 use lettre::transport::smtp::authentication::Credentials as SmtpCredentials;
 use log::debug;
 use serde::Deserialize;
+use shellexpand;
 use std::{
     collections::HashMap,
     env,
@@ -26,6 +27,7 @@ pub struct Account {
     // Override
     pub name: Option<String>,
     pub downloads_dir: Option<PathBuf>,
+    pub signature_delimiter: Option<String>,
     pub signature: Option<String>,
     pub default_page_size: Option<usize>,
     pub watch_cmds: Option<Vec<String>>,
@@ -166,6 +168,7 @@ impl Account {
             name: name.and_then(|name| Some(name.to_string())),
             downloads_dir: Some(PathBuf::from(r"/tmp")),
             signature: None,
+            signature_delimiter: None,
             default_page_size: Some(42),
             default: Some(true),
             email: email_addr.into(),
@@ -226,7 +229,11 @@ impl Account {
     ///     assert_eq!(account_with_default_signature, account_cmp2);
     /// }
     /// ```
-    pub fn new_with_signature(name: Option<&str>, email_addr: &str, signature: Option<&str>) -> Self {
+    pub fn new_with_signature(
+        name: Option<&str>,
+        email_addr: &str,
+        signature: Option<&str>,
+    ) -> Self {
         let mut account = Account::new(name, email_addr);
 
         // Use the default signature "Account Signature", if the programmer didn't provide a custom
@@ -245,6 +252,7 @@ impl Default for Account {
         Self {
             name: None,
             downloads_dir: None,
+            signature_delimiter: None,
             signature: None,
             default_page_size: None,
             default: None,
@@ -274,6 +282,7 @@ pub struct Config {
     pub name: String,
     pub downloads_dir: Option<PathBuf>,
     pub notify_cmd: Option<String>,
+    pub signature_delimiter: Option<String>,
     pub signature: Option<String>,
     pub default_page_size: Option<usize>,
     pub watch_cmds: Option<Vec<String>>,
@@ -358,8 +367,17 @@ impl Config {
         account
             .downloads_dir
             .as_ref()
-            .unwrap_or(self.downloads_dir.as_ref().unwrap_or(&env::temp_dir()))
-            .to_owned()
+            .and_then(|dir| dir.to_str())
+            .and_then(|dir| shellexpand::full(dir).ok())
+            .map(|dir| PathBuf::from(dir.to_string()))
+            .unwrap_or(
+                self.downloads_dir
+                    .as_ref()
+                    .and_then(|dir| dir.to_str())
+                    .and_then(|dir| shellexpand::full(dir).ok())
+                    .map(|dir| PathBuf::from(dir.to_string()))
+                    .unwrap_or(env::temp_dir()),
+            )
             .join(filename)
     }
 
@@ -382,13 +400,21 @@ impl Config {
     }
 
     pub fn signature(&self, account: &Account) -> Option<String> {
+        let default_sig_delim = String::from("-- \n");
+        let sig_delim = account
+            .signature_delimiter
+            .as_ref()
+            .or_else(|| self.signature_delimiter.as_ref())
+            .unwrap_or(&default_sig_delim);
         let sig = account
             .signature
             .as_ref()
             .or_else(|| self.signature.as_ref());
-
-        sig.and_then(|sig| fs::read_to_string(sig).ok())
+        sig.and_then(|sig| shellexpand::full(sig).ok())
+            .map(|sig| sig.to_string())
+            .and_then(|sig| fs::read_to_string(sig).ok())
             .or_else(|| sig.map(|sig| sig.to_owned()))
+            .map(|sig| String::new() + sig_delim + sig.as_ref())
     }
 
     pub fn default_page_size(&self, account: &Account) -> usize {
@@ -428,6 +454,7 @@ impl Default for Config {
             name: String::new(),
             downloads_dir: None,
             notify_cmd: None,
+            signature_delimiter: None,
             signature: None,
             default_page_size: None,
             watch_cmds: None,
