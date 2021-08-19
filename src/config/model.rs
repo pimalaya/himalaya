@@ -414,7 +414,7 @@ impl Config {
             .map(|sig| sig.to_string())
             .and_then(|sig| fs::read_to_string(sig).ok())
             .or_else(|| sig.map(|sig| sig.to_owned()))
-            .map(|sig| String::new() + sig_delim + sig.as_ref())
+            .map(|sig| sig_delim.to_owned() + sig.as_ref())
     }
 
     pub fn default_page_size(&self, account: &Account) -> usize {
