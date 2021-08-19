@@ -97,7 +97,7 @@ fn msg() {
 
     // -- Get the messages --
     // TODO: check non-existance of \Seen flag
-    let msgs = imap_conn.list_msgs("INBOX", &10, &1).unwrap();
+    let msgs = imap_conn.list_msgs("INBOX", &10, &0).unwrap();
     let msgs = if let Some(ref fetches) = msgs {
         Msgs::try_from(fetches).unwrap()
     } else {
