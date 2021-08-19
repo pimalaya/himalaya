@@ -501,13 +501,9 @@ pub fn msg_matches_mailto(ctx: &Ctx, url: &Url) -> Result<()> {
         encoding: ContentTransferEncoding::Base64,
         bcc: Some(bcc),
         cc: Some(cc),
-        custom_headers: None,
-        in_reply_to: None,
-        message_id: None,
-        reply_to: None,
-        sender: None,
         signature: ctx.config.signature(&ctx.account),
         subject: Some(subject.into()),
+        ..Envelope::default()
     };
 
     let mut msg = Msg::new_with_envelope(&ctx.account, envelope);

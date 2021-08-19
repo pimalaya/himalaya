@@ -282,6 +282,7 @@ pub struct Config {
     pub name: String,
     pub downloads_dir: Option<PathBuf>,
     pub notify_cmd: Option<String>,
+    /// Option to override the default signature delimiter `--\n `.
     pub signature_delimiter: Option<String>,
     pub signature: Option<String>,
     pub default_page_size: Option<usize>,
