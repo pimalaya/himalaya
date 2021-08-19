@@ -3,7 +3,7 @@ use std::fmt;
 
 // Output format
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum OutputFmt {
     Plain,
     Json,
@@ -63,6 +63,14 @@ impl Output {
                 print!("{}", serde_json::to_string(&OutputJson::new(item)).unwrap())
             }
         }
+    }
+
+    pub fn is_plain(&self) -> bool {
+        self.fmt == OutputFmt::Plain
+    }
+
+    pub fn is_json(&self) -> bool {
+        self.fmt == OutputFmt::Json
     }
 }
 

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Config option `signature-delimiter` to customize the signature delimiter (default to `-- \n`) [[#114](https://github.com/soywod/himalaya/pull/114)]
+- Expand tilde and env vars for `downloads-dir` and `signature` [#102]
+
+### Changed
+
+- Pagination for list and search cmd starts from 1 instead of 0 [#186]
+
+### Fixed
+
+- New/reply/forward from Vim plugin since Tpl refactor [#176]
+
 ## [0.4.0] - 2021-06-03
 
 ### Added
@@ -277,6 +290,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#95]: https://github.com/soywod/himalaya/issues/95
 [#96]: https://github.com/soywod/himalaya/issues/96
 [#100]: https://github.com/soywod/himalaya/issues/100
+[#102]: https://github.com/soywod/himalaya/issues/102
 [#109]: https://github.com/soywod/himalaya/issues/109
 [#117]: https://github.com/soywod/himalaya/issues/117
 [#121]: https://github.com/soywod/himalaya/issues/121
@@ -296,3 +310,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#144]: https://github.com/soywod/himalaya/issues/144
 [#146]: https://github.com/soywod/himalaya/issues/146
 [#160]: https://github.com/soywod/himalaya/issues/160
+[#176]: https://github.com/soywod/himalaya/issues/176
+[#186]: https://github.com/soywod/himalaya/issues/186

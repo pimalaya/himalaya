@@ -1,28 +1,25 @@
+use super::body::Body;
 use super::envelope::Envelope;
 use super::model::{Msg, Msgs};
-use super::body::Body;
+use url::Url;
 
 use atty::Stream;
 use clap;
 use error_chain::error_chain;
+use lettre::message::header::ContentTransferEncoding;
 use log::{debug, error, trace};
 
 use std::{
+    borrow::Cow,
     collections::HashMap,
+    convert::TryFrom,
     fs,
     io::{self, BufRead},
-    convert::TryFrom,
 };
 
 use imap::types::Flag;
 
-use crate::{
-    ctx::Ctx,
-    imap::model::ImapConnector,
-    input,
-    mbox::cli::mbox_target_arg,
-    smtp,
-};
+use crate::{ctx::Ctx, imap::model::ImapConnector, input, mbox::cli::mbox_target_arg, smtp};
 
 error_chain! {
     links {
@@ -36,7 +33,6 @@ error_chain! {
     }
 }
 
-// == Main-Functions ==
 pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
     vec![
         clap::SubCommand::with_name("list")
@@ -260,6 +256,7 @@ fn msg_matches_list(ctx: &Ctx, opt_matches: Option<&clap::ArgMatches>) -> Result
     debug!("page size: {:?}", page_size);
     let page: usize = opt_matches
         .and_then(|matches| matches.value_of("page").unwrap().parse().ok())
+        .map(|page| 1.max(page) - 1)
         .unwrap_or_default();
     debug!("page: {}", &page);
 
@@ -291,7 +288,8 @@ fn msg_matches_search(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
         .value_of("page")
         .unwrap()
         .parse()
-        .unwrap_or_default();
+        .map(|page| 1.max(page) - 1)
+        .unwrap_or(1);
     debug!("page: {}", &page);
 
     let query = matches
@@ -469,6 +467,53 @@ fn msg_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     Ok(true)
 }
 
+pub fn msg_matches_mailto(ctx: &Ctx, url: &Url) -> Result<()> {
+    debug!("mailto command matched");
+
+    let mut imap_conn = ImapConnector::new(&ctx.account)?;
+
+    let mut cc = Vec::new();
+    let mut bcc = Vec::new();
+    let mut subject = Cow::default();
+    let mut body = Cow::default();
+
+    for (key, val) in url.query_pairs() {
+        match key.as_bytes() {
+            b"cc" => {
+                cc.push(val.into());
+            }
+            b"bcc" => {
+                bcc.push(val.into());
+            }
+            b"subject" => {
+                subject = val;
+            }
+            b"body" => {
+                body = val;
+            }
+            _ => (),
+        }
+    }
+
+    let envelope = Envelope {
+        from: vec![ctx.config.address(ctx.account)],
+        to: vec![url.path().to_string()],
+        encoding: ContentTransferEncoding::Base64,
+        bcc: Some(bcc),
+        cc: Some(cc),
+        signature: ctx.config.signature(&ctx.account),
+        subject: Some(subject.into()),
+        ..Envelope::default()
+    };
+
+    let mut msg = Msg::new_with_envelope(&ctx.account, envelope);
+    msg.body = Body::from(body.as_ref());
+    msg_interaction(&ctx, &mut msg, &mut imap_conn)?;
+
+    imap_conn.logout();
+    Ok(())
+}
+
 fn msg_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     debug!("forward command matched");
 
@@ -581,7 +626,7 @@ fn msg_matches_send(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
 
-    let msg: String = if atty::is(Stream::Stdin) {
+    let msg = if atty::is(Stream::Stdin) || ctx.output.is_json() {
         matches
             .value_of("message")
             .unwrap_or_default()
@@ -786,7 +831,6 @@ fn tpl_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 /// This function opens the prompt to do some actions to the msg like sending, editing it again and
 /// so on.
 fn msg_interaction(ctx: &Ctx, msg: &mut Msg, imap_conn: &mut ImapConnector) -> Result<bool> {
-
     // let the user change the body a little bit first, before opening the prompt
     msg.edit_body()?;
 
@@ -807,7 +851,7 @@ fn msg_interaction(ctx: &Ctx, msg: &mut Msg, imap_conn: &mut ImapConnector) -> R
                             println!("{}", err);
                             println!("Please reedit your msg to make it to a sendable message!");
                             continue;
-                        },
+                        }
                     };
                     smtp::send(&ctx.account, &sendable)?;
 
