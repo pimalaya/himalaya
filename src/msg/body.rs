@@ -1,12 +1,12 @@
 use error_chain::error_chain;
 
-use std::ops::{Deref, DerefMut};
 use std::fmt;
+use std::ops::{Deref, DerefMut};
 
 use serde::Serialize;
 
 // == Macros ==
-error_chain!{
+error_chain! {
     foreign_links {
          ParseContentType(lettre::message::header::ContentTypeErr);
     }
@@ -21,7 +21,7 @@ error_chain!{
 ///
 /// Sincerely
 /// ```
-/// 
+///
 /// This part of the msg/msg would be stored in this struct.
 #[derive(Clone, Serialize, Debug, PartialEq, Eq)]
 pub struct Body(String);
@@ -61,7 +61,7 @@ impl Default for Body {
 
 impl fmt::Display for Body {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(formatter, "{}", &self.0)
+        write!(formatter, "{}", &self.0)
     }
 }
 

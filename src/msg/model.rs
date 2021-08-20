@@ -340,13 +340,12 @@ impl Msg {
 
         if let Some(signature) = ctx.config.signature(&ctx.account) {
             body.push_str(&signature);
-            body.push('\n')
         }
 
         // -- Body --
         // apply a line which should indicate where the forwarded message begins
         body.push_str(&format!(
-            "\n---------- Forwarded Message ----------\n{}",
+            "\n\n---------- Forwarded Message ----------\n{}",
             &self.body,
         ));
 
@@ -411,7 +410,7 @@ impl Msg {
     pub fn edit_body(&mut self) -> Result<()> {
         // First of all, we need to create our template for the user. This
         // means, that the header needs to be added as well!
-        let msg = format!("{}\n{}", self.envelope.get_header_as_string(), self.body);
+        let msg = format!("{}\n\n{}", self.envelope.get_header_as_string(), self.body);
 
         // We don't let this line compile, if we're doing
         // tests, because we just need to look, if the headers are set
@@ -953,7 +952,7 @@ mod tests {
         let msg = Msg::new(&ctx);
         let expected_envelope = Envelope {
             from: vec![String::from("Config Name <test@mail.com>")],
-            signature: Some(String::from("-- \nAccount Signature")),
+            signature: Some(String::from("\n-- \nAccount Signature")),
             ..Envelope::default()
         };
 
@@ -975,7 +974,7 @@ mod tests {
         let msg = Msg::new(&ctx);
         let expected_envelope = Envelope {
             from: vec![String::from("Account Name <test@mail.com>")],
-            signature: Some(String::from("-- \nAccount Signature")),
+            signature: Some(String::from("\n-- \nAccount Signature")),
             ..Envelope::default()
         };
 
@@ -1040,10 +1039,10 @@ mod tests {
         let expected_with_custom_signature = Msg {
             envelope: Envelope {
                 from: vec![String::from("Account Name <test@mail.com>")],
-                signature: Some(String::from("-- \nSignature")),
+                signature: Some(String::from("\n-- \nSignature")),
                 ..Envelope::default()
             },
-            body: Body::from("-- \nSignature"),
+            body: Body::from("\n-- \nSignature"),
             ..Msg::default()
         };
 
@@ -1258,16 +1257,16 @@ mod tests {
             envelope: Envelope {
                 from: vec![String::from("ThirdPerson <some@msg.asdf>")],
                 sender: Some(String::from("Name <some@address.asdf>")),
-                signature: Some(String::from("-- \nlol")),
+                signature: Some(String::from("\n-- \nlol")),
                 subject: Some(String::from("Fwd: Test subject")),
                 ..Envelope::default()
             },
             body: Body::from(concat![
-                "-- \nlol\n",
+                "\n-- \nlol\n",
                 "\n",
                 "---------- Forwarded Message ----------\n",
                 "The body text, nice!\n",
-                "Himalaya is nice!\n",
+                "Himalaya is nice!",
             ]),
             ..Msg::default()
         };
@@ -1315,7 +1314,7 @@ mod tests {
                 cc: Some(vec![String::from("")]),
                 ..Envelope::default()
             },
-            body: Body::from("-- \nAccount Signature\n"),
+            body: Body::from("\n\n-- \nAccount Signature"),
             ..Msg::default()
         };
 
