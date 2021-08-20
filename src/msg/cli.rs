@@ -407,7 +407,7 @@ fn msg_matches_write(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     // create the new msg
     // TODO: Make the header starting customizeable like from template
     let mut msg = Msg::new_with_envelope(
-        &ctx.account,
+        &ctx,
         Envelope {
             subject: Some(String::new()),
             to: Vec::new(),
@@ -444,11 +444,7 @@ fn msg_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     debug!("uid: {}", uid);
 
     // Change the msg to a reply-msg.
-    if matches.is_present("reply-all") {
-        msg.change_to_reply(&ctx.account, true)?;
-    } else {
-        msg.change_to_reply(&ctx.account, false)?;
-    }
+        msg.change_to_reply(&ctx, matches.is_present("reply-all"))?;
 
     // Apply the given attachments to the reply-msg.
     let attachments: Vec<&str> = matches
@@ -506,7 +502,7 @@ pub fn msg_matches_mailto(ctx: &Ctx, url: &Url) -> Result<()> {
         ..Envelope::default()
     };
 
-    let mut msg = Msg::new_with_envelope(&ctx.account, envelope);
+    let mut msg = Msg::new_with_envelope(&ctx, envelope);
     msg.body = Body::from(body.as_ref());
     msg_interaction(&ctx, &mut msg, &mut imap_conn)?;
 
@@ -525,7 +521,7 @@ fn msg_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     debug!("uid: {}", uid);
 
     // prepare to forward it
-    msg.change_to_forwarding(ctx.account);
+    msg.change_to_forwarding(&ctx);
 
     let attachments: Vec<&str> = matches
         .values_of("attachments")
@@ -778,7 +774,7 @@ fn override_msg_with_args(msg: &mut Msg, matches: &clap::ArgMatches) {
 fn tpl_matches_new(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     debug!("new command matched");
 
-    let mut msg = Msg::new(&ctx.account);
+    let mut msg = Msg::new(&ctx);
 
     override_msg_with_args(&mut msg, &matches);
 
@@ -797,11 +793,7 @@ fn tpl_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let mut msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
 
-    if matches.is_present("reply-all") {
-        msg.change_to_reply(&ctx.account, false)?;
-    } else {
-        msg.change_to_reply(&ctx.account, true)?;
-    }
+        msg.change_to_reply(&ctx, matches.is_present("reply-all"))?;
 
     override_msg_with_args(&mut msg, &matches);
     trace!("Message: {:?}", msg);
@@ -818,7 +810,7 @@ fn tpl_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let mut msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
-    msg.change_to_forwarding(ctx.account);
+    msg.change_to_forwarding(&ctx);
 
     override_msg_with_args(&mut msg, &matches);
 

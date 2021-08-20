@@ -110,59 +110,6 @@ impl Account {
         }
     }
 
-    /// This is a little helper-function like which uses the the name and email
-    /// of the account to create a valid address for the header of the envelope
-    /// of an msg.
-    ///
-    /// # Example 1: With name
-    /// Suppose the name field in the account struct *has* a value:
-    ///
-    /// ```rust
-    /// use himalaya::config::model::Account;
-    ///
-    /// fn main() {
-    ///     let account = Account {
-    ///         // we just need those two values
-    ///         name: Some(String::from("Name")),
-    ///         email: String::from("BestEmail@Ever.lol"),
-    ///         ..Account::default()
-    ///     };
-    ///
-    ///     // get the address of the account
-    ///     let address = account.get_full_address();
-    ///
-    ///     assert_eq!("Name <BestEmail@Ever.lol>".to_string(), address);
-    /// }
-    /// ```
-    ///
-    /// # Example 2: Without name
-    /// Suppose the name field in the account-struct *hasn't* a value:
-    ///
-    /// ```rust
-    /// use himalaya::config::model::Account;
-    ///
-    /// fn main() {
-    ///     let account = Account {
-    ///         // we just need those two values
-    ///         name: None,
-    ///         email: String::from("BestEmail@Ever.lol"),
-    ///         ..Account::default()
-    ///     };
-    ///
-    ///     // get the address of the account
-    ///     let address = account.get_full_address();
-    ///
-    ///     assert_eq!("BestEmail@Ever.lol".to_string(), address);
-    /// }
-    /// ```
-    pub fn get_full_address(&self) -> String {
-        if let Some(name) = &self.name {
-            format!("{} <{}>", name, self.email)
-        } else {
-            format!("{}", self.email)
-        }
-    }
-
     pub fn new(name: Option<&str>, email_addr: &str) -> Self {
         Self {
             name: name.and_then(|name| Some(name.to_string())),
@@ -276,7 +223,7 @@ impl Default for Account {
 
 // Config
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Config {
     pub name: String,
@@ -382,6 +329,9 @@ impl Config {
             .join(filename)
     }
 
+    /// This is a little helper-function like which uses the the name and email
+    /// of the account to create a valid address for the header of the envelope
+    /// of an msg.
     pub fn address(&self, account: &Account) -> String {
         let name = account.name.as_ref().unwrap_or(&self.name);
         format!("{} <{}>", name, account.email)
@@ -446,20 +396,5 @@ impl Config {
         });
 
         Ok(())
-    }
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            name: String::new(),
-            downloads_dir: None,
-            notify_cmd: None,
-            signature_delimiter: None,
-            signature: None,
-            default_page_size: None,
-            watch_cmds: None,
-            accounts: HashMap::new(),
-        }
     }
 }
