@@ -20,6 +20,7 @@ error_chain! {
 // == Structs ==
 /// This struct represents an attachment.
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct Attachment {
 
     /// Holds the filename of an attachment.
@@ -29,6 +30,7 @@ pub struct Attachment {
     pub content_type: ContentType,
 
     /// Holds the data of the attachment.
+    #[serde(skip_serializing)]
     pub body_raw: Vec<u8>,
 }
 
