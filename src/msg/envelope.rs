@@ -57,20 +57,20 @@ error_chain! {
 pub struct Envelope {
     // -- Must-Fields --
     // These fields are the mininum needed to send a msg.
-    pub from:     Vec<String>,
-    pub to:       Vec<String>,
+    pub from: Vec<String>,
+    pub to: Vec<String>,
     pub encoding: ContentTransferEncoding,
 
     // -- Optional fields --
-    pub bcc:            Option<Vec<String>>,
-    pub cc:             Option<Vec<String>>,
+    pub bcc: Option<Vec<String>>,
+    pub cc: Option<Vec<String>>,
     pub custom_headers: Option<HashMap<String, Vec<String>>>,
-    pub in_reply_to:    Option<String>,
-    pub message_id:     Option<String>,
-    pub reply_to:       Option<Vec<String>>,
-    pub sender:         Option<String>,
-    pub signature:      Option<String>,
-    pub subject:        Option<String>,
+    pub in_reply_to: Option<String>,
+    pub message_id: Option<String>,
+    pub reply_to: Option<Vec<String>>,
+    pub sender: Option<String>,
+    pub signature: Option<String>,
+    pub subject: Option<String>,
 }
 
 impl Envelope {
@@ -139,11 +139,6 @@ impl Envelope {
         // Here we are adding only the header parts which have a value (are not
         // None). That's why we are always checking here with "if let Some()".
 
-        // Subject
-        if let Some(subject) = &self.subject {
-            header.push_str(&format!("Subject: {}\n", subject));
-        }
-
         // in reply to
         if let Some(in_reply_to) = &self.in_reply_to {
             header.push_str(&format!("In-Reply-To: {}\n", in_reply_to));
@@ -181,6 +176,11 @@ impl Envelope {
             }
         }
 
+        // Subject
+        if let Some(subject) = &self.subject {
+            header.push_str(&format!("Subject: {}\n", subject));
+        }
+
         header
     }
 }
@@ -210,20 +210,20 @@ impl Default for Envelope {
     fn default() -> Self {
         Self {
             // must-fields
-            from:     Vec::new(),
-            to:       Vec::new(),
+            from: Vec::new(),
+            to: Vec::new(),
             encoding: ContentTransferEncoding::Base64,
 
             // optional fields
-            bcc:            None,
-            cc:             None,
+            bcc: None,
+            cc: None,
             custom_headers: None,
-            in_reply_to:    None,
-            message_id:     None,
-            reply_to:       None,
-            sender:         None,
-            signature:      None,
-            subject:        None,
+            in_reply_to: None,
+            message_id: None,
+            reply_to: None,
+            sender: None,
+            signature: None,
+            subject: None,
         }
     }
 }
@@ -619,16 +619,16 @@ mod tests {
 
         let addresses = vec![
             Address {
-                name:    Some(Cow::Owned(b"Name1".to_vec())),
-                adl:     None,
+                name: Some(Cow::Owned(b"Name1".to_vec())),
+                adl: None,
                 mailbox: Some(Cow::Owned(b"Mailbox1".to_vec())),
-                host:    Some(Cow::Owned(b"Host1".to_vec())),
+                host: Some(Cow::Owned(b"Host1".to_vec())),
             },
             Address {
-                name:    None,
-                adl:     None,
+                name: None,
+                adl: None,
                 mailbox: Some(Cow::Owned(b"Mailbox2".to_vec())),
-                host:    Some(Cow::Owned(b"Host2".to_vec())),
+                host: Some(Cow::Owned(b"Host2".to_vec())),
             },
         ];
 

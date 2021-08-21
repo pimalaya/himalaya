@@ -22,7 +22,6 @@ error_chain! {
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Attachment {
-
     /// Holds the filename of an attachment.
     pub filename: String,
 
@@ -35,15 +34,14 @@ pub struct Attachment {
 }
 
 impl Attachment {
-
     /// Creates a new attachment.
     ///
     /// # Example
     /// ```
     /// # use himalaya::msg::attachment::Attachment;
     /// let attachment = Attachment::new(
-    ///     "VIP Text", 
-    ///     "text/plain", 
+    ///     "VIP Text",
+    ///     "text/plain",
     ///     "Some very important text".as_bytes().to_vec());
     ///
     /// ```
@@ -80,7 +78,6 @@ impl Attachment {
     /// ```
     pub fn from_parsed_mail(parsed_mail: &ParsedMail) -> Option<Self> {
         if parsed_mail.get_content_disposition().disposition == DispositionType::Attachment {
-
             let disposition = parsed_mail.get_content_disposition();
             let filename = disposition.params.get("filename").unwrap().to_string();
             let body_raw = parsed_mail.get_body_raw().unwrap_or(Vec::new());
