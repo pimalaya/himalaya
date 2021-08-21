@@ -21,7 +21,7 @@ const DEFAULT_PAGE_SIZE: usize = 10;
 
 // Account
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 pub struct Account {
     // Override
@@ -163,6 +163,9 @@ impl Account {
         }
     }
 
+    /// Creates a new account with some normal properties. Take a look into the implementation of
+    /// this function to see the attributes of the returned Account struct.
+    ///
     pub fn new(name: Option<&str>, email_addr: &str) -> Self {
         Self {
             name: name.and_then(|name| Some(name.to_string())),
@@ -194,6 +197,7 @@ impl Account {
     /// # Examples
     /// ```rust
     /// use himalaya::config::model::Account;
+    /// use std::path::PathBuf;
     ///
     /// fn main() {
     ///
@@ -211,29 +215,63 @@ impl Account {
     ///     );
     ///
     ///     // How they should look like
-    ///     let account_comp1 = Account {
+    ///     let account_cmp1 = Account {
     ///         name: Some("Email name".to_string()),
     ///         email: "some@mail.com".to_string(),
     ///         signature: Some("Custom signature! :)".to_string()),
-    ///         .. Account::default()
+    ///         downloads_dir: Some(PathBuf::from(r"/tmp")),
+    ///         signature_delimiter: None,
+    ///         default_page_size: Some(42),
+    ///         default: Some(true),
+    ///         watch_cmds: Some(vec!["mbsync".to_string(), "-a".to_string()]),
+    ///         imap_host: String::from("localhost"),
+    ///         imap_port: 3993,
+    ///         imap_starttls: Some(false),
+    ///         imap_insecure: Some(true),
+    ///         imap_login: "some@mail.com".into(),
+    ///         imap_passwd_cmd: String::from("echo 'password'"),
+    ///         smtp_host: String::from("localhost"),
+    ///         smtp_port: 3465,
+    ///         smtp_starttls: Some(false),
+    ///         smtp_insecure: Some(true),
+    ///         smtp_login: "some@mail.com".into(),
+    ///         smtp_passwd_cmd: String::from("echo 'password'")
     ///     };
     ///
     ///     let account_cmp2 = Account {
     ///         name: Some("Email name".to_string()),
     ///         email: "some@mail.com".to_string(),
-    ///         signature: Some("Account Signature"),
-    ///         .. Account::default()
+    ///         signature: Some("Account Signature".to_string()),
+    ///         downloads_dir: Some(PathBuf::from(r"/tmp")),
+    ///         signature_delimiter: None,
+    ///         default_page_size: Some(42),
+    ///         default: Some(true),
+    ///         watch_cmds: Some(vec!["mbsync".to_string(), "-a".to_string()]),
+    ///         imap_host: String::from("localhost"),
+    ///         imap_port: 3993,
+    ///         imap_starttls: Some(false),
+    ///         imap_insecure: Some(true),
+    ///         imap_login: "some@mail.com".into(),
+    ///         imap_passwd_cmd: String::from("echo 'password'"),
+    ///         smtp_host: String::from("localhost"),
+    ///         smtp_port: 3465,
+    ///         smtp_starttls: Some(false),
+    ///         smtp_insecure: Some(true),
+    ///         smtp_login: "some@mail.com".into(),
+    ///         smtp_passwd_cmd: String::from("echo 'password'")
     ///     };
     ///
-    ///     assert_eq!(account_with_custom_signature, account_cmp1);
-    ///     assert_eq!(account_with_default_signature, account_cmp2);
+    ///     assert_eq!(account_with_custom_signature, account_cmp1, "{:?}, {:?}",
+    ///         dbg!(&account_with_custom_signature), dbg!(&account_cmp1));
+    ///     assert_eq!(account_with_default_signature, account_cmp2, "{:?}, {:?}",
+    ///         dbg!(&account_with_default_signature), dbg!(&account_cmp2));
     /// }
     /// ```
     pub fn new_with_signature(
         name: Option<&str>,
         email_addr: &str,
         signature: Option<&str>,
-    ) -> Self {
+        ) -> Self {
         let mut account = Account::new(name, email_addr);
 
         // Use the default signature "Account Signature", if the programmer didn't provide a custom
@@ -373,12 +411,12 @@ impl Config {
             .map(|dir| PathBuf::from(dir.to_string()))
             .unwrap_or(
                 self.downloads_dir
-                    .as_ref()
-                    .and_then(|dir| dir.to_str())
-                    .and_then(|dir| shellexpand::full(dir).ok())
-                    .map(|dir| PathBuf::from(dir.to_string()))
-                    .unwrap_or(env::temp_dir()),
-            )
+                .as_ref()
+                .and_then(|dir| dir.to_str())
+                .and_then(|dir| shellexpand::full(dir).ok())
+                .map(|dir| PathBuf::from(dir.to_string()))
+                .unwrap_or(env::temp_dir()),
+                )
             .join(filename)
     }
 
@@ -400,8 +438,64 @@ impl Config {
         Ok(())
     }
 
+    /// Returns the signature of the given account. If the account hasn't its own signature it'll
+    /// return the global signature and if there's no global signature `None` is returned.
+    ///
+    /// # Example
+    ///
+    /// <details>
+    ///
+    /// ```rust
+    /// use himalaya::config::model::{Config, Account};
+    ///
+    /// # fn main() {
+    ///     // ---- Configs -----
+    ///     // config without global signature
+    ///     let config_without_sign = Config {
+    ///         name: "[Config]: Without signature".to_string(),
+    ///         .. Config::default()
+    ///     };
+    ///
+    ///     // config with global signature
+    ///     let config_with_sign = Config {
+    ///         name: "[Config]: With signature".to_string(),
+    ///         signature: Some("Config Signature".to_string()),
+    ///         .. Config::default()
+    ///     };
+    ///     
+    ///     // ---- Accounts ----
+    ///     // account without signature
+    ///     let account_without_sign = Account::default();
+    ///
+    ///     // account with signature
+    ///     let account_with_sign = Account {
+    ///         signature: Some("Account Signature".to_string()),
+    ///         .. Account::default()
+    ///     };
+    ///
+    ///     // ---- Tests ----
+    ///     // Hint: The '--\n' comes from the signature delimiter!
+    ///     assert_eq!(
+    ///         config_with_sign.signature(&account_with_sign),
+    ///         Some("--\nAccount Signature".to_string())
+    ///     );
+    ///
+    ///     assert_eq!(
+    ///         config_with_sign.signature(&account_without_sign),
+    ///         Some("--\nConfig Signature".to_string())
+    ///     );
+    ///
+    ///     assert_eq!(
+    ///         config_without_sign.signature(&account_without_sign),
+    ///         None
+    ///     );
+    /// # }
+    /// ```
+    ///
+    /// </details>
+    ///
     pub fn signature(&self, account: &Account) -> Option<String> {
-        let default_sig_delim = String::from("-- \n");
+        let default_sig_delim = String::from("--\n");
         let sig_delim = account
             .signature_delimiter
             .as_ref()
