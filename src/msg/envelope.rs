@@ -53,6 +53,7 @@ error_chain! {
 /// [Envelope struct]: https://docs.rs/imap-proto/0.14.3/imap_proto/types/struct.Envelope.html
 /// [imap_proto]: https://docs.rs/imap-proto/0.14.3/imap_proto/index.html
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct Envelope {
     // -- Must-Fields --
     // These fields are the mininum needed to send a msg.

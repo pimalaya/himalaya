@@ -71,6 +71,7 @@ error_chain::error_chain! {
 /// This struct represents a whole msg with its attachments, body-content
 /// and its envelope.
 #[derive(Debug, Serialize, PartialEq, Eq, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Msg {
     /// All added attachments are listed in this vector.
     pub attachments: Vec<Attachment>,
@@ -98,6 +99,7 @@ pub struct Msg {
     date: Option<String>,
 
     /// The msg but in raw.
+    #[serde(skip_serializing)]
     raw: Vec<u8>,
 }
 
