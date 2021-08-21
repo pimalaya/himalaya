@@ -956,7 +956,7 @@ mod tests {
         let msg = Msg::new(&ctx);
         let expected_envelope = Envelope {
             from: vec![String::from("Config Name <test@mail.com>")],
-            signature: Some(String::from("\n\n-- \nAccount Signature")),
+            signature: Some(String::from("\n-- \nAccount Signature")),
             ..Envelope::default()
         };
 
@@ -978,7 +978,7 @@ mod tests {
         let msg = Msg::new(&ctx);
         let expected_envelope = Envelope {
             from: vec![String::from("Account Name <test@mail.com>")],
-            signature: Some(String::from("\n\n-- \nAccount Signature")),
+            signature: Some(String::from("\n-- \nAccount Signature")),
             ..Envelope::default()
         };
 
@@ -1013,7 +1013,7 @@ mod tests {
                 ..Envelope::default()
             },
             // The signature should be added automatically
-            body: Body::from(""),
+            body: Body::from("\n"),
             ..Msg::default()
         };
 
@@ -1043,7 +1043,7 @@ mod tests {
         let expected_with_custom_signature = Msg {
             envelope: Envelope {
                 from: vec![String::from("Account Name <test@mail.com>")],
-                signature: Some(String::from("\n\n-- \nSignature")),
+                signature: Some(String::from("\n-- \nSignature")),
                 ..Envelope::default()
             },
             body: Body::from("\n\n-- \nSignature"),
@@ -1261,12 +1261,12 @@ mod tests {
             envelope: Envelope {
                 from: vec![String::from("ThirdPerson <some@msg.asdf>")],
                 sender: Some(String::from("Name <some@address.asdf>")),
-                signature: Some(String::from("\n\n\n-- \nlol")),
+                signature: Some(String::from("\n-- \nlol")),
                 subject: Some(String::from("Fwd: Test subject")),
                 ..Envelope::default()
             },
             body: Body::from(concat![
-                "\n\n-- \nlol\n",
+                "\n-- \nlol\n",
                 "\n",
                 "---------- Forwarded Message ----------\n",
                 "The body text, nice!\n",
@@ -1318,7 +1318,7 @@ mod tests {
                 cc: Some(vec![String::from("")]),
                 ..Envelope::default()
             },
-            body: Body::from("\n\n\n-- \nAccount Signature"),
+            body: Body::from("\n\n-- \nAccount Signature"),
             ..Msg::default()
         };
 
