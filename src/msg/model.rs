@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use super::attachment::Attachment;
 use super::body::Body;
 use super::envelope::Envelope;
@@ -158,17 +160,19 @@ impl Msg {
     /// [`Msg::new`]: struct.Msg.html#method.new
     /// [`envelope`]: struct.Envelope.html
     pub fn new_with_envelope(ctx: &Ctx, mut envelope: Envelope) -> Self {
-        // -- Envelope credentials --
         if envelope.from.is_empty() {
             envelope.from = vec![ctx.config.address(&ctx.account)];
         }
 
         if let None = envelope.signature {
-            envelope.signature = ctx.config.signature(ctx.account).clone();
+            envelope.signature = ctx.config.signature(ctx.account);
         }
 
-        // -- Body credentials --
-        let body = Body::from(envelope.signature.clone().unwrap_or_default());
+        let body = Body::from(if let Some(sig) = envelope.signature.as_ref() {
+            format!("\n{}", sig)
+        } else {
+            String::from("\n")
+        });
 
         Self {
             envelope,
@@ -212,19 +216,18 @@ impl Msg {
     /// TODO: References field is missing, but the imap-crate can't implement it
     /// currently.
     pub fn change_to_reply(&mut self, ctx: &Ctx, reply_all: bool) -> Result<()> {
-        // -- Adjust header --
-        let subject = if let Some(subject) = self.envelope.subject.clone() {
-            // avoid creating a subject like this (if you reply to a reply):
-            //
-            //  Re: Re: My subject
-            if !subject.starts_with("Re:") {
-                format!("Re: {}", subject)
-            } else {
-                subject
-            }
-        } else {
-            String::new()
-        };
+        let subject = self
+            .envelope
+            .subject
+            .as_ref()
+            .map(|sub| {
+                if sub.starts_with("Re:") {
+                    sub.to_owned()
+                } else {
+                    format!("Re: {}", sub)
+                }
+            })
+            .unwrap_or_default();
 
         // The new fields
         let mut to: Vec<String> = Vec::new();
@@ -263,26 +266,27 @@ impl Msg {
             cc,
             subject: Some(subject),
             in_reply_to: self.envelope.message_id.clone(),
+            signature: ctx.config.signature(&ctx.account),
             // and clear the rest of the fields
             ..Envelope::default()
         };
 
         // comment "out" the body of the msg, by adding the `>` characters to
         // each line which includes a string.
-        let mut new_body: String = self
+        let mut new_body = self
             .body
-            .clone()
-            .split('\n')
-            .map(|line| format!("> {}\n", line))
+            .lines()
+            .map(|line| {
+                let space = if line.starts_with(">") { "" } else { " " };
+                format!(">{}{}", space, line)
+            })
             .collect::<Vec<String>>()
-            .concat();
-        // remove the last '\n'
-        new_body.pop();
+            .join("\n");
 
         // also add the the signature in the end
-        if let Some(signature) = ctx.config.signature(&ctx.account) {
+        if let Some(sig) = new_envelope.signature.as_ref() {
             new_body.push('\n');
-            new_body.push_str(&signature)
+            new_body.push_str(&sig)
         }
 
         self.body = Body::from(new_body);
@@ -346,7 +350,7 @@ impl Msg {
         // apply a line which should indicate where the forwarded message begins
         body.push_str(&format!(
             "\n\n---------- Forwarded Message ----------\n{}",
-            &self.body,
+            &self.body.deref().replace("\r", ""),
         ));
 
         self.body = Body::from(body);
@@ -410,7 +414,7 @@ impl Msg {
     pub fn edit_body(&mut self) -> Result<()> {
         // First of all, we need to create our template for the user. This
         // means, that the header needs to be added as well!
-        let msg = format!("{}\n\n{}", self.envelope.get_header_as_string(), self.body);
+        let msg = self.to_string();
 
         // We don't let this line compile, if we're doing
         // tests, because we just need to look, if the headers are set
@@ -740,7 +744,7 @@ impl Default for Msg {
 
 impl fmt::Display for Msg {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(
+        write!(
             formatter,
             "{}\n{}",
             self.envelope.get_header_as_string(),
@@ -952,7 +956,7 @@ mod tests {
         let msg = Msg::new(&ctx);
         let expected_envelope = Envelope {
             from: vec![String::from("Config Name <test@mail.com>")],
-            signature: Some(String::from("\n-- \nAccount Signature")),
+            signature: Some(String::from("\n\n-- \nAccount Signature")),
             ..Envelope::default()
         };
 
@@ -974,7 +978,7 @@ mod tests {
         let msg = Msg::new(&ctx);
         let expected_envelope = Envelope {
             from: vec![String::from("Account Name <test@mail.com>")],
-            signature: Some(String::from("\n-- \nAccount Signature")),
+            signature: Some(String::from("\n\n-- \nAccount Signature")),
             ..Envelope::default()
         };
 
@@ -1039,10 +1043,10 @@ mod tests {
         let expected_with_custom_signature = Msg {
             envelope: Envelope {
                 from: vec![String::from("Account Name <test@mail.com>")],
-                signature: Some(String::from("\n-- \nSignature")),
+                signature: Some(String::from("\n\n-- \nSignature")),
                 ..Envelope::default()
             },
-            body: Body::from("\n-- \nSignature"),
+            body: Body::from("\n\n-- \nSignature"),
             ..Msg::default()
         };
 
@@ -1152,8 +1156,8 @@ mod tests {
                 ..Envelope::default()
             },
             body: Body::from(concat![
-                "> > This is a message just to say hello.\n",
-                "> > So, \"Hello\".",
+                ">> This is a message just to say hello.\n",
+                ">> So, \"Hello\".",
             ]),
             ..Msg::default()
         };
@@ -1257,12 +1261,12 @@ mod tests {
             envelope: Envelope {
                 from: vec![String::from("ThirdPerson <some@msg.asdf>")],
                 sender: Some(String::from("Name <some@address.asdf>")),
-                signature: Some(String::from("\n-- \nlol")),
+                signature: Some(String::from("\n\n\n-- \nlol")),
                 subject: Some(String::from("Fwd: Test subject")),
                 ..Envelope::default()
             },
             body: Body::from(concat![
-                "\n-- \nlol\n",
+                "\n\n-- \nlol\n",
                 "\n",
                 "---------- Forwarded Message ----------\n",
                 "The body text, nice!\n",
@@ -1314,7 +1318,7 @@ mod tests {
                 cc: Some(vec![String::from("")]),
                 ..Envelope::default()
             },
-            body: Body::from("\n\n-- \nAccount Signature"),
+            body: Body::from("\n\n\n-- \nAccount Signature"),
             ..Msg::default()
         };
 
