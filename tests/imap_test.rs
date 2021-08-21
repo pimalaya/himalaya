@@ -48,9 +48,8 @@ fn mbox() {
 
 #[test]
 fn msg() {
-    
     // Preparations
-    
+
     // Get the test-account and clean up the server.
     let account = Account::new(Some("AccountName"), "inbox@localhost");
 
@@ -79,18 +78,18 @@ fn msg() {
     // == Testing ==
     // Add messages
     let message_a = Message::builder()
-            .from("sender-a@localhost".parse().unwrap())
-            .to("inbox@localhost".parse().unwrap())
-            .subject("Subject A")
-            .singlepart(SinglePart::builder().body("Body A".as_bytes().to_vec()))
-            .unwrap();
+        .from("sender-a@localhost".parse().unwrap())
+        .to("inbox@localhost".parse().unwrap())
+        .subject("Subject A")
+        .singlepart(SinglePart::builder().body("Body A".as_bytes().to_vec()))
+        .unwrap();
 
     let message_b = Message::builder()
-            .from("Sender B <sender-b@localhost>".parse().unwrap())
-            .to("inbox@localhost".parse().unwrap())
-            .subject("Subject B")
-            .singlepart(SinglePart::builder().body("Body B".as_bytes().to_vec()))
-            .unwrap();
+        .from("Sender B <sender-b@localhost>".parse().unwrap())
+        .to("inbox@localhost".parse().unwrap())
+        .subject("Subject B")
+        .singlepart(SinglePart::builder().body("Body B".as_bytes().to_vec()))
+        .unwrap();
 
     smtp::send(&account, &message_a).unwrap();
     smtp::send(&account, &message_b).unwrap();
@@ -121,10 +120,16 @@ fn msg() {
 
     // -- Checkup --
     // look, if we received the correct credentials of the msgs.
-    assert_eq!(msg_a.envelope.subject.clone().unwrap_or_default(), "Subject A");
+    assert_eq!(
+        msg_a.envelope.subject.clone().unwrap_or_default(),
+        "Subject A"
+    );
     assert_eq!(&msg_a.envelope.from[0], "sender-a@localhost");
 
-    assert_eq!(msg_b.envelope.subject.clone().unwrap_or_default(), "Subject B");
+    assert_eq!(
+        msg_b.envelope.subject.clone().unwrap_or_default(),
+        "Subject B"
+    );
     assert_eq!(&msg_b.envelope.from[0], "Sender B <sender-b@localhost>");
 
     // TODO: search messages

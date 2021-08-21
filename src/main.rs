@@ -6,9 +6,11 @@ use std::{env, path::PathBuf, process::exit};
 use url::{self, Url};
 
 use himalaya::{
+    comp,
     config::{cli::config_args, model::Config},
     ctx::Ctx,
-    flag, imap, mbox, msg::{self, cli::msg_matches_mailto}, comp,
+    flag, imap, mbox,
+    msg::{self, cli::msg_matches_mailto},
     output::{cli::output_args, model::Output},
 };
 

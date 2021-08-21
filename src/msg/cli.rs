@@ -444,7 +444,7 @@ fn msg_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     debug!("uid: {}", uid);
 
     // Change the msg to a reply-msg.
-        msg.change_to_reply(&ctx, matches.is_present("reply-all"))?;
+    msg.change_to_reply(&ctx, matches.is_present("reply-all"))?;
 
     // Apply the given attachments to the reply-msg.
     let attachments: Vec<&str> = matches
@@ -793,7 +793,7 @@ fn tpl_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
     let mut msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
 
-        msg.change_to_reply(&ctx, matches.is_present("reply-all"))?;
+    msg.change_to_reply(&ctx, matches.is_present("reply-all"))?;
 
     override_msg_with_args(&mut msg, &matches);
     trace!("Message: {:?}", msg);
