@@ -17,8 +17,8 @@ use crate::{
 #[cfg(not(test))]
 use crate::input;
 
-use serde::{Serialize, ser};
 use serde::ser::SerializeStruct;
+use serde::{ser, Serialize};
 
 use lettre::message::{
     header::ContentTransferEncoding, header::ContentType, Attachment as lettre_Attachment, Mailbox,
@@ -36,7 +36,7 @@ use colorful::Colorful;
 error_chain::error_chain! {
     errors {
         ParseBody (err: String) {
-            description("An error appeared, when it tried to parse the body of the msg!"),
+            description("An error appeared, when trying to parse the body of the msg!"),
             display("Couldn't get the body of the parsed msg: {}", err),
         }
 
@@ -225,7 +225,7 @@ impl Msg {
                     format!("Re: {}", sub)
                 }
             })
-        .unwrap_or_default();
+            .unwrap_or_default();
 
         // The new fields
         let mut to: Vec<String> = Vec::new();
@@ -271,14 +271,17 @@ impl Msg {
 
         // comment "out" the body of the msg, by adding the `>` characters to
         // each line which includes a string.
-        let mut new_body = self.body.text.clone()
-            .unwrap_or(String::new())
+        let mut new_body = self
+            .body
+            .text
+            .clone()
+            .unwrap_or_default()
             .lines()
             .map(|line| {
                 let space = if line.starts_with(">") { "" } else { " " };
                 format!(">{}{}", space, line)
             })
-        .collect::<Vec<String>>()
+            .collect::<Vec<String>>()
             .join("\n");
 
         // also add the the signature in the end
@@ -347,9 +350,9 @@ impl Msg {
         // -- Body --
         // apply a line which should indicate where the forwarded message begins
         body.push_str(&format!(
-                "\n\n---------- Forwarded Message ----------\n{}",
-                self.body.text.clone().unwrap_or_default().replace("\r", ""),
-                ));
+            "\n\n---------- Forwarded Message ----------\n{}",
+            self.body.text.clone().unwrap_or_default().replace("\r", ""),
+        ));
 
         self.body = Body::new_with_text(body);
     }
@@ -547,7 +550,7 @@ impl Msg {
                 Err(err) => {
                     return Err(
                         ErrorKind::Header(err.to_string(), "From", mailaddress.to_string()).into(),
-                        )
+                    )
                 }
             });
         }
@@ -559,7 +562,7 @@ impl Msg {
                 Err(err) => {
                     return Err(
                         ErrorKind::Header(err.to_string(), "To", mailaddress.to_string()).into(),
-                        )
+                    )
                 }
             });
         }
@@ -572,11 +575,11 @@ impl Msg {
                     Ok(bcc) => bcc,
                     Err(err) => {
                         return Err(ErrorKind::Header(
-                                err.to_string(),
-                                "Bcc",
-                                mailaddress.to_string(),
-                                )
-                            .into())
+                            err.to_string(),
+                            "Bcc",
+                            mailaddress.to_string(),
+                        )
+                        .into())
                     }
                 });
             }
@@ -589,11 +592,11 @@ impl Msg {
                     Ok(cc) => cc,
                     Err(err) => {
                         return Err(ErrorKind::Header(
-                                err.to_string(),
-                                "Cc",
-                                mailaddress.to_string(),
-                                )
-                            .into())
+                            err.to_string(),
+                            "Cc",
+                            mailaddress.to_string(),
+                        )
+                        .into())
                     }
                 });
             }
@@ -605,11 +608,11 @@ impl Msg {
                 Ok(in_reply_to) => in_reply_to,
                 Err(err) => {
                     return Err(ErrorKind::Header(
-                            err.to_string(),
-                            "In-Reply-To",
-                            in_reply_to.to_string(),
-                            )
-                        .into())
+                        err.to_string(),
+                        "In-Reply-To",
+                        in_reply_to.to_string(),
+                    )
+                    .into())
                 }
             });
         }
@@ -636,11 +639,11 @@ impl Msg {
                     Ok(reply_to) => reply_to,
                     Err(err) => {
                         return Err(ErrorKind::Header(
-                                err.to_string(),
-                                "Reply-to",
-                                mailaddress.to_string(),
-                                )
-                            .into())
+                            err.to_string(),
+                            "Reply-to",
+                            mailaddress.to_string(),
+                        )
+                        .into())
                     }
                 });
             }
@@ -653,7 +656,7 @@ impl Msg {
                 Err(err) => {
                     return Err(
                         ErrorKind::Header(err.to_string(), "Sender", sender.to_string()).into(),
-                        )
+                    )
                 }
             });
         }
@@ -673,9 +676,9 @@ impl Msg {
         // -- Body --
         if self.body.text.is_some() && self.body.html.is_some() {
             msg_parts = msg_parts.multipart(MultiPart::alternative_plain_html(
-                    self.body.text.clone().unwrap(),
-                    self.body.html.clone().unwrap()
-                    ));
+                self.body.text.clone().unwrap(),
+                self.body.html.clone().unwrap(),
+            ));
         } else {
             let msg_body = SinglePart::builder()
                 .header(ContentType::TEXT_PLAIN)
@@ -695,10 +698,10 @@ impl Msg {
         }
 
         Ok(msg
-           .multipart(msg_parts)
-           // whenever an error appears, print out the messge as well to see what might be the
-           // error
-           .chain_err(|| format!("-- Current Message --\n{}", self))?)
+            .multipart(msg_parts)
+            // whenever an error appears, print out the messge as well to see what might be the
+            // error
+            .chain_err(|| format!("-- Current Message --\n{}", self))?)
     }
 
     /// Returns the uid of the msg.
@@ -719,7 +722,7 @@ impl Msg {
             format!(
                 "[{}]: Couldn't get the raw body of the msg/msg.",
                 "Error".red()
-                )
+            )
         })?;
 
         Ok(raw_message)
@@ -733,11 +736,10 @@ impl Msg {
 
 // -- Traits --
 impl ser::Serialize for Msg {
-    fn serialize<S> (&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
     where
-        S: ser::Serializer
+        S: ser::Serializer,
     {
-        println!("ÖLKJASFÖLKJ");
         let mut state = serializer.serialize_struct("Msg", 6)?;
         state.serialize_field("hasAttachment", &(self.attachments.len() > 0))?;
         state.serialize_field("flags", &self.flags)?;
@@ -772,7 +774,7 @@ impl fmt::Display for Msg {
             "{}\n{}",
             self.envelope.get_header_as_string(),
             self.body,
-            )
+        )
     }
 }
 
@@ -878,7 +880,6 @@ impl TryFrom<&Fetch> for Msg {
                 } else if body.html.is_none() && subpart.ctype.mimetype == "text/html" {
                     body.html = subpart.get_body().ok();
                 }
-
                 // otherise it's a normal attachment, like a PNG file or
                 // something like that
                 else if let Some(attachment) = Attachment::from_parsed_mail(subpart) {
@@ -891,7 +892,7 @@ impl TryFrom<&Fetch> for Msg {
                         "[{}] Unknown attachment with the following mime-type: {}\n",
                         "Warning".yellow(),
                         subpart.ctype.mimetype,
-                        );
+                    );
                 }
             }
         }
@@ -1025,7 +1026,7 @@ mod tests {
                 from: vec![String::from("Account Name <test@mail.com>")],
                 ..Envelope::default()
             },
-            );
+        );
         let expected_with_custom_from = Msg {
             envelope: Envelope {
                 // the Msg::new_with_envelope function should use the from
@@ -1045,7 +1046,7 @@ mod tests {
             "Left: {:?}, Right: {:?}",
             dbg!(&msg_with_custom_from),
             dbg!(&expected_with_custom_from)
-            );
+        );
     }
 
     #[test]
@@ -1078,7 +1079,7 @@ mod tests {
             "Left: {:?}, Right: {:?}",
             dbg!(&msg_with_custom_signature),
             dbg!(&expected_with_custom_signature)
-            );
+        );
     }
 
     #[test]
@@ -1110,8 +1111,8 @@ mod tests {
                 ..Envelope::default()
             },
             body: Body::new_with_text(concat![
-                             "This is a message just to say hello.\n",
-                             "So, \"Hello\".",
+                "This is a message just to say hello.\n",
+                "So, \"Hello\".",
             ]),
             ..Msg::default()
         };
@@ -1133,8 +1134,8 @@ mod tests {
                     "Name <some@address.asdf>".to_string(),
                 ],
                 cc: Some(vec![
-                         "test@testing".to_string(),
-                         "test2@testing".to_string(),
+                    "test@testing".to_string(),
+                    "test2@testing".to_string(),
                 ]),
                 message_id: Some("RandomID123".to_string()),
                 reply_to: Some(vec!["Reply@Mail.rofl".to_string()]),
@@ -1153,7 +1154,7 @@ mod tests {
                 from: vec!["Mary Smith <mary@example.net>".to_string()],
                 to: vec!["John Doe <jdoe@machine.example>".to_string()],
                 reply_to: Some(vec![
-                               "\"Mary Smith: Personal Account\" <smith@home.example>".to_string(),
+                    "\"Mary Smith: Personal Account\" <smith@home.example>".to_string(),
                 ]),
                 subject: Some("Re: Saying Hello".to_string()),
                 message_id: Some("<3456@example.net>".to_string()),
@@ -1161,8 +1162,8 @@ mod tests {
                 ..Envelope::default()
             },
             body: Body::new_with_text(concat![
-                             "> This is a message just to say hello.\n",
-                             "> So, \"Hello\".",
+                "> This is a message just to say hello.\n",
+                "> So, \"Hello\".",
             ]),
             ..Msg::default()
         };
@@ -1178,8 +1179,8 @@ mod tests {
                 ..Envelope::default()
             },
             body: Body::new_with_text(concat![
-                             ">> This is a message just to say hello.\n",
-                             ">> So, \"Hello\".",
+                ">> This is a message just to say hello.\n",
+                ">> So, \"Hello\".",
             ]),
             ..Msg::default()
         };
@@ -1194,8 +1195,8 @@ mod tests {
                     "Reply@Mail.rofl".to_string(),
                 ],
                 cc: Some(vec![
-                         "test@testing".to_string(),
-                         "test2@testing".to_string(),
+                    "test@testing".to_string(),
+                    "test2@testing".to_string(),
                 ]),
                 in_reply_to: Some("RandomID123".to_string()),
                 subject: Some("Re: Have you heard of himalaya?".to_string()),
@@ -1215,7 +1216,7 @@ mod tests {
         rfc_reply_1.envelope = Envelope {
             message_id: Some("<3456@example.net>".to_string()),
             reply_to: Some(vec![
-                           "\"Mary Smith: Personal Account\" <smith@home.example>".to_string(),
+                "\"Mary Smith: Personal Account\" <smith@home.example>".to_string(),
             ]),
             ..rfc_reply_1.envelope.clone()
         };
@@ -1234,7 +1235,7 @@ mod tests {
             "Left: {:?}, Right: {:?}",
             dbg!(&rfc_reply_1),
             dbg!(&expected_rfc1)
-            );
+        );
 
         assert_eq!(
             rfc_reply_2,
@@ -1242,7 +1243,7 @@ mod tests {
             "Left: {:?}, Right: {:?}",
             dbg!(&rfc_reply_2),
             dbg!(&expected_rfc2)
-            );
+        );
 
         // -- custom tests -—
         msg_reply_all.change_to_reply(&ctx, true).unwrap();
@@ -1252,7 +1253,7 @@ mod tests {
             "Left: {:?}, Right: {:?}",
             dbg!(&msg_reply_all),
             dbg!(&expected_reply_all)
-            );
+        );
     }
 
     #[test]
@@ -1274,7 +1275,7 @@ mod tests {
                 subject: Some(String::from("Test subject")),
                 ..Envelope::default()
             },
-            );
+        );
 
         msg.body = Body::new_with_text(concat!["The body text, nice!\n", "Himalaya is nice!",]);
 
@@ -1288,11 +1289,11 @@ mod tests {
                 ..Envelope::default()
             },
             body: Body::new_with_text(concat![
-                             "\n-- \nlol\n",
-                             "\n",
-                             "---------- Forwarded Message ----------\n",
-                             "The body text, nice!\n",
-                             "Himalaya is nice!",
+                "\n-- \nlol\n",
+                "\n",
+                "---------- Forwarded Message ----------\n",
+                "The body text, nice!\n",
+                "Himalaya is nice!",
             ]),
             ..Msg::default()
         };
@@ -1305,7 +1306,7 @@ mod tests {
             "Left: {:?}, Right: {:?}",
             dbg!(&msg),
             dbg!(&expected_msg)
-            );
+        );
     }
 
     #[test]
@@ -1327,7 +1328,7 @@ mod tests {
                 subject: Some(String::new()),
                 ..Envelope::default()
             },
-            );
+        );
 
         // == Expected Results ==
         let expected_msg = Msg {
@@ -1352,7 +1353,7 @@ mod tests {
             "Left: {:?}, Right: {:?}",
             dbg!(&msg),
             dbg!(&expected_msg)
-            );
+        );
     }
 
     #[test]
@@ -1396,8 +1397,8 @@ mod tests {
                 from: vec![String::from("Some <user@msg.sf>")],
                 subject: Some(String::from("Awesome Subject")),
                 bcc: Some(vec![
-                          String::from("name <rofl@lol.asdf>"),
-                          String::from("mail1@rofl.lol"),
+                    String::from("name <rofl@lol.asdf>"),
+                    String::from("mail1@rofl.lol"),
                 ]),
                 to: vec![String::from("To <name@msg.rofl>")],
                 ..Envelope::default()
@@ -1416,8 +1417,8 @@ mod tests {
                 from: vec![String::from("Some <user@msg.sf>")],
                 subject: Some(String::from("Awesome Subject")),
                 bcc: Some(vec![
-                          String::from("name <rofl@lol.asdf>"),
-                          String::from("mail1@rofl.lol"),
+                    String::from("name <rofl@lol.asdf>"),
+                    String::from("mail1@rofl.lol"),
                 ]),
                 to: vec![String::from("To <name@msg.rofl>")],
                 custom_headers: Some(custom_headers),
@@ -1440,7 +1441,7 @@ mod tests {
             "Left: {:?}, Right: {:?}",
             dbg!(&msg1),
             dbg!(&expect)
-            );
+        );
 
         assert_eq!(
             msg2,
@@ -1448,6 +1449,6 @@ mod tests {
             "Left: {:?}, Right: {:?}",
             dbg!(&msg2),
             dbg!(&expect_custom_header)
-            );
+        );
     }
 }

@@ -348,11 +348,7 @@ fn msg_matches_read(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     if raw {
         ctx.output.print(msg.get_raw()?);
     } else {
-        if ctx.output.is_json() {
-            ctx.output.print(msg);
-        } else {
-            ctx.output.print(msg.body);
-        }
+        ctx.output.print(msg);
     }
 
     imap_conn.logout();
