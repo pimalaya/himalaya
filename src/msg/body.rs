@@ -32,7 +32,6 @@ pub struct Body {
 }
 
 impl Body {
-
     /// Returns a new instance of `Body` without any attributes set. (Same as `Body::default()`)
     ///
     /// # Example
@@ -53,7 +52,7 @@ impl Body {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// Returns a new instance of `Body` with `text` set.
     ///
     /// # Example
@@ -83,7 +82,7 @@ impl Body {
     /// # Example
     /// ```rust
     /// use himalaya::msg::body::Body;
-    /// 
+    ///
     /// fn main() {
     ///     let body = Body::new_with_html("Html body");
     ///
