@@ -348,7 +348,11 @@ fn msg_matches_read(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     if raw {
         ctx.output.print(msg.get_raw()?);
     } else {
-        ctx.output.print(msg.body);
+        if ctx.output.is_json() {
+            ctx.output.print(msg);
+        } else {
+            ctx.output.print(msg.body);
+        }
     }
 
     imap_conn.logout();
@@ -503,7 +507,7 @@ pub fn msg_matches_mailto(ctx: &Ctx, url: &Url) -> Result<()> {
     };
 
     let mut msg = Msg::new_with_envelope(&ctx, envelope);
-    msg.body = Body::from(body.as_ref());
+    msg.body = Body::new_with_text(body);
     msg_interaction(&ctx, &mut msg, &mut imap_conn)?;
 
     imap_conn.logout();
@@ -753,7 +757,7 @@ fn override_msg_with_args(msg: &mut Msg, matches: &clap::ArgMatches) {
         }
     };
 
-    let body = Body::from(body);
+    let body = Body::new_with_text(body);
 
     // -- Creating and printing --
     let envelope = Envelope {
