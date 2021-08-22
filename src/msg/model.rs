@@ -520,7 +520,7 @@ impl Msg {
     ///         },
     ///     );
     ///
-    ///     msg.body = Body::from("A little text.");
+    ///     msg.body = Body::new_with_text("A little text.");
     ///     let sendable_msg = msg.to_sendable_msg().unwrap();
     ///
     ///     // now send the msg. Hint: Do the appropriate error handling here!
@@ -900,7 +900,7 @@ impl TryFrom<&Fetch> for Msg {
             attachments,
             flags,
             envelope,
-            body: Body::from(body),
+            body: Body::new_with_text(body),
             uid,
             date,
             raw,
@@ -1035,7 +1035,7 @@ mod tests {
                 ..Envelope::default()
             },
             // The signature should be added automatically
-            body: Body::from("\n"),
+            body: Body::new_with_text("\n"),
             ..Msg::default()
         };
 
@@ -1068,7 +1068,7 @@ mod tests {
                 signature: Some(String::from("\n-- \nSignature")),
                 ..Envelope::default()
             },
-            body: Body::from("\n\n-- \nSignature"),
+            body: Body::new_with_text("\n\n-- \nSignature"),
             ..Msg::default()
         };
 
@@ -1109,7 +1109,7 @@ mod tests {
                 message_id: Some("<1234@local.machine.example>".to_string()),
                 ..Envelope::default()
             },
-            body: Body::from(concat![
+            body: Body::new_with_text(concat![
                              "This is a message just to say hello.\n",
                              "So, \"Hello\".",
             ]),
@@ -1141,7 +1141,7 @@ mod tests {
                 subject: Some("Have you heard of himalaya?".to_string()),
                 ..Envelope::default()
             },
-            body: Body::from(concat!["A body test\n", "\n", "Sincerely",]),
+            body: Body::new_with_text(concat!["A body test\n", "\n", "Sincerely",]),
             ..Msg::default()
         };
 
@@ -1160,7 +1160,7 @@ mod tests {
                 in_reply_to: Some("<1234@local.machine.example>".to_string()),
                 ..Envelope::default()
             },
-            body: Body::from(concat![
+            body: Body::new_with_text(concat![
                              "> This is a message just to say hello.\n",
                              "> So, \"Hello\".",
             ]),
@@ -1177,7 +1177,7 @@ mod tests {
                 in_reply_to: Some("<3456@example.net>".to_string()),
                 ..Envelope::default()
             },
-            body: Body::from(concat![
+            body: Body::new_with_text(concat![
                              ">> This is a message just to say hello.\n",
                              ">> So, \"Hello\".",
             ]),
@@ -1201,7 +1201,7 @@ mod tests {
                 subject: Some("Re: Have you heard of himalaya?".to_string()),
                 ..Envelope::default()
             },
-            body: Body::from(concat!["> A body test\n", "> \n", "> Sincerely"]),
+            body: Body::new_with_text(concat!["> A body test\n", "> \n", "> Sincerely"]),
             ..Msg::default()
         };
 
@@ -1276,7 +1276,7 @@ mod tests {
             },
             );
 
-        msg.body = Body::from(concat!["The body text, nice!\n", "Himalaya is nice!",]);
+        msg.body = Body::new_with_text(concat!["The body text, nice!\n", "Himalaya is nice!",]);
 
         // == Expected Results ==
         let expected_msg = Msg {
@@ -1287,7 +1287,7 @@ mod tests {
                 subject: Some(String::from("Fwd: Test subject")),
                 ..Envelope::default()
             },
-            body: Body::from(concat![
+            body: Body::new_with_text(concat![
                              "\n-- \nlol\n",
                              "\n",
                              "---------- Forwarded Message ----------\n",
@@ -1340,7 +1340,7 @@ mod tests {
                 cc: Some(vec![String::from("")]),
                 ..Envelope::default()
             },
-            body: Body::from("\n\n-- \nAccount Signature"),
+            body: Body::new_with_text("\n\n-- \nAccount Signature"),
             ..Msg::default()
         };
 
@@ -1402,7 +1402,7 @@ mod tests {
                 to: vec![String::from("To <name@msg.rofl>")],
                 ..Envelope::default()
             },
-            body: Body::from("Account Signature\n"),
+            body: Body::new_with_text("Account Signature\n"),
             ..Msg::default()
         };
 
@@ -1423,7 +1423,7 @@ mod tests {
                 custom_headers: Some(custom_headers),
                 ..Envelope::default()
             },
-            body: Body::from("Account Signature\n"),
+            body: Body::new_with_text("Account Signature\n"),
             ..Msg::default()
         };
 
