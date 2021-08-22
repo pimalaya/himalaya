@@ -496,7 +496,7 @@ pub fn msg_matches_mailto(ctx: &Ctx, url: &Url) -> Result<()> {
     }
 
     let envelope = Envelope {
-        from: vec![ctx.config.address(ctx.account)],
+        from: vec![ctx.config.address(&ctx.account)],
         to: vec![url.path().to_string()],
         encoding: ContentTransferEncoding::Base64,
         bcc: Some(bcc),

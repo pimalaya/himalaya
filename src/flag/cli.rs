@@ -53,7 +53,7 @@ pub fn matches(ctx: &Ctx) -> Result<bool> {
         debug!("flags: {}", flags);
 
         let mut imap_conn = ImapConnector::new(&ctx.account)?;
-        imap_conn.set_flags(ctx.mbox, uid, flags)?;
+        imap_conn.set_flags(&ctx.mbox, uid, flags)?;
 
         imap_conn.logout();
         return Ok(true);
@@ -69,7 +69,7 @@ pub fn matches(ctx: &Ctx) -> Result<bool> {
         debug!("flags: {}", flags);
 
         let mut imap_conn = ImapConnector::new(&ctx.account)?;
-        imap_conn.add_flags(ctx.mbox, uid, flags)?;
+        imap_conn.add_flags(&ctx.mbox, uid, flags)?;
 
         imap_conn.logout();
         return Ok(true);
@@ -85,7 +85,7 @@ pub fn matches(ctx: &Ctx) -> Result<bool> {
         debug!("flags: {}", flags);
 
         let mut imap_conn = ImapConnector::new(&ctx.account)?;
-        imap_conn.remove_flags(ctx.mbox, uid, flags)?;
+        imap_conn.remove_flags(&ctx.mbox, uid, flags)?;
 
         imap_conn.logout();
         return Ok(true);

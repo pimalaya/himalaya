@@ -141,15 +141,19 @@ impl Account {
     /// # Examples
     /// ```rust
     /// use himalaya::config::model::Account;
+    /// use himalaya::ctx::Ctx;
     ///
     /// fn main() {
     ///
     ///     // the testing accounts
-    ///     let account_with_custom_signature = Account::new_with_signature(
+    ///     let ctx1 = Ctx {
+    ///         account: Account::new_with_signature(
     ///         Some("Email name"),
     ///         "some@mail.com",
-    ///         Some("Custom signature! :)")
-    ///     );
+    ///         Some("Custom signature! :)"),
+    ///         .. Ctx::default()
+    ///     )
+    ///     };
     ///
     ///     let account_with_default_signature = Account::new_with_signature(
     ///         Some("Email name"),

@@ -5,23 +5,26 @@ use crate::{
     output::model::Output,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Ctx<'a> {
-    pub config: &'a Config,
-    pub account: &'a Account,
-    pub output: &'a Output,
-    pub mbox: &'a str,
-    pub arg_matches: &'a clap::ArgMatches<'a>,
+    pub config: Config,
+    pub account: Account,
+    pub output: Output,
+    pub mbox: String,
+    pub arg_matches: clap::ArgMatches<'a>,
 }
 
 impl<'a> Ctx<'a> {
-    pub fn new(
-        config: &'a Config,
-        account: &'a Account,
-        output: &'a Output,
-        mbox: &'a str,
-        arg_matches: &'a clap::ArgMatches<'a>,
+    pub fn new<S: ToString>(
+        config: Config,
+        account: Account,
+        output: Output,
+        mbox: S,
+        arg_matches: clap::ArgMatches<'a>,
     ) -> Self {
+
+        let mbox = mbox.to_string();
+
         Self {
             config,
             account,

@@ -163,7 +163,7 @@ impl Msg {
         }
 
         if let None = envelope.signature {
-            envelope.signature = ctx.config.signature(ctx.account);
+            envelope.signature = ctx.config.signature(&ctx.account);
         }
 
         let body = Body::new_with_text(if let Some(sig) = envelope.signature.as_ref() {
@@ -333,7 +333,7 @@ impl Msg {
 
         self.envelope = Envelope {
             subject: Some(format!("Fwd: {}", old_subject)),
-            sender: Some(ctx.config.address(ctx.account)),
+            sender: Some(ctx.config.address(&ctx.account)),
             // and use the rest of the headers
             ..self.envelope.clone()
         };
