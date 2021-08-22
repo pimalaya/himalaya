@@ -732,6 +732,11 @@ impl Msg {
     pub fn get_encoding(&self) -> ContentTransferEncoding {
         self.envelope.encoding
     }
+
+    /// Returns the whole message: Header + Body as a String
+    pub fn get_full_message(&self) -> String {
+        format!("{}\n{}", self.envelope.get_header_as_string(), self.body)
+    }
 }
 
 // -- Traits --
@@ -769,12 +774,7 @@ impl Default for Msg {
 
 impl fmt::Display for Msg {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            formatter,
-            "{}\n{}",
-            self.envelope.get_header_as_string(),
-            self.body,
-        )
+        write!(formatter, "{}", self.body)
     }
 }
 
