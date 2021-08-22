@@ -50,13 +50,15 @@ fn run() -> Result<()> {
     );
 
     let raw_args: Vec<String> = env::args().collect();
+
+    // This is used if you click on a mailaddress in the webbrowser
     if raw_args.len() > 1 && raw_args[1].starts_with("mailto:") {
         let config = Config::new(None)?;
-        let account = config.find_account_by_name(None)?;
+        let account = config.find_account_by_name(None)?.clone();
         let output = Output::new("plain");
         let mbox = "INBOX";
         let arg_matches = ArgMatches::default();
-        let app = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
+        let app = Ctx::new(config, account, output, mbox, arg_matches);
         let url = Url::parse(&raw_args[1])?;
         return Ok(msg_matches_mailto(&app, &url)?);
     }
@@ -80,14 +82,15 @@ fn run() -> Result<()> {
 
     let account_name = arg_matches.value_of("account");
     debug!("init account: {}", account_name.unwrap_or("default"));
-    let account = config.find_account_by_name(account_name)?;
+    let account = config.find_account_by_name(account_name)?.clone();
     trace!("account: {:?}", account);
 
-    let mbox = arg_matches.value_of("mailbox").unwrap();
+    let mbox = arg_matches.value_of("mailbox").unwrap().to_string();
     debug!("mailbox: {}", mbox);
 
     debug!("begin matching");
-    let app = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
+
+    let app = Ctx::new(config, account, output, mbox, arg_matches);
     let _matched = mbox::cli::matches(&app)?
         || flag::cli::matches(&app)?
         || imap::cli::matches(&app)?
