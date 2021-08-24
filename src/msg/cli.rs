@@ -1,6 +1,6 @@
 use super::body::Body;
 use super::envelope::Envelope;
-use super::model::{Msg, Msgs};
+use super::model::{Msg, Msgs, MsgSerialized};
 use url::Url;
 
 use atty::Stream;
@@ -348,9 +348,8 @@ fn msg_matches_read(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     if raw {
         ctx.output.print(msg.get_raw()?);
     } else {
-        ctx.output.print(msg);
+        ctx.output.print(MsgSerialized::from(&msg));
     }
-
     imap_conn.logout();
     Ok(true)
 }
@@ -779,7 +778,7 @@ fn tpl_matches_new(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     override_msg_with_args(&mut msg, &matches);
 
     trace!("Message: {:?}", msg);
-    ctx.output.print(msg);
+    ctx.output.print(MsgSerialized::from(&msg));
 
     Ok(true)
 }
@@ -797,7 +796,7 @@ fn tpl_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 
     override_msg_with_args(&mut msg, &matches);
     trace!("Message: {:?}", msg);
-    ctx.output.print(msg);
+    ctx.output.print(MsgSerialized::from(&msg));
 
     Ok(true)
 }
@@ -815,7 +814,7 @@ fn tpl_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     override_msg_with_args(&mut msg, &matches);
 
     trace!("Message: {:?}", msg);
-    ctx.output.print(msg);
+    ctx.output.print(MsgSerialized::from(&msg));
 
     Ok(true)
 }

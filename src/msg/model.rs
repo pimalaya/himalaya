@@ -17,8 +17,7 @@ use crate::{
 #[cfg(not(test))]
 use crate::input;
 
-use serde::ser::SerializeStruct;
-use serde::{ser, Serialize};
+use serde::Serialize;
 
 use lettre::message::{
     header::ContentTransferEncoding, header::ContentType, Attachment as lettre_Attachment, Mailbox,
@@ -70,9 +69,37 @@ error_chain::error_chain! {
 }
 
 // == Msg ==
+/// Represents the msg in a serializeable form with additional values.
+#[derive(Serialize, Clone, Debug, Eq, PartialEq)]
+pub struct MsgSerialized {
+    /// First of all, the messge in general
+    #[serde(flatten)]
+    pub msg: Msg,
+
+    /// A bool which indicates if the current msg includes attachments or not.
+    pub has_attachment: bool,
+}
+
+impl From<&Msg> for MsgSerialized {
+    fn from(msg: &Msg) -> Self {
+        let has_attachment = msg.attachments.len() > 0;
+
+        Self {
+            msg: msg.clone(),
+            has_attachment,
+        }
+    }
+}
+
+impl fmt::Display for MsgSerialized {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "{}", self.msg.body)
+    }
+}
+
 /// This struct represents a whole msg with its attachments, body-content
 /// and its envelope.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
 pub struct Msg {
     /// All added attachments are listed in this vector.
     pub attachments: Vec<Attachment>,
@@ -740,21 +767,21 @@ impl Msg {
 }
 
 // -- Traits --
-impl ser::Serialize for Msg {
-    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
-    where
-        S: ser::Serializer,
-    {
-        let mut state = serializer.serialize_struct("Msg", 6)?;
-        state.serialize_field("hasAttachment", &(self.attachments.len() > 0))?;
-        state.serialize_field("flags", &self.flags)?;
-        state.serialize_field("envelope", &self.envelope)?;
-        state.serialize_field("body", &self.body)?;
-        state.serialize_field("uid", &self.uid)?;
-        state.serialize_field("date", &self.date)?;
-        state.end()
-    }
-}
+// impl ser::Serialize for Msg {
+//     fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+//     where
+//         S: ser::Serializer,
+//     {
+//         let mut state = serializer.serialize_struct("Msg", 6)?;
+//         state.serialize_field("hasAttachment", &(self.attachments.len() > 0))?;
+//         state.serialize_field("flags", &self.flags)?;
+//         state.serialize_field("envelope", &self.envelope)?;
+//         state.serialize_field("body", &self.body)?;
+//         state.serialize_field("uid", &self.uid)?;
+//         state.serialize_field("date", &self.date)?;
+//         state.end()
+//     }
+// }
 
 impl Default for Msg {
     fn default() -> Self {
@@ -846,18 +873,18 @@ impl TryFrom<&Fetch> for Msg {
         // the fetch even includes a body or not, since the `BODY[]` query is
         // only *optional*!
         let parsed =
-            // the empty array represents an invalid body, so we can enter the
-            // `Err` arm if the body-query wasn't applied
-            match mailparse::parse_mail(raw.as_slice()) {
-                Ok(parsed) => {
-                    debug!("Fetch has a body to parse.");
-                    Some(parsed)
-                },
-                Err(_) => {
-                    debug!("Fetch hasn't a body to parse.");
-                    None
-                },
-            };
+                // the empty array represents an invalid body, so we can enter the
+                // `Err` arm if the body-query wasn't applied
+                match mailparse::parse_mail(raw.as_slice()) {
+                    Ok(parsed) => {
+                        debug!("Fetch has a body to parse.");
+                        Some(parsed)
+                    },
+                    Err(_) => {
+                        debug!("Fetch hasn't a body to parse.");
+                        None
+                    },
+                };
 
         // -- Storing the information (body) --
         let mut body = Body::new();
