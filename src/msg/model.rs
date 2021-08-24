@@ -70,6 +70,8 @@ error_chain::error_chain! {
 
 // == Msg ==
 /// Represents the msg in a serializeable form with additional values.
+/// This struct-type makes it also possible to print the msg in a serialized form or in a normal
+/// form.
 #[derive(Serialize, Clone, Debug, Eq, PartialEq)]
 pub struct MsgSerialized {
     /// First of all, the messge in general
@@ -767,22 +769,6 @@ impl Msg {
 }
 
 // -- Traits --
-// impl ser::Serialize for Msg {
-//     fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
-//     where
-//         S: ser::Serializer,
-//     {
-//         let mut state = serializer.serialize_struct("Msg", 6)?;
-//         state.serialize_field("hasAttachment", &(self.attachments.len() > 0))?;
-//         state.serialize_field("flags", &self.flags)?;
-//         state.serialize_field("envelope", &self.envelope)?;
-//         state.serialize_field("body", &self.body)?;
-//         state.serialize_field("uid", &self.uid)?;
-//         state.serialize_field("date", &self.date)?;
-//         state.end()
-//     }
-// }
-
 impl Default for Msg {
     fn default() -> Self {
         Self {
