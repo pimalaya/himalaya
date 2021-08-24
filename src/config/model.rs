@@ -21,7 +21,7 @@ const DEFAULT_PAGE_SIZE: usize = 10;
 
 // Account
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub struct Account {
     // Override
@@ -142,42 +142,73 @@ impl Account {
     /// ```rust
     /// use himalaya::config::model::Account;
     /// use himalaya::ctx::Ctx;
+    /// use std::path::PathBuf;
     ///
     /// fn main() {
     ///
     ///     // the testing accounts
-    ///     let ctx1 = Ctx {
-    ///         account: Account::new_with_signature(
-    ///         Some("Email name"),
-    ///         "some@mail.com",
-    ///         Some("Custom signature! :)"),
-    ///         .. Ctx::default()
-    ///     )
-    ///     };
-    ///
-    ///     let account_with_default_signature = Account::new_with_signature(
-    ///         Some("Email name"),
-    ///         "some@mail.com",
-    ///         None
-    ///     );
+    ///     let account_with_custom_signature = Account::new_with_signature(Some("Email name"), "some@mail.com", Some("Custom signature! :)"));
+    ///     let account_with_default_signature = Account::new_with_signature(Some("Email name"), "some@mail.com", None);
     ///
     ///     // How they should look like
-    ///     let account_comp1 = Account {
+    ///     let account_cmp1 = Account {
+    ///         // our values
     ///         name: Some("Email name".to_string()),
     ///         email: "some@mail.com".to_string(),
     ///         signature: Some("Custom signature! :)".to_string()),
-    ///         .. Account::default()
+    ///
+    ///         // standard values
+    ///         downloads_dir: Some(PathBuf::from(r"/tmp")),
+    ///         default_page_size: Some(42),
+    ///         signature_delimiter: None,
+    ///         default: Some(true),
+    ///         watch_cmds: Some(vec!["mbsync".to_string(), "-a".to_string()]),
+    ///         imap_host: String::from("localhost"),
+    ///         imap_port: 3993,
+    ///         imap_starttls: Some(false),
+    ///         imap_insecure: Some(true),
+    ///         imap_login: "some@mail.com".into(),
+    ///         imap_passwd_cmd: String::from("echo 'password'"),
+    ///         smtp_host: String::from("localhost"),
+    ///         smtp_port: 3465,
+    ///         smtp_starttls: Some(false),
+    ///         smtp_insecure: Some(true),
+    ///         smtp_login: "some@mail.com".into(),
+    ///         smtp_passwd_cmd: String::from("echo 'password'"),
     ///     };
     ///
     ///     let account_cmp2 = Account {
+    ///         // our values
     ///         name: Some("Email name".to_string()),
     ///         email: "some@mail.com".to_string(),
-    ///         signature: Some("Account Signature"),
-    ///         .. Account::default()
+    ///         signature: Some("Account Signature".to_string()),
+    ///
+    ///         // set values
+    ///         downloads_dir: Some(PathBuf::from(r"/tmp")),
+    ///         default_page_size: Some(42),
+    ///         signature_delimiter: None,
+    ///         default: Some(true),
+    ///         watch_cmds: Some(vec!["mbsync".to_string(), "-a".to_string()]),
+    ///         imap_host: String::from("localhost"),
+    ///         imap_port: 3993,
+    ///         imap_starttls: Some(false),
+    ///         imap_insecure: Some(true),
+    ///         imap_login: "some@mail.com".into(),
+    ///         imap_passwd_cmd: String::from("echo 'password'"),
+    ///         smtp_host: String::from("localhost"),
+    ///         smtp_port: 3465,
+    ///         smtp_starttls: Some(false),
+    ///         smtp_insecure: Some(true),
+    ///         smtp_login: "some@mail.com".into(),
+    ///         smtp_passwd_cmd: String::from("echo 'password'"),
     ///     };
     ///
-    ///     assert_eq!(account_with_custom_signature, account_cmp1);
-    ///     assert_eq!(account_with_default_signature, account_cmp2);
+    ///     assert_eq!(account_with_custom_signature, account_cmp1,
+    ///         "{:#?}, {:#?}",
+    ///         account_with_custom_signature, account_cmp1);
+    ///     assert_eq!(account_with_default_signature, account_cmp2,
+    ///         "{:#?}, {:#?}",
+    ///         account_with_default_signature, account_cmp2);
     /// }
     /// ```
     pub fn new_with_signature(
@@ -227,7 +258,7 @@ impl Default for Account {
 
 // Config
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct Config {
     pub name: String,
@@ -338,7 +369,11 @@ impl Config {
     /// of an msg.
     pub fn address(&self, account: &Account) -> String {
         let name = account.name.as_ref().unwrap_or(&self.name);
-        format!("{} <{}>", name, account.email)
+        if name.is_empty() {
+            format!("{}", account.email)
+        } else {
+            format!("{} <{}>", name, account.email)
+        }
     }
 
     pub fn run_notify_cmd(&self, subject: &str, sender: &str) -> Result<()> {
