@@ -84,7 +84,7 @@ pub struct MsgSerialized {
 
 impl From<&Msg> for MsgSerialized {
     fn from(msg: &Msg) -> Self {
-        let has_attachment = msg.attachments.len() > 0;
+        let has_attachment = msg.attachments.is_empty();
 
         Self {
             msg: msg.clone(),
@@ -859,18 +859,18 @@ impl TryFrom<&Fetch> for Msg {
         // the fetch even includes a body or not, since the `BODY[]` query is
         // only *optional*!
         let parsed =
-                // the empty array represents an invalid body, so we can enter the
-                // `Err` arm if the body-query wasn't applied
-                match mailparse::parse_mail(raw.as_slice()) {
-                    Ok(parsed) => {
-                        debug!("Fetch has a body to parse.");
-                        Some(parsed)
-                    },
-                    Err(_) => {
-                        debug!("Fetch hasn't a body to parse.");
-                        None
-                    },
-                };
+            // the empty array represents an invalid body, so we can enter the
+            // `Err` arm if the body-query wasn't applied
+            match mailparse::parse_mail(raw.as_slice()) {
+                Ok(parsed) => {
+                    debug!("Fetch has a body to parse.");
+                    Some(parsed)
+                },
+                Err(_) => {
+                    debug!("Fetch hasn't a body to parse.");
+                    None
+                },
+            };
 
         // -- Storing the information (body) --
         let mut body = Body::new();
