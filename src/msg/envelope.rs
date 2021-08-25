@@ -109,16 +109,18 @@ impl Envelope {
     /// let expected_output = concat![
     ///     "From: TornaxO7 <tornax07@gmail.com>\n",
     ///     "To: Soywod <clement.douin@posteo.net>\n",
-    ///     "Subject: Himalaya is cool\n",
     ///     "In-Reply-To: 1234@local.machine.example\n",
     ///     "Sender: himalaya@secretary.net\n",
     ///     "Message-ID: 123456789\n",
     ///     "Reply-To: reply@msg.net\n",
     ///     "Cc: CcAccount <cc@ccmail.net>\n",
     ///     "Bcc: ThirdOne <some@msg.net>\n",
+    ///     "Subject: Himalaya is cool\n",
     /// ];
     ///
-    /// assert_eq!(envelope_string, expected_output);
+    /// assert_eq!(envelope_string, expected_output,
+    ///     "{}, {}",
+    ///     envelope_string, expected_output);
     /// # }
     /// ```
     ///
@@ -432,7 +434,9 @@ impl<'from> From<&mailparse::ParsedMail<'from>> for Envelope {
 ///     "Signature of Envelope",
 /// ];
 ///
-/// assert_eq!(envelope_output, expected_output);
+/// assert_eq!(envelope_output, expected_output,
+///     "{:#?}, {:#?}",
+///     envelope_output, expected_output);
 /// # }
 /// ```
 ///
@@ -581,7 +585,9 @@ mod tests {
             "Soywod <clement.douin@posteo.net>\n",
         ];
 
-        assert_eq!(cc_header, expected_output);
+        assert_eq!(cc_header, expected_output,
+            "{:#?}, {:#?}",
+            cc_header, expected_output);
     }
 
     #[test]

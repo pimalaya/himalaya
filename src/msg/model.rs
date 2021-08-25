@@ -123,30 +123,43 @@ impl Msg {
     /// # use himalaya::msg::model::Msg;
     /// # use himalaya::msg::envelope::Envelope;
     /// # use himalaya::config::model::Account;
+    /// # use himalaya::ctx::Ctx;
+    ///
     /// # fn main() {
     /// // -- Accounts --
-    /// let account1 = Account::new(Some("Soywod"), "clement.douin@posteo.net");
-    /// let account2 = Account::new(None, "tornax07@gmail.com");
+    /// let ctx1 = Ctx {
+    ///     account: Account::new_with_signature(Some("Soywod"), "clement.douin@posteo.net", 
+    ///         Some("Account Signature")
+    ///     ),
+    ///     .. Ctx::default()
+    /// };
+    /// let ctx2 = Ctx {
+    ///     account: Account::new(None, "tornax07@gmail.com"),
+    ///     .. Ctx::default()
+    /// };
     ///
     /// // Creating messages
-    /// let msg1 = Msg::new(&account1);
-    /// let msg2 = Msg::new(&account2);
+    /// let msg1 = Msg::new(&ctx1);
+    /// let msg2 = Msg::new(&ctx2);
     ///
     /// let expected_envelope1 = Envelope {
     ///     from: vec![String::from("Soywod <clement.douin@posteo.net>")],
     ///     // the signature of the account is stored as well
-    ///     signature: Some(String::from("Account Signature")),
+    ///     signature: Some(String::from("\n-- \nAccount Signature")),
     ///     ..Envelope::default()
     /// };
     ///
     /// let expected_envelope2 = Envelope {
     ///     from: vec![String::from("tornax07@gmail.com")],
-    ///     signature: Some(String::from("Account Signature")),
     ///     ..Envelope::default()
     /// };
     ///
-    /// assert_eq!(msg1.envelope, expected_envelope1);
-    /// assert_eq!(msg2.envelope, expected_envelope2);
+    /// assert_eq!(msg1.envelope, expected_envelope1,
+    ///     "{:#?}, {:#?}",
+    ///     msg1.envelope, expected_envelope1);
+    /// assert_eq!(msg2.envelope, expected_envelope2,
+    ///     "{:#?}, {:#?}",
+    ///     msg2.envelope, expected_envelope2);
     /// # }
     /// ```
     ///
@@ -375,10 +388,14 @@ impl Msg {
     /// ```no_run
     /// use himalaya::config::model::Account;
     /// use himalaya::msg::model::Msg;
+    /// use himalaya::ctx::Ctx;
     ///
     /// fn main() {
-    ///     let account = Account::new(Some("Name"), "some@msg.asdf");
-    ///     let mut msg = Msg::new(&account);
+    ///     let ctx = Ctx {
+    ///         account: Account::new(Some("Name"), "some@msg.asdf"),
+    ///         .. Ctx::default()
+    ///     };
+    ///     let mut msg = Msg::new(&ctx);
     ///
     ///     // In this case, only the header fields "From:" and "To:" are gonna
     ///     // be editable, because the other envelope fields are set to "None"
@@ -392,11 +409,16 @@ impl Msg {
     /// ```no_run
     /// use himalaya::config::model::Account;
     /// use himalaya::msg::{envelope::Envelope, model::Msg};
+    /// use himalaya::ctx::Ctx;
     ///
     /// fn main() {
-    ///     let account = Account::new(Some("Name"), "some@msg.asdf");
+    ///     let ctx = Ctx {
+    ///         account: Account::new(Some("Name"), "some@msg.asdf"),
+    ///         .. Ctx::default()
+    ///     };
+    ///
     ///     let mut msg = Msg::new_with_envelope(
-    ///         &account,
+    ///         &ctx,
     ///         Envelope {
     ///             bcc: Some(Vec::new()),
     ///             cc: Some(Vec::new()),
@@ -437,6 +459,7 @@ impl Msg {
     /// ```
     /// use himalaya::config::model::Account;
     /// use himalaya::msg::model::Msg;
+    /// use himalaya::ctx::Ctx;
     ///
     /// fn main() {
     ///     let content = concat![
@@ -450,10 +473,13 @@ impl Msg {
     ///         "Sincerely\n",
     ///     ];
     ///
-    ///     let account = Account::new(Some("Username"), "some@msg.com");
+    ///     let ctx = Ctx {
+    ///         account: Account::new(Some("Username"), "some@msg.com"),
+    ///         .. Ctx::default()
+    ///     };
     ///
     ///     // create the message
-    ///     let mut msg = Msg::new(&account);
+    ///     let mut msg = Msg::new(&ctx);
     ///
     ///     // store the information given by the `content` variable which
     ///     // represents our current msg
@@ -481,13 +507,18 @@ impl Msg {
     /// use himalaya::config::model::Account;
     /// use himalaya::msg::envelope::Envelope;
     /// use himalaya::msg::model::Msg;
+    /// use himalaya::ctx::Ctx;
     ///
     /// fn main() {
-    ///     let account = Account::new(Some("Name"), "address@msg.com");
-    ///     let mut msg = Msg::new(&account);
+    ///     let ctx = Ctx {
+    ///         account: Account::new(Some("Name"), "address@msg.com"),
+    ///         .. Ctx::default()
+    ///     };
+    ///     let mut msg = Msg::new(&ctx);
     ///
     ///     // suppose we have a Screenshot saved in our home directory
-    ///     msg.add_attachment("~/Screenshot.png");
+    ///     // Remember: Currently himalaya can't expand tilde ('~') and shell variables
+    ///     msg.add_attachment("/home/bruh/Screenshot.png");
     /// }
     /// ```
     ///
@@ -511,13 +542,19 @@ impl Msg {
     ///
     /// use himalaya::imap::model::ImapConnector;
     ///
+    /// use himalaya::ctx::Ctx;
+    ///
     /// use imap::types::Flag;
     ///
     /// fn main() {
-    ///     let account = Account::new(Some("Name"), "name@msg.net");
-    ///     let mut imap_conn = ImapConnector::new(&account).unwrap();
+    ///     let ctx = Ctx {
+    ///         account: Account::new(Some("Name"), "name@msg.net"),
+    ///         .. Ctx::default()
+    ///     };
+    ///
+    ///     let mut imap_conn = ImapConnector::new(&ctx.account).unwrap();
     ///     let mut msg = Msg::new_with_envelope(
-    ///         &account,
+    ///         &ctx,
     ///         Envelope {
     ///             to: vec!["someone <msg@address.net>".to_string()],
     ///             ..Envelope::default()
@@ -528,7 +565,7 @@ impl Msg {
     ///     let sendable_msg = msg.to_sendable_msg().unwrap();
     ///
     ///     // now send the msg. Hint: Do the appropriate error handling here!
-    ///     smtp::send(&account, &sendable_msg).unwrap();
+    ///     smtp::send(&ctx.account, &sendable_msg).unwrap();
     ///
     ///     // also say to the server of the account user, that we've just sent
     ///     // new message
@@ -935,26 +972,23 @@ impl fmt::Display for Msgs {
 
 #[cfg(test)]
 mod tests {
-    use clap::ArgMatches;
-
     use crate::{
         config::model::{Account, Config},
         ctx::Ctx,
         msg::{body::Body, envelope::Envelope, model::Msg},
-        output::model::Output,
     };
 
     #[test]
     fn test_new() {
-        let account = Account::new_with_signature(None, "test@mail.com", None);
-        let config = Config {
-            name: String::from("Config Name"),
-            ..Config::default()
+        let ctx = Ctx {
+            account: Account::new_with_signature(None, "test@mail.com", None),
+            config: Config {
+                name: String::from("Config Name"),
+                .. Config::default()
+            },
+            .. Ctx::default()
         };
-        let output = Output::default();
-        let arg_matches = ArgMatches::default();
 
-        let ctx = Ctx::new(&config, &account, &output, "INBOX", &arg_matches);
         let msg = Msg::new(&ctx);
         let expected_envelope = Envelope {
             from: vec![String::from("Config Name <test@mail.com>")],
@@ -968,15 +1002,16 @@ mod tests {
 
     #[test]
     fn test_new_with_account_name() {
-        let account = Account::new_with_signature(Some("Account Name"), "test@mail.com", None);
-        let config = Config {
-            name: String::from("Config Name"),
-            ..Config::default()
+        let ctx = Ctx {
+            account: Account::new_with_signature(Some("Account Name"), "test@mail.com", None),
+            config: Config {
+                name: String::from("Config Name"),
+                .. Config::default()
+            },
+            mbox: String::from("INBOX"),
+            .. Ctx::default()
         };
-        let output = Output::default();
-        let arg_matches = ArgMatches::default();
 
-        let ctx = Ctx::new(&config, &account, &output, "INBOX", &arg_matches);
         let msg = Msg::new(&ctx);
         let expected_envelope = Envelope {
             from: vec![String::from("Account Name <test@mail.com>")],
@@ -990,14 +1025,15 @@ mod tests {
 
     #[test]
     fn test_new_with_envelope() {
-        let account = Account::new(Some("Account Name"), "test@mail.com");
-        let config = Config {
-            name: String::from("Config Name"),
-            ..Config::default()
+        let ctx = Ctx {
+            account: Account::new(Some("Account Name"), "test@mail.com"),
+            config: Config {
+                name: String::from("Config Name"),
+                .. Config::default()
+            },
+            mbox: String::from("INBOX"),
+            .. Ctx::default()
         };
-        let output = Output::default();
-        let arg_matches = ArgMatches::default();
-        let ctx = Ctx::new(&config, &account, &output, "INBOX", &arg_matches);
 
         let msg_with_custom_from = Msg::new_with_envelope(
             &ctx,
@@ -1030,15 +1066,15 @@ mod tests {
 
     #[test]
     fn test_new_with_envelope_and_signature() {
-        let account =
-            Account::new_with_signature(Some("Account Name"), "test@mail.com", Some("Signature"));
-        let config = Config {
-            name: String::from("Config Name"),
-            ..Config::default()
+        let ctx = Ctx {
+            account: Account::new_with_signature(Some("Account Name"), "test@mail.com", Some("Signature")),
+            config: Config {
+                name: String::from("Config Name"),
+                .. Config::default()
+            },
+            mbox: String::from("INBOX"),
+            .. Ctx::default()
         };
-        let output = Output::default();
-        let arg_matches = ArgMatches::default();
-        let ctx = Ctx::new(&config, &account, &output, "INBOX", &arg_matches);
 
         let msg_with_custom_signature = Msg::new_with_envelope(&ctx, Envelope::default());
 
@@ -1073,13 +1109,20 @@ mod tests {
             name: String::from("Config Name"),
             ..Config::default()
         };
-        let output = Output::default();
-        let arg_matches = ArgMatches::default();
 
-        let john_doe = Account::new(Some("John Doe"), "jdoe@machine.example");
-        let john_doe_ctx = Ctx::new(&config, &john_doe, &output, "INBOX", &arg_matches);
-        let mary_smith = Account::new(Some("Mary Smith"), "mary@example.net");
-        let mary_smith_ctx = Ctx::new(&config, &mary_smith, &output, "INBOX", &arg_matches);
+        let john_doe = Ctx {
+            account: Account::new(Some("John Doe"), "jdoe@machine.example"),
+            config: config.clone(),
+            mbox: String::from("INBOX"),
+            .. Ctx::default()
+        };
+
+        let mary_smith = Ctx {
+            account: Account::new(Some("Mary Smith"), "mary@example.net"),
+            config: config.clone(),
+            mbox: String::from("INBOX"),
+            .. Ctx::default()
+        };
 
         let msg_rfc_test = Msg {
             envelope: Envelope {
@@ -1097,8 +1140,12 @@ mod tests {
         };
 
         // -- for general tests --
-        let account = Account::new(Some("Name"), "some@address.asdf");
-        let ctx = Ctx::new(&config, &account, &output, "INBOX", &arg_matches);
+        let ctx = Ctx {
+            account: Account::new(Some("Name"), "some@address.asdf"),
+            config: config,
+            mbox: String::from("INBOX"),
+            .. Ctx::default()
+        };
 
         // -- for reply_all --
         // a custom test to look what happens, if we want to reply to all addresses.
@@ -1189,7 +1236,7 @@ mod tests {
         // -- rfc test --
         // represents the message for the first reply
         let mut rfc_reply_1 = msg_rfc_test.clone();
-        rfc_reply_1.change_to_reply(&mary_smith_ctx, false).unwrap();
+        rfc_reply_1.change_to_reply(&mary_smith, false).unwrap();
 
         // the user would enter this normally
         rfc_reply_1.envelope = Envelope {
@@ -1202,7 +1249,7 @@ mod tests {
 
         // represents the message for the reply to the reply
         let mut rfc_reply_2 = rfc_reply_1.clone();
-        rfc_reply_2.change_to_reply(&john_doe_ctx, false).unwrap();
+        rfc_reply_2.change_to_reply(&john_doe, false).unwrap();
         rfc_reply_2.envelope = Envelope {
             message_id: Some("<abcd.1234@local.machine.test>".to_string()),
             ..rfc_reply_2.envelope.clone()
@@ -1238,14 +1285,15 @@ mod tests {
     #[test]
     fn test_change_to_forwarding() {
         // == Preparations ==
-        let config = Config {
-            name: String::from("Config Name"),
-            ..Config::default()
+        let ctx = Ctx {
+            account: Account::new_with_signature(Some("Name"), "some@address.asdf", Some("lol")),
+            config: Config {
+                name: String::from("Config Name"),
+                .. Config::default()
+            },
+            mbox: String::from("INBOX"),
+            .. Ctx::default()
         };
-        let output = Output::default();
-        let arg_matches = ArgMatches::default();
-        let account = Account::new_with_signature(Some("Name"), "some@address.asdf", Some("lol"));
-        let ctx = Ctx::new(&config, &account, &output, "INBOX", &arg_matches);
 
         let mut msg = Msg::new_with_envelope(
             &ctx,
@@ -1291,14 +1339,16 @@ mod tests {
     #[test]
     fn test_edit_body() {
         // == Preparations ==
-        let config = Config {
-            name: String::from("Config Name"),
-            ..Config::default()
+        let ctx = Ctx {
+            account: Account::new_with_signature(Some("Name"), "some@address.asdf", None),
+            config: Config {
+                name: String::from("Config Name"),
+                .. Config::default()
+            },
+            mbox: String::from("INBOX"),
+            .. Ctx::default()
         };
-        let output = Output::default();
-        let arg_matches = ArgMatches::default();
-        let account = Account::new_with_signature(Some("Name"), "some@address.asdf", None);
-        let ctx = Ctx::new(&config, &account, &output, "INBOX", &arg_matches);
+
         let mut msg = Msg::new_with_envelope(
             &ctx,
             Envelope {
@@ -1340,14 +1390,16 @@ mod tests {
         use std::collections::HashMap;
 
         // == Preparations ==
-        let config = Config {
-            name: String::from("Config Name"),
-            ..Config::default()
+        let ctx = Ctx {
+            account: Account::new_with_signature(Some("Name"), "some@address.asdf", None),
+            config: Config {
+                name: String::from("Config Name"),
+                .. Config::default()
+            },
+            mbox: String::from("INBOX"),
+            .. Ctx::default()
         };
-        let output = Output::default();
-        let arg_matches = ArgMatches::default();
-        let account = Account::new_with_signature(Some("Name"), "some@address.asdf", None);
-        let ctx = Ctx::new(&config, &account, &output, "INBOX", &arg_matches);
+
         let msg_template = Msg::new(&ctx);
 
         let normal_content = concat![

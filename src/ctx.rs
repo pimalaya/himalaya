@@ -5,7 +5,7 @@ use crate::{
     output::model::Output,
 };
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Ctx<'a> {
     pub config: Config,
     pub account: Account,

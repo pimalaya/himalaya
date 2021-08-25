@@ -3,7 +3,7 @@ use std::fmt;
 
 // Output format
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum OutputFmt {
     Plain,
     Json,
@@ -31,7 +31,7 @@ impl fmt::Display for OutputFmt {
 
 // JSON output helper
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct OutputJson<T: Serialize> {
     response: T,
 }
@@ -44,7 +44,7 @@ impl<T: Serialize> OutputJson<T> {
 
 // Output
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Output {
     fmt: OutputFmt,
 }
