@@ -22,7 +22,6 @@ impl<'a> Ctx<'a> {
         mbox: S,
         arg_matches: clap::ArgMatches<'a>,
     ) -> Self {
-
         let mbox = mbox.to_string();
 
         Self {

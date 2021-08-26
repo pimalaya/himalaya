@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use super::attachment::Attachment;
 use super::body::Body;
 use super::envelope::Envelope;
@@ -36,9 +34,8 @@ use colorful::Colorful;
 // == Macros ==
 error_chain::error_chain! {
     errors {
-        // An error appeared, when it tried to parse the body of the msg!
         ParseBody (err: String) {
-            description("Couldn't get the body of the parsed msg."),
+            description("An error appeared, when trying to parse the body of the msg!"),
             display("Couldn't get the body of the parsed msg: {}", err),
         }
 
@@ -72,10 +69,39 @@ error_chain::error_chain! {
 }
 
 // == Msg ==
+/// Represents the msg in a serializeable form with additional values.
+/// This struct-type makes it also possible to print the msg in a serialized form or in a normal
+/// form.
+#[derive(Serialize, Clone, Debug, Eq, PartialEq)]
+pub struct MsgSerialized {
+    /// First of all, the messge in general
+    #[serde(flatten)]
+    pub msg: Msg,
+
+    /// A bool which indicates if the current msg includes attachments or not.
+    pub has_attachment: bool,
+}
+
+impl From<&Msg> for MsgSerialized {
+    fn from(msg: &Msg) -> Self {
+        let has_attachment = msg.attachments.is_empty();
+
+        Self {
+            msg: msg.clone(),
+            has_attachment,
+        }
+    }
+}
+
+impl fmt::Display for MsgSerialized {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "{}", self.msg.body)
+    }
+}
+
 /// This struct represents a whole msg with its attachments, body-content
 /// and its envelope.
-#[derive(Debug, Serialize, PartialEq, Eq, Clone)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
 pub struct Msg {
     /// All added attachments are listed in this vector.
     pub attachments: Vec<Attachment>,
@@ -103,7 +129,6 @@ pub struct Msg {
     date: Option<String>,
 
     /// The msg but in raw.
-    #[serde(skip_serializing)]
     raw: Vec<u8>,
 }
 
@@ -183,7 +208,7 @@ impl Msg {
             envelope.signature = ctx.config.signature(&ctx.account);
         }
 
-        let body = Body::from(if let Some(sig) = envelope.signature.as_ref() {
+        let body = Body::new_with_text(if let Some(sig) = envelope.signature.as_ref() {
             format!("\n{}", sig)
         } else {
             String::from("\n")
@@ -290,6 +315,9 @@ impl Msg {
         // each line which includes a string.
         let mut new_body = self
             .body
+            .text
+            .clone()
+            .unwrap_or_default()
             .lines()
             .map(|line| {
                 let space = if line.starts_with(">") { "" } else { " " };
@@ -304,7 +332,7 @@ impl Msg {
             new_body.push_str(&sig)
         }
 
-        self.body = Body::from(new_body);
+        self.body = Body::new_with_text(new_body);
         self.envelope = new_envelope;
         self.attachments.clear();
 
@@ -365,10 +393,10 @@ impl Msg {
         // apply a line which should indicate where the forwarded message begins
         body.push_str(&format!(
             "\n\n---------- Forwarded Message ----------\n{}",
-            &self.body.deref().replace("\r", ""),
+            self.body.text.clone().unwrap_or_default().replace("\r", ""),
         ));
 
-        self.body = Body::from(body);
+        self.body = Body::new_with_text(body);
     }
 
     /// Returns the bytes of the *sendable message* of the struct!
@@ -493,7 +521,7 @@ impl Msg {
         self.envelope = Envelope::from(&parsed);
 
         match parsed.get_body() {
-            Ok(body) => self.body = Body::from(body),
+            Ok(body) => self.body = Body::new_with_text(body),
             Err(err) => return Err(ErrorKind::ParseBody(err.to_string()).into()),
         };
 
@@ -561,7 +589,7 @@ impl Msg {
     ///         },
     ///     );
     ///
-    ///     msg.body = Body::from("A little text.");
+    ///     msg.body = Body::new_with_text("A little text.");
     ///     let sendable_msg = msg.to_sendable_msg().unwrap();
     ///
     ///     // now send the msg. Hint: Do the appropriate error handling here!
@@ -712,11 +740,19 @@ impl Msg {
         let mut msg_parts = MultiPart::mixed().build();
 
         // -- Body --
-        let msg_body = SinglePart::builder()
-            .header(ContentType::TEXT_PLAIN)
-            .header(self.envelope.encoding)
-            .body(self.body.get_content());
-        msg_parts = msg_parts.singlepart(msg_body);
+        if self.body.text.is_some() && self.body.html.is_some() {
+            msg_parts = msg_parts.multipart(MultiPart::alternative_plain_html(
+                self.body.text.clone().unwrap(),
+                self.body.html.clone().unwrap(),
+            ));
+        } else {
+            let msg_body = SinglePart::builder()
+                .header(ContentType::TEXT_PLAIN)
+                .header(self.envelope.encoding)
+                .body(self.body.text.clone().unwrap_or_default());
+
+            msg_parts = msg_parts.singlepart(msg_body);
+        }
 
         // -- Attachments --
         for attachment in self.attachments.iter() {
@@ -762,6 +798,11 @@ impl Msg {
     pub fn get_encoding(&self) -> ContentTransferEncoding {
         self.envelope.encoding
     }
+
+    /// Returns the whole message: Header + Body as a String
+    pub fn get_full_message(&self) -> String {
+        format!("{}\n{}", self.envelope.get_header_as_string(), self.body)
+    }
 }
 
 // -- Traits --
@@ -783,12 +824,7 @@ impl Default for Msg {
 
 impl fmt::Display for Msg {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            formatter,
-            "{}\n{}",
-            self.envelope.get_header_as_string(),
-            self.body,
-        )
+        write!(formatter, "{}", self.body)
     }
 }
 
@@ -874,27 +910,25 @@ impl TryFrom<&Fetch> for Msg {
             };
 
         // -- Storing the information (body) --
-        let mut body = String::new();
+        let mut body = Body::new();
         if let Some(parsed) = parsed {
             // Ok, so some mails have their mody wrapped in a multipart, some
             // don't. This condition hits, if the body isn't in a multipart, so we can
             // immediately fetch the body from the first part of the mail.
-            if parsed.ctype.mimetype == "text/plain" {
-                // Apply the body (if there exists one)
-                if let Ok(parsed_body) = parsed.get_body() {
-                    debug!("Stored the body of the msg.");
-                    body = parsed_body;
-                }
-            }
+            match parsed.ctype.mimetype.as_ref() {
+                "text/plain" => body.text = parsed.get_body().ok(),
+                "text/html" => body.html = parsed.get_body().ok(),
+                _ => (),
+            };
 
             for subpart in &parsed.subparts {
                 // now it might happen, that the body is *in* a multipart, if
                 // that's the case, look, if we've already applied a body
                 // (body.is_empty()) and set it, if needed
-                if body.is_empty() && subpart.ctype.mimetype == "text/plain" {
-                    if let Ok(subpart_body) = subpart.get_body() {
-                        body = subpart_body;
-                    }
+                if body.text.is_none() && subpart.ctype.mimetype == "text/plain" {
+                    body.text = subpart.get_body().ok();
+                } else if body.html.is_none() && subpart.ctype.mimetype == "text/html" {
+                    body.html = subpart.get_body().ok();
                 }
                 // otherise it's a normal attachment, like a PNG file or
                 // something like that
@@ -917,7 +951,7 @@ impl TryFrom<&Fetch> for Msg {
             attachments,
             flags,
             envelope,
-            body: Body::from(body),
+            body: Body::new_with_text(body),
             uid,
             date,
             raw,
@@ -1051,7 +1085,7 @@ mod tests {
                 ..Envelope::default()
             },
             // The signature should be added automatically
-            body: Body::from("\n"),
+            body: Body::new_with_text("\n"),
             ..Msg::default()
         };
 
@@ -1084,7 +1118,7 @@ mod tests {
                 signature: Some(String::from("\n-- \nSignature")),
                 ..Envelope::default()
             },
-            body: Body::from("\n\n-- \nSignature"),
+            body: Body::new_with_text("\n\n-- \nSignature"),
             ..Msg::default()
         };
 
@@ -1132,7 +1166,7 @@ mod tests {
                 message_id: Some("<1234@local.machine.example>".to_string()),
                 ..Envelope::default()
             },
-            body: Body::from(concat![
+            body: Body::new_with_text(concat![
                 "This is a message just to say hello.\n",
                 "So, \"Hello\".",
             ]),
@@ -1168,7 +1202,7 @@ mod tests {
                 subject: Some("Have you heard of himalaya?".to_string()),
                 ..Envelope::default()
             },
-            body: Body::from(concat!["A body test\n", "\n", "Sincerely",]),
+            body: Body::new_with_text(concat!["A body test\n", "\n", "Sincerely",]),
             ..Msg::default()
         };
 
@@ -1187,7 +1221,7 @@ mod tests {
                 in_reply_to: Some("<1234@local.machine.example>".to_string()),
                 ..Envelope::default()
             },
-            body: Body::from(concat![
+            body: Body::new_with_text(concat![
                 "> This is a message just to say hello.\n",
                 "> So, \"Hello\".",
             ]),
@@ -1204,7 +1238,7 @@ mod tests {
                 in_reply_to: Some("<3456@example.net>".to_string()),
                 ..Envelope::default()
             },
-            body: Body::from(concat![
+            body: Body::new_with_text(concat![
                 ">> This is a message just to say hello.\n",
                 ">> So, \"Hello\".",
             ]),
@@ -1228,7 +1262,7 @@ mod tests {
                 subject: Some("Re: Have you heard of himalaya?".to_string()),
                 ..Envelope::default()
             },
-            body: Body::from(concat!["> A body test\n", "> \n", "> Sincerely"]),
+            body: Body::new_with_text(concat!["> A body test\n", "> \n", "> Sincerely"]),
             ..Msg::default()
         };
 
@@ -1304,7 +1338,7 @@ mod tests {
             },
         );
 
-        msg.body = Body::from(concat!["The body text, nice!\n", "Himalaya is nice!",]);
+        msg.body = Body::new_with_text(concat!["The body text, nice!\n", "Himalaya is nice!",]);
 
         // == Expected Results ==
         let expected_msg = Msg {
@@ -1315,7 +1349,7 @@ mod tests {
                 subject: Some(String::from("Fwd: Test subject")),
                 ..Envelope::default()
             },
-            body: Body::from(concat![
+            body: Body::new_with_text(concat![
                 "\n-- \nlol\n",
                 "\n",
                 "---------- Forwarded Message ----------\n",
@@ -1370,7 +1404,7 @@ mod tests {
                 cc: Some(vec![String::from("")]),
                 ..Envelope::default()
             },
-            body: Body::from("\n\n-- \nAccount Signature"),
+            body: Body::new_with_text("\n\n-- \nAccount Signature"),
             ..Msg::default()
         };
 
@@ -1434,7 +1468,7 @@ mod tests {
                 to: vec![String::from("To <name@msg.rofl>")],
                 ..Envelope::default()
             },
-            body: Body::from("Account Signature\n"),
+            body: Body::new_with_text("Account Signature\n"),
             ..Msg::default()
         };
 
@@ -1455,7 +1489,7 @@ mod tests {
                 custom_headers: Some(custom_headers),
                 ..Envelope::default()
             },
-            body: Body::from("Account Signature\n"),
+            body: Body::new_with_text("Account Signature\n"),
             ..Msg::default()
         };
 
