@@ -390,7 +390,7 @@ impl Config {
         let name = account.name.as_ref().unwrap_or(&self.name);
 
         let special_chars: Vec<&str> = name
-            .matches(|character| ",.:;".contains(character))
+            .matches(|character| "()<>[]:;@.,".contains(character))
             .collect();
 
         if name.is_empty() {
