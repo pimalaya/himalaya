@@ -381,11 +381,8 @@ impl<'from> From<&mailparse::ParsedMail<'from>> for Envelope {
                         new_envelope.custom_headers = Some(HashMap::new());
                     }
 
-                    // we can unwrap for sure, because with the if-condition
-                    // above, we made sure, that the HashMap exists
                     let mut updated_hashmap = new_envelope.custom_headers.unwrap();
 
-                    // now add the custom header to the hash table ..
                     updated_hashmap.insert(
                         custom_header,
                         value
@@ -394,7 +391,6 @@ impl<'from> From<&mailparse::ParsedMail<'from>> for Envelope {
                             .collect(),
                     );
 
-                    // .. and apply the updated hashmap to the envelope struct
                     new_envelope.custom_headers = Some(updated_hashmap);
                 }
             }

@@ -221,7 +221,7 @@ impl Msg {
         }
     }
 
-    /// Converts the message into a Reply message. It'll set the headers
+    /// Converts the message into a Reply message.
     /// An [`Account`] struct is needed to set the `From:` field.
     ///
     /// # Changes
@@ -253,8 +253,8 @@ impl Msg {
     ///
     /// [Here]: https://www.rfc-editor.org/rfc/rfc5322.html#page-46
     ///
-    /// TODO: References field is missing, but the imap-crate can't implement it
-    /// currently.
+    // TODO: References field is missing, but the imap-crate can't implement it
+    // currently.
     pub fn change_to_reply(&mut self, ctx: &Ctx, reply_all: bool) -> Result<()> {
         let subject = self
             .envelope
@@ -483,6 +483,8 @@ impl Msg {
     /// Read the string of the argument `content` and store it's values into the
     /// struct. It stores the envelope-fields and the body of the msg.
     ///
+    /// **Hint: The signature can't be fetched of the content at the moment!**
+    ///
     /// # Example
     /// ```
     /// use himalaya::config::model::Account;
@@ -550,7 +552,7 @@ impl Msg {
     /// }
     /// ```
     ///
-    /// THOUGHT: Error handling?
+    // THOUGHT: Error handling?
     pub fn add_attachment(&mut self, path: &str) {
         if let Ok(new_attachment) = Attachment::try_from(path) {
             self.attachments.push(new_attachment);
@@ -824,7 +826,8 @@ impl Default for Msg {
 
 impl fmt::Display for Msg {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.body)
+        write!(formatter, "{}\n{}", 
+            self.envelope.get_header_as_string(), self.body)
     }
 }
 
@@ -1026,11 +1029,12 @@ mod tests {
         let msg = Msg::new(&ctx);
         let expected_envelope = Envelope {
             from: vec![String::from("Config Name <test@mail.com>")],
-            signature: Some(String::from("\n-- \nAccount Signature")),
             ..Envelope::default()
         };
 
-        assert_eq!(msg.envelope, expected_envelope);
+        assert_eq!(msg.envelope, expected_envelope,
+            "{:#?}, {:#?}",
+            msg.envelope, expected_envelope);
         assert!(msg.get_raw().unwrap().is_empty());
     }
 
@@ -1049,11 +1053,12 @@ mod tests {
         let msg = Msg::new(&ctx);
         let expected_envelope = Envelope {
             from: vec![String::from("Account Name <test@mail.com>")],
-            signature: Some(String::from("\n-- \nAccount Signature")),
             ..Envelope::default()
         };
 
-        assert_eq!(msg.envelope, expected_envelope);
+        assert_eq!(msg.envelope, expected_envelope,
+            "{:#?}, {:#?}",
+            msg.envelope, expected_envelope);
         assert!(msg.get_raw().unwrap().is_empty());
     }
 
@@ -1090,11 +1095,9 @@ mod tests {
         };
 
         assert_eq!(
-            msg_with_custom_from,
-            expected_with_custom_from,
-            "Left: {:?}, Right: {:?}",
-            dbg!(&msg_with_custom_from),
-            dbg!(&expected_with_custom_from)
+            msg_with_custom_from, expected_with_custom_from,
+            "Left: {:#?}, Right: {:#?}",
+            msg_with_custom_from, expected_with_custom_from
         );
     }
 
@@ -1375,20 +1378,15 @@ mod tests {
         // == Preparations ==
         let ctx = Ctx {
             account: Account::new_with_signature(Some("Name"), "some@address.asdf", None),
-            config: Config {
-                name: String::from("Config Name"),
-                .. Config::default()
-            },
-            mbox: String::from("INBOX"),
             .. Ctx::default()
         };
 
         let mut msg = Msg::new_with_envelope(
             &ctx,
             Envelope {
-                bcc: Some(Vec::new()),
-                cc: Some(Vec::new()),
-                subject: Some(String::new()),
+                bcc: Some(vec![String::from("bcc <some@mail.com>")]),
+                cc: Some(vec![String::from("cc <some@mail.com>")]),
+                subject: Some(String::from("Subject")),
                 ..Envelope::default()
             },
         );
@@ -1397,25 +1395,24 @@ mod tests {
         let expected_msg = Msg {
             envelope: Envelope {
                 from: vec![String::from("Name <some@address.asdf>")],
-                to: vec![String::from("")],
+                to: vec![String::new()],
                 // these fields should exist now
-                subject: Some(String::from("")),
-                bcc: Some(vec![String::from("")]),
-                cc: Some(vec![String::from("")]),
+                subject: Some(String::from("Subject")),
+                bcc: Some(vec![String::from("bcc <some@mail.com>")]),
+                cc: Some(vec![String::from("cc <some@mail.com>")]),
                 ..Envelope::default()
             },
-            body: Body::new_with_text("\n\n-- \nAccount Signature"),
+            body: Body::new_with_text("\n"),
             ..Msg::default()
         };
 
         // == Tests ==
         msg.edit_body().unwrap();
+
         assert_eq!(
-            msg,
-            expected_msg,
-            "Left: {:?}, Right: {:?}",
-            dbg!(&msg),
-            dbg!(&expected_msg)
+            msg, expected_msg,
+            "Left: {:#?}, Right: {:#?}",
+            msg, expected_msg
         );
     }
 
