@@ -389,7 +389,7 @@ impl Config {
     pub fn address(&self, account: &Account) -> String {
         let name = account.name.as_ref().unwrap_or(&self.name);
 
-        let has_special_chars: bool = "()<>[]:;@.,".contains(|character| name.contains(character));
+        let has_special_chars: bool = "()<>[]:;@.,".contains(|special_char| name.contains(special_char));
 
         if name.is_empty() {
             format!("{}", account.email)
