@@ -389,13 +389,11 @@ impl Config {
     pub fn address(&self, account: &Account) -> String {
         let name = account.name.as_ref().unwrap_or(&self.name);
 
-        let special_chars: Vec<&str> = name
-            .matches(|character| "()<>[]:;@.,".contains(character))
-            .collect();
+        let has_special_chars: bool = "()<>[]:;@.,".contains(|character| name.contains(character));
 
         if name.is_empty() {
             format!("{}", account.email)
-        } else if !special_chars.is_empty() {
+        } else if has_special_chars {
             // so the name has special characters => Wrap it with '"'
             format!("\"{}\" <{}>", name, account.email)
         } else {
