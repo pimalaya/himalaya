@@ -5,6 +5,8 @@ use crate::{
     output::model::Output,
 };
 
+/// `Ctx` stands for `Context` and includes the most "important" structs which are used quite often
+/// in this crate.
 #[derive(Debug, Default, Clone)]
 pub struct Ctx<'a> {
     pub config: Config,
