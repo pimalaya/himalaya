@@ -6,8 +6,8 @@ use std::{collections::HashSet, convert::TryFrom, iter::FromIterator, net::TcpSt
 
 use crate::config::model::Account;
 use crate::ctx::Ctx;
-use crate::msg::model::Msg;
 use crate::flag::model::Flags;
+use crate::msg::model::Msg;
 
 error_chain! {
     links {
@@ -40,8 +40,10 @@ pub struct ImapConnector<'a> {
 }
 
 impl<'a> ImapConnector<'a> {
-
     /// Creates a new connection with the settings of the given account.
+    ///
+    /// Please call the `logout` method below if you don't need the connection anymore! Be nice
+    /// to the server ;)
     pub fn new(account: &'a Account) -> Result<Self> {
         debug!("create TLS builder");
         let insecure = account.imap_insecure();
@@ -72,7 +74,7 @@ impl<'a> ImapConnector<'a> {
 
     /// Closes the connection.
     ///
-    /// **ALWAYS CALL THIS IF YOU DON'T NEED THE CONNECTION ANYMORE!**
+    /// Always call this if you don't need the connection anymore!
     pub fn logout(&mut self) {
         debug!("logout");
         match self.sess.logout() {
@@ -102,7 +104,6 @@ impl<'a> ImapConnector<'a> {
     /// }
     /// ```
     pub fn set_flags(&mut self, mbox: &str, uid_seq: &str, flags: Flags) -> Result<()> {
-
         let flags: String = flags.to_string();
 
         self.sess
@@ -124,7 +125,7 @@ impl<'a> ImapConnector<'a> {
     /// use himalaya::config::model::Account;
     /// use himalaya::flag::model::Flags;
     /// use imap::types::Flag;
-    /// 
+    ///
     /// fn main() {
     ///     let account = Account::default();
     ///     let mut imap_conn = ImapConnector::new(&account).unwrap();
@@ -137,7 +138,6 @@ impl<'a> ImapConnector<'a> {
     /// }
     /// ```
     pub fn add_flags(&mut self, mbox: &str, uid_seq: &str, flags: Flags) -> Result<()> {
-
         let flags: String = flags.to_string();
 
         self.sess
@@ -154,7 +154,6 @@ impl<'a> ImapConnector<'a> {
     /// Remove the flags to the message by the given information. Take a look on the example above.
     /// It's pretty similar.
     pub fn remove_flags(&mut self, mbox: &str, uid_seq: &str, flags: Flags) -> Result<()> {
-
         let flags = flags.to_string();
 
         self.sess

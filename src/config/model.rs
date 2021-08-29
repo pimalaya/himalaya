@@ -202,7 +202,6 @@ impl Account {
         email_addr: S,
         signature: Option<S>,
     ) -> Self {
-
         let mut account = Account::new(name, email_addr);
         account.signature = signature.and_then(|signature| Some(signature.to_string()));
         account
@@ -359,11 +358,11 @@ impl Config {
     /// # Hint
     /// If the name includes some special characters like a whitespace, comma or semicolon, then
     /// the name will be automatically wrapped between two `"`.
-    /// 
+    ///
     /// # Exapmle
     /// ```
     /// use himalaya::config::model::{Account, Config};
-    /// 
+    ///
     /// fn main() {
     ///     let config = Config::default();
     ///
@@ -391,7 +390,8 @@ impl Config {
     pub fn address(&self, account: &Account) -> String {
         let name = account.name.as_ref().unwrap_or(&self.name);
 
-        let has_special_chars: bool = "()<>[]:;@.,".contains(|special_char| name.contains(special_char));
+        let has_special_chars: bool =
+            "()<>[]:;@.,".contains(|special_char| name.contains(special_char));
 
         if name.is_empty() {
             format!("{}", account.email)
@@ -500,13 +500,13 @@ mod tests {
     #[cfg(test)]
     mod config_test {
 
-        use crate::config::model::{Config, Account};
+        use crate::config::model::{Account, Config};
 
         // a quick way to get a config instance for testing
         fn get_config() -> Config {
             Config {
                 name: String::from("Config Name"),
-                .. Config::default()
+                ..Config::default()
             }
         }
 
@@ -518,14 +518,12 @@ mod tests {
             let account2 = Account::new(Some("Two"), "two@mail.com");
 
             // add some accounts
-            config.accounts.insert(
-                "One".to_string(), account1.clone());
-            config.accounts.insert(
-                "Two".to_string(), account2.clone());
+            config.accounts.insert("One".to_string(), account1.clone());
+            config.accounts.insert("Two".to_string(), account2.clone());
 
             let ret1 = config.find_account_by_name(Some("One")).unwrap();
             let ret2 = config.find_account_by_name(Some("Two")).unwrap();
-            
+
             assert_eq!(*ret1, account1);
             assert_eq!(*ret2, account2);
         }

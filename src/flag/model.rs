@@ -40,7 +40,6 @@ impl<'flag> Serialize for SerializableFlag<'flag> {
 pub struct Flags(pub HashSet<Flag<'static>>);
 
 impl Flags {
-
     /// Returns the flags of their respective flag value in the following order:
     ///
     /// 1. Seen
@@ -73,7 +72,6 @@ impl Flags {
 
 impl ToString for Flags {
     fn to_string(&self) -> String {
-
         let mut flags = String::new();
 
         for flag in &self.0 {
@@ -109,11 +107,11 @@ impl<'a> From<&[imap::types::Flag<'a>]> for Flags {
 
 impl<'a> From<Vec<imap::types::Flag<'a>>> for Flags {
     fn from(flags: Vec<imap::types::Flag<'a>>) -> Self {
-        Self (
+        Self(
             flags
                 .iter()
                 .map(|flag| convert_to_static(flag).unwrap())
-                .collect::<HashSet<Flag<'static>>>()
+                .collect::<HashSet<Flag<'static>>>(),
         )
     }
 }
@@ -208,8 +206,8 @@ fn convert_to_static<'func>(flag: &'func Flag) -> Result<Flag<'static>, ()> {
 #[cfg(test)]
 mod tests {
 
-    use imap::types::Flag;
     use crate::flag::model::Flags;
+    use imap::types::Flag;
     use std::collections::HashSet;
 
     #[test]

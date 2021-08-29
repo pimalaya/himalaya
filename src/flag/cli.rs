@@ -2,7 +2,7 @@ use clap;
 use error_chain::error_chain;
 use log::debug;
 
-use crate::{ctx::Ctx, imap::model::ImapConnector, msg::cli::uid_arg, flag::model::Flags};
+use crate::{ctx::Ctx, flag::model::Flags, imap::model::ImapConnector, msg::cli::uid_arg};
 
 error_chain! {
     links {

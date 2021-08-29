@@ -3,7 +3,7 @@
 //! Each module includes three "main" files:
 //! - `model.rs`: **The "main" file** of each module which includes the main implementation of the given
 //!     module.
-//! - `cli.rs`: Includes the subcommands and arguments which are related to the module. 
+//! - `cli.rs`: Includes the subcommands and arguments which are related to the module.
 //!     
 //!     For example the `read` subcommand is in the `msg/cli.rs` file because it's related to the
 //!     msg you want to read.

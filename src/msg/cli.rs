@@ -1,6 +1,6 @@
 use super::body::Body;
 use super::headers::Headers;
-use super::model::{Msg, Msgs, MsgSerialized};
+use super::model::{Msg, MsgSerialized, Msgs};
 use url::Url;
 
 use atty::Stream;
@@ -19,7 +19,10 @@ use std::{
 
 use imap::types::Flag;
 
-use crate::{ctx::Ctx, imap::model::ImapConnector, input, mbox::cli::mbox_target_arg, smtp, flag::model::Flags};
+use crate::{
+    ctx::Ctx, flag::model::Flags, imap::model::ImapConnector, input, mbox::cli::mbox_target_arg,
+    smtp,
+};
 
 error_chain! {
     links {

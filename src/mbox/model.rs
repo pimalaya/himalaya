@@ -3,8 +3,9 @@ use serde::{
     ser::{self, SerializeSeq},
     Serialize,
 };
+use std::borrow::Cow;
+use std::collections::HashSet;
 use std::fmt;
-use std::borrow::Cow; use std::collections::HashSet;
 
 use crate::table::{Cell, Row, Table};
 
@@ -40,10 +41,11 @@ pub struct Attributes(pub HashSet<NameAttribute<'static>>);
 
 impl<'a> From<&[NameAttribute<'a>]> for Attributes {
     fn from(attrs: &[NameAttribute<'a>]) -> Self {
-        Self(attrs
+        Self(
+            attrs
                 .iter()
                 .map(|attribute| convert_to_static(attribute).unwrap())
-                .collect::<HashSet<NameAttribute<'static>>>()
+                .collect::<HashSet<NameAttribute<'static>>>(),
         )
     }
 }
@@ -85,7 +87,6 @@ impl ser::Serialize for Attributes {
 /// Represents a general mailbox.
 #[derive(Debug, Serialize)]
 pub struct Mbox {
-
     /// The [hierarchie delimiter].
     ///
     /// [hierarchie delimiter]: https://docs.rs/imap/2.4.1/imap/types/struct.Name.html#method.delimiter
@@ -148,7 +149,9 @@ impl fmt::Display for Mboxes {
 }
 
 // == Helper Functions ==
-fn convert_to_static<'func>(attribute: &'func NameAttribute<'func>) -> Result<NameAttribute<'static>, ()> {
+fn convert_to_static<'func>(
+    attribute: &'func NameAttribute<'func>,
+) -> Result<NameAttribute<'static>, ()> {
     match attribute {
         NameAttribute::NoInferiors => Ok(NameAttribute::NoInferiors),
         NameAttribute::NoSelect => Ok(NameAttribute::NoSelect),

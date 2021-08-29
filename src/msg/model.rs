@@ -153,7 +153,7 @@ impl Msg {
     /// # fn main() {
     /// // -- Accounts --
     /// let ctx1 = Ctx {
-    ///     account: Account::new_with_signature(Some("Soywod"), "clement.douin@posteo.net", 
+    ///     account: Account::new_with_signature(Some("Soywod"), "clement.douin@posteo.net",
     ///         Some("Account Signature")
     ///     ),
     ///     .. Ctx::default()
@@ -828,8 +828,12 @@ impl Default for Msg {
 
 impl fmt::Display for Msg {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "{}\n{}", 
-            self.headers.get_header_as_string(), self.body)
+        write!(
+            formatter,
+            "{}\n{}",
+            self.headers.get_header_as_string(),
+            self.body
+        )
     }
 }
 
@@ -1023,9 +1027,9 @@ mod tests {
             account: Account::new_with_signature(None, "test@mail.com", None),
             config: Config {
                 name: String::from("Config Name"),
-                .. Config::default()
+                ..Config::default()
             },
-            .. Ctx::default()
+            ..Ctx::default()
         };
 
         let msg = Msg::new(&ctx);
@@ -1034,9 +1038,11 @@ mod tests {
             ..Headers::default()
         };
 
-        assert_eq!(msg.headers, expected_headers,
+        assert_eq!(
+            msg.headers, expected_headers,
             "{:#?}, {:#?}",
-            msg.headers, expected_headers);
+            msg.headers, expected_headers
+        );
         assert!(msg.get_raw().unwrap().is_empty());
     }
 
@@ -1046,10 +1052,10 @@ mod tests {
             account: Account::new_with_signature(Some("Account Name"), "test@mail.com", None),
             config: Config {
                 name: String::from("Config Name"),
-                .. Config::default()
+                ..Config::default()
             },
             mbox: String::from("INBOX"),
-            .. Ctx::default()
+            ..Ctx::default()
         };
 
         let msg = Msg::new(&ctx);
@@ -1058,9 +1064,11 @@ mod tests {
             ..Headers::default()
         };
 
-        assert_eq!(msg.headers, expected_headers,
+        assert_eq!(
+            msg.headers, expected_headers,
             "{:#?}, {:#?}",
-            msg.headers, expected_headers);
+            msg.headers, expected_headers
+        );
         assert!(msg.get_raw().unwrap().is_empty());
     }
 
@@ -1070,10 +1078,10 @@ mod tests {
             account: Account::new(Some("Account Name"), "test@mail.com"),
             config: Config {
                 name: String::from("Config Name"),
-                .. Config::default()
+                ..Config::default()
             },
             mbox: String::from("INBOX"),
-            .. Ctx::default()
+            ..Ctx::default()
         };
 
         let msg_with_custom_from = Msg::new_with_headers(
@@ -1106,13 +1114,17 @@ mod tests {
     #[test]
     fn test_new_with_headers_and_signature() {
         let ctx = Ctx {
-            account: Account::new_with_signature(Some("Account Name"), "test@mail.com", Some("Signature")),
+            account: Account::new_with_signature(
+                Some("Account Name"),
+                "test@mail.com",
+                Some("Signature"),
+            ),
             config: Config {
                 name: String::from("Config Name"),
-                .. Config::default()
+                ..Config::default()
             },
             mbox: String::from("INBOX"),
-            .. Ctx::default()
+            ..Ctx::default()
         };
 
         let msg_with_custom_signature = Msg::new_with_headers(&ctx, Headers::default());
@@ -1153,14 +1165,14 @@ mod tests {
             account: Account::new(Some("John Doe"), "jdoe@machine.example"),
             config: config.clone(),
             mbox: String::from("INBOX"),
-            .. Ctx::default()
+            ..Ctx::default()
         };
 
         let mary_smith = Ctx {
             account: Account::new(Some("Mary Smith"), "mary@example.net"),
             config: config.clone(),
             mbox: String::from("INBOX"),
-            .. Ctx::default()
+            ..Ctx::default()
         };
 
         let msg_rfc_test = Msg {
@@ -1183,7 +1195,7 @@ mod tests {
             account: Account::new(Some("Name"), "some@address.asdf"),
             config: config,
             mbox: String::from("INBOX"),
-            .. Ctx::default()
+            ..Ctx::default()
         };
 
         // -- for reply_all --
@@ -1328,10 +1340,10 @@ mod tests {
             account: Account::new_with_signature(Some("Name"), "some@address.asdf", Some("lol")),
             config: Config {
                 name: String::from("Config Name"),
-                .. Config::default()
+                ..Config::default()
             },
             mbox: String::from("INBOX"),
-            .. Ctx::default()
+            ..Ctx::default()
         };
 
         let mut msg = Msg::new_with_headers(
@@ -1380,7 +1392,7 @@ mod tests {
         // == Preparations ==
         let ctx = Ctx {
             account: Account::new_with_signature(Some("Name"), "some@address.asdf", None),
-            .. Ctx::default()
+            ..Ctx::default()
         };
 
         let mut msg = Msg::new_with_headers(
@@ -1427,10 +1439,10 @@ mod tests {
             account: Account::new_with_signature(Some("Name"), "some@address.asdf", None),
             config: Config {
                 name: String::from("Config Name"),
-                .. Config::default()
+                ..Config::default()
             },
             mbox: String::from("INBOX"),
-            .. Ctx::default()
+            ..Ctx::default()
         };
 
         let msg_template = Msg::new(&ctx);
