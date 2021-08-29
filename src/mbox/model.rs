@@ -61,7 +61,7 @@ impl ToString for Attributes {
         }
 
         // remove the trailing whitespace with the comma
-        attributes.pop();
+        attributes = attributes.trim_end_matches(' ').to_string();
         attributes.pop();
 
         attributes

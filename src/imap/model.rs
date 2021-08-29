@@ -18,7 +18,7 @@ error_chain! {
 
 /// A little helper function to create a similiar error output. (to avoid duplicated code)
 fn format_err_msg(description: &str, account: &Account) -> String {
-    format!("{}. Given Account: {#:?}", description, account)
+    format!("{}. Given Account: {:#?}", description, account)
 }
 
 /// The main struct to create a connection to your imap-server.
