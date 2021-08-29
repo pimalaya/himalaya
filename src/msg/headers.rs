@@ -35,13 +35,13 @@ error_chain! {
 /// The general idea is, that you create a new instance like that:
 ///
 /// ```
-/// use himalaya::msg::envelope::Envelope;
+/// use himalaya::msg::headers::Headers;
 /// # fn main() {
 ///
-/// let envelope = Envelope {
+/// let headers = Headers {
 ///     from: vec![String::from("From <address@example.com>")],
 ///     to: vec![String::from("To <address@to.com>")],
-///     ..Envelope::default()
+///     ..Headers::default()
 /// };
 ///
 /// # }
@@ -50,11 +50,11 @@ error_chain! {
 /// We don't have a build-pattern here, because this is easy as well and we
 /// don't need a dozens of functions, just to set some values.
 ///
-/// [Envelope struct]: https://docs.rs/imap-proto/0.14.3/imap_proto/types/struct.Envelope.html
+/// [Envelope struct]: https://docs.rs/imap-proto/0.14.3/imap_proto/types/struct.Headers.html
 /// [imap_proto]: https://docs.rs/imap-proto/0.14.3/imap_proto/index.html
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct Envelope {
+pub struct Headers {
     // -- Must-Fields --
     // These fields are the mininum needed to send a msg.
     pub from: Vec<String>,
@@ -73,7 +73,7 @@ pub struct Envelope {
     pub subject: Option<String>,
 }
 
-impl Envelope {
+impl Headers {
     /// This method works similiar to the [`Display Trait`] but it will only
     /// convert the header into a string **without** the signature.
     ///
@@ -82,12 +82,12 @@ impl Envelope {
     /// <details>
     ///
     /// ```
-    /// # use himalaya::msg::envelope::Envelope;
+    /// # use himalaya::msg::headers::Headers;
     /// # use std::collections::HashMap;
     /// # use lettre::message::header::ContentTransferEncoding;
     /// # fn main() {
-    /// // our envelope
-    /// let envelope = Envelope {
+    /// // our headers
+    /// let headers = Headers {
     ///     from:           vec!["TornaxO7 <tornax07@gmail.com>".to_string()],
     ///     to:             vec!["Soywod <clement.douin@posteo.net>".to_string()],
     ///     encoding:       ContentTransferEncoding::Base64,
@@ -98,12 +98,12 @@ impl Envelope {
     ///     message_id:     Some("123456789".to_string()),
     ///     reply_to:       Some(vec!["reply@msg.net".to_string()]),
     ///     sender:         Some("himalaya@secretary.net".to_string()),
-    ///     signature:      Some("Signature of Envelope".to_string()),
+    ///     signature:      Some("Signature of Headers".to_string()),
     ///     subject:        Some("Himalaya is cool".to_string()),
     /// };
     ///
     /// // get the header
-    /// let envelope_string = envelope.get_header_as_string();
+    /// let headers_string = headers.get_header_as_string();
     ///
     /// // how the header part should look like
     /// let expected_output = concat![
@@ -118,9 +118,9 @@ impl Envelope {
     ///     "Subject: Himalaya is cool\n",
     /// ];
     ///
-    /// assert_eq!(envelope_string, expected_output,
+    /// assert_eq!(headers_string, expected_output,
     ///     "{}, {}",
-    ///     envelope_string, expected_output);
+    ///     headers_string, expected_output);
     /// # }
     /// ```
     ///
@@ -187,13 +187,12 @@ impl Envelope {
     }
 }
 
-// == Default implementation ==
-/// Returns an Envelope with the following values:
+/// Returns a Headers with the following values:
 ///
 /// ```no_run
-/// # use himalaya::msg::envelope::Envelope;
+/// # use himalaya::msg::headers::Headers;
 /// # use lettre::message::header::ContentTransferEncoding;
-/// Envelope {
+/// Headers {
 ///     from:           Vec::new(),
 ///     to:             Vec::new(),
 ///     encoding:       ContentTransferEncoding::Base64,
@@ -208,7 +207,7 @@ impl Envelope {
 ///     subject:        None,
 /// };
 /// ```
-impl Default for Envelope {
+impl Default for Headers {
     fn default() -> Self {
         Self {
             // must-fields
@@ -231,19 +230,19 @@ impl Default for Envelope {
 }
 
 // == From implementations ==
-impl TryFrom<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
+impl TryFrom<Option<&imap_proto::types::Envelope<'_>>> for Headers {
     type Error = Error;
 
-    fn try_from(from_envelope: Option<&imap_proto::types::Envelope<'_>>) -> Result<Self> {
-        if let Some(from_envelope) = from_envelope {
-            debug!("Fetch has an envelope.");
+    fn try_from(from_headers: Option<&imap_proto::types::Envelope<'_>>) -> Result<Self> {
+        if let Some(from_headers) = from_headers {
+            debug!("Fetch has headers.");
 
-            let subject = from_envelope
+            let subject = from_headers
                 .subject
                 .as_ref()
                 .and_then(|subj| rfc2047_decoder::decode(subj).ok());
 
-            let from = match convert_vec_address_to_string(from_envelope.from.as_ref())? {
+            let from = match convert_vec_address_to_string(from_headers.from.as_ref())? {
                 Some(from) => from,
                 None => return Err(ErrorKind::Convertion("From").into()),
             };
@@ -251,7 +250,7 @@ impl TryFrom<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
             // since we get a vector here, we just need the first value, because
             // there should be only one sender, otherwise we'll pass an empty
             // string there
-            let sender = convert_vec_address_to_string(from_envelope.sender.as_ref())?;
+            let sender = convert_vec_address_to_string(from_headers.sender.as_ref())?;
             // pick up the first element (if it exists) otherwise just set it
             // to None because we might don't need it
             let sender = match sender {
@@ -265,15 +264,15 @@ impl TryFrom<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
                 None => None,
             };
 
-            let message_id = convert_cow_u8_to_string(from_envelope.message_id.as_ref())?;
-            let reply_to = convert_vec_address_to_string(from_envelope.reply_to.as_ref())?;
-            let to = match convert_vec_address_to_string(from_envelope.to.as_ref())? {
+            let message_id = convert_cow_u8_to_string(from_headers.message_id.as_ref())?;
+            let reply_to = convert_vec_address_to_string(from_headers.reply_to.as_ref())?;
+            let to = match convert_vec_address_to_string(from_headers.to.as_ref())? {
                 Some(to) => to,
                 None => return Err(ErrorKind::Convertion("To").into()),
             };
-            let cc = convert_vec_address_to_string(from_envelope.cc.as_ref())?;
-            let bcc = convert_vec_address_to_string(from_envelope.bcc.as_ref())?;
-            let in_reply_to = convert_cow_u8_to_string(from_envelope.in_reply_to.as_ref())?;
+            let cc = convert_vec_address_to_string(from_headers.cc.as_ref())?;
+            let bcc = convert_vec_address_to_string(from_headers.bcc.as_ref())?;
+            let in_reply_to = convert_cow_u8_to_string(from_headers.in_reply_to.as_ref())?;
 
             Ok(Self {
                 subject,
@@ -290,15 +289,15 @@ impl TryFrom<Option<&imap_proto::types::Envelope<'_>>> for Envelope {
                 encoding: ContentTransferEncoding::Base64,
             })
         } else {
-            debug!("Fetch doesn't have an envelope.");
-            Ok(Envelope::default())
+            debug!("Fetch hasn't headers.");
+            Ok(Headers::default())
         }
     }
 }
 
-impl<'from> From<&mailparse::ParsedMail<'from>> for Envelope {
+impl<'from> From<&mailparse::ParsedMail<'from>> for Headers {
     fn from(parsed_mail: &mailparse::ParsedMail<'from>) -> Self {
-        let mut new_envelope = Envelope::default();
+        let mut new_headers = Headers::default();
 
         let header_iter = parsed_mail.headers.iter();
         for header in header_iter {
@@ -314,21 +313,21 @@ impl<'from> From<&mailparse::ParsedMail<'from>> for Envelope {
             // now go through all headers and look which values they have.
             match header_name {
                 "from" => {
-                    new_envelope.from = value
+                    new_headers.from = value
                         .rsplit(',')
                         .map(|addr| addr.trim().to_string())
                         .collect()
                 }
 
                 "to" => {
-                    new_envelope.to = value
+                    new_headers.to = value
                         .rsplit(',')
                         .map(|addr| addr.trim().to_string())
                         .collect()
                 }
 
                 "bcc" => {
-                    new_envelope.bcc = Some(
+                    new_headers.bcc = Some(
                         value
                             .rsplit(',')
                             .map(|addr| addr.trim().to_string())
@@ -337,16 +336,16 @@ impl<'from> From<&mailparse::ParsedMail<'from>> for Envelope {
                 }
 
                 "cc" => {
-                    new_envelope.cc = Some(
+                    new_headers.cc = Some(
                         value
                             .rsplit(',')
                             .map(|addr| addr.trim().to_string())
                             .collect(),
                     )
                 }
-                "in_reply_to" => new_envelope.in_reply_to = Some(value),
+                "in_reply_to" => new_headers.in_reply_to = Some(value),
                 "reply_to" => {
-                    new_envelope.reply_to = Some(
+                    new_headers.reply_to = Some(
                         value
                             .rsplit(',')
                             .map(|addr| addr.trim().to_string())
@@ -354,17 +353,17 @@ impl<'from> From<&mailparse::ParsedMail<'from>> for Envelope {
                     )
                 }
 
-                "sender" => new_envelope.sender = Some(value),
-                "subject" => new_envelope.subject = Some(value),
-                "message-id" => new_envelope.message_id = Some(value),
+                "sender" => new_headers.sender = Some(value),
+                "subject" => new_headers.subject = Some(value),
+                "message-id" => new_headers.message_id = Some(value),
                 "content-transfer-encoding" => {
                     match value.to_lowercase().as_str() {
-                        "8bit" => new_envelope.encoding = ContentTransferEncoding::EightBit,
-                        "7bit" => new_envelope.encoding = ContentTransferEncoding::SevenBit,
+                        "8bit" => new_headers.encoding = ContentTransferEncoding::EightBit,
+                        "7bit" => new_headers.encoding = ContentTransferEncoding::SevenBit,
                         "quoted-printable" => {
-                            new_envelope.encoding = ContentTransferEncoding::QuotedPrintable
+                            new_headers.encoding = ContentTransferEncoding::QuotedPrintable
                         }
-                        "base64" => new_envelope.encoding = ContentTransferEncoding::Base64,
+                        "base64" => new_headers.encoding = ContentTransferEncoding::Base64,
                         _ => warn!("Unsupported encoding, default to QuotedPrintable"),
                     };
                 }
@@ -377,11 +376,11 @@ impl<'from> From<&mailparse::ParsedMail<'from>> for Envelope {
                     // If we don't have a HashMap yet => Create one! Otherwise
                     // we'll keep using it, because why should we reset its
                     // values again?
-                    if let None = new_envelope.custom_headers {
-                        new_envelope.custom_headers = Some(HashMap::new());
+                    if let None = new_headers.custom_headers {
+                        new_headers.custom_headers = Some(HashMap::new());
                     }
 
-                    let mut updated_hashmap = new_envelope.custom_headers.unwrap();
+                    let mut updated_hashmap = new_headers.custom_headers.unwrap();
 
                     updated_hashmap.insert(
                         custom_header,
@@ -391,35 +390,35 @@ impl<'from> From<&mailparse::ParsedMail<'from>> for Envelope {
                             .collect(),
                     );
 
-                    new_envelope.custom_headers = Some(updated_hashmap);
+                    new_headers.custom_headers = Some(updated_hashmap);
                 }
             }
         }
 
-        new_envelope
+        new_headers
     }
 }
 
 // -- Common Traits --
-/// This trait just returns the envelope but as a string. But be careful! **The
+/// This trait just returns the headers but as a string. But be careful! **The
 /// signature is printed as well!!!**, so it isn't really useable to create the
 /// content of a msg! Use [get_header_as_string] instead!
 ///
 /// # Example
 ///
 /// ```
-/// # use himalaya::msg::envelope::Envelope;
+/// # use himalaya::msg::headers::Headers;
 /// # fn main() {
-/// let envelope = Envelope {
+/// let headers = Headers {
 ///     subject: Some(String::from("Himalaya is cool")),
 ///     to: vec![String::from("Soywod <clement.douin@posteo.net>")],
 ///     from: vec![String::from("TornaxO7 <tornax07@gmail.com>")],
-///     signature: Some(String::from("Signature of Envelope")),
-///     ..Envelope::default()
+///     signature: Some(String::from("Signature of Headers")),
+///     ..Headers::default()
 /// };
 ///
 /// // use the `fmt::Display` trait
-/// let envelope_output = format!("{}", envelope);
+/// let headers_output = format!("{}", headers);
 ///
 /// // How the output of the `fmt::Display` trait should look like
 /// let expected_output = concat![
@@ -427,17 +426,17 @@ impl<'from> From<&mailparse::ParsedMail<'from>> for Envelope {
 ///     "To: Soywod <clement.douin@posteo.net>\n",
 ///     "Subject: Himalaya is cool\n",
 ///     "\n\n\n",
-///     "Signature of Envelope",
+///     "Signature of Headers",
 /// ];
 ///
-/// assert_eq!(envelope_output, expected_output,
+/// assert_eq!(headers_output, expected_output,
 ///     "{:#?}, {:#?}",
-///     envelope_output, expected_output);
+///     headers_output, expected_output);
 /// # }
 /// ```
 ///
-/// [get_header_as_string]: struct.Envelope.html#method.get_header_as_string
-impl fmt::Display for Envelope {
+/// [get_header_as_string]: struct.Headers.html#method.get_header_as_string
+impl fmt::Display for Headers {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         let mut header = self.get_header_as_string();
 

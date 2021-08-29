@@ -1,5 +1,5 @@
 use super::body::Body;
-use super::envelope::Envelope;
+use super::headers::Headers;
 use super::model::{Msg, Msgs, MsgSerialized};
 use url::Url;
 
@@ -405,12 +405,12 @@ fn msg_matches_write(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 
     // create the new msg
     // TODO: Make the header starting customizeable like from template
-    let mut msg = Msg::new_with_envelope(
+    let mut msg = Msg::new_with_headers(
         &ctx,
-        Envelope {
+        Headers {
             subject: Some(String::new()),
             to: Vec::new(),
-            ..Envelope::default()
+            ..Headers::default()
         },
     );
 
@@ -490,7 +490,7 @@ pub fn msg_matches_mailto(ctx: &Ctx, url: &Url) -> Result<()> {
         }
     }
 
-    let envelope = Envelope {
+    let headers = Headers {
         from: vec![ctx.config.address(&ctx.account)],
         to: vec![url.path().to_string()],
         encoding: ContentTransferEncoding::Base64,
@@ -498,10 +498,10 @@ pub fn msg_matches_mailto(ctx: &Ctx, url: &Url) -> Result<()> {
         cc: Some(cc),
         signature: ctx.config.signature(&ctx.account),
         subject: Some(subject.into()),
-        ..Envelope::default()
+        ..Headers::default()
     };
 
-    let mut msg = Msg::new_with_envelope(&ctx, envelope);
+    let mut msg = Msg::new_with_headers(&ctx, headers);
     msg.body = Body::new_with_text(body);
     msg_interaction(&ctx, &mut msg, &mut imap_conn)?;
 
@@ -687,7 +687,7 @@ fn override_msg_with_args(msg: &mut Msg, matches: &clap::ArgMatches) {
     // -- Collecting credentials --
     let from: Vec<String> = match matches.values_of("from") {
         Some(from) => from.map(|arg| arg.to_string()).collect(),
-        None => msg.envelope.from.clone(),
+        None => msg.headers.from.clone(),
     };
 
     let to: Vec<String> = match matches.values_of("to") {
@@ -710,7 +710,7 @@ fn override_msg_with_args(msg: &mut Msg, matches: &clap::ArgMatches) {
     let signature = matches
         .value_of("signature")
         .and_then(|signature| Some(signature.to_string()))
-        .or(msg.envelope.signature.clone());
+        .or(msg.headers.signature.clone());
 
     let custom_headers: Option<HashMap<String, Vec<String>>> = {
         if let Some(matched_headers) = matches.values_of("header") {
@@ -755,7 +755,7 @@ fn override_msg_with_args(msg: &mut Msg, matches: &clap::ArgMatches) {
     let body = Body::new_with_text(body);
 
     // -- Creating and printing --
-    let envelope = Envelope {
+    let headers = Headers {
         from,
         subject,
         to,
@@ -763,10 +763,10 @@ fn override_msg_with_args(msg: &mut Msg, matches: &clap::ArgMatches) {
         bcc,
         signature,
         custom_headers,
-        ..msg.envelope.clone()
+        ..msg.headers.clone()
     };
 
-    msg.envelope = envelope;
+    msg.headers = headers;
     msg.body = body;
 }
 

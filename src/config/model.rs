@@ -351,8 +351,8 @@ impl Config {
     }
 
     /// This is a little helper-function like which uses the the name and email
-    /// of the account to create a valid address for the header of the envelope
-    /// of an msg.
+    /// of the account to create a valid address for the header of the headers
+    /// of a msg.
     ///
     /// # Hint
     /// If the name includes some special characters like a whitespace, comma or semicolon, then
