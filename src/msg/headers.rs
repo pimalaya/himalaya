@@ -233,16 +233,16 @@ impl Default for Headers {
 impl TryFrom<Option<&imap_proto::types::Envelope<'_>>> for Headers {
     type Error = Error;
 
-    fn try_from(from_headers: Option<&imap_proto::types::Envelope<'_>>) -> Result<Self> {
-        if let Some(from_headers) = from_headers {
+    fn try_from(envelope: Option<&imap_proto::types::Envelope<'_>>) -> Result<Self> {
+        if let Some(envelope) = envelope {
             debug!("Fetch has headers.");
 
-            let subject = from_headers
+            let subject = envelope
                 .subject
                 .as_ref()
                 .and_then(|subj| rfc2047_decoder::decode(subj).ok());
 
-            let from = match convert_vec_address_to_string(from_headers.from.as_ref())? {
+            let from = match convert_vec_address_to_string(envelope.from.as_ref())? {
                 Some(from) => from,
                 None => return Err(ErrorKind::Convertion("From").into()),
             };
@@ -250,7 +250,7 @@ impl TryFrom<Option<&imap_proto::types::Envelope<'_>>> for Headers {
             // since we get a vector here, we just need the first value, because
             // there should be only one sender, otherwise we'll pass an empty
             // string there
-            let sender = convert_vec_address_to_string(from_headers.sender.as_ref())?;
+            let sender = convert_vec_address_to_string(envelope.sender.as_ref())?;
             // pick up the first element (if it exists) otherwise just set it
             // to None because we might don't need it
             let sender = match sender {
@@ -264,15 +264,15 @@ impl TryFrom<Option<&imap_proto::types::Envelope<'_>>> for Headers {
                 None => None,
             };
 
-            let message_id = convert_cow_u8_to_string(from_headers.message_id.as_ref())?;
-            let reply_to = convert_vec_address_to_string(from_headers.reply_to.as_ref())?;
-            let to = match convert_vec_address_to_string(from_headers.to.as_ref())? {
+            let message_id = convert_cow_u8_to_string(envelope.message_id.as_ref())?;
+            let reply_to = convert_vec_address_to_string(envelope.reply_to.as_ref())?;
+            let to = match convert_vec_address_to_string(envelope.to.as_ref())? {
                 Some(to) => to,
                 None => return Err(ErrorKind::Convertion("To").into()),
             };
-            let cc = convert_vec_address_to_string(from_headers.cc.as_ref())?;
-            let bcc = convert_vec_address_to_string(from_headers.bcc.as_ref())?;
-            let in_reply_to = convert_cow_u8_to_string(from_headers.in_reply_to.as_ref())?;
+            let cc = convert_vec_address_to_string(envelope.cc.as_ref())?;
+            let bcc = convert_vec_address_to_string(envelope.bcc.as_ref())?;
+            let in_reply_to = convert_cow_u8_to_string(envelope.in_reply_to.as_ref())?;
 
             Ok(Self {
                 subject,
