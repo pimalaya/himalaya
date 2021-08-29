@@ -776,8 +776,9 @@ impl Msg {
     /// Returns the uid of the msg.
     ///
     /// # Hint
-    /// The uid is only set from the server! So you can only get a `Some(...)`
-    /// from this function, if it's a fetched msg otherwise you'll get `None`.
+    /// The uid is set if you *send* a *new* message or if you receive a message of the server. So
+    /// in general you can only get a `Some(...)` from this function, if it's a fetched msg
+    /// otherwise you'll get `None`.
     pub fn get_uid(&self) -> Option<u32> {
         self.uid
     }
