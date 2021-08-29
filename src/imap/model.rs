@@ -16,6 +16,11 @@ error_chain! {
     }
 }
 
+/// A little helper function to create a similiar error output. (to avoid duplicated code)
+fn format_err_msg(description: &str, account: &Account) -> String {
+    format!("{}. Given Account: {#:?}", description, account)
+}
+
 /// The main struct to create a connection to your imap-server.
 ///
 /// # Example
@@ -51,7 +56,7 @@ impl<'a> ImapConnector<'a> {
             .danger_accept_invalid_certs(insecure)
             .danger_accept_invalid_hostnames(insecure)
             .build()
-            .chain_err(|| "Could not create TLS connector")?;
+            .chain_err(|| format_err_msg("Could not create TLS connector", account))?;
 
         debug!("create client");
         let mut client_builder = imap::ClientBuilder::new(&account.imap_host, account.imap_port);
@@ -61,13 +66,13 @@ impl<'a> ImapConnector<'a> {
         }
         let client = client_builder
             .connect(|domain, tcp| Ok(TlsConnector::connect(&ssl_conn, domain, tcp)?))
-            .chain_err(|| "Could not connect to IMAP server")?;
+            .chain_err(|| format_err_msg("Could not connect to IMAP server", account))?;
 
         debug!("create session");
         let sess = client
             .login(&account.imap_login, &account.imap_passwd()?)
             .map_err(|res| res.0)
-            .chain_err(|| "Could not login to IMAP server")?;
+            .chain_err(|| format_err_msg("Could not login to IMAP server", account))?;
 
         Ok(Self { account, sess })
     }
