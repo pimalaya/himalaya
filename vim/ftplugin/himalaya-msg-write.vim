@@ -1,4 +1,3 @@
-setlocal cursorline
 setlocal filetype=mail
 setlocal foldexpr=himalaya#shared#thread#fold(v:lnum)
 setlocal foldmethod=expr
