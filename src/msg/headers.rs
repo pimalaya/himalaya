@@ -580,9 +580,11 @@ mod tests {
             "Soywod <clement.douin@posteo.net>\n",
         ];
 
-        assert_eq!(cc_header, expected_output,
+        assert_eq!(
+            cc_header, expected_output,
             "{:#?}, {:#?}",
-            cc_header, expected_output);
+            cc_header, expected_output
+        );
     }
 
     #[test]

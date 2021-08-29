@@ -1,15 +1,43 @@
 use std::convert::TryFrom;
 
 use himalaya::{
-    config::model::Account, imap::model::ImapConnector, mbox::model::Mboxes, msg::model::Msgs, smtp,
+    config::model::Account, flag::model::Flags, imap::model::ImapConnector, mbox::model::Mboxes,
+    msg::model::Msgs, smtp,
 };
+
+use imap::types::Flag;
 
 use lettre::message::SinglePart;
 use lettre::Message;
 
+fn get_account(addr: &str) -> Account {
+    Account {
+        name: None,
+        downloads_dir: None,
+        signature_delimiter: None,
+        signature: None,
+        default_page_size: None,
+        default: Some(true),
+        email: addr.into(),
+        watch_cmds: None,
+        imap_host: String::from("localhost"),
+        imap_port: 3993,
+        imap_starttls: Some(false),
+        imap_insecure: Some(true),
+        imap_login: addr.into(),
+        imap_passwd_cmd: String::from("echo 'password'"),
+        smtp_host: String::from("localhost"),
+        smtp_port: 3465,
+        smtp_starttls: Some(false),
+        smtp_insecure: Some(true),
+        smtp_login: addr.into(),
+        smtp_passwd_cmd: String::from("echo 'password'"),
+    }
+}
+
 #[test]
 fn mbox() {
-    let account = Account::new(Some("AccountName"), "inbox@localhost");
+    let account = get_account("inbox@localhost");
     let mut imap_conn = ImapConnector::new(&account).unwrap();
     let names = imap_conn.list_mboxes().unwrap();
     let mboxes: Vec<String> = Mboxes::from(&names)
@@ -26,7 +54,7 @@ fn msg() {
     // Preparations
 
     // Get the test-account and clean up the server.
-    let account = Account::new(Some("AccountName"), "inbox@localhost");
+    let account = get_account("inbox@localhost");
 
     // Login
     let mut imap_conn = ImapConnector::new(&account).unwrap();
@@ -42,7 +70,11 @@ fn msg() {
     // mark all mails as deleted
     for msg in msgs.0.iter() {
         imap_conn
-            .add_flags("INBOX", &msg.get_uid().unwrap().to_string(), "\\Deleted")
+            .add_flags(
+                "INBOX",
+                &msg.get_uid().unwrap().to_string(),
+                Flags::from(vec![Flag::Deleted]),
+                )
             .unwrap();
     }
     imap_conn.expunge("INBOX").unwrap();
@@ -98,13 +130,13 @@ fn msg() {
     assert_eq!(
         msg_a.headers.subject.clone().unwrap_or_default(),
         "Subject A"
-    );
+        );
     assert_eq!(&msg_a.headers.from[0], "sender-a@localhost");
 
     assert_eq!(
         msg_b.headers.subject.clone().unwrap_or_default(),
         "Subject B"
-    );
+        );
     assert_eq!(&msg_b.headers.from[0], "Sender B <sender-b@localhost>");
 
     // TODO: search messages

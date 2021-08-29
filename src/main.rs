@@ -75,6 +75,7 @@ fn run() -> Result<()> {
     debug!("output: {:?}", output);
 
     debug!("init config");
+
     let custom_config: Option<PathBuf> = arg_matches.value_of("config").map(|s| s.into());
     debug!("custom config path: {:?}", custom_config);
     let config = Config::new(custom_config)?;
