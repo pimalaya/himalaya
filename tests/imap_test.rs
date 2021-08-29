@@ -74,7 +74,7 @@ fn msg() {
                 "INBOX",
                 &msg.get_uid().unwrap().to_string(),
                 Flags::from(vec![Flag::Deleted]),
-                )
+            )
             .unwrap();
     }
     imap_conn.expunge("INBOX").unwrap();
@@ -130,13 +130,13 @@ fn msg() {
     assert_eq!(
         msg_a.headers.subject.clone().unwrap_or_default(),
         "Subject A"
-        );
+    );
     assert_eq!(&msg_a.headers.from[0], "sender-a@localhost");
 
     assert_eq!(
         msg_b.headers.subject.clone().unwrap_or_default(),
         "Subject B"
-        );
+    );
     assert_eq!(&msg_b.headers.from[0], "Sender B <sender-b@localhost>");
 
     // TODO: search messages
