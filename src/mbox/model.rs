@@ -4,8 +4,7 @@ use serde::{
     Serialize,
 };
 use std::fmt;
-use std::borrow::Cow;
-use std::collections::HashSet;
+use std::borrow::Cow; use std::collections::HashSet;
 
 use crate::table::{Cell, Row, Table};
 
@@ -132,7 +131,7 @@ impl Table for Mbox {
 }
 
 // --- Mboxes ---
-/// A simple wrapper to acces all 
+/// A simple wrapper to acces a bunch of mboxes which are in this vector.
 #[derive(Debug, Serialize)]
 pub struct Mboxes(pub Vec<Mbox>);
 
