@@ -12,7 +12,7 @@ error_chain! {
 
 fn flags_arg<'a>() -> clap::Arg<'a, 'a> {
     clap::Arg::with_name("flags")
-        .help("IMAP flags (see https://tools.ietf.org/html/rfc3501#page-11). Just write the flag name without the backslash. Example: --flags \"Seen,Answered\"")
+        .help("IMAP flags (see https://tools.ietf.org/html/rfc3501#page-11). Just write the flag name without the backslash. Example: --flags \"Seen Answered\"")
         .value_name("FLAGS…")
         .multiple(true)
         .required(true)
