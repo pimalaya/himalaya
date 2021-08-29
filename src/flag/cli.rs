@@ -2,7 +2,7 @@ use clap;
 use error_chain::error_chain;
 use log::debug;
 
-use crate::{ctx::Ctx, imap::model::ImapConnector, msg::cli::uid_arg};
+use crate::{ctx::Ctx, imap::model::ImapConnector, msg::cli::uid_arg, flag::model::Flags};
 
 error_chain! {
     links {
@@ -12,7 +12,7 @@ error_chain! {
 
 fn flags_arg<'a>() -> clap::Arg<'a, 'a> {
     clap::Arg::with_name("flags")
-        .help("IMAP flags (see https://tools.ietf.org/html/rfc3501#page-11)")
+        .help("IMAP flags (see https://tools.ietf.org/html/rfc3501#page-11). Just write the flag name without the backslash. Example: --flags \"Seen,Answered\"")
         .value_name("FLAGS…")
         .multiple(true)
         .required(true)
@@ -51,6 +51,7 @@ pub fn matches(ctx: &Ctx) -> Result<bool> {
 
         let flags = matches.value_of("flags").unwrap();
         debug!("flags: {}", flags);
+        let flags = Flags::from(flags);
 
         let mut imap_conn = ImapConnector::new(&ctx.account)?;
         imap_conn.set_flags(&ctx.mbox, uid, flags)?;
@@ -67,6 +68,7 @@ pub fn matches(ctx: &Ctx) -> Result<bool> {
 
         let flags = matches.value_of("flags").unwrap();
         debug!("flags: {}", flags);
+        let flags = Flags::from(flags);
 
         let mut imap_conn = ImapConnector::new(&ctx.account)?;
         imap_conn.add_flags(&ctx.mbox, uid, flags)?;
@@ -83,6 +85,7 @@ pub fn matches(ctx: &Ctx) -> Result<bool> {
 
         let flags = matches.value_of("flags").unwrap();
         debug!("flags: {}", flags);
+        let flags = Flags::from(flags);
 
         let mut imap_conn = ImapConnector::new(&ctx.account)?;
         imap_conn.remove_flags(&ctx.mbox, uid, flags)?;

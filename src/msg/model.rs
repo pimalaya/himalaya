@@ -252,6 +252,7 @@ impl Msg {
     /// like.
     ///
     /// [Here]: https://www.rfc-editor.org/rfc/rfc5322.html#page-46
+    /// [`Account`]: struct.Account.html
     ///
     // TODO: References field is missing, but the imap-crate can't implement it
     // currently.
@@ -812,7 +813,7 @@ impl Default for Msg {
     fn default() -> Self {
         Self {
             attachments: Vec::new(),
-            flags: Flags::new(&[]),
+            flags: Flags::default(),
             headers: Headers::default(),
             body: Body::default(),
             // the uid is generated in the "to_sendable_msg" function if the server didn't apply a
@@ -846,7 +847,7 @@ impl Table for Msg {
 
         // The data which will be shown in the row
         let uid = self.get_uid().unwrap_or(0);
-        let flags = self.flags.to_string();
+        let flags = self.flags.get_signs();
         let subject = self.headers.subject.clone().unwrap_or_default();
         let mut from = String::new();
         let date = self.date.clone().unwrap_or(String::new());
@@ -882,7 +883,7 @@ impl TryFrom<&Fetch> for Msg {
         // fetched msg.
 
         let mut attachments = Vec::new();
-        let flags = Flags::new(fetch.flags());
+        let flags = Flags::from(fetch.flags());
         let headers = Headers::try_from(fetch.envelope())?;
         let uid = fetch.uid;
 

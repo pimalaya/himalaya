@@ -7,6 +7,7 @@ use std::{collections::HashSet, convert::TryFrom, iter::FromIterator, net::TcpSt
 use crate::config::model::Account;
 use crate::ctx::Ctx;
 use crate::msg::model::Msg;
+use crate::flag::model::Flags;
 
 error_chain! {
     links {
@@ -15,6 +16,23 @@ error_chain! {
     }
 }
 
+/// The main struct to create a connection to your imap-server.
+///
+/// # Example
+/// ```no_run
+/// use himalaya::imap::model::ImapConnector;
+/// use himalaya::config::model::Account;
+///
+/// fn main() {
+///     let account = Account::default();
+///     let mut imap_conn = ImapConnector::new(&account).unwrap();
+///
+///     // do you stuff with the connection...
+///
+///     // Be nice to the server and say 'Bye!'
+///     imap_conn.logout();
+/// }
+/// ```
 #[derive(Debug)]
 pub struct ImapConnector<'a> {
     pub account: &'a Account,
@@ -22,6 +40,8 @@ pub struct ImapConnector<'a> {
 }
 
 impl<'a> ImapConnector<'a> {
+
+    /// Creates a new connection with the settings of the given account.
     pub fn new(account: &'a Account) -> Result<Self> {
         debug!("create TLS builder");
         let insecure = account.imap_insecure();
@@ -50,6 +70,9 @@ impl<'a> ImapConnector<'a> {
         Ok(Self { account, sess })
     }
 
+    /// Closes the connection.
+    ///
+    /// **ALWAYS CALL THIS IF YOU DON'T NEED THE CONNECTION ANYMORE!**
     pub fn logout(&mut self) {
         debug!("logout");
         match self.sess.logout() {
@@ -57,7 +80,31 @@ impl<'a> ImapConnector<'a> {
         }
     }
 
-    pub fn set_flags(&mut self, mbox: &str, uid_seq: &str, flags: &str) -> Result<()> {
+    /// Applies the given flags to the msg.
+    ///
+    /// # Example
+    /// ```no_run
+    /// use himalaya::imap::model::ImapConnector;
+    /// use himalaya::config::model::Account;
+    /// use himalaya::flag::model::Flags;
+    /// use imap::types::Flag;
+    ///
+    /// fn main() {
+    ///     let account = Account::default();
+    ///     let mut imap_conn = ImapConnector::new(&account).unwrap();
+    ///     let flags = Flags::from(vec![Flag::Seen]);
+    ///
+    ///     // Mark the message with the UID 42 in the mailbox "rofl" as "Seen" and wipe all other
+    ///     // flags
+    ///     imap_conn.set_flags("rofl", "42", flags).unwrap();
+    ///
+    ///     imap_conn.logout();
+    /// }
+    /// ```
+    pub fn set_flags(&mut self, mbox: &str, uid_seq: &str, flags: Flags) -> Result<()> {
+
+        let flags: String = flags.to_string();
+
         self.sess
             .select(mbox)
             .chain_err(|| format!("Could not select mailbox `{}`", mbox))?;
@@ -69,7 +116,30 @@ impl<'a> ImapConnector<'a> {
         Ok(())
     }
 
-    pub fn add_flags(&mut self, mbox: &str, uid_seq: &str, flags: &str) -> Result<()> {
+    /// Add the given flags to the given mail.
+    ///
+    /// # Example
+    /// ```no_run
+    /// use himalaya::imap::model::ImapConnector;
+    /// use himalaya::config::model::Account;
+    /// use himalaya::flag::model::Flags;
+    /// use imap::types::Flag;
+    /// 
+    /// fn main() {
+    ///     let account = Account::default();
+    ///     let mut imap_conn = ImapConnector::new(&account).unwrap();
+    ///     let flags = Flags::from(vec![Flag::Seen]);
+    ///
+    ///     // Mark the message with the UID 42 in the mailbox "rofl" as "Seen"
+    ///     imap_conn.add_flags("rofl", "42", flags).unwrap();
+    ///
+    ///     imap_conn.logout();
+    /// }
+    /// ```
+    pub fn add_flags(&mut self, mbox: &str, uid_seq: &str, flags: Flags) -> Result<()> {
+
+        let flags: String = flags.to_string();
+
         self.sess
             .select(mbox)
             .chain_err(|| format!("Could not select mailbox `{}`", mbox))?;
@@ -81,7 +151,12 @@ impl<'a> ImapConnector<'a> {
         Ok(())
     }
 
-    pub fn remove_flags(&mut self, mbox: &str, uid_seq: &str, flags: &str) -> Result<()> {
+    /// Remove the flags to the message by the given information. Take a look on the example above.
+    /// It's pretty similar.
+    pub fn remove_flags(&mut self, mbox: &str, uid_seq: &str, flags: Flags) -> Result<()> {
+
+        let flags = flags.to_string();
+
         self.sess
             .select(mbox)
             .chain_err(|| format!("Could not select mailbox `{}`", mbox))?;
@@ -273,6 +348,7 @@ impl<'a> ImapConnector<'a> {
         Ok(Some(fetches))
     }
 
+    /// Get the message according to the given `mbox` and `uid`.
     pub fn get_msg(&mut self, mbox: &str, uid: &str) -> Result<Msg> {
         self.sess
             .select(mbox)
@@ -289,6 +365,7 @@ impl<'a> ImapConnector<'a> {
         }
     }
 
+    /// Append the given `msg` to `mbox`.
     pub fn append_msg(&mut self, mbox: &str, msg: &mut Msg) -> Result<()> {
         let body = msg.into_bytes()?;
         let flags: HashSet<imap::types::Flag<'static>> = (*msg.flags).clone();

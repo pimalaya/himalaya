@@ -19,8 +19,10 @@ error_chain! {}
 
 const DEFAULT_PAGE_SIZE: usize = 10;
 
-// Account
-
+// --- Account ---
+/// Represents an account section in your config file.
+///
+/// [account section]: https://github.com/soywod/himalaya/wiki/Configuration:config-file#account-specific-settings
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub struct Account {
@@ -234,15 +236,15 @@ impl Default for Account {
     }
 }
 
-// Config
-
+// --- Config ---
+/// Represents the whole config file.
 #[derive(Debug, Default, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct Config {
     pub name: String,
     pub downloads_dir: Option<PathBuf>,
     pub notify_cmd: Option<String>,
-    /// Option to override the default signature delimiter `--\n `.
+    /// Option to override the default signature delimiter "`--\n `".
     pub signature_delimiter: Option<String>,
     pub signature: Option<String>,
     pub default_page_size: Option<usize>,

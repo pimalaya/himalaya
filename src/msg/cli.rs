@@ -19,7 +19,7 @@ use std::{
 
 use imap::types::Flag;
 
-use crate::{ctx::Ctx, imap::model::ImapConnector, input, mbox::cli::mbox_target_arg, smtp};
+use crate::{ctx::Ctx, imap::model::ImapConnector, input, mbox::cli::mbox_target_arg, smtp, flag::model::Flags};
 
 error_chain! {
     links {
@@ -591,7 +591,8 @@ fn msg_matches_move(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     ));
 
     // delete the msg in the old mailbox
-    imap_conn.add_flags(&ctx.mbox, uid, "\\Seen \\Deleted")?;
+    let flags = vec![Flag::Seen, Flag::Deleted];
+    imap_conn.add_flags(&ctx.mbox, uid, Flags::from(flags))?;
     imap_conn.expunge(&ctx.mbox)?;
 
     imap_conn.logout();
@@ -605,7 +606,8 @@ fn msg_matches_delete(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 
     // remove the message according to its UID
     let uid = matches.value_of("uid").unwrap();
-    imap_conn.add_flags(&ctx.mbox, uid, "\\Seen \\Deleted")?;
+    let flags = vec![Flag::Seen, Flag::Deleted];
+    imap_conn.add_flags(&ctx.mbox, uid, Flags::from(flags))?;
     imap_conn.expunge(&ctx.mbox)?;
 
     debug!("message {} successfully deleted", uid);
