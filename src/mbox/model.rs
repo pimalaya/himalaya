@@ -89,7 +89,7 @@ pub struct Mbox {
 
     /// The [hierarchie delimiter].
     ///
-    /// [hierarchie delimiter]: struct.Name.html#method.delimiter
+    /// [hierarchie delimiter]: https://docs.rs/imap/2.4.1/imap/types/struct.Name.html#method.delimiter
     pub delim: String,
 
     /// The name of the mailbox.
