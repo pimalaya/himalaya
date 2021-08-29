@@ -33,7 +33,7 @@ pub mod imap;
 /// message, his module takes care of the draft and calls your ~(neo)vim~ your favourite editor.
 pub mod input;
 
-/// Everything which is related to mboexes, for example creating or deleting some.
+/// Everything which is related to mboxes, for example creating or deleting some.
 pub mod mbox;
 
 /// Includes everything related to a message. This means: Body, Headers, Attachments, etc.
