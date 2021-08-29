@@ -1,8 +1,10 @@
 use std::convert::TryFrom;
 
 use himalaya::{
-    config::model::Account, imap::model::ImapConnector, mbox::model::Mboxes, msg::model::Msgs, smtp,
+    config::model::Account, imap::model::ImapConnector, mbox::model::Mboxes, msg::model::Msgs, smtp, flag::model::Flags
 };
+
+use imap::types::Flag;
 
 use lettre::message::SinglePart;
 use lettre::Message;
@@ -42,7 +44,7 @@ fn msg() {
     // mark all mails as deleted
     for msg in msgs.0.iter() {
         imap_conn
-            .add_flags("INBOX", &msg.get_uid().unwrap().to_string(), "\\Deleted")
+            .add_flags("INBOX", &msg.get_uid().unwrap().to_string(), Flags::from(vec![Flag::Deleted]))
             .unwrap();
     }
     imap_conn.expunge("INBOX").unwrap();
