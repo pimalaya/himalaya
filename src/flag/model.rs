@@ -230,7 +230,15 @@ mod tests {
     fn test_to_string() {
         let flags = Flags::from(vec![Flag::Seen, Flag::Answered]);
 
-        assert_eq!(flags.to_string(), "\\Answered \\Seen");
+        // since we can't influence the order in the HashSet, we're gonna convert it into a vec,
+        // sort it according to the names and compare it aftwards.
+        let flag_string = flags.to_string();
+        let mut flag_vec: Vec<String> = flag_string.split_ascii_whitespace()
+            .map(|word| word.to_string())
+            .collect();
+        flag_vec.sort();
+
+        assert_eq!(flag_vec, vec!["\\Answered".to_string(), "\\Seen".to_string()]);
     }
 
     #[test]
