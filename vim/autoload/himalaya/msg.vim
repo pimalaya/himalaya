@@ -84,9 +84,9 @@ function! himalaya#msg#write()
   try
     let pos = getpos(".")
     let account = himalaya#account#curr()
-    let msg = s:cli("--account %s template new", [shellescape(account)], "Fetching new template", 0)
+    let msg = s:cli("--account %s template new", [shellescape(account)], "Fetching new template", 0, "plain")
     silent! edit Himalaya write
-    call append(0, split(substitute(msg.raw, "\r", "", "g"), "\n"))
+    call append(0, split(substitute(msg, "\r", "", "g"), "\n"))
     silent execute "$d"
     setlocal filetype=himalaya-msg-write
     let &modified = 0
@@ -110,9 +110,10 @@ function! himalaya#msg#reply()
       \[shellescape(account), shellescape(mbox), msg_id],
       \"Fetching reply template",
       \0,
+      \"plain"
     \)
     execute printf("silent! edit Himalaya reply [%d]", msg_id)
-    call append(0, split(substitute(msg.raw, "\r", "", "g"), "\n"))
+    call append(0, split(substitute(msg, "\r", "", "g"), "\n"))
     silent execute "$d"
     setlocal filetype=himalaya-msg-write
     let &modified = 0
@@ -135,10 +136,11 @@ function! himalaya#msg#reply_all()
       \"--account %s --mailbox %s template reply %d --all",
       \[shellescape(account), shellescape(mbox), msg_id],
       \"Fetching reply all template",
-      \0
+      \0,
+      \"plain"
     \)
     execute printf("silent! edit Himalaya reply all [%d]", msg_id)
-    call append(0, split(substitute(msg.raw, "\r", "", "g"), "\n"))
+    call append(0, split(substitute(msg, "\r", "", "g"), "\n"))
     silent execute "$d"
     setlocal filetype=himalaya-msg-write
     let &modified = 0
@@ -161,10 +163,11 @@ function! himalaya#msg#forward()
       \"--account %s --mailbox %s template forward %d",
       \[shellescape(account), shellescape(mbox), msg_id],
       \"Fetching forward template",
-      \0
+      \0,
+      \"plain"
     \)
     execute printf("silent! edit Himalaya forward [%d]", msg_id)
-    call append(0, split(substitute(msg.raw, "\r", "", "g"), "\n"))
+    call append(0, split(substitute(msg, "\r", "", "g"), "\n"))
     silent execute "$d"
     setlocal filetype=himalaya-msg-write
     let &modified = 0
