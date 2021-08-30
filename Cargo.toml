@@ -16,7 +16,7 @@ imap = "3.0.0-alpha.4"
 imap-proto = "0.14.3"
 # This commit includes the de/serialization of the ContentType
 # lettre = { version = "0.10.0-rc.1", features = ["serde"] }
-lettre = { git = "https://github.com/TornaxO7/lettre/", branch = "ContentTransferEncoding", features = ["serde"] }
+lettre = {git = "https://github.com/TornaxO7/lettre/", branch = "master", features = ["serde"] }
 lettre_email = "0.9.4"
 log = "0.4.14"
 mailparse = "0.13.4"
