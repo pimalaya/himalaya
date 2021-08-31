@@ -47,3 +47,4 @@ pub mod smtp;
 
 /// The TUI for listing the mails for example.
 pub mod table;
+
