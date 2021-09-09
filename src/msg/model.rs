@@ -95,7 +95,7 @@ impl From<&Msg> for MsgSerialized {
 
 impl fmt::Display for MsgSerialized {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.msg.body)
+        write!(formatter, "{}", self.msg)
     }
 }
 
