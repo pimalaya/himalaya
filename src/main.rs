@@ -6,13 +6,11 @@ use std::{env, path::PathBuf, process::exit};
 use url::{self, Url};
 
 use himalaya::{
-    comp::cli::{comp_matches, comp_subcmds},
+    comp,
     config::{cli::config_args, model::Config},
     ctx::Ctx,
-    flag::cli::{flag_matches, flag_subcmds},
-    imap::cli::{imap_matches, imap_subcmds},
-    mbox::cli::{mbox_matches, mbox_source_arg, mbox_subcmds},
-    msg::cli::{msg_matches, msg_matches_mailto, msg_subcmds},
+    flag, imap, mbox,
+    msg::{self, cli::msg_matches_mailto},
     output::{cli::output_args, model::Output},
 };
 
@@ -38,12 +36,12 @@ fn parse_args<'a>() -> clap::App<'a, 'a> {
         .setting(clap::AppSettings::InferSubcommands)
         .args(&output_args())
         .args(&config_args())
-        .arg(mbox_source_arg())
-        .subcommands(flag_subcmds())
-        .subcommands(imap_subcmds())
-        .subcommands(mbox_subcmds())
-        .subcommands(msg_subcmds())
-        .subcommands(comp_subcmds())
+        .arg(mbox::cli::source_arg())
+        .subcommands(flag::cli::subcmds())
+        .subcommands(imap::cli::subcmds())
+        .subcommands(mbox::cli::subcmds())
+        .subcommands(msg::cli::subcmds())
+        .subcommands(comp::cli::subcmds())
 }
 
 fn run() -> Result<()> {
@@ -52,13 +50,15 @@ fn run() -> Result<()> {
     );
 
     let raw_args: Vec<String> = env::args().collect();
+
+    // This is used if you click on a mailaddress in the webbrowser
     if raw_args.len() > 1 && raw_args[1].starts_with("mailto:") {
         let config = Config::new(None)?;
-        let account = config.find_account_by_name(None)?;
+        let account = config.find_account_by_name(None)?.clone();
         let output = Output::new("plain");
         let mbox = "INBOX";
         let arg_matches = ArgMatches::default();
-        let app = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
+        let app = Ctx::new(config, account, output, mbox, arg_matches);
         let url = Url::parse(&raw_args[1])?;
         return Ok(msg_matches_mailto(&app, &url)?);
     }
@@ -67,7 +67,7 @@ fn run() -> Result<()> {
     let arg_matches = args.get_matches();
 
     // Check completion before init config
-    if comp_matches(parse_args, &arg_matches)? {
+    if comp::cli::matches(parse_args, &arg_matches)? {
         return Ok(());
     }
 
@@ -75,6 +75,7 @@ fn run() -> Result<()> {
     debug!("output: {:?}", output);
 
     debug!("init config");
+
     let custom_config: Option<PathBuf> = arg_matches.value_of("config").map(|s| s.into());
     debug!("custom config path: {:?}", custom_config);
     let config = Config::new(custom_config)?;
@@ -82,16 +83,19 @@ fn run() -> Result<()> {
 
     let account_name = arg_matches.value_of("account");
     debug!("init account: {}", account_name.unwrap_or("default"));
-    let account = config.find_account_by_name(account_name)?;
+    let account = config.find_account_by_name(account_name)?.clone();
     trace!("account: {:?}", account);
 
-    let mbox = arg_matches.value_of("mailbox").unwrap();
+    let mbox = arg_matches.value_of("mailbox").unwrap().to_string();
     debug!("mailbox: {}", mbox);
 
     debug!("begin matching");
-    let app = Ctx::new(&config, &account, &output, &mbox, &arg_matches);
-    let _matched =
-        mbox_matches(&app)? || flag_matches(&app)? || imap_matches(&app)? || msg_matches(&app)?;
+
+    let app = Ctx::new(config, account, output, mbox, arg_matches);
+    let _matched = mbox::cli::matches(&app)?
+        || flag::cli::matches(&app)?
+        || imap::cli::matches(&app)?
+        || msg::cli::matches(&app)?;
 
     Ok(())
 }

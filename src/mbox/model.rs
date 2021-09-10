@@ -1,8 +1,10 @@
-use imap;
+use imap::types::NameAttribute;
 use serde::{
     ser::{self, SerializeSeq},
     Serialize,
 };
+use std::borrow::Cow;
+use std::collections::HashSet;
 use std::fmt;
 
 use crate::table::{Cell, Row, Table};
@@ -10,16 +12,16 @@ use crate::table::{Cell, Row, Table};
 // Attribute
 
 #[derive(Debug, PartialEq)]
-struct SerializableAttribute<'a>(&'a imap::types::NameAttribute<'a>);
+struct SerializableAttribute<'a>(&'a NameAttribute<'a>);
 
 impl<'a> Into<&'a str> for &'a SerializableAttribute<'a> {
     fn into(self) -> &'a str {
         match &self.0 {
-            imap::types::NameAttribute::NoInferiors => "\\NoInferiors",
-            imap::types::NameAttribute::NoSelect => "\\NoSelect",
-            imap::types::NameAttribute::Marked => "\\Marked",
-            imap::types::NameAttribute::Unmarked => "\\Unmarked",
-            imap::types::NameAttribute::Custom(cow) => cow,
+            NameAttribute::NoInferiors => "\\NoInferiors",
+            NameAttribute::NoSelect => "\\NoSelect",
+            NameAttribute::Marked => "\\Marked",
+            NameAttribute::Unmarked => "\\Unmarked",
+            NameAttribute::Custom(cow) => cow,
         }
     }
 }
@@ -33,41 +35,47 @@ impl<'a> ser::Serialize for SerializableAttribute<'a> {
     }
 }
 
+/// Represents the attributes of a mailbox.
 #[derive(Debug, PartialEq)]
-pub struct Attributes<'a>(&'a [imap::types::NameAttribute<'a>]);
+pub struct Attributes(pub HashSet<NameAttribute<'static>>);
 
-impl<'a> From<&'a [imap::types::NameAttribute<'a>]> for Attributes<'a> {
-    fn from(attrs: &'a [imap::types::NameAttribute<'a>]) -> Self {
-        Self(attrs)
+impl<'a> From<&[NameAttribute<'a>]> for Attributes {
+    fn from(attrs: &[NameAttribute<'a>]) -> Self {
+        Self(
+            attrs
+                .iter()
+                .map(|attribute| convert_to_static(attribute).unwrap())
+                .collect::<HashSet<NameAttribute<'static>>>(),
+        )
     }
 }
 
-impl<'a> ToString for Attributes<'a> {
+impl ToString for Attributes {
     fn to_string(&self) -> String {
-        match self.0.len() {
-            0 => String::new(),
-            1 => {
-                let attr = &SerializableAttribute(&self.0[0]);
-                let attr: &str = attr.into();
-                attr.to_owned()
-            }
-            _ => {
-                let attr = &SerializableAttribute(&self.0[0]);
-                let attr: &str = attr.into();
-                format!("{}, {}", attr, Attributes(&self.0[1..]).to_string())
-            }
+        let mut attributes = String::new();
+
+        for attribute in &self.0 {
+            let attribute = SerializableAttribute(&attribute);
+            attributes.push_str((&attribute).into());
+            attributes.push_str(", ");
         }
+
+        // remove the trailing whitespace with the comma
+        attributes = attributes.trim_end_matches(' ').to_string();
+        attributes.pop();
+
+        attributes
     }
 }
 
-impl<'a> ser::Serialize for Attributes<'a> {
+impl ser::Serialize for Attributes {
     fn serialize<T>(&self, serializer: T) -> Result<T::Ok, T::Error>
     where
         T: ser::Serializer,
     {
         let mut seq = serializer.serialize_seq(Some(self.0.len()))?;
 
-        for attr in self.0 {
+        for attr in &self.0 {
             seq.serialize_element(&SerializableAttribute(attr))?;
         }
 
@@ -75,16 +83,23 @@ impl<'a> ser::Serialize for Attributes<'a> {
     }
 }
 
-// Mailbox
-
+// --- Mailbox ---
+/// Represents a general mailbox.
 #[derive(Debug, Serialize)]
-pub struct Mbox<'a> {
+pub struct Mbox {
+    /// The [hierarchie delimiter].
+    ///
+    /// [hierarchie delimiter]: https://docs.rs/imap/2.4.1/imap/types/struct.Name.html#method.delimiter
     pub delim: String,
+
+    /// The name of the mailbox.
     pub name: String,
-    pub attributes: Attributes<'a>,
+
+    /// Its attributes.
+    pub attributes: Attributes,
 }
 
-impl<'a> From<&'a imap::types::Name> for Mbox<'a> {
+impl<'a> From<&'a imap::types::Name> for Mbox {
     fn from(name: &'a imap::types::Name) -> Self {
         Self {
             delim: name.delimiter().unwrap_or_default().to_owned(),
@@ -94,7 +109,7 @@ impl<'a> From<&'a imap::types::Name> for Mbox<'a> {
     }
 }
 
-impl<'a> Table for Mbox<'a> {
+impl Table for Mbox {
     fn head() -> Row {
         Row::new()
             .cell(Cell::new("DELIM").bold().underline().white())
@@ -116,19 +131,32 @@ impl<'a> Table for Mbox<'a> {
     }
 }
 
-// Mboxes
-
+// --- Mboxes ---
+/// A simple wrapper to acces a bunch of mboxes which are in this vector.
 #[derive(Debug, Serialize)]
-pub struct Mboxes<'a>(pub Vec<Mbox<'a>>);
+pub struct Mboxes(pub Vec<Mbox>);
 
-impl<'a> From<&'a imap::types::ZeroCopy<Vec<imap::types::Name>>> for Mboxes<'a> {
+impl<'a> From<&'a imap::types::ZeroCopy<Vec<imap::types::Name>>> for Mboxes {
     fn from(names: &'a imap::types::ZeroCopy<Vec<imap::types::Name>>) -> Self {
         Self(names.iter().map(Mbox::from).collect::<Vec<_>>())
     }
 }
 
-impl fmt::Display for Mboxes<'_> {
+impl fmt::Display for Mboxes {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "\n{}", Table::render(&self.0))
+    }
+}
+
+// == Helper Functions ==
+fn convert_to_static<'func>(
+    attribute: &'func NameAttribute<'func>,
+) -> Result<NameAttribute<'static>, ()> {
+    match attribute {
+        NameAttribute::NoInferiors => Ok(NameAttribute::NoInferiors),
+        NameAttribute::NoSelect => Ok(NameAttribute::NoSelect),
+        NameAttribute::Marked => Ok(NameAttribute::Marked),
+        NameAttribute::Unmarked => Ok(NameAttribute::Unmarked),
+        NameAttribute::Custom(cow) => Ok(NameAttribute::Custom(Cow::Owned(cow.to_string()))),
     }
 }

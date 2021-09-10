@@ -49,19 +49,19 @@ pub fn open_editor_with_tpl(tpl: &[u8]) -> Result<String> {
         }
     }
 
-    debug!("[input] create draft");
+    debug!("[Input] create draft");
     File::create(&draft_path)
         .chain_err(|| format!("Could not create draft file {:?}", draft_path))?
         .write(tpl)
         .chain_err(|| format!("Could not write draft file {:?}", draft_path))?;
 
-    debug!("[input] open editor");
+    debug!("[Input] open editor");
     Command::new(env::var("EDITOR").chain_err(|| "Could not find `EDITOR` env var")?)
         .arg(&draft_path)
         .status()
         .chain_err(|| "Could not launch editor")?;
 
-    debug!("[input] read draft");
+    debug!("[Input] read draft");
     let mut draft = String::new();
     File::open(&draft_path)
         .chain_err(|| format!("Could not open draft file {:?}", draft_path))?
