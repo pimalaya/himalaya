@@ -95,7 +95,7 @@ impl From<&Msg> for MsgSerialized {
 
 impl fmt::Display for MsgSerialized {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.msg.body)
+        write!(formatter, "{}", self.msg)
     }
 }
 
@@ -386,16 +386,17 @@ impl Msg {
 
         let mut body = String::new();
 
-        if let Some(signature) = ctx.config.signature(&ctx.account) {
-            body.push_str(&signature);
-        }
-
         // -- Body --
         // apply a line which should indicate where the forwarded message begins
         body.push_str(&format!(
-            "\n\n---------- Forwarded Message ----------\n{}",
+            "\n---------- Forwarded Message ----------\n{}",
             self.body.text.clone().unwrap_or_default().replace("\r", ""),
         ));
+
+        if let Some(signature) = ctx.config.signature(&ctx.account) {
+            body.push('\n');
+            body.push_str(&signature);
+        }
 
         self.body = Body::new_with_text(body);
     }
@@ -1367,11 +1368,11 @@ mod tests {
                 ..Headers::default()
             },
             body: Body::new_with_text(concat![
-                "\n-- \nlol\n",
                 "\n",
                 "---------- Forwarded Message ----------\n",
                 "The body text, nice!\n",
-                "Himalaya is nice!",
+                "Himalaya is nice!\n",
+                "\n-- \nlol"
             ]),
             ..Msg::default()
         };
