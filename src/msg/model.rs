@@ -80,16 +80,23 @@ pub struct MsgSerialized {
 
     /// A bool which indicates if the current msg includes attachments or not.
     pub has_attachment: bool,
+
+    /// The raw mail as a string
+    pub raw: String,
 }
 
-impl From<&Msg> for MsgSerialized {
-    fn from(msg: &Msg) -> Self {
-        let has_attachment = msg.attachments.is_empty();
+impl TryFrom<&Msg> for MsgSerialized {
+    type Error = Error;
 
-        Self {
+    fn try_from(msg: &Msg) -> Result<Self> {
+        let has_attachment = msg.attachments.is_empty();
+        let raw = msg.get_raw_as_string()?;
+
+        Ok(Self {
             msg: msg.clone(),
             has_attachment,
-        }
+            raw,
+        })
     }
 }
 
@@ -129,6 +136,7 @@ pub struct Msg {
     date: Option<String>,
 
     /// The msg but in raw.
+    #[serde(skip_serializing)]
     raw: Vec<u8>,
 }
 
@@ -788,13 +796,17 @@ impl Msg {
     /// how you get it if you get the data from the fetch. It's the output if
     /// you read a message with the `--raw` flag like this: `himalaya read
     /// --raw <UID>`.
-    pub fn get_raw(&self) -> Result<String> {
-        let raw_message = String::from_utf8(self.raw.clone()).chain_err(|| {
-            format!(
-                "[{}]: Couldn't get the raw body of the msg/msg.",
+    pub fn get_raw(&self) -> Vec<u8> {
+        self.raw.clone()
+    }
+
+    /// Returns the raw mail as a string instead of a Vector of bytes.
+    pub fn get_raw_as_string(&self) -> Result<String> {
+        let raw_message = String::from_utf8(self.raw.clone())
+            .chain_err(|| format!(
+                "[{}]: Couldn't parse the raw message as string.",
                 "Error".red()
-            )
-        })?;
+            ))?;
 
         Ok(raw_message)
     }
@@ -1044,7 +1056,7 @@ mod tests {
             "{:#?}, {:#?}",
             msg.headers, expected_headers
         );
-        assert!(msg.get_raw().unwrap().is_empty());
+        assert!(msg.get_raw_as_string().unwrap().is_empty());
     }
 
     #[test]
@@ -1070,7 +1082,7 @@ mod tests {
             "{:#?}, {:#?}",
             msg.headers, expected_headers
         );
-        assert!(msg.get_raw().unwrap().is_empty());
+        assert!(msg.get_raw_as_string().unwrap().is_empty());
     }
 
     #[test]

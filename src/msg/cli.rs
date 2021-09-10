@@ -349,9 +349,9 @@ fn msg_matches_read(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     let msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
 
     if raw {
-        ctx.output.print(msg.get_raw()?);
+        ctx.output.print(msg.get_raw_as_string()?);
     } else {
-        ctx.output.print(MsgSerialized::from(&msg));
+        ctx.output.print(MsgSerialized::try_from(&msg)?);
     }
     imap_conn.logout();
     Ok(true)
@@ -783,7 +783,7 @@ fn tpl_matches_new(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     override_msg_with_args(&mut msg, &matches);
 
     trace!("Message: {:?}", msg);
-    ctx.output.print(MsgSerialized::from(&msg));
+    ctx.output.print(MsgSerialized::try_from(&msg)?);
 
     Ok(true)
 }
@@ -801,7 +801,7 @@ fn tpl_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 
     override_msg_with_args(&mut msg, &matches);
     trace!("Message: {:?}", msg);
-    ctx.output.print(MsgSerialized::from(&msg));
+    ctx.output.print(MsgSerialized::try_from(&msg)?);
 
     Ok(true)
 }
@@ -819,7 +819,7 @@ fn tpl_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     override_msg_with_args(&mut msg, &matches);
 
     trace!("Message: {:?}", msg);
-    ctx.output.print(MsgSerialized::from(&msg));
+    ctx.output.print(MsgSerialized::try_from(&msg)?);
 
     Ok(true)
 }
