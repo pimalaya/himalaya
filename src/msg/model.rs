@@ -802,11 +802,12 @@ impl Msg {
 
     /// Returns the raw mail as a string instead of a Vector of bytes.
     pub fn get_raw_as_string(&self) -> Result<String> {
-        let raw_message = String::from_utf8(self.raw.clone())
-            .chain_err(|| format!(
+        let raw_message = String::from_utf8(self.raw.clone()).chain_err(|| {
+            format!(
                 "[{}]: Couldn't parse the raw message as string.",
                 "Error".red()
-            ))?;
+            )
+        })?;
 
         Ok(raw_message)
     }
