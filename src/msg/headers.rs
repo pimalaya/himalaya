@@ -22,6 +22,7 @@ error_chain! {
 
     foreign_links {
         StringFromUtf8(std::string::FromUtf8Error);
+        Rfc2047Decoder(rfc2047_decoder::Error);
     }
 }
 
@@ -247,12 +248,9 @@ impl TryFrom<Option<&imap_proto::types::Envelope<'_>>> for Headers {
                 None => return Err(ErrorKind::Convertion("From").into()),
             };
 
-            // since we get a vector here, we just need the first value, because
-            // there should be only one sender, otherwise we'll pass an empty
-            // string there
+            // only the first address is used, because how should multiple machines send the same
+            // mail?
             let sender = convert_vec_address_to_string(envelope.sender.as_ref())?;
-            // pick up the first element (if it exists) otherwise just set it
-            // to None because we might don't need it
             let sender = match sender {
                 Some(tmp_sender) => Some(
                     tmp_sender
@@ -458,7 +456,7 @@ fn convert_cow_u8_to_string<'val>(value: Option<&Cow<'val, [u8]>>) -> Result<Opt
     if let Some(value) = value {
         // convert the `[u8]` list into a vector and try to get a string out of
         // it. If everything worked fine, return the content of the list
-        Ok(Some(String::from_utf8(value.to_vec())?))
+        Ok(Some(rfc2047_decoder::decode(&value.to_vec())?))
     } else {
         Ok(None)
     }
@@ -500,22 +498,15 @@ fn convert_vec_address_to_string<'val>(
                     let trimmed = mail_address.trim();
 
                     if parsed_address.is_empty() {
-                        // if there's no name, let `parsed_address` look like this:
-                        //
                         //  parsed_address = "msg@host"
                         parsed_address.push_str(&trimmed);
                     } else {
-                        // wrap the mailbox between the `<`,`>` brackets to show, that
-                        // the mailbox belongs to the name, so it should look like
-                        // this afterwards:
-                        //
                         //  parsed_address = "Name <msg@host>"
                         parsed_address.push_str(&format!(" <{}>", trimmed));
                     }
                 }
             }
 
-            // address will be of type Option<String>
             parsed_addresses.push(parsed_address);
         }
 

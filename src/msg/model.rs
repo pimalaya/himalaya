@@ -871,8 +871,20 @@ impl Table for Msg {
         let date = self.date.clone().unwrap_or(String::new());
 
         for from_addr in self.headers.from.iter() {
-            from.push_str(&from_addr);
+            let mut address_iter = from_addr.split_ascii_whitespace();
+
+            if let Some(name) = address_iter.next() {
+                from.push_str(&format!("{}, ", name));
+            } else if let Some(address) = address_iter.next() {
+                from.push_str(&format!("{}, ", address));
+            } else {
+                from.push_str("UNKNWON");
+            }
         }
+
+        // remove trailing whitespace + the ','
+        let mut from = from.trim_end().to_string();
+        from.pop();
 
         Row::new()
             .cell(Cell::new(&uid.to_string()).bold_if(is_seen).red())
