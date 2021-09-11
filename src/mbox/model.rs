@@ -7,7 +7,7 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fmt;
 
-use crate::table::{Cell, Row, Table};
+use crate::ui::table::{Cell, Row, Table};
 
 // Attribute
 

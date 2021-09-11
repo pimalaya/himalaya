@@ -11,7 +11,7 @@ use mailparse;
 use crate::{
     ctx::Ctx,
     flag::model::Flags,
-    table::{Cell, Row, Table},
+    ui::table::{Cell, Row, Table},
 };
 
 #[cfg(not(test))]

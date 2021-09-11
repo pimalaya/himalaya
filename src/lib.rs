@@ -45,5 +45,4 @@ pub mod output;
 /// This module takes care for sending your mails!
 pub mod smtp;
 
-/// The TUI for listing the mails for example.
-pub mod table;
+pub mod ui;

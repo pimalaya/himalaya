@@ -1,40 +1,67 @@
+//! Toolbox for building responsive tables.
+//! A table is composed of rows, a row is composed of cells.
+//! The toolbox uses the [builder design pattern].
+//!
+//! [builder design pattern]: https://refactoring.guru/design-patterns/builder
+
 use log::{debug, trace};
 use std::fmt;
+use terminal_size;
 use unicode_width::UnicodeWidthStr;
 
+/// Define the default terminal size.
+/// It is used when the size cannot be determined by the `terminal_size` crate.
 const DEFAULT_TERM_WIDTH: usize = 80;
+
+/// Define the minimum size of a shrinked cell.
+/// TODO: make this customizable.
 const MAX_SHRINK_WIDTH: usize = 5;
 
+/// Wrapper around [ANSI escape codes] for styling cells.
+///
+/// [ANSI escape codes]: https://en.wikipedia.org/wiki/ANSI_escape_code
 #[derive(Debug)]
-pub struct Style(u8, u8, u8);
+pub struct Style(
+    /// The style/color code.
+    u8,
+    /// The brightness code.
+    u8,
+    /// The shade code.
+    u8,
+);
 
 impl fmt::Display for Style {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Style(color, bright, shade) = self;
-        let mut style = String::from("\x1b[");
+        let mut style = String::new();
 
+        // Push first the style/color code.
         style.push_str(&color.to_string());
 
+        // Then push the brightness code if exist.
         if *bright > 0 {
             style.push_str(";");
             style.push_str(&bright.to_string());
         };
 
+        // Then push the shade code if exist.
         if *shade > 0 {
             style.push_str(";");
             style.push_str(&shade.to_string());
         };
 
-        style.push_str("m");
-
-        write!(f, "{}", style)
+        write!(f, "\x1b[{}m", style)
     }
 }
 
+/// Representation of a table cell.
 #[derive(Debug)]
 pub struct Cell {
+    /// The list of style applied to the cell.
     styles: Vec<Style>,
+    /// The content of the cell.
     value: String,
+    /// Allow/disallow the cell to shrink when the table exceeds the container width.
     shrinkable: bool,
 }
 
@@ -42,32 +69,35 @@ impl Cell {
     pub fn new<T: AsRef<str>>(value: T) -> Self {
         Self {
             styles: Vec::new(),
-            value: String::from(value.as_ref())
-                .replace("\r", "")
-                .replace("\n", "")
-                .replace("\t", ""),
+            value: String::from(value.as_ref()).replace(&['\r', '\n', '\t'][..], ""),
             shrinkable: false,
         }
     }
 
+    /// Return the unicode width of the cell's value.
     pub fn unicode_width(&self) -> usize {
         UnicodeWidthStr::width(self.value.as_str())
     }
 
+    /// Make the cell shrinkable. If the table exceeds the terminal width, this cell will be the
+    /// one to shrink in order to prevent the table to overflow.
     pub fn shrinkable(mut self) -> Self {
         self.shrinkable = true;
         self
     }
 
+    /// Return the shrinkable state of a cell.
     pub fn is_shrinkable(&self) -> bool {
         self.shrinkable
     }
 
+    /// Apply the bold style to the cell.
     pub fn bold(mut self) -> Self {
         self.styles.push(Style(1, 0, 0));
         self
     }
 
+    /// Apply the bold style to the cell conditionally.
     pub fn bold_if(self, predicate: bool) -> Self {
         if predicate {
             self.bold()
@@ -76,36 +106,43 @@ impl Cell {
         }
     }
 
+    /// Apply the underline style to the cell.
     pub fn underline(mut self) -> Self {
         self.styles.push(Style(4, 0, 0));
         self
     }
 
+    /// Apply the red color to the cell.
     pub fn red(mut self) -> Self {
         self.styles.push(Style(31, 0, 0));
         self
     }
 
+    /// Apply the green color to the cell.
     pub fn green(mut self) -> Self {
         self.styles.push(Style(32, 0, 0));
         self
     }
 
+    /// Apply the yellow color to the cell.
     pub fn yellow(mut self) -> Self {
         self.styles.push(Style(33, 0, 0));
         self
     }
 
+    /// Apply the blue color to the cell.
     pub fn blue(mut self) -> Self {
         self.styles.push(Style(34, 0, 0));
         self
     }
 
+    /// Apply the white color to the cell.
     pub fn white(mut self) -> Self {
         self.styles.push(Style(37, 0, 0));
         self
     }
 
+    /// Apply the custom shade color to the cell.
     pub fn ext(mut self, shade: u8) -> Self {
         self.styles.push(Style(38, 5, shade));
         self
@@ -114,13 +151,14 @@ impl Cell {
 
 impl fmt::Display for Cell {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for style in &self.styles {
-            write!(f, "{}", style)?;
-        }
-
-        write!(f, "{}", self.value)?;
-
-        if !self.styles.is_empty() {
+        if self.styles.is_empty() {
+            write!(f, "{}", self.value)?;
+        } else {
+            for style in &self.styles {
+                write!(f, "{}", style)?;
+            }
+            write!(f, "{}", self.value)?;
+            // Apply the reset style in order to avoid style overlapping between cells.
             write!(f, "{}", Style(0, 0, 0))?;
         }
 
@@ -128,8 +166,12 @@ impl fmt::Display for Cell {
     }
 }
 
+/// Representation of a table row.
 #[derive(Debug)]
-pub struct Row(pub Vec<Cell>);
+pub struct Row(
+    /// A row contains a list of cells.
+    pub Vec<Cell>,
+);
 
 impl Row {
     pub fn new() -> Self {
@@ -142,6 +184,7 @@ impl Row {
     }
 }
 
+/// Abstract representation of a table.
 pub trait Table
 where
     Self: Sized,
@@ -149,12 +192,17 @@ where
     fn head() -> Row;
     fn row(&self) -> Row;
 
+    /// Determine the max width of the table.
+    /// The default implementation takes the terminal width as
+    /// the maximum width of the table.
     fn max_width() -> usize {
         terminal_size::terminal_size()
             .map(|(w, _)| w.0 as usize)
             .unwrap_or(DEFAULT_TERM_WIDTH)
     }
 
+    /// Apply styles to cells and return a list of list of printable styled cells.
+    /// TODO: find a way to build an unstyled version of cells.
     fn build(items: &[Self]) -> Vec<Vec<String>> {
         let mut table = vec![Self::head()];
         let mut cell_widths: Vec<usize> =
@@ -253,9 +301,12 @@ where
             .collect::<Vec<_>>()
     }
 
+    /// Render the final printable table as a string.
     fn render(items: &[Self]) -> String {
         Self::build(items)
             .iter()
+            // Join cells with grey pipes.
+            // TODO: make this customizable
             .map(|row| row.join(&Cell::new("│").ext(8).to_string()))
             .collect::<Vec<_>>()
             .join("\n")
@@ -298,6 +349,7 @@ mod tests {
         }
 
         fn max_width() -> usize {
+            // Use a fixed max width instead of terminal size for testing.
             20
         }
     }
