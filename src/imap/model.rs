@@ -4,7 +4,7 @@ use log::{debug, trace};
 use native_tls::{self, TlsConnector, TlsStream};
 use std::{collections::HashSet, convert::TryFrom, iter::FromIterator, net::TcpStream};
 
-use crate::{config::model::Account, ctx::Ctx, flag::model::Flags, msg::model::Msg};
+use crate::{ctx::Ctx, domain::account::entity::Account, flag::model::Flags, msg::model::Msg};
 
 /// A little helper function to create a similiar error output. (to avoid duplicated code)
 fn format_err_msg(description: &str, account: &Account) -> String {
@@ -41,16 +41,15 @@ impl<'a> ImapConnector<'a> {
     /// to the server ;)
     pub fn new(account: &'a Account) -> Result<Self> {
         debug!("create TLS builder");
-        let insecure = account.imap_insecure();
         let ssl_conn = TlsConnector::builder()
-            .danger_accept_invalid_certs(insecure)
-            .danger_accept_invalid_hostnames(insecure)
+            .danger_accept_invalid_certs(account.imap_insecure)
+            .danger_accept_invalid_hostnames(account.imap_insecure)
             .build()
             .context(format_err_msg("cannot create TLS connector", account))?;
 
         debug!("create client");
         let mut client_builder = imap::ClientBuilder::new(&account.imap_host, account.imap_port);
-        if account.imap_starttls() {
+        if account.imap_starttls {
             debug!("enable STARTTLS");
             client_builder.starttls();
         }
@@ -260,7 +259,8 @@ impl<'a> ImapConnector<'a> {
                     })
                 })
                 .context("cannot start the idle mode")?;
-            ctx.config.exec_watch_cmds(&ctx.account)?;
+            // FIXME
+            // ctx.config.exec_watch_cmds(&ctx.account)?;
             debug!("end loop");
         }
     }

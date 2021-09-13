@@ -1,16 +1,15 @@
 use anyhow::Result;
-use clap::{self, ArgMatches};
+use clap;
 use env_logger;
 use log::{debug, trace};
-use std::{env, path::PathBuf};
-use url::{self, Url};
+use std::{convert::TryFrom, env, path::PathBuf};
 
 use himalaya::{
     comp,
-    config::{cli::config_args, model::Config},
+    config::cli::config_args,
     ctx::Ctx,
-    domain, flag, imap, mbox,
-    msg::{self, cli::msg_matches_mailto},
+    domain::{account::entity::Account, config::entity::Config, smtp::service::SMTPService},
+    flag, imap, mbox, msg,
     output::{cli::output_args, model::Output},
 };
 
@@ -35,20 +34,20 @@ fn main() -> Result<()> {
         env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "off"),
     );
 
-    let raw_args: Vec<String> = env::args().collect();
+    // let raw_args: Vec<String> = env::args().collect();
 
-    // This is used if you click on a mailaddress in the webbrowser
-    if raw_args.len() > 1 && raw_args[1].starts_with("mailto:") {
-        let config = Config::new(None)?;
-        let account = config.find_account_by_name(None)?.clone();
-        let output = Output::new("plain");
-        let mbox = "INBOX";
-        let arg_matches = ArgMatches::default();
-        let app = Ctx::new(config, account, output, mbox, arg_matches);
-        let url = Url::parse(&raw_args[1])?;
-        let smtp = domain::smtp::service::SMTPService::init(&app.account);
-        return Ok(msg_matches_mailto(&app, &url, smtp)?);
-    }
+    // // This is used if you click on a mailaddress in the webbrowser
+    // if raw_args.len() > 1 && raw_args[1].starts_with("mailto:") {
+    //     let config = Config::new(None)?;
+    //     let account = config.find_account_by_name(None)?.clone();
+    //     let output = Output::new("plain");
+    //     let mbox = "INBOX";
+    //     let arg_matches = ArgMatches::default();
+    //     let app = Ctx::new(config, output, mbox, arg_matches);
+    //     let url = Url::parse(&raw_args[1])?;
+    //     let smtp = domain::smtp::service::SMTPService::new(&app.account);
+    //     return Ok(msg_matches_mailto(&app, &url, smtp)?);
+    // }
 
     let args = parse_args();
     let arg_matches = args.get_matches();
@@ -63,27 +62,32 @@ fn main() -> Result<()> {
 
     debug!("init config");
 
-    let custom_config: Option<PathBuf> = arg_matches.value_of("config").map(|s| s.into());
-    debug!("custom config path: {:?}", custom_config);
-    let config = Config::new(custom_config)?;
+    let config_path: PathBuf = arg_matches
+        .value_of("config")
+        .map(|s| s.into())
+        .unwrap_or(Config::path()?);
+    debug!("config path: {:?}", config_path);
+
+    let config = Config::try_from(config_path.clone())?;
     trace!("config: {:?}", config);
 
     let account_name = arg_matches.value_of("account");
-    debug!("init account: {}", account_name.unwrap_or("default"));
-    let account = config.find_account_by_name(account_name)?.clone();
+    let account = Account::try_from((&config, account_name))?;
+    let smtp_service = SMTPService::new(&account)?;
+    debug!("account name: {}", account_name.unwrap_or("default"));
     trace!("account: {:?}", account);
 
     let mbox = arg_matches.value_of("mailbox").unwrap().to_string();
     debug!("mailbox: {}", mbox);
 
-    debug!("begin matching");
+    let ctx = Ctx::new(config, output, mbox, arg_matches);
+    trace!("context: {:?}", ctx);
 
-    let app = Ctx::new(config, account, output, mbox, arg_matches);
-    let smtp = domain::smtp::service::SMTPService::init(&app.account);
-    let _matched = mbox::cli::matches(&app)?
-        || flag::cli::matches(&app)?
-        || imap::cli::matches(&app)?
-        || msg::cli::matches(&app, smtp)?;
+    debug!("begin matching");
+    let _matched = mbox::cli::matches(&ctx, &account)?
+        || flag::cli::matches(&ctx, &account)?
+        || imap::cli::matches(&ctx, &account)?
+        || msg::cli::matches(&ctx, &account, smtp_service)?;
 
     Ok(())
 }

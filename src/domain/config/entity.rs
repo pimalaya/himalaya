@@ -1,48 +1,32 @@
-use anyhow::{anyhow, Context, Result};
-use lettre::transport::smtp::authentication::Credentials as SmtpCredentials;
+use anyhow::{anyhow, Context, Error, Result};
 use log::debug;
 use serde::Deserialize;
 use shellexpand;
-use std::{
-    collections::HashMap,
-    env,
-    fs::{self, File},
-    io::Read,
-    path::PathBuf,
-    thread,
-};
+use std::{collections::HashMap, convert::TryFrom, env, fs, path::PathBuf, thread};
 use toml;
 
 use crate::output::utils::run_cmd;
 
 const DEFAULT_PAGE_SIZE: usize = 10;
 
-// --- Account ---
-/// Represents an account section in your config file.
-///
-/// [account section]: https://github.com/soywod/himalaya/wiki/Configuration:config-file#account-specific-settings
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Account {
-    // Override
+    // TODO: rename with `from`
     pub name: Option<String>,
     pub downloads_dir: Option<PathBuf>,
     pub signature_delimiter: Option<String>,
     pub signature: Option<String>,
     pub default_page_size: Option<usize>,
     pub watch_cmds: Option<Vec<String>>,
-
-    // Specific
     pub default: Option<bool>,
     pub email: String,
-
     pub imap_host: String,
     pub imap_port: u16,
     pub imap_starttls: Option<bool>,
     pub imap_insecure: Option<bool>,
     pub imap_login: String,
     pub imap_passwd_cmd: String,
-
     pub smtp_host: String,
     pub smtp_port: u16,
     pub smtp_starttls: Option<bool>,
@@ -51,193 +35,13 @@ pub struct Account {
     pub smtp_passwd_cmd: String,
 }
 
-impl Account {
-    /// Returns the imap-host address + the port usage of the account
-    ///
-    /// # Example
-    /// ```rust
-    /// use himalaya::config::model::Account;
-    /// fn main () {
-    ///     let account = Account {
-    ///         imap_host: String::from("hostExample"),
-    ///         imap_port: 42,
-    ///         .. Account::default()
-    ///     };
-    ///
-    ///     let expected_output = ("hostExample", 42);
-    ///
-    ///     assert_eq!(account.imap_addr(), expected_output);
-    /// }
-    /// ```
-    pub fn imap_addr(&self) -> (&str, u16) {
-        debug!("host: {}", self.imap_host);
-        debug!("port: {}", self.imap_port);
-        (&self.imap_host, self.imap_port)
-    }
+pub type AccountsMap = HashMap<String, Account>;
 
-    /// Runs the given command in your password string and returns it.
-    pub fn imap_passwd(&self) -> Result<String> {
-        let passwd = run_cmd(&self.imap_passwd_cmd).context("cannot run IMAP passwd cmd")?;
-        let passwd = passwd
-            .trim_end_matches(|c| c == '\r' || c == '\n')
-            .to_owned();
-
-        Ok(passwd)
-    }
-
-    pub fn imap_starttls(&self) -> bool {
-        let starttls = match self.imap_starttls {
-            Some(true) => true,
-            _ => false,
-        };
-
-        debug!("STARTTLS: {}", starttls);
-        starttls
-    }
-
-    pub fn imap_insecure(&self) -> bool {
-        let insecure = match self.imap_insecure {
-            Some(true) => true,
-            _ => false,
-        };
-
-        debug!("insecure: {}", insecure);
-        insecure
-    }
-
-    pub fn smtp_creds(&self) -> Result<SmtpCredentials> {
-        let passwd = run_cmd(&self.smtp_passwd_cmd).context("cannot run SMTP passwd cmd")?;
-        let passwd = passwd
-            .trim_end_matches(|c| c == '\r' || c == '\n')
-            .to_owned();
-
-        Ok(SmtpCredentials::new(self.smtp_login.to_owned(), passwd))
-    }
-
-    pub fn smtp_starttls(&self) -> bool {
-        match self.smtp_starttls {
-            Some(true) => true,
-            _ => false,
-        }
-    }
-
-    pub fn smtp_insecure(&self) -> bool {
-        match self.smtp_insecure {
-            Some(true) => true,
-            _ => false,
-        }
-    }
-
-    /// Creates a new account with the given values and returns it. All other attributes of the
-    /// account are gonna be empty/None.
-    ///
-    /// # Example
-    /// ```rust
-    /// use himalaya::config::model::Account;
-    ///
-    /// fn main() {
-    ///     let account1 = Account::new(Some("Name1"), "email@address.com");
-    ///     let account2 = Account::new(None, "email@address.com");
-    ///
-    ///     let expected1 = Account {
-    ///         name: Some("Name1".to_string()),
-    ///         email: "email@address.com".to_string(),
-    ///         .. Account::default()
-    ///     };
-    ///
-    ///     let expected2 = Account {
-    ///         email: "email@address.com".to_string(),
-    ///         .. Account::default()
-    ///     };
-    ///
-    ///     assert_eq!(account1, expected1);
-    ///     assert_eq!(account2, expected2);
-    /// }
-    /// ```
-    pub fn new<S: ToString>(name: Option<S>, email_addr: S) -> Self {
-        Self {
-            name: name.and_then(|name| Some(name.to_string())),
-            email: email_addr.to_string(),
-            ..Self::default()
-        }
-    }
-
-    /// Creates a new account with a custom signature. Passing `None` to `signature` sets the
-    /// signature to `Account Signature`.
-    ///
-    /// # Examples
-    /// ```rust
-    /// use himalaya::config::model::Account;
-    ///
-    /// fn main() {
-    ///
-    ///     // the testing accounts
-    ///     let account_with_custom_signature = Account::new_with_signature(
-    ///         Some("Email name"), "some@mail.com", Some("Custom signature! :)"));
-    ///     let account_with_default_signature = Account::new_with_signature(
-    ///         Some("Email name"), "some@mail.com", None);
-    ///
-    ///     // How they should look like
-    ///     let account_cmp1 = Account {
-    ///         name: Some("Email name".to_string()),
-    ///         email: "some@mail.com".to_string(),
-    ///         signature: Some("Custom signature! :)".to_string()),
-    ///         .. Account::default()
-    ///     };
-    ///
-    ///     let account_cmp2 = Account {
-    ///         name: Some("Email name".to_string()),
-    ///         email: "some@mail.com".to_string(),
-    ///         .. Account::default()
-    ///     };
-    ///
-    ///     assert_eq!(account_with_custom_signature, account_cmp1);
-    ///     assert_eq!(account_with_default_signature, account_cmp2);
-    /// }
-    /// ```
-    pub fn new_with_signature<S: AsRef<str> + ToString>(
-        name: Option<S>,
-        email_addr: S,
-        signature: Option<S>,
-    ) -> Self {
-        let mut account = Account::new(name, email_addr);
-        account.signature = signature.and_then(|signature| Some(signature.to_string()));
-        account
-    }
-}
-
-impl Default for Account {
-    fn default() -> Self {
-        Self {
-            name: None,
-            downloads_dir: None,
-            signature_delimiter: None,
-            signature: None,
-            default_page_size: None,
-            default: None,
-            email: String::new(),
-            watch_cmds: None,
-            imap_host: String::new(),
-            imap_port: 0,
-            imap_starttls: None,
-            imap_insecure: None,
-            imap_login: String::new(),
-            imap_passwd_cmd: String::new(),
-            smtp_host: String::new(),
-            smtp_port: 0,
-            smtp_starttls: None,
-            smtp_insecure: None,
-            smtp_login: String::new(),
-            smtp_passwd_cmd: String::new(),
-        }
-    }
-}
-
-// --- Config ---
 /// Represents the whole config file.
-#[derive(Debug, Default, Deserialize, Clone)]
+#[derive(Debug, Default, Clone, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Config {
+    // TODO: rename with `from`
     pub name: String,
     pub downloads_dir: Option<PathBuf>,
     pub notify_cmd: Option<String>,
@@ -290,22 +94,13 @@ impl Config {
         Ok(path)
     }
 
-    /// Parses the config file by the given path and stores the values into the struct.
-    pub fn new(path: Option<PathBuf>) -> Result<Self> {
-        let path = match path {
-            Some(path) => path,
-            None => Self::path_from_xdg()
-                .or_else(|_| Self::path_from_xdg_alt())
-                .or_else(|_| Self::path_from_home())
-                .context("cannot find config path")?,
-        };
+    pub fn path() -> Result<PathBuf> {
+        let path = Self::path_from_xdg()
+            .or_else(|_| Self::path_from_xdg_alt())
+            .or_else(|_| Self::path_from_home())
+            .context("cannot find config path")?;
 
-        let mut file = File::open(path).context("cannot open config file")?;
-        let mut content = vec![];
-        file.read_to_end(&mut content)
-            .context("cannot read config file")?;
-
-        Ok(toml::from_slice(&content).context("cannot parse config file")?)
+        Ok(path)
     }
 
     /// Returns the account by the given name.
@@ -386,9 +181,7 @@ impl Config {
     /// ```
     pub fn address(&self, account: &Account) -> String {
         let name = account.name.as_ref().unwrap_or(&self.name);
-
-        let has_special_chars: bool =
-            "()<>[]:;@.,".contains(|special_char| name.contains(special_char));
+        let has_special_chars = "()<>[]:;@.,".contains(|special_char| name.contains(special_char));
 
         if name.is_empty() {
             format!("{}", account.email)
@@ -491,57 +284,62 @@ impl Config {
     }
 }
 
-#[cfg(test)]
-mod tests {
+impl TryFrom<PathBuf> for Config {
+    type Error = Error;
 
-    #[cfg(test)]
-    mod config_test {
-
-        use crate::config::model::{Account, Config};
-
-        // a quick way to get a config instance for testing
-        fn get_config() -> Config {
-            Config {
-                name: String::from("Config Name"),
-                ..Config::default()
-            }
-        }
-
-        #[test]
-        fn test_find_account_by_name() {
-            let mut config = get_config();
-
-            let account1 = Account::new(None, "one@mail.com");
-            let account2 = Account::new(Some("Two"), "two@mail.com");
-
-            // add some accounts
-            config.accounts.insert("One".to_string(), account1.clone());
-            config.accounts.insert("Two".to_string(), account2.clone());
-
-            let ret1 = config.find_account_by_name(Some("One")).unwrap();
-            let ret2 = config.find_account_by_name(Some("Two")).unwrap();
-
-            assert_eq!(*ret1, account1);
-            assert_eq!(*ret2, account2);
-        }
-
-        #[test]
-        fn test_address() {
-            let config = get_config();
-
-            let account1 = Account::new(None, "one@mail.com");
-            let account2 = Account::new(Some("Two"), "two@mail.com");
-            let account3 = Account::new(Some("TL;DR"), "three@mail.com");
-            let account4 = Account::new(Some("TL,DR"), "lol@mail.com");
-            let account5 = Account::new(Some("TL:DR"), "rofl@mail.com");
-            let account6 = Account::new(Some("TL.DR"), "rust@mail.com");
-
-            assert_eq!(&config.address(&account1), "Config Name <one@mail.com>");
-            assert_eq!(&config.address(&account2), "Two <two@mail.com>");
-            assert_eq!(&config.address(&account3), "\"TL;DR\" <three@mail.com>");
-            assert_eq!(&config.address(&account4), "\"TL,DR\" <lol@mail.com>");
-            assert_eq!(&config.address(&account5), "\"TL:DR\" <rofl@mail.com>");
-            assert_eq!(&config.address(&account6), "\"TL.DR\" <rust@mail.com>");
-        }
+    fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
+        let file_content = fs::read_to_string(path).context("cannot read config file")?;
+        Ok(toml::from_str(&file_content).context("cannot parse config file")?)
     }
 }
+
+// FIXME: tests
+// #[cfg(test)]
+// mod tests {
+//     use crate::domain::{account::entity::Account, config::entity::Config};
+
+//     // a quick way to get a config instance for testing
+//     fn get_config() -> Config {
+//         Config {
+//             name: String::from("Config Name"),
+//             ..Config::default()
+//         }
+//     }
+
+//     #[test]
+//     fn test_find_account_by_name() {
+//         let mut config = get_config();
+
+//         let account1 = Account::new(None, "one@mail.com");
+//         let account2 = Account::new(Some("Two"), "two@mail.com");
+
+//         // add some accounts
+//         config.accounts.insert("One".to_string(), account1.clone());
+//         config.accounts.insert("Two".to_string(), account2.clone());
+
+//         let ret1 = config.find_account_by_name(Some("One")).unwrap();
+//         let ret2 = config.find_account_by_name(Some("Two")).unwrap();
+
+//         assert_eq!(*ret1, account1);
+//         assert_eq!(*ret2, account2);
+//     }
+
+//     #[test]
+//     fn test_address() {
+//         let config = get_config();
+
+//         let account1 = Account::new(None, "one@mail.com");
+//         let account2 = Account::new(Some("Two"), "two@mail.com");
+//         let account3 = Account::new(Some("TL;DR"), "three@mail.com");
+//         let account4 = Account::new(Some("TL,DR"), "lol@mail.com");
+//         let account5 = Account::new(Some("TL:DR"), "rofl@mail.com");
+//         let account6 = Account::new(Some("TL.DR"), "rust@mail.com");
+
+//         assert_eq!(&config.address(&account1), "Config Name <one@mail.com>");
+//         assert_eq!(&config.address(&account2), "Two <two@mail.com>");
+//         assert_eq!(&config.address(&account3), "\"TL;DR\" <three@mail.com>");
+//         assert_eq!(&config.address(&account4), "\"TL,DR\" <lol@mail.com>");
+//         assert_eq!(&config.address(&account5), "\"TL:DR\" <rofl@mail.com>");
+//         assert_eq!(&config.address(&account6), "\"TL.DR\" <rust@mail.com>");
+//     }
+// }

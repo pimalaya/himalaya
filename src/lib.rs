@@ -42,8 +42,5 @@ pub mod msg;
 /// Handles the output. For example the JSON and HTML output.
 pub mod output;
 
-/// This module takes care for sending your mails!
-pub mod smtp;
-
 pub mod domain;
 pub mod ui;

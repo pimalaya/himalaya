@@ -5,9 +5,9 @@ use lettre::{
     Transport,
 };
 
-use crate::config::model::Account;
+use crate::domain::account::entity::Account;
 
-pub trait SMTPServiceInterface<'a> {
+pub trait SMTPServiceInterface {
     fn send(&self, msg: &lettre::Message) -> Result<()>;
 }
 
@@ -16,24 +16,24 @@ pub struct SMTPService<'a> {
 }
 
 impl<'a> SMTPService<'a> {
-    pub fn init(account: &'a Account) -> Self {
-        Self { account }
+    pub fn new(account: &'a Account) -> Result<Self> {
+        Ok(Self { account })
     }
 }
 
-impl<'a> SMTPServiceInterface<'a> for SMTPService<'a> {
+impl<'a> SMTPServiceInterface for SMTPService<'a> {
     fn send(&self, msg: &lettre::Message) -> Result<()> {
-        let smtp_relay = if self.account.smtp_starttls() {
+        let smtp_relay = if self.account.smtp_starttls {
             SmtpTransport::starttls_relay
         } else {
             SmtpTransport::relay
         };
 
         let tls = TlsParameters::builder(self.account.smtp_host.to_string())
-            .dangerous_accept_invalid_hostnames(self.account.smtp_insecure())
-            .dangerous_accept_invalid_certs(self.account.smtp_insecure())
+            .dangerous_accept_invalid_hostnames(self.account.smtp_insecure)
+            .dangerous_accept_invalid_certs(self.account.smtp_insecure)
             .build()?;
-        let tls = if self.account.smtp_starttls() {
+        let tls = if self.account.smtp_starttls {
             Tls::Required(tls)
         } else {
             Tls::Wrapper(tls)

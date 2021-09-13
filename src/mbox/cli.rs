@@ -2,7 +2,9 @@ use anyhow::Result;
 use clap;
 use log::{debug, trace};
 
-use crate::{ctx::Ctx, imap::model::ImapConnector, mbox::model::Mboxes};
+use crate::{
+    ctx::Ctx, domain::account::entity::Account, imap::model::ImapConnector, mbox::model::Mboxes,
+};
 
 pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
     vec![clap::SubCommand::with_name("mailboxes")
@@ -10,11 +12,11 @@ pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
         .about("Lists all mailboxes")]
 }
 
-pub fn matches(ctx: &Ctx) -> Result<bool> {
+pub fn matches(ctx: &Ctx, account: &Account) -> Result<bool> {
     if let Some(_) = ctx.arg_matches.subcommand_matches("mailboxes") {
         debug!("mailboxes command matched");
 
-        let mut imap_conn = ImapConnector::new(&ctx.account)?;
+        let mut imap_conn = ImapConnector::new(&account)?;
         let names = imap_conn.list_mboxes()?;
         let mboxes = Mboxes::from(&names);
         debug!("found {} mailboxes", mboxes.0.len());
