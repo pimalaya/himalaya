@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Pagination for list and search cmd starts from 1 instead of 0 [#186]
+- Errors management with `anyhow` [#152]
 
 ### Fixed
 
@@ -309,6 +310,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#141]: https://github.com/soywod/himalaya/issues/141
 [#144]: https://github.com/soywod/himalaya/issues/144
 [#146]: https://github.com/soywod/himalaya/issues/146
+[#152]: https://github.com/soywod/himalaya/issues/152
 [#160]: https://github.com/soywod/himalaya/issues/160
 [#176]: https://github.com/soywod/himalaya/issues/176
 [#186]: https://github.com/soywod/himalaya/issues/186

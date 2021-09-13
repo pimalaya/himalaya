@@ -1,11 +1,8 @@
+use anyhow::Result;
 use clap::{self, App, Arg, ArgMatches, Shell, SubCommand};
-use error_chain::error_chain;
 use log::debug;
 use std::io;
 
-error_chain! {}
-
-// == Main functions ==
 pub fn subcmds<'s>() -> Vec<App<'s, 's>> {
     vec![SubCommand::with_name("completion")
         .about("Generates the completion script for the given shell")

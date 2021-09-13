@@ -1,13 +1,6 @@
-use error_chain::error_chain;
+use anyhow::Result;
 use serde::ser::{self, SerializeStruct};
 use std::{fmt, process::Command, result};
-
-error_chain! {
-    foreign_links {
-        Utf8(std::string::FromUtf8Error);
-        Io(std::io::Error);
-    }
-}
 
 pub struct Info(pub String);
 

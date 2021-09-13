@@ -1,4 +1,4 @@
-use error_chain::error_chain;
+use anyhow::{anyhow, Context, Result};
 use lettre::transport::smtp::authentication::Credentials as SmtpCredentials;
 use log::debug;
 use serde::Deserialize;
@@ -14,8 +14,6 @@ use std::{
 use toml;
 
 use crate::output::utils::run_cmd;
-
-error_chain! {}
 
 const DEFAULT_PAGE_SIZE: usize = 10;
 
@@ -79,7 +77,7 @@ impl Account {
 
     /// Runs the given command in your password string and returns it.
     pub fn imap_passwd(&self) -> Result<String> {
-        let passwd = run_cmd(&self.imap_passwd_cmd).chain_err(|| "Cannot run IMAP passwd cmd")?;
+        let passwd = run_cmd(&self.imap_passwd_cmd).context("cannot run IMAP passwd cmd")?;
         let passwd = passwd
             .trim_end_matches(|c| c == '\r' || c == '\n')
             .to_owned();
@@ -108,7 +106,7 @@ impl Account {
     }
 
     pub fn smtp_creds(&self) -> Result<SmtpCredentials> {
-        let passwd = run_cmd(&self.smtp_passwd_cmd).chain_err(|| "Cannot run SMTP passwd cmd")?;
+        let passwd = run_cmd(&self.smtp_passwd_cmd).context("cannot run SMTP passwd cmd")?;
         let passwd = passwd
             .trim_end_matches(|c| c == '\r' || c == '\n')
             .to_owned();
@@ -254,8 +252,7 @@ pub struct Config {
 
 impl Config {
     fn path_from_xdg() -> Result<PathBuf> {
-        let path =
-            env::var("XDG_CONFIG_HOME").chain_err(|| "Cannot find `XDG_CONFIG_HOME` env var")?;
+        let path = env::var("XDG_CONFIG_HOME").context("cannot find `XDG_CONFIG_HOME` env var")?;
         let mut path = PathBuf::from(path);
         path.push("himalaya");
         path.push("config.toml");
@@ -270,7 +267,7 @@ impl Config {
             "HOME"
         };
         let mut path: PathBuf = env::var(home_var)
-            .chain_err(|| format!("Cannot find `{}` env var", home_var))?
+            .context(format!("cannot find `{}` env var", home_var))?
             .into();
         path.push(".config");
         path.push("himalaya");
@@ -286,7 +283,7 @@ impl Config {
             "HOME"
         };
         let mut path: PathBuf = env::var(home_var)
-            .chain_err(|| format!("Cannot find `{}` env var", home_var))?
+            .context(format!("cannot find `{}` env var", home_var))?
             .into();
         path.push(".himalayarc");
 
@@ -300,15 +297,15 @@ impl Config {
             None => Self::path_from_xdg()
                 .or_else(|_| Self::path_from_xdg_alt())
                 .or_else(|_| Self::path_from_home())
-                .chain_err(|| "Cannot find config path")?,
+                .context("cannot find config path")?,
         };
 
-        let mut file = File::open(path).chain_err(|| "Cannot open config file")?;
+        let mut file = File::open(path).context("cannot open config file")?;
         let mut content = vec![];
         file.read_to_end(&mut content)
-            .chain_err(|| "Cannot read config file")?;
+            .context("cannot read config file")?;
 
-        Ok(toml::from_slice(&content).chain_err(|| "Cannot parse config file")?)
+        Ok(toml::from_slice(&content).context("cannot parse config file")?)
     }
 
     /// Returns the account by the given name.
@@ -320,11 +317,11 @@ impl Config {
                 .iter()
                 .find(|(_, account)| account.default.unwrap_or(false))
                 .map(|(_, account)| account)
-                .ok_or_else(|| "Cannot find default account".into()),
+                .ok_or_else(|| anyhow!("cannot find default account")),
             Some(name) => self
                 .accounts
                 .get(name)
-                .ok_or_else(|| format!("Cannot find account `{}`", name).into()),
+                .ok_or_else(|| anyhow!(format!("cannot find account `{}`", name))),
         }
     }
 
@@ -414,7 +411,7 @@ impl Config {
             .map(|cmd| format!(r#"{} {:?} {:?}"#, cmd, subject, sender))
             .unwrap_or(default_cmd);
 
-        run_cmd(&cmd).chain_err(|| "Cannot run notify cmd")?;
+        run_cmd(&cmd).context("cannot run notify cmd")?;
 
         Ok(())
     }

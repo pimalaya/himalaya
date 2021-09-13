@@ -1,15 +1,8 @@
+use anyhow::Result;
 use clap;
-use error_chain::error_chain;
 use log::debug;
 
 use crate::{ctx::Ctx, imap::model::ImapConnector};
-
-error_chain! {
-    links {
-        Config(crate::config::model::Error, crate::config::model::ErrorKind);
-        Imap(crate::imap::model::Error, crate::imap::model::ErrorKind);
-    }
-}
 
 pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
     vec![

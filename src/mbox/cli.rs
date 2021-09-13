@@ -1,16 +1,9 @@
+use anyhow::Result;
 use clap;
-use error_chain::error_chain;
 use log::{debug, trace};
 
 use crate::{ctx::Ctx, imap::model::ImapConnector, mbox::model::Mboxes};
 
-error_chain! {
-    links {
-        Imap(crate::imap::model::Error, crate::imap::model::ErrorKind);
-    }
-}
-
-// == Main functions ==
 pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
     vec![clap::SubCommand::with_name("mailboxes")
         .aliases(&["mailbox", "mboxes", "mbox", "m"])

@@ -1,14 +1,8 @@
+use anyhow::Result;
 use clap;
-use error_chain::error_chain;
 use log::debug;
 
 use crate::{ctx::Ctx, flag::model::Flags, imap::model::ImapConnector, msg::cli::uid_arg};
-
-error_chain! {
-    links {
-        Imap(crate::imap::model::Error, crate::imap::model::ErrorKind);
-    }
-}
 
 fn flags_arg<'a>() -> clap::Arg<'a, 'a> {
     clap::Arg::with_name("flags")

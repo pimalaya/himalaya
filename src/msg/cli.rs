@@ -1,14 +1,9 @@
-use super::body::Body;
-use super::headers::Headers;
-use super::model::{Msg, MsgSerialized, Msgs};
-use url::Url;
-
+use anyhow::{anyhow, Context, Result};
 use atty::Stream;
 use clap;
-use error_chain::error_chain;
+use imap::types::Flag;
 use lettre::message::header::ContentTransferEncoding;
 use log::{debug, error, trace};
-
 use std::{
     borrow::Cow,
     collections::HashMap,
@@ -16,25 +11,17 @@ use std::{
     fs,
     io::{self, BufRead},
 };
+use url::Url;
 
-use imap::types::Flag;
-
+use super::{
+    body::Body,
+    headers::Headers,
+    model::{Msg, MsgSerialized, Msgs},
+};
 use crate::{
     ctx::Ctx, flag::model::Flags, imap::model::ImapConnector, input, mbox::cli::mbox_target_arg,
     smtp,
 };
-
-error_chain! {
-    links {
-        Imap(crate::imap::model::Error, crate::imap::model::ErrorKind);
-        Input(crate::input::Error, crate::input::ErrorKind);
-        MsgModel(super::model::Error, super::model::ErrorKind);
-        Smtp(crate::smtp::Error, crate::smtp::ErrorKind);
-    }
-    foreign_links {
-        Utf8(std::string::FromUtf8Error);
-    }
-}
 
 pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
     vec![
@@ -384,7 +371,7 @@ fn msg_matches_attachments(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool
         debug!("downloading {}…", &attachment.filename);
 
         fs::write(&filepath, &attachment.body_raw)
-            .chain_err(|| format!("Could not save attachment {:?}", filepath))?;
+            .with_context(|| format!("cannot save attachment {:?}", filepath))?;
     }
 
     debug!(
@@ -681,7 +668,7 @@ pub fn msg_matches_tpl(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
         ("forward", Some(matches)) => tpl_matches_forward(ctx, matches),
 
         // TODO: find a way to show the help message for template subcommand
-        _ => Err("Subcommand not found".into()),
+        _ => Err(anyhow!("Subcommand not found")),
     }
 }
 
@@ -887,7 +874,7 @@ fn msg_interaction(ctx: &Ctx, msg: &mut Msg, imap_conn: &mut ImapConnector) -> R
                             ctx.output.print("Message successfully saved to Drafts");
                         }
                         Err(err) => {
-                            ctx.output.print("Couldn't save it to the server...");
+                            ctx.output.print("Cannot save draft to the server");
                             return Err(err.into());
                         }
                     };

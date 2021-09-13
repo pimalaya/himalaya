@@ -1,23 +1,9 @@
+use anyhow::{Error, Result};
 use lettre::message::header::ContentType;
-
 use mailparse::{DispositionType, ParsedMail};
-
-use std::convert::TryFrom;
-use std::fs;
-use std::path::Path;
-
 use serde::Serialize;
+use std::{convert::TryFrom, fs, path::Path};
 
-use error_chain::error_chain;
-
-error_chain! {
-    foreign_links {
-        ContentType(lettre::message::header::ContentTypeErr);
-        FileSytem(std::io::Error);
-    }
-}
-
-// == Structs ==
 /// This struct represents an attachment.
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

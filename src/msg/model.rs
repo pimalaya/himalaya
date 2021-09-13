@@ -1,13 +1,9 @@
-use super::attachment::Attachment;
-use super::body::Body;
-use super::headers::Headers;
-
-use log::debug;
-
+use anyhow::{anyhow, Context, Error, Result};
 use imap::types::{Fetch, Flag, ZeroCopy};
-
+use log::debug;
 use mailparse;
 
+use super::{attachment::Attachment, body::Body, headers::Headers};
 use crate::{
     ctx::Ctx,
     flag::model::Flags,
@@ -29,46 +25,6 @@ use std::{
     fmt,
 };
 
-use colorful::Colorful;
-
-// == Macros ==
-error_chain::error_chain! {
-    errors {
-        ParseBody (err: String) {
-            description("An error appeared, when trying to parse the body of the msg!"),
-            display("Couldn't get the body of the parsed msg: {}", err),
-        }
-
-        /// Is mainly used in the "to_sendable_msg" function
-        Header(error_msg: String, header_name: &'static str, header_input: String) {
-
-            description("An error happened, when trying to parse a header-field."),
-            display(concat![
-                    "[{}] {}\n",
-                    "Header-Field-Name: '{}'\n",
-                    "The word which let this error occur: '{}'"],
-                    "Error".red(),
-                    error_msg.clone().light_red(),
-                    header_name.light_blue(),
-                    header_input.clone().light_cyan()),
-        }
-    }
-
-    links {
-        Attachment(super::attachment::Error, super::attachment::ErrorKind);
-        Headers(super::headers::Error, super::headers::ErrorKind);
-        Input(crate::input::Error, crate::input::ErrorKind);
-    }
-
-    foreign_links {
-        MailParse(mailparse::MailParseError);
-        Lettre(lettre::error::Error);
-        LettreAddress(lettre::address::AddressError);
-        FromUtf8Error(std::string::FromUtf8Error);
-    }
-}
-
-// == Msg ==
 /// Represents the msg in a serializeable form with additional values.
 /// This struct-type makes it also possible to print the msg in a serialized form or in a normal
 /// form.
@@ -528,13 +484,13 @@ impl Msg {
     /// ```
     pub fn parse_from_str(&mut self, content: &str) -> Result<()> {
         let parsed = mailparse::parse_mail(content.as_bytes())
-            .chain_err(|| format!("How the message looks like currently:\n{}", self))?;
+            .with_context(|| format!("How the message looks like currently:\n{}", self))?;
 
         self.headers = Headers::from(&parsed);
 
         match parsed.get_body() {
             Ok(body) => self.body = Body::new_with_text(body),
-            Err(err) => return Err(ErrorKind::ParseBody(err.to_string()).into()),
+            Err(err) => return Err(anyhow!(err.to_string())),
         };
 
         Ok(())
@@ -623,76 +579,72 @@ impl Msg {
         // -- Must-have-fields --
         // add "from"
         for mailaddress in &self.headers.from {
-            msg = msg.from(match mailaddress.parse() {
-                Ok(from) => from,
-                Err(err) => {
-                    return Err(
-                        ErrorKind::Header(err.to_string(), "From", mailaddress.to_string()).into(),
-                    )
-                }
-            });
+            msg = msg.from(
+                match mailaddress
+                    .parse()
+                    .with_context(|| "cannot parse `From` header")
+                {
+                    Ok(from) => from,
+                    Err(err) => return Err(anyhow!(err.to_string())),
+                },
+            );
         }
 
         // add "to"
         for mailaddress in &self.headers.to {
-            msg = msg.to(match mailaddress.parse() {
-                Ok(to) => to,
-                Err(err) => {
-                    return Err(
-                        ErrorKind::Header(err.to_string(), "To", mailaddress.to_string()).into(),
-                    )
-                }
-            });
+            msg = msg.to(
+                match mailaddress
+                    .parse()
+                    .with_context(|| "cannot parse `To` header")
+                {
+                    Ok(from) => from,
+                    Err(err) => return Err(anyhow!(err.to_string())),
+                },
+            );
         }
 
         // -- Optional fields --
         // add "bcc"
         if let Some(bcc) = &self.headers.bcc {
             for mailaddress in bcc {
-                msg = msg.bcc(match mailaddress.parse() {
-                    Ok(bcc) => bcc,
-                    Err(err) => {
-                        return Err(ErrorKind::Header(
-                            err.to_string(),
-                            "Bcc",
-                            mailaddress.to_string(),
-                        )
-                        .into())
-                    }
-                });
+                msg = msg.bcc(
+                    match mailaddress
+                        .parse()
+                        .with_context(|| "cannot parse `Bcc` header")
+                    {
+                        Ok(from) => from,
+                        Err(err) => return Err(anyhow!(err.to_string())),
+                    },
+                );
             }
         }
 
         // add "cc"
         if let Some(cc) = &self.headers.cc {
             for mailaddress in cc {
-                msg = msg.cc(match mailaddress.parse() {
-                    Ok(cc) => cc,
-                    Err(err) => {
-                        return Err(ErrorKind::Header(
-                            err.to_string(),
-                            "Cc",
-                            mailaddress.to_string(),
-                        )
-                        .into())
-                    }
-                });
+                msg = msg.cc(
+                    match mailaddress
+                        .parse()
+                        .with_context(|| "cannot parse `Cc` header")
+                    {
+                        Ok(from) => from,
+                        Err(err) => return Err(anyhow!(err.to_string())),
+                    },
+                );
             }
         }
 
         // add "in_reply_to"
         if let Some(in_reply_to) = &self.headers.in_reply_to {
-            msg = msg.in_reply_to(match in_reply_to.parse() {
-                Ok(in_reply_to) => in_reply_to,
-                Err(err) => {
-                    return Err(ErrorKind::Header(
-                        err.to_string(),
-                        "In-Reply-To",
-                        in_reply_to.to_string(),
-                    )
-                    .into())
-                }
-            });
+            msg = msg.in_reply_to(
+                match in_reply_to
+                    .parse()
+                    .with_context(|| "cannot parse `In-Reply-To` header")
+                {
+                    Ok(from) => from,
+                    Err(err) => return Err(anyhow!(err.to_string())),
+                },
+            );
         }
 
         // add message-id if it exists
@@ -713,30 +665,29 @@ impl Msg {
         // add "reply-to"
         if let Some(reply_to) = &self.headers.reply_to {
             for mailaddress in reply_to {
-                msg = msg.reply_to(match mailaddress.parse() {
-                    Ok(reply_to) => reply_to,
-                    Err(err) => {
-                        return Err(ErrorKind::Header(
-                            err.to_string(),
-                            "Reply-to",
-                            mailaddress.to_string(),
-                        )
-                        .into())
-                    }
-                });
+                msg = msg.reply_to(
+                    match mailaddress
+                        .parse()
+                        .with_context(|| "cannot parse `Reply-To` header")
+                    {
+                        Ok(from) => from,
+                        Err(err) => return Err(anyhow!(err.to_string())),
+                    },
+                );
             }
         }
 
         // add "sender"
         if let Some(sender) = &self.headers.sender {
-            msg = msg.sender(match sender.parse() {
-                Ok(sender) => sender,
-                Err(err) => {
-                    return Err(
-                        ErrorKind::Header(err.to_string(), "Sender", sender.to_string()).into(),
-                    )
-                }
-            });
+            msg = msg.sender(
+                match sender
+                    .parse()
+                    .with_context(|| "cannot parse `Sender` header")
+                {
+                    Ok(from) => from,
+                    Err(err) => return Err(anyhow!(err.to_string())),
+                },
+            );
         }
 
         // add subject
@@ -779,7 +730,7 @@ impl Msg {
             .multipart(msg_parts)
             // whenever an error appears, print out the messge as well to see what might be the
             // error
-            .chain_err(|| format!("-- Current Message --\n{}", self))?)
+            .context(format!("-- Current Message --\n{}", self))?)
     }
 
     /// Returns the uid of the msg.
@@ -802,12 +753,8 @@ impl Msg {
 
     /// Returns the raw mail as a string instead of a Vector of bytes.
     pub fn get_raw_as_string(&self) -> Result<String> {
-        let raw_message = String::from_utf8(self.raw.clone()).chain_err(|| {
-            format!(
-                "[{}]: Couldn't parse the raw message as string.",
-                "Error".red()
-            )
-        })?;
+        let raw_message = String::from_utf8(self.raw.clone())
+            .context(format!("cannot parse raw message as string"))?;
 
         Ok(raw_message)
     }
@@ -974,8 +921,7 @@ impl TryFrom<&Fetch> for Msg {
                 // the body of the mail but something else. Log that!
                 else {
                     println!(
-                        "[{}] Unknown attachment with the following mime-type: {}\n",
-                        "Warning".yellow(),
+                        "Unknown attachment with the following mime-type: {}",
                         subpart.ctype.mimetype,
                     );
                 }
@@ -1219,7 +1165,7 @@ mod tests {
         // -- for general tests --
         let ctx = Ctx {
             account: Account::new(Some("Name"), "some@address.asdf"),
-            config: config,
+            config,
             mbox: String::from("INBOX"),
             ..Ctx::default()
         };

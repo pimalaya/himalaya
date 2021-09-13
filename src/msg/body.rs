@@ -1,17 +1,6 @@
-use error_chain::error_chain;
-
+use serde::Serialize;
 use std::fmt;
 
-use serde::Serialize;
-
-// == Macros ==
-error_chain! {
-    foreign_links {
-        ParseContentType(lettre::message::header::ContentTypeErr);
-    }
-}
-
-// == Structs ==
 /// This struct represents the body/content of a msg. For example:
 ///
 /// ```text

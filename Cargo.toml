@@ -6,12 +6,11 @@ authors = ["soywod <clement.douin@posteo.net>"]
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0.44"
 atty = "0.2.14"
 chrono = "0.4.19"
 clap = { version = "2.33.3", default-features = false, features = ["suggestions", "color"] }
-colorful = "0.2.1"
 env_logger = "0.8.3"
-error-chain = "0.12.4"
 imap = "3.0.0-alpha.4"
 imap-proto = "0.14.3"
 # This commit includes the de/serialization of the ContentType

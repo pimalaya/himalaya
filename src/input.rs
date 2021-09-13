@@ -1,4 +1,4 @@
-use error_chain::error_chain;
+use anyhow::{anyhow, Context, Result};
 use log::{debug, error, trace};
 use std::{
     env,
@@ -7,12 +7,6 @@ use std::{
     path::PathBuf,
     process::Command,
 };
-
-error_chain! {
-    foreign_links {
-        Utf8(std::string::FromUtf8Error);
-    }
-}
 
 fn draft_path() -> PathBuf {
     env::temp_dir().join("himalaya-draft.mail")
@@ -25,7 +19,7 @@ pub fn remove_draft() -> Result<()> {
     debug!("[input] draft path: {:?}", draft_path);
 
     fs::remove_file(&draft_path)
-        .chain_err(|| format!("Could not delete draft file {:?}", draft_path))
+        .with_context(|| format!("cannot delete draft file {:?}", draft_path))
 }
 
 pub fn open_editor_with_tpl(tpl: &[u8]) -> Result<String> {
@@ -42,7 +36,7 @@ pub fn open_editor_with_tpl(tpl: &[u8]) -> Result<String> {
                 Ok(choice) => match choice {
                     PreEditChoice::Edit => return open_editor_with_draft(),
                     PreEditChoice::Discard => break,
-                    PreEditChoice::Quit => return Err("Edition aborted".into()),
+                    PreEditChoice::Quit => return Err(anyhow!("Edition aborted")),
                 },
                 Err(err) => error!("{}", err),
             }
@@ -51,22 +45,22 @@ pub fn open_editor_with_tpl(tpl: &[u8]) -> Result<String> {
 
     debug!("[Input] create draft");
     File::create(&draft_path)
-        .chain_err(|| format!("Could not create draft file {:?}", draft_path))?
+        .with_context(|| format!("cannot create draft file {:?}", draft_path))?
         .write(tpl)
-        .chain_err(|| format!("Could not write draft file {:?}", draft_path))?;
+        .with_context(|| format!("cannot write draft file {:?}", draft_path))?;
 
     debug!("[Input] open editor");
-    Command::new(env::var("EDITOR").chain_err(|| "Could not find `EDITOR` env var")?)
+    Command::new(env::var("EDITOR").with_context(|| "cannot find `EDITOR` env var")?)
         .arg(&draft_path)
         .status()
-        .chain_err(|| "Could not launch editor")?;
+        .with_context(|| "cannot launch editor")?;
 
     debug!("[Input] read draft");
     let mut draft = String::new();
     File::open(&draft_path)
-        .chain_err(|| format!("Could not open draft file {:?}", draft_path))?
+        .with_context(|| format!("cannot open draft file {:?}", draft_path))?
         .read_to_string(&mut draft)
-        .chain_err(|| format!("Could not read draft file {:?}", draft_path))?;
+        .with_context(|| format!("cannot read draft file {:?}", draft_path))?;
 
     Ok(draft)
 }
@@ -78,17 +72,17 @@ pub fn open_editor_with_draft() -> Result<String> {
     debug!("[input] draft path: {:?}", draft_path);
 
     // Opens editor and saves user input to draft file
-    Command::new(env::var("EDITOR").chain_err(|| "Could not find `EDITOR` env var")?)
+    Command::new(env::var("EDITOR").with_context(|| "cannot find `EDITOR` env var")?)
         .arg(&draft_path)
         .status()
-        .chain_err(|| "Could not launch editor")?;
+        .with_context(|| "cannot launch editor")?;
 
     // Extracts draft file content
     let mut draft = String::new();
     File::open(&draft_path)
-        .chain_err(|| format!("Could not open file {:?}", draft_path))?
+        .with_context(|| format!("cannot open file {:?}", draft_path))?
         .read_to_string(&mut draft)
-        .chain_err(|| format!("Could not read file {:?}", draft_path))?;
+        .with_context(|| format!("cannot read file {:?}", draft_path))?;
 
     Ok(draft)
 }
@@ -106,12 +100,12 @@ pub fn pre_edit_choice() -> Result<PreEditChoice> {
     print!("(e)dit, (d)iscard or (q)uit? ");
     io::stdout()
         .flush()
-        .chain_err(|| "Could not flush stdout")?;
+        .with_context(|| "cannot flush stdout")?;
 
     let mut buf = String::new();
     io::stdin()
         .read_line(&mut buf)
-        .chain_err(|| "Could not read stdin")?;
+        .with_context(|| "cannot read stdin")?;
 
     match buf.bytes().next().map(|bytes| bytes as char) {
         Some('e') => {
@@ -128,11 +122,11 @@ pub fn pre_edit_choice() -> Result<PreEditChoice> {
         }
         Some(choice) => {
             debug!("[input] pre edit choice: invalid choice {}", choice);
-            Err(format!("Invalid choice `{}`", choice).into())
+            Err(anyhow!(format!("Invalid choice `{}`", choice)))
         }
         None => {
             debug!("[input] pre edit choice: empty choice");
-            Err("Empty choice".into())
+            Err(anyhow!("Empty choice"))
         }
     }
 }
@@ -149,12 +143,12 @@ pub fn post_edit_choice() -> Result<PostEditChoice> {
     print!("(s)end, (e)dit, (l)ocal/(r)emote draft or (d)iscard? ");
     io::stdout()
         .flush()
-        .chain_err(|| "Could not flush stdout")?;
+        .with_context(|| "cannot flush stdout")?;
 
     let mut buf = String::new();
     io::stdin()
         .read_line(&mut buf)
-        .chain_err(|| "Could not read stdin")?;
+        .with_context(|| "cannot read stdin")?;
 
     match buf.bytes().next().map(|bytes| bytes as char) {
         Some('s') => Ok(PostEditChoice::Send),
@@ -162,7 +156,7 @@ pub fn post_edit_choice() -> Result<PostEditChoice> {
         Some('r') => Ok(PostEditChoice::RemoteDraft),
         Some('e') => Ok(PostEditChoice::Edit),
         Some('d') => Ok(PostEditChoice::Discard),
-        Some(choice) => Err(format!("Invalid choice `{}`", choice).into()),
-        None => Err("Empty choice".into()),
+        Some(choice) => Err(anyhow!(format!("Invalid choice `{}`", choice))),
+        None => Err(anyhow!("Empty choice")),
     }
 }

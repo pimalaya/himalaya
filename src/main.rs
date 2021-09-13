@@ -1,8 +1,8 @@
+use anyhow::Result;
 use clap::{self, ArgMatches};
 use env_logger;
-use error_chain::error_chain;
-use log::{debug, error, trace};
-use std::{env, path::PathBuf, process::exit};
+use log::{debug, trace};
+use std::{env, path::PathBuf};
 use url::{self, Url};
 
 use himalaya::{
@@ -13,20 +13,6 @@ use himalaya::{
     msg::{self, cli::msg_matches_mailto},
     output::{cli::output_args, model::Output},
 };
-
-error_chain! {
-    links {
-        CompletionCli(himalaya::comp::cli::Error, himalaya::comp::cli::ErrorKind);
-        Config(himalaya::config::model::Error, himalaya::config::model::ErrorKind);
-        FlagCli(himalaya::flag::cli::Error, himalaya::flag::cli::ErrorKind);
-        ImapCli(himalaya::imap::cli::Error, himalaya::imap::cli::ErrorKind);
-        MboxCli(himalaya::mbox::cli::Error, himalaya::mbox::cli::ErrorKind);
-        MsgCli(himalaya::msg::cli::Error, himalaya::msg::cli::ErrorKind);
-    }
-    foreign_links {
-        Url(url::ParseError);
-    }
-}
 
 fn parse_args<'a>() -> clap::App<'a, 'a> {
     clap::App::new(env!("CARGO_PKG_NAME"))
@@ -44,7 +30,7 @@ fn parse_args<'a>() -> clap::App<'a, 'a> {
         .subcommands(comp::cli::subcmds())
 }
 
-fn run() -> Result<()> {
+fn main() -> Result<()> {
     env_logger::init_from_env(
         env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "off"),
     );
@@ -98,27 +84,4 @@ fn run() -> Result<()> {
         || msg::cli::matches(&app)?;
 
     Ok(())
-}
-
-fn main() {
-    if let Err(ref errs) = run() {
-        let mut errs = errs.iter();
-
-        match errs.next() {
-            None => (),
-            Some(err) => {
-                error!("{}", err);
-                eprintln!("{}", err);
-
-                errs.for_each(|err| {
-                    error!("{}", err);
-                    eprintln!(" ↳ {}", err);
-                });
-            }
-        }
-
-        exit(1);
-    } else {
-        exit(0);
-    }
 }

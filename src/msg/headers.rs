@@ -1,32 +1,10 @@
-use std::borrow::Cow;
-use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::fmt;
-
-use log::{debug, warn};
-
-use serde::Serialize;
-
-use rfc2047_decoder;
-
-use error_chain::error_chain;
-
+use anyhow::{anyhow, Error, Result};
 use lettre::message::header::ContentTransferEncoding;
+use log::{debug, warn};
+use rfc2047_decoder;
+use serde::Serialize;
+use std::{borrow::Cow, collections::HashMap, convert::TryFrom, fmt};
 
-error_chain! {
-    errors {
-        Convertion(field: &'static str) {
-            display("Couldn't get the data from the '{}:' field.", field),
-        }
-    }
-
-    foreign_links {
-        StringFromUtf8(std::string::FromUtf8Error);
-        Rfc2047Decoder(rfc2047_decoder::Error);
-    }
-}
-
-// == Structs ==
 /// This struct is a wrapper for the [Envelope struct] of the [imap_proto]
 /// crate. It's should mainly help to interact with the mails by using more
 /// common data types like `Vec` or `String` since a `[u8]` array is a little
@@ -245,7 +223,7 @@ impl TryFrom<Option<&imap_proto::types::Envelope<'_>>> for Headers {
 
             let from = match convert_vec_address_to_string(envelope.from.as_ref())? {
                 Some(from) => from,
-                None => return Err(ErrorKind::Convertion("From").into()),
+                None => return Err(anyhow!("cannot extract senders from envelope")),
             };
 
             // only the first address is used, because how should multiple machines send the same
@@ -266,7 +244,7 @@ impl TryFrom<Option<&imap_proto::types::Envelope<'_>>> for Headers {
             let reply_to = convert_vec_address_to_string(envelope.reply_to.as_ref())?;
             let to = match convert_vec_address_to_string(envelope.to.as_ref())? {
                 Some(to) => to,
-                None => return Err(ErrorKind::Convertion("To").into()),
+                None => return Err(anyhow!("cannot extract recipients from envelope")),
             };
             let cc = convert_vec_address_to_string(envelope.cc.as_ref())?;
             let bcc = convert_vec_address_to_string(envelope.bcc.as_ref())?;
