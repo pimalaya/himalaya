@@ -19,8 +19,8 @@ use super::{
     model::{Msg, MsgSerialized, Msgs},
 };
 use crate::{
-    ctx::Ctx, flag::model::Flags, imap::model::ImapConnector, input, mbox::cli::mbox_target_arg,
-    smtp,
+    ctx::Ctx, domain::smtp, flag::model::Flags, imap::model::ImapConnector, input,
+    mbox::cli::mbox_target_arg,
 };
 
 pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
@@ -123,19 +123,22 @@ pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
     ]
 }
 
-pub fn matches(ctx: &Ctx) -> Result<bool> {
+pub fn matches<'a, SMTP: smtp::service::SMTPServiceInterface<'a>>(
+    ctx: &Ctx,
+    smtp: SMTP,
+) -> Result<bool> {
     match ctx.arg_matches.subcommand() {
         ("attachments", Some(matches)) => msg_matches_attachments(ctx, matches),
         ("copy", Some(matches)) => msg_matches_copy(ctx, matches),
         ("delete", Some(matches)) => msg_matches_delete(ctx, matches),
-        ("forward", Some(matches)) => msg_matches_forward(ctx, matches),
+        ("forward", Some(matches)) => msg_matches_forward(ctx, matches, smtp),
         ("move", Some(matches)) => msg_matches_move(ctx, matches),
         ("read", Some(matches)) => msg_matches_read(ctx, matches),
-        ("reply", Some(matches)) => msg_matches_reply(ctx, matches),
+        ("reply", Some(matches)) => msg_matches_reply(ctx, matches, smtp),
         ("save", Some(matches)) => msg_matches_save(ctx, matches),
         ("search", Some(matches)) => msg_matches_search(ctx, matches),
-        ("send", Some(matches)) => msg_matches_send(ctx, matches),
-        ("write", Some(matches)) => msg_matches_write(ctx, matches),
+        ("send", Some(matches)) => msg_matches_send(ctx, matches, smtp),
+        ("write", Some(matches)) => msg_matches_write(ctx, matches, smtp),
 
         ("template", Some(matches)) => Ok(msg_matches_tpl(ctx, matches)?),
         ("list", opt_matches) => msg_matches_list(ctx, opt_matches),
@@ -236,7 +239,6 @@ fn tpl_args<'a>() -> Vec<clap::Arg<'a, 'a>> {
     ]
 }
 
-// == Match functions ==
 fn msg_matches_list(ctx: &Ctx, opt_matches: Option<&clap::ArgMatches>) -> Result<bool> {
     debug!("list command matched");
 
@@ -388,7 +390,11 @@ fn msg_matches_attachments(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool
     Ok(true)
 }
 
-fn msg_matches_write(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
+fn msg_matches_write<'a, SMTP: smtp::service::SMTPServiceInterface<'a>>(
+    ctx: &Ctx,
+    matches: &clap::ArgMatches,
+    smtp: SMTP,
+) -> Result<bool> {
     debug!("write command matched");
 
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
@@ -414,7 +420,7 @@ fn msg_matches_write(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
         .iter()
         .for_each(|path| msg.add_attachment(path));
 
-    msg_interaction(&ctx, &mut msg, &mut imap_conn)?;
+    msg_interaction(&ctx, &mut msg, &mut imap_conn, smtp)?;
 
     // let's be nice to the server and say "bye" to the server
     imap_conn.logout();
@@ -422,7 +428,11 @@ fn msg_matches_write(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     Ok(true)
 }
 
-fn msg_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
+fn msg_matches_reply<'a, SMTP: smtp::service::SMTPServiceInterface<'a>>(
+    ctx: &Ctx,
+    matches: &clap::ArgMatches,
+    smtp: SMTP,
+) -> Result<bool> {
     debug!("reply command matched");
 
     // -- Preparations --
@@ -446,13 +456,17 @@ fn msg_matches_reply(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     debug!("found {} attachments", attachments.len());
     trace!("attachments: {:?}", attachments);
 
-    msg_interaction(&ctx, &mut msg, &mut imap_conn)?;
+    msg_interaction(&ctx, &mut msg, &mut imap_conn, smtp)?;
 
     imap_conn.logout();
     Ok(true)
 }
 
-pub fn msg_matches_mailto(ctx: &Ctx, url: &Url) -> Result<()> {
+pub fn msg_matches_mailto<'a, SMTP: smtp::service::SMTPServiceInterface<'a>>(
+    ctx: &Ctx,
+    url: &Url,
+    smtp: SMTP,
+) -> Result<()> {
     debug!("mailto command matched");
 
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
@@ -493,13 +507,17 @@ pub fn msg_matches_mailto(ctx: &Ctx, url: &Url) -> Result<()> {
 
     let mut msg = Msg::new_with_headers(&ctx, headers);
     msg.body = Body::new_with_text(body);
-    msg_interaction(&ctx, &mut msg, &mut imap_conn)?;
+    msg_interaction(&ctx, &mut msg, &mut imap_conn, smtp)?;
 
     imap_conn.logout();
     Ok(())
 }
 
-fn msg_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
+fn msg_matches_forward<'a, SMTP: smtp::service::SMTPServiceInterface<'a>>(
+    ctx: &Ctx,
+    matches: &clap::ArgMatches,
+    smtp: SMTP,
+) -> Result<bool> {
     debug!("forward command matched");
 
     // fetch the msg
@@ -523,7 +541,7 @@ fn msg_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     trace!("attachments: {:?}", attachments);
 
     // apply changes
-    msg_interaction(&ctx, &mut msg, &mut imap_conn)?;
+    msg_interaction(&ctx, &mut msg, &mut imap_conn, smtp)?;
 
     imap_conn.logout();
 
@@ -608,7 +626,11 @@ fn msg_matches_delete(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
     Ok(true)
 }
 
-fn msg_matches_send(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
+fn msg_matches_send<'a, SMTP: smtp::service::SMTPServiceInterface<'a>>(
+    ctx: &Ctx,
+    matches: &clap::ArgMatches,
+    smtp: SMTP,
+) -> Result<bool> {
     debug!("send command matched");
 
     let mut imap_conn = ImapConnector::new(&ctx.account)?;
@@ -633,7 +655,7 @@ fn msg_matches_send(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 
     // send the message/msg
     let sendable = msg.to_sendable_msg()?;
-    smtp::send(&ctx.account, &sendable)?;
+    smtp.send(&sendable)?;
     debug!("message sent!");
 
     // add the message/msg to the Sent-Mailbox of the user
@@ -813,7 +835,12 @@ fn tpl_matches_forward(ctx: &Ctx, matches: &clap::ArgMatches) -> Result<bool> {
 
 /// This function opens the prompt to do some actions to the msg like sending, editing it again and
 /// so on.
-fn msg_interaction(ctx: &Ctx, msg: &mut Msg, imap_conn: &mut ImapConnector) -> Result<bool> {
+fn msg_interaction<'a, SMTP: smtp::service::SMTPServiceInterface<'a>>(
+    ctx: &Ctx,
+    msg: &mut Msg,
+    imap_conn: &mut ImapConnector,
+    smtp: SMTP,
+) -> Result<bool> {
     // let the user change the body a little bit first, before opening the prompt
     msg.edit_body()?;
 
@@ -836,7 +863,7 @@ fn msg_interaction(ctx: &Ctx, msg: &mut Msg, imap_conn: &mut ImapConnector) -> R
                             continue;
                         }
                     };
-                    smtp::send(&ctx.account, &sendable)?;
+                    smtp.send(&sendable)?;
 
                     // TODO: Gmail sent mailboxes are called `[Gmail]/Sent`
                     // which creates a conflict, fix this!

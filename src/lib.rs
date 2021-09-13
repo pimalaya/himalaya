@@ -45,4 +45,5 @@ pub mod output;
 /// This module takes care for sending your mails!
 pub mod smtp;
 
+pub mod domain;
 pub mod ui;

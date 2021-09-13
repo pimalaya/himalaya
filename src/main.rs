@@ -9,7 +9,7 @@ use himalaya::{
     comp,
     config::{cli::config_args, model::Config},
     ctx::Ctx,
-    flag, imap, mbox,
+    domain, flag, imap, mbox,
     msg::{self, cli::msg_matches_mailto},
     output::{cli::output_args, model::Output},
 };
@@ -46,7 +46,8 @@ fn main() -> Result<()> {
         let arg_matches = ArgMatches::default();
         let app = Ctx::new(config, account, output, mbox, arg_matches);
         let url = Url::parse(&raw_args[1])?;
-        return Ok(msg_matches_mailto(&app, &url)?);
+        let smtp = domain::smtp::service::SMTPService::init(&app.account);
+        return Ok(msg_matches_mailto(&app, &url, smtp)?);
     }
 
     let args = parse_args();
@@ -78,10 +79,11 @@ fn main() -> Result<()> {
     debug!("begin matching");
 
     let app = Ctx::new(config, account, output, mbox, arg_matches);
+    let smtp = domain::smtp::service::SMTPService::init(&app.account);
     let _matched = mbox::cli::matches(&app)?
         || flag::cli::matches(&app)?
         || imap::cli::matches(&app)?
-        || msg::cli::matches(&app)?;
+        || msg::cli::matches(&app, smtp)?;
 
     Ok(())
 }
