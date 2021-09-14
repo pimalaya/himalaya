@@ -20,7 +20,7 @@ use super::{
 };
 use crate::{
     ctx::Ctx,
-    domain::{account::entity::Account, smtp},
+    domain::{account::entity::Account, smtp::*},
     flag::model::Flags,
     imap::model::ImapConnector,
     input,
@@ -127,10 +127,10 @@ pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
     ]
 }
 
-pub fn matches<SMTP: smtp::service::SMTPServiceInterface>(
+pub fn matches<SmtpService: SmtpServiceInterface>(
     ctx: &Ctx,
     account: &Account,
-    smtp: SMTP,
+    smtp: SmtpService,
 ) -> Result<bool> {
     match ctx.arg_matches.subcommand() {
         ("attachments", Some(matches)) => msg_matches_attachments(&ctx, &account, &matches),
@@ -399,11 +399,11 @@ fn msg_matches_attachments(
     Ok(true)
 }
 
-fn msg_matches_write<'a, SMTP: smtp::service::SMTPServiceInterface>(
+fn msg_matches_write<SmtpService: SmtpServiceInterface>(
     ctx: &Ctx,
     account: &Account,
     matches: &clap::ArgMatches,
-    smtp: SMTP,
+    smtp: SmtpService,
 ) -> Result<bool> {
     debug!("write command matched");
 
@@ -438,11 +438,11 @@ fn msg_matches_write<'a, SMTP: smtp::service::SMTPServiceInterface>(
     Ok(true)
 }
 
-fn msg_matches_reply<'a, SMTP: smtp::service::SMTPServiceInterface>(
+fn msg_matches_reply<SmtpService: SmtpServiceInterface>(
     ctx: &Ctx,
     account: &Account,
     matches: &clap::ArgMatches,
-    smtp: SMTP,
+    smtp: SmtpService,
 ) -> Result<bool> {
     debug!("reply command matched");
 
@@ -473,11 +473,11 @@ fn msg_matches_reply<'a, SMTP: smtp::service::SMTPServiceInterface>(
     Ok(true)
 }
 
-pub fn msg_matches_mailto<'a, SMTP: smtp::service::SMTPServiceInterface>(
+pub fn msg_matches_mailto<SmtpService: SmtpServiceInterface>(
     ctx: &Ctx,
     account: &Account,
     url: &Url,
-    smtp: SMTP,
+    smtp: SmtpService,
 ) -> Result<()> {
     debug!("mailto command matched");
 
@@ -525,11 +525,11 @@ pub fn msg_matches_mailto<'a, SMTP: smtp::service::SMTPServiceInterface>(
     Ok(())
 }
 
-fn msg_matches_forward<'a, SMTP: smtp::service::SMTPServiceInterface>(
+fn msg_matches_forward<SmtpService: SmtpServiceInterface>(
     ctx: &Ctx,
     account: &Account,
     matches: &clap::ArgMatches,
-    smtp: SMTP,
+    smtp: SmtpService,
 ) -> Result<bool> {
     debug!("forward command matched");
 
@@ -639,11 +639,11 @@ fn msg_matches_delete(ctx: &Ctx, account: &Account, matches: &clap::ArgMatches) 
     Ok(true)
 }
 
-fn msg_matches_send<'a, SMTP: smtp::service::SMTPServiceInterface>(
+fn msg_matches_send<SmtpService: SmtpServiceInterface>(
     ctx: &Ctx,
     account: &Account,
     matches: &clap::ArgMatches,
-    smtp: SMTP,
+    mut smtp: SmtpService,
 ) -> Result<bool> {
     debug!("send command matched");
 
@@ -849,11 +849,11 @@ fn tpl_matches_forward(ctx: &Ctx, account: &Account, matches: &clap::ArgMatches)
 
 /// This function opens the prompt to do some actions to the msg like sending, editing it again and
 /// so on.
-fn msg_interaction<SMTP: smtp::service::SMTPServiceInterface>(
+fn msg_interaction<SmtpService: SmtpServiceInterface>(
     ctx: &Ctx,
     msg: &mut Msg,
     imap_conn: &mut ImapConnector,
-    smtp: SMTP,
+    mut smtp: SmtpService,
 ) -> Result<bool> {
     // let the user change the body a little bit first, before opening the prompt
     msg.edit_body()?;

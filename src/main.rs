@@ -8,7 +8,7 @@ use himalaya::{
     comp,
     config::cli::config_args,
     ctx::Ctx,
-    domain::{account::entity::Account, config::entity::Config, smtp::service::SMTPService},
+    domain::{account::entity::Account, config::entity::Config, smtp::SmtpService},
     flag, imap, mbox, msg,
     output::{cli::output_args, model::Output},
 };
@@ -73,7 +73,7 @@ fn main() -> Result<()> {
 
     let account_name = arg_matches.value_of("account");
     let account = Account::try_from((&config, account_name))?;
-    let smtp_service = SMTPService::new(&account)?;
+    let smtp_service = SmtpService::new(&account)?;
     debug!("account name: {}", account_name.unwrap_or("default"));
     trace!("account: {:?}", account);
 

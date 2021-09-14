@@ -43,4 +43,5 @@ pub mod msg;
 pub mod output;
 
 pub mod domain;
+pub mod infra;
 pub mod ui;
