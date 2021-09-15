@@ -2,10 +2,7 @@ use anyhow::Result;
 use clap;
 use log::debug;
 
-use crate::{
-    ctx::Ctx, domain::account::entity::Account, flag::model::Flags, imap::model::ImapConnector,
-    msg::cli::uid_arg,
-};
+use crate::{domain::imap::ImapServiceInterface, flag::model::Flags, msg::cli::uid_arg};
 
 fn flags_arg<'a>() -> clap::Arg<'a, 'a> {
     clap::Arg::with_name("flags")
@@ -39,8 +36,11 @@ pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
         )]
 }
 
-pub fn matches(ctx: &Ctx, account: &Account) -> Result<bool> {
-    if let Some(matches) = ctx.arg_matches.subcommand_matches("set") {
+pub fn matches<ImapService: ImapServiceInterface>(
+    arg_matches: &clap::ArgMatches,
+    imap: &mut ImapService,
+) -> Result<bool> {
+    if let Some(matches) = arg_matches.subcommand_matches("set") {
         debug!("set command matched");
 
         let uid = matches.value_of("uid").unwrap();
@@ -50,14 +50,12 @@ pub fn matches(ctx: &Ctx, account: &Account) -> Result<bool> {
         debug!("flags: {}", flags);
         let flags = Flags::from(flags);
 
-        let mut imap_conn = ImapConnector::new(&account)?;
-        imap_conn.set_flags(&ctx.mbox, uid, flags)?;
-
-        imap_conn.logout();
+        imap.set_flags(uid, flags)?;
+        imap.logout()?;
         return Ok(true);
     }
 
-    if let Some(matches) = ctx.arg_matches.subcommand_matches("add") {
+    if let Some(matches) = arg_matches.subcommand_matches("add") {
         debug!("add command matched");
 
         let uid = matches.value_of("uid").unwrap();
@@ -67,14 +65,12 @@ pub fn matches(ctx: &Ctx, account: &Account) -> Result<bool> {
         debug!("flags: {}", flags);
         let flags = Flags::from(flags);
 
-        let mut imap_conn = ImapConnector::new(&account)?;
-        imap_conn.add_flags(&ctx.mbox, uid, flags)?;
-
-        imap_conn.logout();
+        imap.add_flags(uid, flags)?;
+        imap.logout()?;
         return Ok(true);
     }
 
-    if let Some(matches) = ctx.arg_matches.subcommand_matches("remove") {
+    if let Some(matches) = arg_matches.subcommand_matches("remove") {
         debug!("remove command matched");
 
         let uid = matches.value_of("uid").unwrap();
@@ -84,10 +80,8 @@ pub fn matches(ctx: &Ctx, account: &Account) -> Result<bool> {
         debug!("flags: {}", flags);
         let flags = Flags::from(flags);
 
-        let mut imap_conn = ImapConnector::new(&account)?;
-        imap_conn.remove_flags(&ctx.mbox, uid, flags)?;
-
-        imap_conn.logout();
+        imap.remove_flags(uid, flags)?;
+        imap.logout()?;
         return Ok(true);
     }
 

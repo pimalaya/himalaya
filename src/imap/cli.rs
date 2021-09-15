@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap;
 use log::debug;
 
-use crate::{ctx::Ctx, domain::account::entity::Account, imap::model::ImapConnector};
+use crate::domain::{config::entity::Config, imap::ImapServiceInterface};
 
 pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
     vec![
@@ -30,30 +30,30 @@ pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
     ]
 }
 
-pub fn matches(ctx: &Ctx, account: &Account) -> Result<bool> {
-    if let Some(matches) = ctx.arg_matches.subcommand_matches("notify") {
+pub fn matches<ImapService: ImapServiceInterface>(
+    arg_matches: &clap::ArgMatches,
+    config: &Config,
+    imap: &mut ImapService,
+) -> Result<bool> {
+    if let Some(matches) = arg_matches.subcommand_matches("notify") {
         debug!("notify command matched");
 
         let keepalive = clap::value_t_or_exit!(matches.value_of("keepalive"), u64);
         debug!("keepalive: {}", &keepalive);
 
-        let mut imap_conn = ImapConnector::new(&account)?;
-        imap_conn.notify(&ctx, keepalive)?;
-
-        imap_conn.logout();
+        imap.notify(&config, keepalive)?;
+        imap.logout()?;
         return Ok(true);
     }
 
-    if let Some(matches) = ctx.arg_matches.subcommand_matches("watch") {
+    if let Some(matches) = arg_matches.subcommand_matches("watch") {
         debug!("watch command matched");
 
         let keepalive = clap::value_t_or_exit!(matches.value_of("keepalive"), u64);
         debug!("keepalive: {}", &keepalive);
 
-        let mut imap_conn = ImapConnector::new(&account)?;
-        imap_conn.watch(&ctx, keepalive)?;
-
-        imap_conn.logout();
+        imap.watch(keepalive)?;
+        imap.logout()?;
         return Ok(true);
     }
 

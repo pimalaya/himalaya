@@ -19,12 +19,11 @@ use super::{
     model::{Msg, MsgSerialized, Msgs},
 };
 use crate::{
-    ctx::Ctx,
-    domain::{account::entity::Account, smtp::*},
+    domain::{account::entity::Account, imap::ImapServiceInterface, smtp::*},
     flag::model::Flags,
-    imap::model::ImapConnector,
     input,
     mbox::cli::mbox_target_arg,
+    output::service::{OutputService, OutputServiceInterface},
 };
 
 pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
@@ -127,27 +126,32 @@ pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
     ]
 }
 
-pub fn matches<SmtpService: SmtpServiceInterface>(
-    ctx: &Ctx,
+pub fn matches<ImapService: ImapServiceInterface, SmtpService: SmtpServiceInterface>(
+    arg_matches: &clap::ArgMatches,
+    mbox: &str,
     account: &Account,
-    smtp: SmtpService,
+    output: &OutputService,
+    imap: &mut ImapService,
+    smtp: &mut SmtpService,
 ) -> Result<bool> {
-    match ctx.arg_matches.subcommand() {
-        ("attachments", Some(matches)) => msg_matches_attachments(&ctx, &account, &matches),
-        ("copy", Some(matches)) => msg_matches_copy(&ctx, &account, &matches),
-        ("delete", Some(matches)) => msg_matches_delete(&ctx, &account, &matches),
-        ("forward", Some(matches)) => msg_matches_forward(&ctx, &account, &matches, smtp),
-        ("move", Some(matches)) => msg_matches_move(&ctx, &account, &matches),
-        ("read", Some(matches)) => msg_matches_read(&ctx, &account, &matches),
-        ("reply", Some(matches)) => msg_matches_reply(&ctx, &account, &matches, smtp),
-        ("save", Some(matches)) => msg_matches_save(&ctx, &account, matches),
-        ("search", Some(matches)) => msg_matches_search(&ctx, &account, &matches),
-        ("send", Some(matches)) => msg_matches_send(&ctx, &account, &matches, smtp),
-        ("write", Some(matches)) => msg_matches_write(&ctx, &account, &matches, smtp),
+    match arg_matches.subcommand() {
+        ("attachments", Some(matches)) => {
+            msg_matches_attachments(&output, &account, &matches, imap)
+        }
+        ("copy", Some(matches)) => msg_matches_copy(&output, &matches, imap),
+        ("delete", Some(matches)) => msg_matches_delete(&output, &matches, imap),
+        ("forward", Some(matches)) => msg_matches_forward(&output, &account, &matches, imap, smtp),
+        ("move", Some(matches)) => msg_matches_move(&output, &matches, imap),
+        ("read", Some(matches)) => msg_matches_read(&output, &matches, imap),
+        ("reply", Some(matches)) => msg_matches_reply(&output, &account, &matches, imap, smtp),
+        ("save", Some(matches)) => msg_matches_save(&mbox, matches, imap),
+        ("search", Some(matches)) => msg_matches_search(&output, &account, &matches, imap),
+        ("send", Some(matches)) => msg_matches_send(&output, &matches, imap, smtp),
+        ("write", Some(matches)) => msg_matches_write(&output, &account, &matches, imap, smtp),
 
-        ("template", Some(matches)) => Ok(msg_matches_tpl(&ctx, &account, &matches)?),
-        ("list", opt_matches) => msg_matches_list(&ctx, &account, opt_matches),
-        (_other, opt_matches) => msg_matches_list(&ctx, &account, opt_matches),
+        ("template", Some(matches)) => Ok(msg_matches_tpl(&output, &account, &matches, imap)?),
+        ("list", opt_matches) => msg_matches_list(&output, &account, opt_matches, imap),
+        (_other, opt_matches) => msg_matches_list(&output, &account, opt_matches, imap),
     }
 }
 
@@ -244,10 +248,11 @@ fn tpl_args<'a>() -> Vec<clap::Arg<'a, 'a>> {
     ]
 }
 
-fn msg_matches_list(
-    ctx: &Ctx,
+fn msg_matches_list<ImapService: ImapServiceInterface>(
+    output: &OutputService,
     account: &Account,
     opt_matches: Option<&clap::ArgMatches>,
+    imap: &mut ImapService,
 ) -> Result<bool> {
     debug!("list command matched");
 
@@ -261,8 +266,7 @@ fn msg_matches_list(
         .unwrap_or_default();
     debug!("page: {}", &page);
 
-    let mut imap_conn = ImapConnector::new(&account)?;
-    let msgs = imap_conn.list_msgs(&ctx.mbox, &page_size, &page)?;
+    let msgs = imap.list_msgs(&page_size, &page)?;
     let msgs = if let Some(ref fetches) = msgs {
         Msgs::try_from(fetches)?
     } else {
@@ -271,13 +275,18 @@ fn msg_matches_list(
 
     trace!("messages: {:?}", msgs);
 
-    ctx.output.print(msgs);
+    output.print(msgs)?;
 
-    imap_conn.logout();
+    imap.logout()?;
     Ok(true)
 }
 
-fn msg_matches_search(ctx: &Ctx, account: &Account, matches: &clap::ArgMatches) -> Result<bool> {
+fn msg_matches_search<ImapService: ImapServiceInterface>(
+    output: &OutputService,
+    account: &Account,
+    matches: &clap::ArgMatches,
+    imap: &mut ImapService,
+) -> Result<bool> {
     debug!("search command matched");
 
     let page_size: usize = matches
@@ -319,21 +328,24 @@ fn msg_matches_search(ctx: &Ctx, account: &Account, matches: &clap::ArgMatches) 
         .join(" ");
     debug!("query: {}", &page);
 
-    let mut imap_conn = ImapConnector::new(&account)?;
-    let msgs = imap_conn.search_msgs(&ctx.mbox, &query, &page_size, &page)?;
+    let msgs = imap.search_msgs(&query, &page_size, &page)?;
     let msgs = if let Some(ref fetches) = msgs {
         Msgs::try_from(fetches)?
     } else {
         Msgs::new()
     };
     trace!("messages: {:?}", msgs);
-    ctx.output.print(msgs);
+    output.print(msgs)?;
 
-    imap_conn.logout();
+    imap.logout()?;
     Ok(true)
 }
 
-fn msg_matches_read(ctx: &Ctx, account: &Account, matches: &clap::ArgMatches) -> Result<bool> {
+fn msg_matches_read<ImapService: ImapServiceInterface>(
+    output: &OutputService,
+    matches: &clap::ArgMatches,
+    imap: &mut ImapService,
+) -> Result<bool> {
     debug!("read command matched");
 
     let uid = matches.value_of("uid").unwrap();
@@ -343,22 +355,21 @@ fn msg_matches_read(ctx: &Ctx, account: &Account, matches: &clap::ArgMatches) ->
     let raw = matches.is_present("raw");
     debug!("raw: {}", raw);
 
-    let mut imap_conn = ImapConnector::new(&account)?;
-    let msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
-
+    let msg = imap.get_msg(&uid)?;
     if raw {
-        ctx.output.print(msg.get_raw_as_string()?);
+        output.print(msg.get_raw_as_string()?)?;
     } else {
-        ctx.output.print(MsgSerialized::try_from(&msg)?);
+        output.print(MsgSerialized::try_from(&msg)?)?;
     }
-    imap_conn.logout();
+    imap.logout()?;
     Ok(true)
 }
 
-fn msg_matches_attachments(
-    ctx: &Ctx,
+fn msg_matches_attachments<ImapService: ImapServiceInterface>(
+    output: &OutputService,
     account: &Account,
     matches: &clap::ArgMatches,
+    imap: &mut ImapService,
 ) -> Result<bool> {
     debug!("attachments command matched");
 
@@ -366,8 +377,7 @@ fn msg_matches_attachments(
     debug!("uid: {}", &uid);
 
     // get the msg and than it's attachments
-    let mut imap_conn = ImapConnector::new(&account)?;
-    let msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
+    let msg = imap.get_msg(&uid)?;
     let attachments = msg.attachments.clone();
 
     debug!(
@@ -390,24 +400,23 @@ fn msg_matches_attachments(
         &attachments.len()
     );
 
-    ctx.output.print(format!(
+    output.print(format!(
         "{} attachment(s) successfully downloaded",
         &attachments.len()
-    ));
+    ))?;
 
-    imap_conn.logout();
+    imap.logout()?;
     Ok(true)
 }
 
-fn msg_matches_write<SmtpService: SmtpServiceInterface>(
-    ctx: &Ctx,
+fn msg_matches_write<ImapService: ImapServiceInterface, SmtpService: SmtpServiceInterface>(
+    output: &OutputService,
     account: &Account,
     matches: &clap::ArgMatches,
-    smtp: SmtpService,
+    imap: &mut ImapService,
+    smtp: &mut SmtpService,
 ) -> Result<bool> {
     debug!("write command matched");
-
-    let mut imap_conn = ImapConnector::new(&account)?;
 
     // create the new msg
     // TODO: Make the header starting customizeable like from template
@@ -430,28 +439,26 @@ fn msg_matches_write<SmtpService: SmtpServiceInterface>(
         .iter()
         .for_each(|path| msg.add_attachment(path));
 
-    msg_interaction(&ctx, &mut msg, &mut imap_conn, smtp)?;
+    msg_interaction(output, &mut msg, imap, smtp)?;
 
-    // let's be nice to the server and say "bye" to the server
-    imap_conn.logout();
+    imap.logout()?;
 
     Ok(true)
 }
 
-fn msg_matches_reply<SmtpService: SmtpServiceInterface>(
-    ctx: &Ctx,
+fn msg_matches_reply<ImapService: ImapServiceInterface, SmtpService: SmtpServiceInterface>(
+    output: &OutputService,
     account: &Account,
     matches: &clap::ArgMatches,
-    smtp: SmtpService,
+    imap: &mut ImapService,
+    smtp: &mut SmtpService,
 ) -> Result<bool> {
     debug!("reply command matched");
 
     // -- Preparations --
-    let mut imap_conn = ImapConnector::new(&account)?;
     let uid = matches.value_of("uid").unwrap();
-    let mut msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
-
     debug!("uid: {}", uid);
+    let mut msg = imap.get_msg(&uid)?;
 
     // Change the msg to a reply-msg.
     msg.change_to_reply(&account, matches.is_present("reply-all"))?;
@@ -467,21 +474,20 @@ fn msg_matches_reply<SmtpService: SmtpServiceInterface>(
     debug!("found {} attachments", attachments.len());
     trace!("attachments: {:?}", attachments);
 
-    msg_interaction(&ctx, &mut msg, &mut imap_conn, smtp)?;
+    msg_interaction(output, &mut msg, imap, smtp)?;
 
-    imap_conn.logout();
+    imap.logout()?;
     Ok(true)
 }
 
-pub fn msg_matches_mailto<SmtpService: SmtpServiceInterface>(
-    ctx: &Ctx,
+pub fn msg_matches_mailto<ImapService: ImapServiceInterface, SmtpService: SmtpServiceInterface>(
+    output: &OutputService,
     account: &Account,
     url: &Url,
-    smtp: SmtpService,
+    imap: &mut ImapService,
+    smtp: &mut SmtpService,
 ) -> Result<()> {
     debug!("mailto command matched");
-
-    let mut imap_conn = ImapConnector::new(&account)?;
 
     let mut cc = Vec::new();
     let mut bcc = Vec::new();
@@ -519,27 +525,26 @@ pub fn msg_matches_mailto<SmtpService: SmtpServiceInterface>(
 
     let mut msg = Msg::new_with_headers(&account, headers);
     msg.body = Body::new_with_text(body);
-    msg_interaction(&ctx, &mut msg, &mut imap_conn, smtp)?;
+    msg_interaction(output, &mut msg, imap, smtp)?;
 
-    imap_conn.logout();
+    imap.logout()?;
     Ok(())
 }
 
-fn msg_matches_forward<SmtpService: SmtpServiceInterface>(
-    ctx: &Ctx,
+fn msg_matches_forward<ImapService: ImapServiceInterface, SmtpService: SmtpServiceInterface>(
+    output: &OutputService,
     account: &Account,
     matches: &clap::ArgMatches,
-    smtp: SmtpService,
+    imap: &mut ImapService,
+    smtp: &mut SmtpService,
 ) -> Result<bool> {
     debug!("forward command matched");
 
     // fetch the msg
-    let mut imap_conn = ImapConnector::new(&account)?;
     let uid = matches.value_of("uid").unwrap();
-    let mut msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
-
     debug!("uid: {}", uid);
 
+    let mut msg = imap.get_msg(&uid)?;
     // prepare to forward it
     msg.change_to_forwarding(&account);
 
@@ -554,102 +559,104 @@ fn msg_matches_forward<SmtpService: SmtpServiceInterface>(
     trace!("attachments: {:?}", attachments);
 
     // apply changes
-    msg_interaction(&ctx, &mut msg, &mut imap_conn, smtp)?;
+    msg_interaction(output, &mut msg, imap, smtp)?;
 
-    imap_conn.logout();
+    imap.logout()?;
 
     Ok(true)
 }
 
-fn msg_matches_copy(ctx: &Ctx, account: &Account, matches: &clap::ArgMatches) -> Result<bool> {
+fn msg_matches_copy<ImapService: ImapServiceInterface>(
+    output: &OutputService,
+    matches: &clap::ArgMatches,
+    imap: &mut ImapService,
+) -> Result<bool> {
     debug!("copy command matched");
 
     // fetch the message to be copyied
-    let mut imap_conn = ImapConnector::new(&account)?;
     let uid = matches.value_of("uid").unwrap();
-    let target = matches.value_of("target").unwrap();
-    let mut msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
-
     debug!("uid: {}", &uid);
+    let target = matches.value_of("target").unwrap();
     debug!("target: {}", &target);
 
+    let mut msg = imap.get_msg(&uid)?;
     // the message, which will be in the new mailbox doesn't need to be seen
     msg.flags.insert(Flag::Seen);
 
-    imap_conn.append_msg(target, &mut msg)?;
+    imap.append_msg(target, &mut msg)?;
 
     debug!("message {} successfully copied to folder `{}`", uid, target);
 
-    ctx.output.print(format!(
+    output.print(format!(
         "Message {} successfully copied to folder `{}`",
         uid, target
-    ));
+    ))?;
 
-    imap_conn.logout();
+    imap.logout()?;
     Ok(true)
 }
 
-fn msg_matches_move(ctx: &Ctx, account: &Account, matches: &clap::ArgMatches) -> Result<bool> {
+fn msg_matches_move<ImapService: ImapServiceInterface>(
+    output: &OutputService,
+    matches: &clap::ArgMatches,
+    imap: &mut ImapService,
+) -> Result<bool> {
     debug!("move command matched");
 
     // fetch the msg which should be moved
-    let mut imap_conn = ImapConnector::new(&account)?;
     let uid = matches.value_of("uid").unwrap();
-    let target = matches.value_of("target").unwrap();
-    let mut msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
-
     debug!("uid: {}", &uid);
+    let target = matches.value_of("target").unwrap();
     debug!("target: {}", &target);
 
+    let mut msg = imap.get_msg(&uid)?;
     // create the msg in the target-msgbox
     msg.flags.insert(Flag::Seen);
-    imap_conn.append_msg(target, &mut msg)?;
+    imap.append_msg(target, &mut msg)?;
 
     debug!("message {} successfully moved to folder `{}`", uid, target);
-    ctx.output.print(format!(
+    output.print(format!(
         "Message {} successfully moved to folder `{}`",
         uid, target
-    ));
+    ))?;
 
     // delete the msg in the old mailbox
     let flags = vec![Flag::Seen, Flag::Deleted];
-    imap_conn.add_flags(&ctx.mbox, uid, Flags::from(flags))?;
-    imap_conn.expunge(&ctx.mbox)?;
-
-    imap_conn.logout();
+    imap.add_flags(uid, Flags::from(flags))?;
+    imap.expunge()?;
+    imap.logout()?;
     Ok(true)
 }
 
-fn msg_matches_delete(ctx: &Ctx, account: &Account, matches: &clap::ArgMatches) -> Result<bool> {
+fn msg_matches_delete<ImapService: ImapServiceInterface>(
+    output: &OutputService,
+    matches: &clap::ArgMatches,
+    imap: &mut ImapService,
+) -> Result<bool> {
     debug!("delete command matched");
-
-    let mut imap_conn = ImapConnector::new(&account)?;
 
     // remove the message according to its UID
     let uid = matches.value_of("uid").unwrap();
     let flags = vec![Flag::Seen, Flag::Deleted];
-    imap_conn.add_flags(&ctx.mbox, uid, Flags::from(flags))?;
-    imap_conn.expunge(&ctx.mbox)?;
+    imap.add_flags(uid, Flags::from(flags))?;
+    imap.expunge()?;
 
     debug!("message {} successfully deleted", uid);
-    ctx.output
-        .print(format!("Message {} successfully deleted", uid));
+    output.print(format!("Message {} successfully deleted", uid))?;
 
-    imap_conn.logout();
+    imap.logout()?;
     Ok(true)
 }
 
-fn msg_matches_send<SmtpService: SmtpServiceInterface>(
-    ctx: &Ctx,
-    account: &Account,
+fn msg_matches_send<ImapService: ImapServiceInterface, SmtpService: SmtpServiceInterface>(
+    output: &OutputService,
     matches: &clap::ArgMatches,
-    mut smtp: SmtpService,
+    imap: &mut ImapService,
+    smtp: &mut SmtpService,
 ) -> Result<bool> {
     debug!("send command matched");
 
-    let mut imap_conn = ImapConnector::new(&account)?;
-
-    let msg = if atty::is(Stream::Stdin) || ctx.output.is_json() {
+    let msg = if atty::is(Stream::Stdin) || output.is_json() {
         matches
             .value_of("message")
             .unwrap_or_default()
@@ -674,34 +681,37 @@ fn msg_matches_send<SmtpService: SmtpServiceInterface>(
 
     // add the message/msg to the Sent-Mailbox of the user
     msg.flags.insert(Flag::Seen);
-    imap_conn.append_msg("Sent", &mut msg)?;
+    imap.append_msg("Sent", &mut msg)?;
 
-    imap_conn.logout();
+    imap.logout()?;
 
     Ok(true)
 }
 
-fn msg_matches_save(ctx: &Ctx, account: &Account, matches: &clap::ArgMatches) -> Result<bool> {
+fn msg_matches_save<ImapService: ImapServiceInterface>(
+    mbox: &str,
+    matches: &clap::ArgMatches,
+    imap: &mut ImapService,
+) -> Result<bool> {
     debug!("save command matched");
-
-    let mut imap_conn = ImapConnector::new(&account)?;
     let msg: &str = matches.value_of("message").unwrap();
-
     let mut msg = Msg::try_from(msg)?;
-
     msg.flags.insert(Flag::Seen);
-    imap_conn.append_msg(&ctx.mbox, &mut msg)?;
-
-    imap_conn.logout();
-
+    imap.append_msg(&mbox, &mut msg)?;
+    imap.logout()?;
     Ok(true)
 }
 
-pub fn msg_matches_tpl(ctx: &Ctx, account: &Account, matches: &clap::ArgMatches) -> Result<bool> {
+pub fn msg_matches_tpl<ImapService: ImapServiceInterface>(
+    output: &OutputService,
+    account: &Account,
+    matches: &clap::ArgMatches,
+    imap: &mut ImapService,
+) -> Result<bool> {
     match matches.subcommand() {
-        ("new", Some(matches)) => tpl_matches_new(&ctx, &account, matches),
-        ("reply", Some(matches)) => tpl_matches_reply(&ctx, &account, matches),
-        ("forward", Some(matches)) => tpl_matches_forward(&ctx, &account, matches),
+        ("new", Some(matches)) => tpl_matches_new(&output, &account, matches),
+        ("reply", Some(matches)) => tpl_matches_reply(&output, &account, matches, imap),
+        ("forward", Some(matches)) => tpl_matches_forward(&output, &account, matches, imap),
 
         // TODO: find a way to show the help message for template subcommand
         _ => Err(anyhow!("Subcommand not found")),
@@ -798,62 +808,60 @@ fn override_msg_with_args(msg: &mut Msg, matches: &clap::ArgMatches) {
     msg.body = body;
 }
 
-fn tpl_matches_new(ctx: &Ctx, account: &Account, matches: &clap::ArgMatches) -> Result<bool> {
+fn tpl_matches_new(
+    output: &OutputService,
+    account: &Account,
+    matches: &clap::ArgMatches,
+) -> Result<bool> {
     debug!("new command matched");
-
     let mut msg = Msg::new(&account);
-
     override_msg_with_args(&mut msg, &matches);
-
     trace!("Message: {:?}", msg);
-    ctx.output.print(MsgSerialized::try_from(&msg)?);
-
+    output.print(MsgSerialized::try_from(&msg)?)?;
     Ok(true)
 }
 
-fn tpl_matches_reply(ctx: &Ctx, account: &Account, matches: &clap::ArgMatches) -> Result<bool> {
+fn tpl_matches_reply<ImapService: ImapServiceInterface>(
+    output: &OutputService,
+    account: &Account,
+    matches: &clap::ArgMatches,
+    imap: &mut ImapService,
+) -> Result<bool> {
     debug!("reply command matched");
-
     let uid = matches.value_of("uid").unwrap();
     debug!("uid: {}", uid);
-
-    let mut imap_conn = ImapConnector::new(&account)?;
-    let mut msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
-
+    let mut msg = imap.get_msg(&uid)?;
     msg.change_to_reply(&account, matches.is_present("reply-all"))?;
-
     override_msg_with_args(&mut msg, &matches);
     trace!("Message: {:?}", msg);
-    ctx.output.print(MsgSerialized::try_from(&msg)?);
-
+    output.print(MsgSerialized::try_from(&msg)?)?;
     Ok(true)
 }
 
-fn tpl_matches_forward(ctx: &Ctx, account: &Account, matches: &clap::ArgMatches) -> Result<bool> {
+fn tpl_matches_forward<ImapService: ImapServiceInterface>(
+    output: &OutputService,
+    account: &Account,
+    matches: &clap::ArgMatches,
+    imap: &mut ImapService,
+) -> Result<bool> {
     debug!("forward command matched");
-
     let uid = matches.value_of("uid").unwrap();
     debug!("uid: {}", uid);
-
-    let mut imap_conn = ImapConnector::new(&account)?;
-    let mut msg = imap_conn.get_msg(&ctx.mbox, &uid)?;
+    let mut msg = imap.get_msg(&uid)?;
     msg.change_to_forwarding(&account);
-
     override_msg_with_args(&mut msg, &matches);
-
     trace!("Message: {:?}", msg);
-    ctx.output.print(MsgSerialized::try_from(&msg)?);
-
+    output.print(MsgSerialized::try_from(&msg)?)?;
     Ok(true)
 }
 
 /// This function opens the prompt to do some actions to the msg like sending, editing it again and
 /// so on.
-fn msg_interaction<SmtpService: SmtpServiceInterface>(
-    ctx: &Ctx,
+fn msg_interaction<ImapService: ImapServiceInterface, SmtpService: SmtpServiceInterface>(
+    output: &OutputService,
     msg: &mut Msg,
-    imap_conn: &mut ImapConnector,
-    mut smtp: SmtpService,
+    imap: &mut ImapService,
+    smtp: &mut SmtpService,
 ) -> Result<bool> {
     // let the user change the body a little bit first, before opening the prompt
     msg.edit_body()?;
@@ -884,11 +892,11 @@ fn msg_interaction<SmtpService: SmtpServiceInterface>(
 
                     // let the server know, that the user sent a msg
                     msg.flags.insert(Flag::Seen);
-                    imap_conn.append_msg("Sent", msg)?;
+                    imap.append_msg("Sent", msg)?;
 
                     // remove the draft, since we sent it
                     input::remove_draft()?;
-                    ctx.output.print("Message successfully sent");
+                    output.print("Message successfully sent")?;
                     break;
                 }
                 // edit the body of the msg
@@ -909,13 +917,13 @@ fn msg_interaction<SmtpService: SmtpServiceInterface>(
 
                     msg.flags.insert(Flag::Seen);
 
-                    match imap_conn.append_msg("Drafts", msg) {
+                    match imap.append_msg("Drafts", msg) {
                         Ok(_) => {
                             input::remove_draft()?;
-                            ctx.output.print("Message successfully saved to Drafts");
+                            output.print("Message successfully saved to Drafts")?;
                         }
                         Err(err) => {
-                            ctx.output.print("Cannot save draft to the server");
+                            output.print("Cannot save draft to the server")?;
                             return Err(err.into());
                         }
                     };

@@ -19,9 +19,6 @@ pub mod comp;
 /// Everything which is related to the config files. For example the structure of your config file.
 pub mod config;
 
-/// A often used-struct to help us to access the most often used structs.
-pub mod ctx;
-
 /// A wrapper for representing a flag of a message or mailbox. For example the delete-flag or
 /// read-flag.
 pub mod flag;
@@ -43,5 +40,4 @@ pub mod msg;
 pub mod output;
 
 pub mod domain;
-pub mod infra;
 pub mod ui;

@@ -1,17 +1,16 @@
+use anyhow::Result;
 use serde::Serialize;
 use std::fmt;
 
-// Output format
-
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, PartialEq)]
 pub enum OutputFmt {
     Plain,
     Json,
 }
 
 impl From<&str> for OutputFmt {
-    fn from(s: &str) -> Self {
-        match s {
+    fn from(slice: &str) -> Self {
+        match slice {
             "json" => Self::Json,
             "plain" | _ => Self::Plain,
         }
@@ -20,12 +19,11 @@ impl From<&str> for OutputFmt {
 
 impl fmt::Display for OutputFmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let fmt = match *self {
-            OutputFmt::Json => "JSON",
-            OutputFmt::Plain => "PLAIN",
+        let slice = match self {
+            &OutputFmt::Json => "JSON",
+            &OutputFmt::Plain => "Plain",
         };
-
-        write!(f, "{}", fmt)
+        write!(f, "{}", slice)
     }
 }
 
@@ -42,30 +40,19 @@ impl<T: Serialize> OutputJson<T> {
     }
 }
 
-// Output
-/// A simple wrapper for a general formatting.
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub struct Output {
+pub trait OutputServiceInterface {
+    fn print<T: Serialize + fmt::Display>(&self, data: T) -> Result<()>;
+}
+
+#[derive(Debug)]
+pub struct OutputService {
     fmt: OutputFmt,
 }
 
-impl Output {
+impl OutputService {
     /// Create a new output-handler by setting the given formatting style.
     pub fn new(fmt: &str) -> Self {
         Self { fmt: fmt.into() }
-    }
-
-    /// Print the provided item out according to the formatting setting when you created this
-    /// struct.
-    pub fn print<T: Serialize + fmt::Display>(&self, item: T) {
-        match self.fmt {
-            OutputFmt::Plain => {
-                println!("{}", item)
-            }
-            OutputFmt::Json => {
-                print!("{}", serde_json::to_string(&OutputJson::new(item)).unwrap())
-            }
-        }
     }
 
     /// Returns true, if the formatting should be plaintext.
@@ -79,7 +66,23 @@ impl Output {
     }
 }
 
-impl Default for Output {
+impl OutputServiceInterface for OutputService {
+    /// Print the provided item out according to the formatting setting when you created this
+    /// struct.
+    fn print<T: Serialize + fmt::Display>(&self, data: T) -> Result<()> {
+        match self.fmt {
+            OutputFmt::Plain => {
+                println!("{}", data)
+            }
+            OutputFmt::Json => {
+                print!("{}", serde_json::to_string(&OutputJson::new(data))?)
+            }
+        };
+        Ok(())
+    }
+}
+
+impl Default for OutputService {
     fn default() -> Self {
         Self {
             fmt: OutputFmt::Plain,

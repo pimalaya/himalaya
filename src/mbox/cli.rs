@@ -3,7 +3,9 @@ use clap;
 use log::{debug, trace};
 
 use crate::{
-    ctx::Ctx, domain::account::entity::Account, imap::model::ImapConnector, mbox::model::Mboxes,
+    domain::imap::ImapServiceInterface,
+    mbox::model::Mboxes,
+    output::service::{OutputService, OutputServiceInterface},
 };
 
 pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
@@ -12,26 +14,25 @@ pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
         .about("Lists all mailboxes")]
 }
 
-pub fn matches(ctx: &Ctx, account: &Account) -> Result<bool> {
-    if let Some(_) = ctx.arg_matches.subcommand_matches("mailboxes") {
+pub fn matches<ImapService: ImapServiceInterface>(
+    arg_matches: &clap::ArgMatches,
+    output: &OutputService,
+    imap: &mut ImapService,
+) -> Result<bool> {
+    if let Some(_) = arg_matches.subcommand_matches("mailboxes") {
         debug!("mailboxes command matched");
-
-        let mut imap_conn = ImapConnector::new(&account)?;
-        let names = imap_conn.list_mboxes()?;
+        let names = imap.list_mboxes()?;
         let mboxes = Mboxes::from(&names);
-        debug!("found {} mailboxes", mboxes.0.len());
-        trace!("mailboxes: {:?}", mboxes);
-        ctx.output.print(mboxes);
-
-        imap_conn.logout();
+        debug!("mboxes len: {}", mboxes.0.len());
+        trace!("{:#?}", mboxes);
+        output.print(mboxes)?;
+        imap.logout()?;
         return Ok(true);
     }
 
-    debug!("nothing matched");
     Ok(false)
 }
 
-// == Argument Functions ==
 pub fn source_arg<'a>() -> clap::Arg<'a, 'a> {
     clap::Arg::with_name("mailbox")
         .short("m")
