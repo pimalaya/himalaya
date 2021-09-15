@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap;
 use log::debug;
 
-use crate::domain::{config::entity::Config, imap::ImapServiceInterface};
+use crate::domain::{config::entity::Config, imap::service::ImapServiceInterface};
 
 pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
     vec![

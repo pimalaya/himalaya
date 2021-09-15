@@ -2,7 +2,10 @@ use anyhow::Result;
 use clap;
 use log::debug;
 
-use crate::{domain::imap::ImapServiceInterface, flag::model::Flags, msg::cli::uid_arg};
+use crate::{
+    domain::{imap::service::ImapServiceInterface, msg::cli::uid_arg},
+    flag::model::Flags,
+};
 
 fn flags_arg<'a>() -> clap::Arg<'a, 'a> {
     clap::Arg::with_name("flags")

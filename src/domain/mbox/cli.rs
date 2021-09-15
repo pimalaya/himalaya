@@ -3,8 +3,7 @@ use clap;
 use log::{debug, trace};
 
 use crate::{
-    domain::imap::ImapServiceInterface,
-    mbox::model::Mboxes,
+    domain::{imap::service::ImapServiceInterface, mbox::entity::Mboxes},
     output::service::{OutputService, OutputServiceInterface},
 };
 

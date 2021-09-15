@@ -22,7 +22,7 @@ pub mod cli;
 
 /// Here are the two **main structs** of this module: `Msg` and `Msgs` which
 /// represent a *Mail* or *multiple Mails* in this crate.
-pub mod model;
+pub mod entity;
 
 /// This module is used in the `Msg` struct, which should represent an
 /// attachment of a msg.

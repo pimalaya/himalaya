@@ -15,14 +15,16 @@ use url::Url;
 
 use super::{
     body::Body,
+    entity::{Msg, MsgSerialized, Msgs},
     headers::Headers,
-    model::{Msg, MsgSerialized, Msgs},
 };
 use crate::{
-    domain::{account::entity::Account, imap::ImapServiceInterface, smtp::*},
+    domain::{
+        account::entity::Account, imap::service::ImapServiceInterface, mbox::cli::mbox_target_arg,
+        smtp::service::SmtpServiceInterface,
+    },
     flag::model::Flags,
     input,
-    mbox::cli::mbox_target_arg,
     output::service::{OutputService, OutputServiceInterface},
 };
 

@@ -1,6 +1,7 @@
-use anyhow::Result;
+use anyhow::{anyhow, Error, Result};
+use log::debug;
 use serde::Serialize;
-use std::fmt;
+use std::{fmt, str::FromStr};
 
 #[derive(Debug, PartialEq)]
 pub enum OutputFmt {
@@ -8,11 +9,13 @@ pub enum OutputFmt {
     Json,
 }
 
-impl From<&str> for OutputFmt {
-    fn from(slice: &str) -> Self {
+impl FromStr for OutputFmt {
+    type Err = Error;
+    fn from_str(slice: &str) -> Result<Self, Self::Err> {
         match slice {
-            "json" => Self::Json,
-            "plain" | _ => Self::Plain,
+            "JSON" | _ if slice.eq_ignore_ascii_case("json") => Ok(Self::Json),
+            "PLAIN" | _ if slice.eq_ignore_ascii_case("plain") => Ok(Self::Plain),
+            _ => Err(anyhow!("cannot parse output `{}`", slice)),
         }
     }
 }
@@ -21,7 +24,7 @@ impl fmt::Display for OutputFmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let slice = match self {
             &OutputFmt::Json => "JSON",
-            &OutputFmt::Plain => "Plain",
+            &OutputFmt::Plain => "PLAIN",
         };
         write!(f, "{}", slice)
     }
@@ -51,8 +54,11 @@ pub struct OutputService {
 
 impl OutputService {
     /// Create a new output-handler by setting the given formatting style.
-    pub fn new(fmt: &str) -> Self {
-        Self { fmt: fmt.into() }
+    pub fn new(slice: &str) -> Result<Self> {
+        debug!("init output service");
+        debug!("output: {}", slice);
+        let fmt = OutputFmt::from_str(slice)?;
+        Ok(Self { fmt })
     }
 
     /// Returns true, if the formatting should be plaintext.

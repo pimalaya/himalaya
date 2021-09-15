@@ -4,9 +4,10 @@ use log::{debug, trace};
 use native_tls::{self, TlsConnector, TlsStream};
 use std::{collections::HashSet, convert::TryFrom, iter::FromIterator, net::TcpStream};
 
-use crate::{domain::account::entity::Account, flag::model::Flags, msg::model::Msg};
-
-use super::config::entity::Config;
+use crate::{
+    domain::{account::entity::Account, config::entity::Config, msg::entity::Msg},
+    flag::model::Flags,
+};
 
 type ImapSession = imap::Session<TlsStream<TcpStream>>;
 type ImapMsgs = imap::types::ZeroCopy<Vec<imap::types::Fetch>>;

@@ -12,9 +12,7 @@
 //!
 //! [here]: https://doc.rust-lang.org/book/ch07-02-defining-modules-to-control-scope-and-privacy.html
 
-/// `comp` stands for `completion`. This module makes it possible to create autocompletion-settings
-/// for himalaya for your shell :)
-pub mod comp;
+pub mod compl;
 
 /// Everything which is related to the config files. For example the structure of your config file.
 pub mod config;
@@ -23,18 +21,9 @@ pub mod config;
 /// read-flag.
 pub mod flag;
 
-/// A wrapper for creating connections easier to the IMAP-Servers.
-pub mod imap;
-
 /// Handles the input-interaction with the user. For example if you want to edit the body of your
 /// message, his module takes care of the draft and calls your ~(neo)vim~ your favourite editor.
 pub mod input;
-
-/// Everything which is related to mboxes, for example creating or deleting some.
-pub mod mbox;
-
-/// Includes everything related to a message. This means: Body, Headers, Attachments, etc.
-pub mod msg;
 
 /// Handles the output. For example the JSON and HTML output.
 pub mod output;

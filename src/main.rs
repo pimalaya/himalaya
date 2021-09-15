@@ -5,16 +5,20 @@ use log::{debug, trace};
 use std::{convert::TryFrom, env, path::PathBuf};
 
 use himalaya::{
-    comp,
+    compl,
     config::cli::config_args,
     domain::{
-        account::entity::Account, config::entity::Config, imap::ImapService, smtp::SmtpService,
+        account::entity::Account,
+        config::entity::Config,
+        imap::{self, service::ImapService},
+        mbox, msg,
+        smtp::service::SmtpService,
     },
-    flag, imap, mbox, msg,
+    flag,
     output::{cli::output_args, service::OutputService},
 };
 
-fn parse_args<'a>() -> clap::App<'a, 'a> {
+fn create_app<'a>() -> clap::App<'a, 'a> {
     clap::App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
@@ -27,7 +31,7 @@ fn parse_args<'a>() -> clap::App<'a, 'a> {
         .subcommands(imap::cli::subcmds())
         .subcommands(mbox::cli::subcmds())
         .subcommands(msg::cli::subcmds())
-        .subcommands(comp::cli::subcmds())
+        .subcommands(compl::arg::subcmds())
 }
 
 fn main() -> Result<()> {
@@ -50,23 +54,23 @@ fn main() -> Result<()> {
     //     return Ok(msg_matches_mailto(&app, &url, smtp)?);
     // }
 
-    let args = parse_args();
-    let arg_matches = args.get_matches();
+    let app = create_app();
+    let m = app.get_matches();
 
-    // Check completion before init config
-    if comp::cli::matches(parse_args, &arg_matches)? {
+    // Check shell completion BEFORE any entity or service initialization.
+    if let Some(compl::arg::Match::Generate(shell)) = compl::arg::matches(&m)? {
+        let app = create_app();
+        compl::handler::generate(shell, app)?;
         return Ok(());
     }
 
-    debug!("init output service");
-    let output = OutputService::new(arg_matches.value_of("output").unwrap());
-    debug!("output service: {:?}", output);
+    let output = OutputService::new(m.value_of("output").unwrap())?;
 
     debug!("init mbox");
-    let mbox = arg_matches.value_of("mailbox").unwrap();
+    let mbox = m.value_of("mailbox").unwrap();
     debug!("mbox: {}", mbox);
 
-    let config_path: PathBuf = arg_matches
+    let config_path: PathBuf = m
         .value_of("config")
         .map(|s| s.into())
         .unwrap_or(Config::path()?);
@@ -74,7 +78,7 @@ fn main() -> Result<()> {
     let config = Config::try_from(config_path.clone())?;
     trace!("{:#?}", config);
 
-    let account_name = arg_matches.value_of("account");
+    let account_name = m.value_of("account");
     debug!("init account `{}`", account_name.unwrap_or("default"));
     let account = Account::try_from((&config, account_name))?;
     trace!("{:#?}", account);
@@ -86,10 +90,10 @@ fn main() -> Result<()> {
     let mut smtp = SmtpService::new(&account)?;
 
     debug!("begin matching");
-    let _matched = mbox::cli::matches(&arg_matches, &output, &mut imap)?
-        || flag::cli::matches(&arg_matches, &mut imap)?
-        || imap::cli::matches(&arg_matches, &config, &mut imap)?
-        || msg::cli::matches(&arg_matches, mbox, &account, &output, &mut imap, &mut smtp)?;
+    let _matched = mbox::cli::matches(&m, &output, &mut imap)?
+        || flag::cli::matches(&m, &mut imap)?
+        || imap::cli::matches(&m, &config, &mut imap)?
+        || msg::cli::matches(&m, mbox, &account, &output, &mut imap, &mut smtp)?;
 
     Ok(())
 }
