@@ -205,8 +205,7 @@ fn convert_to_static<'func>(flag: &'func Flag) -> Result<Flag<'static>, ()> {
 
 #[cfg(test)]
 mod tests {
-
-    use crate::flag::model::Flags;
+    use crate::domain::msg::flag::entity::Flags;
     use imap::types::Flag;
     use std::collections::HashSet;
 

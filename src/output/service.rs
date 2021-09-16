@@ -12,6 +12,15 @@ pub enum OutputFmt {
     Json,
 }
 
+impl From<&str> for OutputFmt {
+    fn from(fmt: &str) -> Self {
+        match fmt {
+            slice if slice.eq_ignore_ascii_case("json") => Self::Json,
+            _ => Self::Plain,
+        }
+    }
+}
+
 impl TryFrom<Option<&str>> for OutputFmt {
     type Error = Error;
 
@@ -96,6 +105,15 @@ impl Default for OutputService {
         Self {
             fmt: OutputFmt::Plain,
         }
+    }
+}
+
+impl From<&str> for OutputService {
+    fn from(fmt: &str) -> Self {
+        debug!("init output service");
+        debug!("output: `{:?}`", fmt);
+        let fmt = fmt.into();
+        Self { fmt }
     }
 }
 

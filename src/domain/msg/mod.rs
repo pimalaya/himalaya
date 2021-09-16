@@ -35,3 +35,6 @@ pub mod headers;
 /// This module is used in the `Msg` struct, which should represent the body of
 /// a msg; The part where you're writing some text like `Dear Mr. LMAO`.
 pub mod body;
+pub mod flag;
+pub mod handler;
+pub mod tpl;

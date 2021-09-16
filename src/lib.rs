@@ -17,10 +17,6 @@ pub mod compl;
 /// Everything which is related to the config files. For example the structure of your config file.
 pub mod config;
 
-/// A wrapper for representing a flag of a message or mailbox. For example the delete-flag or
-/// read-flag.
-pub mod flag;
-
 /// Handles the input-interaction with the user. For example if you want to edit the body of your
 /// message, his module takes care of the draft and calls your ~(neo)vim~ your favourite editor.
 pub mod input;

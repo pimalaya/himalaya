@@ -8,11 +8,11 @@ use log::{debug, trace};
 use native_tls::{self, TlsConnector, TlsStream};
 use std::{collections::HashSet, convert::TryFrom, iter::FromIterator, net::TcpStream};
 
-use crate::{
-    domain::{
-        account::entity::Account, config::entity::Config, mbox::entity::Mbox, msg::entity::Msg,
-    },
-    flag::model::Flags,
+use crate::domain::{
+    account::entity::Account,
+    config::entity::Config,
+    mbox::entity::Mbox,
+    msg::{entity::Msg, flag::entity::Flags},
 };
 
 type ImapSession = imap::Session<TlsStream<TcpStream>>;
