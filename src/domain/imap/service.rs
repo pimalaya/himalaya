@@ -1,3 +1,7 @@
+//! Module related to IMAP servicing.
+//!
+//! This module exposes a service that can interact with IMAP servers.
+
 use anyhow::{anyhow, Context, Result};
 use imap;
 use log::{debug, trace};

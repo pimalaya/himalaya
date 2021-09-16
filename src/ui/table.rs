@@ -4,7 +4,7 @@
 //!
 //! [builder design pattern]: https://refactoring.guru/design-patterns/builder
 
-use log::{debug, trace};
+use log::trace;
 use std::fmt;
 use terminal_size;
 use unicode_width::UnicodeWidthStr;
@@ -228,12 +228,12 @@ where
         table
             .iter_mut()
             .map(|row| {
-                debug!("processing row: {:?}", row);
+                trace!("processing row: {:?}", row);
                 row.0
                     .iter_mut()
                     .enumerate()
                     .map(|(i, cell)| {
-                        debug!("processing cell: {:?}", cell);
+                        trace!("processing cell: {:?}", cell);
                         trace!("table_width: {}", table_width);
                         trace!("max_width: {}", Self::max_width());
 

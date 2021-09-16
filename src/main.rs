@@ -23,14 +23,13 @@ fn create_app<'a>() -> clap::App<'a, 'a> {
         .version(env!("CARGO_PKG_VERSION"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .author(env!("CARGO_PKG_AUTHORS"))
-        .setting(clap::AppSettings::InferSubcommands)
         .args(&output_args())
         .args(&config_args())
-        .arg(mbox::cli::source_arg())
-        .subcommands(flag::cli::subcmds())
-        .subcommands(imap::cli::subcmds())
-        .subcommands(mbox::cli::subcmds())
-        .subcommands(msg::cli::subcmds())
+        .arg(mbox::arg::source_arg())
+        .subcommands(flag::arg::subcmds())
+        .subcommands(imap::arg::subcmds())
+        .subcommands(mbox::arg::subcmds())
+        .subcommands(msg::arg::subcmds())
         .subcommands(compl::arg::subcmds())
 }
 
@@ -57,9 +56,13 @@ fn main() -> Result<()> {
     let app = create_app();
     let m = app.get_matches();
 
-    // Check shell completion BEFORE any entity or service initialization.
-    if let Some(compl::arg::Match::Generate(shell)) = compl::arg::matches(&m)? {
-        return compl::handler::generate(shell, create_app());
+    // Check completion match BEFORE any entity or service initialization.
+    // See https://github.com/soywod/himalaya/issues/115.
+    match compl::arg::matches(&m)? {
+        Some(compl::arg::Match::Generate(shell)) => {
+            return compl::handler::generate(shell, create_app());
+        }
+        _ => (),
     }
 
     let mbox = Mbox::try_from(m.value_of("mailbox"))?;
@@ -69,11 +72,28 @@ fn main() -> Result<()> {
     let mut imap = ImapService::from((&account, &mbox));
     let mut smtp = SmtpService::from(&account);
 
+    // Check IMAP matches.
+    match imap::arg::matches(&m)? {
+        Some(imap::arg::Match::Notify(keepalive)) => {
+            return imap::handler::notify(keepalive, &config, &mut imap);
+        }
+        Some(imap::arg::Match::Watch(keepalive)) => {
+            return imap::handler::watch(keepalive, &mut imap);
+        }
+        _ => (),
+    }
+
+    // Check mailbox matches.
+    match mbox::arg::matches(&m)? {
+        Some(mbox::arg::Match::List) => {
+            return mbox::handler::list(&output, &mut imap);
+        }
+        _ => (),
+    }
+
     // TODO: use same system as compl
-    let _matched = mbox::cli::matches(&m, &output, &mut imap)?
-        || flag::cli::matches(&m, &mut imap)?
-        || imap::cli::matches(&m, &config, &mut imap)?
-        || msg::cli::matches(&m, &mbox, &account, &output, &mut imap, &mut smtp)?;
+    let _matched = flag::arg::matches(&m, &mut imap)?
+        || msg::arg::matches(&m, &mbox, &account, &output, &mut imap, &mut smtp)?;
 
     Ok(())
 }

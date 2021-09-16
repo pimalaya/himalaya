@@ -22,7 +22,7 @@ use crate::{
     domain::{
         account::entity::Account,
         imap::service::ImapServiceInterface,
-        mbox::{cli::mbox_target_arg, entity::Mbox},
+        mbox::{arg::target_arg, entity::Mbox},
         smtp::service::SmtpServiceInterface,
     },
     flag::model::Flags,
@@ -93,12 +93,12 @@ pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
             .aliases(&["cp"])
             .about("Copies a message to the targetted mailbox")
             .arg(uid_arg())
-            .arg(mbox_target_arg()),
+            .arg(target_arg()),
         clap::SubCommand::with_name("move")
             .aliases(&["mv"])
             .about("Moves a message to the targetted mailbox")
             .arg(uid_arg())
-            .arg(mbox_target_arg()),
+            .arg(target_arg()),
         clap::SubCommand::with_name("delete")
             .aliases(&["remove", "rm"])
             .about("Deletes a message")

@@ -18,7 +18,7 @@
 ///
 /// Execute `himalaya help <cmd>` where `<cmd>` is one entry of this list above
 /// to get more information about them.
-pub mod cli;
+pub mod arg;
 
 /// Here are the two **main structs** of this module: `Msg` and `Msgs` which
 /// represent a *Mail* or *multiple Mails* in this crate.

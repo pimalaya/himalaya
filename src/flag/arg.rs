@@ -3,7 +3,7 @@ use clap;
 use log::debug;
 
 use crate::{
-    domain::{imap::service::ImapServiceInterface, msg::cli::uid_arg},
+    domain::{imap::service::ImapServiceInterface, msg::arg::uid_arg},
     flag::model::Flags,
 };
 

@@ -1,4 +1,5 @@
-//! Modules related to IMAP.
+//! Module related to IMAP.
 
-pub mod cli;
+pub mod arg;
+pub mod handler;
 pub mod service;
