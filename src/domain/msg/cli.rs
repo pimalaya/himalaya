@@ -20,7 +20,9 @@ use super::{
 };
 use crate::{
     domain::{
-        account::entity::Account, imap::service::ImapServiceInterface, mbox::cli::mbox_target_arg,
+        account::entity::Account,
+        imap::service::ImapServiceInterface,
+        mbox::{cli::mbox_target_arg, entity::Mbox},
         smtp::service::SmtpServiceInterface,
     },
     flag::model::Flags,
@@ -130,7 +132,7 @@ pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
 
 pub fn matches<ImapService: ImapServiceInterface, SmtpService: SmtpServiceInterface>(
     arg_matches: &clap::ArgMatches,
-    mbox: &str,
+    mbox: &Mbox,
     account: &Account,
     output: &OutputService,
     imap: &mut ImapService,
@@ -578,14 +580,13 @@ fn msg_matches_copy<ImapService: ImapServiceInterface>(
     // fetch the message to be copyied
     let uid = matches.value_of("uid").unwrap();
     debug!("uid: {}", &uid);
-    let target = matches.value_of("target").unwrap();
-    debug!("target: {}", &target);
+    let target = Mbox::try_from(matches.value_of("target"))?;
 
     let mut msg = imap.get_msg(&uid)?;
     // the message, which will be in the new mailbox doesn't need to be seen
     msg.flags.insert(Flag::Seen);
 
-    imap.append_msg(target, &mut msg)?;
+    imap.append_msg(&target, &mut msg)?;
 
     debug!("message {} successfully copied to folder `{}`", uid, target);
 
@@ -608,13 +609,12 @@ fn msg_matches_move<ImapService: ImapServiceInterface>(
     // fetch the msg which should be moved
     let uid = matches.value_of("uid").unwrap();
     debug!("uid: {}", &uid);
-    let target = matches.value_of("target").unwrap();
-    debug!("target: {}", &target);
+    let target = Mbox::try_from(matches.value_of("target"))?;
 
     let mut msg = imap.get_msg(&uid)?;
     // create the msg in the target-msgbox
     msg.flags.insert(Flag::Seen);
-    imap.append_msg(target, &mut msg)?;
+    imap.append_msg(&target, &mut msg)?;
 
     debug!("message {} successfully moved to folder `{}`", uid, target);
     output.print(format!(
@@ -683,7 +683,8 @@ fn msg_matches_send<ImapService: ImapServiceInterface, SmtpService: SmtpServiceI
 
     // add the message/msg to the Sent-Mailbox of the user
     msg.flags.insert(Flag::Seen);
-    imap.append_msg("Sent", &mut msg)?;
+    let mbox = Mbox::from("Sent");
+    imap.append_msg(&mbox, &mut msg)?;
 
     imap.logout()?;
 
@@ -691,7 +692,7 @@ fn msg_matches_send<ImapService: ImapServiceInterface, SmtpService: SmtpServiceI
 }
 
 fn msg_matches_save<ImapService: ImapServiceInterface>(
-    mbox: &str,
+    mbox: &Mbox,
     matches: &clap::ArgMatches,
     imap: &mut ImapService,
 ) -> Result<bool> {
@@ -894,7 +895,8 @@ fn msg_interaction<ImapService: ImapServiceInterface, SmtpService: SmtpServiceIn
 
                     // let the server know, that the user sent a msg
                     msg.flags.insert(Flag::Seen);
-                    imap.append_msg("Sent", msg)?;
+                    let mbox = Mbox::from("Sent");
+                    imap.append_msg(&mbox, msg)?;
 
                     // remove the draft, since we sent it
                     input::remove_draft()?;
@@ -919,7 +921,8 @@ fn msg_interaction<ImapService: ImapServiceInterface, SmtpService: SmtpServiceIn
 
                     msg.flags.insert(Flag::Seen);
 
-                    match imap.append_msg("Drafts", msg) {
+                    let mbox = Mbox::from("Drafts");
+                    match imap.append_msg(&mbox, msg) {
                         Ok(_) => {
                             input::remove_draft()?;
                             output.print("Message successfully saved to Drafts")?;

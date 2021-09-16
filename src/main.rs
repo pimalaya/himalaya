@@ -1,8 +1,7 @@
 use anyhow::Result;
 use clap;
 use env_logger;
-use log::{debug, trace};
-use std::{convert::TryFrom, env, path::PathBuf};
+use std::{convert::TryFrom, env};
 
 use himalaya::{
     compl,
@@ -11,7 +10,8 @@ use himalaya::{
         account::entity::Account,
         config::entity::Config,
         imap::{self, service::ImapService},
-        mbox, msg,
+        mbox::{self, entity::Mbox},
+        msg,
         smtp::service::SmtpService,
     },
     flag,
@@ -35,13 +35,13 @@ fn create_app<'a>() -> clap::App<'a, 'a> {
 }
 
 fn main() -> Result<()> {
+    // Init env logger
     env_logger::init_from_env(
         env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "off"),
     );
 
+    // TODO: put in a `mailto` module
     // let raw_args: Vec<String> = env::args().collect();
-
-    // // This is used if you click on a mailaddress in the webbrowser
     // if raw_args.len() > 1 && raw_args[1].starts_with("mailto:") {
     //     let config = Config::new(None)?;
     //     let account = config.find_account_by_name(None)?.clone();
@@ -59,41 +59,21 @@ fn main() -> Result<()> {
 
     // Check shell completion BEFORE any entity or service initialization.
     if let Some(compl::arg::Match::Generate(shell)) = compl::arg::matches(&m)? {
-        let app = create_app();
-        compl::handler::generate(shell, app)?;
-        return Ok(());
+        return compl::handler::generate(shell, create_app());
     }
 
-    let output = OutputService::new(m.value_of("output").unwrap())?;
+    let mbox = Mbox::try_from(m.value_of("mailbox"))?;
+    let config = Config::try_from(m.value_of("config"))?;
+    let account = Account::try_from((&config, m.value_of("account")))?;
+    let output = OutputService::try_from(m.value_of("output"))?;
+    let mut imap = ImapService::from((&account, &mbox));
+    let mut smtp = SmtpService::from(&account);
 
-    debug!("init mbox");
-    let mbox = m.value_of("mailbox").unwrap();
-    debug!("mbox: {}", mbox);
-
-    let config_path: PathBuf = m
-        .value_of("config")
-        .map(|s| s.into())
-        .unwrap_or(Config::path()?);
-    debug!("init config from `{:?}`", config_path);
-    let config = Config::try_from(config_path.clone())?;
-    trace!("{:#?}", config);
-
-    let account_name = m.value_of("account");
-    debug!("init account `{}`", account_name.unwrap_or("default"));
-    let account = Account::try_from((&config, account_name))?;
-    trace!("{:#?}", account);
-
-    debug!("init IMAP service");
-    let mut imap = ImapService::new(&account, &mbox)?;
-
-    debug!("init SMTP service");
-    let mut smtp = SmtpService::new(&account)?;
-
-    debug!("begin matching");
+    // TODO: use same system as compl
     let _matched = mbox::cli::matches(&m, &output, &mut imap)?
         || flag::cli::matches(&m, &mut imap)?
         || imap::cli::matches(&m, &config, &mut imap)?
-        || msg::cli::matches(&m, mbox, &account, &output, &mut imap, &mut smtp)?;
+        || msg::cli::matches(&m, &mbox, &account, &output, &mut imap, &mut smtp)?;
 
     Ok(())
 }

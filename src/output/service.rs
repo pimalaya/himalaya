@@ -1,7 +1,10 @@
 use anyhow::{anyhow, Error, Result};
 use log::debug;
 use serde::Serialize;
-use std::{fmt, str::FromStr};
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt,
+};
 
 #[derive(Debug, PartialEq)]
 pub enum OutputFmt {
@@ -9,13 +12,15 @@ pub enum OutputFmt {
     Json,
 }
 
-impl FromStr for OutputFmt {
-    type Err = Error;
-    fn from_str(slice: &str) -> Result<Self, Self::Err> {
-        match slice {
-            "JSON" | _ if slice.eq_ignore_ascii_case("json") => Ok(Self::Json),
-            "PLAIN" | _ if slice.eq_ignore_ascii_case("plain") => Ok(Self::Plain),
-            _ => Err(anyhow!("cannot parse output `{}`", slice)),
+impl TryFrom<Option<&str>> for OutputFmt {
+    type Error = Error;
+
+    fn try_from(fmt: Option<&str>) -> Result<Self, Self::Error> {
+        match fmt {
+            Some(slice) if slice.eq_ignore_ascii_case("json") => Ok(Self::Json),
+            Some(slice) if slice.eq_ignore_ascii_case("plain") => Ok(Self::Plain),
+            None => Ok(Self::Plain),
+            Some(slice) => Err(anyhow!("cannot parse output `{}`", slice)),
         }
     }
 }
@@ -55,9 +60,7 @@ pub struct OutputService {
 impl OutputService {
     /// Create a new output-handler by setting the given formatting style.
     pub fn new(slice: &str) -> Result<Self> {
-        debug!("init output service");
-        debug!("output: {}", slice);
-        let fmt = OutputFmt::from_str(slice)?;
+        let fmt = OutputFmt::try_from(Some(slice))?;
         Ok(Self { fmt })
     }
 
@@ -93,5 +96,16 @@ impl Default for OutputService {
         Self {
             fmt: OutputFmt::Plain,
         }
+    }
+}
+
+impl TryFrom<Option<&str>> for OutputService {
+    type Error = Error;
+
+    fn try_from(fmt: Option<&str>) -> Result<Self, Self::Error> {
+        debug!("init output service");
+        debug!("output: `{:?}`", fmt);
+        let fmt = fmt.try_into()?;
+        Ok(Self { fmt })
     }
 }

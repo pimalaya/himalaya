@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Context, Error, Result};
-use log::debug;
+use log::{debug, trace};
 use serde::Deserialize;
 use shellexpand;
 use std::{collections::HashMap, convert::TryFrom, env, fs, path::PathBuf, thread};
@@ -284,12 +284,16 @@ impl Config {
     }
 }
 
-impl TryFrom<PathBuf> for Config {
+impl TryFrom<Option<&str>> for Config {
     type Error = Error;
 
-    fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
-        let file_content = fs::read_to_string(path).context("cannot read config file")?;
-        Ok(toml::from_str(&file_content).context("cannot parse config file")?)
+    fn try_from(path: Option<&str>) -> Result<Self, Self::Error> {
+        debug!("init config from `{:?}`", path);
+        let path = path.map(|s| s.into()).unwrap_or(Config::path()?);
+        let content = fs::read_to_string(path).context("cannot read config file")?;
+        let config = toml::from_str(&content).context("cannot parse config file")?;
+        trace!("{:#?}", config);
+        Ok(config)
     }
 }
 

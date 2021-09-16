@@ -5,7 +5,9 @@ use native_tls::{self, TlsConnector, TlsStream};
 use std::{collections::HashSet, convert::TryFrom, iter::FromIterator, net::TcpStream};
 
 use crate::{
-    domain::{account::entity::Account, config::entity::Config, msg::entity::Msg},
+    domain::{
+        account::entity::Account, config::entity::Config, mbox::entity::Mbox, msg::entity::Msg,
+    },
     flag::model::Flags,
 };
 
@@ -25,7 +27,7 @@ pub trait ImapServiceInterface {
         page: &usize,
     ) -> Result<Option<ImapMsgs>>;
     fn get_msg(&mut self, uid: &str) -> Result<Msg>;
-    fn append_msg(&mut self, mbox: &str, msg: &mut Msg) -> Result<()>;
+    fn append_msg(&mut self, mbox: &Mbox, msg: &mut Msg) -> Result<()>;
     fn add_flags(&mut self, uid_seq: &str, flags: Flags) -> Result<()>;
     fn set_flags(&mut self, uid_seq: &str, flags: Flags) -> Result<()>;
     fn remove_flags(&mut self, uid_seq: &str, flags: Flags) -> Result<()>;
@@ -35,20 +37,11 @@ pub trait ImapServiceInterface {
 
 pub struct ImapService<'a> {
     account: &'a Account,
-    mbox: &'a str,
+    mbox: &'a Mbox,
     sess: Option<ImapSession>,
 }
 
 impl<'a> ImapService<'a> {
-    pub fn new(account: &'a Account, mbox: &'a str) -> Result<Self> {
-        debug!("create new service");
-        Ok(Self {
-            account,
-            mbox,
-            sess: None,
-        })
-    }
-
     fn sess(&mut self) -> Result<&mut ImapSession> {
         if let None = self.sess {
             debug!("create TLS builder");
@@ -116,8 +109,8 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
         let mbox = self.mbox.to_owned();
         let last_seq = self
             .sess()?
-            .select(mbox)
-            .context(format!("cannot select mailbox `{}`", self.mbox))?
+            .select(&mbox.name)
+            .context(format!("cannot select mailbox `{}`", self.mbox.name))?
             .exists as i64;
 
         if last_seq == 0 {
@@ -150,8 +143,8 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
     ) -> Result<Option<ImapMsgs>> {
         let mbox = self.mbox.to_owned();
         self.sess()?
-            .select(mbox)
-            .context(format!("cannot select mailbox `{}`", self.mbox))?;
+            .select(&mbox.name)
+            .context(format!("cannot select mailbox `{}`", self.mbox.name))?;
 
         let begin = page * page_size;
         let end = begin + (page_size - 1);
@@ -160,7 +153,7 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
             .search(query)
             .context(format!(
                 "cannot search in `{}` with query `{}`",
-                self.mbox, query
+                self.mbox.name, query
             ))?
             .iter()
             .map(|seq| seq.to_string())
@@ -182,8 +175,8 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
     fn get_msg(&mut self, uid: &str) -> Result<Msg> {
         let mbox = self.mbox.to_owned();
         self.sess()?
-            .select(mbox)
-            .context(format!("cannot select mbox `{}`", self.mbox))?;
+            .select(&mbox.name)
+            .context(format!("cannot select mbox `{}`", self.mbox.name))?;
         match self
             .sess()?
             .uid_fetch(uid, "(FLAGS BODY[] ENVELOPE INTERNALDATE)")
@@ -195,14 +188,14 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
         }
     }
 
-    fn append_msg(&mut self, mbox: &str, msg: &mut Msg) -> Result<()> {
+    fn append_msg(&mut self, mbox: &Mbox, msg: &mut Msg) -> Result<()> {
         let body = msg.into_bytes()?;
         let flags: HashSet<imap::types::Flag<'static>> = (*msg.flags).clone();
         self.sess()?
-            .append(mbox, &body)
+            .append(&mbox.name, &body)
             .flags(flags)
             .finish()
-            .context(format!("cannot append message to `{}`", mbox))?;
+            .context(format!("cannot append message to `{}`", mbox.name))?;
         Ok(())
     }
 
@@ -230,8 +223,8 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
         let mbox = self.mbox.to_owned();
         let flags: String = flags.to_string();
         self.sess()?
-            .select(mbox)
-            .context(format!("cannot select mbox `{}`", self.mbox))?;
+            .select(&mbox.name)
+            .context(format!("cannot select mbox `{}`", self.mbox.name))?;
         self.sess()?
             .uid_store(uid_seq, format!("+FLAGS ({})", flags))
             .context(format!("cannot add flags `{}`", &flags))?;
@@ -263,8 +256,8 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
         let mbox = self.mbox.to_owned();
         let flags: String = flags.to_string();
         self.sess()?
-            .select(mbox)
-            .context(format!("cannot select mailbox `{}`", self.mbox))?;
+            .select(&mbox.name)
+            .context(format!("cannot select mailbox `{}`", self.mbox.name))?;
         self.sess()?
             .uid_store(uid_seq, format!("FLAGS ({})", flags))
             .context(format!("cannot set flags `{}`", &flags))?;
@@ -277,8 +270,8 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
         let mbox = self.mbox.to_owned();
         let flags = flags.to_string();
         self.sess()?
-            .select(mbox)
-            .context(format!("cannot select mailbox `{}`", self.mbox))?;
+            .select(&mbox.name)
+            .context(format!("cannot select mailbox `{}`", self.mbox.name))?;
         self.sess()?
             .uid_store(uid_seq, format!("-FLAGS ({})", flags))
             .context(format!("cannot remove flags `{}`", &flags))?;
@@ -288,17 +281,17 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
     fn expunge(&mut self) -> Result<()> {
         self.sess()?
             .expunge()
-            .context(format!("cannot expunge `{}`", self.mbox))?;
+            .context(format!("cannot expunge `{}`", self.mbox.name))?;
         Ok(())
     }
 
     fn notify(&mut self, config: &Config, keepalive: u64) -> Result<()> {
         let mbox = self.mbox.to_owned();
 
-        debug!("examine mailbox: {}", mbox);
+        debug!("examine mailbox: {}", mbox.name);
         self.sess()?
-            .examine(mbox)
-            .context(format!("cannot examine mailbox `{}`", &self.mbox))?;
+            .examine(&mbox.name)
+            .context(format!("cannot examine mailbox `{}`", &self.mbox.name))?;
 
         debug!("init messages hashset");
         let mut msgs_set: HashSet<u32> =
@@ -361,12 +354,12 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
     }
 
     fn watch(&mut self, keepalive: u64) -> Result<()> {
-        debug!("examine mailbox: {}", &self.mbox);
+        debug!("examine mailbox: {}", &self.mbox.name);
         let mbox = self.mbox.to_owned();
 
         self.sess()?
-            .examine(mbox)
-            .context(format!("cannot examine mailbox `{}`", &self.mbox))?;
+            .examine(&mbox.name)
+            .context(format!("cannot examine mailbox `{}`", &self.mbox.name))?;
 
         loop {
             debug!("begin loop");
@@ -396,6 +389,12 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
     }
 }
 
-//impl<'a> ImapConnector<'a> {
-
-//}
+impl<'a> From<(&'a Account, &'a Mbox)> for ImapService<'a> {
+    fn from((account, mbox): (&'a Account, &'a Mbox)) -> Self {
+        Self {
+            account,
+            mbox,
+            sess: None,
+        }
+    }
+}

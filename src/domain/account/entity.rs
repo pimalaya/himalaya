@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context, Error, Result};
 use lettre::transport::smtp::authentication::Credentials as SmtpCredentials;
-use log::debug;
+use log::{debug, trace};
 use std::{convert::TryFrom, env, fs, path::PathBuf};
 
 use crate::{domain::config::entity::Config, output::utils::run_cmd};
@@ -210,6 +210,7 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
     type Error = Error;
 
     fn try_from((config, account_name): (&'a Config, Option<&str>)) -> Result<Self, Self::Error> {
+        debug!("init account `{}`", account_name.unwrap_or("default"));
         let (name, account) = match account_name {
             Some("") | None => config
                 .accounts
@@ -265,7 +266,7 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
             .map(|sig| format!("\n{}{}", signature_delim, sig))
             .unwrap_or_default();
 
-        Ok(Account {
+        let account = Account {
             name,
             from: account.name.as_ref().unwrap_or(&config.name).to_owned(),
             downloads_dir,
@@ -291,6 +292,9 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
             smtp_insecure: account.smtp_insecure.unwrap_or_default(),
             smtp_login: account.smtp_login.to_owned(),
             smtp_passwd_cmd: account.smtp_passwd_cmd.to_owned(),
-        })
+        };
+
+        trace!("{:#?}", account);
+        Ok(account)
     }
 }

@@ -1,11 +1,13 @@
+use anyhow::{anyhow, Error, Result};
 use imap::types::NameAttribute;
+use log::debug;
 use serde::{
     ser::{self, SerializeSeq},
     Serialize,
 };
-use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fmt;
+use std::{borrow::Cow, convert::TryFrom};
 
 use crate::ui::table::{Cell, Row, Table};
 
@@ -99,6 +101,41 @@ pub struct Mbox {
     pub attributes: Attributes,
 }
 
+impl Mbox {
+    pub fn new<S: AsRef<str>>(name: S) -> Self {
+        Self {
+            name: name.as_ref().to_owned(),
+            ..Self::default()
+        }
+    }
+}
+
+impl Default for Mbox {
+    fn default() -> Self {
+        Self {
+            delim: String::default(),
+            name: String::default(),
+            attributes: Attributes::from(&[] as &[NameAttribute]),
+        }
+    }
+}
+
+impl fmt::Display for Mbox {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.name)
+    }
+}
+
+impl From<&str> for Mbox {
+    fn from(mbox: &str) -> Self {
+        debug!("init mailbox from `{:?}`", mbox);
+        Self {
+            name: mbox.to_owned(),
+            ..Self::default()
+        }
+    }
+}
+
 impl<'a> From<&'a imap::types::Name> for Mbox {
     fn from(name: &'a imap::types::Name) -> Self {
         Self {
@@ -106,6 +143,18 @@ impl<'a> From<&'a imap::types::Name> for Mbox {
             name: name.name().to_owned(),
             attributes: Attributes::from(name.attributes()),
         }
+    }
+}
+
+impl TryFrom<Option<&str>> for Mbox {
+    type Error = Error;
+
+    fn try_from(mbox: Option<&str>) -> Result<Self, Self::Error> {
+        debug!("init mailbox from `{:?}`", mbox);
+        Ok(Self {
+            name: mbox.ok_or(anyhow!("cannot parse mailbox"))?.to_string(),
+            ..Self::default()
+        })
     }
 }
 

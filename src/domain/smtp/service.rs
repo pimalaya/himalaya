@@ -7,6 +7,7 @@ use lettre::{
     },
     Transport,
 };
+use log::debug;
 
 use crate::domain::account::entity::Account;
 
@@ -20,13 +21,6 @@ pub struct SmtpService<'a> {
 }
 
 impl<'a> SmtpService<'a> {
-    pub fn new(account: &'a Account) -> Result<Self> {
-        Ok(Self {
-            account,
-            transport: None,
-        })
-    }
-
     fn transport(&mut self) -> Result<&SmtpTransport> {
         if let Some(ref transport) = self.transport {
             Ok(transport)
@@ -64,5 +58,15 @@ impl<'a> SmtpServiceInterface for SmtpService<'a> {
     fn send(&mut self, msg: &lettre::Message) -> Result<()> {
         self.transport()?.send(msg)?;
         Ok(())
+    }
+}
+
+impl<'a> From<&'a Account> for SmtpService<'a> {
+    fn from(account: &'a Account) -> Self {
+        debug!("init SMTP service");
+        Self {
+            account,
+            transport: None,
+        }
     }
 }
