@@ -16,7 +16,7 @@ use himalaya::{
         msg,
         smtp::service::SmtpService,
     },
-    output::{cli::output_args, service::OutputService},
+    output::{self, service::OutputService},
 };
 
 fn create_app<'a>() -> clap::App<'a, 'a> {
@@ -24,7 +24,7 @@ fn create_app<'a>() -> clap::App<'a, 'a> {
         .version(env!("CARGO_PKG_VERSION"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .author(env!("CARGO_PKG_AUTHORS"))
-        .args(&output_args())
+        .args(&output::arg::args())
         .args(&config::arg::args())
         .arg(mbox::arg::source_arg())
         .subcommands(compl::arg::subcmds())

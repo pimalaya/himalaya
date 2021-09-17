@@ -1,6 +1,7 @@
 use clap::Arg;
 
-pub fn output_args<'a>() -> Vec<Arg<'a, 'a>> {
+/// Output arguments.
+pub fn args<'a>() -> Vec<Arg<'a, 'a>> {
     vec![
         Arg::with_name("output")
             .long("output")
