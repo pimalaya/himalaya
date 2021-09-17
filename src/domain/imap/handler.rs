@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 
-use crate::domain::{config::entity::Config, imap::service::ImapServiceInterface};
+use crate::{config::entity::Config, domain::imap::service::ImapServiceInterface};
 
 /// Notify handler.
 pub fn notify<ImapService: ImapServiceInterface>(

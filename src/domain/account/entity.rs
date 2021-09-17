@@ -3,7 +3,7 @@ use lettre::transport::smtp::authentication::Credentials as SmtpCredentials;
 use log::{debug, trace};
 use std::{convert::TryFrom, env, fs, path::PathBuf};
 
-use crate::{domain::config::entity::Config, output::utils::run_cmd};
+use crate::{config::entity::Config, output::utils::run_cmd};
 
 const DEFAULT_PAGE_SIZE: usize = 10;
 const DEFAULT_SIG_DELIM: &str = "-- \n";
