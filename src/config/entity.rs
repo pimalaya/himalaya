@@ -90,7 +90,7 @@ impl Config {
             Some(name) => self
                 .accounts
                 .get(name)
-                .ok_or_else(|| anyhow!(format!("cannot find account `{}`", name))),
+                .ok_or_else(|| anyhow!("cannot find account `{}`", name)),
         }
     }
 
@@ -513,7 +513,7 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
                 .accounts
                 .get(name)
                 .map(|account| (name.to_owned(), account))
-                .ok_or_else(|| anyhow!(format!("cannot find account `{}`", name))),
+                .ok_or_else(|| anyhow!("cannot find account `{}`", name)),
         }?;
 
         let downloads_dir = account

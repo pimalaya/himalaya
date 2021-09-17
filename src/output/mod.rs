@@ -1,4 +1,4 @@
-//! Modules related to output formatting and printing.
+//! Module related to output formatting and printing.
 
 pub mod cli;
 pub mod service;

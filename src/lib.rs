@@ -17,10 +17,6 @@ pub mod compl;
 /// Everything which is related to the config files. For example the structure of your config file.
 pub mod config;
 
-/// Handles the input-interaction with the user. For example if you want to edit the body of your
-/// message, his module takes care of the draft and calls your ~(neo)vim~ your favourite editor.
-pub mod input;
-
 /// Handles the output. For example the JSON and HTML output.
 pub mod output;
 

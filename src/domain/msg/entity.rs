@@ -11,7 +11,7 @@ use crate::{
 };
 
 #[cfg(not(test))]
-use crate::input;
+use crate::ui::editor;
 
 use serde::Serialize;
 
@@ -435,7 +435,7 @@ impl Msg {
         // tests, because we just need to look, if the headers are set
         // correctly
         #[cfg(not(test))]
-        let msg = input::open_editor_with_tpl(msg.as_bytes())?;
+        let msg = editor::open_editor_with_tpl(msg.as_bytes())?;
 
         // refresh the state of the msg
         self.parse_from_str(&msg)?;
@@ -481,7 +481,7 @@ impl Msg {
     /// ```
     pub fn parse_from_str(&mut self, content: &str) -> Result<()> {
         let parsed = mailparse::parse_mail(content.as_bytes())
-            .with_context(|| format!("How the message looks like currently:\n{}", self))?;
+            .context(format!("How the message looks like currently:\n{}", self))?;
 
         self.headers = Headers::from(&parsed);
 
@@ -577,10 +577,7 @@ impl Msg {
         // add "from"
         for mailaddress in &self.headers.from {
             msg = msg.from(
-                match mailaddress
-                    .parse()
-                    .with_context(|| "cannot parse `From` header")
-                {
+                match mailaddress.parse().context("cannot parse `From` header") {
                     Ok(from) => from,
                     Err(err) => return Err(anyhow!(err.to_string())),
                 },
@@ -590,10 +587,7 @@ impl Msg {
         // add "to"
         for mailaddress in &self.headers.to {
             msg = msg.to(
-                match mailaddress
-                    .parse()
-                    .with_context(|| "cannot parse `To` header")
-                {
+                match mailaddress.parse().context("cannot parse `To` header") {
                     Ok(from) => from,
                     Err(err) => return Err(anyhow!(err.to_string())),
                 },
@@ -605,10 +599,7 @@ impl Msg {
         if let Some(bcc) = &self.headers.bcc {
             for mailaddress in bcc {
                 msg = msg.bcc(
-                    match mailaddress
-                        .parse()
-                        .with_context(|| "cannot parse `Bcc` header")
-                    {
+                    match mailaddress.parse().context("cannot parse `Bcc` header") {
                         Ok(from) => from,
                         Err(err) => return Err(anyhow!(err.to_string())),
                     },
@@ -620,10 +611,7 @@ impl Msg {
         if let Some(cc) = &self.headers.cc {
             for mailaddress in cc {
                 msg = msg.cc(
-                    match mailaddress
-                        .parse()
-                        .with_context(|| "cannot parse `Cc` header")
-                    {
+                    match mailaddress.parse().context("cannot parse `Cc` header") {
                         Ok(from) => from,
                         Err(err) => return Err(anyhow!(err.to_string())),
                     },
@@ -636,7 +624,7 @@ impl Msg {
             msg = msg.in_reply_to(
                 match in_reply_to
                     .parse()
-                    .with_context(|| "cannot parse `In-Reply-To` header")
+                    .context("cannot parse `In-Reply-To` header")
                 {
                     Ok(from) => from,
                     Err(err) => return Err(anyhow!(err.to_string())),
@@ -665,7 +653,7 @@ impl Msg {
                 msg = msg.reply_to(
                     match mailaddress
                         .parse()
-                        .with_context(|| "cannot parse `Reply-To` header")
+                        .context("cannot parse `Reply-To` header")
                     {
                         Ok(from) => from,
                         Err(err) => return Err(anyhow!(err.to_string())),
@@ -677,10 +665,7 @@ impl Msg {
         // add "sender"
         if let Some(sender) = &self.headers.sender {
             msg = msg.sender(
-                match sender
-                    .parse()
-                    .with_context(|| "cannot parse `Sender` header")
-                {
+                match sender.parse().context("cannot parse `Sender` header") {
                     Ok(from) => from,
                     Err(err) => return Err(anyhow!(err.to_string())),
                 },

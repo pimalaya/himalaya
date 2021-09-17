@@ -1,3 +1,3 @@
-//! Modules related to SMTP.
+//! Module related to SMTP.
 
 pub mod service;

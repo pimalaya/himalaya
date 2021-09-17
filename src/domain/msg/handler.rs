@@ -17,13 +17,14 @@ use crate::{
         imap::service::ImapServiceInterface,
         mbox::entity::Mbox,
         msg::{
+            self,
             body::Body,
             entity::{Msg, Msgs},
         },
         smtp::service::SmtpServiceInterface,
     },
-    input,
     output::service::{OutputService, OutputServiceInterface},
+    ui::choice::{self, PostEditChoice},
 };
 
 use super::{entity::MsgSerialized, flag::entity::Flags, headers::Headers};
@@ -39,9 +40,9 @@ fn msg_interaction<ImapService: ImapServiceInterface, SmtpService: SmtpServiceIn
     msg.edit_body()?;
 
     loop {
-        match input::post_edit_choice() {
+        match choice::post_edit() {
             Ok(choice) => match choice {
-                input::PostEditChoice::Send => {
+                PostEditChoice::Send => {
                     debug!("sending message…");
 
                     // prepare the msg to be send
@@ -68,12 +69,12 @@ fn msg_interaction<ImapService: ImapServiceInterface, SmtpService: SmtpServiceIn
                     imap.append_msg(&mbox, msg)?;
 
                     // remove the draft, since we sent it
-                    input::remove_draft()?;
+                    msg::utils::remove_draft()?;
                     output.print("Message successfully sent")?;
                     break;
                 }
                 // edit the body of the msg
-                input::PostEditChoice::Edit => {
+                PostEditChoice::Edit => {
                     // Did something goes wrong when the user changed the
                     // content?
                     if let Err(err) = msg.edit_body() {
@@ -84,8 +85,8 @@ fn msg_interaction<ImapService: ImapServiceInterface, SmtpService: SmtpServiceIn
                         ));
                     }
                 }
-                input::PostEditChoice::LocalDraft => break,
-                input::PostEditChoice::RemoteDraft => {
+                PostEditChoice::LocalDraft => break,
+                PostEditChoice::RemoteDraft => {
                     debug!("saving to draft…");
 
                     msg.flags.insert(Flag::Seen);
@@ -93,7 +94,7 @@ fn msg_interaction<ImapService: ImapServiceInterface, SmtpService: SmtpServiceIn
                     let mbox = Mbox::from("Drafts");
                     match imap.append_msg(&mbox, msg) {
                         Ok(_) => {
-                            input::remove_draft()?;
+                            msg::utils::remove_draft()?;
                             output.print("Message successfully saved to Drafts")?;
                         }
                         Err(err) => {
@@ -103,8 +104,8 @@ fn msg_interaction<ImapService: ImapServiceInterface, SmtpService: SmtpServiceIn
                     };
                     break;
                 }
-                input::PostEditChoice::Discard => {
-                    input::remove_draft()?;
+                PostEditChoice::Discard => {
+                    msg::utils::remove_draft()?;
                     break;
                 }
             },

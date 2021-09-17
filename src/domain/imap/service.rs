@@ -339,7 +339,7 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
                 for fetch in fetches.iter() {
                     let msg = Msg::try_from(fetch)?;
                     let uid = fetch.uid.ok_or_else(|| {
-                        anyhow!(format!("cannot retrieve message {}'s UID", fetch.message))
+                        anyhow!("cannot retrieve message {}'s UID", fetch.message)
                     })?;
 
                     let subject = msg.headers.subject.clone().unwrap_or_default();
@@ -386,10 +386,10 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
     }
 
     fn logout(&mut self) -> Result<()> {
-        debug!("logout from IMAP server");
-        self.sess()?
-            .logout()
-            .context("cannot logout from IMAP server")?;
+        if let Some(ref mut sess) = self.sess {
+            debug!("logout from IMAP server");
+            sess.logout().context("cannot logout from IMAP server")?;
+        }
         Ok(())
     }
 }
