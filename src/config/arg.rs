@@ -1,10 +1,17 @@
 use clap::Arg;
 
-/// Config argument.
-pub fn path_arg<'a>() -> Arg<'a, 'a> {
-    Arg::with_name("config")
-        .long("config")
-        .short("c")
-        .help("Forces a specific config path")
-        .value_name("PATH")
+/// Config arguments.
+pub fn args<'a>() -> Vec<Arg<'a, 'a>> {
+    vec![
+        Arg::with_name("config")
+            .long("config")
+            .short("c")
+            .help("Forces a specific config path")
+            .value_name("PATH"),
+        Arg::with_name("account")
+            .long("account")
+            .short("a")
+            .help("Selects a specific account")
+            .value_name("NAME"),
+    ]
 }

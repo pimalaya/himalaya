@@ -9,9 +9,8 @@ use native_tls::{self, TlsConnector, TlsStream};
 use std::{collections::HashSet, convert::TryFrom, iter::FromIterator, net::TcpStream};
 
 use crate::{
-    config::entity::Config,
+    config::entity::{Account, Config},
     domain::{
-        account::entity::Account,
         mbox::entity::Mbox,
         msg::{entity::Msg, flag::entity::Flags},
     },

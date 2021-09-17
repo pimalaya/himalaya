@@ -4,8 +4,8 @@ use anyhow::Result;
 use log::trace;
 
 use crate::{
+    config::entity::Account,
     domain::{
-        account::entity::Account,
         imap::service::ImapServiceInterface,
         msg::entity::{Msg, MsgSerialized},
     },

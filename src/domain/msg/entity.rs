@@ -5,7 +5,8 @@ use mailparse;
 
 use super::{attachment::Attachment, body::Body, headers::Headers};
 use crate::{
-    domain::{account::entity::Account, msg::flag::entity::Flags},
+    config::entity::Account,
+    domain::msg::flag::entity::Flags,
     ui::table::{Cell, Row, Table},
 };
 

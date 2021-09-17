@@ -6,9 +6,11 @@ use url::Url;
 
 use himalaya::{
     compl,
-    config::{self, entity::Config},
+    config::{
+        self,
+        entity::{Account, Config},
+    },
     domain::{
-        account::{self, entity::Account},
         imap::{self, service::ImapService},
         mbox::{self, entity::Mbox},
         msg,
@@ -23,8 +25,7 @@ fn create_app<'a>() -> clap::App<'a, 'a> {
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .author(env!("CARGO_PKG_AUTHORS"))
         .args(&output_args())
-        .arg(config::arg::path_arg())
-        .arg(account::arg::name_arg())
+        .args(&config::arg::args())
         .arg(mbox::arg::source_arg())
         .subcommands(compl::arg::subcmds())
         .subcommands(imap::arg::subcmds())
