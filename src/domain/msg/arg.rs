@@ -1,3 +1,7 @@
+//! Module related to message CLI.
+//!
+//! This module provides subcommands, arguments and a command matcher related to message.
+
 use anyhow::Result;
 use clap::{self, App, Arg, ArgMatches, SubCommand};
 use log::debug;
@@ -15,8 +19,8 @@ type RawMsg<'a> = &'a str;
 type Query = String;
 type AttachmentsPaths<'a> = Vec<&'a str>;
 
-/// Enumeration of all possible matches.
-pub enum Match<'a> {
+/// Message commands.
+pub enum Command<'a> {
     Attachments(Uid<'a>),
     Copy(Uid<'a>, TargetMbox<'a>),
     Delete(Uid<'a>),
@@ -30,16 +34,17 @@ pub enum Match<'a> {
     Send(RawMsg<'a>),
     Write(AttachmentsPaths<'a>),
 
-    Flag(msg::flag::arg::Match<'a>),
-    Tpl(msg::tpl::arg::Match<'a>),
+    Flag(msg::flag::arg::Command<'a>),
+    Tpl(msg::tpl::arg::Command<'a>),
 }
 
-pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Match<'a>>> {
+/// Message command matcher.
+pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
     if let Some(m) = m.subcommand_matches("attachments") {
         debug!("attachments command matched");
         let uid = m.value_of("uid").unwrap();
         debug!("uid: {}", &uid);
-        return Ok(Some(Match::Attachments(uid)));
+        return Ok(Some(Command::Attachments(uid)));
     }
 
     if let Some(m) = m.subcommand_matches("copy") {
@@ -48,18 +53,18 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Match<'a>>> {
         debug!("uid: {}", &uid);
         let target = m.value_of("target");
         debug!("target mailbox: `{:?}`", target);
-        return Ok(Some(Match::Copy(uid, target)));
+        return Ok(Some(Command::Copy(uid, target)));
     }
 
     if let Some(m) = m.subcommand_matches("delete") {
         debug!("copy command matched");
         let uid = m.value_of("uid").unwrap();
         debug!("uid: {}", &uid);
-        return Ok(Some(Match::Delete(uid)));
+        return Ok(Some(Command::Delete(uid)));
     }
 
     if let Some(m) = msg::flag::arg::matches(&m)? {
-        return Ok(Some(Match::Flag(m)));
+        return Ok(Some(Command::Flag(m)));
     }
 
     if let Some(m) = m.subcommand_matches("forward") {
@@ -68,7 +73,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Match<'a>>> {
         let paths: Vec<&str> = m.values_of("attachments").unwrap_or_default().collect();
         debug!("attachments paths: {:?}", paths);
         debug!("uid: {}", &uid);
-        return Ok(Some(Match::Forward(uid, paths)));
+        return Ok(Some(Command::Forward(uid, paths)));
     }
 
     if let Some(m) = m.subcommand_matches("list") {
@@ -83,7 +88,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Match<'a>>> {
             .map(|page| 1.max(page) - 1)
             .unwrap_or_default();
         debug!("page: `{:?}`", page);
-        return Ok(Some(Match::List(page_size, page)));
+        return Ok(Some(Command::List(page_size, page)));
     }
 
     if let Some(m) = m.subcommand_matches("move") {
@@ -92,7 +97,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Match<'a>>> {
         debug!("uid: {}", &uid);
         let target = m.value_of("target");
         debug!("target mailbox: `{:?}`", target);
-        return Ok(Some(Match::Move(uid, target)));
+        return Ok(Some(Command::Move(uid, target)));
     }
 
     if let Some(m) = m.subcommand_matches("read") {
@@ -102,7 +107,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Match<'a>>> {
         debug!("mime: {}", mime);
         let raw = m.is_present("raw");
         debug!("raw: {}", raw);
-        return Ok(Some(Match::Read(uid, mime, raw)));
+        return Ok(Some(Command::Read(uid, mime, raw)));
     }
 
     if let Some(m) = m.subcommand_matches("reply") {
@@ -113,7 +118,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Match<'a>>> {
         debug!("reply all: {}", all);
         let paths: Vec<&str> = m.values_of("attachments").unwrap_or_default().collect();
         debug!("attachments paths: {:?}", paths);
-        return Ok(Some(Match::Reply(uid, all, paths)));
+        return Ok(Some(Command::Reply(uid, all, paths)));
     }
 
     if let Some(m) = m.subcommand_matches("save") {
@@ -122,7 +127,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Match<'a>>> {
         debug!("message: {}", &msg);
         let target = m.value_of("target");
         debug!("target mailbox: `{:?}`", target);
-        return Ok(Some(Match::Save(target, msg)));
+        return Ok(Some(Command::Save(target, msg)));
     }
 
     if let Some(m) = m.subcommand_matches("search") {
@@ -161,34 +166,32 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Match<'a>>> {
             })
             .1
             .join(" ");
-        return Ok(Some(Match::Search(query, page_size, page)));
+        return Ok(Some(Command::Search(query, page_size, page)));
     }
 
     if let Some(m) = m.subcommand_matches("send") {
         debug!("send command matched");
         let msg = m.value_of("message").unwrap_or_default();
         debug!("message: {}", msg);
-        return Ok(Some(Match::Send(msg)));
+        return Ok(Some(Command::Send(msg)));
     }
 
     if let Some(m) = msg::tpl::arg::matches(&m)? {
-        return Ok(Some(Match::Tpl(m)));
+        return Ok(Some(Command::Tpl(m)));
     }
 
     if let Some(m) = m.subcommand_matches("write") {
         debug!("write command matched");
         let attachment_paths: Vec<&str> = m.values_of("attachments").unwrap_or_default().collect();
         debug!("attachments paths: {:?}", attachment_paths);
-        return Ok(Some(Match::Write(attachment_paths)));
+        return Ok(Some(Command::Write(attachment_paths)));
     }
 
     debug!("default list command matched");
-    Ok(Some(Match::List(None, 0)))
+    Ok(Some(Command::List(None, 0)))
 }
 
-// == Argument Functions ==
-/// Returns an Clap-Argument to be able to use `<UID>` in the commandline like
-/// for the `himalaya read` subcommand.
+/// Message UID argument.
 pub(crate) fn uid_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name("uid")
         .help("Specifies the targetted message")
@@ -196,6 +199,7 @@ pub(crate) fn uid_arg<'a>() -> Arg<'a, 'a> {
         .required(true)
 }
 
+/// Message reply all argument.
 pub(crate) fn reply_all_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name("reply-all")
         .help("Includes all recipients")
@@ -203,6 +207,7 @@ pub(crate) fn reply_all_arg<'a>() -> Arg<'a, 'a> {
         .long("all")
 }
 
+/// Message page size argument.
 fn page_size_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name("page-size")
         .help("Page size")
@@ -211,6 +216,7 @@ fn page_size_arg<'a>() -> Arg<'a, 'a> {
         .value_name("INT")
 }
 
+/// Message page argument.
 fn page_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name("page")
         .help("Page number")
@@ -220,6 +226,7 @@ fn page_arg<'a>() -> Arg<'a, 'a> {
         .default_value("0")
 }
 
+/// Message attachment argument.
 /// TODO: move to attachment folder
 fn attachment_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name("attachments")
@@ -230,7 +237,7 @@ fn attachment_arg<'a>() -> Arg<'a, 'a> {
         .multiple(true)
 }
 
-/// Messages subcommands.
+/// Message subcommands.
 pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
     vec![
         msg::flag::arg::subcmds(),

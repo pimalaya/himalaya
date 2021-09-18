@@ -1,3 +1,7 @@
+//! Module related to message flag CLI.
+//!
+//! This module provides subcommands, arguments and a command matcher related to message flag.
+
 use anyhow::Result;
 use clap::{self, App, Arg, ArgMatches, SubCommand};
 use log::debug;
@@ -7,22 +11,22 @@ use crate::domain::msg;
 type Uid<'a> = &'a str;
 type Flags<'a> = &'a str;
 
-/// Enumeration of all possible matches.
-pub enum Match<'a> {
+/// Message flag commands.
+pub enum Command<'a> {
     Set(Uid<'a>, Flags<'a>),
     Add(Uid<'a>, Flags<'a>),
     Remove(Uid<'a>, Flags<'a>),
 }
 
-/// Message flag arg matcher.
-pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Match<'a>>> {
+/// Message flag command matcher.
+pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
     if let Some(m) = m.subcommand_matches("set") {
         debug!("set command matched");
         let uid = m.value_of("uid").unwrap();
         debug!("uid: {}", uid);
         let flags = m.value_of("flags").unwrap();
         debug!("flags: {}", flags);
-        return Ok(Some(Match::Set(uid, flags)));
+        return Ok(Some(Command::Set(uid, flags)));
     }
 
     if let Some(m) = m.subcommand_matches("add") {
@@ -31,7 +35,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Match<'a>>> {
         debug!("uid: {}", uid);
         let flags = m.value_of("flags").unwrap();
         debug!("flags: {}", flags);
-        return Ok(Some(Match::Add(uid, flags)));
+        return Ok(Some(Command::Add(uid, flags)));
     }
 
     if let Some(m) = m.subcommand_matches("remove") {
@@ -40,13 +44,13 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Match<'a>>> {
         debug!("uid: {}", uid);
         let flags = m.value_of("flags").unwrap();
         debug!("flags: {}", flags);
-        return Ok(Some(Match::Remove(uid, flags)));
+        return Ok(Some(Command::Remove(uid, flags)));
     }
 
     Ok(None)
 }
 
-/// Message flag arg.
+/// Message flag flags argument.
 fn flags_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name("flags")
         .help("IMAP flags (see https://tools.ietf.org/html/rfc3501#page-11). Just write the flag name without the backslash. Example: --flags \"Seen Answered\"")

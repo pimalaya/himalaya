@@ -1,24 +1,26 @@
-//! Module related to completion arguments.
+//! Module related to completion CLI.
 //!
-//! This module provides subcommands and an argument matcher related to completion.
+//! This module provides subcommands and a command matcher related to completion.
 
 use anyhow::Result;
 use clap::{self, App, Arg, ArgMatches, Shell, SubCommand};
 use log::debug;
 
-/// Enumeration of all possible matches.
-pub enum Match<'a> {
+type OptionShell<'a> = Option<&'a str>;
+
+/// Completion commands.
+pub enum Command<'a> {
     /// Generate completion script for the given shell slice.
-    Generate(&'a str),
+    Generate(OptionShell<'a>),
 }
 
-/// Completion arg matcher.
-pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Match<'a>>> {
+/// Completion command matcher.
+pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
     if let Some(m) = m.subcommand_matches("completion") {
         debug!("completion command matched");
-        let shell = m.value_of("shell").unwrap();
-        debug!("shell: {}", shell);
-        return Ok(Some(Match::Generate(shell)));
+        let shell = m.value_of("shell");
+        debug!("shell: `{:?}`", shell);
+        return Ok(Some(Command::Generate(shell)));
     };
 
     Ok(None)

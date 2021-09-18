@@ -1,34 +1,36 @@
-//! Module related to IMAP arguments.
+//! Module related to IMAP CLI.
 //!
-//! This module provides subcommands and an argument matcher related to IMAP.
+//! This module provides subcommands and a command matcher related to IMAP.
 
 use anyhow::Result;
 use clap::{App, ArgMatches};
 use log::debug;
 
-/// Enumeration of all possible matches.
-pub enum Match {
+type Keepalive = u64;
+
+/// IMAP commands.
+pub enum Command {
     /// Start the IMAP notify mode with the give keepalive duration.
-    Notify(u64),
+    Notify(Keepalive),
 
     /// Start the IMAP watch mode with the give keepalive duration.
-    Watch(u64),
+    Watch(Keepalive),
 }
 
-/// IMAP arg matcher.
-pub fn matches(m: &ArgMatches) -> Result<Option<Match>> {
+/// IMAP command matcher.
+pub fn matches(m: &ArgMatches) -> Result<Option<Command>> {
     if let Some(m) = m.subcommand_matches("notify") {
         debug!("notify command matched");
         let keepalive = clap::value_t_or_exit!(m.value_of("keepalive"), u64);
         debug!("keepalive: {}", keepalive);
-        return Ok(Some(Match::Notify(keepalive)));
+        return Ok(Some(Command::Notify(keepalive)));
     }
 
     if let Some(m) = m.subcommand_matches("watch") {
         debug!("watch command matched");
         let keepalive = clap::value_t_or_exit!(m.value_of("keepalive"), u64);
         debug!("keepalive: {}", keepalive);
-        return Ok(Some(Match::Watch(keepalive)));
+        return Ok(Some(Command::Watch(keepalive)));
     }
 
     Ok(None)

@@ -1,3 +1,7 @@
+//! Module related to output CLI.
+//!
+//! This module provides arguments related to output.
+
 use clap::Arg;
 
 /// Output arguments.

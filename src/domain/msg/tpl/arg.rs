@@ -1,3 +1,7 @@
+//! Module related to message template CLI.
+//!
+//! This module provides subcommands, arguments and a command matcher related to message template.
+
 use anyhow::Result;
 use clap::{self, App, Arg, ArgMatches, SubCommand};
 use log::debug;
@@ -7,18 +11,18 @@ use crate::domain::msg::{self, arg::uid_arg};
 type Uid<'a> = &'a str;
 type All = bool;
 
-/// Enumeration of all possible matches.
-pub enum Match<'a> {
+/// Message template commands.
+pub enum Command<'a> {
     New,
     Reply(Uid<'a>, All),
     Forward(Uid<'a>),
 }
 
-/// Message template arg matcher.
-pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Match<'a>>> {
+/// Message template command matcher.
+pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
     if let Some(_) = m.subcommand_matches("new") {
         debug!("new command matched");
-        return Ok(Some(Match::New));
+        return Ok(Some(Command::New));
     }
 
     if let Some(m) = m.subcommand_matches("reply") {
@@ -27,14 +31,14 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Match<'a>>> {
         debug!("uid: {}", uid);
         let all = m.is_present("reply-all");
         debug!("reply all: {}", all);
-        return Ok(Some(Match::Reply(uid, all)));
+        return Ok(Some(Command::Reply(uid, all)));
     }
 
     if let Some(m) = m.subcommand_matches("forward") {
         debug!("forward command matched");
         let uid = m.value_of("uid").unwrap();
         debug!("uid: {}", uid);
-        return Ok(Some(Match::Forward(uid)));
+        return Ok(Some(Command::Forward(uid)));
     }
 
     Ok(None)

@@ -1,3 +1,7 @@
+//! Module related to config CLI.
+//!
+//! This module provides arguments related to config.
+
 use clap::Arg;
 
 /// Config arguments.
