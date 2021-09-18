@@ -13,8 +13,8 @@ use std::fmt;
 /// This part of the msg/msg would be stored in this struct.
 #[derive(Clone, Serialize, Debug, PartialEq, Eq)]
 pub struct Body {
-    /// The text version of a body (if available)
-    pub text: Option<String>,
+    /// The plain version of a body (if available)
+    pub plain: Option<String>,
 
     /// The html version of a body (if available)
     pub html: Option<String>,
@@ -61,7 +61,7 @@ impl Body {
     /// ```
     pub fn new_with_text<S: ToString>(text: S) -> Self {
         Self {
-            text: Some(text.to_string()),
+            plain: Some(text.to_string()),
             html: None,
         }
     }
@@ -85,7 +85,7 @@ impl Body {
     /// ```
     pub fn new_with_html<S: ToString>(html: S) -> Self {
         Self {
-            text: None,
+            plain: None,
             html: Some(html.to_string()),
         }
     }
@@ -109,7 +109,7 @@ impl Body {
     /// ```
     pub fn new_with_both<S: ToString>(text: S, html: S) -> Self {
         Self {
-            text: Some(text.to_string()),
+            plain: Some(text.to_string()),
             html: Some(html.to_string()),
         }
     }
@@ -119,7 +119,7 @@ impl Body {
 impl Default for Body {
     fn default() -> Self {
         Self {
-            text: None,
+            plain: None,
             html: None,
         }
     }
@@ -127,7 +127,7 @@ impl Default for Body {
 
 impl fmt::Display for Body {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        let content = if let Some(text) = self.text.clone() {
+        let content = if let Some(text) = self.plain.clone() {
             text
         } else if let Some(html) = self.html.clone() {
             html

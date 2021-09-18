@@ -16,8 +16,7 @@ use crate::ui::editor;
 use serde::Serialize;
 
 use lettre::message::{
-    header::ContentTransferEncoding, header::ContentType, Attachment as lettre_Attachment, Mailbox,
-    Message, MultiPart, SinglePart,
+    header::ContentType, Attachment as lettre_Attachment, Mailbox, Message, MultiPart, SinglePart,
 };
 
 use std::{
@@ -64,7 +63,7 @@ impl fmt::Display for MsgSerialized {
 
 /// This struct represents a whole msg with its attachments, body-content
 /// and its headers.
-#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize)]
 pub struct Msg {
     /// All added attachments are listed in this vector.
     pub attachments: Vec<Attachment>,
@@ -79,6 +78,9 @@ pub struct Msg {
     /// This variable stores the body of the msg.
     /// This includes the general content text and the signature.
     pub body: Body,
+
+    /// The signature of the message.
+    pub sig: String,
 
     /// The UID of the msg. In general, a message should already have one, unless you're writing a
     /// new message, then we're generating it.
@@ -167,11 +169,6 @@ impl Msg {
         if headers.from.is_empty() {
             headers.from = vec![account.address()];
         }
-
-        if let None = headers.signature {
-            headers.signature = Some(account.signature.to_owned());
-        }
-
         let body = Body::new_with_text(if let Some(sig) = headers.signature.as_ref() {
             format!("\n{}", sig)
         } else {
@@ -181,6 +178,7 @@ impl Msg {
         Self {
             headers,
             body,
+            sig: account.signature.to_owned(),
             ..Self::default()
         }
     }
@@ -280,7 +278,7 @@ impl Msg {
         // each line which includes a string.
         let mut new_body = self
             .body
-            .text
+            .plain
             .clone()
             .unwrap_or_default()
             .lines()
@@ -354,7 +352,11 @@ impl Msg {
         // apply a line which should indicate where the forwarded message begins
         body.push_str(&format!(
             "\n---------- Forwarded Message ----------\n{}",
-            self.body.text.clone().unwrap_or_default().replace("\r", ""),
+            self.body
+                .plain
+                .clone()
+                .unwrap_or_default()
+                .replace("\r", ""),
         ));
 
         body.push_str(&account.signature);
@@ -685,16 +687,16 @@ impl Msg {
         let mut msg_parts = MultiPart::mixed().build();
 
         // -- Body --
-        if self.body.text.is_some() && self.body.html.is_some() {
+        if self.body.plain.is_some() && self.body.html.is_some() {
             msg_parts = msg_parts.multipart(MultiPart::alternative_plain_html(
-                self.body.text.clone().unwrap(),
+                self.body.plain.clone().unwrap(),
                 self.body.html.clone().unwrap(),
             ));
         } else {
             let msg_body = SinglePart::builder()
                 .header(ContentType::TEXT_PLAIN)
                 .header(self.headers.encoding)
-                .body(self.body.text.clone().unwrap_or_default());
+                .body(self.body.plain.clone().unwrap_or_default());
 
             msg_parts = msg_parts.singlepart(msg_body);
         }
@@ -740,42 +742,16 @@ impl Msg {
 
         Ok(raw_message)
     }
-
-    /// Returns the [`ContentTransferEncoding`] of the body.
-    pub fn get_encoding(&self) -> ContentTransferEncoding {
-        self.headers.encoding
-    }
-
-    /// Returns the whole message: Header + Body as a String
-    pub fn get_full_message(&self) -> String {
-        format!("{}\n{}", self.headers.get_header_as_string(), self.body)
-    }
-}
-
-// -- Traits --
-impl Default for Msg {
-    fn default() -> Self {
-        Self {
-            attachments: Vec::new(),
-            flags: Flags::default(),
-            headers: Headers::default(),
-            body: Body::default(),
-            // the uid is generated in the "to_sendable_msg" function if the server didn't apply a
-            // message id to it.
-            uid: None,
-            date: None,
-            raw: Vec::new(),
-        }
-    }
 }
 
 impl fmt::Display for Msg {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(
             formatter,
-            "{}\n{}",
+            "{}\n{}{}",
             self.headers.get_header_as_string(),
-            self.body
+            self.body,
+            self.sig
         )
     }
 }
@@ -880,7 +856,7 @@ impl TryFrom<&Fetch> for Msg {
             // don't. This condition hits, if the body isn't in a multipart, so we can
             // immediately fetch the body from the first part of the mail.
             match parsed.ctype.mimetype.as_ref() {
-                "text/plain" => body.text = parsed.get_body().ok(),
+                "text/plain" => body.plain = parsed.get_body().ok(),
                 "text/html" => body.html = parsed.get_body().ok(),
                 _ => (),
             };
@@ -889,8 +865,8 @@ impl TryFrom<&Fetch> for Msg {
                 // now it might happen, that the body is *in* a multipart, if
                 // that's the case, look, if we've already applied a body
                 // (body.is_empty()) and set it, if needed
-                if body.text.is_none() && subpart.ctype.mimetype == "text/plain" {
-                    body.text = subpart.get_body().ok();
+                if body.plain.is_none() && subpart.ctype.mimetype == "text/plain" {
+                    body.plain = subpart.get_body().ok();
                 } else if body.html.is_none() && subpart.ctype.mimetype == "text/html" {
                     body.html = subpart.get_body().ok();
                 }
@@ -918,6 +894,7 @@ impl TryFrom<&Fetch> for Msg {
             uid,
             date,
             raw,
+            ..Self::default()
         })
     }
 }

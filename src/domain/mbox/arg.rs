@@ -7,16 +7,16 @@ use clap::{App, Arg, ArgMatches, SubCommand};
 use log::debug;
 
 /// Mailbox commands.
-pub enum Commands {
+pub enum Command {
     /// List all available mailboxes.
     List,
 }
 
 /// Mailbox command matcher.
-pub fn matches(m: &ArgMatches) -> Result<Option<Commands>> {
+pub fn matches(m: &ArgMatches) -> Result<Option<Command>> {
     if let Some(_) = m.subcommand_matches("mailboxes") {
         debug!("mailboxes command matched");
-        return Ok(Some(Commands::List));
+        return Ok(Some(Command::List));
     }
 
     Ok(None)

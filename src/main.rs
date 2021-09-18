@@ -1,5 +1,5 @@
 use anyhow::Result;
-use clap;
+use clap::{self, AppSettings};
 use env_logger;
 use std::{convert::TryFrom, env};
 use url::Url;
@@ -24,8 +24,10 @@ fn create_app<'a>() -> clap::App<'a, 'a> {
         .version(env!("CARGO_PKG_VERSION"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .author(env!("CARGO_PKG_AUTHORS"))
-        .args(&output::arg::args())
+        .setting(AppSettings::GlobalVersion)
+        .setting(AppSettings::SubcommandRequiredElseHelp)
         .args(&config::arg::args())
+        .args(&output::arg::args())
         .arg(mbox::arg::source_arg())
         .subcommands(compl::arg::subcmds())
         .subcommands(imap::arg::subcmds())
@@ -59,7 +61,7 @@ fn main() -> Result<()> {
     // See https://github.com/soywod/himalaya/issues/115.
     match compl::arg::matches(&m)? {
         Some(compl::arg::Command::Generate(shell)) => {
-            return compl::handler::generate(shell, create_app());
+            return compl::handler::generate(create_app(), shell);
         }
         _ => (),
     }
@@ -84,7 +86,7 @@ fn main() -> Result<()> {
 
     // Check mailbox matches.
     match mbox::arg::matches(&m)? {
-        Some(mbox::arg::Commands::List) => {
+        Some(mbox::arg::Command::List) => {
             return mbox::handler::list(&output, &mut imap);
         }
         _ => (),
@@ -130,26 +132,30 @@ fn main() -> Result<()> {
         }
 
         Some(msg::arg::Command::Flag(m)) => match m {
-            msg::flag::arg::Command::Set(uid, flags) => {
+            Some(msg::flag::arg::Command::Set(uid, flags)) => {
                 return msg::flag::handler::set(uid, flags, &mut imap);
             }
-            msg::flag::arg::Command::Add(uid, flags) => {
+            Some(msg::flag::arg::Command::Add(uid, flags)) => {
                 return msg::flag::handler::add(uid, flags, &mut imap);
             }
-            msg::flag::arg::Command::Remove(uid, flags) => {
+            Some(msg::flag::arg::Command::Remove(uid, flags)) => {
                 return msg::flag::handler::remove(uid, flags, &mut imap);
             }
+            _ => (),
         },
         Some(msg::arg::Command::Tpl(m)) => match m {
-            msg::tpl::arg::Command::New => {
-                return msg::tpl::handler::new(&account, &output, &mut imap);
+            Some(msg::tpl::arg::Command::New(sub, from, to, cc, bcc, h, body, sig)) => {
+                return msg::tpl::handler::new(
+                    sub, from, to, cc, bcc, h, body, sig, &account, &output, &mut imap,
+                );
             }
-            msg::tpl::arg::Command::Reply(uid, all) => {
+            Some(msg::tpl::arg::Command::Reply(uid, all)) => {
                 return msg::tpl::handler::reply(uid, all, &account, &output, &mut imap);
             }
-            msg::tpl::arg::Command::Forward(uid) => {
+            Some(msg::tpl::arg::Command::Forward(uid)) => {
                 return msg::tpl::handler::forward(uid, &account, &output, &mut imap);
             }
+            _ => (),
         },
         _ => (),
     }

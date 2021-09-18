@@ -183,60 +183,6 @@ impl Config {
         Ok(())
     }
 
-    /// Returns the signature of the given acccount in combination witht the sigantion delimiter.
-    /// If the account doesn't have a signature, then the global signature is used.
-    ///
-    /// # Example
-    /// ```
-    /// use himalaya::config::model::{Config, Account};
-    ///
-    /// fn main() {
-    ///     let config = Config {
-    ///         signature: Some("Global signature".to_string()),
-    ///         .. Config::default()
-    ///     };
-    ///
-    ///     // a config without a global signature
-    ///     let config_no_global = Config::default();
-    ///
-    ///     let account1 = Account::new_with_signature(Some("Account Name"), "mail@address.com", Some("Cya"));
-    ///     let account2 = Account::new(Some("Bruh"), "mail@address.com");
-    ///
-    ///     // Hint: Don't forget the default signature delimiter: '\n-- \n'
-    ///     assert_eq!(config.signature(&account1), Some("\n-- \nCya".to_string()));
-    ///     assert_eq!(config.signature(&account2), Some("\n-- \nGlobal signature".to_string()));
-    ///     
-    ///     assert_eq!(config_no_global.signature(&account2), None);
-    /// }
-    /// ```
-    pub fn signature(&self, account: &ConfigAccountEntry) -> Option<String> {
-        let default_sig_delim = String::from("-- \n");
-        let sig_delim = account
-            .signature_delimiter
-            .as_ref()
-            .or_else(|| self.signature_delimiter.as_ref())
-            .unwrap_or(&default_sig_delim);
-        let sig = account
-            .signature
-            .as_ref()
-            .or_else(|| self.signature.as_ref());
-        sig.and_then(|sig| shellexpand::full(sig).ok())
-            .map(|sig| sig.to_string())
-            .and_then(|sig| fs::read_to_string(sig).ok())
-            .or_else(|| sig.map(|sig| sig.to_owned()))
-            .map(|sig| format!("\n{}{}", sig_delim, sig))
-    }
-
-    pub fn default_page_size(&self, account: &ConfigAccountEntry) -> usize {
-        account
-            .default_page_size
-            .as_ref()
-            .or_else(|| self.default_page_size.as_ref())
-            .or(Some(&DEFAULT_PAGE_SIZE))
-            .unwrap()
-            .to_owned()
-    }
-
     pub fn exec_watch_cmds(&self, account: &ConfigAccountEntry) -> Result<()> {
         let cmds = account
             .watch_cmds
@@ -551,10 +497,10 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
             .or_else(|| config.signature.as_ref());
         let signature = signature
             .and_then(|sig| shellexpand::full(sig).ok())
-            .map(|sig| sig.to_string())
+            .map(String::from)
             .and_then(|sig| fs::read_to_string(sig).ok())
             .or_else(|| signature.map(|sig| sig.to_owned()))
-            .map(|sig| format!("\n{}{}", signature_delim, sig))
+            .map(|sig| format!("\n{}{}", signature_delim, sig.trim_end()))
             .unwrap_or_default();
 
         let account = Account {

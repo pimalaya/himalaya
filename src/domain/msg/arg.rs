@@ -34,8 +34,8 @@ pub enum Command<'a> {
     Send(RawMsg<'a>),
     Write(AttachmentsPaths<'a>),
 
-    Flag(msg::flag::arg::Command<'a>),
-    Tpl(msg::tpl::arg::Command<'a>),
+    Flag(Option<msg::flag::arg::Command<'a>>),
+    Tpl(Option<msg::tpl::arg::Command<'a>>),
 }
 
 /// Message command matcher.
@@ -61,10 +61,6 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         let uid = m.value_of("uid").unwrap();
         debug!("uid: {}", &uid);
         return Ok(Some(Command::Delete(uid)));
-    }
-
-    if let Some(m) = msg::flag::arg::matches(&m)? {
-        return Ok(Some(Command::Flag(m)));
     }
 
     if let Some(m) = m.subcommand_matches("forward") {
@@ -176,15 +172,19 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         return Ok(Some(Command::Send(msg)));
     }
 
-    if let Some(m) = msg::tpl::arg::matches(&m)? {
-        return Ok(Some(Command::Tpl(m)));
-    }
-
     if let Some(m) = m.subcommand_matches("write") {
         debug!("write command matched");
         let attachment_paths: Vec<&str> = m.values_of("attachments").unwrap_or_default().collect();
         debug!("attachments paths: {:?}", attachment_paths);
         return Ok(Some(Command::Write(attachment_paths)));
+    }
+
+    if let Some(m) = m.subcommand_matches("template") {
+        return Ok(Some(Command::Tpl(msg::tpl::arg::matches(&m)?)));
+    }
+
+    if let Some(m) = m.subcommand_matches("flag") {
+        return Ok(Some(Command::Flag(msg::flag::arg::matches(&m)?)));
     }
 
     debug!("default list command matched");
