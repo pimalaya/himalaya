@@ -8,56 +8,44 @@ use log::debug;
 
 use crate::domain::msg::{self, arg::uid_arg};
 
-type Subject<'a> = Option<&'a str>;
-type From<'a> = Option<Values<'a>>;
-type To<'a> = Option<Values<'a>>;
-type Cc<'a> = Option<Values<'a>>;
-type Bcc<'a> = Option<Values<'a>>;
-type Headers<'a> = Option<Values<'a>>;
-type Body<'a> = Option<&'a str>;
-type Signature<'a> = Option<&'a str>;
 type Uid<'a> = &'a str;
 type All = bool;
 
+#[derive(Debug)]
+pub struct Tpl<'a> {
+    pub subject: Option<&'a str>,
+    pub from: Option<Values<'a>>,
+    pub to: Option<Values<'a>>,
+    pub cc: Option<Values<'a>>,
+    pub bcc: Option<Values<'a>>,
+    pub headers: Option<Values<'a>>,
+    pub body: Option<&'a str>,
+    pub sig: Option<&'a str>,
+}
+
 /// Message template commands.
 pub enum Command<'a> {
-    New(
-        Subject<'a>,
-        From<'a>,
-        To<'a>,
-        Cc<'a>,
-        Bcc<'a>,
-        Headers<'a>,
-        Body<'a>,
-        Signature<'a>,
-    ),
-    Reply(Uid<'a>, All),
-    Forward(Uid<'a>),
+    New(Tpl<'a>),
+    Reply(Uid<'a>, All, Tpl<'a>),
+    Forward(Uid<'a>, Tpl<'a>),
 }
 
 /// Message template command matcher.
 pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
     if let Some(m) = m.subcommand_matches("new") {
         debug!("new command matched");
-        let subject = m.value_of("subject");
-        debug!("subject: `{:?}`", subject);
-        let from = m.values_of("from");
-        debug!("from: `{:?}`", from);
-        let to = m.values_of("to");
-        debug!("to: `{:?}`", to);
-        let cc = m.values_of("cc");
-        debug!("cc: `{:?}`", cc);
-        let bcc = m.values_of("bcc");
-        debug!("bcc: `{:?}`", bcc);
-        let headers = m.values_of("header");
-        debug!("headers: `{:?}`", headers);
-        let body = m.value_of("body");
-        debug!("body: `{:?}`", body);
-        let sig = m.value_of("signature");
-        debug!("signature: `{:?}`", sig);
-        return Ok(Some(Command::New(
-            subject, from, to, cc, bcc, headers, body, sig,
-        )));
+        let tpl = Tpl {
+            subject: m.value_of("subject"),
+            from: m.values_of("from"),
+            to: m.values_of("to"),
+            cc: m.values_of("cc"),
+            bcc: m.values_of("bcc"),
+            headers: m.values_of("headers"),
+            body: m.value_of("body"),
+            sig: m.value_of("signature"),
+        };
+        debug!("template: `{:?}`", tpl);
+        return Ok(Some(Command::New(tpl)));
     }
 
     if let Some(m) = m.subcommand_matches("reply") {
@@ -66,14 +54,36 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         debug!("uid: {}", uid);
         let all = m.is_present("reply-all");
         debug!("reply all: {}", all);
-        return Ok(Some(Command::Reply(uid, all)));
+        let tpl = Tpl {
+            subject: m.value_of("subject"),
+            from: m.values_of("from"),
+            to: m.values_of("to"),
+            cc: m.values_of("cc"),
+            bcc: m.values_of("bcc"),
+            headers: m.values_of("headers"),
+            body: m.value_of("body"),
+            sig: m.value_of("signature"),
+        };
+        debug!("template: `{:?}`", tpl);
+        return Ok(Some(Command::Reply(uid, all, tpl)));
     }
 
     if let Some(m) = m.subcommand_matches("forward") {
         debug!("forward command matched");
         let uid = m.value_of("uid").unwrap();
         debug!("uid: {}", uid);
-        return Ok(Some(Command::Forward(uid)));
+        let tpl = Tpl {
+            subject: m.value_of("subject"),
+            from: m.values_of("from"),
+            to: m.values_of("to"),
+            cc: m.values_of("cc"),
+            bcc: m.values_of("bcc"),
+            headers: m.values_of("headers"),
+            body: m.value_of("body"),
+            sig: m.value_of("signature"),
+        };
+        debug!("template: `{:?}`", tpl);
+        return Ok(Some(Command::Forward(uid, tpl)));
     }
 
     Ok(None)

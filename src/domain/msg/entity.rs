@@ -169,15 +169,10 @@ impl Msg {
         if headers.from.is_empty() {
             headers.from = vec![account.address()];
         }
-        let body = Body::new_with_text(if let Some(sig) = headers.signature.as_ref() {
-            format!("\n{}", sig)
-        } else {
-            String::from("\n")
-        });
 
         Self {
             headers,
-            body,
+            body: Body::new_with_text(""),
             sig: account.signature.to_owned(),
             ..Self::default()
         }
@@ -269,14 +264,13 @@ impl Msg {
             cc,
             subject: Some(subject),
             in_reply_to: self.headers.message_id.clone(),
-            signature: Some(account.signature.to_owned()),
             // and clear the rest of the fields
             ..Headers::default()
         };
 
         // comment "out" the body of the msg, by adding the `>` characters to
         // each line which includes a string.
-        let mut new_body = self
+        let new_body = self
             .body
             .plain
             .clone()
@@ -289,15 +283,10 @@ impl Msg {
             .collect::<Vec<String>>()
             .join("\n");
 
-        // also add the the signature in the end
-        if let Some(sig) = new_headers.signature.as_ref() {
-            new_body.push('\n');
-            new_body.push_str(&sig)
-        }
-
         self.body = Body::new_with_text(new_body);
         self.headers = new_headers;
         self.attachments.clear();
+        self.sig = account.signature.to_owned();
 
         Ok(())
     }
@@ -358,10 +347,8 @@ impl Msg {
                 .unwrap_or_default()
                 .replace("\r", ""),
         ));
-
-        body.push_str(&account.signature);
-
         self.body = Body::new_with_text(body);
+        self.sig = account.signature.to_owned();
     }
 
     /// Returns the bytes of the *sendable message* of the struct!

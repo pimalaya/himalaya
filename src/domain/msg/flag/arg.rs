@@ -3,7 +3,7 @@
 //! This module provides subcommands, arguments and a command matcher related to message flag.
 
 use anyhow::Result;
-use clap::{self, App, Arg, ArgMatches, SubCommand};
+use clap::{self, App, AppSettings, Arg, ArgMatches, SubCommand};
 use log::debug;
 
 use crate::domain::msg;
@@ -63,6 +63,7 @@ fn flags_arg<'a>() -> Arg<'a, 'a> {
 pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
     vec![SubCommand::with_name("flags")
         .about("Handles flags")
+        .setting(AppSettings::SubcommandRequiredElseHelp)
         .subcommand(
             SubCommand::with_name("set")
                 .about("Replaces all message flags")

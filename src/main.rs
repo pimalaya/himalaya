@@ -25,7 +25,6 @@ fn create_app<'a>() -> clap::App<'a, 'a> {
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .author(env!("CARGO_PKG_AUTHORS"))
         .setting(AppSettings::GlobalVersion)
-        .setting(AppSettings::SubcommandRequiredElseHelp)
         .args(&config::arg::args())
         .args(&output::arg::args())
         .arg(mbox::arg::source_arg())
@@ -144,16 +143,14 @@ fn main() -> Result<()> {
             _ => (),
         },
         Some(msg::arg::Command::Tpl(m)) => match m {
-            Some(msg::tpl::arg::Command::New(sub, from, to, cc, bcc, h, body, sig)) => {
-                return msg::tpl::handler::new(
-                    sub, from, to, cc, bcc, h, body, sig, &account, &output, &mut imap,
-                );
+            Some(msg::tpl::arg::Command::New(tpl)) => {
+                return msg::tpl::handler::new(tpl, &account, &output, &mut imap);
             }
-            Some(msg::tpl::arg::Command::Reply(uid, all)) => {
-                return msg::tpl::handler::reply(uid, all, &account, &output, &mut imap);
+            Some(msg::tpl::arg::Command::Reply(uid, all, tpl)) => {
+                return msg::tpl::handler::reply(uid, all, tpl, &account, &output, &mut imap);
             }
-            Some(msg::tpl::arg::Command::Forward(uid)) => {
-                return msg::tpl::handler::forward(uid, &account, &output, &mut imap);
+            Some(msg::tpl::arg::Command::Forward(uid, tpl)) => {
+                return msg::tpl::handler::forward(uid, tpl, &account, &output, &mut imap);
             }
             _ => (),
         },

@@ -266,7 +266,6 @@ pub fn mailto<ImapService: ImapServiceInterface, SmtpService: SmtpServiceInterfa
         encoding: ContentTransferEncoding::Base64,
         bcc: Some(bcc),
         cc: Some(cc),
-        signature: Some(account.signature.to_owned()),
         subject: Some(subject.into()),
         ..Headers::default()
     };

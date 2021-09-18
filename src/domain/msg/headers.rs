@@ -48,7 +48,6 @@ pub struct Headers {
     pub message_id: Option<String>,
     pub reply_to: Option<Vec<String>>,
     pub sender: Option<String>,
-    pub signature: Option<String>,
     pub subject: Option<String>,
 }
 
@@ -202,7 +201,6 @@ impl Default for Headers {
             message_id: None,
             reply_to: None,
             sender: None,
-            signature: None,
             subject: None,
         }
     }
@@ -261,7 +259,6 @@ impl TryFrom<Option<&imap_proto::types::Envelope<'_>>> for Headers {
                 bcc,
                 in_reply_to,
                 custom_headers: None,
-                signature: None,
                 encoding: ContentTransferEncoding::Base64,
             })
         } else {
@@ -414,15 +411,7 @@ impl<'from> From<&mailparse::ParsedMail<'from>> for Headers {
 /// [get_header_as_string]: struct.Headers.html#method.get_header_as_string
 impl fmt::Display for Headers {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        let mut header = self.get_header_as_string();
-
-        // now add some space between the header and the signature
-        header.push_str("\n\n\n");
-
-        // and add the signature in the end
-        header.push_str(&self.signature.clone().unwrap_or(String::new()));
-
-        write!(formatter, "{}", header)
+        write!(formatter, "{}", self.get_header_as_string())
     }
 }
 

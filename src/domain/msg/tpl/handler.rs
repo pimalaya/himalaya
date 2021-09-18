@@ -6,7 +6,6 @@ use std::{
 
 use anyhow::Result;
 use atty::Stream;
-use clap::Values;
 use log::{debug, trace};
 
 use crate::{
@@ -17,59 +16,54 @@ use crate::{
             body::Body,
             entity::{Msg, MsgSerialized},
             headers::Headers,
+            tpl::arg::Tpl,
         },
     },
     output::service::OutputServiceInterface,
 };
 
 pub fn new<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
-    subject: Option<&'a str>,
-    from: Option<Values<'a>>,
-    to: Option<Values<'a>>,
-    cc: Option<Values<'a>>,
-    bcc: Option<Values<'a>>,
-    headers: Option<Values<'a>>,
-    body: Option<&'a str>,
-    sig: Option<&'a str>,
-    account: &Account,
-    output: &OutputService,
-    imap: &mut ImapService,
+    tpl: Tpl<'a>,
+    account: &'a Account,
+    output: &'a OutputService,
+    imap: &'a mut ImapService,
 ) -> Result<()> {
     let mut msg = Msg::new(&account);
-    override_msg_with_args(&mut msg, subject, from, to, cc, bcc, headers, body, sig);
+    override_msg_with_args(&mut msg, tpl);
     trace!("message: {:#?}", msg);
     output.print(MsgSerialized::try_from(&msg)?)?;
     imap.logout()?;
     Ok(())
 }
 
-pub fn reply<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
+pub fn reply<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
     uid: &str,
     all: bool,
-    account: &Account,
-    output: &OutputService,
-    imap: &mut ImapService,
+    tpl: Tpl<'a>,
+    account: &'a Account,
+    output: &'a OutputService,
+    imap: &'a mut ImapService,
 ) -> Result<()> {
-    let mut msg = imap.get_msg(&uid)?;
-    msg.change_to_reply(&account, all)?;
-    // FIXME
-    // override_msg_with_args(&mut msg, &matches);
+    let mut msg = imap.get_msg(uid)?;
+    msg.change_to_reply(account, all)?;
+    override_msg_with_args(&mut msg, tpl);
     trace!("Message: {:?}", msg);
     output.print(MsgSerialized::try_from(&msg)?)?;
     imap.logout()?;
     Ok(())
 }
 
-pub fn forward<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
+pub fn forward<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
     uid: &str,
-    account: &Account,
-    output: &OutputService,
-    imap: &mut ImapService,
+    tpl: Tpl<'a>,
+    account: &'a Account,
+    output: &'a OutputService,
+    imap: &'a mut ImapService,
 ) -> Result<()> {
     let mut msg = imap.get_msg(&uid)?;
+    msg.sig = account.signature.to_owned();
     msg.change_to_forwarding(&account);
-    // FIXME
-    // override_msg_with_args(&mut msg, &matches);
+    override_msg_with_args(&mut msg, tpl);
     trace!("Message: {:?}", msg);
     output.print(MsgSerialized::try_from(&msg)?)?;
     imap.logout()?;
@@ -79,35 +73,24 @@ pub fn forward<OutputService: OutputServiceInterface, ImapService: ImapServiceIn
 // == Helper functions ==
 // -- Template Subcommands --
 // These functions are more used for the "template" subcommand
-fn override_msg_with_args<'a>(
-    msg: &mut Msg,
-    subject: Option<&'a str>,
-    from: Option<Values<'a>>,
-    to: Option<Values<'a>>,
-    cc: Option<Values<'a>>,
-    bcc: Option<Values<'a>>,
-    headers: Option<Values<'a>>,
-    body: Option<&'a str>,
-    sig: Option<&'a str>,
-) {
+fn override_msg_with_args<'a>(msg: &mut Msg, tpl: Tpl<'a>) {
     // -- Collecting credentials --
-    let from: Vec<String> = match from {
+    let from: Vec<String> = match tpl.from {
         Some(from) => from.map(|arg| arg.to_string()).collect(),
         None => msg.headers.from.clone(),
     };
 
-    let to: Vec<String> = match to {
+    let to: Vec<String> = match tpl.to {
         Some(to) => to.map(|arg| arg.to_string()).collect(),
         None => Vec::new(),
     };
 
-    let subject = subject.map(String::from);
-    let cc: Option<Vec<String>> = cc.map(|cc| cc.map(|arg| arg.to_string()).collect());
-    let bcc: Option<Vec<String>> = bcc.map(|bcc| bcc.map(|arg| arg.to_string()).collect());
-    let signature = sig.map(String::from).or(msg.headers.signature.to_owned());
+    let subject = tpl.subject.map(String::from);
+    let cc: Option<Vec<String>> = tpl.cc.map(|cc| cc.map(|arg| arg.to_string()).collect());
+    let bcc: Option<Vec<String>> = tpl.bcc.map(|bcc| bcc.map(|arg| arg.to_string()).collect());
 
     let custom_headers: Option<HashMap<String, Vec<String>>> = {
-        if let Some(matched_headers) = headers {
+        if let Some(matched_headers) = tpl.headers {
             let mut custom_headers: HashMap<String, Vec<String>> = HashMap::new();
 
             // collect the custom headers
@@ -136,11 +119,15 @@ fn override_msg_with_args<'a>(
                 .join("\n");
             debug!("overriden body from stdin: {:?}", body);
             body
-        } else if let Some(body) = body {
+        } else if let Some(body) = tpl.body {
             debug!("overriden body: {:?}", body);
             body.to_string()
         } else {
-            String::new()
+            msg.body
+                .plain
+                .as_ref()
+                .map(String::from)
+                .unwrap_or_default()
         }
     };
 
@@ -153,11 +140,11 @@ fn override_msg_with_args<'a>(
         to,
         cc,
         bcc,
-        signature,
         custom_headers,
         ..msg.headers.clone()
     };
 
     msg.headers = headers;
     msg.body = body;
+    msg.sig = tpl.sig.map(String::from).unwrap_or(msg.sig.to_owned());
 }

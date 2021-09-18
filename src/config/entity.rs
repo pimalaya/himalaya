@@ -500,7 +500,7 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
             .map(String::from)
             .and_then(|sig| fs::read_to_string(sig).ok())
             .or_else(|| signature.map(|sig| sig.to_owned()))
-            .map(|sig| format!("\n{}{}", signature_delim, sig.trim_end()))
+            .map(|sig| format!("\n\n{}{}", signature_delim, sig.trim_end()))
             .unwrap_or_default();
 
         let account = Account {
