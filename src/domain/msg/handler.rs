@@ -168,16 +168,16 @@ pub fn copy<OutputService: OutputServiceInterface, ImapService: ImapServiceInter
     Ok(())
 }
 
-pub fn delete<ImapService: ImapServiceInterface>(
+/// Delete the given message UID from the selected mailbox.
+pub fn delete<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
     uid: &str,
     output: &OutputService,
     imap: &mut ImapService,
 ) -> Result<()> {
-    let flags = vec![Flag::Seen, Flag::Deleted];
-    imap.add_flags(uid, Flags::from(flags))?;
+    let flags = Flags::from(vec![Flag::Seen, Flag::Deleted]);
+    imap.add_flags(uid, flags)?;
     imap.expunge()?;
-    debug!("message {} successfully deleted", uid);
-    output.print(format!("Message {} successfully deleted", uid))?;
+    output.print(format!("Message(s) {} successfully deleted", uid))?;
     imap.logout()?;
     Ok(())
 }

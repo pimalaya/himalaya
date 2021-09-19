@@ -204,35 +204,22 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
         Ok(())
     }
 
-    /// Add the given flags to the given mail.
+    /// Add flags to the given message UID sequence.
     ///
-    /// # Example
-    /// ```no_run
-    /// use himalaya::imap::model::ImapConnector;
-    /// use himalaya::config::model::Account;
-    /// use himalaya::flag::model::Flags;
-    /// use imap::types::Flag;
+    /// ```ignore
     ///
-    /// fn main() {
-    ///     let account = Account::default();
-    ///     let mut imap_conn = ImapConnector::new(&account).unwrap();
-    ///     let flags = Flags::from(vec![Flag::Seen]);
-    ///
-    ///     // Mark the message with the UID 42 in the mailbox "rofl" as "Seen"
-    ///     imap_conn.add_flags("rofl", "42", flags).unwrap();
-    ///
-    ///     imap_conn.logout();
-    /// }
+    /// let flags = Flags::from(vec![Flag::Seen, Flag::Deleted]);
+    /// imap.add_flags("5:10", flags)
     /// ```
     fn add_flags(&mut self, uid_seq: &str, flags: Flags) -> Result<()> {
         let mbox = self.mbox.to_owned();
         let flags: String = flags.to_string();
         self.sess()?
             .select(&mbox.name)
-            .context(format!("cannot select mbox `{}`", self.mbox.name))?;
+            .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?;
         self.sess()?
             .uid_store(uid_seq, format!("+FLAGS ({})", flags))
-            .context(format!("cannot add flags `{}`", &flags))?;
+            .context(format!(r#"cannot add flags "{}""#, &flags))?;
         Ok(())
     }
 

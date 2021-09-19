@@ -298,7 +298,7 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                 .arg(uid_arg())
                 .arg(mbox::arg::target_arg()),
             SubCommand::with_name("delete")
-                .aliases(&["remove", "rm"])
+                .aliases(&["del", "d", "remove", "rm"])
                 .about("Deletes a message")
                 .arg(uid_arg()),
         ],
