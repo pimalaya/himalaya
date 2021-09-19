@@ -10,7 +10,7 @@ use crate::{
     output::service::{OutputService, OutputServiceInterface},
 };
 
-/// List mailboxes.
+/// List all mailboxes.
 pub fn list<ImapService: ImapServiceInterface>(
     output: &OutputService,
     imap: &mut ImapService,

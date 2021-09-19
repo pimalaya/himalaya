@@ -25,7 +25,7 @@ pub fn matches(m: &ArgMatches) -> Result<Option<Command>> {
 /// Mailbox subcommands.
 pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
     vec![SubCommand::with_name("mailboxes")
-        .aliases(&["mailbox", "mboxes", "mbox", "m"])
+        .aliases(&["mailbox", "mboxes", "mbox", "mb", "m"])
         .about("Lists all mailboxes")]
 }
 
