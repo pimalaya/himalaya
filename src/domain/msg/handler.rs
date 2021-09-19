@@ -221,6 +221,9 @@ pub fn list<ImapService: ImapServiceInterface>(
     Ok(())
 }
 
+/// Parse and edit a message from a [mailto] URL string.
+///
+/// [mailto]: https://en.wikipedia.org/wiki/Mailto
 pub fn mailto<ImapService: ImapServiceInterface, SmtpService: SmtpServiceInterface>(
     url: &Url,
     account: &Account,
@@ -255,8 +258,8 @@ pub fn mailto<ImapService: ImapServiceInterface, SmtpService: SmtpServiceInterfa
         from: vec![account.address()],
         to: vec![url.path().to_string()],
         encoding: ContentTransferEncoding::Base64,
-        bcc: Some(bcc),
-        cc: Some(cc),
+        cc: if cc.is_empty() { None } else { Some(cc) },
+        bcc: if bcc.is_empty() { None } else { Some(bcc) },
         subject: Some(subject.into()),
         ..Headers::default()
     };
