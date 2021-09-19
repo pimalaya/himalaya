@@ -8,11 +8,15 @@ let s:draft = ""
 " Message
 
 function! s:format_msg_for_list(msg)
-  let msg = copy(a:msg)
-  let flag_new = index(msg.flags, "Seen") == -1 ? "✷" : " "
-  let flag_flagged = index(msg.flags, "Flagged") == -1 ? " " : "!"
-  let flag_replied = index(msg.flags, "Answered") == -1 ? " " : "↵"
+  let msg = {}
+  let msg.uid = a:msg.uid
+  let flag_new = index(a:msg.flags, "Seen") == -1 ? "✷" : " "
+  let flag_flagged = index(a:msg.flags, "Flagged") == -1 ? " " : "!"
+  let flag_replied = index(a:msg.flags, "Answered") == -1 ? " " : "↵"
   let msg.flags = printf("%s %s %s", flag_new, flag_replied, flag_flagged)
+  let msg.subject = a:msg.headers.subject
+  let msg.sender = a:msg.headers.from[0]
+  let msg.date = a:msg.date
   return msg
 endfunction
 
@@ -61,13 +65,13 @@ function! himalaya#msg#read()
       \"--account %s --mailbox %s read %d",
       \[shellescape(account), shellescape(mbox), s:msg_id],
       \printf("Fetching message %d", s:msg_id),
-      \0,
+      \1,
     \)
-    let attachment = msg.hasAttachment ? " []" : ""
+    let attachment = len(msg.attachments) > 0 ? " []" : ""
     execute printf("silent! edit Himalaya read message [%d]%s", s:msg_id, attachment)
     setlocal modifiable
     silent execute "%d"
-    call append(0, split(substitute(msg.content, "\r", "", "g"), "\n"))
+    call append(0, split(substitute(msg.body.plain, "\r", "", "g"), "\n"))
     silent execute "$d"
     setlocal filetype=himalaya-msg-read
     let &modified = 0

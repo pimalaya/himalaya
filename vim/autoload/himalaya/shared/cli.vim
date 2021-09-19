@@ -7,6 +7,9 @@ function! himalaya#shared#cli#call(cmd, args, log, should_throw)
     redraw | call himalaya#shared#log#info(printf("%s [OK]", a:log))
   else
     try
+      let res = substitute(res, ":null", ":v:null", "g")
+      let res = substitute(res, ":true", ":v:true", "g")
+      let res = substitute(res, ":false", ":v:false", "g")
       let res = eval(res)
       redraw | call himalaya#shared#log#info(printf("%s [OK]", a:log))
       return res.response
