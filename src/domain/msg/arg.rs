@@ -288,7 +288,7 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                 .arg(uid_arg())
                 .arg(msg::attachment::arg::path_arg()),
             SubCommand::with_name("copy")
-                .aliases(&["cp"])
+                .aliases(&["cp", "c"])
                 .about("Copies a message to the targetted mailbox")
                 .arg(uid_arg())
                 .arg(mbox::arg::target_arg()),

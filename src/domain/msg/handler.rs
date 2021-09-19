@@ -149,7 +149,8 @@ pub fn attachments<OutputService: OutputServiceInterface, ImapService: ImapServi
     Ok(())
 }
 
-pub fn copy<ImapService: ImapServiceInterface>(
+/// Copy the given message UID to the targetted mailbox.
+pub fn copy<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
     uid: &str,
     mbox: Option<&str>,
     output: &OutputService,
@@ -157,12 +158,10 @@ pub fn copy<ImapService: ImapServiceInterface>(
 ) -> Result<()> {
     let target = Mbox::try_from(mbox)?;
     let mut msg = imap.get_msg(&uid)?;
-    // the message, which will be in the new mailbox doesn't need to be seen
     msg.flags.insert(Flag::Seen);
     imap.append_msg(&target, &mut msg)?;
-    debug!("message {} successfully copied to folder `{}`", uid, target);
     output.print(format!(
-        "Message {} successfully copied to folder `{}`",
+        r#"Message {} successfully copied to folder "{}""#,
         uid, target
     ))?;
     imap.logout()?;

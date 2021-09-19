@@ -44,4 +44,5 @@ pub fn target_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name("target")
         .help("Specifies the targetted mailbox")
         .value_name("TARGET")
+        .required(true)
 }

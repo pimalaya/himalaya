@@ -152,7 +152,9 @@ impl TryFrom<Option<&str>> for Mbox {
     fn try_from(mbox: Option<&str>) -> Result<Self, Self::Error> {
         debug!("init mailbox from `{:?}`", mbox);
         Ok(Self {
-            name: mbox.ok_or(anyhow!("cannot parse mailbox"))?.to_string(),
+            name: mbox
+                .ok_or(anyhow!("the target mailbox cannot be empty"))?
+                .to_string(),
             ..Self::default()
         })
     }
