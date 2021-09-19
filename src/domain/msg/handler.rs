@@ -116,7 +116,8 @@ fn msg_interaction<ImapService: ImapServiceInterface, SmtpService: SmtpServiceIn
     Ok(true)
 }
 
-pub fn attachments<ImapService: ImapServiceInterface>(
+/// Download all attachments from the given message UID to the user account downloads directory.
+pub fn attachments<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
     uid: &str,
     account: &Account,
     output: &OutputService,
@@ -127,27 +128,21 @@ pub fn attachments<ImapService: ImapServiceInterface>(
 
     debug!(
         "{} attachment(s) found for message {}",
-        &attachments.len(),
-        &uid
+        attachments.len(),
+        uid
     );
 
-    // Iterate through all attachments and download them to the download
-    // directory of the account.
     for attachment in &attachments {
         let filepath = account.downloads_dir.join(&attachment.filename);
-        debug!("downloading {}…", &attachment.filename);
+        debug!("downloading {}…", attachment.filename);
         fs::write(&filepath, &attachment.body_raw)
-            .context(format!("cannot save attachment {:?}", filepath))?;
+            .context(format!("cannot download attachment {:?}", filepath))?;
     }
 
-    debug!(
-        "{} attachment(s) successfully downloaded",
-        &attachments.len()
-    );
-
     output.print(format!(
-        "{} attachment(s) successfully downloaded",
-        &attachments.len()
+        "{} attachment(s) successfully downloaded to {:?}",
+        attachments.len(),
+        account.downloads_dir
     ))?;
 
     imap.logout()?;

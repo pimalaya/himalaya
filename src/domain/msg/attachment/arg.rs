@@ -9,6 +9,7 @@ use crate::domain::msg;
 /// Message attachment subcommands.
 pub(crate) fn subcmds<'a>() -> Vec<App<'a, 'a>> {
     vec![SubCommand::with_name("attachments")
+        .aliases(&["attachment", "att", "a"])
         .about("Downloads all message attachments")
         .arg(msg::arg::uid_arg())]
 }
