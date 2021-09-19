@@ -200,6 +200,7 @@ pub fn forward<ImapService: ImapServiceInterface, SmtpService: SmtpServiceInterf
     Ok(())
 }
 
+/// List messages with pagination from the selected mailbox.
 pub fn list<ImapService: ImapServiceInterface>(
     page_size: Option<usize>,
     page: usize,
