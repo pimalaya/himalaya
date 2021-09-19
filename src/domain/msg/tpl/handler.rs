@@ -79,15 +79,23 @@ fn override_msg_with_args<'a>(msg: &mut Msg, tpl: Tpl<'a>) {
         Some(from) => from.map(|arg| arg.to_string()).collect(),
         None => msg.headers.from.clone(),
     };
-
     let to: Vec<String> = match tpl.to {
         Some(to) => to.map(|arg| arg.to_string()).collect(),
         None => Vec::new(),
     };
-
-    let subject = tpl.subject.map(String::from);
-    let cc: Option<Vec<String>> = tpl.cc.map(|cc| cc.map(|arg| arg.to_string()).collect());
-    let bcc: Option<Vec<String>> = tpl.bcc.map(|bcc| bcc.map(|arg| arg.to_string()).collect());
+    let subject = tpl
+        .subject
+        .map(String::from)
+        .or_else(|| msg.headers.subject.clone())
+        .or_else(|| Some(String::new()));
+    let cc: Option<Vec<String>> = tpl
+        .cc
+        .map(|cc| cc.map(|arg| arg.to_string()).collect())
+        .or_else(|| msg.headers.cc.clone());
+    let bcc: Option<Vec<String>> = tpl
+        .bcc
+        .map(|bcc| bcc.map(|arg| arg.to_string()).collect())
+        .or_else(|| msg.headers.bcc.clone());
 
     let custom_headers: Option<HashMap<String, Vec<String>>> = {
         if let Some(matched_headers) = tpl.headers {

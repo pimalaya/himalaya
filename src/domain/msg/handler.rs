@@ -354,6 +354,7 @@ pub fn reply<
     Ok(())
 }
 
+/// Save a raw message to the targetted mailbox.
 pub fn save<ImapService: ImapServiceInterface>(
     mbox: Option<&str>,
     msg: &str,
@@ -367,6 +368,7 @@ pub fn save<ImapService: ImapServiceInterface>(
     Ok(())
 }
 
+/// Search messages from the given IMAP query.
 pub fn search<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
     page_size: Option<usize>,
     page: usize,
@@ -388,6 +390,7 @@ pub fn search<OutputService: OutputServiceInterface, ImapService: ImapServiceInt
     Ok(())
 }
 
+/// Send a raw message.
 pub fn send<
     OutputService: OutputServiceInterface,
     ImapService: ImapServiceInterface,
@@ -422,6 +425,7 @@ pub fn send<
     Ok(())
 }
 
+/// Compose a new message.
 pub fn write<
     OutputService: OutputServiceInterface,
     ImapService: ImapServiceInterface,
