@@ -325,28 +325,39 @@ impl Msg {
     /// ```
     pub fn change_to_forwarding(&mut self, account: &Account) {
         // -- Header --
-        let old_subject = self.headers.subject.clone().unwrap_or(String::new());
+        let subject = self
+            .headers
+            .subject
+            .as_ref()
+            .map(|sub| {
+                if sub.starts_with("Fwd:") {
+                    sub.to_owned()
+                } else {
+                    format!("Fwd: {}", sub)
+                }
+            })
+            .unwrap_or_default();
 
         self.headers = Headers {
-            subject: Some(format!("Fwd: {}", old_subject)),
-            sender: Some(account.address()),
+            subject: Some(subject),
+            sender: None,
+            reply_to: None,
+            message_id: None,
+            from: vec![account.address()],
+            to: vec![],
             // and use the rest of the headers
             ..self.headers.clone()
         };
 
-        let mut body = String::new();
-
-        // -- Body --
-        // apply a line which should indicate where the forwarded message begins
-        body.push_str(&format!(
-            "\n---------- Forwarded Message ----------\n{}",
+        // TODO: add Subject, Date, From and To headers after "Forwarded Message"
+        self.body = Body::new_with_text(format!(
+            "\n\n---------- Forwarded Message ----------\n{}",
             self.body
                 .plain
-                .clone()
+                .to_owned()
                 .unwrap_or_default()
                 .replace("\r", ""),
         ));
-        self.body = Body::new_with_text(body);
         self.sig = account.signature.to_owned();
     }
 

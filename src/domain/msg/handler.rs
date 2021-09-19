@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use atty::Stream;
 use imap::types::Flag;
 use lettre::message::header::ContentTransferEncoding;
-use log::{debug, error, trace};
+use log::{debug, trace};
 use std::{
     borrow::Cow,
     convert::TryFrom,
@@ -30,7 +30,10 @@ use crate::{
         smtp::service::SmtpServiceInterface,
     },
     output::service::{OutputService, OutputServiceInterface},
-    ui::choice::{self, PostEditChoice},
+    ui::{
+        choice::{self, PostEditChoice},
+        editor,
+    },
 };
 
 // TODO: move this function to the right folder
@@ -44,76 +47,66 @@ fn msg_interaction<ImapService: ImapServiceInterface, SmtpService: SmtpServiceIn
     msg.edit_body()?;
 
     loop {
-        match choice::post_edit() {
-            Ok(choice) => match choice {
-                PostEditChoice::Send => {
-                    debug!("sending message…");
+        match choice::post_edit()? {
+            PostEditChoice::Send => {
+                debug!("sending message…");
 
-                    // prepare the msg to be send
-                    let sendable = match msg.to_sendable_msg() {
-                        Ok(sendable) => sendable,
-                        // In general if an error occured, then this is normally
-                        // due to a missing value of a header. So let's give the
-                        // user another try and give him/her the chance to fix
-                        // that :)
-                        Err(err) => {
-                            println!("{}", err);
-                            println!("Please reedit your msg to make it to a sendable message!");
-                            continue;
-                        }
-                    };
-                    smtp.send(&sendable)?;
-
-                    // TODO: Gmail sent mailboxes are called `[Gmail]/Sent`
-                    // which creates a conflict, fix this!
-
-                    // let the server know, that the user sent a msg
-                    msg.flags.insert(Flag::Seen);
-                    let mbox = Mbox::from("Sent");
-                    imap.append_msg(&mbox, msg)?;
-
-                    // remove the draft, since we sent it
-                    msg::utils::remove_draft()?;
-                    output.print("Message successfully sent")?;
-                    break;
-                }
-                // edit the body of the msg
-                PostEditChoice::Edit => {
-                    // Did something goes wrong when the user changed the
-                    // content?
-                    if let Err(err) = msg.edit_body() {
-                        println!("[ERROR] {}", err);
-                        println!(concat!(
-                            "Please try to fix the problem by editing",
-                            "the msg again."
-                        ));
+                // prepare the msg to be send
+                let sendable = match msg.to_sendable_msg() {
+                    Ok(sendable) => sendable,
+                    // In general if an error occured, then this is normally
+                    // due to a missing value of a header. So let's give the
+                    // user another try and give him/her the chance to fix
+                    // that :)
+                    Err(err) => {
+                        println!("{}", err);
+                        println!("Please reedit your msg to make it to a sendable message!");
+                        continue;
                     }
-                }
-                PostEditChoice::LocalDraft => break,
-                PostEditChoice::RemoteDraft => {
-                    debug!("saving to draft…");
+                };
+                smtp.send(&sendable)?;
 
-                    msg.flags.insert(Flag::Seen);
+                // TODO: Gmail sent mailboxes are called `[Gmail]/Sent`
+                // which creates a conflict, fix this!
 
-                    let mbox = Mbox::from("Drafts");
-                    match imap.append_msg(&mbox, msg) {
-                        Ok(_) => {
-                            msg::utils::remove_draft()?;
-                            output.print("Message successfully saved to Drafts")?;
-                        }
-                        Err(err) => {
-                            output.print("Cannot save draft to the server")?;
-                            return Err(err.into());
-                        }
-                    };
-                    break;
-                }
-                PostEditChoice::Discard => {
-                    msg::utils::remove_draft()?;
-                    break;
-                }
-            },
-            Err(err) => error!("{}", err),
+                // let the server know, that the user sent a msg
+                msg.flags.insert(Flag::Seen);
+                let mbox = Mbox::from("Sent");
+                imap.append_msg(&mbox, msg)?;
+
+                // remove the draft, since we sent it
+                msg::utils::remove_draft()?;
+                output.print("Message successfully sent")?;
+                break;
+            }
+            // edit the body of the msg
+            PostEditChoice::Edit => {
+                Msg::parse_from_str(msg, &editor::open_editor_with_draft()?)?;
+                continue;
+            }
+            PostEditChoice::LocalDraft => break,
+            PostEditChoice::RemoteDraft => {
+                debug!("saving to draft…");
+
+                msg.flags.insert(Flag::Seen);
+
+                let mbox = Mbox::from("Drafts");
+                match imap.append_msg(&mbox, msg) {
+                    Ok(_) => {
+                        msg::utils::remove_draft()?;
+                        output.print("Message successfully saved to Drafts")?;
+                    }
+                    Err(err) => {
+                        output.print("Cannot save draft to the server")?;
+                        return Err(err.into());
+                    }
+                };
+                break;
+            }
+            PostEditChoice::Discard => {
+                msg::utils::remove_draft()?;
+                break;
+            }
         }
     }
 
@@ -186,6 +179,7 @@ pub fn delete<OutputService: OutputServiceInterface, ImapService: ImapServiceInt
     Ok(())
 }
 
+/// Forward the given message UID from the selected mailbox.
 pub fn forward<ImapService: ImapServiceInterface, SmtpService: SmtpServiceInterface>(
     uid: &str,
     attachments_paths: Vec<&str>,
@@ -195,14 +189,12 @@ pub fn forward<ImapService: ImapServiceInterface, SmtpService: SmtpServiceInterf
     smtp: &mut SmtpService,
 ) -> Result<()> {
     let mut msg = imap.get_msg(&uid)?;
-    // prepare to forward it
     msg.change_to_forwarding(&account);
     attachments_paths
         .iter()
         .for_each(|path| msg.add_attachment(path));
     debug!("found {} attachments", attachments_paths.len());
     trace!("attachments: {:?}", attachments_paths);
-    // apply changes
     msg_interaction(output, &mut msg, imap, smtp)?;
     imap.logout()?;
     Ok(())

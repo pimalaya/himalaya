@@ -43,14 +43,14 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
     if let Some(m) = m.subcommand_matches("attachments") {
         debug!("attachments command matched");
         let uid = m.value_of("uid").unwrap();
-        debug!("uid: {}", &uid);
+        debug!("uid: {}", uid);
         return Ok(Some(Command::Attachments(uid)));
     }
 
     if let Some(m) = m.subcommand_matches("copy") {
         debug!("copy command matched");
         let uid = m.value_of("uid").unwrap();
-        debug!("uid: {}", &uid);
+        debug!("uid: {}", uid);
         let target = m.value_of("target");
         debug!("target mailbox: `{:?}`", target);
         return Ok(Some(Command::Copy(uid, target)));
@@ -59,7 +59,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
     if let Some(m) = m.subcommand_matches("delete") {
         debug!("copy command matched");
         let uid = m.value_of("uid").unwrap();
-        debug!("uid: {}", &uid);
+        debug!("uid: {}", uid);
         return Ok(Some(Command::Delete(uid)));
     }
 
@@ -68,7 +68,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         let uid = m.value_of("uid").unwrap();
         let paths: Vec<&str> = m.values_of("attachments").unwrap_or_default().collect();
         debug!("attachments paths: {:?}", paths);
-        debug!("uid: {}", &uid);
+        debug!("uid: {}", uid);
         return Ok(Some(Command::Forward(uid, paths)));
     }
 
@@ -90,7 +90,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
     if let Some(m) = m.subcommand_matches("move") {
         debug!("move command matched");
         let uid = m.value_of("uid").unwrap();
-        debug!("uid: {}", &uid);
+        debug!("uid: {}", uid);
         let target = m.value_of("target");
         debug!("target mailbox: `{:?}`", target);
         return Ok(Some(Command::Move(uid, target)));
@@ -283,7 +283,7 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                 .arg(reply_all_arg())
                 .arg(msg::attachment::arg::path_arg()),
             SubCommand::with_name("forward")
-                .aliases(&["fwd"])
+                .aliases(&["fwd", "f"])
                 .about("Forwards a message")
                 .arg(uid_arg())
                 .arg(msg::attachment::arg::path_arg()),
