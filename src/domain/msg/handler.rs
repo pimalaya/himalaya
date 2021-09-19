@@ -29,7 +29,7 @@ use crate::{
         },
         smtp::service::SmtpServiceInterface,
     },
-    output::service::{OutputService, OutputServiceInterface},
+    output::service::OutputServiceInterface,
     ui::{
         choice::{self, PostEditChoice},
         editor,
@@ -37,7 +37,11 @@ use crate::{
 };
 
 // TODO: move this function to the right folder
-fn msg_interaction<ImapService: ImapServiceInterface, SmtpService: SmtpServiceInterface>(
+fn msg_interaction<
+    OutputService: OutputServiceInterface,
+    ImapService: ImapServiceInterface,
+    SmtpService: SmtpServiceInterface,
+>(
     output: &OutputService,
     msg: &mut Msg,
     imap: &mut ImapService,
@@ -180,7 +184,11 @@ pub fn delete<OutputService: OutputServiceInterface, ImapService: ImapServiceInt
 }
 
 /// Forward the given message UID from the selected mailbox.
-pub fn forward<ImapService: ImapServiceInterface, SmtpService: SmtpServiceInterface>(
+pub fn forward<
+    OutputService: OutputServiceInterface,
+    ImapService: ImapServiceInterface,
+    SmtpService: SmtpServiceInterface,
+>(
     uid: &str,
     attachments_paths: Vec<&str>,
     account: &Account,
@@ -201,7 +209,7 @@ pub fn forward<ImapService: ImapServiceInterface, SmtpService: SmtpServiceInterf
 }
 
 /// List messages with pagination from the selected mailbox.
-pub fn list<ImapService: ImapServiceInterface>(
+pub fn list<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
     page_size: Option<usize>,
     page: usize,
     account: &Account,
@@ -224,7 +232,11 @@ pub fn list<ImapService: ImapServiceInterface>(
 /// Parse and edit a message from a [mailto] URL string.
 ///
 /// [mailto]: https://en.wikipedia.org/wiki/Mailto
-pub fn mailto<ImapService: ImapServiceInterface, SmtpService: SmtpServiceInterface>(
+pub fn mailto<
+    OutputService: OutputServiceInterface,
+    ImapService: ImapServiceInterface,
+    SmtpService: SmtpServiceInterface,
+>(
     url: &Url,
     account: &Account,
     output: &OutputService,
@@ -295,7 +307,8 @@ pub fn move_<OutputService: OutputServiceInterface, ImapService: ImapServiceInte
     Ok(())
 }
 
-pub fn read<ImapService: ImapServiceInterface>(
+/// Read a message from the given UID.
+pub fn read<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
     uid: &str,
     // TODO: use the mime to select the right body
     _mime: String,
@@ -313,7 +326,11 @@ pub fn read<ImapService: ImapServiceInterface>(
     Ok(())
 }
 
-pub fn reply<ImapService: ImapServiceInterface, SmtpService: SmtpServiceInterface>(
+pub fn reply<
+    OutputService: OutputServiceInterface,
+    ImapService: ImapServiceInterface,
+    SmtpService: SmtpServiceInterface,
+>(
     uid: &str,
     all: bool,
     attachments_paths: Vec<&str>,
@@ -349,7 +366,7 @@ pub fn save<ImapService: ImapServiceInterface>(
     Ok(())
 }
 
-pub fn search<ImapService: ImapServiceInterface>(
+pub fn search<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
     page_size: Option<usize>,
     page: usize,
     query: String,
@@ -370,7 +387,11 @@ pub fn search<ImapService: ImapServiceInterface>(
     Ok(())
 }
 
-pub fn send<ImapService: ImapServiceInterface, SmtpService: SmtpServiceInterface>(
+pub fn send<
+    OutputService: OutputServiceInterface,
+    ImapService: ImapServiceInterface,
+    SmtpService: SmtpServiceInterface,
+>(
     msg: &str,
     output: &OutputService,
     imap: &mut ImapService,
@@ -400,7 +421,11 @@ pub fn send<ImapService: ImapServiceInterface, SmtpService: SmtpServiceInterface
     Ok(())
 }
 
-pub fn write<ImapService: ImapServiceInterface, SmtpService: SmtpServiceInterface>(
+pub fn write<
+    OutputService: OutputServiceInterface,
+    ImapService: ImapServiceInterface,
+    SmtpService: SmtpServiceInterface,
+>(
     attachments_paths: Vec<&str>,
     account: &Account,
     output: &OutputService,

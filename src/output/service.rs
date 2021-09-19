@@ -59,18 +59,12 @@ impl<T: Serialize> OutputJson<T> {
 
 pub trait OutputServiceInterface {
     fn print<T: Serialize + fmt::Display>(&self, data: T) -> Result<()>;
+    fn is_json(&self) -> bool;
 }
 
 #[derive(Debug)]
 pub struct OutputService {
     fmt: OutputFmt,
-}
-
-impl OutputService {
-    /// Returns true, if the formatting should be json.
-    pub fn is_json(&self) -> bool {
-        self.fmt == OutputFmt::Json
-    }
 }
 
 impl OutputServiceInterface for OutputService {
@@ -86,6 +80,11 @@ impl OutputServiceInterface for OutputService {
             }
         };
         Ok(())
+    }
+
+    /// Returns true, if the formatting should be json.
+    fn is_json(&self) -> bool {
+        self.fmt == OutputFmt::Json
     }
 }
 
