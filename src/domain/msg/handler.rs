@@ -326,6 +326,7 @@ pub fn read<OutputService: OutputServiceInterface, ImapService: ImapServiceInter
     Ok(())
 }
 
+/// Reply to the given message UID.
 pub fn reply<
     OutputService: OutputServiceInterface,
     ImapService: ImapServiceInterface,

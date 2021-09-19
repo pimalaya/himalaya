@@ -278,6 +278,7 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                         .short("r"),
                 ),
             SubCommand::with_name("reply")
+                .aliases(&["rep", "r"])
                 .about("Answers to a message")
                 .arg(uid_arg())
                 .arg(reply_all_arg())
