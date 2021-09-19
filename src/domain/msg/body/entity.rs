@@ -65,54 +65,6 @@ impl Body {
             html: None,
         }
     }
-
-    /// Returns a new instance of `Body` with `html` set.
-    ///
-    /// # Example
-    /// ```rust
-    /// use himalaya::msg::body::Body;
-    ///
-    /// fn main() {
-    ///     let body = Body::new_with_html("Html body");
-    ///
-    ///     let expected_body = Body {
-    ///         text: None,
-    ///         html: Some("Html body".to_string()),
-    ///     };
-    ///
-    ///     assert_eq!(body, expected_body);
-    /// }
-    /// ```
-    pub fn new_with_html<S: ToString>(html: S) -> Self {
-        Self {
-            plain: None,
-            html: Some(html.to_string()),
-        }
-    }
-
-    /// Returns a new isntance of `Body` with `text` and `html` set.
-    ///
-    /// # Example
-    /// ```rust
-    /// use himalaya::msg::body::Body;
-    ///
-    /// fn main() {
-    ///     let body = Body::new_with_both("Text body", "Html body");
-    ///
-    ///     let expected_body = Body {
-    ///         text: Some("Text body".to_string()),
-    ///         html: Some("Html body".to_string()),
-    ///     };
-    ///
-    ///     assert_eq!(body, expected_body);
-    /// }
-    /// ```
-    pub fn new_with_both<S: ToString>(text: S, html: S) -> Self {
-        Self {
-            plain: Some(text.to_string()),
-            html: Some(html.to_string()),
-        }
-    }
 }
 
 // == Traits ==

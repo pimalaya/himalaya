@@ -20,31 +20,6 @@ pub struct Attachment {
 }
 
 impl Attachment {
-    /// Creates a new attachment.
-    ///
-    /// # Example
-    /// ```
-    /// # use himalaya::msg::attachment::Attachment;
-    /// let attachment = Attachment::new(
-    ///     "VIP Text",
-    ///     "text/plain",
-    ///     "Some very important text".as_bytes().to_vec());
-    ///
-    /// ```
-    pub fn new(filename: &str, content_type: &str, body_raw: Vec<u8>) -> Self {
-        // Use the mime type `text/plain` per default
-        let content_type: ContentType = match content_type.parse() {
-            Ok(lettre_type) => lettre_type,
-            Err(_) => ContentType::TEXT_PLAIN,
-        };
-
-        Self {
-            filename: filename.to_string(),
-            content_type,
-            body_raw,
-        }
-    }
-
     /// This from function extracts one attachment of a parsed msg.
     /// If it couldn't create an attachment with the given parsed msg, than it will
     /// return `None`.

@@ -1,7 +1,15 @@
 use anyhow::{anyhow, Context, Error, Result};
 use imap::types::{Fetch, Flag, ZeroCopy};
+use lettre::message::{
+    header::ContentType, Attachment as lettre_Attachment, Mailbox, Message, MultiPart, SinglePart,
+};
 use log::debug;
 use mailparse;
+use serde::Serialize;
+use std::{
+    convert::{From, TryFrom},
+    fmt,
+};
 
 use crate::{
     config::entity::Account,
@@ -9,21 +17,10 @@ use crate::{
         attachment::entity::Attachment, body::entity::Body, flag::entity::Flags,
         header::entity::Headers,
     },
-    ui::table::{Cell, Row, Table},
-};
-
-#[cfg(not(test))]
-use crate::ui::editor;
-
-use serde::Serialize;
-
-use lettre::message::{
-    header::ContentType, Attachment as lettre_Attachment, Mailbox, Message, MultiPart, SinglePart,
-};
-
-use std::{
-    convert::{From, TryFrom},
-    fmt,
+    ui::{
+        editor,
+        table::{Cell, Row, Table},
+    },
 };
 
 /// Represents the msg in a serializeable form with additional values.
@@ -425,7 +422,6 @@ impl Msg {
         // We don't let this line compile, if we're doing
         // tests, because we just need to look, if the headers are set
         // correctly
-        #[cfg(not(test))]
         let msg = editor::open_editor_with_tpl(msg.as_bytes())?;
 
         // refresh the state of the msg
@@ -714,14 +710,6 @@ impl Msg {
     /// otherwise you'll get `None`.
     pub fn get_uid(&self) -> Option<u32> {
         self.uid
-    }
-
-    /// It returns the raw version of the Message. In general it's the structure
-    /// how you get it if you get the data from the fetch. It's the output if
-    /// you read a message with the `--raw` flag like this: `himalaya read
-    /// --raw <UID>`.
-    pub fn get_raw(&self) -> Vec<u8> {
-        self.raw.clone()
     }
 
     /// Returns the raw mail as a string instead of a Vector of bytes.

@@ -67,17 +67,6 @@ pub struct OutputService {
 }
 
 impl OutputService {
-    /// Create a new output-handler by setting the given formatting style.
-    pub fn new(slice: &str) -> Result<Self> {
-        let fmt = OutputFmt::try_from(Some(slice))?;
-        Ok(Self { fmt })
-    }
-
-    /// Returns true, if the formatting should be plaintext.
-    pub fn is_plain(&self) -> bool {
-        self.fmt == OutputFmt::Plain
-    }
-
     /// Returns true, if the formatting should be json.
     pub fn is_json(&self) -> bool {
         self.fmt == OutputFmt::Json

@@ -101,15 +101,6 @@ pub struct Mbox {
     pub attributes: Attributes,
 }
 
-impl Mbox {
-    pub fn new<S: AsRef<str>>(name: S) -> Self {
-        Self {
-            name: name.as_ref().to_owned(),
-            ..Self::default()
-        }
-    }
-}
-
 impl Default for Mbox {
     fn default() -> Self {
         Self {

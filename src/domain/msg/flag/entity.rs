@@ -3,6 +3,7 @@ use serde::ser::{Serialize, SerializeSeq, Serializer};
 
 use std::borrow::Cow;
 use std::collections::HashSet;
+use std::fmt;
 use std::ops::{Deref, DerefMut};
 
 use std::convert::From;
@@ -70,27 +71,25 @@ impl Flags {
     }
 }
 
-impl ToString for Flags {
-    fn to_string(&self) -> String {
-        let mut flags = String::new();
-
+impl fmt::Display for Flags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut glue = "";
         for flag in &self.0 {
+            write!(f, "{}", glue)?;
             match flag {
-                Flag::Seen => flags.push_str("\\Seen "),
-                Flag::Answered => flags.push_str("\\Answered "),
-                Flag::Flagged => flags.push_str("\\Flagged "),
-                Flag::Deleted => flags.push_str("\\Deleted "),
-                Flag::Draft => flags.push_str("\\Draft "),
-                Flag::Recent => flags.push_str("\\Recent "),
-                Flag::MayCreate => flags.push_str("\\MayCreate "),
-                Flag::Custom(cow) => flags.push_str(&format!("\\{} ", cow)),
-                _ => panic!("Unknown flag!"),
+                Flag::Seen => write!(f, "\\Seen")?,
+                Flag::Answered => write!(f, "\\Answered")?,
+                Flag::Flagged => write!(f, "\\Flagged")?,
+                Flag::Deleted => write!(f, "\\Deleted")?,
+                Flag::Draft => write!(f, "\\Draft")?,
+                Flag::Recent => write!(f, "\\Recent")?,
+                Flag::MayCreate => write!(f, "\\MayCreate")?,
+                Flag::Custom(cow) => write!(f, "{}", cow)?,
+                _ => (),
             }
+            glue = " ";
         }
-
-        // remove the trailing whitespaces
-        flags = flags.trim_end_matches(' ').to_string();
-        flags
+        Ok(())
     }
 }
 
@@ -143,17 +142,41 @@ impl From<&str> for Flags {
 
         for flag in flags.split_ascii_whitespace() {
             match flag {
-                "Seen" => content.insert(Flag::Seen),
                 "Answered" => content.insert(Flag::Answered),
-                "Deleted" => content.insert(Flag::Flagged),
+                "Deleted" => content.insert(Flag::Deleted),
                 "Draft" => content.insert(Flag::Draft),
-                "Recent" => content.insert(Flag::Recent),
+                "Flagged" => content.insert(Flag::Flagged),
                 "MayCreate" => content.insert(Flag::MayCreate),
-                _other => content.insert(Flag::Custom(Cow::Owned(_other.to_string()))),
+                "Recent" => content.insert(Flag::Recent),
+                "Seen" => content.insert(Flag::Seen),
+                custom => content.insert(Flag::Custom(Cow::Owned(custom.to_string()))),
             };
         }
 
         Self(content)
+    }
+}
+
+impl<'a> From<Vec<&'a str>> for Flags {
+    fn from(flags: Vec<&'a str>) -> Self {
+        let mut map: HashSet<Flag<'static>> = HashSet::new();
+
+        for f in flags {
+            match f {
+                "Answered" | _ if f.eq_ignore_ascii_case("answered") => map.insert(Flag::Answered),
+                "Deleted" | _ if f.eq_ignore_ascii_case("deleted") => map.insert(Flag::Deleted),
+                "Draft" | _ if f.eq_ignore_ascii_case("draft") => map.insert(Flag::Draft),
+                "Flagged" | _ if f.eq_ignore_ascii_case("flagged") => map.insert(Flag::Flagged),
+                "MayCreate" | _ if f.eq_ignore_ascii_case("maycreate") => {
+                    map.insert(Flag::MayCreate)
+                }
+                "Recent" | _ if f.eq_ignore_ascii_case("recent") => map.insert(Flag::Recent),
+                "Seen" | _ if f.eq_ignore_ascii_case("seen") => map.insert(Flag::Seen),
+                custom => map.insert(Flag::Custom(Cow::Owned(custom.into()))),
+            };
+        }
+
+        Self(map)
     }
 }
 

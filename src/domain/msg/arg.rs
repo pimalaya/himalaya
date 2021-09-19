@@ -183,7 +183,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         return Ok(Some(Command::Tpl(msg::tpl::arg::matches(&m)?)));
     }
 
-    if let Some(m) = m.subcommand_matches("flags") {
+    if let Some(m) = m.subcommand_matches("flag") {
         return Ok(Some(Command::Flag(msg::flag::arg::matches(&m)?)));
     }
 

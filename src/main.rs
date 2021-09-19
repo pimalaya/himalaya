@@ -4,20 +4,20 @@ use env_logger;
 use std::{convert::TryFrom, env};
 use url::Url;
 
-use himalaya::{
-    compl,
-    config::{
-        self,
-        entity::{Account, Config},
-    },
-    domain::{
-        imap::{self, service::ImapService},
-        mbox::{self, entity::Mbox},
-        msg,
-        smtp::service::SmtpService,
-    },
-    output::{self, service::OutputService},
+mod compl;
+mod config;
+mod domain;
+mod output;
+mod ui;
+
+use config::entity::{Account, Config};
+use domain::{
+    imap::{self, service::ImapService},
+    mbox::{self, entity::Mbox},
+    msg,
+    smtp::service::SmtpService,
 };
+use output::service::OutputService;
 
 fn create_app<'a>() -> clap::App<'a, 'a> {
     clap::App::new(env!("CARGO_PKG_NAME"))
@@ -132,13 +132,13 @@ fn main() -> Result<()> {
 
         Some(msg::arg::Command::Flag(m)) => match m {
             Some(msg::flag::arg::Command::Set(uid, flags)) => {
-                return msg::flag::handler::set(uid, flags, &mut imap);
+                return msg::flag::handler::set(uid, flags, &output, &mut imap);
             }
             Some(msg::flag::arg::Command::Add(uid, flags)) => {
-                return msg::flag::handler::add(uid, flags, &mut imap);
+                return msg::flag::handler::add(uid, flags, &output, &mut imap);
             }
             Some(msg::flag::arg::Command::Remove(uid, flags)) => {
-                return msg::flag::handler::remove(uid, flags, &mut imap);
+                return msg::flag::handler::remove(uid, flags, &output, &mut imap);
             }
             _ => (),
         },

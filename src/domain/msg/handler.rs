@@ -1,3 +1,7 @@
+//! Module related to message handling.
+//!
+//! This module gathers all message commands.  
+
 use anyhow::{Context, Result};
 use atty::Stream;
 use imap::types::Flag;
@@ -175,7 +179,7 @@ pub fn delete<OutputService: OutputServiceInterface, ImapService: ImapServiceInt
     imap: &mut ImapService,
 ) -> Result<()> {
     let flags = Flags::from(vec![Flag::Seen, Flag::Deleted]);
-    imap.add_flags(uid, flags)?;
+    imap.add_flags(uid, &flags)?;
     imap.expunge()?;
     output.print(format!("Message(s) {} successfully deleted", uid))?;
     imap.logout()?;
@@ -288,8 +292,8 @@ pub fn move_<ImapService: ImapServiceInterface>(
         uid, target
     ))?;
     // delete the msg in the old mailbox
-    let flags = vec![Flag::Seen, Flag::Deleted];
-    imap.add_flags(uid, Flags::from(flags))?;
+    let flags = Flags::from(vec![Flag::Seen, Flag::Deleted]);
+    imap.add_flags(uid, &flags)?;
     imap.expunge()?;
     imap.logout()?;
     Ok(())

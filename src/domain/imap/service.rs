@@ -33,9 +33,15 @@ pub trait ImapServiceInterface {
     ) -> Result<Option<ImapMsgs>>;
     fn get_msg(&mut self, uid: &str) -> Result<Msg>;
     fn append_msg(&mut self, mbox: &Mbox, msg: &mut Msg) -> Result<()>;
-    fn add_flags(&mut self, uid_seq: &str, flags: Flags) -> Result<()>;
-    fn set_flags(&mut self, uid_seq: &str, flags: Flags) -> Result<()>;
-    fn remove_flags(&mut self, uid_seq: &str, flags: Flags) -> Result<()>;
+    /// Add flags to the given message UID sequence.
+    ///
+    /// ```ignore
+    /// let flags = Flags::from(vec![Flag::Seen, Flag::Deleted]);
+    /// add_flags("5:10", flags)
+    /// ```
+    fn add_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()>;
+    fn set_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()>;
+    fn remove_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()>;
     fn expunge(&mut self) -> Result<()>;
     fn logout(&mut self) -> Result<()>;
 }
@@ -204,14 +210,7 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
         Ok(())
     }
 
-    /// Add flags to the given message UID sequence.
-    ///
-    /// ```ignore
-    ///
-    /// let flags = Flags::from(vec![Flag::Seen, Flag::Deleted]);
-    /// imap.add_flags("5:10", flags)
-    /// ```
-    fn add_flags(&mut self, uid_seq: &str, flags: Flags) -> Result<()> {
+    fn add_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()> {
         let mbox = self.mbox.to_owned();
         let flags: String = flags.to_string();
         self.sess()?
@@ -244,9 +243,8 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
     ///     imap_conn.logout();
     /// }
     /// ```
-    fn set_flags(&mut self, uid_seq: &str, flags: Flags) -> Result<()> {
+    fn set_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()> {
         let mbox = self.mbox.to_owned();
-        let flags: String = flags.to_string();
         self.sess()?
             .select(&mbox.name)
             .context(format!("cannot select mailbox `{}`", self.mbox.name))?;
@@ -258,7 +256,7 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
 
     /// Remove the flags to the message by the given information. Take a look on the example above.
     /// It's pretty similar.
-    fn remove_flags(&mut self, uid_seq: &str, flags: Flags) -> Result<()> {
+    fn remove_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()> {
         let mbox = self.mbox.to_owned();
         let flags = flags.to_string();
         self.sess()?

@@ -9,7 +9,7 @@ use log::debug;
 use crate::domain::msg;
 
 type Uid<'a> = &'a str;
-type Flags<'a> = &'a str;
+type Flags<'a> = Vec<&'a str>;
 
 /// Message flag commands.
 pub enum Command<'a> {
@@ -24,8 +24,8 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         debug!("set command matched");
         let uid = m.value_of("uid").unwrap();
         debug!("uid: {}", uid);
-        let flags = m.value_of("flags").unwrap();
-        debug!("flags: {}", flags);
+        let flags: Vec<&str> = m.values_of("flags").unwrap_or_default().collect();
+        debug!("flags: `{:?}`", flags);
         return Ok(Some(Command::Set(uid, flags)));
     }
 
@@ -33,8 +33,8 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         debug!("add command matched");
         let uid = m.value_of("uid").unwrap();
         debug!("uid: {}", uid);
-        let flags = m.value_of("flags").unwrap();
-        debug!("flags: {}", flags);
+        let flags: Vec<&str> = m.values_of("flags").unwrap_or_default().collect();
+        debug!("flags: `{:?}`", flags);
         return Ok(Some(Command::Add(uid, flags)));
     }
 
@@ -42,8 +42,8 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         debug!("remove command matched");
         let uid = m.value_of("uid").unwrap();
         debug!("uid: {}", uid);
-        let flags = m.value_of("flags").unwrap();
-        debug!("flags: {}", flags);
+        let flags: Vec<&str> = m.values_of("flags").unwrap_or_default().collect();
+        debug!("flags: `{:?}`", flags);
         return Ok(Some(Command::Remove(uid, flags)));
     }
 
@@ -53,7 +53,9 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
 /// Message flag flags argument.
 fn flags_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name("flags")
-        .help("IMAP flags (see https://tools.ietf.org/html/rfc3501#page-11). Just write the flag name without the backslash. Example: --flags \"Seen Answered\"")
+        .help(
+            "IMAP flags (they do not need to be prefixed with `\\` and they are case-insensitive)",
+        )
         .value_name("FLAGS…")
         .multiple(true)
         .required(true)
@@ -61,7 +63,8 @@ fn flags_arg<'a>() -> Arg<'a, 'a> {
 
 /// Message flag subcommands.
 pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
-    vec![SubCommand::with_name("flags")
+    vec![SubCommand::with_name("flag")
+        .aliases(&["flags", "flg"])
         .about("Handles flags")
         .setting(AppSettings::SubcommandRequiredElseHelp)
         .subcommand(
@@ -72,7 +75,7 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
         )
         .subcommand(
             SubCommand::with_name("add")
-                .about("Appends flags to a message")
+                .about("Adds flags to a message")
                 .arg(msg::arg::uid_arg())
                 .arg(flags_arg()),
         )

@@ -77,96 +77,6 @@ impl Config {
         Ok(path)
     }
 
-    /// Returns the account by the given name.
-    /// If `name` is `None`, then the default account is returned.
-    pub fn find_account_by_name(&self, name: Option<&str>) -> Result<&ConfigAccountEntry> {
-        match name {
-            Some("") | None => self
-                .accounts
-                .iter()
-                .find(|(_, account)| account.default.unwrap_or(false))
-                .map(|(_, account)| account)
-                .ok_or_else(|| anyhow!("cannot find default account")),
-            Some(name) => self
-                .accounts
-                .get(name)
-                .ok_or_else(|| anyhow!("cannot find account `{}`", name)),
-        }
-    }
-
-    /// Returns the path to the given filename in the download directory.
-    /// You can imagine this as:
-    /// ```skip
-    /// Account-specifique-download-dir-path + Attachment-Filename
-    /// ```
-    pub fn downloads_filepath(&self, account: &ConfigAccountEntry, filename: &str) -> PathBuf {
-        account
-            .downloads_dir
-            .as_ref()
-            .and_then(|dir| dir.to_str())
-            .and_then(|dir| shellexpand::full(dir).ok())
-            .map(|dir| PathBuf::from(dir.to_string()))
-            .unwrap_or(
-                self.downloads_dir
-                    .as_ref()
-                    .and_then(|dir| dir.to_str())
-                    .and_then(|dir| shellexpand::full(dir).ok())
-                    .map(|dir| PathBuf::from(dir.to_string()))
-                    .unwrap_or(env::temp_dir()),
-            )
-            .join(filename)
-    }
-
-    /// This is a little helper-function like which uses the the name and email
-    /// of the account to create a valid address for the header of the headers
-    /// of a msg.
-    ///
-    /// # Hint
-    /// If the name includes some special characters like a whitespace, comma or semicolon, then
-    /// the name will be automatically wrapped between two `"`.
-    ///
-    /// # Exapmle
-    /// ```
-    /// use himalaya::config::model::{Account, Config};
-    ///
-    /// fn main() {
-    ///     let config = Config::default();
-    ///
-    ///     let normal_account = Account::new(Some("Acc1"), "acc1@mail.com");
-    ///     // notice the semicolon in the name!
-    ///     let special_account = Account::new(Some("TL;DR"), "acc2@mail.com");
-    ///
-    ///     // -- Expeced outputs --
-    ///     let expected_normal = Account {
-    ///         name: Some("Acc1".to_string()),
-    ///         email: "acc1@mail.com".to_string(),
-    ///         .. Account::default()
-    ///     };
-    ///
-    ///     let expected_special = Account {
-    ///         name: Some("\"TL;DR\"".to_string()),
-    ///         email: "acc2@mail.com".to_string(),
-    ///         .. Account::default()
-    ///     };
-    ///
-    ///     assert_eq!(config.address(&normal_account), "Acc1 <acc1@mail.com>");
-    ///     assert_eq!(config.address(&special_account), "\"TL;DR\" <acc2@mail.com>");
-    /// }
-    /// ```
-    pub fn address(&self, account: &ConfigAccountEntry) -> String {
-        let name = account.name.as_ref().unwrap_or(&self.name);
-        let has_special_chars = "()<>[]:;@.,".contains(|special_char| name.contains(special_char));
-
-        if name.is_empty() {
-            format!("{}", account.email)
-        } else if has_special_chars {
-            // so the name has special characters => Wrap it with '"'
-            format!("\"{}\" <{}>", name, account.email)
-        } else {
-            format!("{} <{}>", name, account.email)
-        }
-    }
-
     pub fn run_notify_cmd<S: AsRef<str>>(&self, subject: S, sender: S) -> Result<()> {
         let subject = subject.as_ref();
         let sender = sender.as_ref();
@@ -183,7 +93,7 @@ impl Config {
         Ok(())
     }
 
-    pub fn exec_watch_cmds(&self, account: &ConfigAccountEntry) -> Result<()> {
+    pub fn _exec_watch_cmds(&self, account: &ConfigAccountEntry) -> Result<()> {
         let cmds = account
             .watch_cmds
             .as_ref()
@@ -323,28 +233,6 @@ impl Account {
             format!("{} <{}>", name, self.email)
         }
     }
-    /// Returns the imap-host address + the port usage of the account
-    ///
-    /// # Example
-    /// ```rust
-    /// use himalaya::config::model::Account;
-    /// fn main () {
-    ///     let account = Account {
-    ///         imap_host: String::from("hostExample"),
-    ///         imap_port: 42,
-    ///         .. Account::default()
-    ///     };
-    ///
-    ///     let expected_output = ("hostExample", 42);
-    ///
-    ///     assert_eq!(account.imap_addr(), expected_output);
-    /// }
-    /// ```
-    pub fn imap_addr(&self) -> (&str, u16) {
-        debug!("host: {}", self.imap_host);
-        debug!("port: {}", self.imap_port);
-        (&self.imap_host, self.imap_port)
-    }
 
     /// Runs the given command in your password string and returns it.
     pub fn imap_passwd(&self) -> Result<String> {
@@ -363,83 +251,6 @@ impl Account {
             .to_owned();
 
         Ok(SmtpCredentials::new(self.smtp_login.to_owned(), passwd))
-    }
-
-    /// Creates a new account with the given values and returns it. All other attributes of the
-    /// account are gonna be empty/None.
-    ///
-    /// # Example
-    /// ```rust
-    /// use himalaya::config::model::Account;
-    ///
-    /// fn main() {
-    ///     let account1 = Account::new(Some("Name1"), "email@address.com");
-    ///     let account2 = Account::new(None, "email@address.com");
-    ///
-    ///     let expected1 = Account {
-    ///         name: Some("Name1".to_string()),
-    ///         email: "email@address.com".to_string(),
-    ///         .. Account::default()
-    ///     };
-    ///
-    ///     let expected2 = Account {
-    ///         email: "email@address.com".to_string(),
-    ///         .. Account::default()
-    ///     };
-    ///
-    ///     assert_eq!(account1, expected1);
-    ///     assert_eq!(account2, expected2);
-    /// }
-    /// ```
-    pub fn new<S: ToString + Default>(name: Option<S>, email_addr: S) -> Self {
-        Self {
-            name: name.unwrap_or_default().to_string(),
-            email: email_addr.to_string(),
-            ..Self::default()
-        }
-    }
-
-    /// Creates a new account with a custom signature. Passing `None` to `signature` sets the
-    /// signature to `Account Signature`.
-    ///
-    /// # Examples
-    /// ```rust
-    /// use himalaya::config::model::Account;
-    ///
-    /// fn main() {
-    ///
-    ///     // the testing accounts
-    ///     let account_with_custom_signature = Account::new_with_signature(
-    ///         Some("Email name"), "some@mail.com", Some("Custom signature! :)"));
-    ///     let account_with_default_signature = Account::new_with_signature(
-    ///         Some("Email name"), "some@mail.com", None);
-    ///
-    ///     // How they should look like
-    ///     let account_cmp1 = Account {
-    ///         name: Some("Email name".to_string()),
-    ///         email: "some@mail.com".to_string(),
-    ///         signature: Some("Custom signature! :)".to_string()),
-    ///         .. Account::default()
-    ///     };
-    ///
-    ///     let account_cmp2 = Account {
-    ///         name: Some("Email name".to_string()),
-    ///         email: "some@mail.com".to_string(),
-    ///         .. Account::default()
-    ///     };
-    ///
-    ///     assert_eq!(account_with_custom_signature, account_cmp1);
-    ///     assert_eq!(account_with_default_signature, account_cmp2);
-    /// }
-    /// ```
-    pub fn new_with_signature<S: AsRef<str> + ToString + Default>(
-        name: Option<S>,
-        email_addr: S,
-        signature: Option<S>,
-    ) -> Self {
-        let mut account = Account::new(name, email_addr);
-        account.signature = signature.unwrap_or_default().to_string();
-        account
     }
 }
 
