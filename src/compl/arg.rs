@@ -29,6 +29,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
 /// Completion subcommands.
 pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
     vec![SubCommand::with_name("completion")
+        .aliases(&["completions", "compl", "compe", "comp"])
         .about("Generates the completion script for the given shell")
         .args(&[Arg::with_name("shell")
             .possible_values(&Shell::variants()[..])

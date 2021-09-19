@@ -56,7 +56,7 @@ fn main() -> Result<()> {
     let app = create_app();
     let m = app.get_matches();
 
-    // Check completion match BEFORE any entity or service initialization.
+    // Check completion match BEFORE entities and services initialization.
     // See https://github.com/soywod/himalaya/issues/115.
     match compl::arg::matches(&m)? {
         Some(compl::arg::Command::Generate(shell)) => {
