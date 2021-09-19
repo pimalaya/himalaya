@@ -3,10 +3,12 @@ use imap::types::{Fetch, Flag, ZeroCopy};
 use log::debug;
 use mailparse;
 
-use super::{attachment::Attachment, body::Body, headers::Headers};
 use crate::{
     config::entity::Account,
-    domain::msg::flag::entity::Flags,
+    domain::msg::{
+        attachment::entity::Attachment, body::entity::Body, flag::entity::Flags,
+        header::entity::Headers,
+    },
     ui::table::{Cell, Row, Table},
 };
 

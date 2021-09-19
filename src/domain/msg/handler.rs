@@ -18,16 +18,16 @@ use crate::{
         mbox::entity::Mbox,
         msg::{
             self,
-            body::Body,
-            entity::{Msg, Msgs},
+            body::entity::Body,
+            entity::{Msg, MsgSerialized, Msgs},
+            flag::entity::Flags,
+            header::entity::Headers,
         },
         smtp::service::SmtpServiceInterface,
     },
     output::service::{OutputService, OutputServiceInterface},
     ui::choice::{self, PostEditChoice},
 };
-
-use super::{entity::MsgSerialized, flag::entity::Flags, headers::Headers};
 
 // TODO: move this function to the right folder
 fn msg_interaction<ImapService: ImapServiceInterface, SmtpService: SmtpServiceInterface>(

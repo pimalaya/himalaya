@@ -226,22 +226,12 @@ fn page_arg<'a>() -> Arg<'a, 'a> {
         .default_value("0")
 }
 
-/// Message attachment argument.
-/// TODO: move to attachment folder
-fn attachment_arg<'a>() -> Arg<'a, 'a> {
-    Arg::with_name("attachments")
-        .help("Adds attachment to the message")
-        .short("a")
-        .long("attachment")
-        .value_name("PATH")
-        .multiple(true)
-}
-
 /// Message subcommands.
 pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
     vec![
         msg::flag::arg::subcmds(),
         msg::tpl::arg::subcmds(),
+        msg::attachment::arg::subcmds(),
         vec![
             SubCommand::with_name("list")
                 .aliases(&["lst", "l"])
@@ -262,7 +252,7 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                 ),
             SubCommand::with_name("write")
                 .about("Writes a new message")
-                .arg(attachment_arg()),
+                .arg(msg::attachment::arg::path_arg()),
             SubCommand::with_name("send")
                 .about("Sends a raw message")
                 .arg(Arg::with_name("message").raw(true).last(true)),
@@ -287,19 +277,16 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                         .long("raw")
                         .short("r"),
                 ),
-            SubCommand::with_name("attachments")
-                .about("Downloads all message attachments")
-                .arg(uid_arg()),
             SubCommand::with_name("reply")
                 .about("Answers to a message")
                 .arg(uid_arg())
                 .arg(reply_all_arg())
-                .arg(attachment_arg()),
+                .arg(msg::attachment::arg::path_arg()),
             SubCommand::with_name("forward")
                 .aliases(&["fwd"])
                 .about("Forwards a message")
                 .arg(uid_arg())
-                .arg(attachment_arg()),
+                .arg(msg::attachment::arg::path_arg()),
             SubCommand::with_name("copy")
                 .aliases(&["cp"])
                 .about("Copies a message to the targetted mailbox")

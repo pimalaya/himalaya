@@ -13,9 +13,9 @@ use crate::{
     domain::{
         imap::service::ImapServiceInterface,
         msg::{
-            body::Body,
+            body::entity::Body,
             entity::{Msg, MsgSerialized},
-            headers::Headers,
+            header::entity::Headers,
             tpl::arg::Tpl,
         },
     },

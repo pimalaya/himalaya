@@ -30,7 +30,7 @@ pub mod attachment;
 
 /// This module is used in the `Msg` struct, which should represent the headers
 /// fields like `To:` and `From:`.
-pub mod headers;
+pub mod header;
 
 /// This module is used in the `Msg` struct, which should represent the body of
 /// a msg; The part where you're writing some text like `Dear Mr. LMAO`.

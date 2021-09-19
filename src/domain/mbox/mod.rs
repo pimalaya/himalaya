@@ -1,4 +1,4 @@
-//! Module related to mailboxes.
+//! Module related to mailbox.
 
 pub mod arg;
 pub mod entity;
