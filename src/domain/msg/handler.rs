@@ -146,7 +146,7 @@ pub fn attachments<OutputService: OutputServiceInterface, ImapService: ImapServi
     Ok(())
 }
 
-/// Copy the given message UID to the targetted mailbox.
+/// Copy the given message UID from the selected mailbox to the targetted mailbox.
 pub fn copy<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
     uid: &str,
     mbox: Option<&str>,
@@ -268,7 +268,8 @@ pub fn mailto<ImapService: ImapServiceInterface, SmtpService: SmtpServiceInterfa
     Ok(())
 }
 
-pub fn move_<ImapService: ImapServiceInterface>(
+/// Move the given message UID from the selected mailbox to the targetted mailbox.
+pub fn move_<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
     uid: &str,
     mbox: Option<&str>,
     output: &OutputService,
@@ -279,9 +280,8 @@ pub fn move_<ImapService: ImapServiceInterface>(
     // create the msg in the target-msgbox
     msg.flags.insert(Flag::Seen);
     imap.append_msg(&target, &mut msg)?;
-    debug!("message {} successfully moved to folder `{}`", uid, target);
     output.print(format!(
-        "Message {} successfully moved to folder `{}`",
+        r#"Message {} successfully moved to folder "{}""#,
         uid, target
     ))?;
     // delete the msg in the old mailbox
