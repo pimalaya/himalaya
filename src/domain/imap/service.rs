@@ -12,25 +12,22 @@ use crate::{
     config::entity::{Account, Config},
     domain::{
         mbox::entity::Mbox,
-        msg::{entity::Msg, flag::entity::Flags},
+        msg::{
+            entity::{Msg, Msgs},
+            flag::entity::Flags,
+        },
     },
 };
 
 type ImapSession = imap::Session<TlsStream<TcpStream>>;
-type ImapMsgs = imap::types::ZeroCopy<Vec<imap::types::Fetch>>;
 type ImapMboxes = imap::types::ZeroCopy<Vec<imap::types::Name>>;
 
 pub trait ImapServiceInterface {
     fn notify(&mut self, config: &Config, keepalive: u64) -> Result<()>;
     fn watch(&mut self, keepalive: u64) -> Result<()>;
     fn list_mboxes(&mut self) -> Result<ImapMboxes>;
-    fn list_msgs(&mut self, page_size: &usize, page: &usize) -> Result<Option<ImapMsgs>>;
-    fn search_msgs(
-        &mut self,
-        query: &str,
-        page_size: &usize,
-        page: &usize,
-    ) -> Result<Option<ImapMsgs>>;
+    fn list_msgs(&mut self, page_size: &usize, page: &usize) -> Result<Msgs>;
+    fn search_msgs(&mut self, query: &str, page_size: &usize, page: &usize) -> Result<Msgs>;
     fn get_msg(&mut self, uid: &str) -> Result<Msg>;
     fn append_msg(&mut self, mbox: &Mbox, msg: &mut Msg) -> Result<()>;
     /// Add flags to the given message UID sequence.
@@ -116,7 +113,7 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
         Ok(mboxes)
     }
 
-    fn list_msgs(&mut self, page_size: &usize, page: &usize) -> Result<Option<ImapMsgs>> {
+    fn list_msgs(&mut self, page_size: &usize, page: &usize) -> Result<Msgs> {
         let mbox = self.mbox.to_owned();
         let last_seq = self
             .sess()?
@@ -125,11 +122,11 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
             .exists as i64;
 
         if last_seq == 0 {
-            return Ok(None);
+            return Ok(Msgs::default());
         }
 
         // TODO: add tests, improve error management when empty page
-        let range = if page_size > &0 {
+        let range = if *page_size > 0 {
             let cursor = (page * page_size) as i64;
             let begin = 1.max(last_seq - cursor);
             let end = begin - begin.min(*page_size as i64) + 1;
@@ -140,18 +137,13 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
 
         let fetches = self
             .sess()?
-            .fetch(range, "(UID FLAGS ENVELOPE INTERNALDATE)")
+            .fetch(range, "(ENVELOPE FLAGS INTERNALDATE)")
             .context("cannot fetch messages")?;
 
-        Ok(Some(fetches))
+        Ok(Msgs::try_from(fetches)?)
     }
 
-    fn search_msgs(
-        &mut self,
-        query: &str,
-        page_size: &usize,
-        page: &usize,
-    ) -> Result<Option<ImapMsgs>> {
+    fn search_msgs(&mut self, query: &str, page_size: &usize, page: &usize) -> Result<Msgs> {
         let mbox = self.mbox.to_owned();
         self.sess()?
             .select(&mbox.name)
@@ -171,16 +163,16 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
             .collect();
 
         if uids.is_empty() {
-            return Ok(None);
+            return Ok(Msgs::default());
         }
 
         let range = uids[begin..end.min(uids.len())].join(",");
         let fetches = self
             .sess()?
-            .fetch(&range, "(UID FLAGS ENVELOPE INTERNALDATE)")
+            .fetch(&range, "(FLAGS ENVELOPE INTERNALDATE)")
             .context(format!("cannot fetch range `{}`", &range))?;
 
-        Ok(Some(fetches))
+        Ok(Msgs::try_from(fetches)?)
     }
     /// Get the message according to the given `mbox` and `uid`.
     fn get_msg(&mut self, uid: &str) -> Result<Msg> {
@@ -200,13 +192,13 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
     }
 
     fn append_msg(&mut self, mbox: &Mbox, msg: &mut Msg) -> Result<()> {
-        let body = msg.into_bytes()?;
-        let flags: HashSet<imap::types::Flag<'static>> = (*msg.flags).clone();
-        self.sess()?
-            .append(&mbox.name, &body)
-            .flags(flags)
-            .finish()
-            .context(format!("cannot append message to `{}`", mbox.name))?;
+        // let body = msg.into_bytes()?;
+        // let flags: HashSet<imap::types::Flag<'static>> = (*msg.flags).clone();
+        // self.sess()?
+        //     .append(&mbox.name, &body)
+        //     .flags(flags)
+        //     .finish()
+        //     .context(format!("cannot append message to `{}`", mbox.name))?;
         Ok(())
     }
 

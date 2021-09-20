@@ -23,7 +23,7 @@ use crate::{
         msg::{
             self,
             body::entity::Body,
-            entity::{Msg, MsgSerialized, Msgs},
+            entity::{Msg, Msgs},
             flag::entity::Flags,
             header::entity::Headers,
         },
@@ -196,8 +196,7 @@ pub fn forward<
     imap: &mut ImapService,
     smtp: &mut SmtpService,
 ) -> Result<()> {
-    let mut msg = imap.get_msg(&uid)?;
-    msg.change_to_forwarding(&account);
+    let mut msg = imap.get_msg(&uid)?.into_forward(&account)?;
     attachments_paths
         .iter()
         .for_each(|path| msg.add_attachment(path));
@@ -218,11 +217,6 @@ pub fn list<OutputService: OutputServiceInterface, ImapService: ImapServiceInter
 ) -> Result<()> {
     let page_size = page_size.unwrap_or(account.default_page_size);
     let msgs = imap.list_msgs(&page_size, &page)?;
-    let msgs = if let Some(ref fetches) = msgs {
-        Msgs::try_from(fetches)?
-    } else {
-        Msgs::new()
-    };
     trace!("messages: {:#?}", msgs);
     output.print(msgs)?;
     imap.logout()?;
@@ -276,9 +270,9 @@ pub fn mailto<
         ..Headers::default()
     };
 
-    let mut msg = Msg::new_with_headers(&account, headers);
-    msg.body = Body::new_with_text(body);
-    msg_interaction(output, &mut msg, imap, smtp)?;
+    // let mut msg = Msg::new_with_headers(&account, headers);
+    // msg.body = Body::new_with_text(body);
+    // msg_interaction(output, &mut msg, imap, smtp)?;
     imap.logout()?;
     Ok(())
 }
@@ -320,7 +314,7 @@ pub fn read<OutputService: OutputServiceInterface, ImapService: ImapServiceInter
     if raw {
         output.print(msg.get_raw_as_string()?)?;
     } else {
-        output.print(MsgSerialized::try_from(&msg)?)?;
+        // output.print(MsgSerialized::try_from(&msg)?)?;
     }
     imap.logout()?;
     Ok(())
@@ -340,9 +334,7 @@ pub fn reply<
     imap: &mut ImapService,
     smtp: &mut SmtpService,
 ) -> Result<()> {
-    let mut msg = imap.get_msg(&uid)?;
-    // Change the msg to a reply-msg.
-    msg.change_to_reply(&account, all)?;
+    let mut msg = imap.get_msg(&uid)?.into_reply(all, &account)?;
     // Apply the given attachments to the reply-msg.
     attachments_paths
         .iter()
@@ -379,11 +371,6 @@ pub fn search<OutputService: OutputServiceInterface, ImapService: ImapServiceInt
 ) -> Result<()> {
     let page_size = page_size.unwrap_or(account.default_page_size);
     let msgs = imap.search_msgs(&query, &page_size, &page)?;
-    let msgs = if let Some(ref fetches) = msgs {
-        Msgs::try_from(fetches)?
-    } else {
-        Msgs::new()
-    };
     trace!("messages: {:?}", msgs);
     output.print(msgs)?;
     imap.logout()?;
@@ -437,18 +424,18 @@ pub fn write<
     imap: &mut ImapService,
     smtp: &mut SmtpService,
 ) -> Result<()> {
-    let mut msg = Msg::new_with_headers(
-        &account,
-        Headers {
-            subject: Some(String::new()),
-            to: Vec::new(),
-            ..Headers::default()
-        },
-    );
-    attachments_paths
-        .iter()
-        .for_each(|path| msg.add_attachment(path));
-    msg_interaction(output, &mut msg, imap, smtp)?;
+    // let mut msg = Msg::new_with_headers(
+    //     &account,
+    //     Headers {
+    //         subject: Some(String::new()),
+    //         to: Vec::new(),
+    //         ..Headers::default()
+    //     },
+    // );
+    // attachments_paths
+    //     .iter()
+    //     .for_each(|path| msg.add_attachment(path));
+    // msg_interaction(output, &mut msg, imap, smtp)?;
     imap.logout()?;
     Ok(())
 }

@@ -23,350 +23,182 @@ use crate::{
     },
 };
 
-/// Represents the msg in a serializeable form with additional values.
-/// This struct-type makes it also possible to print the msg in a serialized form or in a normal
-/// form.
-#[derive(Serialize, Clone, Debug, Eq, PartialEq)]
-pub struct MsgSerialized {
-    /// First of all, the messge in general
-    #[serde(flatten)]
-    pub msg: Msg,
-
-    /// A bool which indicates if the current msg includes attachments or not.
-    pub has_attachment: bool,
-
-    /// The raw mail as a string
-    pub raw: String,
-}
-
-impl TryFrom<&Msg> for MsgSerialized {
-    type Error = Error;
-
-    fn try_from(msg: &Msg) -> Result<Self> {
-        let has_attachment = msg.attachments.is_empty();
-        let raw = msg.get_raw_as_string()?;
-
-        Ok(Self {
-            msg: msg.clone(),
-            has_attachment,
-            raw,
-        })
-    }
-}
-
-impl fmt::Display for MsgSerialized {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.msg)
-    }
-}
-
-/// This struct represents a whole msg with its attachments, body-content
-/// and its headers.
+/// Representation of a message.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize)]
 pub struct Msg {
-    /// All added attachments are listed in this vector.
-    pub attachments: Vec<Attachment>,
-
-    /// The flags of this msg.
-    pub flags: Flags,
-
-    /// All information of the headers (sender, from, to and so on)
-    // headers: HashMap<HeaderName, Vec<String>>,
-    pub headers: Headers,
-
-    /// This variable stores the body of the msg.
-    /// This includes the general content text and the signature.
-    pub body: Body,
-
-    /// The signature of the message.
-    pub sig: String,
-
-    /// The UID of the msg. In general, a message should already have one, unless you're writing a
-    /// new message, then we're generating it.
-    uid: Option<u32>,
-
-    /// The origination date field. Read [the RFC here] here for more
-    /// information.
+    /// The sequence number of the message.
     ///
-    /// [the RFC here]:
-    /// https://www.rfc-editor.org/rfc/rfc5322.html#section-3.6.1
+    /// [RFC3501]: https://datatracker.ietf.org/doc/html/rfc3501#section-2.3.1.2
+    id: u32,
+
+    /// The internal date of the message.
+    ///
+    /// [RFC3501]: https://datatracker.ietf.org/doc/html/rfc3501#section-2.3.3
     date: Option<String>,
 
-    /// The msg but in raw.
+    /// The flags attached to the message.
+    pub flags: Flags,
+
+    /// The headers of the message (sender, from, to…).
+    pub headers: Headers,
+
+    /// The `text/plain` part of the message.
+    pub body_plain: Option<String>,
+
+    /// The `text/html` part of the message.
+    pub body_html: Option<String>,
+
+    /// The list of non-textual parts of the message.
+    pub attachments: Vec<Attachment>,
+
+    /// The raw version of the message.
     #[serde(skip_serializing)]
     raw: Vec<u8>,
 }
 
 impl Msg {
-    /// Creates a completely new msg where two header fields are set:
-    /// - [`from`]
-    /// - and [`signature`]
-    ///
-    /// [`from`]: struct.Headers.html#structfield.from
-    /// [`signature`]: struct.Headers.html#structfield.signature
-    ///
-    /// # Example
-    ///
-    /// <details>
-    ///
-    /// ```
-    /// # use himalaya::msg::model::Msg;
-    /// # use himalaya::msg::headers::Headers;
-    /// # use himalaya::config::model::Account;
-    /// # use himalaya::ctx::Ctx;
-    ///
-    /// # fn main() {
-    /// // -- Accounts --
-    /// let ctx1 = Ctx {
-    ///     account: Account::new_with_signature(Some("Soywod"), "clement.douin@posteo.net",
-    ///         Some("Account Signature")
-    ///     ),
-    ///     .. Ctx::default()
-    /// };
-    /// let ctx2 = Ctx {
-    ///     account: Account::new(None, "tornax07@gmail.com"),
-    ///     .. Ctx::default()
-    /// };
-    ///
-    /// // Creating messages
-    /// let msg1 = Msg::new(&ctx1);
-    /// let msg2 = Msg::new(&ctx2);
-    ///
-    /// let expected_headers1 = Headers {
-    ///     from: vec![String::from("Soywod <clement.douin@posteo.net>")],
-    ///     // the signature of the account is stored as well
-    ///     signature: Some(String::from("\n-- \nAccount Signature")),
-    ///     ..Headers::default()
-    /// };
-    ///
-    /// let expected_headers2 = Headers {
-    ///     from: vec![String::from("tornax07@gmail.com")],
-    ///     ..Headers::default()
-    /// };
-    ///
-    /// assert_eq!(msg1.headers, expected_headers1,
-    ///     "{:#?}, {:#?}",
-    ///     msg1.headers, expected_headers1);
-    /// assert_eq!(msg2.headers, expected_headers2,
-    ///     "{:#?}, {:#?}",
-    ///     msg2.headers, expected_headers2);
-    /// # }
-    /// ```
-    ///
-    /// </details>
     pub fn new(account: &Account) -> Self {
-        Self::new_with_headers(&account, Headers::default())
-    }
-
-    /// This function does the same as [`Msg::new`] but you can apply a custom
-    /// [`headers`] when calling the function instead of using the default one
-    /// from the [`Msg::new`] function.
-    ///
-    /// [`Msg::new`]: struct.Msg.html#method.new
-    /// [`headers`]: struct.Headers.html
-    pub fn new_with_headers(account: &Account, mut headers: Headers) -> Self {
-        if headers.from.is_empty() {
-            headers.from = vec![account.address()];
-        }
-
+        let mut headers = Headers::default();
+        headers.from = vec![account.address()];
         Self {
             headers,
-            body: Body::new_with_text(""),
-            sig: account.signature.to_owned(),
             ..Self::default()
         }
     }
+    /// Convert the message into a reply one.
+    ///
+    ///  - the `From` is replaced by the address from the user's account
+    ///  - the `To` is replaced by all addresses in `ReplyTo` and `To`
+    ///  - the `In-Reply-To` is replaced by `Message-ID`
+    ///  - the `Subject` is replaced by `Re: {Subject}` unless the subject already starts by `Re:`
+    ///  - the attachments are cleared
+    ///
+    /// In case `reply_all` is false:
+    ///  - the `To` is replaced by the `ReplyTo` or the `From` instead
+    ///  - the `Cc` and `Bcc` are cleared
+    ///
+    /// Previous body is prefixed by `>` and added between the user's body and the user's
+    /// signature. You can see a discussion example directly on the [RFC5322].
+    ///
+    /// [RFC5322]: https://www.rfc-editor.org/rfc/rfc5322.html#page-46
+    pub fn into_reply(mut self, reply_all: bool, account: &Account) -> Result<Self> {
+        let mut headers = Headers::default();
 
-    /// Converts the message into a Reply message.
-    /// An [`Account`] struct is needed to set the `From:` field.
-    ///
-    /// # Changes
-    /// The value on the left side, represents the header *after* the function
-    /// call, while the value on the right side shows the data *before* the
-    /// function call. So if we pick up the first example of `reply_all =
-    /// false`, then we can see, that the value of `ReplyTo:` is moved into the
-    /// `To:` header field in this function call.
-    ///
-    /// - `reply_all = false`:
-    ///     - `To:` = `ReplyTo:` otherwise from `From:`
-    ///     - attachments => cleared
-    ///     - `From:` = Emailaddress of the current user account
-    ///     - `Subject:` = "Re:" + `Subject`
-    ///     - `in_reply_to` = Old Message ID
-    ///     - `Cc:` = cleared
-    ///
-    /// - `reply_all = true`:
-    ///     - `To:` = `ReplyTo:` + Addresses in `To:`
-    ///     - `Cc:` = All CC-Addresses
-    ///     - The rest: Same as in `reply_all = false`
-    ///
-    /// It'll add for each line in the body the `>` character in the beginning
-    /// of each line.
-    ///
-    /// # Example
-    /// [Here] you can see an example how a discussion with replies could look
-    /// like.
-    ///
-    /// [Here]: https://www.rfc-editor.org/rfc/rfc5322.html#page-46
-    /// [`Account`]: struct.Account.html
-    ///
-    // TODO: References field is missing, but the imap-crate can't implement it
-    // currently.
-    pub fn change_to_reply(&mut self, account: &Account, reply_all: bool) -> Result<()> {
-        let subject = self
-            .headers
-            .subject
-            .as_ref()
-            .map(|sub| {
-                if sub.starts_with("Re:") {
-                    sub.to_owned()
-                } else {
-                    format!("Re: {}", sub)
-                }
-            })
-            .unwrap_or_default();
+        // From
+        let account_addr: Mailbox = account.address().parse()?;
+        headers.from = vec![account_addr.to_string()];
 
-        // The new fields
-        let mut to: Vec<String> = Vec::new();
-        let mut cc = None;
-
+        // To
+        headers.to = if let Some(reply_to) = self.headers.reply_to {
+            reply_to
+        } else {
+            self.headers.from
+        };
         if reply_all {
-            let email_addr: lettre::Address = account.email.parse()?;
-
             for addr in self.headers.to.iter() {
-                let addr_parsed: Mailbox = addr.parse()?;
-
-                // we don't want to receive the msg which we have just sent,
-                // don't we?
-                if addr_parsed.email != email_addr {
-                    to.push(addr.to_string());
+                let addr: Mailbox = addr.parse()?;
+                if addr != account_addr {
+                    headers.to.push(addr.to_string());
                 }
             }
-
-            // Also use the addresses in the "Cc:" field
-            cc = self.headers.cc.clone();
         }
 
-        // Now add the addresses in the `Reply-To:` Field or from the `From:`
-        // field.
-        if let Some(reply_to) = &self.headers.reply_to {
-            to.append(&mut reply_to.clone());
-        } else {
-            // if the "Reply-To" wasn't set from the sender, then we're just
-            // replying to the addresses in the "From:" field
-            to.append(&mut self.headers.from.clone());
-        };
+        // In-Reply-To
+        headers.in_reply_to = self.headers.message_id;
 
-        let new_headers = Headers {
-            from: vec![account.address()],
-            to,
-            cc,
-            subject: Some(subject),
-            in_reply_to: self.headers.message_id.clone(),
-            // and clear the rest of the fields
-            ..Headers::default()
-        };
+        // Cc
+        if reply_all {
+            headers.cc = self.headers.cc.to_owned();
+        }
 
-        // comment "out" the body of the msg, by adding the `>` characters to
-        // each line which includes a string.
-        let new_body = self
-            .body
-            .plain
-            .clone()
-            .unwrap_or_default()
-            .lines()
-            .map(|line| {
-                let space = if line.starts_with(">") { "" } else { " " };
-                format!(">{}{}", space, line)
-            })
-            .collect::<Vec<String>>()
-            .join("\n");
+        // Subject
+        headers.subject = self.headers.subject.map(|sub| {
+            if sub.starts_with("Re:") {
+                sub.to_owned()
+            } else {
+                format!("Re: {}", sub)
+            }
+        });
 
-        self.body = Body::new_with_text(new_body);
-        self.headers = new_headers;
+        // Text/plain body
+        self.body_plain = self.body_plain.map(|body| {
+            body.lines()
+                .map(|line| {
+                    let glue = if line.starts_with(">") { "" } else { " " };
+                    format!(">{}{}", glue, line)
+                })
+                .collect::<Vec<String>>()
+                .join("\n")
+        });
+
+        // Text/html body
+        self.body_html = self.body_html.map(|body| {
+            body.lines()
+                .map(|line| {
+                    let glue = if line.starts_with(">") { "" } else { " " };
+                    format!(">{}{}", glue, line)
+                })
+                .collect::<Vec<String>>()
+                .join("\n")
+        });
+
+        // Attachments
         self.attachments.clear();
-        self.sig = account.signature.to_owned();
 
-        Ok(())
+        self.headers = headers;
+        Ok(self)
     }
 
-    /// Changes the msg/msg to a forwarding msg/msg.
+    /// Convert the message into a forward one.
     ///
-    /// # Changes
-    /// Calling this function will change apply the following to the current
-    /// message:
-    ///
-    /// - `Subject:`: `"Fwd: "` will be added in front of the "old" subject
-    /// - `"---------- Forwarded Message ----------"` will be added on top of
-    ///   the body.
-    ///
-    /// # Example
-    /// ```text
-    /// Subject: Test subject
-    /// ...
-    ///
-    /// Hi,
-    /// I use Himalaya
-    ///
-    /// Sincerely
-    /// ```
-    ///
-    /// will be changed to
-    ///
-    /// ```text
-    /// Subject: Fwd: Test subject
-    /// Sender: <Your@address>
-    /// ...
-    ///
-    /// > Hi,
-    /// > I use Himalaya
-    /// >
-    /// > Sincerely
-    /// ```
-    pub fn change_to_forwarding(&mut self, account: &Account) {
-        // -- Header --
-        let subject = self
-            .headers
-            .subject
-            .as_ref()
-            .map(|sub| {
-                if sub.starts_with("Fwd:") {
-                    sub.to_owned()
-                } else {
-                    format!("Fwd: {}", sub)
-                }
-            })
-            .unwrap_or_default();
+    ///  - the `From` is replaced by the address from the user's account
+    ///  - the `To` is cleared
+    ///  - the `Subject` is replaced by `Fwd: {Subject}` unless the subject already starts by `Fwd:`
+    ///  - the `Cc` and `Bcc` are cleared
+    ///  - the body is prefixed by the line "---------- Forwarded Message ----------"
+    pub fn into_forward(mut self, account: &Account) -> Result<Self> {
+        let mut headers = Headers::default();
 
-        self.headers = Headers {
-            subject: Some(subject),
-            sender: None,
-            reply_to: None,
-            message_id: None,
-            from: vec![account.address()],
-            to: vec![],
-            // and use the rest of the headers
-            ..self.headers.clone()
-        };
+        // From
+        headers.from = vec![account.address()];
 
+        // Subject
+        headers.subject = self.headers.subject.map(|sub| {
+            if sub.starts_with("Fwd:") {
+                sub.to_owned()
+            } else {
+                format!("Fwd: {}", sub)
+            }
+        });
+
+        // Text/plain body
         // TODO: add Subject, Date, From and To headers after "Forwarded Message"
-        self.body = Body::new_with_text(format!(
-            "\n\n---------- Forwarded Message ----------\n{}",
-            self.body
-                .plain
-                .to_owned()
-                .unwrap_or_default()
-                .replace("\r", ""),
-        ));
-        self.sig = account.signature.to_owned();
-    }
+        self.body_plain = self.body_plain.map(|body| {
+            vec![
+                "",
+                "",
+                "---------- Forwarded Message ----------",
+                "",
+                &body.replace("\r", ""),
+            ]
+            .join("\n")
+        });
 
-    /// Returns the bytes of the *sendable message* of the struct!
-    pub fn into_bytes(&mut self) -> Result<Vec<u8>> {
-        // parse the whole msg first
-        let parsed = self.to_sendable_msg()?;
+        // Text/html body
+        // TODO: add Subject, Date, From and To headers after "Forwarded Message"
+        self.body_html = self.body_html.map(|body| {
+            vec![
+                "",
+                "",
+                "---------- Forwarded Message ----------",
+                "",
+                &body.replace("\r", ""),
+            ]
+            .join("\n")
+        });
 
-        return Ok(parsed.formatted());
+        self.headers = headers;
+        Ok(self)
     }
 
     /// Let the user edit the body of the msg.
@@ -484,7 +316,7 @@ impl Msg {
         self.headers = Headers::from(&parsed);
 
         match parsed.get_body() {
-            Ok(body) => self.body = Body::new_with_text(body),
+            Ok(body) => self.body_plain = Some(body),
             Err(err) => return Err(anyhow!(err.to_string())),
         };
 
@@ -683,16 +515,16 @@ impl Msg {
         let mut msg_parts = MultiPart::mixed().build();
 
         // -- Body --
-        if self.body.plain.is_some() && self.body.html.is_some() {
+        if self.body_plain.is_some() && self.body_html.is_some() {
             msg_parts = msg_parts.multipart(MultiPart::alternative_plain_html(
-                self.body.plain.clone().unwrap(),
-                self.body.html.clone().unwrap(),
+                self.body_plain.clone().unwrap(),
+                self.body_html.clone().unwrap(),
             ));
         } else {
             let msg_body = SinglePart::builder()
                 .header(ContentType::TEXT_PLAIN)
                 .header(self.headers.encoding)
-                .body(self.body.plain.clone().unwrap_or_default());
+                .body(self.body_plain.clone().unwrap_or_default());
 
             msg_parts = msg_parts.singlepart(msg_body);
         }
@@ -713,16 +545,6 @@ impl Msg {
             .context(format!("-- Current Message --\n{}", self))?)
     }
 
-    /// Returns the uid of the msg.
-    ///
-    /// # Hint
-    /// The uid is set if you *send* a *new* message or if you receive a message of the server. So
-    /// in general you can only get a `Some(...)` from this function, if it's a fetched msg
-    /// otherwise you'll get `None`.
-    pub fn get_uid(&self) -> Option<u32> {
-        self.uid
-    }
-
     /// Returns the raw mail as a string instead of a Vector of bytes.
     pub fn get_raw_as_string(&self) -> Result<String> {
         let raw_message = String::from_utf8(self.raw.clone())
@@ -733,13 +555,15 @@ impl Msg {
 }
 
 impl fmt::Display for Msg {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
-            formatter,
-            "{}\n{}{}",
-            self.headers.get_header_as_string(),
-            self.body,
-            self.sig
+            f,
+            "{}\n{}",
+            self.headers,
+            self.body_plain
+                .to_owned()
+                .or_else(|| self.body_html.to_owned())
+                .unwrap_or_default(),
         )
     }
 }
@@ -747,7 +571,7 @@ impl fmt::Display for Msg {
 impl Table for Msg {
     fn head() -> Row {
         Row::new()
-            .cell(Cell::new("UID").bold().underline().white())
+            .cell(Cell::new("ID").bold().underline().white())
             .cell(Cell::new("FLAGS").bold().underline().white())
             .cell(Cell::new("SUBJECT").shrinkable().bold().underline().white())
             .cell(Cell::new("FROM").bold().underline().white())
@@ -758,7 +582,6 @@ impl Table for Msg {
         let is_seen = !self.flags.contains(&Flag::Seen);
 
         // The data which will be shown in the row
-        let uid = self.get_uid().unwrap_or(0);
         let flags = self.flags.get_signs();
         let subject = self.headers.subject.clone().unwrap_or_default();
         let mut from = String::new();
@@ -781,7 +604,7 @@ impl Table for Msg {
         from.pop();
 
         Row::new()
-            .cell(Cell::new(&uid.to_string()).bold_if(is_seen).red())
+            .cell(Cell::new(&self.id.to_string()).bold_if(is_seen).red())
             .cell(Cell::new(&flags).bold_if(is_seen).white())
             .cell(Cell::new(&subject).shrinkable().bold_if(is_seen).green())
             .cell(Cell::new(&from).bold_if(is_seen).blue())
@@ -809,7 +632,7 @@ impl TryFrom<&Fetch> for Msg {
         let mut attachments = Vec::new();
         let flags = Flags::from(fetch.flags());
         let headers = Headers::try_from(fetch.envelope())?;
-        let uid = fetch.uid;
+        let id = fetch.message;
 
         let date = fetch
             .internal_date()
@@ -878,8 +701,9 @@ impl TryFrom<&Fetch> for Msg {
             attachments,
             flags,
             headers,
-            body: Body::new_with_text(body),
-            uid,
+            body_plain: body.plain,
+            body_html: body.html,
+            id,
             date,
             raw,
             ..Self::default()
@@ -900,28 +724,21 @@ impl TryFrom<&str> for Msg {
 
 // == Msgs ==
 /// A Type-Safety struct which stores a vector of Messages.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Default, Serialize)]
 pub struct Msgs(pub Vec<Msg>);
 
-impl Msgs {
-    pub fn new() -> Self {
-        Self(Vec::new())
-    }
-}
-
 // -- From's --
-impl<'mails> TryFrom<&'mails ZeroCopy<Vec<Fetch>>> for Msgs {
+impl TryFrom<ZeroCopy<Vec<Fetch>>> for Msgs {
     type Error = Error;
 
-    fn try_from(fetches: &'mails ZeroCopy<Vec<Fetch>>) -> Result<Self> {
-        // the content of the Msgs-struct
-        let mut mails = Vec::new();
+    fn try_from(fetches: ZeroCopy<Vec<Fetch>>) -> Result<Self> {
+        let mut msgs = Vec::new();
 
         for fetch in fetches.iter().rev() {
-            mails.push(Msg::try_from(fetch)?);
+            msgs.push(Msg::try_from(fetch)?);
         }
 
-        Ok(Self(mails))
+        Ok(Self(msgs))
     }
 }
 
