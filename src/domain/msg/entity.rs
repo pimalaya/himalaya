@@ -14,8 +14,7 @@ use std::{
 use crate::{
     config::entity::Account,
     domain::msg::{
-        attachment::entity::Attachment, body::entity::Body, flag::entity::Flags,
-        header::entity::Headers,
+        attachment::entity::Attachment, body::entity::Body, header::entity::Headers, Flags,
     },
     ui::{
         editor,
@@ -24,7 +23,7 @@ use crate::{
 };
 
 /// Representation of a message.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Default, Serialize)]
 pub struct Msg {
     /// The sequence number of the message.
     ///
@@ -582,7 +581,7 @@ impl Table for Msg {
         let is_seen = !self.flags.contains(&Flag::Seen);
 
         // The data which will be shown in the row
-        let flags = self.flags.get_signs();
+        let flags = self.flags.to_symbols_string();
         let subject = self.headers.subject.clone().unwrap_or_default();
         let mut from = String::new();
         let date = self.date.clone().unwrap_or(String::new());
@@ -630,7 +629,7 @@ impl TryFrom<&Fetch> for Msg {
         // fetched msg.
 
         let mut attachments = Vec::new();
-        let flags = Flags::from(fetch.flags());
+        let flags = Flags::default();
         let headers = Headers::try_from(fetch.envelope())?;
         let id = fetch.message;
 

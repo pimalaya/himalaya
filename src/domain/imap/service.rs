@@ -14,7 +14,7 @@ use crate::{
         mbox::entity::Mbox,
         msg::{
             entity::{Msg, Msgs},
-            flag::entity::Flags,
+            Envelopes, Flags,
         },
     },
 };
@@ -26,7 +26,7 @@ pub trait ImapServiceInterface {
     fn notify(&mut self, config: &Config, keepalive: u64) -> Result<()>;
     fn watch(&mut self, keepalive: u64) -> Result<()>;
     fn list_mboxes(&mut self) -> Result<ImapMboxes>;
-    fn list_msgs(&mut self, page_size: &usize, page: &usize) -> Result<Msgs>;
+    fn list_msgs(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes>;
     fn search_msgs(&mut self, query: &str, page_size: &usize, page: &usize) -> Result<Msgs>;
     fn get_msg(&mut self, uid: &str) -> Result<Msg>;
     fn append_msg(&mut self, mbox: &Mbox, msg: &mut Msg) -> Result<()>;
@@ -113,16 +113,16 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
         Ok(mboxes)
     }
 
-    fn list_msgs(&mut self, page_size: &usize, page: &usize) -> Result<Msgs> {
+    fn list_msgs(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes> {
         let mbox = self.mbox.to_owned();
         let last_seq = self
             .sess()?
             .select(&mbox.name)
-            .context(format!("cannot select mailbox `{}`", self.mbox.name))?
+            .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?
             .exists as i64;
 
         if last_seq == 0 {
-            return Ok(Msgs::default());
+            return Ok(Envelopes::default());
         }
 
         // TODO: add tests, improve error management when empty page
@@ -140,7 +140,7 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
             .fetch(range, "(ENVELOPE FLAGS INTERNALDATE)")
             .context("cannot fetch messages")?;
 
-        Ok(Msgs::try_from(fetches)?)
+        Ok(Envelopes::try_from(fetches)?)
     }
 
     fn search_msgs(&mut self, query: &str, page_size: &usize, page: &usize) -> Result<Msgs> {

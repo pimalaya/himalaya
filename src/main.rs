@@ -62,9 +62,9 @@ fn main() -> Result<()> {
     // Check completion match BEFORE entities and services initialization.
     // Linked issue: https://github.com/soywod/himalaya/issues/115.
     match compl::arg::matches(&m)? {
-        Some(compl::arg::Command::Generate(shell)) => {
-            return compl::handler::generate(create_app(), shell);
-        }
+        // Some(compl::arg::Command::Generate(shell)) => {
+        //     return compl::handler::generate(create_app(), shell);
+        // }
         _ => (),
     }
 
@@ -77,86 +77,86 @@ fn main() -> Result<()> {
 
     // Check IMAP matches.
     match imap::arg::matches(&m)? {
-        Some(imap::arg::Command::Notify(keepalive)) => {
-            return imap::handler::notify(keepalive, &config, &mut imap);
-        }
-        Some(imap::arg::Command::Watch(keepalive)) => {
-            return imap::handler::watch(keepalive, &mut imap);
-        }
+        // Some(imap::arg::Command::Notify(keepalive)) => {
+        //     return imap::handler::notify(keepalive, &config, &mut imap);
+        // }
+        // Some(imap::arg::Command::Watch(keepalive)) => {
+        //     return imap::handler::watch(keepalive, &mut imap);
+        // }
         _ => (),
     }
 
     // Check mailbox matches.
     match mbox::arg::matches(&m)? {
-        Some(mbox::arg::Command::List) => {
-            return mbox::handler::list(&output, &mut imap);
-        }
+        // Some(mbox::arg::Command::List) => {
+        //     return mbox::handler::list(&output, &mut imap);
+        // }
         _ => (),
     }
 
     // Check message matches.
     match msg::arg::matches(&m)? {
-        Some(msg::arg::Command::Attachments(uid)) => {
-            return msg::handler::attachments(uid, &account, &output, &mut imap);
-        }
-        Some(msg::arg::Command::Copy(uid, mbox)) => {
-            return msg::handler::copy(uid, mbox, &output, &mut imap);
-        }
-        Some(msg::arg::Command::Delete(uid)) => {
-            return msg::handler::delete(uid, &output, &mut imap);
-        }
-        Some(msg::arg::Command::Forward(uid, paths)) => {
-            return msg::handler::forward(uid, paths, &account, &output, &mut imap, &mut smtp);
-        }
+        // Some(msg::arg::Command::Attachments(uid)) => {
+        //     return msg::handler::attachments(uid, &account, &output, &mut imap);
+        // }
+        // Some(msg::arg::Command::Copy(uid, mbox)) => {
+        //     return msg::handler::copy(uid, mbox, &output, &mut imap);
+        // }
+        // Some(msg::arg::Command::Delete(uid)) => {
+        //     return msg::handler::delete(uid, &output, &mut imap);
+        // }
+        // Some(msg::arg::Command::Forward(uid, paths)) => {
+        //     return msg::handler::forward(uid, paths, &account, &output, &mut imap, &mut smtp);
+        // }
         Some(msg::arg::Command::List(page_size, page)) => {
             return msg::handler::list(page_size, page, &account, &output, &mut imap);
         }
-        Some(msg::arg::Command::Move(uid, mbox)) => {
-            return msg::handler::move_(uid, mbox, &output, &mut imap);
-        }
-        Some(msg::arg::Command::Read(uid, mime, raw)) => {
-            return msg::handler::read(uid, mime, raw, &output, &mut imap);
-        }
-        Some(msg::arg::Command::Reply(uid, all, paths)) => {
-            return msg::handler::reply(uid, all, paths, &account, &output, &mut imap, &mut smtp);
-        }
-        Some(msg::arg::Command::Save(mbox, msg)) => {
-            return msg::handler::save(mbox, msg, &mut imap);
-        }
-        Some(msg::arg::Command::Search(query, page_size, page)) => {
-            return msg::handler::search(page_size, page, query, &account, &output, &mut imap);
-        }
-        Some(msg::arg::Command::Send(msg)) => {
-            return msg::handler::send(msg, &output, &mut imap, &mut smtp);
-        }
-        Some(msg::arg::Command::Write(paths)) => {
-            return msg::handler::write(paths, &account, &output, &mut imap, &mut smtp);
-        }
+        // Some(msg::arg::Command::Move(uid, mbox)) => {
+        //     return msg::handler::move_(uid, mbox, &output, &mut imap);
+        // }
+        // Some(msg::arg::Command::Read(uid, mime, raw)) => {
+        //     return msg::handler::read(uid, mime, raw, &output, &mut imap);
+        // }
+        // Some(msg::arg::Command::Reply(uid, all, paths)) => {
+        //     return msg::handler::reply(uid, all, paths, &account, &output, &mut imap, &mut smtp);
+        // }
+        // Some(msg::arg::Command::Save(mbox, msg)) => {
+        //     return msg::handler::save(mbox, msg, &mut imap);
+        // }
+        // Some(msg::arg::Command::Search(query, page_size, page)) => {
+        //     return msg::handler::search(page_size, page, query, &account, &output, &mut imap);
+        // }
+        // Some(msg::arg::Command::Send(msg)) => {
+        //     return msg::handler::send(msg, &output, &mut imap, &mut smtp);
+        // }
+        // Some(msg::arg::Command::Write(paths)) => {
+        //     return msg::handler::write(paths, &account, &output, &mut imap, &mut smtp);
+        // }
 
-        Some(msg::arg::Command::Flag(m)) => match m {
-            Some(msg::flag::arg::Command::Set(uid, flags)) => {
-                return msg::flag::handler::set(uid, flags, &output, &mut imap);
-            }
-            Some(msg::flag::arg::Command::Add(uid, flags)) => {
-                return msg::flag::handler::add(uid, flags, &output, &mut imap);
-            }
-            Some(msg::flag::arg::Command::Remove(uid, flags)) => {
-                return msg::flag::handler::remove(uid, flags, &output, &mut imap);
-            }
-            _ => (),
-        },
-        Some(msg::arg::Command::Tpl(m)) => match m {
-            Some(msg::tpl::arg::Command::New(tpl)) => {
-                return msg::tpl::handler::new(tpl, &account, &output, &mut imap);
-            }
-            Some(msg::tpl::arg::Command::Reply(uid, all, tpl)) => {
-                return msg::tpl::handler::reply(uid, all, tpl, &account, &output, &mut imap);
-            }
-            Some(msg::tpl::arg::Command::Forward(uid, tpl)) => {
-                return msg::tpl::handler::forward(uid, tpl, &account, &output, &mut imap);
-            }
-            _ => (),
-        },
+        // Some(msg::arg::Command::Flag(m)) => match m {
+        //     Some(msg::flag::arg::Command::Set(uid, flags)) => {
+        //         return msg::flag::handler::set(uid, flags, &output, &mut imap);
+        //     }
+        //     Some(msg::flag::arg::Command::Add(uid, flags)) => {
+        //         return msg::flag::handler::add(uid, flags, &output, &mut imap);
+        //     }
+        //     Some(msg::flag::arg::Command::Remove(uid, flags)) => {
+        //         return msg::flag::handler::remove(uid, flags, &output, &mut imap);
+        //     }
+        //     _ => (),
+        // },
+        // Some(msg::arg::Command::Tpl(m)) => match m {
+        //     Some(msg::tpl::arg::Command::New(tpl)) => {
+        //         return msg::tpl::handler::new(tpl, &account, &output, &mut imap);
+        //     }
+        //     Some(msg::tpl::arg::Command::Reply(uid, all, tpl)) => {
+        //         return msg::tpl::handler::reply(uid, all, tpl, &account, &output, &mut imap);
+        //     }
+        //     Some(msg::tpl::arg::Command::Forward(uid, tpl)) => {
+        //         return msg::tpl::handler::forward(uid, tpl, &account, &output, &mut imap);
+        //     }
+        //     _ => (),
+        // },
         _ => (),
     }
 

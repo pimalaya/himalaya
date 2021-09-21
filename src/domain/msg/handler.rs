@@ -20,13 +20,7 @@ use crate::{
     domain::{
         imap::service::ImapServiceInterface,
         mbox::entity::Mbox,
-        msg::{
-            self,
-            body::entity::Body,
-            entity::{Msg, Msgs},
-            flag::entity::Flags,
-            header::entity::Headers,
-        },
+        msg::{self, entity::Msg, header::entity::Headers, Flags},
         smtp::service::SmtpServiceInterface,
     },
     output::service::OutputServiceInterface,
@@ -173,7 +167,7 @@ pub fn delete<OutputService: OutputServiceInterface, ImapService: ImapServiceInt
     output: &OutputService,
     imap: &mut ImapService,
 ) -> Result<()> {
-    let flags = Flags::from(vec![Flag::Seen, Flag::Deleted]);
+    let flags = Flags::try_from(vec![Flag::Seen, Flag::Deleted])?;
     imap.add_flags(uid, &flags)?;
     imap.expunge()?;
     output.print(format!("Message(s) {} successfully deleted", uid))?;
@@ -203,7 +197,7 @@ pub fn forward<
     Ok(())
 }
 
-/// List messages with pagination from the selected mailbox.
+/// List paginated messages from the selected mailbox.
 pub fn list<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
     page_size: Option<usize>,
     page: usize,
@@ -211,10 +205,18 @@ pub fn list<OutputService: OutputServiceInterface, ImapService: ImapServiceInter
     output: &OutputService,
     imap: &mut ImapService,
 ) -> Result<()> {
+    trace!("entering list handler");
+
+    trace!("page size from arg: {:?}", page_size);
+    trace!("page size from account: {}", account.default_page_size);
     let page_size = page_size.unwrap_or(account.default_page_size);
+    debug!("page size: {}", page_size);
+
     let msgs = imap.list_msgs(&page_size, &page)?;
-    trace!("messages: {:#?}", msgs);
+    debug!("messages: {:#?}", msgs);
     output.print(msgs)?;
+
+    trace!("exiting list handler");
     Ok(())
 }
 
@@ -288,7 +290,7 @@ pub fn move_<OutputService: OutputServiceInterface, ImapService: ImapServiceInte
         uid, target
     ))?;
     // delete the msg in the old mailbox
-    let flags = Flags::from(vec![Flag::Seen, Flag::Deleted]);
+    let flags = Flags::try_from(vec![Flag::Seen, Flag::Deleted])?;
     imap.add_flags(uid, &flags)?;
     imap.expunge()?;
     Ok(())
