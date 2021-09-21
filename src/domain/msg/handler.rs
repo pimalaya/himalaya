@@ -352,6 +352,31 @@ pub fn save<ImapService: ImapServiceInterface>(
     Ok(())
 }
 
+/// Paginate messages from the selected mailbox matching the specified query.
+pub fn search<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
+    query: String,
+    page_size: Option<usize>,
+    page: usize,
+    account: &Account,
+    output: &OutputService,
+    imap: &mut ImapService,
+) -> Result<()> {
+    trace!("entering search handler");
+
+    trace!("query from arg: {}", query);
+    trace!("page size from arg: {:?}", page_size);
+    trace!("page size from account: {}", account.default_page_size);
+    let page_size = page_size.unwrap_or(account.default_page_size);
+    debug!("page size: {}", page_size);
+
+    let msgs = imap.search_msgs(&query, &page_size, &page)?;
+    debug!("messages: {:#?}", msgs);
+    output.print(msgs)?;
+
+    trace!("exiting search handler");
+    Ok(())
+}
+
 /// Send a raw message.
 pub fn send<
     OutputService: OutputServiceInterface,

@@ -123,9 +123,9 @@ fn main() -> Result<()> {
         // Some(msg::arg::Command::Save(mbox, msg)) => {
         //     return msg::handler::save(mbox, msg, &mut imap);
         // }
-        // Some(msg::arg::Command::Search(query, page_size, page)) => {
-        //     return msg::handler::search(page_size, page, query, &account, &output, &mut imap);
-        // }
+        Some(msg::arg::Command::Search(query, page_size, page)) => {
+            return msg::handler::search(query, page_size, page, &account, &output, &mut imap);
+        }
         // Some(msg::arg::Command::Send(msg)) => {
         //     return msg::handler::send(msg, &output, &mut imap, &mut smtp);
         // }

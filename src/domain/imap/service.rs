@@ -12,10 +12,7 @@ use crate::{
     config::entity::{Account, Config},
     domain::{
         mbox::entity::Mbox,
-        msg::{
-            entity::{Msg, Msgs},
-            Envelopes, Flags,
-        },
+        msg::{entity::Msg, Envelopes, Flags},
     },
 };
 
@@ -27,15 +24,9 @@ pub trait ImapServiceInterface {
     fn watch(&mut self, keepalive: u64) -> Result<()>;
     fn list_mboxes(&mut self) -> Result<ImapMboxes>;
     fn list_msgs(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes>;
-    fn search_msgs(&mut self, query: &str, page_size: &usize, page: &usize) -> Result<Msgs>;
+    fn search_msgs(&mut self, query: &str, page_size: &usize, page: &usize) -> Result<Envelopes>;
     fn get_msg(&mut self, uid: &str) -> Result<Msg>;
     fn append_msg(&mut self, mbox: &Mbox, msg: &mut Msg) -> Result<()>;
-    /// Add flags to the given message UID sequence.
-    ///
-    /// ```ignore
-    /// let flags = Flags::from(vec![Flag::Seen, Flag::Deleted]);
-    /// add_flags("5:10", flags)
-    /// ```
     fn add_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()>;
     fn set_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()>;
     fn remove_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()>;
@@ -138,42 +129,44 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
         let fetches = self
             .sess()?
             .fetch(range, "(ENVELOPE FLAGS INTERNALDATE)")
-            .context("cannot fetch messages")?;
+            .context(r#"cannot fetch messages within range "{}""#)?;
 
         Ok(Envelopes::try_from(fetches)?)
     }
 
-    fn search_msgs(&mut self, query: &str, page_size: &usize, page: &usize) -> Result<Msgs> {
+    fn search_msgs(&mut self, query: &str, page_size: &usize, page: &usize) -> Result<Envelopes> {
         let mbox = self.mbox.to_owned();
         self.sess()?
             .select(&mbox.name)
-            .context(format!("cannot select mailbox `{}`", self.mbox.name))?;
+            .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?;
 
         let begin = page * page_size;
         let end = begin + (page_size - 1);
-        let uids: Vec<String> = self
+        let seqs: Vec<String> = self
             .sess()?
             .search(query)
             .context(format!(
-                "cannot search in `{}` with query `{}`",
+                r#"cannot search in "{}" with query: "{}""#,
                 self.mbox.name, query
             ))?
             .iter()
             .map(|seq| seq.to_string())
             .collect();
 
-        if uids.is_empty() {
-            return Ok(Msgs::default());
+        if seqs.is_empty() {
+            return Ok(Envelopes::default());
         }
 
-        let range = uids[begin..end.min(uids.len())].join(",");
+        // FIXME: panic if begin > end
+        let range = seqs[begin..end.min(seqs.len())].join(",");
         let fetches = self
             .sess()?
-            .fetch(&range, "(FLAGS ENVELOPE INTERNALDATE)")
-            .context(format!("cannot fetch range `{}`", &range))?;
+            .fetch(&range, "(ENVELOPE FLAGS INTERNALDATE)")
+            .context(r#"cannot fetch messages within range "{}""#)?;
 
-        Ok(Msgs::try_from(fetches)?)
+        Ok(Envelopes::try_from(fetches)?)
     }
+
     /// Get the message according to the given `mbox` and `uid`.
     fn get_msg(&mut self, uid: &str) -> Result<Msg> {
         let mbox = self.mbox.to_owned();
