@@ -29,7 +29,6 @@ pub fn add<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceIn
         r#"Flag(s) "{}" successfully added to message {}"#,
         flags, uid
     ))?;
-    imap.logout()?;
     Ok(())
 }
 
@@ -53,7 +52,6 @@ pub fn remove<'a, OutputService: OutputServiceInterface, ImapService: ImapServic
         r#"Flag(s) "{}" successfully removed from message {}"#,
         flags, uid
     ))?;
-    imap.logout()?;
     Ok(())
 }
 
@@ -77,6 +75,5 @@ pub fn set<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceIn
         r#"Flag(s) "{}" successfully set for message {}"#,
         flags, uid
     ))?;
-    imap.logout()?;
     Ok(())
 }

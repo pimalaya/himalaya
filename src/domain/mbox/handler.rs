@@ -20,6 +20,5 @@ pub fn list<ImapService: ImapServiceInterface>(
     debug!("mailboxes len: {}", mboxes.0.len());
     trace!("mailboxes: {:#?}", mboxes);
     output.print(mboxes)?;
-    imap.logout()?;
     Ok(())
 }

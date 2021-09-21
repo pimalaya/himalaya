@@ -146,7 +146,6 @@ pub fn attachments<OutputService: OutputServiceInterface, ImapService: ImapServi
         account.downloads_dir
     ))?;
 
-    imap.logout()?;
     Ok(())
 }
 
@@ -165,7 +164,6 @@ pub fn copy<OutputService: OutputServiceInterface, ImapService: ImapServiceInter
         r#"Message {} successfully copied to folder "{}""#,
         uid, target
     ))?;
-    imap.logout()?;
     Ok(())
 }
 
@@ -179,7 +177,6 @@ pub fn delete<OutputService: OutputServiceInterface, ImapService: ImapServiceInt
     imap.add_flags(uid, &flags)?;
     imap.expunge()?;
     output.print(format!("Message(s) {} successfully deleted", uid))?;
-    imap.logout()?;
     Ok(())
 }
 
@@ -203,7 +200,6 @@ pub fn forward<
     debug!("found {} attachments", attachments_paths.len());
     trace!("attachments: {:?}", attachments_paths);
     msg_interaction(output, &mut msg, imap, smtp)?;
-    imap.logout()?;
     Ok(())
 }
 
@@ -219,7 +215,6 @@ pub fn list<OutputService: OutputServiceInterface, ImapService: ImapServiceInter
     let msgs = imap.list_msgs(&page_size, &page)?;
     trace!("messages: {:#?}", msgs);
     output.print(msgs)?;
-    imap.logout()?;
     Ok(())
 }
 
@@ -273,7 +268,6 @@ pub fn mailto<
     // let mut msg = Msg::new_with_headers(&account, headers);
     // msg.body = Body::new_with_text(body);
     // msg_interaction(output, &mut msg, imap, smtp)?;
-    imap.logout()?;
     Ok(())
 }
 
@@ -297,7 +291,6 @@ pub fn move_<OutputService: OutputServiceInterface, ImapService: ImapServiceInte
     let flags = Flags::from(vec![Flag::Seen, Flag::Deleted]);
     imap.add_flags(uid, &flags)?;
     imap.expunge()?;
-    imap.logout()?;
     Ok(())
 }
 
@@ -316,7 +309,6 @@ pub fn read<OutputService: OutputServiceInterface, ImapService: ImapServiceInter
     } else {
         // output.print(MsgSerialized::try_from(&msg)?)?;
     }
-    imap.logout()?;
     Ok(())
 }
 
@@ -342,7 +334,6 @@ pub fn reply<
     debug!("found {} attachments", attachments_paths.len());
     trace!("attachments: {:#?}", attachments_paths);
     msg_interaction(output, &mut msg, imap, smtp)?;
-    imap.logout()?;
     Ok(())
 }
 
@@ -356,24 +347,6 @@ pub fn save<ImapService: ImapServiceInterface>(
     let mut msg = Msg::try_from(msg)?;
     msg.flags.insert(Flag::Seen);
     imap.append_msg(&mbox, &mut msg)?;
-    imap.logout()?;
-    Ok(())
-}
-
-/// Search messages from the given IMAP query.
-pub fn search<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
-    page_size: Option<usize>,
-    page: usize,
-    query: String,
-    account: &Account,
-    output: &OutputService,
-    imap: &mut ImapService,
-) -> Result<()> {
-    let page_size = page_size.unwrap_or(account.default_page_size);
-    let msgs = imap.search_msgs(&query, &page_size, &page)?;
-    trace!("messages: {:?}", msgs);
-    output.print(msgs)?;
-    imap.logout()?;
     Ok(())
 }
 
@@ -408,7 +381,6 @@ pub fn send<
     msg.flags.insert(Flag::Seen);
     let mbox = Mbox::from("Sent");
     imap.append_msg(&mbox, &mut msg)?;
-    imap.logout()?;
     Ok(())
 }
 
@@ -436,6 +408,5 @@ pub fn write<
     //     .iter()
     //     .for_each(|path| msg.add_attachment(path));
     // msg_interaction(output, &mut msg, imap, smtp)?;
-    imap.logout()?;
     Ok(())
 }

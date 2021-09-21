@@ -12,7 +12,10 @@ mod ui;
 
 use config::entity::{Account, Config};
 use domain::{
-    imap::{self, service::ImapService},
+    imap::{
+        self,
+        service::{ImapService, ImapServiceInterface},
+    },
     mbox::{self, entity::Mbox},
     msg,
     smtp::service::SmtpService,
@@ -57,7 +60,7 @@ fn main() -> Result<()> {
     let m = app.get_matches();
 
     // Check completion match BEFORE entities and services initialization.
-    // See https://github.com/soywod/himalaya/issues/115.
+    // Linked issue: https://github.com/soywod/himalaya/issues/115.
     match compl::arg::matches(&m)? {
         Some(compl::arg::Command::Generate(shell)) => {
             return compl::handler::generate(create_app(), shell);
@@ -156,6 +159,8 @@ fn main() -> Result<()> {
         },
         _ => (),
     }
+
+    imap.logout()?;
 
     Ok(())
 }

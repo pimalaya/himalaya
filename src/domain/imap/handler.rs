@@ -13,7 +13,6 @@ pub fn notify<ImapService: ImapServiceInterface>(
     imap: &mut ImapService,
 ) -> Result<()> {
     imap.notify(&config, keepalive)?;
-    imap.logout()?;
     Ok(())
 }
 
@@ -23,6 +22,5 @@ pub fn watch<ImapService: ImapServiceInterface>(
     imap: &mut ImapService,
 ) -> Result<()> {
     imap.watch(keepalive)?;
-    imap.logout()?;
     Ok(())
 }

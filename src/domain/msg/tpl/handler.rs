@@ -20,7 +20,6 @@ pub fn new<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceIn
     override_msg_with_args(&mut msg, tpl);
     trace!("message: {:#?}", msg);
     // output.print(MsgSerialized::try_from(&msg)?)?;
-    imap.logout()?;
     Ok(())
 }
 
@@ -36,7 +35,6 @@ pub fn reply<'a, OutputService: OutputServiceInterface, ImapService: ImapService
     override_msg_with_args(&mut msg, tpl);
     trace!("Message: {:?}", msg);
     // output.print(MsgSerialized::try_from(&msg)?)?;
-    imap.logout()?;
     Ok(())
 }
 
@@ -51,7 +49,6 @@ pub fn forward<'a, OutputService: OutputServiceInterface, ImapService: ImapServi
     override_msg_with_args(&mut msg, tpl);
     trace!("Message: {:?}", msg);
     // output.print(MsgSerialized::try_from(&msg)?)?;
-    imap.logout()?;
     Ok(())
 }
 
