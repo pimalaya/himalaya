@@ -1,8 +1,8 @@
 use ammonia;
 use anyhow::{anyhow, Context, Error, Result};
+use chrono::{DateTime, FixedOffset};
 use htmlescape;
 use regex::Regex;
-use serde::Serialize;
 use std::convert::TryFrom;
 
 use crate::msg::{Flags, Parts};
@@ -10,7 +10,7 @@ use crate::msg::{Flags, Parts};
 type Addr = lettre::message::Mailbox;
 
 /// Representation of a message.
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Default)]
 pub struct Msg {
     /// The sequence number of the message.
     ///
@@ -34,7 +34,7 @@ pub struct Msg {
     /// The internal date of the message.
     ///
     /// [RFC3501]: https://datatracker.ietf.org/doc/html/rfc3501#section-2.3.3
-    pub date: Option<String>,
+    pub date: Option<DateTime<FixedOffset>>,
     pub parts: Parts,
 }
 
@@ -136,9 +136,9 @@ impl<'a> TryFrom<&'a imap::types::Fetch> for Msg {
         };
 
         // Get the internal date
-        let date = fetch
-            .internal_date()
-            .map(|date| date.format("%Y/%m/%d %H:%M").to_string());
+        let date = fetch.internal_date();
+
+        // Get all parts
         let parts = Parts::from(
             &mailparse::parse_mail(
                 fetch
