@@ -141,18 +141,18 @@ fn main() -> Result<()> {
             }
             _ => (),
         },
-        // Some(msg::arg::Command::Tpl(m)) => match m {
-        //     Some(msg::tpl::arg::Command::New(tpl)) => {
-        //         return msg::tpl::handler::new(tpl, &account, &output, &mut imap);
-        //     }
-        //     Some(msg::tpl::arg::Command::Reply(uid, all, tpl)) => {
-        //         return msg::tpl::handler::reply(uid, all, tpl, &account, &output, &mut imap);
-        //     }
-        //     Some(msg::tpl::arg::Command::Forward(uid, tpl)) => {
-        //         return msg::tpl::handler::forward(uid, tpl, &account, &output, &mut imap);
-        //     }
-        //     _ => (),
-        // },
+        Some(msg::arg::Command::Tpl(m)) => match m {
+            Some(msg::tpl::arg::Command::New(tpl)) => {
+                return msg::tpl::handler::new(tpl, &account, &output);
+            }
+            Some(msg::tpl::arg::Command::Reply(seq, all, tpl)) => {
+                return msg::tpl::handler::reply(seq, all, tpl, &account, &output, &mut imap);
+            }
+            Some(msg::tpl::arg::Command::Forward(seq, tpl)) => {
+                return msg::tpl::handler::forward(seq, tpl, &account, &output, &mut imap);
+            }
+            _ => (),
+        },
         _ => (),
     }
 

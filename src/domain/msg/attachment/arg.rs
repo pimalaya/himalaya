@@ -11,7 +11,7 @@ pub(crate) fn subcmds<'a>() -> Vec<App<'a, 'a>> {
     vec![SubCommand::with_name("attachments")
         .aliases(&["attachment", "att", "a"])
         .about("Downloads all message attachments")
-        .arg(msg::arg::uid_arg())]
+        .arg(msg::arg::seq_arg())]
 }
 
 /// Message attachment path argument.

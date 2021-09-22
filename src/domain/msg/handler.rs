@@ -70,7 +70,7 @@ fn msg_interaction<
                 // let the server know, that the user sent a msg
                 msg.flags.insert(Flag::Seen);
                 let mbox = Mbox::from("Sent");
-                imap.append_msg(&mbox, msg)?;
+                // imap.append_msg(&mbox, msg)?;
 
                 // remove the draft, since we sent it
                 msg::utils::remove_draft()?;
@@ -89,16 +89,16 @@ fn msg_interaction<
                 msg.flags.insert(Flag::Seen);
 
                 let mbox = Mbox::from("Drafts");
-                match imap.append_msg(&mbox, msg) {
-                    Ok(_) => {
-                        msg::utils::remove_draft()?;
-                        output.print("Message successfully saved to Drafts")?;
-                    }
-                    Err(err) => {
-                        output.print("Cannot save draft to the server")?;
-                        return Err(err.into());
-                    }
-                };
+                // match imap.append_msg(&mbox, msg) {
+                //     Ok(_) => {
+                //         msg::utils::remove_draft()?;
+                //         output.print("Message successfully saved to Drafts")?;
+                //     }
+                //     Err(err) => {
+                //         output.print("Cannot save draft to the server")?;
+                //         return Err(err.into());
+                //     }
+                // };
                 break;
             }
             PostEditChoice::Discard => {
@@ -153,7 +153,7 @@ pub fn copy<OutputService: OutputServiceInterface, ImapService: ImapServiceInter
     let target = Mbox::try_from(mbox)?;
     let mut msg = imap.get_msg(&uid)?;
     msg.flags.insert(Flag::Seen);
-    imap.append_msg(&target, &mut msg)?;
+    // imap.append_msg(&target, &mut msg)?;
     output.print(format!(
         r#"Message {} successfully copied to folder "{}""#,
         uid, target
@@ -205,18 +205,15 @@ pub fn list<OutputService: OutputServiceInterface, ImapService: ImapServiceInter
     output: &OutputService,
     imap: &mut ImapService,
 ) -> Result<()> {
-    trace!("entering list handler");
+    debug!("entering list handler");
 
-    trace!("page size from arg: {:?}", page_size);
-    trace!("page size from account: {}", account.default_page_size);
     let page_size = page_size.unwrap_or(account.default_page_size);
-    debug!("page size: {}", page_size);
+    trace!("page size: {}", page_size);
 
-    let msgs = imap.list_msgs(&page_size, &page)?;
-    debug!("messages: {:#?}", msgs);
+    let msgs = imap.get_msgs(&page_size, &page)?;
+    trace!("messages: {:#?}", msgs);
     output.print(msgs)?;
 
-    trace!("exiting list handler");
     Ok(())
 }
 
@@ -284,7 +281,7 @@ pub fn move_<OutputService: OutputServiceInterface, ImapService: ImapServiceInte
     let mut msg = imap.get_msg(&uid)?;
     // create the msg in the target-msgbox
     msg.flags.insert(Flag::Seen);
-    imap.append_msg(&target, &mut msg)?;
+    // imap.append_msg(&target, &mut msg)?;
     output.print(format!(
         r#"Message {} successfully moved to folder "{}""#,
         uid, target
@@ -348,7 +345,7 @@ pub fn save<ImapService: ImapServiceInterface>(
     let mbox = Mbox::try_from(mbox)?;
     let mut msg = Msg::try_from(msg)?;
     msg.flags.insert(Flag::Seen);
-    imap.append_msg(&mbox, &mut msg)?;
+    // imap.append_msg(&mbox, &mut msg)?;
     Ok(())
 }
 
@@ -361,19 +358,15 @@ pub fn search<OutputService: OutputServiceInterface, ImapService: ImapServiceInt
     output: &OutputService,
     imap: &mut ImapService,
 ) -> Result<()> {
-    trace!("entering search handler");
+    debug!("entering search handler");
 
-    trace!("query from arg: {}", query);
-    trace!("page size from arg: {:?}", page_size);
-    trace!("page size from account: {}", account.default_page_size);
     let page_size = page_size.unwrap_or(account.default_page_size);
-    debug!("page size: {}", page_size);
+    trace!("page size: {}", page_size);
 
-    let msgs = imap.search_msgs(&query, &page_size, &page)?;
-    debug!("messages: {:#?}", msgs);
+    let msgs = imap.find_msgs(&query, &page_size, &page)?;
+    trace!("messages: {:#?}", msgs);
     output.print(msgs)?;
 
-    trace!("exiting search handler");
     Ok(())
 }
 
@@ -407,7 +400,7 @@ pub fn send<
     // add the message/msg to the Sent-Mailbox of the user
     msg.flags.insert(Flag::Seen);
     let mbox = Mbox::from("Sent");
-    imap.append_msg(&mbox, &mut msg)?;
+    // imap.append_msg(&mbox, &mut msg)?;
     Ok(())
 }
 

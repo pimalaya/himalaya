@@ -36,7 +36,6 @@ pub mod header;
 /// a msg; The part where you're writing some text like `Dear Mr. LMAO`.
 pub mod body;
 pub mod handler;
-pub mod tpl;
 pub mod utils;
 
 pub mod flag;
@@ -44,3 +43,12 @@ pub use flag::*;
 
 pub mod envelope;
 pub use envelope::*;
+
+pub mod tpl;
+pub use tpl::*;
+
+pub mod entity_msg;
+pub use entity_msg::*;
+
+pub mod entity_parts;
+pub use entity_parts::*;

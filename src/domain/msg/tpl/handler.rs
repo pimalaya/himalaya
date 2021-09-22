@@ -1,46 +1,48 @@
+use std::convert::{TryFrom, TryInto};
+
 use anyhow::Result;
-use log::trace;
+use log::{debug, trace};
 
 use crate::{
     config::entity::Account,
     domain::{
-        imap::service::ImapServiceInterface,
-        msg::{entity::Msg, tpl::arg::Tpl},
+        imap::ImapServiceInterface,
+        msg::{self, entity::Msg, Envelope, Tpl, TplOverride},
     },
     output::service::OutputServiceInterface,
 };
 
-pub fn new<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
-    tpl: Tpl<'a>,
+pub fn new<'a, OutputService: OutputServiceInterface>(
+    opts: TplOverride<'a>,
     account: &'a Account,
     output: &'a OutputService,
-    imap: &'a mut ImapService,
 ) -> Result<()> {
-    let mut msg = Msg::new(&account);
-    override_msg_with_args(&mut msg, tpl);
-    trace!("message: {:#?}", msg);
-    // output.print(MsgSerialized::try_from(&msg)?)?;
+    let tpl = Tpl::new(&opts, account);
+    trace!("template: {:#?}", tpl);
+    output.print(tpl)?;
     Ok(())
 }
 
 pub fn reply<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
-    uid: &str,
+    seq: &str,
     all: bool,
-    tpl: Tpl<'a>,
+    opts: TplOverride<'a>,
     account: &'a Account,
     output: &'a OutputService,
     imap: &'a mut ImapService,
 ) -> Result<()> {
-    let mut msg = imap.get_msg(uid)?.into_reply(all, account)?;
-    override_msg_with_args(&mut msg, tpl);
-    trace!("Message: {:?}", msg);
-    // output.print(MsgSerialized::try_from(&msg)?)?;
+    debug!("entering reply handler");
+    let msg = imap.find_msg(seq)?;
+    trace!("message: {:#?}", msg);
+    let tpl = Tpl::reply(all, &msg, &opts, account);
+    trace!("template: {:#?}", tpl);
+    output.print(tpl)?;
     Ok(())
 }
 
 pub fn forward<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
     uid: &str,
-    tpl: Tpl<'a>,
+    tpl: TplOverride<'a>,
     account: &'a Account,
     output: &'a OutputService,
     imap: &'a mut ImapService,
@@ -55,7 +57,7 @@ pub fn forward<'a, OutputService: OutputServiceInterface, ImapService: ImapServi
 // == Helper functions ==
 // -- Template Subcommands --
 // These functions are more used for the "template" subcommand
-fn override_msg_with_args<'a>(msg: &mut Msg, tpl: Tpl<'a>) {
+fn override_msg_with_args<'a>(msg: &mut Msg, tpl: TplOverride<'a>) {
     // -- Collecting credentials --
     // let from: Vec<String> = match tpl.from {
     //     Some(from) => from.map(|arg| arg.to_string()).collect(),

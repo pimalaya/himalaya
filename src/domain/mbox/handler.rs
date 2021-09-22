@@ -15,7 +15,7 @@ pub fn list<ImapService: ImapServiceInterface>(
     output: &OutputService,
     imap: &mut ImapService,
 ) -> Result<()> {
-    let names = imap.list_mboxes()?;
+    let names = imap.get_mboxes()?;
     let mboxes = Mboxes::from(&names);
     debug!("mailboxes len: {}", mboxes.0.len());
     trace!("mailboxes: {:#?}", mboxes);

@@ -161,10 +161,9 @@ pub struct Account {
     pub name: String,
     pub from: String,
     pub downloads_dir: PathBuf,
-    pub signature: String,
+    pub sig: Option<String>,
     pub default_page_size: usize,
     pub watch_cmds: Vec<String>,
-
     pub default: bool,
     pub email: String,
 
@@ -297,28 +296,27 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
             .to_owned();
 
         let default_sig_delim = DEFAULT_SIG_DELIM.to_string();
-        let signature_delim = account
+        let sig_delim = account
             .signature_delimiter
             .as_ref()
             .or_else(|| config.signature_delimiter.as_ref())
             .unwrap_or(&default_sig_delim);
-        let signature = account
+        let sig = account
             .signature
             .as_ref()
             .or_else(|| config.signature.as_ref());
-        let signature = signature
+        let sig = sig
             .and_then(|sig| shellexpand::full(sig).ok())
             .map(String::from)
             .and_then(|sig| fs::read_to_string(sig).ok())
-            .or_else(|| signature.map(|sig| sig.to_owned()))
-            .map(|sig| format!("\n\n{}{}", signature_delim, sig.trim_end()))
-            .unwrap_or_default();
+            .or_else(|| sig.map(|sig| sig.to_owned()))
+            .map(|sig| format!("{}{}", sig_delim, sig.trim_end()));
 
         let account = Account {
             name,
             from: account.name.as_ref().unwrap_or(&config.name).to_owned(),
             downloads_dir,
-            signature,
+            sig,
             default_page_size,
             watch_cmds: account
                 .watch_cmds

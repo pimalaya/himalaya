@@ -3,16 +3,15 @@
 //! This module exposes a service that can interact with IMAP servers.
 
 use anyhow::{anyhow, Context, Result};
-use imap;
 use log::{debug, trace};
-use native_tls::{self, TlsConnector, TlsStream};
+use native_tls::{TlsConnector, TlsStream};
 use std::{collections::HashSet, convert::TryFrom, iter::FromIterator, net::TcpStream};
 
 use crate::{
     config::entity::{Account, Config},
     domain::{
         mbox::entity::Mbox,
-        msg::{entity::Msg, Envelopes, Flags},
+        msg::{self, Envelopes, Flags, Msg},
     },
 };
 
@@ -22,10 +21,11 @@ type ImapMboxes = imap::types::ZeroCopy<Vec<imap::types::Name>>;
 pub trait ImapServiceInterface {
     fn notify(&mut self, config: &Config, keepalive: u64) -> Result<()>;
     fn watch(&mut self, keepalive: u64) -> Result<()>;
-    fn list_mboxes(&mut self) -> Result<ImapMboxes>;
-    fn list_msgs(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes>;
-    fn search_msgs(&mut self, query: &str, page_size: &usize, page: &usize) -> Result<Envelopes>;
-    fn get_msg(&mut self, uid: &str) -> Result<Msg>;
+    fn get_mboxes(&mut self) -> Result<ImapMboxes>;
+    fn get_msgs(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes>;
+    fn find_msgs(&mut self, query: &str, page_size: &usize, page: &usize) -> Result<Envelopes>;
+    fn get_msg(&mut self, seq: &str) -> Result<msg::entity::Msg>;
+    fn find_msg(&mut self, seq: &str) -> Result<Msg>;
     fn append_msg(&mut self, mbox: &Mbox, msg: &mut Msg) -> Result<()>;
     fn expunge(&mut self) -> Result<()>;
     fn logout(&mut self) -> Result<()>;
@@ -100,7 +100,7 @@ impl<'a> ImapService<'a> {
 }
 
 impl<'a> ImapServiceInterface for ImapService<'a> {
-    fn list_mboxes(&mut self) -> Result<ImapMboxes> {
+    fn get_mboxes(&mut self) -> Result<ImapMboxes> {
         let mboxes = self
             .sess()?
             .list(Some(""), Some("*"))
@@ -108,7 +108,7 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
         Ok(mboxes)
     }
 
-    fn list_msgs(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes> {
+    fn get_msgs(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes> {
         let mbox = self.mbox.to_owned();
         let last_seq = self
             .sess()?
@@ -138,7 +138,7 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
         Ok(Envelopes::try_from(fetches)?)
     }
 
-    fn search_msgs(&mut self, query: &str, page_size: &usize, page: &usize) -> Result<Envelopes> {
+    fn find_msgs(&mut self, query: &str, page_size: &usize, page: &usize) -> Result<Envelopes> {
         let mbox = self.mbox.to_owned();
         self.sess()?
             .select(&mbox.name)
@@ -171,21 +171,38 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
         Ok(Envelopes::try_from(fetches)?)
     }
 
-    /// Get the message according to the given `mbox` and `uid`.
-    fn get_msg(&mut self, uid: &str) -> Result<Msg> {
+    /// Find a message by sequence number.
+    fn get_msg(&mut self, seq: &str) -> Result<msg::entity::Msg> {
         let mbox = self.mbox.to_owned();
         self.sess()?
             .select(&mbox.name)
             .context(format!("cannot select mbox `{}`", self.mbox.name))?;
         match self
             .sess()?
-            .uid_fetch(uid, "(FLAGS BODY[] ENVELOPE INTERNALDATE)")
+            .fetch(seq, "(FLAGS BODY[] ENVELOPE INTERNALDATE)")
             .context("cannot fetch bodies")?
             .first()
         {
-            None => Err(anyhow!("cannot find message `{}`", uid)),
-            Some(fetch) => Ok(Msg::try_from(fetch)?),
+            None => Err(anyhow!("cannot find message `{}`", seq)),
+            Some(fetch) => Ok(msg::entity::Msg::try_from(fetch)?),
         }
+    }
+
+    /// Find a message by sequence number.
+    fn find_msg(&mut self, seq: &str) -> Result<Msg> {
+        let mbox = self.mbox.to_owned();
+        self.sess()?
+            .select(&mbox.name)
+            .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?;
+        let fetches = self
+            .sess()?
+            .fetch(seq, "(ENVELOPE FLAGS INTERNALDATE BODY[])")
+            .context(r#"cannot fetch messages "{}""#)?;
+        let fetch = fetches
+            .first()
+            .ok_or(anyhow!(r#"cannot find message "{}"#, seq))?;
+
+        Ok(Msg::try_from(fetch)?)
     }
 
     fn append_msg(&mut self, mbox: &Mbox, msg: &mut Msg) -> Result<()> {
@@ -246,7 +263,7 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
                     .context("cannot fetch new messages enveloppe")?;
 
                 for fetch in fetches.iter() {
-                    let msg = Msg::try_from(fetch)?;
+                    let msg = msg::entity::Msg::try_from(fetch)?;
                     let uid = fetch.uid.ok_or_else(|| {
                         anyhow!("cannot retrieve message {}'s UID", fetch.message)
                     })?;

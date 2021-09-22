@@ -3,87 +3,87 @@
 //! This module provides subcommands, arguments and a command matcher related to message template.
 
 use anyhow::Result;
-use clap::{self, App, AppSettings, Arg, ArgMatches, SubCommand, Values};
-use log::debug;
+use clap::{self, App, AppSettings, Arg, ArgMatches, SubCommand};
+use log::{debug, trace};
 
-use crate::domain::msg::{self, arg::uid_arg};
+use crate::domain::msg;
 
-type Uid<'a> = &'a str;
+type Seq<'a> = &'a str;
 type All = bool;
 
 #[derive(Debug)]
-pub struct Tpl<'a> {
+pub struct TplOverride<'a> {
     pub subject: Option<&'a str>,
-    pub from: Option<Values<'a>>,
-    pub to: Option<Values<'a>>,
-    pub cc: Option<Values<'a>>,
-    pub bcc: Option<Values<'a>>,
-    pub headers: Option<Values<'a>>,
+    pub from: Option<Vec<&'a str>>,
+    pub to: Option<Vec<&'a str>>,
+    pub cc: Option<Vec<&'a str>>,
+    pub bcc: Option<Vec<&'a str>>,
+    pub headers: Option<Vec<&'a str>>,
     pub body: Option<&'a str>,
     pub sig: Option<&'a str>,
 }
 
 /// Message template commands.
 pub enum Command<'a> {
-    New(Tpl<'a>),
-    Reply(Uid<'a>, All, Tpl<'a>),
-    Forward(Uid<'a>, Tpl<'a>),
+    New(TplOverride<'a>),
+    Reply(Seq<'a>, All, TplOverride<'a>),
+    Forward(Seq<'a>, TplOverride<'a>),
 }
 
 /// Message template command matcher.
 pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
     if let Some(m) = m.subcommand_matches("new") {
         debug!("new command matched");
-        let tpl = Tpl {
+        let tpl = TplOverride {
             subject: m.value_of("subject"),
-            from: m.values_of("from"),
-            to: m.values_of("to"),
-            cc: m.values_of("cc"),
-            bcc: m.values_of("bcc"),
-            headers: m.values_of("headers"),
+            from: m.values_of("from").map(|v| v.collect()),
+            to: m.values_of("to").map(|v| v.collect()),
+            cc: m.values_of("cc").map(|v| v.collect()),
+            bcc: m.values_of("bcc").map(|v| v.collect()),
+            headers: m.values_of("headers").map(|v| v.collect()),
             body: m.value_of("body"),
             sig: m.value_of("signature"),
         };
-        debug!("template: `{:?}`", tpl);
+        trace!(r#"template args: "{:?}""#, tpl);
         return Ok(Some(Command::New(tpl)));
     }
 
     if let Some(m) = m.subcommand_matches("reply") {
         debug!("reply command matched");
-        let uid = m.value_of("uid").unwrap();
-        debug!("uid: {}", uid);
+        let seq = m.value_of("seq").unwrap();
+        trace!(r#"seq: "{}""#, seq);
         let all = m.is_present("reply-all");
-        debug!("reply all: {}", all);
-        let tpl = Tpl {
+        trace!("reply all: {}", all);
+        let tpl = TplOverride {
             subject: m.value_of("subject"),
-            from: m.values_of("from"),
-            to: m.values_of("to"),
-            cc: m.values_of("cc"),
-            bcc: m.values_of("bcc"),
-            headers: m.values_of("headers"),
+            from: m.values_of("from").map(|v| v.collect()),
+            to: m.values_of("to").map(|v| v.collect()),
+            cc: m.values_of("cc").map(|v| v.collect()),
+            bcc: m.values_of("bcc").map(|v| v.collect()),
+            headers: m.values_of("headers").map(|v| v.collect()),
             body: m.value_of("body"),
             sig: m.value_of("signature"),
         };
-        debug!("template: `{:?}`", tpl);
-        return Ok(Some(Command::Reply(uid, all, tpl)));
+        trace!(r#"template args: "{:?}""#, tpl);
+        return Ok(Some(Command::Reply(seq, all, tpl)));
     }
 
     if let Some(m) = m.subcommand_matches("forward") {
         debug!("forward command matched");
-        let uid = m.value_of("uid").unwrap();
-        debug!("uid: {}", uid);
-        let tpl = Tpl {
+        let seq = m.value_of("seq").unwrap();
+        trace!(r#"seq: "{}""#, seq);
+        let tpl = TplOverride {
             subject: m.value_of("subject"),
-            from: m.values_of("from"),
-            to: m.values_of("to"),
-            cc: m.values_of("cc"),
-            bcc: m.values_of("bcc"),
-            headers: m.values_of("headers"),
+            from: m.values_of("from").map(|v| v.collect()),
+            to: m.values_of("to").map(|v| v.collect()),
+            cc: m.values_of("cc").map(|v| v.collect()),
+            bcc: m.values_of("bcc").map(|v| v.collect()),
+            headers: m.values_of("headers").map(|v| v.collect()),
             body: m.value_of("body"),
             sig: m.value_of("signature"),
         };
-        debug!("template: `{:?}`", tpl);
-        return Ok(Some(Command::Forward(uid, tpl)));
+        trace!(r#"template args: "{:?}""#, tpl);
+        return Ok(Some(Command::Forward(seq, tpl)));
     }
 
     Ok(None)
@@ -156,7 +156,7 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
             SubCommand::with_name("reply")
                 .aliases(&["rep", "r"])
                 .about("Generates a reply message template")
-                .arg(uid_arg())
+                .arg(msg::arg::seq_arg())
                 .arg(msg::arg::reply_all_arg())
                 .args(&tpl_args()),
         )
@@ -164,7 +164,7 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
             SubCommand::with_name("forward")
                 .aliases(&["fwd", "fw", "f"])
                 .about("Generates a forward message template")
-                .arg(uid_arg())
+                .arg(msg::arg::seq_arg())
                 .args(&tpl_args()),
         )]
 }

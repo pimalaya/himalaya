@@ -1,11 +1,10 @@
 use anyhow::{anyhow, Context, Error, Result};
-use imap::types::{Fetch, Flag};
 use lettre::Address;
 use serde::Serialize;
 use std::convert::TryFrom;
 
 use crate::{
-    domain::msg::Flags,
+    domain::msg::{Flag, Flags},
     ui::table::{Cell, Row, Table},
 };
 
@@ -50,10 +49,10 @@ impl Default for Envelope {
     }
 }
 
-impl<'a> TryFrom<&'a Fetch> for Envelope {
+impl<'a> TryFrom<&'a imap::types::Fetch> for Envelope {
     type Error = Error;
 
-    fn try_from(fetch: &'a Fetch) -> Result<Envelope> {
+    fn try_from(fetch: &'a imap::types::Fetch) -> Result<Envelope> {
         let envelope = fetch
             .envelope()
             .ok_or(anyhow!("cannot get envelope of message {}", fetch.message))?;

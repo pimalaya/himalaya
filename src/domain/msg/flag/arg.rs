@@ -67,14 +67,14 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
         .about("Handles flags")
         .setting(AppSettings::SubcommandRequiredElseHelp)
         .subcommand(
-            SubCommand::with_name("set")
-                .about("Replaces all message flags")
+            SubCommand::with_name("add")
+                .about("Adds flags to a message")
                 .arg(msg::arg::seq_range_arg())
                 .arg(flags_arg()),
         )
         .subcommand(
-            SubCommand::with_name("add")
-                .about("Adds flags to a message")
+            SubCommand::with_name("set")
+                .about("Replaces all message flags")
                 .arg(msg::arg::seq_range_arg())
                 .arg(flags_arg()),
         )

@@ -192,18 +192,18 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
     Ok(Some(Command::List(None, 0)))
 }
 
-/// Message UID argument.
-pub(crate) fn uid_arg<'a>() -> Arg<'a, 'a> {
-    Arg::with_name("uid")
+/// Message sequence number argument.
+pub(crate) fn seq_arg<'a>() -> Arg<'a, 'a> {
+    Arg::with_name("seq")
         .help("Specifies the targetted message")
-        .value_name("UID")
+        .value_name("SEQ")
         .required(true)
 }
 
 /// Message sequence range argument.
 pub(crate) fn seq_range_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name("seq-range")
-        .help("Specifies a range () of targetted messages")
+        .help("Specifies targetted message(s)")
         .long_help("Specifies a range of targetted messages. The range follows the [RFC3501](https://datatracker.ietf.org/doc/html/rfc3501#section-9) format: `1:5` matches messages with sequence number between 1 and 5, `1,5` matches messages with sequence number 1 or 5, * matches all messages.")
         .value_name("SEQ")
         .required(true)
@@ -272,7 +272,7 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                 .arg(Arg::with_name("message").raw(true)),
             SubCommand::with_name("read")
                 .about("Reads text bodies of a message")
-                .arg(uid_arg())
+                .arg(seq_arg())
                 .arg(
                     Arg::with_name("mime-type")
                         .help("MIME type to use")
@@ -291,28 +291,28 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
             SubCommand::with_name("reply")
                 .aliases(&["rep", "r"])
                 .about("Answers to a message")
-                .arg(uid_arg())
+                .arg(seq_arg())
                 .arg(reply_all_arg())
                 .arg(msg::attachment::arg::path_arg()),
             SubCommand::with_name("forward")
                 .aliases(&["fwd", "f"])
                 .about("Forwards a message")
-                .arg(uid_arg())
+                .arg(seq_arg())
                 .arg(msg::attachment::arg::path_arg()),
             SubCommand::with_name("copy")
                 .aliases(&["cp", "c"])
                 .about("Copies a message to the targetted mailbox")
-                .arg(uid_arg())
+                .arg(seq_arg())
                 .arg(mbox::arg::target_arg()),
             SubCommand::with_name("move")
                 .aliases(&["mv"])
                 .about("Moves a message to the targetted mailbox")
-                .arg(uid_arg())
+                .arg(seq_arg())
                 .arg(mbox::arg::target_arg()),
             SubCommand::with_name("delete")
                 .aliases(&["del", "d", "remove", "rm"])
                 .about("Deletes a message")
-                .arg(uid_arg()),
+                .arg(seq_arg()),
         ],
     ]
     .concat()
