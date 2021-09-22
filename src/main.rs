@@ -12,10 +12,7 @@ mod ui;
 
 use config::entity::{Account, Config};
 use domain::{
-    imap::{
-        self,
-        service::{ImapService, ImapServiceInterface},
-    },
+    imap::{self, ImapService, ImapServiceInterface},
     mbox::{self, entity::Mbox},
     msg,
     smtp::service::SmtpService,
@@ -132,19 +129,18 @@ fn main() -> Result<()> {
         // Some(msg::arg::Command::Write(paths)) => {
         //     return msg::handler::write(paths, &account, &output, &mut imap, &mut smtp);
         // }
-
-        // Some(msg::arg::Command::Flag(m)) => match m {
-        //     Some(msg::flag::arg::Command::Set(uid, flags)) => {
-        //         return msg::flag::handler::set(uid, flags, &output, &mut imap);
-        //     }
-        //     Some(msg::flag::arg::Command::Add(uid, flags)) => {
-        //         return msg::flag::handler::add(uid, flags, &output, &mut imap);
-        //     }
-        //     Some(msg::flag::arg::Command::Remove(uid, flags)) => {
-        //         return msg::flag::handler::remove(uid, flags, &output, &mut imap);
-        //     }
-        //     _ => (),
-        // },
+        Some(msg::arg::Command::Flag(m)) => match m {
+            Some(msg::flag::arg::Command::Set(seq_range, flags)) => {
+                return msg::flag::handler::set(seq_range, flags, &output, &mut imap);
+            }
+            Some(msg::flag::arg::Command::Add(seq_range, flags)) => {
+                return msg::flag::handler::add(seq_range, flags, &output, &mut imap);
+            }
+            Some(msg::flag::arg::Command::Remove(seq_range, flags)) => {
+                return msg::flag::handler::remove(seq_range, flags, &output, &mut imap);
+            }
+            _ => (),
+        },
         // Some(msg::arg::Command::Tpl(m)) => match m {
         //     Some(msg::tpl::arg::Command::New(tpl)) => {
         //         return msg::tpl::handler::new(tpl, &account, &output, &mut imap);

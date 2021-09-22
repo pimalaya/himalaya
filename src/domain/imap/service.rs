@@ -27,11 +27,15 @@ pub trait ImapServiceInterface {
     fn search_msgs(&mut self, query: &str, page_size: &usize, page: &usize) -> Result<Envelopes>;
     fn get_msg(&mut self, uid: &str) -> Result<Msg>;
     fn append_msg(&mut self, mbox: &Mbox, msg: &mut Msg) -> Result<()>;
-    fn add_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()>;
-    fn set_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()>;
-    fn remove_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()>;
     fn expunge(&mut self) -> Result<()>;
     fn logout(&mut self) -> Result<()>;
+
+    /// Add flags to all messages within the given sequence range.
+    fn add_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()>;
+    /// Replace flags of all messages within the given sequence range.
+    fn set_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()>;
+    /// Remove flags from all messages within the given sequence range.
+    fn remove_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()>;
 }
 
 pub struct ImapService<'a> {
@@ -195,71 +199,6 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
         Ok(())
     }
 
-    fn add_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()> {
-        let mbox = self.mbox.to_owned();
-        let flags: String = flags.to_string();
-        self.sess()?
-            .select(&mbox.name)
-            .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?;
-        self.sess()?
-            .uid_store(uid_seq, format!("+FLAGS ({})", flags))
-            .context(format!(r#"cannot add flags "{}""#, &flags))?;
-        Ok(())
-    }
-
-    /// Applies the given flags to the msg.
-    ///
-    /// # Example
-    /// ```no_run
-    /// use himalaya::imap::model::ImapConnector;
-    /// use himalaya::config::model::Account;
-    /// use himalaya::flag::model::Flags;
-    /// use imap::types::Flag;
-    ///
-    /// fn main() {
-    ///     let account = Account::default();
-    ///     let mut imap_conn = ImapConnector::new(&account).unwrap();
-    ///     let flags = Flags::from(vec![Flag::Seen]);
-    ///
-    ///     // Mark the message with the UID 42 in the mailbox "rofl" as "Seen" and wipe all other
-    ///     // flags
-    ///     imap_conn.set_flags("rofl", "42", flags).unwrap();
-    ///
-    ///     imap_conn.logout();
-    /// }
-    /// ```
-    fn set_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()> {
-        let mbox = self.mbox.to_owned();
-        self.sess()?
-            .select(&mbox.name)
-            .context(format!("cannot select mailbox `{}`", self.mbox.name))?;
-        self.sess()?
-            .uid_store(uid_seq, format!("FLAGS ({})", flags))
-            .context(format!("cannot set flags `{}`", &flags))?;
-        Ok(())
-    }
-
-    /// Remove the flags to the message by the given information. Take a look on the example above.
-    /// It's pretty similar.
-    fn remove_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()> {
-        let mbox = self.mbox.to_owned();
-        let flags = flags.to_string();
-        self.sess()?
-            .select(&mbox.name)
-            .context(format!("cannot select mailbox `{}`", self.mbox.name))?;
-        self.sess()?
-            .uid_store(uid_seq, format!("-FLAGS ({})", flags))
-            .context(format!("cannot remove flags `{}`", &flags))?;
-        Ok(())
-    }
-
-    fn expunge(&mut self) -> Result<()> {
-        self.sess()?
-            .expunge()
-            .context(format!("cannot expunge `{}`", self.mbox.name))?;
-        Ok(())
-    }
-
     fn notify(&mut self, config: &Config, keepalive: u64) -> Result<()> {
         let mbox = self.mbox.to_owned();
 
@@ -360,6 +299,48 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
             debug!("logout from IMAP server");
             sess.logout().context("cannot logout from IMAP server")?;
         }
+        Ok(())
+    }
+
+    fn add_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()> {
+        let mbox = self.mbox.to_owned();
+        let flags: String = flags.to_string();
+        self.sess()?
+            .select(&mbox.name)
+            .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?;
+        self.sess()?
+            .store(seq_range, format!("+FLAGS ({})", flags))
+            .context(format!(r#"cannot add flags "{}""#, &flags))?;
+        Ok(())
+    }
+
+    fn set_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()> {
+        let mbox = self.mbox.to_owned();
+        self.sess()?
+            .select(&mbox.name)
+            .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?;
+        self.sess()?
+            .store(uid_seq, format!("FLAGS ({})", flags))
+            .context(format!(r#"cannot set flags "{}""#, &flags))?;
+        Ok(())
+    }
+
+    fn remove_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()> {
+        let mbox = self.mbox.to_owned();
+        let flags = flags.to_string();
+        self.sess()?
+            .select(&mbox.name)
+            .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?;
+        self.sess()?
+            .store(uid_seq, format!("-FLAGS ({})", flags))
+            .context(format!(r#"cannot remove flags "{}""#, &flags))?;
+        Ok(())
+    }
+
+    fn expunge(&mut self) -> Result<()> {
+        self.sess()?
+            .expunge()
+            .context(format!(r#"cannot expunge mailbox "{}""#, self.mbox.name))?;
         Ok(())
     }
 }

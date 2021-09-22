@@ -162,28 +162,28 @@ impl Serialize for Flags {
 //    }
 //}
 
-// impl<'a> From<Vec<&'a str>> for Flags {
-//     fn from(flags: Vec<&'a str>) -> Self {
-//         let mut map: HashSet<Flag<'static>> = HashSet::new();
+impl<'a> From<Vec<&'a str>> for Flags {
+    fn from(flags: Vec<&'a str>) -> Self {
+        let mut map: HashSet<Flag<'static>> = HashSet::new();
 
-//         for f in flags {
-//             match f {
-//                 "Answered" | _ if f.eq_ignore_ascii_case("answered") => map.insert(Flag::Answered),
-//                 "Deleted" | _ if f.eq_ignore_ascii_case("deleted") => map.insert(Flag::Deleted),
-//                 "Draft" | _ if f.eq_ignore_ascii_case("draft") => map.insert(Flag::Draft),
-//                 "Flagged" | _ if f.eq_ignore_ascii_case("flagged") => map.insert(Flag::Flagged),
-//                 "MayCreate" | _ if f.eq_ignore_ascii_case("maycreate") => {
-//                     map.insert(Flag::MayCreate)
-//                 }
-//                 "Recent" | _ if f.eq_ignore_ascii_case("recent") => map.insert(Flag::Recent),
-//                 "Seen" | _ if f.eq_ignore_ascii_case("seen") => map.insert(Flag::Seen),
-//                 custom => map.insert(Flag::Custom(Cow::Owned(custom.into()))),
-//             };
-//         }
+        for f in flags {
+            match f {
+                "Answered" | _ if f.eq_ignore_ascii_case("answered") => map.insert(Flag::Answered),
+                "Deleted" | _ if f.eq_ignore_ascii_case("deleted") => map.insert(Flag::Deleted),
+                "Draft" | _ if f.eq_ignore_ascii_case("draft") => map.insert(Flag::Draft),
+                "Flagged" | _ if f.eq_ignore_ascii_case("flagged") => map.insert(Flag::Flagged),
+                "MayCreate" | _ if f.eq_ignore_ascii_case("maycreate") => {
+                    map.insert(Flag::MayCreate)
+                }
+                "Recent" | _ if f.eq_ignore_ascii_case("recent") => map.insert(Flag::Recent),
+                "Seen" | _ if f.eq_ignore_ascii_case("seen") => map.insert(Flag::Seen),
+                custom => map.insert(Flag::Custom(Cow::Owned(custom.into()))),
+            };
+        }
 
-//         Self(map)
-//     }
-// }
+        Self(map)
+    }
+}
 
 //#[cfg(test)]
 //mod tests {

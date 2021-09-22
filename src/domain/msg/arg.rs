@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use clap::{self, App, Arg, ArgMatches, SubCommand};
-use log::debug;
+use log::{debug, trace};
 
 use crate::domain::{mbox, msg};
 
@@ -75,7 +75,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
     if let Some(m) = m.subcommand_matches("list") {
         debug!("list command matched");
         let page_size = m.value_of("page-size").and_then(|s| s.parse().ok());
-        debug!("page size: `{:?}`", page_size);
+        trace!(r#"page size: "{:?}""#, page_size);
         let page = m
             .value_of("page")
             .unwrap_or("1")
@@ -83,7 +83,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
             .ok()
             .map(|page| 1.max(page) - 1)
             .unwrap_or_default();
-        debug!("page: `{:?}`", page);
+        trace!(r#"page: "{:?}""#, page);
         return Ok(Some(Command::List(page_size, page)));
     }
 
@@ -129,7 +129,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
     if let Some(m) = m.subcommand_matches("search") {
         debug!("search command matched");
         let page_size = m.value_of("page-size").and_then(|s| s.parse().ok());
-        debug!("page size: `{:?}`", page_size);
+        trace!(r#"page size: "{:?}""#, page_size);
         let page = m
             .value_of("page")
             .unwrap()
@@ -137,7 +137,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
             .ok()
             .map(|page| 1.max(page) - 1)
             .unwrap_or_default();
-        debug!("page: `{:?}`", page);
+        trace!(r#"page: "{:?}""#, page);
         let query = m
             .values_of("query")
             .unwrap_or_default()
@@ -162,6 +162,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
             })
             .1
             .join(" ");
+        trace!(r#"query: "{:?}""#, query);
         return Ok(Some(Command::Search(query, page_size, page)));
     }
 
@@ -196,6 +197,15 @@ pub(crate) fn uid_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name("uid")
         .help("Specifies the targetted message")
         .value_name("UID")
+        .required(true)
+}
+
+/// Message sequence range argument.
+pub(crate) fn seq_range_arg<'a>() -> Arg<'a, 'a> {
+    Arg::with_name("seq-range")
+        .help("Specifies a range () of targetted messages")
+        .long_help("Specifies a range of targetted messages. The range follows the [RFC3501](https://datatracker.ietf.org/doc/html/rfc3501#section-9) format: `1:5` matches messages with sequence number between 1 and 5, `1,5` matches messages with sequence number 1 or 5, * matches all messages.")
+        .value_name("SEQ")
         .required(true)
 }
 
@@ -245,7 +255,8 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                 .arg(page_arg())
                 .arg(
                     Arg::with_name("query")
-                        .help("IMAP query (see https://tools.ietf.org/html/rfc3501#section-6.4.4)")
+                        .help("IMAP query")
+                        .long_help("The IMAP query format follows the [RFC3501](https://tools.ietf.org/html/rfc3501#section-6.4.4). The query is case-insensitive.")
                         .value_name("QUERY")
                         .multiple(true)
                         .required(true),
