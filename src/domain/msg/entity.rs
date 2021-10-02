@@ -64,6 +64,7 @@ impl Msg {
             ..Self::default()
         }
     }
+
     /// Convert the message into a reply one.
     ///
     ///  - the `From` is replaced by the address from the user's account
@@ -264,7 +265,7 @@ impl Msg {
         // We don't let this line compile, if we're doing
         // tests, because we just need to look, if the headers are set
         // correctly
-        let msg = editor::open_editor_with_tpl(msg.as_bytes())?;
+        let msg = editor::open_editor_with_bytes(msg.as_bytes())?;
 
         // refresh the state of the msg
         self.parse_from_str(&msg)?;

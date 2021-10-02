@@ -1,6 +1,9 @@
 use mailparse::MailHeaderMap;
 use serde::Serialize;
-use std::{collections::HashMap, ops::Deref};
+use std::{
+    collections::HashMap,
+    ops::{Deref, DerefMut},
+};
 
 pub type PartsMap = HashMap<String, Vec<String>>;
 
@@ -12,6 +15,12 @@ impl Deref for Parts {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl DerefMut for Parts {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 

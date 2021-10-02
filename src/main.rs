@@ -102,9 +102,9 @@ fn main() -> Result<()> {
         // Some(msg::arg::Command::Delete(uid)) => {
         //     return msg::handler::delete(uid, &output, &mut imap);
         // }
-        // Some(msg::arg::Command::Forward(uid, paths)) => {
-        //     return msg::handler::forward(uid, paths, &account, &output, &mut imap, &mut smtp);
-        // }
+        Some(msg::arg::Command::Forward(seq, paths)) => {
+            return msg::handler::forward(seq, paths, &account, &output, &mut imap, &mut smtp);
+        }
         Some(msg::arg::Command::List(page_size, page)) => {
             return msg::handler::list(page_size, page, &account, &output, &mut imap);
         }
@@ -114,9 +114,9 @@ fn main() -> Result<()> {
         // Some(msg::arg::Command::Read(uid, mime, raw)) => {
         //     return msg::handler::read(uid, mime, raw, &output, &mut imap);
         // }
-        // Some(msg::arg::Command::Reply(uid, all, paths)) => {
-        //     return msg::handler::reply(uid, all, paths, &account, &output, &mut imap, &mut smtp);
-        // }
+        Some(msg::arg::Command::Reply(seq, all, paths)) => {
+            return msg::handler::reply(seq, all, paths, &account, &output, &mut imap, &mut smtp);
+        }
         // Some(msg::arg::Command::Save(mbox, msg)) => {
         //     return msg::handler::save(mbox, msg, &mut imap);
         // }

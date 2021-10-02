@@ -8,11 +8,36 @@ use std::{
 };
 
 use crate::{
-    domain::msg,
+    domain::msg::{self, Tpl},
     ui::choice::{self, PreEditChoice},
 };
 
-pub fn open_editor_with_tpl(tpl: &[u8]) -> Result<String> {
+pub fn open_with_tpl(tpl: Tpl) -> Result<Tpl> {
+    let path = msg::utils::draft_path();
+
+    debug!("create draft");
+    File::create(&path)
+        .context(format!("cannot create draft file `{:?}`", path))?
+        .write(tpl.as_bytes())
+        .context(format!("cannot write draft file `{:?}`", path))?;
+
+    debug!("open editor");
+    Command::new(env::var("EDITOR").context("cannot find `$EDITOR` env var")?)
+        .arg(&path)
+        .status()
+        .context("cannot launch editor")?;
+
+    debug!("read draft");
+    let mut draft = String::new();
+    File::open(&path)
+        .context(format!("cannot open draft file `{:?}`", path))?
+        .read_to_string(&mut draft)
+        .context(format!("cannot read draft file `{:?}`", path))?;
+
+    Ok(Tpl(draft))
+}
+
+pub fn open_editor_with_bytes(tpl: &[u8]) -> Result<String> {
     let path = msg::utils::draft_path();
     if path.exists() {
         debug!("draft found");

@@ -11,7 +11,7 @@ use crate::domain::msg;
 type Seq<'a> = &'a str;
 type All = bool;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct TplOverride<'a> {
     pub subject: Option<&'a str>,
     pub from: Option<Vec<&'a str>>,

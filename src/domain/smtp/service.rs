@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+
 use anyhow::Result;
 use lettre::{
     self,
@@ -9,10 +11,10 @@ use lettre::{
 };
 use log::debug;
 
-use crate::config::entity::Account;
+use crate::{config::entity::Account, domain::msg::Msg};
 
 pub trait SmtpServiceInterface {
-    fn send(&mut self, msg: &lettre::Message) -> Result<()>;
+    fn send(&mut self, msg: &Msg) -> Result<()>;
 }
 
 pub struct SmtpService<'a> {
@@ -55,8 +57,9 @@ impl<'a> SmtpService<'a> {
 }
 
 impl<'a> SmtpServiceInterface for SmtpService<'a> {
-    fn send(&mut self, msg: &lettre::Message) -> Result<()> {
-        self.transport()?.send(msg)?;
+    fn send(&mut self, msg: &Msg) -> Result<()> {
+        debug!("sending message…");
+        self.transport()?.send(&msg.try_into()?)?;
         Ok(())
     }
 }

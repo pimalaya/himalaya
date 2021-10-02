@@ -3,16 +3,10 @@
 //! This module gathers all message commands.  
 
 use anyhow::{Context, Result};
-use atty::Stream;
 use imap::types::Flag;
 use lettre::message::header::ContentTransferEncoding;
 use log::{debug, trace};
-use std::{
-    borrow::Cow,
-    convert::TryFrom,
-    fs,
-    io::{self, BufRead},
-};
+use std::{borrow::Cow, convert::TryFrom, fs};
 use url::Url;
 
 use crate::{
@@ -20,96 +14,12 @@ use crate::{
     domain::{
         imap::service::ImapServiceInterface,
         mbox::entity::Mbox,
-        msg::{self, entity::Msg, header::entity::Headers, Flags},
+        msg::{self, header::entity::Headers, Flags, Msg},
         smtp::service::SmtpServiceInterface,
     },
     output::service::OutputServiceInterface,
-    ui::{
-        choice::{self, PostEditChoice},
-        editor,
-    },
+    ui::choice::{self, PostEditChoice},
 };
-
-// TODO: move this function to the right folder
-fn msg_interaction<
-    OutputService: OutputServiceInterface,
-    ImapService: ImapServiceInterface,
-    SmtpService: SmtpServiceInterface,
->(
-    output: &OutputService,
-    msg: &mut Msg,
-    imap: &mut ImapService,
-    smtp: &mut SmtpService,
-) -> Result<bool> {
-    // let the user change the body a little bit first, before opening the prompt
-    msg.edit_body()?;
-
-    loop {
-        match choice::post_edit()? {
-            PostEditChoice::Send => {
-                debug!("sending message…");
-
-                // prepare the msg to be send
-                let sendable = match msg.to_sendable_msg() {
-                    Ok(sendable) => sendable,
-                    // In general if an error occured, then this is normally
-                    // due to a missing value of a header. So let's give the
-                    // user another try and give him/her the chance to fix
-                    // that :)
-                    Err(err) => {
-                        println!("{}", err);
-                        println!("Please reedit your msg to make it to a sendable message!");
-                        continue;
-                    }
-                };
-                smtp.send(&sendable)?;
-
-                // TODO: Gmail sent mailboxes are called `[Gmail]/Sent`
-                // which creates a conflict, fix this!
-
-                // let the server know, that the user sent a msg
-                msg.flags.insert(Flag::Seen);
-                let mbox = Mbox::from("Sent");
-                // imap.append_msg(&mbox, msg)?;
-
-                // remove the draft, since we sent it
-                msg::utils::remove_draft()?;
-                output.print("Message successfully sent")?;
-                break;
-            }
-            // edit the body of the msg
-            PostEditChoice::Edit => {
-                Msg::parse_from_str(msg, &editor::open_editor_with_draft()?)?;
-                continue;
-            }
-            PostEditChoice::LocalDraft => break,
-            PostEditChoice::RemoteDraft => {
-                debug!("saving to draft…");
-
-                msg.flags.insert(Flag::Seen);
-
-                let mbox = Mbox::from("Drafts");
-                // match imap.append_msg(&mbox, msg) {
-                //     Ok(_) => {
-                //         msg::utils::remove_draft()?;
-                //         output.print("Message successfully saved to Drafts")?;
-                //     }
-                //     Err(err) => {
-                //         output.print("Cannot save draft to the server")?;
-                //         return Err(err.into());
-                //     }
-                // };
-                break;
-            }
-            PostEditChoice::Discard => {
-                msg::utils::remove_draft()?;
-                break;
-            }
-        }
-    }
-
-    Ok(true)
-}
 
 /// Download all attachments from the given message UID to the user account downloads directory.
 pub fn attachments<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
@@ -180,20 +90,17 @@ pub fn forward<
     ImapService: ImapServiceInterface,
     SmtpService: SmtpServiceInterface,
 >(
-    uid: &str,
+    seq: &str,
     attachments_paths: Vec<&str>,
     account: &Account,
     output: &OutputService,
     imap: &mut ImapService,
     smtp: &mut SmtpService,
 ) -> Result<()> {
-    let mut msg = imap.get_msg(&uid)?.into_forward(&account)?;
-    attachments_paths
-        .iter()
-        .for_each(|path| msg.add_attachment(path));
-    debug!("found {} attachments", attachments_paths.len());
-    trace!("attachments: {:?}", attachments_paths);
-    msg_interaction(output, &mut msg, imap, smtp)?;
+    debug!("entering forward handler");
+    imap.find_msg(seq)?
+        .into_forward(account)?
+        .edit(account, output, imap, smtp)?;
     Ok(())
 }
 
@@ -317,7 +224,7 @@ pub fn reply<
     ImapService: ImapServiceInterface,
     SmtpService: SmtpServiceInterface,
 >(
-    uid: &str,
+    seq: &str,
     all: bool,
     attachments_paths: Vec<&str>,
     account: &Account,
@@ -325,14 +232,10 @@ pub fn reply<
     imap: &mut ImapService,
     smtp: &mut SmtpService,
 ) -> Result<()> {
-    let mut msg = imap.get_msg(&uid)?.into_reply(all, &account)?;
-    // Apply the given attachments to the reply-msg.
-    attachments_paths
-        .iter()
-        .for_each(|path| msg.add_attachment(path));
-    debug!("found {} attachments", attachments_paths.len());
-    trace!("attachments: {:#?}", attachments_paths);
-    msg_interaction(output, &mut msg, imap, smtp)?;
+    debug!("entering reply handler");
+    imap.find_msg(seq)?
+        .into_reply(all, account)?
+        .edit(account, output, imap, smtp)?;
     Ok(())
 }
 
@@ -342,9 +245,9 @@ pub fn save<ImapService: ImapServiceInterface>(
     msg: &str,
     imap: &mut ImapService,
 ) -> Result<()> {
-    let mbox = Mbox::try_from(mbox)?;
-    let mut msg = Msg::try_from(msg)?;
-    msg.flags.insert(Flag::Seen);
+    // let mbox = Mbox::try_from(mbox)?;
+    // let mut msg = Msg::try_from(msg)?;
+    // msg.flags.insert(Flag::Seen);
     // imap.append_msg(&mbox, &mut msg)?;
     Ok(())
 }
@@ -381,25 +284,25 @@ pub fn send<
     imap: &mut ImapService,
     smtp: &mut SmtpService,
 ) -> Result<()> {
-    let msg = if atty::is(Stream::Stdin) || output.is_json() {
-        msg.replace("\r", "").replace("\n", "\r\n")
-    } else {
-        io::stdin()
-            .lock()
-            .lines()
-            .filter_map(|ln| ln.ok())
-            .map(|ln| ln.to_string())
-            .collect::<Vec<String>>()
-            .join("\r\n")
-    };
-    let mut msg = Msg::try_from(msg.as_str())?;
+    // let msg = if atty::is(Stream::Stdin) || output.is_json() {
+    //     msg.replace("\r", "").replace("\n", "\r\n")
+    // } else {
+    //     io::stdin()
+    //         .lock()
+    //         .lines()
+    //         .filter_map(|ln| ln.ok())
+    //         .map(|ln| ln.to_string())
+    //         .collect::<Vec<String>>()
+    //         .join("\r\n")
+    // };
+    // let mut msg = Msg::try_from(msg.as_str())?;
     // send the message/msg
-    let sendable = msg.to_sendable_msg()?;
-    smtp.send(&sendable)?;
-    debug!("message sent!");
+    // let sendable = msg.to_sendable_msg()?;
+    // smtp.send(&sendable)?;
+    // debug!("message sent!");
     // add the message/msg to the Sent-Mailbox of the user
-    msg.flags.insert(Flag::Seen);
-    let mbox = Mbox::from("Sent");
+    // msg.flags.insert(Flag::Seen);
+    // let mbox = Mbox::from("Sent");
     // imap.append_msg(&mbox, &mut msg)?;
     Ok(())
 }

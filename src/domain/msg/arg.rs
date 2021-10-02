@@ -8,7 +8,7 @@ use log::{debug, trace};
 
 use crate::domain::{mbox, msg};
 
-type Uid<'a> = &'a str;
+type Seq<'a> = &'a str;
 type PageSize = usize;
 type Page = usize;
 type TargetMbox<'a> = Option<&'a str>;
@@ -21,14 +21,14 @@ type AttachmentsPaths<'a> = Vec<&'a str>;
 
 /// Message commands.
 pub enum Command<'a> {
-    Attachments(Uid<'a>),
-    Copy(Uid<'a>, TargetMbox<'a>),
-    Delete(Uid<'a>),
-    Forward(Uid<'a>, AttachmentsPaths<'a>),
+    Attachments(Seq<'a>),
+    Copy(Seq<'a>, TargetMbox<'a>),
+    Delete(Seq<'a>),
+    Forward(Seq<'a>, AttachmentsPaths<'a>),
     List(Option<PageSize>, Page),
-    Move(Uid<'a>, TargetMbox<'a>),
-    Read(Uid<'a>, Mime, Raw),
-    Reply(Uid<'a>, All, AttachmentsPaths<'a>),
+    Move(Seq<'a>, TargetMbox<'a>),
+    Read(Seq<'a>, Mime, Raw),
+    Reply(Seq<'a>, All, AttachmentsPaths<'a>),
     Save(TargetMbox<'a>, RawMsg<'a>),
     Search(Query, Option<PageSize>, Page),
     Send(RawMsg<'a>),
@@ -42,34 +42,34 @@ pub enum Command<'a> {
 pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
     if let Some(m) = m.subcommand_matches("attachments") {
         debug!("attachments command matched");
-        let uid = m.value_of("uid").unwrap();
-        debug!("uid: {}", uid);
-        return Ok(Some(Command::Attachments(uid)));
+        let seq = m.value_of("seq").unwrap();
+        trace!("seq: {}", seq);
+        return Ok(Some(Command::Attachments(seq)));
     }
 
     if let Some(m) = m.subcommand_matches("copy") {
         debug!("copy command matched");
-        let uid = m.value_of("uid").unwrap();
-        debug!("uid: {}", uid);
+        let seq = m.value_of("seq").unwrap();
+        trace!("seq: {}", seq);
         let target = m.value_of("target");
-        debug!("target mailbox: `{:?}`", target);
-        return Ok(Some(Command::Copy(uid, target)));
+        trace!(r#"target mailbox: "{:?}""#, target);
+        return Ok(Some(Command::Copy(seq, target)));
     }
 
     if let Some(m) = m.subcommand_matches("delete") {
         debug!("copy command matched");
-        let uid = m.value_of("uid").unwrap();
-        debug!("uid: {}", uid);
-        return Ok(Some(Command::Delete(uid)));
+        let seq = m.value_of("seq").unwrap();
+        trace!("seq: {}", seq);
+        return Ok(Some(Command::Delete(seq)));
     }
 
     if let Some(m) = m.subcommand_matches("forward") {
         debug!("forward command matched");
-        let uid = m.value_of("uid").unwrap();
+        let seq = m.value_of("seq").unwrap();
+        trace!("seq: {}", seq);
         let paths: Vec<&str> = m.values_of("attachments").unwrap_or_default().collect();
-        debug!("attachments paths: {:?}", paths);
-        debug!("uid: {}", uid);
-        return Ok(Some(Command::Forward(uid, paths)));
+        trace!("attachments paths: {:?}", paths);
+        return Ok(Some(Command::Forward(seq, paths)));
     }
 
     if let Some(m) = m.subcommand_matches("list") {
@@ -89,32 +89,33 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
 
     if let Some(m) = m.subcommand_matches("move") {
         debug!("move command matched");
-        let uid = m.value_of("uid").unwrap();
-        debug!("uid: {}", uid);
+        let seq = m.value_of("seq").unwrap();
+        trace!("seq: {}", seq);
         let target = m.value_of("target");
-        debug!("target mailbox: `{:?}`", target);
-        return Ok(Some(Command::Move(uid, target)));
+        trace!(r#"target mailbox: "{:?}""#, target);
+        return Ok(Some(Command::Move(seq, target)));
     }
 
     if let Some(m) = m.subcommand_matches("read") {
-        let uid = m.value_of("uid").unwrap();
-        debug!("uid: {}", uid);
+        debug!("read command matched");
+        let seq = m.value_of("seq").unwrap();
+        trace!("seq: {}", seq);
         let mime = format!("text/{}", m.value_of("mime-type").unwrap());
-        debug!("mime: {}", mime);
+        trace!("mime: {}", mime);
         let raw = m.is_present("raw");
-        debug!("raw: {}", raw);
-        return Ok(Some(Command::Read(uid, mime, raw)));
+        trace!("raw: {}", raw);
+        return Ok(Some(Command::Read(seq, mime, raw)));
     }
 
     if let Some(m) = m.subcommand_matches("reply") {
         debug!("reply command matched");
-        let uid = m.value_of("uid").unwrap();
-        debug!("uid: {}", uid);
+        let seq = m.value_of("seq").unwrap();
+        trace!("seq: {}", seq);
         let all = m.is_present("reply-all");
-        debug!("reply all: {}", all);
+        trace!("reply all: {}", all);
         let paths: Vec<&str> = m.values_of("attachments").unwrap_or_default().collect();
-        debug!("attachments paths: {:?}", paths);
-        return Ok(Some(Command::Reply(uid, all, paths)));
+        trace!("attachments paths: {:#?}", paths);
+        return Ok(Some(Command::Reply(seq, all, paths)));
     }
 
     if let Some(m) = m.subcommand_matches("save") {
@@ -169,14 +170,14 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
     if let Some(m) = m.subcommand_matches("send") {
         debug!("send command matched");
         let msg = m.value_of("message").unwrap_or_default();
-        debug!("message: {}", msg);
+        trace!("message: {}", msg);
         return Ok(Some(Command::Send(msg)));
     }
 
     if let Some(m) = m.subcommand_matches("write") {
         debug!("write command matched");
         let attachment_paths: Vec<&str> = m.values_of("attachments").unwrap_or_default().collect();
-        debug!("attachments paths: {:?}", attachment_paths);
+        trace!("attachments paths: {:?}", attachment_paths);
         return Ok(Some(Command::Write(attachment_paths)));
     }
 

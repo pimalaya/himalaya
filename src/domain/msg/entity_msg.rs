@@ -2,10 +2,22 @@ use ammonia;
 use anyhow::{anyhow, Context, Error, Result};
 use chrono::{DateTime, FixedOffset};
 use htmlescape;
+use imap::types::Flag;
+use lettre::message::header::ContentTransferEncoding;
+use log::{debug, warn};
 use regex::Regex;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
-use crate::msg::{Flags, Parts};
+use crate::{
+    config::entity::Account,
+    domain::{imap::ImapServiceInterface, mbox::entity::Mbox, smtp::service::SmtpServiceInterface},
+    msg::{self, Flags, Parts, Tpl, TplOverride},
+    output::service::OutputServiceInterface,
+    ui::{
+        choice::{self, PostEditChoice},
+        editor,
+    },
+};
 
 type Addr = lettre::message::Mailbox;
 
@@ -30,6 +42,7 @@ pub struct Msg {
     pub bcc: Option<Vec<Addr>>,
     pub in_reply_to: Option<String>,
     pub message_id: Option<String>,
+    pub encoding: ContentTransferEncoding,
 
     /// The internal date of the message.
     ///
@@ -39,10 +52,10 @@ pub struct Msg {
 }
 
 impl Msg {
-    pub fn join_text_parts(&self) -> String {
+    pub fn join_text_parts(&self, mime: &str) -> String {
         let rg = Regex::new(r"(\r?\n){2,}").unwrap();
         self.parts
-            .get("text/plain")
+            .get(mime)
             .map(|parts| parts.join("\n\n"))
             .map(|text| {
                 ammonia::Builder::new()
@@ -55,8 +68,421 @@ impl Msg {
                 Err(_) => text,
             })
             .or_else(|| self.parts.get("text/html").map(|parts| parts.join("\n\n")))
-            .map(|text| rg.replace_all(&text.trim(), "\n\n").to_string())
+            .map(|text| rg.replace_all(&text, "\n\n").to_string())
             .unwrap_or_default()
+    }
+
+    pub fn into_reply(mut self, all: bool, account: &Account) -> Result<Self> {
+        let account_addr: Addr = account.address().parse()?;
+
+        // Message-Id
+        self.message_id = None;
+
+        // In-Reply-To
+        self.in_reply_to = self.message_id.to_owned();
+
+        // From
+        self.from = Some(vec![account_addr.to_owned()]);
+
+        // To
+        let addrs = self
+            .reply_to
+            .as_ref()
+            .or_else(|| self.from.as_ref())
+            .map(|addrs| {
+                addrs
+                    .clone()
+                    .into_iter()
+                    .filter(|addr| addr != &account_addr)
+            });
+        if all {
+            self.to = addrs.map(|addrs| addrs.collect());
+        } else {
+            self.to = addrs
+                .and_then(|mut addrs| addrs.next())
+                .map(|addr| vec![addr]);
+        }
+
+        // Cc & Bcc
+        if !all {
+            self.cc = None;
+            self.bcc = None;
+        }
+
+        // Subject
+        if !self.subject.starts_with("Re:") {
+            self.subject = format!("Re: {}", self.subject);
+        }
+
+        // Text plain parts
+        {
+            let date = self
+                .date
+                .as_ref()
+                .map(|date| date.format("%d %b %Y, at %H:%M").to_string())
+                .unwrap_or("unknown date".into());
+            let sender = self
+                .reply_to
+                .as_ref()
+                .or(self.from.as_ref())
+                .and_then(|addrs| addrs.first())
+                .map(|addr| addr.name.to_owned().unwrap_or(addr.email.to_string()))
+                .unwrap_or("unknown sender".into());
+            let mut body = format!("\n\nOn {}, {} wrote:\n", date, sender);
+
+            let mut glue = "";
+            for line in self.join_text_parts("text/plain").trim().lines() {
+                if line == "-- \n" {
+                    break;
+                }
+                body.push_str(glue);
+                body.push_str(">");
+                body.push_str(if line.starts_with(">") { "" } else { " " });
+                body.push_str(line);
+                glue = "\n";
+            }
+
+            self.parts.insert("text/plain".into(), vec![body]);
+        }
+
+        // Text HTML parts
+        {
+            let date = self
+                .date
+                .as_ref()
+                .map(|date| date.format("%d %b %Y, at %H:%M").to_string())
+                .unwrap_or("unknown date".into());
+            let sender = self
+                .reply_to
+                .as_ref()
+                .or(self.from.as_ref())
+                .and_then(|addrs| addrs.first())
+                .map(|addr| addr.name.to_owned().unwrap_or(addr.email.to_string()))
+                .unwrap_or("unknown sender".into());
+            let mut body = format!("\n\nOn {}, {} wrote:\n", date, sender);
+
+            let mut glue = "";
+            for line in self.join_text_parts("text/html").trim().lines() {
+                if line == "-- \n" {
+                    break;
+                }
+                body.push_str(glue);
+                body.push_str(">");
+                body.push_str(if line.starts_with(">") { "" } else { " " });
+                body.push_str(line);
+                glue = "\n";
+            }
+
+            self.parts.insert("text/html".into(), vec![body]);
+        }
+
+        Ok(self)
+    }
+
+    pub fn into_forward(mut self, account: &Account) -> Result<Self> {
+        let account_addr: Addr = account.address().parse()?;
+
+        let prev_subject = self.subject.to_owned();
+        let prev_date = self.date.to_owned();
+        let prev_from = self.reply_to.to_owned().or_else(|| self.from.to_owned());
+        let prev_to = self.to.to_owned();
+
+        // Message-Id
+        self.message_id = None;
+
+        // In-Reply-To
+        self.in_reply_to = None;
+
+        // From
+        self.from = Some(vec![account_addr.to_owned()]);
+
+        // To
+        self.to = Some(vec![]);
+
+        // Cc
+        self.cc = None;
+
+        // Bcc
+        self.bcc = None;
+
+        // Subject
+        if !self.subject.starts_with("Fwd:") {
+            self.subject = format!("Fwd: {}", self.subject);
+        }
+
+        // Text plain parts
+        {
+            let mut body = String::default();
+            body.push_str("\n\n-------- Forwarded Message --------\n");
+            body.push_str(&format!("Subject: {}\n", prev_subject));
+            if let Some(date) = prev_date {
+                body.push_str(&format!("Date: {}\n", date.to_rfc2822()));
+            }
+            if let Some(addrs) = prev_from.as_ref() {
+                body.push_str("From: ");
+                let mut glue = "";
+                for addr in addrs {
+                    body.push_str(glue);
+                    body.push_str(&addr.to_string());
+                    glue = ", ";
+                }
+                body.push_str("\n");
+            }
+            if let Some(addrs) = prev_to.as_ref() {
+                body.push_str("To: ");
+                let mut glue = "";
+                for addr in addrs {
+                    body.push_str(glue);
+                    body.push_str(&addr.to_string());
+                    glue = ", ";
+                }
+                body.push_str("\n");
+            }
+            body.push_str("\n");
+            body.push_str(&self.join_text_parts("text/plain"));
+            self.parts.insert("text/plain".into(), vec![body]);
+        }
+
+        // Text HTML parts
+        {
+            let mut body = String::default();
+            body.push_str("\n\n-------- Forwarded Message --------\n");
+            body.push_str(&format!("Subject: {}\n", prev_subject));
+            if let Some(date) = prev_date {
+                body.push_str(&format!("Date: {}\n", date.to_rfc2822()));
+            }
+            if let Some(addrs) = prev_from.as_ref() {
+                body.push_str("From: ");
+                let mut glue = "";
+                for addr in addrs {
+                    body.push_str(glue);
+                    body.push_str(&addr.to_string());
+                    glue = ", ";
+                }
+                body.push_str("\n");
+            }
+            if let Some(addrs) = prev_to.as_ref() {
+                body.push_str("To: ");
+                let mut glue = "";
+                for addr in addrs {
+                    body.push_str(glue);
+                    body.push_str(&addr.to_string());
+                    glue = ", ";
+                }
+                body.push_str("\n");
+            }
+            body.push_str("\n");
+            body.push_str(&self.join_text_parts("text/html"));
+            self.parts.insert("text/html".into(), vec![body]);
+        }
+
+        Ok(self)
+    }
+
+    fn _edit(&self, account: &Account) -> Result<Self> {
+        let tpl = Tpl::from_msg(TplOverride::default(), self, account);
+        let tpl = editor::open_with_tpl(tpl)?;
+        Self::try_from(tpl)
+    }
+
+    pub fn edit<
+        OutputService: OutputServiceInterface,
+        ImapService: ImapServiceInterface,
+        SmtpService: SmtpServiceInterface,
+    >(
+        &self,
+        account: &Account,
+        output: &OutputService,
+        imap: &mut ImapService,
+        smtp: &mut SmtpService,
+    ) -> Result<()> {
+        loop {
+            let mut msg = self._edit(account)?;
+            match choice::post_edit()? {
+                PostEditChoice::Send => {
+                    smtp.send(&msg)?;
+                    // let the server know, that the user sent a msg
+                    // imap.add_flags("Sent", Flags::from(vec![Flag::Seen]));
+                    // msg.flags.insert(Flag::Seen);
+                    // let mbox = Mbox::from("Sent");
+                    // imap.append_msg(&mbox, &mut msg)?;
+
+                    msg::utils::remove_draft()?;
+                    output.print("Message successfully sent")?;
+                    break;
+                }
+                PostEditChoice::Edit => {
+                    continue;
+                }
+                PostEditChoice::LocalDraft => break,
+                PostEditChoice::RemoteDraft => {
+                    debug!("saving to draft…");
+
+                    msg.flags.insert(Flag::Seen);
+                    let mbox = Mbox::from("Drafts");
+                    imap.append_msg(&mbox, &mut msg)?;
+                    output.print("Message successfully saved to Drafts")?;
+                    break;
+                }
+                PostEditChoice::Discard => {
+                    msg::utils::remove_draft()?;
+                    break;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl TryFrom<Tpl> for Msg {
+    type Error = Error;
+
+    fn try_from(tpl: Tpl) -> Result<Msg> {
+        let mut msg = Msg::default();
+
+        let parsed_msg =
+            mailparse::parse_mail(tpl.as_bytes()).context("cannot parse message from template")?;
+
+        for header in parsed_msg.get_headers() {
+            let key = header.get_key();
+            let val = header.get_value();
+            let val = val.trim();
+
+            match key.as_str() {
+                "Message-Id" | _ if key.eq_ignore_ascii_case("message-id") => {
+                    msg.message_id = Some(val.to_owned())
+                }
+                "Content-Transfer-Encoding" | _
+                    if key.eq_ignore_ascii_case("content-transfer-encoding") =>
+                {
+                    match val {
+                        "8bit" | _ if val.eq_ignore_ascii_case("8bit") => {
+                            msg.encoding = ContentTransferEncoding::EightBit
+                        }
+                        "7bit" | _ if val.eq_ignore_ascii_case("7bit") => {
+                            msg.encoding = ContentTransferEncoding::SevenBit
+                        }
+                        "Quoted-Printable" | _ if val.eq_ignore_ascii_case("quoted-printable") => {
+                            msg.encoding = ContentTransferEncoding::QuotedPrintable
+                        }
+                        "Base64" | _ if val.eq_ignore_ascii_case("base64") => {
+                            msg.encoding = ContentTransferEncoding::Base64
+                        }
+                        _ => warn!("cannot parse encoding {}, default to Quoted-Printable", val),
+                    };
+                }
+                "From" | _ if key.eq_ignore_ascii_case("from") => {
+                    msg.from = Some(
+                        val.split(',')
+                            .filter_map(|addr| addr.parse().ok())
+                            .collect::<Vec<_>>(),
+                    );
+                }
+                "To" | _ if key.eq_ignore_ascii_case("to") => {
+                    msg.to = Some(
+                        val.split(',')
+                            .filter_map(|addr| addr.parse().ok())
+                            .collect::<Vec<_>>(),
+                    );
+                }
+                "Reply-To" | _ if key.eq_ignore_ascii_case("reply-to") => {
+                    msg.reply_to = Some(
+                        val.split(',')
+                            .filter_map(|addr| addr.parse().ok())
+                            .collect::<Vec<_>>(),
+                    );
+                }
+                "In-Reply-To" | _ if key.eq_ignore_ascii_case("in-reply-to") => {
+                    msg.in_reply_to = Some(val.to_owned())
+                }
+                "Cc" | _ if key.eq_ignore_ascii_case("cc") => {
+                    msg.cc = Some(
+                        val.split(',')
+                            .filter_map(|addr| addr.parse().ok())
+                            .collect::<Vec<_>>(),
+                    );
+                }
+                "Bcc" | _ if key.eq_ignore_ascii_case("bcc") => {
+                    msg.bcc = Some(
+                        val.split(',')
+                            .filter_map(|addr| addr.parse().ok())
+                            .collect::<Vec<_>>(),
+                    );
+                }
+                "Subject" | _ if key.eq_ignore_ascii_case("subject") => {
+                    msg.subject = val.to_owned()
+                }
+                _ => (),
+            }
+        }
+
+        msg.parts.insert(
+            "text/plain".into(),
+            vec![parsed_msg
+                .get_body()
+                .context("cannot get body from parsed message")?],
+        );
+
+        Ok(msg)
+    }
+}
+
+impl TryInto<lettre::Message> for &Msg {
+    type Error = Error;
+
+    fn try_into(self) -> Result<lettre::Message> {
+        let mut msg_builder = lettre::Message::builder()
+            .message_id(self.message_id.to_owned())
+            .subject(self.subject.to_owned());
+
+        if let Some(id) = self.in_reply_to.as_ref() {
+            msg_builder = msg_builder.in_reply_to(id.to_owned());
+        };
+
+        if let Some(addrs) = self.from.as_ref() {
+            msg_builder = addrs
+                .iter()
+                .fold(msg_builder, |builder, addr| builder.from(addr.to_owned()))
+        };
+
+        if let Some(addrs) = self.to.as_ref() {
+            msg_builder = addrs
+                .iter()
+                .fold(msg_builder, |builder, addr| builder.to(addr.to_owned()))
+        };
+
+        if let Some(addrs) = self.reply_to.as_ref() {
+            msg_builder = addrs.iter().fold(msg_builder, |builder, addr| {
+                builder.reply_to(addr.to_owned())
+            })
+        };
+
+        if let Some(addrs) = self.cc.as_ref() {
+            msg_builder = addrs
+                .iter()
+                .fold(msg_builder, |builder, addr| builder.cc(addr.to_owned()))
+        };
+
+        if let Some(addrs) = self.bcc.as_ref() {
+            msg_builder = addrs
+                .iter()
+                .fold(msg_builder, |builder, addr| builder.bcc(addr.to_owned()))
+        };
+
+        let mut msg_parts = lettre::message::MultiPart::mixed().build();
+
+        if let Some(parts) = self.parts.get("text/plain") {
+            msg_parts = msg_parts.singlepart(
+                lettre::message::SinglePart::builder()
+                    .header(lettre::message::header::ContentType::TEXT_PLAIN)
+                    .header(self.encoding)
+                    .body(parts.join("\n\n")),
+            );
+        }
+
+        Ok(msg_builder
+            .multipart(msg_parts)
+            .context("cannot build sendable message")?)
     }
 }
 
@@ -152,13 +578,14 @@ impl<'a> TryFrom<&'a imap::types::Fetch> for Msg {
             id,
             flags,
             subject,
+            message_id,
             from,
             reply_to,
+            in_reply_to,
             to,
             cc,
             bcc,
-            in_reply_to,
-            message_id,
+            encoding: ContentTransferEncoding::QuotedPrintable,
             date,
             parts,
         })
