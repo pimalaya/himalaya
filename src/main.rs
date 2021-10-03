@@ -59,9 +59,9 @@ fn main() -> Result<()> {
     // Check completion match BEFORE entities and services initialization.
     // Linked issue: https://github.com/soywod/himalaya/issues/115.
     match compl::arg::matches(&m)? {
-        // Some(compl::arg::Command::Generate(shell)) => {
-        //     return compl::handler::generate(create_app(), shell);
-        // }
+        Some(compl::arg::Command::Generate(shell)) => {
+            return compl::handler::generate(create_app(), shell);
+        }
         _ => (),
     }
 
@@ -96,21 +96,21 @@ fn main() -> Result<()> {
         // Some(msg::arg::Command::Attachments(uid)) => {
         //     return msg::handler::attachments(uid, &account, &output, &mut imap);
         // }
-        // Some(msg::arg::Command::Copy(uid, mbox)) => {
-        //     return msg::handler::copy(uid, mbox, &output, &mut imap);
-        // }
-        // Some(msg::arg::Command::Delete(uid)) => {
-        //     return msg::handler::delete(uid, &output, &mut imap);
-        // }
+        Some(msg::arg::Command::Copy(seq, target)) => {
+            return msg::handler::copy(seq, target, &output, &mut imap);
+        }
+        Some(msg::arg::Command::Delete(seq)) => {
+            return msg::handler::delete(seq, &output, &mut imap);
+        }
         Some(msg::arg::Command::Forward(seq, paths)) => {
             return msg::handler::forward(seq, paths, &account, &output, &mut imap, &mut smtp);
         }
         Some(msg::arg::Command::List(page_size, page)) => {
             return msg::handler::list(page_size, page, &account, &output, &mut imap);
         }
-        // Some(msg::arg::Command::Move(uid, mbox)) => {
-        //     return msg::handler::move_(uid, mbox, &output, &mut imap);
-        // }
+        Some(msg::arg::Command::Move(seq, target)) => {
+            return msg::handler::move_(seq, target, &output, &mut imap);
+        }
         // Some(msg::arg::Command::Read(uid, mime, raw)) => {
         //     return msg::handler::read(uid, mime, raw, &output, &mut imap);
         // }
@@ -126,9 +126,9 @@ fn main() -> Result<()> {
         // Some(msg::arg::Command::Send(msg)) => {
         //     return msg::handler::send(msg, &output, &mut imap, &mut smtp);
         // }
-        // Some(msg::arg::Command::Write(paths)) => {
-        //     return msg::handler::write(paths, &account, &output, &mut imap, &mut smtp);
-        // }
+        Some(msg::arg::Command::Write(paths)) => {
+            return msg::handler::write(paths, &account, &output, &mut imap, &mut smtp);
+        }
         Some(msg::arg::Command::Flag(m)) => match m {
             Some(msg::flag::arg::Command::Set(seq_range, flags)) => {
                 return msg::flag::handler::set(seq_range, flags, &output, &mut imap);

@@ -14,11 +14,10 @@ use crate::{
     domain::{
         imap::service::ImapServiceInterface,
         mbox::entity::Mbox,
-        msg::{self, header::entity::Headers, Flags, Msg},
+        msg::{header::entity::Headers, Flags, Msg},
         smtp::service::SmtpServiceInterface,
     },
     output::service::OutputServiceInterface,
-    ui::choice::{self, PostEditChoice},
 };
 
 /// Download all attachments from the given message UID to the user account downloads directory.
@@ -53,34 +52,38 @@ pub fn attachments<OutputService: OutputServiceInterface, ImapService: ImapServi
     Ok(())
 }
 
-/// Copy the given message UID from the selected mailbox to the targetted mailbox.
+/// Copy a message from a mailbox to another.
 pub fn copy<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
-    uid: &str,
-    mbox: Option<&str>,
+    // The sequence number of the message to copy
+    seq: &str,
+    // The mailbox to copy the message in
+    target: Option<&str>,
     output: &OutputService,
     imap: &mut ImapService,
 ) -> Result<()> {
-    let target = Mbox::try_from(mbox)?;
-    let mut msg = imap.get_msg(&uid)?;
+    let target = Mbox::try_from(target)?;
+    let mut msg = imap.find_msg(&seq)?;
+
+    // Append message to targetted mailbox
     msg.flags.insert(Flag::Seen);
-    // imap.append_msg(&target, &mut msg)?;
+    imap.append_msg(&target, msg)?;
+
     output.print(format!(
         r#"Message {} successfully copied to folder "{}""#,
-        uid, target
+        seq, target
     ))?;
     Ok(())
 }
 
-/// Delete the given message UID from the selected mailbox.
+/// Delete messages matching the given sequence range.
 pub fn delete<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
-    uid: &str,
+    seq: &str,
     output: &OutputService,
     imap: &mut ImapService,
 ) -> Result<()> {
-    let flags = Flags::try_from(vec![Flag::Seen, Flag::Deleted])?;
-    imap.add_flags(uid, &flags)?;
+    imap.add_flags(seq, &Flags::try_from(vec![Flag::Seen, Flag::Deleted])?)?;
     imap.expunge()?;
-    output.print(format!("Message(s) {} successfully deleted", uid))?;
+    output.print(format!("Message(s) {} successfully deleted", seq))?;
     Ok(())
 }
 
@@ -177,26 +180,31 @@ pub fn mailto<
     Ok(())
 }
 
-/// Move the given message UID from the selected mailbox to the targetted mailbox.
+/// Move a message from a mailbox to another.
 pub fn move_<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
-    uid: &str,
-    mbox: Option<&str>,
+    // The sequence number of the message to move
+    seq: &str,
+    // The mailbox to move the message in
+    target: Option<&str>,
     output: &OutputService,
     imap: &mut ImapService,
 ) -> Result<()> {
-    let target = Mbox::try_from(mbox)?;
-    let mut msg = imap.get_msg(&uid)?;
-    // create the msg in the target-msgbox
+    let target = Mbox::try_from(target)?;
+    let mut msg = imap.find_msg(&seq)?;
+
+    // Append message to targetted mailbox
     msg.flags.insert(Flag::Seen);
-    // imap.append_msg(&target, &mut msg)?;
+    imap.append_msg(&target, msg)?;
+
+    // Flag as deleted the original message
+    let flags = Flags::try_from(vec![Flag::Seen, Flag::Deleted])?;
+    imap.add_flags(seq, &flags)?;
+    imap.expunge()?;
+
     output.print(format!(
         r#"Message {} successfully moved to folder "{}""#,
-        uid, target
+        seq, target
     ))?;
-    // delete the msg in the old mailbox
-    let flags = Flags::try_from(vec![Flag::Seen, Flag::Deleted])?;
-    imap.add_flags(uid, &flags)?;
-    imap.expunge()?;
     Ok(())
 }
 
@@ -313,23 +321,14 @@ pub fn write<
     ImapService: ImapServiceInterface,
     SmtpService: SmtpServiceInterface,
 >(
-    attachments_paths: Vec<&str>,
+    // FIXME
+    _attachments_paths: Vec<&str>,
     account: &Account,
     output: &OutputService,
     imap: &mut ImapService,
     smtp: &mut SmtpService,
 ) -> Result<()> {
-    // let mut msg = Msg::new_with_headers(
-    //     &account,
-    //     Headers {
-    //         subject: Some(String::new()),
-    //         to: Vec::new(),
-    //         ..Headers::default()
-    //     },
-    // );
-    // attachments_paths
-    //     .iter()
-    //     .for_each(|path| msg.add_attachment(path));
-    // msg_interaction(output, &mut msg, imap, smtp)?;
+    debug!("entering write handler");
+    Msg::default().edit(account, output, imap, smtp)?;
     Ok(())
 }

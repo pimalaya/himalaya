@@ -5,7 +5,12 @@
 use anyhow::{anyhow, Context, Result};
 use log::{debug, trace};
 use native_tls::{TlsConnector, TlsStream};
-use std::{collections::HashSet, convert::TryFrom, iter::FromIterator, net::TcpStream};
+use std::{
+    collections::HashSet,
+    convert::{TryFrom, TryInto},
+    iter::FromIterator,
+    net::TcpStream,
+};
 
 use crate::{
     config::entity::{Account, Config},
@@ -26,7 +31,7 @@ pub trait ImapServiceInterface {
     fn find_msgs(&mut self, query: &str, page_size: &usize, page: &usize) -> Result<Envelopes>;
     fn get_msg(&mut self, seq: &str) -> Result<msg::entity::Msg>;
     fn find_msg(&mut self, seq: &str) -> Result<Msg>;
-    fn append_msg(&mut self, mbox: &Mbox, msg: &mut Msg) -> Result<()>;
+    fn append_msg(&mut self, mbox: &Mbox, msg: Msg) -> Result<()>;
     fn expunge(&mut self) -> Result<()>;
     fn logout(&mut self) -> Result<()>;
 
@@ -205,14 +210,13 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
         Ok(Msg::try_from(fetch)?)
     }
 
-    fn append_msg(&mut self, mbox: &Mbox, msg: &mut Msg) -> Result<()> {
-        // let body = msg.into_bytes()?;
-        // let flags: HashSet<imap::types::Flag<'static>> = (*msg.flags).clone();
-        // self.sess()?
-        //     .append(&mbox.name, &body)
-        //     .flags(flags)
-        //     .finish()
-        //     .context(format!("cannot append message to `{}`", mbox.name))?;
+    fn append_msg(&mut self, mbox: &Mbox, msg: Msg) -> Result<()> {
+        let msg_raw: Vec<u8> = (&msg).try_into()?;
+        self.sess()?
+            .append(&mbox.name, &msg_raw)
+            .flags(msg.flags.0)
+            .finish()
+            .context(format!(r#"cannot append message to "{}""#, mbox.name))?;
         Ok(())
     }
 

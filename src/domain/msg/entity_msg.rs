@@ -301,12 +301,10 @@ impl Msg {
             match choice::post_edit()? {
                 PostEditChoice::Send => {
                     smtp.send(&msg)?;
-                    // let the server know, that the user sent a msg
-                    // imap.add_flags("Sent", Flags::from(vec![Flag::Seen]));
-                    // msg.flags.insert(Flag::Seen);
-                    // let mbox = Mbox::from("Sent");
-                    // imap.append_msg(&mbox, &mut msg)?;
-
+                    imap.add_flags("Sent", &Flags::try_from(vec![Flag::Seen])?)?;
+                    msg.flags.insert(Flag::Seen);
+                    let mbox = Mbox::from("Sent");
+                    imap.append_msg(&mbox, msg)?;
                     msg::utils::remove_draft()?;
                     output.print("Message successfully sent")?;
                     break;
@@ -320,7 +318,7 @@ impl Msg {
 
                     msg.flags.insert(Flag::Seen);
                     let mbox = Mbox::from("Drafts");
-                    imap.append_msg(&mbox, &mut msg)?;
+                    imap.append_msg(&mbox, msg)?;
                     output.print("Message successfully saved to Drafts")?;
                     break;
                 }
@@ -483,6 +481,15 @@ impl TryInto<lettre::Message> for &Msg {
         Ok(msg_builder
             .multipart(msg_parts)
             .context("cannot build sendable message")?)
+    }
+}
+
+impl TryInto<Vec<u8>> for &Msg {
+    type Error = Error;
+
+    fn try_into(self) -> Result<Vec<u8>> {
+        let msg: lettre::Message = self.try_into()?;
+        Ok(msg.formatted())
     }
 }
 

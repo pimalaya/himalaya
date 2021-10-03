@@ -93,6 +93,8 @@ impl Tpl {
             tpl.push_str(sig);
         }
 
+        tpl.push_str("\n");
+
         let tpl = Tpl(tpl);
         trace!("template: {:#?}", tpl);
         tpl
