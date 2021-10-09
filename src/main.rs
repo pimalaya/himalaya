@@ -85,9 +85,9 @@ fn main() -> Result<()> {
 
     // Check mailbox matches.
     match mbox::arg::matches(&m)? {
-        // Some(mbox::arg::Command::List) => {
-        //     return mbox::handler::list(&output, &mut imap);
-        // }
+        Some(mbox::arg::Command::List) => {
+            return mbox::handler::list(&output, &mut imap);
+        }
         _ => (),
     }
 
@@ -111,21 +111,21 @@ fn main() -> Result<()> {
         Some(msg::arg::Command::Move(seq, target)) => {
             return msg::handler::move_(seq, target, &output, &mut imap);
         }
-        // Some(msg::arg::Command::Read(uid, mime, raw)) => {
-        //     return msg::handler::read(uid, mime, raw, &output, &mut imap);
-        // }
+        Some(msg::arg::Command::Read(seq, mime, raw)) => {
+            return msg::handler::read(seq, mime, raw, &output, &mut imap);
+        }
         Some(msg::arg::Command::Reply(seq, all, paths)) => {
             return msg::handler::reply(seq, all, paths, &account, &output, &mut imap, &mut smtp);
         }
-        // Some(msg::arg::Command::Save(mbox, msg)) => {
-        //     return msg::handler::save(mbox, msg, &mut imap);
-        // }
+        Some(msg::arg::Command::Save(target, msg)) => {
+            return msg::handler::save(target, msg, &mut imap);
+        }
         Some(msg::arg::Command::Search(query, page_size, page)) => {
             return msg::handler::search(query, page_size, page, &account, &output, &mut imap);
         }
-        // Some(msg::arg::Command::Send(msg)) => {
-        //     return msg::handler::send(msg, &output, &mut imap, &mut smtp);
-        // }
+        Some(msg::arg::Command::Send(raw_msg)) => {
+            return msg::handler::send(raw_msg, &output, &mut imap, &mut smtp);
+        }
         Some(msg::arg::Command::Write(paths)) => {
             return msg::handler::write(paths, &account, &output, &mut imap, &mut smtp);
         }

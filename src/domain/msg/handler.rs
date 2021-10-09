@@ -3,10 +3,16 @@
 //! This module gathers all message commands.  
 
 use anyhow::{Context, Result};
+use atty::Stream;
 use imap::types::Flag;
 use lettre::message::header::ContentTransferEncoding;
 use log::{debug, trace};
-use std::{borrow::Cow, convert::TryFrom, fs};
+use std::{
+    borrow::Cow,
+    convert::{TryFrom, TryInto},
+    fs,
+    io::{self, BufRead},
+};
 use url::Url;
 
 use crate::{
@@ -14,11 +20,13 @@ use crate::{
     domain::{
         imap::service::ImapServiceInterface,
         mbox::entity::Mbox,
-        msg::{header::entity::Headers, Flags, Msg},
+        msg::{header::entity::Headers, Flags, Msg, Tpl},
         smtp::service::SmtpServiceInterface,
     },
     output::service::OutputServiceInterface,
 };
+
+use super::PrintableMsg;
 
 /// Download all attachments from the given message UID to the user account downloads directory.
 pub fn attachments<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
@@ -52,17 +60,17 @@ pub fn attachments<OutputService: OutputServiceInterface, ImapService: ImapServi
 /// Copy a message from a mailbox to another.
 pub fn copy<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
     seq: &str,
-    target: Option<&str>,
+    mbox: Option<&str>,
     output: &OutputService,
     imap: &mut ImapService,
 ) -> Result<()> {
-    let target = Mbox::try_from(target)?;
+    let mbox = Mbox::try_from(mbox)?;
     let msg = imap.find_raw_msg(&seq)?;
     let flags = Flags::try_from(vec![Flag::Seen])?;
-    imap.append_raw_msg_with_flags(&target, &msg, flags)?;
+    imap.append_raw_msg_with_flags(&mbox, &msg, flags)?;
     output.print(format!(
         r#"Message {} successfully copied to folder "{}""#,
-        seq, target
+        seq, mbox
     ))?;
     Ok(())
 }
@@ -178,15 +186,15 @@ pub fn move_<OutputService: OutputServiceInterface, ImapService: ImapServiceInte
     // The sequence number of the message to move
     seq: &str,
     // The mailbox to move the message in
-    target: Option<&str>,
+    mbox: Option<&str>,
     output: &OutputService,
     imap: &mut ImapService,
 ) -> Result<()> {
     // Copy the message to targetted mailbox
-    let target = Mbox::try_from(target)?;
+    let mbox = Mbox::try_from(mbox)?;
     let msg = imap.find_raw_msg(&seq)?;
     let flags = Flags::try_from(vec![Flag::Seen])?;
-    imap.append_raw_msg_with_flags(&target, &msg, flags)?;
+    imap.append_raw_msg_with_flags(&mbox, &msg, flags)?;
 
     // Delete the original message
     let flags = Flags::try_from(vec![Flag::Seen, Flag::Deleted])?;
@@ -195,24 +203,25 @@ pub fn move_<OutputService: OutputServiceInterface, ImapService: ImapServiceInte
 
     output.print(format!(
         r#"Message {} successfully moved to folder "{}""#,
-        seq, target
+        seq, mbox
     ))
 }
 
-/// Read a message from the given UID.
+/// Read a message by its sequence number.
 pub fn read<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
-    uid: &str,
+    seq: &str,
     // TODO: use the mime to select the right body
     _mime: String,
     raw: bool,
     output: &OutputService,
     imap: &mut ImapService,
 ) -> Result<()> {
-    let msg = imap.get_msg(&uid)?;
     if raw {
-        output.print(msg.get_raw_as_string()?)?;
+        let msg = String::from_utf8(imap.find_raw_msg(&seq)?)?;
+        output.print(PrintableMsg { msg })?;
     } else {
-        // output.print(MsgSerialized::try_from(&msg)?)?;
+        let msg = imap.find_msg(&seq)?.join_text_parts();
+        output.print(PrintableMsg { msg })?;
     }
     Ok(())
 }
@@ -244,10 +253,9 @@ pub fn save<ImapService: ImapServiceInterface>(
     msg: &str,
     imap: &mut ImapService,
 ) -> Result<()> {
-    // let mbox = Mbox::try_from(mbox)?;
-    // let mut msg = Msg::try_from(msg)?;
-    // msg.flags.insert(Flag::Seen);
-    // imap.append_msg(&mbox, &mut msg)?;
+    let mbox = Mbox::try_from(mbox)?;
+    let flags = Flags::try_from(vec![Flag::Seen])?;
+    imap.append_raw_msg_with_flags(&mbox, msg.as_bytes(), flags)?;
     Ok(())
 }
 
@@ -278,32 +286,33 @@ pub fn send<
     ImapService: ImapServiceInterface,
     SmtpService: SmtpServiceInterface,
 >(
-    msg: &str,
+    raw_msg: &str,
     output: &OutputService,
     imap: &mut ImapService,
     smtp: &mut SmtpService,
 ) -> Result<()> {
-    // let msg = if atty::is(Stream::Stdin) || output.is_json() {
-    //     msg.replace("\r", "").replace("\n", "\r\n")
-    // } else {
-    //     io::stdin()
-    //         .lock()
-    //         .lines()
-    //         .filter_map(|ln| ln.ok())
-    //         .map(|ln| ln.to_string())
-    //         .collect::<Vec<String>>()
-    //         .join("\r\n")
-    // };
-    // let mut msg = Msg::try_from(msg.as_str())?;
-    // send the message/msg
-    // let sendable = msg.to_sendable_msg()?;
-    // smtp.send(&sendable)?;
-    // debug!("message sent!");
-    // add the message/msg to the Sent-Mailbox of the user
-    // msg.flags.insert(Flag::Seen);
-    // let mbox = Mbox::from("Sent");
-    // imap.append_msg(&mbox, &mut msg)?;
-    Ok(())
+    let raw_msg = if atty::is(Stream::Stdin) || output.is_json() {
+        raw_msg.replace("\r", "").replace("\n", "\r\n")
+    } else {
+        io::stdin()
+            .lock()
+            .lines()
+            .filter_map(|ln| ln.ok())
+            .map(|ln| ln.to_string())
+            .collect::<Vec<String>>()
+            .join("\r\n")
+    };
+
+    let tpl = Tpl(raw_msg.to_string());
+    let msg = Msg::try_from(tpl)?;
+    let envelope: lettre::address::Envelope = msg.try_into()?;
+    smtp.send_raw_msg(&envelope, raw_msg.as_bytes())?;
+    debug!("message sent!");
+
+    // Save message to sent folder
+    let mbox = Mbox::from("Sent");
+    let flags = Flags::try_from(vec![Flag::Seen])?;
+    imap.append_raw_msg_with_flags(&mbox, raw_msg.as_bytes(), flags)
 }
 
 /// Compose a new message.

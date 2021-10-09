@@ -6,7 +6,11 @@ use imap::types::Flag;
 use lettre::message::header::ContentTransferEncoding;
 use log::{debug, warn};
 use regex::Regex;
-use std::convert::{TryFrom, TryInto};
+use serde::Serialize;
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt,
+};
 
 use crate::{
     config::entity::Account,
@@ -348,7 +352,7 @@ impl Msg {
             let mut msg = self._edit(account)?;
             match choice::post_edit()? {
                 PostEditChoice::Send => {
-                    smtp.send(&msg)?;
+                    smtp.send_msg(&msg)?;
                     imap.add_flags("Sent", &Flags::try_from(vec![Flag::Seen])?)?;
                     msg.flags.insert(Flag::Seen);
                     let mbox = Mbox::from("Sent");
@@ -469,6 +473,30 @@ impl TryFrom<Tpl> for Msg {
         }));
 
         Ok(msg)
+    }
+}
+
+impl TryInto<lettre::address::Envelope> for Msg {
+    type Error = Error;
+
+    fn try_into(self) -> Result<lettre::address::Envelope> {
+        let from: Option<lettre::Address> = self
+            .from
+            .and_then(|addrs| addrs.into_iter().next())
+            .and_then(|addr| addr.to_string().parse::<lettre::Address>().ok());
+        let to = self
+            .to
+            .map(|addrs| {
+                addrs
+                    .iter()
+                    .filter_map(|addr| addr.to_string().parse::<lettre::Address>().ok())
+                    .collect()
+            })
+            .unwrap_or_default();
+        let envelope =
+            lettre::address::Envelope::new(from, to).context("cannot create envelope")?;
+
+        Ok(envelope)
     }
 }
 
@@ -689,4 +717,15 @@ pub fn parse_some_addrs(addrs: &Option<Vec<imap_proto::Address>>) -> Result<Opti
         Some(addrs) => Some(addrs?),
         None => None,
     })
+}
+
+#[derive(Debug, Serialize)]
+pub struct PrintableMsg {
+    pub msg: String,
+}
+
+impl fmt::Display for PrintableMsg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "{}", self.msg)
+    }
 }

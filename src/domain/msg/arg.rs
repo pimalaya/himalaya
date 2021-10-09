@@ -11,7 +11,7 @@ use crate::domain::{mbox, msg};
 type Seq<'a> = &'a str;
 type PageSize = usize;
 type Page = usize;
-type TargetMbox<'a> = Option<&'a str>;
+type Mbox<'a> = Option<&'a str>;
 type Mime = String;
 type Raw = bool;
 type All = bool;
@@ -22,14 +22,14 @@ type AttachmentsPaths<'a> = Vec<&'a str>;
 /// Message commands.
 pub enum Command<'a> {
     Attachments(Seq<'a>),
-    Copy(Seq<'a>, TargetMbox<'a>),
+    Copy(Seq<'a>, Mbox<'a>),
     Delete(Seq<'a>),
     Forward(Seq<'a>, AttachmentsPaths<'a>),
     List(Option<PageSize>, Page),
-    Move(Seq<'a>, TargetMbox<'a>),
+    Move(Seq<'a>, Mbox<'a>),
     Read(Seq<'a>, Mime, Raw),
     Reply(Seq<'a>, All, AttachmentsPaths<'a>),
-    Save(TargetMbox<'a>, RawMsg<'a>),
+    Save(Mbox<'a>, RawMsg<'a>),
     Search(Query, Option<PageSize>, Page),
     Send(RawMsg<'a>),
     Write(AttachmentsPaths<'a>),
