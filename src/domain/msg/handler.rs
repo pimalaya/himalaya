@@ -22,31 +22,29 @@ use crate::{
 
 /// Download all attachments from the given message UID to the user account downloads directory.
 pub fn attachments<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
-    uid: &str,
+    seq: &str,
     account: &Account,
     output: &OutputService,
     imap: &mut ImapService,
 ) -> Result<()> {
-    let msg = imap.get_msg(&uid)?;
-    let attachments = msg.attachments.clone();
+    let attachments = imap.find_msg(&seq)?.attachments();
+    let attachments_len = attachments.len();
 
     debug!(
         "{} attachment(s) found for message {}",
-        attachments.len(),
-        uid
+        attachments_len, seq
     );
 
-    for attachment in &attachments {
+    for attachment in attachments {
         let filepath = account.downloads_dir.join(&attachment.filename);
         debug!("downloading {}…", attachment.filename);
-        fs::write(&filepath, &attachment.body_raw)
+        fs::write(&filepath, &attachment.content)
             .context(format!("cannot download attachment {:?}", filepath))?;
     }
 
     output.print(format!(
         "{} attachment(s) successfully downloaded to {:?}",
-        attachments.len(),
-        account.downloads_dir
+        attachments_len, account.downloads_dir
     ))?;
 
     Ok(())

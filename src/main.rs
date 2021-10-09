@@ -93,9 +93,9 @@ fn main() -> Result<()> {
 
     // Check message matches.
     match msg::arg::matches(&m)? {
-        // Some(msg::arg::Command::Attachments(uid)) => {
-        //     return msg::handler::attachments(uid, &account, &output, &mut imap);
-        // }
+        Some(msg::arg::Command::Attachments(seq)) => {
+            return msg::handler::attachments(seq, &account, &output, &mut imap);
+        }
         Some(msg::arg::Command::Copy(seq, target)) => {
             return msg::handler::copy(seq, target, &output, &mut imap);
         }

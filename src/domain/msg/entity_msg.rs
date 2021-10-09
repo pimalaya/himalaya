@@ -10,7 +10,12 @@ use std::convert::{TryFrom, TryInto};
 
 use crate::{
     config::entity::Account,
-    domain::{imap::ImapServiceInterface, mbox::entity::Mbox, smtp::service::SmtpServiceInterface},
+    domain::{
+        imap::ImapServiceInterface,
+        mbox::entity::Mbox,
+        msg::{TextHtmlPart, TextPlainPart},
+        smtp::service::SmtpServiceInterface,
+    },
     msg::{self, Flags, Parts, Tpl, TplOverride},
     output::service::OutputServiceInterface,
     ui::{
@@ -18,6 +23,8 @@ use crate::{
         editor,
     },
 };
+
+use super::{BinaryPart, Part};
 
 type Addr = lettre::message::Mailbox;
 
@@ -52,24 +59,61 @@ pub struct Msg {
 }
 
 impl Msg {
-    pub fn join_text_parts(&self, mime: &str) -> String {
-        let rg = Regex::new(r"(\r?\n){2,}").unwrap();
+    pub fn attachments(&self) -> Vec<BinaryPart> {
         self.parts
-            .get(mime)
-            .map(|parts| parts.join("\n\n"))
-            .map(|text| {
-                ammonia::Builder::new()
-                    .tags(Default::default())
-                    .clean(&text)
-                    .to_string()
+            .iter()
+            .filter_map(|part| match part {
+                Part::Binary(part) => Some(part.clone()),
+                _ => None,
             })
-            .map(|text| match htmlescape::decode_html(&text) {
-                Ok(text) => text,
-                Err(_) => text,
+            .collect()
+    }
+
+    pub fn join_text_plain_parts(&self) -> String {
+        let text_parts = self
+            .parts
+            .iter()
+            .filter_map(|part| match part {
+                Part::TextPlain(part) => Some(part.content.to_owned()),
+                _ => None,
             })
-            .or_else(|| self.parts.get("text/html").map(|parts| parts.join("\n\n")))
-            .map(|text| rg.replace_all(&text, "\n\n").to_string())
-            .unwrap_or_default()
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        let text_parts = ammonia::Builder::new()
+            .tags(Default::default())
+            .clean(&text_parts)
+            .to_string();
+        let text_parts = match htmlescape::decode_html(&text_parts) {
+            Ok(text_parts) => text_parts,
+            Err(_) => text_parts,
+        };
+        text_parts
+    }
+
+    pub fn join_text_html_parts(&self) -> String {
+        let text_parts = self
+            .parts
+            .iter()
+            .filter_map(|part| match part {
+                Part::TextPlain(part) => Some(part.content.to_owned()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        let text_parts = Regex::new(r"(\r?\n){2,}")
+            .unwrap()
+            .replace_all(&text_parts, "\n\n")
+            .to_string();
+        text_parts
+    }
+
+    pub fn join_text_parts(&self) -> String {
+        let text_parts = self.join_text_plain_parts();
+        if text_parts.is_empty() {
+            self.join_text_html_parts()
+        } else {
+            text_parts
+        }
     }
 
     pub fn into_reply(mut self, all: bool, account: &Account) -> Result<Self> {
@@ -128,21 +172,22 @@ impl Msg {
                 .and_then(|addrs| addrs.first())
                 .map(|addr| addr.name.to_owned().unwrap_or(addr.email.to_string()))
                 .unwrap_or("unknown sender".into());
-            let mut body = format!("\n\nOn {}, {} wrote:\n", date, sender);
+            let mut content = format!("\n\nOn {}, {} wrote:\n", date, sender);
 
             let mut glue = "";
-            for line in self.join_text_parts("text/plain").trim().lines() {
+            for line in self.join_text_plain_parts().trim().lines() {
                 if line == "-- \n" {
                     break;
                 }
-                body.push_str(glue);
-                body.push_str(">");
-                body.push_str(if line.starts_with(">") { "" } else { " " });
-                body.push_str(line);
+                content.push_str(glue);
+                content.push_str(">");
+                content.push_str(if line.starts_with(">") { "" } else { " " });
+                content.push_str(line);
                 glue = "\n";
             }
 
-            self.parts.insert("text/plain".into(), vec![body]);
+            self.parts
+                .replace_text_plain_parts_with(TextPlainPart { content })
         }
 
         // Text HTML parts
@@ -159,21 +204,22 @@ impl Msg {
                 .and_then(|addrs| addrs.first())
                 .map(|addr| addr.name.to_owned().unwrap_or(addr.email.to_string()))
                 .unwrap_or("unknown sender".into());
-            let mut body = format!("\n\nOn {}, {} wrote:\n", date, sender);
+            let mut content = format!("\n\nOn {}, {} wrote:\n", date, sender);
 
             let mut glue = "";
-            for line in self.join_text_parts("text/html").trim().lines() {
+            for line in self.join_text_html_parts().trim().lines() {
                 if line == "-- \n" {
                     break;
                 }
-                body.push_str(glue);
-                body.push_str(">");
-                body.push_str(if line.starts_with(">") { "" } else { " " });
-                body.push_str(line);
+                content.push_str(glue);
+                content.push_str(">");
+                content.push_str(if line.starts_with(">") { "" } else { " " });
+                content.push_str(line);
                 glue = "\n";
             }
 
-            self.parts.insert("text/html".into(), vec![body]);
+            self.parts
+                .replace_text_html_parts_with(TextHtmlPart { content })
         }
 
         Ok(self)
@@ -212,68 +258,70 @@ impl Msg {
 
         // Text plain parts
         {
-            let mut body = String::default();
-            body.push_str("\n\n-------- Forwarded Message --------\n");
-            body.push_str(&format!("Subject: {}\n", prev_subject));
+            let mut content = String::default();
+            content.push_str("\n\n-------- Forwarded Message --------\n");
+            content.push_str(&format!("Subject: {}\n", prev_subject));
             if let Some(date) = prev_date {
-                body.push_str(&format!("Date: {}\n", date.to_rfc2822()));
+                content.push_str(&format!("Date: {}\n", date.to_rfc2822()));
             }
             if let Some(addrs) = prev_from.as_ref() {
-                body.push_str("From: ");
+                content.push_str("From: ");
                 let mut glue = "";
                 for addr in addrs {
-                    body.push_str(glue);
-                    body.push_str(&addr.to_string());
+                    content.push_str(glue);
+                    content.push_str(&addr.to_string());
                     glue = ", ";
                 }
-                body.push_str("\n");
+                content.push_str("\n");
             }
             if let Some(addrs) = prev_to.as_ref() {
-                body.push_str("To: ");
+                content.push_str("To: ");
                 let mut glue = "";
                 for addr in addrs {
-                    body.push_str(glue);
-                    body.push_str(&addr.to_string());
+                    content.push_str(glue);
+                    content.push_str(&addr.to_string());
                     glue = ", ";
                 }
-                body.push_str("\n");
+                content.push_str("\n");
             }
-            body.push_str("\n");
-            body.push_str(&self.join_text_parts("text/plain"));
-            self.parts.insert("text/plain".into(), vec![body]);
+            content.push_str("\n");
+            content.push_str(&self.join_text_plain_parts());
+            self.parts
+                .replace_text_plain_parts_with(TextPlainPart { content })
         }
 
         // Text HTML parts
         {
-            let mut body = String::default();
-            body.push_str("\n\n-------- Forwarded Message --------\n");
-            body.push_str(&format!("Subject: {}\n", prev_subject));
+            let mut content = String::default();
+            content.push_str("\n\n-------- Forwarded Message --------\n");
+            content.push_str(&format!("Subject: {}\n", prev_subject));
             if let Some(date) = prev_date {
-                body.push_str(&format!("Date: {}\n", date.to_rfc2822()));
+                content.push_str(&format!("Date: {}\n", date.to_rfc2822()));
             }
             if let Some(addrs) = prev_from.as_ref() {
-                body.push_str("From: ");
+                content.push_str("From: ");
                 let mut glue = "";
                 for addr in addrs {
-                    body.push_str(glue);
-                    body.push_str(&addr.to_string());
+                    content.push_str(glue);
+                    content.push_str(&addr.to_string());
                     glue = ", ";
                 }
-                body.push_str("\n");
+                content.push_str("\n");
             }
             if let Some(addrs) = prev_to.as_ref() {
-                body.push_str("To: ");
+                content.push_str("To: ");
                 let mut glue = "";
                 for addr in addrs {
-                    body.push_str(glue);
-                    body.push_str(&addr.to_string());
+                    content.push_str(glue);
+                    content.push_str(&addr.to_string());
                     glue = ", ";
                 }
-                body.push_str("\n");
+                content.push_str("\n");
             }
-            body.push_str("\n");
-            body.push_str(&self.join_text_parts("text/html"));
-            self.parts.insert("text/html".into(), vec![body]);
+            content.push_str("\n");
+            content.push_str(&self.join_text_html_parts());
+            self.parts
+                .replace_text_html_parts_with(TextHtmlPart { content })
         }
 
         Ok(self)
@@ -414,12 +462,11 @@ impl TryFrom<Tpl> for Msg {
             }
         }
 
-        msg.parts.insert(
-            "text/plain".into(),
-            vec![parsed_msg
+        msg.parts.push(Part::TextPlain(TextPlainPart {
+            content: parsed_msg
                 .get_body()
-                .context("cannot get body from parsed message")?],
-        );
+                .context("cannot get body from parsed message")?,
+        }));
 
         Ok(msg)
     }
@@ -469,12 +516,13 @@ impl TryInto<lettre::Message> for &Msg {
 
         let mut msg_parts = lettre::message::MultiPart::mixed().build();
 
-        if let Some(parts) = self.parts.get("text/plain") {
+        let text_parts = self.join_text_parts();
+        if !text_parts.is_empty() {
             msg_parts = msg_parts.singlepart(
                 lettre::message::SinglePart::builder()
                     .header(lettre::message::header::ContentType::TEXT_PLAIN)
                     .header(self.encoding)
-                    .body(parts.join("\n\n")),
+                    .body(text_parts),
             );
         }
 
