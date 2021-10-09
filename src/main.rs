@@ -74,12 +74,12 @@ fn main() -> Result<()> {
 
     // Check IMAP matches.
     match imap::arg::matches(&m)? {
-        // Some(imap::arg::Command::Notify(keepalive)) => {
-        //     return imap::handler::notify(keepalive, &config, &mut imap);
-        // }
-        // Some(imap::arg::Command::Watch(keepalive)) => {
-        //     return imap::handler::watch(keepalive, &mut imap);
-        // }
+        Some(imap::arg::Command::Notify(keepalive)) => {
+            return imap::handler::notify(keepalive, &config, &mut imap);
+        }
+        Some(imap::arg::Command::Watch(keepalive)) => {
+            return imap::handler::watch(keepalive, &mut imap);
+        }
         _ => (),
     }
 

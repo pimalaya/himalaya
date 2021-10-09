@@ -3,7 +3,6 @@
 //! This module exposes a service that can interact with IMAP servers.
 
 use anyhow::{anyhow, Context, Result};
-use imap::types::Flag;
 use log::{debug, trace};
 use native_tls::{TlsConnector, TlsStream};
 use std::{

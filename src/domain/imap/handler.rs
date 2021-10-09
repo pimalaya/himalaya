@@ -12,8 +12,7 @@ pub fn notify<ImapService: ImapServiceInterface>(
     config: &Config,
     imap: &mut ImapService,
 ) -> Result<()> {
-    imap.notify(&config, keepalive)?;
-    Ok(())
+    imap.notify(&config, keepalive)
 }
 
 /// Watch handler.
@@ -21,6 +20,5 @@ pub fn watch<ImapService: ImapServiceInterface>(
     keepalive: u64,
     imap: &mut ImapService,
 ) -> Result<()> {
-    imap.watch(keepalive)?;
-    Ok(())
+    imap.watch(keepalive)
 }
