@@ -156,7 +156,5 @@ fn main() -> Result<()> {
         _ => (),
     }
 
-    imap.logout()?;
-
-    Ok(())
+    imap.logout()
 }

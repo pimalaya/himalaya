@@ -17,6 +17,8 @@ impl Tpl {
     pub fn from_msg(opts: TplOverride, msg: &Msg, account: &Account) -> Tpl {
         let mut tpl = String::default();
 
+        tpl.push_str("Content-Type: text/plain; charset=utf-8\n");
+
         if let Some(in_reply_to) = msg.in_reply_to.as_ref() {
             tpl.push_str(&format!("In-Reply-To: {}\n", in_reply_to))
         }

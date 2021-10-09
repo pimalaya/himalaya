@@ -3,9 +3,10 @@ use anyhow::{anyhow, Context, Error, Result};
 use chrono::{DateTime, FixedOffset};
 use htmlescape;
 use imap::types::Flag;
-use lettre::message::header::ContentTransferEncoding;
-use log::{debug, warn};
+use lettre::message::{header::ContentTransferEncoding, SinglePart};
+use log::debug;
 use regex::Regex;
+use rfc2047_decoder;
 use serde::Serialize;
 use std::{
     convert::{TryFrom, TryInto},
@@ -53,7 +54,6 @@ pub struct Msg {
     pub bcc: Option<Vec<Addr>>,
     pub in_reply_to: Option<String>,
     pub message_id: Option<String>,
-    pub encoding: ContentTransferEncoding,
 
     /// The internal date of the message.
     ///
@@ -352,11 +352,10 @@ impl Msg {
             let mut msg = self._edit(account)?;
             match choice::post_edit()? {
                 PostEditChoice::Send => {
-                    smtp.send_msg(&msg)?;
-                    imap.add_flags("Sent", &Flags::try_from(vec![Flag::Seen])?)?;
-                    msg.flags.insert(Flag::Seen);
                     let mbox = Mbox::from("Sent");
-                    imap.append_msg(&mbox, msg)?;
+                    let sent_msg = smtp.send_msg(&msg)?;
+                    let flags = Flags::try_from(vec![Flag::Seen])?;
+                    imap.append_raw_msg_with_flags(&mbox, &sent_msg.formatted(), flags)?;
                     msg::utils::remove_draft()?;
                     output.print("Message successfully sent")?;
                     break;
@@ -395,31 +394,12 @@ impl TryFrom<Tpl> for Msg {
 
         for header in parsed_msg.get_headers() {
             let key = header.get_key();
-            let val = header.get_value();
-            let val = val.trim();
+            let val = String::from_utf8(header.get_value_raw().to_vec())
+                .map(|val| val.trim().to_string())?;
 
             match key.as_str() {
                 "Message-Id" | _ if key.eq_ignore_ascii_case("message-id") => {
                     msg.message_id = Some(val.to_owned())
-                }
-                "Content-Transfer-Encoding" | _
-                    if key.eq_ignore_ascii_case("content-transfer-encoding") =>
-                {
-                    match val {
-                        "8bit" | _ if val.eq_ignore_ascii_case("8bit") => {
-                            msg.encoding = ContentTransferEncoding::EightBit
-                        }
-                        "7bit" | _ if val.eq_ignore_ascii_case("7bit") => {
-                            msg.encoding = ContentTransferEncoding::SevenBit
-                        }
-                        "Quoted-Printable" | _ if val.eq_ignore_ascii_case("quoted-printable") => {
-                            msg.encoding = ContentTransferEncoding::QuotedPrintable
-                        }
-                        "Base64" | _ if val.eq_ignore_ascii_case("base64") => {
-                            msg.encoding = ContentTransferEncoding::Base64
-                        }
-                        _ => warn!("cannot parse encoding {}, default to Quoted-Printable", val),
-                    };
                 }
                 "From" | _ if key.eq_ignore_ascii_case("from") => {
                     msg.from = Some(
@@ -460,17 +440,17 @@ impl TryFrom<Tpl> for Msg {
                     );
                 }
                 "Subject" | _ if key.eq_ignore_ascii_case("subject") => {
-                    msg.subject = val.to_owned()
+                    msg.subject = val;
                 }
                 _ => (),
             }
         }
 
-        msg.parts.push(Part::TextPlain(TextPlainPart {
-            content: parsed_msg
-                .get_body()
-                .context("cannot get body from parsed message")?,
-        }));
+        let content = parsed_msg
+            .get_body_raw()
+            .context("cannot get body from parsed message")?;
+        let content = String::from_utf8(content).context("cannot decode body from utf-8")?;
+        msg.parts.push(Part::TextPlain(TextPlainPart { content }));
 
         Ok(msg)
     }
@@ -542,21 +522,9 @@ impl TryInto<lettre::Message> for &Msg {
                 .fold(msg_builder, |builder, addr| builder.bcc(addr.to_owned()))
         };
 
-        let mut msg_parts = lettre::message::MultiPart::mixed().build();
-
-        let text_parts = self.join_text_parts();
-        if !text_parts.is_empty() {
-            msg_parts = msg_parts.singlepart(
-                lettre::message::SinglePart::builder()
-                    .header(lettre::message::header::ContentType::TEXT_PLAIN)
-                    .header(self.encoding)
-                    .body(text_parts),
-            );
-        }
-
-        Ok(msg_builder
-            .multipart(msg_parts)
-            .context("cannot build sendable message")?)
+        msg_builder
+            .singlepart(SinglePart::plain(self.join_text_plain_parts()))
+            .context("cannot build sendable message")
     }
 }
 
@@ -668,7 +636,6 @@ impl<'a> TryFrom<&'a imap::types::Fetch> for Msg {
             to,
             cc,
             bcc,
-            encoding: ContentTransferEncoding::QuotedPrintable,
             date,
             parts,
         })
@@ -720,12 +687,10 @@ pub fn parse_some_addrs(addrs: &Option<Vec<imap_proto::Address>>) -> Result<Opti
 }
 
 #[derive(Debug, Serialize)]
-pub struct PrintableMsg {
-    pub msg: String,
-}
+pub struct PrintableMsg(pub String);
 
 impl fmt::Display for PrintableMsg {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "{}", self.msg)
+        writeln!(f, "{}", self.0)
     }
 }

@@ -1,3 +1,7 @@
+//! Module related to message template handling.
+//!
+//! This module gathers all message template commands.  
+
 use anyhow::Result;
 use log::debug;
 
@@ -10,6 +14,7 @@ use crate::{
     output::service::OutputServiceInterface,
 };
 
+/// Generate a new message template.
 pub fn new<'a, OutputService: OutputServiceInterface>(
     opts: TplOverride<'a>,
     account: &'a Account,
@@ -18,10 +23,10 @@ pub fn new<'a, OutputService: OutputServiceInterface>(
     debug!("entering new handler");
     let msg = Msg::default();
     let tpl = Tpl::from_msg(opts, &msg, account);
-    output.print(tpl)?;
-    Ok(())
+    output.print(tpl)
 }
 
+/// Generate a reply message template.
 pub fn reply<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
     seq: &str,
     all: bool,
@@ -33,10 +38,10 @@ pub fn reply<'a, OutputService: OutputServiceInterface, ImapService: ImapService
     debug!("entering reply handler");
     let msg = imap.find_msg(seq)?.into_reply(all, account)?;
     let tpl = Tpl::from_msg(opts, &msg, account);
-    output.print(tpl)?;
-    Ok(())
+    output.print(tpl)
 }
 
+/// Generate a forward message template.
 pub fn forward<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
     seq: &str,
     opts: TplOverride<'a>,
@@ -47,6 +52,5 @@ pub fn forward<'a, OutputService: OutputServiceInterface, ImapService: ImapServi
     debug!("entering forward handler");
     let msg = imap.find_msg(seq)?.into_forward(account)?;
     let tpl = Tpl::from_msg(opts, &msg, account);
-    output.print(tpl)?;
-    Ok(())
+    output.print(tpl)
 }

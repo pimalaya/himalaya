@@ -13,7 +13,7 @@ use std::convert::TryInto;
 use crate::{config::entity::Account, domain::msg::Msg};
 
 pub trait SmtpServiceInterface {
-    fn send_msg(&mut self, msg: &Msg) -> Result<()>;
+    fn send_msg(&mut self, msg: &Msg) -> Result<lettre::Message>;
     fn send_raw_msg(&mut self, envelope: &lettre::address::Envelope, msg: &[u8]) -> Result<()>;
 }
 
@@ -57,10 +57,11 @@ impl<'a> SmtpService<'a> {
 }
 
 impl<'a> SmtpServiceInterface for SmtpService<'a> {
-    fn send_msg(&mut self, msg: &Msg) -> Result<()> {
+    fn send_msg(&mut self, msg: &Msg) -> Result<lettre::Message> {
         debug!("sending message…");
-        self.transport()?.send(&msg.try_into()?)?;
-        Ok(())
+        let sendable_msg: lettre::Message = msg.try_into()?;
+        self.transport()?.send(&sendable_msg)?;
+        Ok(sendable_msg)
     }
 
     fn send_raw_msg(&mut self, envelope: &lettre::address::Envelope, msg: &[u8]) -> Result<()> {

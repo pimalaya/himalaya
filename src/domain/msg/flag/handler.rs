@@ -17,13 +17,12 @@ pub fn add<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceIn
     output: &'a OutputService,
     imap: &'a mut ImapService,
 ) -> Result<()> {
-    let flags = &Flags::from(flags);
-    imap.add_flags(seq_range, flags)?;
+    let flags = Flags::from(flags);
+    imap.add_flags(seq_range, &flags)?;
     output.print(format!(
         r#"Flag(s) "{}" successfully added to message(s) "{}""#,
         flags, seq_range
-    ))?;
-    Ok(())
+    ))
 }
 
 /// Remove flags from all messages within the given sequence range.
@@ -34,13 +33,12 @@ pub fn remove<'a, OutputService: OutputServiceInterface, ImapService: ImapServic
     output: &'a OutputService,
     imap: &'a mut ImapService,
 ) -> Result<()> {
-    let flags = &Flags::from(flags);
-    imap.remove_flags(seq_range, flags)?;
+    let flags = Flags::from(flags);
+    imap.remove_flags(seq_range, &flags)?;
     output.print(format!(
         r#"Flag(s) "{}" successfully removed from message(s) "{}""#,
         flags, seq_range
-    ))?;
-    Ok(())
+    ))
 }
 
 /// Replace flags of all messages within the given sequence range.
@@ -51,11 +49,10 @@ pub fn set<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceIn
     output: &'a OutputService,
     imap: &'a mut ImapService,
 ) -> Result<()> {
-    let flags = &Flags::from(flags);
-    imap.set_flags(seq_range, flags)?;
+    let flags = Flags::from(flags);
+    imap.set_flags(seq_range, &flags)?;
     output.print(format!(
         r#"Flag(s) "{}" successfully set for message(s) "{}""#,
         flags, seq_range
-    ))?;
-    Ok(())
+    ))
 }

@@ -28,7 +28,8 @@ use crate::{
 
 use super::PrintableMsg;
 
-/// Download all attachments from the given message UID to the user account downloads directory.
+/// Download all attachments from the given message sequence number to the user account downloads
+/// directory.
 pub fn attachments<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
     seq: &str,
     account: &Account,
@@ -42,7 +43,6 @@ pub fn attachments<OutputService: OutputServiceInterface, ImapService: ImapServi
         attachments_len, seq
     );
 
-    // Download attachments to user account downloads dir
     for attachment in attachments {
         let filepath = account.downloads_dir.join(&attachment.filename);
         debug!("downloading {}…", attachment.filename);
@@ -53,8 +53,7 @@ pub fn attachments<OutputService: OutputServiceInterface, ImapService: ImapServi
     output.print(format!(
         "{} attachment(s) successfully downloaded to {:?}",
         attachments_len, account.downloads_dir
-    ))?;
-    Ok(())
+    ))
 }
 
 /// Copy a message from a mailbox to another.
@@ -71,8 +70,7 @@ pub fn copy<OutputService: OutputServiceInterface, ImapService: ImapServiceInter
     output.print(format!(
         r#"Message {} successfully copied to folder "{}""#,
         seq, mbox
-    ))?;
-    Ok(())
+    ))
 }
 
 /// Delete messages matching the given sequence range.
@@ -84,8 +82,7 @@ pub fn delete<OutputService: OutputServiceInterface, ImapService: ImapServiceInt
     let flags = Flags::try_from(vec![Flag::Seen, Flag::Deleted])?;
     imap.add_flags(seq, &flags)?;
     imap.expunge()?;
-    output.print(format!(r#"Message(s) {} successfully deleted"#, seq))?;
-    Ok(())
+    output.print(format!(r#"Message(s) {} successfully deleted"#, seq))
 }
 
 /// Forward the given message UID from the selected mailbox.
@@ -104,8 +101,7 @@ pub fn forward<
     debug!("entering forward handler");
     imap.find_msg(seq)?
         .into_forward(account)?
-        .edit(account, output, imap, smtp)?;
-    Ok(())
+        .edit(account, output, imap, smtp)
 }
 
 /// List paginated messages from the selected mailbox.
@@ -123,9 +119,7 @@ pub fn list<OutputService: OutputServiceInterface, ImapService: ImapServiceInter
 
     let msgs = imap.get_msgs(&page_size, &page)?;
     trace!("messages: {:#?}", msgs);
-    output.print(msgs)?;
-
-    Ok(())
+    output.print(msgs)
 }
 
 /// Parse and edit a message from a [mailto] URL string.
@@ -218,12 +212,11 @@ pub fn read<OutputService: OutputServiceInterface, ImapService: ImapServiceInter
 ) -> Result<()> {
     if raw {
         let msg = String::from_utf8(imap.find_raw_msg(&seq)?)?;
-        output.print(PrintableMsg { msg })?;
+        output.print(PrintableMsg(msg))
     } else {
         let msg = imap.find_msg(&seq)?.join_text_parts();
-        output.print(PrintableMsg { msg })?;
+        output.print(PrintableMsg(msg))
     }
-    Ok(())
 }
 
 /// Reply to the given message UID.
@@ -243,8 +236,7 @@ pub fn reply<
     debug!("entering reply handler");
     imap.find_msg(seq)?
         .into_reply(all, account)?
-        .edit(account, output, imap, smtp)?;
-    Ok(())
+        .edit(account, output, imap, smtp)
 }
 
 /// Save a raw message to the targetted mailbox.
@@ -255,8 +247,7 @@ pub fn save<ImapService: ImapServiceInterface>(
 ) -> Result<()> {
     let mbox = Mbox::try_from(mbox)?;
     let flags = Flags::try_from(vec![Flag::Seen])?;
-    imap.append_raw_msg_with_flags(&mbox, msg.as_bytes(), flags)?;
-    Ok(())
+    imap.append_raw_msg_with_flags(&mbox, msg.as_bytes(), flags)
 }
 
 /// Paginate messages from the selected mailbox matching the specified query.
@@ -275,9 +266,7 @@ pub fn search<OutputService: OutputServiceInterface, ImapService: ImapServiceInt
 
     let msgs = imap.find_msgs(&query, &page_size, &page)?;
     trace!("messages: {:#?}", msgs);
-    output.print(msgs)?;
-
-    Ok(())
+    output.print(msgs)
 }
 
 /// Send a raw message.
@@ -329,6 +318,5 @@ pub fn write<
     smtp: &mut SmtpService,
 ) -> Result<()> {
     debug!("entering write handler");
-    Msg::default().edit(account, output, imap, smtp)?;
-    Ok(())
+    Msg::default().edit(account, output, imap, smtp)
 }
