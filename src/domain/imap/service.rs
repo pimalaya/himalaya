@@ -3,6 +3,7 @@
 //! This module exposes a service that can interact with IMAP servers.
 
 use anyhow::{anyhow, Context, Result};
+use imap::types::Flag;
 use log::{debug, trace};
 use native_tls::{TlsConnector, TlsStream};
 use std::{
@@ -31,7 +32,9 @@ pub trait ImapServiceInterface {
     fn find_msgs(&mut self, query: &str, page_size: &usize, page: &usize) -> Result<Envelopes>;
     fn get_msg(&mut self, seq: &str) -> Result<msg::entity::Msg>;
     fn find_msg(&mut self, seq: &str) -> Result<Msg>;
+    fn find_raw_msg(&mut self, seq: &str) -> Result<Vec<u8>>;
     fn append_msg(&mut self, mbox: &Mbox, msg: Msg) -> Result<()>;
+    fn append_raw_msg_with_flags(&mut self, mbox: &Mbox, msg: &[u8], flags: Flags) -> Result<()>;
     fn expunge(&mut self) -> Result<()>;
     fn logout(&mut self) -> Result<()>;
 
@@ -208,6 +211,31 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
             .ok_or(anyhow!(r#"cannot find message "{}"#, seq))?;
 
         Ok(Msg::try_from(fetch)?)
+    }
+
+    fn find_raw_msg(&mut self, seq: &str) -> Result<Vec<u8>> {
+        let mbox = self.mbox.to_owned();
+        self.sess()?
+            .select(&mbox.name)
+            .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?;
+        let fetches = self
+            .sess()?
+            .fetch(seq, "BODY[]")
+            .context(r#"cannot fetch raw messages "{}""#)?;
+        let fetch = fetches
+            .first()
+            .ok_or(anyhow!(r#"cannot find raw message "{}"#, seq))?;
+
+        Ok(fetch.body().map(Vec::from).unwrap_or_default())
+    }
+
+    fn append_raw_msg_with_flags(&mut self, mbox: &Mbox, msg: &[u8], flags: Flags) -> Result<()> {
+        self.sess()?
+            .append(&mbox.name, &msg)
+            .flags(flags.0)
+            .finish()
+            .context(format!(r#"cannot append message to "{}""#, mbox.name))?;
+        Ok(())
     }
 
     fn append_msg(&mut self, mbox: &Mbox, msg: Msg) -> Result<()> {

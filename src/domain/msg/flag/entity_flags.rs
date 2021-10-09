@@ -11,7 +11,7 @@ use std::{
 use crate::msg::{Flag, SerializableFlag};
 
 /// Wrapper arround [`imap::types::Flag`]s.
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Flags(pub HashSet<Flag<'static>>);
 
 impl Flags {

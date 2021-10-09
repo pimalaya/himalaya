@@ -29,12 +29,12 @@ pub fn attachments<OutputService: OutputServiceInterface, ImapService: ImapServi
 ) -> Result<()> {
     let attachments = imap.find_msg(&seq)?.attachments();
     let attachments_len = attachments.len();
-
     debug!(
-        "{} attachment(s) found for message {}",
+        r#"{} attachment(s) found for message "{}""#,
         attachments_len, seq
     );
 
+    // Download attachments to user account downloads dir
     for attachment in attachments {
         let filepath = account.downloads_dir.join(&attachment.filename);
         debug!("downloading {}…", attachment.filename);
@@ -46,26 +46,20 @@ pub fn attachments<OutputService: OutputServiceInterface, ImapService: ImapServi
         "{} attachment(s) successfully downloaded to {:?}",
         attachments_len, account.downloads_dir
     ))?;
-
     Ok(())
 }
 
 /// Copy a message from a mailbox to another.
 pub fn copy<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
-    // The sequence number of the message to copy
     seq: &str,
-    // The mailbox to copy the message in
     target: Option<&str>,
     output: &OutputService,
     imap: &mut ImapService,
 ) -> Result<()> {
     let target = Mbox::try_from(target)?;
-    let mut msg = imap.find_msg(&seq)?;
-
-    // Append message to targetted mailbox
-    msg.flags.insert(Flag::Seen);
-    imap.append_msg(&target, msg)?;
-
+    let msg = imap.find_raw_msg(&seq)?;
+    let flags = Flags::try_from(vec![Flag::Seen])?;
+    imap.append_raw_msg_with_flags(&target, &msg, flags)?;
     output.print(format!(
         r#"Message {} successfully copied to folder "{}""#,
         seq, target
@@ -79,9 +73,10 @@ pub fn delete<OutputService: OutputServiceInterface, ImapService: ImapServiceInt
     output: &OutputService,
     imap: &mut ImapService,
 ) -> Result<()> {
-    imap.add_flags(seq, &Flags::try_from(vec![Flag::Seen, Flag::Deleted])?)?;
+    let flags = Flags::try_from(vec![Flag::Seen, Flag::Deleted])?;
+    imap.add_flags(seq, &flags)?;
     imap.expunge()?;
-    output.print(format!("Message(s) {} successfully deleted", seq))?;
+    output.print(format!(r#"Message(s) {} successfully deleted"#, seq))?;
     Ok(())
 }
 
@@ -187,14 +182,13 @@ pub fn move_<OutputService: OutputServiceInterface, ImapService: ImapServiceInte
     output: &OutputService,
     imap: &mut ImapService,
 ) -> Result<()> {
+    // Copy the message to targetted mailbox
     let target = Mbox::try_from(target)?;
-    let mut msg = imap.find_msg(&seq)?;
+    let msg = imap.find_raw_msg(&seq)?;
+    let flags = Flags::try_from(vec![Flag::Seen])?;
+    imap.append_raw_msg_with_flags(&target, &msg, flags)?;
 
-    // Append message to targetted mailbox
-    msg.flags.insert(Flag::Seen);
-    imap.append_msg(&target, msg)?;
-
-    // Flag as deleted the original message
+    // Delete the original message
     let flags = Flags::try_from(vec![Flag::Seen, Flag::Deleted])?;
     imap.add_flags(seq, &flags)?;
     imap.expunge()?;
@@ -202,8 +196,7 @@ pub fn move_<OutputService: OutputServiceInterface, ImapService: ImapServiceInte
     output.print(format!(
         r#"Message {} successfully moved to folder "{}""#,
         seq, target
-    ))?;
-    Ok(())
+    ))
 }
 
 /// Read a message from the given UID.
