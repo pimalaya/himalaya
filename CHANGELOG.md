@@ -7,18 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2021-10-10
+
 ### Added
 
+- Mailto support [#162]
+- Remove previous signature when replying/forwarding a message [#193]
 - Config option `signature-delimiter` to customize the signature delimiter (default to `-- \n`) [[#114](https://github.com/soywod/himalaya/pull/114)]
 - Expand tilde and env vars for `downloads-dir` and `signature` [#102]
 
 ### Changed
 
+- [**BREAKING**] Folder structure, message management, JSON API and Vim plugin [#199]
 - Pagination for list and search cmd starts from 1 instead of 0 [#186]
 - Errors management with `anyhow` [#152]
 
 ### Fixed
 
+- Make more use of serde [#153]
+- Write message vim plugin [#196]
+- Invalid encoding when sending message [#205]
+- Pagination reset current account [#215]
 - New/reply/forward from Vim plugin since Tpl refactor [#176]
 
 ## [0.4.0] - 2021-06-03
@@ -223,7 +232,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.4.0...HEAD
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/soywod/himalaya/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/soywod/himalaya/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/soywod/himalaya/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/soywod/himalaya/compare/v0.3.0...v0.3.1
@@ -311,6 +321,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#144]: https://github.com/soywod/himalaya/issues/144
 [#146]: https://github.com/soywod/himalaya/issues/146
 [#152]: https://github.com/soywod/himalaya/issues/152
+[#153]: https://github.com/soywod/himalaya/issues/153
 [#160]: https://github.com/soywod/himalaya/issues/160
+[#162]: https://github.com/soywod/himalaya/issues/162
 [#176]: https://github.com/soywod/himalaya/issues/176
 [#186]: https://github.com/soywod/himalaya/issues/186
+[#193]: https://github.com/soywod/himalaya/issues/193
+[#196]: https://github.com/soywod/himalaya/issues/196
+[#199]: https://github.com/soywod/himalaya/issues/199
+[#205]: https://github.com/soywod/himalaya/issues/205
+[#215]: https://github.com/soywod/himalaya/issues/215
