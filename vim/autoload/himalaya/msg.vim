@@ -14,8 +14,8 @@ function! s:format_msg_for_list(msg)
   let flag_flagged = index(a:msg.flags, "Flagged") == -1 ? " " : "!"
   let flag_replied = index(a:msg.flags, "Answered") == -1 ? " " : "↵"
   let msg.flags = printf("%s %s %s", flag_new, flag_replied, flag_flagged)
-  let msg.subject = a:msg.headers.subject
-  let msg.sender = a:msg.headers.from[0]
+  let msg.subject = a:msg.subject
+  let msg.sender = a:msg.sender
   let msg.date = a:msg.date
   return msg
 endfunction
@@ -67,11 +67,11 @@ function! himalaya#msg#read()
       \printf("Fetching message %d", s:msg_id),
       \1,
     \)
-    let attachment = len(msg.attachments) > 0 ? " []" : ""
+    let attachment = msg.hasAttachment ? " []" : ""
     execute printf("silent! edit Himalaya read message [%d]%s", s:msg_id, attachment)
     setlocal modifiable
     silent execute "%d"
-    call append(0, split(substitute(msg.body.plain, "\r", "", "g"), "\n"))
+    call append(0, split(substitute(msg.content, "\r", "", "g"), "\n"))
     silent execute "$d"
     setlocal filetype=himalaya-msg-read
     let &modified = 0
