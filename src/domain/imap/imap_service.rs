@@ -15,7 +15,7 @@ use std::{
 use crate::{
     config::{Account, Config},
     domain::{
-        mbox::entity::Mbox,
+        mbox::Mbox,
         msg::{Envelopes, Flags, Msg},
     },
 };

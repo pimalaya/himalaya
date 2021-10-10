@@ -4,7 +4,7 @@ use serde::Deserialize;
 use std::{collections::HashMap, convert::TryFrom, env, fs, path::PathBuf, thread};
 use toml;
 
-use crate::output::utils::run_cmd;
+use crate::output::run_cmd;
 
 pub const DEFAULT_PAGE_SIZE: usize = 10;
 pub const DEFAULT_SIG_DELIM: &str = "-- \n";

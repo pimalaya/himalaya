@@ -10,7 +10,7 @@ use crate::{
         imap::ImapServiceInterface,
         msg::{Msg, Tpl, TplOverride},
     },
-    output::service::OutputServiceInterface,
+    output::OutputServiceInterface,
 };
 
 /// Generate a new message template.

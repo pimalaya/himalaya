@@ -7,7 +7,7 @@ use std::{
     ops::Deref,
 };
 
-use crate::{msg::Envelope, ui::Table};
+use crate::{domain::msg::Envelope, ui::Table};
 
 /// Representation of a list of envelopes.
 #[derive(Debug, Default, Serialize)]

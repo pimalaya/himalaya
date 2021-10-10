@@ -8,7 +8,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use crate::msg::{Flag, SerializableFlag};
+use crate::domain::msg::{Flag, SerializableFlag};
 
 /// Wrapper arround [`imap::types::Flag`]s.
 #[derive(Debug, Clone, Default)]

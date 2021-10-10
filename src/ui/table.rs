@@ -11,11 +11,11 @@ use unicode_width::UnicodeWidthStr;
 
 /// Define the default terminal size.
 /// It is used when the size cannot be determined by the `terminal_size` crate.
-const DEFAULT_TERM_WIDTH: usize = 80;
+pub const DEFAULT_TERM_WIDTH: usize = 80;
 
 /// Define the minimum size of a shrinked cell.
 /// TODO: make this customizable.
-const MAX_SHRINK_WIDTH: usize = 5;
+pub const MAX_SHRINK_WIDTH: usize = 5;
 
 /// Wrapper around [ANSI escape codes] for styling cells.
 ///

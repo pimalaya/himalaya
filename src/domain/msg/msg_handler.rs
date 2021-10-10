@@ -17,12 +17,12 @@ use url::Url;
 use crate::{
     config::Account,
     domain::{
-        imap::service::ImapServiceInterface,
-        mbox::entity::Mbox,
+        imap::ImapServiceInterface,
+        mbox::Mbox,
         msg::{Flags, Msg, Part, TextPlainPart, Tpl},
-        smtp::service::SmtpServiceInterface,
+        smtp::SmtpServiceInterface,
     },
-    output::service::OutputServiceInterface,
+    output::OutputServiceInterface,
 };
 
 use super::PrintableMsg;

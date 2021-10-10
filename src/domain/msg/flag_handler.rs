@@ -6,7 +6,7 @@ use anyhow::Result;
 
 use crate::{
     domain::{imap::ImapServiceInterface, msg::Flags},
-    output::service::OutputServiceInterface,
+    output::OutputServiceInterface,
 };
 
 /// Add flags to all messages within the given sequence range.

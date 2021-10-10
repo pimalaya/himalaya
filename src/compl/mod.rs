@@ -5,5 +5,5 @@
 //!
 //! [clap's docs.rs website]: https://docs.rs/clap/2.33.3/clap/enum.Shell.html
 
-pub mod arg;
-pub mod handler;
+pub mod compl_arg;
+pub mod compl_handler;

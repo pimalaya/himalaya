@@ -18,22 +18,36 @@
 ///
 /// Execute `himalaya help <cmd>` where `<cmd>` is one entry of this list above
 /// to get more information about them.
-pub mod arg;
+pub mod msg_arg;
 
-pub mod handler;
-pub mod utils;
+pub mod msg_handler;
+pub mod msg_utils;
 
-pub mod flag;
-pub use flag::*;
+pub mod flag_arg;
+pub mod flag_handler;
 
-pub mod envelope;
-pub use envelope::*;
+pub mod flag_entity;
+pub use flag_entity::*;
 
-pub mod tpl;
-pub use tpl::*;
+pub mod flags_entity;
+pub use flags_entity::*;
 
-pub mod entity_msg;
-pub use entity_msg::*;
+pub mod envelope_entity;
+pub use envelope_entity::*;
 
-pub mod entity_parts;
-pub use entity_parts::*;
+pub mod envelopes_entity;
+pub use envelopes_entity::*;
+
+pub mod tpl_arg;
+pub use tpl_arg::TplOverride;
+
+pub mod tpl_handler;
+
+pub mod tpl_entity;
+pub use tpl_entity::*;
+
+pub mod msg_entity;
+pub use msg_entity::*;
+
+pub mod parts_entity;
+pub use parts_entity::*;

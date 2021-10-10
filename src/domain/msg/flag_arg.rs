@@ -6,7 +6,7 @@ use anyhow::Result;
 use clap::{self, App, AppSettings, Arg, ArgMatches, SubCommand};
 use log::{debug, trace};
 
-use crate::domain::msg;
+use crate::domain::msg::msg_arg;
 
 type SeqRange<'a> = &'a str;
 type Flags<'a> = Vec<&'a str>;
@@ -69,20 +69,20 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
         .subcommand(
             SubCommand::with_name("add")
                 .about("Adds flags to a message")
-                .arg(msg::arg::seq_range_arg())
+                .arg(msg_arg::seq_range_arg())
                 .arg(flags_arg()),
         )
         .subcommand(
             SubCommand::with_name("set")
                 .about("Replaces all message flags")
-                .arg(msg::arg::seq_range_arg())
+                .arg(msg_arg::seq_range_arg())
                 .arg(flags_arg()),
         )
         .subcommand(
             SubCommand::with_name("remove")
                 .aliases(&["rm"])
                 .about("Removes flags from a message")
-                .arg(msg::arg::seq_range_arg())
+                .arg(msg_arg::seq_range_arg())
                 .arg(flags_arg()),
         )]
 }

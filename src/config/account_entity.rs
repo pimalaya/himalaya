@@ -5,7 +5,7 @@ use std::{convert::TryFrom, env, fs, path::PathBuf};
 
 use crate::{
     config::{Config, DEFAULT_PAGE_SIZE, DEFAULT_SIG_DELIM},
-    output::utils::run_cmd,
+    output::run_cmd,
 };
 
 /// Represent a user account.

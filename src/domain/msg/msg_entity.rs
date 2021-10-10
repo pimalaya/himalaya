@@ -17,12 +17,11 @@ use crate::{
     config::Account,
     domain::{
         imap::ImapServiceInterface,
-        mbox::entity::Mbox,
-        msg::{TextHtmlPart, TextPlainPart},
-        smtp::service::SmtpServiceInterface,
+        mbox::Mbox,
+        msg::{msg_utils, Flags, Parts, TextHtmlPart, TextPlainPart, Tpl, TplOverride},
+        smtp::SmtpServiceInterface,
     },
-    msg::{self, Flags, Parts, Tpl, TplOverride},
-    output::service::OutputServiceInterface,
+    output::OutputServiceInterface,
     ui::{
         choice::{self, PostEditChoice, PreEditChoice},
         editor,
@@ -360,7 +359,7 @@ impl Msg {
         imap: &mut ImapService,
         smtp: &mut SmtpService,
     ) -> Result<()> {
-        let draft = msg::utils::local_draft_path();
+        let draft = msg_utils::local_draft_path();
         if draft.exists() {
             loop {
                 match choice::pre_edit() {
@@ -393,7 +392,7 @@ impl Msg {
                     let sent_msg = smtp.send_msg(&self)?;
                     let flags = Flags::try_from(vec![Flag::Seen])?;
                     imap.append_raw_msg_with_flags(&mbox, &sent_msg.formatted(), flags)?;
-                    msg::utils::remove_local_draft()?;
+                    msg_utils::remove_local_draft()?;
                     output.print("Message successfully sent")?;
                     break;
                 }
@@ -410,12 +409,12 @@ impl Msg {
                     let flags = Flags::try_from(vec![Flag::Seen, Flag::Draft])?;
                     let tpl = Tpl::from_msg(TplOverride::default(), &self, account);
                     imap.append_raw_msg_with_flags(&mbox, tpl.as_bytes(), flags)?;
-                    msg::utils::remove_local_draft()?;
+                    msg_utils::remove_local_draft()?;
                     output.print("Message successfully saved to Drafts")?;
                     break;
                 }
                 Ok(PostEditChoice::Discard) => {
-                    msg::utils::remove_local_draft()?;
+                    msg_utils::remove_local_draft()?;
                     break;
                 }
                 Err(err) => {

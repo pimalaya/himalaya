@@ -6,7 +6,7 @@ use anyhow::Result;
 use clap::{self, App, AppSettings, Arg, ArgMatches, SubCommand};
 use log::{debug, trace};
 
-use crate::domain::msg;
+use crate::domain::msg::msg_arg;
 
 type Seq<'a> = &'a str;
 type All = bool;
@@ -156,15 +156,15 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
             SubCommand::with_name("reply")
                 .aliases(&["rep", "r"])
                 .about("Generates a reply message template")
-                .arg(msg::arg::seq_arg())
-                .arg(msg::arg::reply_all_arg())
+                .arg(msg_arg::seq_arg())
+                .arg(msg_arg::reply_all_arg())
                 .args(&tpl_args()),
         )
         .subcommand(
             SubCommand::with_name("forward")
                 .aliases(&["fwd", "fw", "f"])
                 .about("Generates a forward message template")
-                .arg(msg::arg::seq_arg())
+                .arg(msg_arg::seq_arg())
                 .args(&tpl_args()),
         )]
 }

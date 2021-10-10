@@ -6,8 +6,8 @@ use anyhow::Result;
 use log::{debug, trace};
 
 use crate::{
-    domain::{imap::service::ImapServiceInterface, mbox::entity::Mboxes},
-    output::service::{OutputService, OutputServiceInterface},
+    domain::{imap::ImapServiceInterface, mbox::Mboxes},
+    output::{OutputService, OutputServiceInterface},
 };
 
 /// List all mailboxes.

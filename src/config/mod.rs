@@ -1,9 +1,9 @@
 //! Module related to the user's configuration.
 
-pub mod arg;
+pub mod config_arg;
 
-pub mod entity_account;
-pub use entity_account::*;
+pub mod account_entity;
+pub use account_entity::*;
 
-pub mod entity_config;
-pub use entity_config::*;
+pub mod config_entity;
+pub use config_entity::*;
