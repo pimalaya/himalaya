@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Panic on flags command [#190]
 - Make more use of serde [#153]
 - Write message vim plugin [#196]
 - Invalid encoding when sending message [#205]
@@ -326,6 +327,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#162]: https://github.com/soywod/himalaya/issues/162
 [#176]: https://github.com/soywod/himalaya/issues/176
 [#186]: https://github.com/soywod/himalaya/issues/186
+[#190]: https://github.com/soywod/himalaya/issues/190
 [#193]: https://github.com/soywod/himalaya/issues/193
 [#196]: https://github.com/soywod/himalaya/issues/196
 [#199]: https://github.com/soywod/himalaya/issues/199
