@@ -3,7 +3,6 @@
 //! This module gathers all message template commands.  
 
 use anyhow::Result;
-use log::debug;
 
 use crate::{
     config::entity::Account,
@@ -20,7 +19,6 @@ pub fn new<'a, OutputService: OutputServiceInterface>(
     account: &'a Account,
     output: &'a OutputService,
 ) -> Result<()> {
-    debug!("entering new handler");
     let msg = Msg::default();
     let tpl = Tpl::from_msg(opts, &msg, account);
     output.print(tpl)
@@ -35,7 +33,6 @@ pub fn reply<'a, OutputService: OutputServiceInterface, ImapService: ImapService
     output: &'a OutputService,
     imap: &'a mut ImapService,
 ) -> Result<()> {
-    debug!("entering reply handler");
     let msg = imap.find_msg(seq)?.into_reply(all, account)?;
     let tpl = Tpl::from_msg(opts, &msg, account);
     output.print(tpl)
@@ -49,7 +46,6 @@ pub fn forward<'a, OutputService: OutputServiceInterface, ImapService: ImapServi
     output: &'a OutputService,
     imap: &'a mut ImapService,
 ) -> Result<()> {
-    debug!("entering forward handler");
     let msg = imap.find_msg(seq)?.into_forward(account)?;
     let tpl = Tpl::from_msg(opts, &msg, account);
     output.print(tpl)

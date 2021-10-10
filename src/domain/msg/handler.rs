@@ -97,10 +97,10 @@ pub fn forward<
     imap: &mut ImapService,
     smtp: &mut SmtpService,
 ) -> Result<()> {
-    debug!("entering forward handler");
     imap.find_msg(seq)?
         .into_forward(account)?
-        .edit(account, output, imap, smtp)
+        .add_attachments(attachments_paths)?
+        .edit_with_editor(account, output, imap, smtp)
 }
 
 /// List paginated messages from the selected mailbox.
@@ -111,8 +111,6 @@ pub fn list<OutputService: OutputServiceInterface, ImapService: ImapServiceInter
     output: &OutputService,
     imap: &mut ImapService,
 ) -> Result<()> {
-    debug!("entering list handler");
-
     let page_size = page_size.unwrap_or(account.default_page_size);
     trace!("page size: {}", page_size);
 
@@ -135,8 +133,6 @@ pub fn mailto<
     imap: &mut ImapService,
     smtp: &mut SmtpService,
 ) -> Result<()> {
-    debug!("entering mailto handler");
-
     let to: Vec<lettre::message::Mailbox> = url
         .path()
         .split(";")
@@ -175,7 +171,7 @@ pub fn mailto<
     msg.parts.push(Part::TextPlain(TextPlainPart {
         content: body.into(),
     }));
-    msg.edit(account, output, imap, smtp)
+    msg.edit_with_editor(account, output, imap, smtp)
 }
 
 /// Move a message from a mailbox to another.
@@ -236,10 +232,12 @@ pub fn reply<
     imap: &mut ImapService,
     smtp: &mut SmtpService,
 ) -> Result<()> {
-    debug!("entering reply handler");
     imap.find_msg(seq)?
         .into_reply(all, account)?
-        .edit(account, output, imap, smtp)
+        .add_attachments(attachments_paths)?
+        .edit_with_editor(account, output, imap, smtp)?;
+    let flags = Flags::try_from(vec![Flag::Answered])?;
+    imap.add_flags(seq, &flags)
 }
 
 /// Save a raw message to the targetted mailbox.
@@ -262,8 +260,6 @@ pub fn search<OutputService: OutputServiceInterface, ImapService: ImapServiceInt
     output: &OutputService,
     imap: &mut ImapService,
 ) -> Result<()> {
-    debug!("entering search handler");
-
     let page_size = page_size.unwrap_or(account.default_page_size);
     trace!("page size: {}", page_size);
 
@@ -313,13 +309,13 @@ pub fn write<
     ImapService: ImapServiceInterface,
     SmtpService: SmtpServiceInterface,
 >(
-    // FIXME
-    _attachments_paths: Vec<&str>,
+    attachments_paths: Vec<&str>,
     account: &Account,
     output: &OutputService,
     imap: &mut ImapService,
     smtp: &mut SmtpService,
 ) -> Result<()> {
-    debug!("entering write handler");
-    Msg::default().edit(account, output, imap, smtp)
+    Msg::default()
+        .add_attachments(attachments_paths)?
+        .edit_with_editor(account, output, imap, smtp)
 }

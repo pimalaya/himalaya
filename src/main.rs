@@ -102,8 +102,8 @@ fn main() -> Result<()> {
         Some(msg::arg::Command::Delete(seq)) => {
             return msg::handler::delete(seq, &output, &mut imap);
         }
-        Some(msg::arg::Command::Forward(seq, paths)) => {
-            return msg::handler::forward(seq, paths, &account, &output, &mut imap, &mut smtp);
+        Some(msg::arg::Command::Forward(seq, atts)) => {
+            return msg::handler::forward(seq, atts, &account, &output, &mut imap, &mut smtp);
         }
         Some(msg::arg::Command::List(page_size, page)) => {
             return msg::handler::list(page_size, page, &account, &output, &mut imap);
@@ -114,8 +114,8 @@ fn main() -> Result<()> {
         Some(msg::arg::Command::Read(seq, mime, raw)) => {
             return msg::handler::read(seq, mime, raw, &output, &mut imap);
         }
-        Some(msg::arg::Command::Reply(seq, all, paths)) => {
-            return msg::handler::reply(seq, all, paths, &account, &output, &mut imap, &mut smtp);
+        Some(msg::arg::Command::Reply(seq, all, atts)) => {
+            return msg::handler::reply(seq, all, atts, &account, &output, &mut imap, &mut smtp);
         }
         Some(msg::arg::Command::Save(target, msg)) => {
             return msg::handler::save(target, msg, &mut imap);
@@ -126,8 +126,8 @@ fn main() -> Result<()> {
         Some(msg::arg::Command::Send(raw_msg)) => {
             return msg::handler::send(raw_msg, &output, &mut imap, &mut smtp);
         }
-        Some(msg::arg::Command::Write(paths)) => {
-            return msg::handler::write(paths, &account, &output, &mut imap, &mut smtp);
+        Some(msg::arg::Command::Write(atts)) => {
+            return msg::handler::write(atts, &account, &output, &mut imap, &mut smtp);
         }
         Some(msg::arg::Command::Flag(m)) => match m {
             Some(msg::flag::arg::Command::Set(seq_range, flags)) => {

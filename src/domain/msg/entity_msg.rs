@@ -3,13 +3,14 @@ use anyhow::{anyhow, Context, Error, Result};
 use chrono::{DateTime, FixedOffset};
 use htmlescape;
 use imap::types::Flag;
-use lettre::message::SinglePart;
+use lettre::message::{Attachment, MultiPart, SinglePart};
 use regex::Regex;
 use rfc2047_decoder;
 use serde::Serialize;
 use std::{
     convert::{TryFrom, TryInto},
-    fmt,
+    fmt, fs,
+    path::PathBuf,
 };
 
 use crate::{
@@ -162,7 +163,7 @@ impl Msg {
         }
 
         // Text plain parts
-        {
+        let plain_content = {
             let date = self
                 .date
                 .as_ref()
@@ -189,12 +190,11 @@ impl Msg {
                 glue = "\n";
             }
 
-            self.parts
-                .replace_text_plain_parts_with(TextPlainPart { content })
-        }
+            content
+        };
 
         // Text HTML parts
-        {
+        let html_content = {
             let date = self
                 .date
                 .as_ref()
@@ -221,8 +221,21 @@ impl Msg {
                 glue = "\n";
             }
 
-            self.parts
-                .replace_text_html_parts_with(TextHtmlPart { content })
+            content
+        };
+
+        self.parts = Parts::default();
+
+        if !plain_content.is_empty() {
+            self.parts.push(Part::TextPlain(TextPlainPart {
+                content: plain_content,
+            }));
+        }
+
+        if !html_content.is_empty() {
+            self.parts.push(Part::TextHtml(TextHtmlPart {
+                content: html_content,
+            }));
         }
 
         Ok(self)
@@ -330,40 +343,35 @@ impl Msg {
         Ok(self)
     }
 
-    fn _edit(&self, account: &Account) -> Result<(Self, Tpl)> {
+    fn _edit_with_editor(&self, account: &Account) -> Result<Self> {
         let tpl = Tpl::from_msg(TplOverride::default(), self, account);
         let tpl = editor::open_with_tpl(tpl)?;
-        Ok((Self::try_from(&tpl)?, tpl))
+        Self::try_from(&tpl)
     }
 
-    pub fn edit<
+    pub fn edit_with_editor<
         OutputService: OutputServiceInterface,
         ImapService: ImapServiceInterface,
         SmtpService: SmtpServiceInterface,
     >(
-        &self,
+        mut self,
         account: &Account,
         output: &OutputService,
         imap: &mut ImapService,
         smtp: &mut SmtpService,
     ) -> Result<()> {
-        let mut msg = Msg::default();
-        let mut tpl = Tpl::default();
-
         let draft = msg::utils::local_draft_path();
         if draft.exists() {
             loop {
                 match choice::pre_edit() {
                     Ok(choice) => match choice {
                         PreEditChoice::Edit => {
-                            tpl = editor::open_with_draft()?;
-                            msg = Msg::try_from(&tpl)?;
+                            let tpl = editor::open_with_draft()?;
+                            self.merge_with(Msg::try_from(&tpl)?);
                             break;
                         }
                         PreEditChoice::Discard => {
-                            let res = self._edit(account)?;
-                            msg = res.0;
-                            tpl = res.1;
+                            self.merge_with(self._edit_with_editor(account)?);
                             break;
                         }
                         PreEditChoice::Quit => return Ok(()),
@@ -375,16 +383,14 @@ impl Msg {
                 }
             }
         } else {
-            let res = self._edit(account)?;
-            msg = res.0;
-            tpl = res.1;
+            self.merge_with(self._edit_with_editor(account)?);
         }
 
         loop {
             match choice::post_edit() {
                 Ok(PostEditChoice::Send) => {
                     let mbox = Mbox::from("Sent");
-                    let sent_msg = smtp.send_msg(&msg)?;
+                    let sent_msg = smtp.send_msg(&self)?;
                     let flags = Flags::try_from(vec![Flag::Seen])?;
                     imap.append_raw_msg_with_flags(&mbox, &sent_msg.formatted(), flags)?;
                     msg::utils::remove_local_draft()?;
@@ -392,9 +398,7 @@ impl Msg {
                     break;
                 }
                 Ok(PostEditChoice::Edit) => {
-                    let res = self._edit(account)?;
-                    msg = res.0;
-                    tpl = res.1;
+                    self.merge_with(self._edit_with_editor(account)?);
                     continue;
                 }
                 Ok(PostEditChoice::LocalDraft) => {
@@ -404,6 +408,7 @@ impl Msg {
                 Ok(PostEditChoice::RemoteDraft) => {
                     let mbox = Mbox::from("Drafts");
                     let flags = Flags::try_from(vec![Flag::Seen, Flag::Draft])?;
+                    let tpl = Tpl::from_msg(TplOverride::default(), &self, account);
                     imap.append_raw_msg_with_flags(&mbox, tpl.as_bytes(), flags)?;
                     msg::utils::remove_local_draft()?;
                     output.print("Message successfully saved to Drafts")?;
@@ -421,6 +426,71 @@ impl Msg {
         }
 
         Ok(())
+    }
+
+    pub fn add_attachments(mut self, attachments_paths: Vec<&str>) -> Result<Self> {
+        for path in attachments_paths {
+            let path = shellexpand::full(path)
+                .context(format!(r#"cannot expand attachment path "{}""#, path))?;
+            let path = PathBuf::from(path.to_string());
+            let filename: String = path
+                .file_name()
+                .ok_or(anyhow!("cannot get file name of attachment {:?}", path))?
+                .to_string_lossy()
+                .into();
+            let content = fs::read(&path).context(format!("cannot read attachment {:?}", path))?;
+            let mime = tree_magic::from_u8(&content);
+
+            self.parts.push(Part::Binary(BinaryPart {
+                filename,
+                mime,
+                content,
+            }))
+        }
+
+        Ok(self)
+    }
+
+    pub fn merge_with(&mut self, msg: Msg) {
+        if msg.from.is_some() {
+            self.from = msg.from;
+        }
+
+        if msg.to.is_some() {
+            self.to = msg.to;
+        }
+
+        if msg.cc.is_some() {
+            self.cc = msg.cc;
+        }
+
+        if msg.bcc.is_some() {
+            self.bcc = msg.bcc;
+        }
+
+        if !msg.subject.is_empty() {
+            self.subject = msg.subject;
+        }
+
+        for part in msg.parts.0.into_iter() {
+            match part {
+                Part::Binary(_) => self.parts.push(part),
+                Part::TextPlain(_) => {
+                    self.parts.retain(|p| match p {
+                        Part::TextPlain(_) => false,
+                        _ => true,
+                    });
+                    self.parts.push(part);
+                }
+                Part::TextHtml(_) => {
+                    self.parts.retain(|p| match p {
+                        Part::TextHtml(_) => false,
+                        _ => true,
+                    });
+                    self.parts.push(part);
+                }
+            }
+        }
     }
 }
 
@@ -563,8 +633,21 @@ impl TryInto<lettre::Message> for &Msg {
                 .fold(msg_builder, |builder, addr| builder.bcc(addr.to_owned()))
         };
 
+        let mut multipart =
+            MultiPart::mixed().singlepart(SinglePart::plain(self.join_text_plain_parts()));
+
+        for part in self.attachments() {
+            let filename = part.filename;
+            let content = part.content;
+            let mime = part.mime.parse().context(format!(
+                r#"cannot parse content type of attachment "{}""#,
+                filename
+            ))?;
+            multipart = multipart.singlepart(Attachment::new(filename).body(content, mime))
+        }
+
         msg_builder
-            .singlepart(SinglePart::plain(self.join_text_plain_parts()))
+            .multipart(multipart)
             .context("cannot build sendable message")
     }
 }
