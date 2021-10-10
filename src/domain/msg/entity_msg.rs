@@ -3,8 +3,7 @@ use anyhow::{anyhow, Context, Error, Result};
 use chrono::{DateTime, FixedOffset};
 use htmlescape;
 use imap::types::Flag;
-use lettre::message::{header::ContentTransferEncoding, SinglePart};
-use log::debug;
+use lettre::message::SinglePart;
 use regex::Regex;
 use rfc2047_decoder;
 use serde::Serialize;
@@ -24,7 +23,7 @@ use crate::{
     msg::{self, Flags, Parts, Tpl, TplOverride},
     output::service::OutputServiceInterface,
     ui::{
-        choice::{self, PostEditChoice},
+        choice::{self, PostEditChoice, PreEditChoice},
         editor,
     },
 };
@@ -331,10 +330,10 @@ impl Msg {
         Ok(self)
     }
 
-    fn _edit(&self, account: &Account) -> Result<Self> {
+    fn _edit(&self, account: &Account) -> Result<(Self, Tpl)> {
         let tpl = Tpl::from_msg(TplOverride::default(), self, account);
         let tpl = editor::open_with_tpl(tpl)?;
-        Self::try_from(tpl)
+        Ok((Self::try_from(&tpl)?, tpl))
     }
 
     pub fn edit<
@@ -348,45 +347,87 @@ impl Msg {
         imap: &mut ImapService,
         smtp: &mut SmtpService,
     ) -> Result<()> {
+        let mut msg = Msg::default();
+        let mut tpl = Tpl::default();
+
+        let draft = msg::utils::local_draft_path();
+        if draft.exists() {
+            loop {
+                match choice::pre_edit() {
+                    Ok(choice) => match choice {
+                        PreEditChoice::Edit => {
+                            tpl = editor::open_with_draft()?;
+                            msg = Msg::try_from(&tpl)?;
+                            break;
+                        }
+                        PreEditChoice::Discard => {
+                            let res = self._edit(account)?;
+                            msg = res.0;
+                            tpl = res.1;
+                            break;
+                        }
+                        PreEditChoice::Quit => return Ok(()),
+                    },
+                    Err(err) => {
+                        println!("{}", err);
+                        continue;
+                    }
+                }
+            }
+        } else {
+            let res = self._edit(account)?;
+            msg = res.0;
+            tpl = res.1;
+        }
+
         loop {
-            let mut msg = self._edit(account)?;
-            match choice::post_edit()? {
-                PostEditChoice::Send => {
+            match choice::post_edit() {
+                Ok(PostEditChoice::Send) => {
                     let mbox = Mbox::from("Sent");
                     let sent_msg = smtp.send_msg(&msg)?;
                     let flags = Flags::try_from(vec![Flag::Seen])?;
                     imap.append_raw_msg_with_flags(&mbox, &sent_msg.formatted(), flags)?;
-                    msg::utils::remove_draft()?;
+                    msg::utils::remove_local_draft()?;
                     output.print("Message successfully sent")?;
                     break;
                 }
-                PostEditChoice::Edit => {
+                Ok(PostEditChoice::Edit) => {
+                    let res = self._edit(account)?;
+                    msg = res.0;
+                    tpl = res.1;
                     continue;
                 }
-                PostEditChoice::LocalDraft => break,
-                PostEditChoice::RemoteDraft => {
-                    debug!("saving to draft…");
-
-                    msg.flags.insert(Flag::Seen);
+                Ok(PostEditChoice::LocalDraft) => {
+                    output.print("Message successfully saved locally")?;
+                    break;
+                }
+                Ok(PostEditChoice::RemoteDraft) => {
                     let mbox = Mbox::from("Drafts");
-                    imap.append_msg(&mbox, msg)?;
+                    let flags = Flags::try_from(vec![Flag::Seen, Flag::Draft])?;
+                    imap.append_raw_msg_with_flags(&mbox, tpl.as_bytes(), flags)?;
+                    msg::utils::remove_local_draft()?;
                     output.print("Message successfully saved to Drafts")?;
                     break;
                 }
-                PostEditChoice::Discard => {
-                    msg::utils::remove_draft()?;
+                Ok(PostEditChoice::Discard) => {
+                    msg::utils::remove_local_draft()?;
                     break;
+                }
+                Err(err) => {
+                    println!("{}", err);
+                    continue;
                 }
             }
         }
+
         Ok(())
     }
 }
 
-impl TryFrom<Tpl> for Msg {
+impl TryFrom<&Tpl> for Msg {
     type Error = Error;
 
-    fn try_from(tpl: Tpl) -> Result<Msg> {
+    fn try_from(tpl: &Tpl) -> Result<Msg> {
         let mut msg = Msg::default();
 
         let parsed_msg =

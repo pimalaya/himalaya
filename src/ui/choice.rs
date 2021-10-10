@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Context, Result};
-use log::debug;
+use log::{debug, error};
 use std::io::{self, Write};
 
 pub enum PreEditChoice {
@@ -32,11 +32,11 @@ pub fn pre_edit() -> Result<PreEditChoice> {
             Ok(PreEditChoice::Quit)
         }
         Some(choice) => {
-            debug!("invalid choice `{}`", choice);
-            Err(anyhow!("invalid choice `{}`", choice))
+            error!(r#"invalid choice "{}""#, choice);
+            Err(anyhow!(r#"invalid choice "{}""#, choice))
         }
         None => {
-            debug!("empty choice");
+            error!("empty choice");
             Err(anyhow!("empty choice"))
         }
     }
@@ -81,11 +81,11 @@ pub fn post_edit() -> Result<PostEditChoice> {
             Ok(PostEditChoice::Discard)
         }
         Some(choice) => {
-            debug!("invalid choice `{}`", choice);
-            Err(anyhow!("invalid choice `{}`", choice))
+            error!(r#"invalid choice "{}""#, choice);
+            Err(anyhow!(r#"invalid choice "{}""#, choice))
         }
         None => {
-            debug!("empty choice");
+            error!("empty choice");
             Err(anyhow!("empty choice"))
         }
     }

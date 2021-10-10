@@ -10,7 +10,7 @@ use crate::{
     domain::msg::{Msg, TplOverride},
 };
 
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub struct Tpl(pub String);
 
 impl Tpl {

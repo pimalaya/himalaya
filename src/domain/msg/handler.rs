@@ -5,7 +5,6 @@
 use anyhow::{Context, Result};
 use atty::Stream;
 use imap::types::Flag;
-use lettre::message::header::ContentTransferEncoding;
 use log::{debug, trace};
 use std::{
     borrow::Cow,
@@ -20,7 +19,7 @@ use crate::{
     domain::{
         imap::service::ImapServiceInterface,
         mbox::entity::Mbox,
-        msg::{header::entity::Headers, Flags, Msg, Tpl},
+        msg::{Flags, Msg, Part, TextPlainPart, Tpl},
         smtp::service::SmtpServiceInterface,
     },
     output::service::OutputServiceInterface,
@@ -136,6 +135,13 @@ pub fn mailto<
     imap: &mut ImapService,
     smtp: &mut SmtpService,
 ) -> Result<()> {
+    debug!("entering mailto handler");
+
+    let to: Vec<lettre::message::Mailbox> = url
+        .path()
+        .split(";")
+        .filter_map(|s| s.parse().ok())
+        .collect();
     let mut cc = Vec::new();
     let mut bcc = Vec::new();
     let mut subject = Cow::default();
@@ -144,10 +150,10 @@ pub fn mailto<
     for (key, val) in url.query_pairs() {
         match key.as_bytes() {
             b"cc" => {
-                cc.push(val.into());
+                cc.push(val.parse()?);
             }
             b"bcc" => {
-                bcc.push(val.into());
+                bcc.push(val.parse()?);
             }
             b"subject" => {
                 subject = val;
@@ -159,20 +165,17 @@ pub fn mailto<
         }
     }
 
-    let headers = Headers {
-        from: vec![account.address()],
-        to: vec![url.path().to_string()],
-        encoding: ContentTransferEncoding::Base64,
-        cc: if cc.is_empty() { None } else { Some(cc) },
-        bcc: if bcc.is_empty() { None } else { Some(bcc) },
-        subject: Some(subject.into()),
-        ..Headers::default()
-    };
+    let mut msg = Msg::default();
 
-    // let mut msg = Msg::new_with_headers(&account, headers);
-    // msg.body = Body::new_with_text(body);
-    // msg_interaction(output, &mut msg, imap, smtp)?;
-    Ok(())
+    msg.from = Some(vec![account.address().parse()?]);
+    msg.to = if to.is_empty() { None } else { Some(to) };
+    msg.cc = if cc.is_empty() { None } else { Some(cc) };
+    msg.bcc = if bcc.is_empty() { None } else { Some(bcc) };
+    msg.subject = subject.into();
+    msg.parts.push(Part::TextPlain(TextPlainPart {
+        content: body.into(),
+    }));
+    msg.edit(account, output, imap, smtp)
 }
 
 /// Move a message from a mailbox to another.
@@ -293,7 +296,7 @@ pub fn send<
     };
 
     let tpl = Tpl(raw_msg.to_string());
-    let msg = Msg::try_from(tpl)?;
+    let msg = Msg::try_from(&tpl)?;
     let envelope: lettre::address::Envelope = msg.try_into()?;
     smtp.send_raw_msg(&envelope, raw_msg.as_bytes())?;
     debug!("message sent!");

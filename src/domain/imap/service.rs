@@ -16,7 +16,7 @@ use crate::{
     config::entity::{Account, Config},
     domain::{
         mbox::entity::Mbox,
-        msg::{self, Envelopes, Flags, Msg},
+        msg::{Envelopes, Flags, Msg},
     },
 };
 
@@ -29,7 +29,6 @@ pub trait ImapServiceInterface {
     fn get_mboxes(&mut self) -> Result<ImapMboxes>;
     fn get_msgs(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes>;
     fn find_msgs(&mut self, query: &str, page_size: &usize, page: &usize) -> Result<Envelopes>;
-    fn get_msg(&mut self, seq: &str) -> Result<msg::entity::Msg>;
     fn find_msg(&mut self, seq: &str) -> Result<Msg>;
     fn find_raw_msg(&mut self, seq: &str) -> Result<Vec<u8>>;
     fn append_msg(&mut self, mbox: &Mbox, msg: Msg) -> Result<()>;
@@ -179,23 +178,6 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
     }
 
     /// Find a message by sequence number.
-    fn get_msg(&mut self, seq: &str) -> Result<msg::entity::Msg> {
-        let mbox = self.mbox.to_owned();
-        self.sess()?
-            .select(&mbox.name)
-            .context(format!("cannot select mbox `{}`", self.mbox.name))?;
-        match self
-            .sess()?
-            .fetch(seq, "(FLAGS BODY[] ENVELOPE INTERNALDATE)")
-            .context("cannot fetch bodies")?
-            .first()
-        {
-            None => Err(anyhow!("cannot find message `{}`", seq)),
-            Some(fetch) => Ok(msg::entity::Msg::try_from(fetch)?),
-        }
-    }
-
-    /// Find a message by sequence number.
     fn find_msg(&mut self, seq: &str) -> Result<Msg> {
         let mbox = self.mbox.to_owned();
         self.sess()?
@@ -294,13 +276,18 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
                     .context("cannot fetch new messages enveloppe")?;
 
                 for fetch in fetches.iter() {
-                    let msg = msg::entity::Msg::try_from(fetch)?;
+                    let msg = Msg::try_from(fetch)?;
                     let uid = fetch.uid.ok_or_else(|| {
                         anyhow!("cannot retrieve message {}'s UID", fetch.message)
                     })?;
 
-                    let subject = msg.headers.subject.clone().unwrap_or_default();
-                    config.run_notify_cmd(&subject, &msg.headers.from[0])?;
+                    let from = msg
+                        .from
+                        .as_ref()
+                        .and_then(|addrs| addrs.iter().next())
+                        .map(|addr| addr.to_string())
+                        .unwrap_or(String::from("unknown"));
+                    config.run_notify_cmd(&msg.subject, &from)?;
 
                     debug!("notify message: {}", uid);
                     trace!("message: {:?}", msg);

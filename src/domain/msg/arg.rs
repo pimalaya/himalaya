@@ -237,13 +237,26 @@ fn page_arg<'a>() -> Arg<'a, 'a> {
         .default_value("0")
 }
 
+/// Message attachment argument.
+fn attachment_arg<'a>() -> Arg<'a, 'a> {
+    Arg::with_name("attachments")
+        .help("Adds attachment to the message")
+        .short("a")
+        .long("attachment")
+        .value_name("PATH")
+        .multiple(true)
+}
+
 /// Message subcommands.
 pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
     vec![
         msg::flag::arg::subcmds(),
         msg::tpl::arg::subcmds(),
-        msg::attachment::arg::subcmds(),
         vec![
+            SubCommand::with_name("attachments")
+                .aliases(&["attachment", "att", "a"])
+                .about("Downloads all message attachments")
+                .arg(msg::arg::seq_arg()),
             SubCommand::with_name("list")
                 .aliases(&["lst", "l"])
                 .about("Lists all messages")
@@ -264,7 +277,7 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                 ),
             SubCommand::with_name("write")
                 .about("Writes a new message")
-                .arg(msg::attachment::arg::path_arg()),
+                .arg(attachment_arg()),
             SubCommand::with_name("send")
                 .about("Sends a raw message")
                 .arg(Arg::with_name("message").raw(true).last(true)),
@@ -294,12 +307,12 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                 .about("Answers to a message")
                 .arg(seq_arg())
                 .arg(reply_all_arg())
-                .arg(msg::attachment::arg::path_arg()),
+                .arg(attachment_arg()),
             SubCommand::with_name("forward")
                 .aliases(&["fwd", "f"])
                 .about("Forwards a message")
                 .arg(seq_arg())
-                .arg(msg::attachment::arg::path_arg()),
+                .arg(attachment_arg()),
             SubCommand::with_name("copy")
                 .aliases(&["cp", "c"])
                 .about("Copies a message to the targetted mailbox")
