@@ -18,24 +18,36 @@
 ///
 /// Execute `himalaya help <cmd>` where `<cmd>` is one entry of this list above
 /// to get more information about them.
-pub mod arg;
+pub mod msg_arg;
 
-/// Here are the two **main structs** of this module: `Msg` and `Msgs` which
-/// represent a *Mail* or *multiple Mails* in this crate.
-pub mod entity;
+pub mod msg_handler;
+pub mod msg_utils;
 
-/// This module is used in the `Msg` struct, which should represent an
-/// attachment of a msg.
-pub mod attachment;
+pub mod flag_arg;
+pub mod flag_handler;
 
-/// This module is used in the `Msg` struct, which should represent the headers
-/// fields like `To:` and `From:`.
-pub mod header;
+pub mod flag_entity;
+pub use flag_entity::*;
 
-/// This module is used in the `Msg` struct, which should represent the body of
-/// a msg; The part where you're writing some text like `Dear Mr. LMAO`.
-pub mod body;
-pub mod flag;
-pub mod handler;
-pub mod tpl;
-pub mod utils;
+pub mod flags_entity;
+pub use flags_entity::*;
+
+pub mod envelope_entity;
+pub use envelope_entity::*;
+
+pub mod envelopes_entity;
+pub use envelopes_entity::*;
+
+pub mod tpl_arg;
+pub use tpl_arg::TplOverride;
+
+pub mod tpl_handler;
+
+pub mod tpl_entity;
+pub use tpl_entity::*;
+
+pub mod msg_entity;
+pub use msg_entity::*;
+
+pub mod parts_entity;
+pub use parts_entity::*;

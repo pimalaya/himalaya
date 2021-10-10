@@ -5,9 +5,7 @@ use serde::{
     ser::{self, SerializeSeq},
     Serialize,
 };
-use std::collections::HashSet;
-use std::fmt;
-use std::{borrow::Cow, convert::TryFrom};
+use std::{borrow::Cow, collections::HashSet, convert::TryFrom, fmt};
 
 use crate::ui::table::{Cell, Row, Table};
 

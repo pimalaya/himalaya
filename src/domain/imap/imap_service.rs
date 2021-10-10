@@ -3,47 +3,45 @@
 //! This module exposes a service that can interact with IMAP servers.
 
 use anyhow::{anyhow, Context, Result};
-use imap;
 use log::{debug, trace};
-use native_tls::{self, TlsConnector, TlsStream};
-use std::{collections::HashSet, convert::TryFrom, iter::FromIterator, net::TcpStream};
+use native_tls::{TlsConnector, TlsStream};
+use std::{
+    collections::HashSet,
+    convert::{TryFrom, TryInto},
+    iter::FromIterator,
+    net::TcpStream,
+};
 
 use crate::{
-    config::entity::{Account, Config},
+    config::{Account, Config},
     domain::{
-        mbox::entity::Mbox,
-        msg::{entity::Msg, flag::entity::Flags},
+        mbox::Mbox,
+        msg::{Envelopes, Flags, Msg},
     },
 };
 
 type ImapSession = imap::Session<TlsStream<TcpStream>>;
-type ImapMsgs = imap::types::ZeroCopy<Vec<imap::types::Fetch>>;
 type ImapMboxes = imap::types::ZeroCopy<Vec<imap::types::Name>>;
 
 pub trait ImapServiceInterface {
     fn notify(&mut self, config: &Config, keepalive: u64) -> Result<()>;
     fn watch(&mut self, keepalive: u64) -> Result<()>;
-    fn list_mboxes(&mut self) -> Result<ImapMboxes>;
-    fn list_msgs(&mut self, page_size: &usize, page: &usize) -> Result<Option<ImapMsgs>>;
-    fn search_msgs(
-        &mut self,
-        query: &str,
-        page_size: &usize,
-        page: &usize,
-    ) -> Result<Option<ImapMsgs>>;
-    fn get_msg(&mut self, uid: &str) -> Result<Msg>;
-    fn append_msg(&mut self, mbox: &Mbox, msg: &mut Msg) -> Result<()>;
-    /// Add flags to the given message UID sequence.
-    ///
-    /// ```ignore
-    /// let flags = Flags::from(vec![Flag::Seen, Flag::Deleted]);
-    /// add_flags("5:10", flags)
-    /// ```
-    fn add_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()>;
-    fn set_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()>;
-    fn remove_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()>;
+    fn get_mboxes(&mut self) -> Result<ImapMboxes>;
+    fn get_msgs(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes>;
+    fn find_msgs(&mut self, query: &str, page_size: &usize, page: &usize) -> Result<Envelopes>;
+    fn find_msg(&mut self, seq: &str) -> Result<Msg>;
+    fn find_raw_msg(&mut self, seq: &str) -> Result<Vec<u8>>;
+    fn append_msg(&mut self, mbox: &Mbox, msg: Msg) -> Result<()>;
+    fn append_raw_msg_with_flags(&mut self, mbox: &Mbox, msg: &[u8], flags: Flags) -> Result<()>;
     fn expunge(&mut self) -> Result<()>;
     fn logout(&mut self) -> Result<()>;
+
+    /// Add flags to all messages within the given sequence range.
+    fn add_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()>;
+    /// Replace flags of all messages within the given sequence range.
+    fn set_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()>;
+    /// Remove flags from all messages within the given sequence range.
+    fn remove_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()>;
 }
 
 pub struct ImapService<'a> {
@@ -108,7 +106,7 @@ impl<'a> ImapService<'a> {
 }
 
 impl<'a> ImapServiceInterface for ImapService<'a> {
-    fn list_mboxes(&mut self) -> Result<ImapMboxes> {
+    fn get_mboxes(&mut self) -> Result<ImapMboxes> {
         let mboxes = self
             .sess()?
             .list(Some(""), Some("*"))
@@ -116,20 +114,20 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
         Ok(mboxes)
     }
 
-    fn list_msgs(&mut self, page_size: &usize, page: &usize) -> Result<Option<ImapMsgs>> {
+    fn get_msgs(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes> {
         let mbox = self.mbox.to_owned();
         let last_seq = self
             .sess()?
             .select(&mbox.name)
-            .context(format!("cannot select mailbox `{}`", self.mbox.name))?
+            .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?
             .exists as i64;
 
         if last_seq == 0 {
-            return Ok(None);
+            return Ok(Envelopes::default());
         }
 
         // TODO: add tests, improve error management when empty page
-        let range = if page_size > &0 {
+        let range = if *page_size > 0 {
             let cursor = (page * page_size) as i64;
             let begin = 1.max(last_seq - cursor);
             let end = begin - begin.min(*page_size as i64) + 1;
@@ -140,138 +138,94 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
 
         let fetches = self
             .sess()?
-            .fetch(range, "(UID FLAGS ENVELOPE INTERNALDATE)")
-            .context("cannot fetch messages")?;
+            .fetch(range, "(ENVELOPE FLAGS INTERNALDATE)")
+            .context(r#"cannot fetch messages within range "{}""#)?;
 
-        Ok(Some(fetches))
+        Ok(Envelopes::try_from(fetches)?)
     }
 
-    fn search_msgs(
-        &mut self,
-        query: &str,
-        page_size: &usize,
-        page: &usize,
-    ) -> Result<Option<ImapMsgs>> {
+    fn find_msgs(&mut self, query: &str, page_size: &usize, page: &usize) -> Result<Envelopes> {
         let mbox = self.mbox.to_owned();
         self.sess()?
             .select(&mbox.name)
-            .context(format!("cannot select mailbox `{}`", self.mbox.name))?;
+            .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?;
 
         let begin = page * page_size;
         let end = begin + (page_size - 1);
-        let uids: Vec<String> = self
+        let seqs: Vec<String> = self
             .sess()?
             .search(query)
             .context(format!(
-                "cannot search in `{}` with query `{}`",
+                r#"cannot search in "{}" with query: "{}""#,
                 self.mbox.name, query
             ))?
             .iter()
             .map(|seq| seq.to_string())
             .collect();
 
-        if uids.is_empty() {
-            return Ok(None);
+        if seqs.is_empty() {
+            return Ok(Envelopes::default());
         }
 
-        let range = uids[begin..end.min(uids.len())].join(",");
+        // FIXME: panic if begin > end
+        let range = seqs[begin..end.min(seqs.len())].join(",");
         let fetches = self
             .sess()?
-            .fetch(&range, "(UID FLAGS ENVELOPE INTERNALDATE)")
-            .context(format!("cannot fetch range `{}`", &range))?;
+            .fetch(&range, "(ENVELOPE FLAGS INTERNALDATE)")
+            .context(r#"cannot fetch messages within range "{}""#)?;
 
-        Ok(Some(fetches))
+        Ok(Envelopes::try_from(fetches)?)
     }
-    /// Get the message according to the given `mbox` and `uid`.
-    fn get_msg(&mut self, uid: &str) -> Result<Msg> {
+
+    /// Find a message by sequence number.
+    fn find_msg(&mut self, seq: &str) -> Result<Msg> {
         let mbox = self.mbox.to_owned();
-        self.sess()?
-            .select(&mbox.name)
-            .context(format!("cannot select mbox `{}`", self.mbox.name))?;
-        match self
-            .sess()?
-            .uid_fetch(uid, "(FLAGS BODY[] ENVELOPE INTERNALDATE)")
-            .context("cannot fetch bodies")?
-            .first()
-        {
-            None => Err(anyhow!("cannot find message `{}`", uid)),
-            Some(fetch) => Ok(Msg::try_from(fetch)?),
-        }
-    }
-
-    fn append_msg(&mut self, mbox: &Mbox, msg: &mut Msg) -> Result<()> {
-        let body = msg.into_bytes()?;
-        let flags: HashSet<imap::types::Flag<'static>> = (*msg.flags).clone();
-        self.sess()?
-            .append(&mbox.name, &body)
-            .flags(flags)
-            .finish()
-            .context(format!("cannot append message to `{}`", mbox.name))?;
-        Ok(())
-    }
-
-    fn add_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()> {
-        let mbox = self.mbox.to_owned();
-        let flags: String = flags.to_string();
         self.sess()?
             .select(&mbox.name)
             .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?;
-        self.sess()?
-            .uid_store(uid_seq, format!("+FLAGS ({})", flags))
-            .context(format!(r#"cannot add flags "{}""#, &flags))?;
-        Ok(())
+        let fetches = self
+            .sess()?
+            .fetch(seq, "(ENVELOPE FLAGS INTERNALDATE BODY[])")
+            .context(r#"cannot fetch messages "{}""#)?;
+        let fetch = fetches
+            .first()
+            .ok_or(anyhow!(r#"cannot find message "{}"#, seq))?;
+
+        Ok(Msg::try_from(fetch)?)
     }
 
-    /// Applies the given flags to the msg.
-    ///
-    /// # Example
-    /// ```no_run
-    /// use himalaya::imap::model::ImapConnector;
-    /// use himalaya::config::model::Account;
-    /// use himalaya::flag::model::Flags;
-    /// use imap::types::Flag;
-    ///
-    /// fn main() {
-    ///     let account = Account::default();
-    ///     let mut imap_conn = ImapConnector::new(&account).unwrap();
-    ///     let flags = Flags::from(vec![Flag::Seen]);
-    ///
-    ///     // Mark the message with the UID 42 in the mailbox "rofl" as "Seen" and wipe all other
-    ///     // flags
-    ///     imap_conn.set_flags("rofl", "42", flags).unwrap();
-    ///
-    ///     imap_conn.logout();
-    /// }
-    /// ```
-    fn set_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()> {
+    fn find_raw_msg(&mut self, seq: &str) -> Result<Vec<u8>> {
         let mbox = self.mbox.to_owned();
         self.sess()?
             .select(&mbox.name)
-            .context(format!("cannot select mailbox `{}`", self.mbox.name))?;
+            .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?;
+        let fetches = self
+            .sess()?
+            .fetch(seq, "BODY[]")
+            .context(r#"cannot fetch raw messages "{}""#)?;
+        let fetch = fetches
+            .first()
+            .ok_or(anyhow!(r#"cannot find raw message "{}"#, seq))?;
+
+        Ok(fetch.body().map(Vec::from).unwrap_or_default())
+    }
+
+    fn append_raw_msg_with_flags(&mut self, mbox: &Mbox, msg: &[u8], flags: Flags) -> Result<()> {
         self.sess()?
-            .uid_store(uid_seq, format!("FLAGS ({})", flags))
-            .context(format!("cannot set flags `{}`", &flags))?;
+            .append(&mbox.name, &msg)
+            .flags(flags.0)
+            .finish()
+            .context(format!(r#"cannot append message to "{}""#, mbox.name))?;
         Ok(())
     }
 
-    /// Remove the flags to the message by the given information. Take a look on the example above.
-    /// It's pretty similar.
-    fn remove_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()> {
-        let mbox = self.mbox.to_owned();
-        let flags = flags.to_string();
+    fn append_msg(&mut self, mbox: &Mbox, msg: Msg) -> Result<()> {
+        let msg_raw: Vec<u8> = (&msg).try_into()?;
         self.sess()?
-            .select(&mbox.name)
-            .context(format!("cannot select mailbox `{}`", self.mbox.name))?;
-        self.sess()?
-            .uid_store(uid_seq, format!("-FLAGS ({})", flags))
-            .context(format!("cannot remove flags `{}`", &flags))?;
-        Ok(())
-    }
-
-    fn expunge(&mut self) -> Result<()> {
-        self.sess()?
-            .expunge()
-            .context(format!("cannot expunge `{}`", self.mbox.name))?;
+            .append(&mbox.name, &msg_raw)
+            .flags(msg.flags.0)
+            .finish()
+            .context(format!(r#"cannot append message to "{}""#, mbox.name))?;
         Ok(())
     }
 
@@ -327,8 +281,13 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
                         anyhow!("cannot retrieve message {}'s UID", fetch.message)
                     })?;
 
-                    let subject = msg.headers.subject.clone().unwrap_or_default();
-                    config.run_notify_cmd(&subject, &msg.headers.from[0])?;
+                    let from = msg
+                        .from
+                        .as_ref()
+                        .and_then(|addrs| addrs.iter().next())
+                        .map(|addr| addr.to_string())
+                        .unwrap_or(String::from("unknown"));
+                    config.run_notify_cmd(&msg.subject, &from)?;
 
                     debug!("notify message: {}", uid);
                     trace!("message: {:?}", msg);
@@ -375,6 +334,48 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
             debug!("logout from IMAP server");
             sess.logout().context("cannot logout from IMAP server")?;
         }
+        Ok(())
+    }
+
+    fn add_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()> {
+        let mbox = self.mbox.to_owned();
+        let flags: String = flags.to_string();
+        self.sess()?
+            .select(&mbox.name)
+            .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?;
+        self.sess()?
+            .store(seq_range, format!("+FLAGS ({})", flags))
+            .context(format!(r#"cannot add flags "{}""#, &flags))?;
+        Ok(())
+    }
+
+    fn set_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()> {
+        let mbox = self.mbox.to_owned();
+        self.sess()?
+            .select(&mbox.name)
+            .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?;
+        self.sess()?
+            .store(uid_seq, format!("FLAGS ({})", flags))
+            .context(format!(r#"cannot set flags "{}""#, &flags))?;
+        Ok(())
+    }
+
+    fn remove_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()> {
+        let mbox = self.mbox.to_owned();
+        let flags = flags.to_string();
+        self.sess()?
+            .select(&mbox.name)
+            .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?;
+        self.sess()?
+            .store(uid_seq, format!("-FLAGS ({})", flags))
+            .context(format!(r#"cannot remove flags "{}""#, &flags))?;
+        Ok(())
+    }
+
+    fn expunge(&mut self) -> Result<()> {
+        self.sess()?
+            .expunge()
+            .context(format!(r#"cannot expunge mailbox "{}""#, self.mbox.name))?;
         Ok(())
     }
 }

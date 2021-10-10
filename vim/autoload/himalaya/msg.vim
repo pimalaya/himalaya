@@ -8,16 +8,11 @@ let s:draft = ""
 " Message
 
 function! s:format_msg_for_list(msg)
-  let msg = {}
-  let msg.uid = a:msg.uid
   let flag_new = index(a:msg.flags, "Seen") == -1 ? "✷" : " "
   let flag_flagged = index(a:msg.flags, "Flagged") == -1 ? " " : "!"
   let flag_replied = index(a:msg.flags, "Answered") == -1 ? " " : "↵"
-  let msg.flags = printf("%s %s %s", flag_new, flag_replied, flag_flagged)
-  let msg.subject = a:msg.subject
-  let msg.sender = a:msg.sender
-  let msg.date = a:msg.date
-  return msg
+  let a:msg.flags = printf("%s %s %s", flag_new, flag_replied, flag_flagged)
+  return a:msg
 endfunction
 
 function! himalaya#msg#list_with(account, mbox, page, should_throw)
@@ -30,7 +25,7 @@ function! himalaya#msg#list_with(account, mbox, page, should_throw)
   \)
   let msgs = map(msgs, "s:format_msg_for_list(v:val)")
   let buftype = stridx(bufname("%"), "Himalaya messages") == 0 ? "file" : "edit"
-  execute printf("silent! %s Himalaya messages [%s] [page %d]", buftype, a:mbox, a:page + 1)
+  execute printf("silent! %s Himalaya messages [%s] [page %d]", buftype, a:mbox, a:page)
   setlocal modifiable
   silent execute "%d"
   call append(0, s:render("list", msgs))
@@ -43,7 +38,9 @@ endfunction
 
 function! himalaya#msg#list(...)
   try
-    call himalaya#account#set(a:0 > 0 ? a:1 : "")
+    if a:0 > 0
+      call himalaya#account#set(a:1)
+    endif
     let account = himalaya#account#curr()
     let mbox = himalaya#mbox#curr_mbox()
     let page = himalaya#mbox#curr_page()
@@ -67,11 +64,10 @@ function! himalaya#msg#read()
       \printf("Fetching message %d", s:msg_id),
       \1,
     \)
-    let attachment = msg.hasAttachment ? " []" : ""
-    execute printf("silent! edit Himalaya read message [%d]%s", s:msg_id, attachment)
+    execute printf("silent! botright new Himalaya read message [%d]", s:msg_id)
     setlocal modifiable
     silent execute "%d"
-    call append(0, split(substitute(msg.content, "\r", "", "g"), "\n"))
+    call append(0, split(substitute(msg, "\r", "", "g"), "\n"))
     silent execute "$d"
     setlocal filetype=himalaya-msg-read
     let &modified = 0
@@ -90,7 +86,7 @@ function! himalaya#msg#write()
     let account = himalaya#account#curr()
     let msg = s:cli("--account %s template new", [shellescape(account)], "Fetching new template", 0)
     silent! edit Himalaya write
-    call append(0, split(substitute(msg.raw, "\r", "", "g"), "\n"))
+    call append(0, split(substitute(msg, "\r", "", "g"), "\n"))
     silent execute "$d"
     setlocal filetype=himalaya-msg-write
     let &modified = 0
@@ -116,7 +112,7 @@ function! himalaya#msg#reply()
       \0,
     \)
     execute printf("silent! edit Himalaya reply [%d]", msg_id)
-    call append(0, split(substitute(msg.raw, "\r", "", "g"), "\n"))
+    call append(0, split(substitute(msg, "\r", "", "g"), "\n"))
     silent execute "$d"
     setlocal filetype=himalaya-msg-write
     let &modified = 0
@@ -142,7 +138,7 @@ function! himalaya#msg#reply_all()
       \0
     \)
     execute printf("silent! edit Himalaya reply all [%d]", msg_id)
-    call append(0, split(substitute(msg.raw, "\r", "", "g"), "\n"))
+    call append(0, split(substitute(msg, "\r", "", "g"), "\n"))
     silent execute "$d"
     setlocal filetype=himalaya-msg-write
     let &modified = 0
@@ -168,7 +164,7 @@ function! himalaya#msg#forward()
       \0
     \)
     execute printf("silent! edit Himalaya forward [%d]", msg_id)
-    call append(0, split(substitute(msg.raw, "\r", "", "g"), "\n"))
+    call append(0, split(substitute(msg, "\r", "", "g"), "\n"))
     silent execute "$d"
     setlocal filetype=himalaya-msg-write
     let &modified = 0
@@ -259,7 +255,7 @@ function! himalaya#msg#delete() range
 endfunction
 
 function! himalaya#msg#draft_save()
-  let s:draft = join(getline(1, "$"), "\n")
+  let s:draft = join(getline(1, "$"), "\n") . "\n"
   redraw | call s:log("Save draft [OK]")
   let &modified = 0
 endfunction
@@ -322,10 +318,10 @@ endfunction
 
 let s:config = {
   \"list": {
-    \"columns": ["uid", "flags", "subject", "sender", "date"],
+    \"columns": ["id", "flags", "subject", "sender", "date"],
   \},
   \"labels": {
-    \"uid": "UID",
+    \"id": "ID",
     \"flags": "FLAGS",
     \"subject": "SUBJECT",
     \"sender": "SENDER",

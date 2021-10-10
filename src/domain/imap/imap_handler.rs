@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 
-use crate::{config::entity::Config, domain::imap::service::ImapServiceInterface};
+use crate::{config::Config, domain::imap::ImapServiceInterface};
 
 /// Notify handler.
 pub fn notify<ImapService: ImapServiceInterface>(
@@ -12,9 +12,7 @@ pub fn notify<ImapService: ImapServiceInterface>(
     config: &Config,
     imap: &mut ImapService,
 ) -> Result<()> {
-    imap.notify(&config, keepalive)?;
-    imap.logout()?;
-    Ok(())
+    imap.notify(&config, keepalive)
 }
 
 /// Watch handler.
@@ -22,7 +20,5 @@ pub fn watch<ImapService: ImapServiceInterface>(
     keepalive: u64,
     imap: &mut ImapService,
 ) -> Result<()> {
-    imap.watch(keepalive)?;
-    imap.logout()?;
-    Ok(())
+    imap.watch(keepalive)
 }

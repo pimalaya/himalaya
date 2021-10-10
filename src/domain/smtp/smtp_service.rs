@@ -8,11 +8,13 @@ use lettre::{
     Transport,
 };
 use log::debug;
+use std::convert::TryInto;
 
-use crate::config::entity::Account;
+use crate::{config::Account, domain::msg::Msg};
 
 pub trait SmtpServiceInterface {
-    fn send(&mut self, msg: &lettre::Message) -> Result<()>;
+    fn send_msg(&mut self, msg: &Msg) -> Result<lettre::Message>;
+    fn send_raw_msg(&mut self, envelope: &lettre::address::Envelope, msg: &[u8]) -> Result<()>;
 }
 
 pub struct SmtpService<'a> {
@@ -55,8 +57,16 @@ impl<'a> SmtpService<'a> {
 }
 
 impl<'a> SmtpServiceInterface for SmtpService<'a> {
-    fn send(&mut self, msg: &lettre::Message) -> Result<()> {
-        self.transport()?.send(msg)?;
+    fn send_msg(&mut self, msg: &Msg) -> Result<lettre::Message> {
+        debug!("sending message…");
+        let sendable_msg: lettre::Message = msg.try_into()?;
+        self.transport()?.send(&sendable_msg)?;
+        Ok(sendable_msg)
+    }
+
+    fn send_raw_msg(&mut self, envelope: &lettre::address::Envelope, msg: &[u8]) -> Result<()> {
+        debug!("sending raw message…");
+        self.transport()?.send_raw(envelope, msg)?;
         Ok(())
     }
 }
