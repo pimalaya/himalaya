@@ -13,7 +13,7 @@ use std::{
 };
 
 use crate::{
-    config::entity::{Account, Config},
+    config::{Account, Config},
     domain::{
         mbox::entity::Mbox,
         msg::{Envelopes, Flags, Msg},

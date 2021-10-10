@@ -1,25 +1,5 @@
 use anyhow::Result;
-use serde::ser::{self, SerializeStruct};
-use std::{fmt, process::Command, result};
-
-pub struct Info(pub String);
-
-impl fmt::Display for Info {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl ser::Serialize for Info {
-    fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
-    where
-        S: ser::Serializer,
-    {
-        let mut state = serializer.serialize_struct("Info", 1)?;
-        state.serialize_field("info", &self.0)?;
-        state.end()
-    }
-}
+use std::process::Command;
 
 pub fn run_cmd(cmd: &str) -> Result<String> {
     let output = if cfg!(target_os = "windows") {

@@ -10,7 +10,7 @@ use lettre::{
 use log::debug;
 use std::convert::TryInto;
 
-use crate::{config::entity::Account, domain::msg::Msg};
+use crate::{config::Account, domain::msg::Msg};
 
 pub trait SmtpServiceInterface {
     fn send_msg(&mut self, msg: &Msg) -> Result<lettre::Message>;

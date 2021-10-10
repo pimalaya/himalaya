@@ -5,7 +5,7 @@
 use anyhow::Result;
 
 use crate::{
-    config::entity::Account,
+    config::Account,
     domain::{
         imap::ImapServiceInterface,
         msg::{Msg, Tpl, TplOverride},

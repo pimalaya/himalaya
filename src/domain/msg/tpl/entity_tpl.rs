@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    config::entity::Account,
+    config::Account,
     domain::msg::{Msg, TplOverride},
 };
 

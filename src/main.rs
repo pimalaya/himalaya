@@ -10,7 +10,7 @@ mod domain;
 mod output;
 mod ui;
 
-use config::entity::{Account, Config};
+use config::{Account, Config};
 use domain::{
     imap::{self, ImapService, ImapServiceInterface},
     mbox::{self, entity::Mbox},

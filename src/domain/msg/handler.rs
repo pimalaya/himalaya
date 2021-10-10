@@ -15,7 +15,7 @@ use std::{
 use url::Url;
 
 use crate::{
-    config::entity::Account,
+    config::Account,
     domain::{
         imap::service::ImapServiceInterface,
         mbox::entity::Mbox,
