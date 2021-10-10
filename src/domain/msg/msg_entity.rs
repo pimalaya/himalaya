@@ -573,15 +573,10 @@ impl TryInto<lettre::address::Envelope> for Msg {
         let from: Option<lettre::Address> = self
             .from
             .and_then(|addrs| addrs.into_iter().next())
-            .and_then(|addr| addr.to_string().parse::<lettre::Address>().ok());
+            .map(|addr| addr.email);
         let to = self
             .to
-            .map(|addrs| {
-                addrs
-                    .iter()
-                    .filter_map(|addr| addr.to_string().parse::<lettre::Address>().ok())
-                    .collect()
-            })
+            .map(|addrs| addrs.into_iter().map(|addr| addr.email).collect())
             .unwrap_or_default();
         let envelope =
             lettre::address::Envelope::new(from, to).context("cannot create envelope")?;

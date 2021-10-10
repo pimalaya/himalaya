@@ -10,7 +10,7 @@ endfunction
 function! s:fzf_picker(cb, mboxes)
   call fzf#run({
     \"source": a:mboxes,
-    \"sink": a:cb,
+    \"sink": function(a:cb),
     \"down": "25%",
   \})
 endfunction
@@ -24,14 +24,14 @@ endfunction
 
 " Pagination
 
-let s:curr_page = 0
+let s:curr_page = 1
 
 function! himalaya#mbox#curr_page()
   return s:curr_page
 endfunction
 
 function! himalaya#mbox#prev_page()
-  let s:curr_page = max([0, s:curr_page - 1])
+  let s:curr_page = max([1, s:curr_page - 1])
   call himalaya#msg#list()
 endfunction
 
@@ -79,6 +79,6 @@ endfunction
 
 function! himalaya#mbox#_change(mbox)
   let s:curr_mbox = a:mbox
-  let s:curr_page = 0
+  let s:curr_page = 1
   call himalaya#msg#list()
 endfunction

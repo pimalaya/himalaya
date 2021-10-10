@@ -74,8 +74,8 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
 
     fn try_from((config, account_name): (&'a Config, Option<&str>)) -> Result<Self, Self::Error> {
         debug!("init account `{}`", account_name.unwrap_or("default"));
-        let (name, account) = match account_name {
-            Some("") | None => config
+        let (name, account) = match account_name.map(|name| name.trim()) {
+            Some("default") | Some("") | None => config
                 .accounts
                 .iter()
                 .find(|(_, account)| account.default.unwrap_or(false))
@@ -85,7 +85,7 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
                 .accounts
                 .get(name)
                 .map(|account| (name.to_owned(), account))
-                .ok_or_else(|| anyhow!("cannot find account `{}`", name)),
+                .ok_or_else(|| anyhow!(r#"cannot find account "{}""#, name)),
         }?;
 
         let downloads_dir = account
