@@ -161,73 +161,50 @@ impl Msg {
             self.subject = format!("Re: {}", self.subject);
         }
 
-        // Text plain parts
-        let plain_content = {
-            let date = self
-                .date
-                .as_ref()
-                .map(|date| date.format("%d %b %Y, at %H:%M").to_string())
-                .unwrap_or("unknown date".into());
-            let sender = self
-                .reply_to
-                .as_ref()
-                .or(self.from.as_ref())
-                .and_then(|addrs| addrs.first())
-                .map(|addr| addr.name.to_owned().unwrap_or(addr.email.to_string()))
-                .unwrap_or("unknown sender".into());
-            let mut content = format!("\n\nOn {}, {} wrote:\n", date, sender);
+        // plaintext and html content
+        let date = self
+            .date
+            .as_ref()
+            .map(|date| date.format("%d %b %Y, at %H:%M").to_string())
+            .unwrap_or("unknown date".into());
+        let sender = self
+            .reply_to
+            .as_ref()
+            .or(self.from.as_ref())
+            .and_then(|addrs| addrs.first())
+            .map(|addr| addr.name.to_owned().unwrap_or(addr.email.to_string()))
+            .unwrap_or("unknown sender".into());
 
-            let mut glue = "";
-            for line in self.join_text_plain_parts().trim().lines() {
-                if line == "-- \n" {
-                    break;
-                }
-                content.push_str(glue);
-                content.push_str(">");
-                content.push_str(if line.starts_with(">") { "" } else { " " });
-                content.push_str(line);
-                glue = "\n";
+        let mut html_content = format!("\n\nOn {}, {} wrote:\n", date, sender);
+        let mut plaintext_content = html_content.clone();
+
+        let mut glue = "";
+        for plaintext_line in self.join_text_plain_parts().trim().lines() {
+            if plaintext_line == "-- \n" {
+                break;
             }
-
-            content
-        };
-
-        // Text HTML parts
-        let html_content = {
-            let date = self
-                .date
-                .as_ref()
-                .map(|date| date.format("%d %b %Y, at %H:%M").to_string())
-                .unwrap_or("unknown date".into());
-            let sender = self
-                .reply_to
-                .as_ref()
-                .or(self.from.as_ref())
-                .and_then(|addrs| addrs.first())
-                .map(|addr| addr.name.to_owned().unwrap_or(addr.email.to_string()))
-                .unwrap_or("unknown sender".into());
-            let mut content = format!("\n\nOn {}, {} wrote:\n", date, sender);
-
-            let mut glue = "";
-            for line in self.join_text_html_parts().trim().lines() {
-                if line == "-- \n" {
-                    break;
-                }
-                content.push_str(glue);
-                content.push_str(">");
-                content.push_str(if line.starts_with(">") { "" } else { " " });
-                content.push_str(line);
-                glue = "\n";
+            plaintext_content.push_str(glue);
+            plaintext_content.push_str(">");
+            plaintext_content.push_str(if plaintext_line.starts_with(">") { "" } else { " " });
+            plaintext_content.push_str(plaintext_line);
+            glue = "\n";
+        }
+        for html_line in self.join_text_html_parts().trim().lines() {
+            if html_line == "-- \n" {
+                break;
             }
-
-            content
-        };
+            html_content.push_str(glue);
+            html_content.push_str(">");
+            html_content.push_str(if html_line.starts_with(">") { "" } else { " " });
+            html_content.push_str(html_line);
+            glue = "\n";
+        }
 
         self.parts = Parts::default();
 
-        if !plain_content.is_empty() {
+        if !plaintext_content.is_empty() {
             self.parts.push(Part::TextPlain(TextPlainPart {
-                content: plain_content,
+                content: plaintext_content,
             }));
         }
 
@@ -271,73 +248,43 @@ impl Msg {
             self.subject = format!("Fwd: {}", self.subject);
         }
 
-        // Text plain parts
-        {
-            let mut content = String::default();
-            content.push_str("\n\n-------- Forwarded Message --------\n");
-            content.push_str(&format!("Subject: {}\n", prev_subject));
-            if let Some(date) = prev_date {
-                content.push_str(&format!("Date: {}\n", date.to_rfc2822()));
-            }
-            if let Some(addrs) = prev_from.as_ref() {
-                content.push_str("From: ");
-                let mut glue = "";
-                for addr in addrs {
-                    content.push_str(glue);
-                    content.push_str(&addr.to_string());
-                    glue = ", ";
-                }
-                content.push_str("\n");
-            }
-            if let Some(addrs) = prev_to.as_ref() {
-                content.push_str("To: ");
-                let mut glue = "";
-                for addr in addrs {
-                    content.push_str(glue);
-                    content.push_str(&addr.to_string());
-                    glue = ", ";
-                }
-                content.push_str("\n");
+        // Content for the plaintext and html parts
+        let mut content = String::default();
+        content.push_str("\n\n-------- Forwarded Message --------\n");
+        content.push_str(&format!("Subject: {}\n", prev_subject));
+        if let Some(date) = prev_date {
+            content.push_str(&format!("Date: {}\n", date.to_rfc2822()));
+        }
+        if let Some(addrs) = prev_from.as_ref() {
+            content.push_str("From: ");
+            let mut glue = "";
+            for addr in addrs {
+                content.push_str(glue);
+                content.push_str(&addr.to_string());
+                glue = ", ";
             }
             content.push_str("\n");
-            content.push_str(&self.join_text_plain_parts());
-            self.parts
-                .replace_text_plain_parts_with(TextPlainPart { content })
         }
+        if let Some(addrs) = prev_to.as_ref() {
+            content.push_str("To: ");
+            let mut glue = "";
+            for addr in addrs {
+                content.push_str(glue);
+                content.push_str(&addr.to_string());
+                glue = ", ";
+            }
+            content.push_str("\n");
+        }
+        content.push_str("\n");
+        
+        let mut html_content = content.clone();
+        let mut plaintext_content = content;
 
-        // Text HTML parts
-        {
-            let mut content = String::default();
-            content.push_str("\n\n-------- Forwarded Message --------\n");
-            content.push_str(&format!("Subject: {}\n", prev_subject));
-            if let Some(date) = prev_date {
-                content.push_str(&format!("Date: {}\n", date.to_rfc2822()));
-            }
-            if let Some(addrs) = prev_from.as_ref() {
-                content.push_str("From: ");
-                let mut glue = "";
-                for addr in addrs {
-                    content.push_str(glue);
-                    content.push_str(&addr.to_string());
-                    glue = ", ";
-                }
-                content.push_str("\n");
-            }
-            if let Some(addrs) = prev_to.as_ref() {
-                content.push_str("To: ");
-                let mut glue = "";
-                for addr in addrs {
-                    content.push_str(glue);
-                    content.push_str(&addr.to_string());
-                    glue = ", ";
-                }
-                content.push_str("\n");
-            }
-            content.push_str("\n");
-            content.push_str(&self.join_text_html_parts());
-            self.parts
-                .replace_text_html_parts_with(TextHtmlPart { content })
-        }
+        html_content.push_str(&self.join_text_html_parts());
+        plaintext_content.push_str(&self.join_text_plain_parts());
+
+        self.parts.replace_text_html_parts_with(TextHtmlPart { content: html_content });
+        self.parts.replace_text_plain_parts_with(TextPlainPart { content: plaintext_content});
 
         Ok(self)
     }
@@ -398,7 +345,6 @@ impl Msg {
                 }
                 Ok(PostEditChoice::Edit) => {
                     self.merge_with(self._edit_with_editor(account)?);
-                    continue;
                 }
                 Ok(PostEditChoice::LocalDraft) => {
                     output.print("Message successfully saved locally")?;
@@ -419,7 +365,6 @@ impl Msg {
                 }
                 Err(err) => {
                     println!("{}", err);
-                    continue;
                 }
             }
         }
