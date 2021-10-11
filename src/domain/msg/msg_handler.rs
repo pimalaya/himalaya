@@ -25,8 +25,6 @@ use crate::{
     output::OutputServiceInterface,
 };
 
-use super::PrintableMsg;
-
 /// Download all attachments from the given message sequence number to the user account downloads
 /// directory.
 pub fn attachments<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
@@ -203,19 +201,18 @@ pub fn move_<OutputService: OutputServiceInterface, ImapService: ImapServiceInte
 /// Read a message by its sequence number.
 pub fn read<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
     seq: &str,
-    // TODO: use the mime to select the right body
-    _mime: String,
+    text_mime: &str,
     raw: bool,
     output: &OutputService,
     imap: &mut ImapService,
 ) -> Result<()> {
-    if raw {
-        let msg = String::from_utf8(imap.find_raw_msg(&seq)?)?;
-        output.print(PrintableMsg(msg))
+    let msg = if raw {
+        String::from_utf8(imap.find_raw_msg(&seq)?)?
     } else {
-        let msg = imap.find_msg(&seq)?.join_text_parts();
-        output.print(PrintableMsg(msg))
-    }
+        imap.find_msg(&seq)?.fold_text_parts(text_mime)
+    };
+
+    output.print(msg)
 }
 
 /// Reply to the given message UID.

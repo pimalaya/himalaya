@@ -83,7 +83,7 @@ impl Tpl {
         if let Some(body) = opts.body {
             tpl.push_str(body);
         } else {
-            tpl.push_str(&msg.join_text_plain_parts())
+            tpl.push_str(&msg.fold_text_plain_parts())
         }
 
         // Signature

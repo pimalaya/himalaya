@@ -27,6 +27,12 @@ pub enum Part {
     Binary(BinaryPart),
 }
 
+impl Part {
+    pub fn new_text_plain(content: String) -> Self {
+        Self::TextPlain(TextPlainPart { content })
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Parts(pub Vec<Part>);

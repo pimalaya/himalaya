@@ -1,24 +1,24 @@
 use ammonia;
 use anyhow::{anyhow, Context, Error, Result};
 use chrono::{DateTime, FixedOffset};
-use htmlescape;
+use html_escape;
 use imap::types::Flag;
 use lettre::message::{Attachment, MultiPart, SinglePart};
 use regex::Regex;
 use rfc2047_decoder;
-use serde::Serialize;
 use std::{
+    collections::HashSet,
     convert::{TryFrom, TryInto},
-    fmt, fs,
+    fs,
     path::PathBuf,
 };
 
 use crate::{
-    config::Account,
+    config::{Account, DEFAULT_SIG_DELIM},
     domain::{
         imap::ImapServiceInterface,
         mbox::Mbox,
-        msg::{msg_utils, Flags, Parts, TextHtmlPart, TextPlainPart, Tpl, TplOverride},
+        msg::{msg_utils, BinaryPart, Flags, Part, Parts, TextPlainPart, Tpl, TplOverride},
         smtp::SmtpServiceInterface,
     },
     output::OutputServiceInterface,
@@ -27,8 +27,6 @@ use crate::{
         editor,
     },
 };
-
-use super::{BinaryPart, Part};
 
 type Addr = lettre::message::Mailbox;
 
@@ -66,39 +64,66 @@ impl Msg {
         self.parts
             .iter()
             .filter_map(|part| match part {
-                Part::Binary(part) => Some(part.clone()),
+                Part::Binary(part) => Some(part.to_owned()),
                 _ => None,
             })
             .collect()
     }
 
-    pub fn join_text_plain_parts(&self) -> String {
-        let text_parts = self
-            .parts
-            .iter()
-            .filter_map(|part| match part {
-                Part::TextPlain(part) => Some(part.content.to_owned()),
-                _ => None,
-            })
-            .collect::<Vec<_>>()
-            .join("\n\n");
-        let text_parts = ammonia::Builder::new()
-            .tags(Default::default())
-            .clean(&text_parts)
-            .to_string();
-        let text_parts = match htmlescape::decode_html(&text_parts) {
-            Ok(text_parts) => text_parts,
-            Err(_) => text_parts,
-        };
-        text_parts
+    /// Fold string body from all plain text parts into a single string body. If no plain text
+    /// parts are found, HTML parts are used instead. The result is sanitized (all HTML markup is
+    /// removed).
+    pub fn fold_text_plain_parts(&self) -> String {
+        let (plain, html) = self.parts.iter().fold(
+            (String::default(), String::default()),
+            |(mut plain, mut html), part| {
+                match part {
+                    Part::TextPlain(part) => {
+                        let glue = if plain.is_empty() { "" } else { "\n\n" };
+                        plain.push_str(glue);
+                        plain.push_str(&part.content);
+                    }
+                    Part::TextHtml(part) => {
+                        let glue = if html.is_empty() { "" } else { "\n\n" };
+                        html.push_str(glue);
+                        html.push_str(&part.content);
+                    }
+                    _ => (),
+                };
+                (plain, html)
+            },
+        );
+        if plain.is_empty() {
+            // Remove HTML markup
+            let sanitized_html = ammonia::Builder::new()
+                .tags(HashSet::default())
+                .clean(&html)
+                .to_string();
+            // Replace `&nbsp;` by regular space
+            let sanitized_html = Regex::new(r"&nbsp;")
+                .unwrap()
+                .replace_all(&sanitized_html, " ")
+                .to_string();
+            // Merge new line chars
+            let sanitized_html = Regex::new(r"(\r?\n ?){2,}")
+                .unwrap()
+                .replace_all(&sanitized_html, "\n\n")
+                .to_string();
+            // Decode HTML entities
+            let sanitized_html = html_escape::decode_html_entities(&sanitized_html).to_string();
+            sanitized_html
+        } else {
+            plain
+        }
     }
 
-    pub fn join_text_html_parts(&self) -> String {
+    /// Fold string body from all HTML parts into a single string body.
+    fn fold_text_html_parts(&self) -> String {
         let text_parts = self
             .parts
             .iter()
             .filter_map(|part| match part {
-                Part::TextPlain(part) => Some(part.content.to_owned()),
+                Part::TextHtml(part) => Some(part.content.to_owned()),
                 _ => None,
             })
             .collect::<Vec<_>>()
@@ -110,12 +135,13 @@ impl Msg {
         text_parts
     }
 
-    pub fn join_text_parts(&self) -> String {
-        let text_parts = self.join_text_plain_parts();
-        if text_parts.is_empty() {
-            self.join_text_html_parts()
+    /// Fold string body from all text parts into a single string body. The mime allows users to
+    /// choose between plain text parts and html text parts.
+    pub fn fold_text_parts(&self, text_mime: &str) -> String {
+        if text_mime == "html" {
+            self.fold_text_html_parts()
         } else {
-            text_parts
+            self.fold_text_plain_parts()
         }
     }
 
@@ -161,7 +187,7 @@ impl Msg {
             self.subject = format!("Re: {}", self.subject);
         }
 
-        // Text plain parts
+        // Body
         let plain_content = {
             let date = self
                 .date
@@ -178,8 +204,8 @@ impl Msg {
             let mut content = format!("\n\nOn {}, {} wrote:\n", date, sender);
 
             let mut glue = "";
-            for line in self.join_text_plain_parts().trim().lines() {
-                if line == "-- \n" {
+            for line in self.fold_text_parts("plain").trim().lines() {
+                if line == DEFAULT_SIG_DELIM {
                     break;
                 }
                 content.push_str(glue);
@@ -192,50 +218,7 @@ impl Msg {
             content
         };
 
-        // Text HTML parts
-        let html_content = {
-            let date = self
-                .date
-                .as_ref()
-                .map(|date| date.format("%d %b %Y, at %H:%M").to_string())
-                .unwrap_or("unknown date".into());
-            let sender = self
-                .reply_to
-                .as_ref()
-                .or(self.from.as_ref())
-                .and_then(|addrs| addrs.first())
-                .map(|addr| addr.name.to_owned().unwrap_or(addr.email.to_string()))
-                .unwrap_or("unknown sender".into());
-            let mut content = format!("\n\nOn {}, {} wrote:\n", date, sender);
-
-            let mut glue = "";
-            for line in self.join_text_html_parts().trim().lines() {
-                if line == "-- \n" {
-                    break;
-                }
-                content.push_str(glue);
-                content.push_str(">");
-                content.push_str(if line.starts_with(">") { "" } else { " " });
-                content.push_str(line);
-                glue = "\n";
-            }
-
-            content
-        };
-
-        self.parts = Parts::default();
-
-        if !plain_content.is_empty() {
-            self.parts.push(Part::TextPlain(TextPlainPart {
-                content: plain_content,
-            }));
-        }
-
-        if !html_content.is_empty() {
-            self.parts.push(Part::TextHtml(TextHtmlPart {
-                content: html_content,
-            }));
-        }
+        self.parts = Parts(vec![Part::new_text_plain(plain_content)]);
 
         Ok(self)
     }
@@ -271,73 +254,37 @@ impl Msg {
             self.subject = format!("Fwd: {}", self.subject);
         }
 
-        // Text plain parts
-        {
-            let mut content = String::default();
-            content.push_str("\n\n-------- Forwarded Message --------\n");
-            content.push_str(&format!("Subject: {}\n", prev_subject));
-            if let Some(date) = prev_date {
-                content.push_str(&format!("Date: {}\n", date.to_rfc2822()));
-            }
-            if let Some(addrs) = prev_from.as_ref() {
-                content.push_str("From: ");
-                let mut glue = "";
-                for addr in addrs {
-                    content.push_str(glue);
-                    content.push_str(&addr.to_string());
-                    glue = ", ";
-                }
-                content.push_str("\n");
-            }
-            if let Some(addrs) = prev_to.as_ref() {
-                content.push_str("To: ");
-                let mut glue = "";
-                for addr in addrs {
-                    content.push_str(glue);
-                    content.push_str(&addr.to_string());
-                    glue = ", ";
-                }
-                content.push_str("\n");
+        // Body
+        let mut content = String::default();
+        content.push_str("\n\n-------- Forwarded Message --------\n");
+        content.push_str(&format!("Subject: {}\n", prev_subject));
+        if let Some(date) = prev_date {
+            content.push_str(&format!("Date: {}\n", date.to_rfc2822()));
+        }
+        if let Some(addrs) = prev_from.as_ref() {
+            content.push_str("From: ");
+            let mut glue = "";
+            for addr in addrs {
+                content.push_str(glue);
+                content.push_str(&addr.to_string());
+                glue = ", ";
             }
             content.push_str("\n");
-            content.push_str(&self.join_text_plain_parts());
-            self.parts
-                .replace_text_plain_parts_with(TextPlainPart { content })
         }
-
-        // Text HTML parts
-        {
-            let mut content = String::default();
-            content.push_str("\n\n-------- Forwarded Message --------\n");
-            content.push_str(&format!("Subject: {}\n", prev_subject));
-            if let Some(date) = prev_date {
-                content.push_str(&format!("Date: {}\n", date.to_rfc2822()));
-            }
-            if let Some(addrs) = prev_from.as_ref() {
-                content.push_str("From: ");
-                let mut glue = "";
-                for addr in addrs {
-                    content.push_str(glue);
-                    content.push_str(&addr.to_string());
-                    glue = ", ";
-                }
-                content.push_str("\n");
-            }
-            if let Some(addrs) = prev_to.as_ref() {
-                content.push_str("To: ");
-                let mut glue = "";
-                for addr in addrs {
-                    content.push_str(glue);
-                    content.push_str(&addr.to_string());
-                    glue = ", ";
-                }
-                content.push_str("\n");
+        if let Some(addrs) = prev_to.as_ref() {
+            content.push_str("To: ");
+            let mut glue = "";
+            for addr in addrs {
+                content.push_str(glue);
+                content.push_str(&addr.to_string());
+                glue = ", ";
             }
             content.push_str("\n");
-            content.push_str(&self.join_text_html_parts());
-            self.parts
-                .replace_text_html_parts_with(TextHtmlPart { content })
         }
+        content.push_str("\n");
+        content.push_str(&self.fold_text_parts("plain"));
+        self.parts
+            .replace_text_plain_parts_with(TextPlainPart { content });
 
         Ok(self)
     }
@@ -628,7 +575,7 @@ impl TryInto<lettre::Message> for &Msg {
         };
 
         let mut multipart =
-            MultiPart::mixed().singlepart(SinglePart::plain(self.join_text_plain_parts()));
+            MultiPart::mixed().singlepart(SinglePart::plain(self.fold_text_plain_parts()));
 
         for part in self.attachments() {
             let filename = part.filename;
@@ -802,13 +749,4 @@ pub fn parse_some_addrs(addrs: &Option<Vec<imap_proto::Address>>) -> Result<Opti
         Some(addrs) => Some(addrs?),
         None => None,
     })
-}
-
-#[derive(Debug, Serialize)]
-pub struct PrintableMsg(pub String);
-
-impl fmt::Display for PrintableMsg {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "{}", self.0)
-    }
 }
