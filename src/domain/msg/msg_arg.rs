@@ -15,7 +15,7 @@ type Seq<'a> = &'a str;
 type PageSize = usize;
 type Page = usize;
 type Mbox<'a> = Option<&'a str>;
-type Mime = String;
+type TextMime<'a> = &'a str;
 type Raw = bool;
 type All = bool;
 type RawMsg<'a> = &'a str;
@@ -30,7 +30,7 @@ pub enum Command<'a> {
     Forward(Seq<'a>, AttachmentsPaths<'a>),
     List(Option<PageSize>, Page),
     Move(Seq<'a>, Mbox<'a>),
-    Read(Seq<'a>, Mime, Raw),
+    Read(Seq<'a>, TextMime<'a>, Raw),
     Reply(Seq<'a>, All, AttachmentsPaths<'a>),
     Save(Mbox<'a>, RawMsg<'a>),
     Search(Query, Option<PageSize>, Page),
@@ -103,8 +103,8 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         debug!("read command matched");
         let seq = m.value_of("seq").unwrap();
         trace!("seq: {}", seq);
-        let mime = format!("text/{}", m.value_of("mime-type").unwrap());
-        trace!("mime: {}", mime);
+        let mime = m.value_of("mime-type").unwrap();
+        trace!("text mime: {}", mime);
         let raw = m.is_present("raw");
         trace!("raw: {}", raw);
         return Ok(Some(Command::Read(seq, mime, raw)));

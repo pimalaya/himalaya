@@ -111,8 +111,8 @@ fn main() -> Result<()> {
         Some(msg_arg::Command::Move(seq, target)) => {
             return msg_handler::move_(seq, target, &output, &mut imap);
         }
-        Some(msg_arg::Command::Read(seq, mime, raw)) => {
-            return msg_handler::read(seq, mime, raw, &output, &mut imap);
+        Some(msg_arg::Command::Read(seq, text_mime, raw)) => {
+            return msg_handler::read(seq, text_mime, raw, &output, &mut imap);
         }
         Some(msg_arg::Command::Reply(seq, all, atts)) => {
             return msg_handler::reply(seq, all, atts, &account, &output, &mut imap, &mut smtp);
