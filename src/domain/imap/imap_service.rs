@@ -46,7 +46,7 @@ pub trait ImapServiceInterface {
 
 pub struct ImapService<'a> {
     account: &'a Account,
-    mbox: &'a Mbox,
+    mbox: &'a Mbox<'a>,
     sess: Option<ImapSession>,
 }
 
@@ -380,7 +380,7 @@ impl<'a> ImapServiceInterface for ImapService<'a> {
     }
 }
 
-impl<'a> From<(&'a Account, &'a Mbox)> for ImapService<'a> {
+impl<'a> From<(&'a Account, &'a Mbox<'a>)> for ImapService<'a> {
     fn from((account, mbox): (&'a Account, &'a Mbox)) -> Self {
         Self {
             account,

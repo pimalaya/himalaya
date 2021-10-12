@@ -1,4 +1,4 @@
-//! Module related to mailbox CLI.
+//! Mailbox CLI module.
 //!
 //! This module provides subcommands, arguments and a command matcher related to mailbox.
 
@@ -6,43 +6,43 @@ use anyhow::Result;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use log::debug;
 
-/// Mailbox commands.
+/// Represents the Mailbox commands.
 pub enum Command {
     /// List all available mailboxes.
     List,
 }
 
-/// Mailbox command matcher.
+/// Defines the mailbox command matcher.
 pub fn matches(m: &ArgMatches) -> Result<Option<Command>> {
     if let Some(_) = m.subcommand_matches("mailboxes") {
         debug!("mailboxes command matched");
         return Ok(Some(Command::List));
+    } else {
+        Ok(None)
     }
-
-    Ok(None)
 }
 
-/// Mailbox subcommands.
-pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
-    vec![SubCommand::with_name("mailboxes")
-        .aliases(&["mailbox", "mboxes", "mbox", "mb", "m"])
-        .about("Lists all mailboxes")]
-}
-
-/// Source mailbox argument.
+/// Define the source mailbox argument.
 pub fn source_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name("mailbox")
         .short("m")
         .long("mailbox")
         .help("Selects a specific mailbox")
-        .value_name("MAILBOX")
+        .value_name("SOURCE")
         .default_value("INBOX")
 }
 
-/// Target mailbox argument.
+/// Defines the target mailbox argument.
 pub fn target_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name("target")
         .help("Specifies the targetted mailbox")
         .value_name("TARGET")
         .required(true)
+}
+
+/// Contains the root mailbox subcommands.
+pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
+    vec![SubCommand::with_name("mailboxes")
+        .aliases(&["mailbox", "mboxes", "mbox", "mb", "m"])
+        .about("Lists all mailboxes")]
 }

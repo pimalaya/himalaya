@@ -1,12 +1,12 @@
-//! Module related to mailboxes handling.
+//! Mailbox handling module.
 //!
-//! This module gathers all mailboxes actions triggered by the CLI.
+//! This module gathers all mailbox actions triggered by the CLI.
 
 use anyhow::Result;
 use log::{debug, trace};
 
 use crate::{
-    domain::{imap::ImapServiceInterface, mbox::Mboxes},
+    domain::{ImapServiceInterface, Mboxes},
     output::{OutputService, OutputServiceInterface},
 };
 
@@ -17,7 +17,7 @@ pub fn list<ImapService: ImapServiceInterface>(
 ) -> Result<()> {
     let names = imap.get_mboxes()?;
     let mboxes = Mboxes::from(&names);
-    debug!("mailboxes len: {}", mboxes.0.len());
+    debug!("mailboxes len: {}", mboxes.len());
     trace!("mailboxes: {:#?}", mboxes);
     output.print(mboxes)?;
     Ok(())
