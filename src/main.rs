@@ -26,7 +26,6 @@ fn create_app<'a>() -> clap::App<'a, 'a> {
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .author(env!("CARGO_PKG_AUTHORS"))
         .global_setting(clap::AppSettings::GlobalVersion)
-        .global_setting(clap::AppSettings::SubcommandRequiredElseHelp)
         .args(&config_arg::args())
         .args(&output_arg::args())
         .arg(mbox_arg::source_arg())
@@ -68,7 +67,7 @@ fn main() -> Result<()> {
     }
 
     // Init entities and services.
-    let mbox = Mbox::new(m.value_of("mailbox").unwrap());
+    let mbox = Mbox::new(m.value_of("mbox-source").unwrap());
     let config = Config::try_from(m.value_of("config"))?;
     let account = Account::try_from((&config, m.value_of("account")))?;
     let output = OutputService::try_from(m.value_of("output"))?;
@@ -88,7 +87,7 @@ fn main() -> Result<()> {
 
     // Check mailbox commands.
     match mbox_arg::matches(&m)? {
-        Some(mbox_arg::Command::List) => {
+        Some(mbox_arg::Cmd::List) => {
             return mbox_handler::list(&output, &mut imap);
         }
         _ => (),

@@ -54,7 +54,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         debug!("copy command matched");
         let seq = m.value_of("seq").unwrap();
         trace!("seq: {}", seq);
-        let mbox = m.value_of("target").unwrap();
+        let mbox = m.value_of("mbox-target").unwrap();
         trace!(r#"target mailbox: "{:?}""#, mbox);
         return Ok(Some(Command::Copy(seq, mbox)));
     }
@@ -94,7 +94,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         debug!("move command matched");
         let seq = m.value_of("seq").unwrap();
         trace!("seq: {}", seq);
-        let mbox = m.value_of("target").unwrap();
+        let mbox = m.value_of("mbox-target").unwrap();
         trace!(r#"target mailbox: "{:?}""#, mbox);
         return Ok(Some(Command::Move(seq, mbox)));
     }
@@ -125,7 +125,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         debug!("save command matched");
         let msg = m.value_of("message").unwrap();
         debug!("message: {}", &msg);
-        let mbox = m.value_of("target").unwrap();
+        let mbox = m.value_of("mbox-target").unwrap();
         debug!("target mailbox: `{:?}`", mbox);
         return Ok(Some(Command::Save(mbox, msg)));
     }
