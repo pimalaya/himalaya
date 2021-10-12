@@ -3,7 +3,7 @@
 //! This module provides subcommands, arguments and a command matcher related to message template.
 
 use anyhow::Result;
-use clap::{self, App, AppSettings, Arg, ArgMatches, SubCommand};
+use clap::{self, App, Arg, ArgMatches, SubCommand};
 use log::{debug, trace};
 
 use crate::domain::msg::msg_arg;
@@ -145,7 +145,6 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
     vec![SubCommand::with_name("template")
         .aliases(&["tpl"])
         .about("Generates a message template")
-        .setting(AppSettings::SubcommandRequiredElseHelp)
         .subcommand(
             SubCommand::with_name("new")
                 .aliases(&["n"])
