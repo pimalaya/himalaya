@@ -14,7 +14,7 @@ use crate::domain::{
 type Seq<'a> = &'a str;
 type PageSize = usize;
 type Page = usize;
-type Mbox<'a> = Option<&'a str>;
+type Mbox<'a> = &'a str;
 type TextMime<'a> = &'a str;
 type Raw = bool;
 type All = bool;
@@ -54,9 +54,9 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         debug!("copy command matched");
         let seq = m.value_of("seq").unwrap();
         trace!("seq: {}", seq);
-        let target = m.value_of("target");
-        trace!(r#"target mailbox: "{:?}""#, target);
-        return Ok(Some(Command::Copy(seq, target)));
+        let mbox = m.value_of("mbox-target").unwrap();
+        trace!(r#"target mailbox: "{:?}""#, mbox);
+        return Ok(Some(Command::Copy(seq, mbox)));
     }
 
     if let Some(m) = m.subcommand_matches("delete") {
@@ -94,9 +94,9 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         debug!("move command matched");
         let seq = m.value_of("seq").unwrap();
         trace!("seq: {}", seq);
-        let target = m.value_of("target");
-        trace!(r#"target mailbox: "{:?}""#, target);
-        return Ok(Some(Command::Move(seq, target)));
+        let mbox = m.value_of("mbox-target").unwrap();
+        trace!(r#"target mailbox: "{:?}""#, mbox);
+        return Ok(Some(Command::Move(seq, mbox)));
     }
 
     if let Some(m) = m.subcommand_matches("read") {
@@ -125,9 +125,9 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         debug!("save command matched");
         let msg = m.value_of("message").unwrap();
         debug!("message: {}", &msg);
-        let target = m.value_of("target");
-        debug!("target mailbox: `{:?}`", target);
-        return Ok(Some(Command::Save(target, msg)));
+        let mbox = m.value_of("mbox-target").unwrap();
+        debug!("target mailbox: `{:?}`", mbox);
+        return Ok(Some(Command::Save(mbox, msg)));
     }
 
     if let Some(m) = m.subcommand_matches("search") {

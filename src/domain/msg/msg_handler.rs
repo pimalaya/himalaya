@@ -25,8 +25,7 @@ use crate::{
     output::OutputServiceInterface,
 };
 
-/// Download all attachments from the given message sequence number to the user account downloads
-/// directory.
+/// Download all message attachments to the user account downloads directory.
 pub fn attachments<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
     seq: &str,
     account: &Account,
@@ -56,11 +55,11 @@ pub fn attachments<OutputService: OutputServiceInterface, ImapService: ImapServi
 /// Copy a message from a mailbox to another.
 pub fn copy<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
     seq: &str,
-    mbox: Option<&str>,
+    mbox: &str,
     output: &OutputService,
     imap: &mut ImapService,
 ) -> Result<()> {
-    let mbox = Mbox::try_from(mbox)?;
+    let mbox = Mbox::new(mbox);
     let msg = imap.find_raw_msg(&seq)?;
     let flags = Flags::try_from(vec![Flag::Seen])?;
     imap.append_raw_msg_with_flags(&mbox, &msg, flags)?;
@@ -177,12 +176,12 @@ pub fn move_<OutputService: OutputServiceInterface, ImapService: ImapServiceInte
     // The sequence number of the message to move
     seq: &str,
     // The mailbox to move the message in
-    mbox: Option<&str>,
+    mbox: &str,
     output: &OutputService,
     imap: &mut ImapService,
 ) -> Result<()> {
     // Copy the message to targetted mailbox
-    let mbox = Mbox::try_from(mbox)?;
+    let mbox = Mbox::new(mbox);
     let msg = imap.find_raw_msg(&seq)?;
     let flags = Flags::try_from(vec![Flag::Seen])?;
     imap.append_raw_msg_with_flags(&mbox, &msg, flags)?;
@@ -239,11 +238,11 @@ pub fn reply<
 
 /// Save a raw message to the targetted mailbox.
 pub fn save<ImapService: ImapServiceInterface>(
-    mbox: Option<&str>,
+    mbox: &str,
     msg: &str,
     imap: &mut ImapService,
 ) -> Result<()> {
-    let mbox = Mbox::try_from(mbox)?;
+    let mbox = Mbox::new(mbox);
     let flags = Flags::try_from(vec![Flag::Seen])?;
     imap.append_raw_msg_with_flags(&mbox, msg.as_bytes(), flags)
 }
@@ -295,7 +294,7 @@ pub fn send<
     debug!("message sent!");
 
     // Save message to sent folder
-    let mbox = Mbox::from("Sent");
+    let mbox = Mbox::new("Sent");
     let flags = Flags::try_from(vec![Flag::Seen])?;
     imap.append_raw_msg_with_flags(&mbox, raw_msg.as_bytes(), flags)
 }
