@@ -14,19 +14,16 @@ use std::{
 
 use crate::{
     config::{Account, Config},
-    domain::{
-        mbox::Mbox,
-        msg::{Envelopes, Flags, Msg},
-    },
+    domain::{Envelopes, Flags, Mbox, Msg},
 };
 
 type ImapSession = imap::Session<TlsStream<TcpStream>>;
-type ImapMboxes = imap::types::ZeroCopy<Vec<imap::types::Name>>;
+pub(crate) type RawMboxes = imap::types::ZeroCopy<Vec<imap::types::Name>>;
 
 pub trait ImapServiceInterface {
     fn notify(&mut self, config: &Config, keepalive: u64) -> Result<()>;
     fn watch(&mut self, keepalive: u64) -> Result<()>;
-    fn get_mboxes(&mut self) -> Result<ImapMboxes>;
+    fn fetch_raw_mboxes(&mut self) -> Result<RawMboxes>;
     fn get_msgs(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes>;
     fn find_msgs(&mut self, query: &str, page_size: &usize, page: &usize) -> Result<Envelopes>;
     fn find_msg(&mut self, seq: &str) -> Result<Msg>;
@@ -106,12 +103,10 @@ impl<'a> ImapService<'a> {
 }
 
 impl<'a> ImapServiceInterface for ImapService<'a> {
-    fn get_mboxes(&mut self) -> Result<ImapMboxes> {
-        let mboxes = self
-            .sess()?
+    fn fetch_raw_mboxes(&mut self) -> Result<RawMboxes> {
+        self.sess()?
             .list(Some(""), Some("*"))
-            .context("cannot list mailboxes")?;
-        Ok(mboxes)
+            .context("cannot list mailboxes")
     }
 
     fn get_msgs(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes> {

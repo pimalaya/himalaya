@@ -12,7 +12,7 @@ use crate::{domain::Mbox, ui::Table};
 
 /// Represents a list of mailboxes.
 #[derive(Debug, Serialize)]
-pub struct Mboxes<'a>(Vec<Mbox<'a>>);
+pub struct Mboxes<'a>(pub Vec<Mbox<'a>>);
 
 /// Derefs the mailboxes to its inner vector.
 impl<'a> Deref for Mboxes<'a> {
@@ -33,6 +33,6 @@ impl<'a> Display for Mboxes<'a> {
 /// Converts a list of `imap::types::Name` into mailboxes.
 impl<'a> From<&'a imap::types::ZeroCopy<Vec<imap::types::Name>>> for Mboxes<'a> {
     fn from(names: &'a imap::types::ZeroCopy<Vec<imap::types::Name>>) -> Self {
-        Self(names.iter().map(Mbox::from).collect::<Vec<_>>())
+        Self(names.iter().map(Mbox::from).collect())
     }
 }
