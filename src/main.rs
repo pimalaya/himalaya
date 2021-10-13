@@ -44,7 +44,7 @@ fn main() -> Result<()> {
     // Check mailto command BEFORE app initialization.
     let raw_args: Vec<String> = env::args().collect();
     if raw_args.len() > 1 && raw_args[1].starts_with("mailto:") {
-        let mbox = Mbox::from("INBOX");
+        let mbox = Mbox::new("INBOX");
         let config = Config::try_from(None)?;
         let account = Account::try_from((&config, None))?;
         let output = OutputService::from("plain");

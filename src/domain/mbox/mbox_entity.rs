@@ -2,7 +2,6 @@
 //!
 //! This module contains the definition of the mailbox and its traits implementations.
 
-use log::trace;
 use serde::Serialize;
 use std::{
     borrow::Cow,
@@ -14,8 +13,8 @@ use crate::{
     ui::{Cell, Row, Table},
 };
 
-/// Represents a mailbox.
-#[derive(Debug, Serialize)]
+/// Represents the mailbox.
+#[derive(Debug, Default, Serialize)]
 pub struct Mbox<'a> {
     /// Represents the mailbox hierarchie delimiter.
     pub delim: Cow<'a, str>,
@@ -28,7 +27,7 @@ pub struct Mbox<'a> {
 }
 
 impl<'a> Mbox<'a> {
-    /// Create a new mailbox with just a name.
+    /// Creates a new mailbox with just a name.
     pub fn new(name: &'a str) -> Self {
         Self {
             name: name.into(),
@@ -37,7 +36,14 @@ impl<'a> Mbox<'a> {
     }
 }
 
-/// Implements the table trait for a mailbox.
+/// Makes the mailbox displayable.
+impl<'a> Display for Mbox<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.name)
+    }
+}
+
+/// Makes the mailbox tableable.
 impl<'a> Table for Mbox<'a> {
     fn head() -> Row {
         Row::new()
@@ -60,33 +66,7 @@ impl<'a> Table for Mbox<'a> {
     }
 }
 
-/// Implements the default trait for the mailbox.
-impl<'a> Default for Mbox<'a> {
-    fn default() -> Self {
-        Self {
-            delim: Cow::default(),
-            name: Cow::default(),
-            attrs: Attrs::from(&[] as &[imap::types::NameAttribute]),
-        }
-    }
-}
-
-/// Makes the mailbox displayable.
-impl<'a> Display for Mbox<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.name)
-    }
-}
-
-/// Convert a string slice into a mailbox.
-impl<'a> From<&'a str> for Mbox<'a> {
-    fn from(name: &'a str) -> Self {
-        trace!(r#"create mailbox from "{}""#, name);
-        Self::new(name)
-    }
-}
-
-/// Convert an `imap::types::Name` into a mailbox.
+/// Converts an `imap::types::Name` into a mailbox.
 impl<'a> From<&'a imap::types::Name> for Mbox<'a> {
     fn from(name: &'a imap::types::Name) -> Self {
         Self {

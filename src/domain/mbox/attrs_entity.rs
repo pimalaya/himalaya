@@ -12,9 +12,9 @@ use std::{
 
 use crate::domain::Attr;
 
-/// Represents the attributes of a mailbox.
+/// Represents the attributes of the mailbox.
 /// A HashSet is used in order to avoid duplicates.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Default, Serialize)]
 pub struct Attrs<'a>(HashSet<Attr<'a>>);
 
 /// Converts a slice of `imap::types::NameAttribute` into attributes.
@@ -24,7 +24,7 @@ impl<'a> From<&'a [AttrRemote<'a>]> for Attrs<'a> {
     }
 }
 
-/// Makes attributes derefable.
+/// Derefs the attributes to its inner hashset.
 impl<'a> Deref for Attrs<'a> {
     type Target = HashSet<Attr<'a>>;
 
@@ -33,7 +33,7 @@ impl<'a> Deref for Attrs<'a> {
     }
 }
 
-/// Makes attributes displayable.
+/// Makes the attributes displayable.
 impl<'a> Display for Attrs<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut glue = "";

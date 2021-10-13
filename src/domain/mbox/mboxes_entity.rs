@@ -14,7 +14,7 @@ use crate::{domain::Mbox, ui::Table};
 #[derive(Debug, Serialize)]
 pub struct Mboxes<'a>(Vec<Mbox<'a>>);
 
-/// Makes the mailboxes derefable.
+/// Derefs the mailboxes to its inner vector.
 impl<'a> Deref for Mboxes<'a> {
     type Target = Vec<Mbox<'a>>;
 

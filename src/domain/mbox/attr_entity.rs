@@ -21,12 +21,12 @@ pub enum AttrWrap<'a> {
     Custom(Cow<'a, str>),
 }
 
-/// Represent a mailbox attribute.
+/// Represents the mailbox attribute.
 /// See https://serde.rs/remote-derive.html.
 #[derive(Debug, PartialEq, Eq, Hash, Serialize)]
 pub struct Attr<'a>(#[serde(with = "AttrWrap")] pub &'a AttrRemote<'a>);
 
-/// Makes attribute displayable.
+/// Makes the attribute displayable.
 impl<'a> Display for Attr<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self.0 {

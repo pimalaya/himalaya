@@ -335,7 +335,7 @@ impl Msg {
         loop {
             match choice::post_edit() {
                 Ok(PostEditChoice::Send) => {
-                    let mbox = Mbox::from("Sent");
+                    let mbox = Mbox::new("Sent");
                     let sent_msg = smtp.send_msg(&self)?;
                     let flags = Flags::try_from(vec![Flag::Seen])?;
                     imap.append_raw_msg_with_flags(&mbox, &sent_msg.formatted(), flags)?;
@@ -352,7 +352,7 @@ impl Msg {
                     break;
                 }
                 Ok(PostEditChoice::RemoteDraft) => {
-                    let mbox = Mbox::from("Drafts");
+                    let mbox = Mbox::new("Drafts");
                     let flags = Flags::try_from(vec![Flag::Seen, Flag::Draft])?;
                     let tpl = Tpl::from_msg(TplOverride::default(), &self, account);
                     imap.append_raw_msg_with_flags(&mbox, tpl.as_bytes(), flags)?;
