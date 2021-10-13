@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// Represents the mailbox.
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Default, PartialEq, Eq, Serialize)]
 pub struct Mbox<'a> {
     /// Represents the mailbox hierarchie delimiter.
     pub delim: Cow<'a, str>,
@@ -74,5 +74,40 @@ impl<'a> From<&'a imap::types::Name> for Mbox<'a> {
             name: name.name().into(),
             attrs: Attrs::from(name.attributes()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::AttrRemote;
+    use super::*;
+
+    #[test]
+    fn it_should_create_new_mbox() {
+        assert_eq!(Mbox::default(), Mbox::new(""));
+        assert_eq!(
+            Mbox {
+                delim: Cow::default(),
+                name: "INBOX".into(),
+                attrs: Attrs::default()
+            },
+            Mbox::new("INBOX")
+        );
+    }
+
+    #[test]
+    fn it_should_display_mbox() {
+        let default_mbox = Mbox::default();
+        assert_eq!("", default_mbox.to_string());
+
+        let new_mbox = Mbox::new("INBOX");
+        assert_eq!("INBOX", new_mbox.to_string());
+
+        let full_mbox = Mbox {
+            delim: ".".into(),
+            name: "Sent".into(),
+            attrs: Attrs::from(&[AttrRemote::NoSelect] as &[AttrRemote]),
+        };
+        assert_eq!("Sent", full_mbox.to_string());
     }
 }

@@ -2,7 +2,6 @@
 //!
 //! This module contains the definition of the mailbox attributes and its traits implementations.
 
-use imap::types::NameAttribute as AttrRemote;
 use serde::Serialize;
 use std::{
     collections::HashSet,
@@ -10,11 +9,11 @@ use std::{
     ops::Deref,
 };
 
-use crate::domain::Attr;
+use crate::domain::{Attr, AttrRemote};
 
 /// Represents the attributes of the mailbox.
 /// A HashSet is used in order to avoid duplicates.
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Default, PartialEq, Eq, Serialize)]
 pub struct Attrs<'a>(HashSet<Attr<'a>>);
 
 /// Converts a slice of `imap::types::NameAttribute` into attributes.
@@ -42,5 +41,32 @@ impl<'a> Display for Attrs<'a> {
             glue = ", ";
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_should_display_attrs() {
+        macro_rules! attrs_from {
+            ($($attr:expr),*) => {
+                Attrs::from(&[$($attr,)*] as &[AttrRemote]).to_string()
+            };
+        }
+
+        let empty_attr = attrs_from![];
+        let single_attr = attrs_from![AttrRemote::NoInferiors];
+        let multiple_attrs = attrs_from![
+            AttrRemote::Custom("AttrCustom".into()),
+            AttrRemote::NoInferiors
+        ];
+
+        assert_eq!("", empty_attr);
+        assert_eq!("NoInferiors", single_attr);
+        assert!(multiple_attrs.contains("NoInferiors"));
+        assert!(multiple_attrs.contains("AttrCustom"));
+        assert!(multiple_attrs.contains(","));
     }
 }

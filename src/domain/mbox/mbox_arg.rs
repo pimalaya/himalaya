@@ -54,7 +54,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_cmd_matcher() {
+    fn it_should_match_cmds() {
         let arg = clap::App::new("himalaya")
             .subcommands(subcmds())
             .get_matches_from(&["himalaya", "mailboxes"]);
@@ -63,7 +63,7 @@ mod tests {
     }
 
     #[test]
-    fn test_subcmds_aliases() {
+    fn it_should_match_aliases() {
         macro_rules! get_matches_from {
             ($alias:expr) => {
                 clap::App::new("himalaya")
@@ -81,7 +81,7 @@ mod tests {
     }
 
     #[test]
-    fn test_source_arg() {
+    fn it_should_match_source_arg() {
         macro_rules! get_matches_from {
             ($($arg:expr),*) => {
                 clap::App::new("himalaya")
@@ -101,7 +101,7 @@ mod tests {
     }
 
     #[test]
-    fn test_target_arg() {
+    fn it_should_match_target_arg() {
         macro_rules! get_matches_from {
             ($($arg:expr),*) => {
                 clap::App::new("himalaya")
