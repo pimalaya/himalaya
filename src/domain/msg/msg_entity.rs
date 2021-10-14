@@ -8,7 +8,7 @@ use regex::Regex;
 use rfc2047_decoder;
 use serde::Serialize;
 use std::{
-    convert::{TryFrom, TryInto},
+    convert::{TryFrom, TryInto, From},
     fmt, fs,
     path::PathBuf,
 };
@@ -17,7 +17,7 @@ use crate::{
     config::Account,
     domain::{
         imap::ImapServiceInterface,
-        mbox::Mbox,
+        mbox::{Mbox, Mboxes, MboxType},
         msg::{msg_utils, Flags, Parts, TextHtmlPart, TextPlainPart, Tpl, TplOverride},
         smtp::SmtpServiceInterface,
     },
@@ -385,10 +385,13 @@ impl Msg {
             self.merge_with(self._edit_with_editor(account)?);
         }
 
+        let names = imap.get_mboxes()?;
+        let mboxes = Mboxes::from(&names);
+
         loop {
             match choice::post_edit() {
                 Ok(PostEditChoice::Send) => {
-                    let mbox = Mbox::from("Sent");
+                    let mbox = mboxes.get_mbox_by_type(MboxType::Sent)?;
                     let sent_msg = smtp.send_msg(&self)?;
                     let flags = Flags::try_from(vec![Flag::Seen])?;
                     imap.append_raw_msg_with_flags(&mbox, &sent_msg.formatted(), flags)?;
@@ -405,7 +408,7 @@ impl Msg {
                     break;
                 }
                 Ok(PostEditChoice::RemoteDraft) => {
-                    let mbox = Mbox::from("Drafts");
+                    let mbox = mboxes.get_mbox_by_type(MboxType::Drafts)?;
                     let flags = Flags::try_from(vec![Flag::Seen, Flag::Draft])?;
                     let tpl = Tpl::from_msg(TplOverride::default(), &self, account);
                     imap.append_raw_msg_with_flags(&mbox, tpl.as_bytes(), flags)?;

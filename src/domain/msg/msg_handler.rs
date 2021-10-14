@@ -18,7 +18,7 @@ use crate::{
     config::Account,
     domain::{
         imap::ImapServiceInterface,
-        mbox::Mbox,
+        mbox::{Mbox, Mboxes, MboxType},
         msg::{Flags, Msg, Part, TextPlainPart, Tpl},
         smtp::SmtpServiceInterface,
     },
@@ -298,9 +298,12 @@ pub fn send<
     debug!("message sent!");
 
     // Save message to sent folder
-    let mbox = Mbox::from("Sent");
+    let mbox_data = imap.get_mboxes()?;
+    let mboxes = Mboxes::from(&mbox_data);
+    let send_mbox = mboxes.get_mbox_by_type(MboxType::Sent)?;
+
     let flags = Flags::try_from(vec![Flag::Seen])?;
-    imap.append_raw_msg_with_flags(&mbox, raw_msg.as_bytes(), flags)
+    imap.append_raw_msg_with_flags(&send_mbox, raw_msg.as_bytes(), flags)
 }
 
 /// Compose a new message.

@@ -9,6 +9,8 @@ use std::{borrow::Cow, collections::HashSet, convert::TryFrom, fmt};
 
 use crate::ui::table::{Cell, Row, Table};
 
+use super::{MboxType, MboxTypes};
+
 // Attribute
 
 #[derive(Debug, PartialEq)]
@@ -36,7 +38,7 @@ impl<'a> ser::Serialize for SerializableAttribute<'a> {
 }
 
 /// Represents the attributes of a mailbox.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Attributes(pub HashSet<NameAttribute<'static>>);
 
 impl<'a> From<&[NameAttribute<'a>]> for Attributes {
@@ -85,7 +87,7 @@ impl ser::Serialize for Attributes {
 
 // --- Mailbox ---
 /// Represents a general mailbox.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Mbox {
     /// The [hierarchie delimiter].
     ///
@@ -175,6 +177,19 @@ impl Table for Mbox {
 /// A simple wrapper to acces a bunch of mboxes which are in this vector.
 #[derive(Debug, Serialize)]
 pub struct Mboxes(pub Vec<Mbox>);
+
+impl Mboxes {
+    pub fn get_mbox_by_type(&self, mbox_type: MboxType) -> Result<Mbox> {
+        match self.0.iter()
+            .find(|mbox| MboxTypes::from(mbox.attributes.0.clone())
+                  .contains(mbox_type.clone()))
+            .cloned()
+        {
+            Some(mbox) => Ok(mbox),
+            None => Err(anyhow!("Couldn't find the mailbox with the attribute '{}'.", mbox_type)),
+        }
+    }
+}
 
 impl<'a> From<&'a imap::types::ZeroCopy<Vec<imap::types::Name>>> for Mboxes {
     fn from(names: &'a imap::types::ZeroCopy<Vec<imap::types::Name>>) -> Self {
