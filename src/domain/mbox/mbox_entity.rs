@@ -75,7 +75,7 @@ impl<'a> From<&'a imap::types::Name> for Mbox<'a> {
         Self {
             delim: raw_mbox.delimiter().unwrap_or_default().into(),
             name: raw_mbox.name().into(),
-            attrs: Attrs::from(raw_mbox.attributes()),
+            attrs: Attrs::from(raw_mbox.attributes().to_vec()),
         }
     }
 }
@@ -109,7 +109,7 @@ mod tests {
         let full_mbox = Mbox {
             delim: ".".into(),
             name: "Sent".into(),
-            attrs: Attrs::from(&[AttrRemote::NoSelect] as &[AttrRemote]),
+            attrs: Attrs::from(vec![AttrRemote::NoSelect]),
         };
         assert_eq!("Sent", full_mbox.to_string());
     }

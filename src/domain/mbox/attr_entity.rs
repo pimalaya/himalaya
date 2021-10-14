@@ -24,7 +24,7 @@ pub enum AttrWrap<'a> {
 /// Represents the mailbox attribute.
 /// See https://serde.rs/remote-derive.html.
 #[derive(Debug, PartialEq, Eq, Hash, Serialize)]
-pub struct Attr<'a>(#[serde(with = "AttrWrap")] pub &'a AttrRemote<'a>);
+pub struct Attr<'a>(#[serde(with = "AttrWrap")] pub AttrRemote<'a>);
 
 /// Makes the attribute displayable.
 impl<'a> Display for Attr<'a> {
@@ -39,6 +39,13 @@ impl<'a> Display for Attr<'a> {
     }
 }
 
+/// Converts an `imap::types::NameAttribute` into an attribute.
+impl<'a> From<AttrRemote<'a>> for Attr<'a> {
+    fn from(attr: AttrRemote<'a>) -> Self {
+        Self(attr)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -47,10 +54,10 @@ mod tests {
     fn it_should_display_attr() {
         macro_rules! attr_from {
             ($attr:ident) => {
-                Attr(&AttrRemote::$attr).to_string()
+                Attr(AttrRemote::$attr).to_string()
             };
             ($custom:literal) => {
-                Attr(&AttrRemote::Custom($custom.into())).to_string()
+                Attr(AttrRemote::Custom($custom.into())).to_string()
             };
         }
 

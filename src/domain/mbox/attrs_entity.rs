@@ -4,7 +4,6 @@
 
 use serde::Serialize;
 use std::{
-    collections::HashSet,
     fmt::{self, Display},
     ops::Deref,
 };
@@ -12,20 +11,19 @@ use std::{
 use crate::domain::{Attr, AttrRemote};
 
 /// Represents the attributes of the mailbox.
-/// A HashSet is used in order to avoid duplicates.
 #[derive(Debug, Default, PartialEq, Eq, Serialize)]
-pub struct Attrs<'a>(HashSet<Attr<'a>>);
+pub struct Attrs<'a>(Vec<Attr<'a>>);
 
-/// Converts a slice of `imap::types::NameAttribute` into attributes.
-impl<'a> From<&'a [AttrRemote<'a>]> for Attrs<'a> {
-    fn from(attrs: &'a [AttrRemote<'a>]) -> Self {
-        Self(attrs.iter().map(Attr).collect())
+/// Converts a vector of `imap::types::NameAttribute` into attributes.
+impl<'a> From<Vec<AttrRemote<'a>>> for Attrs<'a> {
+    fn from(attrs: Vec<AttrRemote<'a>>) -> Self {
+        Self(attrs.into_iter().map(Attr::from).collect())
     }
 }
 
 /// Derefs the attributes to its inner hashset.
 impl<'a> Deref for Attrs<'a> {
-    type Target = HashSet<Attr<'a>>;
+    type Target = Vec<Attr<'a>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -52,7 +50,7 @@ mod tests {
     fn it_should_display_attrs() {
         macro_rules! attrs_from {
             ($($attr:expr),*) => {
-                Attrs::from(&[$($attr,)*] as &[AttrRemote]).to_string()
+                Attrs::from(vec![$($attr,)*]).to_string()
             };
         }
 
