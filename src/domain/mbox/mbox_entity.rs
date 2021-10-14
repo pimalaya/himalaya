@@ -13,7 +13,10 @@ use crate::{
     ui::{Cell, Row, Table},
 };
 
-/// Represents the mailbox.
+/// Represents a raw mailbox returned by the `imap` crate.
+pub(crate) type RawMbox = imap::types::Name;
+
+/// Represents a mailbox.
 #[derive(Debug, Default, PartialEq, Eq, Serialize)]
 pub struct Mbox<'a> {
     /// Represents the mailbox hierarchie delimiter.
@@ -68,11 +71,11 @@ impl<'a> Table for Mbox<'a> {
 
 /// Converts an `imap::types::Name` into a mailbox.
 impl<'a> From<&'a imap::types::Name> for Mbox<'a> {
-    fn from(name: &'a imap::types::Name) -> Self {
+    fn from(raw_mbox: &'a imap::types::Name) -> Self {
         Self {
-            delim: name.delimiter().unwrap_or_default().into(),
-            name: name.name().into(),
-            attrs: Attrs::from(name.attributes()),
+            delim: raw_mbox.delimiter().unwrap_or_default().into(),
+            name: raw_mbox.name().into(),
+            attrs: Attrs::from(raw_mbox.attributes().to_vec()),
         }
     }
 }
@@ -106,7 +109,7 @@ mod tests {
         let full_mbox = Mbox {
             delim: ".".into(),
             name: "Sent".into(),
-            attrs: Attrs::from(&[AttrRemote::NoSelect] as &[AttrRemote]),
+            attrs: Attrs::from(vec![AttrRemote::NoSelect]),
         };
         assert_eq!("Sent", full_mbox.to_string());
     }

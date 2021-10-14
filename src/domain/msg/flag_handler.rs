@@ -11,7 +11,7 @@ use crate::{
 
 /// Add flags to all messages within the given sequence range.
 /// Flags are case-insensitive, and they do not need to be prefixed with `\`.
-pub fn add<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
+pub fn add<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface<'a>>(
     seq_range: &'a str,
     flags: Vec<&'a str>,
     output: &'a OutputService,
@@ -27,7 +27,7 @@ pub fn add<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceIn
 
 /// Remove flags from all messages within the given sequence range.
 /// Flags are case-insensitive, and they do not need to be prefixed with `\`.
-pub fn remove<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
+pub fn remove<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface<'a>>(
     seq_range: &'a str,
     flags: Vec<&'a str>,
     output: &'a OutputService,
@@ -43,7 +43,7 @@ pub fn remove<'a, OutputService: OutputServiceInterface, ImapService: ImapServic
 
 /// Replace flags of all messages within the given sequence range.
 /// Flags are case-insensitive, and they do not need to be prefixed with `\`.
-pub fn set<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
+pub fn set<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface<'a>>(
     seq_range: &'a str,
     flags: Vec<&'a str>,
     output: &'a OutputService,

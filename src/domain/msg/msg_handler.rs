@@ -26,7 +26,11 @@ use crate::{
 };
 
 /// Download all message attachments to the user account downloads directory.
-pub fn attachments<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
+pub fn attachments<
+    'a,
+    OutputService: OutputServiceInterface,
+    ImapService: ImapServiceInterface<'a>,
+>(
     seq: &str,
     account: &Account,
     output: &OutputService,
@@ -53,7 +57,7 @@ pub fn attachments<OutputService: OutputServiceInterface, ImapService: ImapServi
 }
 
 /// Copy a message from a mailbox to another.
-pub fn copy<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
+pub fn copy<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface<'a>>(
     seq: &str,
     mbox: &str,
     output: &OutputService,
@@ -70,7 +74,7 @@ pub fn copy<OutputService: OutputServiceInterface, ImapService: ImapServiceInter
 }
 
 /// Delete messages matching the given sequence range.
-pub fn delete<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
+pub fn delete<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface<'a>>(
     seq: &str,
     output: &OutputService,
     imap: &mut ImapService,
@@ -83,8 +87,9 @@ pub fn delete<OutputService: OutputServiceInterface, ImapService: ImapServiceInt
 
 /// Forward the given message UID from the selected mailbox.
 pub fn forward<
+    'a,
     OutputService: OutputServiceInterface,
-    ImapService: ImapServiceInterface,
+    ImapService: ImapServiceInterface<'a>,
     SmtpService: SmtpServiceInterface,
 >(
     seq: &str,
@@ -101,7 +106,7 @@ pub fn forward<
 }
 
 /// List paginated messages from the selected mailbox.
-pub fn list<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
+pub fn list<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface<'a>>(
     page_size: Option<usize>,
     page: usize,
     account: &Account,
@@ -120,8 +125,9 @@ pub fn list<OutputService: OutputServiceInterface, ImapService: ImapServiceInter
 ///
 /// [mailto]: https://en.wikipedia.org/wiki/Mailto
 pub fn mailto<
+    'a,
     OutputService: OutputServiceInterface,
-    ImapService: ImapServiceInterface,
+    ImapService: ImapServiceInterface<'a>,
     SmtpService: SmtpServiceInterface,
 >(
     url: &Url,
@@ -172,7 +178,7 @@ pub fn mailto<
 }
 
 /// Move a message from a mailbox to another.
-pub fn move_<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
+pub fn move_<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface<'a>>(
     // The sequence number of the message to move
     seq: &str,
     // The mailbox to move the message in
@@ -198,7 +204,7 @@ pub fn move_<OutputService: OutputServiceInterface, ImapService: ImapServiceInte
 }
 
 /// Read a message by its sequence number.
-pub fn read<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
+pub fn read<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface<'a>>(
     seq: &str,
     text_mime: &str,
     raw: bool,
@@ -216,8 +222,9 @@ pub fn read<OutputService: OutputServiceInterface, ImapService: ImapServiceInter
 
 /// Reply to the given message UID.
 pub fn reply<
+    'a,
     OutputService: OutputServiceInterface,
-    ImapService: ImapServiceInterface,
+    ImapService: ImapServiceInterface<'a>,
     SmtpService: SmtpServiceInterface,
 >(
     seq: &str,
@@ -237,7 +244,7 @@ pub fn reply<
 }
 
 /// Save a raw message to the targetted mailbox.
-pub fn save<ImapService: ImapServiceInterface>(
+pub fn save<'a, ImapService: ImapServiceInterface<'a>>(
     mbox: &str,
     msg: &str,
     imap: &mut ImapService,
@@ -248,7 +255,7 @@ pub fn save<ImapService: ImapServiceInterface>(
 }
 
 /// Paginate messages from the selected mailbox matching the specified query.
-pub fn search<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
+pub fn search<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface<'a>>(
     query: String,
     page_size: Option<usize>,
     page: usize,
@@ -266,8 +273,9 @@ pub fn search<OutputService: OutputServiceInterface, ImapService: ImapServiceInt
 
 /// Send a raw message.
 pub fn send<
+    'a,
     OutputService: OutputServiceInterface,
-    ImapService: ImapServiceInterface,
+    ImapService: ImapServiceInterface<'a>,
     SmtpService: SmtpServiceInterface,
 >(
     raw_msg: &str,
@@ -301,8 +309,9 @@ pub fn send<
 
 /// Compose a new message.
 pub fn write<
+    'a,
     OutputService: OutputServiceInterface,
-    ImapService: ImapServiceInterface,
+    ImapService: ImapServiceInterface<'a>,
     SmtpService: SmtpServiceInterface,
 >(
     attachments_paths: Vec<&str>,
