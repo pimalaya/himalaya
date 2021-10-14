@@ -17,7 +17,7 @@ use crate::{
     config::Account,
     domain::{
         imap::ImapServiceInterface,
-        mbox::{Mbox, Mboxes, MboxType},
+        mbox::{Mboxes, MboxType},
         msg::{msg_utils, Flags, Parts, TextHtmlPart, TextPlainPart, Tpl, TplOverride},
         smtp::SmtpServiceInterface,
     },
