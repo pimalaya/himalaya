@@ -64,6 +64,7 @@ function! himalaya#msg#read()
       \printf("Fetching message %d", s:msg_id),
       \1,
     \)
+    call s:close_open_buffers('Himalaya read message')
     execute printf("silent! botright new Himalaya read message [%d]", s:msg_id)
     setlocal modifiable
     silent execute "%d"
@@ -374,4 +375,12 @@ function! s:get_focused_msg_ids(from, to)
   catch
     throw "messages not found"
   endtry
+endfunction
+
+function! s:close_open_buffers(name)
+  let l:open_buffers = filter(range(1, bufnr('$')), 'bufexists(v:val)')
+  let l:target_buffers = filter(l:open_buffers, 'buffer_name(v:val) =~ a:name')
+  for buffer_to_close in l:target_buffers
+    execute ":bwipeout " . buffer_to_close
+  endfor
 endfunction
