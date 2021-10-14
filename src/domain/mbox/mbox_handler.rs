@@ -5,18 +5,14 @@
 use anyhow::Result;
 use log::trace;
 
-use crate::{
-    domain::{ImapServiceInterface, Mboxes},
-    output::OutputServiceInterface,
-};
+use crate::{domain::ImapServiceInterface, output::OutputServiceInterface};
 
 /// List all mailboxes.
-pub fn list<OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
+pub fn list<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface<'a>>(
     output: &OutputService,
-    imap: &mut ImapService,
+    imap: &'a mut ImapService,
 ) -> Result<()> {
-    let raw_mboxes = imap.fetch_raw_mboxes()?;
-    let mboxes = Mboxes::from(&raw_mboxes);
+    let mboxes = imap.fetch_mboxes()?;
     trace!("mailboxes: {:#?}", mboxes);
     output.print(mboxes)
 }

@@ -296,8 +296,9 @@ impl Msg {
     }
 
     pub fn edit_with_editor<
+        'a,
         OutputService: OutputServiceInterface,
-        ImapService: ImapServiceInterface,
+        ImapService: ImapServiceInterface<'a>,
         SmtpService: SmtpServiceInterface,
     >(
         mut self,

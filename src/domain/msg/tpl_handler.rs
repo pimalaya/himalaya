@@ -25,7 +25,7 @@ pub fn new<'a, OutputService: OutputServiceInterface>(
 }
 
 /// Generate a reply message template.
-pub fn reply<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
+pub fn reply<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface<'a>>(
     seq: &str,
     all: bool,
     opts: TplOverride<'a>,
@@ -39,7 +39,7 @@ pub fn reply<'a, OutputService: OutputServiceInterface, ImapService: ImapService
 }
 
 /// Generate a forward message template.
-pub fn forward<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface>(
+pub fn forward<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface<'a>>(
     seq: &str,
     opts: TplOverride<'a>,
     account: &'a Account,

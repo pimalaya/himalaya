@@ -14,16 +14,15 @@ use std::{
 
 use crate::{
     config::{Account, Config},
-    domain::{Envelopes, Flags, Mbox, Msg},
+    domain::{Envelopes, Flags, Mbox, Mboxes, Msg, RawMboxes},
 };
 
 type ImapSession = imap::Session<TlsStream<TcpStream>>;
-pub(crate) type RawMboxes = imap::types::ZeroCopy<Vec<imap::types::Name>>;
 
-pub trait ImapServiceInterface {
+pub trait ImapServiceInterface<'a> {
     fn notify(&mut self, config: &Config, keepalive: u64) -> Result<()>;
     fn watch(&mut self, keepalive: u64) -> Result<()>;
-    fn fetch_raw_mboxes(&mut self) -> Result<RawMboxes>;
+    fn fetch_mboxes(&'a mut self) -> Result<Mboxes>;
     fn get_msgs(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes>;
     fn find_msgs(&mut self, query: &str, page_size: &usize, page: &usize) -> Result<Envelopes>;
     fn find_msg(&mut self, seq: &str) -> Result<Msg>;
@@ -45,6 +44,10 @@ pub struct ImapService<'a> {
     account: &'a Account,
     mbox: &'a Mbox<'a>,
     sess: Option<ImapSession>,
+    /// Holds raw mailboxes fetched by the `imap` crate in order to extend mailboxes lifetime
+    /// outside of handlers. Without that, it would be impossible for handlers to return a `Mbox`
+    /// struct or a `Mboxes` struct due to the `ZeroCopy` constraint.
+    _raw_mboxes_cache: Option<RawMboxes>,
 }
 
 impl<'a> ImapService<'a> {
@@ -102,11 +105,14 @@ impl<'a> ImapService<'a> {
     }
 }
 
-impl<'a> ImapServiceInterface for ImapService<'a> {
-    fn fetch_raw_mboxes(&mut self) -> Result<RawMboxes> {
-        self.sess()?
+impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
+    fn fetch_mboxes(&'a mut self) -> Result<Mboxes> {
+        let raw_mboxes = self
+            .sess()?
             .list(Some(""), Some("*"))
-            .context("cannot list mailboxes")
+            .context("cannot list mailboxes")?;
+        self._raw_mboxes_cache = Some(raw_mboxes);
+        Ok(Mboxes::from(self._raw_mboxes_cache.as_ref().unwrap()))
     }
 
     fn get_msgs(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes> {
@@ -381,6 +387,7 @@ impl<'a> From<(&'a Account, &'a Mbox<'a>)> for ImapService<'a> {
             account,
             mbox,
             sess: None,
+            _raw_mboxes_cache: None,
         }
     }
 }
