@@ -2,9 +2,9 @@ use anyhow::{Context, Result};
 use log::debug;
 use std::{env, fs, process::Command};
 
-use crate::domain::msg::{msg_utils, Tpl};
+use crate::domain::msg::msg_utils;
 
-pub fn open_with_tpl(tpl: Tpl) -> Result<Tpl> {
+pub fn open_with_tpl(tpl: String) -> Result<String> {
     let path = msg_utils::local_draft_path();
 
     debug!("create draft");
@@ -20,13 +20,12 @@ pub fn open_with_tpl(tpl: Tpl) -> Result<Tpl> {
     let content =
         fs::read_to_string(&path).context(format!("cannot read local draft at {:?}", path))?;
 
-    Ok(Tpl(content))
+    Ok(content)
 }
 
-pub fn open_with_draft() -> Result<Tpl> {
+pub fn open_with_draft() -> Result<String> {
     let path = msg_utils::local_draft_path();
-    let content =
+    let tpl =
         fs::read_to_string(&path).context(format!("cannot read local draft at {:?}", path))?;
-    let tpl = Tpl(content);
     open_with_tpl(tpl)
 }

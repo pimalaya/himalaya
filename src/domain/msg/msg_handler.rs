@@ -19,7 +19,7 @@ use crate::{
     domain::{
         imap::ImapServiceInterface,
         mbox::Mbox,
-        msg::{Flags, Msg, Part, TextPlainPart, Tpl},
+        msg::{Flags, Msg, Part, TextPlainPart},
         smtp::SmtpServiceInterface,
     },
     output::OutputServiceInterface,
@@ -295,8 +295,7 @@ pub fn send<
             .join("\r\n")
     };
 
-    let tpl = Tpl(raw_msg.to_string());
-    let msg = Msg::try_from(&tpl)?;
+    let msg = Msg::from_tpl(&raw_msg.to_string())?;
     let envelope: lettre::address::Envelope = msg.try_into()?;
     smtp.send_raw_msg(&envelope, raw_msg.as_bytes())?;
     debug!("message sent!");

@@ -4,6 +4,7 @@ use chrono::{DateTime, FixedOffset};
 use html_escape;
 use imap::types::Flag;
 use lettre::message::{Attachment, MultiPart, SinglePart};
+use log::trace;
 use regex::Regex;
 use rfc2047_decoder;
 use std::{
@@ -18,7 +19,7 @@ use crate::{
     domain::{
         imap::ImapServiceInterface,
         mbox::Mbox,
-        msg::{msg_utils, BinaryPart, Flags, Part, Parts, TextPlainPart, Tpl, TplOverride},
+        msg::{msg_utils, BinaryPart, Flags, Part, Parts, TextPlainPart, TplOverride},
         smtp::SmtpServiceInterface,
     },
     output::OutputServiceInterface,
@@ -290,9 +291,9 @@ impl Msg {
     }
 
     fn _edit_with_editor(&self, account: &Account) -> Result<Self> {
-        let tpl = Tpl::from_msg(TplOverride::default(), self, account);
+        let tpl = self.to_tpl(TplOverride::default(), account);
         let tpl = editor::open_with_tpl(tpl)?;
-        Self::try_from(&tpl)
+        Self::from_tpl(&tpl)
     }
 
     pub fn edit_with_editor<
@@ -314,7 +315,7 @@ impl Msg {
                     Ok(choice) => match choice {
                         PreEditChoice::Edit => {
                             let tpl = editor::open_with_draft()?;
-                            self.merge_with(Msg::try_from(&tpl)?);
+                            self.merge_with(Msg::from_tpl(&tpl)?);
                             break;
                         }
                         PreEditChoice::Discard => {
@@ -355,7 +356,7 @@ impl Msg {
                 Ok(PostEditChoice::RemoteDraft) => {
                     let mbox = Mbox::new("Drafts");
                     let flags = Flags::try_from(vec![Flag::Seen, Flag::Draft])?;
-                    let tpl = Tpl::from_msg(TplOverride::default(), &self, account);
+                    let tpl = self.to_tpl(TplOverride::default(), account);
                     imap.append_raw_msg_with_flags(&mbox, tpl.as_bytes(), flags)?;
                     msg_utils::remove_local_draft()?;
                     output.print("Message successfully saved to Drafts")?;
@@ -439,12 +440,95 @@ impl Msg {
             }
         }
     }
-}
 
-impl TryFrom<&Tpl> for Msg {
-    type Error = Error;
+    pub fn to_tpl(&self, opts: TplOverride, account: &Account) -> String {
+        let mut tpl = String::default();
 
-    fn try_from(tpl: &Tpl) -> Result<Msg> {
+        tpl.push_str("Content-Type: text/plain; charset=utf-8\n");
+
+        if let Some(in_reply_to) = self.in_reply_to.as_ref() {
+            tpl.push_str(&format!("In-Reply-To: {}\n", in_reply_to))
+        }
+
+        // From
+        tpl.push_str(&format!(
+            "From: {}\n",
+            opts.from
+                .map(|addrs| addrs.join(", "))
+                .unwrap_or_else(|| account.address())
+        ));
+
+        // To
+        tpl.push_str(&format!(
+            "To: {}\n",
+            opts.to
+                .map(|addrs| addrs.join(", "))
+                .or_else(|| self.to.clone().map(|addrs| addrs
+                    .iter()
+                    .map(|addr| addr.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")))
+                .unwrap_or_default()
+        ));
+
+        // Cc
+        if let Some(addrs) = opts.cc.map(|addrs| addrs.join(", ")).or_else(|| {
+            self.cc.clone().map(|addrs| {
+                addrs
+                    .iter()
+                    .map(|addr| addr.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            })
+        }) {
+            tpl.push_str(&format!("Cc: {}\n", addrs));
+        }
+
+        // Bcc
+        if let Some(addrs) = opts.bcc.map(|addrs| addrs.join(", ")).or_else(|| {
+            self.bcc.clone().map(|addrs| {
+                addrs
+                    .iter()
+                    .map(|addr| addr.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            })
+        }) {
+            tpl.push_str(&format!("Bcc: {}\n", addrs));
+        }
+
+        // Subject
+        tpl.push_str(&format!(
+            "Subject: {}\n",
+            opts.subject.unwrap_or(&self.subject)
+        ));
+
+        // Headers <=> body separator
+        tpl.push_str("\n");
+
+        // Body
+        if let Some(body) = opts.body {
+            tpl.push_str(body);
+        } else {
+            tpl.push_str(&self.fold_text_plain_parts())
+        }
+
+        // Signature
+        if let Some(sig) = opts.sig {
+            tpl.push_str("\n\n");
+            tpl.push_str(sig);
+        } else if let Some(ref sig) = account.sig {
+            tpl.push_str("\n\n");
+            tpl.push_str(sig);
+        }
+
+        tpl.push_str("\n");
+
+        trace!("template: {:#?}", tpl);
+        tpl
+    }
+
+    pub fn from_tpl(tpl: &str) -> Result<Self> {
         let mut msg = Msg::default();
 
         let parsed_msg =
