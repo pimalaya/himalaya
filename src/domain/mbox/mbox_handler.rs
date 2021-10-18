@@ -77,11 +77,11 @@ mod tests {
                 unimplemented!()
             }
 
-            fn get_msgs(&mut self, _: &usize, _: &usize) -> Result<Envelopes> {
+            fn fetch_envelopes(&mut self, _: &usize, _: &usize) -> Result<Envelopes> {
                 unimplemented!()
             }
 
-            fn find_msgs(&mut self, _: &str, _: &usize, _: &usize) -> Result<Envelopes> {
+            fn fetch_envelopes_with(&mut self, _: &str, _: &usize, _: &usize) -> Result<Envelopes> {
                 unimplemented!()
             }
 

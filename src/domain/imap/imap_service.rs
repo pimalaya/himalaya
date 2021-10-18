@@ -14,7 +14,7 @@ use std::{
 
 use crate::{
     config::{Account, Config},
-    domain::{Envelopes, Flags, Mbox, Mboxes, Msg, RawMboxes},
+    domain::{Envelopes, Flags, Mbox, Mboxes, Msg, RawEnvelopes, RawMboxes},
 };
 
 type ImapSession = imap::Session<TlsStream<TcpStream>>;
@@ -23,8 +23,13 @@ pub trait ImapServiceInterface<'a> {
     fn notify(&mut self, config: &Config, keepalive: u64) -> Result<()>;
     fn watch(&mut self, keepalive: u64) -> Result<()>;
     fn fetch_mboxes(&'a mut self) -> Result<Mboxes>;
-    fn get_msgs(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes>;
-    fn find_msgs(&mut self, query: &str, page_size: &usize, page: &usize) -> Result<Envelopes>;
+    fn fetch_envelopes(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes>;
+    fn fetch_envelopes_with(
+        &'a mut self,
+        query: &str,
+        page_size: &usize,
+        page: &usize,
+    ) -> Result<Envelopes>;
     fn find_msg(&mut self, seq: &str) -> Result<Msg>;
     fn find_raw_msg(&mut self, seq: &str) -> Result<Vec<u8>>;
     fn append_msg(&mut self, mbox: &Mbox, msg: Msg) -> Result<()>;
@@ -48,6 +53,7 @@ pub struct ImapService<'a> {
     /// outside of handlers. Without that, it would be impossible for handlers to return a `Mbox`
     /// struct or a `Mboxes` struct due to the `ZeroCopy` constraint.
     _raw_mboxes_cache: Option<RawMboxes>,
+    _raw_msgs_cache: Option<RawEnvelopes>,
 }
 
 impl<'a> ImapService<'a> {
@@ -115,7 +121,7 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
         Ok(Mboxes::from(self._raw_mboxes_cache.as_ref().unwrap()))
     }
 
-    fn get_msgs(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes> {
+    fn fetch_envelopes(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes> {
         let mbox = self.mbox.to_owned();
         let last_seq = self
             .sess()?
@@ -141,11 +147,16 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
             .sess()?
             .fetch(range, "(ENVELOPE FLAGS INTERNALDATE)")
             .context(r#"cannot fetch messages within range "{}""#)?;
-
-        Ok(Envelopes::try_from(fetches)?)
+        self._raw_msgs_cache = Some(fetches);
+        Ok(Envelopes::try_from(self._raw_msgs_cache.as_ref().unwrap())?)
     }
 
-    fn find_msgs(&mut self, query: &str, page_size: &usize, page: &usize) -> Result<Envelopes> {
+    fn fetch_envelopes_with(
+        &'a mut self,
+        query: &str,
+        page_size: &usize,
+        page: &usize,
+    ) -> Result<Envelopes> {
         let mbox = self.mbox.to_owned();
         self.sess()?
             .select(&mbox.name)
@@ -174,8 +185,8 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
             .sess()?
             .fetch(&range, "(ENVELOPE FLAGS INTERNALDATE)")
             .context(r#"cannot fetch messages within range "{}""#)?;
-
-        Ok(Envelopes::try_from(fetches)?)
+        self._raw_msgs_cache = Some(fetches);
+        Ok(Envelopes::try_from(self._raw_msgs_cache.as_ref().unwrap())?)
     }
 
     /// Find a message by sequence number.
@@ -388,6 +399,7 @@ impl<'a> From<(&'a Account, &'a Mbox<'a>)> for ImapService<'a> {
             mbox,
             sess: None,
             _raw_mboxes_cache: None,
+            _raw_msgs_cache: None,
         }
     }
 }

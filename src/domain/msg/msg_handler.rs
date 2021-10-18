@@ -116,7 +116,7 @@ pub fn list<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceI
     let page_size = page_size.unwrap_or(account.default_page_size);
     trace!("page size: {}", page_size);
 
-    let msgs = imap.get_msgs(&page_size, &page)?;
+    let msgs = imap.fetch_envelopes(&page_size, &page)?;
     trace!("messages: {:#?}", msgs);
     output.print(msgs)
 }
@@ -261,12 +261,12 @@ pub fn search<'a, OutputService: OutputServiceInterface, ImapService: ImapServic
     page: usize,
     account: &Account,
     output: &OutputService,
-    imap: &mut ImapService,
+    imap: &'a mut ImapService,
 ) -> Result<()> {
     let page_size = page_size.unwrap_or(account.default_page_size);
     trace!("page size: {}", page_size);
 
-    let msgs = imap.find_msgs(&query, &page_size, &page)?;
+    let msgs = imap.fetch_envelopes_with(&query, &page_size, &page)?;
     trace!("messages: {:#?}", msgs);
     output.print(msgs)
 }
