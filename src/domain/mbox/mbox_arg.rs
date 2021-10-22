@@ -9,13 +9,13 @@ use log::trace;
 
 /// Represents the mailbox commands.
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) enum Cmd {
+pub enum Cmd {
     /// Represents the list mailboxes command.
     List,
 }
 
 /// Defines the mailbox command matcher.
-pub(crate) fn matches(m: &clap::ArgMatches) -> Result<Option<Cmd>> {
+pub fn matches(m: &clap::ArgMatches) -> Result<Option<Cmd>> {
     if let Some(_) = m.subcommand_matches("mailboxes") {
         trace!("mailboxes subcommand matched");
         return Ok(Some(Cmd::List));
@@ -25,14 +25,14 @@ pub(crate) fn matches(m: &clap::ArgMatches) -> Result<Option<Cmd>> {
 }
 
 /// Contains mailbox subcommands.
-pub(crate) fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
+pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
     vec![clap::SubCommand::with_name("mailboxes")
         .aliases(&["mailbox", "mboxes", "mbox", "mb", "m"])
         .about("Lists mailboxes")]
 }
 
 /// Defines the source mailbox argument.
-pub(crate) fn source_arg<'a>() -> clap::Arg<'a, 'a> {
+pub fn source_arg<'a>() -> clap::Arg<'a, 'a> {
     clap::Arg::with_name("mbox-source")
         .short("m")
         .long("mailbox")
@@ -42,7 +42,7 @@ pub(crate) fn source_arg<'a>() -> clap::Arg<'a, 'a> {
 }
 
 /// Defines the target mailbox argument.
-pub(crate) fn target_arg<'a>() -> clap::Arg<'a, 'a> {
+pub fn target_arg<'a>() -> clap::Arg<'a, 'a> {
     clap::Arg::with_name("mbox-target")
         .help("Specifies the targetted mailbox")
         .value_name("TARGET")

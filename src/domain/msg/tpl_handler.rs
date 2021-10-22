@@ -8,7 +8,7 @@ use crate::{
     config::Account,
     domain::{
         imap::ImapServiceInterface,
-        msg::{Msg, Tpl, TplOverride},
+        msg::{Msg, TplOverride},
     },
     output::OutputServiceInterface,
 };
@@ -19,8 +19,7 @@ pub fn new<'a, OutputService: OutputServiceInterface>(
     account: &'a Account,
     output: &'a OutputService,
 ) -> Result<()> {
-    let msg = Msg::default();
-    let tpl = Tpl::from_msg(opts, &msg, account);
+    let tpl = Msg::default().to_tpl(opts, account);
     output.print(tpl)
 }
 
@@ -33,8 +32,10 @@ pub fn reply<'a, OutputService: OutputServiceInterface, ImapService: ImapService
     output: &'a OutputService,
     imap: &'a mut ImapService,
 ) -> Result<()> {
-    let msg = imap.find_msg(seq)?.into_reply(all, account)?;
-    let tpl = Tpl::from_msg(opts, &msg, account);
+    let tpl = imap
+        .find_msg(seq)?
+        .into_reply(all, account)?
+        .to_tpl(opts, account);
     output.print(tpl)
 }
 
@@ -46,7 +47,9 @@ pub fn forward<'a, OutputService: OutputServiceInterface, ImapService: ImapServi
     output: &'a OutputService,
     imap: &'a mut ImapService,
 ) -> Result<()> {
-    let msg = imap.find_msg(seq)?.into_forward(account)?;
-    let tpl = Tpl::from_msg(opts, &msg, account);
+    let tpl = imap
+        .find_msg(seq)?
+        .into_forward(account)?
+        .to_tpl(opts, account);
     output.print(tpl)
 }

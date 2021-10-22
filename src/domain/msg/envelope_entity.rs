@@ -1,16 +1,18 @@
 use anyhow::{anyhow, Context, Error, Result};
 use serde::Serialize;
-use std::convert::TryFrom;
+use std::{borrow::Cow, convert::TryFrom};
 
 use crate::{
     domain::msg::{Flag, Flags},
     ui::table::{Cell, Row, Table},
 };
 
+pub type RawEnvelope = imap::types::Fetch;
+
 /// Representation of an envelope. An envelope gathers basic information related to a message. It
 /// is mostly used for listings.
 #[derive(Debug, Default, Serialize)]
-pub struct Envelope {
+pub struct Envelope<'a> {
     /// The sequence number of the message.
     ///
     /// [RFC3501]: https://datatracker.ietf.org/doc/html/rfc3501#section-2.3.1.2
@@ -20,7 +22,7 @@ pub struct Envelope {
     pub flags: Flags,
 
     /// The subject of the message.
-    pub subject: String,
+    pub subject: Cow<'a, str>,
 
     /// The sender of the message.
     pub sender: String,
@@ -31,10 +33,10 @@ pub struct Envelope {
     pub date: Option<String>,
 }
 
-impl<'a> TryFrom<&'a imap::types::Fetch> for Envelope {
+impl<'a> TryFrom<&'a RawEnvelope> for Envelope<'a> {
     type Error = Error;
 
-    fn try_from(fetch: &'a imap::types::Fetch) -> Result<Envelope> {
+    fn try_from(fetch: &'a RawEnvelope) -> Result<Envelope> {
         let envelope = fetch
             .envelope()
             .ok_or(anyhow!("cannot get envelope of message {}", fetch.message))?;
@@ -46,7 +48,7 @@ impl<'a> TryFrom<&'a imap::types::Fetch> for Envelope {
         let flags = Flags::try_from(fetch.flags())?;
 
         // Get the subject
-        let subject = envelope
+        let subject: Cow<str> = envelope
             .subject
             .as_ref()
             .ok_or(anyhow!("cannot get subject of message {}", fetch.message))
@@ -55,7 +57,8 @@ impl<'a> TryFrom<&'a imap::types::Fetch> for Envelope {
                     "cannot decode subject of message {}",
                     fetch.message
                 ))
-            })?;
+            })?
+            .into();
 
         // Get the sender
         let sender = envelope
@@ -114,7 +117,7 @@ impl<'a> TryFrom<&'a imap::types::Fetch> for Envelope {
     }
 }
 
-impl Table for Envelope {
+impl<'a> Table for Envelope<'a> {
     fn head() -> Row {
         Row::new()
             .cell(Cell::new("ID").bold().underline().white())

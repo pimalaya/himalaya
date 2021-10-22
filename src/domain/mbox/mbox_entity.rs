@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// Represents a raw mailbox returned by the `imap` crate.
-pub(crate) type RawMbox = imap::types::Name;
+pub type RawMbox = imap::types::Name;
 
 /// Represents a mailbox.
 #[derive(Debug, Default, PartialEq, Eq, Serialize)]

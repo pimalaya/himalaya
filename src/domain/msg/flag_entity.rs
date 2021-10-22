@@ -1,10 +1,15 @@
 pub use imap::types::Flag;
 use serde::ser::{Serialize, Serializer};
 
-/// Serializable wrapper arround [`imap::types::Flag`].
+/// Represents a serializable `imap::types::Flag`.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct SerializableFlag<'a>(pub &'a Flag<'a>);
 
+/// Implements the serialize trait for `imap::types::Flag`.
+/// Remote serialization cannot be used because of the [#[non_exhaustive]] directive of
+/// `imap::types::Flag`.
+///
+/// [#[non_exhaustive]]: https://github.com/serde-rs/serde/issues/1991
 impl<'a> Serialize for SerializableFlag<'a> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

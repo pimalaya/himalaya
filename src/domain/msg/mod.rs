@@ -43,9 +43,6 @@ pub use tpl_arg::TplOverride;
 
 pub mod tpl_handler;
 
-pub mod tpl_entity;
-pub use tpl_entity::*;
-
 pub mod msg_entity;
 pub use msg_entity::*;
 

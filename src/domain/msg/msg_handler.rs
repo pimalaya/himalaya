@@ -19,7 +19,7 @@ use crate::{
     domain::{
         imap::ImapServiceInterface,
         mbox::Mbox,
-        msg::{Flags, Msg, Part, TextPlainPart, Tpl},
+        msg::{Flags, Msg, Part, TextPlainPart},
         smtp::SmtpServiceInterface,
     },
     output::OutputServiceInterface,
@@ -116,7 +116,7 @@ pub fn list<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceI
     let page_size = page_size.unwrap_or(account.default_page_size);
     trace!("page size: {}", page_size);
 
-    let msgs = imap.get_msgs(&page_size, &page)?;
+    let msgs = imap.fetch_envelopes(&page_size, &page)?;
     trace!("messages: {:#?}", msgs);
     output.print(msgs)
 }
@@ -244,14 +244,26 @@ pub fn reply<
 }
 
 /// Save a raw message to the targetted mailbox.
-pub fn save<'a, ImapService: ImapServiceInterface<'a>>(
-    mbox: &str,
-    msg: &str,
+pub fn save<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface<'a>>(
+    mbox: &Mbox,
+    raw_msg: &str,
+    output: &OutputService,
     imap: &mut ImapService,
 ) -> Result<()> {
-    let mbox = Mbox::new(mbox);
+    let raw_msg = if atty::is(Stream::Stdin) || output.is_json() {
+        raw_msg.replace("\r", "").replace("\n", "\r\n")
+    } else {
+        io::stdin()
+            .lock()
+            .lines()
+            .filter_map(|ln| ln.ok())
+            .map(|ln| ln.to_string())
+            .collect::<Vec<String>>()
+            .join("\r\n")
+    };
+
     let flags = Flags::try_from(vec![Flag::Seen])?;
-    imap.append_raw_msg_with_flags(&mbox, msg.as_bytes(), flags)
+    imap.append_raw_msg_with_flags(mbox, raw_msg.as_bytes(), flags)
 }
 
 /// Paginate messages from the selected mailbox matching the specified query.
@@ -261,12 +273,12 @@ pub fn search<'a, OutputService: OutputServiceInterface, ImapService: ImapServic
     page: usize,
     account: &Account,
     output: &OutputService,
-    imap: &mut ImapService,
+    imap: &'a mut ImapService,
 ) -> Result<()> {
     let page_size = page_size.unwrap_or(account.default_page_size);
     trace!("page size: {}", page_size);
 
-    let msgs = imap.find_msgs(&query, &page_size, &page)?;
+    let msgs = imap.fetch_envelopes_with(&query, &page_size, &page)?;
     trace!("messages: {:#?}", msgs);
     output.print(msgs)
 }
@@ -295,8 +307,7 @@ pub fn send<
             .join("\r\n")
     };
 
-    let tpl = Tpl(raw_msg.to_string());
-    let msg = Msg::try_from(&tpl)?;
+    let msg = Msg::from_tpl(&raw_msg.to_string())?;
     let envelope: lettre::address::Envelope = msg.try_into()?;
     smtp.send_raw_msg(&envelope, raw_msg.as_bytes())?;
     debug!("message sent!");

@@ -32,7 +32,7 @@ pub enum Command<'a> {
     Move(Seq<'a>, Mbox<'a>),
     Read(Seq<'a>, TextMime<'a>, Raw),
     Reply(Seq<'a>, All, AttachmentsPaths<'a>),
-    Save(Mbox<'a>, RawMsg<'a>),
+    Save(RawMsg<'a>),
     Search(Query, Option<PageSize>, Page),
     Send(RawMsg<'a>),
     Write(AttachmentsPaths<'a>),
@@ -123,11 +123,9 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
 
     if let Some(m) = m.subcommand_matches("save") {
         debug!("save command matched");
-        let msg = m.value_of("message").unwrap();
-        debug!("message: {}", &msg);
-        let mbox = m.value_of("mbox-target").unwrap();
-        debug!("target mailbox: `{:?}`", mbox);
-        return Ok(Some(Command::Save(mbox, msg)));
+        let msg = m.value_of("message").unwrap_or_default();
+        trace!("message: {}", msg);
+        return Ok(Some(Command::Save(msg)));
     }
 
     if let Some(m) = m.subcommand_matches("search") {
@@ -197,7 +195,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
 }
 
 /// Message sequence number argument.
-pub(crate) fn seq_arg<'a>() -> Arg<'a, 'a> {
+pub fn seq_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name("seq")
         .help("Specifies the targetted message")
         .value_name("SEQ")
@@ -205,7 +203,7 @@ pub(crate) fn seq_arg<'a>() -> Arg<'a, 'a> {
 }
 
 /// Message sequence range argument.
-pub(crate) fn seq_range_arg<'a>() -> Arg<'a, 'a> {
+pub fn seq_range_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name("seq-range")
         .help("Specifies targetted message(s)")
         .long_help("Specifies a range of targetted messages. The range follows the [RFC3501](https://datatracker.ietf.org/doc/html/rfc3501#section-9) format: `1:5` matches messages with sequence number between 1 and 5, `1,5` matches messages with sequence number 1 or 5, * matches all messages.")
@@ -214,7 +212,7 @@ pub(crate) fn seq_range_arg<'a>() -> Arg<'a, 'a> {
 }
 
 /// Message reply all argument.
-pub(crate) fn reply_all_arg<'a>() -> Arg<'a, 'a> {
+pub fn reply_all_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name("reply-all")
         .help("Includes all recipients")
         .short("A")

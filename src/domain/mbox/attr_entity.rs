@@ -2,7 +2,7 @@
 //!
 //! This module contains the definition of the mailbox attribute and its traits implementations.
 
-pub(crate) use imap::types::NameAttribute as AttrRemote;
+pub use imap::types::NameAttribute as AttrRemote;
 use serde::Serialize;
 use std::{
     borrow::Cow,

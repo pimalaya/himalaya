@@ -10,12 +10,13 @@ use std::{
 
 use crate::domain::msg::{Flag, SerializableFlag};
 
-/// Wrapper arround [`imap::types::Flag`]s.
+/// Represents the flags of the message.
+/// A hashset is used to avoid duplicates.
 #[derive(Debug, Clone, Default)]
 pub struct Flags(pub HashSet<Flag<'static>>);
 
 impl Flags {
-    /// Build a symbols string based on flags contained in the hashset.
+    /// Builds a symbols string based on flags contained in the hashset.
     pub fn to_symbols_string(&self) -> String {
         let mut flags = String::new();
         flags.push_str(if self.contains(&Flag::Seen) {
@@ -120,48 +121,6 @@ impl Serialize for Flags {
     }
 }
 
-///// Converst a string of flags into their appropriate flag representation. For example `"Seen"` is
-///// gonna be convertred to `Flag::Seen`.
-/////
-///// # Example
-///// ```rust
-///// use himalaya::flag::model::Flags;
-///// use imap::types::Flag;
-///// use std::collections::HashSet;
-/////
-///// fn main() {
-/////     let flags = "Seen Answered";
-/////
-/////     let mut expected = HashSet::new();
-/////     expected.insert(Flag::Seen);
-/////     expected.insert(Flag::Answered);
-/////
-/////     let output = Flags::from(flags);
-/////
-/////     assert_eq!(output.0, expected);
-///// }
-///// ```
-//impl From<&str> for Flags {
-//    fn from(flags: &str) -> Self {
-//        let mut content: HashSet<Flag<'static>> = HashSet::new();
-
-//        for flag in flags.split_ascii_whitespace() {
-//            match flag {
-//                "Answered" => content.insert(Flag::Answered),
-//                "Deleted" => content.insert(Flag::Deleted),
-//                "Draft" => content.insert(Flag::Draft),
-//                "Flagged" => content.insert(Flag::Flagged),
-//                "MayCreate" => content.insert(Flag::MayCreate),
-//                "Recent" => content.insert(Flag::Recent),
-//                "Seen" => content.insert(Flag::Seen),
-//                custom => content.insert(Flag::Custom(Cow::Owned(custom.to_string()))),
-//            };
-//        }
-
-//        Self(content)
-//    }
-//}
-
 impl<'a> From<Vec<&'a str>> for Flags {
     fn from(flags: Vec<&'a str>) -> Self {
         let mut map: HashSet<Flag<'static>> = HashSet::new();
@@ -185,6 +144,7 @@ impl<'a> From<Vec<&'a str>> for Flags {
     }
 }
 
+// FIXME
 //#[cfg(test)]
 //mod tests {
 //    use crate::domain::msg::flag::entity::Flags;
