@@ -111,7 +111,7 @@ impl Config {
         let subject = subject.as_ref();
         let sender = sender.as_ref();
 
-        let default_cmd = format!(r#"notify-send "📫 {}" "{}""#, sender, subject);
+        let default_cmd = format!(r#"notify-send "New message from {}" "{}""#, sender, subject);
         let cmd = self
             .notify_cmd
             .as_ref()

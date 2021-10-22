@@ -14,7 +14,7 @@ use std::{
 
 use crate::{
     config::{Account, Config},
-    domain::{Envelopes, Flags, Mbox, Mboxes, Msg, RawEnvelopes, RawMboxes},
+    domain::{Envelope, Envelopes, Flags, Mbox, Mboxes, Msg, RawEnvelopes, RawMboxes},
 };
 
 type ImapSession = imap::Session<TlsStream<TcpStream>>;
@@ -284,21 +284,16 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
                     .join(",");
                 let fetches = self
                     .sess()?
-                    .uid_fetch(uids, "(ENVELOPE)")
+                    .uid_fetch(uids, "(UID ENVELOPE)")
                     .context("cannot fetch new messages enveloppe")?;
 
                 for fetch in fetches.iter() {
-                    let msg = Msg::try_from(fetch)?;
+                    let msg = Envelope::try_from(fetch)?;
                     let uid = fetch.uid.ok_or_else(|| {
                         anyhow!("cannot retrieve message {}'s UID", fetch.message)
                     })?;
 
-                    let from = msg
-                        .from
-                        .as_ref()
-                        .and_then(|addrs| addrs.iter().next())
-                        .map(|addr| addr.to_string())
-                        .unwrap_or(String::from("unknown"));
+                    let from = msg.sender.to_owned().into();
                     config.run_notify_cmd(&msg.subject, &from)?;
 
                     debug!("notify message: {}", uid);
@@ -350,7 +345,7 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
     }
 
     fn add_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()> {
-        let mbox = self.mbox.to_owned();
+        let mbox = self.mbox;
         let flags: String = flags.to_string();
         self.sess()?
             .select(&mbox.name)
@@ -361,25 +356,25 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
         Ok(())
     }
 
-    fn set_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()> {
-        let mbox = self.mbox.to_owned();
+    fn set_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()> {
+        let mbox = self.mbox;
         self.sess()?
             .select(&mbox.name)
             .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?;
         self.sess()?
-            .store(uid_seq, format!("FLAGS ({})", flags))
+            .store(seq_range, format!("FLAGS ({})", flags))
             .context(format!(r#"cannot set flags "{}""#, &flags))?;
         Ok(())
     }
 
-    fn remove_flags(&mut self, uid_seq: &str, flags: &Flags) -> Result<()> {
-        let mbox = self.mbox.to_owned();
+    fn remove_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()> {
+        let mbox = self.mbox;
         let flags = flags.to_string();
         self.sess()?
             .select(&mbox.name)
             .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?;
         self.sess()?
-            .store(uid_seq, format!("-FLAGS ({})", flags))
+            .store(seq_range, format!("-FLAGS ({})", flags))
             .context(format!(r#"cannot remove flags "{}""#, &flags))?;
         Ok(())
     }
