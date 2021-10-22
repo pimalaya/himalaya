@@ -119,8 +119,8 @@ fn main() -> Result<()> {
         Some(msg_arg::Command::Reply(seq, all, atts)) => {
             return msg_handler::reply(seq, all, atts, &account, &output, &mut imap, &mut smtp);
         }
-        Some(msg_arg::Command::Save(mbox, msg)) => {
-            return msg_handler::save(mbox, msg, &mut imap);
+        Some(msg_arg::Command::Save(raw_msg)) => {
+            return msg_handler::save(&mbox, raw_msg, &output, &mut imap);
         }
         Some(msg_arg::Command::Search(query, page_size, page)) => {
             return msg_handler::search(query, page_size, page, &account, &output, &mut imap);

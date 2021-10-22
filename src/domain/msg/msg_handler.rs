@@ -244,14 +244,26 @@ pub fn reply<
 }
 
 /// Save a raw message to the targetted mailbox.
-pub fn save<'a, ImapService: ImapServiceInterface<'a>>(
-    mbox: &str,
-    msg: &str,
+pub fn save<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface<'a>>(
+    mbox: &Mbox,
+    raw_msg: &str,
+    output: &OutputService,
     imap: &mut ImapService,
 ) -> Result<()> {
-    let mbox = Mbox::new(mbox);
+    let raw_msg = if atty::is(Stream::Stdin) || output.is_json() {
+        raw_msg.replace("\r", "").replace("\n", "\r\n")
+    } else {
+        io::stdin()
+            .lock()
+            .lines()
+            .filter_map(|ln| ln.ok())
+            .map(|ln| ln.to_string())
+            .collect::<Vec<String>>()
+            .join("\r\n")
+    };
+
     let flags = Flags::try_from(vec![Flag::Seen])?;
-    imap.append_raw_msg_with_flags(&mbox, msg.as_bytes(), flags)
+    imap.append_raw_msg_with_flags(mbox, raw_msg.as_bytes(), flags)
 }
 
 /// Paginate messages from the selected mailbox matching the specified query.

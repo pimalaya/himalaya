@@ -32,7 +32,7 @@ pub enum Command<'a> {
     Move(Seq<'a>, Mbox<'a>),
     Read(Seq<'a>, TextMime<'a>, Raw),
     Reply(Seq<'a>, All, AttachmentsPaths<'a>),
-    Save(Mbox<'a>, RawMsg<'a>),
+    Save(RawMsg<'a>),
     Search(Query, Option<PageSize>, Page),
     Send(RawMsg<'a>),
     Write(AttachmentsPaths<'a>),
@@ -123,11 +123,9 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
 
     if let Some(m) = m.subcommand_matches("save") {
         debug!("save command matched");
-        let msg = m.value_of("message").unwrap();
-        debug!("message: {}", &msg);
-        let mbox = m.value_of("mbox-target").unwrap();
-        debug!("target mailbox: `{:?}`", mbox);
-        return Ok(Some(Command::Save(mbox, msg)));
+        let msg = m.value_of("message").unwrap_or_default();
+        trace!("message: {}", msg);
+        return Ok(Some(Command::Save(msg)));
     }
 
     if let Some(m) = m.subcommand_matches("search") {
