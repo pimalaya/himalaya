@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Error on empty subject [#229]
+
 ## [0.5.0] - 2021-10-10
 
 ### Added
@@ -333,3 +337,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#199]: https://github.com/soywod/himalaya/issues/199
 [#205]: https://github.com/soywod/himalaya/issues/205
 [#215]: https://github.com/soywod/himalaya/issues/215
+[#229]: https://github.com/soywod/himalaya/issues/229
