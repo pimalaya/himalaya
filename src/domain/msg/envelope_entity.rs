@@ -51,13 +51,13 @@ impl<'a> TryFrom<&'a RawEnvelope> for Envelope<'a> {
         let subject: Cow<str> = envelope
             .subject
             .as_ref()
-            .ok_or(anyhow!("cannot get subject of message {}", fetch.message))
-            .and_then(|subj| {
+            .map(|subj| {
                 rfc2047_decoder::decode(subj).context(format!(
                     "cannot decode subject of message {}",
                     fetch.message
                 ))
-            })?
+            })
+            .unwrap_or(Ok(String::default()))?
             .into();
 
         // Get the sender

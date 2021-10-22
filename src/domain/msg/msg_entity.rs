@@ -705,13 +705,13 @@ impl<'a> TryFrom<&'a imap::types::Fetch> for Msg {
         let subject = envelope
             .subject
             .as_ref()
-            .ok_or(anyhow!("cannot get subject of message {}", fetch.message))
-            .and_then(|subj| {
+            .map(|subj| {
                 rfc2047_decoder::decode(subj).context(format!(
                     "cannot decode subject of message {}",
                     fetch.message
                 ))
-            })?;
+            })
+            .unwrap_or(Ok(String::default()))?;
 
         // Get the sender(s) address(es)
         let from = match envelope
