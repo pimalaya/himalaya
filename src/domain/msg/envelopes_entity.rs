@@ -11,7 +11,7 @@ use crate::{
     ui::Table,
 };
 
-pub(crate) type RawEnvelopes = imap::types::ZeroCopy<Vec<RawEnvelope>>;
+pub type RawEnvelopes = imap::types::ZeroCopy<Vec<RawEnvelope>>;
 
 /// Representation of a list of envelopes.
 #[derive(Debug, Default, Serialize)]

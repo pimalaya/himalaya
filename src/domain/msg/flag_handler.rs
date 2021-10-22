@@ -1,15 +1,15 @@
-//! Module related to message flag handling.
+//! Message flag handling module.
 //!
-//! This module gathers all message flag commands.  
+//! This module gathers all flag actions triggered by the CLI.
 
 use anyhow::Result;
 
 use crate::{
-    domain::{imap::ImapServiceInterface, msg::Flags},
+    domain::{Flags, ImapServiceInterface},
     output::OutputServiceInterface,
 };
 
-/// Add flags to all messages within the given sequence range.
+/// Adds flags to all messages matching the given sequence range.
 /// Flags are case-insensitive, and they do not need to be prefixed with `\`.
 pub fn add<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface<'a>>(
     seq_range: &'a str,
@@ -25,7 +25,7 @@ pub fn add<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceIn
     ))
 }
 
-/// Remove flags from all messages within the given sequence range.
+/// Removes flags from all messages matching the given sequence range.
 /// Flags are case-insensitive, and they do not need to be prefixed with `\`.
 pub fn remove<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface<'a>>(
     seq_range: &'a str,
@@ -41,7 +41,7 @@ pub fn remove<'a, OutputService: OutputServiceInterface, ImapService: ImapServic
     ))
 }
 
-/// Replace flags of all messages within the given sequence range.
+/// Replaces flags of all messages matching the given sequence range.
 /// Flags are case-insensitive, and they do not need to be prefixed with `\`.
 pub fn set<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceInterface<'a>>(
     seq_range: &'a str,

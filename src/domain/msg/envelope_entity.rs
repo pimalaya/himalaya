@@ -7,7 +7,7 @@ use crate::{
     ui::table::{Cell, Row, Table},
 };
 
-pub(crate) type RawEnvelope = imap::types::Fetch;
+pub type RawEnvelope = imap::types::Fetch;
 
 /// Representation of an envelope. An envelope gathers basic information related to a message. It
 /// is mostly used for listings.
