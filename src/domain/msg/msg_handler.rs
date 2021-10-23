@@ -212,7 +212,8 @@ pub fn read<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceI
     imap: &mut ImapService,
 ) -> Result<()> {
     let msg = if raw {
-        String::from_utf8(imap.find_raw_msg(&seq)?)?
+        // Emails don't always have valid utf8. Using "lossy" to display what we can.
+        String::from_utf8_lossy(&imap.find_raw_msg(&seq)?).into_owned()
     } else {
         imap.find_msg(&seq)?.fold_text_parts(text_mime)
     };
