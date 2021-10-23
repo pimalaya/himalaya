@@ -6,6 +6,8 @@ use std::{
     fmt,
 };
 
+use crate::output::Printable;
+
 #[derive(Debug, PartialEq)]
 pub enum OutputFmt {
     Plain,
@@ -58,7 +60,7 @@ impl<T: Serialize> OutputJson<T> {
 }
 
 pub trait OutputServiceInterface {
-    fn print<T: Serialize + fmt::Display>(&self, data: T) -> Result<()>;
+    fn print<T: Serialize + Printable>(&self, data: T) -> Result<()>;
     fn is_json(&self) -> bool;
 }
 
@@ -70,10 +72,10 @@ pub struct OutputService {
 impl OutputServiceInterface for OutputService {
     /// Print the provided item out according to the formatting setting when you created this
     /// struct.
-    fn print<T: Serialize + fmt::Display>(&self, data: T) -> Result<()> {
+    fn print<T: Serialize + Printable>(&self, data: T) -> Result<()> {
         match self.fmt {
             OutputFmt::Plain => {
-                println!("{}", data)
+                data.print()?;
             }
             OutputFmt::Json => {
                 print!("{}", serde_json::to_string(&OutputJson::new(data))?)

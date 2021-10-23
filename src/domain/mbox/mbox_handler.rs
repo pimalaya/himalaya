@@ -20,13 +20,12 @@ pub fn list<'a, OutputService: OutputServiceInterface, ImapService: ImapServiceI
 #[cfg(test)]
 mod tests {
     use serde::Serialize;
-    use std::fmt::Display;
 
     use super::*;
     use crate::{
         config::Config,
         domain::{AttrRemote, Attrs, Envelopes, Flags, Mbox, Mboxes, Msg},
-        output::OutputJson,
+        output::{OutputJson, Printable},
     };
 
     #[test]
@@ -34,7 +33,7 @@ mod tests {
         struct OutputServiceTest;
 
         impl OutputServiceInterface for OutputServiceTest {
-            fn print<T: Serialize + Display>(&self, data: T) -> Result<()> {
+            fn print<T: Serialize + Printable>(&self, data: T) -> Result<()> {
                 let data = serde_json::to_string(&OutputJson::new(data))?;
                 assert_eq!(
                     data,

@@ -381,6 +381,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shellexpand",
+ "termcolor",
  "terminal_size",
  "toml",
  "tree_magic",

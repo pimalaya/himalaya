@@ -7,3 +7,6 @@ pub use output_utils::*;
 
 pub mod output_service;
 pub use output_service::*;
+
+pub mod printable;
+pub use printable::*;
