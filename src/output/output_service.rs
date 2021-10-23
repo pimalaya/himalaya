@@ -1,10 +1,12 @@
 use anyhow::{anyhow, Error, Result};
+use atty::Stream;
 use log::debug;
 use serde::Serialize;
 use std::{
     convert::{TryFrom, TryInto},
     fmt,
 };
+use termcolor::{ColorChoice, StandardStream};
 
 use crate::output::Print;
 
@@ -75,7 +77,21 @@ impl OutputServiceInterface for OutputService {
     fn print<T: Serialize + Print>(&self, data: T) -> Result<()> {
         match self.fmt {
             OutputFmt::Plain => {
-                data.print()?;
+                let color_choice = if atty::isnt(Stream::Stdin) {
+                    // Colors should be deactivated if the terminal is not a tty.
+                    ColorChoice::Never
+                } else {
+                    // Otherwise let's `termcolor` decide by inspecting the environment. From the [doc]:
+                    // - If `NO_COLOR` is set to any value, then colors will be suppressed.
+                    // - If `TERM` is set to dumb, then colors will be suppressed.
+                    // - In non-Windows environments, if `TERM` is not set, then colors will be suppressed.
+                    //
+                    // [doc]: https://github.com/BurntSushi/termcolor#automatic-color-selection
+                    ColorChoice::Auto
+                };
+
+                // Returns a mutable writter on stdout with color support.
+                data.print(&mut StandardStream::stdout(color_choice))?;
             }
             OutputFmt::Json => {
                 print!("{}", serde_json::to_string(&OutputJson::new(data))?)

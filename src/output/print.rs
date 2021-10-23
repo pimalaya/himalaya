@@ -1,23 +1,28 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
+use std::io;
+use termcolor::{StandardStream, WriteColor};
+
+pub trait WriteWithColor: io::Write + WriteColor {}
+
+impl WriteWithColor for StandardStream {}
 
 pub trait Print {
-    fn print(&self) -> Result<()>;
+    fn print<W: WriteWithColor>(&self, writter: &mut W) -> Result<()>;
 
-    fn println(&self) -> Result<()> {
+    fn println<W: WriteWithColor>(&self, writter: &mut W) -> Result<()> {
         println!();
-        self.print()
+        self.print(writter)
     }
 }
 
 impl Print for &str {
-    fn print(&self) -> Result<()> {
-        print!("{}", self);
-        Ok(())
+    fn print<W: WriteWithColor>(&self, writter: &mut W) -> Result<()> {
+        write!(writter, "{}", self).context(format!(r#"cannot print string "{}""#, self))
     }
 }
 
 impl Print for String {
-    fn print(&self) -> Result<()> {
-        self.as_str().print()
+    fn print<W: WriteWithColor>(&self, writter: &mut W) -> Result<()> {
+        self.as_str().print(writter)
     }
 }
