@@ -5,6 +5,7 @@
 //! [builder design pattern]: https://refactoring.guru/design-patterns/builder
 
 use anyhow::{Context, Result};
+use atty::Stream;
 use log::trace;
 use std::io::Write;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
@@ -118,7 +119,11 @@ impl Cell {
 
 impl Printable for Cell {
     fn print(&self) -> Result<()> {
-        let mut stdout = StandardStream::stdout(ColorChoice::Auto);
+        let mut stdout = StandardStream::stdout(if atty::isnt(Stream::Stdin) {
+            ColorChoice::Never
+        } else {
+            ColorChoice::Auto
+        });
         stdout.set_color(&self.styles)?;
         write!(&mut stdout, "{}", self.value)
             .context(format!(r#"cannot print cell "{}""#, self.value))
