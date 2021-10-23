@@ -77,7 +77,7 @@ impl OutputServiceInterface for OutputService {
     fn print<T: Serialize + Print>(&self, data: T) -> Result<()> {
         match self.fmt {
             OutputFmt::Plain => {
-                let color_choice = if atty::isnt(Stream::Stdin) {
+                data.print(&mut StandardStream::stdout(if atty::isnt(Stream::Stdin) {
                     // Colors should be deactivated if the terminal is not a tty.
                     ColorChoice::Never
                 } else {
@@ -88,10 +88,7 @@ impl OutputServiceInterface for OutputService {
                     //
                     // [doc]: https://github.com/BurntSushi/termcolor#automatic-color-selection
                     ColorChoice::Auto
-                };
-
-                // Returns a mutable writter on stdout with color support.
-                data.print(&mut StandardStream::stdout(color_choice))?;
+                }))?;
             }
             OutputFmt::Json => {
                 print!("{}", serde_json::to_string(&OutputJson::new(data))?)
