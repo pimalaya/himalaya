@@ -2,14 +2,13 @@
 //!
 //! This module contains the definition of the mailboxes and its traits implementations.
 
+use anyhow::Result;
 use serde::Serialize;
-use std::{
-    fmt::{self, Display},
-    ops::Deref,
-};
+use std::ops::Deref;
 
 use crate::{
     domain::{Mbox, RawMbox},
+    output::{Print, WriteWithColor},
     ui::Table,
 };
 
@@ -29,10 +28,11 @@ impl<'a> Deref for Mboxes<'a> {
     }
 }
 
-/// Makes the mailboxes displayable.
-impl<'a> Display for Mboxes<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "\n{}", Table::render(&self))
+/// Makes the mailboxes printable.
+impl<'a> Print for Mboxes<'a> {
+    fn print<W: WriteWithColor>(&self, writter: &mut W) -> Result<()> {
+        writeln!(writter)?;
+        Table::println(writter, &self)
     }
 }
 

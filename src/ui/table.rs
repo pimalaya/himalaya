@@ -4,100 +4,66 @@
 //!
 //! [builder design pattern]: https://refactoring.guru/design-patterns/builder
 
+use anyhow::{Context, Result};
 use log::trace;
-use std::fmt;
+use termcolor::{Color, ColorSpec};
 use terminal_size;
 use unicode_width::UnicodeWidthStr;
 
-/// Define the default terminal size.
-/// It is used when the size cannot be determined by the `terminal_size` crate.
+use crate::output::{Print, WriteWithColor};
+
+/// Defines the default terminal size.
+/// This is used when the size cannot be determined by the `terminal_size` crate.
+/// TODO: make this customizable.
 pub const DEFAULT_TERM_WIDTH: usize = 80;
 
-/// Define the minimum size of a shrinked cell.
+/// Defines the minimum size of a shrinked cell.
 /// TODO: make this customizable.
 pub const MAX_SHRINK_WIDTH: usize = 5;
 
-/// Wrapper around [ANSI escape codes] for styling cells.
-///
-/// [ANSI escape codes]: https://en.wikipedia.org/wiki/ANSI_escape_code
-#[derive(Debug)]
-pub struct Style(
-    /// The style/color code.
-    u8,
-    /// The brightness code.
-    u8,
-    /// The shade code.
-    u8,
-);
-
-impl fmt::Display for Style {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Style(color, bright, shade) = self;
-        let mut style = String::new();
-
-        // Push first the style/color code.
-        style.push_str(&color.to_string());
-
-        // Then push the brightness code if exist.
-        if *bright > 0 {
-            style.push_str(";");
-            style.push_str(&bright.to_string());
-        };
-
-        // Then push the shade code if exist.
-        if *shade > 0 {
-            style.push_str(";");
-            style.push_str(&shade.to_string());
-        };
-
-        write!(f, "\x1b[{}m", style)
-    }
-}
-
-/// Representation of a table cell.
-#[derive(Debug)]
+/// Represents a cell in a table.
+#[derive(Debug, Default)]
 pub struct Cell {
-    /// The list of style applied to the cell.
-    styles: Vec<Style>,
-    /// The content of the cell.
+    /// Represents the style of the cell.
+    style: ColorSpec,
+    /// Represents the content of the cell.
     value: String,
-    /// Allow/disallow the cell to shrink when the table exceeds the container width.
+    /// (Dis)allowes the cell to shrink when the table exceeds the container width.
     shrinkable: bool,
 }
 
 impl Cell {
     pub fn new<T: AsRef<str>>(value: T) -> Self {
         Self {
-            styles: Vec::new(),
             value: String::from(value.as_ref()).replace(&['\r', '\n', '\t'][..], ""),
-            shrinkable: false,
+            ..Self::default()
         }
     }
 
-    /// Return the unicode width of the cell's value.
+    /// Returns the unicode width of the cell's value.
     pub fn unicode_width(&self) -> usize {
         UnicodeWidthStr::width(self.value.as_str())
     }
 
-    /// Make the cell shrinkable. If the table exceeds the terminal width, this cell will be the
+    /// Makes the cell shrinkable. If the table exceeds the terminal width, this cell will be the
     /// one to shrink in order to prevent the table to overflow.
     pub fn shrinkable(mut self) -> Self {
         self.shrinkable = true;
         self
     }
 
-    /// Return the shrinkable state of a cell.
+    /// Returns the shrinkable state of a cell.
     pub fn is_shrinkable(&self) -> bool {
         self.shrinkable
     }
 
-    /// Apply the bold style to the cell.
+    /// Applies the bold style to the cell.
     pub fn bold(mut self) -> Self {
-        self.styles.push(Style(1, 0, 0));
+        self.style.set_bold(true);
         self
     }
 
-    /// Apply the bold style to the cell conditionally.
+    /// Applies the bold style to the cell conditionally.
     pub fn bold_if(self, predicate: bool) -> Self {
         if predicate {
             self.bold()
@@ -106,76 +72,85 @@ impl Cell {
         }
     }
 
-    /// Apply the underline style to the cell.
+    /// Applies the underline style to the cell.
     pub fn underline(mut self) -> Self {
-        self.styles.push(Style(4, 0, 0));
+        self.style.set_underline(true);
         self
     }
 
-    /// Apply the red color to the cell.
+    /// Applies the red color to the cell.
     pub fn red(mut self) -> Self {
-        self.styles.push(Style(31, 0, 0));
+        self.style.set_fg(Some(Color::Red));
         self
     }
 
-    /// Apply the green color to the cell.
+    /// Applies the green color to the cell.
     pub fn green(mut self) -> Self {
-        self.styles.push(Style(32, 0, 0));
+        self.style.set_fg(Some(Color::Green));
         self
     }
 
-    /// Apply the yellow color to the cell.
+    /// Applies the yellow color to the cell.
     pub fn yellow(mut self) -> Self {
-        self.styles.push(Style(33, 0, 0));
+        self.style.set_fg(Some(Color::Yellow));
         self
     }
 
-    /// Apply the blue color to the cell.
+    /// Applies the blue color to the cell.
     pub fn blue(mut self) -> Self {
-        self.styles.push(Style(34, 0, 0));
+        self.style.set_fg(Some(Color::Blue));
         self
     }
 
-    /// Apply the white color to the cell.
+    /// Applies the white color to the cell.
     pub fn white(mut self) -> Self {
-        self.styles.push(Style(37, 0, 0));
+        self.style.set_fg(Some(Color::White));
         self
     }
 
-    /// Apply the custom shade color to the cell.
-    pub fn ext(mut self, shade: u8) -> Self {
-        self.styles.push(Style(38, 5, shade));
+    /// Applies the custom ansi color to the cell.
+    pub fn ansi_256(mut self, code: u8) -> Self {
+        self.style.set_fg(Some(Color::Ansi256(code)));
         self
     }
 }
 
-impl fmt::Display for Cell {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.styles.is_empty() {
-            write!(f, "{}", self.value)?;
-        } else {
-            for style in &self.styles {
-                write!(f, "{}", style)?;
-            }
-            write!(f, "{}", self.value)?;
-            // Apply the reset style in order to avoid style overlapping between cells.
-            write!(f, "{}", Style(0, 0, 0))?;
-        }
+/// Makes the cell printable.
+impl Print for Cell {
+    fn print<W: WriteWithColor>(&self, writter: &mut W) -> Result<()> {
+        //let color_choice = if atty::isnt(Stream::Stdin) {
+        //    // Colors should be deactivated if the terminal is not a tty.
+        //    ColorChoice::Never
+        //} else {
+        //    // Otherwise let's `termcolor` decide by inspecting the environment. From the [doc]:
+        //    // - If `NO_COLOR` is set to any value, then colors will be suppressed.
+        //    // - If `TERM` is set to dumb, then colors will be suppressed.
+        //    // - In non-Windows environments, if `TERM` is not set, then colors will be suppressed.
+        //    //
+        //    // [doc]: https://github.com/BurntSushi/termcolor#automatic-color-selection
+        //    ColorChoice::Auto
+        //};
 
-        Ok(())
+        // Applies colors to the cell
+        writter
+            .set_color(&self.style)
+            .context(format!(r#"cannot apply colors to cell "{}""#, self.value))?;
+
+        // Writes the colorized cell to stdout
+        write!(writter, "{}", self.value).context(format!(r#"cannot print cell "{}""#, self.value))
     }
 }
 
-/// Representation of a table row.
-#[derive(Debug)]
+/// Represents a row in a table.
+#[derive(Debug, Default)]
 pub struct Row(
-    /// A row contains a list of cells.
+    /// Represents a list of cells.
     pub Vec<Cell>,
 );
 
 impl Row {
     pub fn new() -> Self {
-        Self(Vec::new())
+        Self::default()
     }
 
     pub fn cell(mut self, cell: Cell) -> Self {
@@ -184,26 +159,27 @@ impl Row {
     }
 }
 
-/// Abstract representation of a table.
+/// Represents a table abstraction.
 pub trait Table
 where
     Self: Sized,
 {
+    /// Defines the header row.
     fn head() -> Row;
+
+    /// Defines the row template.
     fn row(&self) -> Row;
 
-    /// Determine the max width of the table.
-    /// The default implementation takes the terminal width as
-    /// the maximum width of the table.
+    /// Determines the max width of the table.
+    /// The default implementation takes the terminal width as the maximum width of the table.
     fn max_width() -> usize {
         terminal_size::terminal_size()
             .map(|(w, _)| w.0 as usize)
             .unwrap_or(DEFAULT_TERM_WIDTH)
     }
 
-    /// Apply styles to cells and return a list of list of printable styled cells.
-    /// TODO: find a way to build an unstyled version of cells.
-    fn build(items: &[Self]) -> Vec<Vec<String>> {
+    /// Prints the table.
+    fn println<W: WriteWithColor>(writter: &mut W, items: &[Self]) -> Result<()> {
         let mut table = vec![Self::head()];
         let mut cell_widths: Vec<usize> =
             table[0].0.iter().map(|cell| cell.unicode_width()).collect();
@@ -219,103 +195,122 @@ where
                 })
                 .collect::<Vec<_>>(),
         );
-        trace!("cell_widths: {:?}", cell_widths);
+        trace!("cell widths: {:?}", cell_widths);
 
         let spaces_plus_separators_len = cell_widths.len() * 2 - 1;
         let table_width = cell_widths.iter().sum::<usize>() + spaces_plus_separators_len;
-        trace!("table_width: {}", table_width);
+        trace!("table width: {}", table_width);
 
-        table
-            .iter_mut()
-            .map(|row| {
-                trace!("processing row: {:?}", row);
-                row.0
-                    .iter_mut()
-                    .enumerate()
-                    .map(|(i, cell)| {
-                        trace!("processing cell: {:?}", cell);
-                        trace!("table_width: {}", table_width);
-                        trace!("max_width: {}", Self::max_width());
+        for row in table.iter_mut() {
+            let mut glue = Cell::default();
+            for (i, cell) in row.0.iter_mut().enumerate() {
+                glue.print(writter)?;
 
-                        let table_is_overflowing = table_width > Self::max_width();
-                        if table_is_overflowing && cell.is_shrinkable() {
-                            trace!("table is overflowing and cell is shrinkable");
+                let table_is_overflowing = table_width > Self::max_width();
+                if table_is_overflowing && cell.is_shrinkable() {
+                    trace!("table is overflowing and cell is shrinkable");
 
-                            let shrink_width = table_width - Self::max_width();
-                            trace!("shrink_width: {}", shrink_width);
-                            let cell_width = if shrink_width + MAX_SHRINK_WIDTH < cell_widths[i] {
-                                cell_widths[i] - shrink_width
-                            } else {
-                                MAX_SHRINK_WIDTH
-                            };
-                            trace!("cell_width: {}", cell_width);
-                            trace!("cell unicode_width: {}", cell.unicode_width());
+                    let shrink_width = table_width - Self::max_width();
+                    trace!("shrink width: {}", shrink_width);
+                    let cell_width = if shrink_width + MAX_SHRINK_WIDTH < cell_widths[i] {
+                        cell_widths[i] - shrink_width
+                    } else {
+                        MAX_SHRINK_WIDTH
+                    };
+                    trace!("cell width: {}", cell_width);
+                    trace!("cell unicode width: {}", cell.unicode_width());
 
-                            let cell_is_overflowing = cell.unicode_width() > cell_width;
-                            if cell_is_overflowing {
-                                trace!("cell is overflowing");
+                    let cell_is_overflowing = cell.unicode_width() > cell_width;
+                    if cell_is_overflowing {
+                        trace!("cell is overflowing");
 
-                                let mut value = String::new();
-                                let mut chars_width = 0;
+                        let mut value = String::new();
+                        let mut chars_width = 0;
 
-                                for c in cell.value.chars() {
-                                    let char_width = UnicodeWidthStr::width(c.to_string().as_str());
-                                    if chars_width + char_width >= cell_width {
-                                        break;
-                                    }
-
-                                    chars_width += char_width;
-                                    value.push(c);
-                                }
-
-                                value.push_str("… ");
-                                trace!("chars_width: {}", chars_width);
-                                trace!("shrinked value: {}", value);
-                                let spaces_count = cell_width - chars_width - 1;
-                                trace!(
-                                    "number of spaces added to shrinked value: {}",
-                                    spaces_count
-                                );
-                                value.push_str(&" ".repeat(spaces_count));
-                                cell.value = value;
-                                cell.to_string()
-                            } else {
-                                trace!("cell is not overflowing");
-                                let spaces_count = cell_width - cell.unicode_width() + 1;
-                                trace!("number of spaces added to value: {}", spaces_count);
-                                cell.value.push_str(&" ".repeat(spaces_count));
-                                cell.to_string()
+                        for c in cell.value.chars() {
+                            let char_width = UnicodeWidthStr::width(c.to_string().as_str());
+                            if chars_width + char_width >= cell_width {
+                                break;
                             }
-                        } else {
-                            trace!("table is not overflowing or cell is not shrinkable");
-                            trace!("cell_width: {}", cell_widths[i]);
-                            trace!("cell unicode_width: {}", cell.unicode_width());
-                            let spaces_count = cell_widths[i] - cell.unicode_width() + 1;
-                            trace!("number of spaces added to value: {}", spaces_count);
-                            cell.value.push_str(&" ".repeat(spaces_count));
-                            cell.to_string()
-                        }
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>()
-    }
 
-    /// Render the final printable table as a string.
-    fn render(items: &[Self]) -> String {
-        Self::build(items)
-            .iter()
-            // Join cells with grey pipes.
-            // TODO: make this customizable
-            .map(|row| row.join(&Cell::new("│").ext(8).to_string()))
-            .collect::<Vec<_>>()
-            .join("\n")
+                            chars_width += char_width;
+                            value.push(c);
+                        }
+
+                        value.push_str("… ");
+                        trace!("chars width: {}", chars_width);
+                        trace!("shrinked value: {}", value);
+                        let spaces_count = cell_width - chars_width - 1;
+                        trace!("number of spaces added to shrinked value: {}", spaces_count);
+                        value.push_str(&" ".repeat(spaces_count));
+                        cell.value = value;
+                        cell.print(writter)?;
+                    } else {
+                        trace!("cell is not overflowing");
+                        let spaces_count = cell_width - cell.unicode_width() + 1;
+                        trace!("number of spaces added to value: {}", spaces_count);
+                        cell.value.push_str(&" ".repeat(spaces_count));
+                        cell.print(writter)?;
+                    }
+                } else {
+                    trace!("table is not overflowing or cell is not shrinkable");
+                    trace!("cell width: {}", cell_widths[i]);
+                    trace!("cell unicode width: {}", cell.unicode_width());
+                    let spaces_count = cell_widths[i] - cell.unicode_width() + 1;
+                    trace!("number of spaces added to value: {}", spaces_count);
+                    cell.value.push_str(&" ".repeat(spaces_count));
+                    cell.print(writter)?;
+                }
+                glue = Cell::new("│").ansi_256(8);
+            }
+            writeln!(writter)?;
+        }
+
+        writeln!(writter)?;
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::io;
+    use termcolor::WriteColor;
+
     use super::*;
+
+    #[derive(Debug, Default)]
+    struct StringWritter {
+        content: String,
+    }
+
+    impl io::Write for StringWritter {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            self.content
+                .push_str(&String::from_utf8(buf.to_vec()).unwrap());
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            self.content = String::default();
+            Ok(())
+        }
+    }
+
+    impl WriteColor for StringWritter {
+        fn supports_color(&self) -> bool {
+            false
+        }
+
+        fn set_color(&mut self, _spec: &ColorSpec) -> io::Result<()> {
+            io::Result::Ok(())
+        }
+
+        fn reset(&mut self) -> io::Result<()> {
+            io::Result::Ok(())
+        }
+    }
+
+    impl WriteWithColor for StringWritter {}
 
     struct Item {
         id: u16,
@@ -348,66 +343,77 @@ mod tests {
                 .cell(Cell::new(self.desc.as_str()))
         }
 
+        // Defines a fixed max width instead of terminal size for testing.
         fn max_width() -> usize {
-            // Use a fixed max width instead of terminal size for testing.
             20
         }
     }
 
+    macro_rules! write_items {
+        ($writter:expr, $($item:expr),*) => {
+            Table::println($writter, &[$($item,)*]).unwrap();
+        };
+    }
+
     #[test]
     fn row_smaller_than_head() {
-        let items = vec![
+        let mut writter = StringWritter::default();
+        write_items![
+            &mut writter,
             Item::new(1, "a", "aa"),
             Item::new(2, "b", "bb"),
-            Item::new(3, "c", "cc"),
+            Item::new(3, "c", "cc")
         ];
 
-        let table = vec![
-            vec!["ID ", "NAME ", "DESC "],
-            vec!["1  ", "a    ", "aa   "],
-            vec!["2  ", "b    ", "bb   "],
-            vec!["3  ", "c    ", "cc   "],
+        let expected = concat![
+            "ID │NAME │DESC \n",
+            "1  │a    │aa   \n",
+            "2  │b    │bb   \n",
+            "3  │c    │cc   \n\n"
         ];
-
-        assert_eq!(table, Table::build(&items));
+        assert_eq!(expected, writter.content);
     }
 
     #[test]
     fn row_bigger_than_head() {
-        let items = vec![
+        let mut writter = StringWritter::default();
+        write_items![
+            &mut writter,
             Item::new(1, "a", "aa"),
             Item::new(2222, "bbbbb", "bbbbb"),
-            Item::new(3, "c", "cc"),
+            Item::new(3, "c", "cc")
         ];
 
-        let table = vec![
-            vec!["ID   ", "NAME  ", "DESC  "],
-            vec!["1    ", "a     ", "aa    "],
-            vec!["2222 ", "bbbbb ", "bbbbb "],
-            vec!["3    ", "c     ", "cc    "],
+        let expected = concat![
+            "ID   │NAME  │DESC  \n",
+            "1    │a     │aa    \n",
+            "2222 │bbbbb │bbbbb \n",
+            "3    │c     │cc    \n\n",
         ];
+        assert_eq!(expected, writter.content);
 
-        assert_eq!(table, Table::build(&items));
-
-        let items = vec![
+        let mut writter = StringWritter::default();
+        write_items![
+            &mut writter,
             Item::new(1, "a", "aa"),
             Item::new(2222, "bbbbb", "bbbbb"),
-            Item::new(3, "cccccc", "cc"),
+            Item::new(3, "cccccc", "cc")
         ];
 
-        let table = vec![
-            vec!["ID   ", "NAME   ", "DESC  "],
-            vec!["1    ", "a      ", "aa    "],
-            vec!["2222 ", "bbbbb  ", "bbbbb "],
-            vec!["3    ", "cccccc ", "cc    "],
+        let expected = concat![
+            "ID   │NAME   │DESC  \n",
+            "1    │a      │aa    \n",
+            "2222 │bbbbb  │bbbbb \n",
+            "3    │cccccc │cc    \n\n",
         ];
-
-        assert_eq!(table, Table::build(&items));
+        assert_eq!(expected, writter.content);
     }
 
     #[test]
     fn basic_shrink() {
-        let items = vec![
+        let mut writter = StringWritter::default();
+        write_items![
+            &mut writter,
             Item::new(1, "", "desc"),
             Item::new(2, "short", "desc"),
             Item::new(3, "loooooong", "desc"),
@@ -415,37 +421,37 @@ mod tests {
             Item::new(5, "shriiiiiiiiiink", "desc"),
             Item::new(6, "😍😍😍😍", "desc"),
             Item::new(7, "😍😍😍😍😍", "desc"),
-            Item::new(8, "!😍😍😍😍😍", "desc"),
+            Item::new(8, "!😍😍😍😍😍", "desc")
         ];
 
-        let table = vec![
-            vec!["ID ", "NAME      ", "DESC "],
-            vec!["1  ", "          ", "desc "],
-            vec!["2  ", "short     ", "desc "],
-            vec!["3  ", "loooooong ", "desc "],
-            vec!["4  ", "shriiiii… ", "desc "],
-            vec!["5  ", "shriiiii… ", "desc "],
-            vec!["6  ", "😍😍😍😍  ", "desc "],
-            vec!["7  ", "😍😍😍😍… ", "desc "],
-            vec!["8  ", "!😍😍😍…  ", "desc "],
+        let expected = concat![
+            "ID │NAME      │DESC \n",
+            "1  │          │desc \n",
+            "2  │short     │desc \n",
+            "3  │loooooong │desc \n",
+            "4  │shriiiii… │desc \n",
+            "5  │shriiiii… │desc \n",
+            "6  │😍😍😍😍  │desc \n",
+            "7  │😍😍😍😍… │desc \n",
+            "8  │!😍😍😍…  │desc \n\n",
         ];
-
-        assert_eq!(table, Table::build(&items));
+        assert_eq!(expected, writter.content);
     }
 
     #[test]
     fn max_shrink_width() {
-        let items = vec![
+        let mut writter = StringWritter::default();
+        write_items![
+            &mut writter,
             Item::new(1111, "shriiiiiiiink", "desc very looong"),
-            Item::new(2222, "shriiiiiiiink", "desc very loooooooooong"),
+            Item::new(2222, "shriiiiiiiink", "desc very loooooooooong")
         ];
 
-        let table = vec![
-            vec!["ID   ", "NAME  ", "DESC                    "],
-            vec!["1111 ", "shri… ", "desc very looong        "],
-            vec!["2222 ", "shri… ", "desc very loooooooooong "],
+        let expected = concat![
+            "ID   │NAME  │DESC                    \n",
+            "1111 │shri… │desc very looong        \n",
+            "2222 │shri… │desc very loooooooooong \n\n",
         ];
-
-        assert_eq!(table, Table::build(&items));
+        assert_eq!(expected, writter.content);
     }
 }

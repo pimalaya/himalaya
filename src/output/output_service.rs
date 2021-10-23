@@ -1,10 +1,14 @@
 use anyhow::{anyhow, Error, Result};
+use atty::Stream;
 use log::debug;
 use serde::Serialize;
 use std::{
     convert::{TryFrom, TryInto},
     fmt,
 };
+use termcolor::{ColorChoice, StandardStream};
+
+use crate::output::Print;
 
 #[derive(Debug, PartialEq)]
 pub enum OutputFmt {
@@ -58,7 +62,7 @@ impl<T: Serialize> OutputJson<T> {
 }
 
 pub trait OutputServiceInterface {
-    fn print<T: Serialize + fmt::Display>(&self, data: T) -> Result<()>;
+    fn print<T: Serialize + Print>(&self, data: T) -> Result<()>;
     fn is_json(&self) -> bool;
 }
 
@@ -70,10 +74,21 @@ pub struct OutputService {
 impl OutputServiceInterface for OutputService {
     /// Print the provided item out according to the formatting setting when you created this
     /// struct.
-    fn print<T: Serialize + fmt::Display>(&self, data: T) -> Result<()> {
+    fn print<T: Serialize + Print>(&self, data: T) -> Result<()> {
         match self.fmt {
             OutputFmt::Plain => {
-                println!("{}", data)
+                data.print(&mut StandardStream::stdout(if atty::isnt(Stream::Stdin) {
+                    // Colors should be deactivated if the terminal is not a tty.
+                    ColorChoice::Never
+                } else {
+                    // Otherwise let's `termcolor` decide by inspecting the environment. From the [doc]:
+                    // - If `NO_COLOR` is set to any value, then colors will be suppressed.
+                    // - If `TERM` is set to dumb, then colors will be suppressed.
+                    // - In non-Windows environments, if `TERM` is not set, then colors will be suppressed.
+                    //
+                    // [doc]: https://github.com/BurntSushi/termcolor#automatic-color-selection
+                    ColorChoice::Auto
+                }))?;
             }
             OutputFmt::Json => {
                 print!("{}", serde_json::to_string(&OutputJson::new(data))?)

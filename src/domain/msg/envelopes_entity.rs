@@ -1,13 +1,10 @@
 use anyhow::{Error, Result};
 use serde::Serialize;
-use std::{
-    convert::TryFrom,
-    fmt::{self, Display},
-    ops::Deref,
-};
+use std::{convert::TryFrom, ops::Deref};
 
 use crate::{
     domain::{msg::Envelope, RawEnvelope},
+    output::{Print, WriteWithColor},
     ui::Table,
 };
 
@@ -39,8 +36,9 @@ impl<'a> TryFrom<&'a RawEnvelopes> for Envelopes<'a> {
     }
 }
 
-impl<'a> Display for Envelopes<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "\n{}", Table::render(&self))
+impl<'a> Print for Envelopes<'a> {
+    fn print<W: WriteWithColor>(&self, writter: &mut W) -> Result<()> {
+        println!();
+        Table::println(writter, &self)
     }
 }

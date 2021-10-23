@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Disable color support [#185]
+
 ### Fixed
 
 - Error when receiving notification from `notify` command [#228]
@@ -334,6 +338,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#160]: https://github.com/soywod/himalaya/issues/160
 [#162]: https://github.com/soywod/himalaya/issues/162
 [#176]: https://github.com/soywod/himalaya/issues/176
+[#185]: https://github.com/soywod/himalaya/issues/185
 [#186]: https://github.com/soywod/himalaya/issues/186
 [#190]: https://github.com/soywod/himalaya/issues/190
 [#193]: https://github.com/soywod/himalaya/issues/193
