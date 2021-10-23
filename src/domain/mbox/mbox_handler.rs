@@ -25,7 +25,7 @@ mod tests {
     use crate::{
         config::Config,
         domain::{AttrRemote, Attrs, Envelopes, Flags, Mbox, Mboxes, Msg},
-        output::{OutputJson, Printable},
+        output::{OutputJson, Print},
     };
 
     #[test]
@@ -33,7 +33,7 @@ mod tests {
         struct OutputServiceTest;
 
         impl OutputServiceInterface for OutputServiceTest {
-            fn print<T: Serialize + Printable>(&self, data: T) -> Result<()> {
+            fn print<T: Serialize + Print>(&self, data: T) -> Result<()> {
                 let data = serde_json::to_string(&OutputJson::new(data))?;
                 assert_eq!(
                     data,

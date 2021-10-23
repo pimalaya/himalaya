@@ -8,7 +8,7 @@ use std::ops::Deref;
 
 use crate::{
     domain::{Mbox, RawMbox},
-    output::Printable,
+    output::Print,
     ui::Table,
 };
 
@@ -29,7 +29,7 @@ impl<'a> Deref for Mboxes<'a> {
 }
 
 /// Makes the mailboxes printable.
-impl<'a> Printable for Mboxes<'a> {
+impl<'a> Print for Mboxes<'a> {
     fn print(&self) -> Result<()> {
         Table::println(&self)
     }

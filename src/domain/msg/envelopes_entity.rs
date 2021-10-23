@@ -4,7 +4,7 @@ use std::{convert::TryFrom, ops::Deref};
 
 use crate::{
     domain::{msg::Envelope, RawEnvelope},
-    output::Printable,
+    output::Print,
     ui::Table,
 };
 
@@ -36,7 +36,7 @@ impl<'a> TryFrom<&'a RawEnvelopes> for Envelopes<'a> {
     }
 }
 
-impl<'a> Printable for Envelopes<'a> {
+impl<'a> Print for Envelopes<'a> {
     fn print(&self) -> Result<()> {
         println!();
         Table::println(&self)

@@ -12,60 +12,60 @@ use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 use terminal_size;
 use unicode_width::UnicodeWidthStr;
 
-use crate::output::Printable;
+use crate::output::Print;
 
-/// Define the default terminal size.
-/// It is used when the size cannot be determined by the `terminal_size` crate.
+/// Defines the default terminal size.
+/// This is used when the size cannot be determined by the `terminal_size` crate.
+/// TODO: make this customizable.
 pub const DEFAULT_TERM_WIDTH: usize = 80;
 
-/// Define the minimum size of a shrinked cell.
+/// Defines the minimum size of a shrinked cell.
 /// TODO: make this customizable.
 pub const MAX_SHRINK_WIDTH: usize = 5;
 
-/// Representation of a table cell.
+/// Represents a cell in a table.
 #[derive(Debug, Default)]
 pub struct Cell {
-    /// The list of style applied to the cell.
-    styles: ColorSpec,
-    /// The content of the cell.
+    /// Represents the color spec.
+    color_spec: ColorSpec,
+    /// Represents the content of the cell.
     value: String,
-    /// Allow/disallow the cell to shrink when the table exceeds the container width.
+    /// (Dis)allowes the cell to shrink when the table exceeds the container width.
     shrinkable: bool,
 }
 
 impl Cell {
     pub fn new<T: AsRef<str>>(value: T) -> Self {
         Self {
-            styles: ColorSpec::default(),
             value: String::from(value.as_ref()).replace(&['\r', '\n', '\t'][..], ""),
-            shrinkable: false,
+            ..Self::default()
         }
     }
 
-    /// Return the unicode width of the cell's value.
+    /// Returns the unicode width of the cell's value.
     pub fn unicode_width(&self) -> usize {
         UnicodeWidthStr::width(self.value.as_str())
     }
 
-    /// Make the cell shrinkable. If the table exceeds the terminal width, this cell will be the
+    /// Makes the cell shrinkable. If the table exceeds the terminal width, this cell will be the
     /// one to shrink in order to prevent the table to overflow.
     pub fn shrinkable(mut self) -> Self {
         self.shrinkable = true;
         self
     }
 
-    /// Return the shrinkable state of a cell.
+    /// Returns the shrinkable state of a cell.
     pub fn is_shrinkable(&self) -> bool {
         self.shrinkable
     }
 
-    /// Apply the bold style to the cell.
+    /// Applies the bold style to the cell.
     pub fn bold(mut self) -> Self {
-        self.styles.set_bold(true);
+        self.color_spec.set_bold(true);
         self
     }
 
-    /// Apply the bold style to the cell conditionally.
+    /// Applies the bold style to the cell conditionally.
     pub fn bold_if(self, predicate: bool) -> Self {
         if predicate {
             self.bold()
@@ -74,72 +74,87 @@ impl Cell {
         }
     }
 
-    /// Apply the underline style to the cell.
+    /// Applies the underline style to the cell.
     pub fn underline(mut self) -> Self {
-        self.styles.set_underline(true);
+        self.color_spec.set_underline(true);
         self
     }
 
-    /// Apply the red color to the cell.
+    /// Applies the red color to the cell.
     pub fn red(mut self) -> Self {
-        self.styles.set_fg(Some(Color::Red));
+        self.color_spec.set_fg(Some(Color::Red));
         self
     }
 
-    /// Apply the green color to the cell.
+    /// Applies the green color to the cell.
     pub fn green(mut self) -> Self {
-        self.styles.set_fg(Some(Color::Green));
+        self.color_spec.set_fg(Some(Color::Green));
         self
     }
 
-    /// Apply the yellow color to the cell.
+    /// Applies the yellow color to the cell.
     pub fn yellow(mut self) -> Self {
-        self.styles.set_fg(Some(Color::Yellow));
+        self.color_spec.set_fg(Some(Color::Yellow));
         self
     }
 
-    /// Apply the blue color to the cell.
+    /// Applies the blue color to the cell.
     pub fn blue(mut self) -> Self {
-        self.styles.set_fg(Some(Color::Blue));
+        self.color_spec.set_fg(Some(Color::Blue));
         self
     }
 
-    /// Apply the white color to the cell.
+    /// Applies the white color to the cell.
     pub fn white(mut self) -> Self {
-        self.styles.set_fg(Some(Color::White));
+        self.color_spec.set_fg(Some(Color::White));
         self
     }
 
-    /// Apply the custom shade color to the cell.
-    pub fn ansi_256(mut self, shade: u8) -> Self {
-        self.styles.set_fg(Some(Color::Ansi256(shade)));
+    /// Applies the custom ansi color to the cell.
+    pub fn ansi_256(mut self, code: u8) -> Self {
+        self.color_spec.set_fg(Some(Color::Ansi256(code)));
         self
     }
 }
 
-impl Printable for Cell {
+/// Makes the cell printable.
+impl Print for Cell {
     fn print(&self) -> Result<()> {
-        let mut stdout = StandardStream::stdout(if atty::isnt(Stream::Stdin) {
+        let color_choice = if atty::isnt(Stream::Stdin) {
+            // Colors should be deactivated if the terminal is not a tty.
             ColorChoice::Never
         } else {
+            // Otherwise let's `termcolor` decide by inspecting the environment. From the [doc]:
+            // - If `NO_COLOR` is set to any value, then colors will be suppressed.
+            // - If `TERM` is set to dumb, then colors will be suppressed.
+            // - In non-Windows environments, if `TERM` is not set, then colors will be suppressed.
+            //
+            // [doc]: https://github.com/BurntSushi/termcolor#automatic-color-selection
             ColorChoice::Auto
-        });
-        stdout.set_color(&self.styles)?;
+        };
+
+        // Applies colors to the cell
+        let mut stdout = StandardStream::stdout(color_choice);
+        stdout
+            .set_color(&self.color_spec)
+            .context(format!(r#"cannot apply colors to cell "{}""#, self.value))?;
+
+        // Writes the colorized cell to stdout
         write!(&mut stdout, "{}", self.value)
             .context(format!(r#"cannot print cell "{}""#, self.value))
     }
 }
 
-/// Representation of a table row.
-#[derive(Debug)]
+/// Represents a row in a table.
+#[derive(Debug, Default)]
 pub struct Row(
-    /// A row contains a list of cells.
+    /// Represents a list of cells.
     pub Vec<Cell>,
 );
 
 impl Row {
     pub fn new() -> Self {
-        Self(Vec::new())
+        Self::default()
     }
 
     pub fn cell(mut self, cell: Cell) -> Self {
@@ -148,24 +163,26 @@ impl Row {
     }
 }
 
-/// Abstract representation of a table.
+/// Represents a table abstraction.
 pub trait Table
 where
     Self: Sized,
 {
+    /// Defines the header row.
     fn head() -> Row;
+
+    /// Defines the row template.
     fn row(&self) -> Row;
 
-    /// Determine the max width of the table.
-    /// The default implementation takes the terminal width as
-    /// the maximum width of the table.
+    /// Determines the max width of the table.
+    /// The default implementation takes the terminal width as the maximum width of the table.
     fn max_width() -> usize {
         terminal_size::terminal_size()
             .map(|(w, _)| w.0 as usize)
             .unwrap_or(DEFAULT_TERM_WIDTH)
     }
 
-    /// Apply styles to cells and return a list of list of printable styled cells.
+    /// Prints the table.
     fn println(items: &[Self]) -> Result<()> {
         let mut table = vec![Self::head()];
         let mut cell_widths: Vec<usize> =
@@ -182,34 +199,30 @@ where
                 })
                 .collect::<Vec<_>>(),
         );
-        trace!("cell_widths: {:?}", cell_widths);
+        trace!("cell widths: {:?}", cell_widths);
 
         let spaces_plus_separators_len = cell_widths.len() * 2 - 1;
         let table_width = cell_widths.iter().sum::<usize>() + spaces_plus_separators_len;
-        trace!("table_width: {}", table_width);
+        trace!("table width: {}", table_width);
 
         for row in table.iter_mut() {
-            trace!("processing row: {:?}", row);
             let mut glue = Cell::default();
             for (i, cell) in row.0.iter_mut().enumerate() {
                 glue.print()?;
-                trace!("processing cell: {:?}", cell);
-                trace!("table_width: {}", table_width);
-                trace!("max_width: {}", Self::max_width());
 
                 let table_is_overflowing = table_width > Self::max_width();
                 if table_is_overflowing && cell.is_shrinkable() {
                     trace!("table is overflowing and cell is shrinkable");
 
                     let shrink_width = table_width - Self::max_width();
-                    trace!("shrink_width: {}", shrink_width);
+                    trace!("shrink width: {}", shrink_width);
                     let cell_width = if shrink_width + MAX_SHRINK_WIDTH < cell_widths[i] {
                         cell_widths[i] - shrink_width
                     } else {
                         MAX_SHRINK_WIDTH
                     };
-                    trace!("cell_width: {}", cell_width);
-                    trace!("cell unicode_width: {}", cell.unicode_width());
+                    trace!("cell width: {}", cell_width);
+                    trace!("cell unicode width: {}", cell.unicode_width());
 
                     let cell_is_overflowing = cell.unicode_width() > cell_width;
                     if cell_is_overflowing {
@@ -229,7 +242,7 @@ where
                         }
 
                         value.push_str("… ");
-                        trace!("chars_width: {}", chars_width);
+                        trace!("chars width: {}", chars_width);
                         trace!("shrinked value: {}", value);
                         let spaces_count = cell_width - chars_width - 1;
                         trace!("number of spaces added to shrinked value: {}", spaces_count);
@@ -245,8 +258,8 @@ where
                     }
                 } else {
                     trace!("table is not overflowing or cell is not shrinkable");
-                    trace!("cell_width: {}", cell_widths[i]);
-                    trace!("cell unicode_width: {}", cell.unicode_width());
+                    trace!("cell width: {}", cell_widths[i]);
+                    trace!("cell unicode width: {}", cell.unicode_width());
                     let spaces_count = cell_widths[i] - cell.unicode_width() + 1;
                     trace!("number of spaces added to value: {}", spaces_count);
                     cell.value.push_str(&" ".repeat(spaces_count));
