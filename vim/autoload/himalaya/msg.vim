@@ -1,34 +1,24 @@
 let s:log = function("himalaya#shared#log#info")
 let s:trim = function("himalaya#shared#utils#trim")
 let s:cli = function("himalaya#shared#cli#call")
+let s:plain_req = function("himalaya#request#plain")
 
 let s:msg_id = 0
 let s:draft = ""
 
-" Message
-
-function! s:format_msg_for_list(msg)
-  let flag_new = index(a:msg.flags, "Seen") == -1 ? "✷" : " "
-  let flag_flagged = index(a:msg.flags, "Flagged") == -1 ? " " : "!"
-  let flag_replied = index(a:msg.flags, "Answered") == -1 ? " " : "↵"
-  let a:msg.flags = printf("%s %s %s", flag_new, flag_replied, flag_flagged)
-  return a:msg
-endfunction
-
 function! himalaya#msg#list_with(account, mbox, page, should_throw)
   let pos = getpos(".")
-  let msgs = s:cli(
-    \"--account %s --mailbox %s list --page %d",
-    \[shellescape(a:account), shellescape(a:mbox), a:page],
-    \printf("Fetching %s messages", a:mbox),
-    \a:should_throw,
-  \)
-  let msgs = map(msgs, "s:format_msg_for_list(v:val)")
+  let msgs = s:plain_req({
+    \'cmd': '--account %s --mailbox %s list --max-width %d --page %d',
+    \'args': [shellescape(a:account), shellescape(a:mbox), s:bufwidth(), a:page],
+    \'msg': printf("Fetching %s messages", a:mbox),
+    \'should_throw': a:should_throw,
+  \})
   let buftype = stridx(bufname("%"), "Himalaya messages") == 0 ? "file" : "edit"
   execute printf("silent! %s Himalaya messages [%s] [page %d]", buftype, a:mbox, a:page)
   setlocal modifiable
   silent execute "%d"
-  call append(0, s:render("list", msgs))
+  call append(0, split(msgs, '\n'))
   silent execute "$d"
   setlocal filetype=himalaya-msg-list
   let &modified = 0
@@ -315,50 +305,25 @@ function! himalaya#msg#attachments()
   endtry
 endfunction
 
-" Render utils
+" Utils
 
-let s:config = {
-  \"list": {
-    \"columns": ["id", "flags", "subject", "sender", "date"],
-  \},
-  \"labels": {
-    \"id": "ID",
-    \"flags": "FLAGS",
-    \"subject": "SUBJECT",
-    \"sender": "SENDER",
-    \"date": "DATE",
-  \},
-\}
+" https://newbedev.com/get-usable-window-width-in-vim-script
+function! s:bufwidth()
+  let width = winwidth(0)
+  let numberwidth = max([&numberwidth, strlen(line('$'))+1])
+  let numwidth = (&number || &relativenumber)? numberwidth : 0
+  let foldwidth = &foldcolumn
 
-function! s:render(type, lines)
-  let s:max_widths = s:get_max_widths(a:lines, s:config[a:type].columns)
-  let header = [s:render_line(s:config.labels, s:max_widths, a:type)]
-  let line = map(copy(a:lines), "s:render_line(v:val, s:max_widths, a:type)")
-
-  return header + line
-endfunction
-
-function! s:render_line(line, max_widths, type)
-  return "|" . join(map(
-    \copy(s:config[a:type].columns),
-    \"s:render_cell(a:line[v:val], a:max_widths[v:key])",
-  \), "")
-endfunction
-
-function! s:render_cell(cell, max_width)
-  let cell_width = strdisplaywidth(a:cell[:a:max_width])
-  return a:cell[:a:max_width] . repeat(" ", a:max_width - cell_width) . " |"
-endfunction
-
-function! s:get_max_widths(msgs, columns)
-  let max_widths = map(copy(a:columns), "strlen(s:config.labels[v:val])")
-
-  for msg in a:msgs
-    let widths = map(copy(a:columns), "has_key(msg, v:val . '_len') ? msg[v:val . '_len'] : strlen(msg[v:val])")
-    call map(max_widths, "max([widths[v:key], v:val])")
-  endfor
-
-  return max_widths
+  if &signcolumn == 'yes'
+    let signwidth = 2
+  elseif &signcolumn == 'auto'
+    let signs = execute(printf('sign place buffer=%d', bufnr('')))
+    let signs = split(signs, '\n')
+    let signwidth = len(signs)>2? 2: 0
+  else
+    let signwidth = 0
+  endif
+  return width - numwidth - foldwidth - signwidth
 endfunction
 
 function! s:get_focused_msg_id()
@@ -378,9 +343,9 @@ function! s:get_focused_msg_ids(from, to)
 endfunction
 
 function! s:close_open_buffers(name)
-  let l:open_buffers = filter(range(1, bufnr('$')), 'bufexists(v:val)')
-  let l:target_buffers = filter(l:open_buffers, 'buffer_name(v:val) =~ a:name')
-  for buffer_to_close in l:target_buffers
+  let open_buffers = filter(range(1, bufnr('$')), 'bufexists(v:val)')
+  let target_buffers = filter(open_buffers, 'buffer_name(v:val) =~ a:name')
+  for buffer_to_close in target_buffers
     execute ":bwipeout " . buffer_to_close
   endfor
 endfunction
