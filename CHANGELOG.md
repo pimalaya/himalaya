@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Change
 
 - Remove error when empty subject [#229]
+- Vim plugin does not render anymore the msg by itself, it uses the one available from the CLI [#220]
 
 ## [0.5.0] - 2021-10-10
 

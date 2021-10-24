@@ -3,14 +3,14 @@ if exists("b:current_syntax")
 endif
 
 syntax match HimalayaSeparator /│/
+syntax match HimalayaHead      /.*\%1l/                         contains=HimalayaSeparator
 syntax match HimalayaId        /^.\{-}│/                        contains=HimalayaSeparator
 syntax match HimalayaFlags     /^.\{-}│.\{-}│/                  contains=HimalayaId,HimalayaSeparator
 syntax match HimalayaSubject   /^.\{-}│.\{-}│.\{-}│/            contains=HimalayaId,HimalayaFlags,HimalayaSeparator
 syntax match HimalayaSender    /^.\{-}│.\{-}│.\{-}│.\{-}│/      contains=HimalayaId,HimalayaFlags,HimalayaSubject,HimalayaSeparator
 syntax match HimalayaDate      /^.\{-}│.\{-}│.\{-}│.\{-}│.\{-}/ contains=HimalayaId,HimalayaFlags,HimalayaSubject,HimalayaSender,HimalayaSeparator
-syntax match HimalayaHead      /.*\%1l/                         contains=HimalayaSeparator
 
-" TODO: Find a way to set the line bold AND to keep the style of each columns.
+" FIXME: Find a way to set the line bold AND to keep the style of each columns.
 " syntax match HimalayaUnseen /^.\{-}│✷.*$/ contains=HimalayaSeparator
 " highlight HimalayaUnseen term=bold cterm=bold gui=bold
 
