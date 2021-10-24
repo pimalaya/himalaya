@@ -4,7 +4,7 @@ use std::{convert::TryFrom, ops::Deref};
 
 use crate::{
     domain::{msg::Envelope, RawEnvelope},
-    output::{Print, WriteWithColor},
+    output::{PrintTable, PrintTableOpts, WriteColor},
     ui::Table,
 };
 
@@ -36,9 +36,11 @@ impl<'a> TryFrom<&'a RawEnvelopes> for Envelopes<'a> {
     }
 }
 
-impl<'a> Print for Envelopes<'a> {
-    fn print<W: WriteWithColor>(&self, writter: &mut W) -> Result<()> {
-        println!();
-        Table::println(writter, &self)
+impl<'a> PrintTable for Envelopes<'a> {
+    fn print_table(&self, writter: &mut dyn WriteColor, opts: PrintTableOpts) -> Result<()> {
+        writeln!(writter)?;
+        Table::print(writter, &self, opts)?;
+        writeln!(writter)?;
+        Ok(())
     }
 }

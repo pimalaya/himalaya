@@ -1,28 +1,23 @@
 use anyhow::{Context, Result};
-use std::io;
-use termcolor::{StandardStream, WriteColor};
+use log::error;
 
-pub trait WriteWithColor: io::Write + WriteColor {}
-
-impl WriteWithColor for StandardStream {}
+use crate::output::WriteColor;
 
 pub trait Print {
-    fn print<W: WriteWithColor>(&self, writter: &mut W) -> Result<()>;
-
-    fn println<W: WriteWithColor>(&self, writter: &mut W) -> Result<()> {
-        println!();
-        self.print(writter)
-    }
+    fn print(&self, writter: &mut dyn WriteColor) -> Result<()>;
 }
 
 impl Print for &str {
-    fn print<W: WriteWithColor>(&self, writter: &mut W) -> Result<()> {
-        write!(writter, "{}", self).context(format!(r#"cannot print string "{}""#, self))
+    fn print(&self, writter: &mut dyn WriteColor) -> Result<()> {
+        write!(writter, "{}", self).with_context(|| {
+            error!(r#"cannot write string to writter: "{}""#, self);
+            "cannot write string to writter"
+        })
     }
 }
 
 impl Print for String {
-    fn print<W: WriteWithColor>(&self, writter: &mut W) -> Result<()> {
+    fn print(&self, writter: &mut dyn WriteColor) -> Result<()> {
         self.as_str().print(writter)
     }
 }

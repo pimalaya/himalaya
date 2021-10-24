@@ -6,9 +6,12 @@ use anyhow::Result;
 use clap::{self, App, Arg, ArgMatches, SubCommand};
 use log::{debug, trace};
 
-use crate::domain::{
-    mbox::mbox_arg,
-    msg::{flag_arg, msg_arg, tpl_arg},
+use crate::{
+    domain::{
+        mbox::mbox_arg,
+        msg::{flag_arg, msg_arg, tpl_arg},
+    },
+    ui::table_arg,
 };
 
 type Seq<'a> = &'a str;
@@ -21,6 +24,7 @@ type All = bool;
 type RawMsg<'a> = &'a str;
 type Query = String;
 type AttachmentsPaths<'a> = Vec<&'a str>;
+type MaxTableWidth = Option<usize>;
 
 /// Message commands.
 pub enum Command<'a> {
@@ -28,12 +32,12 @@ pub enum Command<'a> {
     Copy(Seq<'a>, Mbox<'a>),
     Delete(Seq<'a>),
     Forward(Seq<'a>, AttachmentsPaths<'a>),
-    List(Option<PageSize>, Page),
+    List(MaxTableWidth, Option<PageSize>, Page),
     Move(Seq<'a>, Mbox<'a>),
     Read(Seq<'a>, TextMime<'a>, Raw),
     Reply(Seq<'a>, All, AttachmentsPaths<'a>),
     Save(RawMsg<'a>),
-    Search(Query, Option<PageSize>, Page),
+    Search(Query, MaxTableWidth, Option<PageSize>, Page),
     Send(RawMsg<'a>),
     Write(AttachmentsPaths<'a>),
 
@@ -77,6 +81,10 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
 
     if let Some(m) = m.subcommand_matches("list") {
         debug!("list command matched");
+        let max_table_width = m
+            .value_of("max-table-width")
+            .and_then(|width| width.parse::<usize>().ok());
+        trace!(r#"max table width: "{:?}""#, max_table_width);
         let page_size = m.value_of("page-size").and_then(|s| s.parse().ok());
         trace!(r#"page size: "{:?}""#, page_size);
         let page = m
@@ -87,7 +95,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
             .map(|page| 1.max(page) - 1)
             .unwrap_or_default();
         trace!(r#"page: "{:?}""#, page);
-        return Ok(Some(Command::List(page_size, page)));
+        return Ok(Some(Command::List(max_table_width, page_size, page)));
     }
 
     if let Some(m) = m.subcommand_matches("move") {
@@ -130,6 +138,10 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
 
     if let Some(m) = m.subcommand_matches("search") {
         debug!("search command matched");
+        let max_table_width = m
+            .value_of("max-table-width")
+            .and_then(|width| width.parse::<usize>().ok());
+        trace!(r#"max table width: "{:?}""#, max_table_width);
         let page_size = m.value_of("page-size").and_then(|s| s.parse().ok());
         trace!(r#"page size: "{:?}""#, page_size);
         let page = m
@@ -165,7 +177,12 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
             .1
             .join(" ");
         trace!(r#"query: "{:?}""#, query);
-        return Ok(Some(Command::Search(query, page_size, page)));
+        return Ok(Some(Command::Search(
+            query,
+            max_table_width,
+            page_size,
+            page,
+        )));
     }
 
     if let Some(m) = m.subcommand_matches("send") {
@@ -191,7 +208,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
     }
 
     debug!("default list command matched");
-    Ok(Some(Command::List(None, 0)))
+    Ok(Some(Command::List(None, None, 0)))
 }
 
 /// Message sequence number argument.
@@ -262,12 +279,14 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                 .aliases(&["lst", "l"])
                 .about("Lists all messages")
                 .arg(page_size_arg())
-                .arg(page_arg()),
+                .arg(page_arg())
+                .arg(table_arg::max_width()),
             SubCommand::with_name("search")
                 .aliases(&["s", "query", "q"])
                 .about("Lists messages matching the given IMAP query")
                 .arg(page_size_arg())
                 .arg(page_arg())
+                .arg(table_arg::max_width())
                 .arg(
                     Arg::with_name("query")
                         .help("IMAP query")

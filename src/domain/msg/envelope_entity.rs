@@ -4,7 +4,7 @@ use std::{borrow::Cow, convert::TryFrom};
 
 use crate::{
     domain::msg::{Flag, Flags},
-    ui::table::{Cell, Row, Table},
+    ui::{Cell, Row, Table},
 };
 
 pub type RawEnvelope = imap::types::Fetch;

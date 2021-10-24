@@ -8,7 +8,7 @@ use std::ops::Deref;
 
 use crate::{
     domain::{Mbox, RawMbox},
-    output::{Print, WriteWithColor},
+    output::{PrintTable, PrintTableOpts, WriteColor},
     ui::Table,
 };
 
@@ -29,10 +29,12 @@ impl<'a> Deref for Mboxes<'a> {
 }
 
 /// Makes the mailboxes printable.
-impl<'a> Print for Mboxes<'a> {
-    fn print<W: WriteWithColor>(&self, writter: &mut W) -> Result<()> {
+impl<'a> PrintTable for Mboxes<'a> {
+    fn print_table(&self, writter: &mut dyn WriteColor, opts: PrintTableOpts) -> Result<()> {
         writeln!(writter)?;
-        Table::println(writter, &self)
+        Table::print(writter, &self, opts)?;
+        writeln!(writter)?;
+        Ok(())
     }
 }
 

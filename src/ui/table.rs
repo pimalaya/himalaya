@@ -10,7 +10,7 @@ use termcolor::{Color, ColorSpec};
 use terminal_size;
 use unicode_width::UnicodeWidthStr;
 
-use crate::output::{Print, WriteWithColor};
+use crate::output::{Print, PrintTableOpts, WriteColor};
 
 /// Defines the default terminal size.
 /// This is used when the size cannot be determined by the `terminal_size` crate.
@@ -117,20 +117,7 @@ impl Cell {
 
 /// Makes the cell printable.
 impl Print for Cell {
-    fn print<W: WriteWithColor>(&self, writter: &mut W) -> Result<()> {
-        //let color_choice = if atty::isnt(Stream::Stdin) {
-        //    // Colors should be deactivated if the terminal is not a tty.
-        //    ColorChoice::Never
-        //} else {
-        //    // Otherwise let's `termcolor` decide by inspecting the environment. From the [doc]:
-        //    // - If `NO_COLOR` is set to any value, then colors will be suppressed.
-        //    // - If `TERM` is set to dumb, then colors will be suppressed.
-        //    // - In non-Windows environments, if `TERM` is not set, then colors will be suppressed.
-        //    //
-        //    // [doc]: https://github.com/BurntSushi/termcolor#automatic-color-selection
-        //    ColorChoice::Auto
-        //};
-
+    fn print(&self, writter: &mut dyn WriteColor) -> Result<()> {
         // Applies colors to the cell
         writter
             .set_color(&self.style)
@@ -170,16 +157,12 @@ where
     /// Defines the row template.
     fn row(&self) -> Row;
 
-    /// Determines the max width of the table.
-    /// The default implementation takes the terminal width as the maximum width of the table.
-    fn max_width() -> usize {
-        terminal_size::terminal_size()
-            .map(|(w, _)| w.0 as usize)
-            .unwrap_or(DEFAULT_TERM_WIDTH)
-    }
-
-    /// Prints the table.
-    fn println<W: WriteWithColor>(writter: &mut W, items: &[Self]) -> Result<()> {
+    /// Writes the table to the writter.
+    fn print(writter: &mut dyn WriteColor, items: &[Self], opts: PrintTableOpts) -> Result<()> {
+        let max_width = opts
+            .max_width
+            .or_else(|| terminal_size::terminal_size().map(|(w, _)| w.0 as usize))
+            .unwrap_or(DEFAULT_TERM_WIDTH);
         let mut table = vec![Self::head()];
         let mut cell_widths: Vec<usize> =
             table[0].0.iter().map(|cell| cell.unicode_width()).collect();
@@ -206,11 +189,11 @@ where
             for (i, cell) in row.0.iter_mut().enumerate() {
                 glue.print(writter)?;
 
-                let table_is_overflowing = table_width > Self::max_width();
+                let table_is_overflowing = table_width > max_width;
                 if table_is_overflowing && cell.is_shrinkable() {
                     trace!("table is overflowing and cell is shrinkable");
 
-                    let shrink_width = table_width - Self::max_width();
+                    let shrink_width = table_width - max_width;
                     trace!("shrink width: {}", shrink_width);
                     let cell_width = if shrink_width + MAX_SHRINK_WIDTH < cell_widths[i] {
                         cell_widths[i] - shrink_width
@@ -265,8 +248,6 @@ where
             }
             writeln!(writter)?;
         }
-
-        writeln!(writter)?;
         Ok(())
     }
 }
@@ -274,7 +255,6 @@ where
 #[cfg(test)]
 mod tests {
     use std::io;
-    use termcolor::WriteColor;
 
     use super::*;
 
@@ -296,7 +276,7 @@ mod tests {
         }
     }
 
-    impl WriteColor for StringWritter {
+    impl termcolor::WriteColor for StringWritter {
         fn supports_color(&self) -> bool {
             false
         }
@@ -310,7 +290,7 @@ mod tests {
         }
     }
 
-    impl WriteWithColor for StringWritter {}
+    impl WriteColor for StringWritter {}
 
     struct Item {
         id: u16,
@@ -342,16 +322,11 @@ mod tests {
                 .cell(Cell::new(self.name.as_str()).shrinkable())
                 .cell(Cell::new(self.desc.as_str()))
         }
-
-        // Defines a fixed max width instead of terminal size for testing.
-        fn max_width() -> usize {
-            20
-        }
     }
 
     macro_rules! write_items {
         ($writter:expr, $($item:expr),*) => {
-            Table::println($writter, &[$($item,)*]).unwrap();
+            Table::print($writter, &[$($item,)*], PrintTableOpts { max_width: Some(20) }).unwrap();
         };
     }
 
@@ -369,7 +344,7 @@ mod tests {
             "ID │NAME │DESC \n",
             "1  │a    │aa   \n",
             "2  │b    │bb   \n",
-            "3  │c    │cc   \n\n"
+            "3  │c    │cc   \n",
         ];
         assert_eq!(expected, writter.content);
     }
@@ -388,7 +363,7 @@ mod tests {
             "ID   │NAME  │DESC  \n",
             "1    │a     │aa    \n",
             "2222 │bbbbb │bbbbb \n",
-            "3    │c     │cc    \n\n",
+            "3    │c     │cc    \n",
         ];
         assert_eq!(expected, writter.content);
 
@@ -404,7 +379,7 @@ mod tests {
             "ID   │NAME   │DESC  \n",
             "1    │a      │aa    \n",
             "2222 │bbbbb  │bbbbb \n",
-            "3    │cccccc │cc    \n\n",
+            "3    │cccccc │cc    \n",
         ];
         assert_eq!(expected, writter.content);
     }
@@ -433,7 +408,7 @@ mod tests {
             "5  │shriiiii… │desc \n",
             "6  │😍😍😍😍  │desc \n",
             "7  │😍😍😍😍… │desc \n",
-            "8  │!😍😍😍…  │desc \n\n",
+            "8  │!😍😍😍…  │desc \n",
         ];
         assert_eq!(expected, writter.content);
     }
@@ -450,7 +425,7 @@ mod tests {
         let expected = concat![
             "ID   │NAME  │DESC                    \n",
             "1111 │shri… │desc very looong        \n",
-            "2222 │shri… │desc very loooooooooong \n\n",
+            "2222 │shri… │desc very loooooooooong \n",
         ];
         assert_eq!(expected, writter.content);
     }
