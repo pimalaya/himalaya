@@ -22,7 +22,7 @@ use crate::{
         msg::{msg_utils, BinaryPart, Flags, Part, Parts, TextPlainPart, TplOverride},
         smtp::SmtpServiceInterface,
     },
-    output::OutputServiceInterface,
+    print::PrinterServiceInterface,
     ui::{
         choice::{self, PostEditChoice, PreEditChoice},
         editor,
@@ -298,13 +298,13 @@ impl Msg {
 
     pub fn edit_with_editor<
         'a,
-        OutputService: OutputServiceInterface,
+        PrinterService: PrinterServiceInterface,
         ImapService: ImapServiceInterface<'a>,
         SmtpService: SmtpServiceInterface,
     >(
         mut self,
         account: &Account,
-        output: &OutputService,
+        printer: &mut PrinterService,
         imap: &mut ImapService,
         smtp: &mut SmtpService,
     ) -> Result<()> {
@@ -342,7 +342,7 @@ impl Msg {
                     let flags = Flags::try_from(vec![Flag::Seen])?;
                     imap.append_raw_msg_with_flags(&mbox, &sent_msg.formatted(), flags)?;
                     msg_utils::remove_local_draft()?;
-                    output.print("Message successfully sent")?;
+                    printer.print("Message successfully sent")?;
                     break;
                 }
                 Ok(PostEditChoice::Edit) => {
@@ -350,7 +350,7 @@ impl Msg {
                     continue;
                 }
                 Ok(PostEditChoice::LocalDraft) => {
-                    output.print("Message successfully saved locally")?;
+                    printer.print("Message successfully saved locally")?;
                     break;
                 }
                 Ok(PostEditChoice::RemoteDraft) => {
@@ -359,7 +359,7 @@ impl Msg {
                     let tpl = self.to_tpl(TplOverride::default(), account);
                     imap.append_raw_msg_with_flags(&mbox, tpl.as_bytes(), flags)?;
                     msg_utils::remove_local_draft()?;
-                    output.print("Message successfully saved to Drafts")?;
+                    printer.print("Message successfully saved to Drafts")?;
                     break;
                 }
                 Ok(PostEditChoice::Discard) => {

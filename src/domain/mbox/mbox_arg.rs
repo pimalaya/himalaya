@@ -7,18 +7,26 @@ use anyhow::Result;
 use clap;
 use log::trace;
 
+use crate::ui::table_arg;
+
+type MaxTableWidth = Option<usize>;
+
 /// Represents the mailbox commands.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Cmd {
     /// Represents the list mailboxes command.
-    List,
+    List(MaxTableWidth),
 }
 
 /// Defines the mailbox command matcher.
 pub fn matches(m: &clap::ArgMatches) -> Result<Option<Cmd>> {
-    if let Some(_) = m.subcommand_matches("mailboxes") {
+    if let Some(m) = m.subcommand_matches("mailboxes") {
         trace!("mailboxes subcommand matched");
-        return Ok(Some(Cmd::List));
+        let max_table_width = m
+            .value_of("max-table-width")
+            .and_then(|width| width.parse::<usize>().ok());
+        trace!(r#"max table width: "{:?}""#, max_table_width);
+        return Ok(Some(Cmd::List(max_table_width)));
     }
 
     Ok(None)
@@ -28,7 +36,8 @@ pub fn matches(m: &clap::ArgMatches) -> Result<Option<Cmd>> {
 pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
     vec![clap::SubCommand::with_name("mailboxes")
         .aliases(&["mailbox", "mboxes", "mbox", "mb", "m"])
-        .about("Lists mailboxes")]
+        .about("Lists mailboxes")
+        .arg(table_arg::max_width())]
 }
 
 /// Defines the source mailbox argument.
@@ -58,8 +67,12 @@ mod tests {
         let arg = clap::App::new("himalaya")
             .subcommands(subcmds())
             .get_matches_from(&["himalaya", "mailboxes"]);
+        assert_eq!(Some(Cmd::List(None)), matches(&arg).unwrap());
 
-        assert_eq!(Some(Cmd::List), matches(&arg).unwrap());
+        let arg = clap::App::new("himalaya")
+            .subcommands(subcmds())
+            .get_matches_from(&["himalaya", "mailboxes", "--max-width", "20"]);
+        assert_eq!(Some(Cmd::List(Some(20))), matches(&arg).unwrap());
     }
 
     #[test]
