@@ -6,7 +6,7 @@ use termcolor::{ColorChoice, StandardStream};
 
 use crate::output::{OutputFmt, OutputJson, Print, PrintTable, PrintTableOpts, WriteColor};
 
-pub trait PrinterServiceInterface {
+pub trait PrinterService {
     fn print<T: Debug + Print + Serialize>(&mut self, data: T) -> Result<()>;
     fn print_table<T: Debug + PrintTable + Serialize>(
         &mut self,
@@ -16,12 +16,12 @@ pub trait PrinterServiceInterface {
     fn is_json(&self) -> bool;
 }
 
-pub struct PrinterService {
+pub struct StdoutPrinter {
     pub writter: Box<dyn WriteColor>,
     pub fmt: OutputFmt,
 }
 
-impl PrinterServiceInterface for PrinterService {
+impl PrinterService for StdoutPrinter {
     fn print<T: Debug + Print + Serialize>(&mut self, data: T) -> Result<()> {
         match self.fmt {
             OutputFmt::Plain => data.print(self.writter.as_mut()),
@@ -47,7 +47,7 @@ impl PrinterServiceInterface for PrinterService {
     }
 }
 
-impl From<OutputFmt> for PrinterService {
+impl From<OutputFmt> for StdoutPrinter {
     fn from(fmt: OutputFmt) -> Self {
         let writter = StandardStream::stdout(if atty::isnt(Stream::Stdin) {
             // Colors should be deactivated if the terminal is not a tty.
@@ -66,7 +66,7 @@ impl From<OutputFmt> for PrinterService {
     }
 }
 
-impl TryFrom<Option<&str>> for PrinterService {
+impl TryFrom<Option<&str>> for StdoutPrinter {
     type Error = Error;
 
     fn try_from(fmt: Option<&str>) -> Result<Self> {

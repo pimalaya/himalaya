@@ -1,16 +1,19 @@
-//! Mailbox controller module.
+//! Mailbox handling module.
 //!
 //! This module gathers all mailbox actions triggered by the CLI.
 
 use anyhow::Result;
 use log::trace;
 
-use crate::{domain::ImapServiceInterface, output::PrintTableOpts, print::PrinterServiceInterface};
+use crate::{
+    domain::ImapServiceInterface,
+    output::{PrintTableOpts, PrinterService},
+};
 
 /// Lists all mailboxes.
-pub fn list<'a, PrinterService: PrinterServiceInterface, ImapService: ImapServiceInterface<'a>>(
+pub fn list<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
     max_width: Option<usize>,
-    printer: &mut PrinterService,
+    printer: &mut Printer,
     imap: &'a mut ImapService,
 ) -> Result<()> {
     let mboxes = imap.fetch_mboxes()?;
@@ -73,7 +76,7 @@ mod tests {
             pub writter: StringWritter,
         }
 
-        impl PrinterServiceInterface for PrinterServiceTest {
+        impl PrinterService for PrinterServiceTest {
             fn print_table<T: Debug + PrintTable + Serialize>(
                 &mut self,
                 data: T,

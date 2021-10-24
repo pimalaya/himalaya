@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap;
 use env_logger;
-use print::PrinterService;
+use output::StdoutPrinter;
 use std::{convert::TryFrom, env};
 use url::Url;
 
@@ -9,7 +9,6 @@ mod compl;
 mod config;
 mod domain;
 mod output;
-mod print;
 mod ui;
 
 use compl::{compl_arg, compl_handler};
@@ -49,7 +48,7 @@ fn main() -> Result<()> {
         let mbox = Mbox::new("INBOX");
         let config = Config::try_from(None)?;
         let account = Account::try_from((&config, None))?;
-        let mut printer = PrinterService::from(OutputFmt::Plain);
+        let mut printer = StdoutPrinter::from(OutputFmt::Plain);
         let url = Url::parse(&raw_args[1])?;
         let mut imap = ImapService::from((&account, &mbox));
         let mut smtp = SmtpService::from(&account);
@@ -72,7 +71,7 @@ fn main() -> Result<()> {
     let mbox = Mbox::new(m.value_of("mbox-source").unwrap());
     let config = Config::try_from(m.value_of("config"))?;
     let account = Account::try_from((&config, m.value_of("account")))?;
-    let mut printer = PrinterService::try_from(m.value_of("output"))?;
+    let mut printer = StdoutPrinter::try_from(m.value_of("output"))?;
     let mut imap = ImapService::from((&account, &mbox));
     let mut smtp = SmtpService::from(&account);
 

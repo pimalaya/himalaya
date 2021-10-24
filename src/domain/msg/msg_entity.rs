@@ -22,7 +22,7 @@ use crate::{
         msg::{msg_utils, BinaryPart, Flags, Part, Parts, TextPlainPart, TplOverride},
         smtp::SmtpServiceInterface,
     },
-    print::PrinterServiceInterface,
+    output::PrinterService,
     ui::{
         choice::{self, PostEditChoice, PreEditChoice},
         editor,
@@ -298,13 +298,13 @@ impl Msg {
 
     pub fn edit_with_editor<
         'a,
-        PrinterService: PrinterServiceInterface,
+        Printer: PrinterService,
         ImapService: ImapServiceInterface<'a>,
         SmtpService: SmtpServiceInterface,
     >(
         mut self,
         account: &Account,
-        printer: &mut PrinterService,
+        printer: &mut Printer,
         imap: &mut ImapService,
         smtp: &mut SmtpService,
     ) -> Result<()> {

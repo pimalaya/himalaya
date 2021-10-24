@@ -10,26 +10,26 @@ use crate::{
         imap::ImapServiceInterface,
         msg::{Msg, TplOverride},
     },
-    print::PrinterServiceInterface,
+    output::PrinterService,
 };
 
 /// Generate a new message template.
-pub fn new<'a, PrinterService: PrinterServiceInterface>(
+pub fn new<'a, Printer: PrinterService>(
     opts: TplOverride<'a>,
     account: &'a Account,
-    printer: &'a mut PrinterService,
+    printer: &'a mut Printer,
 ) -> Result<()> {
     let tpl = Msg::default().to_tpl(opts, account);
     printer.print(tpl)
 }
 
 /// Generate a reply message template.
-pub fn reply<'a, PrinterService: PrinterServiceInterface, ImapService: ImapServiceInterface<'a>>(
+pub fn reply<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
     seq: &str,
     all: bool,
     opts: TplOverride<'a>,
     account: &'a Account,
-    printer: &'a mut PrinterService,
+    printer: &'a mut Printer,
     imap: &'a mut ImapService,
 ) -> Result<()> {
     let tpl = imap
@@ -40,15 +40,11 @@ pub fn reply<'a, PrinterService: PrinterServiceInterface, ImapService: ImapServi
 }
 
 /// Generate a forward message template.
-pub fn forward<
-    'a,
-    PrinterService: PrinterServiceInterface,
-    ImapService: ImapServiceInterface<'a>,
->(
+pub fn forward<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
     seq: &str,
     opts: TplOverride<'a>,
     account: &'a Account,
-    printer: &'a mut PrinterService,
+    printer: &'a mut Printer,
     imap: &'a mut ImapService,
 ) -> Result<()> {
     let tpl = imap
