@@ -4,7 +4,7 @@
 [![gh-actions](https://github.com/soywod/himalaya/workflows/nix-build/badge.svg)](https://github.com/soywod/himalaya/actions?query=workflow%3Anix-build)
 [![Homebrew](https://img.shields.io/badge/dynamic/json.svg?url=https://formulae.brew.sh/api/formula/himalaya.json&query=$.versions.stable&label=homebrew)](https://formulae.brew.sh/formula/himalaya)
 
-CLI email client written in Rust.
+CLI email client
 
 *The project is under active development. Do not use in production before the
 `v1.0.0` (see the [roadmap](https://github.com/soywod/himalaya/milestone/5)).*

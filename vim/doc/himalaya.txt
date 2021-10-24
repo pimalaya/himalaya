@@ -1,4 +1,4 @@
-*himalaya.txt* - 📫 CLI email client
+*himalaya.txt* - CLI email client
                                                         
     _/    _/  _/_/_/  _/      _/    _/_/    _/        _/_/  _/      _/   _/_/ 
    _/    _/    _/    _/_/  _/_/  _/    _/  _/      _/    _/  _/  _/   _/    _/
