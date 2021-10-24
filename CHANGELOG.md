@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Disable color support [#185]
+- Disable color feature [#185]
+- `--max-width|-w` argument to restrict listing table width [#220]
 
 ### Fixed
 
@@ -346,5 +347,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#199]: https://github.com/soywod/himalaya/issues/199
 [#205]: https://github.com/soywod/himalaya/issues/205
 [#215]: https://github.com/soywod/himalaya/issues/215
+[#220]: https://github.com/soywod/himalaya/issues/220
 [#228]: https://github.com/soywod/himalaya/issues/228
 [#229]: https://github.com/soywod/himalaya/issues/229
