@@ -37,7 +37,7 @@ pub enum Command<'a> {
     Read(Seq<'a>, TextMime<'a>, Raw),
     Reply(Seq<'a>, All, AttachmentsPaths<'a>),
     Save(RawMsg<'a>),
-    Search(Query, Option<PageSize>, Page),
+    Search(Query, MaxTableWidth, Option<PageSize>, Page),
     Send(RawMsg<'a>),
     Write(AttachmentsPaths<'a>),
 
@@ -138,6 +138,10 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
 
     if let Some(m) = m.subcommand_matches("search") {
         debug!("search command matched");
+        let max_table_width = m
+            .value_of("max-table-width")
+            .and_then(|width| width.parse::<usize>().ok());
+        trace!(r#"max table width: "{:?}""#, max_table_width);
         let page_size = m.value_of("page-size").and_then(|s| s.parse().ok());
         trace!(r#"page size: "{:?}""#, page_size);
         let page = m
@@ -173,7 +177,12 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
             .1
             .join(" ");
         trace!(r#"query: "{:?}""#, query);
-        return Ok(Some(Command::Search(query, page_size, page)));
+        return Ok(Some(Command::Search(
+            query,
+            max_table_width,
+            page_size,
+            page,
+        )));
     }
 
     if let Some(m) = m.subcommand_matches("send") {

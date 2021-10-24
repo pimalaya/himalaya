@@ -280,6 +280,7 @@ pub fn search<
     ImapService: ImapServiceInterface<'a>,
 >(
     query: String,
+    max_width: Option<usize>,
     page_size: Option<usize>,
     page: usize,
     account: &Account,
@@ -291,7 +292,7 @@ pub fn search<
 
     let msgs = imap.fetch_envelopes_with(&query, &page_size, &page)?;
     trace!("messages: {:#?}", msgs);
-    printer.print_table(msgs, PrintTableOpts { max_width: None })
+    printer.print_table(msgs, PrintTableOpts { max_width })
 }
 
 /// Send a raw message.

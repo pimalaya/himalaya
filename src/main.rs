@@ -139,8 +139,16 @@ fn main() -> Result<()> {
         Some(msg_arg::Command::Save(raw_msg)) => {
             return msg_handler::save(&mbox, raw_msg, &mut printer, &mut imap);
         }
-        Some(msg_arg::Command::Search(query, page_size, page)) => {
-            return msg_handler::search(query, page_size, page, &account, &mut printer, &mut imap);
+        Some(msg_arg::Command::Search(query, max_width, page_size, page)) => {
+            return msg_handler::search(
+                query,
+                max_width,
+                page_size,
+                page,
+                &account,
+                &mut printer,
+                &mut imap,
+            );
         }
         Some(msg_arg::Command::Send(raw_msg)) => {
             return msg_handler::send(raw_msg, &mut printer, &mut imap, &mut smtp);
