@@ -158,7 +158,7 @@ where
     fn row(&self) -> Row;
 
     /// Writes the table to the writter.
-    fn writeln(writter: &mut dyn WriteColor, items: &[Self], opts: PrintTableOpts) -> Result<()> {
+    fn print(writter: &mut dyn WriteColor, items: &[Self], opts: PrintTableOpts) -> Result<()> {
         let max_width = opts
             .max_width
             .or_else(|| terminal_size::terminal_size().map(|(w, _)| w.0 as usize))
@@ -248,8 +248,6 @@ where
             }
             writeln!(writter)?;
         }
-
-        writeln!(writter)?;
         Ok(())
     }
 }
@@ -328,7 +326,7 @@ mod tests {
 
     macro_rules! write_items {
         ($writter:expr, $($item:expr),*) => {
-            Table::writeln($writter, &[$($item,)*], PrintTableOpts { max_width: Some(20) }).unwrap();
+            Table::print($writter, &[$($item,)*], PrintTableOpts { max_width: Some(20) }).unwrap();
         };
     }
 
@@ -347,7 +345,6 @@ mod tests {
             "1  │a    │aa   \n",
             "2  │b    │bb   \n",
             "3  │c    │cc   \n",
-            "\n"
         ];
         assert_eq!(expected, writter.content);
     }
@@ -367,7 +364,6 @@ mod tests {
             "1    │a     │aa    \n",
             "2222 │bbbbb │bbbbb \n",
             "3    │c     │cc    \n",
-            "\n"
         ];
         assert_eq!(expected, writter.content);
 
@@ -384,7 +380,6 @@ mod tests {
             "1    │a      │aa    \n",
             "2222 │bbbbb  │bbbbb \n",
             "3    │cccccc │cc    \n",
-            "\n"
         ];
         assert_eq!(expected, writter.content);
     }
@@ -414,7 +409,6 @@ mod tests {
             "6  │😍😍😍😍  │desc \n",
             "7  │😍😍😍😍… │desc \n",
             "8  │!😍😍😍…  │desc \n",
-            "\n"
         ];
         assert_eq!(expected, writter.content);
     }
@@ -432,7 +426,6 @@ mod tests {
             "ID   │NAME  │DESC                    \n",
             "1111 │shri… │desc very looong        \n",
             "2222 │shri… │desc very loooooooooong \n",
-            "\n"
         ];
         assert_eq!(expected, writter.content);
     }

@@ -2,8 +2,8 @@
 
 pub mod table_arg;
 
-pub mod table_entity;
-pub use table_entity::*;
+pub mod table;
+pub use table::*;
 
 pub mod choice;
 pub mod editor;
