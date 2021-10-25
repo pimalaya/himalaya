@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Blur in list msg screenshot [#181]
+
 ## [0.5.1] - 2021-10-24
 
 ### Added
@@ -343,6 +347,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#160]: https://github.com/soywod/himalaya/issues/160
 [#162]: https://github.com/soywod/himalaya/issues/162
 [#176]: https://github.com/soywod/himalaya/issues/176
+[#181]: https://github.com/soywod/himalaya/issues/181
 [#185]: https://github.com/soywod/himalaya/issues/185
 [#186]: https://github.com/soywod/himalaya/issues/186
 [#190]: https://github.com/soywod/himalaya/issues/190
