@@ -45,9 +45,9 @@ fn main() -> Result<()> {
     // Check mailto command BEFORE app initialization.
     let raw_args: Vec<String> = env::args().collect();
     if raw_args.len() > 1 && raw_args[1].starts_with("mailto:") {
-        let mbox = Mbox::new("INBOX");
         let config = Config::try_from(None)?;
         let account = Account::try_from((&config, None))?;
+        let mbox = Mbox::new(&account.inbox_folder);
         let mut printer = StdoutPrinter::from(OutputFmt::Plain);
         let url = Url::parse(&raw_args[1])?;
         let mut imap = ImapService::from((&account, &mbox));
@@ -68,9 +68,9 @@ fn main() -> Result<()> {
     }
 
     // Init entities and services.
-    let mbox = Mbox::new(m.value_of("mbox-source").unwrap());
     let config = Config::try_from(m.value_of("config"))?;
     let account = Account::try_from((&config, m.value_of("account")))?;
+    let mbox = Mbox::new(m.value_of("mbox-source").unwrap_or(&account.inbox_folder));
     let mut printer = StdoutPrinter::try_from(m.value_of("output"))?;
     let mut imap = ImapService::from((&account, &mbox));
     let mut smtp = SmtpService::from(&account);
@@ -150,7 +150,7 @@ fn main() -> Result<()> {
             );
         }
         Some(msg_arg::Command::Send(raw_msg)) => {
-            return msg_handler::send(raw_msg, &mut printer, &mut imap, &mut smtp);
+            return msg_handler::send(raw_msg, &mut printer, &account, &mut imap, &mut smtp);
         }
         Some(msg_arg::Command::Write(atts)) => {
             return msg_handler::write(atts, &account, &mut printer, &mut imap, &mut smtp);

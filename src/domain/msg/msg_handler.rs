@@ -291,6 +291,7 @@ pub fn send<
 >(
     raw_msg: &str,
     printer: &mut Printer,
+    account: &Account,
     imap: &mut ImapService,
     smtp: &mut SmtpService,
 ) -> Result<()> {
@@ -312,7 +313,7 @@ pub fn send<
     debug!("message sent!");
 
     // Save message to sent folder
-    let mbox = Mbox::new("Sent");
+    let mbox = Mbox::new(&account.sent_folder);
     let flags = Flags::try_from(vec![Flag::Seen])?;
     imap.append_raw_msg_with_flags(&mbox, raw_msg.as_bytes(), flags)
 }

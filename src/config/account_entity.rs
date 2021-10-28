@@ -8,6 +8,10 @@ use crate::{
     output::run_cmd,
 };
 
+pub const DEFAULT_INBOX_FOLDER: &str = "INBOX";
+pub const DEFAULT_SENT_FOLDER: &str = "Sent";
+pub const DEFAULT_DRAFT_FOLDER: &str = "Drafts";
+
 /// Represent a user account.
 #[derive(Debug, Default)]
 pub struct Account {
@@ -16,6 +20,12 @@ pub struct Account {
     pub downloads_dir: PathBuf,
     pub sig: Option<String>,
     pub default_page_size: usize,
+    /// Defines the inbox folder name for this account
+    pub inbox_folder: String,
+    /// Defines the sent folder name for this account
+    pub sent_folder: String,
+    /// Defines the draft folder name for this account
+    pub draft_folder: String,
     pub watch_cmds: Vec<String>,
     pub default: bool,
     pub email: String,
@@ -134,6 +144,27 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
             downloads_dir,
             sig,
             default_page_size,
+            inbox_folder: account
+                .inbox_folder
+                .as_ref()
+                .map(|s| s.as_str())
+                .or(config.inbox_folder.as_ref().map(|s| s.as_str()))
+                .unwrap_or(&DEFAULT_INBOX_FOLDER)
+                .to_string(),
+            sent_folder: account
+                .sent_folder
+                .as_ref()
+                .map(|s| s.as_str())
+                .or(config.sent_folder.as_ref().map(|s| s.as_str()))
+                .unwrap_or(&DEFAULT_SENT_FOLDER)
+                .to_string(),
+            draft_folder: account
+                .draft_folder
+                .as_ref()
+                .map(|s| s.as_str())
+                .or(config.draft_folder.as_ref().map(|s| s.as_str()))
+                .unwrap_or(&DEFAULT_DRAFT_FOLDER)
+                .to_string(),
             watch_cmds: account
                 .watch_cmds
                 .as_ref()
@@ -142,12 +173,14 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
                 .to_owned(),
             default: account.default.unwrap_or(false),
             email: account.email.to_owned(),
+
             imap_host: account.imap_host.to_owned(),
             imap_port: account.imap_port,
             imap_starttls: account.imap_starttls.unwrap_or_default(),
             imap_insecure: account.imap_insecure.unwrap_or_default(),
             imap_login: account.imap_login.to_owned(),
             imap_passwd_cmd: account.imap_passwd_cmd.to_owned(),
+
             smtp_host: account.smtp_host.to_owned(),
             smtp_port: account.smtp_port,
             smtp_starttls: account.smtp_starttls.unwrap_or_default(),

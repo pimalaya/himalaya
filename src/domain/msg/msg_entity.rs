@@ -337,7 +337,7 @@ impl Msg {
         loop {
             match choice::post_edit() {
                 Ok(PostEditChoice::Send) => {
-                    let mbox = Mbox::new("Sent");
+                    let mbox = Mbox::new(&account.sent_folder);
                     let sent_msg = smtp.send_msg(&self)?;
                     let flags = Flags::try_from(vec![Flag::Seen])?;
                     imap.append_raw_msg_with_flags(&mbox, &sent_msg.formatted(), flags)?;
@@ -354,12 +354,15 @@ impl Msg {
                     break;
                 }
                 Ok(PostEditChoice::RemoteDraft) => {
-                    let mbox = Mbox::new("Drafts");
+                    let mbox = Mbox::new(&account.draft_folder);
                     let flags = Flags::try_from(vec![Flag::Seen, Flag::Draft])?;
                     let tpl = self.to_tpl(TplOverride::default(), account);
                     imap.append_raw_msg_with_flags(&mbox, tpl.as_bytes(), flags)?;
                     msg_utils::remove_local_draft()?;
-                    printer.print("Message successfully saved to Drafts")?;
+                    printer.print(format!(
+                        "Message successfully saved to {}",
+                        account.draft_folder
+                    ))?;
                     break;
                 }
                 Ok(PostEditChoice::Discard) => {
