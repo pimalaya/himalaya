@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Blur in list msg screenshot [#181]
+- Make inbox, sent and drafts folders customizable [#172]
 
 ## [0.5.1] - 2021-10-24
 
@@ -347,6 +348,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#160]: https://github.com/soywod/himalaya/issues/160
 [#162]: https://github.com/soywod/himalaya/issues/162
 [#176]: https://github.com/soywod/himalaya/issues/176
+[#172]: https://github.com/soywod/himalaya/issues/172
 [#181]: https://github.com/soywod/himalaya/issues/181
 [#185]: https://github.com/soywod/himalaya/issues/185
 [#186]: https://github.com/soywod/himalaya/issues/186

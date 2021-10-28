@@ -47,7 +47,6 @@ pub fn source_arg<'a>() -> clap::Arg<'a, 'a> {
         .long("mailbox")
         .help("Specifies the source mailbox")
         .value_name("SOURCE")
-        .default_value("INBOX")
 }
 
 /// Defines the target mailbox argument.
@@ -104,7 +103,7 @@ mod tests {
         }
 
         let app = get_matches_from![];
-        assert_eq!(Some("INBOX"), app.value_of("mbox-source"));
+        assert_eq!(None, app.value_of("mbox-source"));
 
         let app = get_matches_from!["-m", "SOURCE"];
         assert_eq!(Some("SOURCE"), app.value_of("mbox-source"));
