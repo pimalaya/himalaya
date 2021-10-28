@@ -53,7 +53,7 @@ pub fn source_arg<'a>() -> clap::Arg<'a, 'a> {
 /// Defines the target mailbox argument.
 pub fn target_arg<'a>() -> clap::Arg<'a, 'a> {
     clap::Arg::with_name("mbox-target")
-        .help("Specifies the targetted mailbox")
+        .help("Specifies the targeted mailbox")
         .value_name("TARGET")
         .required(true)
 }
