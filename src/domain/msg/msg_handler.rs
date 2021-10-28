@@ -290,8 +290,8 @@ pub fn send<
     SmtpService: SmtpServiceInterface,
 >(
     raw_msg: &str,
-    printer: &mut Printer,
     account: &Account,
+    printer: &mut Printer,
     imap: &mut ImapService,
     smtp: &mut SmtpService,
 ) -> Result<()> {

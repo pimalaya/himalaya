@@ -150,7 +150,7 @@ fn main() -> Result<()> {
             );
         }
         Some(msg_arg::Command::Send(raw_msg)) => {
-            return msg_handler::send(raw_msg, &mut printer, &account, &mut imap, &mut smtp);
+            return msg_handler::send(raw_msg, &account, &mut printer, &mut imap, &mut smtp);
         }
         Some(msg_arg::Command::Write(atts)) => {
             return msg_handler::write(atts, &account, &mut printer, &mut imap, &mut smtp);
