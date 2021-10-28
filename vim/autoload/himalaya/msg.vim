@@ -326,9 +326,13 @@ function! s:bufwidth()
   return width - numwidth - foldwidth - signwidth
 endfunction
 
+function! s:get_msg_id(line)
+    return matchstr(a:line, '[0-9]*')
+endfunction
+
 function! s:get_focused_msg_id()
   try
-    return s:trim(split(getline("."), "|")[0])
+    return s:get_msg_id(getline("."))
   catch
     throw "message not found"
   endtry
@@ -336,7 +340,7 @@ endfunction
 
 function! s:get_focused_msg_ids(from, to)
   try
-    return join(map(range(a:from, a:to), "s:trim(split(getline(v:val), '|')[0])"), ",")
+    return join(map(range(a:from, a:to), "s:get_msg_id(getline(v:val))"), ",")
   catch
     throw "messages not found"
   endtry
