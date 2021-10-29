@@ -9,7 +9,7 @@ pub trait Print {
 
 impl Print for &str {
     fn print(&self, writter: &mut dyn WriteColor) -> Result<()> {
-        write!(writter, "{}", self).with_context(|| {
+        writeln!(writter, "{}", self).with_context(|| {
             error!(r#"cannot write string to writter: "{}""#, self);
             "cannot write string to writter"
         })
