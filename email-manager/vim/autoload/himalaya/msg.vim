@@ -305,6 +305,37 @@ function! himalaya#msg#attachments()
   endtry
 endfunction
 
+function! himalaya#msg#complete_contact(findstart, base)
+  try
+    if a:findstart
+      if !exists("g:himalaya_complete_contact_cmd")
+        echoerr "You must set 'g:himalaya_complete_contact_cmd' to complete contacts"
+        return -3
+      endif
+
+      " search for everything up to the last colon or comma
+      let line_to_cursor = getline(".")[:col(".") - 1]
+      let start = match(line_to_cursor, '[^:,]*$')
+
+      " don't include leading spaces
+      while start <= len(line_to_cursor) && line_to_cursor[start] == " "
+        let start += 1
+      endwhile
+
+      return start
+    else
+      let output = system(substitute(g:himalaya_complete_contact_cmd, "%s", a:base, ""))
+      let lines = split(output, "\n")
+
+      return map(lines, "s:line_to_complete_item(v:val)")
+    endif
+  catch
+    if !empty(v:exception)
+      redraw | call himalaya#shared#log#err(v:exception)
+    endif
+  endtry
+endfunction
+
 " Utils
 
 " https://newbedev.com/get-usable-window-width-in-vim-script
@@ -352,4 +383,15 @@ function! s:close_open_buffers(name)
   for buffer_to_close in target_buffers
     execute ":bwipeout " . buffer_to_close
   endfor
+endfunction
+
+function! s:line_to_complete_item(line)
+  let fields = split(a:line, "\t")
+  let email = fields[0]
+  let name = ""
+  if len(fields) > 1
+    let name = '"' . fields[1] . '" '
+  endif
+
+  return name . "<" . email . ">"
 endfunction
