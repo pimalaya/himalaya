@@ -19,25 +19,21 @@ are in progress by the community. A
 [synchronizer](https://github.com/soywod/himalaya/blob/set-up-multi-crate/email-synchronizer/README.md)
 should also come soon.
 
-*See the
-[README](https://github.com/soywod/himalaya/blob/set-up-multi-crate/email-manager/README.md)
-for more information abouth this tools suite.*
-
-### Contact (TODO)
+### [Contact](https://github.com/soywod/himalaya/blob/set-up-multi-crate/contact-manager/README.md) (TODO)
 
 Himalaya plans to propose a command-line API to manage your contacts through
 the [CardDAV](https://en.wikipedia.org/wiki/CardDAV) protocol. It may come in
 the future with a Vim plugin, an Emacs plugin, a TUI and a synchronizer.
 
-### Calendar (TODO)
+### [Calendar](https://github.com/soywod/himalaya/blob/set-up-multi-crate/calendar-manager/README.md) (TODO)
 
 Himalaya plans to propose a command-line API to manage your calendar through
 the [CalDAV](https://en.wikipedia.org/wiki/CalDAV) protocol. It may come in the
 future with a Vim plugin, an Emacs plugin, a TUI and a synchronizer.
 
-### Tasks (TODO)
+### [Tasks](https://github.com/soywod/himalaya/blob/set-up-multi-crate/task-manager/README.md) (TODO)
 
-Himalaya plans to propose a command-line API to manage your task and your time
+Himalaya plans to propose a command-line API to manage your tasks and your time
 through the [CalDAV](https://en.wikipedia.org/wiki/CalDAV) protocol. It may
 come in the future with a Vim plugin, an Emacs plugin, a TUI and a
 synchronizer. The tool already exists in [another

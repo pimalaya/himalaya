@@ -1,9 +1,11 @@
 [workspace]
 members = [
   "email-manager",
-  "email-synchronizer",
-  "contact-manager",
-  "contact-synchronizer",
-  "calendar-manager",
-  "calendar-synchronizer",
+  # "email-synchronizer",
+  # "contact-manager",
+  # "contact-synchronizer",
+  # "calendar-manager",
+  # "calendar-synchronizer",
+  # "task-manager",
+  # "task-synchronizer",
 ]

@@ -1,5 +1,4 @@
-# 📫 Himalaya
-[![Homebrew](https://img.shields.io/badge/dynamic/json.svg?url=https://formulae.brew.sh/api/formula/himalaya.json&query=$.versions.stable&label=homebrew)](https://formulae.brew.sh/formula/himalaya)
+# 📫 Himalaya [![Homebrew](https://img.shields.io/badge/dynamic/json.svg?url=https://formulae.brew.sh/api/formula/himalaya.json&query=$.versions.stable&label=homebrew)](https://formulae.brew.sh/formula/himalaya)
 
 ![image](https://user-images.githubusercontent.com/10437171/138774902-7b9de5a3-93eb-44b0-8cfb-6d2e11e3b1aa.png)
 
@@ -19,10 +18,10 @@ Possibilities are endless!
 
 ```sh
 # As root:
-curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | sudo sh
+curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/email-manager/install.sh | sudo sh
 
 # As a regular user:
-curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | PREFIX=~/.local sh
+curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/email-manager/install.sh | PREFIX=~/.local sh
 ```
 
 *See the [wiki](https://github.com/soywod/himalaya/wiki) for other installation
