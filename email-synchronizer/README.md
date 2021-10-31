@@ -1,3 +1,3 @@
-# 📫 Himalaya synchronizer
+# :mailbox: :repeat: Himalaya synchronizer
 
 TODO

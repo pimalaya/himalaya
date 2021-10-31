@@ -1,3 +1,3 @@
-#  Makalu synchronizer
+# :date: :repeat: Makalu synchronizer
 
 TODO

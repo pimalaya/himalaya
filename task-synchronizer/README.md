@@ -1,3 +1,3 @@
-# ⏱ Lhotse synchronizer
+# :stopwatch: :repeat: Lhotse synchronizer
 
 TODO

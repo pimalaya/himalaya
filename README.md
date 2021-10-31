@@ -1,4 +1,4 @@
-# 🧙 Himalaya
+# :mage: Himalaya
 
 Himalaya is a suite of independent [Personal Information
 Management](https://en.wikipedia.org/wiki/Personal_information_manager)
@@ -8,7 +8,7 @@ command-line tools.
 
 ## Features
 
-### [Email](https://github.com/soywod/himalaya/blob/set-up-multi-crate/email-manager/README.md)
+### :mailbox: [Email](https://github.com/soywod/himalaya/blob/set-up-multi-crate/email-manager/README.md)
 
 Himalaya proposes a command-line API to manage your emails (listing, searching,
 reading, copying, moving, deleting…). It is also shipped with a [Vim
@@ -19,19 +19,19 @@ are in progress by the community. A
 [synchronizer](https://github.com/soywod/himalaya/blob/set-up-multi-crate/email-synchronizer/README.md)
 should also come soon.
 
-### [Contact](https://github.com/soywod/himalaya/blob/set-up-multi-crate/contact-manager/README.md) (TODO)
+### :card_index: [Contact](https://github.com/soywod/himalaya/blob/set-up-multi-crate/contact-manager/README.md) (TODO)
 
 Himalaya plans to propose a command-line API to manage your contacts through
 the [CardDAV](https://en.wikipedia.org/wiki/CardDAV) protocol. It may come in
 the future with a Vim plugin, an Emacs plugin, a TUI and a synchronizer.
 
-### [Calendar](https://github.com/soywod/himalaya/blob/set-up-multi-crate/calendar-manager/README.md) (TODO)
+### :date: [Calendar](https://github.com/soywod/himalaya/blob/set-up-multi-crate/calendar-manager/README.md) (TODO)
 
 Himalaya plans to propose a command-line API to manage your calendar through
 the [CalDAV](https://en.wikipedia.org/wiki/CalDAV) protocol. It may come in the
 future with a Vim plugin, an Emacs plugin, a TUI and a synchronizer.
 
-### [Tasks](https://github.com/soywod/himalaya/blob/set-up-multi-crate/task-manager/README.md) (TODO)
+### :stopwatch: [Tasks](https://github.com/soywod/himalaya/blob/set-up-multi-crate/task-manager/README.md) (TODO)
 
 Himalaya plans to propose a command-line API to manage your tasks and your time
 through the [CalDAV](https://en.wikipedia.org/wiki/CalDAV) protocol. It may

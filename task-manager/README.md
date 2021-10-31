@@ -1,3 +1,3 @@
-# ⏱ Lhotse
+# :stopwatch: Lhotse
 
 TODO
