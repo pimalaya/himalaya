@@ -227,6 +227,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "everest"
+version = "0.1.0"
+
+[[package]]
+name = "everest-sync"
+version = "0.1.0"
+
+[[package]]
 name = "fastrand"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -389,6 +397,10 @@ dependencies = [
  "url",
  "uuid",
 ]
+
+[[package]]
+name = "himalaya-sync"
+version = "0.1.0"
 
 [[package]]
 name = "hostname"
@@ -573,6 +585,14 @@ dependencies = [
  "charset",
  "quoted_printable",
 ]
+
+[[package]]
+name = "makalu"
+version = "0.1.0"
+
+[[package]]
+name = "makalu-sync"
+version = "0.1.0"
 
 [[package]]
 name = "maplit"
