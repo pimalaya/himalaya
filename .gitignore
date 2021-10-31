@@ -1,4 +1,9 @@
+# Cargo build directory
 /target
-/vim/doc/tags
+
+# Nix build directory
 /result
 /result-lib
+
+# Vim plugins doc tags file
+/*/vim/doc/tags

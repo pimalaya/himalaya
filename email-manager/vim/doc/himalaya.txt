@@ -1,4 +1,4 @@
-*himalaya.txt* - CLI email client
+*himalaya.txt* - CLI email manager
                                                         
     _/    _/  _/_/_/  _/      _/    _/_/    _/        _/_/  _/      _/   _/_/ 
    _/    _/    _/    _/_/  _/_/  _/    _/  _/      _/    _/  _/  _/   _/    _/
