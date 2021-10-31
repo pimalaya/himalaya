@@ -52,7 +52,7 @@
                 inherit buildInputs nativeBuildInputs;
                 postInstall = ''
                   mkdir -p $out/share/applications/
-                  cp email-manager/assets/himalaya.desktop $out/share/applications/
+                  cp assets/himalaya.desktop $out/share/applications/
                 '';
               };
             };
