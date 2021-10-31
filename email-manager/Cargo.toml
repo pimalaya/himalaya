@@ -4,6 +4,7 @@ description = "CLI email manager"
 version = "0.5.1"
 authors = ["soywod <clement.douin@posteo.net>"]
 edition = "2018"
+default-run = "himalaya"
 
 [dependencies]
 ammonia = "3.1.2"
