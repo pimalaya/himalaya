@@ -1,47 +1,5 @@
 # 📫 Himalaya
-[![gh-actions](https://github.com/soywod/himalaya/workflows/deployment/badge.svg)](https://github.com/soywod/himalaya/actions?query=workflow%3Adeployment)
-[![gh-actions](https://github.com/soywod/himalaya/workflows/tests/badge.svg)](https://github.com/soywod/himalaya/actions?query=workflow%3Atests)
-[![gh-actions](https://github.com/soywod/himalaya/workflows/nix-build/badge.svg)](https://github.com/soywod/himalaya/actions?query=workflow%3Anix-build)
 [![Homebrew](https://img.shields.io/badge/dynamic/json.svg?url=https://formulae.brew.sh/api/formula/himalaya.json&query=$.versions.stable&label=homebrew)](https://formulae.brew.sh/formula/himalaya)
-
-Himalaya is a suite of independent [PIM
-tools](https://en.wikipedia.org/wiki/Personal_information_manager). For now,
-these tools are available:
-
-- Email management
-  - CLI
-  - Vim plugin
-
-Those tools are either planned or in progress:
-
-- Email management
-  - TUI
-  - Emacs plugin
-  - Synchronizer
-
-- Contact management (CardDAV)
-  - CLI
-  - TUI
-  - Vim plugin
-  - Emacs plugin
-  - Synchronizer
-
-- Event management (CalDAV)
-  - CLI
-  - TUI
-  - Vim plugin
-  - Emacs plugin
-  - Synchronizer
-
-- Task and time management (CalDAV)
-  - CLI
-  - TUI
-  - Vim plugin
-  - Emacs plugin
-  - Synchronizer
-
-*The project is under active development. Do not use in production before the
-`v1.0.0`.*
 
 ![image](https://user-images.githubusercontent.com/10437171/138774902-7b9de5a3-93eb-44b0-8cfb-6d2e11e3b1aa.png)
 
