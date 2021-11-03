@@ -1,6 +1,4 @@
 use anyhow::Result;
-use clap;
-use env_logger;
 use output::StdoutPrinter;
 use std::{convert::TryFrom, env};
 use url::Url;
@@ -36,6 +34,7 @@ fn create_app<'a>() -> clap::App<'a, 'a> {
         .subcommands(msg_arg::subcmds())
 }
 
+#[allow(clippy::single_match)]
 fn main() -> Result<()> {
     // Init env logger
     env_logger::init_from_env(

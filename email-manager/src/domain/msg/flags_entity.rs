@@ -126,16 +126,14 @@ impl<'a> From<Vec<&'a str>> for Flags {
         let mut map: HashSet<Flag<'static>> = HashSet::new();
 
         for f in flags {
-            match f {
-                "Answered" | _ if f.eq_ignore_ascii_case("answered") => map.insert(Flag::Answered),
-                "Deleted" | _ if f.eq_ignore_ascii_case("deleted") => map.insert(Flag::Deleted),
-                "Draft" | _ if f.eq_ignore_ascii_case("draft") => map.insert(Flag::Draft),
-                "Flagged" | _ if f.eq_ignore_ascii_case("flagged") => map.insert(Flag::Flagged),
-                "MayCreate" | _ if f.eq_ignore_ascii_case("maycreate") => {
-                    map.insert(Flag::MayCreate)
-                }
-                "Recent" | _ if f.eq_ignore_ascii_case("recent") => map.insert(Flag::Recent),
-                "Seen" | _ if f.eq_ignore_ascii_case("seen") => map.insert(Flag::Seen),
+            match f.to_lowercase().as_str() {
+                "answered" => map.insert(Flag::Answered),
+                "deleted" => map.insert(Flag::Deleted),
+                "draft" => map.insert(Flag::Draft),
+                "flagged" => map.insert(Flag::Flagged),
+                "maycreate" => map.insert(Flag::MayCreate),
+                "recent" => map.insert(Flag::Recent),
+                "seen" => map.insert(Flag::Seen),
                 custom => map.insert(Flag::Custom(Cow::Owned(custom.into()))),
             };
         }

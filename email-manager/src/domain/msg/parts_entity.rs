@@ -39,24 +39,12 @@ pub struct Parts(pub Vec<Part>);
 
 impl Parts {
     pub fn replace_text_plain_parts_with(&mut self, part: TextPlainPart) {
-        self.retain(|part| {
-            if let Part::TextPlain(_) = part {
-                false
-            } else {
-                true
-            }
-        });
+        self.retain(|part| !matches!(part, Part::TextPlain(_)));
         self.push(Part::TextPlain(part));
     }
 
     pub fn replace_text_html_parts_with(&mut self, part: TextHtmlPart) {
-        self.retain(|part| {
-            if let Part::TextHtml(_) = part {
-                false
-            } else {
-                true
-            }
-        });
+        self.retain(|part| !matches!(part, Part::TextHtml(_)));
         self.push(Part::TextHtml(part));
     }
 }
@@ -92,7 +80,7 @@ fn build_parts_map_rec(part: &mailparse::ParsedMail, parts: &mut Vec<Part>) {
                     .params
                     .get("filename")
                     .map(String::from)
-                    .unwrap_or(String::from("noname"));
+                    .unwrap_or_else(|| String::from("noname"));
                 let content = part.get_body_raw().unwrap_or_default();
                 let mime = tree_magic::from_u8(&content);
                 parts.push(Part::Binary(BinaryPart {
@@ -103,16 +91,14 @@ fn build_parts_map_rec(part: &mailparse::ParsedMail, parts: &mut Vec<Part>) {
             }
             // TODO: manage other use cases
             _ => {
-                part.get_headers()
-                    .get_first_value("content-type")
-                    .map(|ctype| {
-                        let content = part.get_body().unwrap_or_default();
-                        if ctype.starts_with("text/plain") {
-                            parts.push(Part::TextPlain(TextPlainPart { content }))
-                        } else if ctype.starts_with("text/html") {
-                            parts.push(Part::TextHtml(TextHtmlPart { content }))
-                        }
-                    });
+                if let Some(ctype) = part.get_headers().get_first_value("content-type") {
+                    let content = part.get_body().unwrap_or_default();
+                    if ctype.starts_with("text/plain") {
+                        parts.push(Part::TextPlain(TextPlainPart { content }))
+                    } else if ctype.starts_with("text/html") {
+                        parts.push(Part::TextHtml(TextHtmlPart { content }))
+                    }
+                };
             }
         };
     } else {

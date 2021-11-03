@@ -8,7 +8,6 @@ use native_tls::{TlsConnector, TlsStream};
 use std::{
     collections::HashSet,
     convert::{TryFrom, TryInto},
-    iter::FromIterator,
     net::TcpStream,
 };
 
@@ -58,7 +57,7 @@ pub struct ImapService<'a> {
 
 impl<'a> ImapService<'a> {
     fn sess(&mut self) -> Result<&mut ImapSession> {
-        if let None = self.sess {
+        if self.sess.is_none() {
             debug!("create TLS builder");
             debug!("insecure: {}", self.account.imap_insecure);
             let builder = TlsConnector::builder()
@@ -148,7 +147,7 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
             .fetch(range, "(ENVELOPE FLAGS INTERNALDATE)")
             .context(r#"cannot fetch messages within range "{}""#)?;
         self._raw_msgs_cache = Some(fetches);
-        Ok(Envelopes::try_from(self._raw_msgs_cache.as_ref().unwrap())?)
+        Envelopes::try_from(self._raw_msgs_cache.as_ref().unwrap())
     }
 
     fn fetch_envelopes_with(
@@ -186,7 +185,7 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
             .fetch(&range, "(ENVELOPE FLAGS INTERNALDATE)")
             .context(r#"cannot fetch messages within range "{}""#)?;
         self._raw_msgs_cache = Some(fetches);
-        Ok(Envelopes::try_from(self._raw_msgs_cache.as_ref().unwrap())?)
+        Envelopes::try_from(self._raw_msgs_cache.as_ref().unwrap())
     }
 
     /// Find a message by sequence number.
@@ -201,9 +200,9 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
             .context(r#"cannot fetch messages "{}""#)?;
         let fetch = fetches
             .first()
-            .ok_or(anyhow!(r#"cannot find message "{}"#, seq))?;
+            .ok_or_else(|| anyhow!(r#"cannot find message "{}"#, seq))?;
 
-        Ok(Msg::try_from(fetch)?)
+        Msg::try_from(fetch)
     }
 
     fn find_raw_msg(&mut self, seq: &str) -> Result<Vec<u8>> {
@@ -217,14 +216,14 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
             .context(r#"cannot fetch raw messages "{}""#)?;
         let fetch = fetches
             .first()
-            .ok_or(anyhow!(r#"cannot find raw message "{}"#, seq))?;
+            .ok_or_else(|| anyhow!(r#"cannot find raw message "{}"#, seq))?;
 
         Ok(fetch.body().map(Vec::from).unwrap_or_default())
     }
 
     fn append_raw_msg_with_flags(&mut self, mbox: &Mbox, msg: &[u8], flags: Flags) -> Result<()> {
         self.sess()?
-            .append(&mbox.name, &msg)
+            .append(&mbox.name, msg)
             .flags(flags.0)
             .finish()
             .context(format!(r#"cannot append message to "{}""#, mbox.name))?;
@@ -250,8 +249,11 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
             .context(format!("cannot examine mailbox `{}`", &self.mbox.name))?;
 
         debug!("init messages hashset");
-        let mut msgs_set: HashSet<u32> =
-            HashSet::from_iter(self.search_new_msgs()?.iter().cloned());
+        let mut msgs_set: HashSet<u32> = self
+            .search_new_msgs()?
+            .iter()
+            .cloned()
+            .collect::<HashSet<_>>();
         trace!("messages hashset: {:?}", msgs_set);
 
         loop {
@@ -271,7 +273,7 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
             let uids: Vec<u32> = self
                 .search_new_msgs()?
                 .into_iter()
-                .filter(|uid| msgs_set.get(&uid).is_none())
+                .filter(|uid| -> bool { msgs_set.get(uid).is_none() })
                 .collect();
             debug!("found {} new messages not in hashset", uids.len());
             trace!("messages hashet: {:?}", msgs_set);

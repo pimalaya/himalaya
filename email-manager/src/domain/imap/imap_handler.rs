@@ -12,7 +12,7 @@ pub fn notify<'a, ImapService: ImapServiceInterface<'a>>(
     config: &Config,
     imap: &mut ImapService,
 ) -> Result<()> {
-    imap.notify(&config, keepalive)
+    imap.notify(config, keepalive)
 }
 
 /// Watch handler.
