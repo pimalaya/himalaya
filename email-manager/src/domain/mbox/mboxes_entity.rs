@@ -32,7 +32,7 @@ impl<'a> Deref for Mboxes<'a> {
 impl<'a> PrintTable for Mboxes<'a> {
     fn print_table(&self, writter: &mut dyn WriteColor, opts: PrintTableOpts) -> Result<()> {
         writeln!(writter)?;
-        Table::print(writter, &self, opts)?;
+        Table::print(writter, self, opts)?;
         writeln!(writter)?;
         Ok(())
     }

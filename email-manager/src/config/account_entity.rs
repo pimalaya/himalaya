@@ -51,7 +51,7 @@ impl Account {
         let has_special_chars = "()<>[]:;@.,".contains(|special_char| name.contains(special_char));
 
         if name.is_empty() {
-            format!("{}", self.email)
+            self.email.clone()
         } else if has_special_chars {
             // so the name has special characters => Wrap it with '"'
             format!("\"{}\" <{}>", name, self.email)
@@ -112,7 +112,7 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
                     .and_then(|dir| shellexpand::full(dir).ok())
                     .map(|dir| PathBuf::from(dir.to_string()))
             })
-            .unwrap_or_else(|| env::temp_dir());
+            .unwrap_or_else(env::temp_dir);
 
         let default_page_size = account
             .default_page_size
@@ -146,24 +146,21 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
             default_page_size,
             inbox_folder: account
                 .inbox_folder
-                .as_ref()
-                .map(|s| s.as_str())
-                .or(config.inbox_folder.as_ref().map(|s| s.as_str()))
-                .unwrap_or(&DEFAULT_INBOX_FOLDER)
+                .as_deref()
+                .or_else(|| config.inbox_folder.as_deref())
+                .unwrap_or(DEFAULT_INBOX_FOLDER)
                 .to_string(),
             sent_folder: account
                 .sent_folder
-                .as_ref()
-                .map(|s| s.as_str())
-                .or(config.sent_folder.as_ref().map(|s| s.as_str()))
-                .unwrap_or(&DEFAULT_SENT_FOLDER)
+                .as_deref()
+                .or_else(|| config.sent_folder.as_deref())
+                .unwrap_or(DEFAULT_SENT_FOLDER)
                 .to_string(),
             draft_folder: account
                 .draft_folder
-                .as_ref()
-                .map(|s| s.as_str())
-                .or(config.draft_folder.as_ref().map(|s| s.as_str()))
-                .unwrap_or(&DEFAULT_DRAFT_FOLDER)
+                .as_deref()
+                .or_else(|| config.draft_folder.as_deref())
+                .unwrap_or(DEFAULT_DRAFT_FOLDER)
                 .to_string(),
             watch_cmds: account
                 .watch_cmds

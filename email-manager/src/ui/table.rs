@@ -227,13 +227,11 @@ where
                         trace!("number of spaces added to shrinked value: {}", spaces_count);
                         value.push_str(&" ".repeat(spaces_count));
                         cell.value = value;
-                        cell.print(writter)?;
                     } else {
                         trace!("cell is not overflowing");
                         let spaces_count = cell_width - cell.unicode_width() + 1;
                         trace!("number of spaces added to value: {}", spaces_count);
                         cell.value.push_str(&" ".repeat(spaces_count));
-                        cell.print(writter)?;
                     }
                 } else {
                     trace!("table is not overflowing or cell is not shrinkable");
@@ -242,8 +240,8 @@ where
                     let spaces_count = cell_widths[i] - cell.unicode_width() + 1;
                     trace!("number of spaces added to value: {}", spaces_count);
                     cell.value.push_str(&" ".repeat(spaces_count));
-                    cell.print(writter)?;
                 }
+                cell.print(writter)?;
                 glue = Cell::new("│").ansi_256(8);
             }
             writeln!(writter)?;

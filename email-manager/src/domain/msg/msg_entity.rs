@@ -194,14 +194,18 @@ impl Msg {
                 .date
                 .as_ref()
                 .map(|date| date.format("%d %b %Y, at %H:%M").to_string())
-                .unwrap_or("unknown date".into());
+                .unwrap_or_else(|| "unknown date".into());
             let sender = self
                 .reply_to
                 .as_ref()
-                .or(self.from.as_ref())
+                .or_else(|| self.from.as_ref())
                 .and_then(|addrs| addrs.first())
-                .map(|addr| addr.name.to_owned().unwrap_or(addr.email.to_string()))
-                .unwrap_or("unknown sender".into());
+                .map(|addr| {
+                    addr.name
+                        .to_owned()
+                        .unwrap_or_else(|| addr.email.to_string())
+                })
+                .unwrap_or_else(|| "unknown sender".into());
             let mut content = format!("\n\nOn {}, {} wrote:\n", date, sender);
 
             let mut glue = "";
@@ -210,8 +214,8 @@ impl Msg {
                     break;
                 }
                 content.push_str(glue);
-                content.push_str(">");
-                content.push_str(if line.starts_with(">") { "" } else { " " });
+                content.push('>');
+                content.push_str(if line.starts_with('>') { "" } else { " " });
                 content.push_str(line);
                 glue = "\n";
             }
@@ -239,7 +243,7 @@ impl Msg {
         self.in_reply_to = None;
 
         // From
-        self.from = Some(vec![account_addr.to_owned()]);
+        self.from = Some(vec![account_addr]);
 
         // To
         self.to = Some(vec![]);
@@ -270,7 +274,7 @@ impl Msg {
                 content.push_str(&addr.to_string());
                 glue = ", ";
             }
-            content.push_str("\n");
+            content.push('\n');
         }
         if let Some(addrs) = prev_to.as_ref() {
             content.push_str("To: ");
@@ -280,9 +284,9 @@ impl Msg {
                 content.push_str(&addr.to_string());
                 glue = ", ";
             }
-            content.push_str("\n");
+            content.push('\n');
         }
-        content.push_str("\n");
+        content.push('\n');
         content.push_str(&self.fold_text_parts("plain"));
         self.parts
             .replace_text_plain_parts_with(TextPlainPart { content });
@@ -386,7 +390,7 @@ impl Msg {
             let path = PathBuf::from(path.to_string());
             let filename: String = path
                 .file_name()
-                .ok_or(anyhow!("cannot get file name of attachment {:?}", path))?
+                .ok_or_else(|| anyhow!("cannot get file name of attachment {:?}", path))?
                 .to_string_lossy()
                 .into();
             let content = fs::read(&path).context(format!("cannot read attachment {:?}", path))?;
@@ -427,17 +431,11 @@ impl Msg {
             match part {
                 Part::Binary(_) => self.parts.push(part),
                 Part::TextPlain(_) => {
-                    self.parts.retain(|p| match p {
-                        Part::TextPlain(_) => false,
-                        _ => true,
-                    });
+                    self.parts.retain(|p| !matches!(p, Part::TextPlain(_)));
                     self.parts.push(part);
                 }
                 Part::TextHtml(_) => {
-                    self.parts.retain(|p| match p {
-                        Part::TextHtml(_) => false,
-                        _ => true,
-                    });
+                    self.parts.retain(|p| !matches!(p, Part::TextHtml(_)));
                     self.parts.push(part);
                 }
             }
@@ -507,7 +505,7 @@ impl Msg {
         ));
 
         // Headers <=> body separator
-        tpl.push_str("\n");
+        tpl.push('\n');
 
         // Body
         if let Some(body) = opts.body {
@@ -525,7 +523,7 @@ impl Msg {
             tpl.push_str(sig);
         }
 
-        tpl.push_str("\n");
+        tpl.push('\n');
 
         trace!("template: {:#?}", tpl);
         tpl
@@ -542,49 +540,45 @@ impl Msg {
             let val = String::from_utf8(header.get_value_raw().to_vec())
                 .map(|val| val.trim().to_string())?;
 
-            match key.as_str() {
-                "Message-Id" | _ if key.eq_ignore_ascii_case("message-id") => {
-                    msg.message_id = Some(val.to_owned())
-                }
-                "From" | _ if key.eq_ignore_ascii_case("from") => {
+            match key.to_lowercase().as_str() {
+                "message-id" => msg.message_id = Some(val.to_owned()),
+                "from" => {
                     msg.from = Some(
                         val.split(',')
                             .filter_map(|addr| addr.parse().ok())
                             .collect::<Vec<_>>(),
                     );
                 }
-                "To" | _ if key.eq_ignore_ascii_case("to") => {
+                "to" => {
                     msg.to = Some(
                         val.split(',')
                             .filter_map(|addr| addr.parse().ok())
                             .collect::<Vec<_>>(),
                     );
                 }
-                "Reply-To" | _ if key.eq_ignore_ascii_case("reply-to") => {
+                "reply-to" => {
                     msg.reply_to = Some(
                         val.split(',')
                             .filter_map(|addr| addr.parse().ok())
                             .collect::<Vec<_>>(),
                     );
                 }
-                "In-Reply-To" | _ if key.eq_ignore_ascii_case("in-reply-to") => {
-                    msg.in_reply_to = Some(val.to_owned())
-                }
-                "Cc" | _ if key.eq_ignore_ascii_case("cc") => {
+                "in-reply-to" => msg.in_reply_to = Some(val.to_owned()),
+                "cc" => {
                     msg.cc = Some(
                         val.split(',')
                             .filter_map(|addr| addr.parse().ok())
                             .collect::<Vec<_>>(),
                     );
                 }
-                "Bcc" | _ if key.eq_ignore_ascii_case("bcc") => {
+                "bcc" => {
                     msg.bcc = Some(
                         val.split(',')
                             .filter_map(|addr| addr.parse().ok())
                             .collect::<Vec<_>>(),
                     );
                 }
-                "Subject" | _ if key.eq_ignore_ascii_case("subject") => {
+                "subject" => {
                     msg.subject = val;
                 }
                 _ => (),
@@ -696,7 +690,7 @@ impl<'a> TryFrom<&'a imap::types::Fetch> for Msg {
     fn try_from(fetch: &'a imap::types::Fetch) -> Result<Msg> {
         let envelope = fetch
             .envelope()
-            .ok_or(anyhow!("cannot get envelope of message {}", fetch.message))?;
+            .ok_or_else(|| anyhow!("cannot get envelope of message {}", fetch.message))?;
 
         // Get the sequence number
         let id = fetch.message;
@@ -714,13 +708,13 @@ impl<'a> TryFrom<&'a imap::types::Fetch> for Msg {
                     fetch.message
                 ))
             })
-            .unwrap_or(Ok(String::default()))?;
+            .unwrap_or_else(|| Ok(String::default()))?;
 
         // Get the sender(s) address(es)
         let from = match envelope
             .sender
-            .as_ref()
-            .or_else(|| envelope.from.as_ref())
+            .as_deref()
+            .or_else(|| envelope.from.as_deref())
             .map(parse_addrs)
         {
             Some(addrs) => Some(addrs?),
@@ -773,7 +767,7 @@ impl<'a> TryFrom<&'a imap::types::Fetch> for Msg {
             &mailparse::parse_mail(
                 fetch
                     .body()
-                    .ok_or(anyhow!("cannot get body of message {}", id))?,
+                    .ok_or_else(|| anyhow!("cannot get body of message {}", id))?,
             )
             .context(format!("cannot parse body of message {}", id))?,
         );
@@ -782,13 +776,13 @@ impl<'a> TryFrom<&'a imap::types::Fetch> for Msg {
             id,
             flags,
             subject,
-            message_id,
             from,
             reply_to,
-            in_reply_to,
             to,
             cc,
             bcc,
+            in_reply_to,
+            message_id,
             date,
             parts,
         })
@@ -802,20 +796,20 @@ pub fn parse_addr(addr: &imap_proto::Address) -> Result<Addr> {
         .map(|name| {
             rfc2047_decoder::decode(&name.to_vec())
                 .context("cannot decode address name")
-                .map(|name| Some(name))
+                .map(Some)
         })
         .unwrap_or(Ok(None))?;
     let mbox = addr
         .mailbox
         .as_ref()
-        .ok_or(anyhow!("cannot get address mailbox"))
+        .ok_or_else(|| anyhow!("cannot get address mailbox"))
         .and_then(|mbox| {
             rfc2047_decoder::decode(&mbox.to_vec()).context("cannot decode address mailbox")
         })?;
     let host = addr
         .host
         .as_ref()
-        .ok_or(anyhow!("cannot get address host"))
+        .ok_or_else(|| anyhow!("cannot get address host"))
         .and_then(|host| {
             rfc2047_decoder::decode(&host.to_vec()).context("cannot decode address host")
         })?;
@@ -823,7 +817,7 @@ pub fn parse_addr(addr: &imap_proto::Address) -> Result<Addr> {
     Ok(Addr::new(name, lettre::Address::new(mbox, host)?))
 }
 
-pub fn parse_addrs(addrs: &Vec<imap_proto::Address>) -> Result<Vec<Addr>> {
+pub fn parse_addrs(addrs: &[imap_proto::Address]) -> Result<Vec<Addr>> {
     let mut parsed_addrs = vec![];
     for addr in addrs {
         parsed_addrs
@@ -833,7 +827,7 @@ pub fn parse_addrs(addrs: &Vec<imap_proto::Address>) -> Result<Vec<Addr>> {
 }
 
 pub fn parse_some_addrs(addrs: &Option<Vec<imap_proto::Address>>) -> Result<Option<Vec<Addr>>> {
-    Ok(match addrs.as_ref().map(parse_addrs) {
+    Ok(match addrs.as_deref().map(parse_addrs) {
         Some(addrs) => Some(addrs?),
         None => None,
     })

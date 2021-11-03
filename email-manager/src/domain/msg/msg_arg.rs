@@ -200,11 +200,11 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
     }
 
     if let Some(m) = m.subcommand_matches("template") {
-        return Ok(Some(Command::Tpl(tpl_arg::matches(&m)?)));
+        return Ok(Some(Command::Tpl(tpl_arg::matches(m)?)));
     }
 
     if let Some(m) = m.subcommand_matches("flag") {
-        return Ok(Some(Command::Flag(flag_arg::matches(&m)?)));
+        return Ok(Some(Command::Flag(flag_arg::matches(m)?)));
     }
 
     debug!("default list command matched");
