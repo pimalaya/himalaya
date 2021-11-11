@@ -1,5 +1,5 @@
 {
-  description = "CLI email manager";
+  description = "Command-line interface for email management";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";

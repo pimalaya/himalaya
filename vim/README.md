@@ -8,7 +8,7 @@ this plugin with your favorite plugin manager. For example with
 [vim-plug](https://github.com/junegunn/vim-plug), add to your `.vimrc`:
 
 ```viml
-Plug 'soywod/himalaya', {'rtp': 'email-manager/vim'}
+Plug 'soywod/himalaya', {'rtp': 'vim'}
 ```
 
 Then:

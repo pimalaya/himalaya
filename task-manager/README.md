@@ -1,3 +1,0 @@
-# :stopwatch: Lhotse
-
-TODO

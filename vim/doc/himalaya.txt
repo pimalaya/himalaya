@@ -1,4 +1,4 @@
-*himalaya.txt* - CLI email manager
+*himalaya.txt* - Command-line interface for email management
                                                         
     _/    _/  _/_/_/  _/      _/    _/_/    _/        _/_/  _/      _/   _/_/ 
    _/    _/    _/    _/_/  _/_/  _/    _/  _/      _/    _/  _/  _/   _/    _/

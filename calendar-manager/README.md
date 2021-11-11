@@ -1,3 +1,0 @@
-# :date: Makalu
-
-TODO

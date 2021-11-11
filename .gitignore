@@ -5,5 +5,5 @@
 /result
 /result-lib
 
-# Vim plugins doc tags file
-/*/vim/doc/tags
+# Vim plugin doc tags file
+/vim/doc/tags

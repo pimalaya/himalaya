@@ -7,11 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- Make use of cargo workspace feature
-- [**BREAKING**] Because of workspace feature, the vim plugin is now accessible at `/email-manager/vim` instead of `/vim`
-
 ### Fixed
 
 - Blur in list msg screenshot [#181]
