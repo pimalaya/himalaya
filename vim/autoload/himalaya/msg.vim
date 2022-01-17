@@ -328,7 +328,7 @@ endfunction
 
 function! s:get_focused_msg_id()
   try
-    return s:trim(split(getline("."), "|")[0])
+    return s:trim(matchstr(getline("."), '^\d*'))
   catch
     throw "message not found"
   endtry
@@ -336,7 +336,7 @@ endfunction
 
 function! s:get_focused_msg_ids(from, to)
   try
-    return join(map(range(a:from, a:to), "s:trim(split(getline(v:val), '|')[0])"), ",")
+    return join(map(range(a:from, a:to), "s:trim(matchstr(getline(v:val), '^\\d*'))"), ",")
   catch
     throw "messages not found"
   endtry
