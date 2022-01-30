@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Blur in list msg screenshot [#181]
 - Make inbox, sent and drafts folders customizable [#172]
+- Nix run issue [#272]
+
+### Removed
+
+- The wiki git submodule [#273]
 
 ## [0.5.1] - 2021-10-24
 
@@ -23,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Error when receiving notification from `notify` command [#228]
 
-### Change
+### Changed
 
 - Remove error when empty subject [#229]
 - Vim plugin does not render anymore the msg by itself, it uses the one available from the CLI [#220]
@@ -361,3 +366,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#220]: https://github.com/soywod/himalaya/issues/220
 [#228]: https://github.com/soywod/himalaya/issues/228
 [#229]: https://github.com/soywod/himalaya/issues/229
+[#272]: https://github.com/soywod/himalaya/issues/272
+[#273]: https://github.com/soywod/himalaya/issues/273
