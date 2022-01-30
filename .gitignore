@@ -5,5 +5,9 @@
 /result
 /result-lib
 
+# Direnv
+/.envrc
+/.direnv
+
 # Vim plugin doc tags file
 /vim/doc/tags

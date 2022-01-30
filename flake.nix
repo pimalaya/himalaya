@@ -3,6 +3,7 @@
 
   inputs = {
     utils.url = "github:numtide/flake-utils";
+    rust-overlay.url = "github:oxalica/rust-overlay";
     naersk.url = "github:nix-community/naersk";
     flake-compat = {
       url = "github:edolstra/flake-compat";
@@ -10,16 +11,28 @@
     };
   };
 
-  outputs = { self, nixpkgs, utils, naersk, ... }:
+  outputs = { self, nixpkgs, utils, rust-overlay, naersk, ... }:
     utils.lib.eachDefaultSystem
       (system:
         let
           name = "himalaya";
-          pkgs = import nixpkgs { inherit system; };
+          pkgs = import nixpkgs {
+            inherit system;
+            overlays = [
+              rust-overlay.overlay
+              (self: super: {
+                # Because rust-overlay bundles multiple rust packages into one
+                # derivation, specify that mega-bundle here, so that crate2nix
+                # will use them automatically.
+                rustc = self.rust-bin.stable.latest.default;
+                cargo = self.rust-bin.stable.latest.default;
+              })
+            ];
+          };
           naersk-lib = naersk.lib.${system};
         in
         rec {
-          # `nix build`
+          # nix build
           defaultPackage = packages.${name};
           packages = {
             ${name} = naersk-lib.buildPackage {
@@ -47,18 +60,27 @@
             };
           };
 
-          # `nix run`
+          # nix run
           defaultApp = apps.${name};
           apps.${name} = utils.lib.mkApp {
             inherit name;
             drv = packages.${name};
           };
 
-          # `nix develop`
+          # nix develop
           devShell = pkgs.mkShell {
-            inputsFrom = builtins.attrValues self.packages.${system};
-            buildInputs = with pkgs; [ cargo cargo-watch trunk ];
             RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
+            inputsFrom = builtins.attrValues self.packages.${system};
+            buildInputs = with pkgs; [
+              cargo
+              cargo-watch
+              trunk
+              ripgrep
+              rust-analyzer
+              rustfmt
+              rnix-lsp
+              nixpkgs-fmt
+            ];
           };
         }
       );
