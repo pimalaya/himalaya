@@ -9,18 +9,20 @@ use std::{
     collections::HashSet,
     convert::{TryFrom, TryInto},
     net::TcpStream,
+    thread,
 };
 
 use crate::{
     config::{Account, Config},
     domain::{Envelope, Envelopes, Flags, Mbox, Mboxes, Msg, RawEnvelopes, RawMboxes},
+    output::run_cmd,
 };
 
 type ImapSession = imap::Session<TlsStream<TcpStream>>;
 
 pub trait ImapServiceInterface<'a> {
     fn notify(&mut self, config: &Config, keepalive: u64) -> Result<()>;
-    fn watch(&mut self, keepalive: u64) -> Result<()>;
+    fn watch(&mut self, account: &Account, keepalive: u64) -> Result<()>;
     fn fetch_mboxes(&'a mut self) -> Result<Mboxes>;
     fn fetch_envelopes(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes>;
     fn fetch_envelopes_with(
@@ -247,12 +249,14 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
     }
 
     fn notify(&mut self, config: &Config, keepalive: u64) -> Result<()> {
+        debug!("notify");
+
         let mbox = self.mbox.to_owned();
 
-        debug!("examine mailbox: {}", mbox.name);
+        debug!("examine mailbox {:?}", mbox);
         self.sess()?
             .examine(&mbox.name)
-            .context(format!("cannot examine mailbox `{}`", &self.mbox.name))?;
+            .context(format!("cannot examine mailbox {}", self.mbox.name))?;
 
         debug!("init messages hashset");
         let mut msgs_set: HashSet<u32> = self
@@ -317,7 +321,7 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
         }
     }
 
-    fn watch(&mut self, keepalive: u64) -> Result<()> {
+    fn watch(&mut self, account: &Account, keepalive: u64) -> Result<()> {
         debug!("examine mailbox: {}", &self.mbox.name);
         let mbox = self.mbox.to_owned();
 
@@ -338,8 +342,17 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
                     })
                 })
                 .context("cannot start the idle mode")?;
-            // FIXME
-            // ctx.config.exec_watch_cmds(&ctx.account)?;
+
+            let cmds = account.watch_cmds.clone();
+            thread::spawn(move || {
+                debug!("batch execution of {} cmd(s)", cmds.len());
+                cmds.iter().for_each(|cmd| {
+                    debug!("running command {:?}…", cmd);
+                    let res = run_cmd(cmd);
+                    debug!("{:?}", res);
+                })
+            });
+
             debug!("end loop");
         }
     }

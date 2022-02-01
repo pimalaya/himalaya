@@ -4,7 +4,10 @@
 
 use anyhow::Result;
 
-use crate::{config::Config, domain::imap::ImapServiceInterface};
+use crate::{
+    config::{Account, Config},
+    domain::imap::ImapServiceInterface,
+};
 
 /// Notify handler.
 pub fn notify<'a, ImapService: ImapServiceInterface<'a>>(
@@ -18,7 +21,8 @@ pub fn notify<'a, ImapService: ImapServiceInterface<'a>>(
 /// Watch handler.
 pub fn watch<'a, ImapService: ImapServiceInterface<'a>>(
     keepalive: u64,
+    account: &Account,
     imap: &mut ImapService,
 ) -> Result<()> {
-    imap.watch(keepalive)
+    imap.watch(account, keepalive)
 }

@@ -80,7 +80,7 @@ fn main() -> Result<()> {
             return imap_handler::notify(keepalive, &config, &mut imap);
         }
         Some(imap_arg::Command::Watch(keepalive)) => {
-            return imap_handler::watch(keepalive, &mut imap);
+            return imap_handler::watch(keepalive, &account, &mut imap);
         }
         _ => (),
     }

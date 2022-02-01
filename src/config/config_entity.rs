@@ -1,7 +1,7 @@
 use anyhow::{Context, Error, Result};
 use log::{debug, trace};
 use serde::Deserialize;
-use std::{collections::HashMap, convert::TryFrom, env, fs, path::PathBuf, thread};
+use std::{collections::HashMap, convert::TryFrom, env, fs, path::PathBuf};
 use toml;
 
 use crate::output::run_cmd;
@@ -135,28 +135,8 @@ impl Config {
             .map(|cmd| format!(r#"{} {:?} {:?}"#, cmd, subject, sender))
             .unwrap_or(default_cmd);
 
+        debug!("run command: {}", cmd);
         run_cmd(&cmd).context("cannot run notify cmd")?;
-
-        Ok(())
-    }
-
-    pub fn _exec_watch_cmds(&self, account: &ConfigAccountEntry) -> Result<()> {
-        let cmds = account
-            .watch_cmds
-            .as_ref()
-            .or_else(|| self.watch_cmds.as_ref())
-            .map(|cmds| cmds.to_owned())
-            .unwrap_or_default();
-
-        thread::spawn(move || {
-            debug!("batch execution of {} cmd(s)", cmds.len());
-            cmds.iter().for_each(|cmd| {
-                debug!("running command {:?}…", cmd);
-                let res = run_cmd(cmd);
-                debug!("{:?}", res);
-            })
-        });
-
         Ok(())
     }
 }
