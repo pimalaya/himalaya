@@ -106,15 +106,21 @@ impl Msg {
                 .replace_all(&sanitized_html, " ")
                 .to_string();
             // Merge new line chars
-            let sanitized_html = Regex::new(r"(\r?\n ?){2,}")
+            let sanitized_html = Regex::new(r"(\r?\n *){2,}")
                 .unwrap()
                 .replace_all(&sanitized_html, "\n\n")
                 .to_string();
             // Decode HTML entities
             let sanitized_html = html_escape::decode_html_entities(&sanitized_html).to_string();
+
             sanitized_html
         } else {
-            plain
+            let sanitized_plain = Regex::new(r"(\r?\n *){2,}")
+                .unwrap()
+                .replace_all(&plain, "\n\n")
+                .to_string();
+
+            sanitized_plain
         }
     }
 

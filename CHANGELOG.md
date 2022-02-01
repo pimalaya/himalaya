@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Vim plugin get focused msg id [#268]
 - Nix run issue [#272]
 - Range not displayed when fetch fails [#276]
+- Blank lines and spaces in `text/plain` parts [#280]
 
 ### Removed
 
@@ -372,3 +373,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#272]: https://github.com/soywod/himalaya/issues/272
 [#273]: https://github.com/soywod/himalaya/issues/273
 [#276]: https://github.com/soywod/himalaya/issues/276
+[#280]: https://github.com/soywod/himalaya/issues/280
