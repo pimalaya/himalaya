@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Blur in list msg screenshot [#181]
 - Make inbox, sent and drafts folders customizable [#172]
+- Vim plugin get focused msg id [#268]
 - Nix run issue [#272]
 - Range not displayed when fetch fails [#276]
 
@@ -367,6 +368,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#220]: https://github.com/soywod/himalaya/issues/220
 [#228]: https://github.com/soywod/himalaya/issues/228
 [#229]: https://github.com/soywod/himalaya/issues/229
+[#268]: https://github.com/soywod/himalaya/issues/268
 [#272]: https://github.com/soywod/himalaya/issues/272
 [#273]: https://github.com/soywod/himalaya/issues/273
 [#276]: https://github.com/soywod/himalaya/issues/276
