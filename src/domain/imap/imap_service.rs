@@ -121,12 +121,17 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
     }
 
     fn fetch_envelopes(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes> {
+        debug!("fetch envelopes");
+        debug!("page size: {:?}", page_size);
+        debug!("page: {:?}", page);
+
         let mbox = self.mbox.to_owned();
         let last_seq = self
             .sess()?
             .select(&mbox.name)
             .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?
             .exists as i64;
+        debug!("last sequence number: {:?}", last_seq);
 
         if last_seq == 0 {
             return Ok(Envelopes::default());
@@ -141,11 +146,12 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
         } else {
             String::from("1:*")
         };
+        debug!("range: {:?}", range);
 
         let fetches = self
             .sess()?
-            .fetch(range, "(ENVELOPE FLAGS INTERNALDATE)")
-            .context(r#"cannot fetch messages within range "{}""#)?;
+            .fetch(&range, "(ENVELOPE FLAGS INTERNALDATE)")
+            .context(format!(r#"cannot fetch messages within range "{}""#, range))?;
         self._raw_msgs_cache = Some(fetches);
         Envelopes::try_from(self._raw_msgs_cache.as_ref().unwrap())
     }

@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Blur in list msg screenshot [#181]
 - Make inbox, sent and drafts folders customizable [#172]
 - Nix run issue [#272]
+- Range not displayed when fetch fails [#276]
 
 ### Removed
 
@@ -368,3 +369,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#229]: https://github.com/soywod/himalaya/issues/229
 [#272]: https://github.com/soywod/himalaya/issues/272
 [#273]: https://github.com/soywod/himalaya/issues/273
+[#276]: https://github.com/soywod/himalaya/issues/276
