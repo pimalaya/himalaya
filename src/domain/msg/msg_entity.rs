@@ -100,24 +100,40 @@ impl Msg {
                 .tags(HashSet::default())
                 .clean(&html)
                 .to_string();
-            // Replace `&nbsp;` by regular space
-            let sanitized_html = Regex::new(r"&nbsp;")
+            // Merge new line chars
+            let sanitized_html = Regex::new(r"(\r?\n\s*){2,}")
+                .unwrap()
+                .replace_all(&sanitized_html, "\n\n")
+                .to_string();
+            // Replace tabulations and &npsp; by spaces
+            let sanitized_html = Regex::new(r"(\t|&nbsp;)")
                 .unwrap()
                 .replace_all(&sanitized_html, " ")
                 .to_string();
-            // Merge new line chars
-            let sanitized_html = Regex::new(r"(\r?\n[\t ]*){2,}")
+            // Merge spaces
+            let sanitized_html = Regex::new(r" {2,}")
                 .unwrap()
-                .replace_all(&sanitized_html, "\n\n")
+                .replace_all(&sanitized_html, "  ")
                 .to_string();
             // Decode HTML entities
             let sanitized_html = html_escape::decode_html_entities(&sanitized_html).to_string();
 
             sanitized_html
         } else {
-            let sanitized_plain = Regex::new(r"(\r?\n[\t ]*){2,}")
+            // Merge new line chars
+            let sanitized_plain = Regex::new(r"(\r?\n\s*){2,}")
                 .unwrap()
                 .replace_all(&plain, "\n\n")
+                .to_string();
+            // Replace tabulations by spaces
+            let sanitized_plain = Regex::new(r"\t")
+                .unwrap()
+                .replace_all(&sanitized_plain, " ")
+                .to_string();
+            // Merge spaces
+            let sanitized_plain = Regex::new(r" {2,}")
+                .unwrap()
+                .replace_all(&sanitized_plain, "  ")
                 .to_string();
 
             sanitized_plain
