@@ -106,7 +106,7 @@ impl Msg {
                 .replace_all(&sanitized_html, " ")
                 .to_string();
             // Merge new line chars
-            let sanitized_html = Regex::new(r"(\r?\n *){2,}")
+            let sanitized_html = Regex::new(r"(\r?\n[\t ]*){2,}")
                 .unwrap()
                 .replace_all(&sanitized_html, "\n\n")
                 .to_string();
@@ -115,7 +115,7 @@ impl Msg {
 
             sanitized_html
         } else {
-            let sanitized_plain = Regex::new(r"(\r?\n *){2,}")
+            let sanitized_plain = Regex::new(r"(\r?\n[\t ]*){2,}")
                 .unwrap()
                 .replace_all(&plain, "\n\n")
                 .to_string();
