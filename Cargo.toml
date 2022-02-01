@@ -20,7 +20,7 @@ imap-proto = "0.14.3"
 lettre = { git = "https://github.com/TornaxO7/lettre/", branch = "master", features = ["serde"] }
 log = "0.4.14"
 mailparse = "0.13.6"
-native-tls = "0.2"
+native-tls = "0.2.8"
 regex = "1.5.4"
 rfc2047-decoder = "0.1.2"
 serde = { version = "1.0.118", features = ["derive"] }
