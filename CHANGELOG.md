@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Range not displayed when fetch fails [#276]
 - Blank lines and spaces in `text/plain` parts [#280]
 - Watch command [#271]
+- Mailbox telescope.nvim preview [#249]
 
 ### Removed
 
@@ -370,6 +371,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#220]: https://github.com/soywod/himalaya/issues/220
 [#228]: https://github.com/soywod/himalaya/issues/228
 [#229]: https://github.com/soywod/himalaya/issues/229
+[#249]: https://github.com/soywod/himalaya/issues/249
 [#268]: https://github.com/soywod/himalaya/issues/268
 [#272]: https://github.com/soywod/himalaya/issues/272
 [#273]: https://github.com/soywod/himalaya/issues/273
