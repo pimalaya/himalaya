@@ -47,13 +47,12 @@ pub fn source_arg<'a>() -> clap::Arg<'a, 'a> {
         .long("mailbox")
         .help("Specifies the source mailbox")
         .value_name("SOURCE")
-        .default_value("INBOX")
 }
 
 /// Defines the target mailbox argument.
 pub fn target_arg<'a>() -> clap::Arg<'a, 'a> {
     clap::Arg::with_name("mbox-target")
-        .help("Specifies the targetted mailbox")
+        .help("Specifies the targeted mailbox")
         .value_name("TARGET")
         .required(true)
 }
@@ -104,7 +103,7 @@ mod tests {
         }
 
         let app = get_matches_from![];
-        assert_eq!(Some("INBOX"), app.value_of("mbox-source"));
+        assert_eq!(None, app.value_of("mbox-source"));
 
         let app = get_matches_from!["-m", "SOURCE"];
         assert_eq!(Some("SOURCE"), app.value_of("mbox-source"));

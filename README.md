@@ -4,7 +4,7 @@
 [![gh-actions](https://github.com/soywod/himalaya/workflows/nix-build/badge.svg)](https://github.com/soywod/himalaya/actions?query=workflow%3Anix-build)
 [![Homebrew](https://img.shields.io/badge/dynamic/json.svg?url=https://formulae.brew.sh/api/formula/himalaya.json&query=$.versions.stable&label=homebrew)](https://formulae.brew.sh/formula/himalaya)
 
-CLI email client
+Command-line interface for email management
 
 *The project is under active development. Do not use in production before the
 `v1.0.0` (see the [roadmap](https://github.com/soywod/himalaya/milestone/5)).*
@@ -26,15 +26,12 @@ Possibilities are endless!
 ## Installation
 
 ```sh
-# As root:
-curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | sudo sh
-
-# As a regular user:
 curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | PREFIX=~/.local sh
 ```
 
-*See the [wiki](https://github.com/soywod/himalaya/wiki) for other installation
-methods.*
+*See the
+[wiki](https://github.com/soywod/himalaya/wiki/Installation:from-binary) for
+other installation methods.*
 
 ## Configuration
 
@@ -44,7 +41,7 @@ methods.*
 name = "Your full name"
 downloads-dir = "/abs/path/to/downloads"
 signature = """
---
+Cordialement,
 Regards,
 """
 
@@ -80,7 +77,8 @@ all the options.*
 - JSON output
 - …
 
-*See the [wiki](https://github.com/soywod/himalaya/wiki) for all the features.*
+*See the [wiki](https://github.com/soywod/himalaya/wiki/Usage:msg:list) for all
+the features.*
 
 ## Sponsoring
 

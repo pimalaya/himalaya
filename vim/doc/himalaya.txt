@@ -1,4 +1,4 @@
-*himalaya.txt* - CLI email client
+*himalaya.txt* - Command-line interface for email management
                                                         
     _/    _/  _/_/_/  _/      _/    _/_/    _/        _/_/  _/      _/   _/_/ 
    _/    _/    _/    _/_/  _/_/  _/    _/  _/      _/    _/  _/  _/   _/    _/
@@ -45,6 +45,23 @@ TELESCOPE PREVIEW
 <
 Should enable telescope preview when picking a mailbox with the telescope
 provider.
+
+------------------------------------------------------------------------------
+CONTACT COMPLETION
+>
+  let g:himalaya_complete_contact_cmd = '<your completion command>'
+<
+Define the command to use for contact completion. When this is set,
+'completefunc' will be set when composing messages so that contacts can be
+completed with |i_CTRL-X_CTRL-U|.
+
+The command must print each possible result on its own line. Each line must
+contain tab-separated fields; the first must be the email address, and the
+second, if present, must be the name. `%s` in the command will be replaced
+with the search query.
+
+For example, to complete contacts with khard, you could use
+`khard email --remove-first-line --parsable '%s'` as the completion command.
 
 ==============================================================================
 USAGE                                                         *himalaya-usage* 

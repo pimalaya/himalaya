@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2022-02-02
+
+### Fixed
+
+- Blur in list msg screenshot [#181]
+- Make inbox, sent and drafts folders customizable [#172]
+- Vim plugin get focused msg id [#268]
+- Nix run issue [#272]
+- Range not displayed when fetch fails [#276]
+- Blank lines and spaces in `text/plain` parts [#280]
+- Watch command [#271]
+- Mailbox telescope.nvim preview [#249]
+
+### Removed
+
+- The wiki git submodule [#273]
+
 ## [0.5.1] - 2021-10-24
 
 ### Added
@@ -18,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Error when receiving notification from `notify` command [#228]
 
-### Change
+### Changed
 
 - Remove error when empty subject [#229]
 - Vim plugin does not render anymore the msg by itself, it uses the one available from the CLI [#220]
@@ -249,7 +266,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.5.1...HEAD
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/soywod/himalaya/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/soywod/himalaya/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/soywod/himalaya/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/soywod/himalaya/compare/v0.3.2...v0.4.0
@@ -343,6 +361,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#160]: https://github.com/soywod/himalaya/issues/160
 [#162]: https://github.com/soywod/himalaya/issues/162
 [#176]: https://github.com/soywod/himalaya/issues/176
+[#172]: https://github.com/soywod/himalaya/issues/172
+[#181]: https://github.com/soywod/himalaya/issues/181
 [#185]: https://github.com/soywod/himalaya/issues/185
 [#186]: https://github.com/soywod/himalaya/issues/186
 [#190]: https://github.com/soywod/himalaya/issues/190
@@ -354,3 +374,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#220]: https://github.com/soywod/himalaya/issues/220
 [#228]: https://github.com/soywod/himalaya/issues/228
 [#229]: https://github.com/soywod/himalaya/issues/229
+[#249]: https://github.com/soywod/himalaya/issues/249
+[#268]: https://github.com/soywod/himalaya/issues/268
+[#272]: https://github.com/soywod/himalaya/issues/272
+[#273]: https://github.com/soywod/himalaya/issues/273
+[#276]: https://github.com/soywod/himalaya/issues/276
+[#271]: https://github.com/soywod/himalaya/issues/271
+[#280]: https://github.com/soywod/himalaya/issues/280

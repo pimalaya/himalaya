@@ -1,27 +1,21 @@
 {
-  description = "CLI email client";
+  description = "Command-line interface for email management";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     utils.url = "github:numtide/flake-utils";
     rust-overlay.url = "github:oxalica/rust-overlay";
-    crate2nix = {
-      url = "github:balsoft/crate2nix/tools-nix-version-comparison";
-      flake = false;
-    };
+    naersk.url = "github:nix-community/naersk";
     flake-compat = {
       url = "github:edolstra/flake-compat";
       flake = false;
     };
   };
 
-  outputs = { self, nixpkgs, utils, rust-overlay, crate2nix, ... }:
+  outputs = { self, nixpkgs, utils, rust-overlay, naersk, ... }:
     utils.lib.eachDefaultSystem
       (system:
         let
           name = "himalaya";
-
-          # Imports
           pkgs = import nixpkgs {
             inherit system;
             overlays = [
@@ -35,37 +29,23 @@
               })
             ];
           };
-          inherit (import "${crate2nix}/tools.nix" { inherit pkgs; })
-            generatedCargoNix;
-
-          # Create the cargo2nix project
-          project = pkgs.callPackage (generatedCargoNix {
-            inherit name;
-            src = ./.;
-          }) {
-            # Individual crate overrides go here
-            # Example: https://github.com/balsoft/simple-osd-daemons/blob/6f85144934c0c1382c7a4d3a2bbb80106776e270/flake.nix#L28-L50
-            defaultCrateOverrides = pkgs.defaultCrateOverrides // {
-              # The himalaya crate itself is overriden here. Typically we
-              # configure non-Rust dependencies (see below) here.
-              ${name} = oldAttrs: {
-                inherit buildInputs nativeBuildInputs;
+          naersk-lib = naersk.lib.${system};
+        in
+        rec {
+          # nix build
+          defaultPackage = packages.${name};
+          packages = {
+            ${name} = naersk-lib.buildPackage {
+              pname = name;
+              root = ./.;
+              nativeBuildInputs = with pkgs; [ openssl.dev pkgconfig ];
+              overrideMain = _: {
                 postInstall = ''
                   mkdir -p $out/share/applications/
                   cp assets/himalaya.desktop $out/share/applications/
                 '';
               };
             };
-          };
-
-          # Configuration for the non-Rust dependencies
-          buildInputs = with pkgs; [ openssl.dev ];
-          nativeBuildInputs = with pkgs; [ rustc cargo pkgconfig ];
-        in
-        rec {
-          packages = {
-            ${name} = project.rootCrate.build;
-
             "${name}-vim" = pkgs.vimUtils.buildVimPluginFrom2Nix {
               inherit (packages.${name}) version;
               name = "${name}-vim";
@@ -80,21 +60,27 @@
             };
           };
 
-          # `nix build`
-          defaultPackage = packages.${name};
-
-          # `nix run`
+          # nix run
+          defaultApp = apps.${name};
           apps.${name} = utils.lib.mkApp {
             inherit name;
             drv = packages.${name};
           };
-          defaultApp = apps.${name};
 
-          # `nix develop`
+          # nix develop
           devShell = pkgs.mkShell {
-            inputsFrom = builtins.attrValues self.packages.${system};
-            buildInputs = with pkgs; [ cargo cargo-watch trunk ];
             RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
+            inputsFrom = builtins.attrValues self.packages.${system};
+            buildInputs = with pkgs; [
+              cargo
+              cargo-watch
+              trunk
+              ripgrep
+              rust-analyzer
+              rustfmt
+              rnix-lsp
+              nixpkgs-fmt
+            ];
           };
         }
       );

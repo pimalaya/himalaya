@@ -28,7 +28,7 @@ mod tests {
     use termcolor::ColorSpec;
 
     use crate::{
-        config::Config,
+        config::{Account, Config},
         domain::{AttrRemote, Attrs, Envelopes, Flags, Mbox, Mboxes, Msg},
         output::{Print, PrintTable, WriteColor},
     };
@@ -117,7 +117,7 @@ mod tests {
             fn notify(&mut self, _: &Config, _: u64) -> Result<()> {
                 unimplemented!()
             }
-            fn watch(&mut self, _: u64) -> Result<()> {
+            fn watch(&mut self, _: &Account, _: u64) -> Result<()> {
                 unimplemented!()
             }
             fn fetch_envelopes(&mut self, _: &usize, _: &usize) -> Result<Envelopes> {

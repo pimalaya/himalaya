@@ -39,7 +39,7 @@ impl<'a> TryFrom<&'a RawEnvelopes> for Envelopes<'a> {
 impl<'a> PrintTable for Envelopes<'a> {
     fn print_table(&self, writter: &mut dyn WriteColor, opts: PrintTableOpts) -> Result<()> {
         writeln!(writter)?;
-        Table::print(writter, &self, opts)?;
+        Table::print(writter, self, opts)?;
         writeln!(writter)?;
         Ok(())
     }

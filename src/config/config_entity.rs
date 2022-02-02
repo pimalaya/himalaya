@@ -1,7 +1,7 @@
 use anyhow::{Context, Error, Result};
 use log::{debug, trace};
 use serde::Deserialize;
-use std::{collections::HashMap, convert::TryFrom, env, fs, path::PathBuf, thread};
+use std::{collections::HashMap, convert::TryFrom, env, fs, path::PathBuf};
 use toml;
 
 use crate::output::run_cmd;
@@ -13,18 +13,27 @@ pub const DEFAULT_SIG_DELIM: &str = "-- \n";
 #[derive(Debug, Default, Clone, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Config {
-    /// Define the full display name of the user.
+    /// Defines the full display name of the user.
     pub name: String,
-    /// Define the downloads directory (eg. for attachments).
+    /// Defines the downloads directory (eg. for attachments).
     pub downloads_dir: Option<PathBuf>,
-    /// Override the default signature delimiter "`--\n `".
+    /// Overrides the default signature delimiter "`--\n `".
     pub signature_delimiter: Option<String>,
-    /// Define the signature.
+    /// Defines the signature.
     pub signature: Option<String>,
-    /// Define the default page size for listings.
+    /// Defines the default page size for listings.
     pub default_page_size: Option<usize>,
+    /// Defines the inbox folder name.
+    pub inbox_folder: Option<String>,
+    /// Defines the sent folder name.
+    pub sent_folder: Option<String>,
+    /// Defines the draft folder name.
+    pub draft_folder: Option<String>,
+    /// Defines the notify command.
     pub notify_cmd: Option<String>,
+    /// Defines the watch commands.
     pub watch_cmds: Option<Vec<String>>,
+
     #[serde(flatten)]
     pub accounts: ConfigAccountsMap,
 }
@@ -41,15 +50,23 @@ pub struct ConfigAccountEntry {
     pub signature_delimiter: Option<String>,
     pub signature: Option<String>,
     pub default_page_size: Option<usize>,
+    /// Defines a specific inbox folder name for this account.
+    pub inbox_folder: Option<String>,
+    /// Defines a specific sent folder name for this account.
+    pub sent_folder: Option<String>,
+    /// Defines a specific draft folder name for this account.
+    pub draft_folder: Option<String>,
     pub watch_cmds: Option<Vec<String>>,
     pub default: Option<bool>,
     pub email: String,
+
     pub imap_host: String,
     pub imap_port: u16,
     pub imap_starttls: Option<bool>,
     pub imap_insecure: Option<bool>,
     pub imap_login: String,
     pub imap_passwd_cmd: String,
+
     pub smtp_host: String,
     pub smtp_port: u16,
     pub smtp_starttls: Option<bool>,
@@ -118,28 +135,8 @@ impl Config {
             .map(|cmd| format!(r#"{} {:?} {:?}"#, cmd, subject, sender))
             .unwrap_or(default_cmd);
 
+        debug!("run command: {}", cmd);
         run_cmd(&cmd).context("cannot run notify cmd")?;
-
-        Ok(())
-    }
-
-    pub fn _exec_watch_cmds(&self, account: &ConfigAccountEntry) -> Result<()> {
-        let cmds = account
-            .watch_cmds
-            .as_ref()
-            .or_else(|| self.watch_cmds.as_ref())
-            .map(|cmds| cmds.to_owned())
-            .unwrap_or_default();
-
-        thread::spawn(move || {
-            debug!("batch execution of {} cmd(s)", cmds.len());
-            cmds.iter().for_each(|cmd| {
-                debug!("running command {:?}…", cmd);
-                let res = run_cmd(cmd);
-                debug!("{:?}", res);
-            })
-        });
-
         Ok(())
     }
 }

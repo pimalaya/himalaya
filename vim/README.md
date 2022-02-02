@@ -49,6 +49,24 @@ let g:himalaya_telescope_preview_enabled = 0
 Should enable telescope preview when picking a mailbox with the telescope
 provider.
 
+### Contact completion
+
+```vim
+let g:himalaya_complete_contact_cmd = '<your completion command>'
+```
+
+Define the command to use for contact completion. When this is set,
+`completefunc` will be set when composing messages so that contacts can be
+completed with `<C-x><C-u>`.
+
+The command must print each possible result on its own line. Each line must
+contain tab-separated fields; the first must be the email address, and the
+second, if present, must be the name. `%s` in the command will be replaced
+with the search query.
+
+For example, to complete contacts with khard, you could use
+`khard email --remove-first-line --parsable '%s'` as the completion command.
+
 ## Usage
 
 ### List messages view

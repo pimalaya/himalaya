@@ -1,4 +1,13 @@
+# Cargo build directory
 /target
-/vim/doc/tags
+
+# Nix build directory
 /result
 /result-lib
+
+# Direnv
+/.envrc
+/.direnv
+
+# Vim plugin doc tags file
+/vim/doc/tags

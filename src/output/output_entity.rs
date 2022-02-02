@@ -36,9 +36,9 @@ impl TryFrom<Option<&str>> for OutputFmt {
 
 impl Display for OutputFmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let fmt = match self {
-            &OutputFmt::Json => "JSON",
-            &OutputFmt::Plain => "Plain",
+        let fmt = match *self {
+            OutputFmt::Json => "JSON",
+            OutputFmt::Plain => "Plain",
         };
         write!(f, "{}", fmt)
     }

@@ -39,7 +39,7 @@ impl<'a> TryFrom<&'a RawEnvelope> for Envelope<'a> {
     fn try_from(fetch: &'a RawEnvelope) -> Result<Envelope> {
         let envelope = fetch
             .envelope()
-            .ok_or(anyhow!("cannot get envelope of message {}", fetch.message))?;
+            .ok_or_else(|| anyhow!("cannot get envelope of message {}", fetch.message))?;
 
         // Get the sequence number
         let id = fetch.message;
@@ -57,7 +57,7 @@ impl<'a> TryFrom<&'a RawEnvelope> for Envelope<'a> {
                     fetch.message
                 ))
             })
-            .unwrap_or(Ok(String::default()))?
+            .unwrap_or_else(|| Ok(String::default()))?
             .into();
 
         // Get the sender
@@ -66,7 +66,7 @@ impl<'a> TryFrom<&'a RawEnvelope> for Envelope<'a> {
             .as_ref()
             .and_then(|addrs| addrs.get(0))
             .or_else(|| envelope.from.as_ref().and_then(|addrs| addrs.get(0)))
-            .ok_or(anyhow!("cannot get sender of message {}", fetch.message))?;
+            .ok_or_else(|| anyhow!("cannot get sender of message {}", fetch.message))?;
         let sender = if let Some(ref name) = sender.name {
             rfc2047_decoder::decode(&name.to_vec()).context(format!(
                 "cannot decode sender's name of message {}",
@@ -76,10 +76,7 @@ impl<'a> TryFrom<&'a RawEnvelope> for Envelope<'a> {
             let mbox = sender
                 .mailbox
                 .as_ref()
-                .ok_or(anyhow!(
-                    "cannot get sender's mailbox of message {}",
-                    fetch.message
-                ))
+                .ok_or_else(|| anyhow!("cannot get sender's mailbox of message {}", fetch.message))
                 .and_then(|mbox| {
                     rfc2047_decoder::decode(&mbox.to_vec()).context(format!(
                         "cannot decode sender's mailbox of message {}",
@@ -89,10 +86,7 @@ impl<'a> TryFrom<&'a RawEnvelope> for Envelope<'a> {
             let host = sender
                 .host
                 .as_ref()
-                .ok_or(anyhow!(
-                    "cannot get sender's host of message {}",
-                    fetch.message
-                ))
+                .ok_or_else(|| anyhow!("cannot get sender's host of message {}", fetch.message))
                 .and_then(|host| {
                     rfc2047_decoder::decode(&host.to_vec()).context(format!(
                         "cannot decode sender's host of message {}",
@@ -133,11 +127,7 @@ impl<'a> Table for Envelope<'a> {
         let unseen = !self.flags.contains(&Flag::Seen);
         let subject = &self.subject;
         let sender = &self.sender;
-        let date = self
-            .date
-            .as_ref()
-            .map(|date| date.as_str())
-            .unwrap_or_default();
+        let date = self.date.as_deref().unwrap_or_default();
         Row::new()
             .cell(Cell::new(id).bold_if(unseen).red())
             .cell(Cell::new(flags).bold_if(unseen).white())

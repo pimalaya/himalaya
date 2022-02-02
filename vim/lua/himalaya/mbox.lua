@@ -10,7 +10,7 @@ local previewers = require('telescope.previewers')
 local function preview_command(entry, bufnr)
   vim.api.nvim_buf_call(bufnr, function()
     local page = 0 -- page 0 for preview
-    local account = pcall(vim.fn['himalaya#account#curr'])
+    local account = vim.fn['himalaya#account#curr']()
     local success, output = pcall(vim.fn['himalaya#msg#list_with'], account, entry.value, page, true)
     if not (success) then
       vim.cmd('redraw')
