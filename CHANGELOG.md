@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2022-02-02
+
 ### Fixed
 
 - Blur in list msg screenshot [#181]
@@ -264,7 +266,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.5.1...HEAD
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/soywod/himalaya/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/soywod/himalaya/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/soywod/himalaya/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/soywod/himalaya/compare/v0.3.2...v0.4.0
