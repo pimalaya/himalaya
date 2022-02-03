@@ -3,7 +3,7 @@
 //! This module exposes a service that can interact with IMAP servers.
 
 use anyhow::{anyhow, Context, Result};
-use log::{debug, trace};
+use log::{debug, log_enabled, trace, Level};
 use native_tls::{TlsConnector, TlsStream};
 use std::{
     collections::HashSet,
@@ -84,12 +84,12 @@ impl<'a> ImapService<'a> {
             debug!("create session");
             debug!("login: {}", self.account.imap_login);
             debug!("passwd cmd: {}", self.account.imap_passwd_cmd);
-            self.sess = Some(
-                client
-                    .login(&self.account.imap_login, &self.account.imap_passwd()?)
-                    .map_err(|res| res.0)
-                    .context("cannot login to IMAP server")?,
-            );
+            let mut sess = client
+                .login(&self.account.imap_login, &self.account.imap_passwd()?)
+                .map_err(|res| res.0)
+                .context("cannot login to IMAP server")?;
+            sess.debug = log_enabled!(Level::Trace);
+            self.sess = Some(sess);
         }
 
         match self.sess {
