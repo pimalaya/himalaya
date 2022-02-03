@@ -2,6 +2,8 @@ name: deployment
 
 on:
   push:
+    branches:
+      - master
     tags:
       - v*
 
@@ -9,21 +11,21 @@ jobs:
   create_release:
     runs-on: ubuntu-latest
     outputs:
-      upload_url: ${{steps.create_release.outputs.upload_url}}
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
       - name: Create release
         id: create_release
         uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{github.ref}}
-          release_name: ${{github.ref}}
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref }}
           draft: false
           prerelease: false
-  build:
+  deploy_binaries:
     needs: create_release
-    runs-on: ${{matrix.os}}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -59,9 +61,25 @@ jobs:
       - name: Upload release asset
         uses: actions/upload-release-asset@v1
         env:
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{needs.create_release.outputs.upload_url}}
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
           asset_path: himalaya.tar.gz
-          asset_name: himalaya-${{matrix.os_name}}.tar.gz
+          asset_name: himalaya-${{ matrix.os_name }}.tar.gz
           asset_content_type: application/gzip
+  deploy_crate:
+    needs: create_release
+    runs-on: linux
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+      - name: Check project
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+      - name: Publish package to crates.io
+        run: cargo publish
