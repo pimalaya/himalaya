@@ -4,6 +4,17 @@ description = "Command-line interface for email management"
 version = "0.5.2"
 authors = ["soywod <clement.douin@posteo.net>"]
 edition = "2018"
+license-file = "LICENSE"
+readme = "README.md"
+categories = ["command-line-interface", "command-line-utilities", "email"]
+keywords = ["cli", "mail", "email", "client", "imap"]
+homepage = "https://github.com/soywod/himalaya/wiki"
+documentation = "https://github.com/soywod/himalaya/wiki"
+repository = "https://github.com/soywod/himalaya"
+
+[package.metadata.deb]
+priority = "optional"
+section = "mail"
 
 [dependencies]
 ammonia = "3.1.2"
@@ -15,9 +26,7 @@ env_logger = "0.8.3"
 html-escape = "0.2.9"
 imap = "3.0.0-alpha.4"
 imap-proto = "0.14.3"
-# This commit includes the de/serialization of the ContentType
-# lettre = { version = "0.10.0-rc.1", features = ["serde"] }
-lettre = { git = "https://github.com/TornaxO7/lettre/", branch = "master", features = ["serde"] }
+lettre = { version = "0.10.0-rc.1", features = ["serde"] }
 log = "0.4.14"
 mailparse = "0.13.6"
 native-tls = "0.2.8"

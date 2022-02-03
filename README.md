@@ -26,6 +26,12 @@ Possibilities are endless!
 ## Installation
 
 ```sh
+# From registry
+nix-env -i himalaya
+brew install himalaya
+cargo install himalaya
+
+# From script
 curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | PREFIX=~/.local sh
 ```
 
