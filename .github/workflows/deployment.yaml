@@ -2,8 +2,6 @@ name: deployment
 
 on:
   push:
-    branches:
-      - master
     tags:
       - v*
 
