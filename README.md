@@ -1,8 +1,4 @@
 # 📫 Himalaya
-[![gh-actions](https://github.com/soywod/himalaya/workflows/deployment/badge.svg)](https://github.com/soywod/himalaya/actions?query=workflow%3Adeployment)
-[![gh-actions](https://github.com/soywod/himalaya/workflows/tests/badge.svg)](https://github.com/soywod/himalaya/actions?query=workflow%3Atests)
-[![gh-actions](https://github.com/soywod/himalaya/workflows/nix-build/badge.svg)](https://github.com/soywod/himalaya/actions?query=workflow%3Anix-build)
-[![Homebrew](https://img.shields.io/badge/dynamic/json.svg?url=https://formulae.brew.sh/api/formula/himalaya.json&query=$.versions.stable&label=homebrew)](https://formulae.brew.sh/formula/himalaya)
 
 Command-line interface for email management
 
@@ -25,13 +21,10 @@ Possibilities are endless!
 
 ## Installation
 
-```sh
-# From registry
-nix-env -i himalaya
-brew install himalaya
-cargo install himalaya
+[![homebrew](https://img.shields.io/homebrew/v/himalaya?color=success&style=flat-square)](https://formulae.brew.sh/formula/himalaya)
+[![crates](https://img.shields.io/crates/v/himalaya?color=success&style=flat-square)](https://crates.io/crates/himalaya)
 
-# From script
+```sh
 curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | PREFIX=~/.local sh
 ```
 
