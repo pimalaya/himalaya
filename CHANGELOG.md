@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2022-02-05
+
+### Fixed
+
+- Add attachments with save and send commands [#47] [#259]
+- Invalid sequence set [#276]
+
 ## [0.5.3] - 2022-02-03
 
 ### Added
@@ -273,7 +280,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.5.3...HEAD
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/soywod/himalaya/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/soywod/himalaya/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/soywod/himalaya/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/soywod/himalaya/compare/v0.5.0...v0.5.1
@@ -325,6 +333,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#39]: https://github.com/soywod/himalaya/issues/39
 [#40]: https://github.com/soywod/himalaya/issues/40
 [#41]: https://github.com/soywod/himalaya/issues/41
+[#47]: https://github.com/soywod/himalaya/issues/47
 [#48]: https://github.com/soywod/himalaya/issues/48
 [#50]: https://github.com/soywod/himalaya/issues/50
 [#58]: https://github.com/soywod/himalaya/issues/58
@@ -383,9 +392,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#228]: https://github.com/soywod/himalaya/issues/228
 [#229]: https://github.com/soywod/himalaya/issues/229
 [#249]: https://github.com/soywod/himalaya/issues/249
+[#259]: https://github.com/soywod/himalaya/issues/259
 [#268]: https://github.com/soywod/himalaya/issues/268
 [#272]: https://github.com/soywod/himalaya/issues/272
 [#273]: https://github.com/soywod/himalaya/issues/273
 [#276]: https://github.com/soywod/himalaya/issues/276
 [#271]: https://github.com/soywod/himalaya/issues/271
+[#276]: https://github.com/soywod/himalaya/issues/276
 [#280]: https://github.com/soywod/himalaya/issues/280

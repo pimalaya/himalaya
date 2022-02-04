@@ -5,7 +5,7 @@
 use anyhow::{Context, Result};
 use atty::Stream;
 use imap::types::Flag;
-use log::{debug, trace};
+use log::{debug, info, trace};
 use std::{
     borrow::Cow,
     convert::{TryFrom, TryInto},
@@ -244,14 +244,25 @@ pub fn reply<
     imap.add_flags(seq, &flags)
 }
 
-/// Save a raw message to the targetted mailbox.
+/// Saves a raw message to the targetted mailbox.
 pub fn save<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
     mbox: &Mbox,
     raw_msg: &str,
     printer: &mut Printer,
     imap: &mut ImapService,
 ) -> Result<()> {
-    let raw_msg = if atty::is(Stream::Stdin) || printer.is_json() {
+    info!("entering save message handler");
+
+    debug!("mailbox: {}", mbox);
+    let flags = Flags::try_from(vec![Flag::Seen])?;
+    debug!("flags: {}", flags);
+
+    let is_tty = atty::is(Stream::Stdin);
+    debug!("is tty: {}", is_tty);
+    let is_json = printer.is_json();
+    debug!("is json: {}", is_json);
+
+    let raw_msg = if is_tty || is_json {
         raw_msg.replace("\r", "").replace("\n", "\r\n")
     } else {
         io::stdin()
@@ -261,8 +272,6 @@ pub fn save<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
             .collect::<Vec<String>>()
             .join("\r\n")
     };
-
-    let flags = Flags::try_from(vec![Flag::Seen])?;
     imap.append_raw_msg_with_flags(mbox, raw_msg.as_bytes(), flags)
 }
 
@@ -297,7 +306,19 @@ pub fn send<
     imap: &mut ImapService,
     smtp: &mut SmtpService,
 ) -> Result<()> {
-    let raw_msg = if atty::is(Stream::Stdin) || printer.is_json() {
+    info!("entering send message handler");
+
+    let mbox = Mbox::new(&account.sent_folder);
+    debug!("mailbox: {}", mbox);
+    let flags = Flags::try_from(vec![Flag::Seen])?;
+    debug!("flags: {}", flags);
+
+    let is_tty = atty::is(Stream::Stdin);
+    debug!("is tty: {}", is_tty);
+    let is_json = printer.is_json();
+    debug!("is json: {}", is_json);
+
+    let raw_msg = if is_tty || is_json {
         raw_msg.replace("\r", "").replace("\n", "\r\n")
     } else {
         io::stdin()
@@ -307,15 +328,11 @@ pub fn send<
             .collect::<Vec<String>>()
             .join("\r\n")
     };
+    trace!("raw message: {:?}", raw_msg);
+    let envelope: lettre::address::Envelope = Msg::from_tpl(&raw_msg)?.try_into()?;
+    trace!("envelope: {:?}", envelope);
 
-    let msg = Msg::from_tpl(&raw_msg)?;
-    let envelope: lettre::address::Envelope = msg.try_into()?;
     smtp.send_raw_msg(&envelope, raw_msg.as_bytes())?;
-    debug!("message sent!");
-
-    // Save message to sent folder
-    let mbox = Mbox::new(&account.sent_folder);
-    let flags = Flags::try_from(vec![Flag::Seen])?;
     imap.append_raw_msg_with_flags(&mbox, raw_msg.as_bytes(), flags)
 }
 

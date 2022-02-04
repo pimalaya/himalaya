@@ -144,11 +144,11 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
             let cursor = (page * page_size) as i64;
             let begin = 1.max(last_seq - cursor);
             let end = begin - begin.min(*page_size as i64) + 1;
-            format!("{}:{}", begin, end)
+            format!("{}:{}", end, begin)
         } else {
             String::from("1:*")
         };
-        debug!("range: {:?}", range);
+        debug!("range: {}", range);
 
         let fetches = self
             .sess()?
