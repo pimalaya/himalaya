@@ -4,12 +4,14 @@
 
 use anyhow::Result;
 use clap::{self, App, AppSettings, Arg, ArgMatches, SubCommand};
-use log::{debug, trace};
+use log::{debug, info, trace};
 
 use crate::domain::msg::msg_arg;
 
 type Seq<'a> = &'a str;
-type All = bool;
+type ReplyAll = bool;
+type AttachmentPaths<'a> = Vec<&'a str>;
+type Tpl<'a> = &'a str;
 
 #[derive(Debug, Default)]
 pub struct TplOverride<'a> {
@@ -23,67 +25,75 @@ pub struct TplOverride<'a> {
     pub sig: Option<&'a str>,
 }
 
+impl<'a> From<&'a ArgMatches<'a>> for TplOverride<'a> {
+    fn from(matches: &'a ArgMatches<'a>) -> Self {
+        Self {
+            subject: matches.value_of("subject"),
+            from: matches.values_of("from").map(|v| v.collect()),
+            to: matches.values_of("to").map(|v| v.collect()),
+            cc: matches.values_of("cc").map(|v| v.collect()),
+            bcc: matches.values_of("bcc").map(|v| v.collect()),
+            headers: matches.values_of("headers").map(|v| v.collect()),
+            body: matches.value_of("body"),
+            sig: matches.value_of("signature"),
+        }
+    }
+}
+
 /// Message template commands.
 pub enum Command<'a> {
     New(TplOverride<'a>),
-    Reply(Seq<'a>, All, TplOverride<'a>),
+    Reply(Seq<'a>, ReplyAll, TplOverride<'a>),
     Forward(Seq<'a>, TplOverride<'a>),
+    Save(AttachmentPaths<'a>, Tpl<'a>),
+    Send(AttachmentPaths<'a>, Tpl<'a>),
 }
 
 /// Message template command matcher.
 pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
     if let Some(m) = m.subcommand_matches("new") {
-        debug!("new command matched");
-        let tpl = TplOverride {
-            subject: m.value_of("subject"),
-            from: m.values_of("from").map(|v| v.collect()),
-            to: m.values_of("to").map(|v| v.collect()),
-            cc: m.values_of("cc").map(|v| v.collect()),
-            bcc: m.values_of("bcc").map(|v| v.collect()),
-            headers: m.values_of("headers").map(|v| v.collect()),
-            body: m.value_of("body"),
-            sig: m.value_of("signature"),
-        };
-        trace!(r#"template args: "{:?}""#, tpl);
+        info!("new command matched");
+        let tpl = TplOverride::from(m);
+        trace!("template override: {:?}", tpl);
         return Ok(Some(Command::New(tpl)));
     }
 
     if let Some(m) = m.subcommand_matches("reply") {
-        debug!("reply command matched");
+        info!("reply command matched");
         let seq = m.value_of("seq").unwrap();
-        trace!(r#"seq: "{}""#, seq);
+        debug!("sequence: {}", seq);
         let all = m.is_present("reply-all");
-        trace!("reply all: {}", all);
-        let tpl = TplOverride {
-            subject: m.value_of("subject"),
-            from: m.values_of("from").map(|v| v.collect()),
-            to: m.values_of("to").map(|v| v.collect()),
-            cc: m.values_of("cc").map(|v| v.collect()),
-            bcc: m.values_of("bcc").map(|v| v.collect()),
-            headers: m.values_of("headers").map(|v| v.collect()),
-            body: m.value_of("body"),
-            sig: m.value_of("signature"),
-        };
-        trace!(r#"template args: "{:?}""#, tpl);
+        debug!("reply all: {}", all);
+        let tpl = TplOverride::from(m);
+        trace!("template override: {:?}", tpl);
         return Ok(Some(Command::Reply(seq, all, tpl)));
     }
 
     if let Some(m) = m.subcommand_matches("forward") {
-        debug!("forward command matched");
+        info!("forward command matched");
         let seq = m.value_of("seq").unwrap();
-        trace!(r#"seq: "{}""#, seq);
-        let tpl = TplOverride {
-            subject: m.value_of("subject"),
-            from: m.values_of("from").map(|v| v.collect()),
-            to: m.values_of("to").map(|v| v.collect()),
-            cc: m.values_of("cc").map(|v| v.collect()),
-            bcc: m.values_of("bcc").map(|v| v.collect()),
-            headers: m.values_of("headers").map(|v| v.collect()),
-            body: m.value_of("body"),
-            sig: m.value_of("signature"),
-        };
-        trace!(r#"template args: "{:?}""#, tpl);
+        debug!("sequence: {}", seq);
+        let tpl = TplOverride::from(m);
+        trace!("template args: {:?}", tpl);
         return Ok(Some(Command::Forward(seq, tpl)));
+    }
+
+    if let Some(m) = m.subcommand_matches("save") {
+        info!("save command matched");
+        let attachment_paths: Vec<&str> = m.values_of("attachments").unwrap_or_default().collect();
+        trace!("attachments paths: {:?}", attachment_paths);
+        let tpl = m.value_of("template").unwrap_or_default();
+        trace!("template: {}", tpl);
+        return Ok(Some(Command::Save(attachment_paths, tpl)));
+    }
+
+    if let Some(m) = m.subcommand_matches("send") {
+        info!("send command matched");
+        let attachment_paths: Vec<&str> = m.values_of("attachments").unwrap_or_default().collect();
+        trace!("attachments paths: {:?}", attachment_paths);
+        let tpl = m.value_of("template").unwrap_or_default();
+        trace!("template: {}", tpl);
+        return Ok(Some(Command::Send(attachment_paths, tpl)));
     }
 
     Ok(None)
@@ -154,7 +164,7 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
         )
         .subcommand(
             SubCommand::with_name("reply")
-                .aliases(&["rep", "r"])
+                .aliases(&["rep", "re", "r"])
                 .about("Generates a reply message template")
                 .arg(msg_arg::seq_arg())
                 .arg(msg_arg::reply_all_arg())
@@ -166,5 +176,17 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                 .about("Generates a forward message template")
                 .arg(msg_arg::seq_arg())
                 .args(&tpl_args()),
+        )
+        .subcommand(
+            SubCommand::with_name("save")
+                .about("Saves a message based on the given template")
+                .arg(&msg_arg::attachment_arg())
+                .arg(Arg::with_name("template").raw(true)),
+        )
+        .subcommand(
+            SubCommand::with_name("send")
+                .about("Sends a message based on the given template")
+                .arg(&msg_arg::attachment_arg())
+                .arg(Arg::with_name("template").raw(true)),
         )]
 }

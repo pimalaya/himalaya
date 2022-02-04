@@ -23,7 +23,7 @@ type Raw = bool;
 type All = bool;
 type RawMsg<'a> = &'a str;
 type Query = String;
-type AttachmentsPaths<'a> = Vec<&'a str>;
+type AttachmentPaths<'a> = Vec<&'a str>;
 type MaxTableWidth = Option<usize>;
 
 /// Message commands.
@@ -31,15 +31,15 @@ pub enum Command<'a> {
     Attachments(Seq<'a>),
     Copy(Seq<'a>, Mbox<'a>),
     Delete(Seq<'a>),
-    Forward(Seq<'a>, AttachmentsPaths<'a>),
+    Forward(Seq<'a>, AttachmentPaths<'a>),
     List(MaxTableWidth, Option<PageSize>, Page),
     Move(Seq<'a>, Mbox<'a>),
     Read(Seq<'a>, TextMime<'a>, Raw),
-    Reply(Seq<'a>, All, AttachmentsPaths<'a>),
+    Reply(Seq<'a>, All, AttachmentPaths<'a>),
     Save(RawMsg<'a>),
     Search(Query, MaxTableWidth, Option<PageSize>, Page),
     Send(RawMsg<'a>),
-    Write(AttachmentsPaths<'a>),
+    Write(AttachmentPaths<'a>),
 
     Flag(Option<flag_arg::Command<'a>>),
     Tpl(Option<tpl_arg::Command<'a>>),
@@ -256,7 +256,7 @@ fn page_arg<'a>() -> Arg<'a, 'a> {
 }
 
 /// Message attachment argument.
-fn attachment_arg<'a>() -> Arg<'a, 'a> {
+pub fn attachment_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name("attachments")
         .help("Adds attachment to the message")
         .short("a")
