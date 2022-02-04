@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Add attachments with save and send commands [#47] [#259]
+- Invalid sequence set [#276]
 
 ## [0.5.3] - 2022-02-03
 
@@ -394,4 +395,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#273]: https://github.com/soywod/himalaya/issues/273
 [#276]: https://github.com/soywod/himalaya/issues/276
 [#271]: https://github.com/soywod/himalaya/issues/271
+[#276]: https://github.com/soywod/himalaya/issues/276
 [#280]: https://github.com/soywod/himalaya/issues/280
