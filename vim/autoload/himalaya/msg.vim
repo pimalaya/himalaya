@@ -342,9 +342,10 @@ function! himalaya#msg#add_attachment()
   try
     let attachment_path = input("Attachment path: ", "", "file")
     if empty(expand(glob(attachment_path)))
-      throw "file does not exist"
+      throw "The file does not exist"
     endif
     call add(s:attachment_paths, attachment_path)
+    redraw | call himalaya#shared#log#info("Attachment added!")
   catch
     if !empty(v:exception)
       redraw | call himalaya#shared#log#err(v:exception)
