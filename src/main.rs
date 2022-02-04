@@ -176,6 +176,12 @@ fn main() -> Result<()> {
             Some(tpl_arg::Command::Forward(seq, tpl)) => {
                 return tpl_handler::forward(seq, tpl, &account, &mut printer, &mut imap);
             }
+            Some(tpl_arg::Command::Save(atts, tpl)) => {
+                return tpl_handler::save(&mbox, atts, tpl, &mut printer, &mut imap);
+            }
+            Some(tpl_arg::Command::Send(atts, tpl)) => {
+                return tpl_handler::send(&mbox, atts, tpl, &mut printer, &mut imap, &mut smtp);
+            }
             _ => (),
         },
         _ => (),

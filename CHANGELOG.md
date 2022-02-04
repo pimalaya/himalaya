@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Add attachments with save and send commands [#47] [#259]
+
 ## [0.5.3] - 2022-02-03
 
 ### Added
@@ -325,6 +329,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#39]: https://github.com/soywod/himalaya/issues/39
 [#40]: https://github.com/soywod/himalaya/issues/40
 [#41]: https://github.com/soywod/himalaya/issues/41
+[#47]: https://github.com/soywod/himalaya/issues/47
 [#48]: https://github.com/soywod/himalaya/issues/48
 [#50]: https://github.com/soywod/himalaya/issues/50
 [#58]: https://github.com/soywod/himalaya/issues/58
@@ -383,6 +388,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#228]: https://github.com/soywod/himalaya/issues/228
 [#229]: https://github.com/soywod/himalaya/issues/229
 [#249]: https://github.com/soywod/himalaya/issues/249
+[#259]: https://github.com/soywod/himalaya/issues/259
 [#268]: https://github.com/soywod/himalaya/issues/268
 [#272]: https://github.com/soywod/himalaya/issues/272
 [#273]: https://github.com/soywod/himalaya/issues/273

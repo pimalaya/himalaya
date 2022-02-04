@@ -5,6 +5,7 @@ let s:plain_req = function("himalaya#request#plain")
 
 let s:msg_id = 0
 let s:draft = ""
+let s:attachment_paths = []
 
 function! himalaya#msg#list_with(account, mbox, page, should_throw)
   let pos = getpos(".")
@@ -254,6 +255,7 @@ endfunction
 function! himalaya#msg#draft_handle()
   try
     let account = himalaya#account#curr()
+    let attachments = join(map(s:attachment_paths, "'--attachment '.v:val"), " ")
     while 1
       let choice = input("(s)end, (d)raft, (q)uit or (c)ancel? ")
       let choice = tolower(choice)[0]
@@ -261,15 +263,15 @@ function! himalaya#msg#draft_handle()
 
       if choice == "s"
         return s:cli(
-          \"--account %s send -- %s",
-          \[shellescape(account), shellescape(s:draft)],
+          \"--account %s template send %s -- %s",
+          \[shellescape(account), attachments, shellescape(s:draft)],
           \"Sending message",
           \0,
         \)
       elseif choice == "d"
         return s:cli(
-          \"--account %s --mailbox Drafts save -- %s",
-          \[shellescape(account), shellescape(s:draft)],
+          \"--account %s --mailbox Drafts template save %s -- %s",
+          \[shellescape(account), attachments, shellescape(s:draft)],
           \"Saving draft",
           \0,
         \)
@@ -329,6 +331,21 @@ function! himalaya#msg#complete_contact(findstart, base)
 
       return map(lines, "s:line_to_complete_item(v:val)")
     endif
+  catch
+    if !empty(v:exception)
+      redraw | call himalaya#shared#log#err(v:exception)
+    endif
+  endtry
+endfunction
+
+function! himalaya#msg#add_attachment()
+  try
+    let attachment_path = input("Attachment path: ", "", "file")
+    if empty(expand(glob(attachment_path)))
+      throw "The file does not exist"
+    endif
+    call add(s:attachment_paths, attachment_path)
+    redraw | call himalaya#shared#log#info("Attachment added!")
   catch
     if !empty(v:exception)
       redraw | call himalaya#shared#log#err(v:exception)
