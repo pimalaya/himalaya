@@ -155,6 +155,16 @@ nmap gD <plug>(himalaya-msg-delete)
 
 ![gif](https://user-images.githubusercontent.com/10437171/110708795-84387900-81fb-11eb-8f8a-f7e7862e816d.gif)
 
+| Function | Default binding |
+| --- | --- |
+| Add attachment | `ga` |
+
+They can be customized:
+
+```vim
+nmap ga <plug>(himalaya-msg-add-attachment)
+```
+
 When you exit this special buffer, you will be prompted 4 choices:
 
 - `Send`: sends the message
