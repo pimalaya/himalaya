@@ -3,7 +3,7 @@
 //! This module gathers all mailbox actions triggered by the CLI.
 
 use anyhow::Result;
-use log::trace;
+use log::{info, trace};
 
 use crate::{
     domain::ImapServiceInterface,
@@ -16,8 +16,9 @@ pub fn list<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
     printer: &mut Printer,
     imap: &'a mut ImapService,
 ) -> Result<()> {
+    info!("entering list mailbox handler");
     let mboxes = imap.fetch_mboxes()?;
-    trace!("mailboxes: {:#?}", mboxes);
+    trace!("mailboxes: {:?}", mboxes);
     printer.print_table(mboxes, PrintTableOpts { max_width })
 }
 

@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use clap::{self, App, AppSettings, Arg, ArgMatches, SubCommand};
-use log::{debug, trace};
+use log::{debug, info};
 
 use crate::domain::msg::msg_arg;
 
@@ -24,30 +24,32 @@ pub enum Command<'a> {
 
 /// Defines the flag command matcher.
 pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
+    info!("entering message flag command matcher");
+
     if let Some(m) = m.subcommand_matches("add") {
-        debug!("add subcommand matched");
+        info!("add subcommand matched");
         let seq_range = m.value_of("seq-range").unwrap();
-        trace!(r#"seq range: "{}""#, seq_range);
+        debug!("seq range: {}", seq_range);
         let flags: Vec<&str> = m.values_of("flags").unwrap_or_default().collect();
-        trace!(r#"flags: "{:?}""#, flags);
+        debug!("flags: {:?}", flags);
         return Ok(Some(Command::Add(seq_range, flags)));
     }
 
     if let Some(m) = m.subcommand_matches("set") {
-        debug!("set subcommand matched");
+        info!("set subcommand matched");
         let seq_range = m.value_of("seq-range").unwrap();
-        trace!(r#"seq range: "{}""#, seq_range);
+        debug!("seq range: {}", seq_range);
         let flags: Vec<&str> = m.values_of("flags").unwrap_or_default().collect();
-        trace!(r#"flags: "{:?}""#, flags);
+        debug!("flags: {:?}", flags);
         return Ok(Some(Command::Set(seq_range, flags)));
     }
 
     if let Some(m) = m.subcommand_matches("remove") {
-        trace!("remove subcommand matched");
+        info!("remove subcommand matched");
         let seq_range = m.value_of("seq-range").unwrap();
-        trace!(r#"seq range: "{}""#, seq_range);
+        debug!("seq range: {}", seq_range);
         let flags: Vec<&str> = m.values_of("flags").unwrap_or_default().collect();
-        trace!(r#"flags: "{:?}""#, flags);
+        debug!("flags: {:?}", flags);
         return Ok(Some(Command::Remove(seq_range, flags)));
     }
 

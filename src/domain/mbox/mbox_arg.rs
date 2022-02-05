@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use clap;
-use log::trace;
+use log::{debug, info};
 
 use crate::ui::table_arg;
 
@@ -20,12 +20,14 @@ pub enum Cmd {
 
 /// Defines the mailbox command matcher.
 pub fn matches(m: &clap::ArgMatches) -> Result<Option<Cmd>> {
+    info!("entering mailbox command matcher");
+
     if let Some(m) = m.subcommand_matches("mailboxes") {
-        trace!("mailboxes subcommand matched");
+        info!("mailboxes command matched");
         let max_table_width = m
             .value_of("max-table-width")
             .and_then(|width| width.parse::<usize>().ok());
-        trace!(r#"max table width: "{:?}""#, max_table_width);
+        debug!("max table width: {:?}", max_table_width);
         return Ok(Some(Cmd::List(max_table_width)));
     }
 

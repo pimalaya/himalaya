@@ -119,7 +119,7 @@ pub fn list<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
     printer.print_table(msgs, PrintTableOpts { max_width })
 }
 
-/// Parse and edit a message from a [mailto] URL string.
+/// Parses and edits a message from a [mailto] URL string.
 ///
 /// [mailto]: https://en.wikipedia.org/wiki/Mailto
 pub fn mailto<
@@ -134,6 +134,8 @@ pub fn mailto<
     imap: &mut ImapService,
     smtp: &mut SmtpService,
 ) -> Result<()> {
+    info!("entering mailto command handler");
+
     let to: Vec<lettre::message::Mailbox> = url
         .path()
         .split(';')
@@ -173,6 +175,7 @@ pub fn mailto<
         })]),
         ..Msg::default()
     };
+    trace!("message: {:?}", msg);
 
     msg.edit_with_editor(account, printer, imap, smtp)
 }

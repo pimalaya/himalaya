@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use clap::{self, App, Arg, ArgMatches, Shell, SubCommand};
-use log::debug;
+use log::{debug, info};
 
 type OptionShell<'a> = Option<&'a str>;
 
@@ -16,10 +16,12 @@ pub enum Command<'a> {
 
 /// Completion command matcher.
 pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
+    info!("entering completion command matcher");
+
     if let Some(m) = m.subcommand_matches("completion") {
-        debug!("completion command matched");
+        info!("completion command matched");
         let shell = m.value_of("shell");
-        debug!("shell: `{:?}`", shell);
+        debug!("shell: {:?}", shell);
         return Ok(Some(Command::Generate(shell)));
     };
 

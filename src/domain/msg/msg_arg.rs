@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use clap::{self, App, Arg, ArgMatches, SubCommand};
-use log::{debug, trace};
+use log::{debug, info, trace};
 
 use crate::{
     domain::{
@@ -47,46 +47,48 @@ pub enum Command<'a> {
 
 /// Message command matcher.
 pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
+    info!("entering message command matcher");
+
     if let Some(m) = m.subcommand_matches("attachments") {
-        debug!("attachments command matched");
+        info!("attachments command matched");
         let seq = m.value_of("seq").unwrap();
-        trace!("seq: {}", seq);
+        debug!("seq: {}", seq);
         return Ok(Some(Command::Attachments(seq)));
     }
 
     if let Some(m) = m.subcommand_matches("copy") {
-        debug!("copy command matched");
+        info!("copy command matched");
         let seq = m.value_of("seq").unwrap();
-        trace!("seq: {}", seq);
+        debug!("seq: {}", seq);
         let mbox = m.value_of("mbox-target").unwrap();
-        trace!(r#"target mailbox: "{:?}""#, mbox);
+        debug!(r#"target mailbox: "{:?}""#, mbox);
         return Ok(Some(Command::Copy(seq, mbox)));
     }
 
     if let Some(m) = m.subcommand_matches("delete") {
-        debug!("copy command matched");
+        info!("copy command matched");
         let seq = m.value_of("seq").unwrap();
-        trace!("seq: {}", seq);
+        debug!("seq: {}", seq);
         return Ok(Some(Command::Delete(seq)));
     }
 
     if let Some(m) = m.subcommand_matches("forward") {
-        debug!("forward command matched");
+        info!("forward command matched");
         let seq = m.value_of("seq").unwrap();
-        trace!("seq: {}", seq);
+        debug!("seq: {}", seq);
         let paths: Vec<&str> = m.values_of("attachments").unwrap_or_default().collect();
-        trace!("attachments paths: {:?}", paths);
+        debug!("attachments paths: {:?}", paths);
         return Ok(Some(Command::Forward(seq, paths)));
     }
 
     if let Some(m) = m.subcommand_matches("list") {
-        debug!("list command matched");
+        info!("list command matched");
         let max_table_width = m
             .value_of("max-table-width")
             .and_then(|width| width.parse::<usize>().ok());
-        trace!(r#"max table width: "{:?}""#, max_table_width);
+        debug!("max table width: {:?}", max_table_width);
         let page_size = m.value_of("page-size").and_then(|s| s.parse().ok());
-        trace!(r#"page size: "{:?}""#, page_size);
+        debug!("page size: {:?}", page_size);
         let page = m
             .value_of("page")
             .unwrap_or("1")
@@ -94,56 +96,56 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
             .ok()
             .map(|page| 1.max(page) - 1)
             .unwrap_or_default();
-        trace!(r#"page: "{:?}""#, page);
+        debug!("page: {}", page);
         return Ok(Some(Command::List(max_table_width, page_size, page)));
     }
 
     if let Some(m) = m.subcommand_matches("move") {
-        debug!("move command matched");
+        info!("move command matched");
         let seq = m.value_of("seq").unwrap();
-        trace!("seq: {}", seq);
+        debug!("seq: {}", seq);
         let mbox = m.value_of("mbox-target").unwrap();
-        trace!(r#"target mailbox: "{:?}""#, mbox);
+        debug!("target mailbox: {:?}", mbox);
         return Ok(Some(Command::Move(seq, mbox)));
     }
 
     if let Some(m) = m.subcommand_matches("read") {
-        debug!("read command matched");
+        info!("read command matched");
         let seq = m.value_of("seq").unwrap();
-        trace!("seq: {}", seq);
+        debug!("seq: {}", seq);
         let mime = m.value_of("mime-type").unwrap();
-        trace!("text mime: {}", mime);
+        debug!("text mime: {}", mime);
         let raw = m.is_present("raw");
-        trace!("raw: {}", raw);
+        debug!("raw: {}", raw);
         return Ok(Some(Command::Read(seq, mime, raw)));
     }
 
     if let Some(m) = m.subcommand_matches("reply") {
-        debug!("reply command matched");
+        info!("reply command matched");
         let seq = m.value_of("seq").unwrap();
-        trace!("seq: {}", seq);
+        debug!("seq: {}", seq);
         let all = m.is_present("reply-all");
-        trace!("reply all: {}", all);
+        debug!("reply all: {}", all);
         let paths: Vec<&str> = m.values_of("attachments").unwrap_or_default().collect();
-        trace!("attachments paths: {:#?}", paths);
+        debug!("attachments paths: {:?}", paths);
         return Ok(Some(Command::Reply(seq, all, paths)));
     }
 
     if let Some(m) = m.subcommand_matches("save") {
-        debug!("save command matched");
+        info!("save command matched");
         let msg = m.value_of("message").unwrap_or_default();
         trace!("message: {}", msg);
         return Ok(Some(Command::Save(msg)));
     }
 
     if let Some(m) = m.subcommand_matches("search") {
-        debug!("search command matched");
+        info!("search command matched");
         let max_table_width = m
             .value_of("max-table-width")
             .and_then(|width| width.parse::<usize>().ok());
-        trace!(r#"max table width: "{:?}""#, max_table_width);
+        debug!("max table width: {:?}", max_table_width);
         let page_size = m.value_of("page-size").and_then(|s| s.parse().ok());
-        trace!(r#"page size: "{:?}""#, page_size);
+        debug!("page size: {:?}", page_size);
         let page = m
             .value_of("page")
             .unwrap()
@@ -151,7 +153,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
             .ok()
             .map(|page| 1.max(page) - 1)
             .unwrap_or_default();
-        trace!(r#"page: "{:?}""#, page);
+        debug!("page: {}", page);
         let query = m
             .values_of("query")
             .unwrap_or_default()
@@ -176,7 +178,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
             })
             .1
             .join(" ");
-        trace!(r#"query: "{:?}""#, query);
+        debug!("query: {}", query);
         return Ok(Some(Command::Search(
             query,
             max_table_width,
@@ -186,16 +188,16 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
     }
 
     if let Some(m) = m.subcommand_matches("send") {
-        debug!("send command matched");
+        info!("send command matched");
         let msg = m.value_of("message").unwrap_or_default();
         trace!("message: {}", msg);
         return Ok(Some(Command::Send(msg)));
     }
 
     if let Some(m) = m.subcommand_matches("write") {
-        debug!("write command matched");
+        info!("write command matched");
         let attachment_paths: Vec<&str> = m.values_of("attachments").unwrap_or_default().collect();
-        trace!("attachments paths: {:?}", attachment_paths);
+        debug!("attachments paths: {:?}", attachment_paths);
         return Ok(Some(Command::Write(attachment_paths)));
     }
 
@@ -207,7 +209,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         return Ok(Some(Command::Flag(flag_arg::matches(m)?)));
     }
 
-    debug!("default list command matched");
+    info!("default list command matched");
     Ok(Some(Command::List(None, None, 0)))
 }
 
