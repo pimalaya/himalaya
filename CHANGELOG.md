@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- [Contributing guide](https://github.com/soywod/himalaya/blob/master/CONTRIBUTING.md) [#256]
+
 ## [0.5.4] - 2022-02-05
 
 ### Fixed
@@ -392,6 +396,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#228]: https://github.com/soywod/himalaya/issues/228
 [#229]: https://github.com/soywod/himalaya/issues/229
 [#249]: https://github.com/soywod/himalaya/issues/249
+[#256]: https://github.com/soywod/himalaya/issues/256
 [#259]: https://github.com/soywod/himalaya/issues/259
 [#268]: https://github.com/soywod/himalaya/issues/268
 [#272]: https://github.com/soywod/himalaya/issues/272
