@@ -129,3 +129,44 @@ fn build_parts_map_rec(part: &mailparse::ParsedMail, parts: &mut Vec<Part>) {
         }
     }
 }
+
+// TODO: this is a small POC for https://github.com/soywod/himalaya/issues/286
+// #[cfg(test)]
+// mod tests {
+//     use lettre::message::SinglePart;
+//     use pgp::{Deserializable, Message, SignedPublicKey, SignedSecretKey};
+//     use rand::thread_rng;
+
+//     #[test]
+//     fn test_build_parts_map_rec() {
+//         let (secret_key, _) =
+//             SignedSecretKey::from_string(include_str!("../../../tests/keys/alice.asc"))
+//                 .expect("cannot read alice's secret key");
+//         let (pub_key, _) =
+//             SignedPublicKey::from_string(include_str!("../../../tests/keys/patrick.pub.asc"))
+//                 .expect("cannot read patrick's public key");
+//         let encrypted_msg = Message::new_literal_bytes(
+//             "",
+//             SinglePart::plain(String::from("This message is encrypted."))
+//                 .formatted()
+//                 .as_slice(),
+//         )
+//         .sign(
+//             &secret_key,
+//             || String::new(),
+//             pgp::crypto::HashAlgorithm::MD5,
+//         )
+//         .and_then(|msg| msg.compress(pgp::types::CompressionAlgorithm::ZIP))
+//         .and_then(|msg| {
+//             msg.encrypt_to_keys(
+//                 &mut thread_rng(),
+//                 pgp::crypto::SymmetricKeyAlgorithm::AES256,
+//                 &[&pub_key],
+//             )
+//         });
+//         let msg = encrypted_msg.unwrap();
+//         let encoded_msg: Vec<u8> = msg.to_armored_bytes(None).unwrap();
+
+//         assert_eq!("bad", String::from_utf8(encoded_msg).unwrap());
+//     }
+// }
