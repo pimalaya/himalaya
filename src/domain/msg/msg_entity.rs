@@ -3,17 +3,20 @@ use anyhow::{anyhow, Context, Error, Result};
 use chrono::{DateTime, FixedOffset};
 use html_escape;
 use imap::types::Flag;
-use lettre::message::{Attachment, MultiPart, SinglePart};
+use lettre::message::{header::ContentType, Attachment, Body, MultiPart, SinglePart};
 use log::{debug, info, trace};
 use regex::Regex;
 use rfc2047_decoder;
 use std::{
     collections::HashSet,
     convert::{TryFrom, TryInto},
+    env::temp_dir,
     fmt::Debug,
-    fs,
+    fs::{self, File},
+    io::Write,
     path::PathBuf,
 };
+use uuid::Uuid;
 
 use crate::{
     config::{Account, DEFAULT_SIG_DELIM},
@@ -23,7 +26,7 @@ use crate::{
         msg::{msg_utils, BinaryPart, Flags, Part, Parts, TextPlainPart, TplOverride},
         smtp::SmtpServiceInterface,
     },
-    output::PrinterService,
+    output::{run_cmd, PrinterService},
     ui::{
         choice::{self, PostEditChoice, PreEditChoice},
         editor,
@@ -59,6 +62,9 @@ pub struct Msg {
     /// [RFC3501]: https://datatracker.ietf.org/doc/html/rfc3501#section-2.3.3
     pub date: Option<DateTime<FixedOffset>>,
     pub parts: Parts,
+
+    pub encrypt: bool,
+    pub sign: bool,
 }
 
 impl Msg {
@@ -72,7 +78,7 @@ impl Msg {
             .collect()
     }
 
-    /// Fold string body from all plain text parts into a single string body. If no plain text
+    /// Folds string body from all plain text parts into a single string body. If no plain text
     /// parts are found, HTML parts are used instead. The result is sanitized (all HTML markup is
     /// removed).
     pub fn fold_text_plain_parts(&self) -> String {
@@ -408,6 +414,16 @@ impl Msg {
         Ok(())
     }
 
+    pub fn encrypt(mut self, encrypt: bool) -> Self {
+        self.encrypt = encrypt;
+        self
+    }
+
+    pub fn sign(mut self, sign: bool) -> Self {
+        self.sign = sign;
+        self
+    }
+
     pub fn add_attachments(mut self, attachments_paths: Vec<&str>) -> Result<Self> {
         for path in attachments_paths {
             let path = shellexpand::full(path)
@@ -678,18 +694,44 @@ impl TryInto<lettre::Message> for &Msg {
                 .fold(msg_builder, |builder, addr| builder.bcc(addr.to_owned()))
         };
 
-        let mut multipart =
-            MultiPart::mixed().singlepart(SinglePart::plain(self.fold_text_plain_parts()));
-
-        for part in self.attachments() {
-            let filename = part.filename;
-            let content = part.content;
-            let mime = part.mime.parse().context(format!(
-                r#"cannot parse content type of attachment "{}""#,
-                filename
-            ))?;
-            multipart = multipart.singlepart(Attachment::new(filename).body(content, mime))
-        }
+        let text_plain_body = self.fold_text_plain_parts();
+        let multipart = if self.encrypt {
+            let tmp_file = Uuid::new_v4().to_string();
+            let mut tmp_path = temp_dir();
+            tmp_path.push(tmp_file);
+            let mut tmp_file = File::create(tmp_path.clone()).unwrap();
+            tmp_file.write_all(text_plain_body.as_bytes()).unwrap();
+            let crypt = run_cmd(&format!(
+                "gpg -o - -esar {} {}",
+                self.to.as_ref().unwrap().first().unwrap().email,
+                tmp_path.to_str().unwrap()
+            ))
+            .unwrap();
+            MultiPart::encrypted(String::from("application/pgp-encrypted"))
+                .singlepart(
+                    SinglePart::builder()
+                        .header(ContentType::parse("application/pgp-encrypted").unwrap())
+                        .body(String::from("Version: 1")),
+                )
+                .singlepart(
+                    SinglePart::builder()
+                        .header(ContentType::parse("application/octet-stream").unwrap())
+                        .body(Body::new(SinglePart::plain(crypt).formatted())),
+                )
+        } else {
+            let mut multipart =
+                MultiPart::mixed().singlepart(SinglePart::plain(self.fold_text_plain_parts()));
+            for part in self.attachments() {
+                multipart = multipart.singlepart(Attachment::new(part.filename.clone()).body(
+                    part.content,
+                    part.mime.parse().context(format!(
+                        "cannot parse content type of attachment {}",
+                        part.filename
+                    ))?,
+                ))
+            }
+            multipart
+        };
 
         msg_builder
             .multipart(multipart)
@@ -807,6 +849,8 @@ impl<'a> TryFrom<&'a imap::types::Fetch> for Msg {
             message_id,
             date,
             parts,
+            encrypt: false,
+            sign: false,
         })
     }
 }

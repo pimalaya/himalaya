@@ -1,6 +1,14 @@
 use mailparse::MailHeaderMap;
 use serde::Serialize;
-use std::ops::{Deref, DerefMut};
+use std::{
+    env,
+    fs::File,
+    io::Write,
+    ops::{Deref, DerefMut},
+};
+use uuid::Uuid;
+
+use crate::output::run_cmd;
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct TextPlainPart {
@@ -102,8 +110,22 @@ fn build_parts_map_rec(part: &mailparse::ParsedMail, parts: &mut Vec<Part>) {
             }
         };
     } else {
-        part.subparts
-            .iter()
-            .for_each(|part| build_parts_map_rec(part, parts));
+        if let Some(ctype) = part.get_headers().get_first_value("content-type") {
+            if ctype.starts_with("multipart/encrypted") {
+                if let Some(encrypted_part) = part.subparts.get(1) {
+                    let tmp_path = env::temp_dir().join(Uuid::new_v4().to_string());
+                    let mut tmp_file = File::create(tmp_path.clone()).unwrap();
+                    tmp_file
+                        .write_all(encrypted_part.get_body().unwrap().as_bytes())
+                        .unwrap();
+                    let part = run_cmd(&format!("gpg -dq {}", tmp_path.to_str().unwrap())).unwrap();
+                    build_parts_map_rec(&mailparse::parse_mail(part.as_bytes()).unwrap(), parts)
+                }
+            } else {
+                part.subparts
+                    .iter()
+                    .for_each(|part| build_parts_map_rec(part, parts));
+            }
+        }
     }
 }

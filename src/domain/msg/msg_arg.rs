@@ -25,6 +25,8 @@ type RawMsg<'a> = &'a str;
 type Query = String;
 type AttachmentPaths<'a> = Vec<&'a str>;
 type MaxTableWidth = Option<usize>;
+type Encrypt = bool;
+type Sign = bool;
 
 /// Message commands.
 pub enum Command<'a> {
@@ -39,7 +41,7 @@ pub enum Command<'a> {
     Save(RawMsg<'a>),
     Search(Query, MaxTableWidth, Option<PageSize>, Page),
     Send(RawMsg<'a>),
-    Write(AttachmentPaths<'a>),
+    Write(AttachmentPaths<'a>, Encrypt, Sign),
 
     Flag(Option<flag_arg::Command<'a>>),
     Tpl(Option<tpl_arg::Command<'a>>),
@@ -198,7 +200,11 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         info!("write command matched");
         let attachment_paths: Vec<&str> = m.values_of("attachments").unwrap_or_default().collect();
         debug!("attachments paths: {:?}", attachment_paths);
-        return Ok(Some(Command::Write(attachment_paths)));
+        let encrypt = m.is_present("encrypt");
+        debug!("encrypt: {}", encrypt);
+        let sign = m.is_present("sign");
+        debug!("sign: {}", sign);
+        return Ok(Some(Command::Write(attachment_paths, encrypt, sign)));
     }
 
     if let Some(m) = m.subcommand_matches("template") {
@@ -299,7 +305,19 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                 ),
             SubCommand::with_name("write")
                 .about("Writes a new message")
-                .arg(attachment_arg()),
+                .arg(attachment_arg())
+                .arg(
+                    Arg::with_name("encrypt")
+                        .help("Encrypts the message")
+                        .short("e")
+                        .long("encrypt"),
+                )
+                .arg(
+                    Arg::with_name("sign")
+                        .help("Signs the message")
+                        .short("s")
+                        .long("sign"),
+                ),
             SubCommand::with_name("send")
                 .about("Sends a raw message")
                 .arg(Arg::with_name("message").raw(true).last(true)),

@@ -201,7 +201,7 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
         let mbox = self.mbox.to_owned();
         self.sess()?
             .select(&mbox.name)
-            .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?;
+            .context(format!("cannot select mailbox {}", self.mbox.name))?;
         let fetches = self
             .sess()?
             .fetch(seq, "(ENVELOPE FLAGS INTERNALDATE BODY[])")
