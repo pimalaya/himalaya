@@ -40,7 +40,7 @@ pub fn reply<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>
     imap: &'a mut ImapService,
 ) -> Result<()> {
     let tpl = imap
-        .find_msg(seq)?
+        .find_msg(account, seq)?
         .into_reply(all, account)?
         .to_tpl(opts, account);
     printer.print(tpl)
@@ -55,7 +55,7 @@ pub fn forward<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a
     imap: &'a mut ImapService,
 ) -> Result<()> {
     let tpl = imap
-        .find_msg(seq)?
+        .find_msg(account, seq)?
         .into_forward(account)?
         .to_tpl(opts, account);
     printer.print(tpl)

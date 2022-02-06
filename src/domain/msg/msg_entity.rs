@@ -748,10 +748,10 @@ impl TryInto<Vec<u8>> for &Msg {
     }
 }
 
-impl<'a> TryFrom<&'a imap::types::Fetch> for Msg {
+impl<'a> TryFrom<(&'a Account, &'a imap::types::Fetch)> for Msg {
     type Error = Error;
 
-    fn try_from(fetch: &'a imap::types::Fetch) -> Result<Msg> {
+    fn try_from((account, fetch): (&'a Account, &'a imap::types::Fetch)) -> Result<Msg> {
         let envelope = fetch
             .envelope()
             .ok_or_else(|| anyhow!("cannot get envelope of message {}", fetch.message))?;
@@ -827,14 +827,12 @@ impl<'a> TryFrom<&'a imap::types::Fetch> for Msg {
         let date = fetch.internal_date();
 
         // Get all parts
-        let parts = Parts::from(
-            &mailparse::parse_mail(
-                fetch
-                    .body()
-                    .ok_or_else(|| anyhow!("cannot get body of message {}", id))?,
-            )
-            .context(format!("cannot parse body of message {}", id))?,
-        );
+        let body = fetch
+            .body()
+            .ok_or_else(|| anyhow!("cannot get body of message {}", id))?;
+        let parsed_mail =
+            mailparse::parse_mail(body).context(format!("cannot parse body of message {}", id))?;
+        let parts = Parts::from((account, &parsed_mail));
 
         Ok(Self {
             id,

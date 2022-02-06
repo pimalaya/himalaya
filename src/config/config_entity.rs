@@ -77,6 +77,9 @@ pub struct ConfigAccountEntry {
     pub smtp_insecure: Option<bool>,
     pub smtp_login: String,
     pub smtp_passwd_cmd: String,
+
+    pub pgp_encrypt_cmd: Option<String>,
+    pub pgp_decrypt_cmd: Option<String>,
 }
 
 impl Config {

@@ -31,7 +31,7 @@ pub trait ImapServiceInterface<'a> {
         page_size: &usize,
         page: &usize,
     ) -> Result<Envelopes>;
-    fn find_msg(&mut self, seq: &str) -> Result<Msg>;
+    fn find_msg(&mut self, account: &Account, seq: &str) -> Result<Msg>;
     fn find_raw_msg(&mut self, seq: &str) -> Result<Vec<u8>>;
     fn append_msg(&mut self, mbox: &Mbox, msg: Msg) -> Result<()>;
     fn append_raw_msg_with_flags(&mut self, mbox: &Mbox, msg: &[u8], flags: Flags) -> Result<()>;
@@ -197,7 +197,7 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
     }
 
     /// Find a message by sequence number.
-    fn find_msg(&mut self, seq: &str) -> Result<Msg> {
+    fn find_msg(&mut self, account: &Account, seq: &str) -> Result<Msg> {
         let mbox = self.mbox.to_owned();
         self.sess()?
             .select(&mbox.name)
@@ -210,7 +210,7 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
             .first()
             .ok_or_else(|| anyhow!(r#"cannot find message "{}"#, seq))?;
 
-        Msg::try_from(fetch)
+        Msg::try_from((account, fetch))
     }
 
     fn find_raw_msg(&mut self, seq: &str) -> Result<Vec<u8>> {

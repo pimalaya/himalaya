@@ -119,7 +119,7 @@ fn main() -> Result<()> {
             return msg_handler::move_(seq, mbox, &mut printer, &mut imap);
         }
         Some(msg_arg::Command::Read(seq, text_mime, raw)) => {
-            return msg_handler::read(seq, text_mime, raw, &mut printer, &mut imap);
+            return msg_handler::read(seq, text_mime, raw, &account, &mut printer, &mut imap);
         }
         Some(msg_arg::Command::Reply(seq, all, atts)) => {
             return msg_handler::reply(

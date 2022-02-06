@@ -45,6 +45,9 @@ pub struct Account {
     pub smtp_insecure: bool,
     pub smtp_login: String,
     pub smtp_passwd_cmd: String,
+
+    pub pgp_encrypt_cmd: Option<String>,
+    pub pgp_decrypt_cmd: Option<String>,
 }
 
 impl Account {
@@ -78,6 +81,17 @@ impl Account {
             .to_owned();
 
         Ok(SmtpCredentials::new(self.smtp_login.to_owned(), passwd))
+    }
+
+    pub fn pgp_decrypt_file(&self, filepath: PathBuf) -> Result<Option<String>> {
+        if let Some(cmd) = self.pgp_decrypt_cmd.as_ref() {
+            let decrypt_file_cmd = format!("{} {:?}", cmd, filepath);
+            run_cmd(&decrypt_file_cmd)
+                .map(Some)
+                .context(format!("cannot run decrypt command {:?}", decrypt_file_cmd))
+        } else {
+            Ok(None)
+        }
     }
 }
 
@@ -192,9 +206,12 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
             smtp_insecure: account.smtp_insecure.unwrap_or_default(),
             smtp_login: account.smtp_login.to_owned(),
             smtp_passwd_cmd: account.smtp_passwd_cmd.to_owned(),
+
+            pgp_encrypt_cmd: account.pgp_encrypt_cmd.to_owned(),
+            pgp_decrypt_cmd: account.pgp_decrypt_cmd.to_owned(),
         };
 
-        trace!("{:#?}", account);
+        trace!("account: {:?}", account);
         Ok(account)
     }
 }

@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use log::{error, trace, warn};
 use mailparse::MailHeaderMap;
 use serde::Serialize;
@@ -8,7 +8,7 @@ use std::{
 };
 use uuid::Uuid;
 
-use crate::output::run_cmd;
+use crate::config::Account;
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct TextPlainPart {
@@ -71,15 +71,15 @@ impl DerefMut for Parts {
     }
 }
 
-impl<'a> From<&'a mailparse::ParsedMail<'a>> for Parts {
-    fn from(part: &'a mailparse::ParsedMail<'a>) -> Self {
+impl<'a> From<(&'a Account, &'a mailparse::ParsedMail<'a>)> for Parts {
+    fn from((account, part): (&'a Account, &'a mailparse::ParsedMail<'a>)) -> Self {
         let mut parts = vec![];
-        build_parts_map_rec(part, &mut parts);
+        build_parts_map_rec(account, part, &mut parts);
         Self(parts)
     }
 }
 
-fn build_parts_map_rec(part: &mailparse::ParsedMail, parts: &mut Vec<Part>) {
+fn build_parts_map_rec(account: &Account, part: &mailparse::ParsedMail, parts: &mut Vec<Part>) {
     if part.subparts.is_empty() {
         let content_disp = part.get_content_disposition();
         match content_disp.disposition {
@@ -113,9 +113,11 @@ fn build_parts_map_rec(part: &mailparse::ParsedMail, parts: &mut Vec<Part>) {
         if let Some(ctype) = part.get_headers().get_first_value("content-type") {
             if ctype.starts_with("multipart/encrypted") {
                 if let Some(encrypted_part) = part.subparts.get(1) {
-                    match decrypt_part(encrypted_part) {
+                    match decrypt_part(account, encrypted_part) {
                         Ok(part) => match mailparse::parse_mail(part.as_bytes()) {
-                            Ok(ref decrypted_part) => build_parts_map_rec(decrypted_part, parts),
+                            Ok(ref decrypted_part) => {
+                                build_parts_map_rec(account, decrypted_part, parts)
+                            }
                             Err(err) => {
                                 error!("{}", err);
                                 warn!("cannot parse decrypted content of a multipart/encrypted, skipping it");
@@ -135,7 +137,7 @@ fn build_parts_map_rec(part: &mailparse::ParsedMail, parts: &mut Vec<Part>) {
             } else {
                 part.subparts
                     .iter()
-                    .for_each(|part| build_parts_map_rec(part, parts));
+                    .for_each(|part| build_parts_map_rec(account, part, parts));
             };
         } else {
             warn!("cannot find content type of a multipart, skipping it");
@@ -144,9 +146,8 @@ fn build_parts_map_rec(part: &mailparse::ParsedMail, parts: &mut Vec<Part>) {
     }
 }
 
-fn decrypt_part(encrypted_part: &mailparse::ParsedMail) -> Result<String> {
+fn decrypt_part(account: &Account, encrypted_part: &mailparse::ParsedMail) -> Result<String> {
     let encrypted_part_path = env::temp_dir().join(Uuid::new_v4().to_string());
-    let decrypt_part_cmd = format!("gpg -dq {:?}", encrypted_part_path);
     fs::write(
         encrypted_part_path.clone(),
         encrypted_part.get_body().unwrap().as_bytes(),
@@ -156,10 +157,12 @@ fn decrypt_part(encrypted_part: &mailparse::ParsedMail) -> Result<String> {
             "cannot write encrypted part to temporary file {:?}",
             encrypted_part_path
         );
-        error!("part: {:?}", encrypted_part);
+        trace!("part: {:?}", encrypted_part);
         "cannot decrypt part"
     })?;
-    run_cmd(&decrypt_part_cmd).context(format!("cannot run decrypt command {:?}", decrypt_part_cmd))
+    account
+        .pgp_decrypt_file(encrypted_part_path.clone())?
+        .ok_or_else(|| anyhow!("cannot find pgp decrypt command in config"))
 }
 
 // TODO: this is a small POC for https://github.com/soywod/himalaya/issues/286
