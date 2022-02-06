@@ -6,7 +6,7 @@ use anyhow::Result;
 use atty::Stream;
 use imap::types::Flag;
 use std::{
-    convert::{TryFrom, TryInto},
+    convert::TryFrom,
     io::{self, BufRead},
 };
 
@@ -64,6 +64,7 @@ pub fn forward<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a
 /// Saves a message based on a template.
 pub fn save<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
     mbox: &Mbox,
+    account: &Account,
     attachments_paths: Vec<&str>,
     tpl: &str,
     printer: &mut Printer,
@@ -80,7 +81,7 @@ pub fn save<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
             .join("\n")
     };
     let msg = Msg::from_tpl(&tpl)?.add_attachments(attachments_paths)?;
-    let raw_msg: Vec<u8> = TryInto::try_into(&msg)?;
+    let raw_msg = msg.into_sendable_msg(account)?.formatted();
     let flags = Flags::try_from(vec![Flag::Seen])?;
     imap.append_raw_msg_with_flags(mbox, &raw_msg, flags)?;
     printer.print("Template successfully saved")
@@ -94,6 +95,7 @@ pub fn send<
     SmtpService: SmtpServiceInterface,
 >(
     mbox: &Mbox,
+    account: &Account,
     attachments_paths: Vec<&str>,
     tpl: &str,
     printer: &mut Printer,
@@ -111,7 +113,7 @@ pub fn send<
             .join("\n")
     };
     let msg = Msg::from_tpl(&tpl)?.add_attachments(attachments_paths)?;
-    let sent_msg = smtp.send_msg(&msg)?;
+    let sent_msg = smtp.send_msg(account, &msg)?;
     let flags = Flags::try_from(vec![Flag::Seen])?;
     imap.append_raw_msg_with_flags(mbox, &sent_msg.formatted(), flags)?;
     printer.print("Template successfully sent")

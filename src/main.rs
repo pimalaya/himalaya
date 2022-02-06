@@ -183,10 +183,18 @@ fn main() -> Result<()> {
                 return tpl_handler::forward(seq, tpl, &account, &mut printer, &mut imap);
             }
             Some(tpl_arg::Command::Save(atts, tpl)) => {
-                return tpl_handler::save(&mbox, atts, tpl, &mut printer, &mut imap);
+                return tpl_handler::save(&mbox, &account, atts, tpl, &mut printer, &mut imap);
             }
             Some(tpl_arg::Command::Send(atts, tpl)) => {
-                return tpl_handler::send(&mbox, atts, tpl, &mut printer, &mut imap, &mut smtp);
+                return tpl_handler::send(
+                    &mbox,
+                    &account,
+                    atts,
+                    tpl,
+                    &mut printer,
+                    &mut imap,
+                    &mut smtp,
+                );
             }
             _ => (),
         },

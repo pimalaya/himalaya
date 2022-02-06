@@ -5,12 +5,7 @@
 use anyhow::{anyhow, Context, Result};
 use log::{debug, log_enabled, trace, Level};
 use native_tls::{TlsConnector, TlsStream};
-use std::{
-    collections::HashSet,
-    convert::{TryFrom, TryInto},
-    net::TcpStream,
-    thread,
-};
+use std::{collections::HashSet, convert::TryFrom, net::TcpStream, thread};
 
 use crate::{
     config::{Account, Config},
@@ -33,7 +28,7 @@ pub trait ImapServiceInterface<'a> {
     ) -> Result<Envelopes>;
     fn find_msg(&mut self, account: &Account, seq: &str) -> Result<Msg>;
     fn find_raw_msg(&mut self, seq: &str) -> Result<Vec<u8>>;
-    fn append_msg(&mut self, mbox: &Mbox, msg: Msg) -> Result<()>;
+    fn append_msg(&mut self, mbox: &Mbox, account: &Account, msg: Msg) -> Result<()>;
     fn append_raw_msg_with_flags(&mut self, mbox: &Mbox, msg: &[u8], flags: Flags) -> Result<()>;
     fn expunge(&mut self) -> Result<()>;
     fn logout(&mut self) -> Result<()>;
@@ -238,8 +233,8 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
         Ok(())
     }
 
-    fn append_msg(&mut self, mbox: &Mbox, msg: Msg) -> Result<()> {
-        let msg_raw: Vec<u8> = (&msg).try_into()?;
+    fn append_msg(&mut self, mbox: &Mbox, account: &Account, msg: Msg) -> Result<()> {
+        let msg_raw = msg.into_sendable_msg(account)?.formatted();
         self.sess()?
             .append(&mbox.name, &msg_raw)
             .flags(msg.flags.0)

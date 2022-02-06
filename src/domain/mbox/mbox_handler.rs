@@ -127,13 +127,13 @@ mod tests {
             fn fetch_envelopes_with(&mut self, _: &str, _: &usize, _: &usize) -> Result<Envelopes> {
                 unimplemented!()
             }
-            fn find_msg(&mut self, _: &str) -> Result<Msg> {
+            fn find_msg(&mut self, _: &Account, _: &str) -> Result<Msg> {
                 unimplemented!()
             }
             fn find_raw_msg(&mut self, _: &str) -> Result<Vec<u8>> {
                 unimplemented!()
             }
-            fn append_msg(&mut self, _: &Mbox, _: Msg) -> Result<()> {
+            fn append_msg(&mut self, _: &Mbox, _: &Account, _: Msg) -> Result<()> {
                 unimplemented!()
             }
             fn append_raw_msg_with_flags(&mut self, _: &Mbox, _: &[u8], _: Flags) -> Result<()> {
