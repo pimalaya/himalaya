@@ -3,7 +3,7 @@ use anyhow::{anyhow, Context, Error, Result};
 use chrono::{DateTime, FixedOffset};
 use html_escape;
 use imap::types::Flag;
-use lettre::message::{header::ContentType, Attachment, Body, MultiPart, SinglePart};
+use lettre::message::{header::ContentType, Attachment, MultiPart, SinglePart};
 use log::{debug, info, trace};
 use regex::Regex;
 use rfc2047_decoder;
@@ -672,15 +672,33 @@ impl Msg {
 
         let text_plain_body = self.fold_text_plain_parts();
         let multipart = if self.encrypt {
-            let tmp_path = temp_dir().join(Uuid::new_v4().to_string());
+            let part = SinglePart::plain(text_plain_body);
+            let hash = format!("{:x}", md5::compute(&part.formatted()));
+            debug!("part hash: {}", hash);
+            let tmp_file = temp_dir().join(Uuid::new_v4().to_string());
+            fs::write(tmp_file.clone(), hash)?;
+            let encrypted_hash = account
+                .pgp_encrypt_file(&account.email, tmp_file.clone())?
+                .ok_or_else(|| anyhow!("cannot find pgp encrypt command in config"))?;
+
             fs::write(
-                tmp_path.clone(),
-                SinglePart::plain(text_plain_body).formatted(),
+                tmp_file.clone(),
+                MultiPart::signed(
+                    String::from("application/pgp-signature"),
+                    String::from("pgp-md5"),
+                )
+                .singlepart(part)
+                .singlepart(
+                    SinglePart::builder()
+                        .header(ContentType::parse("application/pgp-signature").unwrap())
+                        .body(encrypted_hash),
+                )
+                .formatted(),
             )?;
             let encrypted_part = account
                 .pgp_encrypt_file(
-                    &self.to.as_ref().unwrap().first().unwrap().email,
-                    tmp_path.clone(),
+                    &self.to.as_ref().unwrap().first().unwrap().email.to_string(),
+                    tmp_file.clone(),
                 )?
                 .ok_or_else(|| anyhow!("cannot find pgp encrypt command in config"))?;
             trace!("encrypted part: {}", encrypted_part);
@@ -693,7 +711,7 @@ impl Msg {
                 .singlepart(
                     SinglePart::builder()
                         .header(ContentType::parse("application/octet-stream").unwrap())
-                        .body(Body::new(encrypted_part)),
+                        .body(encrypted_part),
                 )
         } else {
             let mut multipart =

@@ -83,11 +83,7 @@ impl Account {
         Ok(SmtpCredentials::new(self.smtp_login.to_owned(), passwd))
     }
 
-    pub fn pgp_encrypt_file(
-        &self,
-        addr: &lettre::Address,
-        path: PathBuf,
-    ) -> Result<Option<String>> {
+    pub fn pgp_encrypt_file(&self, addr: &str, path: PathBuf) -> Result<Option<String>> {
         if let Some(cmd) = self.pgp_encrypt_cmd.as_ref() {
             let encrypt_file_cmd = format!("{} {} {:?}", cmd, addr, path);
             run_cmd(&encrypt_file_cmd).map(Some).context(format!(
