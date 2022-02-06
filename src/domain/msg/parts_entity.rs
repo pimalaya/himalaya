@@ -1,9 +1,9 @@
+use anyhow::{Context, Result};
+use log::{error, trace, warn};
 use mailparse::MailHeaderMap;
 use serde::Serialize;
 use std::{
-    env,
-    fs::File,
-    io::Write,
+    env, fs,
     ops::{Deref, DerefMut},
 };
 use uuid::Uuid;
@@ -113,21 +113,53 @@ fn build_parts_map_rec(part: &mailparse::ParsedMail, parts: &mut Vec<Part>) {
         if let Some(ctype) = part.get_headers().get_first_value("content-type") {
             if ctype.starts_with("multipart/encrypted") {
                 if let Some(encrypted_part) = part.subparts.get(1) {
-                    let tmp_path = env::temp_dir().join(Uuid::new_v4().to_string());
-                    let mut tmp_file = File::create(tmp_path.clone()).unwrap();
-                    tmp_file
-                        .write_all(encrypted_part.get_body().unwrap().as_bytes())
-                        .unwrap();
-                    let part = run_cmd(&format!("gpg -dq {}", tmp_path.to_str().unwrap())).unwrap();
-                    build_parts_map_rec(&mailparse::parse_mail(part.as_bytes()).unwrap(), parts)
+                    match decrypt_part(encrypted_part) {
+                        Ok(part) => match mailparse::parse_mail(part.as_bytes()) {
+                            Ok(ref decrypted_part) => build_parts_map_rec(decrypted_part, parts),
+                            Err(err) => {
+                                error!("{}", err);
+                                warn!("cannot parse decrypted content of a multipart/encrypted, skipping it");
+                                trace!("part: {:?}", part);
+                            }
+                        },
+                        Err(err) => {
+                            error!("{}", err);
+                            warn!("cannot decrypt content of a multipart/encrypted, skipping it");
+                            trace!("encrypted part: {:?}", encrypted_part);
+                        }
+                    }
+                } else {
+                    warn!("cannot find encrypted content of a multipart/encrypted, skipping it");
+                    trace!("multipart: {:?}", part);
                 }
             } else {
                 part.subparts
                     .iter()
                     .for_each(|part| build_parts_map_rec(part, parts));
-            }
+            };
+        } else {
+            warn!("cannot find content type of a multipart, skipping it");
+            trace!("part: {:?}", part);
         }
     }
+}
+
+fn decrypt_part(encrypted_part: &mailparse::ParsedMail) -> Result<String> {
+    let encrypted_part_path = env::temp_dir().join(Uuid::new_v4().to_string());
+    let decrypt_part_cmd = format!("gpg -dq {:?}", encrypted_part_path);
+    fs::write(
+        encrypted_part_path.clone(),
+        encrypted_part.get_body().unwrap().as_bytes(),
+    )
+    .with_context(|| {
+        error!(
+            "cannot write encrypted part to temporary file {:?}",
+            encrypted_part_path
+        );
+        error!("part: {:?}", encrypted_part);
+        "cannot decrypt part"
+    })?;
+    run_cmd(&decrypt_part_cmd).context(format!("cannot run decrypt command {:?}", decrypt_part_cmd))
 }
 
 // TODO: this is a small POC for https://github.com/soywod/himalaya/issues/286
