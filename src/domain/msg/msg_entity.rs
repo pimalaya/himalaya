@@ -63,7 +63,6 @@ pub struct Msg {
     pub parts: Parts,
 
     pub encrypt: bool,
-    pub sign: bool,
 }
 
 impl Msg {
@@ -418,11 +417,6 @@ impl Msg {
         self
     }
 
-    pub fn sign(mut self, sign: bool) -> Self {
-        self.sign = sign;
-        self
-    }
-
     pub fn add_attachments(mut self, attachments_paths: Vec<&str>) -> Result<Self> {
         for path in attachments_paths {
             let path = shellexpand::full(path)
@@ -670,50 +664,7 @@ impl Msg {
                 .fold(msg_builder, |builder, addr| builder.bcc(addr.to_owned()))
         };
 
-        let text_plain_body = self.fold_text_plain_parts();
-        let multipart = if self.encrypt {
-            let part = SinglePart::plain(text_plain_body);
-            let hash = format!("{:x}", md5::compute(&part.formatted()));
-            debug!("part hash: {}", hash);
-            let tmp_file = temp_dir().join(Uuid::new_v4().to_string());
-            fs::write(tmp_file.clone(), hash)?;
-            let encrypted_hash = account
-                .pgp_encrypt_file(&account.email, tmp_file.clone())?
-                .ok_or_else(|| anyhow!("cannot find pgp encrypt command in config"))?;
-
-            fs::write(
-                tmp_file.clone(),
-                MultiPart::signed(
-                    String::from("application/pgp-signature"),
-                    String::from("pgp-md5"),
-                )
-                .singlepart(part)
-                .singlepart(
-                    SinglePart::builder()
-                        .header(ContentType::parse("application/pgp-signature").unwrap())
-                        .body(encrypted_hash),
-                )
-                .formatted(),
-            )?;
-            let encrypted_part = account
-                .pgp_encrypt_file(
-                    &self.to.as_ref().unwrap().first().unwrap().email.to_string(),
-                    tmp_file.clone(),
-                )?
-                .ok_or_else(|| anyhow!("cannot find pgp encrypt command in config"))?;
-            trace!("encrypted part: {}", encrypted_part);
-            MultiPart::encrypted(String::from("application/pgp-encrypted"))
-                .singlepart(
-                    SinglePart::builder()
-                        .header(ContentType::parse("application/pgp-encrypted").unwrap())
-                        .body(String::from("Version: 1")),
-                )
-                .singlepart(
-                    SinglePart::builder()
-                        .header(ContentType::parse("application/octet-stream").unwrap())
-                        .body(encrypted_part),
-                )
-        } else {
+        let mut multipart = {
             let mut multipart =
                 MultiPart::mixed().singlepart(SinglePart::plain(self.fold_text_plain_parts()));
             for part in self.attachments() {
@@ -727,6 +678,29 @@ impl Msg {
             }
             multipart
         };
+
+        if self.encrypt {
+            let multipart_buffer = temp_dir().join(Uuid::new_v4().to_string());
+            fs::write(multipart_buffer.clone(), multipart.formatted())?;
+            let encrypted_multipart = account
+                .pgp_encrypt_file(
+                    &self.to.as_ref().unwrap().first().unwrap().email.to_string(),
+                    multipart_buffer.clone(),
+                )?
+                .ok_or_else(|| anyhow!("cannot find pgp encrypt command in config"))?;
+            trace!("encrypted multipart: {:#?}", encrypted_multipart);
+            multipart = MultiPart::encrypted(String::from("application/pgp-encrypted"))
+                .singlepart(
+                    SinglePart::builder()
+                        .header(ContentType::parse("application/pgp-encrypted").unwrap())
+                        .body(String::from("Version: 1")),
+                )
+                .singlepart(
+                    SinglePart::builder()
+                        .header(ContentType::parse("application/octet-stream").unwrap())
+                        .body(encrypted_multipart),
+                )
+        }
 
         msg_builder
             .multipart(multipart)
@@ -853,7 +827,6 @@ impl<'a> TryFrom<(&'a Account, &'a imap::types::Fetch)> for Msg {
             date,
             parts,
             encrypt: false,
-            sign: false,
         })
     }
 }

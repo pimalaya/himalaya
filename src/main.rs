@@ -149,16 +149,8 @@ fn main() -> Result<()> {
         Some(msg_arg::Command::Send(raw_msg)) => {
             return msg_handler::send(raw_msg, &account, &mut printer, &mut imap, &mut smtp);
         }
-        Some(msg_arg::Command::Write(atts, encrypt, sign)) => {
-            return msg_handler::write(
-                atts,
-                encrypt,
-                sign,
-                &account,
-                &mut printer,
-                &mut imap,
-                &mut smtp,
-            );
+        Some(msg_arg::Command::Write(atts, encrypt)) => {
+            return msg_handler::write(atts, encrypt, &account, &mut printer, &mut imap, &mut smtp);
         }
         Some(msg_arg::Command::Flag(m)) => match m {
             Some(flag_arg::Command::Set(seq_range, flags)) => {

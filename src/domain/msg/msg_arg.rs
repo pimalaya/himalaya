@@ -26,7 +26,6 @@ type Query = String;
 type AttachmentPaths<'a> = Vec<&'a str>;
 type MaxTableWidth = Option<usize>;
 type Encrypt = bool;
-type Sign = bool;
 
 /// Message commands.
 pub enum Command<'a> {
@@ -41,7 +40,7 @@ pub enum Command<'a> {
     Save(RawMsg<'a>),
     Search(Query, MaxTableWidth, Option<PageSize>, Page),
     Send(RawMsg<'a>),
-    Write(AttachmentPaths<'a>, Encrypt, Sign),
+    Write(AttachmentPaths<'a>, Encrypt),
 
     Flag(Option<flag_arg::Command<'a>>),
     Tpl(Option<tpl_arg::Command<'a>>),
@@ -202,9 +201,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         debug!("attachments paths: {:?}", attachment_paths);
         let encrypt = m.is_present("encrypt");
         debug!("encrypt: {}", encrypt);
-        let sign = m.is_present("sign");
-        debug!("sign: {}", sign);
-        return Ok(Some(Command::Write(attachment_paths, encrypt, sign)));
+        return Ok(Some(Command::Write(attachment_paths, encrypt)));
     }
 
     if let Some(m) = m.subcommand_matches("template") {
@@ -311,12 +308,6 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                         .help("Encrypts the message")
                         .short("e")
                         .long("encrypt"),
-                )
-                .arg(
-                    Arg::with_name("sign")
-                        .help("Signs the message")
-                        .short("s")
-                        .long("sign"),
                 ),
             SubCommand::with_name("send")
                 .about("Sends a raw message")

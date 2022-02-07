@@ -50,11 +50,6 @@ impl Parts {
         self.push(Part::TextPlain(part));
     }
 
-    pub fn replace_text_html_parts_with(&mut self, part: TextHtmlPart) {
-        self.retain(|part| !matches!(part, Part::TextHtml(_)));
-        self.push(Part::TextHtml(part));
-    }
-
     pub fn from_parsed_mail<'a>(
         account: &'a Account,
         part: &'a mailparse::ParsedMail<'a>,

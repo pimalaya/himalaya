@@ -349,7 +349,6 @@ pub fn write<
 >(
     attachments_paths: Vec<&str>,
     encrypt: bool,
-    sign: bool,
     account: &Account,
     printer: &mut Printer,
     imap: &mut ImapService,
@@ -358,6 +357,5 @@ pub fn write<
     Msg::default()
         .add_attachments(attachments_paths)?
         .encrypt(encrypt)
-        .sign(sign)
         .edit_with_editor(account, printer, imap, smtp)
 }
