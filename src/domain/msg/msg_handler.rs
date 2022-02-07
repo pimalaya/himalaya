@@ -91,6 +91,7 @@ pub fn forward<
 >(
     seq: &str,
     attachments_paths: Vec<&str>,
+    encrypt: bool,
     account: &Account,
     printer: &mut Printer,
     imap: &mut ImapService,
@@ -99,6 +100,7 @@ pub fn forward<
     imap.find_msg(account, seq)?
         .into_forward(account)?
         .add_attachments(attachments_paths)?
+        .encrypt(encrypt)
         .edit_with_editor(account, printer, imap, smtp)
 }
 
@@ -235,6 +237,7 @@ pub fn reply<
     seq: &str,
     all: bool,
     attachments_paths: Vec<&str>,
+    encrypt: bool,
     account: &Account,
     printer: &mut Printer,
     imap: &mut ImapService,
@@ -243,6 +246,7 @@ pub fn reply<
     imap.find_msg(account, seq)?
         .into_reply(all, account)?
         .add_attachments(attachments_paths)?
+        .encrypt(encrypt)
         .edit_with_editor(account, printer, imap, smtp)?;
     let flags = Flags::try_from(vec![Flag::Answered])?;
     imap.add_flags(seq, &flags)
