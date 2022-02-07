@@ -275,6 +275,7 @@ pub fn attachment_arg<'a>() -> Arg<'a, 'a> {
         .multiple(true)
 }
 
+/// Message encrypt argument.
 pub fn encrypt_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name("encrypt")
         .help("Encrypts the message")
@@ -346,13 +347,13 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                 .arg(seq_arg())
                 .arg(reply_all_arg())
                 .arg(attachment_arg())
-	        .arg(encrypt_arg()),
+		.arg(encrypt_arg()),
             SubCommand::with_name("forward")
                 .aliases(&["fwd", "f"])
                 .about("Forwards a message")
                 .arg(seq_arg())
                 .arg(attachment_arg())
-	        .arg(encrypt_arg()),
+		.arg(encrypt_arg()),
             SubCommand::with_name("copy")
                 .aliases(&["cp", "c"])
                 .about("Copies a message to the targetted mailbox")
