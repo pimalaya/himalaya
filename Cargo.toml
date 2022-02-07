@@ -29,7 +29,6 @@ imap-proto = "0.14.3"
 lettre = { version = "0.10.0-rc.1", features = ["serde"] }
 log = "0.4.14"
 mailparse = "0.13.6"
-md5 = "0.7.0"
 native-tls = "0.2.8"
 regex = "1.5.4"
 rfc2047-decoder = "0.1.2"
