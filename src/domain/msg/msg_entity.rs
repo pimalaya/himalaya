@@ -837,7 +837,7 @@ impl<'a> TryFrom<(&'a Account, &'a imap::types::Fetch)> for Msg {
             .ok_or_else(|| anyhow!("cannot get body of message {}", id))?;
         let parsed_mail =
             mailparse::parse_mail(body).context(format!("cannot parse body of message {}", id))?;
-        let parts = Parts::from((account, &parsed_mail));
+        let parts = Parts::from_parsed_mail(account, &parsed_mail)?;
 
         Ok(Self {
             id,
