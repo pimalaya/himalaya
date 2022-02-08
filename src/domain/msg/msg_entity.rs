@@ -3,16 +3,19 @@ use anyhow::{anyhow, Context, Error, Result};
 use chrono::{DateTime, FixedOffset};
 use html_escape;
 use imap::types::Flag;
-use lettre::message::{Attachment, MultiPart, SinglePart};
-use log::trace;
+use lettre::message::{header::ContentType, Attachment, MultiPart, SinglePart};
+use log::{debug, info, trace};
 use regex::Regex;
 use rfc2047_decoder;
 use std::{
     collections::HashSet,
     convert::{TryFrom, TryInto},
+    env::temp_dir,
+    fmt::Debug,
     fs,
     path::PathBuf,
 };
+use uuid::Uuid;
 
 use crate::{
     config::{Account, DEFAULT_SIG_DELIM},
@@ -58,6 +61,8 @@ pub struct Msg {
     /// [RFC3501]: https://datatracker.ietf.org/doc/html/rfc3501#section-2.3.3
     pub date: Option<DateTime<FixedOffset>>,
     pub parts: Parts,
+
+    pub encrypt: bool,
 }
 
 impl Msg {
@@ -71,7 +76,7 @@ impl Msg {
             .collect()
     }
 
-    /// Fold string body from all plain text parts into a single string body. If no plain text
+    /// Folds string body from all plain text parts into a single string body. If no plain text
     /// parts are found, HTML parts are used instead. The result is sanitized (all HTML markup is
     /// removed).
     pub fn fold_text_plain_parts(&self) -> String {
@@ -334,6 +339,8 @@ impl Msg {
         imap: &mut ImapService,
         smtp: &mut SmtpService,
     ) -> Result<()> {
+        info!("start editing with editor");
+
         let draft = msg_utils::local_draft_path();
         if draft.exists() {
             loop {
@@ -364,7 +371,7 @@ impl Msg {
             match choice::post_edit() {
                 Ok(PostEditChoice::Send) => {
                     let mbox = Mbox::new(&account.sent_folder);
-                    let sent_msg = smtp.send_msg(&self)?;
+                    let sent_msg = smtp.send_msg(account, &self)?;
                     let flags = Flags::try_from(vec![Flag::Seen])?;
                     imap.append_raw_msg_with_flags(&mbox, &sent_msg.formatted(), flags)?;
                     msg_utils::remove_local_draft()?;
@@ -403,6 +410,11 @@ impl Msg {
         }
 
         Ok(())
+    }
+
+    pub fn encrypt(mut self, encrypt: bool) -> Self {
+        self.encrypt = encrypt;
+        self
     }
 
     pub fn add_attachments(mut self, attachments_paths: Vec<&str>) -> Result<Self> {
@@ -547,99 +559,73 @@ impl Msg {
 
         tpl.push('\n');
 
-        trace!("template: {:#?}", tpl);
+        trace!("template: {:?}", tpl);
         tpl
     }
 
     pub fn from_tpl(tpl: &str) -> Result<Self> {
+        info!("begin: building message from template");
+        trace!("template: {:?}", tpl);
+
         let mut msg = Msg::default();
+        let parsed_msg = mailparse::parse_mail(tpl.as_bytes()).context("cannot parse template")?;
 
-        let parsed_msg =
-            mailparse::parse_mail(tpl.as_bytes()).context("cannot parse message from template")?;
-
+        debug!("parsing headers");
         for header in parsed_msg.get_headers() {
             let key = header.get_key();
+            debug!("header key: {:?}", key);
+
+            let val = header.get_value();
             let val = String::from_utf8(header.get_value_raw().to_vec())
-                .map(|val| val.trim().to_string())?;
+                .map(|val| val.trim().to_string())
+                .context(format!(
+                    "cannot decode value {:?} from header {:?}",
+                    key, val
+                ))?;
+            debug!("header value: {:?}", val);
 
             match key.to_lowercase().as_str() {
-                "message-id" => msg.message_id = Some(val.to_owned()),
-                "from" => {
-                    msg.from = Some(
-                        val.split(',')
-                            .filter_map(|addr| addr.parse().ok())
-                            .collect::<Vec<_>>(),
-                    );
-                }
-                "to" => {
-                    msg.to = Some(
-                        val.split(',')
-                            .filter_map(|addr| addr.parse().ok())
-                            .collect::<Vec<_>>(),
-                    );
-                }
-                "reply-to" => {
-                    msg.reply_to = Some(
-                        val.split(',')
-                            .filter_map(|addr| addr.parse().ok())
-                            .collect::<Vec<_>>(),
-                    );
-                }
-                "in-reply-to" => msg.in_reply_to = Some(val.to_owned()),
-                "cc" => {
-                    msg.cc = Some(
-                        val.split(',')
-                            .filter_map(|addr| addr.parse().ok())
-                            .collect::<Vec<_>>(),
-                    );
-                }
-                "bcc" => {
-                    msg.bcc = Some(
-                        val.split(',')
-                            .filter_map(|addr| addr.parse().ok())
-                            .collect::<Vec<_>>(),
-                    );
-                }
+                "message-id" => msg.message_id = Some(val),
+                "in-reply-to" => msg.in_reply_to = Some(val),
                 "subject" => {
                     msg.subject = val;
+                }
+                "from" => {
+                    msg.from = parse_addrs(val).context(format!("cannot parse header {:?}", key))?
+                }
+                "to" => {
+                    msg.to = parse_addrs(val).context(format!("cannot parse header {:?}", key))?
+                }
+                "reply-to" => {
+                    msg.reply_to =
+                        parse_addrs(val).context(format!("cannot parse header {:?}", key))?
+                }
+                "cc" => {
+                    msg.cc = parse_addrs(val).context(format!("cannot parse header {:?}", key))?
+                }
+                "bcc" => {
+                    msg.bcc = parse_addrs(val).context(format!("cannot parse header {:?}", key))?
                 }
                 _ => (),
             }
         }
 
-        let content = parsed_msg
+        debug!("parsing body");
+        let body = parsed_msg
             .get_body_raw()
-            .context("cannot get body from parsed message")?;
-        let content = String::from_utf8(content).context("cannot decode body from utf-8")?;
-        msg.parts.push(Part::TextPlain(TextPlainPart { content }));
+            .context("cannot get raw body from message")
+            .and_then(|body| String::from_utf8(body).context("cannot decode body from utf8"))?;
+        trace!("body: {:?}", body);
 
+        msg.parts
+            .push(Part::TextPlain(TextPlainPart { content: body }));
+
+        info!("end: building message from template");
+        trace!("message: {:?}", msg);
         Ok(msg)
     }
-}
 
-impl TryInto<lettre::address::Envelope> for Msg {
-    type Error = Error;
-
-    fn try_into(self) -> Result<lettre::address::Envelope> {
-        let from: Option<lettre::Address> = self
-            .from
-            .and_then(|addrs| addrs.into_iter().next())
-            .map(|addr| addr.email);
-        let to = self
-            .to
-            .map(|addrs| addrs.into_iter().map(|addr| addr.email).collect())
-            .unwrap_or_default();
-        let envelope =
-            lettre::address::Envelope::new(from, to).context("cannot create envelope")?;
-
-        Ok(envelope)
-    }
-}
-
-impl TryInto<lettre::Message> for &Msg {
-    type Error = Error;
-
-    fn try_into(self) -> Result<lettre::Message> {
+    pub fn into_sendable_msg(&self, account: &Account) -> Result<lettre::Message> {
         let mut msg_builder = lettre::Message::builder()
             .message_id(self.message_id.to_owned())
             .subject(self.subject.to_owned());
@@ -678,17 +664,42 @@ impl TryInto<lettre::Message> for &Msg {
                 .fold(msg_builder, |builder, addr| builder.bcc(addr.to_owned()))
         };
 
-        let mut multipart =
-            MultiPart::mixed().singlepart(SinglePart::plain(self.fold_text_plain_parts()));
+        let mut multipart = {
+            let mut multipart =
+                MultiPart::mixed().singlepart(SinglePart::plain(self.fold_text_plain_parts()));
+            for part in self.attachments() {
+                multipart = multipart.singlepart(Attachment::new(part.filename.clone()).body(
+                    part.content,
+                    part.mime.parse().context(format!(
+                        "cannot parse content type of attachment {}",
+                        part.filename
+                    ))?,
+                ))
+            }
+            multipart
+        };
 
-        for part in self.attachments() {
-            let filename = part.filename;
-            let content = part.content;
-            let mime = part.mime.parse().context(format!(
-                r#"cannot parse content type of attachment "{}""#,
-                filename
-            ))?;
-            multipart = multipart.singlepart(Attachment::new(filename).body(content, mime))
+        if self.encrypt {
+            let multipart_buffer = temp_dir().join(Uuid::new_v4().to_string());
+            fs::write(multipart_buffer.clone(), multipart.formatted())?;
+            let encrypted_multipart = account
+                .pgp_encrypt_file(
+                    &self.to.as_ref().unwrap().first().unwrap().email.to_string(),
+                    multipart_buffer.clone(),
+                )?
+                .ok_or_else(|| anyhow!("cannot find pgp encrypt command in config"))?;
+            trace!("encrypted multipart: {:#?}", encrypted_multipart);
+            multipart = MultiPart::encrypted(String::from("application/pgp-encrypted"))
+                .singlepart(
+                    SinglePart::builder()
+                        .header(ContentType::parse("application/pgp-encrypted").unwrap())
+                        .body(String::from("Version: 1")),
+                )
+                .singlepart(
+                    SinglePart::builder()
+                        .header(ContentType::parse("application/octet-stream").unwrap())
+                        .body(encrypted_multipart),
+                )
         }
 
         msg_builder
@@ -697,19 +708,29 @@ impl TryInto<lettre::Message> for &Msg {
     }
 }
 
-impl TryInto<Vec<u8>> for &Msg {
+impl TryInto<lettre::address::Envelope> for Msg {
     type Error = Error;
 
-    fn try_into(self) -> Result<Vec<u8>> {
-        let msg: lettre::Message = self.try_into()?;
-        Ok(msg.formatted())
+    fn try_into(self) -> Result<lettre::address::Envelope> {
+        let from: Option<lettre::Address> = self
+            .from
+            .and_then(|addrs| addrs.into_iter().next())
+            .map(|addr| addr.email);
+        let to = self
+            .to
+            .map(|addrs| addrs.into_iter().map(|addr| addr.email).collect())
+            .unwrap_or_default();
+        let envelope =
+            lettre::address::Envelope::new(from, to).context("cannot create envelope")?;
+
+        Ok(envelope)
     }
 }
 
-impl<'a> TryFrom<&'a imap::types::Fetch> for Msg {
+impl<'a> TryFrom<(&'a Account, &'a imap::types::Fetch)> for Msg {
     type Error = Error;
 
-    fn try_from(fetch: &'a imap::types::Fetch) -> Result<Msg> {
+    fn try_from((account, fetch): (&'a Account, &'a imap::types::Fetch)) -> Result<Msg> {
         let envelope = fetch
             .envelope()
             .ok_or_else(|| anyhow!("cannot get envelope of message {}", fetch.message))?;
@@ -737,28 +758,28 @@ impl<'a> TryFrom<&'a imap::types::Fetch> for Msg {
             .sender
             .as_deref()
             .or_else(|| envelope.from.as_deref())
-            .map(parse_addrs)
+            .map(to_addrs)
         {
             Some(addrs) => Some(addrs?),
             None => None,
         };
 
         // Get the "Reply-To" address(es)
-        let reply_to = parse_some_addrs(&envelope.reply_to).context(format!(
+        let reply_to = to_some_addrs(&envelope.reply_to).context(format!(
             r#"cannot parse "reply to" address of message {}"#,
             id
         ))?;
 
         // Get the recipient(s) address(es)
-        let to = parse_some_addrs(&envelope.to)
+        let to = to_some_addrs(&envelope.to)
             .context(format!(r#"cannot parse "to" address of message {}"#, id))?;
 
         // Get the "Cc" recipient(s) address(es)
-        let cc = parse_some_addrs(&envelope.cc)
+        let cc = to_some_addrs(&envelope.cc)
             .context(format!(r#"cannot parse "cc" address of message {}"#, id))?;
 
         // Get the "Bcc" recipient(s) address(es)
-        let bcc = parse_some_addrs(&envelope.bcc)
+        let bcc = to_some_addrs(&envelope.bcc)
             .context(format!(r#"cannot parse "bcc" address of message {}"#, id))?;
 
         // Get the "In-Reply-To" message identifier
@@ -785,14 +806,12 @@ impl<'a> TryFrom<&'a imap::types::Fetch> for Msg {
         let date = fetch.internal_date();
 
         // Get all parts
-        let parts = Parts::from(
-            &mailparse::parse_mail(
-                fetch
-                    .body()
-                    .ok_or_else(|| anyhow!("cannot get body of message {}", id))?,
-            )
-            .context(format!("cannot parse body of message {}", id))?,
-        );
+        let body = fetch
+            .body()
+            .ok_or_else(|| anyhow!("cannot get body of message {}", id))?;
+        let parsed_mail =
+            mailparse::parse_mail(body).context(format!("cannot parse body of message {}", id))?;
+        let parts = Parts::from_parsed_mail(account, &parsed_mail)?;
 
         Ok(Self {
             id,
@@ -807,11 +826,29 @@ impl<'a> TryFrom<&'a imap::types::Fetch> for Msg {
             message_id,
             date,
             parts,
+            encrypt: false,
         })
     }
 }
 
-pub fn parse_addr(addr: &imap_proto::Address) -> Result<Addr> {
+pub fn parse_addr<S: AsRef<str> + Debug>(raw_addr: S) -> Result<Addr> {
+    raw_addr
+        .as_ref()
+        .trim()
+        .parse()
+        .context(format!("cannot parse address {:?}", raw_addr))
+}
+
+pub fn parse_addrs<S: AsRef<str> + Debug>(raw_addrs: S) -> Result<Option<Vec<Addr>>> {
+    let mut addrs: Vec<Addr> = vec![];
+    for raw_addr in raw_addrs.as_ref().split(',') {
+        addrs
+            .push(parse_addr(raw_addr).context(format!("cannot parse addresses {:?}", raw_addrs))?);
+    }
+    Ok(if addrs.is_empty() { None } else { Some(addrs) })
+}
+
+pub fn to_addr(addr: &imap_proto::Address) -> Result<Addr> {
     let name = addr
         .name
         .as_ref()
@@ -839,17 +876,16 @@ pub fn parse_addr(addr: &imap_proto::Address) -> Result<Addr> {
     Ok(Addr::new(name, lettre::Address::new(mbox, host)?))
 }
 
-pub fn parse_addrs(addrs: &[imap_proto::Address]) -> Result<Vec<Addr>> {
+pub fn to_addrs(addrs: &[imap_proto::Address]) -> Result<Vec<Addr>> {
     let mut parsed_addrs = vec![];
     for addr in addrs {
-        parsed_addrs
-            .push(parse_addr(addr).context(format!(r#"cannot parse address "{:?}""#, addr))?);
+        parsed_addrs.push(to_addr(addr).context(format!(r#"cannot parse address "{:?}""#, addr))?);
     }
     Ok(parsed_addrs)
 }
 
-pub fn parse_some_addrs(addrs: &Option<Vec<imap_proto::Address>>) -> Result<Option<Vec<Addr>>> {
-    Ok(match addrs.as_deref().map(parse_addrs) {
+pub fn to_some_addrs(addrs: &Option<Vec<imap_proto::Address>>) -> Result<Option<Vec<Addr>>> {
+    Ok(match addrs.as_deref().map(to_addrs) {
         Some(addrs) => Some(addrs?),
         None => None,
     })

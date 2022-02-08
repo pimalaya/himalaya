@@ -51,15 +51,17 @@ pub enum Command<'a> {
 
 /// Message template command matcher.
 pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
+    info!("entering message template command matcher");
+
     if let Some(m) = m.subcommand_matches("new") {
-        info!("new command matched");
+        info!("new subcommand matched");
         let tpl = TplOverride::from(m);
         trace!("template override: {:?}", tpl);
         return Ok(Some(Command::New(tpl)));
     }
 
     if let Some(m) = m.subcommand_matches("reply") {
-        info!("reply command matched");
+        info!("reply subcommand matched");
         let seq = m.value_of("seq").unwrap();
         debug!("sequence: {}", seq);
         let all = m.is_present("reply-all");
@@ -70,7 +72,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
     }
 
     if let Some(m) = m.subcommand_matches("forward") {
-        info!("forward command matched");
+        info!("forward subcommand matched");
         let seq = m.value_of("seq").unwrap();
         debug!("sequence: {}", seq);
         let tpl = TplOverride::from(m);
@@ -79,7 +81,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
     }
 
     if let Some(m) = m.subcommand_matches("save") {
-        info!("save command matched");
+        info!("save subcommand matched");
         let attachment_paths: Vec<&str> = m.values_of("attachments").unwrap_or_default().collect();
         trace!("attachments paths: {:?}", attachment_paths);
         let tpl = m.value_of("template").unwrap_or_default();
@@ -88,7 +90,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
     }
 
     if let Some(m) = m.subcommand_matches("send") {
-        info!("send command matched");
+        info!("send subcommand matched");
         let attachment_paths: Vec<&str> = m.values_of("attachments").unwrap_or_default().collect();
         trace!("attachments paths: {:?}", attachment_paths);
         let tpl = m.value_of("template").unwrap_or_default();

@@ -3,7 +3,7 @@
 //! This module gathers all mailbox actions triggered by the CLI.
 
 use anyhow::Result;
-use log::trace;
+use log::{info, trace};
 
 use crate::{
     domain::ImapServiceInterface,
@@ -16,8 +16,9 @@ pub fn list<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
     printer: &mut Printer,
     imap: &'a mut ImapService,
 ) -> Result<()> {
+    info!("entering list mailbox handler");
     let mboxes = imap.fetch_mboxes()?;
-    trace!("mailboxes: {:#?}", mboxes);
+    trace!("mailboxes: {:?}", mboxes);
     printer.print_table(mboxes, PrintTableOpts { max_width })
 }
 
@@ -114,7 +115,7 @@ mod tests {
                 ]))
             }
 
-            fn notify(&mut self, _: &Config, _: u64) -> Result<()> {
+            fn notify(&mut self, _: &Config, _: &Account, _: u64) -> Result<()> {
                 unimplemented!()
             }
             fn watch(&mut self, _: &Account, _: u64) -> Result<()> {
@@ -126,13 +127,13 @@ mod tests {
             fn fetch_envelopes_with(&mut self, _: &str, _: &usize, _: &usize) -> Result<Envelopes> {
                 unimplemented!()
             }
-            fn find_msg(&mut self, _: &str) -> Result<Msg> {
+            fn find_msg(&mut self, _: &Account, _: &str) -> Result<Msg> {
                 unimplemented!()
             }
             fn find_raw_msg(&mut self, _: &str) -> Result<Vec<u8>> {
                 unimplemented!()
             }
-            fn append_msg(&mut self, _: &Mbox, _: Msg) -> Result<()> {
+            fn append_msg(&mut self, _: &Mbox, _: &Account, _: Msg) -> Result<()> {
                 unimplemented!()
             }
             fn append_raw_msg_with_flags(&mut self, _: &Mbox, _: &[u8], _: Flags) -> Result<()> {

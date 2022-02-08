@@ -31,6 +31,8 @@ pub struct Config {
     pub draft_folder: Option<String>,
     /// Defines the notify command.
     pub notify_cmd: Option<String>,
+    /// Customizes the IMAP query used to fetch new messages.
+    pub notify_query: Option<String>,
     /// Defines the watch commands.
     pub watch_cmds: Option<Vec<String>>,
 
@@ -56,6 +58,8 @@ pub struct ConfigAccountEntry {
     pub sent_folder: Option<String>,
     /// Defines a specific draft folder name for this account.
     pub draft_folder: Option<String>,
+    /// Customizes the IMAP query used to fetch new messages.
+    pub notify_query: Option<String>,
     pub watch_cmds: Option<Vec<String>>,
     pub default: Option<bool>,
     pub email: String,
@@ -73,6 +77,9 @@ pub struct ConfigAccountEntry {
     pub smtp_insecure: Option<bool>,
     pub smtp_login: String,
     pub smtp_passwd_cmd: String,
+
+    pub pgp_encrypt_cmd: Option<String>,
+    pub pgp_decrypt_cmd: Option<String>,
 }
 
 impl Config {

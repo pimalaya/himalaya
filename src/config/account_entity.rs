@@ -26,6 +26,8 @@ pub struct Account {
     pub sent_folder: String,
     /// Defines the draft folder name for this account
     pub draft_folder: String,
+    /// Defines the IMAP query used to fetch new messages.
+    pub notify_query: String,
     pub watch_cmds: Vec<String>,
     pub default: bool,
     pub email: String,
@@ -43,6 +45,9 @@ pub struct Account {
     pub smtp_insecure: bool,
     pub smtp_login: String,
     pub smtp_passwd_cmd: String,
+
+    pub pgp_encrypt_cmd: Option<String>,
+    pub pgp_decrypt_cmd: Option<String>,
 }
 
 impl Account {
@@ -76,6 +81,30 @@ impl Account {
             .to_owned();
 
         Ok(SmtpCredentials::new(self.smtp_login.to_owned(), passwd))
+    }
+
+    pub fn pgp_encrypt_file(&self, addr: &str, path: PathBuf) -> Result<Option<String>> {
+        if let Some(cmd) = self.pgp_encrypt_cmd.as_ref() {
+            let encrypt_file_cmd = format!("{} {} {:?}", cmd, addr, path);
+            run_cmd(&encrypt_file_cmd).map(Some).context(format!(
+                "cannot run pgp encrypt command {:?}",
+                encrypt_file_cmd
+            ))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn pgp_decrypt_file(&self, path: PathBuf) -> Result<Option<String>> {
+        if let Some(cmd) = self.pgp_decrypt_cmd.as_ref() {
+            let decrypt_file_cmd = format!("{} {:?}", cmd, path);
+            run_cmd(&decrypt_file_cmd).map(Some).context(format!(
+                "cannot run pgp decrypt command {:?}",
+                decrypt_file_cmd
+            ))
+        } else {
+            Ok(None)
+        }
     }
 }
 
@@ -162,6 +191,12 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
                 .or_else(|| config.draft_folder.as_deref())
                 .unwrap_or(DEFAULT_DRAFT_FOLDER)
                 .to_string(),
+            notify_query: account
+                .notify_query
+                .as_ref()
+                .or_else(|| config.notify_query.as_ref())
+                .unwrap_or(&String::from("NEW"))
+                .to_owned(),
             watch_cmds: account
                 .watch_cmds
                 .as_ref()
@@ -184,9 +219,12 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
             smtp_insecure: account.smtp_insecure.unwrap_or_default(),
             smtp_login: account.smtp_login.to_owned(),
             smtp_passwd_cmd: account.smtp_passwd_cmd.to_owned(),
+
+            pgp_encrypt_cmd: account.pgp_encrypt_cmd.to_owned(),
+            pgp_decrypt_cmd: account.pgp_decrypt_cmd.to_owned(),
         };
 
-        trace!("{:#?}", account);
+        trace!("account: {:?}", account);
         Ok(account)
     }
 }

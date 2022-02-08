@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use clap::{App, ArgMatches};
-use log::debug;
+use log::{debug, info};
 
 type Keepalive = u64;
 
@@ -19,15 +19,17 @@ pub enum Command {
 
 /// IMAP command matcher.
 pub fn matches(m: &ArgMatches) -> Result<Option<Command>> {
+    info!("entering imap command matcher");
+
     if let Some(m) = m.subcommand_matches("notify") {
-        debug!("notify command matched");
+        info!("notify command matched");
         let keepalive = clap::value_t_or_exit!(m.value_of("keepalive"), u64);
         debug!("keepalive: {}", keepalive);
         return Ok(Some(Command::Notify(keepalive)));
     }
 
     if let Some(m) = m.subcommand_matches("watch") {
-        debug!("watch command matched");
+        info!("watch command matched");
         let keepalive = clap::value_t_or_exit!(m.value_of("keepalive"), u64);
         debug!("keepalive: {}", keepalive);
         return Ok(Some(Command::Watch(keepalive)));

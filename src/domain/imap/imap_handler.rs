@@ -9,16 +9,15 @@ use crate::{
     domain::imap::ImapServiceInterface,
 };
 
-/// Notify handler.
 pub fn notify<'a, ImapService: ImapServiceInterface<'a>>(
     keepalive: u64,
     config: &Config,
+    account: &Account,
     imap: &mut ImapService,
 ) -> Result<()> {
-    imap.notify(config, keepalive)
+    imap.notify(config, account, keepalive)
 }
 
-/// Watch handler.
 pub fn watch<'a, ImapService: ImapServiceInterface<'a>>(
     keepalive: u64,
     account: &Account,

@@ -1,0 +1,19 @@
+From: alice@localhost
+To: patrick@localhost
+Subject: Encrypted message
+Content-Type: multipart/encrypted; protocol="application/pgp-encrypted"; boundary="boundary"
+
+--boundary
+Content-Type: application/pgp-encrypted
+
+Version: 1
+
+--boundary
+Content-Type: application/octet-stream
+
+-----BEGIN PGP MESSAGE-----
+
+
+-----END PGP MESSAGE-----
+
+--boundary

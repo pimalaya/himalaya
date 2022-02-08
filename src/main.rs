@@ -36,10 +36,8 @@ fn create_app<'a>() -> clap::App<'a, 'a> {
 
 #[allow(clippy::single_match)]
 fn main() -> Result<()> {
-    // Init env logger
-    env_logger::init_from_env(
-        env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "off"),
-    );
+    let default_env_filter = env_logger::DEFAULT_FILTER_ENV;
+    env_logger::init_from_env(env_logger::Env::default().filter_or(default_env_filter, "off"));
 
     // Check mailto command BEFORE app initialization.
     let raw_args: Vec<String> = env::args().collect();
@@ -77,7 +75,7 @@ fn main() -> Result<()> {
     // Check IMAP commands.
     match imap_arg::matches(&m)? {
         Some(imap_arg::Command::Notify(keepalive)) => {
-            return imap_handler::notify(keepalive, &config, &mut imap);
+            return imap_handler::notify(keepalive, &config, &account, &mut imap);
         }
         Some(imap_arg::Command::Watch(keepalive)) => {
             return imap_handler::watch(keepalive, &account, &mut imap);
@@ -104,8 +102,16 @@ fn main() -> Result<()> {
         Some(msg_arg::Command::Delete(seq)) => {
             return msg_handler::delete(seq, &mut printer, &mut imap);
         }
-        Some(msg_arg::Command::Forward(seq, atts)) => {
-            return msg_handler::forward(seq, atts, &account, &mut printer, &mut imap, &mut smtp);
+        Some(msg_arg::Command::Forward(seq, attachment_paths, encrypt)) => {
+            return msg_handler::forward(
+                seq,
+                attachment_paths,
+                encrypt,
+                &account,
+                &mut printer,
+                &mut imap,
+                &mut smtp,
+            );
         }
         Some(msg_arg::Command::List(max_width, page_size, page)) => {
             return msg_handler::list(
@@ -121,13 +127,14 @@ fn main() -> Result<()> {
             return msg_handler::move_(seq, mbox, &mut printer, &mut imap);
         }
         Some(msg_arg::Command::Read(seq, text_mime, raw)) => {
-            return msg_handler::read(seq, text_mime, raw, &mut printer, &mut imap);
+            return msg_handler::read(seq, text_mime, raw, &account, &mut printer, &mut imap);
         }
-        Some(msg_arg::Command::Reply(seq, all, atts)) => {
+        Some(msg_arg::Command::Reply(seq, all, attachment_paths, encrypt)) => {
             return msg_handler::reply(
                 seq,
                 all,
-                atts,
+                attachment_paths,
+                encrypt,
                 &account,
                 &mut printer,
                 &mut imap,
@@ -151,8 +158,8 @@ fn main() -> Result<()> {
         Some(msg_arg::Command::Send(raw_msg)) => {
             return msg_handler::send(raw_msg, &account, &mut printer, &mut imap, &mut smtp);
         }
-        Some(msg_arg::Command::Write(atts)) => {
-            return msg_handler::write(atts, &account, &mut printer, &mut imap, &mut smtp);
+        Some(msg_arg::Command::Write(atts, encrypt)) => {
+            return msg_handler::write(atts, encrypt, &account, &mut printer, &mut imap, &mut smtp);
         }
         Some(msg_arg::Command::Flag(m)) => match m {
             Some(flag_arg::Command::Set(seq_range, flags)) => {
@@ -177,10 +184,18 @@ fn main() -> Result<()> {
                 return tpl_handler::forward(seq, tpl, &account, &mut printer, &mut imap);
             }
             Some(tpl_arg::Command::Save(atts, tpl)) => {
-                return tpl_handler::save(&mbox, atts, tpl, &mut printer, &mut imap);
+                return tpl_handler::save(&mbox, &account, atts, tpl, &mut printer, &mut imap);
             }
             Some(tpl_arg::Command::Send(atts, tpl)) => {
-                return tpl_handler::send(&mbox, atts, tpl, &mut printer, &mut imap, &mut smtp);
+                return tpl_handler::send(
+                    &mbox,
+                    &account,
+                    atts,
+                    tpl,
+                    &mut printer,
+                    &mut imap,
+                    &mut smtp,
+                );
             }
             _ => (),
         },
