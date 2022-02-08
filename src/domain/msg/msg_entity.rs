@@ -3,17 +3,19 @@ use anyhow::{anyhow, Context, Error, Result};
 use chrono::{DateTime, FixedOffset};
 use html_escape;
 use imap::types::Flag;
-use lettre::message::{Attachment, MultiPart, SinglePart};
+use lettre::message::{header::ContentType, Attachment, MultiPart, SinglePart};
 use log::{debug, info, trace};
 use regex::Regex;
 use rfc2047_decoder;
 use std::{
     collections::HashSet,
     convert::{TryFrom, TryInto},
+    env::temp_dir,
     fmt::Debug,
     fs,
     path::PathBuf,
 };
+use uuid::Uuid;
 
 use crate::{
     config::{Account, DEFAULT_SIG_DELIM},
@@ -59,6 +61,8 @@ pub struct Msg {
     /// [RFC3501]: https://datatracker.ietf.org/doc/html/rfc3501#section-2.3.3
     pub date: Option<DateTime<FixedOffset>>,
     pub parts: Parts,
+
+    pub encrypt: bool,
 }
 
 impl Msg {
@@ -72,7 +76,7 @@ impl Msg {
             .collect()
     }
 
-    /// Fold string body from all plain text parts into a single string body. If no plain text
+    /// Folds string body from all plain text parts into a single string body. If no plain text
     /// parts are found, HTML parts are used instead. The result is sanitized (all HTML markup is
     /// removed).
     pub fn fold_text_plain_parts(&self) -> String {
@@ -367,7 +371,7 @@ impl Msg {
             match choice::post_edit() {
                 Ok(PostEditChoice::Send) => {
                     let mbox = Mbox::new(&account.sent_folder);
-                    let sent_msg = smtp.send_msg(&self)?;
+                    let sent_msg = smtp.send_msg(account, &self)?;
                     let flags = Flags::try_from(vec![Flag::Seen])?;
                     imap.append_raw_msg_with_flags(&mbox, &sent_msg.formatted(), flags)?;
                     msg_utils::remove_local_draft()?;
@@ -406,6 +410,11 @@ impl Msg {
         }
 
         Ok(())
+    }
+
+    pub fn encrypt(mut self, encrypt: bool) -> Self {
+        self.encrypt = encrypt;
+        self
     }
 
     pub fn add_attachments(mut self, attachments_paths: Vec<&str>) -> Result<Self> {
@@ -615,31 +624,8 @@ impl Msg {
         trace!("message: {:?}", msg);
         Ok(msg)
     }
-}
 
-impl TryInto<lettre::address::Envelope> for Msg {
-    type Error = Error;
-
-    fn try_into(self) -> Result<lettre::address::Envelope> {
-        let from: Option<lettre::Address> = self
-            .from
-            .and_then(|addrs| addrs.into_iter().next())
-            .map(|addr| addr.email);
-        let to = self
-            .to
-            .map(|addrs| addrs.into_iter().map(|addr| addr.email).collect())
-            .unwrap_or_default();
-        let envelope =
-            lettre::address::Envelope::new(from, to).context("cannot create envelope")?;
-
-        Ok(envelope)
-    }
-}
-
-impl TryInto<lettre::Message> for &Msg {
-    type Error = Error;
-
-    fn try_into(self) -> Result<lettre::Message> {
+    pub fn into_sendable_msg(&self, account: &Account) -> Result<lettre::Message> {
         let mut msg_builder = lettre::Message::builder()
             .message_id(self.message_id.to_owned())
             .subject(self.subject.to_owned());
@@ -678,17 +664,42 @@ impl TryInto<lettre::Message> for &Msg {
                 .fold(msg_builder, |builder, addr| builder.bcc(addr.to_owned()))
         };
 
-        let mut multipart =
-            MultiPart::mixed().singlepart(SinglePart::plain(self.fold_text_plain_parts()));
+        let mut multipart = {
+            let mut multipart =
+                MultiPart::mixed().singlepart(SinglePart::plain(self.fold_text_plain_parts()));
+            for part in self.attachments() {
+                multipart = multipart.singlepart(Attachment::new(part.filename.clone()).body(
+                    part.content,
+                    part.mime.parse().context(format!(
+                        "cannot parse content type of attachment {}",
+                        part.filename
+                    ))?,
+                ))
+            }
+            multipart
+        };
 
-        for part in self.attachments() {
-            let filename = part.filename;
-            let content = part.content;
-            let mime = part.mime.parse().context(format!(
-                r#"cannot parse content type of attachment "{}""#,
-                filename
-            ))?;
-            multipart = multipart.singlepart(Attachment::new(filename).body(content, mime))
+        if self.encrypt {
+            let multipart_buffer = temp_dir().join(Uuid::new_v4().to_string());
+            fs::write(multipart_buffer.clone(), multipart.formatted())?;
+            let encrypted_multipart = account
+                .pgp_encrypt_file(
+                    &self.to.as_ref().unwrap().first().unwrap().email.to_string(),
+                    multipart_buffer.clone(),
+                )?
+                .ok_or_else(|| anyhow!("cannot find pgp encrypt command in config"))?;
+            trace!("encrypted multipart: {:#?}", encrypted_multipart);
+            multipart = MultiPart::encrypted(String::from("application/pgp-encrypted"))
+                .singlepart(
+                    SinglePart::builder()
+                        .header(ContentType::parse("application/pgp-encrypted").unwrap())
+                        .body(String::from("Version: 1")),
+                )
+                .singlepart(
+                    SinglePart::builder()
+                        .header(ContentType::parse("application/octet-stream").unwrap())
+                        .body(encrypted_multipart),
+                )
         }
 
         msg_builder
@@ -697,19 +708,29 @@ impl TryInto<lettre::Message> for &Msg {
     }
 }
 
-impl TryInto<Vec<u8>> for &Msg {
+impl TryInto<lettre::address::Envelope> for Msg {
     type Error = Error;
 
-    fn try_into(self) -> Result<Vec<u8>> {
-        let msg: lettre::Message = self.try_into()?;
-        Ok(msg.formatted())
+    fn try_into(self) -> Result<lettre::address::Envelope> {
+        let from: Option<lettre::Address> = self
+            .from
+            .and_then(|addrs| addrs.into_iter().next())
+            .map(|addr| addr.email);
+        let to = self
+            .to
+            .map(|addrs| addrs.into_iter().map(|addr| addr.email).collect())
+            .unwrap_or_default();
+        let envelope =
+            lettre::address::Envelope::new(from, to).context("cannot create envelope")?;
+
+        Ok(envelope)
     }
 }
 
-impl<'a> TryFrom<&'a imap::types::Fetch> for Msg {
+impl<'a> TryFrom<(&'a Account, &'a imap::types::Fetch)> for Msg {
     type Error = Error;
 
-    fn try_from(fetch: &'a imap::types::Fetch) -> Result<Msg> {
+    fn try_from((account, fetch): (&'a Account, &'a imap::types::Fetch)) -> Result<Msg> {
         let envelope = fetch
             .envelope()
             .ok_or_else(|| anyhow!("cannot get envelope of message {}", fetch.message))?;
@@ -785,14 +806,12 @@ impl<'a> TryFrom<&'a imap::types::Fetch> for Msg {
         let date = fetch.internal_date();
 
         // Get all parts
-        let parts = Parts::from(
-            &mailparse::parse_mail(
-                fetch
-                    .body()
-                    .ok_or_else(|| anyhow!("cannot get body of message {}", id))?,
-            )
-            .context(format!("cannot parse body of message {}", id))?,
-        );
+        let body = fetch
+            .body()
+            .ok_or_else(|| anyhow!("cannot get body of message {}", id))?;
+        let parsed_mail =
+            mailparse::parse_mail(body).context(format!("cannot parse body of message {}", id))?;
+        let parts = Parts::from_parsed_mail(account, &parsed_mail)?;
 
         Ok(Self {
             id,
@@ -807,6 +826,7 @@ impl<'a> TryFrom<&'a imap::types::Fetch> for Msg {
             message_id,
             date,
             parts,
+            encrypt: false,
         })
     }
 }

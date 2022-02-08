@@ -25,21 +25,22 @@ type RawMsg<'a> = &'a str;
 type Query = String;
 type AttachmentPaths<'a> = Vec<&'a str>;
 type MaxTableWidth = Option<usize>;
+type Encrypt = bool;
 
 /// Message commands.
 pub enum Command<'a> {
     Attachments(Seq<'a>),
     Copy(Seq<'a>, Mbox<'a>),
     Delete(Seq<'a>),
-    Forward(Seq<'a>, AttachmentPaths<'a>),
+    Forward(Seq<'a>, AttachmentPaths<'a>, Encrypt),
     List(MaxTableWidth, Option<PageSize>, Page),
     Move(Seq<'a>, Mbox<'a>),
     Read(Seq<'a>, TextMime<'a>, Raw),
-    Reply(Seq<'a>, All, AttachmentPaths<'a>),
+    Reply(Seq<'a>, All, AttachmentPaths<'a>, Encrypt),
     Save(RawMsg<'a>),
     Search(Query, MaxTableWidth, Option<PageSize>, Page),
     Send(RawMsg<'a>),
-    Write(AttachmentPaths<'a>),
+    Write(AttachmentPaths<'a>, Encrypt),
 
     Flag(Option<flag_arg::Command<'a>>),
     Tpl(Option<tpl_arg::Command<'a>>),
@@ -78,7 +79,9 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         debug!("seq: {}", seq);
         let paths: Vec<&str> = m.values_of("attachments").unwrap_or_default().collect();
         debug!("attachments paths: {:?}", paths);
-        return Ok(Some(Command::Forward(seq, paths)));
+        let encrypt = m.is_present("encrypt");
+        debug!("encrypt: {}", encrypt);
+        return Ok(Some(Command::Forward(seq, paths, encrypt)));
     }
 
     if let Some(m) = m.subcommand_matches("list") {
@@ -128,7 +131,10 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         debug!("reply all: {}", all);
         let paths: Vec<&str> = m.values_of("attachments").unwrap_or_default().collect();
         debug!("attachments paths: {:?}", paths);
-        return Ok(Some(Command::Reply(seq, all, paths)));
+        let encrypt = m.is_present("encrypt");
+        debug!("encrypt: {}", encrypt);
+
+        return Ok(Some(Command::Reply(seq, all, paths, encrypt)));
     }
 
     if let Some(m) = m.subcommand_matches("save") {
@@ -198,7 +204,9 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         info!("write command matched");
         let attachment_paths: Vec<&str> = m.values_of("attachments").unwrap_or_default().collect();
         debug!("attachments paths: {:?}", attachment_paths);
-        return Ok(Some(Command::Write(attachment_paths)));
+        let encrypt = m.is_present("encrypt");
+        debug!("encrypt: {}", encrypt);
+        return Ok(Some(Command::Write(attachment_paths, encrypt)));
     }
 
     if let Some(m) = m.subcommand_matches("template") {
@@ -267,6 +275,14 @@ pub fn attachment_arg<'a>() -> Arg<'a, 'a> {
         .multiple(true)
 }
 
+/// Message encrypt argument.
+pub fn encrypt_arg<'a>() -> Arg<'a, 'a> {
+    Arg::with_name("encrypt")
+        .help("Encrypts the message")
+        .short("e")
+        .long("encrypt")
+}
+
 /// Message subcommands.
 pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
     vec![
@@ -299,7 +315,8 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                 ),
             SubCommand::with_name("write")
                 .about("Writes a new message")
-                .arg(attachment_arg()),
+                .arg(attachment_arg())
+                .arg(encrypt_arg()),
             SubCommand::with_name("send")
                 .about("Sends a raw message")
                 .arg(Arg::with_name("message").raw(true).last(true)),
@@ -329,12 +346,14 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                 .about("Answers to a message")
                 .arg(seq_arg())
                 .arg(reply_all_arg())
-                .arg(attachment_arg()),
+                .arg(attachment_arg())
+		.arg(encrypt_arg()),
             SubCommand::with_name("forward")
                 .aliases(&["fwd", "f"])
                 .about("Forwards a message")
                 .arg(seq_arg())
-                .arg(attachment_arg()),
+                .arg(attachment_arg())
+		.arg(encrypt_arg()),
             SubCommand::with_name("copy")
                 .aliases(&["cp", "c"])
                 .about("Copies a message to the targetted mailbox")

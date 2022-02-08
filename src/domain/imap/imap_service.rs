@@ -5,12 +5,7 @@
 use anyhow::{anyhow, Context, Result};
 use log::{debug, log_enabled, trace, Level};
 use native_tls::{TlsConnector, TlsStream};
-use std::{
-    collections::HashSet,
-    convert::{TryFrom, TryInto},
-    net::TcpStream,
-    thread,
-};
+use std::{collections::HashSet, convert::TryFrom, net::TcpStream, thread};
 
 use crate::{
     config::{Account, Config},
@@ -31,9 +26,9 @@ pub trait ImapServiceInterface<'a> {
         page_size: &usize,
         page: &usize,
     ) -> Result<Envelopes>;
-    fn find_msg(&mut self, seq: &str) -> Result<Msg>;
+    fn find_msg(&mut self, account: &Account, seq: &str) -> Result<Msg>;
     fn find_raw_msg(&mut self, seq: &str) -> Result<Vec<u8>>;
-    fn append_msg(&mut self, mbox: &Mbox, msg: Msg) -> Result<()>;
+    fn append_msg(&mut self, mbox: &Mbox, account: &Account, msg: Msg) -> Result<()>;
     fn append_raw_msg_with_flags(&mut self, mbox: &Mbox, msg: &[u8], flags: Flags) -> Result<()>;
     fn expunge(&mut self) -> Result<()>;
     fn logout(&mut self) -> Result<()>;
@@ -197,11 +192,11 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
     }
 
     /// Find a message by sequence number.
-    fn find_msg(&mut self, seq: &str) -> Result<Msg> {
+    fn find_msg(&mut self, account: &Account, seq: &str) -> Result<Msg> {
         let mbox = self.mbox.to_owned();
         self.sess()?
             .select(&mbox.name)
-            .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?;
+            .context(format!("cannot select mailbox {}", self.mbox.name))?;
         let fetches = self
             .sess()?
             .fetch(seq, "(ENVELOPE FLAGS INTERNALDATE BODY[])")
@@ -210,7 +205,7 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
             .first()
             .ok_or_else(|| anyhow!(r#"cannot find message "{}"#, seq))?;
 
-        Msg::try_from(fetch)
+        Msg::try_from((account, fetch))
     }
 
     fn find_raw_msg(&mut self, seq: &str) -> Result<Vec<u8>> {
@@ -238,8 +233,8 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
         Ok(())
     }
 
-    fn append_msg(&mut self, mbox: &Mbox, msg: Msg) -> Result<()> {
-        let msg_raw: Vec<u8> = (&msg).try_into()?;
+    fn append_msg(&mut self, mbox: &Mbox, account: &Account, msg: Msg) -> Result<()> {
+        let msg_raw = msg.into_sendable_msg(account)?.formatted();
         self.sess()?
             .append(&mbox.name, &msg_raw)
             .flags(msg.flags.0)

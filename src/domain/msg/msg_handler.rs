@@ -33,7 +33,7 @@ pub fn attachments<'a, Printer: PrinterService, ImapService: ImapServiceInterfac
     printer: &mut Printer,
     imap: &mut ImapService,
 ) -> Result<()> {
-    let attachments = imap.find_msg(seq)?.attachments();
+    let attachments = imap.find_msg(account, seq)?.attachments();
     let attachments_len = attachments.len();
     debug!(
         r#"{} attachment(s) found for message "{}""#,
@@ -91,14 +91,16 @@ pub fn forward<
 >(
     seq: &str,
     attachments_paths: Vec<&str>,
+    encrypt: bool,
     account: &Account,
     printer: &mut Printer,
     imap: &mut ImapService,
     smtp: &mut SmtpService,
 ) -> Result<()> {
-    imap.find_msg(seq)?
+    imap.find_msg(account, seq)?
         .into_forward(account)?
         .add_attachments(attachments_paths)?
+        .encrypt(encrypt)
         .edit_with_editor(account, printer, imap, smtp)
 }
 
@@ -211,6 +213,7 @@ pub fn read<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
     seq: &str,
     text_mime: &str,
     raw: bool,
+    account: &Account,
     printer: &mut Printer,
     imap: &mut ImapService,
 ) -> Result<()> {
@@ -218,7 +221,7 @@ pub fn read<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
         // Emails don't always have valid utf8. Using "lossy" to display what we can.
         String::from_utf8_lossy(&imap.find_raw_msg(seq)?).into_owned()
     } else {
-        imap.find_msg(seq)?.fold_text_parts(text_mime)
+        imap.find_msg(account, seq)?.fold_text_parts(text_mime)
     };
 
     printer.print(msg)
@@ -234,14 +237,16 @@ pub fn reply<
     seq: &str,
     all: bool,
     attachments_paths: Vec<&str>,
+    encrypt: bool,
     account: &Account,
     printer: &mut Printer,
     imap: &mut ImapService,
     smtp: &mut SmtpService,
 ) -> Result<()> {
-    imap.find_msg(seq)?
+    imap.find_msg(account, seq)?
         .into_reply(all, account)?
         .add_attachments(attachments_paths)?
+        .encrypt(encrypt)
         .edit_with_editor(account, printer, imap, smtp)?;
     let flags = Flags::try_from(vec![Flag::Answered])?;
     imap.add_flags(seq, &flags)
@@ -347,6 +352,7 @@ pub fn write<
     SmtpService: SmtpServiceInterface,
 >(
     attachments_paths: Vec<&str>,
+    encrypt: bool,
     account: &Account,
     printer: &mut Printer,
     imap: &mut ImapService,
@@ -354,5 +360,6 @@ pub fn write<
 ) -> Result<()> {
     Msg::default()
         .add_attachments(attachments_paths)?
+        .encrypt(encrypt)
         .edit_with_editor(account, printer, imap, smtp)
 }
