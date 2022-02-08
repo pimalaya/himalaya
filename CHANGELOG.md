@@ -7,10 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.5] - 2022-02-08
+
 ### Added
 
 - [Contributing guide](https://github.com/soywod/himalaya/blob/master/CONTRIBUTING.md) [#256]
 - Notify query config option [#289]
+- End-to-end encryption *(EXPERIMENTAL)* [#54]
 
 ### Fixed
 
@@ -289,7 +292,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.5.4...HEAD
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.5.5...HEAD
+[0.5.5]: https://github.com/soywod/himalaya/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/soywod/himalaya/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/soywod/himalaya/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/soywod/himalaya/compare/v0.5.1...v0.5.2
@@ -345,6 +349,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#47]: https://github.com/soywod/himalaya/issues/47
 [#48]: https://github.com/soywod/himalaya/issues/48
 [#50]: https://github.com/soywod/himalaya/issues/50
+[#54]: https://github.com/soywod/himalaya/issues/54
 [#58]: https://github.com/soywod/himalaya/issues/58
 [#59]: https://github.com/soywod/himalaya/issues/59
 [#61]: https://github.com/soywod/himalaya/issues/61
