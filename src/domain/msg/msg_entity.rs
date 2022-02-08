@@ -4,12 +4,13 @@ use chrono::{DateTime, FixedOffset};
 use html_escape;
 use imap::types::Flag;
 use lettre::message::{Attachment, MultiPart, SinglePart};
-use log::trace;
+use log::{debug, info, trace};
 use regex::Regex;
 use rfc2047_decoder;
 use std::{
     collections::HashSet,
     convert::{TryFrom, TryInto},
+    fmt::Debug,
     fs,
     path::PathBuf,
 };
@@ -334,6 +335,8 @@ impl Msg {
         imap: &mut ImapService,
         smtp: &mut SmtpService,
     ) -> Result<()> {
+        info!("start editing with editor");
+
         let draft = msg_utils::local_draft_path();
         if draft.exists() {
             loop {
@@ -547,72 +550,69 @@ impl Msg {
 
         tpl.push('\n');
 
-        trace!("template: {:#?}", tpl);
+        trace!("template: {:?}", tpl);
         tpl
     }
 
     pub fn from_tpl(tpl: &str) -> Result<Self> {
+        info!("begin: building message from template");
+        trace!("template: {:?}", tpl);
+
         let mut msg = Msg::default();
+        let parsed_msg = mailparse::parse_mail(tpl.as_bytes()).context("cannot parse template")?;
 
-        let parsed_msg =
-            mailparse::parse_mail(tpl.as_bytes()).context("cannot parse message from template")?;
-
+        debug!("parsing headers");
         for header in parsed_msg.get_headers() {
             let key = header.get_key();
+            debug!("header key: {:?}", key);
+
+            let val = header.get_value();
             let val = String::from_utf8(header.get_value_raw().to_vec())
-                .map(|val| val.trim().to_string())?;
+                .map(|val| val.trim().to_string())
+                .context(format!(
+                    "cannot decode value {:?} from header {:?}",
+                    key, val
+                ))?;
+            debug!("header value: {:?}", val);
 
             match key.to_lowercase().as_str() {
-                "message-id" => msg.message_id = Some(val.to_owned()),
-                "from" => {
-                    msg.from = Some(
-                        val.split(',')
-                            .filter_map(|addr| addr.parse().ok())
-                            .collect::<Vec<_>>(),
-                    );
-                }
-                "to" => {
-                    msg.to = Some(
-                        val.split(',')
-                            .filter_map(|addr| addr.parse().ok())
-                            .collect::<Vec<_>>(),
-                    );
-                }
-                "reply-to" => {
-                    msg.reply_to = Some(
-                        val.split(',')
-                            .filter_map(|addr| addr.parse().ok())
-                            .collect::<Vec<_>>(),
-                    );
-                }
-                "in-reply-to" => msg.in_reply_to = Some(val.to_owned()),
-                "cc" => {
-                    msg.cc = Some(
-                        val.split(',')
-                            .filter_map(|addr| addr.parse().ok())
-                            .collect::<Vec<_>>(),
-                    );
-                }
-                "bcc" => {
-                    msg.bcc = Some(
-                        val.split(',')
-                            .filter_map(|addr| addr.parse().ok())
-                            .collect::<Vec<_>>(),
-                    );
-                }
+                "message-id" => msg.message_id = Some(val),
+                "in-reply-to" => msg.in_reply_to = Some(val),
                 "subject" => {
                     msg.subject = val;
+                }
+                "from" => {
+                    msg.from = parse_addrs(val).context(format!("cannot parse header {:?}", key))?
+                }
+                "to" => {
+                    msg.to = parse_addrs(val).context(format!("cannot parse header {:?}", key))?
+                }
+                "reply-to" => {
+                    msg.reply_to =
+                        parse_addrs(val).context(format!("cannot parse header {:?}", key))?
+                }
+                "cc" => {
+                    msg.cc = parse_addrs(val).context(format!("cannot parse header {:?}", key))?
+                }
+                "bcc" => {
+                    msg.bcc = parse_addrs(val).context(format!("cannot parse header {:?}", key))?
                 }
                 _ => (),
             }
         }
 
-        let content = parsed_msg
+        debug!("parsing body");
+        let body = parsed_msg
             .get_body_raw()
-            .context("cannot get body from parsed message")?;
-        let content = String::from_utf8(content).context("cannot decode body from utf-8")?;
-        msg.parts.push(Part::TextPlain(TextPlainPart { content }));
+            .context("cannot get raw body from message")
+            .and_then(|body| String::from_utf8(body).context("cannot decode body from utf8"))?;
+        trace!("body: {:?}", body);
 
+        msg.parts
+            .push(Part::TextPlain(TextPlainPart { content: body }));
+
+        info!("end: building message from template");
+        trace!("message: {:?}", msg);
         Ok(msg)
     }
 }
@@ -737,28 +737,28 @@ impl<'a> TryFrom<&'a imap::types::Fetch> for Msg {
             .sender
             .as_deref()
             .or_else(|| envelope.from.as_deref())
-            .map(parse_addrs)
+            .map(to_addrs)
         {
             Some(addrs) => Some(addrs?),
             None => None,
         };
 
         // Get the "Reply-To" address(es)
-        let reply_to = parse_some_addrs(&envelope.reply_to).context(format!(
+        let reply_to = to_some_addrs(&envelope.reply_to).context(format!(
             r#"cannot parse "reply to" address of message {}"#,
             id
         ))?;
 
         // Get the recipient(s) address(es)
-        let to = parse_some_addrs(&envelope.to)
+        let to = to_some_addrs(&envelope.to)
             .context(format!(r#"cannot parse "to" address of message {}"#, id))?;
 
         // Get the "Cc" recipient(s) address(es)
-        let cc = parse_some_addrs(&envelope.cc)
+        let cc = to_some_addrs(&envelope.cc)
             .context(format!(r#"cannot parse "cc" address of message {}"#, id))?;
 
         // Get the "Bcc" recipient(s) address(es)
-        let bcc = parse_some_addrs(&envelope.bcc)
+        let bcc = to_some_addrs(&envelope.bcc)
             .context(format!(r#"cannot parse "bcc" address of message {}"#, id))?;
 
         // Get the "In-Reply-To" message identifier
@@ -811,7 +811,24 @@ impl<'a> TryFrom<&'a imap::types::Fetch> for Msg {
     }
 }
 
-pub fn parse_addr(addr: &imap_proto::Address) -> Result<Addr> {
+pub fn parse_addr<S: AsRef<str> + Debug>(raw_addr: S) -> Result<Addr> {
+    raw_addr
+        .as_ref()
+        .trim()
+        .parse()
+        .context(format!("cannot parse address {:?}", raw_addr))
+}
+
+pub fn parse_addrs<S: AsRef<str> + Debug>(raw_addrs: S) -> Result<Option<Vec<Addr>>> {
+    let mut addrs: Vec<Addr> = vec![];
+    for raw_addr in raw_addrs.as_ref().split(',') {
+        addrs
+            .push(parse_addr(raw_addr).context(format!("cannot parse addresses {:?}", raw_addrs))?);
+    }
+    Ok(if addrs.is_empty() { None } else { Some(addrs) })
+}
+
+pub fn to_addr(addr: &imap_proto::Address) -> Result<Addr> {
     let name = addr
         .name
         .as_ref()
@@ -839,17 +856,16 @@ pub fn parse_addr(addr: &imap_proto::Address) -> Result<Addr> {
     Ok(Addr::new(name, lettre::Address::new(mbox, host)?))
 }
 
-pub fn parse_addrs(addrs: &[imap_proto::Address]) -> Result<Vec<Addr>> {
+pub fn to_addrs(addrs: &[imap_proto::Address]) -> Result<Vec<Addr>> {
     let mut parsed_addrs = vec![];
     for addr in addrs {
-        parsed_addrs
-            .push(parse_addr(addr).context(format!(r#"cannot parse address "{:?}""#, addr))?);
+        parsed_addrs.push(to_addr(addr).context(format!(r#"cannot parse address "{:?}""#, addr))?);
     }
     Ok(parsed_addrs)
 }
 
-pub fn parse_some_addrs(addrs: &Option<Vec<imap_proto::Address>>) -> Result<Option<Vec<Addr>>> {
-    Ok(match addrs.as_deref().map(parse_addrs) {
+pub fn to_some_addrs(addrs: &Option<Vec<imap_proto::Address>>) -> Result<Option<Vec<Addr>>> {
+    Ok(match addrs.as_deref().map(to_addrs) {
         Some(addrs) => Some(addrs?),
         None => None,
     })

@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [Contributing guide](https://github.com/soywod/himalaya/blob/master/CONTRIBUTING.md) [#256]
 
+### Fixed
+
+- Multiple recipients issue [#288]
+
 ## [0.5.4] - 2022-02-05
 
 ### Fixed
@@ -405,3 +409,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#271]: https://github.com/soywod/himalaya/issues/271
 [#276]: https://github.com/soywod/himalaya/issues/276
 [#280]: https://github.com/soywod/himalaya/issues/280
+[#288]: https://github.com/soywod/himalaya/issues/288
