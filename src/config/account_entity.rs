@@ -26,6 +26,8 @@ pub struct Account {
     pub sent_folder: String,
     /// Defines the draft folder name for this account
     pub draft_folder: String,
+    /// Defines the IMAP query used to fetch new messages.
+    pub notify_query: String,
     pub watch_cmds: Vec<String>,
     pub default: bool,
     pub email: String,
@@ -162,6 +164,12 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
                 .or_else(|| config.draft_folder.as_deref())
                 .unwrap_or(DEFAULT_DRAFT_FOLDER)
                 .to_string(),
+            notify_query: account
+                .notify_query
+                .as_ref()
+                .or_else(|| config.notify_query.as_ref())
+                .unwrap_or(&String::from("NEW"))
+                .to_owned(),
             watch_cmds: account
                 .watch_cmds
                 .as_ref()

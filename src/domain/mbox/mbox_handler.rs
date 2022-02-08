@@ -115,7 +115,7 @@ mod tests {
                 ]))
             }
 
-            fn notify(&mut self, _: &Config, _: u64) -> Result<()> {
+            fn notify(&mut self, _: &Config, _: &Account, _: u64) -> Result<()> {
                 unimplemented!()
             }
             fn watch(&mut self, _: &Account, _: u64) -> Result<()> {

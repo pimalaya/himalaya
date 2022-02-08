@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - [Contributing guide](https://github.com/soywod/himalaya/blob/master/CONTRIBUTING.md) [#256]
+- Notify query config option [#289]
 
 ### Fixed
 
@@ -410,3 +411,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#276]: https://github.com/soywod/himalaya/issues/276
 [#280]: https://github.com/soywod/himalaya/issues/280
 [#288]: https://github.com/soywod/himalaya/issues/288
+[#289]: https://github.com/soywod/himalaya/issues/289

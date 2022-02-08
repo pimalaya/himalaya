@@ -75,7 +75,7 @@ fn main() -> Result<()> {
     // Check IMAP commands.
     match imap_arg::matches(&m)? {
         Some(imap_arg::Command::Notify(keepalive)) => {
-            return imap_handler::notify(keepalive, &config, &mut imap);
+            return imap_handler::notify(keepalive, &config, &account, &mut imap);
         }
         Some(imap_arg::Command::Watch(keepalive)) => {
             return imap_handler::watch(keepalive, &account, &mut imap);

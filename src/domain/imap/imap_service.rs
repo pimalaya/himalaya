@@ -21,7 +21,7 @@ use crate::{
 type ImapSession = imap::Session<TlsStream<TcpStream>>;
 
 pub trait ImapServiceInterface<'a> {
-    fn notify(&mut self, config: &Config, keepalive: u64) -> Result<()>;
+    fn notify(&mut self, config: &Config, account: &Account, keepalive: u64) -> Result<()>;
     fn watch(&mut self, account: &Account, keepalive: u64) -> Result<()>;
     fn fetch_mboxes(&'a mut self) -> Result<Mboxes>;
     fn fetch_envelopes(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes>;
@@ -98,10 +98,10 @@ impl<'a> ImapService<'a> {
         }
     }
 
-    fn search_new_msgs(&mut self) -> Result<Vec<u32>> {
+    fn search_new_msgs(&mut self, account: &Account) -> Result<Vec<u32>> {
         let uids: Vec<u32> = self
             .sess()?
-            .uid_search("NEW")
+            .uid_search(&account.notify_query)
             .context("cannot search new messages")?
             .into_iter()
             .collect();
@@ -248,7 +248,7 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
         Ok(())
     }
 
-    fn notify(&mut self, config: &Config, keepalive: u64) -> Result<()> {
+    fn notify(&mut self, config: &Config, account: &Account, keepalive: u64) -> Result<()> {
         debug!("notify");
 
         let mbox = self.mbox.to_owned();
@@ -260,7 +260,7 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
 
         debug!("init messages hashset");
         let mut msgs_set: HashSet<u32> = self
-            .search_new_msgs()?
+            .search_new_msgs(account)?
             .iter()
             .cloned()
             .collect::<HashSet<_>>();
@@ -281,7 +281,7 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
                 .context("cannot start the idle mode")?;
 
             let uids: Vec<u32> = self
-                .search_new_msgs()?
+                .search_new_msgs(account)?
                 .into_iter()
                 .filter(|uid| -> bool { msgs_set.get(uid).is_none() })
                 .collect();
