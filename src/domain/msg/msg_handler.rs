@@ -43,6 +43,7 @@ pub fn attachments<'a, Printer: PrinterService, ImapService: ImapServiceInterfac
     for attachment in attachments {
         let filepath = account.downloads_dir.join(&attachment.filename);
         debug!("downloading {}…", attachment.filename);
+        printer.print(format!("downloading {}…", attachment.filename));
         fs::write(&filepath, &attachment.content)
             .context(format!("cannot download attachment {:?}", filepath))?;
     }
