@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Context, Error, Result};
 use lettre::transport::smtp::authentication::Credentials as SmtpCredentials;
 use log::{debug, trace};
+use mailparse::MailAddr;
 use std::{convert::TryFrom, env, fs, path::PathBuf};
 
 use crate::{
@@ -51,18 +52,12 @@ pub struct Account {
 }
 
 impl Account {
-    pub fn address(&self) -> String {
-        let name = &self.from;
-        let has_special_chars = "()<>[]:;@.,".contains(|special_char| name.contains(special_char));
-
-        if name.is_empty() {
-            self.email.clone()
-        } else if has_special_chars {
-            // so the name has special characters => Wrap it with '"'
-            format!("\"{}\" <{}>", name, self.email)
-        } else {
-            format!("{} <{}>", name, self.email)
-        }
+    pub fn address(&self) -> Result<MailAddr> {
+        Ok(mailparse::addrparse(&self.from)
+            .context(format!("cannot parse account address {:?}", self.from))?
+            .first()
+            .ok_or_else(|| anyhow!("cannot parse account address {:?}", self.from))?
+            .clone())
     }
 
     pub fn imap_passwd(&self) -> Result<String> {

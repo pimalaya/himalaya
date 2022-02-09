@@ -6,6 +6,7 @@ use anyhow::{Context, Result};
 use atty::Stream;
 use imap::types::Flag;
 use log::{debug, info, trace};
+use mailparse::addrparse;
 use std::{
     borrow::Cow,
     convert::{TryFrom, TryInto},
@@ -138,11 +139,7 @@ pub fn mailto<
 ) -> Result<()> {
     info!("entering mailto command handler");
 
-    let to: Vec<lettre::message::Mailbox> = url
-        .path()
-        .split(';')
-        .filter_map(|s| s.parse().ok())
-        .collect();
+    let to = addrparse(url.path())?;
     let mut cc = Vec::new();
     let mut bcc = Vec::new();
     let mut subject = Cow::default();
@@ -151,10 +148,10 @@ pub fn mailto<
     for (key, val) in url.query_pairs() {
         match key.as_bytes() {
             b"cc" => {
-                cc.push(val.parse()?);
+                cc.push(val.to_string());
             }
             b"bcc" => {
-                bcc.push(val.parse()?);
+                bcc.push(val.to_string());
             }
             b"subject" => {
                 subject = val;
@@ -167,10 +164,18 @@ pub fn mailto<
     }
 
     let msg = Msg {
-        from: Some(vec![account.address().parse()?]),
+        from: Some(vec![account.address()?].into()),
         to: if to.is_empty() { None } else { Some(to) },
-        cc: if cc.is_empty() { None } else { Some(cc) },
-        bcc: if bcc.is_empty() { None } else { Some(bcc) },
+        cc: if cc.is_empty() {
+            None
+        } else {
+            Some(addrparse(&cc.join(","))?)
+        },
+        bcc: if bcc.is_empty() {
+            None
+        } else {
+            Some(addrparse(&bcc.join(","))?)
+        },
         subject: subject.into(),
         parts: Parts(vec![Part::TextPlain(TextPlainPart {
             content: body.into(),

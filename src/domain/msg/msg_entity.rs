@@ -3,8 +3,9 @@ use anyhow::{anyhow, Context, Error, Result};
 use chrono::{DateTime, FixedOffset};
 use html_escape;
 use imap::types::Flag;
-use lettre::message::{header::ContentType, Attachment, MultiPart, SinglePart};
+use lettre::message::{header::ContentType, Attachment, Mailbox, MultiPart, SinglePart};
 use log::{debug, info, trace};
+use mailparse::{addrparse, GroupInfo, MailAddr, MailAddrList, SingleInfo};
 use regex::Regex;
 use rfc2047_decoder;
 use std::{
@@ -32,8 +33,6 @@ use crate::{
     },
 };
 
-type Addr = lettre::message::Mailbox;
-
 /// Representation of a message.
 #[derive(Debug, Default)]
 pub struct Msg {
@@ -48,11 +47,11 @@ pub struct Msg {
     /// The subject of the message.
     pub subject: String,
 
-    pub from: Option<Vec<Addr>>,
-    pub reply_to: Option<Vec<Addr>>,
-    pub to: Option<Vec<Addr>>,
-    pub cc: Option<Vec<Addr>>,
-    pub bcc: Option<Vec<Addr>>,
+    pub from: Option<MailAddrList>,
+    pub reply_to: Option<MailAddrList>,
+    pub to: Option<MailAddrList>,
+    pub cc: Option<MailAddrList>,
+    pub bcc: Option<MailAddrList>,
     pub in_reply_to: Option<String>,
     pub message_id: Option<String>,
 
@@ -174,7 +173,7 @@ impl Msg {
     }
 
     pub fn into_reply(mut self, all: bool, account: &Account) -> Result<Self> {
-        let account_addr: Addr = account.address().parse()?;
+        let account_addr = account.address()?;
 
         // Message-Id
         self.message_id = None;
@@ -183,13 +182,13 @@ impl Msg {
         self.in_reply_to = self.message_id.to_owned();
 
         // From
-        self.from = Some(vec![account_addr.to_owned()]);
+        self.from = Some(vec![account_addr.clone()].into());
 
         // To
         let addrs = self
             .reply_to
-            .as_ref()
-            .or_else(|| self.from.as_ref())
+            .as_deref()
+            .or_else(|| self.from.as_deref())
             .map(|addrs| {
                 addrs
                     .clone()
@@ -197,11 +196,11 @@ impl Msg {
                     .filter(|addr| addr != &account_addr)
             });
         if all {
-            self.to = addrs.map(|addrs| addrs.collect());
+            self.to = addrs.map(|addrs| addrs.collect::<Vec<_>>().into());
         } else {
             self.to = addrs
                 .and_then(|mut addrs| addrs.next())
-                .map(|addr| vec![addr]);
+                .map(|addr| vec![addr].into());
         }
 
         // Cc & Bcc
@@ -226,12 +225,8 @@ impl Msg {
                 .reply_to
                 .as_ref()
                 .or_else(|| self.from.as_ref())
-                .and_then(|addrs| addrs.first())
-                .map(|addr| {
-                    addr.name
-                        .to_owned()
-                        .unwrap_or_else(|| addr.email.to_string())
-                })
+                .and_then(|addrs| addrs.clone().extract_single_info())
+                .map(|addr| addr.display_name.clone().unwrap_or_else(|| addr.addr))
                 .unwrap_or_else(|| "unknown sender".into());
             let mut content = format!("\n\nOn {}, {} wrote:\n", date, sender);
 
@@ -256,7 +251,7 @@ impl Msg {
     }
 
     pub fn into_forward(mut self, account: &Account) -> Result<Self> {
-        let account_addr: Addr = account.address().parse()?;
+        let account_addr = account.address()?;
 
         let prev_subject = self.subject.to_owned();
         let prev_date = self.date.to_owned();
@@ -270,10 +265,10 @@ impl Msg {
         self.in_reply_to = None;
 
         // From
-        self.from = Some(vec![account_addr]);
+        self.from = Some(vec![account_addr].into());
 
         // To
-        self.to = Some(vec![]);
+        self.to = Some(vec![].into());
 
         // Cc
         self.cc = None;
@@ -295,22 +290,12 @@ impl Msg {
         }
         if let Some(addrs) = prev_from.as_ref() {
             content.push_str("From: ");
-            let mut glue = "";
-            for addr in addrs {
-                content.push_str(glue);
-                content.push_str(&addr.to_string());
-                glue = ", ";
-            }
+            content.push_str(&addrs.to_string());
             content.push('\n');
         }
         if let Some(addrs) = prev_to.as_ref() {
             content.push_str("To: ");
-            let mut glue = "";
-            for addr in addrs {
-                content.push_str(glue);
-                content.push_str(&addr.to_string());
-                glue = ", ";
-            }
+            content.push_str(&addrs.to_string());
             content.push('\n');
         }
         content.push('\n');
@@ -322,7 +307,7 @@ impl Msg {
     }
 
     fn _edit_with_editor(&self, account: &Account) -> Result<Self> {
-        let tpl = self.to_tpl(TplOverride::default(), account);
+        let tpl = self.to_tpl(TplOverride::default(), account)?;
         let tpl = editor::open_with_tpl(tpl)?;
         Self::from_tpl(&tpl)
     }
@@ -389,7 +374,7 @@ impl Msg {
                 Ok(PostEditChoice::RemoteDraft) => {
                     let mbox = Mbox::new(&account.draft_folder);
                     let flags = Flags::try_from(vec![Flag::Seen, Flag::Draft])?;
-                    let tpl = self.to_tpl(TplOverride::default(), account);
+                    let tpl = self.to_tpl(TplOverride::default(), account)?;
                     imap.append_raw_msg_with_flags(&mbox, tpl.as_bytes(), flags)?;
                     msg_utils::remove_local_draft()?;
                     printer.print(format!(
@@ -476,7 +461,8 @@ impl Msg {
         }
     }
 
-    pub fn to_tpl(&self, opts: TplOverride, account: &Account) -> String {
+    pub fn to_tpl(&self, opts: TplOverride, account: &Account) -> Result<String> {
+        let account_addr: MailAddrList = vec![account.address()?].into();
         let mut tpl = String::default();
 
         tpl.push_str("Content-Type: text/plain; charset=utf-8\n");
@@ -490,7 +476,7 @@ impl Msg {
             "From: {}\n",
             opts.from
                 .map(|addrs| addrs.join(", "))
-                .unwrap_or_else(|| account.address())
+                .unwrap_or_else(|| account_addr.to_string())
         ));
 
         // To
@@ -498,37 +484,25 @@ impl Msg {
             "To: {}\n",
             opts.to
                 .map(|addrs| addrs.join(", "))
-                .or_else(|| self.to.clone().map(|addrs| addrs
-                    .iter()
-                    .map(|addr| addr.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")))
+                .or_else(|| self.to.clone().map(|addrs| addrs.to_string()))
                 .unwrap_or_default()
         ));
 
         // Cc
-        if let Some(addrs) = opts.cc.map(|addrs| addrs.join(", ")).or_else(|| {
-            self.cc.clone().map(|addrs| {
-                addrs
-                    .iter()
-                    .map(|addr| addr.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            })
-        }) {
+        if let Some(addrs) = opts
+            .cc
+            .map(|addrs| addrs.join(", "))
+            .or_else(|| self.cc.clone().map(|addrs| addrs.to_string()))
+        {
             tpl.push_str(&format!("Cc: {}\n", addrs));
         }
 
         // Bcc
-        if let Some(addrs) = opts.bcc.map(|addrs| addrs.join(", ")).or_else(|| {
-            self.bcc.clone().map(|addrs| {
-                addrs
-                    .iter()
-                    .map(|addr| addr.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            })
-        }) {
+        if let Some(addrs) = opts
+            .bcc
+            .map(|addrs| addrs.join(", "))
+            .or_else(|| self.bcc.clone().map(|addrs| addrs.to_string()))
+        {
             tpl.push_str(&format!("Bcc: {}\n", addrs));
         }
 
@@ -560,7 +534,7 @@ impl Msg {
         tpl.push('\n');
 
         trace!("template: {:?}", tpl);
-        tpl
+        Ok(tpl)
     }
 
     pub fn from_tpl(tpl: &str) -> Result<Self> {
@@ -635,33 +609,98 @@ impl Msg {
         };
 
         if let Some(addrs) = self.from.as_ref() {
-            msg_builder = addrs
-                .iter()
-                .fold(msg_builder, |builder, addr| builder.from(addr.to_owned()))
+            for addr in addrs.iter() {
+                match addr {
+                    MailAddr::Single(SingleInfo { display_name, addr }) => {
+                        msg_builder =
+                            msg_builder.from(Mailbox::new(display_name.clone(), addr.parse()?))
+                    }
+                    MailAddr::Group(GroupInfo { group_name, addrs }) => {
+                        for addr in addrs {
+                            msg_builder = msg_builder.from(Mailbox::new(
+                                addr.display_name.clone().or(Some(group_name.clone())),
+                                addr.to_string().parse()?,
+                            ))
+                        }
+                    }
+                }
+            }
         };
 
         if let Some(addrs) = self.to.as_ref() {
-            msg_builder = addrs
-                .iter()
-                .fold(msg_builder, |builder, addr| builder.to(addr.to_owned()))
+            for addr in addrs.iter() {
+                match addr {
+                    MailAddr::Single(SingleInfo { display_name, addr }) => {
+                        msg_builder =
+                            msg_builder.to(Mailbox::new(display_name.clone(), addr.parse()?))
+                    }
+                    MailAddr::Group(GroupInfo { group_name, addrs }) => {
+                        for addr in addrs {
+                            msg_builder = msg_builder.to(Mailbox::new(
+                                addr.display_name.clone().or(Some(group_name.clone())),
+                                addr.to_string().parse()?,
+                            ))
+                        }
+                    }
+                }
+            }
         };
 
         if let Some(addrs) = self.reply_to.as_ref() {
-            msg_builder = addrs.iter().fold(msg_builder, |builder, addr| {
-                builder.reply_to(addr.to_owned())
-            })
+            for addr in addrs.iter() {
+                match addr {
+                    MailAddr::Single(SingleInfo { display_name, addr }) => {
+                        msg_builder =
+                            msg_builder.reply_to(Mailbox::new(display_name.clone(), addr.parse()?))
+                    }
+                    MailAddr::Group(GroupInfo { group_name, addrs }) => {
+                        for addr in addrs {
+                            msg_builder = msg_builder.reply_to(Mailbox::new(
+                                addr.display_name.clone().or(Some(group_name.clone())),
+                                addr.to_string().parse()?,
+                            ))
+                        }
+                    }
+                }
+            }
         };
 
         if let Some(addrs) = self.cc.as_ref() {
-            msg_builder = addrs
-                .iter()
-                .fold(msg_builder, |builder, addr| builder.cc(addr.to_owned()))
+            for addr in addrs.iter() {
+                match addr {
+                    MailAddr::Single(SingleInfo { display_name, addr }) => {
+                        msg_builder =
+                            msg_builder.cc(Mailbox::new(display_name.clone(), addr.parse()?))
+                    }
+                    MailAddr::Group(GroupInfo { group_name, addrs }) => {
+                        for addr in addrs {
+                            msg_builder = msg_builder.cc(Mailbox::new(
+                                addr.display_name.clone().or(Some(group_name.clone())),
+                                addr.to_string().parse()?,
+                            ))
+                        }
+                    }
+                }
+            }
         };
 
         if let Some(addrs) = self.bcc.as_ref() {
-            msg_builder = addrs
-                .iter()
-                .fold(msg_builder, |builder, addr| builder.bcc(addr.to_owned()))
+            for addr in addrs.iter() {
+                match addr {
+                    MailAddr::Single(SingleInfo { display_name, addr }) => {
+                        msg_builder =
+                            msg_builder.bcc(Mailbox::new(display_name.clone(), addr.parse()?))
+                    }
+                    MailAddr::Group(GroupInfo { group_name, addrs }) => {
+                        for addr in addrs {
+                            msg_builder = msg_builder.bcc(Mailbox::new(
+                                addr.display_name.clone().or(Some(group_name.clone())),
+                                addr.to_string().parse()?,
+                            ))
+                        }
+                    }
+                }
+            }
         };
 
         let mut multipart = {
@@ -682,11 +721,14 @@ impl Msg {
         if self.encrypt {
             let multipart_buffer = temp_dir().join(Uuid::new_v4().to_string());
             fs::write(multipart_buffer.clone(), multipart.formatted())?;
+            let addr = self
+                .to
+                .as_ref()
+                .and_then(|addrs| addrs.clone().extract_single_info())
+                .map(|addr| addr.addr)
+                .ok_or_else(|| anyhow!("cannot find recipient"))?;
             let encrypted_multipart = account
-                .pgp_encrypt_file(
-                    &self.to.as_ref().unwrap().first().unwrap().email.to_string(),
-                    multipart_buffer.clone(),
-                )?
+                .pgp_encrypt_file(&addr, multipart_buffer.clone())?
                 .ok_or_else(|| anyhow!("cannot find pgp encrypt command in config"))?;
             trace!("encrypted multipart: {:#?}", encrypted_multipart);
             multipart = MultiPart::encrypted(String::from("application/pgp-encrypted"))
@@ -712,18 +754,36 @@ impl TryInto<lettre::address::Envelope> for Msg {
     type Error = Error;
 
     fn try_into(self) -> Result<lettre::address::Envelope> {
-        let from: Option<lettre::Address> = self
-            .from
-            .and_then(|addrs| addrs.into_iter().next())
-            .map(|addr| addr.email);
-        let to = self
-            .to
-            .map(|addrs| addrs.into_iter().map(|addr| addr.email).collect())
-            .unwrap_or_default();
-        let envelope =
-            lettre::address::Envelope::new(from, to).context("cannot create envelope")?;
-
-        Ok(envelope)
+        let from = match self.from.and_then(|addrs| addrs.extract_single_info()) {
+            Some(addr) => addr.addr.parse().map(Some),
+            None => Ok(None),
+        }?;
+        let to = match self.to.as_ref() {
+            Some(addrs) => {
+                let mut sendable_addrs = vec![];
+                for addr in addrs.iter() {
+                    match addr {
+                        MailAddr::Single(SingleInfo {
+                            display_name: _,
+                            addr,
+                        }) => {
+                            sendable_addrs.push(addr.parse()?);
+                        }
+                        MailAddr::Group(GroupInfo {
+                            group_name: _,
+                            addrs,
+                        }) => {
+                            for addr in addrs {
+                                sendable_addrs.push(addr.addr.parse()?);
+                            }
+                        }
+                    };
+                }
+                sendable_addrs
+            }
+            None => vec![],
+        };
+        Ok(lettre::address::Envelope::new(from, to).context("cannot create envelope")?)
     }
 }
 
@@ -753,53 +813,41 @@ impl<'a> TryFrom<(&'a Account, &'a imap::types::Fetch)> for Msg {
             })
             .unwrap_or_else(|| Ok(String::default()))?;
 
-        // Get the sender(s) address(es)
-        let from = match envelope
+        let from = if let Some(addrs) = envelope
             .sender
-            .as_deref()
-            .or_else(|| envelope.from.as_deref())
-            .map(to_addrs)
+            .as_ref()
+            .or_else(|| envelope.from.as_ref())
+            .map(|ref addrs| to_addrs(addrs))
         {
-            Some(addrs) => Some(addrs?),
-            None => None,
+            Some(addrs?)
+        } else {
+            None
         };
-
-        // Get the "Reply-To" address(es)
-        let reply_to = to_some_addrs(&envelope.reply_to).context(format!(
-            r#"cannot parse "reply to" address of message {}"#,
-            id
-        ))?;
-
-        // Get the recipient(s) address(es)
-        let to = to_some_addrs(&envelope.to)
-            .context(format!(r#"cannot parse "to" address of message {}"#, id))?;
-
-        // Get the "Cc" recipient(s) address(es)
-        let cc = to_some_addrs(&envelope.cc)
-            .context(format!(r#"cannot parse "cc" address of message {}"#, id))?;
-
-        // Get the "Bcc" recipient(s) address(es)
-        let bcc = to_some_addrs(&envelope.bcc)
-            .context(format!(r#"cannot parse "bcc" address of message {}"#, id))?;
+        let reply_to = to_some_addrs(&envelope.reply_to)?;
+        let to = to_some_addrs(&envelope.to)?;
+        let cc = to_some_addrs(&envelope.cc)?;
+        let bcc = to_some_addrs(&envelope.bcc)?;
 
         // Get the "In-Reply-To" message identifier
-        let in_reply_to = match envelope
+        let in_reply_to = if let Some(id) = envelope
             .in_reply_to
             .as_ref()
             .map(|cow| String::from_utf8(cow.to_vec()))
         {
-            Some(id) => Some(id?),
-            None => None,
+            Some(id?)
+        } else {
+            None
         };
 
         // Get the message identifier
-        let message_id = match envelope
+        let message_id = if let Some(id) = envelope
             .message_id
             .as_ref()
             .map(|cow| String::from_utf8(cow.to_vec()))
         {
-            Some(id) => Some(id?),
-            None => None,
+            Some(id?)
+        } else {
+            None
         };
 
         // Get the internal date
@@ -831,24 +879,14 @@ impl<'a> TryFrom<(&'a Account, &'a imap::types::Fetch)> for Msg {
     }
 }
 
-pub fn parse_addr<S: AsRef<str> + Debug>(raw_addr: S) -> Result<Addr> {
-    raw_addr
-        .as_ref()
-        .trim()
-        .parse()
-        .context(format!("cannot parse address {:?}", raw_addr))
-}
-
-pub fn parse_addrs<S: AsRef<str> + Debug>(raw_addrs: S) -> Result<Option<Vec<Addr>>> {
-    let mut addrs: Vec<Addr> = vec![];
-    for raw_addr in raw_addrs.as_ref().split(',') {
-        addrs
-            .push(parse_addr(raw_addr).context(format!("cannot parse addresses {:?}", raw_addrs))?);
-    }
+pub fn parse_addrs<S: AsRef<str> + Debug>(raw_addrs: S) -> Result<Option<MailAddrList>> {
+    let addrs = addrparse(raw_addrs.as_ref())?;
     Ok(if addrs.is_empty() { None } else { Some(addrs) })
 }
 
-pub fn to_addr(addr: &imap_proto::Address) -> Result<Addr> {
+pub fn to_addr(addr: &imap_proto::Address) -> Result<MailAddr> {
+    trace!("address: {:?}", addr);
+
     let name = addr
         .name
         .as_ref()
@@ -861,32 +899,47 @@ pub fn to_addr(addr: &imap_proto::Address) -> Result<Addr> {
     let mbox = addr
         .mailbox
         .as_ref()
-        .ok_or_else(|| anyhow!("cannot get address mailbox"))
-        .and_then(|mbox| {
-            rfc2047_decoder::decode(&mbox.to_vec()).context("cannot decode address mailbox")
-        })?;
+        .map(|mbox| {
+            rfc2047_decoder::decode(&mbox.to_vec())
+                .context("cannot decode address mailbox")
+                .map(Some)
+        })
+        .unwrap_or(Ok(None))?;
     let host = addr
         .host
         .as_ref()
-        .ok_or_else(|| anyhow!("cannot get address host"))
-        .and_then(|host| {
-            rfc2047_decoder::decode(&host.to_vec()).context("cannot decode address host")
-        })?;
+        .map(|host| {
+            rfc2047_decoder::decode(&host.to_vec())
+                .context("cannot decode address host")
+                .map(Some)
+        })
+        .unwrap_or(Ok(None))?;
 
-    Ok(Addr::new(name, lettre::Address::new(mbox, host)?))
+    trace!("name: {}", name.clone().unwrap_or_default());
+    trace!("mbox: {}", mbox.clone().unwrap_or_default());
+    trace!("host: {}", host.clone().unwrap_or_default());
+
+    Ok(MailAddr::Single(SingleInfo {
+        display_name: name,
+        addr: match host {
+            Some(host) => format!("{}@{}", mbox.unwrap_or_default(), host),
+            None => mbox.unwrap_or_default(),
+        },
+    }))
 }
 
-pub fn to_addrs(addrs: &[imap_proto::Address]) -> Result<Vec<Addr>> {
-    let mut parsed_addrs = vec![];
-    for addr in addrs {
-        parsed_addrs.push(to_addr(addr).context(format!(r#"cannot parse address "{:?}""#, addr))?);
+pub fn to_addrs(proto_addrs: &[imap_proto::Address]) -> Result<MailAddrList> {
+    let mut addrs = vec![];
+    for addr in proto_addrs {
+        addrs.push(to_addr(addr).context(format!("cannot parse address {:?}", addr))?);
     }
-    Ok(parsed_addrs)
+    Ok(addrs.into())
 }
 
-pub fn to_some_addrs(addrs: &Option<Vec<imap_proto::Address>>) -> Result<Option<Vec<Addr>>> {
-    Ok(match addrs.as_deref().map(to_addrs) {
-        Some(addrs) => Some(addrs?),
-        None => None,
+pub fn to_some_addrs(addrs: &Option<Vec<imap_proto::Address>>) -> Result<Option<MailAddrList>> {
+    Ok(if let Some(addrs) = addrs.as_deref().map(to_addrs) {
+        Some(addrs?)
+    } else {
+        None
     })
 }

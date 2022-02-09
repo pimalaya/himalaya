@@ -26,7 +26,7 @@ pub fn new<'a, Printer: PrinterService>(
     account: &'a Account,
     printer: &'a mut Printer,
 ) -> Result<()> {
-    let tpl = Msg::default().to_tpl(opts, account);
+    let tpl = Msg::default().to_tpl(opts, account)?;
     printer.print(tpl)
 }
 
@@ -42,7 +42,7 @@ pub fn reply<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>
     let tpl = imap
         .find_msg(account, seq)?
         .into_reply(all, account)?
-        .to_tpl(opts, account);
+        .to_tpl(opts, account)?;
     printer.print(tpl)
 }
 
@@ -57,7 +57,7 @@ pub fn forward<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a
     let tpl = imap
         .find_msg(account, seq)?
         .into_forward(account)?
-        .to_tpl(opts, account);
+        .to_tpl(opts, account)?;
     printer.print(tpl)
 }
 
