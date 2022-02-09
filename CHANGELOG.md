@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Multiple recipients issue [#288]
+- Cannot parse address [#227]
 
 ## [0.5.4] - 2022-02-05
 
@@ -403,6 +404,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#205]: https://github.com/soywod/himalaya/issues/205
 [#215]: https://github.com/soywod/himalaya/issues/215
 [#220]: https://github.com/soywod/himalaya/issues/220
+[#227]: https://github.com/soywod/himalaya/issues/227
 [#228]: https://github.com/soywod/himalaya/issues/228
 [#229]: https://github.com/soywod/himalaya/issues/229
 [#249]: https://github.com/soywod/himalaya/issues/249
