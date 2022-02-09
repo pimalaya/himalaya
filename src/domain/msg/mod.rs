@@ -48,3 +48,6 @@ pub use msg_entity::*;
 
 pub mod parts_entity;
 pub use parts_entity::*;
+
+pub mod addr_entity;
+pub use addr_entity::*;

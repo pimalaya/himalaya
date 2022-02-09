@@ -53,7 +53,18 @@ pub struct Account {
 
 impl Account {
     pub fn address(&self) -> Result<MailAddr> {
-        Ok(mailparse::addrparse(&self.from)
+        let has_special_chars =
+            "()<>[]:;@.,".contains(|special_char| self.from.contains(special_char));
+        let addr = if self.from.is_empty() {
+            self.email.clone()
+        } else if has_special_chars {
+            // so the name has special characters => Wrap it with '"'
+            format!("\"{}\" <{}>", self.from, self.email)
+        } else {
+            format!("{} <{}>", self.from, self.email)
+        };
+
+        Ok(mailparse::addrparse(&addr)
             .context(format!("cannot parse account address {:?}", self.from))?
             .first()
             .ok_or_else(|| anyhow!("cannot parse account address {:?}", self.from))?

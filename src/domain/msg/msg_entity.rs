@@ -3,9 +3,8 @@ use anyhow::{anyhow, Context, Error, Result};
 use chrono::{DateTime, FixedOffset};
 use html_escape;
 use imap::types::Flag;
-use lettre::message::{header::ContentType, Attachment, Mailbox, MultiPart, SinglePart};
+use lettre::message::{header::ContentType, Attachment, MultiPart, SinglePart};
 use log::{debug, info, trace};
-use mailparse::{addrparse, GroupInfo, MailAddr, MailAddrList, SingleInfo};
 use regex::Regex;
 use rfc2047_decoder;
 use std::{
@@ -21,10 +20,13 @@ use uuid::Uuid;
 use crate::{
     config::{Account, DEFAULT_SIG_DELIM},
     domain::{
+        from_addrs_to_sendable_addrs, from_addrs_to_sendable_mbox, from_imap_addrs_to_addrs,
+        from_imap_addrs_to_some_addrs, from_slice_to_addrs,
         imap::ImapServiceInterface,
         mbox::Mbox,
         msg::{msg_utils, BinaryPart, Flags, Part, Parts, TextPlainPart, TplOverride},
         smtp::SmtpServiceInterface,
+        Addrs,
     },
     output::PrinterService,
     ui::{
@@ -47,11 +49,11 @@ pub struct Msg {
     /// The subject of the message.
     pub subject: String,
 
-    pub from: Option<MailAddrList>,
-    pub reply_to: Option<MailAddrList>,
-    pub to: Option<MailAddrList>,
-    pub cc: Option<MailAddrList>,
-    pub bcc: Option<MailAddrList>,
+    pub from: Option<Addrs>,
+    pub reply_to: Option<Addrs>,
+    pub to: Option<Addrs>,
+    pub cc: Option<Addrs>,
+    pub bcc: Option<Addrs>,
     pub in_reply_to: Option<String>,
     pub message_id: Option<String>,
 
@@ -462,7 +464,7 @@ impl Msg {
     }
 
     pub fn to_tpl(&self, opts: TplOverride, account: &Account) -> Result<String> {
-        let account_addr: MailAddrList = vec![account.address()?].into();
+        let account_addr: Addrs = vec![account.address()?].into();
         let mut tpl = String::default();
 
         tpl.push_str("Content-Type: text/plain; charset=utf-8\n");
@@ -565,37 +567,39 @@ impl Msg {
                     msg.subject = val;
                 }
                 "from" => {
-                    msg.from = parse_addrs(val).context(format!("cannot parse header {:?}", key))?
+                    msg.from = from_slice_to_addrs(val)
+                        .context(format!("cannot parse header {:?}", key))?
                 }
                 "to" => {
-                    msg.to = parse_addrs(val).context(format!("cannot parse header {:?}", key))?
+                    msg.to = from_slice_to_addrs(val)
+                        .context(format!("cannot parse header {:?}", key))?
                 }
                 "reply-to" => {
-                    msg.reply_to =
-                        parse_addrs(val).context(format!("cannot parse header {:?}", key))?
+                    msg.reply_to = from_slice_to_addrs(val)
+                        .context(format!("cannot parse header {:?}", key))?
                 }
                 "cc" => {
-                    msg.cc = parse_addrs(val).context(format!("cannot parse header {:?}", key))?
+                    msg.cc = from_slice_to_addrs(val)
+                        .context(format!("cannot parse header {:?}", key))?
                 }
                 "bcc" => {
-                    msg.bcc = parse_addrs(val).context(format!("cannot parse header {:?}", key))?
+                    msg.bcc = from_slice_to_addrs(val)
+                        .context(format!("cannot parse header {:?}", key))?
                 }
                 _ => (),
             }
         }
 
         debug!("parsing body");
-        let body = parsed_msg
+        let content = parsed_msg
             .get_body_raw()
             .context("cannot get raw body from message")
             .and_then(|body| String::from_utf8(body).context("cannot decode body from utf8"))?;
-        trace!("body: {:?}", body);
+        trace!("body: {:?}", content);
+        msg.parts.push(Part::TextPlain(TextPlainPart { content }));
 
-        msg.parts
-            .push(Part::TextPlain(TextPlainPart { content: body }));
-
-        info!("end: building message from template");
         trace!("message: {:?}", msg);
+        info!("end: building message from template");
         Ok(msg)
     }
 
@@ -609,97 +613,32 @@ impl Msg {
         };
 
         if let Some(addrs) = self.from.as_ref() {
-            for addr in addrs.iter() {
-                match addr {
-                    MailAddr::Single(SingleInfo { display_name, addr }) => {
-                        msg_builder =
-                            msg_builder.from(Mailbox::new(display_name.clone(), addr.parse()?))
-                    }
-                    MailAddr::Group(GroupInfo { group_name, addrs }) => {
-                        for addr in addrs {
-                            msg_builder = msg_builder.from(Mailbox::new(
-                                addr.display_name.clone().or(Some(group_name.clone())),
-                                addr.to_string().parse()?,
-                            ))
-                        }
-                    }
-                }
+            for addr in from_addrs_to_sendable_mbox(addrs)? {
+                msg_builder = msg_builder.from(addr)
             }
         };
 
         if let Some(addrs) = self.to.as_ref() {
-            for addr in addrs.iter() {
-                match addr {
-                    MailAddr::Single(SingleInfo { display_name, addr }) => {
-                        msg_builder =
-                            msg_builder.to(Mailbox::new(display_name.clone(), addr.parse()?))
-                    }
-                    MailAddr::Group(GroupInfo { group_name, addrs }) => {
-                        for addr in addrs {
-                            msg_builder = msg_builder.to(Mailbox::new(
-                                addr.display_name.clone().or(Some(group_name.clone())),
-                                addr.to_string().parse()?,
-                            ))
-                        }
-                    }
-                }
+            for addr in from_addrs_to_sendable_mbox(addrs)? {
+                msg_builder = msg_builder.to(addr)
             }
         };
 
         if let Some(addrs) = self.reply_to.as_ref() {
-            for addr in addrs.iter() {
-                match addr {
-                    MailAddr::Single(SingleInfo { display_name, addr }) => {
-                        msg_builder =
-                            msg_builder.reply_to(Mailbox::new(display_name.clone(), addr.parse()?))
-                    }
-                    MailAddr::Group(GroupInfo { group_name, addrs }) => {
-                        for addr in addrs {
-                            msg_builder = msg_builder.reply_to(Mailbox::new(
-                                addr.display_name.clone().or(Some(group_name.clone())),
-                                addr.to_string().parse()?,
-                            ))
-                        }
-                    }
-                }
+            for addr in from_addrs_to_sendable_mbox(addrs)? {
+                msg_builder = msg_builder.reply_to(addr)
             }
         };
 
         if let Some(addrs) = self.cc.as_ref() {
-            for addr in addrs.iter() {
-                match addr {
-                    MailAddr::Single(SingleInfo { display_name, addr }) => {
-                        msg_builder =
-                            msg_builder.cc(Mailbox::new(display_name.clone(), addr.parse()?))
-                    }
-                    MailAddr::Group(GroupInfo { group_name, addrs }) => {
-                        for addr in addrs {
-                            msg_builder = msg_builder.cc(Mailbox::new(
-                                addr.display_name.clone().or(Some(group_name.clone())),
-                                addr.to_string().parse()?,
-                            ))
-                        }
-                    }
-                }
+            for addr in from_addrs_to_sendable_mbox(addrs)? {
+                msg_builder = msg_builder.cc(addr)
             }
         };
 
         if let Some(addrs) = self.bcc.as_ref() {
-            for addr in addrs.iter() {
-                match addr {
-                    MailAddr::Single(SingleInfo { display_name, addr }) => {
-                        msg_builder =
-                            msg_builder.bcc(Mailbox::new(display_name.clone(), addr.parse()?))
-                    }
-                    MailAddr::Group(GroupInfo { group_name, addrs }) => {
-                        for addr in addrs {
-                            msg_builder = msg_builder.bcc(Mailbox::new(
-                                addr.display_name.clone().or(Some(group_name.clone())),
-                                addr.to_string().parse()?,
-                            ))
-                        }
-                    }
-                }
+            for addr in from_addrs_to_sendable_mbox(addrs)? {
+                msg_builder = msg_builder.bcc(addr)
             }
         };
 
@@ -758,31 +697,11 @@ impl TryInto<lettre::address::Envelope> for Msg {
             Some(addr) => addr.addr.parse().map(Some),
             None => Ok(None),
         }?;
-        let to = match self.to.as_ref() {
-            Some(addrs) => {
-                let mut sendable_addrs = vec![];
-                for addr in addrs.iter() {
-                    match addr {
-                        MailAddr::Single(SingleInfo {
-                            display_name: _,
-                            addr,
-                        }) => {
-                            sendable_addrs.push(addr.parse()?);
-                        }
-                        MailAddr::Group(GroupInfo {
-                            group_name: _,
-                            addrs,
-                        }) => {
-                            for addr in addrs {
-                                sendable_addrs.push(addr.addr.parse()?);
-                            }
-                        }
-                    };
-                }
-                sendable_addrs
-            }
-            None => vec![],
-        };
+        let to = self
+            .to
+            .as_ref()
+            .map(from_addrs_to_sendable_addrs)
+            .unwrap_or(Ok(vec![]))?;
         Ok(lettre::address::Envelope::new(from, to).context("cannot create envelope")?)
     }
 }
@@ -817,16 +736,16 @@ impl<'a> TryFrom<(&'a Account, &'a imap::types::Fetch)> for Msg {
             .sender
             .as_ref()
             .or_else(|| envelope.from.as_ref())
-            .map(|ref addrs| to_addrs(addrs))
+            .map(|ref addrs| from_imap_addrs_to_addrs(addrs))
         {
             Some(addrs?)
         } else {
             None
         };
-        let reply_to = to_some_addrs(&envelope.reply_to)?;
-        let to = to_some_addrs(&envelope.to)?;
-        let cc = to_some_addrs(&envelope.cc)?;
-        let bcc = to_some_addrs(&envelope.bcc)?;
+        let reply_to = from_imap_addrs_to_some_addrs(&envelope.reply_to)?;
+        let to = from_imap_addrs_to_some_addrs(&envelope.to)?;
+        let cc = from_imap_addrs_to_some_addrs(&envelope.cc)?;
+        let bcc = from_imap_addrs_to_some_addrs(&envelope.bcc)?;
 
         // Get the "In-Reply-To" message identifier
         let in_reply_to = if let Some(id) = envelope
@@ -877,69 +796,4 @@ impl<'a> TryFrom<(&'a Account, &'a imap::types::Fetch)> for Msg {
             encrypt: false,
         })
     }
-}
-
-pub fn parse_addrs<S: AsRef<str> + Debug>(raw_addrs: S) -> Result<Option<MailAddrList>> {
-    let addrs = addrparse(raw_addrs.as_ref())?;
-    Ok(if addrs.is_empty() { None } else { Some(addrs) })
-}
-
-pub fn to_addr(addr: &imap_proto::Address) -> Result<MailAddr> {
-    trace!("address: {:?}", addr);
-
-    let name = addr
-        .name
-        .as_ref()
-        .map(|name| {
-            rfc2047_decoder::decode(&name.to_vec())
-                .context("cannot decode address name")
-                .map(Some)
-        })
-        .unwrap_or(Ok(None))?;
-    let mbox = addr
-        .mailbox
-        .as_ref()
-        .map(|mbox| {
-            rfc2047_decoder::decode(&mbox.to_vec())
-                .context("cannot decode address mailbox")
-                .map(Some)
-        })
-        .unwrap_or(Ok(None))?;
-    let host = addr
-        .host
-        .as_ref()
-        .map(|host| {
-            rfc2047_decoder::decode(&host.to_vec())
-                .context("cannot decode address host")
-                .map(Some)
-        })
-        .unwrap_or(Ok(None))?;
-
-    trace!("name: {}", name.clone().unwrap_or_default());
-    trace!("mbox: {}", mbox.clone().unwrap_or_default());
-    trace!("host: {}", host.clone().unwrap_or_default());
-
-    Ok(MailAddr::Single(SingleInfo {
-        display_name: name,
-        addr: match host {
-            Some(host) => format!("{}@{}", mbox.unwrap_or_default(), host),
-            None => mbox.unwrap_or_default(),
-        },
-    }))
-}
-
-pub fn to_addrs(proto_addrs: &[imap_proto::Address]) -> Result<MailAddrList> {
-    let mut addrs = vec![];
-    for addr in proto_addrs {
-        addrs.push(to_addr(addr).context(format!("cannot parse address {:?}", addr))?);
-    }
-    Ok(addrs.into())
-}
-
-pub fn to_some_addrs(addrs: &Option<Vec<imap_proto::Address>>) -> Result<Option<MailAddrList>> {
-    Ok(if let Some(addrs) = addrs.as_deref().map(to_addrs) {
-        Some(addrs?)
-    } else {
-        None
-    })
 }
