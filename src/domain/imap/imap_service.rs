@@ -3,6 +3,7 @@
 //! This module exposes a service that can interact with IMAP servers.
 
 use anyhow::{anyhow, Context, Result};
+use imap::extensions::sort::{SortCharset, SortCriterion};
 use log::{debug, log_enabled, trace, Level};
 use native_tls::{TlsConnector, TlsStream};
 use std::{collections::HashSet, convert::TryFrom, net::TcpStream, thread};
@@ -20,8 +21,16 @@ pub trait ImapServiceInterface<'a> {
     fn watch(&mut self, account: &Account, keepalive: u64) -> Result<()>;
     fn fetch_mboxes(&'a mut self) -> Result<Mboxes>;
     fn fetch_envelopes(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes>;
-    fn fetch_envelopes_with(
+    fn find_envelopes(
         &'a mut self,
+        query: &str,
+        page_size: &usize,
+        page: &usize,
+    ) -> Result<Envelopes>;
+    fn find_and_sort_envelopes(
+        &'a mut self,
+        criteria: &[SortCriterion],
+        charset: SortCharset,
         query: &str,
         page_size: &usize,
         page: &usize,
@@ -153,7 +162,7 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
         Envelopes::try_from(self._raw_msgs_cache.as_ref().unwrap())
     }
 
-    fn fetch_envelopes_with(
+    fn find_envelopes(
         &'a mut self,
         query: &str,
         page_size: &usize,
@@ -187,6 +196,46 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
             .sess()?
             .fetch(&range, "(ENVELOPE FLAGS INTERNALDATE)")
             .context(r#"cannot fetch messages within range "{}""#)?;
+        self._raw_msgs_cache = Some(fetches);
+        Envelopes::try_from(self._raw_msgs_cache.as_ref().unwrap())
+    }
+
+    fn find_and_sort_envelopes(
+        &'a mut self,
+        criteria: &[SortCriterion],
+        charset: SortCharset,
+        query: &str,
+        page_size: &usize,
+        page: &usize,
+    ) -> Result<Envelopes> {
+        let mbox = self.mbox.to_owned();
+        self.sess()?
+            .select(&mbox.name)
+            .context(format!("cannot select mailbox {:?}", self.mbox.name))?;
+
+        let begin = page * page_size;
+        let end = begin + (page_size - 1);
+        let seqs: Vec<String> = self
+            .sess()?
+            .sort(criteria, charset, query)
+            .context(format!(
+                "cannot search in {:?} with query {:?}",
+                self.mbox.name, query
+            ))?
+            .iter()
+            .map(|seq| seq.to_string())
+            .collect();
+
+        if seqs.is_empty() {
+            return Ok(Envelopes::default());
+        }
+
+        // FIXME: panic if begin > end
+        let range = seqs[begin..end.min(seqs.len())].join(",");
+        let fetches = self
+            .sess()?
+            .fetch(&range, "(ENVELOPE FLAGS INTERNALDATE)")
+            .context(format!("cannot fetch messages within range {:?}", range))?;
         self._raw_msgs_cache = Some(fetches);
         Envelopes::try_from(self._raw_msgs_cache.as_ref().unwrap())
     }

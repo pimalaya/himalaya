@@ -24,6 +24,7 @@ pub fn list<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
 
 #[cfg(test)]
 mod tests {
+    use imap::extensions::sort::{SortCharset, SortCriterion};
     use serde::Serialize;
     use std::{fmt::Debug, io};
     use termcolor::ColorSpec;
@@ -124,7 +125,17 @@ mod tests {
             fn fetch_envelopes(&mut self, _: &usize, _: &usize) -> Result<Envelopes> {
                 unimplemented!()
             }
-            fn fetch_envelopes_with(&mut self, _: &str, _: &usize, _: &usize) -> Result<Envelopes> {
+            fn find_envelopes(&mut self, _: &str, _: &usize, _: &usize) -> Result<Envelopes> {
+                unimplemented!()
+            }
+            fn find_and_sort_envelopes(
+                &mut self,
+                _: &[SortCriterion],
+                _: SortCharset,
+                _: &str,
+                _: &usize,
+                _: &usize,
+            ) -> Result<Envelopes> {
                 unimplemented!()
             }
             fn find_msg(&mut self, _: &Account, _: &str) -> Result<Msg> {

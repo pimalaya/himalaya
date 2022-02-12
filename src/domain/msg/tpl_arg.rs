@@ -13,7 +13,7 @@ type ReplyAll = bool;
 type AttachmentPaths<'a> = Vec<&'a str>;
 type Tpl<'a> = &'a str;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct TplOverride<'a> {
     pub subject: Option<&'a str>,
     pub from: Option<Vec<&'a str>>,
@@ -41,7 +41,8 @@ impl<'a> From<&'a ArgMatches<'a>> for TplOverride<'a> {
 }
 
 /// Message template commands.
-pub enum Command<'a> {
+#[derive(Debug, PartialEq, Eq)]
+pub enum Cmd<'a> {
     New(TplOverride<'a>),
     Reply(Seq<'a>, ReplyAll, TplOverride<'a>),
     Forward(Seq<'a>, TplOverride<'a>),
@@ -50,14 +51,14 @@ pub enum Command<'a> {
 }
 
 /// Message template command matcher.
-pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
+pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
     info!("entering message template command matcher");
 
     if let Some(m) = m.subcommand_matches("new") {
         info!("new subcommand matched");
         let tpl = TplOverride::from(m);
         trace!("template override: {:?}", tpl);
-        return Ok(Some(Command::New(tpl)));
+        return Ok(Some(Cmd::New(tpl)));
     }
 
     if let Some(m) = m.subcommand_matches("reply") {
@@ -68,7 +69,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         debug!("reply all: {}", all);
         let tpl = TplOverride::from(m);
         trace!("template override: {:?}", tpl);
-        return Ok(Some(Command::Reply(seq, all, tpl)));
+        return Ok(Some(Cmd::Reply(seq, all, tpl)));
     }
 
     if let Some(m) = m.subcommand_matches("forward") {
@@ -77,7 +78,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         debug!("sequence: {}", seq);
         let tpl = TplOverride::from(m);
         trace!("template args: {:?}", tpl);
-        return Ok(Some(Command::Forward(seq, tpl)));
+        return Ok(Some(Cmd::Forward(seq, tpl)));
     }
 
     if let Some(m) = m.subcommand_matches("save") {
@@ -86,7 +87,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         trace!("attachments paths: {:?}", attachment_paths);
         let tpl = m.value_of("template").unwrap_or_default();
         trace!("template: {}", tpl);
-        return Ok(Some(Command::Save(attachment_paths, tpl)));
+        return Ok(Some(Cmd::Save(attachment_paths, tpl)));
     }
 
     if let Some(m) = m.subcommand_matches("send") {
@@ -95,7 +96,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         trace!("attachments paths: {:?}", attachment_paths);
         let tpl = m.value_of("template").unwrap_or_default();
         trace!("template: {}", tpl);
-        return Ok(Some(Command::Send(attachment_paths, tpl)));
+        return Ok(Some(Cmd::Send(attachment_paths, tpl)));
     }
 
     Ok(None)

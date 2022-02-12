@@ -4,6 +4,7 @@
 
 use anyhow::Result;
 use clap::{self, App, Arg, ArgMatches, SubCommand};
+use imap::extensions::sort::{SortCharset, SortCriterion};
 use log::{debug, info, trace};
 
 use crate::{
@@ -26,9 +27,12 @@ type Query = String;
 type AttachmentPaths<'a> = Vec<&'a str>;
 type MaxTableWidth = Option<usize>;
 type Encrypt = bool;
+type Criteria<'a> = Vec<SortCriterion<'a>>;
+type Charset<'a> = SortCharset<'a>;
 
 /// Message commands.
-pub enum Command<'a> {
+#[derive(Debug, PartialEq, Eq)]
+pub enum Cmd<'a> {
     Attachments(Seq<'a>),
     Copy(Seq<'a>, Mbox<'a>),
     Delete(Seq<'a>),
@@ -39,22 +43,30 @@ pub enum Command<'a> {
     Reply(Seq<'a>, All, AttachmentPaths<'a>, Encrypt),
     Save(RawMsg<'a>),
     Search(Query, MaxTableWidth, Option<PageSize>, Page),
+    Sort(
+        Criteria<'a>,
+        Charset<'a>,
+        Query,
+        MaxTableWidth,
+        Option<PageSize>,
+        Page,
+    ),
     Send(RawMsg<'a>),
     Write(AttachmentPaths<'a>, Encrypt),
 
-    Flag(Option<flag_arg::Command<'a>>),
-    Tpl(Option<tpl_arg::Command<'a>>),
+    Flag(Option<flag_arg::Cmd<'a>>),
+    Tpl(Option<tpl_arg::Cmd<'a>>),
 }
 
 /// Message command matcher.
-pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
+pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
     info!("entering message command matcher");
 
     if let Some(m) = m.subcommand_matches("attachments") {
         info!("attachments command matched");
         let seq = m.value_of("seq").unwrap();
         debug!("seq: {}", seq);
-        return Ok(Some(Command::Attachments(seq)));
+        return Ok(Some(Cmd::Attachments(seq)));
     }
 
     if let Some(m) = m.subcommand_matches("copy") {
@@ -63,14 +75,14 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         debug!("seq: {}", seq);
         let mbox = m.value_of("mbox-target").unwrap();
         debug!(r#"target mailbox: "{:?}""#, mbox);
-        return Ok(Some(Command::Copy(seq, mbox)));
+        return Ok(Some(Cmd::Copy(seq, mbox)));
     }
 
     if let Some(m) = m.subcommand_matches("delete") {
         info!("copy command matched");
         let seq = m.value_of("seq").unwrap();
         debug!("seq: {}", seq);
-        return Ok(Some(Command::Delete(seq)));
+        return Ok(Some(Cmd::Delete(seq)));
     }
 
     if let Some(m) = m.subcommand_matches("forward") {
@@ -81,7 +93,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         debug!("attachments paths: {:?}", paths);
         let encrypt = m.is_present("encrypt");
         debug!("encrypt: {}", encrypt);
-        return Ok(Some(Command::Forward(seq, paths, encrypt)));
+        return Ok(Some(Cmd::Forward(seq, paths, encrypt)));
     }
 
     if let Some(m) = m.subcommand_matches("list") {
@@ -100,7 +112,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
             .map(|page| 1.max(page) - 1)
             .unwrap_or_default();
         debug!("page: {}", page);
-        return Ok(Some(Command::List(max_table_width, page_size, page)));
+        return Ok(Some(Cmd::List(max_table_width, page_size, page)));
     }
 
     if let Some(m) = m.subcommand_matches("move") {
@@ -109,7 +121,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         debug!("seq: {}", seq);
         let mbox = m.value_of("mbox-target").unwrap();
         debug!("target mailbox: {:?}", mbox);
-        return Ok(Some(Command::Move(seq, mbox)));
+        return Ok(Some(Cmd::Move(seq, mbox)));
     }
 
     if let Some(m) = m.subcommand_matches("read") {
@@ -120,7 +132,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         debug!("text mime: {}", mime);
         let raw = m.is_present("raw");
         debug!("raw: {}", raw);
-        return Ok(Some(Command::Read(seq, mime, raw)));
+        return Ok(Some(Cmd::Read(seq, mime, raw)));
     }
 
     if let Some(m) = m.subcommand_matches("reply") {
@@ -134,14 +146,14 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         let encrypt = m.is_present("encrypt");
         debug!("encrypt: {}", encrypt);
 
-        return Ok(Some(Command::Reply(seq, all, paths, encrypt)));
+        return Ok(Some(Cmd::Reply(seq, all, paths, encrypt)));
     }
 
     if let Some(m) = m.subcommand_matches("save") {
         info!("save command matched");
         let msg = m.value_of("message").unwrap_or_default();
         trace!("message: {}", msg);
-        return Ok(Some(Command::Save(msg)));
+        return Ok(Some(Cmd::Save(msg)));
     }
 
     if let Some(m) = m.subcommand_matches("search") {
@@ -185,7 +197,81 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
             .1
             .join(" ");
         debug!("query: {}", query);
-        return Ok(Some(Command::Search(
+        return Ok(Some(Cmd::Search(query, max_table_width, page_size, page)));
+    }
+
+    if let Some(m) = m.subcommand_matches("sort") {
+        info!("sort command matched");
+        let max_table_width = m
+            .value_of("max-table-width")
+            .and_then(|width| width.parse::<usize>().ok());
+        debug!("max table width: {:?}", max_table_width);
+        let page_size = m.value_of("page-size").and_then(|s| s.parse().ok());
+        debug!("page size: {:?}", page_size);
+        let page = m
+            .value_of("page")
+            .unwrap()
+            .parse()
+            .ok()
+            .map(|page| 1.max(page) - 1)
+            .unwrap_or_default();
+        debug!("page: {:?}", page);
+        let criteria: Vec<SortCriterion> = m
+            .values_of("criteria")
+            .unwrap_or_default()
+            .filter_map(|criterion| match criterion {
+                "arrival:asc" | "arrival" => Some(SortCriterion::Arrival),
+                "arrival:desc" => Some(SortCriterion::Reverse(&SortCriterion::Arrival)),
+                "cc:asc" | "cc" => Some(SortCriterion::Cc),
+                "cc:desc" => Some(SortCriterion::Reverse(&SortCriterion::Cc)),
+                "date:asc" | "date" => Some(SortCriterion::Date),
+                "date:desc" => Some(SortCriterion::Reverse(&SortCriterion::Date)),
+                "from:asc" | "from" => Some(SortCriterion::From),
+                "from:desc" => Some(SortCriterion::Reverse(&SortCriterion::From)),
+                "size:asc" | "size" => Some(SortCriterion::Size),
+                "size:desc" => Some(SortCriterion::Reverse(&SortCriterion::Size)),
+                "subject:asc" | "subject" => Some(SortCriterion::Subject),
+                "subject:desc" => Some(SortCriterion::Reverse(&SortCriterion::Subject)),
+                "to:asc" | "to" => Some(SortCriterion::To),
+                "to:desc" => Some(SortCriterion::Reverse(&SortCriterion::To)),
+                _ => None,
+            })
+            .collect();
+        debug!("criteria: {:?}", criteria);
+        let charset = match m.value_of("charset").unwrap().to_lowercase() {
+            c if ["utf8", "utf-8"].contains(&c.as_str()) => SortCharset::Utf8,
+            c if ["ascii", "usascii", "us-ascii"].contains(&c.as_str()) => SortCharset::UsAscii,
+            c => SortCharset::Custom(c.into()),
+        };
+        debug!("charset: {:?}", charset);
+        let query = m
+            .values_of("query")
+            .unwrap_or_default()
+            .fold((false, vec![]), |(escape, mut cmds), cmd| {
+                match (cmd, escape) {
+                    // Next command is an arg and needs to be escaped
+                    ("subject", _) | ("body", _) | ("text", _) => {
+                        cmds.push(cmd.to_string());
+                        (true, cmds)
+                    }
+                    // Escaped arg commands
+                    (_, true) => {
+                        cmds.push(format!("\"{}\"", cmd));
+                        (false, cmds)
+                    }
+                    // Regular commands
+                    (_, false) => {
+                        cmds.push(cmd.to_string());
+                        (false, cmds)
+                    }
+                }
+            })
+            .1
+            .join(" ");
+        debug!("query: {:?}", query);
+        return Ok(Some(Cmd::Sort(
+            criteria,
+            charset,
             query,
             max_table_width,
             page_size,
@@ -197,7 +283,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         info!("send command matched");
         let msg = m.value_of("message").unwrap_or_default();
         trace!("message: {}", msg);
-        return Ok(Some(Command::Send(msg)));
+        return Ok(Some(Cmd::Send(msg)));
     }
 
     if let Some(m) = m.subcommand_matches("write") {
@@ -206,19 +292,19 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         debug!("attachments paths: {:?}", attachment_paths);
         let encrypt = m.is_present("encrypt");
         debug!("encrypt: {}", encrypt);
-        return Ok(Some(Command::Write(attachment_paths, encrypt)));
+        return Ok(Some(Cmd::Write(attachment_paths, encrypt)));
     }
 
     if let Some(m) = m.subcommand_matches("template") {
-        return Ok(Some(Command::Tpl(tpl_arg::matches(m)?)));
+        return Ok(Some(Cmd::Tpl(tpl_arg::matches(m)?)));
     }
 
     if let Some(m) = m.subcommand_matches("flag") {
-        return Ok(Some(Command::Flag(flag_arg::matches(m)?)));
+        return Ok(Some(Cmd::Flag(flag_arg::matches(m)?)));
     }
 
     info!("default list command matched");
-    Ok(Some(Command::List(None, None, 0)))
+    Ok(Some(Cmd::List(None, None, 0)))
 }
 
 /// Message sequence number argument.
@@ -313,13 +399,54 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                         .multiple(true)
                         .required(true),
                 ),
+            SubCommand::with_name("sort")
+                .about("Sorts messages by the given criteria and matching the given IMAP query")
+                .arg(page_size_arg())
+                .arg(page_arg())
+                .arg(table_arg::max_width())
+		.arg(
+		    Arg::with_name("criteria")
+			.long("criteria")
+			.short("c")
+			.help("Defines the message sorting preferences")
+			.value_name("CRITERION:ORDER")
+			.takes_value(true)
+			.multiple(true)
+			.required(true)
+			.possible_values(&[
+			    "arrival", "arrival:asc", "arrival:desc",
+			    "cc", "cc:asc", "cc:desc",
+			    "date", "date:asc", "date:desc",
+			    "from", "from:asc", "from:desc",
+			    "size", "size:asc", "size:desc",
+			    "subject", "subject:asc", "subject:desc",
+			    "to", "to:asc", "to:desc",
+			]),
+		)
+		.arg(
+		    Arg::with_name("charset")
+			.long("charset")
+			.short("t")
+			.help("The character encoding to use for strings that are subject to a sort criterion")
+			.value_name("CHARSET")
+			.takes_value(true)
+			.default_value("utf8")
+		)
+                .arg(
+                    Arg::with_name("query")
+                        .help("IMAP query")
+                        .long_help("The IMAP query format follows the [RFC3501](https://tools.ietf.org/html/rfc3501#section-6.4.4). The query is case-insensitive.")
+                        .value_name("QUERY")
+			.default_value("ALL")
+                        .raw(true),
+                ),
             SubCommand::with_name("write")
                 .about("Writes a new message")
                 .arg(attachment_arg())
                 .arg(encrypt_arg()),
             SubCommand::with_name("send")
                 .about("Sends a raw message")
-                .arg(Arg::with_name("message").raw(true).last(true)),
+                .arg(Arg::with_name("message").raw(true)),
             SubCommand::with_name("save")
                 .about("Saves a raw message")
                 .arg(Arg::with_name("message").raw(true)),
@@ -371,4 +498,107 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
         ],
     ]
     .concat()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_should_match_sort_cmd() {
+        macro_rules! get_matches_from {
+            ($($arg:expr),*) => {
+                clap::App::new("himalaya")
+                    .subcommands(subcmds())
+                    .get_matches_from_safe(&["himalaya", "sort", $($arg,)*])
+            };
+        }
+
+        // Test the required rule of the criteria argument
+        let m = get_matches_from![];
+        assert_eq!(
+            clap::ErrorKind::MissingRequiredArgument,
+            m.unwrap_err().kind
+        );
+
+        // Test the criteria argument with its order
+        let m = get_matches_from!["-c", "subject", "date:asc", "arrival:desc"];
+        assert_eq!(
+            matches(&m.unwrap()).unwrap(),
+            Some(Cmd::Sort(
+                vec![
+                    SortCriterion::Subject,
+                    SortCriterion::Date,
+                    SortCriterion::Reverse(&SortCriterion::Arrival),
+                ],
+                SortCharset::Utf8,
+                String::from("ALL"),
+                None,
+                None,
+                0,
+            )),
+        );
+
+        // Test the utf-8 charset argument
+        for charset in ["utf8", "utf-8", "Utf8", "Utf-8", "UTF8", "UTF-8"] {
+            let m = get_matches_from!["-c", "cc", "-t", charset];
+            assert_eq!(
+                matches(&m.unwrap()).unwrap(),
+                Some(Cmd::Sort(
+                    vec![SortCriterion::Cc],
+                    SortCharset::Utf8,
+                    String::from("ALL"),
+                    None,
+                    None,
+                    0,
+                )),
+            );
+        }
+
+        // Test the us-ascii charset argument
+        for charset in [
+            "usascii", "us-ascii", "UsAscii", "Us-Ascii", "USASCII", "US-ASCII",
+        ] {
+            let m = get_matches_from!["-c", "to", "-t", charset];
+            assert_eq!(
+                matches(&m.unwrap()).unwrap(),
+                Some(Cmd::Sort(
+                    vec![SortCriterion::To],
+                    SortCharset::UsAscii,
+                    String::from("ALL"),
+                    None,
+                    None,
+                    0,
+                )),
+            );
+        }
+
+        // Test the custom charset argument
+        let m = get_matches_from!["-c", "size", "-t", "custom"];
+        assert_eq!(
+            matches(&m.unwrap()).unwrap(),
+            Some(Cmd::Sort(
+                vec![SortCriterion::Size],
+                SortCharset::Custom("custom".into()),
+                String::from("ALL"),
+                None,
+                None,
+                0,
+            )),
+        );
+
+        // Test the query argument
+        let m = get_matches_from!["-c", "from", "--", "not", "seen"];
+        assert_eq!(
+            matches(&m.unwrap()).unwrap(),
+            Some(Cmd::Sort(
+                vec![SortCriterion::From],
+                SortCharset::Utf8,
+                String::from("not seen"),
+                None,
+                None,
+                0,
+            )),
+        );
+    }
 }

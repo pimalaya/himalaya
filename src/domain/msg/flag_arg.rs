@@ -13,7 +13,8 @@ type SeqRange<'a> = &'a str;
 type Flags<'a> = Vec<&'a str>;
 
 /// Represents the flag commands.
-pub enum Command<'a> {
+#[derive(Debug, PartialEq, Eq)]
+pub enum Cmd<'a> {
     /// Represents the add flags command.
     Add(SeqRange<'a>, Flags<'a>),
     /// Represents the set flags command.
@@ -23,7 +24,7 @@ pub enum Command<'a> {
 }
 
 /// Defines the flag command matcher.
-pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
+pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
     info!("entering message flag command matcher");
 
     if let Some(m) = m.subcommand_matches("add") {
@@ -32,7 +33,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         debug!("seq range: {}", seq_range);
         let flags: Vec<&str> = m.values_of("flags").unwrap_or_default().collect();
         debug!("flags: {:?}", flags);
-        return Ok(Some(Command::Add(seq_range, flags)));
+        return Ok(Some(Cmd::Add(seq_range, flags)));
     }
 
     if let Some(m) = m.subcommand_matches("set") {
@@ -41,7 +42,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         debug!("seq range: {}", seq_range);
         let flags: Vec<&str> = m.values_of("flags").unwrap_or_default().collect();
         debug!("flags: {:?}", flags);
-        return Ok(Some(Command::Set(seq_range, flags)));
+        return Ok(Some(Cmd::Set(seq_range, flags)));
     }
 
     if let Some(m) = m.subcommand_matches("remove") {
@@ -50,7 +51,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
         debug!("seq range: {}", seq_range);
         let flags: Vec<&str> = m.values_of("flags").unwrap_or_default().collect();
         debug!("flags: {:?}", flags);
-        return Ok(Some(Command::Remove(seq_range, flags)));
+        return Ok(Some(Cmd::Remove(seq_range, flags)));
     }
 
     Ok(None)

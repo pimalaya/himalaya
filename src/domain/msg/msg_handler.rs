@@ -4,7 +4,10 @@
 
 use anyhow::{Context, Result};
 use atty::Stream;
-use imap::types::Flag;
+use imap::{
+    extensions::sort::{SortCharset, SortCriterion},
+    types::Flag,
+};
 use log::{debug, info, trace};
 use mailparse::addrparse;
 use std::{
@@ -301,8 +304,27 @@ pub fn search<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>
     let page_size = page_size.unwrap_or(account.default_page_size);
     trace!("page size: {}", page_size);
 
-    let msgs = imap.fetch_envelopes_with(&query, &page_size, &page)?;
+    let msgs = imap.find_envelopes(&query, &page_size, &page)?;
     trace!("messages: {:#?}", msgs);
+    printer.print_table(msgs, PrintTableOpts { max_width })
+}
+
+/// Paginates messages from the selected mailbox matching the specified query, sorted by the given criteria.
+pub fn sort<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
+    criteria: &'a [SortCriterion<'a>],
+    charset: SortCharset<'a>,
+    query: String,
+    max_width: Option<usize>,
+    page_size: Option<usize>,
+    page: usize,
+    account: &Account,
+    printer: &mut Printer,
+    imap: &'a mut ImapService,
+) -> Result<()> {
+    let page_size = page_size.unwrap_or(account.default_page_size);
+    trace!("page size: {}", page_size);
+    let msgs = imap.find_and_sort_envelopes(criteria, charset, &query, &page_size, &page)?;
+    trace!("envelopes: {:#?}", msgs);
     printer.print_table(msgs, PrintTableOpts { max_width })
 }
 

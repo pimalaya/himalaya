@@ -93,16 +93,16 @@ fn main() -> Result<()> {
 
     // Check message commands.
     match msg_arg::matches(&m)? {
-        Some(msg_arg::Command::Attachments(seq)) => {
+        Some(msg_arg::Cmd::Attachments(seq)) => {
             return msg_handler::attachments(seq, &account, &mut printer, &mut imap);
         }
-        Some(msg_arg::Command::Copy(seq, mbox)) => {
+        Some(msg_arg::Cmd::Copy(seq, mbox)) => {
             return msg_handler::copy(seq, mbox, &mut printer, &mut imap);
         }
-        Some(msg_arg::Command::Delete(seq)) => {
+        Some(msg_arg::Cmd::Delete(seq)) => {
             return msg_handler::delete(seq, &mut printer, &mut imap);
         }
-        Some(msg_arg::Command::Forward(seq, attachment_paths, encrypt)) => {
+        Some(msg_arg::Cmd::Forward(seq, attachment_paths, encrypt)) => {
             return msg_handler::forward(
                 seq,
                 attachment_paths,
@@ -113,7 +113,7 @@ fn main() -> Result<()> {
                 &mut smtp,
             );
         }
-        Some(msg_arg::Command::List(max_width, page_size, page)) => {
+        Some(msg_arg::Cmd::List(max_width, page_size, page)) => {
             return msg_handler::list(
                 max_width,
                 page_size,
@@ -123,13 +123,13 @@ fn main() -> Result<()> {
                 &mut imap,
             );
         }
-        Some(msg_arg::Command::Move(seq, mbox)) => {
+        Some(msg_arg::Cmd::Move(seq, mbox)) => {
             return msg_handler::move_(seq, mbox, &mut printer, &mut imap);
         }
-        Some(msg_arg::Command::Read(seq, text_mime, raw)) => {
+        Some(msg_arg::Cmd::Read(seq, text_mime, raw)) => {
             return msg_handler::read(seq, text_mime, raw, &account, &mut printer, &mut imap);
         }
-        Some(msg_arg::Command::Reply(seq, all, attachment_paths, encrypt)) => {
+        Some(msg_arg::Cmd::Reply(seq, all, attachment_paths, encrypt)) => {
             return msg_handler::reply(
                 seq,
                 all,
@@ -141,10 +141,10 @@ fn main() -> Result<()> {
                 &mut smtp,
             );
         }
-        Some(msg_arg::Command::Save(raw_msg)) => {
+        Some(msg_arg::Cmd::Save(raw_msg)) => {
             return msg_handler::save(&mbox, raw_msg, &mut printer, &mut imap);
         }
-        Some(msg_arg::Command::Search(query, max_width, page_size, page)) => {
+        Some(msg_arg::Cmd::Search(query, max_width, page_size, page)) => {
             return msg_handler::search(
                 query,
                 max_width,
@@ -155,38 +155,51 @@ fn main() -> Result<()> {
                 &mut imap,
             );
         }
-        Some(msg_arg::Command::Send(raw_msg)) => {
+        Some(msg_arg::Cmd::Sort(criteria, charset, query, max_width, page_size, page)) => {
+            return msg_handler::sort(
+                &criteria,
+                charset,
+                query,
+                max_width,
+                page_size,
+                page,
+                &account,
+                &mut printer,
+                &mut imap,
+            );
+        }
+        Some(msg_arg::Cmd::Send(raw_msg)) => {
             return msg_handler::send(raw_msg, &account, &mut printer, &mut imap, &mut smtp);
         }
-        Some(msg_arg::Command::Write(atts, encrypt)) => {
+        Some(msg_arg::Cmd::Write(atts, encrypt)) => {
             return msg_handler::write(atts, encrypt, &account, &mut printer, &mut imap, &mut smtp);
         }
-        Some(msg_arg::Command::Flag(m)) => match m {
-            Some(flag_arg::Command::Set(seq_range, flags)) => {
+        Some(msg_arg::Cmd::Flag(m)) => match m {
+            Some(flag_arg::Cmd::Set(seq_range, flags)) => {
                 return flag_handler::set(seq_range, flags, &mut printer, &mut imap);
             }
-            Some(flag_arg::Command::Add(seq_range, flags)) => {
+            Some(flag_arg::Cmd::Add(seq_range, flags)) => {
                 return flag_handler::add(seq_range, flags, &mut printer, &mut imap);
             }
-            Some(flag_arg::Command::Remove(seq_range, flags)) => {
+            Some(flag_arg::Cmd::Remove(seq_range, flags)) => {
                 return flag_handler::remove(seq_range, flags, &mut printer, &mut imap);
             }
             _ => (),
         },
-        Some(msg_arg::Command::Tpl(m)) => match m {
-            Some(tpl_arg::Command::New(tpl)) => {
+        Some(msg_arg::Cmd::Tpl(m)) => match m {
+            Some(tpl_arg::Cmd::New(tpl)) => {
                 return tpl_handler::new(tpl, &account, &mut printer);
             }
-            Some(tpl_arg::Command::Reply(seq, all, tpl)) => {
+            Some(tpl_arg::Cmd::Reply(seq, all, tpl)) => {
                 return tpl_handler::reply(seq, all, tpl, &account, &mut printer, &mut imap);
             }
-            Some(tpl_arg::Command::Forward(seq, tpl)) => {
+            Some(tpl_arg::Cmd::Forward(seq, tpl)) => {
                 return tpl_handler::forward(seq, tpl, &account, &mut printer, &mut imap);
             }
-            Some(tpl_arg::Command::Save(atts, tpl)) => {
+            Some(tpl_arg::Cmd::Save(atts, tpl)) => {
                 return tpl_handler::save(&mbox, &account, atts, tpl, &mut printer, &mut imap);
             }
-            Some(tpl_arg::Command::Send(atts, tpl)) => {
+            Some(tpl_arg::Cmd::Send(atts, tpl)) => {
                 return tpl_handler::send(
                     &mbox,
                     &account,
