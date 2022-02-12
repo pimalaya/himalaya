@@ -42,10 +42,10 @@ pub fn attachments<'a, Printer: PrinterService, ImapService: ImapServiceInterfac
     );
 
     for attachment in attachments {
-        let filepath = account.downloads_dir.join(&attachment.filename);
+        let file_path = account.get_download_file_path(&attachment.filename)?;
         debug!("downloading {}…", attachment.filename);
-        fs::write(&filepath, &attachment.content)
-            .context(format!("cannot download attachment {:?}", filepath))?;
+        fs::write(&file_path, &attachment.content)
+            .context(format!("cannot download attachment {:?}", file_path))?;
     }
 
     printer.print(format!(

@@ -2,7 +2,7 @@ use anyhow::{anyhow, Context, Error, Result};
 use lettre::transport::smtp::authentication::Credentials as SmtpCredentials;
 use log::{debug, trace};
 use mailparse::MailAddr;
-use std::{convert::TryFrom, env, fs, path::PathBuf};
+use std::{convert::TryFrom, env, ffi::OsStr, fs, path::PathBuf};
 
 use crate::{
     config::{Config, DEFAULT_PAGE_SIZE, DEFAULT_SIG_DELIM},
@@ -111,6 +111,42 @@ impl Account {
         } else {
             Ok(None)
         }
+    }
+
+    pub fn get_download_file_path<S: AsRef<str>>(&self, file_name: S) -> Result<PathBuf> {
+        let file_path = self.downloads_dir.join(file_name.as_ref());
+        self.get_unique_download_file_path(&file_path, |path, _count| path.is_file())
+            .context(format!(
+                "cannot get download file path of {:?}",
+                file_name.as_ref()
+            ))
+    }
+
+    pub fn get_unique_download_file_path(
+        &self,
+        original_file_path: &PathBuf,
+        is_file: impl Fn(&PathBuf, u8) -> bool,
+    ) -> Result<PathBuf> {
+        let mut count = 0;
+        let file_ext = original_file_path
+            .extension()
+            .and_then(OsStr::to_str)
+            .map(|fext| String::from(".") + fext)
+            .unwrap_or_default();
+        let mut file_path = original_file_path.clone();
+
+        while is_file(&file_path, count) {
+            count += 1;
+            file_path.set_file_name(OsStr::new(
+                &original_file_path
+                    .file_stem()
+                    .and_then(OsStr::to_str)
+                    .map(|fstem| format!("{}_{}{}", fstem, count, file_ext))
+                    .ok_or_else(|| anyhow!("cannot get stem from file {:?}", original_file_path))?,
+            ));
+        }
+
+        Ok(file_path)
     }
 }
 
@@ -232,5 +268,48 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
 
         trace!("account: {:?}", account);
         Ok(account)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_unique_download_file_path() {
+        let account = Account::default();
+        let path = PathBuf::from("downloads/file.ext");
+
+        // When file path is unique
+        assert!(matches!(
+            account.get_unique_download_file_path(&path, |_, _| false),
+            Ok(path) if path == PathBuf::from("downloads/file.ext")
+        ));
+
+        // When 1 file path already exist
+        assert!(matches!(
+            account.get_unique_download_file_path(&path, |_, count| count <  1),
+            Ok(path) if path == PathBuf::from("downloads/file_1.ext")
+        ));
+
+        // When 5 file paths already exist
+        assert!(matches!(
+            account.get_unique_download_file_path(&path, |_, count| count < 5),
+            Ok(path) if path == PathBuf::from("downloads/file_5.ext")
+        ));
+
+        // When file path has no extension
+        let path = PathBuf::from("downloads/file");
+        assert!(matches!(
+            account.get_unique_download_file_path(&path, |_, count| count < 5),
+            Ok(path) if path == PathBuf::from("downloads/file_5")
+        ));
+
+        // When file path has 2 extensions
+        let path = PathBuf::from("downloads/file.ext.ext2");
+        assert!(matches!(
+            account.get_unique_download_file_path(&path, |_, count| count < 5),
+            Ok(path) if path == PathBuf::from("downloads/file.ext_5.ext2")
+        ));
     }
 }

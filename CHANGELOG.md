@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Suffix to downloaded attachments with same name [#204]
+
 ## [0.5.5] - 2022-02-08
 
 ### Added
@@ -401,6 +405,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#193]: https://github.com/soywod/himalaya/issues/193
 [#196]: https://github.com/soywod/himalaya/issues/196
 [#199]: https://github.com/soywod/himalaya/issues/199
+[#204]: https://github.com/soywod/himalaya/issues/204
 [#205]: https://github.com/soywod/himalaya/issues/205
 [#215]: https://github.com/soywod/himalaya/issues/215
 [#220]: https://github.com/soywod/himalaya/issues/220
