@@ -13,33 +13,33 @@ use std::{
 use crate::{
     config::Account,
     domain::{
-        imap::Backend,
+        imap::BackendService,
         msg::{Msg, TplOverride},
-        Flags, Mbox, SmtpServiceInterface,
+        Flags, Mbox, SmtpService,
     },
     output::PrinterService,
 };
 
 /// Generate a new message template.
-pub fn new<'a, Printer: PrinterService>(
+pub fn new<'a, P: PrinterService>(
     opts: TplOverride<'a>,
     account: &'a Account,
-    printer: &'a mut Printer,
+    printer: &'a mut P,
 ) -> Result<()> {
     let tpl = Msg::default().to_tpl(opts, account)?;
     printer.print(tpl)
 }
 
 /// Generate a reply message template.
-pub fn reply<'a, Printer: PrinterService, ImapService: Backend<'a>>(
+pub fn reply<'a, P: PrinterService, B: BackendService<'a>>(
     seq: &str,
     all: bool,
     opts: TplOverride<'a>,
     account: &'a Account,
-    printer: &'a mut Printer,
-    imap: &'a mut ImapService,
+    printer: &'a mut P,
+    backend: &'a mut B,
 ) -> Result<()> {
-    let tpl = imap
+    let tpl = backend
         .find_msg(account, seq)?
         .into_reply(all, account)?
         .to_tpl(opts, account)?;
@@ -47,14 +47,14 @@ pub fn reply<'a, Printer: PrinterService, ImapService: Backend<'a>>(
 }
 
 /// Generate a forward message template.
-pub fn forward<'a, Printer: PrinterService, ImapService: Backend<'a>>(
+pub fn forward<'a, P: PrinterService, B: BackendService<'a>>(
     seq: &str,
     opts: TplOverride<'a>,
     account: &'a Account,
-    printer: &'a mut Printer,
-    imap: &'a mut ImapService,
+    printer: &'a mut P,
+    backend: &'a mut B,
 ) -> Result<()> {
-    let tpl = imap
+    let tpl = backend
         .find_msg(account, seq)?
         .into_forward(account)?
         .to_tpl(opts, account)?;
@@ -62,13 +62,13 @@ pub fn forward<'a, Printer: PrinterService, ImapService: Backend<'a>>(
 }
 
 /// Saves a message based on a template.
-pub fn save<'a, Printer: PrinterService, ImapService: Backend<'a>>(
+pub fn save<'a, P: PrinterService, B: BackendService<'a>>(
     mbox: &Mbox,
     account: &Account,
     attachments_paths: Vec<&str>,
     tpl: &str,
-    printer: &mut Printer,
-    imap: &mut ImapService,
+    printer: &mut P,
+    backend: &mut B,
 ) -> Result<()> {
     let tpl = if atty::is(Stream::Stdin) || printer.is_json() {
         tpl.replace("\r", "")
@@ -83,24 +83,19 @@ pub fn save<'a, Printer: PrinterService, ImapService: Backend<'a>>(
     let msg = Msg::from_tpl(&tpl)?.add_attachments(attachments_paths)?;
     let raw_msg = msg.into_sendable_msg(account)?.formatted();
     let flags = Flags::try_from(vec![Flag::Seen])?;
-    imap.append_raw_msg_with_flags(mbox, &raw_msg, flags)?;
+    backend.append_raw_msg_with_flags(mbox, &raw_msg, flags)?;
     printer.print("Template successfully saved")
 }
 
 /// Sends a message based on a template.
-pub fn send<
-    'a,
-    Printer: PrinterService,
-    ImapService: Backend<'a>,
-    SmtpService: SmtpServiceInterface,
->(
+pub fn send<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
     mbox: &Mbox,
     account: &Account,
     attachments_paths: Vec<&str>,
     tpl: &str,
-    printer: &mut Printer,
-    imap: &mut ImapService,
-    smtp: &mut SmtpService,
+    printer: &mut P,
+    backend: &mut B,
+    smtp: &mut S,
 ) -> Result<()> {
     let tpl = if atty::is(Stream::Stdin) || printer.is_json() {
         tpl.replace("\r", "")
@@ -115,6 +110,6 @@ pub fn send<
     let msg = Msg::from_tpl(&tpl)?.add_attachments(attachments_paths)?;
     let sent_msg = smtp.send_msg(account, &msg)?;
     let flags = Flags::try_from(vec![Flag::Seen])?;
-    imap.append_raw_msg_with_flags(mbox, &sent_msg.formatted(), flags)?;
+    backend.append_raw_msg_with_flags(mbox, &sent_msg.formatted(), flags)?;
     printer.print("Template successfully sent")
 }

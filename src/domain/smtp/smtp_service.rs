@@ -11,17 +11,17 @@ use log::debug;
 
 use crate::{config::Account, domain::msg::Msg};
 
-pub trait SmtpServiceInterface {
+pub trait SmtpService {
     fn send_msg(&mut self, account: &Account, msg: &Msg) -> Result<lettre::Message>;
     fn send_raw_msg(&mut self, envelope: &lettre::address::Envelope, msg: &[u8]) -> Result<()>;
 }
 
-pub struct SmtpService<'a> {
+pub struct LettreService<'a> {
     account: &'a Account,
     transport: Option<SmtpTransport>,
 }
 
-impl<'a> SmtpService<'a> {
+impl<'a> LettreService<'a> {
     fn transport(&mut self) -> Result<&SmtpTransport> {
         if let Some(ref transport) = self.transport {
             Ok(transport)
@@ -55,7 +55,7 @@ impl<'a> SmtpService<'a> {
     }
 }
 
-impl<'a> SmtpServiceInterface for SmtpService<'a> {
+impl<'a> SmtpService for LettreService<'a> {
     fn send_msg(&mut self, account: &Account, msg: &Msg) -> Result<lettre::Message> {
         debug!("sending message…");
         let sendable_msg = msg.into_sendable_msg(account)?;
@@ -70,7 +70,7 @@ impl<'a> SmtpServiceInterface for SmtpService<'a> {
     }
 }
 
-impl<'a> From<&'a Account> for SmtpService<'a> {
+impl<'a> From<&'a Account> for LettreService<'a> {
     fn from(account: &'a Account) -> Self {
         debug!("init SMTP service");
         Self {

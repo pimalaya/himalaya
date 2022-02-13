@@ -16,7 +16,7 @@ use crate::{
 
 type ImapSession = imap::Session<TlsStream<TcpStream>>;
 
-pub trait Backend<'a> {
+pub trait BackendService<'a> {
     fn notify(&mut self, config: &Config, account: &Account, keepalive: u64) -> Result<()>;
     fn watch(&mut self, account: &Account, keepalive: u64) -> Result<()>;
     fn fetch_mboxes(&'a mut self) -> Result<Mboxes>;
@@ -116,7 +116,7 @@ impl<'a> ImapService<'a> {
     }
 }
 
-impl<'a> Backend<'a> for ImapService<'a> {
+impl<'a> BackendService<'a> for ImapService<'a> {
     fn fetch_mboxes(&'a mut self) -> Result<Mboxes> {
         let raw_mboxes = self
             .sess()?

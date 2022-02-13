@@ -12,10 +12,10 @@ mod ui;
 use compl::{compl_arg, compl_handler};
 use config::{config_arg, Account, AccountKind, Config};
 use domain::{
-    imap::{imap_arg, imap_handler, Backend, ImapService},
+    imap::{imap_arg, imap_handler, BackendService, ImapService},
     mbox::{mbox_arg, mbox_handler, Mbox},
     msg::{flag_arg, flag_handler, msg_arg, msg_handler, tpl_arg, tpl_handler},
-    smtp::SmtpService,
+    smtp::LettreService,
 };
 use output::{output_arg, OutputFmt};
 
@@ -44,13 +44,13 @@ fn main() -> Result<()> {
     if raw_args.len() > 1 && raw_args[1].starts_with("mailto:") {
         let config = Config::try_from(None)?;
         let account = Account::try_from((&config, None))?;
-        let mbox = Mbox::new(&(account.inbox_folder));
+        let mbox = Mbox::new(&account.inbox_folder);
         let mut printer = StdoutPrinter::from(OutputFmt::Plain);
         let url = Url::parse(&raw_args[1])?;
         let mut backend = match &account.full {
             AccountKind::Imap(account) => ImapService::from((account, &mbox)),
         };
-        let mut smtp = SmtpService::from(&account);
+        let mut smtp = LettreService::from(&account);
 
         return msg_handler::mailto(&url, &account, &mut printer, &mut backend, &mut smtp);
     }
@@ -76,7 +76,7 @@ fn main() -> Result<()> {
         AccountKind::Imap(account) => ImapService::from((account, &mbox)),
     };
 
-    let mut smtp = SmtpService::from(&account);
+    let mut smtp = LettreService::from(&account);
 
     // Check IMAP commands.
     match imap_arg::matches(&m)? {

@@ -21,23 +21,23 @@ use url::Url;
 use crate::{
     config::Account,
     domain::{
-        imap::Backend,
+        imap::BackendService,
         mbox::Mbox,
         msg::{Flags, Msg, Part, TextPlainPart},
-        smtp::SmtpServiceInterface,
+        smtp::SmtpService,
         Parts,
     },
     output::{PrintTableOpts, PrinterService},
 };
 
 /// Download all message attachments to the user account downloads directory.
-pub fn attachments<'a, Printer: PrinterService, ImapService: Backend<'a>>(
+pub fn attachments<'a, P: PrinterService, B: BackendService<'a>>(
     seq: &str,
     account: &Account,
-    printer: &mut Printer,
-    imap: &mut ImapService,
+    printer: &mut P,
+    backend: &mut B,
 ) -> Result<()> {
-    let attachments = imap.find_msg(account, seq)?.attachments();
+    let attachments = backend.find_msg(account, seq)?.attachments();
     let attachments_len = attachments.len();
     debug!(
         r#"{} attachment(s) found for message "{}""#,
@@ -58,16 +58,16 @@ pub fn attachments<'a, Printer: PrinterService, ImapService: Backend<'a>>(
 }
 
 /// Copy a message from a mailbox to another.
-pub fn copy<'a, Printer: PrinterService, ImapService: Backend<'a>>(
+pub fn copy<'a, P: PrinterService, B: BackendService<'a>>(
     seq: &str,
     mbox: &str,
-    printer: &mut Printer,
-    imap: &mut ImapService,
+    printer: &mut P,
+    backend: &mut B,
 ) -> Result<()> {
     let mbox = Mbox::new(mbox);
-    let msg = imap.find_raw_msg(seq)?;
+    let msg = backend.find_raw_msg(seq)?;
     let flags = Flags::try_from(vec![Flag::Seen])?;
-    imap.append_raw_msg_with_flags(&mbox, &msg, flags)?;
+    backend.append_raw_msg_with_flags(&mbox, &msg, flags)?;
     printer.print(format!(
         r#"Message {} successfully copied to folder "{}""#,
         seq, mbox
@@ -75,47 +75,43 @@ pub fn copy<'a, Printer: PrinterService, ImapService: Backend<'a>>(
 }
 
 /// Delete messages matching the given sequence range.
-pub fn delete<'a, Printer: PrinterService, ImapService: Backend<'a>>(
+pub fn delete<'a, P: PrinterService, B: BackendService<'a>>(
     seq: &str,
-    printer: &mut Printer,
-    imap: &mut ImapService,
+    printer: &mut P,
+    backend: &mut B,
 ) -> Result<()> {
     let flags = Flags::try_from(vec![Flag::Seen, Flag::Deleted])?;
-    imap.add_flags(seq, &flags)?;
-    imap.expunge()?;
+    backend.add_flags(seq, &flags)?;
+    backend.expunge()?;
     printer.print(format!(r#"Message(s) {} successfully deleted"#, seq))
 }
 
 /// Forward the given message UID from the selected mailbox.
-pub fn forward<
-    'a,
-    Printer: PrinterService,
-    ImapService: Backend<'a>,
-    SmtpService: SmtpServiceInterface,
->(
+pub fn forward<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
     seq: &str,
     attachments_paths: Vec<&str>,
     encrypt: bool,
     account: &Account,
-    printer: &mut Printer,
-    imap: &mut ImapService,
-    smtp: &mut SmtpService,
+    printer: &mut P,
+    backend: &mut B,
+    smtp: &mut S,
 ) -> Result<()> {
-    imap.find_msg(account, seq)?
+    backend
+        .find_msg(account, seq)?
         .into_forward(account)?
         .add_attachments(attachments_paths)?
         .encrypt(encrypt)
-        .edit_with_editor(account, printer, imap, smtp)
+        .edit_with_editor(account, printer, backend, smtp)
 }
 
 /// List paginated messages from the selected mailbox.
-pub fn list<'a, Printer: PrinterService, ImapService: Backend<'a>>(
+pub fn list<'a, P: PrinterService, B: BackendService<'a>>(
     max_width: Option<usize>,
     page_size: Option<usize>,
     page: usize,
     account: &Account,
-    printer: &mut Printer,
-    imap: &'a mut ImapService,
+    printer: &mut P,
+    imap: &'a mut B,
 ) -> Result<()> {
     let page_size = page_size.unwrap_or(account.default_page_size);
     trace!("page size: {}", page_size);
@@ -128,17 +124,12 @@ pub fn list<'a, Printer: PrinterService, ImapService: Backend<'a>>(
 /// Parses and edits a message from a [mailto] URL string.
 ///
 /// [mailto]: https://en.wikipedia.org/wiki/Mailto
-pub fn mailto<
-    'a,
-    Printer: PrinterService,
-    ImapService: Backend<'a>,
-    SmtpService: SmtpServiceInterface,
->(
+pub fn mailto<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
     url: &Url,
     account: &Account,
-    printer: &mut Printer,
-    imap: &mut ImapService,
-    smtp: &mut SmtpService,
+    printer: &mut P,
+    backend: &mut B,
+    smtp: &mut S,
 ) -> Result<()> {
     info!("entering mailto command handler");
 
@@ -187,28 +178,28 @@ pub fn mailto<
     };
     trace!("message: {:?}", msg);
 
-    msg.edit_with_editor(account, printer, imap, smtp)
+    msg.edit_with_editor(account, printer, backend, smtp)
 }
 
 /// Move a message from a mailbox to another.
-pub fn move_<'a, Printer: PrinterService, ImapService: Backend<'a>>(
+pub fn move_<'a, P: PrinterService, B: BackendService<'a>>(
     // The sequence number of the message to move
     seq: &str,
     // The mailbox to move the message in
     mbox: &str,
-    printer: &mut Printer,
-    imap: &mut ImapService,
+    printer: &mut P,
+    backend: &mut B,
 ) -> Result<()> {
     // Copy the message to targetted mailbox
     let mbox = Mbox::new(mbox);
-    let msg = imap.find_raw_msg(seq)?;
+    let msg = backend.find_raw_msg(seq)?;
     let flags = Flags::try_from(vec![Flag::Seen])?;
-    imap.append_raw_msg_with_flags(&mbox, &msg, flags)?;
+    backend.append_raw_msg_with_flags(&mbox, &msg, flags)?;
 
     // Delete the original message
     let flags = Flags::try_from(vec![Flag::Seen, Flag::Deleted])?;
-    imap.add_flags(seq, &flags)?;
-    imap.expunge()?;
+    backend.add_flags(seq, &flags)?;
+    backend.expunge()?;
 
     printer.print(format!(
         r#"Message {} successfully moved to folder "{}""#,
@@ -217,55 +208,51 @@ pub fn move_<'a, Printer: PrinterService, ImapService: Backend<'a>>(
 }
 
 /// Read a message by its sequence number.
-pub fn read<'a, Printer: PrinterService, ImapService: Backend<'a>>(
+pub fn read<'a, P: PrinterService, B: BackendService<'a>>(
     seq: &str,
     text_mime: &str,
     raw: bool,
     account: &Account,
-    printer: &mut Printer,
-    imap: &mut ImapService,
+    printer: &mut P,
+    backend: &mut B,
 ) -> Result<()> {
     let msg = if raw {
         // Emails don't always have valid utf8. Using "lossy" to display what we can.
-        String::from_utf8_lossy(&imap.find_raw_msg(seq)?).into_owned()
+        String::from_utf8_lossy(&backend.find_raw_msg(seq)?).into_owned()
     } else {
-        imap.find_msg(account, seq)?.fold_text_parts(text_mime)
+        backend.find_msg(account, seq)?.fold_text_parts(text_mime)
     };
 
     printer.print(msg)
 }
 
 /// Reply to the given message UID.
-pub fn reply<
-    'a,
-    Printer: PrinterService,
-    ImapService: Backend<'a>,
-    SmtpService: SmtpServiceInterface,
->(
+pub fn reply<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
     seq: &str,
     all: bool,
     attachments_paths: Vec<&str>,
     encrypt: bool,
     account: &Account,
-    printer: &mut Printer,
-    imap: &mut ImapService,
-    smtp: &mut SmtpService,
+    printer: &mut P,
+    backend: &mut B,
+    smtp: &mut S,
 ) -> Result<()> {
-    imap.find_msg(account, seq)?
+    backend
+        .find_msg(account, seq)?
         .into_reply(all, account)?
         .add_attachments(attachments_paths)?
         .encrypt(encrypt)
-        .edit_with_editor(account, printer, imap, smtp)?;
+        .edit_with_editor(account, printer, backend, smtp)?;
     let flags = Flags::try_from(vec![Flag::Answered])?;
-    imap.add_flags(seq, &flags)
+    backend.add_flags(seq, &flags)
 }
 
 /// Saves a raw message to the targetted mailbox.
-pub fn save<'a, Printer: PrinterService, ImapService: Backend<'a>>(
+pub fn save<'a, P: PrinterService, B: BackendService<'a>>(
     mbox: &Mbox,
     raw_msg: &str,
-    printer: &mut Printer,
-    imap: &mut ImapService,
+    printer: &mut P,
+    backend: &mut B,
 ) -> Result<()> {
     info!("entering save message handler");
 
@@ -288,29 +275,29 @@ pub fn save<'a, Printer: PrinterService, ImapService: Backend<'a>>(
             .collect::<Vec<String>>()
             .join("\r\n")
     };
-    imap.append_raw_msg_with_flags(mbox, raw_msg.as_bytes(), flags)
+    backend.append_raw_msg_with_flags(mbox, raw_msg.as_bytes(), flags)
 }
 
 /// Paginate messages from the selected mailbox matching the specified query.
-pub fn search<'a, Printer: PrinterService, ImapService: Backend<'a>>(
+pub fn search<'a, P: PrinterService, B: BackendService<'a>>(
     query: String,
     max_width: Option<usize>,
     page_size: Option<usize>,
     page: usize,
     account: &Account,
-    printer: &mut Printer,
-    imap: &'a mut ImapService,
+    printer: &mut P,
+    backend: &'a mut B,
 ) -> Result<()> {
     let page_size = page_size.unwrap_or(account.default_page_size);
     trace!("page size: {}", page_size);
 
-    let msgs = imap.find_envelopes(&query, &page_size, &page)?;
+    let msgs = backend.find_envelopes(&query, &page_size, &page)?;
     trace!("messages: {:#?}", msgs);
     printer.print_table(msgs, PrintTableOpts { max_width })
 }
 
 /// Paginates messages from the selected mailbox matching the specified query, sorted by the given criteria.
-pub fn sort<'a, Printer: PrinterService, ImapService: Backend<'a>>(
+pub fn sort<'a, P: PrinterService, B: BackendService<'a>>(
     criteria: &'a [SortCriterion<'a>],
     charset: SortCharset<'a>,
     query: String,
@@ -318,28 +305,23 @@ pub fn sort<'a, Printer: PrinterService, ImapService: Backend<'a>>(
     page_size: Option<usize>,
     page: usize,
     account: &Account,
-    printer: &mut Printer,
-    imap: &'a mut ImapService,
+    printer: &mut P,
+    backend: &'a mut B,
 ) -> Result<()> {
     let page_size = page_size.unwrap_or(account.default_page_size);
     trace!("page size: {}", page_size);
-    let msgs = imap.find_and_sort_envelopes(criteria, charset, &query, &page_size, &page)?;
+    let msgs = backend.find_and_sort_envelopes(criteria, charset, &query, &page_size, &page)?;
     trace!("envelopes: {:#?}", msgs);
     printer.print_table(msgs, PrintTableOpts { max_width })
 }
 
 /// Send a raw message.
-pub fn send<
-    'a,
-    Printer: PrinterService,
-    ImapService: Backend<'a>,
-    SmtpService: SmtpServiceInterface,
->(
+pub fn send<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
     raw_msg: &str,
     account: &Account,
-    printer: &mut Printer,
-    imap: &mut ImapService,
-    smtp: &mut SmtpService,
+    printer: &mut P,
+    backend: &mut B,
+    smtp: &mut S,
 ) -> Result<()> {
     info!("entering send message handler");
 
@@ -368,25 +350,20 @@ pub fn send<
     trace!("envelope: {:?}", envelope);
 
     smtp.send_raw_msg(&envelope, raw_msg.as_bytes())?;
-    imap.append_raw_msg_with_flags(&mbox, raw_msg.as_bytes(), flags)
+    backend.append_raw_msg_with_flags(&mbox, raw_msg.as_bytes(), flags)
 }
 
 /// Compose a new message.
-pub fn write<
-    'a,
-    Printer: PrinterService,
-    ImapService: Backend<'a>,
-    SmtpService: SmtpServiceInterface,
->(
+pub fn write<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
     attachments_paths: Vec<&str>,
     encrypt: bool,
     account: &Account,
-    printer: &mut Printer,
-    imap: &mut ImapService,
-    smtp: &mut SmtpService,
+    printer: &mut P,
+    backend: &mut B,
+    smtp: &mut S,
 ) -> Result<()> {
     Msg::default()
         .add_attachments(attachments_paths)?
         .encrypt(encrypt)
-        .edit_with_editor(account, printer, imap, smtp)
+        .edit_with_editor(account, printer, backend, smtp)
 }
