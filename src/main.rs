@@ -47,9 +47,8 @@ fn main() -> Result<()> {
         let mbox = Mbox::new(&(account.inbox_folder));
         let mut printer = StdoutPrinter::from(OutputFmt::Plain);
         let url = Url::parse(&raw_args[1])?;
-        let mut backend = match &account.with_backend_config {
+        let mut backend = match &account.full {
             AccountKind::Imap(account) => ImapService::from((account, &mbox)),
-            AccountKind::None => panic!("CACA"),
         };
         let mut smtp = SmtpService::from(&account);
 
@@ -73,9 +72,8 @@ fn main() -> Result<()> {
     let account = Account::try_from((&config, m.value_of("account")))?;
     let mbox = Mbox::new(m.value_of("mbox-source").unwrap_or(&account.inbox_folder));
     let mut printer = StdoutPrinter::try_from(m.value_of("output"))?;
-    let mut backend = match &account.with_backend_config {
+    let mut backend = match &account.full {
         AccountKind::Imap(account) => ImapService::from((account, &mbox)),
-        AccountKind::None => panic!("CACA"),
     };
 
     let mut smtp = SmtpService::from(&account);

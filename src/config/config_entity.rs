@@ -8,6 +8,10 @@ use crate::output::run_cmd;
 pub const DEFAULT_PAGE_SIZE: usize = 10;
 pub const DEFAULT_SIG_DELIM: &str = "-- \n";
 
+pub const DEFAULT_INBOX_FOLDER: &str = "INBOX";
+pub const DEFAULT_SENT_FOLDER: &str = "Sent";
+pub const DEFAULT_DRAFT_FOLDER: &str = "Drafts";
+
 /// Represents the user deserialized config file.
 #[derive(Debug, Default, Clone, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -16,7 +20,7 @@ pub struct Config {
     pub name: String,
     /// Represents the downloads directory (mostly for attachments).
     pub downloads_dir: Option<PathBuf>,
-    /// Represents the signature.
+    /// Represents the signature of the user.
     pub signature: Option<String>,
     /// Overrides the default signature delimiter "`--\n `".
     pub signature_delimiter: Option<String>,
@@ -37,13 +41,13 @@ pub struct Config {
 
     /// Represents all the user accounts.
     #[serde(flatten)]
-    pub accounts: HashMap<String, ConfigAccount>,
+    pub accounts: HashMap<String, ConfigAccountKind>,
 }
 
 /// Represents all existing kind of account (backend).
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(untagged)]
-pub enum ConfigAccount {
+pub enum ConfigAccountKind {
     Imap(ConfigImapAccount),
 }
 
@@ -173,7 +177,7 @@ impl Config {
     }
 }
 
-/// Tries to create a config from an optional string slice (path from args).
+/// Tries to create a config from an optional path.
 impl TryFrom<Option<&str>> for Config {
     type Error = Error;
 
