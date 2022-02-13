@@ -5,7 +5,7 @@ use mailparse::MailAddr;
 use std::{convert::TryFrom, env, ffi::OsStr, fs, path::PathBuf};
 
 use crate::{
-    config::{Config, ConfigAccountKind, DEFAULT_PAGE_SIZE, DEFAULT_SIG_DELIM},
+    config::{Config, ConfigAccount, DEFAULT_PAGE_SIZE, DEFAULT_SIG_DELIM},
     output::run_cmd,
 };
 
@@ -235,7 +235,7 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
                 .accounts
                 .iter()
                 .find_map(|(name, config_account)| match config_account {
-                    ConfigAccountKind::Imap(account) => {
+                    ConfigAccount::Imap(account) => {
                         if account.default.unwrap_or(false) {
                             Some((name.to_owned(), config_account))
                         } else {
@@ -252,7 +252,7 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
         }?;
 
         let downloads_dir = match config_account {
-            ConfigAccountKind::Imap(account) => account
+            ConfigAccount::Imap(account) => account
                 .downloads_dir
                 .as_ref()
                 .and_then(|dir| dir.to_str())
@@ -270,7 +270,7 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
         };
 
         let default_page_size = match config_account {
-            ConfigAccountKind::Imap(account) => account
+            ConfigAccount::Imap(account) => account
                 .default_page_size
                 .as_ref()
                 .or_else(|| config.default_page_size.as_ref())
@@ -280,14 +280,14 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
 
         let default_sig_delim = DEFAULT_SIG_DELIM.to_string();
         let sig_delim = match config_account {
-            ConfigAccountKind::Imap(account) => account
+            ConfigAccount::Imap(account) => account
                 .signature_delimiter
                 .as_ref()
                 .or_else(|| config.signature_delimiter.as_ref())
                 .unwrap_or(&default_sig_delim),
         };
         let sig = match config_account {
-            ConfigAccountKind::Imap(account) => account
+            ConfigAccount::Imap(account) => account
                 .signature
                 .as_ref()
                 .or_else(|| config.signature.as_ref()),
@@ -300,13 +300,13 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
             .map(|sig| format!("{}{}", sig_delim, sig.trim_end()));
 
         let from = match config_account {
-            ConfigAccountKind::Imap(account) => {
+            ConfigAccount::Imap(account) => {
                 account.name.as_ref().unwrap_or(&config.name).to_owned()
             }
         };
 
         let inbox_folder = match config_account {
-            ConfigAccountKind::Imap(account) => account
+            ConfigAccount::Imap(account) => account
                 .inbox_folder
                 .as_deref()
                 .or_else(|| config.inbox_folder.as_deref())
@@ -315,7 +315,7 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
         };
 
         let sent_folder = match config_account {
-            ConfigAccountKind::Imap(account) => account
+            ConfigAccount::Imap(account) => account
                 .sent_folder
                 .as_deref()
                 .or_else(|| config.sent_folder.as_deref())
@@ -324,7 +324,7 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
         };
 
         let draft_folder = match config_account {
-            ConfigAccountKind::Imap(account) => account
+            ConfigAccount::Imap(account) => account
                 .draft_folder
                 .as_deref()
                 .or_else(|| config.draft_folder.as_deref())
@@ -333,7 +333,7 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
         };
 
         let notify_query = match config_account {
-            ConfigAccountKind::Imap(account) => account
+            ConfigAccount::Imap(account) => account
                 .notify_query
                 .as_ref()
                 .or_else(|| config.notify_query.as_ref())
@@ -342,7 +342,7 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
         };
 
         let watch_cmds = match config_account {
-            ConfigAccountKind::Imap(account) => account
+            ConfigAccount::Imap(account) => account
                 .watch_cmds
                 .as_ref()
                 .or_else(|| config.watch_cmds.as_ref())
@@ -351,43 +351,43 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
         };
 
         let default = match config_account {
-            ConfigAccountKind::Imap(account) => account.default.unwrap_or_default(),
+            ConfigAccount::Imap(account) => account.default.unwrap_or_default(),
         };
 
         let email = match config_account {
-            ConfigAccountKind::Imap(account) => account.email.to_owned(),
+            ConfigAccount::Imap(account) => account.email.to_owned(),
         };
 
         let smtp_host = match config_account {
-            ConfigAccountKind::Imap(account) => account.smtp_host.clone(),
+            ConfigAccount::Imap(account) => account.smtp_host.clone(),
         };
 
         let smtp_port = match config_account {
-            ConfigAccountKind::Imap(account) => account.smtp_port,
+            ConfigAccount::Imap(account) => account.smtp_port,
         };
 
         let smtp_starttls = match config_account {
-            ConfigAccountKind::Imap(account) => account.smtp_starttls.unwrap_or_default(),
+            ConfigAccount::Imap(account) => account.smtp_starttls.unwrap_or_default(),
         };
 
         let smtp_insecure = match config_account {
-            ConfigAccountKind::Imap(account) => account.smtp_insecure.unwrap_or_default(),
+            ConfigAccount::Imap(account) => account.smtp_insecure.unwrap_or_default(),
         };
 
         let smtp_login = match config_account {
-            ConfigAccountKind::Imap(account) => account.smtp_login.clone(),
+            ConfigAccount::Imap(account) => account.smtp_login.clone(),
         };
 
         let smtp_passwd_cmd = match config_account {
-            ConfigAccountKind::Imap(account) => account.smtp_passwd_cmd.clone(),
+            ConfigAccount::Imap(account) => account.smtp_passwd_cmd.clone(),
         };
 
         let pgp_encrypt_cmd = match config_account {
-            ConfigAccountKind::Imap(account) => account.pgp_encrypt_cmd.clone(),
+            ConfigAccount::Imap(account) => account.pgp_encrypt_cmd.clone(),
         };
 
         let pgp_decrypt_cmd = match config_account {
-            ConfigAccountKind::Imap(account) => account.pgp_decrypt_cmd.clone(),
+            ConfigAccount::Imap(account) => account.pgp_decrypt_cmd.clone(),
         };
 
         let account = Account {
@@ -412,7 +412,7 @@ impl<'a> TryFrom<(&'a Config, Option<&str>)> for Account {
             pgp_encrypt_cmd: pgp_encrypt_cmd.clone(),
             pgp_decrypt_cmd: pgp_decrypt_cmd.clone(),
             with_backend_config: match &config_account {
-                ConfigAccountKind::Imap(backend_config) => AccountKind::Imap(ImapAccount {
+                ConfigAccount::Imap(backend_config) => AccountKind::Imap(ImapAccount {
                     name,
                     from,
                     downloads_dir,
