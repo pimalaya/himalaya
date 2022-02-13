@@ -13,7 +13,7 @@ use std::{
 use crate::{
     config::Account,
     domain::{
-        imap::ImapServiceInterface,
+        imap::Backend,
         msg::{Msg, TplOverride},
         Flags, Mbox, SmtpServiceInterface,
     },
@@ -31,7 +31,7 @@ pub fn new<'a, Printer: PrinterService>(
 }
 
 /// Generate a reply message template.
-pub fn reply<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
+pub fn reply<'a, Printer: PrinterService, ImapService: Backend<'a>>(
     seq: &str,
     all: bool,
     opts: TplOverride<'a>,
@@ -47,7 +47,7 @@ pub fn reply<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>
 }
 
 /// Generate a forward message template.
-pub fn forward<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
+pub fn forward<'a, Printer: PrinterService, ImapService: Backend<'a>>(
     seq: &str,
     opts: TplOverride<'a>,
     account: &'a Account,
@@ -62,7 +62,7 @@ pub fn forward<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a
 }
 
 /// Saves a message based on a template.
-pub fn save<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
+pub fn save<'a, Printer: PrinterService, ImapService: Backend<'a>>(
     mbox: &Mbox,
     account: &Account,
     attachments_paths: Vec<&str>,
@@ -91,7 +91,7 @@ pub fn save<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
 pub fn send<
     'a,
     Printer: PrinterService,
-    ImapService: ImapServiceInterface<'a>,
+    ImapService: Backend<'a>,
     SmtpService: SmtpServiceInterface,
 >(
     mbox: &Mbox,

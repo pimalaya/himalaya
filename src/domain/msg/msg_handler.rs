@@ -21,7 +21,7 @@ use url::Url;
 use crate::{
     config::Account,
     domain::{
-        imap::ImapServiceInterface,
+        imap::Backend,
         mbox::Mbox,
         msg::{Flags, Msg, Part, TextPlainPart},
         smtp::SmtpServiceInterface,
@@ -31,7 +31,7 @@ use crate::{
 };
 
 /// Download all message attachments to the user account downloads directory.
-pub fn attachments<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
+pub fn attachments<'a, Printer: PrinterService, ImapService: Backend<'a>>(
     seq: &str,
     account: &Account,
     printer: &mut Printer,
@@ -58,7 +58,7 @@ pub fn attachments<'a, Printer: PrinterService, ImapService: ImapServiceInterfac
 }
 
 /// Copy a message from a mailbox to another.
-pub fn copy<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
+pub fn copy<'a, Printer: PrinterService, ImapService: Backend<'a>>(
     seq: &str,
     mbox: &str,
     printer: &mut Printer,
@@ -75,7 +75,7 @@ pub fn copy<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
 }
 
 /// Delete messages matching the given sequence range.
-pub fn delete<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
+pub fn delete<'a, Printer: PrinterService, ImapService: Backend<'a>>(
     seq: &str,
     printer: &mut Printer,
     imap: &mut ImapService,
@@ -90,7 +90,7 @@ pub fn delete<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>
 pub fn forward<
     'a,
     Printer: PrinterService,
-    ImapService: ImapServiceInterface<'a>,
+    ImapService: Backend<'a>,
     SmtpService: SmtpServiceInterface,
 >(
     seq: &str,
@@ -109,7 +109,7 @@ pub fn forward<
 }
 
 /// List paginated messages from the selected mailbox.
-pub fn list<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
+pub fn list<'a, Printer: PrinterService, ImapService: Backend<'a>>(
     max_width: Option<usize>,
     page_size: Option<usize>,
     page: usize,
@@ -131,7 +131,7 @@ pub fn list<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
 pub fn mailto<
     'a,
     Printer: PrinterService,
-    ImapService: ImapServiceInterface<'a>,
+    ImapService: Backend<'a>,
     SmtpService: SmtpServiceInterface,
 >(
     url: &Url,
@@ -191,7 +191,7 @@ pub fn mailto<
 }
 
 /// Move a message from a mailbox to another.
-pub fn move_<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
+pub fn move_<'a, Printer: PrinterService, ImapService: Backend<'a>>(
     // The sequence number of the message to move
     seq: &str,
     // The mailbox to move the message in
@@ -217,7 +217,7 @@ pub fn move_<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>
 }
 
 /// Read a message by its sequence number.
-pub fn read<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
+pub fn read<'a, Printer: PrinterService, ImapService: Backend<'a>>(
     seq: &str,
     text_mime: &str,
     raw: bool,
@@ -239,7 +239,7 @@ pub fn read<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
 pub fn reply<
     'a,
     Printer: PrinterService,
-    ImapService: ImapServiceInterface<'a>,
+    ImapService: Backend<'a>,
     SmtpService: SmtpServiceInterface,
 >(
     seq: &str,
@@ -261,7 +261,7 @@ pub fn reply<
 }
 
 /// Saves a raw message to the targetted mailbox.
-pub fn save<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
+pub fn save<'a, Printer: PrinterService, ImapService: Backend<'a>>(
     mbox: &Mbox,
     raw_msg: &str,
     printer: &mut Printer,
@@ -292,7 +292,7 @@ pub fn save<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
 }
 
 /// Paginate messages from the selected mailbox matching the specified query.
-pub fn search<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
+pub fn search<'a, Printer: PrinterService, ImapService: Backend<'a>>(
     query: String,
     max_width: Option<usize>,
     page_size: Option<usize>,
@@ -310,7 +310,7 @@ pub fn search<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>
 }
 
 /// Paginates messages from the selected mailbox matching the specified query, sorted by the given criteria.
-pub fn sort<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
+pub fn sort<'a, Printer: PrinterService, ImapService: Backend<'a>>(
     criteria: &'a [SortCriterion<'a>],
     charset: SortCharset<'a>,
     query: String,
@@ -332,7 +332,7 @@ pub fn sort<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
 pub fn send<
     'a,
     Printer: PrinterService,
-    ImapService: ImapServiceInterface<'a>,
+    ImapService: Backend<'a>,
     SmtpService: SmtpServiceInterface,
 >(
     raw_msg: &str,
@@ -375,7 +375,7 @@ pub fn send<
 pub fn write<
     'a,
     Printer: PrinterService,
-    ImapService: ImapServiceInterface<'a>,
+    ImapService: Backend<'a>,
     SmtpService: SmtpServiceInterface,
 >(
     attachments_paths: Vec<&str>,

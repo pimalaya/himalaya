@@ -41,12 +41,18 @@ pub struct Config {
 }
 
 /// Represent the accounts section of the config.
-pub type ConfigAccountsMap = HashMap<String, ConfigAccountEntry>;
+pub type ConfigAccountsMap = HashMap<String, ConfigAccountKind>;
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(untagged)]
+pub enum ConfigAccountKind {
+    Imap(ConfigImapAccount),
+}
 
 /// Represent an account in the accounts section.
 #[derive(Debug, Default, Clone, PartialEq, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub struct ConfigAccountEntry {
+pub struct ConfigImapAccount {
     pub name: Option<String>,
     pub downloads_dir: Option<PathBuf>,
     pub signature_delimiter: Option<String>,

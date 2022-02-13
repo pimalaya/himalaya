@@ -5,13 +5,13 @@
 use anyhow::Result;
 
 use crate::{
-    domain::{Flags, ImapServiceInterface},
+    domain::{Backend, Flags},
     output::PrinterService,
 };
 
 /// Adds flags to all messages matching the given sequence range.
 /// Flags are case-insensitive, and they do not need to be prefixed with `\`.
-pub fn add<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
+pub fn add<'a, Printer: PrinterService, ImapService: Backend<'a>>(
     seq_range: &'a str,
     flags: Vec<&'a str>,
     printer: &'a mut Printer,
@@ -27,7 +27,7 @@ pub fn add<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
 
 /// Removes flags from all messages matching the given sequence range.
 /// Flags are case-insensitive, and they do not need to be prefixed with `\`.
-pub fn remove<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
+pub fn remove<'a, Printer: PrinterService, ImapService: Backend<'a>>(
     seq_range: &'a str,
     flags: Vec<&'a str>,
     printer: &'a mut Printer,
@@ -43,7 +43,7 @@ pub fn remove<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>
 
 /// Replaces flags of all messages matching the given sequence range.
 /// Flags are case-insensitive, and they do not need to be prefixed with `\`.
-pub fn set<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
+pub fn set<'a, Printer: PrinterService, ImapService: Backend<'a>>(
     seq_range: &'a str,
     flags: Vec<&'a str>,
     printer: &'a mut Printer,

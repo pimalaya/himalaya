@@ -6,12 +6,12 @@ use anyhow::Result;
 use log::{info, trace};
 
 use crate::{
-    domain::ImapServiceInterface,
+    domain::Backend,
     output::{PrintTableOpts, PrinterService},
 };
 
 /// Lists all mailboxes.
-pub fn list<'a, Printer: PrinterService, ImapService: ImapServiceInterface<'a>>(
+pub fn list<'a, Printer: PrinterService, ImapService: Backend<'a>>(
     max_width: Option<usize>,
     printer: &mut Printer,
     imap: &'a mut ImapService,
@@ -97,7 +97,7 @@ mod tests {
 
         struct ImapServiceTest;
 
-        impl<'a> ImapServiceInterface<'a> for ImapServiceTest {
+        impl<'a> Backend<'a> for ImapServiceTest {
             fn fetch_mboxes(&'a mut self) -> Result<Mboxes> {
                 Ok(Mboxes(vec![
                     Mbox {

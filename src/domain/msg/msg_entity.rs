@@ -22,7 +22,7 @@ use crate::{
     domain::{
         from_addrs_to_sendable_addrs, from_addrs_to_sendable_mbox, from_imap_addrs_to_addrs,
         from_imap_addrs_to_some_addrs, from_slice_to_addrs,
-        imap::ImapServiceInterface,
+        imap::Backend,
         mbox::Mbox,
         msg::{msg_utils, BinaryPart, Flags, Part, Parts, TextPlainPart, TplOverride},
         smtp::SmtpServiceInterface,
@@ -317,7 +317,7 @@ impl Msg {
     pub fn edit_with_editor<
         'a,
         Printer: PrinterService,
-        ImapService: ImapServiceInterface<'a>,
+        ImapService: Backend<'a>,
         SmtpService: SmtpServiceInterface,
     >(
         mut self,
