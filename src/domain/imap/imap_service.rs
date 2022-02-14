@@ -9,14 +9,14 @@ use native_tls::{TlsConnector, TlsStream};
 use std::{collections::HashSet, convert::TryFrom, net::TcpStream, thread};
 
 use crate::{
-    config::{Account, Config},
+    config::{Account, Config, ImapAccount},
     domain::{Envelope, Envelopes, Flags, Mbox, Mboxes, Msg, RawEnvelopes, RawMboxes},
     output::run_cmd,
 };
 
 type ImapSession = imap::Session<TlsStream<TcpStream>>;
 
-pub trait ImapServiceInterface<'a> {
+pub trait BackendService<'a> {
     fn notify(&mut self, config: &Config, account: &Account, keepalive: u64) -> Result<()>;
     fn watch(&mut self, account: &Account, keepalive: u64) -> Result<()>;
     fn fetch_mboxes(&'a mut self) -> Result<Mboxes>;
@@ -51,7 +51,7 @@ pub trait ImapServiceInterface<'a> {
 }
 
 pub struct ImapService<'a> {
-    account: &'a Account,
+    account: &'a ImapAccount,
     mbox: &'a Mbox<'a>,
     sess: Option<ImapSession>,
     /// Holds raw mailboxes fetched by the `imap` crate in order to extend mailboxes lifetime
@@ -116,7 +116,7 @@ impl<'a> ImapService<'a> {
     }
 }
 
-impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
+impl<'a> BackendService<'a> for ImapService<'a> {
     fn fetch_mboxes(&'a mut self) -> Result<Mboxes> {
         let raw_mboxes = self
             .sess()?
@@ -452,8 +452,8 @@ impl<'a> ImapServiceInterface<'a> for ImapService<'a> {
     }
 }
 
-impl<'a> From<(&'a Account, &'a Mbox<'a>)> for ImapService<'a> {
-    fn from((account, mbox): (&'a Account, &'a Mbox)) -> Self {
+impl<'a> From<(&'a ImapAccount, &'a Mbox<'a>)> for ImapService<'a> {
+    fn from((account, mbox): (&'a ImapAccount, &'a Mbox)) -> Self {
         Self {
             account,
             mbox,

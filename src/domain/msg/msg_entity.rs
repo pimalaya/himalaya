@@ -22,10 +22,10 @@ use crate::{
     domain::{
         from_addrs_to_sendable_addrs, from_addrs_to_sendable_mbox, from_imap_addrs_to_addrs,
         from_imap_addrs_to_some_addrs, from_slice_to_addrs,
-        imap::ImapServiceInterface,
+        imap::BackendService,
         mbox::Mbox,
         msg::{msg_utils, BinaryPart, Flags, Part, Parts, TextPlainPart, TplOverride},
-        smtp::SmtpServiceInterface,
+        smtp::SmtpService,
         Addrs,
     },
     output::PrinterService,
@@ -314,17 +314,12 @@ impl Msg {
         Self::from_tpl(&tpl)
     }
 
-    pub fn edit_with_editor<
-        'a,
-        Printer: PrinterService,
-        ImapService: ImapServiceInterface<'a>,
-        SmtpService: SmtpServiceInterface,
-    >(
+    pub fn edit_with_editor<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
         mut self,
         account: &Account,
-        printer: &mut Printer,
-        imap: &mut ImapService,
-        smtp: &mut SmtpService,
+        printer: &mut P,
+        backend: &mut B,
+        smtp: &mut S,
     ) -> Result<()> {
         info!("start editing with editor");
 
@@ -360,7 +355,7 @@ impl Msg {
                     let mbox = Mbox::new(&account.sent_folder);
                     let sent_msg = smtp.send_msg(account, &self)?;
                     let flags = Flags::try_from(vec![Flag::Seen])?;
-                    imap.append_raw_msg_with_flags(&mbox, &sent_msg.formatted(), flags)?;
+                    backend.append_raw_msg_with_flags(&mbox, &sent_msg.formatted(), flags)?;
                     msg_utils::remove_local_draft()?;
                     printer.print("Message successfully sent")?;
                     break;
@@ -377,7 +372,7 @@ impl Msg {
                     let mbox = Mbox::new(&account.draft_folder);
                     let flags = Flags::try_from(vec![Flag::Seen, Flag::Draft])?;
                     let tpl = self.to_tpl(TplOverride::default(), account)?;
-                    imap.append_raw_msg_with_flags(&mbox, tpl.as_bytes(), flags)?;
+                    backend.append_raw_msg_with_flags(&mbox, tpl.as_bytes(), flags)?;
                     msg_utils::remove_local_draft()?;
                     printer.print(format!(
                         "Message successfully saved to {}",
