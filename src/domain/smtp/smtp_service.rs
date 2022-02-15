@@ -9,15 +9,15 @@ use lettre::{
 };
 use log::debug;
 
-use crate::{config::Account, domain::msg::Msg};
+use crate::{config::AccountConfig, domain::msg::Msg};
 
 pub trait SmtpService {
-    fn send_msg(&mut self, account: &Account, msg: &Msg) -> Result<lettre::Message>;
+    fn send_msg(&mut self, account: &AccountConfig, msg: &Msg) -> Result<lettre::Message>;
     fn send_raw_msg(&mut self, envelope: &lettre::address::Envelope, msg: &[u8]) -> Result<()>;
 }
 
 pub struct LettreService<'a> {
-    account: &'a Account,
+    account: &'a AccountConfig,
     transport: Option<SmtpTransport>,
 }
 
@@ -56,7 +56,7 @@ impl<'a> LettreService<'a> {
 }
 
 impl<'a> SmtpService for LettreService<'a> {
-    fn send_msg(&mut self, account: &Account, msg: &Msg) -> Result<lettre::Message> {
+    fn send_msg(&mut self, account: &AccountConfig, msg: &Msg) -> Result<lettre::Message> {
         debug!("sending message…");
         let sendable_msg = msg.into_sendable_msg(account)?;
         self.transport()?.send(&sendable_msg)?;
@@ -70,8 +70,8 @@ impl<'a> SmtpService for LettreService<'a> {
     }
 }
 
-impl<'a> From<&'a Account> for LettreService<'a> {
-    fn from(account: &'a Account) -> Self {
+impl<'a> From<&'a AccountConfig> for LettreService<'a> {
+    fn from(account: &'a AccountConfig) -> Self {
         debug!("init SMTP service");
         Self {
             account,

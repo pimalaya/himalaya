@@ -30,7 +30,7 @@ mod tests {
     use termcolor::ColorSpec;
 
     use crate::{
-        config::{Account, Config},
+        config::{AccountConfig, Config},
         domain::{AttrRemote, Attrs, Envelopes, Flags, Mbox, Mboxes, Msg},
         output::{Print, PrintTable, WriteColor},
     };
@@ -116,10 +116,10 @@ mod tests {
                 ]))
             }
 
-            fn notify(&mut self, _: &Config, _: &Account, _: u64) -> Result<()> {
+            fn notify(&mut self, _: &AccountConfig, _: u64) -> Result<()> {
                 unimplemented!()
             }
-            fn watch(&mut self, _: &Account, _: u64) -> Result<()> {
+            fn watch(&mut self, _: &AccountConfig, _: u64) -> Result<()> {
                 unimplemented!()
             }
             fn fetch_envelopes(&mut self, _: &usize, _: &usize) -> Result<Envelopes> {
@@ -138,13 +138,13 @@ mod tests {
             ) -> Result<Envelopes> {
                 unimplemented!()
             }
-            fn find_msg(&mut self, _: &Account, _: &str) -> Result<Msg> {
+            fn find_msg(&mut self, _: &AccountConfig, _: &str) -> Result<Msg> {
                 unimplemented!()
             }
             fn find_raw_msg(&mut self, _: &str) -> Result<Vec<u8>> {
                 unimplemented!()
             }
-            fn append_msg(&mut self, _: &Mbox, _: &Account, _: Msg) -> Result<()> {
+            fn append_msg(&mut self, _: &Mbox, _: &AccountConfig, _: Msg) -> Result<()> {
                 unimplemented!()
             }
             fn append_raw_msg_with_flags(&mut self, _: &Mbox, _: &[u8], _: Flags) -> Result<()> {

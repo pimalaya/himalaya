@@ -19,7 +19,7 @@ use std::{
 use url::Url;
 
 use crate::{
-    config::Account,
+    config::AccountConfig,
     domain::{
         imap::BackendService,
         mbox::Mbox,
@@ -33,7 +33,7 @@ use crate::{
 /// Download all message attachments to the user account downloads directory.
 pub fn attachments<'a, P: PrinterService, B: BackendService<'a>>(
     seq: &str,
-    account: &Account,
+    account: &AccountConfig,
     printer: &mut P,
     backend: &mut B,
 ) -> Result<()> {
@@ -91,7 +91,7 @@ pub fn forward<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
     seq: &str,
     attachments_paths: Vec<&str>,
     encrypt: bool,
-    account: &Account,
+    account: &AccountConfig,
     printer: &mut P,
     backend: &mut B,
     smtp: &mut S,
@@ -109,7 +109,7 @@ pub fn list<'a, P: PrinterService, B: BackendService<'a>>(
     max_width: Option<usize>,
     page_size: Option<usize>,
     page: usize,
-    account: &Account,
+    account: &AccountConfig,
     printer: &mut P,
     imap: &'a mut B,
 ) -> Result<()> {
@@ -126,7 +126,7 @@ pub fn list<'a, P: PrinterService, B: BackendService<'a>>(
 /// [mailto]: https://en.wikipedia.org/wiki/Mailto
 pub fn mailto<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
     url: &Url,
-    account: &Account,
+    account: &AccountConfig,
     printer: &mut P,
     backend: &mut B,
     smtp: &mut S,
@@ -212,7 +212,7 @@ pub fn read<'a, P: PrinterService, B: BackendService<'a>>(
     seq: &str,
     text_mime: &str,
     raw: bool,
-    account: &Account,
+    account: &AccountConfig,
     printer: &mut P,
     backend: &mut B,
 ) -> Result<()> {
@@ -232,7 +232,7 @@ pub fn reply<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
     all: bool,
     attachments_paths: Vec<&str>,
     encrypt: bool,
-    account: &Account,
+    account: &AccountConfig,
     printer: &mut P,
     backend: &mut B,
     smtp: &mut S,
@@ -284,7 +284,7 @@ pub fn search<'a, P: PrinterService, B: BackendService<'a>>(
     max_width: Option<usize>,
     page_size: Option<usize>,
     page: usize,
-    account: &Account,
+    account: &AccountConfig,
     printer: &mut P,
     backend: &'a mut B,
 ) -> Result<()> {
@@ -304,7 +304,7 @@ pub fn sort<'a, P: PrinterService, B: BackendService<'a>>(
     max_width: Option<usize>,
     page_size: Option<usize>,
     page: usize,
-    account: &Account,
+    account: &AccountConfig,
     printer: &mut P,
     backend: &'a mut B,
 ) -> Result<()> {
@@ -318,7 +318,7 @@ pub fn sort<'a, P: PrinterService, B: BackendService<'a>>(
 /// Send a raw message.
 pub fn send<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
     raw_msg: &str,
-    account: &Account,
+    account: &AccountConfig,
     printer: &mut P,
     backend: &mut B,
     smtp: &mut S,
@@ -357,7 +357,7 @@ pub fn send<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
 pub fn write<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
     attachments_paths: Vec<&str>,
     encrypt: bool,
-    account: &Account,
+    account: &AccountConfig,
     printer: &mut P,
     backend: &mut B,
     smtp: &mut S,

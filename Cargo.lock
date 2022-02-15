@@ -323,6 +323,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "gethostname"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4addc164932852d066774c405dbbdb7914742d2b39e39e1a7ca949c856d054d1"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -374,6 +384,7 @@ dependencies = [
  "imap-proto",
  "lettre",
  "log",
+ "maildir",
  "mailparse",
  "native-tls",
  "regex",
@@ -562,6 +573,16 @@ name = "mac"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c41e0c4fef86961ac6d6f8a82609f55f31b05e4fce149ac5710e439df7619ba4"
+
+[[package]]
+name = "maildir"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6adcf4693a3c725b9c69ccf24f8ed9c6d3e7168c1a45632570d65529adc13b5e"
+dependencies = [
+ "gethostname",
+ "mailparse",
+]
 
 [[package]]
 name = "mailparse"

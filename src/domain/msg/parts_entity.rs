@@ -7,7 +7,7 @@ use std::{
 };
 use uuid::Uuid;
 
-use crate::config::Account;
+use crate::config::AccountConfig;
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct TextPlainPart {
@@ -51,7 +51,7 @@ impl Parts {
     }
 
     pub fn from_parsed_mail<'a>(
-        account: &'a Account,
+        account: &'a AccountConfig,
         part: &'a mailparse::ParsedMail<'a>,
     ) -> Result<Self> {
         let mut parts = vec![];
@@ -75,7 +75,7 @@ impl DerefMut for Parts {
 }
 
 fn build_parts_map_rec(
-    account: &Account,
+    account: &AccountConfig,
     parsed_mail: &mailparse::ParsedMail,
     parts: &mut Vec<Part>,
 ) -> Result<()> {
@@ -133,7 +133,7 @@ fn build_parts_map_rec(
     Ok(())
 }
 
-fn decrypt_part(account: &Account, msg: &mailparse::ParsedMail) -> Result<String> {
+fn decrypt_part(account: &AccountConfig, msg: &mailparse::ParsedMail) -> Result<String> {
     let msg_path = env::temp_dir().join(Uuid::new_v4().to_string());
     let msg_body = msg
         .get_body()

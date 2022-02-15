@@ -18,7 +18,7 @@ use std::{
 use uuid::Uuid;
 
 use crate::{
-    config::{Account, DEFAULT_SIG_DELIM},
+    config::{AccountConfig, DEFAULT_SIG_DELIM},
     domain::{
         from_addrs_to_sendable_addrs, from_addrs_to_sendable_mbox, from_imap_addrs_to_addrs,
         from_imap_addrs_to_some_addrs, from_slice_to_addrs,
@@ -174,7 +174,7 @@ impl Msg {
         }
     }
 
-    pub fn into_reply(mut self, all: bool, account: &Account) -> Result<Self> {
+    pub fn into_reply(mut self, all: bool, account: &AccountConfig) -> Result<Self> {
         let account_addr = account.address()?;
 
         // Message-Id
@@ -252,7 +252,7 @@ impl Msg {
         Ok(self)
     }
 
-    pub fn into_forward(mut self, account: &Account) -> Result<Self> {
+    pub fn into_forward(mut self, account: &AccountConfig) -> Result<Self> {
         let account_addr = account.address()?;
 
         let prev_subject = self.subject.to_owned();
@@ -308,7 +308,7 @@ impl Msg {
         Ok(self)
     }
 
-    fn _edit_with_editor(&self, account: &Account) -> Result<Self> {
+    fn _edit_with_editor(&self, account: &AccountConfig) -> Result<Self> {
         let tpl = self.to_tpl(TplOverride::default(), account)?;
         let tpl = editor::open_with_tpl(tpl)?;
         Self::from_tpl(&tpl)
@@ -316,7 +316,7 @@ impl Msg {
 
     pub fn edit_with_editor<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
         mut self,
-        account: &Account,
+        account: &AccountConfig,
         printer: &mut P,
         backend: &mut B,
         smtp: &mut S,
@@ -458,7 +458,7 @@ impl Msg {
         }
     }
 
-    pub fn to_tpl(&self, opts: TplOverride, account: &Account) -> Result<String> {
+    pub fn to_tpl(&self, opts: TplOverride, account: &AccountConfig) -> Result<String> {
         let account_addr: Addrs = vec![account.address()?].into();
         let mut tpl = String::default();
 
@@ -598,7 +598,7 @@ impl Msg {
         Ok(msg)
     }
 
-    pub fn into_sendable_msg(&self, account: &Account) -> Result<lettre::Message> {
+    pub fn into_sendable_msg(&self, account: &AccountConfig) -> Result<lettre::Message> {
         let mut msg_builder = lettre::Message::builder()
             .message_id(self.message_id.to_owned())
             .subject(self.subject.to_owned());
@@ -701,10 +701,10 @@ impl TryInto<lettre::address::Envelope> for Msg {
     }
 }
 
-impl<'a> TryFrom<(&'a Account, &'a imap::types::Fetch)> for Msg {
+impl<'a> TryFrom<(&'a AccountConfig, &'a imap::types::Fetch)> for Msg {
     type Error = Error;
 
-    fn try_from((account, fetch): (&'a Account, &'a imap::types::Fetch)) -> Result<Msg> {
+    fn try_from((account, fetch): (&'a AccountConfig, &'a imap::types::Fetch)) -> Result<Msg> {
         let envelope = fetch
             .envelope()
             .ok_or_else(|| anyhow!("cannot get envelope of message {}", fetch.message))?;

@@ -11,7 +11,7 @@ use std::{
 };
 
 use crate::{
-    config::Account,
+    config::AccountConfig,
     domain::{
         imap::BackendService,
         msg::{Msg, TplOverride},
@@ -23,7 +23,7 @@ use crate::{
 /// Generate a new message template.
 pub fn new<'a, P: PrinterService>(
     opts: TplOverride<'a>,
-    account: &'a Account,
+    account: &'a AccountConfig,
     printer: &'a mut P,
 ) -> Result<()> {
     let tpl = Msg::default().to_tpl(opts, account)?;
@@ -35,7 +35,7 @@ pub fn reply<'a, P: PrinterService, B: BackendService<'a>>(
     seq: &str,
     all: bool,
     opts: TplOverride<'a>,
-    account: &'a Account,
+    account: &'a AccountConfig,
     printer: &'a mut P,
     backend: &'a mut B,
 ) -> Result<()> {
@@ -50,7 +50,7 @@ pub fn reply<'a, P: PrinterService, B: BackendService<'a>>(
 pub fn forward<'a, P: PrinterService, B: BackendService<'a>>(
     seq: &str,
     opts: TplOverride<'a>,
-    account: &'a Account,
+    account: &'a AccountConfig,
     printer: &'a mut P,
     backend: &'a mut B,
 ) -> Result<()> {
@@ -64,7 +64,7 @@ pub fn forward<'a, P: PrinterService, B: BackendService<'a>>(
 /// Saves a message based on a template.
 pub fn save<'a, P: PrinterService, B: BackendService<'a>>(
     mbox: &Mbox,
-    account: &Account,
+    account: &AccountConfig,
     attachments_paths: Vec<&str>,
     tpl: &str,
     printer: &mut P,
@@ -90,7 +90,7 @@ pub fn save<'a, P: PrinterService, B: BackendService<'a>>(
 /// Sends a message based on a template.
 pub fn send<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
     mbox: &Mbox,
-    account: &Account,
+    account: &AccountConfig,
     attachments_paths: Vec<&str>,
     tpl: &str,
     printer: &mut P,

@@ -4,23 +4,19 @@
 
 use anyhow::Result;
 
-use crate::{
-    config::{Account, Config},
-    domain::imap::BackendService,
-};
+use crate::{config::AccountConfig, domain::imap::BackendService};
 
 pub fn notify<'a, B: BackendService<'a>>(
     keepalive: u64,
-    config: &Config,
-    account: &Account,
+    config: &AccountConfig,
     backend: &mut B,
 ) -> Result<()> {
-    backend.notify(config, account, keepalive)
+    backend.notify(config, keepalive)
 }
 
 pub fn watch<'a, B: BackendService<'a>>(
     keepalive: u64,
-    account: &Account,
+    account: &AccountConfig,
     backend: &mut B,
 ) -> Result<()> {
     backend.watch(account, keepalive)

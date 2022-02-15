@@ -9,7 +9,7 @@ use native_tls::{TlsConnector, TlsStream};
 use std::{collections::HashSet, convert::TryFrom, net::TcpStream, thread};
 
 use crate::{
-    config::{Account, Config, ImapAccount},
+    config::{AccountConfig, ImapBackendConfig},
     domain::{Envelope, Envelopes, Flags, Mbox, Mboxes, Msg, RawEnvelopes, RawMboxes},
     output::run_cmd,
 };
@@ -17,8 +17,8 @@ use crate::{
 type ImapSession = imap::Session<TlsStream<TcpStream>>;
 
 pub trait BackendService<'a> {
-    fn notify(&mut self, config: &Config, account: &Account, keepalive: u64) -> Result<()>;
-    fn watch(&mut self, account: &Account, keepalive: u64) -> Result<()>;
+    fn notify(&mut self, config: &AccountConfig, keepalive: u64) -> Result<()>;
+    fn watch(&mut self, account: &AccountConfig, keepalive: u64) -> Result<()>;
     fn fetch_mboxes(&'a mut self) -> Result<Mboxes>;
     fn fetch_envelopes(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes>;
     fn find_envelopes(
@@ -35,9 +35,9 @@ pub trait BackendService<'a> {
         page_size: &usize,
         page: &usize,
     ) -> Result<Envelopes>;
-    fn find_msg(&mut self, account: &Account, seq: &str) -> Result<Msg>;
+    fn find_msg(&mut self, account: &AccountConfig, seq: &str) -> Result<Msg>;
     fn find_raw_msg(&mut self, seq: &str) -> Result<Vec<u8>>;
-    fn append_msg(&mut self, mbox: &Mbox, account: &Account, msg: Msg) -> Result<()>;
+    fn append_msg(&mut self, mbox: &Mbox, account: &AccountConfig, msg: Msg) -> Result<()>;
     fn append_raw_msg_with_flags(&mut self, mbox: &Mbox, msg: &[u8], flags: Flags) -> Result<()>;
     fn expunge(&mut self) -> Result<()>;
     fn logout(&mut self) -> Result<()>;
@@ -51,7 +51,7 @@ pub trait BackendService<'a> {
 }
 
 pub struct ImapService<'a> {
-    account: &'a ImapAccount,
+    backend_config: &'a ImapBackendConfig,
     mbox: &'a Mbox<'a>,
     sess: Option<ImapSession>,
     /// Holds raw mailboxes fetched by the `imap` crate in order to extend mailboxes lifetime
@@ -62,23 +62,35 @@ pub struct ImapService<'a> {
 }
 
 impl<'a> ImapService<'a> {
+    pub fn from_config_and_mbox(backend_config: &'a ImapBackendConfig, mbox: &'a Mbox) -> Self {
+        Self {
+            backend_config,
+            mbox,
+            sess: None,
+            _raw_mboxes_cache: None,
+            _raw_msgs_cache: None,
+        }
+    }
+
     fn sess(&mut self) -> Result<&mut ImapSession> {
         if self.sess.is_none() {
             debug!("create TLS builder");
-            debug!("insecure: {}", self.account.imap_insecure);
+            debug!("insecure: {}", self.backend_config.imap_insecure);
             let builder = TlsConnector::builder()
-                .danger_accept_invalid_certs(self.account.imap_insecure)
-                .danger_accept_invalid_hostnames(self.account.imap_insecure)
+                .danger_accept_invalid_certs(self.backend_config.imap_insecure)
+                .danger_accept_invalid_hostnames(self.backend_config.imap_insecure)
                 .build()
                 .context("cannot create TLS connector")?;
 
             debug!("create client");
-            debug!("host: {}", self.account.imap_host);
-            debug!("port: {}", self.account.imap_port);
-            debug!("starttls: {}", self.account.imap_starttls);
-            let mut client_builder =
-                imap::ClientBuilder::new(&self.account.imap_host, self.account.imap_port);
-            if self.account.imap_starttls {
+            debug!("host: {}", self.backend_config.imap_host);
+            debug!("port: {}", self.backend_config.imap_port);
+            debug!("starttls: {}", self.backend_config.imap_starttls);
+            let mut client_builder = imap::ClientBuilder::new(
+                &self.backend_config.imap_host,
+                self.backend_config.imap_port,
+            );
+            if self.backend_config.imap_starttls {
                 client_builder.starttls();
             }
             let client = client_builder
@@ -86,10 +98,13 @@ impl<'a> ImapService<'a> {
                 .context("cannot connect to IMAP server")?;
 
             debug!("create session");
-            debug!("login: {}", self.account.imap_login);
-            debug!("passwd cmd: {}", self.account.imap_passwd_cmd);
+            debug!("login: {}", self.backend_config.imap_login);
+            debug!("passwd cmd: {}", self.backend_config.imap_passwd_cmd);
             let mut sess = client
-                .login(&self.account.imap_login, &self.account.imap_passwd()?)
+                .login(
+                    &self.backend_config.imap_login,
+                    &self.backend_config.imap_passwd()?,
+                )
                 .map_err(|res| res.0)
                 .context("cannot login to IMAP server")?;
             sess.debug = log_enabled!(Level::Trace);
@@ -102,7 +117,7 @@ impl<'a> ImapService<'a> {
         }
     }
 
-    fn search_new_msgs(&mut self, account: &Account) -> Result<Vec<u32>> {
+    fn search_new_msgs(&mut self, account: &AccountConfig) -> Result<Vec<u32>> {
         let uids: Vec<u32> = self
             .sess()?
             .uid_search(&account.notify_query)
@@ -241,7 +256,7 @@ impl<'a> BackendService<'a> for ImapService<'a> {
     }
 
     /// Find a message by sequence number.
-    fn find_msg(&mut self, account: &Account, seq: &str) -> Result<Msg> {
+    fn find_msg(&mut self, account: &AccountConfig, seq: &str) -> Result<Msg> {
         let mbox = self.mbox.to_owned();
         self.sess()?
             .select(&mbox.name)
@@ -282,7 +297,7 @@ impl<'a> BackendService<'a> for ImapService<'a> {
         Ok(())
     }
 
-    fn append_msg(&mut self, mbox: &Mbox, account: &Account, msg: Msg) -> Result<()> {
+    fn append_msg(&mut self, mbox: &Mbox, account: &AccountConfig, msg: Msg) -> Result<()> {
         let msg_raw = msg.into_sendable_msg(account)?.formatted();
         self.sess()?
             .append(&mbox.name, &msg_raw)
@@ -292,7 +307,7 @@ impl<'a> BackendService<'a> for ImapService<'a> {
         Ok(())
     }
 
-    fn notify(&mut self, config: &Config, account: &Account, keepalive: u64) -> Result<()> {
+    fn notify(&mut self, config: &AccountConfig, keepalive: u64) -> Result<()> {
         debug!("notify");
 
         let mbox = self.mbox.to_owned();
@@ -304,7 +319,7 @@ impl<'a> BackendService<'a> for ImapService<'a> {
 
         debug!("init messages hashset");
         let mut msgs_set: HashSet<u32> = self
-            .search_new_msgs(account)?
+            .search_new_msgs(config)?
             .iter()
             .cloned()
             .collect::<HashSet<_>>();
@@ -325,7 +340,7 @@ impl<'a> BackendService<'a> for ImapService<'a> {
                 .context("cannot start the idle mode")?;
 
             let uids: Vec<u32> = self
-                .search_new_msgs(account)?
+                .search_new_msgs(config)?
                 .into_iter()
                 .filter(|uid| -> bool { msgs_set.get(uid).is_none() })
                 .collect();
@@ -365,7 +380,7 @@ impl<'a> BackendService<'a> for ImapService<'a> {
         }
     }
 
-    fn watch(&mut self, account: &Account, keepalive: u64) -> Result<()> {
+    fn watch(&mut self, account: &AccountConfig, keepalive: u64) -> Result<()> {
         debug!("examine mailbox: {}", &self.mbox.name);
         let mbox = self.mbox.to_owned();
 
@@ -449,17 +464,5 @@ impl<'a> BackendService<'a> for ImapService<'a> {
             .expunge()
             .context(format!(r#"cannot expunge mailbox "{}""#, self.mbox.name))?;
         Ok(())
-    }
-}
-
-impl<'a> From<(&'a ImapAccount, &'a Mbox<'a>)> for ImapService<'a> {
-    fn from((account, mbox): (&'a ImapAccount, &'a Mbox)) -> Self {
-        Self {
-            account,
-            mbox,
-            sess: None,
-            _raw_mboxes_cache: None,
-            _raw_msgs_cache: None,
-        }
     }
 }
