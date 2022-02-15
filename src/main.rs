@@ -132,7 +132,7 @@ fn main() -> Result<()> {
             return msg_handler::attachments(seq, &account_config, &mut printer, backend);
         }
         Some(msg_arg::Cmd::Copy(seq, mbox)) => {
-            return msg_handler::copy(seq, mbox, &mut printer, backend);
+            return msg_handler::copy(seq, mbox, &account_config, &mut printer, backend);
         }
         Some(msg_arg::Cmd::Delete(seq)) => {
             return msg_handler::delete(seq, &mut printer, backend);
@@ -159,7 +159,7 @@ fn main() -> Result<()> {
             );
         }
         Some(msg_arg::Cmd::Move(seq, mbox)) => {
-            return msg_handler::move_(seq, mbox, &mut printer, backend);
+            return msg_handler::move_(seq, mbox, &account_config, &mut printer, backend);
         }
         Some(msg_arg::Cmd::Read(seq, text_mime, raw)) => {
             return msg_handler::read(seq, text_mime, raw, &account_config, &mut printer, backend);

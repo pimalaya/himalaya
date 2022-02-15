@@ -129,9 +129,6 @@ mod tests {
             fn get_msg(&mut self, _: &AccountConfig, _: &str) -> Result<Msg> {
                 unimplemented!()
             }
-            fn find_raw_msg(&mut self, _: &str) -> Result<Vec<u8>> {
-                unimplemented!()
-            }
             fn add_msg(&mut self, _: &Mbox, _: &AccountConfig, _: Msg) -> Result<()> {
                 unimplemented!()
             }

@@ -58,11 +58,12 @@ pub fn attachments<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 pub fn copy<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     seq: &str,
     mbox: &str,
+    account: &AccountConfig,
     printer: &mut P,
     backend: Box<&mut B>,
 ) -> Result<()> {
     let mbox = Mbox::new(mbox);
-    let msg = backend.find_raw_msg(seq)?;
+    let msg = backend.get_msg(account, seq)?.raw;
     let flags = Flags::try_from(vec![Flag::Seen])?;
     backend.append_raw_msg_with_flags(&mbox, &msg, flags)?;
     printer.print(format!(
@@ -186,12 +187,13 @@ pub fn move_<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     seq: &str,
     // The mailbox to move the message in
     mbox: &str,
+    account: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
     // Copy the message to targetted mailbox
     let mbox = Mbox::new(mbox);
-    let msg = backend.find_raw_msg(seq)?;
+    let msg = backend.get_msg(account, seq)?.raw;
     let flags = Flags::try_from(vec![Flag::Seen])?;
     backend.append_raw_msg_with_flags(&mbox, &msg, flags)?;
 
@@ -215,11 +217,12 @@ pub fn read<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
+    let msg = backend.get_msg(account, seq)?;
     let msg = if raw {
         // Emails don't always have valid utf8. Using "lossy" to display what we can.
-        String::from_utf8_lossy(&backend.find_raw_msg(seq)?).into_owned()
+        String::from_utf8_lossy(&msg.raw).into_owned()
     } else {
-        backend.get_msg(account, seq)?.fold_text_parts(text_mime)
+        msg.fold_text_parts(text_mime)
     };
 
     printer.print(msg)

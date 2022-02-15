@@ -139,7 +139,6 @@ pub trait BackendService<'a> {
     fn del_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()>;
     fn disconnect(&mut self) -> Result<()>;
 
-    fn find_raw_msg(&mut self, seq: &str) -> Result<Vec<u8>>;
     fn append_raw_msg_with_flags(&mut self, mbox: &Mbox, msg: &[u8], flags: Flags) -> Result<()>;
     fn expunge(&mut self) -> Result<()>;
 }
@@ -396,14 +395,14 @@ impl<'a> BackendService<'a> for ImapService<'a> {
         let mbox = self.mbox.to_owned();
         self.sess()?
             .select(&mbox.name)
-            .context(format!("cannot select mailbox {}", self.mbox.name))?;
+            .context(format!("cannot select mailbox {:?}", self.mbox.name))?;
         let fetches = self
             .sess()?
             .fetch(seq, "(ENVELOPE FLAGS INTERNALDATE BODY[])")
-            .context(r#"cannot fetch messages "{}""#)?;
+            .context(format!("cannot fetch messages {:?}", seq))?;
         let fetch = fetches
             .first()
-            .ok_or_else(|| anyhow!(r#"cannot find message "{}"#, seq))?;
+            .ok_or_else(|| anyhow!("cannot find message {:?}", seq))?;
 
         Msg::try_from((account, fetch))
     }
@@ -459,22 +458,6 @@ impl<'a> BackendService<'a> for ImapService<'a> {
             sess.logout().context("cannot logout from IMAP server")?;
         }
         Ok(())
-    }
-
-    fn find_raw_msg(&mut self, seq: &str) -> Result<Vec<u8>> {
-        let mbox = self.mbox.to_owned();
-        self.sess()?
-            .select(&mbox.name)
-            .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?;
-        let fetches = self
-            .sess()?
-            .fetch(seq, "BODY[]")
-            .context(r#"cannot fetch raw messages "{}""#)?;
-        let fetch = fetches
-            .first()
-            .ok_or_else(|| anyhow!(r#"cannot find raw message "{}"#, seq))?;
-
-        Ok(fetch.body().map(Vec::from).unwrap_or_default())
     }
 
     fn append_raw_msg_with_flags(&mut self, mbox: &Mbox, msg: &[u8], flags: Flags) -> Result<()> {

@@ -64,6 +64,8 @@ pub struct Msg {
     pub parts: Parts,
 
     pub encrypt: bool,
+
+    pub raw: Vec<u8>,
 }
 
 impl Msg {
@@ -773,11 +775,12 @@ impl<'a> TryFrom<(&'a AccountConfig, &'a imap::types::Fetch)> for Msg {
         let date = fetch.internal_date();
 
         // Get all parts
-        let body = fetch
+        let raw = fetch
             .body()
-            .ok_or_else(|| anyhow!("cannot get body of message {}", id))?;
+            .ok_or_else(|| anyhow!("cannot get body of message {}", id))?
+            .to_vec();
         let parsed_mail =
-            mailparse::parse_mail(body).context(format!("cannot parse body of message {}", id))?;
+            mailparse::parse_mail(&raw).context(format!("cannot parse body of message {}", id))?;
         let parts = Parts::from_parsed_mail(account, &parsed_mail)?;
 
         Ok(Self {
@@ -794,6 +797,7 @@ impl<'a> TryFrom<(&'a AccountConfig, &'a imap::types::Fetch)> for Msg {
             date,
             parts,
             encrypt: false,
+            raw,
         })
     }
 }
