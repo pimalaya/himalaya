@@ -31,11 +31,11 @@ use crate::{
 };
 
 /// Download all message attachments to the user account downloads directory.
-pub fn attachments<'a, P: PrinterService, B: BackendService<'a>>(
+pub fn attachments<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     seq: &str,
     account: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
+    backend: Box<&mut B>,
 ) -> Result<()> {
     let attachments = backend.find_msg(account, seq)?.attachments();
     let attachments_len = attachments.len();
@@ -58,11 +58,11 @@ pub fn attachments<'a, P: PrinterService, B: BackendService<'a>>(
 }
 
 /// Copy a message from a mailbox to another.
-pub fn copy<'a, P: PrinterService, B: BackendService<'a>>(
+pub fn copy<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     seq: &str,
     mbox: &str,
     printer: &mut P,
-    backend: &mut B,
+    backend: Box<&mut B>,
 ) -> Result<()> {
     let mbox = Mbox::new(mbox);
     let msg = backend.find_raw_msg(seq)?;
@@ -75,10 +75,10 @@ pub fn copy<'a, P: PrinterService, B: BackendService<'a>>(
 }
 
 /// Delete messages matching the given sequence range.
-pub fn delete<'a, P: PrinterService, B: BackendService<'a>>(
+pub fn delete<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     seq: &str,
     printer: &mut P,
-    backend: &mut B,
+    backend: Box<&mut B>,
 ) -> Result<()> {
     let flags = Flags::try_from(vec![Flag::Seen, Flag::Deleted])?;
     backend.add_flags(seq, &flags)?;
@@ -87,13 +87,13 @@ pub fn delete<'a, P: PrinterService, B: BackendService<'a>>(
 }
 
 /// Forward the given message UID from the selected mailbox.
-pub fn forward<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
+pub fn forward<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpService>(
     seq: &str,
     attachments_paths: Vec<&str>,
     encrypt: bool,
     account: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
+    backend: Box<&'a mut B>,
     smtp: &mut S,
 ) -> Result<()> {
     backend
@@ -101,17 +101,18 @@ pub fn forward<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
         .into_forward(account)?
         .add_attachments(attachments_paths)?
         .encrypt(encrypt)
-        .edit_with_editor(account, printer, backend, smtp)
+        .edit_with_editor(account, printer, backend, smtp)?;
+    Ok(())
 }
 
 /// List paginated messages from the selected mailbox.
-pub fn list<'a, P: PrinterService, B: BackendService<'a>>(
+pub fn list<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     max_width: Option<usize>,
     page_size: Option<usize>,
     page: usize,
     account: &AccountConfig,
     printer: &mut P,
-    imap: &'a mut B,
+    imap: Box<&'a mut B>,
 ) -> Result<()> {
     let page_size = page_size.unwrap_or(account.default_page_size);
     trace!("page size: {}", page_size);
@@ -124,11 +125,11 @@ pub fn list<'a, P: PrinterService, B: BackendService<'a>>(
 /// Parses and edits a message from a [mailto] URL string.
 ///
 /// [mailto]: https://en.wikipedia.org/wiki/Mailto
-pub fn mailto<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
+pub fn mailto<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpService>(
     url: &Url,
     account: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
+    backend: Box<&'a mut B>,
     smtp: &mut S,
 ) -> Result<()> {
     info!("entering mailto command handler");
@@ -178,17 +179,18 @@ pub fn mailto<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
     };
     trace!("message: {:?}", msg);
 
-    msg.edit_with_editor(account, printer, backend, smtp)
+    msg.edit_with_editor(account, printer, backend, smtp)?;
+    Ok(())
 }
 
 /// Move a message from a mailbox to another.
-pub fn move_<'a, P: PrinterService, B: BackendService<'a>>(
+pub fn move_<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     // The sequence number of the message to move
     seq: &str,
     // The mailbox to move the message in
     mbox: &str,
     printer: &mut P,
-    backend: &mut B,
+    backend: Box<&mut B>,
 ) -> Result<()> {
     // Copy the message to targetted mailbox
     let mbox = Mbox::new(mbox);
@@ -208,13 +210,13 @@ pub fn move_<'a, P: PrinterService, B: BackendService<'a>>(
 }
 
 /// Read a message by its sequence number.
-pub fn read<'a, P: PrinterService, B: BackendService<'a>>(
+pub fn read<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     seq: &str,
     text_mime: &str,
     raw: bool,
     account: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
+    backend: Box<&mut B>,
 ) -> Result<()> {
     let msg = if raw {
         // Emails don't always have valid utf8. Using "lossy" to display what we can.
@@ -227,14 +229,14 @@ pub fn read<'a, P: PrinterService, B: BackendService<'a>>(
 }
 
 /// Reply to the given message UID.
-pub fn reply<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
+pub fn reply<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpService>(
     seq: &str,
     all: bool,
     attachments_paths: Vec<&str>,
     encrypt: bool,
     account: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
+    backend: Box<&'a mut B>,
     smtp: &mut S,
 ) -> Result<()> {
     backend
@@ -242,17 +244,16 @@ pub fn reply<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
         .into_reply(all, account)?
         .add_attachments(attachments_paths)?
         .encrypt(encrypt)
-        .edit_with_editor(account, printer, backend, smtp)?;
-    let flags = Flags::try_from(vec![Flag::Answered])?;
-    backend.add_flags(seq, &flags)
+        .edit_with_editor(account, printer, backend, smtp)?
+        .add_flags(seq, &Flags::try_from(vec![Flag::Answered])?)
 }
 
 /// Saves a raw message to the targetted mailbox.
-pub fn save<'a, P: PrinterService, B: BackendService<'a>>(
+pub fn save<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     mbox: &Mbox,
     raw_msg: &str,
     printer: &mut P,
-    backend: &mut B,
+    backend: Box<&mut B>,
 ) -> Result<()> {
     info!("entering save message handler");
 
@@ -279,14 +280,14 @@ pub fn save<'a, P: PrinterService, B: BackendService<'a>>(
 }
 
 /// Paginate messages from the selected mailbox matching the specified query.
-pub fn search<'a, P: PrinterService, B: BackendService<'a>>(
+pub fn search<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     query: String,
     max_width: Option<usize>,
     page_size: Option<usize>,
     page: usize,
     account: &AccountConfig,
     printer: &mut P,
-    backend: &'a mut B,
+    backend: Box<&'a mut B>,
 ) -> Result<()> {
     let page_size = page_size.unwrap_or(account.default_page_size);
     trace!("page size: {}", page_size);
@@ -297,7 +298,7 @@ pub fn search<'a, P: PrinterService, B: BackendService<'a>>(
 }
 
 /// Paginates messages from the selected mailbox matching the specified query, sorted by the given criteria.
-pub fn sort<'a, P: PrinterService, B: BackendService<'a>>(
+pub fn sort<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     criteria: &'a [SortCriterion<'a>],
     charset: SortCharset<'a>,
     query: String,
@@ -306,7 +307,7 @@ pub fn sort<'a, P: PrinterService, B: BackendService<'a>>(
     page: usize,
     account: &AccountConfig,
     printer: &mut P,
-    backend: &'a mut B,
+    backend: Box<&'a mut B>,
 ) -> Result<()> {
     let page_size = page_size.unwrap_or(account.default_page_size);
     trace!("page size: {}", page_size);
@@ -316,11 +317,11 @@ pub fn sort<'a, P: PrinterService, B: BackendService<'a>>(
 }
 
 /// Send a raw message.
-pub fn send<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
+pub fn send<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpService>(
     raw_msg: &str,
     account: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
+    backend: Box<&mut B>,
     smtp: &mut S,
 ) -> Result<()> {
     info!("entering send message handler");
@@ -354,16 +355,17 @@ pub fn send<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
 }
 
 /// Compose a new message.
-pub fn write<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
+pub fn write<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpService>(
     attachments_paths: Vec<&str>,
     encrypt: bool,
     account: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
+    backend: Box<&'a mut B>,
     smtp: &mut S,
 ) -> Result<()> {
     Msg::default()
         .add_attachments(attachments_paths)?
         .encrypt(encrypt)
-        .edit_with_editor(account, printer, backend, smtp)
+        .edit_with_editor(account, printer, backend, smtp)?;
+    Ok(())
 }

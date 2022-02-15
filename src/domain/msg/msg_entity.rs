@@ -314,13 +314,18 @@ impl Msg {
         Self::from_tpl(&tpl)
     }
 
-    pub fn edit_with_editor<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
+    pub fn edit_with_editor<
+        'a,
+        P: PrinterService,
+        B: BackendService<'a> + ?Sized,
+        S: SmtpService,
+    >(
         mut self,
         account: &AccountConfig,
         printer: &mut P,
-        backend: &mut B,
+        backend: Box<&'a mut B>,
         smtp: &mut S,
-    ) -> Result<()> {
+    ) -> Result<Box<&'a mut B>> {
         info!("start editing with editor");
 
         let draft = msg_utils::local_draft_path();
@@ -337,7 +342,7 @@ impl Msg {
                             self.merge_with(self._edit_with_editor(account)?);
                             break;
                         }
-                        PreEditChoice::Quit => return Ok(()),
+                        PreEditChoice::Quit => return Ok(backend),
                     },
                     Err(err) => {
                         println!("{}", err);
@@ -391,7 +396,7 @@ impl Msg {
             }
         }
 
-        Ok(())
+        Ok(backend)
     }
 
     pub fn encrypt(mut self, encrypt: bool) -> Self {

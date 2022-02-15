@@ -11,10 +11,10 @@ use crate::{
 };
 
 /// Lists all mailboxes.
-pub fn list<'a, P: PrinterService, B: BackendService<'a>>(
+pub fn list<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     max_width: Option<usize>,
     printer: &mut P,
-    backend: &'a mut B,
+    backend: Box<&'a mut B>,
 ) -> Result<()> {
     info!("entering list mailbox handler");
     let mboxes = backend.fetch_mboxes()?;
@@ -30,7 +30,7 @@ mod tests {
     use termcolor::ColorSpec;
 
     use crate::{
-        config::{AccountConfig, Config},
+        config::AccountConfig,
         domain::{AttrRemote, Attrs, Envelopes, Flags, Mbox, Mboxes, Msg},
         output::{Print, PrintTable, WriteColor},
     };
@@ -115,13 +115,6 @@ mod tests {
                     },
                 ]))
             }
-
-            fn notify(&mut self, _: &AccountConfig, _: u64) -> Result<()> {
-                unimplemented!()
-            }
-            fn watch(&mut self, _: &AccountConfig, _: u64) -> Result<()> {
-                unimplemented!()
-            }
             fn fetch_envelopes(&mut self, _: &usize, _: &usize) -> Result<Envelopes> {
                 unimplemented!()
             }
@@ -168,9 +161,9 @@ mod tests {
         }
 
         let mut printer = PrinterServiceTest::default();
-        let mut imap = TestBackendService {};
+        let mut backend = Box::new(&mut TestBackendService {});
 
-        assert!(list(None, &mut printer, &mut imap).is_ok());
+        assert!(list(None, &mut printer, backend).is_ok());
         assert_eq!(
             concat![
                 "\n",

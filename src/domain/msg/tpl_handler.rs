@@ -31,13 +31,13 @@ pub fn new<'a, P: PrinterService>(
 }
 
 /// Generate a reply message template.
-pub fn reply<'a, P: PrinterService, B: BackendService<'a>>(
+pub fn reply<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     seq: &str,
     all: bool,
     opts: TplOverride<'a>,
     account: &'a AccountConfig,
     printer: &'a mut P,
-    backend: &'a mut B,
+    backend: Box<&'a mut B>,
 ) -> Result<()> {
     let tpl = backend
         .find_msg(account, seq)?
@@ -47,12 +47,12 @@ pub fn reply<'a, P: PrinterService, B: BackendService<'a>>(
 }
 
 /// Generate a forward message template.
-pub fn forward<'a, P: PrinterService, B: BackendService<'a>>(
+pub fn forward<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     seq: &str,
     opts: TplOverride<'a>,
     account: &'a AccountConfig,
     printer: &'a mut P,
-    backend: &'a mut B,
+    backend: Box<&'a mut B>,
 ) -> Result<()> {
     let tpl = backend
         .find_msg(account, seq)?
@@ -62,13 +62,13 @@ pub fn forward<'a, P: PrinterService, B: BackendService<'a>>(
 }
 
 /// Saves a message based on a template.
-pub fn save<'a, P: PrinterService, B: BackendService<'a>>(
+pub fn save<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     mbox: &Mbox,
     account: &AccountConfig,
     attachments_paths: Vec<&str>,
     tpl: &str,
     printer: &mut P,
-    backend: &mut B,
+    backend: Box<&mut B>,
 ) -> Result<()> {
     let tpl = if atty::is(Stream::Stdin) || printer.is_json() {
         tpl.replace("\r", "")
@@ -88,13 +88,13 @@ pub fn save<'a, P: PrinterService, B: BackendService<'a>>(
 }
 
 /// Sends a message based on a template.
-pub fn send<'a, P: PrinterService, B: BackendService<'a>, S: SmtpService>(
+pub fn send<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpService>(
     mbox: &Mbox,
     account: &AccountConfig,
     attachments_paths: Vec<&str>,
     tpl: &str,
     printer: &mut P,
-    backend: &mut B,
+    backend: Box<&mut B>,
     smtp: &mut S,
 ) -> Result<()> {
     let tpl = if atty::is(Stream::Stdin) || printer.is_json() {

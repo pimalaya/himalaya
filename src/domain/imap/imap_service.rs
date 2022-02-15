@@ -17,8 +17,6 @@ use crate::{
 type ImapSession = imap::Session<TlsStream<TcpStream>>;
 
 pub trait BackendService<'a> {
-    fn notify(&mut self, config: &AccountConfig, keepalive: u64) -> Result<()>;
-    fn watch(&mut self, account: &AccountConfig, keepalive: u64) -> Result<()>;
     fn fetch_mboxes(&'a mut self) -> Result<Mboxes>;
     fn fetch_envelopes(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes>;
     fn find_envelopes(
@@ -128,6 +126,115 @@ impl<'a> ImapService<'a> {
         trace!("uids: {:?}", uids);
 
         Ok(uids)
+    }
+
+    pub fn notify(&mut self, config: &AccountConfig, keepalive: u64) -> Result<()> {
+        debug!("notify");
+
+        let mbox = self.mbox.to_owned();
+
+        debug!("examine mailbox {:?}", mbox);
+        self.sess()?
+            .examine(&mbox.name)
+            .context(format!("cannot examine mailbox {}", self.mbox.name))?;
+
+        debug!("init messages hashset");
+        let mut msgs_set: HashSet<u32> = self
+            .search_new_msgs(config)?
+            .iter()
+            .cloned()
+            .collect::<HashSet<_>>();
+        trace!("messages hashset: {:?}", msgs_set);
+
+        loop {
+            debug!("begin loop");
+            self.sess()?
+                .idle()
+                .and_then(|mut idle| {
+                    idle.set_keepalive(std::time::Duration::new(keepalive, 0));
+                    idle.wait_keepalive_while(|res| {
+                        // TODO: handle response
+                        trace!("idle response: {:?}", res);
+                        false
+                    })
+                })
+                .context("cannot start the idle mode")?;
+
+            let uids: Vec<u32> = self
+                .search_new_msgs(config)?
+                .into_iter()
+                .filter(|uid| -> bool { msgs_set.get(uid).is_none() })
+                .collect();
+            debug!("found {} new messages not in hashset", uids.len());
+            trace!("messages hashet: {:?}", msgs_set);
+
+            if !uids.is_empty() {
+                let uids = uids
+                    .iter()
+                    .map(|uid| uid.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",");
+                let fetches = self
+                    .sess()?
+                    .uid_fetch(uids, "(UID ENVELOPE)")
+                    .context("cannot fetch new messages enveloppe")?;
+
+                for fetch in fetches.iter() {
+                    let msg = Envelope::try_from(fetch)?;
+                    let uid = fetch.uid.ok_or_else(|| {
+                        anyhow!("cannot retrieve message {}'s UID", fetch.message)
+                    })?;
+
+                    let from = msg.sender.to_owned().into();
+                    config.run_notify_cmd(&msg.subject, &from)?;
+
+                    debug!("notify message: {}", uid);
+                    trace!("message: {:?}", msg);
+
+                    debug!("insert message {} in hashset", uid);
+                    msgs_set.insert(uid);
+                    trace!("messages hashset: {:?}", msgs_set);
+                }
+            }
+
+            debug!("end loop");
+        }
+    }
+
+    pub fn watch(&mut self, account: &AccountConfig, keepalive: u64) -> Result<()> {
+        debug!("examine mailbox: {}", &self.mbox.name);
+        let mbox = self.mbox.to_owned();
+
+        self.sess()?
+            .examine(&mbox.name)
+            .context(format!("cannot examine mailbox `{}`", &self.mbox.name))?;
+
+        loop {
+            debug!("begin loop");
+            self.sess()?
+                .idle()
+                .and_then(|mut idle| {
+                    idle.set_keepalive(std::time::Duration::new(keepalive, 0));
+                    idle.wait_keepalive_while(|res| {
+                        // TODO: handle response
+                        trace!("idle response: {:?}", res);
+                        false
+                    })
+                })
+                .context("cannot start the idle mode")?;
+
+            let cmds = account.watch_cmds.clone();
+            thread::spawn(move || {
+                debug!("batch execution of {} cmd(s)", cmds.len());
+                cmds.iter().for_each(|cmd| {
+                    debug!("running command {:?}…", cmd);
+                    let res = run_cmd(cmd);
+                    debug!("{:?}", res);
+                })
+            });
+
+            debug!("end loop");
+        }
     }
 }
 
@@ -305,115 +412,6 @@ impl<'a> BackendService<'a> for ImapService<'a> {
             .finish()
             .context(format!(r#"cannot append message to "{}""#, mbox.name))?;
         Ok(())
-    }
-
-    fn notify(&mut self, config: &AccountConfig, keepalive: u64) -> Result<()> {
-        debug!("notify");
-
-        let mbox = self.mbox.to_owned();
-
-        debug!("examine mailbox {:?}", mbox);
-        self.sess()?
-            .examine(&mbox.name)
-            .context(format!("cannot examine mailbox {}", self.mbox.name))?;
-
-        debug!("init messages hashset");
-        let mut msgs_set: HashSet<u32> = self
-            .search_new_msgs(config)?
-            .iter()
-            .cloned()
-            .collect::<HashSet<_>>();
-        trace!("messages hashset: {:?}", msgs_set);
-
-        loop {
-            debug!("begin loop");
-            self.sess()?
-                .idle()
-                .and_then(|mut idle| {
-                    idle.set_keepalive(std::time::Duration::new(keepalive, 0));
-                    idle.wait_keepalive_while(|res| {
-                        // TODO: handle response
-                        trace!("idle response: {:?}", res);
-                        false
-                    })
-                })
-                .context("cannot start the idle mode")?;
-
-            let uids: Vec<u32> = self
-                .search_new_msgs(config)?
-                .into_iter()
-                .filter(|uid| -> bool { msgs_set.get(uid).is_none() })
-                .collect();
-            debug!("found {} new messages not in hashset", uids.len());
-            trace!("messages hashet: {:?}", msgs_set);
-
-            if !uids.is_empty() {
-                let uids = uids
-                    .iter()
-                    .map(|uid| uid.to_string())
-                    .collect::<Vec<_>>()
-                    .join(",");
-                let fetches = self
-                    .sess()?
-                    .uid_fetch(uids, "(UID ENVELOPE)")
-                    .context("cannot fetch new messages enveloppe")?;
-
-                for fetch in fetches.iter() {
-                    let msg = Envelope::try_from(fetch)?;
-                    let uid = fetch.uid.ok_or_else(|| {
-                        anyhow!("cannot retrieve message {}'s UID", fetch.message)
-                    })?;
-
-                    let from = msg.sender.to_owned().into();
-                    config.run_notify_cmd(&msg.subject, &from)?;
-
-                    debug!("notify message: {}", uid);
-                    trace!("message: {:?}", msg);
-
-                    debug!("insert message {} in hashset", uid);
-                    msgs_set.insert(uid);
-                    trace!("messages hashset: {:?}", msgs_set);
-                }
-            }
-
-            debug!("end loop");
-        }
-    }
-
-    fn watch(&mut self, account: &AccountConfig, keepalive: u64) -> Result<()> {
-        debug!("examine mailbox: {}", &self.mbox.name);
-        let mbox = self.mbox.to_owned();
-
-        self.sess()?
-            .examine(&mbox.name)
-            .context(format!("cannot examine mailbox `{}`", &self.mbox.name))?;
-
-        loop {
-            debug!("begin loop");
-            self.sess()?
-                .idle()
-                .and_then(|mut idle| {
-                    idle.set_keepalive(std::time::Duration::new(keepalive, 0));
-                    idle.wait_keepalive_while(|res| {
-                        // TODO: handle response
-                        trace!("idle response: {:?}", res);
-                        false
-                    })
-                })
-                .context("cannot start the idle mode")?;
-
-            let cmds = account.watch_cmds.clone();
-            thread::spawn(move || {
-                debug!("batch execution of {} cmd(s)", cmds.len());
-                cmds.iter().for_each(|cmd| {
-                    debug!("running command {:?}…", cmd);
-                    let res = run_cmd(cmd);
-                    debug!("{:?}", res);
-                })
-            });
-
-            debug!("end loop");
-        }
     }
 
     fn logout(&mut self) -> Result<()> {

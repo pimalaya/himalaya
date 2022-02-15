@@ -11,11 +11,11 @@ use crate::{
 
 /// Adds flags to all messages matching the given sequence range.
 /// Flags are case-insensitive, and they do not need to be prefixed with `\`.
-pub fn add<'a, P: PrinterService, B: BackendService<'a>>(
+pub fn add<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     seq_range: &'a str,
     flags: Vec<&'a str>,
     printer: &'a mut P,
-    backend: &'a mut B,
+    backend: Box<&'a mut B>,
 ) -> Result<()> {
     let flags = Flags::from(flags);
     backend.add_flags(seq_range, &flags)?;
@@ -27,11 +27,11 @@ pub fn add<'a, P: PrinterService, B: BackendService<'a>>(
 
 /// Removes flags from all messages matching the given sequence range.
 /// Flags are case-insensitive, and they do not need to be prefixed with `\`.
-pub fn remove<'a, P: PrinterService, B: BackendService<'a>>(
+pub fn remove<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     seq_range: &'a str,
     flags: Vec<&'a str>,
     printer: &'a mut P,
-    backend: &'a mut B,
+    backend: Box<&'a mut B>,
 ) -> Result<()> {
     let flags = Flags::from(flags);
     backend.remove_flags(seq_range, &flags)?;
@@ -43,11 +43,11 @@ pub fn remove<'a, P: PrinterService, B: BackendService<'a>>(
 
 /// Replaces flags of all messages matching the given sequence range.
 /// Flags are case-insensitive, and they do not need to be prefixed with `\`.
-pub fn set<'a, P: PrinterService, B: BackendService<'a>>(
+pub fn set<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     seq_range: &'a str,
     flags: Vec<&'a str>,
     printer: &'a mut P,
-    backend: &'a mut B,
+    backend: Box<&'a mut B>,
 ) -> Result<()> {
     let flags = Flags::from(flags);
     backend.set_flags(seq_range, &flags)?;
