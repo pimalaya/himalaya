@@ -133,13 +133,11 @@ pub trait BackendService<'a> {
         page: &usize,
     ) -> Result<Envelopes>;
     fn get_msg(&mut self, account: &AccountConfig, seq: &str) -> Result<Msg>;
-    fn add_msg(&mut self, mbox: &Mbox, account: &AccountConfig, msg: Msg) -> Result<()>;
+    fn add_msg(&mut self, mbox: &Mbox, msg: &[u8], flags: Flags) -> Result<()>;
     fn add_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()>;
     fn set_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()>;
     fn del_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()>;
     fn disconnect(&mut self) -> Result<()>;
-
-    fn append_raw_msg_with_flags(&mut self, mbox: &Mbox, msg: &[u8], flags: Flags) -> Result<()>;
 }
 
 pub struct ImapService<'a> {
@@ -406,11 +404,10 @@ impl<'a> BackendService<'a> for ImapService<'a> {
         Msg::try_from((account, fetch))
     }
 
-    fn add_msg(&mut self, mbox: &Mbox, account: &AccountConfig, msg: Msg) -> Result<()> {
-        let msg_raw = msg.into_sendable_msg(account)?.formatted();
+    fn add_msg(&mut self, mbox: &Mbox, msg: &[u8], flags: Flags) -> Result<()> {
         self.sess()?
-            .append(&mbox.name, &msg_raw)
-            .flags(msg.flags.0)
+            .append(&mbox.name, msg)
+            .flags(flags.0)
             .finish()
             .context(format!(r#"cannot append message to "{}""#, mbox.name))?;
         Ok(())
@@ -459,15 +456,6 @@ impl<'a> BackendService<'a> for ImapService<'a> {
             debug!("logout from IMAP server");
             sess.logout().context("cannot logout from IMAP server")?;
         }
-        Ok(())
-    }
-
-    fn append_raw_msg_with_flags(&mut self, mbox: &Mbox, msg: &[u8], flags: Flags) -> Result<()> {
-        self.sess()?
-            .append(&mbox.name, msg)
-            .flags(flags.0)
-            .finish()
-            .context(format!(r#"cannot append message to "{}""#, mbox.name))?;
         Ok(())
     }
 }

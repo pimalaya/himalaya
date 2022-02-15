@@ -65,7 +65,7 @@ pub fn copy<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     let mbox = Mbox::new(mbox);
     let msg = backend.get_msg(account, seq)?.raw;
     let flags = Flags::try_from(vec![Flag::Seen])?;
-    backend.append_raw_msg_with_flags(&mbox, &msg, flags)?;
+    backend.add_msg(&mbox, &msg, flags)?;
     printer.print(format!(
         r#"Message {} successfully copied to folder "{}""#,
         seq, mbox
@@ -194,7 +194,7 @@ pub fn move_<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     let mbox = Mbox::new(mbox);
     let msg = backend.get_msg(account, seq)?.raw;
     let flags = Flags::try_from(vec![Flag::Seen])?;
-    backend.append_raw_msg_with_flags(&mbox, &msg, flags)?;
+    backend.add_msg(&mbox, &msg, flags)?;
 
     // Delete the original message
     let flags = Flags::try_from(vec![Flag::Seen, Flag::Deleted])?;
@@ -274,7 +274,7 @@ pub fn save<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
             .collect::<Vec<String>>()
             .join("\r\n")
     };
-    backend.append_raw_msg_with_flags(mbox, raw_msg.as_bytes(), flags)
+    backend.add_msg(mbox, raw_msg.as_bytes(), flags)
 }
 
 /// Paginate messages from the selected mailbox matching the specified query.
@@ -348,7 +348,7 @@ pub fn send<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpServic
     trace!("envelope: {:?}", envelope);
 
     smtp.send_raw_msg(&envelope, raw_msg.as_bytes())?;
-    backend.append_raw_msg_with_flags(&mbox, raw_msg.as_bytes(), flags)
+    backend.add_msg(&mbox, raw_msg.as_bytes(), flags)
 }
 
 /// Compose a new message.

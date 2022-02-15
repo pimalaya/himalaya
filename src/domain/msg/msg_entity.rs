@@ -362,7 +362,7 @@ impl Msg {
                     let mbox = Mbox::new(&account.sent_folder);
                     let sent_msg = smtp.send_msg(account, &self)?;
                     let flags = Flags::try_from(vec![Flag::Seen])?;
-                    backend.append_raw_msg_with_flags(&mbox, &sent_msg.formatted(), flags)?;
+                    backend.add_msg(&mbox, &sent_msg.formatted(), flags)?;
                     msg_utils::remove_local_draft()?;
                     printer.print("Message successfully sent")?;
                     break;
@@ -379,7 +379,7 @@ impl Msg {
                     let mbox = Mbox::new(&account.draft_folder);
                     let flags = Flags::try_from(vec![Flag::Seen, Flag::Draft])?;
                     let tpl = self.to_tpl(TplOverride::default(), account)?;
-                    backend.append_raw_msg_with_flags(&mbox, tpl.as_bytes(), flags)?;
+                    backend.add_msg(&mbox, tpl.as_bytes(), flags)?;
                     msg_utils::remove_local_draft()?;
                     printer.print(format!(
                         "Message successfully saved to {}",

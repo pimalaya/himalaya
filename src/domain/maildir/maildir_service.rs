@@ -26,10 +26,7 @@ impl<'a> BackendService<'a> for MaildirService {
     fn get_msg(&mut self, _: &AccountConfig, _: &str) -> Result<Msg> {
         unimplemented!()
     }
-    fn add_msg(&mut self, _: &Mbox, _: &AccountConfig, _: Msg) -> Result<()> {
-        unimplemented!()
-    }
-    fn append_raw_msg_with_flags(&mut self, _: &Mbox, _: &[u8], _: Flags) -> Result<()> {
+    fn add_msg(&mut self, _: &Mbox, _: &[u8], _: Flags) -> Result<()> {
         unimplemented!()
     }
     fn disconnect(&mut self) -> Result<()> {
