@@ -4,7 +4,7 @@ use serde::Deserialize;
 use std::{collections::HashMap, env, fs, path::PathBuf};
 use toml;
 
-use crate::config::DeserializableAccountConfig;
+use crate::config::DeserializedAccountConfig;
 
 pub const DEFAULT_PAGE_SIZE: usize = 10;
 pub const DEFAULT_SIG_DELIM: &str = "-- \n";
@@ -16,7 +16,7 @@ pub const DEFAULT_DRAFT_FOLDER: &str = "Drafts";
 /// Represents the user config file.
 #[derive(Debug, Default, Clone, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub struct DeserializableConfig {
+pub struct DeserializedConfig {
     /// Represents the display name of the user.
     pub name: String,
     /// Represents the downloads directory (mostly for attachments).
@@ -42,10 +42,10 @@ pub struct DeserializableConfig {
 
     /// Represents all the user accounts.
     #[serde(flatten)]
-    pub accounts: HashMap<String, DeserializableAccountConfig>,
+    pub accounts: HashMap<String, DeserializedAccountConfig>,
 }
 
-impl DeserializableConfig {
+impl DeserializedConfig {
     /// Tries to create a config from an optional path.
     pub fn from_opt_path(path: Option<&str>) -> Result<Self> {
         info!("begin: trying to parse config from path");

@@ -1,20 +1,20 @@
 use serde::Deserialize;
 use std::path::PathBuf;
 
-pub trait ToDeserializableBaseAccountConfig {
-    fn to_base(&self) -> DeserializableBaseAccountConfig;
+pub trait ToDeserializedBaseAccountConfig {
+    fn to_base(&self) -> DeserializedBaseAccountConfig;
 }
 
 /// Represents all existing kind of account config.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
-pub enum DeserializableAccountConfig {
-    Imap(DeserializableImapAccountConfig),
-    Maildir(DeserializableMaildirAccountConfig),
+pub enum DeserializedAccountConfig {
+    Imap(DeserializedImapAccountConfig),
+    Maildir(DeserializedMaildirAccountConfig),
 }
 
-impl ToDeserializableBaseAccountConfig for DeserializableAccountConfig {
-    fn to_base(&self) -> DeserializableBaseAccountConfig {
+impl ToDeserializedBaseAccountConfig for DeserializedAccountConfig {
+    fn to_base(&self) -> DeserializedBaseAccountConfig {
         match self {
             Self::Imap(config) => config.to_base(),
             Self::Maildir(config) => config.to_base(),
@@ -76,9 +76,9 @@ macro_rules! make_account_config {
 	    $(pub $element: $ty),*
 	}
 
-	impl ToDeserializableBaseAccountConfig for $AccountConfig {
-	    fn to_base(&self) -> DeserializableBaseAccountConfig {
-		DeserializableBaseAccountConfig {
+	impl ToDeserializedBaseAccountConfig for $AccountConfig {
+	    fn to_base(&self) -> DeserializedBaseAccountConfig {
+		DeserializedBaseAccountConfig {
             	    name: self.name.clone(),
             	    downloads_dir: self.downloads_dir.clone(),
             	    signature: self.signature.clone(),
@@ -109,10 +109,10 @@ macro_rules! make_account_config {
     }
 }
 
-make_account_config!(DeserializableBaseAccountConfig,);
+make_account_config!(DeserializedBaseAccountConfig,);
 
 make_account_config!(
-    DeserializableImapAccountConfig,
+    DeserializedImapAccountConfig,
     imap_host: String,
     imap_port: u16,
     imap_starttls: Option<bool>,
@@ -121,4 +121,4 @@ make_account_config!(
     imap_passwd_cmd: String
 );
 
-make_account_config!(DeserializableMaildirAccountConfig, maildir_dir: PathBuf);
+make_account_config!(DeserializedMaildirAccountConfig, maildir_dir: PathBuf);

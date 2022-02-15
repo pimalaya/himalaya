@@ -58,7 +58,7 @@ pub struct AccountConfig {
 impl<'a> AccountConfig {
     /// tries to create an account from a config and an optional account name.
     pub fn from_config_and_opt_account_name(
-        config: &'a DeserializableConfig,
+        config: &'a DeserializedConfig,
         account_name: Option<&str>,
     ) -> Result<(AccountConfig, BackendConfig)> {
         info!("begin: parsing account and backend configs from config and account name");
@@ -69,10 +69,8 @@ impl<'a> AccountConfig {
                 .accounts
                 .iter()
                 .find(|(_, account)| match account {
-                    DeserializableAccountConfig::Imap(account) => {
-                        account.default.unwrap_or_default()
-                    }
-                    DeserializableAccountConfig::Maildir(account) => {
+                    DeserializedAccountConfig::Imap(account) => account.default.unwrap_or_default(),
+                    DeserializedAccountConfig::Maildir(account) => {
                         account.default.unwrap_or_default()
                     }
                 })
@@ -183,7 +181,7 @@ impl<'a> AccountConfig {
         trace!("account config: {:?}", account_config);
 
         let backend_config = match account {
-            DeserializableAccountConfig::Imap(config) => BackendConfig::Imap(ImapBackendConfig {
+            DeserializedAccountConfig::Imap(config) => BackendConfig::Imap(ImapBackendConfig {
                 imap_host: config.imap_host.clone(),
                 imap_port: config.imap_port.clone(),
                 imap_starttls: config.imap_starttls.unwrap_or_default(),
@@ -191,7 +189,7 @@ impl<'a> AccountConfig {
                 imap_login: config.imap_login.clone(),
                 imap_passwd_cmd: config.imap_passwd_cmd.clone(),
             }),
-            DeserializableAccountConfig::Maildir(config) => {
+            DeserializedAccountConfig::Maildir(config) => {
                 BackendConfig::Maildir(MaildirBackendConfig {
                     maildir_dir: config.maildir_dir.clone(),
                 })

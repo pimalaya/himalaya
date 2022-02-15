@@ -10,7 +10,7 @@ mod output;
 mod ui;
 
 use compl::{compl_arg, compl_handler};
-use config::{account_args, config_args, AccountConfig, BackendConfig, DeserializableConfig};
+use config::{account_args, config_args, AccountConfig, BackendConfig, DeserializedConfig};
 use domain::{
     imap::{imap_arg, imap_handler, BackendService, ImapService},
     mbox::{mbox_arg, mbox_handler, Mbox},
@@ -43,7 +43,7 @@ fn main() -> Result<()> {
     // Check mailto command BEFORE app initialization.
     let raw_args: Vec<String> = env::args().collect();
     if raw_args.len() > 1 && raw_args[1].starts_with("mailto:") {
-        let config = DeserializableConfig::from_opt_path(None)?;
+        let config = DeserializedConfig::from_opt_path(None)?;
         let (account_config, backend_config) =
             AccountConfig::from_config_and_opt_account_name(&config, None)?;
         let mbox = Mbox::new(&account_config.inbox_folder);
@@ -70,7 +70,7 @@ fn main() -> Result<()> {
     }
 
     // Init entities and services.
-    let config = DeserializableConfig::from_opt_path(m.value_of("config"))?;
+    let config = DeserializedConfig::from_opt_path(m.value_of("config"))?;
     let (account_config, backend_config) =
         AccountConfig::from_config_and_opt_account_name(&config, m.value_of("account"))?;
     let mbox = Mbox::new(
