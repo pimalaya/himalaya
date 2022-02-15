@@ -9,10 +9,13 @@ use crate::{
 pub struct MaildirService;
 
 impl<'a> BackendService<'a> for MaildirService {
-    fn fetch_mboxes(&'a mut self) -> Result<Mboxes> {
+    fn connect(&mut self) -> Result<()> {
+        Ok(())
+    }
+    fn get_mboxes(&mut self) -> Result<Mboxes> {
         unimplemented!()
     }
-    fn fetch_envelopes(&mut self, _: &usize, _: &usize) -> Result<Envelopes> {
+    fn get_envelopes(&mut self, _: &usize, _: &usize) -> Result<Envelopes> {
         unimplemented!()
     }
     fn find_envelopes(&mut self, _: &str, _: &usize, _: &usize) -> Result<Envelopes> {
@@ -28,13 +31,13 @@ impl<'a> BackendService<'a> for MaildirService {
     ) -> Result<Envelopes> {
         unimplemented!()
     }
-    fn find_msg(&mut self, _: &AccountConfig, _: &str) -> Result<Msg> {
+    fn get_msg(&mut self, _: &AccountConfig, _: &str) -> Result<Msg> {
         unimplemented!()
     }
     fn find_raw_msg(&mut self, _: &str) -> Result<Vec<u8>> {
         unimplemented!()
     }
-    fn append_msg(&mut self, _: &Mbox, _: &AccountConfig, _: Msg) -> Result<()> {
+    fn add_msg(&mut self, _: &Mbox, _: &AccountConfig, _: Msg) -> Result<()> {
         unimplemented!()
     }
     fn append_raw_msg_with_flags(&mut self, _: &Mbox, _: &[u8], _: Flags) -> Result<()> {
@@ -43,7 +46,7 @@ impl<'a> BackendService<'a> for MaildirService {
     fn expunge(&mut self) -> Result<()> {
         unimplemented!()
     }
-    fn logout(&mut self) -> Result<()> {
+    fn disconnect(&mut self) -> Result<()> {
         unimplemented!()
     }
     fn add_flags(&mut self, _: &str, _: &Flags) -> Result<()> {
@@ -52,7 +55,7 @@ impl<'a> BackendService<'a> for MaildirService {
     fn set_flags(&mut self, _: &str, _: &Flags) -> Result<()> {
         unimplemented!()
     }
-    fn remove_flags(&mut self, _: &str, _: &Flags) -> Result<()> {
+    fn del_flags(&mut self, _: &str, _: &Flags) -> Result<()> {
         unimplemented!()
     }
 }

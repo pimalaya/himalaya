@@ -35,9 +35,9 @@ pub fn attachments<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     seq: &str,
     account: &AccountConfig,
     printer: &mut P,
-    backend: Box<&mut B>,
+    backend: Box<&'a mut B>,
 ) -> Result<()> {
-    let attachments = backend.find_msg(account, seq)?.attachments();
+    let attachments = backend.get_msg(account, seq)?.attachments();
     let attachments_len = attachments.len();
     debug!(
         r#"{} attachment(s) found for message "{}""#,
@@ -78,7 +78,7 @@ pub fn copy<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 pub fn delete<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     seq: &str,
     printer: &mut P,
-    backend: Box<&mut B>,
+    backend: Box<&'a mut B>,
 ) -> Result<()> {
     let flags = Flags::try_from(vec![Flag::Seen, Flag::Deleted])?;
     backend.add_flags(seq, &flags)?;
@@ -97,7 +97,7 @@ pub fn forward<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpSer
     smtp: &mut S,
 ) -> Result<()> {
     backend
-        .find_msg(account, seq)?
+        .get_msg(account, seq)?
         .into_forward(account)?
         .add_attachments(attachments_paths)?
         .encrypt(encrypt)
@@ -117,7 +117,7 @@ pub fn list<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     let page_size = page_size.unwrap_or(account.default_page_size);
     trace!("page size: {}", page_size);
 
-    let msgs = imap.fetch_envelopes(&page_size, &page)?;
+    let msgs = imap.get_envelopes(&page_size, &page)?;
     trace!("messages: {:#?}", msgs);
     printer.print_table(msgs, PrintTableOpts { max_width })
 }
@@ -190,7 +190,7 @@ pub fn move_<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     // The mailbox to move the message in
     mbox: &str,
     printer: &mut P,
-    backend: Box<&mut B>,
+    backend: Box<&'a mut B>,
 ) -> Result<()> {
     // Copy the message to targetted mailbox
     let mbox = Mbox::new(mbox);
@@ -216,13 +216,13 @@ pub fn read<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     raw: bool,
     account: &AccountConfig,
     printer: &mut P,
-    backend: Box<&mut B>,
+    backend: Box<&'a mut B>,
 ) -> Result<()> {
     let msg = if raw {
         // Emails don't always have valid utf8. Using "lossy" to display what we can.
         String::from_utf8_lossy(&backend.find_raw_msg(seq)?).into_owned()
     } else {
-        backend.find_msg(account, seq)?.fold_text_parts(text_mime)
+        backend.get_msg(account, seq)?.fold_text_parts(text_mime)
     };
 
     printer.print(msg)
@@ -240,7 +240,7 @@ pub fn reply<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpServi
     smtp: &mut S,
 ) -> Result<()> {
     backend
-        .find_msg(account, seq)?
+        .get_msg(account, seq)?
         .into_reply(all, account)?
         .add_attachments(attachments_paths)?
         .encrypt(encrypt)

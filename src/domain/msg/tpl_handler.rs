@@ -40,7 +40,7 @@ pub fn reply<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     backend: Box<&'a mut B>,
 ) -> Result<()> {
     let tpl = backend
-        .find_msg(account, seq)?
+        .get_msg(account, seq)?
         .into_reply(all, account)?
         .to_tpl(opts, account)?;
     printer.print(tpl)
@@ -55,7 +55,7 @@ pub fn forward<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     backend: Box<&'a mut B>,
 ) -> Result<()> {
     let tpl = backend
-        .find_msg(account, seq)?
+        .get_msg(account, seq)?
         .into_forward(account)?
         .to_tpl(opts, account)?;
     printer.print(tpl)

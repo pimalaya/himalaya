@@ -17,8 +17,16 @@ use crate::{
 type ImapSession = imap::Session<TlsStream<TcpStream>>;
 
 pub trait BackendService<'a> {
-    fn fetch_mboxes(&'a mut self) -> Result<Mboxes>;
-    fn fetch_envelopes(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes>;
+    fn connect(&mut self) -> Result<()>;
+    fn get_mboxes(&mut self) -> Result<Mboxes>;
+    fn get_envelopes(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes>;
+    fn get_msg(&mut self, account: &AccountConfig, seq: &str) -> Result<Msg>;
+    fn add_msg(&mut self, mbox: &Mbox, account: &AccountConfig, msg: Msg) -> Result<()>;
+    fn add_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()>;
+    fn set_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()>;
+    fn del_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()>;
+    fn disconnect(&mut self) -> Result<()>;
+
     fn find_envelopes(
         &'a mut self,
         query: &str,
@@ -33,19 +41,9 @@ pub trait BackendService<'a> {
         page_size: &usize,
         page: &usize,
     ) -> Result<Envelopes>;
-    fn find_msg(&mut self, account: &AccountConfig, seq: &str) -> Result<Msg>;
     fn find_raw_msg(&mut self, seq: &str) -> Result<Vec<u8>>;
-    fn append_msg(&mut self, mbox: &Mbox, account: &AccountConfig, msg: Msg) -> Result<()>;
     fn append_raw_msg_with_flags(&mut self, mbox: &Mbox, msg: &[u8], flags: Flags) -> Result<()>;
     fn expunge(&mut self) -> Result<()>;
-    fn logout(&mut self) -> Result<()>;
-
-    /// Add flags to all messages within the given sequence range.
-    fn add_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()>;
-    /// Replace flags of all messages within the given sequence range.
-    fn set_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()>;
-    /// Remove flags from all messages within the given sequence range.
-    fn remove_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()>;
 }
 
 pub struct ImapService<'a> {
@@ -239,7 +237,11 @@ impl<'a> ImapService<'a> {
 }
 
 impl<'a> BackendService<'a> for ImapService<'a> {
-    fn fetch_mboxes(&'a mut self) -> Result<Mboxes> {
+    fn connect(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    fn get_mboxes(&mut self) -> Result<Mboxes> {
         let raw_mboxes = self
             .sess()?
             .list(Some(""), Some("*"))
@@ -248,7 +250,7 @@ impl<'a> BackendService<'a> for ImapService<'a> {
         Ok(Mboxes::from(self._raw_mboxes_cache.as_ref().unwrap()))
     }
 
-    fn fetch_envelopes(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes> {
+    fn get_envelopes(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes> {
         debug!("fetch envelopes");
         debug!("page size: {:?}", page_size);
         debug!("page: {:?}", page);
@@ -285,7 +287,7 @@ impl<'a> BackendService<'a> for ImapService<'a> {
     }
 
     fn find_envelopes(
-        &'a mut self,
+        &mut self,
         query: &str,
         page_size: &usize,
         page: &usize,
@@ -323,7 +325,7 @@ impl<'a> BackendService<'a> for ImapService<'a> {
     }
 
     fn find_and_sort_envelopes(
-        &'a mut self,
+        &mut self,
         criteria: &[SortCriterion],
         charset: SortCharset,
         query: &str,
@@ -363,7 +365,7 @@ impl<'a> BackendService<'a> for ImapService<'a> {
     }
 
     /// Find a message by sequence number.
-    fn find_msg(&mut self, account: &AccountConfig, seq: &str) -> Result<Msg> {
+    fn get_msg(&mut self, account: &AccountConfig, seq: &str) -> Result<Msg> {
         let mbox = self.mbox.to_owned();
         self.sess()?
             .select(&mbox.name)
@@ -404,7 +406,7 @@ impl<'a> BackendService<'a> for ImapService<'a> {
         Ok(())
     }
 
-    fn append_msg(&mut self, mbox: &Mbox, account: &AccountConfig, msg: Msg) -> Result<()> {
+    fn add_msg(&mut self, mbox: &Mbox, account: &AccountConfig, msg: Msg) -> Result<()> {
         let msg_raw = msg.into_sendable_msg(account)?.formatted();
         self.sess()?
             .append(&mbox.name, &msg_raw)
@@ -414,7 +416,7 @@ impl<'a> BackendService<'a> for ImapService<'a> {
         Ok(())
     }
 
-    fn logout(&mut self) -> Result<()> {
+    fn disconnect(&mut self) -> Result<()> {
         if let Some(ref mut sess) = self.sess {
             debug!("logout from IMAP server");
             sess.logout().context("cannot logout from IMAP server")?;
@@ -445,7 +447,7 @@ impl<'a> BackendService<'a> for ImapService<'a> {
         Ok(())
     }
 
-    fn remove_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()> {
+    fn del_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()> {
         let mbox = self.mbox;
         let flags = flags.to_string();
         self.sess()?

@@ -257,5 +257,5 @@ fn main() -> Result<()> {
         _ => (),
     }
 
-    backend.logout()
+    backend.disconnect()
 }

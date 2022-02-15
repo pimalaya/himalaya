@@ -34,7 +34,7 @@ pub fn remove<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     backend: Box<&'a mut B>,
 ) -> Result<()> {
     let flags = Flags::from(flags);
-    backend.remove_flags(seq_range, &flags)?;
+    backend.del_flags(seq_range, &flags)?;
     printer.print(format!(
         "Flag(s) {:?} successfully removed from message(s) {:?}",
         flags, seq_range

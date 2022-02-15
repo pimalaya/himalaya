@@ -17,7 +17,7 @@ pub fn list<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     backend: Box<&'a mut B>,
 ) -> Result<()> {
     info!("entering list mailbox handler");
-    let mboxes = backend.fetch_mboxes()?;
+    let mboxes = backend.get_mboxes()?;
     trace!("mailboxes: {:?}", mboxes);
     printer.print_table(mboxes, PrintTableOpts { max_width })
 }
@@ -98,7 +98,10 @@ mod tests {
         struct TestBackendService;
 
         impl<'a> BackendService<'a> for TestBackendService {
-            fn fetch_mboxes(&'a mut self) -> Result<Mboxes> {
+            fn connect(&mut self) -> Result<()> {
+                Ok(())
+            }
+            fn get_mboxes(&mut self) -> Result<Mboxes> {
                 Ok(Mboxes(vec![
                     Mbox {
                         delim: "/".into(),
@@ -115,7 +118,7 @@ mod tests {
                     },
                 ]))
             }
-            fn fetch_envelopes(&mut self, _: &usize, _: &usize) -> Result<Envelopes> {
+            fn get_envelopes(&mut self, _: &usize, _: &usize) -> Result<Envelopes> {
                 unimplemented!()
             }
             fn find_envelopes(&mut self, _: &str, _: &usize, _: &usize) -> Result<Envelopes> {
@@ -131,13 +134,13 @@ mod tests {
             ) -> Result<Envelopes> {
                 unimplemented!()
             }
-            fn find_msg(&mut self, _: &AccountConfig, _: &str) -> Result<Msg> {
+            fn get_msg(&mut self, _: &AccountConfig, _: &str) -> Result<Msg> {
                 unimplemented!()
             }
             fn find_raw_msg(&mut self, _: &str) -> Result<Vec<u8>> {
                 unimplemented!()
             }
-            fn append_msg(&mut self, _: &Mbox, _: &AccountConfig, _: Msg) -> Result<()> {
+            fn add_msg(&mut self, _: &Mbox, _: &AccountConfig, _: Msg) -> Result<()> {
                 unimplemented!()
             }
             fn append_raw_msg_with_flags(&mut self, _: &Mbox, _: &[u8], _: Flags) -> Result<()> {
@@ -146,7 +149,7 @@ mod tests {
             fn expunge(&mut self) -> Result<()> {
                 unimplemented!()
             }
-            fn logout(&mut self) -> Result<()> {
+            fn disconnect(&mut self) -> Result<()> {
                 unimplemented!()
             }
             fn add_flags(&mut self, _: &str, _: &Flags) -> Result<()> {
@@ -155,13 +158,14 @@ mod tests {
             fn set_flags(&mut self, _: &str, _: &Flags) -> Result<()> {
                 unimplemented!()
             }
-            fn remove_flags(&mut self, _: &str, _: &Flags) -> Result<()> {
+            fn del_flags(&mut self, _: &str, _: &Flags) -> Result<()> {
                 unimplemented!()
             }
         }
 
         let mut printer = PrinterServiceTest::default();
-        let mut backend = Box::new(&mut TestBackendService {});
+        let mut backend = TestBackendService {};
+        let backend = Box::new(&mut backend);
 
         assert!(list(None, &mut printer, backend).is_ok());
         assert_eq!(
