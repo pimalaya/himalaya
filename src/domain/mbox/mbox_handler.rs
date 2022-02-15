@@ -135,9 +135,6 @@ mod tests {
             fn append_raw_msg_with_flags(&mut self, _: &Mbox, _: &[u8], _: Flags) -> Result<()> {
                 unimplemented!()
             }
-            fn expunge(&mut self) -> Result<()> {
-                unimplemented!()
-            }
             fn disconnect(&mut self) -> Result<()> {
                 unimplemented!()
             }

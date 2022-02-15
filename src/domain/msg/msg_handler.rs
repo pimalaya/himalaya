@@ -80,7 +80,6 @@ pub fn delete<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 ) -> Result<()> {
     let flags = Flags::try_from(vec![Flag::Seen, Flag::Deleted])?;
     backend.add_flags(seq, &flags)?;
-    backend.expunge()?;
     printer.print(format!(r#"Message(s) {} successfully deleted"#, seq))
 }
 
@@ -200,7 +199,6 @@ pub fn move_<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     // Delete the original message
     let flags = Flags::try_from(vec![Flag::Seen, Flag::Deleted])?;
     backend.add_flags(seq, &flags)?;
-    backend.expunge()?;
 
     printer.print(format!(
         r#"Message {} successfully moved to folder "{}""#,

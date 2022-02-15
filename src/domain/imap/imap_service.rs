@@ -140,7 +140,6 @@ pub trait BackendService<'a> {
     fn disconnect(&mut self) -> Result<()>;
 
     fn append_raw_msg_with_flags(&mut self, mbox: &Mbox, msg: &[u8], flags: Flags) -> Result<()>;
-    fn expunge(&mut self) -> Result<()>;
 }
 
 pub struct ImapService<'a> {
@@ -422,10 +421,13 @@ impl<'a> BackendService<'a> for ImapService<'a> {
         let flags: String = flags.to_string();
         self.sess()?
             .select(&mbox.name)
-            .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?;
+            .context(format!("cannot select mailbox {:?}", self.mbox.name))?;
         self.sess()?
             .store(seq_range, format!("+FLAGS ({})", flags))
-            .context(format!(r#"cannot add flags "{}""#, &flags))?;
+            .context(format!("cannot add flags {:?}", &flags))?;
+        self.sess()?
+            .expunge()
+            .context(format!("cannot expunge mailbox {:?}", self.mbox.name))?;
         Ok(())
     }
 
@@ -466,13 +468,6 @@ impl<'a> BackendService<'a> for ImapService<'a> {
             .flags(flags.0)
             .finish()
             .context(format!(r#"cannot append message to "{}""#, mbox.name))?;
-        Ok(())
-    }
-
-    fn expunge(&mut self) -> Result<()> {
-        self.sess()?
-            .expunge()
-            .context(format!(r#"cannot expunge mailbox "{}""#, self.mbox.name))?;
         Ok(())
     }
 }
