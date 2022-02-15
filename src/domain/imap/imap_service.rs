@@ -2,8 +2,7 @@
 //!
 //! This module exposes a service that can interact with IMAP servers.
 
-use anyhow::{anyhow, Context, Result};
-use imap::extensions::sort::{SortCharset, SortCriterion};
+use anyhow::{anyhow, Context, Error, Result};
 use log::{debug, log_enabled, trace, Level};
 use native_tls::{TlsConnector, TlsStream};
 use std::{collections::HashSet, convert::TryFrom, net::TcpStream, thread};
@@ -16,10 +15,123 @@ use crate::{
 
 type ImapSession = imap::Session<TlsStream<TcpStream>>;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SortCriterionKind {
+    Arrival,
+    Cc,
+    Date,
+    From,
+    Size,
+    Subject,
+    To,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SortCriterionOrder {
+    Asc,
+    Desc,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SortCriterion {
+    kind: SortCriterionKind,
+    order: SortCriterionOrder,
+}
+
+impl TryFrom<&str> for SortCriterion {
+    type Error = Error;
+
+    fn try_from(criterion: &str) -> Result<Self, Self::Error> {
+        match criterion {
+            "arrival:asc" | "arrival" => Ok(Self {
+                kind: SortCriterionKind::Arrival,
+                order: SortCriterionOrder::Asc,
+            }),
+            "arrival:desc" => Ok(Self {
+                kind: SortCriterionKind::Arrival,
+                order: SortCriterionOrder::Desc,
+            }),
+            "cc:asc" | "cc" => Ok(Self {
+                kind: SortCriterionKind::Cc,
+                order: SortCriterionOrder::Asc,
+            }),
+            "cc:desc" => Ok(Self {
+                kind: SortCriterionKind::Cc,
+                order: SortCriterionOrder::Desc,
+            }),
+            "date:asc" | "date" => Ok(Self {
+                kind: SortCriterionKind::Date,
+                order: SortCriterionOrder::Asc,
+            }),
+            "date:desc" => Ok(Self {
+                kind: SortCriterionKind::Date,
+                order: SortCriterionOrder::Desc,
+            }),
+            "from:asc" | "from" => Ok(Self {
+                kind: SortCriterionKind::From,
+                order: SortCriterionOrder::Asc,
+            }),
+            "from:desc" => Ok(Self {
+                kind: SortCriterionKind::From,
+                order: SortCriterionOrder::Desc,
+            }),
+            "size:asc" | "size" => Ok(Self {
+                kind: SortCriterionKind::Size,
+                order: SortCriterionOrder::Asc,
+            }),
+            "size:desc" => Ok(Self {
+                kind: SortCriterionKind::Size,
+                order: SortCriterionOrder::Desc,
+            }),
+            "subject:asc" | "subject" => Ok(Self {
+                kind: SortCriterionKind::Subject,
+                order: SortCriterionOrder::Asc,
+            }),
+            "subject:desc" => Ok(Self {
+                kind: SortCriterionKind::Subject,
+                order: SortCriterionOrder::Desc,
+            }),
+            "to:asc" | "to" => Ok(Self {
+                kind: SortCriterionKind::To,
+                order: SortCriterionOrder::Asc,
+            }),
+            "to:desc" => Ok(Self {
+                kind: SortCriterionKind::To,
+                order: SortCriterionOrder::Desc,
+            }),
+            _ => Err(anyhow!("cannot parse sort criterion {:?}", criterion)),
+        }
+    }
+}
+
+impl<'a> Into<imap::extensions::sort::SortCriterion<'a>> for &'a SortCriterion {
+    fn into(self) -> imap::extensions::sort::SortCriterion<'a> {
+        let criterion = match self.kind {
+            SortCriterionKind::Arrival => &imap::extensions::sort::SortCriterion::Arrival,
+            SortCriterionKind::Cc => &imap::extensions::sort::SortCriterion::Cc,
+            SortCriterionKind::Date => &imap::extensions::sort::SortCriterion::Date,
+            SortCriterionKind::From => &imap::extensions::sort::SortCriterion::From,
+            SortCriterionKind::Size => &imap::extensions::sort::SortCriterion::Size,
+            SortCriterionKind::Subject => &imap::extensions::sort::SortCriterion::Subject,
+            SortCriterionKind::To => &imap::extensions::sort::SortCriterion::To,
+        };
+        match self.order {
+            SortCriterionOrder::Asc => *criterion,
+            SortCriterionOrder::Desc => imap::extensions::sort::SortCriterion::Reverse(criterion),
+        }
+    }
+}
+
 pub trait BackendService<'a> {
     fn connect(&mut self) -> Result<()>;
     fn get_mboxes(&mut self) -> Result<Mboxes>;
-    fn get_envelopes(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes>;
+    fn get_envelopes(
+        &mut self,
+        sort: &[SortCriterion],
+        query: &str,
+        page_size: &usize,
+        page: &usize,
+    ) -> Result<Envelopes>;
     fn get_msg(&mut self, account: &AccountConfig, seq: &str) -> Result<Msg>;
     fn add_msg(&mut self, mbox: &Mbox, account: &AccountConfig, msg: Msg) -> Result<()>;
     fn add_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()>;
@@ -27,20 +139,6 @@ pub trait BackendService<'a> {
     fn del_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()>;
     fn disconnect(&mut self) -> Result<()>;
 
-    fn find_envelopes(
-        &'a mut self,
-        query: &str,
-        page_size: &usize,
-        page: &usize,
-    ) -> Result<Envelopes>;
-    fn find_and_sort_envelopes(
-        &'a mut self,
-        criteria: &[SortCriterion],
-        charset: SortCharset,
-        query: &str,
-        page_size: &usize,
-        page: &usize,
-    ) -> Result<Envelopes>;
     fn find_raw_msg(&mut self, seq: &str) -> Result<Vec<u8>>;
     fn append_raw_msg_with_flags(&mut self, mbox: &Mbox, msg: &[u8], flags: Flags) -> Result<()>;
     fn expunge(&mut self) -> Result<()>;
@@ -250,84 +348,9 @@ impl<'a> BackendService<'a> for ImapService<'a> {
         Ok(Mboxes::from(self._raw_mboxes_cache.as_ref().unwrap()))
     }
 
-    fn get_envelopes(&mut self, page_size: &usize, page: &usize) -> Result<Envelopes> {
-        debug!("fetch envelopes");
-        debug!("page size: {:?}", page_size);
-        debug!("page: {:?}", page);
-
-        let mbox = self.mbox.to_owned();
-        let last_seq = self
-            .sess()?
-            .select(&mbox.name)
-            .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?
-            .exists as i64;
-        debug!("last sequence number: {:?}", last_seq);
-
-        if last_seq == 0 {
-            return Ok(Envelopes::default());
-        }
-
-        // TODO: add tests, improve error management when empty page
-        let range = if *page_size > 0 {
-            let cursor = (page * page_size) as i64;
-            let begin = 1.max(last_seq - cursor);
-            let end = begin - begin.min(*page_size as i64) + 1;
-            format!("{}:{}", end, begin)
-        } else {
-            String::from("1:*")
-        };
-        debug!("range: {}", range);
-
-        let fetches = self
-            .sess()?
-            .fetch(&range, "(ENVELOPE FLAGS INTERNALDATE)")
-            .context(format!(r#"cannot fetch messages within range "{}""#, range))?;
-        self._raw_msgs_cache = Some(fetches);
-        Envelopes::try_from(self._raw_msgs_cache.as_ref().unwrap())
-    }
-
-    fn find_envelopes(
+    fn get_envelopes(
         &mut self,
-        query: &str,
-        page_size: &usize,
-        page: &usize,
-    ) -> Result<Envelopes> {
-        let mbox = self.mbox.to_owned();
-        self.sess()?
-            .select(&mbox.name)
-            .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?;
-
-        let begin = page * page_size;
-        let end = begin + (page_size - 1);
-        let seqs: Vec<String> = self
-            .sess()?
-            .search(query)
-            .context(format!(
-                r#"cannot search in "{}" with query: "{}""#,
-                self.mbox.name, query
-            ))?
-            .iter()
-            .map(|seq| seq.to_string())
-            .collect();
-
-        if seqs.is_empty() {
-            return Ok(Envelopes::default());
-        }
-
-        // FIXME: panic if begin > end
-        let range = seqs[begin..end.min(seqs.len())].join(",");
-        let fetches = self
-            .sess()?
-            .fetch(&range, "(ENVELOPE FLAGS INTERNALDATE)")
-            .context(r#"cannot fetch messages within range "{}""#)?;
-        self._raw_msgs_cache = Some(fetches);
-        Envelopes::try_from(self._raw_msgs_cache.as_ref().unwrap())
-    }
-
-    fn find_and_sort_envelopes(
-        &mut self,
-        criteria: &[SortCriterion],
-        charset: SortCharset,
+        sort: &[SortCriterion],
         query: &str,
         page_size: &usize,
         page: &usize,
@@ -337,11 +360,15 @@ impl<'a> BackendService<'a> for ImapService<'a> {
             .select(&mbox.name)
             .context(format!("cannot select mailbox {:?}", self.mbox.name))?;
 
+        let sort = sort
+            .iter()
+            .map(|criterion| criterion.into())
+            .collect::<Vec<_>>();
         let begin = page * page_size;
         let end = begin + (page_size - 1);
         let seqs: Vec<String> = self
             .sess()?
-            .sort(criteria, charset, query)
+            .sort(&sort, imap::extensions::sort::SortCharset::Utf8, query)
             .context(format!(
                 "cannot search in {:?} with query {:?}",
                 self.mbox.name, query
@@ -381,31 +408,6 @@ impl<'a> BackendService<'a> for ImapService<'a> {
         Msg::try_from((account, fetch))
     }
 
-    fn find_raw_msg(&mut self, seq: &str) -> Result<Vec<u8>> {
-        let mbox = self.mbox.to_owned();
-        self.sess()?
-            .select(&mbox.name)
-            .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?;
-        let fetches = self
-            .sess()?
-            .fetch(seq, "BODY[]")
-            .context(r#"cannot fetch raw messages "{}""#)?;
-        let fetch = fetches
-            .first()
-            .ok_or_else(|| anyhow!(r#"cannot find raw message "{}"#, seq))?;
-
-        Ok(fetch.body().map(Vec::from).unwrap_or_default())
-    }
-
-    fn append_raw_msg_with_flags(&mut self, mbox: &Mbox, msg: &[u8], flags: Flags) -> Result<()> {
-        self.sess()?
-            .append(&mbox.name, msg)
-            .flags(flags.0)
-            .finish()
-            .context(format!(r#"cannot append message to "{}""#, mbox.name))?;
-        Ok(())
-    }
-
     fn add_msg(&mut self, mbox: &Mbox, account: &AccountConfig, msg: Msg) -> Result<()> {
         let msg_raw = msg.into_sendable_msg(account)?.formatted();
         self.sess()?
@@ -413,14 +415,6 @@ impl<'a> BackendService<'a> for ImapService<'a> {
             .flags(msg.flags.0)
             .finish()
             .context(format!(r#"cannot append message to "{}""#, mbox.name))?;
-        Ok(())
-    }
-
-    fn disconnect(&mut self) -> Result<()> {
-        if let Some(ref mut sess) = self.sess {
-            debug!("logout from IMAP server");
-            sess.logout().context("cannot logout from IMAP server")?;
-        }
         Ok(())
     }
 
@@ -456,6 +450,39 @@ impl<'a> BackendService<'a> for ImapService<'a> {
         self.sess()?
             .store(seq_range, format!("-FLAGS ({})", flags))
             .context(format!(r#"cannot remove flags "{}""#, &flags))?;
+        Ok(())
+    }
+
+    fn disconnect(&mut self) -> Result<()> {
+        if let Some(ref mut sess) = self.sess {
+            debug!("logout from IMAP server");
+            sess.logout().context("cannot logout from IMAP server")?;
+        }
+        Ok(())
+    }
+
+    fn find_raw_msg(&mut self, seq: &str) -> Result<Vec<u8>> {
+        let mbox = self.mbox.to_owned();
+        self.sess()?
+            .select(&mbox.name)
+            .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?;
+        let fetches = self
+            .sess()?
+            .fetch(seq, "BODY[]")
+            .context(r#"cannot fetch raw messages "{}""#)?;
+        let fetch = fetches
+            .first()
+            .ok_or_else(|| anyhow!(r#"cannot find raw message "{}"#, seq))?;
+
+        Ok(fetch.body().map(Vec::from).unwrap_or_default())
+    }
+
+    fn append_raw_msg_with_flags(&mut self, mbox: &Mbox, msg: &[u8], flags: Flags) -> Result<()> {
+        self.sess()?
+            .append(&mbox.name, msg)
+            .flags(flags.0)
+            .finish()
+            .context(format!(r#"cannot append message to "{}""#, mbox.name))?;
         Ok(())
     }
 

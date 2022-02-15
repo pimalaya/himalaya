@@ -4,10 +4,7 @@
 
 use anyhow::{Context, Result};
 use atty::Stream;
-use imap::{
-    extensions::sort::{SortCharset, SortCriterion},
-    types::Flag,
-};
+use imap::types::Flag;
 use log::{debug, info, trace};
 use mailparse::addrparse;
 use std::{
@@ -25,7 +22,7 @@ use crate::{
         mbox::Mbox,
         msg::{Flags, Msg, Part, TextPlainPart},
         smtp::SmtpService,
-        Parts,
+        Parts, SortCriterion,
     },
     output::{PrintTableOpts, PrinterService},
 };
@@ -117,7 +114,7 @@ pub fn list<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     let page_size = page_size.unwrap_or(account.default_page_size);
     trace!("page size: {}", page_size);
 
-    let msgs = imap.get_envelopes(&page_size, &page)?;
+    let msgs = imap.get_envelopes(&["arrival:desc".try_into()?], "all", &page_size, &page)?;
     trace!("messages: {:#?}", msgs);
     printer.print_table(msgs, PrintTableOpts { max_width })
 }
@@ -292,15 +289,14 @@ pub fn search<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     let page_size = page_size.unwrap_or(account.default_page_size);
     trace!("page size: {}", page_size);
 
-    let msgs = backend.find_envelopes(&query, &page_size, &page)?;
+    let msgs = backend.get_envelopes(&["arrival:desc".try_into()?], &query, &page_size, &page)?;
     trace!("messages: {:#?}", msgs);
     printer.print_table(msgs, PrintTableOpts { max_width })
 }
 
 /// Paginates messages from the selected mailbox matching the specified query, sorted by the given criteria.
 pub fn sort<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
-    criteria: &'a [SortCriterion<'a>],
-    charset: SortCharset<'a>,
+    criteria: &'a [SortCriterion],
     query: String,
     max_width: Option<usize>,
     page_size: Option<usize>,
@@ -311,7 +307,7 @@ pub fn sort<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 ) -> Result<()> {
     let page_size = page_size.unwrap_or(account.default_page_size);
     trace!("page size: {}", page_size);
-    let msgs = backend.find_and_sort_envelopes(criteria, charset, &query, &page_size, &page)?;
+    let msgs = backend.get_envelopes(criteria, &query, &page_size, &page)?;
     trace!("envelopes: {:#?}", msgs);
     printer.print_table(msgs, PrintTableOpts { max_width })
 }

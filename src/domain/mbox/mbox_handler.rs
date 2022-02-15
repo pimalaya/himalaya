@@ -24,14 +24,13 @@ pub fn list<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 
 #[cfg(test)]
 mod tests {
-    use imap::extensions::sort::{SortCharset, SortCriterion};
     use serde::Serialize;
     use std::{fmt::Debug, io};
     use termcolor::ColorSpec;
 
     use crate::{
         config::AccountConfig,
-        domain::{AttrRemote, Attrs, Envelopes, Flags, Mbox, Mboxes, Msg},
+        domain::{AttrRemote, Attrs, Envelopes, Flags, Mbox, Mboxes, Msg, SortCriterion},
         output::{Print, PrintTable, WriteColor},
     };
 
@@ -118,16 +117,9 @@ mod tests {
                     },
                 ]))
             }
-            fn get_envelopes(&mut self, _: &usize, _: &usize) -> Result<Envelopes> {
-                unimplemented!()
-            }
-            fn find_envelopes(&mut self, _: &str, _: &usize, _: &usize) -> Result<Envelopes> {
-                unimplemented!()
-            }
-            fn find_and_sort_envelopes(
+            fn get_envelopes(
                 &mut self,
                 _: &[SortCriterion],
-                _: SortCharset,
                 _: &str,
                 _: &usize,
                 _: &usize,

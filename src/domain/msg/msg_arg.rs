@@ -2,15 +2,17 @@
 //!
 //! This module provides subcommands, arguments and a command matcher related to message.
 
+use std::convert::TryInto;
+
 use anyhow::Result;
 use clap::{self, App, Arg, ArgMatches, SubCommand};
-use imap::extensions::sort::{SortCharset, SortCriterion};
 use log::{debug, info, trace};
 
 use crate::{
     domain::{
         mbox::mbox_arg,
         msg::{flag_arg, msg_arg, tpl_arg},
+        SortCriterion,
     },
     ui::table_arg,
 };
@@ -27,8 +29,7 @@ type Query = String;
 type AttachmentPaths<'a> = Vec<&'a str>;
 type MaxTableWidth = Option<usize>;
 type Encrypt = bool;
-type Criteria<'a> = Vec<SortCriterion<'a>>;
-type Charset<'a> = SortCharset<'a>;
+type Criteria = Vec<SortCriterion>;
 
 /// Message commands.
 #[derive(Debug, PartialEq, Eq)]
@@ -43,14 +44,7 @@ pub enum Cmd<'a> {
     Reply(Seq<'a>, All, AttachmentPaths<'a>, Encrypt),
     Save(RawMsg<'a>),
     Search(Query, MaxTableWidth, Option<PageSize>, Page),
-    Sort(
-        Criteria<'a>,
-        Charset<'a>,
-        Query,
-        MaxTableWidth,
-        Option<PageSize>,
-        Page,
-    ),
+    Sort(Criteria, Query, MaxTableWidth, Option<PageSize>, Page),
     Send(RawMsg<'a>),
     Write(AttachmentPaths<'a>, Encrypt),
 
@@ -219,31 +213,9 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
         let criteria: Vec<SortCriterion> = m
             .values_of("criteria")
             .unwrap_or_default()
-            .filter_map(|criterion| match criterion {
-                "arrival:asc" | "arrival" => Some(SortCriterion::Arrival),
-                "arrival:desc" => Some(SortCriterion::Reverse(&SortCriterion::Arrival)),
-                "cc:asc" | "cc" => Some(SortCriterion::Cc),
-                "cc:desc" => Some(SortCriterion::Reverse(&SortCriterion::Cc)),
-                "date:asc" | "date" => Some(SortCriterion::Date),
-                "date:desc" => Some(SortCriterion::Reverse(&SortCriterion::Date)),
-                "from:asc" | "from" => Some(SortCriterion::From),
-                "from:desc" => Some(SortCriterion::Reverse(&SortCriterion::From)),
-                "size:asc" | "size" => Some(SortCriterion::Size),
-                "size:desc" => Some(SortCriterion::Reverse(&SortCriterion::Size)),
-                "subject:asc" | "subject" => Some(SortCriterion::Subject),
-                "subject:desc" => Some(SortCriterion::Reverse(&SortCriterion::Subject)),
-                "to:asc" | "to" => Some(SortCriterion::To),
-                "to:desc" => Some(SortCriterion::Reverse(&SortCriterion::To)),
-                _ => None,
-            })
+            .filter_map(|criterion| criterion.try_into().ok())
             .collect();
         debug!("criteria: {:?}", criteria);
-        let charset = match m.value_of("charset").unwrap().to_lowercase() {
-            c if ["utf8", "utf-8"].contains(&c.as_str()) => SortCharset::Utf8,
-            c if ["ascii", "usascii", "us-ascii"].contains(&c.as_str()) => SortCharset::UsAscii,
-            c => SortCharset::Custom(c.into()),
-        };
-        debug!("charset: {:?}", charset);
         let query = m
             .values_of("query")
             .unwrap_or_default()
@@ -271,7 +243,6 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
         debug!("query: {:?}", query);
         return Ok(Some(Cmd::Sort(
             criteria,
-            charset,
             query,
             max_table_width,
             page_size,
@@ -423,15 +394,6 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
 			    "to", "to:asc", "to:desc",
 			]),
 		)
-		.arg(
-		    Arg::with_name("charset")
-			.long("charset")
-			.short("t")
-			.help("The character encoding to use for strings that are subject to a sort criterion")
-			.value_name("CHARSET")
-			.takes_value(true)
-			.default_value("utf8")
-		)
                 .arg(
                     Arg::with_name("query")
                         .help("IMAP query")
@@ -498,107 +460,4 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
         ],
     ]
     .concat()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_should_match_sort_cmd() {
-        macro_rules! get_matches_from {
-            ($($arg:expr),*) => {
-                clap::App::new("himalaya")
-                    .subcommands(subcmds())
-                    .get_matches_from_safe(&["himalaya", "sort", $($arg,)*])
-            };
-        }
-
-        // Test the required rule of the criteria argument
-        let m = get_matches_from![];
-        assert_eq!(
-            clap::ErrorKind::MissingRequiredArgument,
-            m.unwrap_err().kind
-        );
-
-        // Test the criteria argument with its order
-        let m = get_matches_from!["-c", "subject", "date:asc", "arrival:desc"];
-        assert_eq!(
-            matches(&m.unwrap()).unwrap(),
-            Some(Cmd::Sort(
-                vec![
-                    SortCriterion::Subject,
-                    SortCriterion::Date,
-                    SortCriterion::Reverse(&SortCriterion::Arrival),
-                ],
-                SortCharset::Utf8,
-                String::from("ALL"),
-                None,
-                None,
-                0,
-            )),
-        );
-
-        // Test the utf-8 charset argument
-        for charset in ["utf8", "utf-8", "Utf8", "Utf-8", "UTF8", "UTF-8"] {
-            let m = get_matches_from!["-c", "cc", "-t", charset];
-            assert_eq!(
-                matches(&m.unwrap()).unwrap(),
-                Some(Cmd::Sort(
-                    vec![SortCriterion::Cc],
-                    SortCharset::Utf8,
-                    String::from("ALL"),
-                    None,
-                    None,
-                    0,
-                )),
-            );
-        }
-
-        // Test the us-ascii charset argument
-        for charset in [
-            "usascii", "us-ascii", "UsAscii", "Us-Ascii", "USASCII", "US-ASCII",
-        ] {
-            let m = get_matches_from!["-c", "to", "-t", charset];
-            assert_eq!(
-                matches(&m.unwrap()).unwrap(),
-                Some(Cmd::Sort(
-                    vec![SortCriterion::To],
-                    SortCharset::UsAscii,
-                    String::from("ALL"),
-                    None,
-                    None,
-                    0,
-                )),
-            );
-        }
-
-        // Test the custom charset argument
-        let m = get_matches_from!["-c", "size", "-t", "custom"];
-        assert_eq!(
-            matches(&m.unwrap()).unwrap(),
-            Some(Cmd::Sort(
-                vec![SortCriterion::Size],
-                SortCharset::Custom("custom".into()),
-                String::from("ALL"),
-                None,
-                None,
-                0,
-            )),
-        );
-
-        // Test the query argument
-        let m = get_matches_from!["-c", "from", "--", "not", "seen"];
-        assert_eq!(
-            matches(&m.unwrap()).unwrap(),
-            Some(Cmd::Sort(
-                vec![SortCriterion::From],
-                SortCharset::Utf8,
-                String::from("not seen"),
-                None,
-                None,
-                0,
-            )),
-        );
-    }
 }

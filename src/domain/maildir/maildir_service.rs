@@ -1,9 +1,8 @@
 use anyhow::Result;
-use imap::extensions::sort::{SortCharset, SortCriterion};
 
 use crate::{
     config::AccountConfig,
-    domain::{BackendService, Envelopes, Flags, Mbox, Mboxes, Msg},
+    domain::{BackendService, Envelopes, Flags, Mbox, Mboxes, Msg, SortCriterion},
 };
 
 pub struct MaildirService;
@@ -15,16 +14,9 @@ impl<'a> BackendService<'a> for MaildirService {
     fn get_mboxes(&mut self) -> Result<Mboxes> {
         unimplemented!()
     }
-    fn get_envelopes(&mut self, _: &usize, _: &usize) -> Result<Envelopes> {
-        unimplemented!()
-    }
-    fn find_envelopes(&mut self, _: &str, _: &usize, _: &usize) -> Result<Envelopes> {
-        unimplemented!()
-    }
-    fn find_and_sort_envelopes(
+    fn get_envelopes(
         &mut self,
         _: &[SortCriterion],
-        _: SortCharset,
         _: &str,
         _: &usize,
         _: &usize,

@@ -190,10 +190,9 @@ fn main() -> Result<()> {
                 backend,
             );
         }
-        Some(msg_arg::Cmd::Sort(criteria, charset, query, max_width, page_size, page)) => {
+        Some(msg_arg::Cmd::Sort(criteria, query, max_width, page_size, page)) => {
             return msg_handler::sort(
                 &criteria,
-                charset,
                 query,
                 max_width,
                 page_size,
