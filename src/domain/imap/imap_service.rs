@@ -5,7 +5,12 @@
 use anyhow::{anyhow, Context, Error, Result};
 use log::{debug, log_enabled, trace, Level};
 use native_tls::{TlsConnector, TlsStream};
-use std::{collections::HashSet, convert::TryFrom, net::TcpStream, thread};
+use std::{
+    collections::HashSet,
+    convert::{TryFrom, TryInto},
+    net::TcpStream,
+    thread,
+};
 
 use crate::{
     config::{AccountConfig, ImapBackendConfig},
@@ -42,7 +47,8 @@ impl TryFrom<&str> for SortCriterion {
     type Error = Error;
 
     fn try_from(criterion: &str) -> Result<Self, Self::Error> {
-        match criterion {
+        let criterion = criterion.to_lowercase();
+        match criterion.as_str() {
             "arrival:asc" | "arrival" => Ok(Self {
                 kind: SortCriterionKind::Arrival,
                 order: SortCriterionOrder::Asc,
@@ -104,7 +110,37 @@ impl TryFrom<&str> for SortCriterion {
     }
 }
 
-impl<'a> Into<imap::extensions::sort::SortCriterion<'a>> for &'a SortCriterion {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SortCriteria(Vec<SortCriterion>);
+
+impl TryFrom<&str> for SortCriteria {
+    type Error = Error;
+
+    fn try_from(criteria_str: &str) -> Result<Self, Self::Error> {
+        let mut criteria = vec![];
+        for criterion_str in criteria_str.split(" ") {
+            let criterion_str = criterion_str.trim();
+            let criterion: SortCriterion = criterion_str
+                .try_into()
+                .context(format!("cannot parse criterion {:?}", criterion_str))?;
+        }
+        Ok(Self(criteria))
+    }
+}
+
+impl<'a> Into<Vec<imap::extensions::sort::SortCriterion<'a>>> for SortCriteria {
+    fn into(self) -> Vec<imap::extensions::sort::SortCriterion<'a>> {
+        self.0
+            .into_iter()
+            .map(|criterion| {
+                let criterion: imap::extensions::sort::SortCriterion = criterion.into();
+                criterion
+            })
+            .collect()
+    }
+}
+
+impl<'a> Into<imap::extensions::sort::SortCriterion<'a>> for SortCriterion {
     fn into(self) -> imap::extensions::sort::SortCriterion<'a> {
         let criterion = match self.kind {
             SortCriterionKind::Arrival => &imap::extensions::sort::SortCriterion::Arrival,
@@ -130,16 +166,18 @@ pub trait BackendService<'a> {
     fn get_mboxes(&mut self) -> Result<Mboxes>;
     fn get_envelopes(
         &mut self,
-        sort: &[SortCriterion],
-        query: &str,
-        page_size: &usize,
-        page: &usize,
+        mbox: &str,
+        filter: &str,
+        sort: &str,
+        page_size: usize,
+        page: usize,
     ) -> Result<Envelopes>;
-    fn get_msg(&mut self, seq: &str) -> Result<Msg>;
-    fn add_msg(&mut self, mbox: &Mbox, msg: &[u8], flags: Flags) -> Result<String>;
-    fn add_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()>;
-    fn set_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()>;
-    fn del_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()>;
+    fn add_msg(&mut self, mbox: &str, msg: &[u8], flags: &str) -> Result<String>;
+    fn get_msg(&mut self, mbox: &str, id: &str) -> Result<Msg>;
+    fn del_msg(&mut self, mbox: &str, ids: &str) -> Result<()>;
+    fn add_flags(&mut self, mbox: &str, ids: &str, flags: &str) -> Result<()>;
+    fn set_flags(&mut self, mbox: &str, ids: &str, flags: &str) -> Result<()>;
+    fn del_flags(&mut self, mbox: &str, ids: &str, flags: &str) -> Result<()>;
 
     fn disconnect(&mut self) -> Result<()> {
         Ok(())
@@ -341,10 +379,6 @@ impl<'a> ImapService<'a> {
 }
 
 impl<'a> BackendService<'a> for ImapService<'a> {
-    fn connect(&mut self) -> Result<()> {
-        Ok(())
-    }
-
     fn get_mboxes(&mut self) -> Result<Mboxes> {
         let raw_mboxes = self
             .sess()?
@@ -356,28 +390,27 @@ impl<'a> BackendService<'a> for ImapService<'a> {
 
     fn get_envelopes(
         &mut self,
-        sort: &[SortCriterion],
-        query: &str,
-        page_size: &usize,
-        page: &usize,
+        mbox: &str,
+        sort: &str,
+        filter: &str,
+        page_size: usize,
+        page: usize,
     ) -> Result<Envelopes> {
-        let mbox = self.mbox.to_owned();
         self.sess()?
-            .select(&mbox.name)
-            .context(format!("cannot select mailbox {:?}", self.mbox.name))?;
+            .select(mbox)
+            .context(format!("cannot select mailbox {:?}", mbox))?;
 
-        let sort = sort
-            .iter()
-            .map(|criterion| criterion.into())
-            .collect::<Vec<_>>();
+        let sort: SortCriteria = sort.try_into()?;
+        let sort: Vec<imap::extensions::sort::SortCriterion> = sort.into();
+        let charset = imap::extensions::sort::SortCharset::Utf8;
         let begin = page * page_size;
         let end = begin + (page_size - 1);
         let seqs: Vec<String> = self
             .sess()?
-            .sort(&sort, imap::extensions::sort::SortCharset::Utf8, query)
+            .sort(&sort, charset, filter)
             .context(format!(
                 "cannot search in {:?} with query {:?}",
-                self.mbox.name, query
+                self.mbox.name, filter
             ))?
             .iter()
             .map(|seq| seq.to_string())
@@ -397,12 +430,20 @@ impl<'a> BackendService<'a> for ImapService<'a> {
         Envelopes::try_from(self._raw_msgs_cache.as_ref().unwrap())
     }
 
-    /// Find a message by sequence number.
-    fn get_msg(&mut self, seq: &str) -> Result<Msg> {
-        let mbox = self.mbox.to_owned();
+    fn add_msg(&mut self, mbox: &str, msg: &[u8], flags: &str) -> Result<String> {
+        let flags: Flags = flags.split_whitespace().collect::<Vec<_>>().try_into()?;
         self.sess()?
-            .select(&mbox.name)
-            .context(format!("cannot select mailbox {:?}", self.mbox.name))?;
+            .append(mbox, msg)
+            .flags(flags.0)
+            .finish()
+            .context(format!("cannot append message to {}", mbox))?;
+        Ok(String::new())
+    }
+
+    fn get_msg(&mut self, mbox: &str, seq: &str) -> Result<Msg> {
+        self.sess()?
+            .select(mbox)
+            .context(format!("cannot select mailbox {:?}", mbox))?;
         let fetches = self
             .sess()?
             .fetch(seq, "(ENVELOPE FLAGS INTERNALDATE BODY[])")
@@ -414,50 +455,46 @@ impl<'a> BackendService<'a> for ImapService<'a> {
         Msg::try_from((self.account_config, fetch))
     }
 
-    fn add_msg(&mut self, mbox: &Mbox, msg: &[u8], flags: Flags) -> Result<String> {
-        self.sess()?
-            .append(&mbox.name, msg)
-            .flags(flags.0)
-            .finish()
-            .context(format!(r#"cannot append message to "{}""#, mbox.name))?;
-        Ok(String::new())
+    fn del_msg(&mut self, mbox: &str, seq: &str) -> Result<()> {
+        self.set_flags(mbox, seq, "deleted")
     }
 
-    fn add_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()> {
-        let mbox = self.mbox;
-        let flags: String = flags.to_string();
+    fn add_flags(&mut self, mbox: &str, seq_range: &str, flags: &str) -> Result<()> {
+        let flags: Flags = flags.split_whitespace().collect::<Vec<_>>().try_into()?;
+        let flags = flags.to_string();
         self.sess()?
-            .select(&mbox.name)
-            .context(format!("cannot select mailbox {:?}", self.mbox.name))?;
+            .select(mbox)
+            .context(format!("cannot select mailbox {:?}", mbox))?;
         self.sess()?
             .store(seq_range, format!("+FLAGS ({})", flags))
             .context(format!("cannot add flags {:?}", &flags))?;
         self.sess()?
             .expunge()
-            .context(format!("cannot expunge mailbox {:?}", self.mbox.name))?;
+            .context(format!("cannot expunge mailbox {:?}", mbox))?;
         Ok(())
     }
 
-    fn set_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()> {
-        let mbox = self.mbox;
-        self.sess()?
-            .select(&mbox.name)
-            .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?;
-        self.sess()?
-            .store(seq_range, format!("FLAGS ({})", flags))
-            .context(format!(r#"cannot set flags "{}""#, &flags))?;
-        Ok(())
-    }
-
-    fn del_flags(&mut self, seq_range: &str, flags: &Flags) -> Result<()> {
-        let mbox = self.mbox;
+    fn set_flags(&mut self, mbox: &str, seq_range: &str, flags: &str) -> Result<()> {
+        let flags: Flags = flags.split_whitespace().collect::<Vec<_>>().try_into()?;
         let flags = flags.to_string();
         self.sess()?
-            .select(&mbox.name)
-            .context(format!(r#"cannot select mailbox "{}""#, self.mbox.name))?;
+            .select(mbox)
+            .context(format!("cannot select mailbox {:?}", mbox))?;
+        self.sess()?
+            .store(seq_range, format!("FLAGS ({})", flags))
+            .context(format!("cannot set flags {:?}", &flags))?;
+        Ok(())
+    }
+
+    fn del_flags(&mut self, mbox: &str, seq_range: &str, flags: &str) -> Result<()> {
+        let flags: Flags = flags.split_whitespace().collect::<Vec<_>>().try_into()?;
+        let flags = flags.to_string();
+        self.sess()?
+            .select(mbox)
+            .context(format!("cannot select mailbox {:?}", mbox))?;
         self.sess()?
             .store(seq_range, format!("-FLAGS ({})", flags))
-            .context(format!(r#"cannot remove flags "{}""#, &flags))?;
+            .context(format!("cannot remove flags {:?}", &flags))?;
         Ok(())
     }
 

@@ -4,12 +4,11 @@
 
 use anyhow::{Context, Result};
 use atty::Stream;
-use imap::types::Flag;
 use log::{debug, info, trace};
 use mailparse::addrparse;
 use std::{
     borrow::Cow,
-    convert::{TryFrom, TryInto},
+    convert::TryInto,
     fs,
     io::{self, BufRead},
 };
@@ -20,9 +19,9 @@ use crate::{
     domain::{
         imap::BackendService,
         mbox::Mbox,
-        msg::{Flags, Msg, Part, TextPlainPart},
+        msg::{Msg, Part, TextPlainPart},
         smtp::SmtpService,
-        Parts, SortCriterion,
+        Parts,
     },
     output::{PrintTableOpts, PrinterService},
 };
@@ -30,11 +29,12 @@ use crate::{
 /// Download all message attachments to the user account downloads directory.
 pub fn attachments<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     seq: &str,
+    mbox: &Mbox,
     account: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
-    let attachments = backend.get_msg(seq)?.attachments();
+    let attachments = backend.get_msg(&mbox.name.to_string(), seq)?.attachments();
     let attachments_len = attachments.len();
     debug!(
         r#"{} attachment(s) found for message "{}""#,
@@ -57,15 +57,15 @@ pub fn attachments<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 /// Copy a message from a mailbox to another.
 pub fn copy<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     seq: &str,
-    mbox: &str,
+    mbox_source: &str,
+    mbox_target: &str,
     account: &AccountConfig,
     printer: &mut P,
     backend: Box<&mut B>,
 ) -> Result<()> {
-    let mbox = Mbox::new(mbox);
-    let msg = backend.get_msg(seq)?.raw;
-    let flags = Flags::try_from(vec![Flag::Seen])?;
-    backend.add_msg(&mbox, &msg, flags)?;
+    let mbox = Mbox::new(mbox_target);
+    let msg = backend.get_msg(&mbox.name.to_string(), seq)?.raw;
+    backend.add_msg(&mbox_target, &msg, "seen")?;
     printer.print(format!(
         r#"Message {} successfully copied to folder "{}""#,
         seq, mbox
@@ -75,11 +75,11 @@ pub fn copy<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 /// Delete messages matching the given sequence range.
 pub fn delete<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     seq: &str,
+    mbox: &str,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
-    let flags = Flags::try_from(vec![Flag::Seen, Flag::Deleted])?;
-    backend.add_flags(seq, &flags)?;
+    backend.add_flags(mbox, seq, "seen deleted")?;
     printer.print(format!(r#"Message(s) {} successfully deleted"#, seq))
 }
 
@@ -88,13 +88,14 @@ pub fn forward<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpSer
     seq: &str,
     attachments_paths: Vec<&str>,
     encrypt: bool,
+    mbox: &Mbox,
     account: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
     smtp: &mut S,
 ) -> Result<()> {
     backend
-        .get_msg(seq)?
+        .get_msg(&mbox.name.to_string(), seq)?
         .into_forward(account)?
         .add_attachments(attachments_paths)?
         .encrypt(encrypt)
@@ -107,6 +108,7 @@ pub fn list<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     max_width: Option<usize>,
     page_size: Option<usize>,
     page: usize,
+    mbox: &Mbox,
     account: &AccountConfig,
     printer: &mut P,
     imap: Box<&'a mut B>,
@@ -114,7 +116,13 @@ pub fn list<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     let page_size = page_size.unwrap_or(account.default_page_size);
     trace!("page size: {}", page_size);
 
-    let msgs = imap.get_envelopes(&["arrival:desc".try_into()?], "all", &page_size, &page)?;
+    let msgs = imap.get_envelopes(
+        &mbox.name.to_string(),
+        "arrival:desc",
+        "all",
+        page_size,
+        page,
+    )?;
     trace!("messages: {:#?}", msgs);
     printer.print_table(msgs, PrintTableOpts { max_width })
 }
@@ -182,27 +190,23 @@ pub fn mailto<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpServ
 
 /// Move a message from a mailbox to another.
 pub fn move_<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
-    // The sequence number of the message to move
     seq: &str,
-    // The mailbox to move the message in
-    mbox: &str,
+    mbox_source: &str,
+    mbox_target: &str,
     account: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
     // Copy the message to targetted mailbox
-    let mbox = Mbox::new(mbox);
-    let msg = backend.get_msg(seq)?.raw;
-    let flags = Flags::try_from(vec![Flag::Seen])?;
-    backend.add_msg(&mbox, &msg, flags)?;
+    let msg = backend.get_msg(mbox_source, seq)?.raw;
+    backend.add_msg(mbox_target, &msg, "seen")?;
 
     // Delete the original message
-    let flags = Flags::try_from(vec![Flag::Seen, Flag::Deleted])?;
-    backend.add_flags(seq, &flags)?;
+    backend.add_flags(mbox_source, seq, "seen deleted")?;
 
     printer.print(format!(
         r#"Message {} successfully moved to folder "{}""#,
-        seq, mbox
+        seq, mbox_target
     ))
 }
 
@@ -211,11 +215,12 @@ pub fn read<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     seq: &str,
     text_mime: &str,
     raw: bool,
+    mbox: &Mbox,
     account: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
-    let msg = backend.get_msg(seq)?;
+    let msg = backend.get_msg(&mbox.name.to_string(), seq)?;
     let msg = if raw {
         // Emails don't always have valid utf8. Using "lossy" to display what we can.
         String::from_utf8_lossy(&msg.raw).into_owned()
@@ -232,23 +237,24 @@ pub fn reply<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpServi
     all: bool,
     attachments_paths: Vec<&str>,
     encrypt: bool,
+    mbox: &str,
     account: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
     smtp: &mut S,
 ) -> Result<()> {
     backend
-        .get_msg(seq)?
+        .get_msg(mbox, seq)?
         .into_reply(all, account)?
         .add_attachments(attachments_paths)?
         .encrypt(encrypt)
         .edit_with_editor(account, printer, backend, smtp)?
-        .add_flags(seq, &Flags::try_from(vec![Flag::Answered])?)
+        .add_flags(mbox, seq, "replied")
 }
 
 /// Saves a raw message to the targetted mailbox.
 pub fn save<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
-    mbox: &Mbox,
+    mbox: &str,
     raw_msg: &str,
     printer: &mut P,
     backend: Box<&mut B>,
@@ -256,8 +262,6 @@ pub fn save<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     info!("entering save message handler");
 
     debug!("mailbox: {}", mbox);
-    let flags = Flags::try_from(vec![Flag::Seen])?;
-    debug!("flags: {}", flags);
 
     let is_tty = atty::is(Stream::Stdin);
     debug!("is tty: {}", is_tty);
@@ -274,7 +278,7 @@ pub fn save<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
             .collect::<Vec<String>>()
             .join("\r\n")
     };
-    backend.add_msg(mbox, raw_msg.as_bytes(), flags)?;
+    backend.add_msg(mbox, raw_msg.as_bytes(), "seen")?;
     Ok(())
 }
 
@@ -284,6 +288,7 @@ pub fn search<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     max_width: Option<usize>,
     page_size: Option<usize>,
     page: usize,
+    mbox: &Mbox,
     account: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
@@ -291,25 +296,32 @@ pub fn search<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     let page_size = page_size.unwrap_or(account.default_page_size);
     trace!("page size: {}", page_size);
 
-    let msgs = backend.get_envelopes(&["arrival:desc".try_into()?], &query, &page_size, &page)?;
+    let msgs = backend.get_envelopes(
+        &mbox.name.to_string(),
+        "arrival:desc",
+        &query,
+        page_size,
+        page,
+    )?;
     trace!("messages: {:#?}", msgs);
     printer.print_table(msgs, PrintTableOpts { max_width })
 }
 
 /// Paginates messages from the selected mailbox matching the specified query, sorted by the given criteria.
 pub fn sort<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
-    criteria: &'a [SortCriterion],
+    sort: String,
     query: String,
     max_width: Option<usize>,
     page_size: Option<usize>,
     page: usize,
+    mbox: &Mbox,
     account: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
     let page_size = page_size.unwrap_or(account.default_page_size);
     trace!("page size: {}", page_size);
-    let msgs = backend.get_envelopes(criteria, &query, &page_size, &page)?;
+    let msgs = backend.get_envelopes(&mbox.name.to_string(), &sort, &query, page_size, page)?;
     trace!("envelopes: {:#?}", msgs);
     printer.print_table(msgs, PrintTableOpts { max_width })
 }
@@ -323,11 +335,6 @@ pub fn send<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpServic
     smtp: &mut S,
 ) -> Result<()> {
     info!("entering send message handler");
-
-    let mbox = Mbox::new(&account.sent_folder);
-    debug!("mailbox: {}", mbox);
-    let flags = Flags::try_from(vec![Flag::Seen])?;
-    debug!("flags: {}", flags);
 
     let is_tty = atty::is(Stream::Stdin);
     debug!("is tty: {}", is_tty);
@@ -349,7 +356,7 @@ pub fn send<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpServic
     trace!("envelope: {:?}", envelope);
 
     smtp.send_raw_msg(&envelope, raw_msg.as_bytes())?;
-    backend.add_msg(&mbox, raw_msg.as_bytes(), flags)?;
+    backend.add_msg(&account.sent_folder, raw_msg.as_bytes(), "seen")?;
     Ok(())
 }
 

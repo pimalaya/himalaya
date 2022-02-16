@@ -10,17 +10,17 @@ use log::{debug, info};
 use crate::domain::msg::msg_arg;
 
 type SeqRange<'a> = &'a str;
-type Flags<'a> = Vec<&'a str>;
+type Flags = String;
 
 /// Represents the flag commands.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Cmd<'a> {
     /// Represents the add flags command.
-    Add(SeqRange<'a>, Flags<'a>),
+    Add(SeqRange<'a>, Flags),
     /// Represents the set flags command.
-    Set(SeqRange<'a>, Flags<'a>),
+    Set(SeqRange<'a>, Flags),
     /// Represents the remove flags command.
-    Remove(SeqRange<'a>, Flags<'a>),
+    Remove(SeqRange<'a>, Flags),
 }
 
 /// Defines the flag command matcher.
@@ -31,7 +31,11 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
         info!("add subcommand matched");
         let seq_range = m.value_of("seq-range").unwrap();
         debug!("seq range: {}", seq_range);
-        let flags: Vec<&str> = m.values_of("flags").unwrap_or_default().collect();
+        let flags: String = m
+            .values_of("flags")
+            .unwrap_or_default()
+            .collect::<Vec<_>>()
+            .join(" ");
         debug!("flags: {:?}", flags);
         return Ok(Some(Cmd::Add(seq_range, flags)));
     }
@@ -40,7 +44,11 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
         info!("set subcommand matched");
         let seq_range = m.value_of("seq-range").unwrap();
         debug!("seq range: {}", seq_range);
-        let flags: Vec<&str> = m.values_of("flags").unwrap_or_default().collect();
+        let flags: String = m
+            .values_of("flags")
+            .unwrap_or_default()
+            .collect::<Vec<_>>()
+            .join(" ");
         debug!("flags: {:?}", flags);
         return Ok(Some(Cmd::Set(seq_range, flags)));
     }
@@ -49,7 +57,11 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
         info!("remove subcommand matched");
         let seq_range = m.value_of("seq-range").unwrap();
         debug!("seq range: {}", seq_range);
-        let flags: Vec<&str> = m.values_of("flags").unwrap_or_default().collect();
+        let flags: String = m
+            .values_of("flags")
+            .unwrap_or_default()
+            .collect::<Vec<_>>()
+            .join(" ");
         debug!("flags: {:?}", flags);
         return Ok(Some(Cmd::Remove(seq_range, flags)));
     }

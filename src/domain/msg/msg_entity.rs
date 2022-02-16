@@ -360,10 +360,8 @@ impl Msg {
         loop {
             match choice::post_edit() {
                 Ok(PostEditChoice::Send) => {
-                    let mbox = Mbox::new(&account.sent_folder);
                     let sent_msg = smtp.send_msg(account, &self)?;
-                    let flags = Flags::try_from(vec![Flag::Seen])?;
-                    backend.add_msg(&mbox, &sent_msg.formatted(), flags)?;
+                    backend.add_msg(&account.sent_folder, &sent_msg.formatted(), "seen")?;
                     msg_utils::remove_local_draft()?;
                     printer.print("Message successfully sent")?;
                     break;
@@ -377,10 +375,8 @@ impl Msg {
                     break;
                 }
                 Ok(PostEditChoice::RemoteDraft) => {
-                    let mbox = Mbox::new(&account.draft_folder);
-                    let flags = Flags::try_from(vec![Flag::Seen, Flag::Draft])?;
                     let tpl = self.to_tpl(TplOverride::default(), account)?;
-                    backend.add_msg(&mbox, tpl.as_bytes(), flags)?;
+                    backend.add_msg(&account.draft_folder, tpl.as_bytes(), "seen draft")?;
                     msg_utils::remove_local_draft()?;
                     printer.print(format!(
                         "Message successfully saved to {}",
@@ -550,70 +546,7 @@ impl Msg {
         let parsed_mail = mailparse::parse_mail(tpl.as_bytes()).context("cannot parse template")?;
 
         info!("end: building message from template");
-        Self::from_parsed_mail(parsed_mail)
-    }
-
-    pub fn from_parsed_mail(parsed_mail: ParsedMail) -> Result<Self> {
-        info!("begin: building message from parsed mail");
-        trace!("parsed mail: {:?}", parsed_mail);
-
-        let mut msg = Msg::default();
-
-        debug!("parsing headers");
-        for header in parsed_mail.get_headers() {
-            let key = header.get_key();
-            debug!("header key: {:?}", key);
-
-            let val = header.get_value();
-            let val = String::from_utf8(header.get_value_raw().to_vec())
-                .map(|val| val.trim().to_string())
-                .context(format!(
-                    "cannot decode value {:?} from header {:?}",
-                    key, val
-                ))?;
-            debug!("header value: {:?}", val);
-
-            match key.to_lowercase().as_str() {
-                "message-id" => msg.message_id = Some(val),
-                "in-reply-to" => msg.in_reply_to = Some(val),
-                "subject" => {
-                    msg.subject = val;
-                }
-                "from" => {
-                    msg.from = from_slice_to_addrs(val)
-                        .context(format!("cannot parse header {:?}", key))?
-                }
-                "to" => {
-                    msg.to = from_slice_to_addrs(val)
-                        .context(format!("cannot parse header {:?}", key))?
-                }
-                "reply-to" => {
-                    msg.reply_to = from_slice_to_addrs(val)
-                        .context(format!("cannot parse header {:?}", key))?
-                }
-                "cc" => {
-                    msg.cc = from_slice_to_addrs(val)
-                        .context(format!("cannot parse header {:?}", key))?
-                }
-                "bcc" => {
-                    msg.bcc = from_slice_to_addrs(val)
-                        .context(format!("cannot parse header {:?}", key))?
-                }
-                _ => (),
-            }
-        }
-
-        debug!("parsing body");
-        let content = parsed_mail
-            .get_body_raw()
-            .context("cannot get raw body from message")
-            .and_then(|body| String::from_utf8(body).context("cannot decode body from utf8"))?;
-        trace!("body: {:?}", content);
-        msg.parts.push(Part::TextPlain(TextPlainPart { content }));
-
-        trace!("message: {:?}", msg);
-        info!("end: building message from parsed mail");
-        Ok(msg)
+        Self::try_from(parsed_mail)
     }
 
     pub fn into_sendable_msg(&self, account: &AccountConfig) -> Result<lettre::Message> {
@@ -699,6 +632,73 @@ impl Msg {
         msg_builder
             .multipart(multipart)
             .context("cannot build sendable message")
+    }
+}
+
+impl TryFrom<mailparse::ParsedMail<'_>> for Msg {
+    type Error = Error;
+
+    fn try_from(parsed_mail: mailparse::ParsedMail) -> Result<Self, Self::Error> {
+        info!("begin: building message from parsed mail");
+        trace!("parsed mail: {:?}", parsed_mail);
+
+        let mut msg = Msg::default();
+
+        debug!("parsing headers");
+        for header in parsed_mail.get_headers() {
+            let key = header.get_key();
+            debug!("header key: {:?}", key);
+
+            let val = header.get_value();
+            let val = String::from_utf8(header.get_value_raw().to_vec())
+                .map(|val| val.trim().to_string())
+                .context(format!(
+                    "cannot decode value {:?} from header {:?}",
+                    key, val
+                ))?;
+            debug!("header value: {:?}", val);
+
+            match key.to_lowercase().as_str() {
+                "message-id" => msg.message_id = Some(val),
+                "in-reply-to" => msg.in_reply_to = Some(val),
+                "subject" => {
+                    msg.subject = val;
+                }
+                "from" => {
+                    msg.from = from_slice_to_addrs(val)
+                        .context(format!("cannot parse header {:?}", key))?
+                }
+                "to" => {
+                    msg.to = from_slice_to_addrs(val)
+                        .context(format!("cannot parse header {:?}", key))?
+                }
+                "reply-to" => {
+                    msg.reply_to = from_slice_to_addrs(val)
+                        .context(format!("cannot parse header {:?}", key))?
+                }
+                "cc" => {
+                    msg.cc = from_slice_to_addrs(val)
+                        .context(format!("cannot parse header {:?}", key))?
+                }
+                "bcc" => {
+                    msg.bcc = from_slice_to_addrs(val)
+                        .context(format!("cannot parse header {:?}", key))?
+                }
+                _ => (),
+            }
+        }
+
+        debug!("parsing body");
+        let content = parsed_mail
+            .get_body_raw()
+            .context("cannot get raw body from message")
+            .and_then(|body| String::from_utf8(body).context("cannot decode body from utf8"))?;
+        trace!("body: {:?}", content);
+        msg.parts.push(Part::TextPlain(TextPlainPart { content }));
+
+        trace!("message: {:?}", msg);
+        info!("end: building message from parsed mail");
+        Ok(msg)
     }
 }
 

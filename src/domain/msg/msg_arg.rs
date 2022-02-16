@@ -29,7 +29,7 @@ type Query = String;
 type AttachmentPaths<'a> = Vec<&'a str>;
 type MaxTableWidth = Option<usize>;
 type Encrypt = bool;
-type Criteria = Vec<SortCriterion>;
+type Criteria = String;
 
 /// Message commands.
 #[derive(Debug, PartialEq, Eq)]
@@ -210,11 +210,11 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
             .map(|page| 1.max(page) - 1)
             .unwrap_or_default();
         debug!("page: {:?}", page);
-        let criteria: Vec<SortCriterion> = m
+        let criteria = m
             .values_of("criteria")
             .unwrap_or_default()
-            .filter_map(|criterion| criterion.try_into().ok())
-            .collect();
+            .collect::<Vec<_>>()
+            .join(" ");
         debug!("criteria: {:?}", criteria);
         let query = m
             .values_of("query")

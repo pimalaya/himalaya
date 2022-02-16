@@ -97,9 +97,6 @@ mod tests {
         struct TestBackendService;
 
         impl<'a> BackendService<'a> for TestBackendService {
-            fn connect(&mut self) -> Result<()> {
-                Ok(())
-            }
             fn get_mboxes(&mut self) -> Result<Mboxes> {
                 Ok(Mboxes(vec![
                     Mbox {
@@ -119,29 +116,30 @@ mod tests {
             }
             fn get_envelopes(
                 &mut self,
-                _: &[SortCriterion],
                 _: &str,
-                _: &usize,
-                _: &usize,
+                _: &str,
+                _: &str,
+                _: usize,
+                _: usize,
             ) -> Result<Envelopes> {
                 unimplemented!()
             }
-            fn get_msg(&mut self, _: &str) -> Result<Msg> {
+            fn add_msg(&mut self, _: &str, _: &[u8], _: &str) -> Result<String> {
                 unimplemented!()
             }
-            fn add_msg(&mut self, _: &Mbox, _: &[u8], _: Flags) -> Result<String> {
+            fn get_msg(&mut self, _: &str, _: &str) -> Result<Msg> {
                 unimplemented!()
             }
-            fn disconnect(&mut self) -> Result<()> {
+            fn del_msg(&mut self, _: &str, _: &str) -> Result<()> {
                 unimplemented!()
             }
-            fn add_flags(&mut self, _: &str, _: &Flags) -> Result<()> {
+            fn add_flags(&mut self, _: &str, _: &str, _: &str) -> Result<()> {
                 unimplemented!()
             }
-            fn set_flags(&mut self, _: &str, _: &Flags) -> Result<()> {
+            fn set_flags(&mut self, _: &str, _: &str, _: &str) -> Result<()> {
                 unimplemented!()
             }
-            fn del_flags(&mut self, _: &str, _: &Flags) -> Result<()> {
+            fn del_flags(&mut self, _: &str, _: &str, _: &str) -> Result<()> {
                 unimplemented!()
             }
         }
