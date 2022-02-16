@@ -1,9 +1,13 @@
 use anyhow::{anyhow, Context, Error, Result};
+use log::{debug, info, trace};
 use serde::Serialize;
 use std::{borrow::Cow, convert::TryFrom};
 
 use crate::{
-    domain::msg::{Flag, Flags},
+    domain::{
+        from_slice_to_addrs,
+        msg::{Flag, Flags},
+    },
     ui::{Cell, Row, Table},
 };
 
@@ -11,7 +15,7 @@ pub type RawEnvelope = imap::types::Fetch;
 
 /// Representation of an envelope. An envelope gathers basic information related to a message. It
 /// is mostly used for listings.
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub struct Envelope<'a> {
     /// The sequence number of the message.
     ///
@@ -31,6 +35,49 @@ pub struct Envelope<'a> {
     ///
     /// [RFC3501]: https://datatracker.ietf.org/doc/html/rfc3501#section-2.3.3
     pub date: Option<String>,
+}
+
+impl<'a> TryFrom<mailparse::ParsedMail<'_>> for Envelope<'a> {
+    type Error = Error;
+
+    fn try_from(parsed_mail: mailparse::ParsedMail) -> Result<Self, Self::Error> {
+        info!("begin: building envelope from parsed mail");
+        trace!("parsed mail: {:?}", parsed_mail);
+
+        let mut envelope = Self::default();
+
+        debug!("parsing headers");
+        for header in parsed_mail.get_headers() {
+            let key = header.get_key();
+            debug!("header key: {:?}", key);
+
+            let val = header.get_value();
+            let val = String::from_utf8(header.get_value_raw().to_vec())
+                .map(|val| val.trim().to_string())
+                .context(format!(
+                    "cannot decode value {:?} from header {:?}",
+                    key, val
+                ))?;
+            debug!("header value: {:?}", val);
+
+            match key.to_lowercase().as_str() {
+                "subject" => {
+                    envelope.subject = val.clone().into();
+                }
+                "from" => {
+                    envelope.sender = from_slice_to_addrs(val)
+                        .context(format!("cannot parse header {:?}", key))?
+                        .ok_or_else(|| anyhow!("cannot find sender"))?
+                        .to_string()
+                }
+                _ => (),
+            }
+        }
+
+        trace!("envelope: {:?}", envelope);
+        info!("end: building envelope from parsed mail");
+        Ok(envelope)
+    }
 }
 
 impl<'a> TryFrom<&'a RawEnvelope> for Envelope<'a> {

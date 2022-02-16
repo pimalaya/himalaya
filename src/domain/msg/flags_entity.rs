@@ -142,6 +142,12 @@ impl<'a> From<Vec<&'a str>> for Flags {
     }
 }
 
+impl From<&str> for Flags {
+    fn from(flags: &str) -> Self {
+        flags.split(" ").collect::<Vec<_>>().into()
+    }
+}
+
 // FIXME
 //#[cfg(test)]
 //mod tests {

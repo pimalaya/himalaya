@@ -1,0 +1,6 @@
+From: alice@localhost
+To: patrick@localhost
+Subject: Plain message
+Content-Type: text/plain; charset=utf-8
+
+Ceci est un message.

@@ -5,6 +5,7 @@ use html_escape;
 use imap::types::Flag;
 use lettre::message::{header::ContentType, Attachment, MultiPart, SinglePart};
 use log::{debug, info, trace};
+use mailparse::ParsedMail;
 use regex::Regex;
 use rfc2047_decoder;
 use std::{
@@ -546,10 +547,20 @@ impl Msg {
         trace!("template: {:?}", tpl);
 
         let mut msg = Msg::default();
-        let parsed_msg = mailparse::parse_mail(tpl.as_bytes()).context("cannot parse template")?;
+        let parsed_mail = mailparse::parse_mail(tpl.as_bytes()).context("cannot parse template")?;
+
+        info!("end: building message from template");
+        Self::from_parsed_mail(parsed_mail)
+    }
+
+    pub fn from_parsed_mail(parsed_mail: ParsedMail) -> Result<Self> {
+        info!("begin: building message from parsed mail");
+        trace!("parsed mail: {:?}", parsed_mail);
+
+        let mut msg = Msg::default();
 
         debug!("parsing headers");
-        for header in parsed_msg.get_headers() {
+        for header in parsed_mail.get_headers() {
             let key = header.get_key();
             debug!("header key: {:?}", key);
 
@@ -593,7 +604,7 @@ impl Msg {
         }
 
         debug!("parsing body");
-        let content = parsed_msg
+        let content = parsed_mail
             .get_body_raw()
             .context("cannot get raw body from message")
             .and_then(|body| String::from_utf8(body).context("cannot decode body from utf8"))?;
@@ -601,7 +612,7 @@ impl Msg {
         msg.parts.push(Part::TextPlain(TextPlainPart { content }));
 
         trace!("message: {:?}", msg);
-        info!("end: building message from template");
+        info!("end: building message from parsed mail");
         Ok(msg)
     }
 

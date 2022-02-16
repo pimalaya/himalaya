@@ -34,7 +34,7 @@ pub fn attachments<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
-    let attachments = backend.get_msg(account, seq)?.attachments();
+    let attachments = backend.get_msg(seq)?.attachments();
     let attachments_len = attachments.len();
     debug!(
         r#"{} attachment(s) found for message "{}""#,
@@ -63,7 +63,7 @@ pub fn copy<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     backend: Box<&mut B>,
 ) -> Result<()> {
     let mbox = Mbox::new(mbox);
-    let msg = backend.get_msg(account, seq)?.raw;
+    let msg = backend.get_msg(seq)?.raw;
     let flags = Flags::try_from(vec![Flag::Seen])?;
     backend.add_msg(&mbox, &msg, flags)?;
     printer.print(format!(
@@ -94,7 +94,7 @@ pub fn forward<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpSer
     smtp: &mut S,
 ) -> Result<()> {
     backend
-        .get_msg(account, seq)?
+        .get_msg(seq)?
         .into_forward(account)?
         .add_attachments(attachments_paths)?
         .encrypt(encrypt)
@@ -192,7 +192,7 @@ pub fn move_<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 ) -> Result<()> {
     // Copy the message to targetted mailbox
     let mbox = Mbox::new(mbox);
-    let msg = backend.get_msg(account, seq)?.raw;
+    let msg = backend.get_msg(seq)?.raw;
     let flags = Flags::try_from(vec![Flag::Seen])?;
     backend.add_msg(&mbox, &msg, flags)?;
 
@@ -215,7 +215,7 @@ pub fn read<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
-    let msg = backend.get_msg(account, seq)?;
+    let msg = backend.get_msg(seq)?;
     let msg = if raw {
         // Emails don't always have valid utf8. Using "lossy" to display what we can.
         String::from_utf8_lossy(&msg.raw).into_owned()
@@ -238,7 +238,7 @@ pub fn reply<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpServi
     smtp: &mut S,
 ) -> Result<()> {
     backend
-        .get_msg(account, seq)?
+        .get_msg(seq)?
         .into_reply(all, account)?
         .add_attachments(attachments_paths)?
         .encrypt(encrypt)
@@ -274,7 +274,8 @@ pub fn save<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
             .collect::<Vec<String>>()
             .join("\r\n")
     };
-    backend.add_msg(mbox, raw_msg.as_bytes(), flags)
+    backend.add_msg(mbox, raw_msg.as_bytes(), flags)?;
+    Ok(())
 }
 
 /// Paginate messages from the selected mailbox matching the specified query.
@@ -348,7 +349,8 @@ pub fn send<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpServic
     trace!("envelope: {:?}", envelope);
 
     smtp.send_raw_msg(&envelope, raw_msg.as_bytes())?;
-    backend.add_msg(&mbox, raw_msg.as_bytes(), flags)
+    backend.add_msg(&mbox, raw_msg.as_bytes(), flags)?;
+    Ok(())
 }
 
 /// Compose a new message.

@@ -126,10 +126,10 @@ mod tests {
             ) -> Result<Envelopes> {
                 unimplemented!()
             }
-            fn get_msg(&mut self, _: &AccountConfig, _: &str) -> Result<Msg> {
+            fn get_msg(&mut self, _: &str) -> Result<Msg> {
                 unimplemented!()
             }
-            fn add_msg(&mut self, _: &Mbox, _: &[u8], _: Flags) -> Result<()> {
+            fn add_msg(&mut self, _: &Mbox, _: &[u8], _: Flags) -> Result<String> {
                 unimplemented!()
             }
             fn disconnect(&mut self) -> Result<()> {

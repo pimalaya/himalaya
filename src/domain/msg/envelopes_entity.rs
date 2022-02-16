@@ -11,8 +11,20 @@ use crate::{
 pub type RawEnvelopes = imap::types::ZeroCopy<Vec<RawEnvelope>>;
 
 /// Representation of a list of envelopes.
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub struct Envelopes<'a>(pub Vec<Envelope<'a>>);
+
+impl<'a> From<Vec<Envelope<'a>>> for Envelopes<'a> {
+    fn from(envelopes: Vec<Envelope<'a>>) -> Self {
+        Self(envelopes)
+    }
+}
+
+impl<'a> From<&'a [Envelope<'a>]> for Envelopes<'a> {
+    fn from(envelopes: &'a [Envelope<'a>]) -> Self {
+        Self(envelopes.to_vec())
+    }
+}
 
 impl<'a> Deref for Envelopes<'a> {
     type Target = Vec<Envelope<'a>>;
