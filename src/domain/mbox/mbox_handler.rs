@@ -29,8 +29,7 @@ mod tests {
     use termcolor::ColorSpec;
 
     use crate::{
-        config::AccountConfig,
-        domain::{AttrRemote, Attrs, Envelopes, Flags, Mbox, Mboxes, Msg, SortCriterion},
+        domain::{AttrRemote, Attrs, Envelopes, Mbox, Mboxes, Msg},
         output::{Print, PrintTable, WriteColor},
     };
 
@@ -128,6 +127,12 @@ mod tests {
                 unimplemented!()
             }
             fn get_msg(&mut self, _: &str, _: &str) -> Result<Msg> {
+                unimplemented!()
+            }
+            fn copy_msg(&mut self, _: &str, _: &str, _: &str) -> Result<()> {
+                unimplemented!()
+            }
+            fn move_msg(&mut self, _: &str, _: &str, _: &str) -> Result<()> {
                 unimplemented!()
             }
             fn del_msg(&mut self, _: &str, _: &str) -> Result<()> {

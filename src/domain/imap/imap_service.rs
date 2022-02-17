@@ -123,6 +123,7 @@ impl TryFrom<&str> for SortCriteria {
             let criterion: SortCriterion = criterion_str
                 .try_into()
                 .context(format!("cannot parse criterion {:?}", criterion_str))?;
+            criteria.push(criterion)
         }
         Ok(Self(criteria))
     }
@@ -174,6 +175,8 @@ pub trait BackendService<'a> {
     ) -> Result<Envelopes>;
     fn add_msg(&mut self, mbox: &str, msg: &[u8], flags: &str) -> Result<String>;
     fn get_msg(&mut self, mbox: &str, id: &str) -> Result<Msg>;
+    fn copy_msg(&mut self, mbox_source: &str, mbox_target: &str, id: &str) -> Result<()>;
+    fn move_msg(&mut self, mbox_source: &str, mbox_target: &str, id: &str) -> Result<()>;
     fn del_msg(&mut self, mbox: &str, ids: &str) -> Result<()>;
     fn add_flags(&mut self, mbox: &str, ids: &str, flags: &str) -> Result<()>;
     fn set_flags(&mut self, mbox: &str, ids: &str, flags: &str) -> Result<()>;
@@ -453,6 +456,19 @@ impl<'a> BackendService<'a> for ImapService<'a> {
             .ok_or_else(|| anyhow!("cannot find message {:?}", seq))?;
 
         Msg::try_from((self.account_config, fetch))
+    }
+
+    fn copy_msg(&mut self, mbox_source: &str, mbox_target: &str, seq: &str) -> Result<()> {
+        let msg = self.get_msg(&mbox_source, seq)?.raw;
+        self.add_msg(&mbox_target, &msg, "seen")?;
+        Ok(())
+    }
+
+    fn move_msg(&mut self, mbox_src: &str, mbox_dest: &str, seq: &str) -> Result<()> {
+        let msg = self.get_msg(mbox_src, seq)?.raw;
+        self.add_flags(mbox_src, seq, "seen deleted")?;
+        self.add_msg(&mbox_dest, &msg, "seen")?;
+        Ok(())
     }
 
     fn del_msg(&mut self, mbox: &str, seq: &str) -> Result<()> {

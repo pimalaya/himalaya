@@ -2,7 +2,7 @@ use anyhow::{anyhow, Context, Error, Result};
 use std::convert::{TryFrom, TryInto};
 
 use crate::{
-    config::{AccountConfig, MaildirBackendConfig},
+    config::MaildirBackendConfig,
     domain::{BackendService, Envelope, Envelopes, Mboxes, Msg},
 };
 
@@ -67,13 +67,11 @@ impl TryFrom<&str> for Flags {
     }
 }
 
-pub struct MaildirService<'a> {
-    account_config: &'a AccountConfig,
-    maildir_config: &'a MaildirBackendConfig,
+pub struct MaildirService {
     maildir: maildir::Maildir,
 }
 
-impl<'a> BackendService<'a> for MaildirService<'a> {
+impl<'a> BackendService<'a> for MaildirService {
     fn get_mboxes(&mut self) -> Result<Mboxes> {
         unimplemented!()
     }
@@ -126,6 +124,14 @@ impl<'a> BackendService<'a> for MaildirService<'a> {
         Msg::try_from(parsed_mail).context(format!("cannot parse message {:?}", id))
     }
 
+    fn copy_msg(&mut self, _mbox_src: &str, _mbox_dest: &str, _id: &str) -> Result<()> {
+        unimplemented!();
+    }
+
+    fn move_msg(&mut self, _mbox_src: &str, _mbox_dest: &str, _id: &str) -> Result<()> {
+        unimplemented!();
+    }
+
     fn del_msg(&mut self, _mbox: &str, id: &str) -> Result<()> {
         self.maildir
             .delete(id)
@@ -163,14 +169,9 @@ impl<'a> BackendService<'a> for MaildirService<'a> {
     }
 }
 
-impl<'a> MaildirService<'a> {
-    pub fn new(
-        account_config: &'a AccountConfig,
-        maildir_config: &'a MaildirBackendConfig,
-    ) -> Self {
+impl<'a> MaildirService {
+    pub fn new(maildir_config: &'a MaildirBackendConfig) -> Self {
         Self {
-            account_config,
-            maildir_config,
             maildir: maildir_config.maildir_dir.clone().into(),
         }
     }

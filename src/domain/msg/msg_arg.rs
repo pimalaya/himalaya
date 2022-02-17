@@ -2,8 +2,6 @@
 //!
 //! This module provides subcommands, arguments and a command matcher related to message.
 
-use std::convert::TryInto;
-
 use anyhow::Result;
 use clap::{self, App, Arg, ArgMatches, SubCommand};
 use log::{debug, info, trace};
@@ -12,7 +10,6 @@ use crate::{
     domain::{
         mbox::mbox_arg,
         msg::{flag_arg, msg_arg, tpl_arg},
-        SortCriterion,
     },
     ui::table_arg,
 };

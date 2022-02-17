@@ -2,10 +2,8 @@ use ammonia;
 use anyhow::{anyhow, Context, Error, Result};
 use chrono::{DateTime, FixedOffset};
 use html_escape;
-use imap::types::Flag;
 use lettre::message::{header::ContentType, Attachment, MultiPart, SinglePart};
 use log::{debug, info, trace};
-use mailparse::ParsedMail;
 use regex::Regex;
 use rfc2047_decoder;
 use std::{
@@ -24,7 +22,6 @@ use crate::{
         from_addrs_to_sendable_addrs, from_addrs_to_sendable_mbox, from_imap_addrs_to_addrs,
         from_imap_addrs_to_some_addrs, from_slice_to_addrs,
         imap::BackendService,
-        mbox::Mbox,
         msg::{msg_utils, BinaryPart, Flags, Part, Parts, TextPlainPart, TplOverride},
         smtp::SmtpService,
         Addrs,
@@ -542,7 +539,6 @@ impl Msg {
         info!("begin: building message from template");
         trace!("template: {:?}", tpl);
 
-        let mut msg = Msg::default();
         let parsed_mail = mailparse::parse_mail(tpl.as_bytes()).context("cannot parse template")?;
 
         info!("end: building message from template");

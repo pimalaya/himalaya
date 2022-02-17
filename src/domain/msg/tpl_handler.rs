@@ -4,18 +4,14 @@
 
 use anyhow::Result;
 use atty::Stream;
-use imap::types::Flag;
-use std::{
-    convert::TryFrom,
-    io::{self, BufRead},
-};
+use std::io::{self, BufRead};
 
 use crate::{
     config::AccountConfig,
     domain::{
         imap::BackendService,
         msg::{Msg, TplOverride},
-        Flags, Mbox, SmtpService,
+        Mbox, SmtpService,
     },
     output::PrinterService,
 };

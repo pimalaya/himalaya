@@ -55,7 +55,7 @@ fn main() -> Result<()> {
                 Box::new(&mut imap)
             }
             BackendConfig::Maildir(ref maildir_config) => {
-                maildir = MaildirService::new(&account_config, maildir_config);
+                maildir = MaildirService::new(maildir_config);
                 Box::new(&mut maildir)
             }
         };
@@ -92,7 +92,7 @@ fn main() -> Result<()> {
             Box::new(&mut imap)
         }
         BackendConfig::Maildir(ref maildir_config) => {
-            maildir = MaildirService::new(&account_config, maildir_config);
+            maildir = MaildirService::new(maildir_config);
             Box::new(&mut maildir)
         }
     };
@@ -127,14 +127,7 @@ fn main() -> Result<()> {
             return msg_handler::attachments(seq, &mbox, &account_config, &mut printer, backend);
         }
         Some(msg_arg::Cmd::Copy(seq, mbox_target)) => {
-            return msg_handler::copy(
-                seq,
-                &mbox.name,
-                mbox_target,
-                &account_config,
-                &mut printer,
-                backend,
-            );
+            return msg_handler::copy(seq, &mbox.name, mbox_target, &mut printer, backend);
         }
         Some(msg_arg::Cmd::Delete(seq)) => {
             return msg_handler::delete(seq, &mbox.name.to_string(), &mut printer, backend);
@@ -167,21 +160,12 @@ fn main() -> Result<()> {
                 seq,
                 &mbox.name.to_string(),
                 mbox_target,
-                &account_config,
                 &mut printer,
                 backend,
             );
         }
         Some(msg_arg::Cmd::Read(seq, text_mime, raw)) => {
-            return msg_handler::read(
-                seq,
-                text_mime,
-                raw,
-                &mbox,
-                &account_config,
-                &mut printer,
-                backend,
-            );
+            return msg_handler::read(seq, text_mime, raw, &mbox, &mut printer, backend);
         }
         Some(msg_arg::Cmd::Reply(seq, all, attachment_paths, encrypt)) => {
             return msg_handler::reply(

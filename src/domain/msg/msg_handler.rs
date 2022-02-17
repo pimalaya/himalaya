@@ -57,18 +57,15 @@ pub fn attachments<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 /// Copy a message from a mailbox to another.
 pub fn copy<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     seq: &str,
-    mbox_source: &str,
-    mbox_target: &str,
-    account: &AccountConfig,
+    mbox_src: &str,
+    mbox_dest: &str,
     printer: &mut P,
     backend: Box<&mut B>,
 ) -> Result<()> {
-    let mbox = Mbox::new(mbox_target);
-    let msg = backend.get_msg(&mbox.name.to_string(), seq)?.raw;
-    backend.add_msg(&mbox_target, &msg, "seen")?;
+    backend.copy_msg(mbox_src, mbox_dest, seq)?;
     printer.print(format!(
         r#"Message {} successfully copied to folder "{}""#,
-        seq, mbox
+        seq, mbox_dest
     ))
 }
 
@@ -191,22 +188,15 @@ pub fn mailto<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpServ
 /// Move a message from a mailbox to another.
 pub fn move_<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     seq: &str,
-    mbox_source: &str,
-    mbox_target: &str,
-    account: &AccountConfig,
+    mbox_src: &str,
+    mbox_dest: &str,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
-    // Copy the message to targetted mailbox
-    let msg = backend.get_msg(mbox_source, seq)?.raw;
-    backend.add_msg(mbox_target, &msg, "seen")?;
-
-    // Delete the original message
-    backend.add_flags(mbox_source, seq, "seen deleted")?;
-
+    backend.move_msg(mbox_src, mbox_dest, seq)?;
     printer.print(format!(
         r#"Message {} successfully moved to folder "{}""#,
-        seq, mbox_target
+        seq, mbox_dest
     ))
 }
 
@@ -216,7 +206,6 @@ pub fn read<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     text_mime: &str,
     raw: bool,
     mbox: &Mbox,
-    account: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
