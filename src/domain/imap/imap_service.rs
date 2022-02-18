@@ -14,7 +14,7 @@ use std::{
 
 use crate::{
     config::{AccountConfig, ImapBackendConfig},
-    domain::{Envelope, Envelopes, Flags, Mbox, Mboxes, Msg, RawEnvelopes, RawMboxes},
+    domain::{Envelope, Envelopes, Flags, Mboxes, Msg, RawEnvelopes, RawMboxes},
     output::run_cmd,
 };
 
@@ -175,8 +175,8 @@ pub trait BackendService<'a> {
     ) -> Result<Envelopes>;
     fn add_msg(&mut self, mbox: &str, msg: &[u8], flags: &str) -> Result<String>;
     fn get_msg(&mut self, mbox: &str, id: &str) -> Result<Msg>;
-    fn copy_msg(&mut self, mbox_source: &str, mbox_target: &str, id: &str) -> Result<()>;
-    fn move_msg(&mut self, mbox_source: &str, mbox_target: &str, id: &str) -> Result<()>;
+    fn copy_msg(&mut self, mbox_src: &str, mbox_dst: &str, id: &str) -> Result<()>;
+    fn move_msg(&mut self, mbox_src: &str, mbox_dst: &str, id: &str) -> Result<()>;
     fn del_msg(&mut self, mbox: &str, ids: &str) -> Result<()>;
     fn add_flags(&mut self, mbox: &str, ids: &str, flags: &str) -> Result<()>;
     fn set_flags(&mut self, mbox: &str, ids: &str, flags: &str) -> Result<()>;
@@ -190,7 +190,6 @@ pub trait BackendService<'a> {
 pub struct ImapService<'a> {
     account_config: &'a AccountConfig,
     imap_config: &'a ImapBackendConfig,
-    mbox: &'a Mbox<'a>,
     sess: Option<ImapSession>,
     /// Holds raw mailboxes fetched by the `imap` crate in order to extend mailboxes lifetime
     /// outside of handlers. Without that, it would be impossible for handlers to return a `Mbox`
@@ -200,15 +199,10 @@ pub struct ImapService<'a> {
 }
 
 impl<'a> ImapService<'a> {
-    pub fn new(
-        account_config: &'a AccountConfig,
-        imap_config: &'a ImapBackendConfig,
-        mbox: &'a Mbox,
-    ) -> Self {
+    pub fn new(account_config: &'a AccountConfig, imap_config: &'a ImapBackendConfig) -> Self {
         Self {
             account_config,
             imap_config,
-            mbox,
             sess: None,
             _raw_mboxes_cache: None,
             _raw_msgs_cache: None,
@@ -271,15 +265,13 @@ impl<'a> ImapService<'a> {
         Ok(uids)
     }
 
-    pub fn notify(&mut self, config: &AccountConfig, keepalive: u64) -> Result<()> {
+    pub fn notify(&mut self, keepalive: u64, mbox: &str, config: &AccountConfig) -> Result<()> {
         debug!("notify");
-
-        let mbox = self.mbox.to_owned();
 
         debug!("examine mailbox {:?}", mbox);
         self.sess()?
-            .examine(&mbox.name)
-            .context(format!("cannot examine mailbox {}", self.mbox.name))?;
+            .examine(mbox)
+            .context(format!("cannot examine mailbox {}", mbox))?;
 
         debug!("init messages hashset");
         let mut msgs_set: HashSet<u32> = self
@@ -344,13 +336,12 @@ impl<'a> ImapService<'a> {
         }
     }
 
-    pub fn watch(&mut self, account: &AccountConfig, keepalive: u64) -> Result<()> {
-        debug!("examine mailbox: {}", &self.mbox.name);
-        let mbox = self.mbox.to_owned();
+    pub fn watch(&mut self, keepalive: u64, mbox: &str, account: &AccountConfig) -> Result<()> {
+        debug!("examine mailbox: {}", mbox);
 
         self.sess()?
-            .examine(&mbox.name)
-            .context(format!("cannot examine mailbox `{}`", &self.mbox.name))?;
+            .examine(mbox)
+            .context(format!("cannot examine mailbox `{}`", mbox))?;
 
         loop {
             debug!("begin loop");
@@ -413,7 +404,7 @@ impl<'a> BackendService<'a> for ImapService<'a> {
             .sort(&sort, charset, filter)
             .context(format!(
                 "cannot search in {:?} with query {:?}",
-                self.mbox.name, filter
+                mbox, filter
             ))?
             .iter()
             .map(|seq| seq.to_string())
@@ -472,7 +463,7 @@ impl<'a> BackendService<'a> for ImapService<'a> {
     }
 
     fn del_msg(&mut self, mbox: &str, seq: &str) -> Result<()> {
-        self.set_flags(mbox, seq, "deleted")
+        self.add_flags(mbox, seq, "deleted")
     }
 
     fn add_flags(&mut self, mbox: &str, seq_range: &str, flags: &str) -> Result<()> {

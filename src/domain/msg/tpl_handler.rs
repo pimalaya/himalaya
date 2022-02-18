@@ -11,7 +11,7 @@ use crate::{
     domain::{
         imap::BackendService,
         msg::{Msg, TplOverride},
-        Mbox, SmtpService,
+        SmtpService,
     },
     output::PrinterService,
 };
@@ -31,13 +31,13 @@ pub fn reply<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     seq: &str,
     all: bool,
     opts: TplOverride<'a>,
-    mbox: &Mbox,
+    mbox: &str,
     account: &'a AccountConfig,
     printer: &'a mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
     let tpl = backend
-        .get_msg(&mbox.name.to_string(), seq)?
+        .get_msg(mbox, seq)?
         .into_reply(all, account)?
         .to_tpl(opts, account)?;
     printer.print(tpl)
@@ -47,13 +47,13 @@ pub fn reply<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 pub fn forward<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     seq: &str,
     opts: TplOverride<'a>,
-    mbox: &Mbox,
+    mbox: &str,
     account: &'a AccountConfig,
     printer: &'a mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
     let tpl = backend
-        .get_msg(&mbox.name.to_string(), seq)?
+        .get_msg(mbox, seq)?
         .into_forward(account)?
         .to_tpl(opts, account)?;
     printer.print(tpl)
@@ -61,7 +61,7 @@ pub fn forward<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 
 /// Saves a message based on a template.
 pub fn save<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
-    mbox: &Mbox,
+    mbox: &str,
     account: &AccountConfig,
     attachments_paths: Vec<&str>,
     tpl: &str,
@@ -80,13 +80,13 @@ pub fn save<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     };
     let msg = Msg::from_tpl(&tpl)?.add_attachments(attachments_paths)?;
     let raw_msg = msg.into_sendable_msg(account)?.formatted();
-    backend.add_msg(&mbox.name.to_string(), &raw_msg, "seen")?;
+    backend.add_msg(mbox, &raw_msg, "seen")?;
     printer.print("Template successfully saved")
 }
 
 /// Sends a message based on a template.
 pub fn send<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpService>(
-    mbox: &Mbox,
+    mbox: &str,
     account: &AccountConfig,
     attachments_paths: Vec<&str>,
     tpl: &str,
@@ -106,6 +106,6 @@ pub fn send<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpServic
     };
     let msg = Msg::from_tpl(&tpl)?.add_attachments(attachments_paths)?;
     let sent_msg = smtp.send_msg(account, &msg)?;
-    backend.add_msg(&mbox.name.to_string(), &sent_msg.formatted(), "seen")?;
+    backend.add_msg(mbox, &sent_msg.formatted(), "seen")?;
     printer.print("Template successfully sent")
 }

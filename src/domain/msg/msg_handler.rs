@@ -18,7 +18,6 @@ use crate::{
     config::AccountConfig,
     domain::{
         imap::BackendService,
-        mbox::Mbox,
         msg::{Msg, Part, TextPlainPart},
         smtp::SmtpService,
         Parts,
@@ -26,15 +25,15 @@ use crate::{
     output::{PrintTableOpts, PrinterService},
 };
 
-/// Download all message attachments to the user account downloads directory.
+/// Downloads all message attachments to the user account downloads directory.
 pub fn attachments<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     seq: &str,
-    mbox: &Mbox,
+    mbox: &str,
     account: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
-    let attachments = backend.get_msg(&mbox.name.to_string(), seq)?.attachments();
+    let attachments = backend.get_msg(mbox, seq)?.attachments();
     let attachments_len = attachments.len();
     debug!(
         r#"{} attachment(s) found for message "{}""#,
@@ -58,14 +57,14 @@ pub fn attachments<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 pub fn copy<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     seq: &str,
     mbox_src: &str,
-    mbox_dest: &str,
+    mbox_dst: &str,
     printer: &mut P,
     backend: Box<&mut B>,
 ) -> Result<()> {
-    backend.copy_msg(mbox_src, mbox_dest, seq)?;
+    backend.copy_msg(mbox_src, mbox_dst, seq)?;
     printer.print(format!(
         r#"Message {} successfully copied to folder "{}""#,
-        seq, mbox_dest
+        seq, mbox_dst
     ))
 }
 
@@ -76,7 +75,7 @@ pub fn delete<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
-    backend.add_flags(mbox, seq, "seen deleted")?;
+    backend.del_msg(mbox, seq)?;
     printer.print(format!(r#"Message(s) {} successfully deleted"#, seq))
 }
 
@@ -85,14 +84,14 @@ pub fn forward<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpSer
     seq: &str,
     attachments_paths: Vec<&str>,
     encrypt: bool,
-    mbox: &Mbox,
+    mbox: &str,
     account: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
     smtp: &mut S,
 ) -> Result<()> {
     backend
-        .get_msg(&mbox.name.to_string(), seq)?
+        .get_msg(mbox, seq)?
         .into_forward(account)?
         .add_attachments(attachments_paths)?
         .encrypt(encrypt)
@@ -105,7 +104,7 @@ pub fn list<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     max_width: Option<usize>,
     page_size: Option<usize>,
     page: usize,
-    mbox: &Mbox,
+    mbox: &str,
     account: &AccountConfig,
     printer: &mut P,
     imap: Box<&'a mut B>,
@@ -113,13 +112,7 @@ pub fn list<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     let page_size = page_size.unwrap_or(account.default_page_size);
     trace!("page size: {}", page_size);
 
-    let msgs = imap.get_envelopes(
-        &mbox.name.to_string(),
-        "arrival:desc",
-        "all",
-        page_size,
-        page,
-    )?;
+    let msgs = imap.get_envelopes(mbox, "arrival:desc", "all", page_size, page)?;
     trace!("messages: {:#?}", msgs);
     printer.print_table(msgs, PrintTableOpts { max_width })
 }
@@ -205,11 +198,11 @@ pub fn read<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     seq: &str,
     text_mime: &str,
     raw: bool,
-    mbox: &Mbox,
+    mbox: &str,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
-    let msg = backend.get_msg(&mbox.name.to_string(), seq)?;
+    let msg = backend.get_msg(mbox, seq)?;
     let msg = if raw {
         // Emails don't always have valid utf8. Using "lossy" to display what we can.
         String::from_utf8_lossy(&msg.raw).into_owned()
@@ -277,7 +270,7 @@ pub fn search<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     max_width: Option<usize>,
     page_size: Option<usize>,
     page: usize,
-    mbox: &Mbox,
+    mbox: &str,
     account: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
@@ -285,13 +278,7 @@ pub fn search<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     let page_size = page_size.unwrap_or(account.default_page_size);
     trace!("page size: {}", page_size);
 
-    let msgs = backend.get_envelopes(
-        &mbox.name.to_string(),
-        "arrival:desc",
-        &query,
-        page_size,
-        page,
-    )?;
+    let msgs = backend.get_envelopes(mbox, "arrival:desc", &query, page_size, page)?;
     trace!("messages: {:#?}", msgs);
     printer.print_table(msgs, PrintTableOpts { max_width })
 }
@@ -303,14 +290,14 @@ pub fn sort<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
     max_width: Option<usize>,
     page_size: Option<usize>,
     page: usize,
-    mbox: &Mbox,
+    mbox: &str,
     account: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
     let page_size = page_size.unwrap_or(account.default_page_size);
     trace!("page size: {}", page_size);
-    let msgs = backend.get_envelopes(&mbox.name.to_string(), &sort, &query, page_size, page)?;
+    let msgs = backend.get_envelopes(mbox, &sort, &query, page_size, page)?;
     trace!("envelopes: {:#?}", msgs);
     printer.print_table(msgs, PrintTableOpts { max_width })
 }
