@@ -8,7 +8,7 @@ use std::{
     ops::Deref,
 };
 
-use crate::domain::{Attr, AttrRemote};
+use crate::{Attr, AttrRemote};
 
 /// Represents the attributes of the mailbox.
 #[derive(Debug, Default, PartialEq, Eq, Serialize)]

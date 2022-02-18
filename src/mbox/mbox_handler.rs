@@ -29,8 +29,9 @@ mod tests {
     use termcolor::ColorSpec;
 
     use crate::{
-        domain::{AttrRemote, Attrs, Envelopes, Mbox, Mboxes, Msg},
+        domain::{Envelopes, Msg},
         output::{Print, PrintTable, WriteColor},
+        AttrRemote, Attrs, Mbox, Mboxes,
     };
 
     use super::*;

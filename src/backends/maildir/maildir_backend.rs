@@ -4,7 +4,8 @@ use std::convert::{TryFrom, TryInto};
 use crate::{
     backends::{maildir::Flags, Backend},
     config::MaildirBackendConfig,
-    domain::{Envelope, Envelopes, Mboxes, Msg},
+    domain::{Envelope, Envelopes, Msg},
+    Mboxes,
 };
 
 pub struct MaildirBackend {
@@ -27,10 +28,9 @@ impl<'a> Backend<'a> for MaildirBackend {
         let mut envelopes = vec![];
 
         let mail_entries = match filter {
-            "new" => Ok(self.maildir.list_new()),
-            "cur" => Ok(self.maildir.list_cur()),
-            filter => Err(anyhow!("cannot use invalid filter {:?}", filter)),
-        }?;
+            "new" => self.maildir.list_new(),
+            _ => self.maildir.list_cur(),
+        };
 
         for mail_entry in mail_entries {
             let mut parsed_mail = mail_entry?;

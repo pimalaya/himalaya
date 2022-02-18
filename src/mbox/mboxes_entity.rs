@@ -7,9 +7,9 @@ use serde::Serialize;
 use std::ops::Deref;
 
 use crate::{
-    domain::{Mbox, RawMbox},
     output::{PrintTable, PrintTableOpts, WriteColor},
     ui::Table,
+    Mbox, RawMbox,
 };
 
 /// Represents a list of raw mailboxes returned by the `imap` crate.

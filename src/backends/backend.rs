@@ -5,7 +5,10 @@
 
 use anyhow::Result;
 
-use crate::domain::{Envelopes, Mboxes, Msg};
+use crate::{
+    domain::{Envelopes, Msg},
+    Mboxes,
+};
 
 pub trait Backend<'a> {
     fn connect(&mut self) -> Result<()> {

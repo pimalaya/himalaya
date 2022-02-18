@@ -15,8 +15,9 @@ use std::{
 use crate::{
     backends::{imap::SortCriteria, Backend},
     config::{AccountConfig, ImapBackendConfig},
-    domain::{Envelope, Envelopes, Flags, Mboxes, Msg, RawEnvelopes, RawMboxes},
+    domain::{Envelope, Envelopes, Flags, Msg, RawEnvelopes},
     output::run_cmd,
+    Mboxes, RawMboxes,
 };
 
 type ImapSess = imap::Session<TlsStream<TcpStream>>;

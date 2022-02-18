@@ -9,8 +9,8 @@ use std::{
 };
 
 use crate::{
-    domain::Attrs,
     ui::{Cell, Row, Table},
+    Attrs,
 };
 
 /// Represents a raw mailbox returned by the `imap` crate.

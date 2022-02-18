@@ -8,10 +8,10 @@ use himalaya::{
     config::{account_args, config_args, AccountConfig, BackendConfig, DeserializedConfig},
     domain::{
         imap::{imap_arg, imap_handler},
-        mbox::{mbox_arg, mbox_handler},
         msg::{flag_arg, flag_handler, msg_arg, msg_handler, tpl_arg, tpl_handler},
         smtp::LettreService,
     },
+    mbox::{mbox_arg, mbox_handler},
     output::{output_arg, OutputFmt, StdoutPrinter},
 };
 
