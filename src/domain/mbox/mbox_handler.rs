@@ -6,12 +6,12 @@ use anyhow::Result;
 use log::{info, trace};
 
 use crate::{
-    domain::BackendService,
+    backends::Backend,
     output::{PrintTableOpts, PrinterService},
 };
 
 /// Lists all mailboxes.
-pub fn list<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
+pub fn list<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     max_width: Option<usize>,
     printer: &mut P,
     backend: Box<&'a mut B>,
@@ -93,9 +93,9 @@ mod tests {
             }
         }
 
-        struct TestBackendService;
+        struct TestBackend;
 
-        impl<'a> BackendService<'a> for TestBackendService {
+        impl<'a> Backend<'a> for TestBackend {
             fn get_mboxes(&mut self) -> Result<Mboxes> {
                 Ok(Mboxes(vec![
                     Mbox {
@@ -150,7 +150,7 @@ mod tests {
         }
 
         let mut printer = PrinterServiceTest::default();
-        let mut backend = TestBackendService {};
+        let mut backend = TestBackend {};
         let backend = Box::new(&mut backend);
 
         assert!(list(None, &mut printer, backend).is_ok());

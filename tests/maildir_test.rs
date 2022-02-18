@@ -3,8 +3,8 @@ use maildir::Maildir;
 use std::env;
 
 use himalaya::{
+    backends::{Backend, MaildirBackend},
     config::MaildirBackendConfig,
-    domain::{BackendService, MaildirService},
 };
 
 #[test]
@@ -14,7 +14,7 @@ fn test_maildir() -> Result<()> {
     maildir.create_dirs()?;
 
     let maildir_config = MaildirBackendConfig { maildir_dir: dir };
-    let mut maildir = MaildirService::new(&maildir_config);
+    let mut maildir = MaildirBackend::new(&maildir_config);
     let msg = include_bytes!("./emails/alice-to-patrick.eml");
     let id = maildir.add_msg("", msg, "seen")?;
 

@@ -15,9 +15,9 @@ use std::{
 use url::Url;
 
 use crate::{
+    backends::Backend,
     config::AccountConfig,
     domain::{
-        imap::BackendService,
         msg::{Msg, Part, TextPlainPart},
         smtp::SmtpService,
         Parts,
@@ -26,7 +26,7 @@ use crate::{
 };
 
 /// Downloads all message attachments to the user account downloads directory.
-pub fn attachments<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
+pub fn attachments<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     seq: &str,
     mbox: &str,
     account: &AccountConfig,
@@ -54,7 +54,7 @@ pub fn attachments<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 }
 
 /// Copy a message from a mailbox to another.
-pub fn copy<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
+pub fn copy<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     seq: &str,
     mbox_src: &str,
     mbox_dst: &str,
@@ -69,7 +69,7 @@ pub fn copy<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 }
 
 /// Delete messages matching the given sequence range.
-pub fn delete<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
+pub fn delete<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     seq: &str,
     mbox: &str,
     printer: &mut P,
@@ -80,7 +80,7 @@ pub fn delete<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 }
 
 /// Forward the given message UID from the selected mailbox.
-pub fn forward<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpService>(
+pub fn forward<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     seq: &str,
     attachments_paths: Vec<&str>,
     encrypt: bool,
@@ -100,7 +100,7 @@ pub fn forward<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpSer
 }
 
 /// List paginated messages from the selected mailbox.
-pub fn list<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
+pub fn list<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     max_width: Option<usize>,
     page_size: Option<usize>,
     page: usize,
@@ -120,7 +120,7 @@ pub fn list<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 /// Parses and edits a message from a [mailto] URL string.
 ///
 /// [mailto]: https://en.wikipedia.org/wiki/Mailto
-pub fn mailto<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpService>(
+pub fn mailto<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     url: &Url,
     account: &AccountConfig,
     printer: &mut P,
@@ -179,7 +179,7 @@ pub fn mailto<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpServ
 }
 
 /// Move a message from a mailbox to another.
-pub fn move_<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
+pub fn move_<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     seq: &str,
     mbox_src: &str,
     mbox_dest: &str,
@@ -194,7 +194,7 @@ pub fn move_<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 }
 
 /// Read a message by its sequence number.
-pub fn read<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
+pub fn read<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     seq: &str,
     text_mime: &str,
     raw: bool,
@@ -214,7 +214,7 @@ pub fn read<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 }
 
 /// Reply to the given message UID.
-pub fn reply<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpService>(
+pub fn reply<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     seq: &str,
     all: bool,
     attachments_paths: Vec<&str>,
@@ -235,7 +235,7 @@ pub fn reply<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpServi
 }
 
 /// Saves a raw message to the targetted mailbox.
-pub fn save<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
+pub fn save<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     mbox: &str,
     raw_msg: &str,
     printer: &mut P,
@@ -265,7 +265,7 @@ pub fn save<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 }
 
 /// Paginate messages from the selected mailbox matching the specified query.
-pub fn search<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
+pub fn search<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     query: String,
     max_width: Option<usize>,
     page_size: Option<usize>,
@@ -284,7 +284,7 @@ pub fn search<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 }
 
 /// Paginates messages from the selected mailbox matching the specified query, sorted by the given criteria.
-pub fn sort<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
+pub fn sort<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     sort: String,
     query: String,
     max_width: Option<usize>,
@@ -303,7 +303,7 @@ pub fn sort<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 }
 
 /// Send a raw message.
-pub fn send<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpService>(
+pub fn send<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     raw_msg: &str,
     account: &AccountConfig,
     printer: &mut P,
@@ -337,7 +337,7 @@ pub fn send<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpServic
 }
 
 /// Compose a new message.
-pub fn write<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpService>(
+pub fn write<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     attachments_paths: Vec<&str>,
     encrypt: bool,
     account: &AccountConfig,

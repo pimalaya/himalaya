@@ -1,8 +1,8 @@
-//! Module related to IMAP servicing.
+//! IMAP backend module.
 //!
-//! This module exposes a service that can interact with IMAP servers.
+//! This module contains the definition of the IMAP backend.
 
-use anyhow::{anyhow, Context, Error, Result};
+use anyhow::{anyhow, Context, Result};
 use log::{debug, log_enabled, trace, Level};
 use native_tls::{TlsConnector, TlsStream};
 use std::{
@@ -13,192 +13,27 @@ use std::{
 };
 
 use crate::{
+    backends::{imap::SortCriteria, Backend},
     config::{AccountConfig, ImapBackendConfig},
     domain::{Envelope, Envelopes, Flags, Mboxes, Msg, RawEnvelopes, RawMboxes},
     output::run_cmd,
 };
 
-type ImapSession = imap::Session<TlsStream<TcpStream>>;
+type ImapSess = imap::Session<TlsStream<TcpStream>>;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SortCriterionKind {
-    Arrival,
-    Cc,
-    Date,
-    From,
-    Size,
-    Subject,
-    To,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SortCriterionOrder {
-    Asc,
-    Desc,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SortCriterion {
-    kind: SortCriterionKind,
-    order: SortCriterionOrder,
-}
-
-impl TryFrom<&str> for SortCriterion {
-    type Error = Error;
-
-    fn try_from(criterion: &str) -> Result<Self, Self::Error> {
-        let criterion = criterion.to_lowercase();
-        match criterion.as_str() {
-            "arrival:asc" | "arrival" => Ok(Self {
-                kind: SortCriterionKind::Arrival,
-                order: SortCriterionOrder::Asc,
-            }),
-            "arrival:desc" => Ok(Self {
-                kind: SortCriterionKind::Arrival,
-                order: SortCriterionOrder::Desc,
-            }),
-            "cc:asc" | "cc" => Ok(Self {
-                kind: SortCriterionKind::Cc,
-                order: SortCriterionOrder::Asc,
-            }),
-            "cc:desc" => Ok(Self {
-                kind: SortCriterionKind::Cc,
-                order: SortCriterionOrder::Desc,
-            }),
-            "date:asc" | "date" => Ok(Self {
-                kind: SortCriterionKind::Date,
-                order: SortCriterionOrder::Asc,
-            }),
-            "date:desc" => Ok(Self {
-                kind: SortCriterionKind::Date,
-                order: SortCriterionOrder::Desc,
-            }),
-            "from:asc" | "from" => Ok(Self {
-                kind: SortCriterionKind::From,
-                order: SortCriterionOrder::Asc,
-            }),
-            "from:desc" => Ok(Self {
-                kind: SortCriterionKind::From,
-                order: SortCriterionOrder::Desc,
-            }),
-            "size:asc" | "size" => Ok(Self {
-                kind: SortCriterionKind::Size,
-                order: SortCriterionOrder::Asc,
-            }),
-            "size:desc" => Ok(Self {
-                kind: SortCriterionKind::Size,
-                order: SortCriterionOrder::Desc,
-            }),
-            "subject:asc" | "subject" => Ok(Self {
-                kind: SortCriterionKind::Subject,
-                order: SortCriterionOrder::Asc,
-            }),
-            "subject:desc" => Ok(Self {
-                kind: SortCriterionKind::Subject,
-                order: SortCriterionOrder::Desc,
-            }),
-            "to:asc" | "to" => Ok(Self {
-                kind: SortCriterionKind::To,
-                order: SortCriterionOrder::Asc,
-            }),
-            "to:desc" => Ok(Self {
-                kind: SortCriterionKind::To,
-                order: SortCriterionOrder::Desc,
-            }),
-            _ => Err(anyhow!("cannot parse sort criterion {:?}", criterion)),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SortCriteria(Vec<SortCriterion>);
-
-impl TryFrom<&str> for SortCriteria {
-    type Error = Error;
-
-    fn try_from(criteria_str: &str) -> Result<Self, Self::Error> {
-        let mut criteria = vec![];
-        for criterion_str in criteria_str.split(" ") {
-            let criterion_str = criterion_str.trim();
-            let criterion: SortCriterion = criterion_str
-                .try_into()
-                .context(format!("cannot parse criterion {:?}", criterion_str))?;
-            criteria.push(criterion)
-        }
-        Ok(Self(criteria))
-    }
-}
-
-impl<'a> Into<Vec<imap::extensions::sort::SortCriterion<'a>>> for SortCriteria {
-    fn into(self) -> Vec<imap::extensions::sort::SortCriterion<'a>> {
-        self.0
-            .into_iter()
-            .map(|criterion| {
-                let criterion: imap::extensions::sort::SortCriterion = criterion.into();
-                criterion
-            })
-            .collect()
-    }
-}
-
-impl<'a> Into<imap::extensions::sort::SortCriterion<'a>> for SortCriterion {
-    fn into(self) -> imap::extensions::sort::SortCriterion<'a> {
-        let criterion = match self.kind {
-            SortCriterionKind::Arrival => &imap::extensions::sort::SortCriterion::Arrival,
-            SortCriterionKind::Cc => &imap::extensions::sort::SortCriterion::Cc,
-            SortCriterionKind::Date => &imap::extensions::sort::SortCriterion::Date,
-            SortCriterionKind::From => &imap::extensions::sort::SortCriterion::From,
-            SortCriterionKind::Size => &imap::extensions::sort::SortCriterion::Size,
-            SortCriterionKind::Subject => &imap::extensions::sort::SortCriterion::Subject,
-            SortCriterionKind::To => &imap::extensions::sort::SortCriterion::To,
-        };
-        match self.order {
-            SortCriterionOrder::Asc => *criterion,
-            SortCriterionOrder::Desc => imap::extensions::sort::SortCriterion::Reverse(criterion),
-        }
-    }
-}
-
-pub trait BackendService<'a> {
-    fn connect(&mut self) -> Result<()> {
-        Ok(())
-    }
-
-    fn get_mboxes(&mut self) -> Result<Mboxes>;
-    fn get_envelopes(
-        &mut self,
-        mbox: &str,
-        filter: &str,
-        sort: &str,
-        page_size: usize,
-        page: usize,
-    ) -> Result<Envelopes>;
-    fn add_msg(&mut self, mbox: &str, msg: &[u8], flags: &str) -> Result<String>;
-    fn get_msg(&mut self, mbox: &str, id: &str) -> Result<Msg>;
-    fn copy_msg(&mut self, mbox_src: &str, mbox_dst: &str, id: &str) -> Result<()>;
-    fn move_msg(&mut self, mbox_src: &str, mbox_dst: &str, id: &str) -> Result<()>;
-    fn del_msg(&mut self, mbox: &str, ids: &str) -> Result<()>;
-    fn add_flags(&mut self, mbox: &str, ids: &str, flags: &str) -> Result<()>;
-    fn set_flags(&mut self, mbox: &str, ids: &str, flags: &str) -> Result<()>;
-    fn del_flags(&mut self, mbox: &str, ids: &str, flags: &str) -> Result<()>;
-
-    fn disconnect(&mut self) -> Result<()> {
-        Ok(())
-    }
-}
-
-pub struct ImapService<'a> {
+pub struct ImapBackend<'a> {
     account_config: &'a AccountConfig,
     imap_config: &'a ImapBackendConfig,
-    sess: Option<ImapSession>,
-    /// Holds raw mailboxes fetched by the `imap` crate in order to extend mailboxes lifetime
-    /// outside of handlers. Without that, it would be impossible for handlers to return a `Mbox`
-    /// struct or a `Mboxes` struct due to the `ZeroCopy` constraint.
+    sess: Option<ImapSess>,
+    /// Holds raw mailboxes fetched by the `imap` crate in order to
+    /// extend mailboxes lifetime outside of handlers. Without that,
+    /// it would be impossible for handlers to return a `Mbox` struct
+    /// or a `Mboxes` struct due to the `ZeroCopy` constraint.
     _raw_mboxes_cache: Option<RawMboxes>,
     _raw_msgs_cache: Option<RawEnvelopes>,
 }
 
-impl<'a> ImapService<'a> {
+impl<'a> ImapBackend<'a> {
     pub fn new(account_config: &'a AccountConfig, imap_config: &'a ImapBackendConfig) -> Self {
         Self {
             account_config,
@@ -209,7 +44,7 @@ impl<'a> ImapService<'a> {
         }
     }
 
-    fn sess(&mut self) -> Result<&mut ImapSession> {
+    fn sess(&mut self) -> Result<&mut ImapSess> {
         if self.sess.is_none() {
             debug!("create TLS builder");
             debug!("insecure: {}", self.imap_config.imap_insecure);
@@ -372,7 +207,7 @@ impl<'a> ImapService<'a> {
     }
 }
 
-impl<'a> BackendService<'a> for ImapService<'a> {
+impl<'a> Backend<'a> for ImapBackend<'a> {
     fn get_mboxes(&mut self) -> Result<Mboxes> {
         let raw_mboxes = self
             .sess()?
@@ -395,7 +230,6 @@ impl<'a> BackendService<'a> for ImapService<'a> {
             .context(format!("cannot select mailbox {:?}", mbox))?;
 
         let sort: SortCriteria = sort.try_into()?;
-        let sort: Vec<imap::extensions::sort::SortCriterion> = sort.into();
         let charset = imap::extensions::sort::SortCharset::Utf8;
         let begin = page * page_size;
         let end = begin + (page_size - 1);

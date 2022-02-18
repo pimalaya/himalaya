@@ -4,11 +4,11 @@
 
 use anyhow::Result;
 
-use crate::{domain::BackendService, output::PrinterService};
+use crate::{backends::Backend, output::PrinterService};
 
 /// Adds flags to all messages matching the given sequence range.
 /// Flags are case-insensitive, and they do not need to be prefixed with `\`.
-pub fn add<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
+pub fn add<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     seq_range: &'a str,
     flags: &'a str,
     mbox: &'a str,
@@ -24,7 +24,7 @@ pub fn add<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 
 /// Removes flags from all messages matching the given sequence range.
 /// Flags are case-insensitive, and they do not need to be prefixed with `\`.
-pub fn remove<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
+pub fn remove<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     seq_range: &'a str,
     flags: &'a str,
     mbox: &'a str,
@@ -40,7 +40,7 @@ pub fn remove<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 
 /// Replaces flags of all messages matching the given sequence range.
 /// Flags are case-insensitive, and they do not need to be prefixed with `\`.
-pub fn set<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
+pub fn set<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     seq_range: &'a str,
     flags: &'a str,
     mbox: &'a str,

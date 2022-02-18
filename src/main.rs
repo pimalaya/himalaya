@@ -3,14 +3,14 @@ use std::{convert::TryFrom, env};
 use url::Url;
 
 use himalaya::{
+    backends::{Backend, ImapBackend, MaildirBackend},
     compl::{compl_arg, compl_handler},
     config::{account_args, config_args, AccountConfig, BackendConfig, DeserializedConfig},
     domain::{
-        imap::{imap_arg, imap_handler, BackendService, ImapService},
+        imap::{imap_arg, imap_handler},
         mbox::{mbox_arg, mbox_handler},
         msg::{flag_arg, flag_handler, msg_arg, msg_handler, tpl_arg, tpl_handler},
         smtp::LettreService,
-        MaildirService,
     },
     output::{output_arg, OutputFmt, StdoutPrinter},
 };
@@ -48,13 +48,13 @@ fn main() -> Result<()> {
 
         let mut imap;
         let mut maildir;
-        let backend: Box<&mut dyn BackendService> = match backend_config {
+        let backend: Box<&mut dyn Backend> = match backend_config {
             BackendConfig::Imap(ref imap_config) => {
-                imap = ImapService::new(&account_config, imap_config);
+                imap = ImapBackend::new(&account_config, imap_config);
                 Box::new(&mut imap)
             }
             BackendConfig::Maildir(ref maildir_config) => {
-                maildir = MaildirService::new(maildir_config);
+                maildir = MaildirBackend::new(maildir_config);
                 Box::new(&mut maildir)
             }
         };
@@ -84,13 +84,13 @@ fn main() -> Result<()> {
     let mut printer = StdoutPrinter::try_from(m.value_of("output"))?;
     let mut imap;
     let mut maildir;
-    let backend: Box<&mut dyn BackendService> = match backend_config {
+    let backend: Box<&mut dyn Backend> = match backend_config {
         BackendConfig::Imap(ref imap_config) => {
-            imap = ImapService::new(&account_config, imap_config);
+            imap = ImapBackend::new(&account_config, imap_config);
             Box::new(&mut imap)
         }
         BackendConfig::Maildir(ref maildir_config) => {
-            maildir = MaildirService::new(maildir_config);
+            maildir = MaildirBackend::new(maildir_config);
             Box::new(&mut maildir)
         }
     };
@@ -99,7 +99,7 @@ fn main() -> Result<()> {
 
     // Check IMAP commands.
     if let BackendConfig::Imap(ref imap_config) = backend_config {
-        let mut imap = ImapService::new(&account_config, imap_config);
+        let mut imap = ImapBackend::new(&account_config, imap_config);
         match imap_arg::matches(&m)? {
             Some(imap_arg::Command::Notify(keepalive)) => {
                 return imap_handler::notify(keepalive, mbox, &account_config, &mut imap);

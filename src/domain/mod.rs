@@ -3,9 +3,6 @@
 pub mod imap;
 pub use self::imap::*;
 
-pub mod maildir;
-pub use self::maildir::*;
-
 pub mod mbox;
 pub use mbox::*;
 

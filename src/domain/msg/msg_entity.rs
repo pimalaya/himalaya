@@ -17,11 +17,11 @@ use std::{
 use uuid::Uuid;
 
 use crate::{
+    backends::Backend,
     config::{AccountConfig, DEFAULT_SIG_DELIM},
     domain::{
         from_addrs_to_sendable_addrs, from_addrs_to_sendable_mbox, from_imap_addrs_to_addrs,
         from_imap_addrs_to_some_addrs, from_slice_to_addrs,
-        imap::BackendService,
         msg::{msg_utils, BinaryPart, Flags, Part, Parts, TextPlainPart, TplOverride},
         smtp::SmtpService,
         Addrs,
@@ -314,12 +314,7 @@ impl Msg {
         Self::from_tpl(&tpl)
     }
 
-    pub fn edit_with_editor<
-        'a,
-        P: PrinterService,
-        B: BackendService<'a> + ?Sized,
-        S: SmtpService,
-    >(
+    pub fn edit_with_editor<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
         mut self,
         account: &AccountConfig,
         printer: &mut P,

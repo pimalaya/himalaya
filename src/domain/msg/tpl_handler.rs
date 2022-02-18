@@ -7,9 +7,9 @@ use atty::Stream;
 use std::io::{self, BufRead};
 
 use crate::{
+    backends::Backend,
     config::AccountConfig,
     domain::{
-        imap::BackendService,
         msg::{Msg, TplOverride},
         SmtpService,
     },
@@ -27,7 +27,7 @@ pub fn new<'a, P: PrinterService>(
 }
 
 /// Generate a reply message template.
-pub fn reply<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
+pub fn reply<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     seq: &str,
     all: bool,
     opts: TplOverride<'a>,
@@ -44,7 +44,7 @@ pub fn reply<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 }
 
 /// Generate a forward message template.
-pub fn forward<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
+pub fn forward<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     seq: &str,
     opts: TplOverride<'a>,
     mbox: &str,
@@ -60,7 +60,7 @@ pub fn forward<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 }
 
 /// Saves a message based on a template.
-pub fn save<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
+pub fn save<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     mbox: &str,
     account: &AccountConfig,
     attachments_paths: Vec<&str>,
@@ -85,7 +85,7 @@ pub fn save<'a, P: PrinterService, B: BackendService<'a> + ?Sized>(
 }
 
 /// Sends a message based on a template.
-pub fn send<'a, P: PrinterService, B: BackendService<'a> + ?Sized, S: SmtpService>(
+pub fn send<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     mbox: &str,
     account: &AccountConfig,
     attachments_paths: Vec<&str>,
