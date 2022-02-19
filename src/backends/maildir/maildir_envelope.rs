@@ -21,28 +21,27 @@ impl<'a> TryFrom<&'a mut RawMaildirEnvelopes> for Envelopes<'a> {
     fn try_from(raw_envelopes: &'a mut RawMaildirEnvelopes) -> Result<Self, Self::Error> {
         let mut envelopes = vec![];
         for raw_envelope in raw_envelopes {
-            envelopes.push(
-                raw_envelope
-                    .parsed()
-                    .context("cannot parse maildir mail entry")?
-                    .try_into()?,
-            );
+            envelopes.push(raw_envelope.try_into()?);
         }
         Ok(Envelopes(envelopes))
     }
 }
 
 /// Represents the raw envelope returned by the `maildir` crate.
-pub type RawMaildirEnvelope<'a> = mailparse::ParsedMail<'a>;
+pub type RawMaildirEnvelope = maildir::MailEntry;
 
-impl<'a> TryFrom<RawMaildirEnvelope<'a>> for Envelope<'a> {
+impl<'a> TryFrom<&'a mut RawMaildirEnvelope> for Envelope<'a> {
     type Error = Error;
 
-    fn try_from(parsed_mail: RawMaildirEnvelope<'a>) -> Result<Self, Self::Error> {
-        info!("begin: building envelope from parsed mail");
-        trace!("parsed mail: {:?}", parsed_mail);
+    fn try_from(mail_entry: &'a mut RawMaildirEnvelope) -> Result<Self, Self::Error> {
+        info!("begin: build envelope from maildir parsed mail");
 
         let mut envelope = Self::default();
+
+        let parsed_mail = mail_entry
+            .parsed()
+            .context("cannot parse maildir mail entry")?;
+        trace!("parsed mail: {:?}", parsed_mail);
 
         debug!("parsing headers");
         for header in parsed_mail.get_headers() {
@@ -60,7 +59,7 @@ impl<'a> TryFrom<RawMaildirEnvelope<'a>> for Envelope<'a> {
 
             match key.to_lowercase().as_str() {
                 "subject" => {
-                    envelope.subject = val.clone().into();
+                    envelope.subject = val.into();
                 }
                 "from" => {
                     envelope.sender = from_slice_to_addrs(val)
@@ -71,6 +70,8 @@ impl<'a> TryFrom<RawMaildirEnvelope<'a>> for Envelope<'a> {
                 _ => (),
             }
         }
+
+        envelope.id = mail_entry.id().into();
 
         trace!("envelope: {:?}", envelope);
         info!("end: building envelope from parsed mail");

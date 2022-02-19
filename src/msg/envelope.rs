@@ -49,10 +49,8 @@ impl<'a> From<&'a [Envelope<'a>]> for Envelopes<'a> {
 /// and is mostly used for listings.
 #[derive(Debug, Default, Clone, serde::Serialize)]
 pub struct Envelope<'a> {
-    /// Represents the sequence number of the message.
-    ///
-    /// [RFC3501]: https://datatracker.ietf.org/doc/html/rfc3501#section-2.3.1.2
-    pub id: u32,
+    /// Represents the id of the message.
+    pub id: Cow<'a, str>,
 
     /// Represents the flags attached to the message.
     pub flags: Flags,
@@ -60,12 +58,10 @@ pub struct Envelope<'a> {
     /// Represents the subject of the message.
     pub subject: Cow<'a, str>,
 
-    /// Represents the sender of the message.
+    /// Represents the first sender of the message.
     pub sender: String,
 
     /// Represents the internal date of the message.
-    ///
-    /// [RFC3501]: https://datatracker.ietf.org/doc/html/rfc3501#section-2.3.3
     pub date: Option<String>,
 }
 

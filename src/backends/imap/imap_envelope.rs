@@ -38,7 +38,7 @@ impl<'a> TryFrom<&'a RawImapEnvelope> for Envelope<'a> {
             .ok_or_else(|| anyhow!("cannot get envelope of message {}", fetch.message))?;
 
         // Get the sequence number
-        let id = fetch.message;
+        let id = fetch.message.to_string().into();
 
         // Get the flags
         let flags = Flags::try_from(fetch.flags())?;
