@@ -23,10 +23,10 @@ use crate::{
         from_addrs_to_sendable_addrs, from_addrs_to_sendable_mbox, from_imap_addrs_to_addrs,
         from_imap_addrs_to_some_addrs, from_slice_to_addrs,
         msg::{msg_utils, BinaryPart, Flags, Part, Parts, TextPlainPart, TplOverride},
-        smtp::SmtpService,
         Addrs,
     },
     output::PrinterService,
+    smtp::SmtpService,
     ui::{
         choice::{self, PostEditChoice, PreEditChoice},
         editor,

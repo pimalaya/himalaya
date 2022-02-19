@@ -19,10 +19,10 @@ use crate::{
     config::AccountConfig,
     domain::{
         msg::{Msg, Part, TextPlainPart},
-        smtp::SmtpService,
         Parts,
     },
     output::{PrintTableOpts, PrinterService},
+    smtp::SmtpService,
 };
 
 /// Downloads all message attachments to the user account downloads directory.

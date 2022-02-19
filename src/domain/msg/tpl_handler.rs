@@ -9,11 +9,9 @@ use std::io::{self, BufRead};
 use crate::{
     backends::Backend,
     config::AccountConfig,
-    domain::{
-        msg::{Msg, TplOverride},
-        SmtpService,
-    },
+    domain::msg::{Msg, TplOverride},
     output::PrinterService,
+    smtp::SmtpService,
 };
 
 /// Generate a new message template.
