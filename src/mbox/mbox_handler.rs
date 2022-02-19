@@ -24,14 +24,13 @@ pub fn list<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
 
 #[cfg(test)]
 mod tests {
-    use serde::Serialize;
     use std::{fmt::Debug, io};
     use termcolor::ColorSpec;
 
     use crate::{
         domain::{Envelopes, Msg},
+        mbox::{Mbox, MboxAttr, MboxAttrs, Mboxes},
         output::{Print, PrintTable, WriteColor},
-        AttrRemote, Attrs, Mbox, Mboxes,
     };
 
     use super::*;
@@ -78,7 +77,7 @@ mod tests {
         }
 
         impl PrinterService for PrinterServiceTest {
-            fn print_table<T: Debug + PrintTable + Serialize>(
+            fn print_table<T: Debug + PrintTable + serde::Serialize>(
                 &mut self,
                 data: T,
                 opts: PrintTableOpts,
@@ -86,7 +85,7 @@ mod tests {
                 data.print_table(&mut self.writter, opts)?;
                 Ok(())
             }
-            fn print<T: Serialize + Print>(&mut self, _data: T) -> Result<()> {
+            fn print<T: serde::Serialize + Print>(&mut self, _data: T) -> Result<()> {
                 unimplemented!()
             }
             fn is_json(&self) -> bool {
@@ -102,14 +101,14 @@ mod tests {
                     Mbox {
                         delim: "/".into(),
                         name: "INBOX".into(),
-                        attrs: Attrs::from(vec![AttrRemote::NoSelect]),
+                        attrs: MboxAttrs(vec![MboxAttr::NoSelect]),
                     },
                     Mbox {
                         delim: "/".into(),
                         name: "Sent".into(),
-                        attrs: Attrs::from(vec![
-                            AttrRemote::NoInferiors,
-                            AttrRemote::Custom("HasNoChildren".into()),
+                        attrs: MboxAttrs(vec![
+                            MboxAttr::NoInferiors,
+                            MboxAttr::Custom("HasNoChildren".into()),
                         ]),
                     },
                 ]))

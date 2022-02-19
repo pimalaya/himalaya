@@ -7,7 +7,7 @@ use anyhow::Result;
 
 use crate::{
     domain::{Envelopes, Msg},
-    Mboxes,
+    mbox::Mboxes,
 };
 
 pub trait Backend<'a> {

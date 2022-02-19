@@ -13,11 +13,11 @@ use std::{
 };
 
 use crate::{
-    backends::{imap::SortCriteria, Backend},
+    backends::{imap::msg_sort_criterion::SortCriteria, Backend, RawImapMboxes},
     config::{AccountConfig, ImapBackendConfig},
     domain::{Envelope, Envelopes, Flags, Msg, RawEnvelopes},
+    mbox::Mboxes,
     output::run_cmd,
-    Mboxes, RawMboxes,
 };
 
 type ImapSess = imap::Session<TlsStream<TcpStream>>;
@@ -30,7 +30,7 @@ pub struct ImapBackend<'a> {
     /// extend mailboxes lifetime outside of handlers. Without that,
     /// it would be impossible for handlers to return a `Mbox` struct
     /// or a `Mboxes` struct due to the `ZeroCopy` constraint.
-    _raw_mboxes_cache: Option<RawMboxes>,
+    _raw_mboxes_cache: Option<RawImapMboxes>,
     _raw_msgs_cache: Option<RawEnvelopes>,
 }
 
@@ -215,7 +215,7 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
             .list(Some(""), Some("*"))
             .context("cannot list mailboxes")?;
         self._raw_mboxes_cache = Some(raw_mboxes);
-        Ok(Mboxes::from(self._raw_mboxes_cache.as_ref().unwrap()))
+        Ok(self._raw_mboxes_cache.as_ref().unwrap().into())
     }
 
     fn get_envelopes(

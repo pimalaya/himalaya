@@ -1,14 +1,13 @@
 use anyhow::{Context, Error, Result};
 use atty::Stream;
-use serde::Serialize;
 use std::{convert::TryFrom, fmt::Debug};
 use termcolor::{ColorChoice, StandardStream};
 
 use crate::output::{OutputFmt, OutputJson, Print, PrintTable, PrintTableOpts, WriteColor};
 
 pub trait PrinterService {
-    fn print<T: Debug + Print + Serialize>(&mut self, data: T) -> Result<()>;
-    fn print_table<T: Debug + PrintTable + Serialize>(
+    fn print<T: Debug + Print + serde::Serialize>(&mut self, data: T) -> Result<()>;
+    fn print_table<T: Debug + PrintTable + serde::Serialize>(
         &mut self,
         data: T,
         opts: PrintTableOpts,
@@ -22,7 +21,7 @@ pub struct StdoutPrinter {
 }
 
 impl PrinterService for StdoutPrinter {
-    fn print<T: Debug + Print + Serialize>(&mut self, data: T) -> Result<()> {
+    fn print<T: Debug + Print + serde::Serialize>(&mut self, data: T) -> Result<()> {
         match self.fmt {
             OutputFmt::Plain => data.print(self.writter.as_mut()),
             OutputFmt::Json => serde_json::to_writer(self.writter.as_mut(), &OutputJson::new(data))
@@ -30,7 +29,7 @@ impl PrinterService for StdoutPrinter {
         }
     }
 
-    fn print_table<T: Debug + PrintTable + Serialize>(
+    fn print_table<T: Debug + PrintTable + serde::Serialize>(
         &mut self,
         data: T,
         opts: PrintTableOpts,

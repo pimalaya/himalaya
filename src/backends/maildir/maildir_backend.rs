@@ -2,19 +2,39 @@ use anyhow::{anyhow, Context, Result};
 use std::convert::{TryFrom, TryInto};
 
 use crate::{
-    backends::{maildir::Flags, Backend},
+    backends::{maildir::msg_flag::Flags, Backend, RawMaildirMboxes},
     config::MaildirBackendConfig,
     domain::{Envelope, Envelopes, Msg},
-    Mboxes,
+    mbox::Mboxes,
 };
 
 pub struct MaildirBackend {
     maildir: maildir::Maildir,
+    _raw_mboxes_cache: Option<RawMaildirMboxes>,
+}
+
+impl<'a> MaildirBackend {
+    pub fn new(maildir_config: &'a MaildirBackendConfig) -> Self {
+        Self {
+            maildir: maildir_config.maildir_dir.clone().into(),
+            _raw_mboxes_cache: None,
+        }
+    }
 }
 
 impl<'a> Backend<'a> for MaildirBackend {
     fn get_mboxes(&mut self) -> Result<Mboxes> {
-        unimplemented!()
+        let mut raw_mboxes = vec![];
+        for entry in self.maildir.list_subdirs() {
+            let raw_mbox = entry.context("cannot parse mailbox")?;
+            raw_mboxes.push(raw_mbox);
+        }
+        self._raw_mboxes_cache = Some(raw_mboxes);
+        self._raw_mboxes_cache
+            .as_ref()
+            .unwrap()
+            .try_into()
+            .context("cannot parse maildir subdirectories")
     }
 
     fn get_envelopes(
@@ -106,13 +126,5 @@ impl<'a> Backend<'a> for MaildirBackend {
                 "cannot remove flags {:?} to message {:?}",
                 flags_str, id
             ))
-    }
-}
-
-impl<'a> MaildirBackend {
-    pub fn new(maildir_config: &'a MaildirBackendConfig) -> Self {
-        Self {
-            maildir: maildir_config.maildir_dir.clone().into(),
-        }
     }
 }

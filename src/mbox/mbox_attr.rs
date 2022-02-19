@@ -3,8 +3,6 @@
 //! This module contains the definition of the mailbox attribute and
 //! its traits implementations.
 
-pub use imap::types::NameAttribute as AttrRemote;
-use serde::Serialize;
 use std::{
     borrow::Cow,
     fmt::{self, Display},
@@ -12,27 +10,18 @@ use std::{
 };
 
 /// Represents the attributes of the mailbox.
-#[derive(Debug, Default, PartialEq, Eq, Serialize)]
-pub struct Attrs<'a>(Vec<Attr<'a>>);
+#[derive(Debug, Default, PartialEq, Eq, serde::Serialize)]
+pub struct MboxAttrs<'a>(pub Vec<MboxAttr<'a>>);
 
-/// Converts a vector of `imap::types::NameAttribute` into attributes.
-impl<'a> From<Vec<AttrRemote<'a>>> for Attrs<'a> {
-    fn from(attrs: Vec<AttrRemote<'a>>) -> Self {
-        Self(attrs.into_iter().map(Attr::from).collect())
-    }
-}
-
-/// Derefs the attributes to its inner hashset.
-impl<'a> Deref for Attrs<'a> {
-    type Target = Vec<Attr<'a>>;
+impl<'a> Deref for MboxAttrs<'a> {
+    type Target = Vec<MboxAttr<'a>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-/// Makes the attributes displayable.
-impl<'a> Display for Attrs<'a> {
+impl<'a> Display for MboxAttrs<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut glue = "";
         for attr in self.iter() {
@@ -43,11 +32,8 @@ impl<'a> Display for Attrs<'a> {
     }
 }
 
-/// Wraps an `imap::types::NameAttribute`.
-/// See https://serde.rs/remote-derive.html.
-#[derive(Debug, PartialEq, Eq, Hash, Serialize)]
-#[serde(remote = "AttrRemote")]
-pub enum AttrWrap<'a> {
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize)]
+pub enum MboxAttr<'a> {
     NoInferiors,
     NoSelect,
     Marked,
@@ -55,28 +41,16 @@ pub enum AttrWrap<'a> {
     Custom(Cow<'a, str>),
 }
 
-/// Represents the mailbox attribute.
-/// See https://serde.rs/remote-derive.html.
-#[derive(Debug, PartialEq, Eq, Hash, Serialize)]
-pub struct Attr<'a>(#[serde(with = "AttrWrap")] pub AttrRemote<'a>);
-
 /// Makes the attribute displayable.
-impl<'a> Display for Attr<'a> {
+impl<'a> Display for MboxAttr<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match &self.0 {
-            AttrRemote::NoInferiors => write!(f, "NoInferiors"),
-            AttrRemote::NoSelect => write!(f, "NoSelect"),
-            AttrRemote::Marked => write!(f, "Marked"),
-            AttrRemote::Unmarked => write!(f, "Unmarked"),
-            AttrRemote::Custom(cow) => write!(f, "{}", cow),
+        match self {
+            MboxAttr::NoInferiors => write!(f, "NoInferiors"),
+            MboxAttr::NoSelect => write!(f, "NoSelect"),
+            MboxAttr::Marked => write!(f, "Marked"),
+            MboxAttr::Unmarked => write!(f, "Unmarked"),
+            MboxAttr::Custom(cow) => write!(f, "{}", cow),
         }
-    }
-}
-
-/// Converts an `imap::types::NameAttribute` into an attribute.
-impl<'a> From<AttrRemote<'a>> for Attr<'a> {
-    fn from(attr: AttrRemote<'a>) -> Self {
-        Self(attr)
     }
 }
 
@@ -88,16 +62,14 @@ mod tests {
     fn it_should_display_attrs() {
         macro_rules! attrs_from {
             ($($attr:expr),*) => {
-                Attrs::from(vec![$($attr,)*]).to_string()
+                MboxAttrs(vec![$($attr,)*]).to_string()
             };
         }
 
         let empty_attr = attrs_from![];
-        let single_attr = attrs_from![AttrRemote::NoInferiors];
-        let multiple_attrs = attrs_from![
-            AttrRemote::Custom("AttrCustom".into()),
-            AttrRemote::NoInferiors
-        ];
+        let single_attr = attrs_from![MboxAttr::NoInferiors];
+        let multiple_attrs =
+            attrs_from![MboxAttr::Custom("AttrCustom".into()), MboxAttr::NoInferiors];
 
         assert_eq!("", empty_attr);
         assert_eq!("NoInferiors", single_attr);
@@ -110,10 +82,10 @@ mod tests {
     fn it_should_display_attr() {
         macro_rules! attr_from {
             ($attr:ident) => {
-                Attr(AttrRemote::$attr).to_string()
+                MboxAttr::$attr.to_string()
             };
             ($custom:literal) => {
-                Attr(AttrRemote::Custom($custom.into())).to_string()
+                MboxAttr::Custom($custom.into()).to_string()
             };
         }
 

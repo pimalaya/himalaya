@@ -1,23 +1,44 @@
-//! Mailbox entity module.
+//! Mailbox module.
 //!
-//! This module contains the definition of the mailbox and its traits implementations.
+//! This module contains the definition of the mailbox and its traits
+//! implementations.
 
-use serde::Serialize;
+use anyhow::Result;
+use std::ops::Deref;
 use std::{
     borrow::Cow,
     fmt::{self, Display},
 };
 
 use crate::{
+    mbox::MboxAttrs,
+    output::{PrintTable, PrintTableOpts, WriteColor},
     ui::{Cell, Row, Table},
-    Attrs,
 };
 
-/// Represents a raw mailbox returned by the `imap` crate.
-pub type RawMbox = imap::types::Name;
+/// Represents a list of mailboxes.
+#[derive(Debug, Default, serde::Serialize)]
+pub struct Mboxes<'a>(pub Vec<Mbox<'a>>);
 
-/// Represents a mailbox.
-#[derive(Debug, Default, PartialEq, Eq, Serialize)]
+impl<'a> Deref for Mboxes<'a> {
+    type Target = Vec<Mbox<'a>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'a> PrintTable for Mboxes<'a> {
+    fn print_table(&self, writter: &mut dyn WriteColor, opts: PrintTableOpts) -> Result<()> {
+        writeln!(writter)?;
+        Table::print(writter, self, opts)?;
+        writeln!(writter)?;
+        Ok(())
+    }
+}
+
+/// Represents the mailbox.
+#[derive(Debug, Default, PartialEq, Eq, serde::Serialize)]
 pub struct Mbox<'a> {
     /// Represents the mailbox hierarchie delimiter.
     pub delim: Cow<'a, str>,
@@ -26,7 +47,7 @@ pub struct Mbox<'a> {
     pub name: Cow<'a, str>,
 
     /// Represents the mailbox attributes.
-    pub attrs: Attrs<'a>,
+    pub attrs: MboxAttrs<'a>,
 }
 
 impl<'a> Mbox<'a> {
@@ -39,15 +60,13 @@ impl<'a> Mbox<'a> {
     }
 }
 
-/// Makes the mailbox displayable.
-impl<'a> Display for Mbox<'a> {
+impl Display for Mbox<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.name)
     }
 }
 
-/// Makes the mailbox tableable.
-impl<'a> Table for Mbox<'a> {
+impl Table for Mbox<'_> {
     fn head() -> Row {
         Row::new()
             .cell(Cell::new("DELIM").bold().underline().white())
@@ -69,20 +88,10 @@ impl<'a> Table for Mbox<'a> {
     }
 }
 
-/// Converts an `imap::types::Name` into a mailbox.
-impl<'a> From<&'a imap::types::Name> for Mbox<'a> {
-    fn from(raw_mbox: &'a imap::types::Name) -> Self {
-        Self {
-            delim: raw_mbox.delimiter().unwrap_or_default().into(),
-            name: raw_mbox.name().into(),
-            attrs: Attrs::from(raw_mbox.attributes().to_vec()),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::super::AttrRemote;
+    use crate::mbox::{MboxAttr, MboxAttrs};
+
     use super::*;
 
     #[test]
@@ -92,7 +101,7 @@ mod tests {
             Mbox {
                 delim: Cow::default(),
                 name: "INBOX".into(),
-                attrs: Attrs::default()
+                attrs: MboxAttrs::default()
             },
             Mbox::new("INBOX")
         );
@@ -109,7 +118,7 @@ mod tests {
         let full_mbox = Mbox {
             delim: ".".into(),
             name: "Sent".into(),
-            attrs: Attrs::from(vec![AttrRemote::NoSelect]),
+            attrs: MboxAttrs(vec![MboxAttr::NoSelect]),
         };
         assert_eq!("Sent", full_mbox.to_string());
     }

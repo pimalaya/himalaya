@@ -45,7 +45,7 @@ impl Display for OutputFmt {
 }
 
 /// Defines a struct-wrapper to provide a JSON output.
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct OutputJson<T: Serialize> {
     response: T,
 }
