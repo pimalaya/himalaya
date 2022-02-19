@@ -2,15 +2,21 @@ use anyhow::{anyhow, Context, Result};
 use std::convert::{TryFrom, TryInto};
 
 use crate::{
-    backends::{maildir::msg_flag::Flags, Backend, RawMaildirMboxes},
+    backends::{maildir::msg_flag::Flags, Backend, RawMaildirEnvelopes, RawMaildirMboxes},
     config::MaildirBackendConfig,
-    domain::{Envelope, Envelopes, Msg},
+    domain::Msg,
     mbox::Mboxes,
+    msg::Envelopes,
 };
 
 pub struct MaildirBackend {
     maildir: maildir::Maildir,
+    /// Holds raw mailboxes fetched by the `maildir` crate in order to
+    /// extend mailboxes lifetime outside of handlers.
     _raw_mboxes_cache: Option<RawMaildirMboxes>,
+    /// Holds raw mailboxes fetched by the `maildir` crate in order to
+    /// extend mailboxes lifetime outside of handlers.
+    _raw_envelopes_cache: Option<RawMaildirEnvelopes>,
 }
 
 impl<'a> MaildirBackend {
@@ -18,6 +24,7 @@ impl<'a> MaildirBackend {
         Self {
             maildir: maildir_config.maildir_dir.clone().into(),
             _raw_mboxes_cache: None,
+            _raw_envelopes_cache: None,
         }
     }
 }
@@ -45,24 +52,22 @@ impl<'a> Backend<'a> for MaildirBackend {
         _page_size: usize,
         _page: usize,
     ) -> Result<Envelopes> {
-        let mut envelopes = vec![];
-
         let mail_entries = match filter {
             "new" => self.maildir.list_new(),
             _ => self.maildir.list_cur(),
         };
 
-        for mail_entry in mail_entries {
-            let mut parsed_mail = mail_entry?;
-            let parsed_mail = parsed_mail
-                .parsed()
-                .context(format!("cannot parse message"))?;
-            let envelope =
-                Envelope::try_from(parsed_mail).context(format!("cannot parse message"))?;
-            envelopes.push(envelope);
+        let mut raw_envelopes = vec![];
+        for entry in mail_entries {
+            raw_envelopes.push(entry.context("cannot read maildir mail entry")?);
         }
 
-        Ok(envelopes.into())
+        self._raw_envelopes_cache = Some(raw_envelopes);
+        self._raw_envelopes_cache
+            .as_mut()
+            .unwrap()
+            .try_into()
+            .context("cannot convert maildir envelopes")
     }
 
     fn add_msg(&mut self, _mbox: &str, msg: &[u8], flags: &str) -> Result<String> {

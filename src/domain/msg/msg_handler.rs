@@ -110,10 +110,10 @@ pub fn list<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     imap: Box<&'a mut B>,
 ) -> Result<()> {
     let page_size = page_size.unwrap_or(account.default_page_size);
-    trace!("page size: {}", page_size);
+    debug!("page size: {}", page_size);
 
     let msgs = imap.get_envelopes(mbox, "arrival:desc", "all", page_size, page)?;
-    trace!("messages: {:#?}", msgs);
+    trace!("envelopes: {:?}", msgs);
     printer.print_table(msgs, PrintTableOpts { max_width })
 }
 

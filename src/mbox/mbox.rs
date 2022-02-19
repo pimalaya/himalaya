@@ -18,6 +18,7 @@ use crate::{
 
 /// Represents a list of mailboxes.
 #[derive(Debug, Default, serde::Serialize)]
+
 pub struct Mboxes<'a>(pub Vec<Mbox<'a>>);
 
 impl<'a> Deref for Mboxes<'a> {

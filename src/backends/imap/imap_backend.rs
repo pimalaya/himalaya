@@ -13,10 +13,11 @@ use std::{
 };
 
 use crate::{
-    backends::{imap::msg_sort_criterion::SortCriteria, Backend, RawImapMboxes},
+    backends::{imap::msg_sort_criterion::SortCriteria, Backend, RawImapEnvelopes, RawImapMboxes},
     config::{AccountConfig, ImapBackendConfig},
-    domain::{Envelope, Envelopes, Flags, Msg, RawEnvelopes},
+    domain::{Flags, Msg},
     mbox::Mboxes,
+    msg::{Envelope, Envelopes},
     output::run_cmd,
 };
 
@@ -27,11 +28,11 @@ pub struct ImapBackend<'a> {
     imap_config: &'a ImapBackendConfig,
     sess: Option<ImapSess>,
     /// Holds raw mailboxes fetched by the `imap` crate in order to
-    /// extend mailboxes lifetime outside of handlers. Without that,
-    /// it would be impossible for handlers to return a `Mbox` struct
-    /// or a `Mboxes` struct due to the `ZeroCopy` constraint.
+    /// extend mailboxes lifetime outside of handlers.
     _raw_mboxes_cache: Option<RawImapMboxes>,
-    _raw_msgs_cache: Option<RawEnvelopes>,
+    /// Holds raw envelopes fetched by the `imap` crate in order to
+    /// extend envelopes lifetime outside of handlers.
+    _raw_envelopes_cache: Option<RawImapEnvelopes>,
 }
 
 impl<'a> ImapBackend<'a> {
@@ -41,7 +42,7 @@ impl<'a> ImapBackend<'a> {
             imap_config,
             sess: None,
             _raw_mboxes_cache: None,
-            _raw_msgs_cache: None,
+            _raw_envelopes_cache: None,
         }
     }
 
@@ -226,9 +227,14 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
         page_size: usize,
         page: usize,
     ) -> Result<Envelopes> {
-        self.sess()?
+        let last_seq = self
+            .sess()?
             .select(mbox)
-            .context(format!("cannot select mailbox {:?}", mbox))?;
+            .context(format!("cannot select mailbox {:?}", mbox))?
+            .exists;
+        if last_seq == 0 {
+            return Ok(Envelopes::default());
+        }
 
         let sort: SortCriteria = sort.try_into()?;
         let charset = imap::extensions::sort::SortCharset::Utf8;
@@ -244,7 +250,6 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
             .iter()
             .map(|seq| seq.to_string())
             .collect();
-
         if seqs.is_empty() {
             return Ok(Envelopes::default());
         }
@@ -255,8 +260,8 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
             .sess()?
             .fetch(&range, "(ENVELOPE FLAGS INTERNALDATE)")
             .context(format!("cannot fetch messages within range {:?}", range))?;
-        self._raw_msgs_cache = Some(fetches);
-        Envelopes::try_from(self._raw_msgs_cache.as_ref().unwrap())
+        self._raw_envelopes_cache = Some(fetches);
+        self._raw_envelopes_cache.as_ref().unwrap().try_into()
     }
 
     fn add_msg(&mut self, mbox: &str, msg: &[u8], flags: &str) -> Result<String> {

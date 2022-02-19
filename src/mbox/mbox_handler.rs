@@ -28,8 +28,9 @@ mod tests {
     use termcolor::ColorSpec;
 
     use crate::{
-        domain::{Envelopes, Msg},
+        domain::Msg,
         mbox::{Mbox, MboxAttr, MboxAttrs, Mboxes},
+        msg::Envelopes,
         output::{Print, PrintTable, WriteColor},
     };
 
