@@ -7,7 +7,6 @@ use crate::{
     },
     config::MaildirBackendConfig,
     domain::Msg,
-    mbox::Mboxes,
     msg::Envelopes,
     output::Output,
 };
