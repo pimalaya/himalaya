@@ -26,15 +26,13 @@ use crate::{
 type ImapSess = imap::Session<TlsStream<TcpStream>>;
 
 pub struct ImapBackend<'a> {
-    account_config: &'a AccountConfig,
     imap_config: &'a ImapBackendConfig,
     sess: Option<ImapSess>,
 }
 
 impl<'a> ImapBackend<'a> {
-    pub fn new(account_config: &'a AccountConfig, imap_config: &'a ImapBackendConfig) -> Self {
+    pub fn new(imap_config: &'a ImapBackendConfig) -> Self {
         Self {
-            account_config,
             imap_config,
             sess: None,
         }
@@ -267,29 +265,42 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
         Ok(Box::new(String::new()))
     }
 
-    fn get_msg(&mut self, mbox: &str, seq: &str) -> Result<Msg> {
+    fn get_msg(&mut self, mbox: &str, seq: &str, config: &AccountConfig) -> Result<Msg> {
         self.sess()?
             .select(mbox)
             .context(format!("cannot select mailbox {:?}", mbox))?;
         let fetches = self
             .sess()?
-            .fetch(seq, "(ENVELOPE FLAGS INTERNALDATE BODY[])")
+            .fetch(seq, "(FLAGS INTERNALDATE BODY[])")
             .context(format!("cannot fetch messages {:?}", seq))?;
         let fetch = fetches
             .first()
             .ok_or_else(|| anyhow!("cannot find message {:?}", seq))?;
-
-        Msg::try_from((self.account_config, fetch))
+        let parsed_mail = mailparse::parse_mail(fetch.body().unwrap_or_default())
+            .context("cannot parse message")?;
+        Msg::from_parsed_mail(parsed_mail, config)
     }
 
-    fn copy_msg(&mut self, mbox_source: &str, mbox_target: &str, seq: &str) -> Result<()> {
-        let msg = self.get_msg(&mbox_source, seq)?.raw;
+    fn copy_msg(
+        &mut self,
+        mbox_source: &str,
+        mbox_target: &str,
+        seq: &str,
+        config: &AccountConfig,
+    ) -> Result<()> {
+        let msg = self.get_msg(&mbox_source, seq, config)?.raw;
         self.add_msg(&mbox_target, &msg, "seen")?;
         Ok(())
     }
 
-    fn move_msg(&mut self, mbox_src: &str, mbox_dest: &str, seq: &str) -> Result<()> {
-        let msg = self.get_msg(mbox_src, seq)?.raw;
+    fn move_msg(
+        &mut self,
+        mbox_src: &str,
+        mbox_dest: &str,
+        seq: &str,
+        config: &AccountConfig,
+    ) -> Result<()> {
+        let msg = self.get_msg(mbox_src, seq, config)?.raw;
         self.add_flags(mbox_src, seq, "seen deleted")?;
         self.add_msg(&mbox_dest, &msg, "seen")?;
         Ok(())

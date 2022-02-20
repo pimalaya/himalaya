@@ -47,7 +47,7 @@ fn main() -> Result<()> {
         let mut maildir;
         let backend: Box<&mut dyn Backend> = match backend_config {
             BackendConfig::Imap(ref imap_config) => {
-                imap = ImapBackend::new(&account_config, imap_config);
+                imap = ImapBackend::new(imap_config);
                 Box::new(&mut imap)
             }
             BackendConfig::Maildir(ref maildir_config) => {
@@ -83,7 +83,7 @@ fn main() -> Result<()> {
     let mut maildir;
     let backend: Box<&mut dyn Backend> = match backend_config {
         BackendConfig::Imap(ref imap_config) => {
-            imap = ImapBackend::new(&account_config, imap_config);
+            imap = ImapBackend::new(imap_config);
             Box::new(&mut imap)
         }
         BackendConfig::Maildir(ref maildir_config) => {
@@ -96,7 +96,7 @@ fn main() -> Result<()> {
 
     // Check IMAP commands.
     if let BackendConfig::Imap(ref imap_config) = backend_config {
-        let mut imap = ImapBackend::new(&account_config, imap_config);
+        let mut imap = ImapBackend::new(imap_config);
         match imap_arg::matches(&m)? {
             Some(imap_arg::Command::Notify(keepalive)) => {
                 return imap_handler::notify(keepalive, mbox, &account_config, &mut imap);
@@ -122,7 +122,7 @@ fn main() -> Result<()> {
             return msg_handler::attachments(seq, mbox, &account_config, &mut printer, backend);
         }
         Some(msg_arg::Cmd::Copy(seq, mbox_dst)) => {
-            return msg_handler::copy(seq, mbox, mbox_dst, &mut printer, backend);
+            return msg_handler::copy(seq, mbox, mbox_dst, &account_config, &mut printer, backend);
         }
         Some(msg_arg::Cmd::Delete(seq)) => {
             return msg_handler::delete(seq, mbox, &mut printer, backend);
@@ -151,10 +151,18 @@ fn main() -> Result<()> {
             );
         }
         Some(msg_arg::Cmd::Move(seq, mbox_dst)) => {
-            return msg_handler::move_(seq, mbox, mbox_dst, &mut printer, backend);
+            return msg_handler::move_(seq, mbox, mbox_dst, &account_config, &mut printer, backend);
         }
         Some(msg_arg::Cmd::Read(seq, text_mime, raw)) => {
-            return msg_handler::read(seq, text_mime, raw, mbox, &mut printer, backend);
+            return msg_handler::read(
+                seq,
+                text_mime,
+                raw,
+                mbox,
+                &account_config,
+                &mut printer,
+                backend,
+            );
         }
         Some(msg_arg::Cmd::Reply(seq, all, attachment_paths, encrypt)) => {
             return msg_handler::reply(

@@ -1,11 +1,11 @@
 use anyhow::{anyhow, Context, Result};
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 
 use crate::{
     backends::{
         maildir::msg_flag::Flags, Backend, MaildirEnvelopes, MaildirMboxes, RawMaildirEnvelopes,
     },
-    config::MaildirBackendConfig,
+    config::{AccountConfig, MaildirBackendConfig},
     domain::Msg,
     mbox::Mboxes,
     msg::Envelopes,
@@ -60,7 +60,7 @@ impl<'a> Backend<'a> for MaildirBackend {
         Ok(Box::new(id))
     }
 
-    fn get_msg(&mut self, _mbox: &str, id: &str) -> Result<Msg> {
+    fn get_msg(&mut self, _mbox: &str, id: &str, config: &AccountConfig) -> Result<Msg> {
         let mut mail_entry = self
             .maildir
             .find(id)
@@ -69,14 +69,26 @@ impl<'a> Backend<'a> for MaildirBackend {
         let parsed_mail = mail_entry
             .parsed()
             .context(format!("cannot parse message {:?}", id))?;
-        Msg::try_from(parsed_mail).context(format!("cannot parse message {:?}", id))
+        Msg::from_parsed_mail(parsed_mail, config).context(format!("cannot parse message {:?}", id))
     }
 
-    fn copy_msg(&mut self, _mbox_src: &str, _mbox_dest: &str, _id: &str) -> Result<()> {
+    fn copy_msg(
+        &mut self,
+        _mbox_src: &str,
+        _mbox_dest: &str,
+        _id: &str,
+        _config: &AccountConfig,
+    ) -> Result<()> {
         unimplemented!();
     }
 
-    fn move_msg(&mut self, _mbox_src: &str, _mbox_dest: &str, _id: &str) -> Result<()> {
+    fn move_msg(
+        &mut self,
+        _mbox_src: &str,
+        _mbox_dest: &str,
+        _id: &str,
+        _config: &AccountConfig,
+    ) -> Result<()> {
         unimplemented!();
     }
 

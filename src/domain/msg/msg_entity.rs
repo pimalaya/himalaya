@@ -5,23 +5,14 @@ use html_escape;
 use lettre::message::{header::ContentType, Attachment, MultiPart, SinglePart};
 use log::{debug, info, trace};
 use regex::Regex;
-use rfc2047_decoder;
-use std::{
-    collections::HashSet,
-    convert::{TryFrom, TryInto},
-    env::temp_dir,
-    fmt::Debug,
-    fs,
-    path::PathBuf,
-};
+use std::{collections::HashSet, env::temp_dir, fmt::Debug, fs, path::PathBuf};
 use uuid::Uuid;
 
 use crate::{
     backends::Backend,
     config::{AccountConfig, DEFAULT_SIG_DELIM},
     domain::{
-        from_addrs_to_sendable_addrs, from_addrs_to_sendable_mbox, from_imap_addrs_to_addrs,
-        from_imap_addrs_to_some_addrs, from_slice_to_addrs,
+        from_addrs_to_sendable_addrs, from_addrs_to_sendable_mbox, from_slice_to_addrs,
         msg::{msg_utils, BinaryPart, Flags, Part, Parts, TextPlainPart, TplOverride},
         Addrs,
     },
@@ -537,7 +528,7 @@ impl Msg {
         let parsed_mail = mailparse::parse_mail(tpl.as_bytes()).context("cannot parse template")?;
 
         info!("end: building message from template");
-        Self::try_from(parsed_mail)
+        Self::from_parsed_mail(parsed_mail, &AccountConfig::default())
     }
 
     pub fn into_sendable_msg(&self, account: &AccountConfig) -> Result<lettre::Message> {
@@ -624,12 +615,11 @@ impl Msg {
             .multipart(multipart)
             .context("cannot build sendable message")
     }
-}
 
-impl TryFrom<mailparse::ParsedMail<'_>> for Msg {
-    type Error = Error;
-
-    fn try_from(parsed_mail: mailparse::ParsedMail) -> Result<Self, Self::Error> {
+    pub fn from_parsed_mail(
+        parsed_mail: mailparse::ParsedMail<'_>,
+        config: &AccountConfig,
+    ) -> Result<Self> {
         info!("begin: building message from parsed mail");
         trace!("parsed mail: {:?}", parsed_mail);
 
@@ -679,15 +669,10 @@ impl TryFrom<mailparse::ParsedMail<'_>> for Msg {
             }
         }
 
-        debug!("parsing body");
-        let content = parsed_mail
-            .get_body_raw()
-            .context("cannot get raw body from message")
-            .and_then(|body| String::from_utf8(body).context("cannot decode body from utf8"))?;
-        trace!("body: {:?}", content);
-        msg.parts.push(Part::TextPlain(TextPlainPart { content }));
-
+        msg.parts = Parts::from_parsed_mail(config, &parsed_mail)
+            .context("cannot parsed message mime parts")?;
         trace!("message: {:?}", msg);
+
         info!("end: building message from parsed mail");
         Ok(msg)
     }
@@ -707,99 +692,5 @@ impl TryInto<lettre::address::Envelope> for Msg {
             .map(from_addrs_to_sendable_addrs)
             .unwrap_or(Ok(vec![]))?;
         Ok(lettre::address::Envelope::new(from, to).context("cannot create envelope")?)
-    }
-}
-
-impl<'a> TryFrom<(&'a AccountConfig, &'a imap::types::Fetch)> for Msg {
-    type Error = Error;
-
-    fn try_from((account, fetch): (&'a AccountConfig, &'a imap::types::Fetch)) -> Result<Msg> {
-        let envelope = fetch
-            .envelope()
-            .ok_or_else(|| anyhow!("cannot get envelope of message {}", fetch.message))?;
-
-        // Get the sequence number
-        let id = fetch.message;
-
-        // Get the flags
-        let flags = Flags::try_from(fetch.flags())?;
-
-        // Get the subject
-        let subject = envelope
-            .subject
-            .as_ref()
-            .map(|subj| {
-                rfc2047_decoder::decode(subj).context(format!(
-                    "cannot decode subject of message {}",
-                    fetch.message
-                ))
-            })
-            .unwrap_or_else(|| Ok(String::default()))?;
-
-        let from = if let Some(addrs) = envelope
-            .sender
-            .as_ref()
-            .or_else(|| envelope.from.as_ref())
-            .map(|ref addrs| from_imap_addrs_to_addrs(addrs))
-        {
-            Some(addrs?)
-        } else {
-            None
-        };
-        let reply_to = from_imap_addrs_to_some_addrs(&envelope.reply_to)?;
-        let to = from_imap_addrs_to_some_addrs(&envelope.to)?;
-        let cc = from_imap_addrs_to_some_addrs(&envelope.cc)?;
-        let bcc = from_imap_addrs_to_some_addrs(&envelope.bcc)?;
-
-        // Get the "In-Reply-To" message identifier
-        let in_reply_to = if let Some(id) = envelope
-            .in_reply_to
-            .as_ref()
-            .map(|cow| String::from_utf8(cow.to_vec()))
-        {
-            Some(id?)
-        } else {
-            None
-        };
-
-        // Get the message identifier
-        let message_id = if let Some(id) = envelope
-            .message_id
-            .as_ref()
-            .map(|cow| String::from_utf8(cow.to_vec()))
-        {
-            Some(id?)
-        } else {
-            None
-        };
-
-        // Get the internal date
-        let date = fetch.internal_date();
-
-        // Get all parts
-        let raw = fetch
-            .body()
-            .ok_or_else(|| anyhow!("cannot get body of message {}", id))?
-            .to_vec();
-        let parsed_mail =
-            mailparse::parse_mail(&raw).context(format!("cannot parse body of message {}", id))?;
-        let parts = Parts::from_parsed_mail(account, &parsed_mail)?;
-
-        Ok(Self {
-            id,
-            flags,
-            subject,
-            from,
-            reply_to,
-            to,
-            cc,
-            bcc,
-            in_reply_to,
-            message_id,
-            date,
-            parts,
-            encrypt: false,
-            raw,
-        })
     }
 }

@@ -30,14 +30,14 @@ pub fn reply<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     all: bool,
     opts: TplOverride<'a>,
     mbox: &str,
-    account: &'a AccountConfig,
+    config: &'a AccountConfig,
     printer: &'a mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
     let tpl = backend
-        .get_msg(mbox, seq)?
-        .into_reply(all, account)?
-        .to_tpl(opts, account)?;
+        .get_msg(mbox, seq, config)?
+        .into_reply(all, config)?
+        .to_tpl(opts, config)?;
     printer.print(tpl)
 }
 
@@ -46,21 +46,21 @@ pub fn forward<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     seq: &str,
     opts: TplOverride<'a>,
     mbox: &str,
-    account: &'a AccountConfig,
+    config: &'a AccountConfig,
     printer: &'a mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
     let tpl = backend
-        .get_msg(mbox, seq)?
-        .into_forward(account)?
-        .to_tpl(opts, account)?;
+        .get_msg(mbox, seq, config)?
+        .into_forward(config)?
+        .to_tpl(opts, config)?;
     printer.print(tpl)
 }
 
 /// Saves a message based on a template.
 pub fn save<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     mbox: &str,
-    account: &AccountConfig,
+    config: &AccountConfig,
     attachments_paths: Vec<&str>,
     tpl: &str,
     printer: &mut P,
@@ -77,7 +77,7 @@ pub fn save<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
             .join("\n")
     };
     let msg = Msg::from_tpl(&tpl)?.add_attachments(attachments_paths)?;
-    let raw_msg = msg.into_sendable_msg(account)?.formatted();
+    let raw_msg = msg.into_sendable_msg(config)?.formatted();
     backend.add_msg(mbox, &raw_msg, "seen")?;
     printer.print("Template successfully saved")
 }

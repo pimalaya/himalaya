@@ -29,11 +29,11 @@ use crate::{
 pub fn attachments<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     seq: &str,
     mbox: &str,
-    account: &AccountConfig,
+    config: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
-    let attachments = backend.get_msg(mbox, seq)?.attachments();
+    let attachments = backend.get_msg(mbox, seq, config)?.attachments();
     let attachments_len = attachments.len();
     debug!(
         r#"{} attachment(s) found for message "{}""#,
@@ -41,7 +41,7 @@ pub fn attachments<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     );
 
     for attachment in attachments {
-        let file_path = account.get_download_file_path(&attachment.filename)?;
+        let file_path = config.get_download_file_path(&attachment.filename)?;
         debug!("downloading {}…", attachment.filename);
         fs::write(&file_path, &attachment.content)
             .context(format!("cannot download attachment {:?}", file_path))?;
@@ -49,7 +49,7 @@ pub fn attachments<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
 
     printer.print(format!(
         "{} attachment(s) successfully downloaded to {:?}",
-        attachments_len, account.downloads_dir
+        attachments_len, config.downloads_dir
     ))
 }
 
@@ -58,10 +58,11 @@ pub fn copy<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     seq: &str,
     mbox_src: &str,
     mbox_dst: &str,
+    config: &AccountConfig,
     printer: &mut P,
     backend: Box<&mut B>,
 ) -> Result<()> {
-    backend.copy_msg(mbox_src, mbox_dst, seq)?;
+    backend.copy_msg(mbox_src, mbox_dst, seq, config)?;
     printer.print(format!(
         r#"Message {} successfully copied to folder "{}""#,
         seq, mbox_dst
@@ -85,17 +86,17 @@ pub fn forward<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     attachments_paths: Vec<&str>,
     encrypt: bool,
     mbox: &str,
-    account: &AccountConfig,
+    config: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
     smtp: &mut S,
 ) -> Result<()> {
     backend
-        .get_msg(mbox, seq)?
-        .into_forward(account)?
+        .get_msg(mbox, seq, config)?
+        .into_forward(config)?
         .add_attachments(attachments_paths)?
         .encrypt(encrypt)
-        .edit_with_editor(account, printer, backend, smtp)?;
+        .edit_with_editor(config, printer, backend, smtp)?;
     Ok(())
 }
 
@@ -105,11 +106,11 @@ pub fn list<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     page_size: Option<usize>,
     page: usize,
     mbox: &str,
-    account: &AccountConfig,
+    config: &AccountConfig,
     printer: &mut P,
     imap: Box<&'a mut B>,
 ) -> Result<()> {
-    let page_size = page_size.unwrap_or(account.default_page_size);
+    let page_size = page_size.unwrap_or(config.default_page_size);
     debug!("page size: {}", page_size);
     let msgs = imap.get_envelopes(mbox, "arrival:desc", "all", page_size, page)?;
     trace!("envelopes: {:?}", msgs);
@@ -121,7 +122,7 @@ pub fn list<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
 /// [mailto]: https://en.wikipedia.org/wiki/Mailto
 pub fn mailto<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     url: &Url,
-    account: &AccountConfig,
+    config: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
     smtp: &mut S,
@@ -153,7 +154,7 @@ pub fn mailto<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     }
 
     let msg = Msg {
-        from: Some(vec![account.address()?].into()),
+        from: Some(vec![config.address()?].into()),
         to: if to.is_empty() { None } else { Some(to) },
         cc: if cc.is_empty() {
             None
@@ -173,7 +174,7 @@ pub fn mailto<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     };
     trace!("message: {:?}", msg);
 
-    msg.edit_with_editor(account, printer, backend, smtp)?;
+    msg.edit_with_editor(config, printer, backend, smtp)?;
     Ok(())
 }
 
@@ -182,10 +183,11 @@ pub fn move_<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     seq: &str,
     mbox_src: &str,
     mbox_dest: &str,
+    config: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
-    backend.move_msg(mbox_src, mbox_dest, seq)?;
+    backend.move_msg(mbox_src, mbox_dest, seq, config)?;
     printer.print(format!(
         r#"Message {} successfully moved to folder "{}""#,
         seq, mbox_dest
@@ -198,10 +200,11 @@ pub fn read<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     text_mime: &str,
     raw: bool,
     mbox: &str,
+    config: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
-    let msg = backend.get_msg(mbox, seq)?;
+    let msg = backend.get_msg(mbox, seq, config)?;
     let msg = if raw {
         // Emails don't always have valid utf8. Using "lossy" to display what we can.
         String::from_utf8_lossy(&msg.raw).into_owned()
@@ -219,17 +222,17 @@ pub fn reply<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     attachments_paths: Vec<&str>,
     encrypt: bool,
     mbox: &str,
-    account: &AccountConfig,
+    config: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
     smtp: &mut S,
 ) -> Result<()> {
     backend
-        .get_msg(mbox, seq)?
-        .into_reply(all, account)?
+        .get_msg(mbox, seq, config)?
+        .into_reply(all, config)?
         .add_attachments(attachments_paths)?
         .encrypt(encrypt)
-        .edit_with_editor(account, printer, backend, smtp)?
+        .edit_with_editor(config, printer, backend, smtp)?
         .add_flags(mbox, seq, "replied")
 }
 
@@ -270,11 +273,11 @@ pub fn search<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     page_size: Option<usize>,
     page: usize,
     mbox: &str,
-    account: &AccountConfig,
+    config: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
-    let page_size = page_size.unwrap_or(account.default_page_size);
+    let page_size = page_size.unwrap_or(config.default_page_size);
     debug!("page size: {}", page_size);
     let msgs = backend.get_envelopes(mbox, "arrival:desc", &query, page_size, page)?;
     trace!("messages: {:#?}", msgs);
@@ -289,11 +292,11 @@ pub fn sort<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     page_size: Option<usize>,
     page: usize,
     mbox: &str,
-    account: &AccountConfig,
+    config: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
-    let page_size = page_size.unwrap_or(account.default_page_size);
+    let page_size = page_size.unwrap_or(config.default_page_size);
     debug!("page size: {}", page_size);
     let msgs = backend.get_envelopes(mbox, &sort, &query, page_size, page)?;
     trace!("envelopes: {:#?}", msgs);
@@ -303,7 +306,7 @@ pub fn sort<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
 /// Send a raw message.
 pub fn send<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     raw_msg: &str,
-    account: &AccountConfig,
+    config: &AccountConfig,
     printer: &mut P,
     backend: Box<&mut B>,
     smtp: &mut S,
@@ -330,7 +333,7 @@ pub fn send<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     trace!("envelope: {:?}", envelope);
 
     smtp.send_raw_msg(&envelope, raw_msg.as_bytes())?;
-    backend.add_msg(&account.sent_folder, raw_msg.as_bytes(), "seen")?;
+    backend.add_msg(&config.sent_folder, raw_msg.as_bytes(), "seen")?;
     Ok(())
 }
 
@@ -338,7 +341,7 @@ pub fn send<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
 pub fn write<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     attachments_paths: Vec<&str>,
     encrypt: bool,
-    account: &AccountConfig,
+    config: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
     smtp: &mut S,
@@ -346,6 +349,6 @@ pub fn write<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     Msg::default()
         .add_attachments(attachments_paths)?
         .encrypt(encrypt)
-        .edit_with_editor(account, printer, backend, smtp)?;
+        .edit_with_editor(config, printer, backend, smtp)?;
     Ok(())
 }
