@@ -49,6 +49,8 @@ pub mod smtp {
 }
 
 pub mod mbox {
+    pub mod mbox;
+    pub use mbox::*;
     pub mod mbox_arg;
     pub mod mbox_handler;
 }

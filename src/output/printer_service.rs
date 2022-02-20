@@ -1,14 +1,20 @@
 use anyhow::{Context, Error, Result};
 use atty::Stream;
-use std::{convert::TryFrom, fmt::Debug};
+use std::{
+    convert::TryFrom,
+    fmt::{self, Debug},
+};
 use termcolor::{ColorChoice, StandardStream};
 
-use crate::output::{Output, OutputFmt, OutputJson, Print, PrintTableOpts, WriteColor};
+use crate::output::{OutputFmt, OutputJson, Print, PrintTable, PrintTableOpts, WriteColor};
 
 pub trait PrinterService {
     fn print<T: Debug + Print + serde::Serialize>(&mut self, data: T) -> Result<()>;
-    fn print_table<T: Output + ?Sized>(&mut self, data: Box<T>, opts: PrintTableOpts)
-        -> Result<()>;
+    fn print_table<T: fmt::Debug + erased_serde::Serialize + PrintTable + ?Sized>(
+        &mut self,
+        data: Box<T>,
+        opts: PrintTableOpts,
+    ) -> Result<()>;
     fn is_json(&self) -> bool;
 }
 
@@ -26,7 +32,7 @@ impl PrinterService for StdoutPrinter {
         }
     }
 
-    fn print_table<T: Output + ?Sized>(
+    fn print_table<T: fmt::Debug + erased_serde::Serialize + PrintTable + ?Sized>(
         &mut self,
         data: Box<T>,
         opts: PrintTableOpts,

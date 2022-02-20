@@ -12,6 +12,7 @@ use std::{
 };
 
 use crate::{
+    mbox::PrintableMboxes,
     output::{PrintTable, PrintTableOpts, WriteColor},
     ui::{Cell, Row, Table},
 };
@@ -35,6 +36,10 @@ impl PrintTable for MaildirMboxes {
         writeln!(writter)?;
         Ok(())
     }
+}
+
+impl PrintableMboxes for MaildirMboxes {
+    //
 }
 
 /// Represents the mailbox.

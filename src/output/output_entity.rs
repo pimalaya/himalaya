@@ -1,13 +1,6 @@
 use anyhow::{anyhow, Error, Result};
 use std::{convert::TryFrom, fmt};
 
-use super::PrintTable;
-
-pub trait Output: fmt::Debug + erased_serde::Serialize + PrintTable {}
-impl<T: fmt::Debug + erased_serde::Serialize + PrintTable> Output for T {}
-
-erased_serde::serialize_trait_object!(Output);
-
 /// Represents the available output formats.
 #[derive(Debug, PartialEq)]
 pub enum OutputFmt {

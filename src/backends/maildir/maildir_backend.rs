@@ -2,20 +2,15 @@ use anyhow::{anyhow, Context, Result};
 use std::convert::{TryFrom, TryInto};
 
 use crate::{
-    backends::{
-        maildir::msg_flag::Flags, Backend, MaildirMboxes, RawMaildirEnvelopes, RawMaildirMboxes,
-    },
+    backends::{maildir::msg_flag::Flags, Backend, MaildirMboxes, RawMaildirEnvelopes},
     config::MaildirBackendConfig,
     domain::Msg,
+    mbox::Mboxes,
     msg::Envelopes,
-    output::Output,
 };
 
 pub struct MaildirBackend {
     maildir: maildir::Maildir,
-    /// Holds raw mailboxes fetched by the `maildir` crate in order to
-    /// extend mailboxes lifetime outside of handlers.
-    _raw_mboxes_cache: Option<RawMaildirMboxes>,
     /// Holds raw mailboxes fetched by the `maildir` crate in order to
     /// extend mailboxes lifetime outside of handlers.
     _raw_envelopes_cache: Option<RawMaildirEnvelopes>,
@@ -25,14 +20,13 @@ impl<'a> MaildirBackend {
     pub fn new(maildir_config: &'a MaildirBackendConfig) -> Self {
         Self {
             maildir: maildir_config.maildir_dir.clone().into(),
-            _raw_mboxes_cache: None,
             _raw_envelopes_cache: None,
         }
     }
 }
 
 impl<'a> Backend<'a> for MaildirBackend {
-    fn get_mboxes(&mut self) -> Result<Box<dyn Output>> {
+    fn get_mboxes(&mut self) -> Result<Mboxes> {
         let mboxes: MaildirMboxes = self.maildir.list_subdirs().try_into()?;
         Ok(Box::new(mboxes))
     }

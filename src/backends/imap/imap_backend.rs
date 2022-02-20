@@ -19,8 +19,9 @@ use crate::{
     },
     config::{AccountConfig, ImapBackendConfig},
     domain::{Flags, Msg},
+    mbox::Mboxes,
     msg::{Envelope, Envelopes},
-    output::{run_cmd, Output},
+    output::run_cmd,
 };
 
 type ImapSess = imap::Session<TlsStream<TcpStream>>;
@@ -212,7 +213,7 @@ impl<'a> ImapBackend<'a> {
 }
 
 impl<'a> Backend<'a> for ImapBackend<'a> {
-    fn get_mboxes(&mut self) -> Result<Box<dyn Output>> {
+    fn get_mboxes(&mut self) -> Result<Mboxes> {
         let mboxes: ImapMboxes = self
             .sess()?
             .list(Some(""), Some("*"))
