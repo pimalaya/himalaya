@@ -3,15 +3,12 @@ use atty::Stream;
 use std::{convert::TryFrom, fmt::Debug};
 use termcolor::{ColorChoice, StandardStream};
 
-use crate::output::{OutputFmt, OutputJson, Print, PrintTable, PrintTableOpts, WriteColor};
+use crate::output::{Output, OutputFmt, OutputJson, Print, PrintTableOpts, WriteColor};
 
 pub trait PrinterService {
     fn print<T: Debug + Print + serde::Serialize>(&mut self, data: T) -> Result<()>;
-    fn print_table<T: Debug + PrintTable + serde::Serialize>(
-        &mut self,
-        data: T,
-        opts: PrintTableOpts,
-    ) -> Result<()>;
+    fn print_table<T: Output + ?Sized>(&mut self, data: Box<T>, opts: PrintTableOpts)
+        -> Result<()>;
     fn is_json(&self) -> bool;
 }
 
@@ -29,15 +26,19 @@ impl PrinterService for StdoutPrinter {
         }
     }
 
-    fn print_table<T: Debug + PrintTable + serde::Serialize>(
+    fn print_table<T: Output + ?Sized>(
         &mut self,
-        data: T,
+        data: Box<T>,
         opts: PrintTableOpts,
     ) -> Result<()> {
         match self.fmt {
             OutputFmt::Plain => data.print_table(self.writter.as_mut(), opts),
-            OutputFmt::Json => serde_json::to_writer(self.writter.as_mut(), &OutputJson::new(data))
-                .context("cannot write JSON to writter"),
+            OutputFmt::Json => {
+                let json = &mut serde_json::Serializer::new(self.writter.as_mut());
+                let ser = &mut <dyn erased_serde::Serializer>::erase(json);
+                data.erased_serialize(ser).unwrap();
+                Ok(())
+            }
         }
     }
 

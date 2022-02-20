@@ -2,11 +2,14 @@ use anyhow::{anyhow, Context, Result};
 use std::convert::{TryFrom, TryInto};
 
 use crate::{
-    backends::{maildir::msg_flag::Flags, Backend, RawMaildirEnvelopes, RawMaildirMboxes},
+    backends::{
+        maildir::msg_flag::Flags, Backend, MaildirMboxes, RawMaildirEnvelopes, RawMaildirMboxes,
+    },
     config::MaildirBackendConfig,
     domain::Msg,
     mbox::Mboxes,
     msg::Envelopes,
+    output::Output,
 };
 
 pub struct MaildirBackend {
@@ -30,18 +33,9 @@ impl<'a> MaildirBackend {
 }
 
 impl<'a> Backend<'a> for MaildirBackend {
-    fn get_mboxes(&mut self) -> Result<Mboxes> {
-        let mut raw_mboxes = vec![];
-        for entry in self.maildir.list_subdirs() {
-            let raw_mbox = entry.context("cannot parse mailbox")?;
-            raw_mboxes.push(raw_mbox);
-        }
-        self._raw_mboxes_cache = Some(raw_mboxes);
-        self._raw_mboxes_cache
-            .as_ref()
-            .unwrap()
-            .try_into()
-            .context("cannot parse maildir subdirectories")
+    fn get_mboxes(&mut self) -> Result<Box<dyn Output>> {
+        let mboxes: MaildirMboxes = self.maildir.list_subdirs().try_into()?;
+        Ok(Box::new(mboxes))
     }
 
     fn get_envelopes(

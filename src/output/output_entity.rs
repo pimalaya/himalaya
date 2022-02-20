@@ -1,9 +1,12 @@
 use anyhow::{anyhow, Error, Result};
-use serde::Serialize;
-use std::{
-    convert::TryFrom,
-    fmt::{self, Display},
-};
+use std::{convert::TryFrom, fmt};
+
+use super::PrintTable;
+
+pub trait Output: fmt::Debug + erased_serde::Serialize + PrintTable {}
+impl<T: fmt::Debug + erased_serde::Serialize + PrintTable> Output for T {}
+
+erased_serde::serialize_trait_object!(Output);
 
 /// Represents the available output formats.
 #[derive(Debug, PartialEq)]
@@ -34,7 +37,7 @@ impl TryFrom<Option<&str>> for OutputFmt {
     }
 }
 
-impl Display for OutputFmt {
+impl fmt::Display for OutputFmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let fmt = match *self {
             OutputFmt::Json => "JSON",
@@ -45,12 +48,12 @@ impl Display for OutputFmt {
 }
 
 /// Defines a struct-wrapper to provide a JSON output.
-#[derive(Debug, Clone, Serialize)]
-pub struct OutputJson<T: Serialize> {
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct OutputJson<T: serde::Serialize> {
     response: T,
 }
 
-impl<T: Serialize> OutputJson<T> {
+impl<T: serde::Serialize> OutputJson<T> {
     pub fn new(response: T) -> Self {
         Self { response }
     }

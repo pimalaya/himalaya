@@ -13,12 +13,14 @@ use std::{
 };
 
 use crate::{
-    backends::{imap::msg_sort_criterion::SortCriteria, Backend, RawImapEnvelopes, RawImapMboxes},
+    backends::{
+        imap::msg_sort_criterion::SortCriteria, Backend, ImapMboxes, RawImapEnvelopes,
+        RawImapMboxes,
+    },
     config::{AccountConfig, ImapBackendConfig},
     domain::{Flags, Msg},
-    mbox::Mboxes,
     msg::{Envelope, Envelopes},
-    output::run_cmd,
+    output::{run_cmd, Output},
 };
 
 type ImapSess = imap::Session<TlsStream<TcpStream>>;
@@ -210,13 +212,13 @@ impl<'a> ImapBackend<'a> {
 }
 
 impl<'a> Backend<'a> for ImapBackend<'a> {
-    fn get_mboxes(&mut self) -> Result<Mboxes> {
-        let raw_mboxes = self
+    fn get_mboxes(&mut self) -> Result<Box<dyn Output>> {
+        let mboxes: ImapMboxes = self
             .sess()?
             .list(Some(""), Some("*"))
-            .context("cannot list mailboxes")?;
-        self._raw_mboxes_cache = Some(raw_mboxes);
-        Ok(self._raw_mboxes_cache.as_ref().unwrap().into())
+            .context("cannot list mailboxes")?
+            .into();
+        Ok(Box::new(mboxes))
     }
 
     fn get_envelopes(

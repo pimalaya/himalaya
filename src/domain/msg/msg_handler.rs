@@ -114,7 +114,8 @@ pub fn list<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
 
     let msgs = imap.get_envelopes(mbox, "arrival:desc", "all", page_size, page)?;
     trace!("envelopes: {:?}", msgs);
-    printer.print_table(msgs, PrintTableOpts { max_width })
+    // printer.print_table(msgs, PrintTableOpts { max_width })
+    Ok(())
 }
 
 /// Parses and edits a message from a [mailto] URL string.
@@ -280,7 +281,8 @@ pub fn search<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
 
     let msgs = backend.get_envelopes(mbox, "arrival:desc", &query, page_size, page)?;
     trace!("messages: {:#?}", msgs);
-    printer.print_table(msgs, PrintTableOpts { max_width })
+    // printer.print_table(msgs, PrintTableOpts { max_width })
+    Ok(())
 }
 
 /// Paginates messages from the selected mailbox matching the specified query, sorted by the given criteria.
@@ -299,7 +301,8 @@ pub fn sort<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     trace!("page size: {}", page_size);
     let msgs = backend.get_envelopes(mbox, &sort, &query, page_size, page)?;
     trace!("envelopes: {:#?}", msgs);
-    printer.print_table(msgs, PrintTableOpts { max_width })
+    // printer.print_table(msgs, PrintTableOpts { max_width })
+    Ok(())
 }
 
 /// Send a raw message.

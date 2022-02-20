@@ -4,11 +4,8 @@
 //! implementations.
 
 use anyhow::Result;
+use std::fmt::{self, Display};
 use std::ops::Deref;
-use std::{
-    borrow::Cow,
-    fmt::{self, Display},
-};
 
 use crate::{
     mbox::MboxAttrs,
@@ -18,18 +15,17 @@ use crate::{
 
 /// Represents a list of mailboxes.
 #[derive(Debug, Default, serde::Serialize)]
+pub struct Mboxes(pub Vec<Mbox>);
 
-pub struct Mboxes<'a>(pub Vec<Mbox<'a>>);
-
-impl<'a> Deref for Mboxes<'a> {
-    type Target = Vec<Mbox<'a>>;
+impl Deref for Mboxes {
+    type Target = Vec<Mbox>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<'a> PrintTable for Mboxes<'a> {
+impl PrintTable for Mboxes {
     fn print_table(&self, writter: &mut dyn WriteColor, opts: PrintTableOpts) -> Result<()> {
         writeln!(writter)?;
         Table::print(writter, self, opts)?;
@@ -40,20 +36,20 @@ impl<'a> PrintTable for Mboxes<'a> {
 
 /// Represents the mailbox.
 #[derive(Debug, Default, PartialEq, Eq, serde::Serialize)]
-pub struct Mbox<'a> {
+pub struct Mbox {
     /// Represents the mailbox hierarchie delimiter.
-    pub delim: Cow<'a, str>,
+    pub delim: String,
 
     /// Represents the mailbox name.
-    pub name: Cow<'a, str>,
+    pub name: String,
 
     /// Represents the mailbox attributes.
-    pub attrs: MboxAttrs<'a>,
+    pub attrs: MboxAttrs,
 }
 
-impl<'a> Mbox<'a> {
+impl Mbox {
     /// Creates a new mailbox with just a name.
-    pub fn new(name: &'a str) -> Self {
+    pub fn new(name: &str) -> Self {
         Self {
             name: name.into(),
             ..Self::default()
@@ -61,13 +57,13 @@ impl<'a> Mbox<'a> {
     }
 }
 
-impl Display for Mbox<'_> {
+impl Display for Mbox {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.name)
     }
 }
 
-impl Table for Mbox<'_> {
+impl Table for Mbox {
     fn head() -> Row {
         Row::new()
             .cell(Cell::new("DELIM").bold().underline().white())
@@ -100,9 +96,8 @@ mod tests {
         assert_eq!(Mbox::default(), Mbox::new(""));
         assert_eq!(
             Mbox {
-                delim: Cow::default(),
                 name: "INBOX".into(),
-                attrs: MboxAttrs::default()
+                ..Mbox::default()
             },
             Mbox::new("INBOX")
         );

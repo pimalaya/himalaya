@@ -5,14 +5,14 @@
 
 use anyhow::Result;
 
-use crate::{domain::Msg, mbox::Mboxes, msg::Envelopes};
+use crate::{domain::Msg, msg::Envelopes, output::Output};
 
 pub trait Backend<'a> {
     fn connect(&mut self) -> Result<()> {
         Ok(())
     }
 
-    fn get_mboxes(&mut self) -> Result<Mboxes>;
+    fn get_mboxes(&mut self) -> Result<Box<dyn Output>>;
     fn get_envelopes(
         &mut self,
         mbox: &str,

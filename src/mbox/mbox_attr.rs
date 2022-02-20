@@ -4,24 +4,23 @@
 //! its traits implementations.
 
 use std::{
-    borrow::Cow,
     fmt::{self, Display},
     ops::Deref,
 };
 
 /// Represents the attributes of the mailbox.
 #[derive(Debug, Default, PartialEq, Eq, serde::Serialize)]
-pub struct MboxAttrs<'a>(pub Vec<MboxAttr<'a>>);
+pub struct MboxAttrs(pub Vec<MboxAttr>);
 
-impl<'a> Deref for MboxAttrs<'a> {
-    type Target = Vec<MboxAttr<'a>>;
+impl Deref for MboxAttrs {
+    type Target = Vec<MboxAttr>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<'a> Display for MboxAttrs<'a> {
+impl Display for MboxAttrs {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut glue = "";
         for attr in self.iter() {
@@ -33,23 +32,23 @@ impl<'a> Display for MboxAttrs<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize)]
-pub enum MboxAttr<'a> {
+pub enum MboxAttr {
     NoInferiors,
     NoSelect,
     Marked,
     Unmarked,
-    Custom(Cow<'a, str>),
+    Custom(String),
 }
 
 /// Makes the attribute displayable.
-impl<'a> Display for MboxAttr<'a> {
+impl Display for MboxAttr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             MboxAttr::NoInferiors => write!(f, "NoInferiors"),
             MboxAttr::NoSelect => write!(f, "NoSelect"),
             MboxAttr::Marked => write!(f, "Marked"),
             MboxAttr::Unmarked => write!(f, "Unmarked"),
-            MboxAttr::Custom(cow) => write!(f, "{}", cow),
+            MboxAttr::Custom(custom) => write!(f, "{}", custom),
         }
     }
 }

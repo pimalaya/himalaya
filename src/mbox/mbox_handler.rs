@@ -78,7 +78,7 @@ mod tests {
         }
 
         impl PrinterService for PrinterServiceTest {
-            fn print_table<T: Debug + PrintTable + serde::Serialize>(
+            fn print_table<T: Debug + PrintTable + erased_serde::Serialize>(
                 &mut self,
                 data: T,
                 opts: PrintTableOpts,
