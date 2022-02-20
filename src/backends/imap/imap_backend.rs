@@ -14,13 +14,12 @@ use std::{
 
 use crate::{
     backends::{
-        imap::msg_sort_criterion::SortCriteria, Backend, ImapMboxes, RawImapEnvelopes,
-        RawImapMboxes,
+        imap::msg_sort_criterion::SortCriteria, Backend, ImapEnvelope, ImapEnvelopes, ImapMboxes,
     },
     config::{AccountConfig, ImapBackendConfig},
     domain::{Flags, Msg},
     mbox::Mboxes,
-    msg::{Envelope, Envelopes},
+    msg::Envelopes,
     output::run_cmd,
 };
 
@@ -30,12 +29,6 @@ pub struct ImapBackend<'a> {
     account_config: &'a AccountConfig,
     imap_config: &'a ImapBackendConfig,
     sess: Option<ImapSess>,
-    /// Holds raw mailboxes fetched by the `imap` crate in order to
-    /// extend mailboxes lifetime outside of handlers.
-    _raw_mboxes_cache: Option<RawImapMboxes>,
-    /// Holds raw envelopes fetched by the `imap` crate in order to
-    /// extend envelopes lifetime outside of handlers.
-    _raw_envelopes_cache: Option<RawImapEnvelopes>,
 }
 
 impl<'a> ImapBackend<'a> {
@@ -44,8 +37,6 @@ impl<'a> ImapBackend<'a> {
             account_config,
             imap_config,
             sess: None,
-            _raw_mboxes_cache: None,
-            _raw_envelopes_cache: None,
         }
     }
 
@@ -155,7 +146,7 @@ impl<'a> ImapBackend<'a> {
                     .context("cannot fetch new messages enveloppe")?;
 
                 for fetch in fetches.iter() {
-                    let msg = Envelope::try_from(fetch)?;
+                    let msg = ImapEnvelope::try_from(fetch)?;
                     let uid = fetch.uid.ok_or_else(|| {
                         anyhow!("cannot retrieve message {}'s UID", fetch.message)
                     })?;
@@ -236,7 +227,7 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
             .context(format!("cannot select mailbox {:?}", mbox))?
             .exists;
         if last_seq == 0 {
-            return Ok(Envelopes::default());
+            return Ok(Box::new(ImapEnvelopes::default()));
         }
 
         let sort: SortCriteria = sort.try_into()?;
@@ -254,17 +245,16 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
             .map(|seq| seq.to_string())
             .collect();
         if seqs.is_empty() {
-            return Ok(Envelopes::default());
+            return Ok(Box::new(ImapEnvelopes::default()));
         }
 
-        // FIXME: panic if begin > end
         let range = seqs[begin..end.min(seqs.len())].join(",");
         let fetches = self
             .sess()?
             .fetch(&range, "(ENVELOPE FLAGS INTERNALDATE)")
             .context(format!("cannot fetch messages within range {:?}", range))?;
-        self._raw_envelopes_cache = Some(fetches);
-        self._raw_envelopes_cache.as_ref().unwrap().try_into()
+        let envelopes: ImapEnvelopes = fetches.try_into()?;
+        Ok(Box::new(envelopes))
     }
 
     fn add_msg(&mut self, mbox: &str, msg: &[u8], flags: &str) -> Result<String> {

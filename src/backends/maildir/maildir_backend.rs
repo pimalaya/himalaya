@@ -2,7 +2,9 @@ use anyhow::{anyhow, Context, Result};
 use std::convert::{TryFrom, TryInto};
 
 use crate::{
-    backends::{maildir::msg_flag::Flags, Backend, MaildirMboxes, RawMaildirEnvelopes},
+    backends::{
+        maildir::msg_flag::Flags, Backend, MaildirEnvelopes, MaildirMboxes, RawMaildirEnvelopes,
+    },
     config::MaildirBackendConfig,
     domain::Msg,
     mbox::Mboxes,
@@ -43,18 +45,10 @@ impl<'a> Backend<'a> for MaildirBackend {
             "new" => self.maildir.list_new(),
             _ => self.maildir.list_cur(),
         };
-
-        let mut raw_envelopes = vec![];
-        for entry in mail_entries {
-            raw_envelopes.push(entry.context("cannot read maildir mail entry")?);
-        }
-
-        self._raw_envelopes_cache = Some(raw_envelopes);
-        self._raw_envelopes_cache
-            .as_mut()
-            .unwrap()
+        let envelopes: MaildirEnvelopes = mail_entries
             .try_into()
-            .context("cannot convert maildir envelopes")
+            .context("cannot parse maildir envelopes")?;
+        Ok(Box::new(envelopes))
     }
 
     fn add_msg(&mut self, _mbox: &str, msg: &[u8], flags: &str) -> Result<String> {

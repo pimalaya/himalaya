@@ -28,19 +28,19 @@ pub mod backends {
         pub mod msg_sort_criterion;
     }
 
+    pub use self::maildir::*;
     pub mod maildir {
         pub mod maildir_backend;
         pub use maildir_backend::*;
 
-        pub mod maildir_envelope;
-        pub use maildir_envelope::*;
-
         pub mod maildir_mbox;
         pub use maildir_mbox::*;
 
+        pub mod maildir_envelope;
+        pub use maildir_envelope::*;
+
         pub mod msg_flag;
     }
-    pub use self::maildir::*;
 }
 
 pub mod smtp {
@@ -51,6 +51,7 @@ pub mod smtp {
 pub mod mbox {
     pub mod mbox;
     pub use mbox::*;
+
     pub mod mbox_arg;
     pub mod mbox_handler;
 }

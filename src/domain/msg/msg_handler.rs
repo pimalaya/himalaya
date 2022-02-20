@@ -111,11 +111,9 @@ pub fn list<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
 ) -> Result<()> {
     let page_size = page_size.unwrap_or(account.default_page_size);
     debug!("page size: {}", page_size);
-
     let msgs = imap.get_envelopes(mbox, "arrival:desc", "all", page_size, page)?;
     trace!("envelopes: {:?}", msgs);
-    // printer.print_table(msgs, PrintTableOpts { max_width })
-    Ok(())
+    printer.print_table(msgs, PrintTableOpts { max_width })
 }
 
 /// Parses and edits a message from a [mailto] URL string.
@@ -277,12 +275,10 @@ pub fn search<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     backend: Box<&'a mut B>,
 ) -> Result<()> {
     let page_size = page_size.unwrap_or(account.default_page_size);
-    trace!("page size: {}", page_size);
-
+    debug!("page size: {}", page_size);
     let msgs = backend.get_envelopes(mbox, "arrival:desc", &query, page_size, page)?;
     trace!("messages: {:#?}", msgs);
-    // printer.print_table(msgs, PrintTableOpts { max_width })
-    Ok(())
+    printer.print_table(msgs, PrintTableOpts { max_width })
 }
 
 /// Paginates messages from the selected mailbox matching the specified query, sorted by the given criteria.
@@ -298,11 +294,10 @@ pub fn sort<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     backend: Box<&'a mut B>,
 ) -> Result<()> {
     let page_size = page_size.unwrap_or(account.default_page_size);
-    trace!("page size: {}", page_size);
+    debug!("page size: {}", page_size);
     let msgs = backend.get_envelopes(mbox, &sort, &query, page_size, page)?;
     trace!("envelopes: {:#?}", msgs);
-    // printer.print_table(msgs, PrintTableOpts { max_width })
-    Ok(())
+    printer.print_table(msgs, PrintTableOpts { max_width })
 }
 
 /// Send a raw message.
