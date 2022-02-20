@@ -34,18 +34,6 @@ impl PrintTable for ImapEnvelopes {
     }
 }
 
-impl From<Vec<ImapEnvelope>> for ImapEnvelopes {
-    fn from(envelopes: Vec<ImapEnvelope>) -> Self {
-        Self(envelopes)
-    }
-}
-
-impl From<&[ImapEnvelope]> for ImapEnvelopes {
-    fn from(envelopes: &[ImapEnvelope]) -> Self {
-        Self(envelopes.to_vec())
-    }
-}
-
 impl PrintableEnvelopes for ImapEnvelopes {
     //
 }
