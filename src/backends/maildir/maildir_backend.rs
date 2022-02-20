@@ -28,7 +28,7 @@ impl<'a> MaildirBackend {
 }
 
 impl<'a> Backend<'a> for MaildirBackend {
-    fn get_mboxes(&mut self) -> Result<Mboxes> {
+    fn get_mboxes(&mut self) -> Result<Box<dyn Mboxes>> {
         let mboxes: MaildirMboxes = self.maildir.list_subdirs().try_into()?;
         Ok(Box::new(mboxes))
     }
@@ -40,7 +40,7 @@ impl<'a> Backend<'a> for MaildirBackend {
         filter: &str,
         _page_size: usize,
         _page: usize,
-    ) -> Result<Envelopes> {
+    ) -> Result<Box<dyn Envelopes>> {
         let mail_entries = match filter {
             "new" => self.maildir.list_new(),
             _ => self.maildir.list_cur(),
@@ -51,11 +51,13 @@ impl<'a> Backend<'a> for MaildirBackend {
         Ok(Box::new(envelopes))
     }
 
-    fn add_msg(&mut self, _mbox: &str, msg: &[u8], flags: &str) -> Result<String> {
+    fn add_msg(&mut self, _mbox: &str, msg: &[u8], flags: &str) -> Result<Box<dyn ToString>> {
         let flags: Flags = flags.try_into()?;
-        self.maildir
+        let id = self
+            .maildir
             .store_cur_with_flags(msg, &flags.to_string())
-            .context("cannot add message to the \"cur\" folder")
+            .context("cannot add message to the \"cur\" folder")?;
+        Ok(Box::new(id))
     }
 
     fn get_msg(&mut self, _mbox: &str, id: &str) -> Result<Msg> {

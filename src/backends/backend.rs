@@ -12,7 +12,7 @@ pub trait Backend<'a> {
         Ok(())
     }
 
-    fn get_mboxes(&mut self) -> Result<Mboxes>;
+    fn get_mboxes(&mut self) -> Result<Box<dyn Mboxes>>;
     fn get_envelopes(
         &mut self,
         mbox: &str,
@@ -20,8 +20,8 @@ pub trait Backend<'a> {
         sort: &str,
         page_size: usize,
         page: usize,
-    ) -> Result<Envelopes>;
-    fn add_msg(&mut self, mbox: &str, msg: &[u8], flags: &str) -> Result<String>;
+    ) -> Result<Box<dyn Envelopes>>;
+    fn add_msg(&mut self, mbox: &str, msg: &[u8], flags: &str) -> Result<Box<dyn ToString>>;
     fn get_msg(&mut self, mbox: &str, id: &str) -> Result<Msg>;
     fn copy_msg(&mut self, mbox_src: &str, mbox_dst: &str, ids: &str) -> Result<()>;
     fn move_msg(&mut self, mbox_src: &str, mbox_dst: &str, ids: &str) -> Result<()>;

@@ -204,7 +204,7 @@ impl<'a> ImapBackend<'a> {
 }
 
 impl<'a> Backend<'a> for ImapBackend<'a> {
-    fn get_mboxes(&mut self) -> Result<Mboxes> {
+    fn get_mboxes(&mut self) -> Result<Box<dyn Mboxes>> {
         let mboxes: ImapMboxes = self
             .sess()?
             .list(Some(""), Some("*"))
@@ -220,7 +220,7 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
         filter: &str,
         page_size: usize,
         page: usize,
-    ) -> Result<Envelopes> {
+    ) -> Result<Box<dyn Envelopes>> {
         let last_seq = self
             .sess()?
             .select(mbox)
@@ -257,14 +257,14 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
         Ok(Box::new(envelopes))
     }
 
-    fn add_msg(&mut self, mbox: &str, msg: &[u8], flags: &str) -> Result<String> {
+    fn add_msg(&mut self, mbox: &str, msg: &[u8], flags: &str) -> Result<Box<dyn ToString>> {
         let flags: Flags = flags.split_whitespace().collect::<Vec<_>>().try_into()?;
         self.sess()?
             .append(mbox, msg)
             .flags(flags.0)
             .finish()
             .context(format!("cannot append message to {}", mbox))?;
-        Ok(String::new())
+        Ok(Box::new(String::new()))
     }
 
     fn get_msg(&mut self, mbox: &str, seq: &str) -> Result<Msg> {

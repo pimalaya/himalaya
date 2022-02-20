@@ -7,7 +7,7 @@ use anyhow::Result;
 use std::fmt::{self, Display};
 use std::ops::Deref;
 
-use crate::mbox::PrintableMboxes;
+use crate::mbox::Mboxes;
 use crate::{
     output::{PrintTable, PrintTableOpts, WriteColor},
     ui::{Cell, Row, Table},
@@ -36,7 +36,7 @@ impl PrintTable for ImapMboxes {
     }
 }
 
-impl PrintableMboxes for ImapMboxes {
+impl Mboxes for ImapMboxes {
     //
 }
 

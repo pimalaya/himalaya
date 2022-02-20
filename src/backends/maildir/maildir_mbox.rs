@@ -12,7 +12,7 @@ use std::{
 };
 
 use crate::{
-    mbox::PrintableMboxes,
+    mbox::Mboxes,
     output::{PrintTable, PrintTableOpts, WriteColor},
     ui::{Cell, Row, Table},
 };
@@ -38,7 +38,7 @@ impl PrintTable for MaildirMboxes {
     }
 }
 
-impl PrintableMboxes for MaildirMboxes {
+impl Mboxes for MaildirMboxes {
     //
 }
 

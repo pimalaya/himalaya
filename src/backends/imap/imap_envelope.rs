@@ -8,7 +8,7 @@ use std::{convert::TryFrom, ops::Deref};
 
 use crate::{
     domain::{msg::Flag, Flags},
-    msg::PrintableEnvelopes,
+    msg::Envelopes,
     output::{PrintTable, PrintTableOpts, WriteColor},
     ui::{Cell, Row, Table},
 };
@@ -34,7 +34,7 @@ impl PrintTable for ImapEnvelopes {
     }
 }
 
-impl PrintableEnvelopes for ImapEnvelopes {
+impl Envelopes for ImapEnvelopes {
     //
 }
 

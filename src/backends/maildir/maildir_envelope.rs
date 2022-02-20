@@ -12,7 +12,7 @@ use std::{
 
 use crate::{
     domain::from_slice_to_addrs,
-    msg::PrintableEnvelopes,
+    msg::Envelopes,
     output::{PrintTable, PrintTableOpts, WriteColor},
     ui::{Cell, Row, Table},
 };
@@ -38,7 +38,7 @@ impl PrintTable for MaildirEnvelopes {
     }
 }
 
-impl PrintableEnvelopes for MaildirEnvelopes {
+impl Envelopes for MaildirEnvelopes {
     //
 }
 
