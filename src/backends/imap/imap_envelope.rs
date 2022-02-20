@@ -7,11 +7,12 @@ use anyhow::{anyhow, Context, Error, Result};
 use std::{convert::TryFrom, ops::Deref};
 
 use crate::{
-    domain::{msg::Flag, Flags},
     msg::Envelopes,
     output::{PrintTable, PrintTableOpts, WriteColor},
     ui::{Cell, Row, Table},
 };
+
+use super::{ImapFlag, ImapFlags};
 
 /// Represents a list of IMAP envelopes.
 #[derive(Debug, Default, serde::Serialize)]
@@ -48,7 +49,7 @@ pub struct ImapEnvelope {
     pub id: u32,
 
     /// Represents the flags attached to the message.
-    pub flags: Flags,
+    pub flags: ImapFlags,
 
     /// Represents the subject of the message.
     pub subject: String,
@@ -75,7 +76,7 @@ impl Table for ImapEnvelope {
     fn row(&self) -> Row {
         let id = self.id.to_string();
         let flags = self.flags.to_symbols_string();
-        let unseen = !self.flags.contains(&Flag::Seen);
+        let unseen = !self.flags.contains(&ImapFlag::Seen);
         let subject = &self.subject;
         let sender = &self.sender;
         let date = self.date.as_deref().unwrap_or_default();
@@ -118,7 +119,7 @@ impl TryFrom<&RawImapEnvelope> for ImapEnvelope {
         let id = fetch.message;
 
         // Get the flags
-        let flags = Flags::try_from(fetch.flags())?;
+        let flags = ImapFlags::try_from(fetch.flags())?;
 
         // Get the subject
         let subject = envelope

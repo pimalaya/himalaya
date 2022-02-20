@@ -2,9 +2,7 @@ use anyhow::{anyhow, Context, Result};
 use std::convert::TryInto;
 
 use crate::{
-    backends::{
-        maildir::msg_flag::Flags, Backend, MaildirEnvelopes, MaildirMboxes, RawMaildirEnvelopes,
-    },
+    backends::{Backend, MaildirEnvelopes, MaildirFlags, MaildirMboxes, RawMaildirEnvelopes},
     config::{AccountConfig, MaildirBackendConfig},
     domain::Msg,
     mbox::Mboxes,
@@ -52,7 +50,7 @@ impl<'a> Backend<'a> for MaildirBackend {
     }
 
     fn add_msg(&mut self, _mbox: &str, msg: &[u8], flags: &str) -> Result<Box<dyn ToString>> {
-        let flags: Flags = flags.try_into()?;
+        let flags: MaildirFlags = flags.try_into()?;
         let id = self
             .maildir
             .store_cur_with_flags(msg, &flags.to_string())
@@ -99,7 +97,7 @@ impl<'a> Backend<'a> for MaildirBackend {
     }
 
     fn add_flags(&mut self, _mbox: &str, id: &str, flags_str: &str) -> Result<()> {
-        let flags: Flags = flags_str.try_into()?;
+        let flags: MaildirFlags = flags_str.try_into()?;
         self.maildir
             .add_flags(id, &flags.to_string())
             .context(format!(
@@ -109,7 +107,7 @@ impl<'a> Backend<'a> for MaildirBackend {
     }
 
     fn set_flags(&mut self, _mbox: &str, id: &str, flags_str: &str) -> Result<()> {
-        let flags: Flags = flags_str.try_into()?;
+        let flags: MaildirFlags = flags_str.try_into()?;
         self.maildir
             .set_flags(id, &flags.to_string())
             .context(format!(
@@ -119,7 +117,7 @@ impl<'a> Backend<'a> for MaildirBackend {
     }
 
     fn del_flags(&mut self, _mbox: &str, id: &str, flags_str: &str) -> Result<()> {
-        let flags: Flags = flags_str.try_into()?;
+        let flags: MaildirFlags = flags_str.try_into()?;
         self.maildir
             .remove_flags(id, &flags.to_string())
             .context(format!(

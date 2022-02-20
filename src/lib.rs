@@ -16,14 +16,17 @@ pub mod backends {
 
         pub mod imap_handler;
 
-        pub use imap_envelope::*;
-        pub mod imap_envelope;
-
         pub use imap_mbox::*;
         pub mod imap_mbox;
 
         pub use imap_mbox_attr::*;
         pub mod imap_mbox_attr;
+
+        pub use imap_envelope::*;
+        pub mod imap_envelope;
+
+        pub use imap_flag::*;
+        pub mod imap_flag;
 
         pub mod msg_sort_criterion;
     }
@@ -39,7 +42,8 @@ pub mod backends {
         pub mod maildir_envelope;
         pub use maildir_envelope::*;
 
-        pub mod msg_flag;
+        pub mod maildir_flag;
+        pub use maildir_flag::*;
     }
 }
 
@@ -59,6 +63,9 @@ pub mod mbox {
 pub mod msg {
     pub mod envelope;
     pub use envelope::*;
+
+    pub mod flag;
+    pub use flag::*;
 }
 
 pub mod domain {
