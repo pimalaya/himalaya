@@ -17,11 +17,13 @@ use crate::{
         imap::msg_sort_criterion::SortCriteria, Backend, ImapEnvelope, ImapEnvelopes, ImapMboxes,
     },
     config::{AccountConfig, ImapBackendConfig},
-    domain::{Flags, Msg},
+    domain::Msg,
     mbox::Mboxes,
     msg::Envelopes,
     output::run_cmd,
 };
+
+use super::ImapFlags;
 
 type ImapSess = imap::Session<TlsStream<TcpStream>>;
 
@@ -256,10 +258,10 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
     }
 
     fn add_msg(&mut self, mbox: &str, msg: &[u8], flags: &str) -> Result<Box<dyn ToString>> {
-        let flags: Flags = flags.split_whitespace().collect::<Vec<_>>().try_into()?;
+        let flags: ImapFlags = flags.into();
         self.sess()?
             .append(mbox, msg)
-            .flags(flags.0)
+            .flags(<ImapFlags as Into<Vec<imap::types::Flag<'a>>>>::into(flags))
             .finish()
             .context(format!("cannot append message to {}", mbox))?;
         Ok(Box::new(String::new()))
@@ -311,8 +313,7 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
     }
 
     fn add_flags(&mut self, mbox: &str, seq_range: &str, flags: &str) -> Result<()> {
-        let flags: Flags = flags.split_whitespace().collect::<Vec<_>>().try_into()?;
-        let flags = flags.to_string();
+        let flags: ImapFlags = flags.into();
         self.sess()?
             .select(mbox)
             .context(format!("cannot select mailbox {:?}", mbox))?;
@@ -326,8 +327,7 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
     }
 
     fn set_flags(&mut self, mbox: &str, seq_range: &str, flags: &str) -> Result<()> {
-        let flags: Flags = flags.split_whitespace().collect::<Vec<_>>().try_into()?;
-        let flags = flags.to_string();
+        let flags: ImapFlags = flags.into();
         self.sess()?
             .select(mbox)
             .context(format!("cannot select mailbox {:?}", mbox))?;
@@ -338,8 +338,7 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
     }
 
     fn del_flags(&mut self, mbox: &str, seq_range: &str, flags: &str) -> Result<()> {
-        let flags: Flags = flags.split_whitespace().collect::<Vec<_>>().try_into()?;
-        let flags = flags.to_string();
+        let flags: ImapFlags = flags.into();
         self.sess()?
             .select(mbox)
             .context(format!("cannot select mailbox {:?}", mbox))?;

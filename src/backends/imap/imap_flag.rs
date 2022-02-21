@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Error, Result};
-use std::{convert::TryFrom, ops::Deref};
+use std::{convert::TryFrom, fmt, ops::Deref};
 
 /// Represents the imap flag variants.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -82,6 +82,47 @@ impl Deref for ImapFlags {
     }
 }
 
+impl fmt::Display for ImapFlags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut glue = "";
+
+        for flag in &self.0 {
+            write!(f, "{}", glue)?;
+            match flag {
+                ImapFlag::Seen => write!(f, "\\Seen")?,
+                ImapFlag::Answered => write!(f, "\\Answered")?,
+                ImapFlag::Flagged => write!(f, "\\Flagged")?,
+                ImapFlag::Deleted => write!(f, "\\Deleted")?,
+                ImapFlag::Draft => write!(f, "\\Draft")?,
+                ImapFlag::Recent => write!(f, "\\Recent")?,
+                ImapFlag::MayCreate => write!(f, "\\MayCreate")?,
+                ImapFlag::Custom(custom) => write!(f, "{}", custom)?,
+            }
+            glue = " ";
+        }
+
+        Ok(())
+    }
+}
+
+impl<'a> Into<Vec<imap::types::Flag<'a>>> for ImapFlags {
+    fn into(self) -> Vec<imap::types::Flag<'a>> {
+        self.0
+            .into_iter()
+            .map(|flag| match flag {
+                ImapFlag::Seen => imap::types::Flag::Seen,
+                ImapFlag::Answered => imap::types::Flag::Answered,
+                ImapFlag::Flagged => imap::types::Flag::Flagged,
+                ImapFlag::Deleted => imap::types::Flag::Deleted,
+                ImapFlag::Draft => imap::types::Flag::Draft,
+                ImapFlag::Recent => imap::types::Flag::Recent,
+                ImapFlag::MayCreate => imap::types::Flag::MayCreate,
+                ImapFlag::Custom(custom) => imap::types::Flag::Custom(custom.into()),
+            })
+            .collect()
+    }
+}
+
 impl From<&str> for ImapFlags {
     fn from(flags_str: &str) -> Self {
         ImapFlags(
@@ -92,6 +133,7 @@ impl From<&str> for ImapFlags {
         )
     }
 }
+
 impl TryFrom<&[imap::types::Flag<'_>]> for ImapFlags {
     type Error = Error;
 
