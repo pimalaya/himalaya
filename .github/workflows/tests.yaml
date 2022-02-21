@@ -14,8 +14,17 @@ jobs:
         uses: actions/checkout@v2
       - name: Start GreenMail testing server
         run: |
-          docker run --rm -d -e GREENMAIL_OPTS='-Dgreenmail.setup.test.all -Dgreenmail.hostname=0.0.0.0 -Dgreenmail.auth.disabled -Dgreenmail.verbose' -p 3025:3025 -p 3110:3110 -p 3143:3143 -p 3465:3465 -p 3993:3993 -p 3995:3995 greenmail/standalone:1.6.2
-
+          docker run \
+            --rm \
+            -d \
+            -e GREENMAIL_OPTS='-Dgreenmail.setup.test.all -Dgreenmail.hostname=0.0.0.0 -Dgreenmail.auth.disabled -Dgreenmail.verbose' \
+            -p 3025:3025 \
+            -p 3110:3110 \
+            -p 3143:3143 \
+            -p 3465:3465 \
+            -p 3993:3993 \
+            -p 3995:3995 \
+            greenmail/standalone:1.6.2
       - name: Install rust
         uses: actions-rs/toolchain@v1
         with:

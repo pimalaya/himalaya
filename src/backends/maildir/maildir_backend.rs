@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Context, Result};
-use std::convert::TryInto;
+use std::{convert::TryInto, fs};
 
 use crate::{
     backends::{Backend, MaildirEnvelopes, MaildirFlags, MaildirMboxes},
@@ -35,6 +35,11 @@ impl<'a> MaildirBackend<'a> {
 }
 
 impl<'a> Backend<'a> for MaildirBackend<'a> {
+    fn add_mbox(&mut self, mdir: &str) -> Result<()> {
+        fs::create_dir(self.mdir.path().join(format!(".{}", mdir)))
+            .context(format!("cannot create maildir subfolder {:?}", mdir))
+    }
+
     fn get_mboxes(&mut self) -> Result<Box<dyn Mboxes>> {
         let mboxes: MaildirMboxes = self.mdir.list_subdirs().try_into()?;
         Ok(Box::new(mboxes))
@@ -55,7 +60,7 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         };
         let envelopes: MaildirEnvelopes = mail_entries
             .try_into()
-            .context("cannot parse Maildir envelopes from {:?}")?;
+            .context("cannot parse maildir envelopes from {:?}")?;
         Ok(Box::new(envelopes))
     }
 
@@ -65,7 +70,7 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         let id = mdir
             .store_cur_with_flags(msg, &flags.to_string())
             .context(format!(
-                "cannot add message to the \"cur\" folder of Maildir {:?}",
+                "cannot add message to the \"cur\" folder of maildir {:?}",
                 mdir.path()
             ))?;
         Ok(Box::new(id))
@@ -75,14 +80,14 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         let mdir = self.get_mdir_from_name(mdir);
         let mut mail_entry = mdir
             .find(id)
-            .ok_or_else(|| anyhow!("cannot find Maildir message {:?} in {:?}", id, mdir.path()))?;
+            .ok_or_else(|| anyhow!("cannot find maildir message {:?} in {:?}", id, mdir.path()))?;
         let parsed_mail = mail_entry.parsed().context(format!(
-            "cannot parse Maildir message {:?} in {:?}",
+            "cannot parse maildir message {:?} in {:?}",
             id,
             mdir.path()
         ))?;
         Msg::from_parsed_mail(parsed_mail, self.account_config).context(format!(
-            "cannot parse Maildir message {:?} from {:?}",
+            "cannot parse maildir message {:?} from {:?}",
             id,
             mdir.path()
         ))
@@ -92,7 +97,7 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         let mdir_src = self.get_mdir_from_name(mdir_src);
         let mdir_dst = self.get_mdir_from_name(mdir_dst);
         mdir_src.copy_to(id, &mdir_dst).context(format!(
-            "cannot copy message {:?} from Maildir {:?} to Maildir {:?}",
+            "cannot copy message {:?} from maildir {:?} to maildir {:?}",
             id,
             mdir_src.path(),
             mdir_dst.path()
@@ -103,7 +108,7 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         let mdir_src = self.get_mdir_from_name(mdir_src);
         let mdir_dst = self.get_mdir_from_name(mdir_dst);
         mdir_src.move_to(id, &mdir_dst).context(format!(
-            "cannot move message {:?} from Maildir {:?} to Maildir {:?}",
+            "cannot move message {:?} from maildir {:?} to maildir {:?}",
             id,
             mdir_src.path(),
             mdir_dst.path()
@@ -113,7 +118,7 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
     fn del_msg(&mut self, mdir: &str, id: &str) -> Result<()> {
         let mdir = self.get_mdir_from_name(mdir);
         mdir.delete(id).context(format!(
-            "cannot delete message {:?} from Maildir {:?}",
+            "cannot delete message {:?} from maildir {:?}",
             id,
             mdir.path()
         ))
@@ -123,7 +128,7 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         let mdir = self.get_mdir_from_name(mdir);
         let flags: MaildirFlags = flags_str.try_into()?;
         mdir.add_flags(id, &flags.to_string()).context(format!(
-            "cannot add flags {:?} to Maildir message {:?}",
+            "cannot add flags {:?} to maildir message {:?}",
             flags_str, id
         ))
     }
@@ -132,7 +137,7 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         let mdir = self.get_mdir_from_name(mdir);
         let flags: MaildirFlags = flags_str.try_into()?;
         mdir.set_flags(id, &flags.to_string()).context(format!(
-            "cannot set flags {:?} to Maildir message {:?}",
+            "cannot set flags {:?} to maildir message {:?}",
             flags_str, id
         ))
     }
@@ -141,7 +146,7 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         let mdir = self.get_mdir_from_name(mdir);
         let flags: MaildirFlags = flags_str.try_into()?;
         mdir.remove_flags(id, &flags.to_string()).context(format!(
-            "cannot remove flags {:?} from Maildir message {:?}",
+            "cannot remove flags {:?} from maildir message {:?}",
             flags_str, id
         ))
     }

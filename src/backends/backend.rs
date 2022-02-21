@@ -12,12 +12,13 @@ pub trait Backend<'a> {
         Ok(())
     }
 
+    fn add_mbox(&mut self, mbox: &str) -> Result<()>;
     fn get_mboxes(&mut self) -> Result<Box<dyn Mboxes>>;
     fn get_envelopes(
         &mut self,
         mbox: &str,
-        filter: &str,
         sort: &str,
+        filter: &str,
         page_size: usize,
         page: usize,
     ) -> Result<Box<dyn Envelopes>>;

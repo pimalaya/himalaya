@@ -7,17 +7,17 @@ use himalaya::{
 };
 
 #[test]
-fn test_maildir() {
+fn test_maildir_backend() {
     // set up maildir folders
     let mdir: Maildir = env::temp_dir().join("himalaya-test-mdir").into();
     if let Err(_) = fs::remove_dir_all(mdir.path()) {}
     mdir.create_dirs().unwrap();
 
-    let mdir_subdir: Maildir = mdir.path().join(".Subdir").into();
-    if let Err(_) = fs::remove_dir_all(mdir_subdir.path()) {}
-    mdir_subdir.create_dirs().unwrap();
+    let mdir_sub: Maildir = mdir.path().join(".Subdir").into();
+    if let Err(_) = fs::remove_dir_all(mdir_sub.path()) {}
+    mdir_sub.create_dirs().unwrap();
 
-    // set up configs
+    // configure accounts
     let account_config = AccountConfig {
         inbox_folder: "INBOX".into(),
         ..AccountConfig::default()
@@ -26,10 +26,10 @@ fn test_maildir() {
         maildir_dir: mdir.path().to_owned(),
     };
     let mut mdir = MaildirBackend::new(&account_config, &mdir_config);
-    let mdir_subdir_config = MaildirBackendConfig {
-        maildir_dir: mdir_subdir.path().to_owned(),
+    let mdir_sub_config = MaildirBackendConfig {
+        maildir_dir: mdir_sub.path().to_owned(),
     };
-    let mut mdir_subdir = MaildirBackend::new(&account_config, &mdir_subdir_config);
+    let mut mdir_subdir = MaildirBackend::new(&account_config, &mdir_sub_config);
 
     // check that a message can be added
     let msg = include_bytes!("./emails/alice-to-patrick.eml");
@@ -42,7 +42,7 @@ fn test_maildir() {
     assert_eq!("Ceci est un message.", msg.fold_text_plain_parts());
 
     // check that the envelope of the added message exists
-    let envelopes = mdir.get_envelopes("INBOX", "", "cur", 10, 1).unwrap();
+    let envelopes = mdir.get_envelopes("INBOX", "", "cur", 10, 0).unwrap();
     let envelopes: &MaildirEnvelopes = envelopes.as_any().downcast_ref().unwrap();
     let envelope = envelopes.first().unwrap();
     assert_eq!(1, envelopes.len());

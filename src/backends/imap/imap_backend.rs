@@ -206,6 +206,12 @@ impl<'a> ImapBackend<'a> {
 }
 
 impl<'a> Backend<'a> for ImapBackend<'a> {
+    fn add_mbox(&mut self, mbox: &str) -> Result<()> {
+        self.sess()?
+            .create(mbox)
+            .context(format!("cannot create imap mailbox {:?}", mbox))
+    }
+
     fn get_mboxes(&mut self) -> Result<Box<dyn Mboxes>> {
         let mboxes: ImapMboxes = self
             .sess()?
@@ -265,8 +271,13 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
             .append(mbox, msg)
             .flags(<ImapFlags as Into<Vec<imap::types::Flag<'a>>>>::into(flags))
             .finish()
-            .context(format!("cannot append message to {}", mbox))?;
-        Ok(Box::new(String::new()))
+            .context(format!("cannot append message to {:?}", mbox))?;
+        let last_seq = self
+            .sess()?
+            .select(mbox)
+            .context(format!("cannot select mailbox {:?}", mbox))?
+            .exists;
+        Ok(Box::new(last_seq))
     }
 
     fn get_msg(&mut self, mbox: &str, seq: &str) -> Result<Msg> {
@@ -280,13 +291,18 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
         let fetch = fetches
             .first()
             .ok_or_else(|| anyhow!("cannot find message {:?}", seq))?;
-        let parsed_mail = mailparse::parse_mail(fetch.body().unwrap_or_default())
-            .context("cannot parse message")?;
-        Msg::from_parsed_mail(parsed_mail, self.account_config)
+        let msg_raw = fetch.body().unwrap_or_default().to_owned();
+        let mut msg = Msg::from_parsed_mail(
+            mailparse::parse_mail(&msg_raw).context("cannot parse message")?,
+            self.account_config,
+        )?;
+        msg.raw = msg_raw;
+        Ok(msg)
     }
 
     fn copy_msg(&mut self, mbox_src: &str, mbox_dst: &str, seq: &str) -> Result<()> {
         let msg = self.get_msg(&mbox_src, seq)?.raw;
+        println!("raw: {:?}", String::from_utf8(msg.to_vec()).unwrap());
         self.add_msg(&mbox_dst, &msg, "seen")?;
         Ok(())
     }
