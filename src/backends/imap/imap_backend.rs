@@ -28,13 +28,15 @@ use super::ImapFlags;
 type ImapSess = imap::Session<TlsStream<TcpStream>>;
 
 pub struct ImapBackend<'a> {
+    account_config: &'a AccountConfig,
     imap_config: &'a ImapBackendConfig,
     sess: Option<ImapSess>,
 }
 
 impl<'a> ImapBackend<'a> {
-    pub fn new(imap_config: &'a ImapBackendConfig) -> Self {
+    pub fn new(account_config: &'a AccountConfig, imap_config: &'a ImapBackendConfig) -> Self {
         Self {
+            account_config,
             imap_config,
             sess: None,
         }
@@ -83,10 +85,10 @@ impl<'a> ImapBackend<'a> {
         }
     }
 
-    fn search_new_msgs(&mut self, account: &AccountConfig) -> Result<Vec<u32>> {
+    fn search_new_msgs(&mut self, query: &str) -> Result<Vec<u32>> {
         let uids: Vec<u32> = self
             .sess()?
-            .uid_search(&account.notify_query)
+            .uid_search(query)
             .context("cannot search new messages")?
             .into_iter()
             .collect();
@@ -96,7 +98,7 @@ impl<'a> ImapBackend<'a> {
         Ok(uids)
     }
 
-    pub fn notify(&mut self, keepalive: u64, mbox: &str, config: &AccountConfig) -> Result<()> {
+    pub fn notify(&mut self, keepalive: u64, mbox: &str) -> Result<()> {
         debug!("notify");
 
         debug!("examine mailbox {:?}", mbox);
@@ -106,7 +108,7 @@ impl<'a> ImapBackend<'a> {
 
         debug!("init messages hashset");
         let mut msgs_set: HashSet<u32> = self
-            .search_new_msgs(config)?
+            .search_new_msgs(&self.account_config.notify_query)?
             .iter()
             .cloned()
             .collect::<HashSet<_>>();
@@ -127,7 +129,7 @@ impl<'a> ImapBackend<'a> {
                 .context("cannot start the idle mode")?;
 
             let uids: Vec<u32> = self
-                .search_new_msgs(config)?
+                .search_new_msgs(&self.account_config.notify_query)?
                 .into_iter()
                 .filter(|uid| -> bool { msgs_set.get(uid).is_none() })
                 .collect();
@@ -152,7 +154,7 @@ impl<'a> ImapBackend<'a> {
                     })?;
 
                     let from = msg.sender.to_owned().into();
-                    config.run_notify_cmd(&msg.subject, &from)?;
+                    self.account_config.run_notify_cmd(&msg.subject, &from)?;
 
                     debug!("notify message: {}", uid);
                     trace!("message: {:?}", msg);
@@ -167,7 +169,7 @@ impl<'a> ImapBackend<'a> {
         }
     }
 
-    pub fn watch(&mut self, keepalive: u64, mbox: &str, account: &AccountConfig) -> Result<()> {
+    pub fn watch(&mut self, keepalive: u64, mbox: &str) -> Result<()> {
         debug!("examine mailbox: {}", mbox);
 
         self.sess()?
@@ -188,7 +190,7 @@ impl<'a> ImapBackend<'a> {
                 })
                 .context("cannot start the idle mode")?;
 
-            let cmds = account.watch_cmds.clone();
+            let cmds = self.account_config.watch_cmds.clone();
             thread::spawn(move || {
                 debug!("batch execution of {} cmd(s)", cmds.len());
                 cmds.iter().for_each(|cmd| {
@@ -267,7 +269,7 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
         Ok(Box::new(String::new()))
     }
 
-    fn get_msg(&mut self, mbox: &str, seq: &str, config: &AccountConfig) -> Result<Msg> {
+    fn get_msg(&mut self, mbox: &str, seq: &str) -> Result<Msg> {
         self.sess()?
             .select(mbox)
             .context(format!("cannot select mailbox {:?}", mbox))?;
@@ -280,31 +282,19 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
             .ok_or_else(|| anyhow!("cannot find message {:?}", seq))?;
         let parsed_mail = mailparse::parse_mail(fetch.body().unwrap_or_default())
             .context("cannot parse message")?;
-        Msg::from_parsed_mail(parsed_mail, config)
+        Msg::from_parsed_mail(parsed_mail, self.account_config)
     }
 
-    fn copy_msg(
-        &mut self,
-        mbox_source: &str,
-        mbox_target: &str,
-        seq: &str,
-        config: &AccountConfig,
-    ) -> Result<()> {
-        let msg = self.get_msg(&mbox_source, seq, config)?.raw;
-        self.add_msg(&mbox_target, &msg, "seen")?;
+    fn copy_msg(&mut self, mbox_src: &str, mbox_dst: &str, seq: &str) -> Result<()> {
+        let msg = self.get_msg(&mbox_src, seq)?.raw;
+        self.add_msg(&mbox_dst, &msg, "seen")?;
         Ok(())
     }
 
-    fn move_msg(
-        &mut self,
-        mbox_src: &str,
-        mbox_dest: &str,
-        seq: &str,
-        config: &AccountConfig,
-    ) -> Result<()> {
-        let msg = self.get_msg(mbox_src, seq, config)?.raw;
+    fn move_msg(&mut self, mbox_src: &str, mbox_dst: &str, seq: &str) -> Result<()> {
+        let msg = self.get_msg(mbox_src, seq)?.raw;
         self.add_flags(mbox_src, seq, "seen deleted")?;
-        self.add_msg(&mbox_dest, &msg, "seen")?;
+        self.add_msg(&mbox_dst, &msg, "seen")?;
         Ok(())
     }
 

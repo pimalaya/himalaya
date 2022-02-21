@@ -7,7 +7,6 @@ use anyhow::{anyhow, Context, Error, Result};
 use std::{convert::TryFrom, ops::Deref};
 
 use crate::{
-    msg::Envelopes,
     output::{PrintTable, PrintTableOpts, WriteColor},
     ui::{Cell, Row, Table},
 };
@@ -35,9 +34,9 @@ impl PrintTable for ImapEnvelopes {
     }
 }
 
-impl Envelopes for ImapEnvelopes {
-    //
-}
+// impl Envelopes for ImapEnvelopes {
+//     //
+// }
 
 /// Represents the IMAP envelope. The envelope is just a message
 /// subset, and is mostly used for listings.

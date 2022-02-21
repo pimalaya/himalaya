@@ -13,7 +13,6 @@ use std::{
 use crate::{
     backends::{MaildirFlag, MaildirFlags},
     domain::from_slice_to_addrs,
-    msg::Envelopes,
     output::{PrintTable, PrintTableOpts, WriteColor},
     ui::{Cell, Row, Table},
 };
@@ -39,9 +38,9 @@ impl PrintTable for MaildirEnvelopes {
     }
 }
 
-impl Envelopes for MaildirEnvelopes {
-    //
-}
+// impl Envelopes for MaildirEnvelopes {
+//     //
+// }
 
 /// Represents the envelope. The envelope is just a message subset,
 /// and is mostly used for listings.

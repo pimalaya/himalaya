@@ -33,7 +33,7 @@ pub fn attachments<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
-    let attachments = backend.get_msg(mbox, seq, config)?.attachments();
+    let attachments = backend.get_msg(mbox, seq)?.attachments();
     let attachments_len = attachments.len();
     debug!(
         r#"{} attachment(s) found for message "{}""#,
@@ -58,11 +58,10 @@ pub fn copy<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     seq: &str,
     mbox_src: &str,
     mbox_dst: &str,
-    config: &AccountConfig,
     printer: &mut P,
     backend: Box<&mut B>,
 ) -> Result<()> {
-    backend.copy_msg(mbox_src, mbox_dst, seq, config)?;
+    backend.copy_msg(mbox_src, mbox_dst, seq)?;
     printer.print(format!(
         r#"Message {} successfully copied to folder "{}""#,
         seq, mbox_dst
@@ -92,7 +91,7 @@ pub fn forward<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     smtp: &mut S,
 ) -> Result<()> {
     backend
-        .get_msg(mbox, seq, config)?
+        .get_msg(mbox, seq)?
         .into_forward(config)?
         .add_attachments(attachments_paths)?
         .encrypt(encrypt)
@@ -182,15 +181,14 @@ pub fn mailto<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
 pub fn move_<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     seq: &str,
     mbox_src: &str,
-    mbox_dest: &str,
-    config: &AccountConfig,
+    mbox_dst: &str,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
-    backend.move_msg(mbox_src, mbox_dest, seq, config)?;
+    backend.move_msg(mbox_src, mbox_dst, seq)?;
     printer.print(format!(
         r#"Message {} successfully moved to folder "{}""#,
-        seq, mbox_dest
+        seq, mbox_dst
     ))
 }
 
@@ -200,11 +198,10 @@ pub fn read<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     text_mime: &str,
     raw: bool,
     mbox: &str,
-    config: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
-    let msg = backend.get_msg(mbox, seq, config)?;
+    let msg = backend.get_msg(mbox, seq)?;
     let msg = if raw {
         // Emails don't always have valid utf8. Using "lossy" to display what we can.
         String::from_utf8_lossy(&msg.raw).into_owned()
@@ -228,7 +225,7 @@ pub fn reply<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     smtp: &mut S,
 ) -> Result<()> {
     backend
-        .get_msg(mbox, seq, config)?
+        .get_msg(mbox, seq)?
         .into_reply(all, config)?
         .add_attachments(attachments_paths)?
         .encrypt(encrypt)

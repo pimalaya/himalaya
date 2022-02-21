@@ -4,22 +4,12 @@
 
 use anyhow::Result;
 
-use crate::{backends::ImapBackend, config::AccountConfig};
+use crate::backends::ImapBackend;
 
-pub fn notify(
-    keepalive: u64,
-    mbox: &str,
-    config: &AccountConfig,
-    imap: &mut ImapBackend,
-) -> Result<()> {
-    imap.notify(keepalive, mbox, config)
+pub fn notify(keepalive: u64, mbox: &str, imap: &mut ImapBackend) -> Result<()> {
+    imap.notify(keepalive, mbox)
 }
 
-pub fn watch(
-    keepalive: u64,
-    mbox: &str,
-    config: &AccountConfig,
-    imap: &mut ImapBackend,
-) -> Result<()> {
-    imap.watch(keepalive, mbox, config)
+pub fn watch(keepalive: u64, mbox: &str, imap: &mut ImapBackend) -> Result<()> {
+    imap.watch(keepalive, mbox)
 }

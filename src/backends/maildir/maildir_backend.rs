@@ -2,127 +2,147 @@ use anyhow::{anyhow, Context, Result};
 use std::convert::TryInto;
 
 use crate::{
-    backends::{Backend, MaildirEnvelopes, MaildirFlags, MaildirMboxes, RawMaildirEnvelopes},
+    backends::{Backend, MaildirEnvelopes, MaildirFlags, MaildirMboxes},
     config::{AccountConfig, MaildirBackendConfig},
     domain::Msg,
     mbox::Mboxes,
     msg::Envelopes,
 };
 
-pub struct MaildirBackend {
-    maildir: maildir::Maildir,
-    /// Holds raw mailboxes fetched by the `maildir` crate in order to
-    /// extend mailboxes lifetime outside of handlers.
-    _raw_envelopes_cache: Option<RawMaildirEnvelopes>,
+pub struct MaildirBackend<'a> {
+    mdir: maildir::Maildir,
+    account_config: &'a AccountConfig,
 }
 
-impl<'a> MaildirBackend {
-    pub fn new(maildir_config: &'a MaildirBackendConfig) -> Self {
+impl<'a> MaildirBackend<'a> {
+    pub fn new(
+        account_config: &'a AccountConfig,
+        maildir_config: &'a MaildirBackendConfig,
+    ) -> Self {
         Self {
-            maildir: maildir_config.maildir_dir.clone().into(),
-            _raw_envelopes_cache: None,
+            account_config,
+            mdir: maildir_config.maildir_dir.clone().into(),
+        }
+    }
+
+    fn get_mdir_from_name(&self, mdir: &str) -> maildir::Maildir {
+        if mdir == self.account_config.inbox_folder {
+            self.mdir.path().to_owned().into()
+        } else {
+            self.mdir.path().join(format!(".{}", mdir)).into()
         }
     }
 }
 
-impl<'a> Backend<'a> for MaildirBackend {
+impl<'a> Backend<'a> for MaildirBackend<'a> {
     fn get_mboxes(&mut self) -> Result<Box<dyn Mboxes>> {
-        let mboxes: MaildirMboxes = self.maildir.list_subdirs().try_into()?;
+        let mboxes: MaildirMboxes = self.mdir.list_subdirs().try_into()?;
         Ok(Box::new(mboxes))
     }
 
     fn get_envelopes(
         &mut self,
-        _mbox: &str,
+        mdir: &str,
         _sort: &str,
         filter: &str,
         _page_size: usize,
         _page: usize,
     ) -> Result<Box<dyn Envelopes>> {
+        let mdir = self.get_mdir_from_name(mdir);
         let mail_entries = match filter {
-            "new" => self.maildir.list_new(),
-            _ => self.maildir.list_cur(),
+            "new" => mdir.list_new(),
+            _ => mdir.list_cur(),
         };
         let envelopes: MaildirEnvelopes = mail_entries
             .try_into()
-            .context("cannot parse maildir envelopes")?;
+            .context("cannot parse Maildir envelopes from {:?}")?;
         Ok(Box::new(envelopes))
     }
 
-    fn add_msg(&mut self, _mbox: &str, msg: &[u8], flags: &str) -> Result<Box<dyn ToString>> {
+    fn add_msg(&mut self, mdir: &str, msg: &[u8], flags: &str) -> Result<Box<dyn ToString>> {
+        let mdir = self.get_mdir_from_name(mdir);
         let flags: MaildirFlags = flags.try_into()?;
-        let id = self
-            .maildir
+        let id = mdir
             .store_cur_with_flags(msg, &flags.to_string())
-            .context("cannot add message to the \"cur\" folder")?;
+            .context(format!(
+                "cannot add message to the \"cur\" folder of Maildir {:?}",
+                mdir.path()
+            ))?;
         Ok(Box::new(id))
     }
 
-    fn get_msg(&mut self, _mbox: &str, id: &str, config: &AccountConfig) -> Result<Msg> {
-        let mut mail_entry = self
-            .maildir
+    fn get_msg(&mut self, mdir: &str, id: &str) -> Result<Msg> {
+        let mdir = self.get_mdir_from_name(mdir);
+        let mut mail_entry = mdir
             .find(id)
-            .ok_or_else(|| anyhow!("cannot find message {:?}", id))?;
-        // TODO: parse flags
-        let parsed_mail = mail_entry
-            .parsed()
-            .context(format!("cannot parse message {:?}", id))?;
-        Msg::from_parsed_mail(parsed_mail, config).context(format!("cannot parse message {:?}", id))
+            .ok_or_else(|| anyhow!("cannot find Maildir message {:?} in {:?}", id, mdir.path()))?;
+        let parsed_mail = mail_entry.parsed().context(format!(
+            "cannot parse Maildir message {:?} in {:?}",
+            id,
+            mdir.path()
+        ))?;
+        Msg::from_parsed_mail(parsed_mail, self.account_config).context(format!(
+            "cannot parse Maildir message {:?} from {:?}",
+            id,
+            mdir.path()
+        ))
     }
 
-    fn copy_msg(
-        &mut self,
-        _mbox_src: &str,
-        _mbox_dest: &str,
-        _id: &str,
-        _config: &AccountConfig,
-    ) -> Result<()> {
-        unimplemented!();
+    fn copy_msg(&mut self, mdir_src: &str, mdir_dst: &str, id: &str) -> Result<()> {
+        let mdir_src = self.get_mdir_from_name(mdir_src);
+        let mdir_dst = self.get_mdir_from_name(mdir_dst);
+        mdir_src.copy_to(id, &mdir_dst).context(format!(
+            "cannot copy message {:?} from Maildir {:?} to Maildir {:?}",
+            id,
+            mdir_src.path(),
+            mdir_dst.path()
+        ))
     }
 
-    fn move_msg(
-        &mut self,
-        _mbox_src: &str,
-        _mbox_dest: &str,
-        _id: &str,
-        _config: &AccountConfig,
-    ) -> Result<()> {
-        unimplemented!();
+    fn move_msg(&mut self, mdir_src: &str, mdir_dst: &str, id: &str) -> Result<()> {
+        let mdir_src = self.get_mdir_from_name(mdir_src);
+        let mdir_dst = self.get_mdir_from_name(mdir_dst);
+        mdir_src.move_to(id, &mdir_dst).context(format!(
+            "cannot move message {:?} from Maildir {:?} to Maildir {:?}",
+            id,
+            mdir_src.path(),
+            mdir_dst.path()
+        ))
     }
 
-    fn del_msg(&mut self, _mbox: &str, id: &str) -> Result<()> {
-        self.maildir
-            .delete(id)
-            .context(format!("cannot delete message {:?}", id))
+    fn del_msg(&mut self, mdir: &str, id: &str) -> Result<()> {
+        let mdir = self.get_mdir_from_name(mdir);
+        mdir.delete(id).context(format!(
+            "cannot delete message {:?} from Maildir {:?}",
+            id,
+            mdir.path()
+        ))
     }
 
-    fn add_flags(&mut self, _mbox: &str, id: &str, flags_str: &str) -> Result<()> {
+    fn add_flags(&mut self, mdir: &str, id: &str, flags_str: &str) -> Result<()> {
+        let mdir = self.get_mdir_from_name(mdir);
         let flags: MaildirFlags = flags_str.try_into()?;
-        self.maildir
-            .add_flags(id, &flags.to_string())
-            .context(format!(
-                "cannot add flags {:?} to message {:?}",
-                flags_str, id
-            ))
+        mdir.add_flags(id, &flags.to_string()).context(format!(
+            "cannot add flags {:?} to Maildir message {:?}",
+            flags_str, id
+        ))
     }
 
-    fn set_flags(&mut self, _mbox: &str, id: &str, flags_str: &str) -> Result<()> {
+    fn set_flags(&mut self, mdir: &str, id: &str, flags_str: &str) -> Result<()> {
+        let mdir = self.get_mdir_from_name(mdir);
         let flags: MaildirFlags = flags_str.try_into()?;
-        self.maildir
-            .set_flags(id, &flags.to_string())
-            .context(format!(
-                "cannot set flags {:?} to message {:?}",
-                flags_str, id
-            ))
+        mdir.set_flags(id, &flags.to_string()).context(format!(
+            "cannot set flags {:?} to Maildir message {:?}",
+            flags_str, id
+        ))
     }
 
-    fn del_flags(&mut self, _mbox: &str, id: &str, flags_str: &str) -> Result<()> {
+    fn del_flags(&mut self, mdir: &str, id: &str, flags_str: &str) -> Result<()> {
+        let mdir = self.get_mdir_from_name(mdir);
         let flags: MaildirFlags = flags_str.try_into()?;
-        self.maildir
-            .remove_flags(id, &flags.to_string())
-            .context(format!(
-                "cannot remove flags {:?} to message {:?}",
-                flags_str, id
-            ))
+        mdir.remove_flags(id, &flags.to_string()).context(format!(
+            "cannot remove flags {:?} from Maildir message {:?}",
+            flags_str, id
+        ))
     }
 }
