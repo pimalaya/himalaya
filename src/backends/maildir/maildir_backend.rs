@@ -44,6 +44,11 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         Ok(Box::new(mboxes))
     }
 
+    fn del_mbox(&mut self, mdir: &str) -> Result<()> {
+        fs::remove_dir_all(self.mdir.path().join(format!(".{}", mdir)))
+            .context(format!("cannot delete maildir subfolder {:?}", mdir))
+    }
+
     fn get_envelopes(
         &mut self,
         mdir: &str,

@@ -220,6 +220,12 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
         Ok(Box::new(mboxes))
     }
 
+    fn del_mbox(&mut self, mbox: &str) -> Result<()> {
+        self.sess()?
+            .delete(mbox)
+            .context(format!("cannot delete imap mailbox {:?}", mbox))
+    }
+
     fn get_envelopes(
         &mut self,
         mbox: &str,

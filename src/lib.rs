@@ -1,7 +1,37 @@
-pub mod compl;
-pub mod config;
-pub mod output;
-pub mod ui;
+pub mod mbox {
+    pub mod mbox;
+    pub use mbox::*;
+
+    pub mod mbox_arg;
+    pub mod mbox_handler;
+}
+
+pub mod msg {
+    pub mod envelope;
+    pub use envelope::*;
+
+    pub mod msg_arg;
+
+    pub mod msg_handler;
+    pub mod msg_utils;
+
+    pub mod flag_arg;
+    pub mod flag_handler;
+
+    pub mod tpl_arg;
+    pub use tpl_arg::TplOverride;
+
+    pub mod tpl_handler;
+
+    pub mod msg_entity;
+    pub use msg_entity::*;
+
+    pub mod parts_entity;
+    pub use parts_entity::*;
+
+    pub mod addr_entity;
+    pub use addr_entity::*;
+}
 
 pub mod backends {
     pub use backend::*;
@@ -52,40 +82,7 @@ pub mod smtp {
     pub use smtp_service::*;
 }
 
-pub mod mbox {
-    pub mod mbox;
-    pub use mbox::*;
-
-    pub mod mbox_arg;
-    pub mod mbox_handler;
-}
-
-pub mod msg {
-    pub mod envelope;
-    pub use envelope::*;
-
-    pub mod flag;
-    pub use flag::*;
-
-    pub mod msg_arg;
-
-    pub mod msg_handler;
-    pub mod msg_utils;
-
-    pub mod flag_arg;
-    pub mod flag_handler;
-
-    pub mod tpl_arg;
-    pub use tpl_arg::TplOverride;
-
-    pub mod tpl_handler;
-
-    pub mod msg_entity;
-    pub use msg_entity::*;
-
-    pub mod parts_entity;
-    pub use parts_entity::*;
-
-    pub mod addr_entity;
-    pub use addr_entity::*;
-}
+pub mod compl;
+pub mod config;
+pub mod output;
+pub mod ui;

@@ -17,6 +17,7 @@ pub trait Backend<'a> {
 
     fn add_mbox(&mut self, mbox: &str) -> Result<()>;
     fn get_mboxes(&mut self) -> Result<Box<dyn Mboxes>>;
+    fn del_mbox(&mut self, mbox: &str) -> Result<()>;
     fn get_envelopes(
         &mut self,
         mbox: &str,
