@@ -6,8 +6,8 @@ use himalaya::{
     backends::{imap_arg, imap_handler, Backend, ImapBackend, MaildirBackend},
     compl::{compl_arg, compl_handler},
     config::{account_args, config_args, AccountConfig, BackendConfig, DeserializedConfig},
-    domain::msg::{flag_arg, flag_handler, msg_arg, msg_handler, tpl_arg, tpl_handler},
     mbox::{mbox_arg, mbox_handler},
+    msg::{flag_arg, flag_handler, msg_arg, msg_handler, tpl_arg, tpl_handler},
     output::{output_arg, OutputFmt, StdoutPrinter},
     smtp::LettreService,
 };

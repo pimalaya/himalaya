@@ -9,7 +9,7 @@ use lettre::{
 };
 use log::debug;
 
-use crate::{config::AccountConfig, domain::msg::Msg};
+use crate::{config::AccountConfig, msg::Msg};
 
 pub trait SmtpService {
     fn send_msg(&mut self, account: &AccountConfig, msg: &Msg) -> Result<lettre::Message>;

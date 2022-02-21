@@ -7,8 +7,8 @@ use clap::{self, App, Arg, ArgMatches, SubCommand};
 use log::{debug, info, trace};
 
 use crate::{
-    domain::msg::{flag_arg, msg_arg, tpl_arg},
     mbox::mbox_arg,
+    msg::{flag_arg, msg_arg, tpl_arg},
     ui::table_arg,
 };
 

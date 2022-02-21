@@ -9,7 +9,7 @@ use std::io::{self, BufRead};
 use crate::{
     backends::Backend,
     config::AccountConfig,
-    domain::msg::{Msg, TplOverride},
+    msg::{Msg, TplOverride},
     output::PrinterService,
     smtp::SmtpService,
 };

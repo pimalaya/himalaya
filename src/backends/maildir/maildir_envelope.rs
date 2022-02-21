@@ -12,7 +12,7 @@ use std::{
 
 use crate::{
     backends::{MaildirFlag, MaildirFlags},
-    domain::from_slice_to_addrs,
+    msg::from_slice_to_addrs,
     output::{PrintTable, PrintTableOpts, WriteColor},
     ui::{Cell, Row, Table},
 };

@@ -4,9 +4,8 @@ use std::{convert::TryInto, fs};
 use crate::{
     backends::{Backend, MaildirEnvelopes, MaildirFlags, MaildirMboxes},
     config::{AccountConfig, MaildirBackendConfig},
-    domain::Msg,
     mbox::Mboxes,
-    msg::Envelopes,
+    msg::{Envelopes, Msg},
 };
 
 pub struct MaildirBackend<'a> {

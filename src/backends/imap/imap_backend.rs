@@ -17,9 +17,8 @@ use crate::{
         imap::msg_sort_criterion::SortCriteria, Backend, ImapEnvelope, ImapEnvelopes, ImapMboxes,
     },
     config::{AccountConfig, ImapBackendConfig},
-    domain::Msg,
     mbox::Mboxes,
-    msg::Envelopes,
+    msg::{Envelopes, Msg},
     output::run_cmd,
 };
 

@@ -11,10 +11,9 @@ use uuid::Uuid;
 use crate::{
     backends::Backend,
     config::{AccountConfig, DEFAULT_SIG_DELIM},
-    domain::{
-        from_addrs_to_sendable_addrs, from_addrs_to_sendable_mbox, from_slice_to_addrs,
-        msg::{msg_utils, BinaryPart, Part, Parts, TextPlainPart, TplOverride},
-        Addrs,
+    msg::{
+        from_addrs_to_sendable_addrs, from_addrs_to_sendable_mbox, from_slice_to_addrs, msg_utils,
+        Addrs, BinaryPart, Part, Parts, TextPlainPart, TplOverride,
     },
     output::PrinterService,
     smtp::SmtpService,

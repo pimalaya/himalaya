@@ -17,10 +17,7 @@ use url::Url;
 use crate::{
     backends::Backend,
     config::AccountConfig,
-    domain::{
-        msg::{Msg, Part, TextPlainPart},
-        Parts,
-    },
+    msg::{Msg, Part, Parts, TextPlainPart},
     output::{PrintTableOpts, PrinterService},
     smtp::SmtpService,
 };

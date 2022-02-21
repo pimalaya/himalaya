@@ -7,7 +7,7 @@ use anyhow::Result;
 use clap::{self, App, AppSettings, Arg, ArgMatches, SubCommand};
 use log::{debug, info};
 
-use crate::domain::msg::msg_arg;
+use crate::msg::msg_arg;
 
 type SeqRange<'a> = &'a str;
 type Flags = String;

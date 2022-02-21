@@ -6,7 +6,7 @@ use anyhow::Result;
 use clap::{self, App, AppSettings, Arg, ArgMatches, SubCommand};
 use log::{debug, info, trace};
 
-use crate::domain::msg::msg_arg;
+use crate::msg::msg_arg;
 
 type Seq<'a> = &'a str;
 type ReplyAll = bool;
