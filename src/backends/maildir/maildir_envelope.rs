@@ -8,7 +8,7 @@ use chrono::DateTime;
 use log::{debug, info, trace};
 use std::{
     convert::{TryFrom, TryInto},
-    ops::Deref,
+    ops::{Deref, DerefMut},
 };
 
 use crate::{
@@ -27,6 +27,12 @@ impl Deref for MaildirEnvelopes {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl DerefMut for MaildirEnvelopes {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 

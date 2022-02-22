@@ -54,17 +54,29 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         mdir: &str,
         _sort: &str,
         filter: &str,
-        _page_size: usize,
-        _page: usize,
+        page_size: usize,
+        page: usize,
     ) -> Result<Box<dyn Envelopes>> {
         let mdir = self.get_mdir_from_name(mdir);
         let mail_entries = match filter {
             "new" => mdir.list_new(),
             _ => mdir.list_cur(),
         };
-        let envelopes: MaildirEnvelopes = mail_entries
+        let mut envelopes: MaildirEnvelopes = mail_entries
             .try_into()
             .context("cannot parse maildir envelopes from {:?}")?;
+        envelopes.sort_by(|a, b| b.date.partial_cmp(&a.date).unwrap());
+
+        let page_begin = page * page_size;
+        let page_end = page_begin + page_size;
+        if page_end > envelopes.len() {
+            return Err(anyhow!(format!(
+                "cannot list maildir envelopes at page {:?} with a page size at {:?} (out of bounds)",
+                page_begin + 1,
+		page_size,
+            )));
+        }
+        envelopes.0 = envelopes[page_begin..page_end].to_owned();
         Ok(Box::new(envelopes))
     }
 
