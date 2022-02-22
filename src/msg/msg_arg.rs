@@ -206,7 +206,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
             .unwrap_or_default();
         debug!("page: {:?}", page);
         let criteria = m
-            .values_of("criteria")
+            .values_of("criterion")
             .unwrap_or_default()
             .collect::<Vec<_>>()
             .join(" ");
@@ -371,8 +371,8 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                 .arg(page_arg())
                 .arg(table_arg::max_width())
 		.arg(
-		    Arg::with_name("criteria")
-			.long("criteria")
+		    Arg::with_name("criterion")
+			.long("criterion")
 			.short("c")
 			.help("Defines the message sorting preferences")
 			.value_name("CRITERION:ORDER")
