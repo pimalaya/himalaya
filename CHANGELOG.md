@@ -7,17 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.6] - 2022-02-22
+
+### Added
+
+- Sort command [#34]
+- Maildir support [#43]
+
+### Fixed
+
+- Suffix to downloaded attachments with same name [#204]
+
 ## [0.5.5] - 2022-02-08
 
 ### Added
 
 - [Contributing guide](https://github.com/soywod/himalaya/blob/master/CONTRIBUTING.md) [#256]
 - Notify query config option [#289]
-- End-to-end encryption *(EXPERIMENTAL)* [#54]
+- End-to-end encryption [#54]
 
 ### Fixed
 
 - Multiple recipients issue [#288]
+- Cannot parse address [#227]
 
 ## [0.5.4] - 2022-02-05
 
@@ -292,7 +304,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.5.5...HEAD
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.5.6...HEAD
+[0.5.6]: https://github.com/soywod/himalaya/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/soywod/himalaya/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/soywod/himalaya/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/soywod/himalaya/compare/v0.5.2...v0.5.3
@@ -346,6 +359,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#39]: https://github.com/soywod/himalaya/issues/39
 [#40]: https://github.com/soywod/himalaya/issues/40
 [#41]: https://github.com/soywod/himalaya/issues/41
+[#43]: https://github.com/soywod/himalaya/issues/43
 [#47]: https://github.com/soywod/himalaya/issues/47
 [#48]: https://github.com/soywod/himalaya/issues/48
 [#50]: https://github.com/soywod/himalaya/issues/50
@@ -400,9 +414,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#193]: https://github.com/soywod/himalaya/issues/193
 [#196]: https://github.com/soywod/himalaya/issues/196
 [#199]: https://github.com/soywod/himalaya/issues/199
+[#204]: https://github.com/soywod/himalaya/issues/204
 [#205]: https://github.com/soywod/himalaya/issues/205
 [#215]: https://github.com/soywod/himalaya/issues/215
 [#220]: https://github.com/soywod/himalaya/issues/220
+[#227]: https://github.com/soywod/himalaya/issues/227
 [#228]: https://github.com/soywod/himalaya/issues/228
 [#229]: https://github.com/soywod/himalaya/issues/229
 [#249]: https://github.com/soywod/himalaya/issues/249

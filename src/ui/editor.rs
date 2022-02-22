@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use log::debug;
 use std::{env, fs, process::Command};
 
-use crate::domain::msg::msg_utils;
+use crate::msg::msg_utils;
 
 pub fn open_with_tpl(tpl: String) -> Result<String> {
     let path = msg_utils::local_draft_path();

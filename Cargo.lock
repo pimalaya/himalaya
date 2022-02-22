@@ -227,6 +227,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "erased-serde"
+version = "0.3.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56047058e1ab118075ca22f9ecd737bcc961aa3566a3019cb71388afa280bd8a"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "fastrand"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -323,6 +332,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "gethostname"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4addc164932852d066774c405dbbdb7914742d2b39e39e1a7ca949c856d054d1"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -361,7 +380,7 @@ dependencies = [
 
 [[package]]
 name = "himalaya"
-version = "0.5.5"
+version = "0.5.6"
 dependencies = [
  "ammonia",
  "anyhow",
@@ -369,11 +388,13 @@ dependencies = [
  "chrono",
  "clap",
  "env_logger",
+ "erased-serde",
  "html-escape",
  "imap",
  "imap-proto",
  "lettre",
  "log",
+ "maildir",
  "mailparse",
  "native-tls",
  "regex",
@@ -562,6 +583,16 @@ name = "mac"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c41e0c4fef86961ac6d6f8a82609f55f31b05e4fce149ac5710e439df7619ba4"
+
+[[package]]
+name = "maildir"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c47481eb056f735997fe5248a94fe8d03816388858c990a52eb271c21b33ff3"
+dependencies = [
+ "gethostname",
+ "mailparse",
+]
 
 [[package]]
 name = "mailparse"
