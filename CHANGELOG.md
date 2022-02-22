@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.6] - 2022-02-22
+
 ### Added
 
 - Sort command [#34]
@@ -22,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [Contributing guide](https://github.com/soywod/himalaya/blob/master/CONTRIBUTING.md) [#256]
 - Notify query config option [#289]
-- End-to-end encryption *(EXPERIMENTAL)* [#54]
+- End-to-end encryption [#54]
 
 ### Fixed
 
@@ -302,7 +304,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.5.5...HEAD
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.5.6...HEAD
+[0.5.6]: https://github.com/soywod/himalaya/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/soywod/himalaya/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/soywod/himalaya/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/soywod/himalaya/compare/v0.5.2...v0.5.3
