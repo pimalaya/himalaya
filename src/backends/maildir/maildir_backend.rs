@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Context, Result};
-use std::{convert::TryInto, fs};
+use std::{convert::TryInto, fs, path::PathBuf};
 
 use crate::{
     backends::{Backend, MaildirEnvelopes, MaildirFlags, MaildirMboxes},
@@ -24,11 +24,28 @@ impl<'a> MaildirBackend<'a> {
         }
     }
 
-    fn get_mdir_from_name(&self, mdir: &str) -> maildir::Maildir {
-        if mdir == self.account_config.inbox_folder {
-            self.mdir.path().to_owned().into()
+    fn validate_mdir_path(&self, mdir_path: PathBuf) -> Result<PathBuf> {
+        if mdir_path.is_dir() {
+            Ok(mdir_path)
         } else {
-            self.mdir.path().join(format!(".{}", mdir)).into()
+            Err(anyhow!(
+                "cannot read maildir from directory {:?}",
+                mdir_path
+            ))
+        }
+    }
+
+    fn get_mdir_from_name(&self, mdir: &str) -> Result<maildir::Maildir> {
+        if mdir == self.account_config.inbox_folder {
+            self.validate_mdir_path(self.mdir.path().to_owned())
+                .map(maildir::Maildir::from)
+        } else {
+            self.validate_mdir_path(mdir.into())
+                .or_else(|_| {
+                    let path = self.mdir.path().join(format!(".{}", mdir));
+                    self.validate_mdir_path(path)
+                })
+                .map(maildir::Maildir::from)
         }
     }
 }
@@ -57,7 +74,7 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         page_size: usize,
         page: usize,
     ) -> Result<Box<dyn Envelopes>> {
-        let mdir = self.get_mdir_from_name(mdir);
+        let mdir = self.get_mdir_from_name(mdir)?;
         let mail_entries = match filter {
             "new" => mdir.list_new(),
             _ => mdir.list_cur(),
@@ -68,20 +85,19 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         envelopes.sort_by(|a, b| b.date.partial_cmp(&a.date).unwrap());
 
         let page_begin = page * page_size;
-        let page_end = page_begin + page_size;
-        if page_end > envelopes.len() {
+        if page_begin > envelopes.len() {
             return Err(anyhow!(format!(
-                "cannot list maildir envelopes at page {:?} with a page size at {:?} (out of bounds)",
+                "cannot list maildir envelopes at page {:?} (out of bounds)",
                 page_begin + 1,
-		page_size,
             )));
         }
+        let page_end = envelopes.len().min(page_begin + page_size);
         envelopes.0 = envelopes[page_begin..page_end].to_owned();
         Ok(Box::new(envelopes))
     }
 
     fn add_msg(&mut self, mdir: &str, msg: &[u8], flags: &str) -> Result<Box<dyn ToString>> {
-        let mdir = self.get_mdir_from_name(mdir);
+        let mdir = self.get_mdir_from_name(mdir)?;
         let flags: MaildirFlags = flags.try_into()?;
         let id = mdir
             .store_cur_with_flags(msg, &flags.to_string())
@@ -93,7 +109,7 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
     }
 
     fn get_msg(&mut self, mdir: &str, id: &str) -> Result<Msg> {
-        let mdir = self.get_mdir_from_name(mdir);
+        let mdir = self.get_mdir_from_name(mdir)?;
         let mut mail_entry = mdir
             .find(id)
             .ok_or_else(|| anyhow!("cannot find maildir message {:?} in {:?}", id, mdir.path()))?;
@@ -110,8 +126,8 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
     }
 
     fn copy_msg(&mut self, mdir_src: &str, mdir_dst: &str, id: &str) -> Result<()> {
-        let mdir_src = self.get_mdir_from_name(mdir_src);
-        let mdir_dst = self.get_mdir_from_name(mdir_dst);
+        let mdir_src = self.get_mdir_from_name(mdir_src)?;
+        let mdir_dst = self.get_mdir_from_name(mdir_dst)?;
         mdir_src.copy_to(id, &mdir_dst).context(format!(
             "cannot copy message {:?} from maildir {:?} to maildir {:?}",
             id,
@@ -121,8 +137,8 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
     }
 
     fn move_msg(&mut self, mdir_src: &str, mdir_dst: &str, id: &str) -> Result<()> {
-        let mdir_src = self.get_mdir_from_name(mdir_src);
-        let mdir_dst = self.get_mdir_from_name(mdir_dst);
+        let mdir_src = self.get_mdir_from_name(mdir_src)?;
+        let mdir_dst = self.get_mdir_from_name(mdir_dst)?;
         mdir_src.move_to(id, &mdir_dst).context(format!(
             "cannot move message {:?} from maildir {:?} to maildir {:?}",
             id,
@@ -132,7 +148,7 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
     }
 
     fn del_msg(&mut self, mdir: &str, id: &str) -> Result<()> {
-        let mdir = self.get_mdir_from_name(mdir);
+        let mdir = self.get_mdir_from_name(mdir)?;
         mdir.delete(id).context(format!(
             "cannot delete message {:?} from maildir {:?}",
             id,
@@ -141,7 +157,7 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
     }
 
     fn add_flags(&mut self, mdir: &str, id: &str, flags_str: &str) -> Result<()> {
-        let mdir = self.get_mdir_from_name(mdir);
+        let mdir = self.get_mdir_from_name(mdir)?;
         let flags: MaildirFlags = flags_str.try_into()?;
         mdir.add_flags(id, &flags.to_string()).context(format!(
             "cannot add flags {:?} to maildir message {:?}",
@@ -150,7 +166,7 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
     }
 
     fn set_flags(&mut self, mdir: &str, id: &str, flags_str: &str) -> Result<()> {
-        let mdir = self.get_mdir_from_name(mdir);
+        let mdir = self.get_mdir_from_name(mdir)?;
         let flags: MaildirFlags = flags_str.try_into()?;
         mdir.set_flags(id, &flags.to_string()).context(format!(
             "cannot set flags {:?} to maildir message {:?}",
@@ -159,7 +175,7 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
     }
 
     fn del_flags(&mut self, mdir: &str, id: &str, flags_str: &str) -> Result<()> {
-        let mdir = self.get_mdir_from_name(mdir);
+        let mdir = self.get_mdir_from_name(mdir)?;
         let flags: MaildirFlags = flags_str.try_into()?;
         mdir.remove_flags(id, &flags.to_string()).context(format!(
             "cannot remove flags {:?} from maildir message {:?}",
