@@ -1,16 +1,18 @@
 use anyhow::{Context, Error, Result};
 use atty::Stream;
-use serde::Serialize;
-use std::{convert::TryFrom, fmt::Debug};
+use std::{
+    convert::TryFrom,
+    fmt::{self, Debug},
+};
 use termcolor::{ColorChoice, StandardStream};
 
 use crate::output::{OutputFmt, OutputJson, Print, PrintTable, PrintTableOpts, WriteColor};
 
 pub trait PrinterService {
-    fn print<T: Debug + Print + Serialize>(&mut self, data: T) -> Result<()>;
-    fn print_table<T: Debug + PrintTable + Serialize>(
+    fn print<T: Debug + Print + serde::Serialize>(&mut self, data: T) -> Result<()>;
+    fn print_table<T: fmt::Debug + erased_serde::Serialize + PrintTable + ?Sized>(
         &mut self,
-        data: T,
+        data: Box<T>,
         opts: PrintTableOpts,
     ) -> Result<()>;
     fn is_json(&self) -> bool;
@@ -22,7 +24,7 @@ pub struct StdoutPrinter {
 }
 
 impl PrinterService for StdoutPrinter {
-    fn print<T: Debug + Print + Serialize>(&mut self, data: T) -> Result<()> {
+    fn print<T: Debug + Print + serde::Serialize>(&mut self, data: T) -> Result<()> {
         match self.fmt {
             OutputFmt::Plain => data.print(self.writter.as_mut()),
             OutputFmt::Json => serde_json::to_writer(self.writter.as_mut(), &OutputJson::new(data))
@@ -30,15 +32,19 @@ impl PrinterService for StdoutPrinter {
         }
     }
 
-    fn print_table<T: Debug + PrintTable + Serialize>(
+    fn print_table<T: fmt::Debug + erased_serde::Serialize + PrintTable + ?Sized>(
         &mut self,
-        data: T,
+        data: Box<T>,
         opts: PrintTableOpts,
     ) -> Result<()> {
         match self.fmt {
             OutputFmt::Plain => data.print_table(self.writter.as_mut(), opts),
-            OutputFmt::Json => serde_json::to_writer(self.writter.as_mut(), &OutputJson::new(data))
-                .context("cannot write JSON to writter"),
+            OutputFmt::Json => {
+                let json = &mut serde_json::Serializer::new(self.writter.as_mut());
+                let ser = &mut <dyn erased_serde::Serializer>::erase(json);
+                data.erased_serialize(ser).unwrap();
+                Ok(())
+            }
         }
     }
 
