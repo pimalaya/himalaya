@@ -12,7 +12,7 @@ use std::{
 
 use crate::{
     backends::{MaildirFlag, MaildirFlags},
-    msg::from_slice_to_addrs,
+    msg::{from_slice_to_addrs, Addr},
     output::{PrintTable, PrintTableOpts, WriteColor},
     ui::{Cell, Row, Table},
 };
@@ -62,7 +62,7 @@ pub struct MaildirEnvelope {
 impl Table for MaildirEnvelope {
     fn head() -> Row {
         Row::new()
-            .cell(Cell::new("ID").bold().underline().white())
+            .cell(Cell::new("IDENTIFIER").bold().underline().white())
             .cell(Cell::new("FLAGS").bold().underline().white())
             .cell(Cell::new("SUBJECT").shrinkable().bold().underline().white())
             .cell(Cell::new("SENDER").bold().underline().white())
@@ -108,50 +108,60 @@ impl<'a> TryFrom<RawMaildirEnvelope> for MaildirEnvelope {
     type Error = Error;
 
     fn try_from(mut mail_entry: RawMaildirEnvelope) -> Result<Self, Self::Error> {
-        info!("begin: build envelope from maildir parsed mail");
+        info!("begin: try building envelope from maildir parsed mail");
 
-        let mut envelope = Self::default();
-        envelope.flags = (&mail_entry)
-            .try_into()
-            .context("cannot parse maildir flags")?;
+        let mut envelope = Self {
+            id: mail_entry.id().into(),
+            flags: (&mail_entry)
+                .try_into()
+                .context("cannot parse maildir flags")?,
+            ..Self::default()
+        };
 
         let parsed_mail = mail_entry
             .parsed()
             .context("cannot parse maildir mail entry")?;
-        trace!("parsed mail: {:?}", parsed_mail);
 
-        debug!("parsing headers");
-        for header in parsed_mail.get_headers() {
-            let key = header.get_key();
-            debug!("header key: {:?}", key);
+        debug!("begin: parse headers");
+        for h in parsed_mail.get_headers() {
+            let k = h.get_key();
+            debug!("header key: {:?}", k);
 
-            let val = header.get_value();
-            let val = String::from_utf8(header.get_value_raw().to_vec())
-                .map(|val| val.trim().to_string())
-                .context(format!(
-                    "cannot decode value {:?} from header {:?}",
-                    key, val
-                ))?;
-            debug!("header value: {:?}", val);
+            let v = rfc2047_decoder::decode(h.get_value_raw())
+                .context(format!("cannot decode value from header {:?}", k))?;
+            debug!("header value: {:?}", v);
 
-            match key.to_lowercase().as_str() {
+            match k.to_lowercase().as_str() {
                 "subject" => {
-                    envelope.subject = val.into();
+                    envelope.subject = v.into();
                 }
                 "from" => {
-                    envelope.sender = from_slice_to_addrs(val)
-                        .context(format!("cannot parse header {:?}", key))?
-                        .ok_or_else(|| anyhow!("cannot find sender"))?
-                        .to_string()
+                    envelope.sender = from_slice_to_addrs(v)
+                        .context(format!("cannot parse header {:?}", k))?
+                        .and_then(|senders| {
+                            if senders.is_empty() {
+                                None
+                            } else {
+                                Some(senders)
+                            }
+                        })
+                        .map(|senders| match &senders[0] {
+                            Addr::Single(mailparse::SingleInfo { display_name, addr }) => {
+                                display_name.as_ref().unwrap_or_else(|| addr).to_owned()
+                            }
+                            Addr::Group(mailparse::GroupInfo { group_name, .. }) => {
+                                group_name.to_owned()
+                            }
+                        })
+                        .ok_or_else(|| anyhow!("cannot find sender"))?;
                 }
                 _ => (),
             }
         }
-
-        envelope.id = mail_entry.id().into();
+        debug!("end: parse headers");
 
         trace!("envelope: {:?}", envelope);
-        info!("end: building envelope from parsed mail");
+        info!("end: try building envelope from maildir parsed mail");
         Ok(envelope)
     }
 }
