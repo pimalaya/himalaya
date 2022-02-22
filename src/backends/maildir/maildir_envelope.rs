@@ -4,6 +4,7 @@
 //! related to the envelope
 
 use anyhow::{anyhow, Context, Error, Result};
+use chrono::DateTime;
 use log::{debug, info, trace};
 use std::{
     convert::{TryFrom, TryInto},
@@ -57,6 +58,9 @@ pub struct MaildirEnvelope {
 
     /// Represents the first sender of the message.
     pub sender: String,
+
+    /// Represents the date of the message.
+    pub date: String,
 }
 
 impl Table for MaildirEnvelope {
@@ -66,6 +70,7 @@ impl Table for MaildirEnvelope {
             .cell(Cell::new("FLAGS").bold().underline().white())
             .cell(Cell::new("SUBJECT").shrinkable().bold().underline().white())
             .cell(Cell::new("SENDER").bold().underline().white())
+            .cell(Cell::new("DATE").bold().underline().white())
     }
 
     fn row(&self) -> Row {
@@ -74,11 +79,13 @@ impl Table for MaildirEnvelope {
         let flags = self.flags.to_symbols_string();
         let subject = &self.subject;
         let sender = &self.sender;
+        let date = &self.date;
         Row::new()
             .cell(Cell::new(id).bold_if(unseen).red())
             .cell(Cell::new(flags).bold_if(unseen).white())
             .cell(Cell::new(subject).shrinkable().bold_if(unseen).green())
             .cell(Cell::new(sender).bold_if(unseen).blue())
+            .cell(Cell::new(date).bold_if(unseen).yellow())
     }
 }
 
@@ -132,6 +139,13 @@ impl<'a> TryFrom<RawMaildirEnvelope> for MaildirEnvelope {
             debug!("header value: {:?}", v);
 
             match k.to_lowercase().as_str() {
+                "date" => {
+                    envelope.date =
+                        DateTime::parse_from_rfc2822(v.split_at(v.find(" (").unwrap_or(v.len())).0)
+                            .context(format!("cannot parse maildir message date {:?}", v))?
+                            .naive_local()
+                            .to_string();
+                }
                 "subject" => {
                     envelope.subject = v.into();
                 }
