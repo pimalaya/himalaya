@@ -191,7 +191,7 @@ impl<'a> AccountConfig {
             }),
             DeserializedAccountConfig::Maildir(config) => {
                 BackendConfig::Maildir(MaildirBackendConfig {
-                    maildir_dir: config.maildir_dir.clone(),
+                    maildir_dir: shellexpand::full(&config.maildir_dir)?.to_string().into(),
                 })
             }
         };
