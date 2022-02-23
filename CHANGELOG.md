@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Rust edition transition [#303]
+
 ## [0.5.6] - 2022-02-22
 
 ### Added
@@ -433,3 +437,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#280]: https://github.com/soywod/himalaya/issues/280
 [#288]: https://github.com/soywod/himalaya/issues/288
 [#289]: https://github.com/soywod/himalaya/issues/289
+[#303]: https://github.com/soywod/himalaya/issues/303

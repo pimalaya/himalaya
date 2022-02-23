@@ -5,7 +5,7 @@ use html_escape;
 use lettre::message::{header::ContentType, Attachment, MultiPart, SinglePart};
 use log::{debug, info, trace};
 use regex::Regex;
-use std::{collections::HashSet, env::temp_dir, fmt::Debug, fs, path::PathBuf};
+use std::{collections::HashSet, convert::TryInto, env::temp_dir, fmt::Debug, fs, path::PathBuf};
 use uuid::Uuid;
 
 use crate::{
