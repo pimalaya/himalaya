@@ -2,12 +2,7 @@ use anyhow::{anyhow, Context, Result};
 use lettre::transport::smtp::authentication::Credentials as SmtpCredentials;
 use log::{debug, info, trace};
 use mailparse::MailAddr;
-use std::{
-    env,
-    ffi::OsStr,
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{env, ffi::OsStr, fs, path::PathBuf};
 
 use crate::{config::*, output::run_cmd};
 
@@ -195,11 +190,8 @@ impl<'a> AccountConfig {
                 imap_passwd_cmd: config.imap_passwd_cmd.clone(),
             }),
             DeserializedAccountConfig::Maildir(config) => {
-                let maildir_path_str = config.maildir_dir.to_string_lossy();
-                let expanded_path = shellexpand::full(&maildir_path_str)?.into_owned();
-                let expanded_path = Path::new(&expanded_path);
                 BackendConfig::Maildir(MaildirBackendConfig {
-                    maildir_dir: expanded_path.to_path_buf(),
+                    maildir_dir: shellexpand::full(&config.maildir_dir)?.to_string().into(),
                 })
             }
         };

@@ -121,4 +121,4 @@ make_account_config!(
     imap_passwd_cmd: String
 );
 
-make_account_config!(DeserializedMaildirAccountConfig, maildir_dir: PathBuf);
+make_account_config!(DeserializedMaildirAccountConfig, maildir_dir: String);
