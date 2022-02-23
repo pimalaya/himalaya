@@ -30,7 +30,7 @@ curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | 
 ```
 
 *See the
-[wiki](https://github.com/soywod/himalaya/wiki/Installation:from-binary)
+[wiki](https://github.com/soywod/himalaya/wiki/Installation:binary)
 for other installation methods.*
 
 ## Configuration
