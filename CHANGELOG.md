@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Build failure due to `imap` version [#303]
 - No tilde expansion in `maildir-dir` [#305]
+- Unknown command SORT [#308]
 
 ## [0.5.6] - 2022-02-22
 
@@ -440,3 +441,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#289]: https://github.com/soywod/himalaya/issues/289
 [#303]: https://github.com/soywod/himalaya/issues/303
 [#305]: https://github.com/soywod/himalaya/issues/305
+[#308]: https://github.com/soywod/himalaya/issues/308

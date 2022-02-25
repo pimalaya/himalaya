@@ -21,8 +21,14 @@ pub trait Backend<'a> {
     fn get_envelopes(
         &mut self,
         mbox: &str,
+        page_size: usize,
+        page: usize,
+    ) -> Result<Box<dyn Envelopes>>;
+    fn find_envelopes(
+        &mut self,
+        mbox: &str,
+        query: &str,
         sort: &str,
-        filter: &str,
         page_size: usize,
         page: usize,
     ) -> Result<Box<dyn Envelopes>>;

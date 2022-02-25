@@ -108,7 +108,7 @@ pub fn list<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
 ) -> Result<()> {
     let page_size = page_size.unwrap_or(config.default_page_size);
     debug!("page size: {}", page_size);
-    let msgs = imap.get_envelopes(mbox, "arrival:desc", "all", page_size, page)?;
+    let msgs = imap.get_envelopes(mbox, page_size, page)?;
     trace!("envelopes: {:?}", msgs);
     printer.print_table(msgs, PrintTableOpts { max_width })
 }
@@ -273,7 +273,7 @@ pub fn search<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
 ) -> Result<()> {
     let page_size = page_size.unwrap_or(config.default_page_size);
     debug!("page size: {}", page_size);
-    let msgs = backend.get_envelopes(mbox, "arrival:desc", &query, page_size, page)?;
+    let msgs = backend.find_envelopes(mbox, &query, "", page_size, page)?;
     trace!("messages: {:#?}", msgs);
     printer.print_table(msgs, PrintTableOpts { max_width })
 }
@@ -292,7 +292,7 @@ pub fn sort<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
 ) -> Result<()> {
     let page_size = page_size.unwrap_or(config.default_page_size);
     debug!("page size: {}", page_size);
-    let msgs = backend.get_envelopes(mbox, &sort, &query, page_size, page)?;
+    let msgs = backend.find_envelopes(mbox, &query, &sort, page_size, page)?;
     trace!("envelopes: {:#?}", msgs);
     printer.print_table(msgs, PrintTableOpts { max_width })
 }

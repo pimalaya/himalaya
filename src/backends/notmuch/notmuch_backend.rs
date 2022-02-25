@@ -51,18 +51,30 @@ impl<'a> Backend<'a> for NotmuchBackend<'a> {
     fn get_envelopes(
         &mut self,
         mdir: &str,
-        _sort: &str,
-        filter: &str,
         page_size: usize,
         page: usize,
     ) -> Result<Box<dyn Envelopes>> {
-        let query = self
+        unimplemented!();
+    }
+
+    fn find_envelopes(
+        &mut self,
+        _mdir: &str,
+        query: &str,
+        _sort: &str,
+        _page_size: usize,
+        _page: usize,
+    ) -> Result<Box<dyn Envelopes>> {
+        let query_builder = self
             .db
-            .create_query(filter)
-            .context("cannot create query")?;
-        let msgs: NotmuchEnvelopes = query
+            .create_query(query)
+            .context("cannot create notmuch query")?;
+        let msgs: NotmuchEnvelopes = query_builder
             .search_messages()
-            .context("cannot get messages")?
+            .context(format!(
+                "cannot find notmuch envelopes with query {:?}",
+                query
+            ))?
             .try_into()?;
         Ok(Box::new(msgs))
     }

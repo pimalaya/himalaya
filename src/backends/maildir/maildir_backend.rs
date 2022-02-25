@@ -69,17 +69,12 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
     fn get_envelopes(
         &mut self,
         mdir: &str,
-        _sort: &str,
-        filter: &str,
         page_size: usize,
         page: usize,
     ) -> Result<Box<dyn Envelopes>> {
         let mdir = self.get_mdir_from_name(mdir)?;
-        let mail_entries = match filter {
-            "new" => mdir.list_new(),
-            _ => mdir.list_cur(),
-        };
-        let mut envelopes: MaildirEnvelopes = mail_entries
+        let mut envelopes: MaildirEnvelopes = mdir
+            .list_cur()
             .try_into()
             .context("cannot parse maildir envelopes from {:?}")?;
         envelopes.sort_by(|a, b| b.date.partial_cmp(&a.date).unwrap());
@@ -94,6 +89,19 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         let page_end = envelopes.len().min(page_begin + page_size);
         envelopes.0 = envelopes[page_begin..page_end].to_owned();
         Ok(Box::new(envelopes))
+    }
+
+    fn find_envelopes(
+        &mut self,
+        _mdir: &str,
+        _query: &str,
+        _sort: &str,
+        _page_size: usize,
+        _page: usize,
+    ) -> Result<Box<dyn Envelopes>> {
+        Err(anyhow!(
+            "cannot find maildir envelopes: feature not implemented"
+        ))
     }
 
     fn add_msg(&mut self, mdir: &str, msg: &[u8], flags: &str) -> Result<Box<dyn ToString>> {

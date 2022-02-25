@@ -229,8 +229,42 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
     fn get_envelopes(
         &mut self,
         mbox: &str,
+        page_size: usize,
+        page: usize,
+    ) -> Result<Box<dyn Envelopes>> {
+        let last_seq = self
+            .sess()?
+            .select(mbox)
+            .context(format!("cannot select mailbox {:?}", mbox))?
+            .exists as usize;
+        debug!("last sequence number: {:?}", last_seq);
+        if last_seq == 0 {
+            return Ok(Box::new(ImapEnvelopes::default()));
+        }
+
+        let range = if page_size > 0 {
+            let cursor = page * page_size;
+            let begin = 1.max(last_seq - cursor);
+            let end = begin - begin.min(page_size) + 1;
+            format!("{}:{}", end, begin)
+        } else {
+            String::from("1:*")
+        };
+        debug!("range: {:?}", range);
+
+        let fetches = self
+            .sess()?
+            .fetch(&range, "(ENVELOPE FLAGS INTERNALDATE)")
+            .context(format!("cannot fetch messages within range {:?}", range))?;
+        let envelopes: ImapEnvelopes = fetches.try_into()?;
+        Ok(Box::new(envelopes))
+    }
+
+    fn find_envelopes(
+        &mut self,
+        mbox: &str,
+        query: &str,
         sort: &str,
-        filter: &str,
         page_size: usize,
         page: usize,
     ) -> Result<Box<dyn Envelopes>> {
@@ -239,24 +273,36 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
             .select(mbox)
             .context(format!("cannot select mailbox {:?}", mbox))?
             .exists;
+        debug!("last sequence number: {:?}", last_seq);
         if last_seq == 0 {
             return Ok(Box::new(ImapEnvelopes::default()));
         }
 
-        let sort: SortCriteria = sort.try_into()?;
-        let charset = imap::extensions::sort::SortCharset::Utf8;
         let begin = page * page_size;
         let end = begin + (page_size - 1);
-        let seqs: Vec<String> = self
-            .sess()?
-            .sort(&sort, charset, filter)
-            .context(format!(
-                "cannot search in {:?} with query {:?}",
-                mbox, filter
-            ))?
-            .iter()
-            .map(|seq| seq.to_string())
-            .collect();
+        let seqs: Vec<String> = if sort.is_empty() {
+            self.sess()?
+                .search(query)
+                .context(format!(
+                    "cannot find envelopes in {:?} with query {:?}",
+                    mbox, query
+                ))?
+                .iter()
+                .map(|seq| seq.to_string())
+                .collect()
+        } else {
+            let sort: SortCriteria = sort.try_into()?;
+            let charset = imap::extensions::sort::SortCharset::Utf8;
+            self.sess()?
+                .sort(&sort, charset, query)
+                .context(format!(
+                    "cannot find envelopes in {:?} with query {:?}",
+                    mbox, query
+                ))?
+                .iter()
+                .map(|seq| seq.to_string())
+                .collect()
+        };
         if seqs.is_empty() {
             return Ok(Box::new(ImapEnvelopes::default()));
         }
