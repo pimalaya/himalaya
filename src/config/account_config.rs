@@ -73,6 +73,9 @@ impl<'a> AccountConfig {
                     DeserializedAccountConfig::Maildir(account) => {
                         account.default.unwrap_or_default()
                     }
+                    DeserializedAccountConfig::Notmuch(account) => {
+                        account.default.unwrap_or_default()
+                    }
                 })
                 .map(|(name, account)| (name.to_owned(), account))
                 .ok_or_else(|| anyhow!("cannot find default account")),
@@ -192,6 +195,13 @@ impl<'a> AccountConfig {
             DeserializedAccountConfig::Maildir(config) => {
                 BackendConfig::Maildir(MaildirBackendConfig {
                     maildir_dir: shellexpand::full(&config.maildir_dir)?.to_string().into(),
+                })
+            }
+            DeserializedAccountConfig::Notmuch(config) => {
+                BackendConfig::Notmuch(NotmuchBackendConfig {
+                    notmuch_database_dir: shellexpand::full(&config.notmuch_database_dir)?
+                        .to_string()
+                        .into(),
                 })
             }
         };
@@ -321,6 +331,7 @@ impl<'a> AccountConfig {
 pub enum BackendConfig {
     Imap(ImapBackendConfig),
     Maildir(MaildirBackendConfig),
+    Notmuch(NotmuchBackendConfig),
 }
 
 /// Represents the IMAP backend.
@@ -356,6 +367,13 @@ impl ImapBackendConfig {
 pub struct MaildirBackendConfig {
     /// Represents the Maildir directory path.
     pub maildir_dir: PathBuf,
+}
+
+/// Represents the Notmuch backend.
+#[derive(Debug, Default, Clone)]
+pub struct NotmuchBackendConfig {
+    /// Represents the Notmuch database path.
+    pub notmuch_database_dir: PathBuf,
 }
 
 #[cfg(test)]

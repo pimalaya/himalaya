@@ -75,6 +75,15 @@ pub mod backends {
         pub mod maildir_flag;
         pub use maildir_flag::*;
     }
+
+    pub use self::notmuch::*;
+    pub mod notmuch {
+        pub mod notmuch_backend;
+        pub use notmuch_backend::*;
+
+        pub mod notmuch_envelope;
+        pub use notmuch_envelope::*;
+    }
 }
 
 pub mod smtp {
