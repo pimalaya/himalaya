@@ -25,7 +25,7 @@ clap = { version = "2.33.3", default-features = false, features = ["suggestions"
 env_logger = "0.8.3"
 erased-serde = "0.3.18"
 html-escape = "0.2.9"
-imap = "3.0.0-alpha.4"
+imap = "=3.0.0-alpha.4"
 imap-proto = "0.14.3"
 lettre = { version = "0.10.0-rc.1", features = ["serde"] }
 log = "0.4.14"

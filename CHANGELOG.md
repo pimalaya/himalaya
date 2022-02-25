@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Rust edition transition [#303]
+- Build failure due to `imap` version [#303]
 - No tilde expansion in `maildir-dir` [#305]
 
 ## [0.5.6] - 2022-02-22
