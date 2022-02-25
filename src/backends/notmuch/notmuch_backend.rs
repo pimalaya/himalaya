@@ -3,7 +3,7 @@ use std::{convert::TryInto, fs};
 use anyhow::{anyhow, Context, Result};
 
 use crate::{
-    backends::{Backend, NotmuchEnvelopes},
+    backends::{Backend, NotmuchEnvelopes, NotmuchMbox, NotmuchMboxes},
     config::{AccountConfig, NotmuchBackendConfig},
     mbox::Mboxes,
     msg::{Envelopes, Msg},
@@ -39,7 +39,14 @@ impl<'a> Backend<'a> for NotmuchBackend<'a> {
     }
 
     fn get_mboxes(&mut self) -> Result<Box<dyn Mboxes>> {
-        unimplemented!();
+        let mut mboxes: Vec<_> = self
+            .account_config
+            .mailboxes
+            .iter()
+            .map(|(k, v)| NotmuchMbox::new(k, v))
+            .collect();
+        mboxes.sort_by(|a, b| b.name.partial_cmp(&a.name).unwrap());
+        Ok(Box::new(NotmuchMboxes(mboxes)))
     }
 
     fn del_mbox(&mut self, _mbox: &str) -> Result<()> {

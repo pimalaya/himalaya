@@ -81,6 +81,9 @@ pub mod backends {
         pub mod notmuch_backend;
         pub use notmuch_backend::*;
 
+        pub mod notmuch_mbox;
+        pub use notmuch_mbox::*;
+
         pub mod notmuch_envelope;
         pub use notmuch_envelope::*;
     }
