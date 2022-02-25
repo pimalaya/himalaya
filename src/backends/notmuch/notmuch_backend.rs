@@ -141,8 +141,17 @@ impl<'a> Backend<'a> for NotmuchBackend<'a> {
         unimplemented!();
     }
 
-    fn del_msg(&mut self, _mbox: &str, _id: &str) -> Result<()> {
-        unimplemented!();
+    fn del_msg(&mut self, _mbox: &str, id: &str) -> Result<()> {
+        let msg_filepath = self
+            .db
+            .find_message(id)
+            .context(format!("cannot find notmuch message {:?}", id))?
+            .ok_or_else(|| anyhow!("cannot find notmuch message {:?}", id))?
+            .filename()
+            .to_owned();
+        self.db
+            .remove_message(msg_filepath)
+            .context(format!("cannot delete notmuch message {:?}", id))
     }
 
     fn add_flags(&mut self, _mbox: &str, _id: &str, _flags_str: &str) -> Result<()> {
