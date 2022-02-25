@@ -16,7 +16,7 @@ use url::Url;
 
 use crate::{
     backends::Backend,
-    config::AccountConfig,
+    config::{AccountConfig, DEFAULT_SENT_FOLDER},
     msg::{Msg, Part, Parts, TextPlainPart},
     output::{PrintTableOpts, PrinterService},
     smtp::SmtpService,
@@ -312,6 +312,13 @@ pub fn send<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     let is_json = printer.is_json();
     debug!("is json: {}", is_json);
 
+    let sent_folder = config
+        .mailboxes
+        .get("sent")
+        .map(|s| s.as_str())
+        .unwrap_or(DEFAULT_SENT_FOLDER);
+    debug!("sent folder: {:?}", sent_folder);
+
     let raw_msg = if is_tty || is_json {
         raw_msg.replace("\r", "").replace("\n", "\r\n")
     } else {
@@ -325,9 +332,8 @@ pub fn send<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     trace!("raw message: {:?}", raw_msg);
     let envelope: lettre::address::Envelope = Msg::from_tpl(&raw_msg)?.try_into()?;
     trace!("envelope: {:?}", envelope);
-
     smtp.send_raw_msg(&envelope, raw_msg.as_bytes())?;
-    backend.add_msg(&config.sent_folder, raw_msg.as_bytes(), "seen")?;
+    backend.add_msg(&sent_folder, raw_msg.as_bytes(), "seen")?;
     Ok(())
 }
 

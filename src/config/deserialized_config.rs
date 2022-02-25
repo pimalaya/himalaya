@@ -27,12 +27,6 @@ pub struct DeserializedConfig {
     pub signature_delimiter: Option<String>,
     /// Represents the default page size for listings.
     pub default_page_size: Option<usize>,
-    /// Overrides the default inbox folder name "INBOX".
-    pub inbox_folder: Option<String>,
-    /// Overrides the default sent folder name "Sent".
-    pub sent_folder: Option<String>,
-    /// Overrides the default draft folder name "Drafts".
-    pub draft_folder: Option<String>,
     /// Represents the notify command.
     pub notify_cmd: Option<String>,
     /// Overrides the default IMAP query "NEW" used to fetch new messages
@@ -48,12 +42,12 @@ pub struct DeserializedConfig {
 impl DeserializedConfig {
     /// Tries to create a config from an optional path.
     pub fn from_opt_path(path: Option<&str>) -> Result<Self> {
-        info!("begin: trying to parse config from path");
+        info!("begin: try to parse config from path");
         debug!("path: {:?}", path);
         let path = path.map(|s| s.into()).unwrap_or(Self::path()?);
         let content = fs::read_to_string(path).context("cannot read config file")?;
         let config = toml::from_str(&content).context("cannot parse config file")?;
-        info!("end: trying to parse config from path");
+        info!("end: try to parse config from path");
         trace!("config: {:?}", config);
         Ok(config)
     }

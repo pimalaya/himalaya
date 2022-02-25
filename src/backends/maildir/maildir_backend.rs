@@ -3,7 +3,7 @@ use std::{convert::TryInto, fs, path::PathBuf};
 
 use crate::{
     backends::{Backend, MaildirEnvelopes, MaildirFlags, MaildirMboxes},
-    config::{AccountConfig, MaildirBackendConfig},
+    config::{AccountConfig, MaildirBackendConfig, DEFAULT_INBOX_FOLDER},
     mbox::Mboxes,
     msg::{Envelopes, Msg},
 };
@@ -36,7 +36,14 @@ impl<'a> MaildirBackend<'a> {
     }
 
     fn get_mdir_from_name(&self, mdir: &str) -> Result<maildir::Maildir> {
-        if mdir == self.account_config.inbox_folder {
+        let inbox_folder = self
+            .account_config
+            .mailboxes
+            .get("inbox")
+            .map(|s| s.as_str())
+            .unwrap_or(DEFAULT_INBOX_FOLDER);
+
+        if mdir == inbox_folder {
             self.validate_mdir_path(self.mdir.path().to_owned())
                 .map(maildir::Maildir::from)
         } else {

@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - No tilde expansion in `maildir-dir` [#305]
 - Unknown command SORT [#308]
 
+### Changed
+
+- [**BREAKING**] Replace `inbox-folder`, `sent-folder` and `draft-folder` by a generic hashmap `mailboxes`
+
 ## [0.5.6] - 2022-02-22
 
 ### Added

@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::{
     backends::Backend,
-    config::{AccountConfig, DEFAULT_SIG_DELIM},
+    config::{AccountConfig, DEFAULT_DRAFT_FOLDER, DEFAULT_SENT_FOLDER, DEFAULT_SIG_DELIM},
     msg::{
         from_addrs_to_sendable_addrs, from_addrs_to_sendable_mbox, from_slice_to_addrs, msg_utils,
         Addrs, BinaryPart, Part, Parts, TextPlainPart, TplOverride,
@@ -340,7 +340,12 @@ impl Msg {
             match choice::post_edit() {
                 Ok(PostEditChoice::Send) => {
                     let sent_msg = smtp.send_msg(account, &self)?;
-                    backend.add_msg(&account.sent_folder, &sent_msg.formatted(), "seen")?;
+                    let sent_folder = account
+                        .mailboxes
+                        .get("sent")
+                        .map(|s| s.as_str())
+                        .unwrap_or(DEFAULT_SENT_FOLDER);
+                    backend.add_msg(&sent_folder, &sent_msg.formatted(), "seen")?;
                     msg_utils::remove_local_draft()?;
                     printer.print("Message successfully sent")?;
                     break;
@@ -355,12 +360,14 @@ impl Msg {
                 }
                 Ok(PostEditChoice::RemoteDraft) => {
                     let tpl = self.to_tpl(TplOverride::default(), account)?;
-                    backend.add_msg(&account.draft_folder, tpl.as_bytes(), "seen draft")?;
+                    let draft_folder = account
+                        .mailboxes
+                        .get("draft")
+                        .map(|s| s.as_str())
+                        .unwrap_or(DEFAULT_DRAFT_FOLDER);
+                    backend.add_msg(&draft_folder, tpl.as_bytes(), "seen draft")?;
                     msg_utils::remove_local_draft()?;
-                    printer.print(format!(
-                        "Message successfully saved to {}",
-                        account.draft_folder
-                    ))?;
+                    printer.print(format!("Message successfully saved to {}", draft_folder))?;
                     break;
                 }
                 Ok(PostEditChoice::Discard) => {

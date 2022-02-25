@@ -5,7 +5,10 @@ use url::Url;
 use himalaya::{
     backends::{imap_arg, imap_handler, Backend, ImapBackend, MaildirBackend, NotmuchBackend},
     compl::{compl_arg, compl_handler},
-    config::{account_args, config_args, AccountConfig, BackendConfig, DeserializedConfig},
+    config::{
+        account_args, config_args, AccountConfig, BackendConfig, DeserializedConfig,
+        DEFAULT_INBOX_FOLDER,
+    },
     mbox::{mbox_arg, mbox_handler},
     msg::{flag_arg, flag_handler, msg_arg, msg_handler, tpl_arg, tpl_handler},
     output::{output_arg, OutputFmt, StdoutPrinter},
@@ -82,7 +85,8 @@ fn main() -> Result<()> {
         AccountConfig::from_config_and_opt_account_name(&config, m.value_of("account"))?;
     let mbox = m
         .value_of("mbox-source")
-        .unwrap_or(&account_config.inbox_folder);
+        .or_else(|| account_config.mailboxes.get("inbox").map(|s| s.as_str()))
+        .unwrap_or(DEFAULT_INBOX_FOLDER);
     let mut printer = StdoutPrinter::try_from(m.value_of("output"))?;
     let mut imap;
     let mut maildir;
