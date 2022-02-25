@@ -1,15 +1,13 @@
-use std::convert::TryInto;
+use std::{convert::TryInto, fs};
 
 use anyhow::{anyhow, Context, Result};
 
 use crate::{
-    backends::Backend,
+    backends::{Backend, NotmuchEnvelopes},
     config::{AccountConfig, NotmuchBackendConfig},
     mbox::Mboxes,
     msg::{Envelopes, Msg},
 };
-
-use super::NotmuchEnvelopes;
 
 pub struct NotmuchBackend<'a> {
     account_config: &'a AccountConfig,
@@ -121,8 +119,18 @@ impl<'a> Backend<'a> for NotmuchBackend<'a> {
         unimplemented!();
     }
 
-    fn get_msg(&mut self, _mbox: &str, _id: &str) -> Result<Msg> {
-        unimplemented!();
+    fn get_msg(&mut self, _mbox: &str, id: &str) -> Result<Msg> {
+        let msg_filepath = self
+            .db
+            .find_message(id)
+            .context(format!("cannot find notmuch message {:?}", id))?
+            .ok_or_else(|| anyhow!("cannot find notmuch message {:?}", id))?
+            .filename()
+            .to_owned();
+        let raw_msg = fs::read(&msg_filepath)
+            .context(format!("cannot read message from file {:?}", msg_filepath))?;
+        let msg = Msg::from_parsed_mail(mailparse::parse_mail(&raw_msg)?, &self.account_config)?;
+        Ok(msg)
     }
 
     fn copy_msg(&mut self, _mbox_src: &str, _mbox_dst: &str, _id: &str) -> Result<()> {
