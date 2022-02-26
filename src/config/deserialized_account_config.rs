@@ -11,6 +11,7 @@ pub trait ToDeserializedBaseAccountConfig {
 pub enum DeserializedAccountConfig {
     Imap(DeserializedImapAccountConfig),
     Maildir(DeserializedMaildirAccountConfig),
+    #[cfg(feature = "notmuch")]
     Notmuch(DeserializedNotmuchAccountConfig),
 }
 
@@ -19,6 +20,7 @@ impl ToDeserializedBaseAccountConfig for DeserializedAccountConfig {
         match self {
             Self::Imap(config) => config.to_base(),
             Self::Maildir(config) => config.to_base(),
+            #[cfg(feature = "notmuch")]
             Self::Notmuch(config) => config.to_base(),
         }
     }
@@ -122,6 +124,7 @@ make_account_config!(
 
 make_account_config!(DeserializedMaildirAccountConfig, maildir_dir: String);
 
+#[cfg(feature = "notmuch")]
 make_account_config!(
     DeserializedNotmuchAccountConfig,
     notmuch_database_dir: String

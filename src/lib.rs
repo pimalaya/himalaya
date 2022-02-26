@@ -76,7 +76,9 @@ pub mod backends {
         pub use maildir_flag::*;
     }
 
+    #[cfg(feature = "notmuch")]
     pub use self::notmuch::*;
+    #[cfg(feature = "notmuch")]
     pub mod notmuch {
         pub mod notmuch_backend;
         pub use notmuch_backend::*;

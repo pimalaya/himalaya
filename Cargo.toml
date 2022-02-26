@@ -32,7 +32,7 @@ log = "0.4.14"
 maildir = "0.6.0"
 mailparse = "0.13.6"
 native-tls = "0.2.8"
-notmuch = "0.7.1"
+notmuch = { version = "0.7.1", optional = true }
 regex = "1.5.4"
 rfc2047-decoder = "0.1.2"
 serde = { version = "1.0.118", features = ["derive"] }

@@ -3,7 +3,7 @@ use std::{convert::TryFrom, env};
 use url::Url;
 
 use himalaya::{
-    backends::{imap_arg, imap_handler, Backend, ImapBackend, MaildirBackend, NotmuchBackend},
+    backends::{imap_arg, imap_handler, Backend, ImapBackend, MaildirBackend},
     compl::{compl_arg, compl_handler},
     config::{
         account_args, config_args, AccountConfig, BackendConfig, DeserializedConfig,
@@ -14,6 +14,9 @@ use himalaya::{
     output::{output_arg, OutputFmt, StdoutPrinter},
     smtp::LettreService,
 };
+
+#[cfg(feature = "notmuch")]
+use himalaya::backends::NotmuchBackend;
 
 fn create_app<'a>() -> clap::App<'a, 'a> {
     clap::App::new(env!("CARGO_PKG_NAME"))
@@ -48,6 +51,7 @@ fn main() -> Result<()> {
 
         let mut imap;
         let mut maildir;
+        #[cfg(feature = "notmuch")]
         let mut notmuch;
         let backend: Box<&mut dyn Backend> = match backend_config {
             BackendConfig::Imap(ref imap_config) => {
@@ -58,6 +62,7 @@ fn main() -> Result<()> {
                 maildir = MaildirBackend::new(&account_config, maildir_config);
                 Box::new(&mut maildir)
             }
+            #[cfg(feature = "notmuch")]
             BackendConfig::Notmuch(ref notmuch_config) => {
                 notmuch = NotmuchBackend::new(&account_config, notmuch_config)?;
                 Box::new(&mut notmuch)
@@ -90,6 +95,7 @@ fn main() -> Result<()> {
     let mut printer = StdoutPrinter::try_from(m.value_of("output"))?;
     let mut imap;
     let mut maildir;
+    #[cfg(feature = "notmuch")]
     let mut notmuch;
     let backend: Box<&mut dyn Backend> = match backend_config {
         BackendConfig::Imap(ref imap_config) => {
@@ -100,6 +106,7 @@ fn main() -> Result<()> {
             maildir = MaildirBackend::new(&account_config, maildir_config);
             Box::new(&mut maildir)
         }
+        #[cfg(feature = "notmuch")]
         BackendConfig::Notmuch(ref notmuch_config) => {
             notmuch = NotmuchBackend::new(&account_config, notmuch_config)?;
             Box::new(&mut notmuch)
