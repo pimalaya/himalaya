@@ -273,7 +273,7 @@ pub fn search<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
 ) -> Result<()> {
     let page_size = page_size.unwrap_or(config.default_page_size);
     debug!("page size: {}", page_size);
-    let msgs = backend.find_envelopes(mbox, &query, "", page_size, page)?;
+    let msgs = backend.search_envelopes(mbox, &query, "", page_size, page)?;
     trace!("messages: {:#?}", msgs);
     printer.print_table(msgs, PrintTableOpts { max_width })
 }
@@ -292,7 +292,7 @@ pub fn sort<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
 ) -> Result<()> {
     let page_size = page_size.unwrap_or(config.default_page_size);
     debug!("page size: {}", page_size);
-    let msgs = backend.find_envelopes(mbox, &query, &sort, page_size, page)?;
+    let msgs = backend.search_envelopes(mbox, &query, &sort, page_size, page)?;
     trace!("envelopes: {:#?}", msgs);
     printer.print_table(msgs, PrintTableOpts { max_width })
 }

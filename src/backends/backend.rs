@@ -24,7 +24,7 @@ pub trait Backend<'a> {
         page_size: usize,
         page: usize,
     ) -> Result<Box<dyn Envelopes>>;
-    fn find_envelopes(
+    fn search_envelopes(
         &mut self,
         mbox: &str,
         query: &str,

@@ -260,7 +260,7 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
         Ok(Box::new(envelopes))
     }
 
-    fn find_envelopes(
+    fn search_envelopes(
         &mut self,
         mbox: &str,
         query: &str,
