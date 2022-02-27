@@ -4,7 +4,7 @@ use serde::Deserialize;
 use std::{collections::HashMap, env, fs, path::PathBuf};
 use toml;
 
-use crate::config::DeserializedAccountConfig;
+use crate::config::{DeserializedAccountConfig, wizard::Wizard};
 
 pub const DEFAULT_PAGE_SIZE: usize = 10;
 pub const DEFAULT_SIG_DELIM: &str = "-- \n";
@@ -45,7 +45,8 @@ impl DeserializedConfig {
         info!("begin: try to parse config from path");
         debug!("path: {:?}", path);
         let path = path.map(|s| s.into()).unwrap_or(Self::path()?);
-        let content = fs::read_to_string(path).context("cannot read config file")?;
+        // let content = fs::read_to_string(path).context("cannot read config file")?;
+        let content = fs::read_to_string(path).or_else(|_| Wizard::start())?;
         let config = toml::from_str(&content).context("cannot parse config file")?;
         info!("end: try to parse config from path");
         trace!("config: {:?}", config);

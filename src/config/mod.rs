@@ -3,6 +3,7 @@
 pub mod config_args;
 pub mod deserialized_config;
 pub use deserialized_config::*;
+pub mod wizard;
 
 pub mod account_args;
 pub mod account_config;
