@@ -37,6 +37,9 @@ pub mod backends {
     pub use backend::*;
     pub mod backend;
 
+    pub use id_mapper::*;
+    pub mod id_mapper;
+
     pub use self::imap::*;
     pub mod imap {
         pub mod imap_arg;
