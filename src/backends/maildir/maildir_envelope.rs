@@ -72,7 +72,7 @@ pub struct MaildirEnvelope {
 impl Table for MaildirEnvelope {
     fn head() -> Row {
         Row::new()
-            .cell(Cell::new("IDENTIFIER").bold().underline().white())
+            .cell(Cell::new("HASH").bold().underline().white())
             .cell(Cell::new("FLAGS").bold().underline().white())
             .cell(Cell::new("SUBJECT").shrinkable().bold().underline().white())
             .cell(Cell::new("SENDER").bold().underline().white())
@@ -80,7 +80,7 @@ impl Table for MaildirEnvelope {
     }
 
     fn row(&self) -> Row {
-        let id = self.id.to_string();
+        let id = self.id.clone();
         let unseen = !self.flags.contains(&MaildirFlag::Seen);
         let flags = self.flags.to_symbols_string();
         let subject = &self.subject;
@@ -110,6 +110,7 @@ impl<'a> TryFrom<RawMaildirEnvelopes> for MaildirEnvelopes {
                 .context("cannot parse maildir mail entry")?;
             envelopes.push(envelope);
         }
+
         Ok(MaildirEnvelopes(envelopes))
     }
 }

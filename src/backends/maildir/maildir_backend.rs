@@ -1,5 +1,13 @@
 use anyhow::{anyhow, Context, Result};
-use std::{convert::TryInto, fs, path::PathBuf};
+use std::{
+    collections::HashSet,
+    convert::TryInto,
+    env::temp_dir,
+    fs::{self, OpenOptions},
+    io::{BufRead, BufReader, Write},
+    iter::FromIterator,
+    path::PathBuf,
+};
 
 use crate::{
     backends::{Backend, MaildirEnvelopes, MaildirFlags, MaildirMboxes},
@@ -55,6 +63,48 @@ impl<'a> MaildirBackend<'a> {
                 .map(maildir::Maildir::from)
         }
     }
+
+    fn write_envelopes_cache(cache: &[u8]) -> Result<()> {
+        OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(temp_dir().join("himalaya-msg-id-hash-map"))
+            .context("cannot open maildir id hash map cache")?
+            .write(cache)
+            .map(|_| ())
+            .context("cannot write maildir id hash map cache")
+    }
+
+    fn get_id_from_short_hash(short_hash: &str) -> Result<String> {
+        let path = temp_dir().join("himalaya-msg-id-hash-map");
+        let file = OpenOptions::new()
+            .read(true)
+            .open(path)
+            .context("cannot open id hash map file")?;
+        let reader = BufReader::new(file);
+        let mut id_found = None;
+        for line in reader.lines() {
+            let line = line.context("cannot read id hash map line")?;
+            let line = line
+                .split_once(' ')
+                .ok_or_else(|| anyhow!("cannot parse id hash map line {:?}", line));
+            match line {
+                Ok((id, hash)) if hash.starts_with(short_hash) => {
+                    if id_found.is_some() {
+                        return Err(anyhow!(
+                            "cannot find id from hash {:?}: multiple match found",
+                            short_hash
+                        ));
+                    } else {
+                        id_found = Some(id.to_owned())
+                    }
+                }
+                _ => continue,
+            }
+        }
+        id_found.ok_or_else(|| anyhow!("cannot find id from hash {:?}", short_hash))
+    }
 }
 
 impl<'a> Backend<'a> for MaildirBackend<'a> {
@@ -80,11 +130,48 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         page: usize,
     ) -> Result<Box<dyn Envelopes>> {
         let mdir = self.get_mdir_from_name(mdir)?;
+
         let mut envelopes: MaildirEnvelopes = mdir
             .list_cur()
             .try_into()
             .context("cannot parse maildir envelopes from {:?}")?;
+
+        Self::write_envelopes_cache(
+            envelopes
+                .iter()
+                .map(|env| format!("{} {:x}", env.id, md5::compute(&env.id)))
+                .collect::<Vec<_>>()
+                .join("\n")
+                .as_bytes(),
+        )?;
+
         envelopes.sort_by(|a, b| b.date.partial_cmp(&a.date).unwrap());
+        envelopes
+            .iter_mut()
+            .for_each(|env| env.id = format!("{:x}", md5::compute(&env.id)));
+
+        let mut short_id_len = 2;
+        loop {
+            let short_ids: Vec<_> = envelopes
+                .iter()
+                .map(|env| env.id[0..short_id_len].to_string())
+                .collect();
+            let short_ids_set: HashSet<String> = HashSet::from_iter(short_ids.iter().cloned());
+
+            if short_id_len > 32 {
+                break;
+            }
+
+            if short_ids.len() == short_ids_set.len() {
+                break;
+            }
+
+            short_id_len += 1;
+        }
+
+        envelopes
+            .iter_mut()
+            .for_each(|env| env.id = env.id[0..short_id_len].to_string());
 
         let page_begin = page * page_size;
         if page_begin > envelopes.len() {
@@ -95,6 +182,7 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         }
         let page_end = envelopes.len().min(page_begin + page_size);
         envelopes.0 = envelopes[page_begin..page_end].to_owned();
+
         Ok(Box::new(envelopes))
     }
 
@@ -123,19 +211,25 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         Ok(Box::new(id))
     }
 
-    fn get_msg(&mut self, mdir: &str, id: &str) -> Result<Msg> {
+    fn get_msg(&mut self, mdir: &str, hash: &str) -> Result<Msg> {
         let mdir = self.get_mdir_from_name(mdir)?;
-        let mut mail_entry = mdir
-            .find(id)
-            .ok_or_else(|| anyhow!("cannot find maildir message {:?} in {:?}", id, mdir.path()))?;
+        let id = Self::get_id_from_short_hash(hash)
+            .context(format!("cannot get msg from hash {:?}", hash))?;
+        let mut mail_entry = mdir.find(&id).ok_or_else(|| {
+            anyhow!(
+                "cannot find maildir message {:?} in {:?}",
+                hash,
+                mdir.path()
+            )
+        })?;
         let parsed_mail = mail_entry.parsed().context(format!(
             "cannot parse maildir message {:?} in {:?}",
-            id,
+            hash,
             mdir.path()
         ))?;
         Msg::from_parsed_mail(parsed_mail, self.account_config).context(format!(
             "cannot parse maildir message {:?} from {:?}",
-            id,
+            hash,
             mdir.path()
         ))
     }
