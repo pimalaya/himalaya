@@ -51,6 +51,9 @@ pub struct NotmuchEnvelope {
     /// Represents the id of the message.
     pub id: String,
 
+    /// Represents the MD5 hash of the message id.
+    pub hash: String,
+
     /// Represents the tags of the message.
     pub flags: Vec<String>,
 
@@ -67,7 +70,7 @@ pub struct NotmuchEnvelope {
 impl Table for NotmuchEnvelope {
     fn head() -> Row {
         Row::new()
-            .cell(Cell::new("ID").bold().underline().white())
+            .cell(Cell::new("HASH").bold().underline().white())
             .cell(Cell::new("FLAGS").bold().underline().white())
             .cell(Cell::new("SUBJECT").shrinkable().bold().underline().white())
             .cell(Cell::new("SENDER").bold().underline().white())
@@ -75,14 +78,14 @@ impl Table for NotmuchEnvelope {
     }
 
     fn row(&self) -> Row {
-        let id = self.id.to_string();
+        let hash = self.hash.to_string();
         let unseen = !self.flags.contains(&String::from("unread"));
         let flags = String::new();
         let subject = &self.subject;
         let sender = &self.sender;
         let date = &self.date;
         Row::new()
-            .cell(Cell::new(id).bold_if(unseen).red())
+            .cell(Cell::new(hash).bold_if(unseen).red())
             .cell(Cell::new(flags).bold_if(unseen).white())
             .cell(Cell::new(subject).shrinkable().bold_if(unseen).green())
             .cell(Cell::new(sender).bold_if(unseen).blue())
@@ -117,7 +120,8 @@ impl<'a> TryFrom<RawNotmuchEnvelope> for NotmuchEnvelope {
     fn try_from(raw_envelope: RawNotmuchEnvelope) -> Result<Self, Self::Error> {
         info!("begin: try building envelope from notmuch parsed mail");
 
-        let id = raw_envelope.id().trim().to_string();
+        let id = raw_envelope.id().to_string();
+        let hash = format!("{:x}", md5::compute(&id));
         let subject = raw_envelope
             .header("subject")
             .context("cannot get header \"Subject\" from notmuch message")?
@@ -159,6 +163,7 @@ impl<'a> TryFrom<RawNotmuchEnvelope> for NotmuchEnvelope {
 
         let envelope = Self {
             id,
+            hash,
             flags: raw_envelope.tags().collect(),
             subject,
             sender,
