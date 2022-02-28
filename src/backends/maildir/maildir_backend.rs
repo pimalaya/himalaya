@@ -1,3 +1,8 @@
+//! Maildir backend module.
+//!
+//! This module contains the definition of the maildir backend and its
+//! traits implementation.
+
 use anyhow::{anyhow, Context, Result};
 use log::{debug, info, trace};
 use std::{convert::TryInto, fs, path::PathBuf};
@@ -82,49 +87,46 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
     }
 
     fn get_mboxes(&mut self) -> Result<Box<dyn Mboxes>> {
-        info!(">> get maildir subdirs");
+        info!(">> get maildir dirs");
 
-        let subdirs: MaildirMboxes = self.mdir.list_subdirs().try_into().context(format!(
-            "cannot parse maildir subdirs from {:?}",
+        let dirs: MaildirMboxes = self.mdir.list_subdirs().try_into().context(format!(
+            "cannot parse maildir dirs from {:?}",
             self.mdir.path()
         ))?;
-        trace!("subdirs: {:?}", subdirs);
+        trace!("dirs: {:?}", dirs);
 
-        info!("<< get maildir subdirs");
-        Ok(Box::new(subdirs))
+        info!("<< get maildir dirs");
+        Ok(Box::new(dirs))
     }
 
-    fn del_mbox(&mut self, subdir: &str) -> Result<()> {
-        info!(">> delete maildir subdir");
-        debug!("subdir: {:?}", subdir);
+    fn del_mbox(&mut self, dir: &str) -> Result<()> {
+        info!(">> delete maildir dir");
+        debug!("dir: {:?}", dir);
 
-        let path = self.mdir.path().join(format!(".{}", subdir));
-        trace!("subdir path: {:?}", path);
+        let path = self.mdir.path().join(format!(".{}", dir));
+        trace!("dir path: {:?}", path);
 
-        fs::remove_dir_all(&path).context(format!(
-            "cannot delete maildir subdir {:?} from {:?}",
-            subdir, path
-        ))?;
+        fs::remove_dir_all(&path)
+            .context(format!("cannot delete maildir {:?} from {:?}", dir, path))?;
 
-        info!("<< delete maildir subdir");
+        info!("<< delete maildir dir");
         Ok(())
     }
 
     fn get_envelopes(
         &mut self,
-        subdir: &str,
+        dir: &str,
         page_size: usize,
         page: usize,
     ) -> Result<Box<dyn Envelopes>> {
         info!(">> get maildir envelopes");
-        debug!("maildir subdir: {:?}", subdir);
+        debug!("dir: {:?}", dir);
         debug!("page size: {:?}", page_size);
         debug!("page: {:?}", page);
 
-        let mdir = self.get_mdir_from_dir(subdir).context(format!(
-            "cannot get maildir instance from subdir {:?}",
-            subdir
-        ))?;
+        let mdir = self
+            .get_mdir_from_dir(dir)
+            .context(format!("cannot get maildir instance from {:?}", dir))?;
 
         // Reads envelopes from the "cur" folder of the selected
         // maildir.
@@ -178,7 +180,7 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
 
     fn search_envelopes(
         &mut self,
-        _subdir: &str,
+        _dir: &str,
         _query: &str,
         _sort: &str,
         _page_size: usize,
@@ -191,18 +193,17 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         ))
     }
 
-    fn add_msg(&mut self, subdir: &str, msg: &[u8], flags: &str) -> Result<Box<dyn ToString>> {
+    fn add_msg(&mut self, dir: &str, msg: &[u8], flags: &str) -> Result<Box<dyn ToString>> {
         info!(">> add maildir message");
-        debug!("subdir: {:?}", subdir);
+        debug!("dir: {:?}", dir);
         debug!("flags: {:?}", flags);
 
-        let mdir = self.get_mdir_from_dir(subdir).context(format!(
-            "cannot get maildir instance from subdir {:?}",
-            subdir
-        ))?;
+        let mdir = self
+            .get_mdir_from_dir(dir)
+            .context(format!("cannot get maildir instance from {:?}", dir))?;
         let flags: MaildirFlags = flags
             .try_into()
-            .context(format!("cannot parse flags {:?}", flags))?;
+            .context(format!("cannot parse maildir flags {:?}", flags))?;
         let id = mdir
             .store_cur_with_flags(msg, &flags.to_string())
             .context(format!("cannot add maildir message to {:?}", mdir.path()))?;
@@ -226,15 +227,14 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         Ok(Box::new(hash))
     }
 
-    fn get_msg(&mut self, subdir: &str, short_hash: &str) -> Result<Msg> {
+    fn get_msg(&mut self, dir: &str, short_hash: &str) -> Result<Msg> {
         info!(">> get maildir message");
-        debug!("subdir: {:?}", subdir);
+        debug!("dir: {:?}", dir);
         debug!("short hash: {:?}", short_hash);
 
-        let mdir = self.get_mdir_from_dir(subdir).context(format!(
-            "cannot get maildir instance from subdir {:?}",
-            subdir
-        ))?;
+        let mdir = self
+            .get_mdir_from_dir(dir)
+            .context(format!("cannot get maildir instance from {:?}", dir))?;
         let id = IdMapper::new(mdir.path())?
             .find(short_hash)
             .context(format!(
@@ -266,18 +266,18 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         Ok(msg)
     }
 
-    fn copy_msg(&mut self, subdir_src: &str, subdir_dst: &str, short_hash: &str) -> Result<()> {
+    fn copy_msg(&mut self, dir_src: &str, dir_dst: &str, short_hash: &str) -> Result<()> {
         info!(">> copy maildir message");
-        debug!("source subdir: {:?}", subdir_src);
-        debug!("destination subdir: {:?}", subdir_dst);
+        debug!("source dir: {:?}", dir_src);
+        debug!("destination dir: {:?}", dir_dst);
 
-        let mdir_src = self.get_mdir_from_dir(subdir_src).context(format!(
-            "cannot get source maildir instance from subdir {:?}",
-            subdir_src
+        let mdir_src = self.get_mdir_from_dir(dir_src).context(format!(
+            "cannot get source maildir instance from {:?}",
+            dir_src
         ))?;
-        let mdir_dst = self.get_mdir_from_dir(subdir_dst).context(format!(
-            "cannot get destination maildir instance from subdir {:?}",
-            subdir_dst
+        let mdir_dst = self.get_mdir_from_dir(dir_dst).context(format!(
+            "cannot get destination maildir instance from {:?}",
+            dir_dst
         ))?;
         let id = IdMapper::new(mdir_src.path())
             .context(format!(
@@ -316,18 +316,18 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         Ok(())
     }
 
-    fn move_msg(&mut self, subdir_src: &str, subdir_dst: &str, short_hash: &str) -> Result<()> {
+    fn move_msg(&mut self, dir_src: &str, dir_dst: &str, short_hash: &str) -> Result<()> {
         info!(">> move maildir message");
-        debug!("source subdir: {:?}", subdir_src);
-        debug!("destination subdir: {:?}", subdir_dst);
+        debug!("source dir: {:?}", dir_src);
+        debug!("destination dir: {:?}", dir_dst);
 
-        let mdir_src = self.get_mdir_from_dir(subdir_src).context(format!(
-            "cannot get source maildir instance from subdir {:?}",
-            subdir_src
+        let mdir_src = self.get_mdir_from_dir(dir_src).context(format!(
+            "cannot get source maildir instance from {:?}",
+            dir_src
         ))?;
-        let mdir_dst = self.get_mdir_from_dir(subdir_dst).context(format!(
-            "cannot get destination maildir instance from subdir {:?}",
-            subdir_dst
+        let mdir_dst = self.get_mdir_from_dir(dir_dst).context(format!(
+            "cannot get destination maildir instance from {:?}",
+            dir_dst
         ))?;
         let id = IdMapper::new(mdir_src.path())
             .context(format!(
@@ -366,15 +366,14 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         Ok(())
     }
 
-    fn del_msg(&mut self, subdir: &str, short_hash: &str) -> Result<()> {
+    fn del_msg(&mut self, dir: &str, short_hash: &str) -> Result<()> {
         info!(">> delete maildir message");
-        debug!("subdir: {:?}", subdir);
+        debug!("dir: {:?}", dir);
         debug!("short hash: {:?}", short_hash);
 
-        let mdir = self.get_mdir_from_dir(subdir).context(format!(
-            "cannot get maildir instance from subdir {:?}",
-            subdir
-        ))?;
+        let mdir = self
+            .get_mdir_from_dir(dir)
+            .context(format!("cannot get maildir instance from {:?}", dir))?;
         let id = IdMapper::new(mdir.path())
             .context(format!(
                 "cannot create id mapper instance for {:?}",
@@ -397,16 +396,15 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         Ok(())
     }
 
-    fn add_flags(&mut self, subdir: &str, short_hash: &str, flags: &str) -> Result<()> {
+    fn add_flags(&mut self, dir: &str, short_hash: &str, flags: &str) -> Result<()> {
         info!(">> add maildir message flags");
-        debug!("subdir: {:?}", subdir);
+        debug!("dir: {:?}", dir);
         debug!("short hash: {:?}", short_hash);
         debug!("flags: {:?}", flags);
 
-        let mdir = self.get_mdir_from_dir(subdir).context(format!(
-            "cannot get maildir instance from subdir {:?}",
-            subdir
-        ))?;
+        let mdir = self
+            .get_mdir_from_dir(dir)
+            .context(format!("cannot get maildir instance from {:?}", dir))?;
         let flags: MaildirFlags = flags
             .try_into()
             .context(format!("cannot parse maildir flags {:?}", flags))?;
@@ -432,16 +430,15 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         Ok(())
     }
 
-    fn set_flags(&mut self, subdir: &str, short_hash: &str, flags: &str) -> Result<()> {
+    fn set_flags(&mut self, dir: &str, short_hash: &str, flags: &str) -> Result<()> {
         info!(">> set maildir message flags");
-        debug!("subdir: {:?}", subdir);
+        debug!("dir: {:?}", dir);
         debug!("short hash: {:?}", short_hash);
         debug!("flags: {:?}", flags);
 
-        let mdir = self.get_mdir_from_dir(subdir).context(format!(
-            "cannot get maildir instance from subdir {:?}",
-            subdir
-        ))?;
+        let mdir = self
+            .get_mdir_from_dir(dir)
+            .context(format!("cannot get maildir instance from {:?}", dir))?;
         let flags: MaildirFlags = flags
             .try_into()
             .context(format!("cannot parse maildir flags {:?}", flags))?;
@@ -467,16 +464,15 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         Ok(())
     }
 
-    fn del_flags(&mut self, subdir: &str, short_hash: &str, flags: &str) -> Result<()> {
+    fn del_flags(&mut self, dir: &str, short_hash: &str, flags: &str) -> Result<()> {
         info!(">> delete maildir message flags");
-        debug!("subdir: {:?}", subdir);
+        debug!("dir: {:?}", dir);
         debug!("short hash: {:?}", short_hash);
         debug!("flags: {:?}", flags);
 
-        let mdir = self.get_mdir_from_dir(subdir).context(format!(
-            "cannot get maildir instance from subdir {:?}",
-            subdir
-        ))?;
+        let mdir = self
+            .get_mdir_from_dir(dir)
+            .context(format!("cannot get maildir instance from {:?}", dir))?;
         let flags: MaildirFlags = flags
             .try_into()
             .context(format!("cannot parse maildir flags {:?}", flags))?;
