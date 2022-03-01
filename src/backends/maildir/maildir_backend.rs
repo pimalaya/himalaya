@@ -141,10 +141,10 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         let page_begin = page * page_size;
         debug!("page begin: {:?}", page_begin);
         if page_begin > envelopes.len() {
-            return Err(anyhow!(format!(
+            return Err(anyhow!(
                 "cannot get maildir envelopes at page {:?} (out of bounds)",
                 page_begin + 1,
-            )));
+            ));
         }
         let page_end = envelopes.len().min(page_begin + page_size);
         debug!("page end: {:?}", page_end);
