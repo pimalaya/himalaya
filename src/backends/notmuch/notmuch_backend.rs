@@ -288,15 +288,117 @@ impl<'a> Backend<'a> for NotmuchBackend<'a> {
         Ok(())
     }
 
-    fn add_flags(&mut self, _virt_mbox: &str, _id: &str, _flags: &str) -> Result<()> {
-        unimplemented!();
+    fn add_flags(&mut self, virt_mbox: &str, query: &str, tags: &str) -> Result<()> {
+        info!(">> add notmuch message flags");
+        debug!("tags: {:?}", tags);
+        debug!("query: {:?}", query);
+
+        let query = self
+            .account_config
+            .mailboxes
+            .get(virt_mbox)
+            .map(|s| s.as_str())
+            .unwrap_or(query);
+        debug!("final query: {:?}", query);
+        let tags: Vec<_> = tags.split_whitespace().collect();
+        let query_builder = self
+            .db
+            .create_query(query)
+            .with_context(|| format!("cannot create notmuch query from {:?}", query))?;
+        let envelopes = query_builder
+            .search_messages()
+            .with_context(|| format!("cannot find notmuch envelopes from query {:?}", query))?;
+        for envelope in envelopes {
+            for tag in tags.iter() {
+                envelope.add_tag(*tag).with_context(|| {
+                    format!(
+                        "cannot add tag {:?} to notmuch message {:?}",
+                        tag,
+                        envelope.id()
+                    )
+                })?
+            }
+        }
+
+        info!("<< add notmuch message flags");
+        Ok(())
     }
 
-    fn set_flags(&mut self, _virt_mbox: &str, _id: &str, _flags: &str) -> Result<()> {
-        unimplemented!();
+    fn set_flags(&mut self, virt_mbox: &str, query: &str, tags: &str) -> Result<()> {
+        info!(">> set notmuch message flags");
+        debug!("tags: {:?}", tags);
+        debug!("query: {:?}", query);
+
+        let query = self
+            .account_config
+            .mailboxes
+            .get(virt_mbox)
+            .map(|s| s.as_str())
+            .unwrap_or(query);
+        debug!("final query: {:?}", query);
+        let tags: Vec<_> = tags.split_whitespace().collect();
+        let query_builder = self
+            .db
+            .create_query(query)
+            .with_context(|| format!("cannot create notmuch query from {:?}", query))?;
+        let envelopes = query_builder
+            .search_messages()
+            .with_context(|| format!("cannot find notmuch envelopes from query {:?}", query))?;
+        for envelope in envelopes {
+            envelope.remove_all_tags().with_context(|| {
+                format!(
+                    "cannot remove all tags from notmuch message {:?}",
+                    envelope.id()
+                )
+            })?;
+            for tag in tags.iter() {
+                envelope.add_tag(*tag).with_context(|| {
+                    format!(
+                        "cannot add tag {:?} to notmuch message {:?}",
+                        tag,
+                        envelope.id()
+                    )
+                })?
+            }
+        }
+
+        info!("<< set notmuch message flags");
+        Ok(())
     }
 
-    fn del_flags(&mut self, _virt_mbox: &str, _id: &str, _flags: &str) -> Result<()> {
-        unimplemented!();
+    fn del_flags(&mut self, virt_mbox: &str, query: &str, tags: &str) -> Result<()> {
+        info!(">> delete notmuch message flags");
+        debug!("tags: {:?}", tags);
+        debug!("query: {:?}", query);
+
+        let query = self
+            .account_config
+            .mailboxes
+            .get(virt_mbox)
+            .map(|s| s.as_str())
+            .unwrap_or(query);
+        debug!("final query: {:?}", query);
+        let tags: Vec<_> = tags.split_whitespace().collect();
+        let query_builder = self
+            .db
+            .create_query(query)
+            .with_context(|| format!("cannot create notmuch query from {:?}", query))?;
+        let envelopes = query_builder
+            .search_messages()
+            .with_context(|| format!("cannot find notmuch envelopes from query {:?}", query))?;
+        for envelope in envelopes {
+            for tag in tags.iter() {
+                envelope.remove_tag(*tag).with_context(|| {
+                    format!(
+                        "cannot delete tag {:?} from notmuch message {:?}",
+                        tag,
+                        envelope.id()
+                    )
+                })?
+            }
+        }
+
+        info!("<< delete notmuch message flags");
+        Ok(())
     }
 }
