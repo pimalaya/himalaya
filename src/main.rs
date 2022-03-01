@@ -7,7 +7,7 @@ use himalaya::{
     compl::{compl_arg, compl_handler},
     config::{
         account_args, config_args, AccountConfig, BackendConfig, DeserializedConfig,
-        DEFAULT_INBOX_FOLDER,
+        MaildirBackendConfig, DEFAULT_INBOX_FOLDER,
     },
     mbox::{mbox_arg, mbox_handler},
     msg::{flag_arg, flag_handler, msg_arg, msg_handler, tpl_arg, tpl_handler},
@@ -51,6 +51,7 @@ fn main() -> Result<()> {
 
         let mut imap;
         let mut maildir;
+        let maildir_config;
         #[cfg(feature = "notmuch")]
         let mut notmuch;
         let backend: Box<&mut dyn Backend> = match backend_config {
@@ -64,7 +65,11 @@ fn main() -> Result<()> {
             }
             #[cfg(feature = "notmuch")]
             BackendConfig::Notmuch(ref notmuch_config) => {
-                notmuch = NotmuchBackend::new(&account_config, notmuch_config)?;
+                maildir_config = MaildirBackendConfig {
+                    maildir_dir: notmuch_config.notmuch_database_dir.clone(),
+                };
+                maildir = MaildirBackend::new(&account_config, &maildir_config);
+                notmuch = NotmuchBackend::new(&account_config, notmuch_config, &mut maildir)?;
                 Box::new(&mut notmuch)
             }
         };
@@ -95,6 +100,7 @@ fn main() -> Result<()> {
     let mut printer = StdoutPrinter::try_from(m.value_of("output"))?;
     let mut imap;
     let mut maildir;
+    let maildir_config;
     #[cfg(feature = "notmuch")]
     let mut notmuch;
     let backend: Box<&mut dyn Backend> = match backend_config {
@@ -108,7 +114,11 @@ fn main() -> Result<()> {
         }
         #[cfg(feature = "notmuch")]
         BackendConfig::Notmuch(ref notmuch_config) => {
-            notmuch = NotmuchBackend::new(&account_config, notmuch_config)?;
+            maildir_config = MaildirBackendConfig {
+                maildir_dir: notmuch_config.notmuch_database_dir.clone(),
+            };
+            maildir = MaildirBackend::new(&account_config, &maildir_config);
+            notmuch = NotmuchBackend::new(&account_config, notmuch_config, &mut maildir)?;
             Box::new(&mut notmuch)
         }
     };

@@ -9,7 +9,7 @@ use std::{convert::TryInto, fs, path::PathBuf};
 
 use crate::{
     backends::{Backend, IdMapper, MaildirEnvelopes, MaildirFlags, MaildirMboxes},
-    config::{AccountConfig, MaildirBackendConfig, DEFAULT_INBOX_FOLDER},
+    config::{AccountConfig, MaildirBackendConfig},
     mbox::Mboxes,
     msg::{Envelopes, Msg},
 };
@@ -40,17 +40,10 @@ impl<'a> MaildirBackend<'a> {
     }
 
     /// Creates a maildir instance from a string slice.
-    fn get_mdir_from_dir(&self, dir: &str) -> Result<maildir::Maildir> {
-        let inbox_folder = self
-            .account_config
-            .mailboxes
-            .get("inbox")
-            .map(|s| s.as_str())
-            .unwrap_or(DEFAULT_INBOX_FOLDER);
-
+    pub fn get_mdir_from_dir(&self, dir: &str) -> Result<maildir::Maildir> {
         // If the dir points to the inbox folder, creates a maildir
         // instance from the root folder.
-        if dir == inbox_folder {
+        if dir == "inbox" {
             self.validate_mdir_path(self.mdir.path().to_owned())
                 .map(maildir::Maildir::from)
         } else {

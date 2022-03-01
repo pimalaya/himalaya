@@ -4,17 +4,17 @@ use anyhow::{anyhow, Context, Result};
 use log::{debug, info, trace};
 
 use crate::{
-    backends::{Backend, IdMapper, NotmuchEnvelopes, NotmuchMbox, NotmuchMboxes},
+    backends::{Backend, IdMapper, MaildirBackend, NotmuchEnvelopes, NotmuchMbox, NotmuchMboxes},
     config::{AccountConfig, NotmuchBackendConfig},
     mbox::Mboxes,
     msg::{Envelopes, Msg},
 };
 
 /// Represents the Notmuch backend.
-#[derive(Debug)]
 pub struct NotmuchBackend<'a> {
     account_config: &'a AccountConfig,
     notmuch_config: &'a NotmuchBackendConfig,
+    pub mdir: &'a mut MaildirBackend<'a>,
     db: notmuch::Database,
 }
 
@@ -22,12 +22,14 @@ impl<'a> NotmuchBackend<'a> {
     pub fn new(
         account_config: &'a AccountConfig,
         notmuch_config: &'a NotmuchBackendConfig,
-    ) -> Result<Self> {
+        mdir: &'a mut MaildirBackend<'a>,
+    ) -> Result<NotmuchBackend<'a>> {
         info!(">> create new notmuch backend");
 
         let backend = Self {
             account_config,
             notmuch_config,
+            mdir,
             db: notmuch::Database::open(
                 notmuch_config.notmuch_database_dir.clone(),
                 notmuch::DatabaseMode::ReadWrite,
@@ -39,7 +41,6 @@ impl<'a> NotmuchBackend<'a> {
                 )
             })?,
         };
-        trace!("backend: {:?}", backend);
 
         info!("<< create new notmuch backend");
         Ok(backend)
@@ -68,10 +69,10 @@ impl<'a> NotmuchBackend<'a> {
         let page_begin = page * page_size;
         debug!("page begin: {:?}", page_begin);
         if page_begin > envelopes.len() {
-            return Err(anyhow!(format!(
+            return Err(anyhow!(
                 "cannot get notmuch envelopes at page {:?} (out of bounds)",
                 page_begin + 1,
-            )));
+            ));
         }
         let page_end = envelopes.len().min(page_begin + page_size);
         debug!("page end: {:?}", page_end);
@@ -192,17 +193,75 @@ impl<'a> Backend<'a> for NotmuchBackend<'a> {
         Ok(envelopes)
     }
 
-    fn add_msg(
-        &mut self,
-        _virt_mbox: &str,
-        _msg: &[u8],
-        _flags: &str,
-    ) -> Result<Box<dyn ToString>> {
+    fn add_msg(&mut self, dir: &str, msg: &[u8], tags: &str) -> Result<Box<dyn ToString>> {
         info!(">> add notmuch envelopes");
+        debug!("dir: {:?}", dir);
+        debug!("tags: {:?}", tags);
+
+        let mdir = self
+            .mdir
+            .get_mdir_from_dir(dir)
+            .with_context(|| format!("cannot get maildir instance from {:?}", dir))?;
+        let mdir_path_str = mdir
+            .path()
+            .to_str()
+            .ok_or_else(|| anyhow!("cannot parse maildir path to string"))?;
+
+        // Adds the message to the maildir folder and gets its hash.
+        let hash = self
+            .mdir
+            .add_msg(mdir_path_str, msg, "seen")
+            .with_context(|| {
+                format!(
+                    "cannot add notmuch message to maildir {:?}",
+                    self.notmuch_config.notmuch_database_dir
+                )
+            })?
+            .to_string();
+        debug!("hash: {:?}", hash);
+
+        // Retrieves the file path of the added message by its maildir
+        // identifier.
+        let id = IdMapper::new(mdir.path())
+            .with_context(|| format!("cannot create id mapper instance for {:?}", dir))?
+            .find(&hash)
+            .with_context(|| format!("cannot find notmuch message from short hash {:?}", hash))?;
+        debug!("id: {:?}", id);
+        let file_path = mdir.path().join("cur").join(format!("{}:2,S", id));
+        debug!("file path: {:?}", file_path);
+
+        // Adds the message to the notmuch database by indexing it.
+        let id = self
+            .db
+            .index_file(&file_path, None)
+            .with_context(|| format!("cannot index notmuch message from file {:?}", file_path))?
+            .id()
+            .to_string();
+        let hash = format!("{:x}", md5::compute(&id));
+
+        // Appends hash entry to the id mapper cache file.
+        let mut mapper =
+            IdMapper::new(&self.notmuch_config.notmuch_database_dir).with_context(|| {
+                format!(
+                    "cannot create id mapper instance for {:?}",
+                    self.notmuch_config.notmuch_database_dir
+                )
+            })?;
+        mapper
+            .append(vec![(hash.clone(), id.clone())])
+            .with_context(|| {
+                format!(
+                    "cannot append hash {:?} with id {:?} to id mapper",
+                    hash, id
+                )
+            })?;
+
+        // Attaches tags to the notmuch message.
+        self.add_flags("", &hash, tags)
+            .with_context(|| format!("cannot add flags to notmuch message {:?}", id))?;
+
         info!("<< add notmuch envelopes");
-        Err(anyhow!(
-            "cannot add notmuch envelopes: feature not implemented"
-        ))
+        Ok(Box::new(hash))
     }
 
     fn get_msg(&mut self, _virt_mbox: &str, short_hash: &str) -> Result<Msg> {
@@ -288,34 +347,35 @@ impl<'a> Backend<'a> for NotmuchBackend<'a> {
         Ok(())
     }
 
-    fn add_flags(&mut self, virt_mbox: &str, query: &str, tags: &str) -> Result<()> {
+    fn add_flags(&mut self, _virt_mbox: &str, short_hash: &str, tags: &str) -> Result<()> {
         info!(">> add notmuch message flags");
         debug!("tags: {:?}", tags);
-        debug!("query: {:?}", query);
 
-        let query = self
-            .account_config
-            .mailboxes
-            .get(virt_mbox)
-            .map(|s| s.as_str())
-            .unwrap_or(query);
-        debug!("final query: {:?}", query);
+        let dir = &self.notmuch_config.notmuch_database_dir;
+        let id = IdMapper::new(dir)
+            .with_context(|| format!("cannot create id mapper instance for {:?}", dir))?
+            .find(short_hash)
+            .with_context(|| {
+                format!(
+                    "cannot find notmuch message from short hash {:?}",
+                    short_hash
+                )
+            })?;
+        debug!("id: {:?}", id);
+        let query = format!("id:{}", id);
+        debug!("query: {:?}", query);
         let tags: Vec<_> = tags.split_whitespace().collect();
         let query_builder = self
             .db
-            .create_query(query)
+            .create_query(&query)
             .with_context(|| format!("cannot create notmuch query from {:?}", query))?;
-        let envelopes = query_builder
+        let msgs = query_builder
             .search_messages()
             .with_context(|| format!("cannot find notmuch envelopes from query {:?}", query))?;
-        for envelope in envelopes {
+        for msg in msgs {
             for tag in tags.iter() {
-                envelope.add_tag(*tag).with_context(|| {
-                    format!(
-                        "cannot add tag {:?} to notmuch message {:?}",
-                        tag,
-                        envelope.id()
-                    )
+                msg.add_tag(*tag).with_context(|| {
+                    format!("cannot add tag {:?} to notmuch message {:?}", tag, msg.id())
                 })?
             }
         }
@@ -324,40 +384,38 @@ impl<'a> Backend<'a> for NotmuchBackend<'a> {
         Ok(())
     }
 
-    fn set_flags(&mut self, virt_mbox: &str, query: &str, tags: &str) -> Result<()> {
+    fn set_flags(&mut self, _virt_mbox: &str, short_hash: &str, tags: &str) -> Result<()> {
         info!(">> set notmuch message flags");
         debug!("tags: {:?}", tags);
-        debug!("query: {:?}", query);
 
-        let query = self
-            .account_config
-            .mailboxes
-            .get(virt_mbox)
-            .map(|s| s.as_str())
-            .unwrap_or(query);
-        debug!("final query: {:?}", query);
+        let dir = &self.notmuch_config.notmuch_database_dir;
+        let id = IdMapper::new(dir)
+            .with_context(|| format!("cannot create id mapper instance for {:?}", dir))?
+            .find(short_hash)
+            .with_context(|| {
+                format!(
+                    "cannot find notmuch message from short hash {:?}",
+                    short_hash
+                )
+            })?;
+        debug!("id: {:?}", id);
+        let query = format!("id:{}", id);
+        debug!("query: {:?}", query);
         let tags: Vec<_> = tags.split_whitespace().collect();
         let query_builder = self
             .db
-            .create_query(query)
+            .create_query(&query)
             .with_context(|| format!("cannot create notmuch query from {:?}", query))?;
-        let envelopes = query_builder
+        let msgs = query_builder
             .search_messages()
             .with_context(|| format!("cannot find notmuch envelopes from query {:?}", query))?;
-        for envelope in envelopes {
-            envelope.remove_all_tags().with_context(|| {
-                format!(
-                    "cannot remove all tags from notmuch message {:?}",
-                    envelope.id()
-                )
+        for msg in msgs {
+            msg.remove_all_tags().with_context(|| {
+                format!("cannot remove all tags from notmuch message {:?}", msg.id())
             })?;
             for tag in tags.iter() {
-                envelope.add_tag(*tag).with_context(|| {
-                    format!(
-                        "cannot add tag {:?} to notmuch message {:?}",
-                        tag,
-                        envelope.id()
-                    )
+                msg.add_tag(*tag).with_context(|| {
+                    format!("cannot add tag {:?} to notmuch message {:?}", tag, msg.id())
                 })?
             }
         }
@@ -366,33 +424,38 @@ impl<'a> Backend<'a> for NotmuchBackend<'a> {
         Ok(())
     }
 
-    fn del_flags(&mut self, virt_mbox: &str, query: &str, tags: &str) -> Result<()> {
+    fn del_flags(&mut self, _virt_mbox: &str, short_hash: &str, tags: &str) -> Result<()> {
         info!(">> delete notmuch message flags");
         debug!("tags: {:?}", tags);
-        debug!("query: {:?}", query);
 
-        let query = self
-            .account_config
-            .mailboxes
-            .get(virt_mbox)
-            .map(|s| s.as_str())
-            .unwrap_or(query);
-        debug!("final query: {:?}", query);
+        let dir = &self.notmuch_config.notmuch_database_dir;
+        let id = IdMapper::new(dir)
+            .with_context(|| format!("cannot create id mapper instance for {:?}", dir))?
+            .find(short_hash)
+            .with_context(|| {
+                format!(
+                    "cannot find notmuch message from short hash {:?}",
+                    short_hash
+                )
+            })?;
+        debug!("id: {:?}", id);
+        let query = format!("id:{}", id);
+        debug!("query: {:?}", query);
         let tags: Vec<_> = tags.split_whitespace().collect();
         let query_builder = self
             .db
-            .create_query(query)
+            .create_query(&query)
             .with_context(|| format!("cannot create notmuch query from {:?}", query))?;
-        let envelopes = query_builder
+        let msgs = query_builder
             .search_messages()
             .with_context(|| format!("cannot find notmuch envelopes from query {:?}", query))?;
-        for envelope in envelopes {
+        for msg in msgs {
             for tag in tags.iter() {
-                envelope.remove_tag(*tag).with_context(|| {
+                msg.remove_tag(*tag).with_context(|| {
                     format!(
                         "cannot delete tag {:?} from notmuch message {:?}",
                         tag,
-                        envelope.id()
+                        msg.id()
                     )
                 })?
             }
