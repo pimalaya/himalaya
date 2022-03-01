@@ -43,9 +43,7 @@ fn test_imap_backend() {
     assert_eq!("Ceci est un message.", msg.fold_text_plain_parts());
 
     // check that the envelope of the added message exists
-    let envelopes = imap
-        .get_envelopes("Mailbox1", "arrival:desc", "ALL", 10, 0)
-        .unwrap();
+    let envelopes = imap.get_envelopes("Mailbox1", 10, 0).unwrap();
     let envelopes: &ImapEnvelopes = envelopes.as_any().downcast_ref().unwrap();
     assert_eq!(1, envelopes.len());
     let envelope = envelopes.first().unwrap();
@@ -55,28 +53,20 @@ fn test_imap_backend() {
     // check that the message can be copied
     imap.copy_msg("Mailbox1", "Mailbox2", &envelope.id.to_string())
         .unwrap();
-    let envelopes = imap
-        .get_envelopes("Mailbox1", "arrival:desc", "ALL", 10, 0)
-        .unwrap();
+    let envelopes = imap.get_envelopes("Mailbox1", 10, 0).unwrap();
     let envelopes: &ImapEnvelopes = envelopes.as_any().downcast_ref().unwrap();
     assert_eq!(1, envelopes.len());
-    let envelopes = imap
-        .get_envelopes("Mailbox2", "arrival:desc", "ALL", 10, 0)
-        .unwrap();
+    let envelopes = imap.get_envelopes("Mailbox2", 10, 0).unwrap();
     let envelopes: &ImapEnvelopes = envelopes.as_any().downcast_ref().unwrap();
     assert_eq!(1, envelopes.len());
 
     // check that the message can be moved
     imap.move_msg("Mailbox1", "Mailbox2", &envelope.id.to_string())
         .unwrap();
-    let envelopes = imap
-        .get_envelopes("Mailbox1", "arrival:desc", "ALL", 10, 0)
-        .unwrap();
+    let envelopes = imap.get_envelopes("Mailbox1", 10, 0).unwrap();
     let envelopes: &ImapEnvelopes = envelopes.as_any().downcast_ref().unwrap();
     assert_eq!(0, envelopes.len());
-    let envelopes = imap
-        .get_envelopes("Mailbox2", "arrival:desc", "ALL", 10, 0)
-        .unwrap();
+    let envelopes = imap.get_envelopes("Mailbox2", 10, 0).unwrap();
     let envelopes: &ImapEnvelopes = envelopes.as_any().downcast_ref().unwrap();
     assert_eq!(2, envelopes.len());
     let id = envelopes.first().unwrap().id.to_string();

@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 pub trait ToDeserializedBaseAccountConfig {
     fn to_base(&self) -> DeserializedBaseAccountConfig;
@@ -11,6 +11,8 @@ pub trait ToDeserializedBaseAccountConfig {
 pub enum DeserializedAccountConfig {
     Imap(DeserializedImapAccountConfig),
     Maildir(DeserializedMaildirAccountConfig),
+    #[cfg(feature = "notmuch")]
+    Notmuch(DeserializedNotmuchAccountConfig),
 }
 
 impl ToDeserializedBaseAccountConfig for DeserializedAccountConfig {
@@ -18,6 +20,8 @@ impl ToDeserializedBaseAccountConfig for DeserializedAccountConfig {
         match self {
             Self::Imap(config) => config.to_base(),
             Self::Maildir(config) => config.to_base(),
+            #[cfg(feature = "notmuch")]
+            Self::Notmuch(config) => config.to_base(),
         }
     }
 }
@@ -37,12 +41,6 @@ macro_rules! make_account_config {
             pub signature_delimiter: Option<String>,
             /// Overrides the default page size for this account.
             pub default_page_size: Option<usize>,
-            /// Overrides the inbox folder name for this account.
-            pub inbox_folder: Option<String>,
-            /// Overrides the sent folder name for this account.
-            pub sent_folder: Option<String>,
-            /// Overrides the draft folder name for this account.
-            pub draft_folder: Option<String>,
             /// Overrides the notify command for this account.
             pub notify_cmd: Option<String>,
             /// Overrides the IMAP query used to fetch new messages for this account.
@@ -73,6 +71,10 @@ macro_rules! make_account_config {
             /// Represents the command used to decrypt a message.
             pub pgp_decrypt_cmd: Option<String>,
 
+    	    /// Represents mailbox aliases.
+    	    #[serde(default)]
+    	    pub mailboxes: HashMap<String, String>,
+
 	    $(pub $element: $ty),*
 	}
 
@@ -84,9 +86,6 @@ macro_rules! make_account_config {
             	    signature: self.signature.clone(),
             	    signature_delimiter: self.signature_delimiter.clone(),
             	    default_page_size: self.default_page_size.clone(),
-            	    inbox_folder: self.inbox_folder.clone(),
-            	    sent_folder: self.sent_folder.clone(),
-            	    draft_folder: self.draft_folder.clone(),
             	    notify_cmd: self.notify_cmd.clone(),
             	    notify_query: self.notify_query.clone(),
             	    watch_cmds: self.watch_cmds.clone(),
@@ -103,6 +102,8 @@ macro_rules! make_account_config {
 
             	    pgp_encrypt_cmd: self.pgp_encrypt_cmd.clone(),
             	    pgp_decrypt_cmd: self.pgp_decrypt_cmd.clone(),
+
+		    mailboxes: self.mailboxes.clone(),
 		}
 	    }
 	}
@@ -121,4 +122,10 @@ make_account_config!(
     imap_passwd_cmd: String
 );
 
-make_account_config!(DeserializedMaildirAccountConfig, maildir_dir: PathBuf);
+make_account_config!(DeserializedMaildirAccountConfig, maildir_dir: String);
+
+#[cfg(feature = "notmuch")]
+make_account_config!(
+    DeserializedNotmuchAccountConfig,
+    notmuch_database_dir: String
+);

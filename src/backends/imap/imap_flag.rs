@@ -1,5 +1,9 @@
 use anyhow::{anyhow, Error, Result};
-use std::{convert::TryFrom, fmt, ops::Deref};
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt,
+    ops::Deref,
+};
 
 /// Represents the imap flag variants.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]

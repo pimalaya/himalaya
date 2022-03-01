@@ -2,7 +2,7 @@ use anyhow::{anyhow, Context, Result};
 use lettre::transport::smtp::authentication::Credentials as SmtpCredentials;
 use log::{debug, info, trace};
 use mailparse::MailAddr;
-use std::{env, ffi::OsStr, fs, path::PathBuf};
+use std::{collections::HashMap, env, ffi::OsStr, fs, path::PathBuf};
 
 use crate::{config::*, output::run_cmd};
 
@@ -23,18 +23,15 @@ pub struct AccountConfig {
     pub sig: Option<String>,
     /// Represents the default page size for listings.
     pub default_page_size: usize,
-    /// Represents the inbox folder name for this account.
-    pub inbox_folder: String,
-    /// Represents the sent folder name for this account.
-    pub sent_folder: String,
-    /// Represents the draft folder name for this account.
-    pub draft_folder: String,
     /// Represents the notify command.
     pub notify_cmd: Option<String>,
     /// Overrides the default IMAP query "NEW" used to fetch new messages
     pub notify_query: String,
     /// Represents the watch commands.
     pub watch_cmds: Vec<String>,
+
+    /// Represents mailbox aliases.
+    pub mailboxes: HashMap<String, String>,
 
     /// Represents the SMTP host.
     pub smtp_host: String,
@@ -71,6 +68,10 @@ impl<'a> AccountConfig {
                 .find(|(_, account)| match account {
                     DeserializedAccountConfig::Imap(account) => account.default.unwrap_or_default(),
                     DeserializedAccountConfig::Maildir(account) => {
+                        account.default.unwrap_or_default()
+                    }
+                    #[cfg(feature = "notmuch")]
+                    DeserializedAccountConfig::Notmuch(account) => {
                         account.default.unwrap_or_default()
                     }
                 })
@@ -134,24 +135,6 @@ impl<'a> AccountConfig {
             downloads_dir,
             sig,
             default_page_size,
-            inbox_folder: base_account
-                .inbox_folder
-                .as_deref()
-                .or_else(|| config.inbox_folder.as_deref())
-                .unwrap_or(DEFAULT_INBOX_FOLDER)
-                .to_string(),
-            sent_folder: base_account
-                .sent_folder
-                .as_deref()
-                .or_else(|| config.sent_folder.as_deref())
-                .unwrap_or(DEFAULT_SENT_FOLDER)
-                .to_string(),
-            draft_folder: base_account
-                .draft_folder
-                .as_deref()
-                .or_else(|| config.draft_folder.as_deref())
-                .unwrap_or(DEFAULT_DRAFT_FOLDER)
-                .to_string(),
             notify_cmd: base_account.notify_cmd.clone(),
             notify_query: base_account
                 .notify_query
@@ -165,6 +148,7 @@ impl<'a> AccountConfig {
                 .or_else(|| config.watch_cmds.as_ref())
                 .unwrap_or(&vec![])
                 .to_owned(),
+            mailboxes: base_account.mailboxes.clone(),
             default: base_account.default.unwrap_or_default(),
             email: base_account.email.to_owned(),
 
@@ -191,7 +175,15 @@ impl<'a> AccountConfig {
             }),
             DeserializedAccountConfig::Maildir(config) => {
                 BackendConfig::Maildir(MaildirBackendConfig {
-                    maildir_dir: config.maildir_dir.clone(),
+                    maildir_dir: shellexpand::full(&config.maildir_dir)?.to_string().into(),
+                })
+            }
+            #[cfg(feature = "notmuch")]
+            DeserializedAccountConfig::Notmuch(config) => {
+                BackendConfig::Notmuch(NotmuchBackendConfig {
+                    notmuch_database_dir: shellexpand::full(&config.notmuch_database_dir)?
+                        .to_string()
+                        .into(),
                 })
             }
         };
@@ -321,6 +313,8 @@ impl<'a> AccountConfig {
 pub enum BackendConfig {
     Imap(ImapBackendConfig),
     Maildir(MaildirBackendConfig),
+    #[cfg(feature = "notmuch")]
+    Notmuch(NotmuchBackendConfig),
 }
 
 /// Represents the IMAP backend.
@@ -356,6 +350,14 @@ impl ImapBackendConfig {
 pub struct MaildirBackendConfig {
     /// Represents the Maildir directory path.
     pub maildir_dir: PathBuf,
+}
+
+/// Represents the Notmuch backend.
+#[cfg(feature = "notmuch")]
+#[derive(Debug, Default, Clone)]
+pub struct NotmuchBackendConfig {
+    /// Represents the Notmuch database path.
+    pub notmuch_database_dir: PathBuf,
 }
 
 #[cfg(test)]

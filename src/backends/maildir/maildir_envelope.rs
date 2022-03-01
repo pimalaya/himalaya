@@ -56,6 +56,9 @@ pub struct MaildirEnvelope {
     /// Represents the id of the message.
     pub id: String,
 
+    /// Represents the MD5 hash of the message id.
+    pub hash: String,
+
     /// Represents the flags of the message.
     pub flags: MaildirFlags,
 
@@ -72,7 +75,7 @@ pub struct MaildirEnvelope {
 impl Table for MaildirEnvelope {
     fn head() -> Row {
         Row::new()
-            .cell(Cell::new("IDENTIFIER").bold().underline().white())
+            .cell(Cell::new("HASH").bold().underline().white())
             .cell(Cell::new("FLAGS").bold().underline().white())
             .cell(Cell::new("SUBJECT").shrinkable().bold().underline().white())
             .cell(Cell::new("SENDER").bold().underline().white())
@@ -80,14 +83,14 @@ impl Table for MaildirEnvelope {
     }
 
     fn row(&self) -> Row {
-        let id = self.id.to_string();
+        let hash = self.hash.clone();
         let unseen = !self.flags.contains(&MaildirFlag::Seen);
         let flags = self.flags.to_symbols_string();
         let subject = &self.subject;
         let sender = &self.sender;
         let date = &self.date;
         Row::new()
-            .cell(Cell::new(id).bold_if(unseen).red())
+            .cell(Cell::new(hash).bold_if(unseen).red())
             .cell(Cell::new(flags).bold_if(unseen).white())
             .cell(Cell::new(subject).shrinkable().bold_if(unseen).green())
             .cell(Cell::new(sender).bold_if(unseen).blue())
@@ -110,6 +113,7 @@ impl<'a> TryFrom<RawMaildirEnvelopes> for MaildirEnvelopes {
                 .context("cannot parse maildir mail entry")?;
             envelopes.push(envelope);
         }
+
         Ok(MaildirEnvelopes(envelopes))
     }
 }
@@ -123,13 +127,13 @@ impl<'a> TryFrom<RawMaildirEnvelope> for MaildirEnvelope {
     fn try_from(mut mail_entry: RawMaildirEnvelope) -> Result<Self, Self::Error> {
         info!("begin: try building envelope from maildir parsed mail");
 
-        let mut envelope = Self {
-            id: mail_entry.id().into(),
-            flags: (&mail_entry)
-                .try_into()
-                .context("cannot parse maildir flags")?,
-            ..Self::default()
-        };
+        let mut envelope = Self::default();
+
+        envelope.id = mail_entry.id().into();
+        envelope.hash = format!("{:x}", md5::compute(&envelope.id));
+        envelope.flags = (&mail_entry)
+            .try_into()
+            .context("cannot parse maildir flags")?;
 
         let parsed_mail = mail_entry
             .parsed()

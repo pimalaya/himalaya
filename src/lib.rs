@@ -37,6 +37,9 @@ pub mod backends {
     pub use backend::*;
     pub mod backend;
 
+    pub use id_mapper::*;
+    pub mod id_mapper;
+
     pub use self::imap::*;
     pub mod imap {
         pub mod imap_arg;
@@ -74,6 +77,20 @@ pub mod backends {
 
         pub mod maildir_flag;
         pub use maildir_flag::*;
+    }
+
+    #[cfg(feature = "notmuch")]
+    pub use self::notmuch::*;
+    #[cfg(feature = "notmuch")]
+    pub mod notmuch {
+        pub mod notmuch_backend;
+        pub use notmuch_backend::*;
+
+        pub mod notmuch_mbox;
+        pub use notmuch_mbox::*;
+
+        pub mod notmuch_envelope;
+        pub use notmuch_envelope::*;
     }
 }
 

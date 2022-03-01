@@ -120,7 +120,10 @@ mod tests {
             fn del_mbox(&mut self, _: &str) -> Result<()> {
                 unimplemented!();
             }
-            fn get_envelopes(
+            fn get_envelopes(&mut self, _: &str, _: usize, _: usize) -> Result<Box<dyn Envelopes>> {
+                unimplemented!()
+            }
+            fn search_envelopes(
                 &mut self,
                 _: &str,
                 _: &str,
