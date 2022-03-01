@@ -77,10 +77,8 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         let path = self.mdir.path().join(format!(".{}", subdir));
         trace!("subdir path: {:?}", path);
 
-        fs::create_dir(&path).context(format!(
-            "cannot create maildir subdir {:?} at {:?}",
-            subdir, path
-        ))?;
+        fs::create_dir(&path)
+            .with_context(|| format!("cannot create maildir subdir {:?} at {:?}", subdir, path))?;
 
         info!("<< add maildir subdir");
         Ok(())
@@ -89,10 +87,10 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
     fn get_mboxes(&mut self) -> Result<Box<dyn Mboxes>> {
         info!(">> get maildir dirs");
 
-        let dirs: MaildirMboxes = self.mdir.list_subdirs().try_into().context(format!(
-            "cannot parse maildir dirs from {:?}",
-            self.mdir.path()
-        ))?;
+        let dirs: MaildirMboxes =
+            self.mdir.list_subdirs().try_into().with_context(|| {
+                format!("cannot parse maildir dirs from {:?}", self.mdir.path())
+            })?;
         trace!("dirs: {:?}", dirs);
 
         info!("<< get maildir dirs");
@@ -107,7 +105,7 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         trace!("dir path: {:?}", path);
 
         fs::remove_dir_all(&path)
-            .context(format!("cannot delete maildir {:?} from {:?}", dir, path))?;
+            .with_context(|| format!("cannot delete maildir {:?} from {:?}", dir, path))?;
 
         info!("<< delete maildir dir");
         Ok(())
@@ -126,14 +124,13 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
 
         let mdir = self
             .get_mdir_from_dir(dir)
-            .context(format!("cannot get maildir instance from {:?}", dir))?;
+            .with_context(|| format!("cannot get maildir instance from {:?}", dir))?;
 
         // Reads envelopes from the "cur" folder of the selected
         // maildir.
-        let mut envelopes: MaildirEnvelopes = mdir.list_cur().try_into().context(format!(
-            "cannot parse maildir envelopes from {:?}",
-            self.mdir.path()
-        ))?;
+        let mut envelopes: MaildirEnvelopes = mdir.list_cur().try_into().with_context(|| {
+            format!("cannot parse maildir envelopes from {:?}", self.mdir.path())
+        })?;
         debug!("envelopes len: {:?}", envelopes.len());
         trace!("envelopes: {:?}", envelopes);
 
@@ -200,28 +197,28 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
 
         let mdir = self
             .get_mdir_from_dir(dir)
-            .context(format!("cannot get maildir instance from {:?}", dir))?;
+            .with_context(|| format!("cannot get maildir instance from {:?}", dir))?;
         let flags: MaildirFlags = flags
             .try_into()
-            .context(format!("cannot parse maildir flags {:?}", flags))?;
+            .with_context(|| format!("cannot parse maildir flags {:?}", flags))?;
         let id = mdir
             .store_cur_with_flags(msg, &flags.to_string())
-            .context(format!("cannot add maildir message to {:?}", mdir.path()))?;
+            .with_context(|| format!("cannot add maildir message to {:?}", mdir.path()))?;
         debug!("id: {:?}", id);
         let hash = format!("{:x}", md5::compute(&id));
         debug!("hash: {:?}", hash);
 
         // Appends hash entry to the id mapper cache file.
-        let mut mapper = IdMapper::new(mdir.path()).context(format!(
-            "cannot create id mapper instance for {:?}",
-            mdir.path()
-        ))?;
+        let mut mapper = IdMapper::new(mdir.path())
+            .with_context(|| format!("cannot create id mapper instance for {:?}", mdir.path()))?;
         mapper
             .append(vec![(hash.clone(), id.clone())])
-            .context(format!(
-                "cannot append hash {:?} with id {:?} to id mapper",
-                hash, id
-            ))?;
+            .with_context(|| {
+                format!(
+                    "cannot append hash {:?} with id {:?} to id mapper",
+                    hash, id
+                )
+            })?;
 
         info!("<< add maildir message");
         Ok(Box::new(hash))
@@ -234,14 +231,16 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
 
         let mdir = self
             .get_mdir_from_dir(dir)
-            .context(format!("cannot get maildir instance from {:?}", dir))?;
+            .with_context(|| format!("cannot get maildir instance from {:?}", dir))?;
         let id = IdMapper::new(mdir.path())?
             .find(short_hash)
-            .context(format!(
-                "cannot find maildir message by short hash {:?} at {:?}",
-                short_hash,
-                mdir.path()
-            ))?;
+            .with_context(|| {
+                format!(
+                    "cannot find maildir message by short hash {:?} at {:?}",
+                    short_hash,
+                    mdir.path()
+                )
+            })?;
         debug!("id: {:?}", id);
         let mut mail_entry = mdir.find(&id).ok_or_else(|| {
             anyhow!(
@@ -250,16 +249,12 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
                 mdir.path()
             )
         })?;
-        let parsed_mail = mail_entry.parsed().context(format!(
-            "cannot parse maildir message {:?} at {:?}",
-            id,
-            mdir.path()
-        ))?;
-        let msg = Msg::from_parsed_mail(parsed_mail, self.account_config).context(format!(
-            "cannot parse maildir message {:?} at {:?}",
-            id,
-            mdir.path()
-        ))?;
+        let parsed_mail = mail_entry.parsed().with_context(|| {
+            format!("cannot parse maildir message {:?} at {:?}", id, mdir.path())
+        })?;
+        let msg = Msg::from_parsed_mail(parsed_mail, self.account_config).with_context(|| {
+            format!("cannot parse maildir message {:?} at {:?}", id, mdir.path())
+        })?;
         trace!("message: {:?}", msg);
 
         info!("<< get maildir message");
@@ -271,46 +266,46 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         debug!("source dir: {:?}", dir_src);
         debug!("destination dir: {:?}", dir_dst);
 
-        let mdir_src = self.get_mdir_from_dir(dir_src).context(format!(
-            "cannot get source maildir instance from {:?}",
-            dir_src
-        ))?;
-        let mdir_dst = self.get_mdir_from_dir(dir_dst).context(format!(
-            "cannot get destination maildir instance from {:?}",
-            dir_dst
-        ))?;
+        let mdir_src = self
+            .get_mdir_from_dir(dir_src)
+            .with_context(|| format!("cannot get source maildir instance from {:?}", dir_src))?;
+        let mdir_dst = self.get_mdir_from_dir(dir_dst).with_context(|| {
+            format!("cannot get destination maildir instance from {:?}", dir_dst)
+        })?;
         let id = IdMapper::new(mdir_src.path())
-            .context(format!(
-                "cannot create id mapper instance for {:?}",
-                mdir_src.path()
-            ))?
+            .with_context(|| format!("cannot create id mapper instance for {:?}", mdir_src.path()))?
             .find(short_hash)
-            .context(format!(
-                "cannot find maildir message by short hash {:?} at {:?}",
-                short_hash,
-                mdir_src.path()
-            ))?;
+            .with_context(|| {
+                format!(
+                    "cannot find maildir message by short hash {:?} at {:?}",
+                    short_hash,
+                    mdir_src.path()
+                )
+            })?;
         debug!("id: {:?}", id);
 
-        mdir_src.copy_to(&id, &mdir_dst).context(format!(
-            "cannot copy message {:?} from maildir {:?} to maildir {:?}",
-            id,
-            mdir_src.path(),
-            mdir_dst.path()
-        ))?;
+        mdir_src.copy_to(&id, &mdir_dst).with_context(|| {
+            format!(
+                "cannot copy message {:?} from maildir {:?} to maildir {:?}",
+                id,
+                mdir_src.path(),
+                mdir_dst.path()
+            )
+        })?;
 
         // Appends hash entry to the id mapper cache file.
-        let mut mapper = IdMapper::new(mdir_dst.path()).context(format!(
-            "cannot create id mapper instance for {:?}",
-            mdir_dst.path()
-        ))?;
+        let mut mapper = IdMapper::new(mdir_dst.path()).with_context(|| {
+            format!("cannot create id mapper instance for {:?}", mdir_dst.path())
+        })?;
         let hash = format!("{:x}", md5::compute(&id));
         mapper
             .append(vec![(hash.clone(), id.clone())])
-            .context(format!(
-                "cannot append hash {:?} with id {:?} to id mapper",
-                hash, id
-            ))?;
+            .with_context(|| {
+                format!(
+                    "cannot append hash {:?} with id {:?} to id mapper",
+                    hash, id
+                )
+            })?;
 
         info!("<< copy maildir message");
         Ok(())
@@ -321,46 +316,46 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         debug!("source dir: {:?}", dir_src);
         debug!("destination dir: {:?}", dir_dst);
 
-        let mdir_src = self.get_mdir_from_dir(dir_src).context(format!(
-            "cannot get source maildir instance from {:?}",
-            dir_src
-        ))?;
-        let mdir_dst = self.get_mdir_from_dir(dir_dst).context(format!(
-            "cannot get destination maildir instance from {:?}",
-            dir_dst
-        ))?;
+        let mdir_src = self
+            .get_mdir_from_dir(dir_src)
+            .with_context(|| format!("cannot get source maildir instance from {:?}", dir_src))?;
+        let mdir_dst = self.get_mdir_from_dir(dir_dst).with_context(|| {
+            format!("cannot get destination maildir instance from {:?}", dir_dst)
+        })?;
         let id = IdMapper::new(mdir_src.path())
-            .context(format!(
-                "cannot create id mapper instance for {:?}",
-                mdir_src.path()
-            ))?
+            .with_context(|| format!("cannot create id mapper instance for {:?}", mdir_src.path()))?
             .find(short_hash)
-            .context(format!(
-                "cannot find maildir message by short hash {:?} at {:?}",
-                short_hash,
-                mdir_src.path()
-            ))?;
+            .with_context(|| {
+                format!(
+                    "cannot find maildir message by short hash {:?} at {:?}",
+                    short_hash,
+                    mdir_src.path()
+                )
+            })?;
         debug!("id: {:?}", id);
 
-        mdir_src.move_to(&id, &mdir_dst).context(format!(
-            "cannot move message {:?} from maildir {:?} to maildir {:?}",
-            id,
-            mdir_src.path(),
-            mdir_dst.path()
-        ))?;
+        mdir_src.move_to(&id, &mdir_dst).with_context(|| {
+            format!(
+                "cannot move message {:?} from maildir {:?} to maildir {:?}",
+                id,
+                mdir_src.path(),
+                mdir_dst.path()
+            )
+        })?;
 
         // Appends hash entry to the id mapper cache file.
-        let mut mapper = IdMapper::new(mdir_dst.path()).context(format!(
-            "cannot create id mapper instance for {:?}",
-            mdir_dst.path()
-        ))?;
+        let mut mapper = IdMapper::new(mdir_dst.path()).with_context(|| {
+            format!("cannot create id mapper instance for {:?}", mdir_dst.path())
+        })?;
         let hash = format!("{:x}", md5::compute(&id));
         mapper
             .append(vec![(hash.clone(), id.clone())])
-            .context(format!(
-                "cannot append hash {:?} with id {:?} to id mapper",
-                hash, id
-            ))?;
+            .with_context(|| {
+                format!(
+                    "cannot append hash {:?} with id {:?} to id mapper",
+                    hash, id
+                )
+            })?;
 
         info!("<< move maildir message");
         Ok(())
@@ -373,24 +368,25 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
 
         let mdir = self
             .get_mdir_from_dir(dir)
-            .context(format!("cannot get maildir instance from {:?}", dir))?;
+            .with_context(|| format!("cannot get maildir instance from {:?}", dir))?;
         let id = IdMapper::new(mdir.path())
-            .context(format!(
-                "cannot create id mapper instance for {:?}",
-                mdir.path()
-            ))?
+            .with_context(|| format!("cannot create id mapper instance for {:?}", mdir.path()))?
             .find(short_hash)
-            .context(format!(
-                "cannot find maildir message by short hash {:?} at {:?}",
-                short_hash,
-                mdir.path()
-            ))?;
+            .with_context(|| {
+                format!(
+                    "cannot find maildir message by short hash {:?} at {:?}",
+                    short_hash,
+                    mdir.path()
+                )
+            })?;
         debug!("id: {:?}", id);
-        mdir.delete(&id).context(format!(
-            "cannot delete message {:?} from maildir {:?}",
-            id,
-            mdir.path()
-        ))?;
+        mdir.delete(&id).with_context(|| {
+            format!(
+                "cannot delete message {:?} from maildir {:?}",
+                id,
+                mdir.path()
+            )
+        })?;
 
         info!("<< delete maildir message");
         Ok(())
@@ -404,27 +400,24 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
 
         let mdir = self
             .get_mdir_from_dir(dir)
-            .context(format!("cannot get maildir instance from {:?}", dir))?;
+            .with_context(|| format!("cannot get maildir instance from {:?}", dir))?;
         let flags: MaildirFlags = flags
             .try_into()
-            .context(format!("cannot parse maildir flags {:?}", flags))?;
+            .with_context(|| format!("cannot parse maildir flags {:?}", flags))?;
         debug!("flags: {:?}", flags);
         let id = IdMapper::new(mdir.path())
-            .context(format!(
-                "cannot create id mapper instance for {:?}",
-                mdir.path()
-            ))?
+            .with_context(|| format!("cannot create id mapper instance for {:?}", mdir.path()))?
             .find(short_hash)
-            .context(format!(
-                "cannot find maildir message by short hash {:?} at {:?}",
-                short_hash,
-                mdir.path()
-            ))?;
+            .with_context(|| {
+                format!(
+                    "cannot find maildir message by short hash {:?} at {:?}",
+                    short_hash,
+                    mdir.path()
+                )
+            })?;
         debug!("id: {:?}", id);
-        mdir.add_flags(&id, &flags.to_string()).context(format!(
-            "cannot add flags {:?} to maildir message {:?}",
-            flags, id
-        ))?;
+        mdir.add_flags(&id, &flags.to_string())
+            .with_context(|| format!("cannot add flags {:?} to maildir message {:?}", flags, id))?;
 
         info!("<< add maildir message flags");
         Ok(())
@@ -438,27 +431,24 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
 
         let mdir = self
             .get_mdir_from_dir(dir)
-            .context(format!("cannot get maildir instance from {:?}", dir))?;
+            .with_context(|| format!("cannot get maildir instance from {:?}", dir))?;
         let flags: MaildirFlags = flags
             .try_into()
-            .context(format!("cannot parse maildir flags {:?}", flags))?;
+            .with_context(|| format!("cannot parse maildir flags {:?}", flags))?;
         debug!("flags: {:?}", flags);
         let id = IdMapper::new(mdir.path())
-            .context(format!(
-                "cannot create id mapper instance for {:?}",
-                mdir.path()
-            ))?
+            .with_context(|| format!("cannot create id mapper instance for {:?}", mdir.path()))?
             .find(short_hash)
-            .context(format!(
-                "cannot find maildir message by short hash {:?} at {:?}",
-                short_hash,
-                mdir.path()
-            ))?;
+            .with_context(|| {
+                format!(
+                    "cannot find maildir message by short hash {:?} at {:?}",
+                    short_hash,
+                    mdir.path()
+                )
+            })?;
         debug!("id: {:?}", id);
-        mdir.set_flags(&id, &flags.to_string()).context(format!(
-            "cannot set flags {:?} to maildir message {:?}",
-            flags, id
-        ))?;
+        mdir.set_flags(&id, &flags.to_string())
+            .with_context(|| format!("cannot set flags {:?} to maildir message {:?}", flags, id))?;
 
         info!("<< set maildir message flags");
         Ok(())
@@ -472,27 +462,29 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
 
         let mdir = self
             .get_mdir_from_dir(dir)
-            .context(format!("cannot get maildir instance from {:?}", dir))?;
+            .with_context(|| format!("cannot get maildir instance from {:?}", dir))?;
         let flags: MaildirFlags = flags
             .try_into()
-            .context(format!("cannot parse maildir flags {:?}", flags))?;
+            .with_context(|| format!("cannot parse maildir flags {:?}", flags))?;
         debug!("flags: {:?}", flags);
         let id = IdMapper::new(mdir.path())
-            .context(format!(
-                "cannot create id mapper instance for {:?}",
-                mdir.path()
-            ))?
+            .with_context(|| format!("cannot create id mapper instance for {:?}", mdir.path()))?
             .find(short_hash)
-            .context(format!(
-                "cannot find maildir message by short hash {:?} at {:?}",
-                short_hash,
-                mdir.path()
-            ))?;
+            .with_context(|| {
+                format!(
+                    "cannot find maildir message by short hash {:?} at {:?}",
+                    short_hash,
+                    mdir.path()
+                )
+            })?;
         debug!("id: {:?}", id);
-        mdir.remove_flags(&id, &flags.to_string()).context(format!(
-            "cannot delete flags {:?} to maildir message {:?}",
-            flags, id
-        ))?;
+        mdir.remove_flags(&id, &flags.to_string())
+            .with_context(|| {
+                format!(
+                    "cannot delete flags {:?} to maildir message {:?}",
+                    flags, id
+                )
+            })?;
 
         info!("<< delete maildir message flags");
         Ok(())

@@ -2,7 +2,7 @@ use maildir::Maildir;
 use std::{collections::HashMap, env, fs, iter::FromIterator};
 
 use himalaya::{
-    backends::{Backend, MaildirBackend, MaildirEnvelopes},
+    backends::{Backend, MaildirBackend, MaildirEnvelopes, MaildirFlag},
     config::{AccountConfig, MaildirBackendConfig},
 };
 
@@ -48,6 +48,34 @@ fn test_maildir_backend() {
     assert_eq!(1, envelopes.len());
     assert_eq!("alice@localhost", envelope.sender);
     assert_eq!("Plain message", envelope.subject);
+
+    // check that a flag can be added to the message
+    mdir.add_flags("INBOX", &envelope.hash, "flagged passed")
+        .unwrap();
+    let envelopes = mdir.get_envelopes("INBOX", 1, 0).unwrap();
+    let envelopes: &MaildirEnvelopes = envelopes.as_any().downcast_ref().unwrap();
+    let envelope = envelopes.first().unwrap();
+    assert!(envelope.flags.contains(&MaildirFlag::Seen));
+    assert!(envelope.flags.contains(&MaildirFlag::Flagged));
+    assert!(envelope.flags.contains(&MaildirFlag::Passed));
+
+    // check that the message flags can be changed
+    mdir.set_flags("INBOX", &envelope.hash, "passed").unwrap();
+    let envelopes = mdir.get_envelopes("INBOX", 1, 0).unwrap();
+    let envelopes: &MaildirEnvelopes = envelopes.as_any().downcast_ref().unwrap();
+    let envelope = envelopes.first().unwrap();
+    assert!(!envelope.flags.contains(&MaildirFlag::Seen));
+    assert!(!envelope.flags.contains(&MaildirFlag::Flagged));
+    assert!(envelope.flags.contains(&MaildirFlag::Passed));
+
+    // check that a flag can be removed from the message
+    mdir.del_flags("INBOX", &envelope.hash, "passed").unwrap();
+    let envelopes = mdir.get_envelopes("INBOX", 1, 0).unwrap();
+    let envelopes: &MaildirEnvelopes = envelopes.as_any().downcast_ref().unwrap();
+    let envelope = envelopes.first().unwrap();
+    assert!(!envelope.flags.contains(&MaildirFlag::Seen));
+    assert!(!envelope.flags.contains(&MaildirFlag::Flagged));
+    assert!(!envelope.flags.contains(&MaildirFlag::Passed));
 
     // check that the message can be copied
     mdir.copy_msg("INBOX", "Subdir", &envelope.hash).unwrap();
