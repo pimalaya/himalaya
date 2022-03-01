@@ -7,7 +7,7 @@ use himalaya::{
     compl::{compl_arg, compl_handler},
     config::{
         account_args, config_args, AccountConfig, BackendConfig, DeserializedConfig,
-        MaildirBackendConfig, DEFAULT_INBOX_FOLDER,
+        DEFAULT_INBOX_FOLDER,
     },
     mbox::{mbox_arg, mbox_handler},
     msg::{flag_arg, flag_handler, msg_arg, msg_handler, tpl_arg, tpl_handler},
@@ -16,7 +16,7 @@ use himalaya::{
 };
 
 #[cfg(feature = "notmuch")]
-use himalaya::backends::NotmuchBackend;
+use himalaya::{backends::NotmuchBackend, config::MaildirBackendConfig};
 
 fn create_app<'a>() -> clap::App<'a, 'a> {
     clap::App::new(env!("CARGO_PKG_NAME"))
@@ -51,7 +51,8 @@ fn main() -> Result<()> {
 
         let mut imap;
         let mut maildir;
-        let maildir_config;
+        #[cfg(feature = "notmuch")]
+        let maildir_config: MaildirBackendConfig;
         #[cfg(feature = "notmuch")]
         let mut notmuch;
         let backend: Box<&mut dyn Backend> = match backend_config {
@@ -100,7 +101,8 @@ fn main() -> Result<()> {
     let mut printer = StdoutPrinter::try_from(m.value_of("output"))?;
     let mut imap;
     let mut maildir;
-    let maildir_config;
+    #[cfg(feature = "notmuch")]
+    let maildir_config: MaildirBackendConfig;
     #[cfg(feature = "notmuch")]
     let mut notmuch;
     let backend: Box<&mut dyn Backend> = match backend_config {
