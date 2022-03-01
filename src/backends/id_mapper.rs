@@ -76,31 +76,28 @@ impl IdMapper {
     }
 
     pub fn append(&mut self, lines: Vec<(String, String)>) -> Result<usize> {
-        let mut entries = String::new();
+        self.extend(lines);
 
-        self.extend(lines.clone());
+        let mut entries = String::new();
+        let mut short_hash_len = self.short_hash_len;
 
         for (hash, id) in self.iter() {
-            entries.push_str(&format!("{} {}\n", hash, id));
-        }
-
-        for (hash, id) in lines {
             loop {
                 let short_hash = &hash[0..self.short_hash_len];
                 let conflict_found = self
                     .map
                     .keys()
-                    .find(|cached_hash| {
-                        cached_hash.starts_with(short_hash) && *cached_hash != &hash
-                    })
+                    .find(|cached_hash| cached_hash.starts_with(short_hash) && cached_hash != &hash)
                     .is_some();
                 if self.short_hash_len > 32 || !conflict_found {
                     break;
                 }
-                self.short_hash_len += 1;
+                short_hash_len += 1;
             }
             entries.push_str(&format!("{} {}\n", hash, id));
         }
+
+        self.short_hash_len = short_hash_len;
 
         OpenOptions::new()
             .write(true)
@@ -108,10 +105,10 @@ impl IdMapper {
             .truncate(true)
             .open(&self.path)
             .context("cannot open maildir id hash map cache")?
-            .write(format!("{}\n{}", self.short_hash_len, entries).as_bytes())
+            .write(format!("{}\n{}", short_hash_len, entries).as_bytes())
             .context("cannot write maildir id hash map cache")?;
 
-        Ok(self.short_hash_len)
+        Ok(short_hash_len)
     }
 }
 

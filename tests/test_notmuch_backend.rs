@@ -49,7 +49,7 @@ fn test_notmuch_backend() {
     notmuch
         .add_flags("", &envelope.hash, "flagged passed")
         .unwrap();
-    let envelopes = notmuch.get_envelopes("inbox", 1, 0).unwrap();
+    let envelopes = notmuch.get_envelopes("inbox", 10, 0).unwrap();
     let envelopes: &NotmuchEnvelopes = envelopes.as_any().downcast_ref().unwrap();
     let envelope = envelopes.first().unwrap();
     assert!(envelope.flags.contains(&"inbox".into()));
@@ -61,7 +61,7 @@ fn test_notmuch_backend() {
     notmuch
         .set_flags("", &envelope.hash, "inbox passed")
         .unwrap();
-    let envelopes = notmuch.get_envelopes("inbox", 1, 0).unwrap();
+    let envelopes = notmuch.get_envelopes("inbox", 10, 0).unwrap();
     let envelopes: &NotmuchEnvelopes = envelopes.as_any().downcast_ref().unwrap();
     let envelope = envelopes.first().unwrap();
     assert!(envelope.flags.contains(&"inbox".into()));
@@ -71,11 +71,15 @@ fn test_notmuch_backend() {
 
     // check that a flag can be removed from the message
     notmuch.del_flags("", &envelope.hash, "passed").unwrap();
-    let envelopes = notmuch.get_envelopes("inbox", 1, 0).unwrap();
+    let envelopes = notmuch.get_envelopes("inbox", 10, 0).unwrap();
     let envelopes: &NotmuchEnvelopes = envelopes.as_any().downcast_ref().unwrap();
     let envelope = envelopes.first().unwrap();
     assert!(envelope.flags.contains(&"inbox".into()));
     assert!(!envelope.flags.contains(&"seen".into()));
     assert!(!envelope.flags.contains(&"flagged".into()));
     assert!(!envelope.flags.contains(&"passed".into()));
+
+    // check that the message can be deleted
+    notmuch.del_msg("", &hash).unwrap();
+    assert!(notmuch.get_msg("inbox", &hash).is_err());
 }

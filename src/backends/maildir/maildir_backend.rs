@@ -54,6 +54,12 @@ impl<'a> MaildirBackend<'a> {
                     // maildir subdirectory by adding a "." in front
                     // of the name as described in the spec:
                     // https://cr.yp.to/proto/maildir.html
+                    let dir = self
+                        .account_config
+                        .mailboxes
+                        .get(dir)
+                        .map(|s| s.as_str())
+                        .unwrap_or(dir);
                     let path = self.mdir.path().join(format!(".{}", dir));
                     self.validate_mdir_path(path)
                 })

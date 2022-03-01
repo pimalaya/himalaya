@@ -193,24 +193,16 @@ impl<'a> Backend<'a> for NotmuchBackend<'a> {
         Ok(envelopes)
     }
 
-    fn add_msg(&mut self, dir: &str, msg: &[u8], tags: &str) -> Result<Box<dyn ToString>> {
+    fn add_msg(&mut self, _: &str, msg: &[u8], tags: &str) -> Result<Box<dyn ToString>> {
         info!(">> add notmuch envelopes");
-        debug!("dir: {:?}", dir);
         debug!("tags: {:?}", tags);
 
-        let mdir = self
-            .mdir
-            .get_mdir_from_dir(dir)
-            .with_context(|| format!("cannot get maildir instance from {:?}", dir))?;
-        let mdir_path_str = mdir
-            .path()
-            .to_str()
-            .ok_or_else(|| anyhow!("cannot parse maildir path to string"))?;
+        let dir = &self.notmuch_config.notmuch_database_dir;
 
         // Adds the message to the maildir folder and gets its hash.
         let hash = self
             .mdir
-            .add_msg(mdir_path_str, msg, "seen")
+            .add_msg("inbox", msg, "seen")
             .with_context(|| {
                 format!(
                     "cannot add notmuch message to maildir {:?}",
@@ -222,12 +214,13 @@ impl<'a> Backend<'a> for NotmuchBackend<'a> {
 
         // Retrieves the file path of the added message by its maildir
         // identifier.
-        let id = IdMapper::new(mdir.path())
-            .with_context(|| format!("cannot create id mapper instance for {:?}", dir))?
+        let mut mapper = IdMapper::new(dir)
+            .with_context(|| format!("cannot create id mapper instance for {:?}", dir))?;
+        let id = mapper
             .find(&hash)
             .with_context(|| format!("cannot find notmuch message from short hash {:?}", hash))?;
         debug!("id: {:?}", id);
-        let file_path = mdir.path().join("cur").join(format!("{}:2,S", id));
+        let file_path = dir.join("cur").join(format!("{}:2,S", id));
         debug!("file path: {:?}", file_path);
 
         // Adds the message to the notmuch database by indexing it.
@@ -240,13 +233,6 @@ impl<'a> Backend<'a> for NotmuchBackend<'a> {
         let hash = format!("{:x}", md5::compute(&id));
 
         // Appends hash entry to the id mapper cache file.
-        let mut mapper =
-            IdMapper::new(&self.notmuch_config.notmuch_database_dir).with_context(|| {
-                format!(
-                    "cannot create id mapper instance for {:?}",
-                    self.notmuch_config.notmuch_database_dir
-                )
-            })?;
         mapper
             .append(vec![(hash.clone(), id.clone())])
             .with_context(|| {
@@ -264,7 +250,7 @@ impl<'a> Backend<'a> for NotmuchBackend<'a> {
         Ok(Box::new(hash))
     }
 
-    fn get_msg(&mut self, _virt_mbox: &str, short_hash: &str) -> Result<Msg> {
+    fn get_msg(&mut self, _: &str, short_hash: &str) -> Result<Msg> {
         info!(">> add notmuch envelopes");
         debug!("short hash: {:?}", short_hash);
 
@@ -300,7 +286,7 @@ impl<'a> Backend<'a> for NotmuchBackend<'a> {
         Ok(msg)
     }
 
-    fn copy_msg(&mut self, _mbox_src: &str, _mbox_dst: &str, _id: &str) -> Result<()> {
+    fn copy_msg(&mut self, _dir_src: &str, _dir_dst: &str, _short_hash: &str) -> Result<()> {
         info!(">> copy notmuch message");
         info!("<< copy notmuch message");
         Err(anyhow!(
@@ -308,7 +294,7 @@ impl<'a> Backend<'a> for NotmuchBackend<'a> {
         ))
     }
 
-    fn move_msg(&mut self, _src: &str, _dst: &str, _id: &str) -> Result<()> {
+    fn move_msg(&mut self, _dir_src: &str, _dir_dst: &str, _short_hash: &str) -> Result<()> {
         info!(">> move notmuch message");
         info!("<< move notmuch message");
         Err(anyhow!(
