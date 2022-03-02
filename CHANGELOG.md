@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Vim doc about mailbox pickers [#298]
+
 ### Fixed
 
 - Some emojis break the table layout [#300]
@@ -456,6 +460,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#280]: https://github.com/soywod/himalaya/issues/280
 [#288]: https://github.com/soywod/himalaya/issues/288
 [#289]: https://github.com/soywod/himalaya/issues/289
+[#298]: https://github.com/soywod/himalaya/issues/298
 [#300]: https://github.com/soywod/himalaya/issues/300
 [#303]: https://github.com/soywod/himalaya/issues/303
 [#305]: https://github.com/soywod/himalaya/issues/305

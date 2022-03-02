@@ -3,9 +3,10 @@
 ## Installation
 
 First you need to install and configure the [himalaya
-CLI](https://github.com/soywod/himalaya#installation). Then you can install
-this plugin with your favorite plugin manager. For example with
-[vim-plug](https://github.com/junegunn/vim-plug), add to your `.vimrc`:
+CLI](https://github.com/soywod/himalaya#installation). Then you can
+install this plugin with your favorite plugin manager. For example
+with [vim-plug](https://github.com/junegunn/vim-plug), add to your
+`.vimrc`:
 
 ```viml
 Plug 'soywod/himalaya', {'rtp': 'vim'}
@@ -31,14 +32,15 @@ set hidden
 let g:himalaya_mailbox_picker = 'native' | 'fzf' | 'telescope'
 ```
 
-Defines the provider used for picking mailboxes:
+Defines the provider used for picking mailboxes (default keybind:
+`gm`):
 
 - `native`: a vim native input
 - `fzf`: https://github.com/junegunn/fzf.vim
 - `telescope`: https://github.com/nvim-telescope/telescope.nvim
 
-If no value given, the first loaded (and available) provider will be used (fzf
-> telescope > native).
+If no value given, the first loaded (and available) provider will be
+used (fzf > telescope > native).
 
 ### Telescope preview
 
