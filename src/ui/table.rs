@@ -35,7 +35,12 @@ pub struct Cell {
 impl Cell {
     pub fn new<T: AsRef<str>>(value: T) -> Self {
         Self {
-            value: String::from(value.as_ref()).replace(&['\r', '\n', '\t'][..], ""),
+            // Removes carriage returns, new line feeds, tabulations
+            // and [variation selectors].
+            //
+            // [variation selectors]: https://en.wikipedia.org/wiki/Variation_Selectors_(Unicode_block)
+            value: String::from(value.as_ref())
+                .replace(&['\r', '\n', '\t', '\u{fe0e}', '\u{fe0f}'], ""),
             ..Self::default()
         }
     }
