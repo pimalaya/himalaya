@@ -3,7 +3,7 @@ use anyhow::{anyhow, Context, Error, Result};
 use chrono::{DateTime, FixedOffset};
 use html_escape;
 use lettre::message::{header::ContentType, Attachment, MultiPart, SinglePart};
-use log::{debug, info, trace};
+use log::{debug, info, trace, warn};
 use regex::Regex;
 use std::{collections::HashSet, convert::TryInto, env::temp_dir, fmt::Debug, fs, path::PathBuf};
 use uuid::Uuid;
@@ -170,9 +170,6 @@ impl Msg {
         // In-Reply-To
         self.in_reply_to = self.message_id.to_owned();
 
-        // From
-        self.from = Some(vec![account_addr.clone()].into());
-
         // To
         let addrs = self
             .reply_to
@@ -196,11 +193,6 @@ impl Msg {
         if !all {
             self.cc = None;
             self.bcc = None;
-        }
-
-        // Subject
-        if !self.subject.starts_with("Re:") {
-            self.subject = format!("Re: {}", self.subject);
         }
 
         // Body
@@ -235,6 +227,14 @@ impl Msg {
         };
 
         self.parts = Parts(vec![Part::new_text_plain(plain_content)]);
+
+        // Subject
+        if !self.subject.starts_with("Re:") {
+            self.subject = format!("Re: {}", self.subject);
+        }
+
+        // From
+        self.from = Some(vec![account_addr.clone()].into());
 
         Ok(self)
     }
@@ -647,6 +647,16 @@ impl Msg {
                 "in-reply-to" => msg.in_reply_to = Some(val),
                 "subject" => {
                     msg.subject = val;
+                }
+                "date" => {
+                    msg.date = DateTime::parse_from_rfc2822(
+                        val.split_at(val.find(" (").unwrap_or_else(|| val.len())).0,
+                    )
+                    .map_err(|err| {
+                        warn!("cannot parse message date {:?}, skipping it", val);
+                        err
+                    })
+                    .ok();
                 }
                 "from" => {
                     msg.from = from_slice_to_addrs(val)

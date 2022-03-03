@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Some emojis break the table layout [#300]
+- Bad sender and date in reply and forward template [#321]
 
 ## [0.5.7] - 2022-03-01
 
