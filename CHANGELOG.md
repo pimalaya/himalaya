@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Flowed format support [#206]
+
 ### Changed
 
 - Vim doc about mailbox pickers [#298]
