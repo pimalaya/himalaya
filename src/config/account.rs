@@ -48,7 +48,7 @@ pub struct Account {
     /// Represents the backend name of the account.
     pub backend: String,
 
-    /// Represents the defaultness state of the account.
+    /// Represents the default state of the account.
     pub default: bool,
 }
 
