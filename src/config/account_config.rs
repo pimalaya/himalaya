@@ -29,6 +29,9 @@ pub struct AccountConfig {
     pub notify_query: String,
     /// Represents the watch commands.
     pub watch_cmds: Vec<String>,
+    /// Represents the text/plain format as defined in the
+    /// [RFC2646](https://www.ietf.org/rfc/rfc2646.txt)
+    pub format: Format,
 
     /// Represents mailbox aliases.
     pub mailboxes: HashMap<String, String>,
@@ -148,6 +151,7 @@ impl<'a> AccountConfig {
                 .or_else(|| config.watch_cmds.as_ref())
                 .unwrap_or(&vec![])
                 .to_owned(),
+            format: base_account.format.unwrap_or_default(),
             mailboxes: base_account.mailboxes.clone(),
             default: base_account.default.unwrap_or_default(),
             email: base_account.email.to_owned(),

@@ -34,37 +34,36 @@ pub mod msg {
 }
 
 pub mod backends {
-    pub use backend::*;
     pub mod backend;
+    pub use backend::*;
 
-    pub use id_mapper::*;
     pub mod id_mapper;
+    pub use id_mapper::*;
 
-    pub use self::imap::*;
     pub mod imap {
         pub mod imap_arg;
 
-        pub use imap_backend::*;
         pub mod imap_backend;
+        pub use imap_backend::*;
 
         pub mod imap_handler;
 
-        pub use imap_mbox::*;
         pub mod imap_mbox;
+        pub use imap_mbox::*;
 
-        pub use imap_mbox_attr::*;
         pub mod imap_mbox_attr;
+        pub use imap_mbox_attr::*;
 
-        pub use imap_envelope::*;
         pub mod imap_envelope;
+        pub use imap_envelope::*;
 
-        pub use imap_flag::*;
         pub mod imap_flag;
+        pub use imap_flag::*;
 
         pub mod msg_sort_criterion;
     }
+    pub use self::imap::*;
 
-    pub use self::maildir::*;
     pub mod maildir {
         pub mod maildir_backend;
         pub use maildir_backend::*;
@@ -78,6 +77,7 @@ pub mod backends {
         pub mod maildir_flag;
         pub use maildir_flag::*;
     }
+    pub use self::maildir::*;
 
     #[cfg(feature = "notmuch")]
     pub use self::notmuch::*;
@@ -99,7 +99,21 @@ pub mod smtp {
     pub use smtp_service::*;
 }
 
+pub mod config {
+    pub mod config_args;
+    pub mod deserialized_config;
+    pub use deserialized_config::*;
+
+    pub mod account_args;
+    pub mod account_config;
+    pub use account_config::*;
+    pub mod deserialized_account_config;
+    pub use deserialized_account_config::*;
+
+    pub mod format;
+    pub use format::*;
+}
+
 pub mod compl;
-pub mod config;
 pub mod output;
 pub mod ui;

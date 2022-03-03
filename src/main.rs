@@ -144,7 +144,7 @@ fn main() -> Result<()> {
     // Check mailbox commands.
     match mbox_arg::matches(&m)? {
         Some(mbox_arg::Cmd::List(max_width)) => {
-            return mbox_handler::list(max_width, &mut printer, backend);
+            return mbox_handler::list(max_width, &account_config, &mut printer, backend);
         }
         _ => (),
     }

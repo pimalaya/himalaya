@@ -1,6 +1,8 @@
 use serde::Deserialize;
 use std::{collections::HashMap, path::PathBuf};
 
+use crate::config::Format;
+
 pub trait ToDeserializedBaseAccountConfig {
     fn to_base(&self) -> DeserializedBaseAccountConfig;
 }
@@ -47,6 +49,9 @@ macro_rules! make_account_config {
             pub notify_query: Option<String>,
             /// Overrides the watch commands for this account.
             pub watch_cmds: Option<Vec<String>>,
+	    /// Represents the text/plain format as defined in the
+	    /// [RFC2646](https://www.ietf.org/rfc/rfc2646.txt)
+            pub format: Option<Format>,
 
             /// Makes this account the default one.
             pub default: Option<bool>,
@@ -89,6 +94,7 @@ macro_rules! make_account_config {
             	    notify_cmd: self.notify_cmd.clone(),
             	    notify_query: self.notify_query.clone(),
             	    watch_cmds: self.watch_cmds.clone(),
+            	    format: self.format.clone(),
 
             	    default: self.default.clone(),
             	    email: self.email.clone(),
