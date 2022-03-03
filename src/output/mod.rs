@@ -1,6 +1,6 @@
 //! Module related to output formatting and printing.
 
-pub mod output_arg;
+pub mod output_args;
 
 pub mod output_utils;
 pub use output_utils::*;

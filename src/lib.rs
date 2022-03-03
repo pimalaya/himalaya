@@ -2,26 +2,26 @@ pub mod mbox {
     pub mod mbox;
     pub use mbox::*;
 
-    pub mod mbox_arg;
-    pub mod mbox_handler;
+    pub mod mbox_args;
+    pub mod mbox_handlers;
 }
 
 pub mod msg {
     pub mod envelope;
     pub use envelope::*;
 
-    pub mod msg_arg;
+    pub mod msg_args;
 
-    pub mod msg_handler;
+    pub mod msg_handlers;
     pub mod msg_utils;
 
-    pub mod flag_arg;
-    pub mod flag_handler;
+    pub mod flag_args;
+    pub mod flag_handlers;
 
-    pub mod tpl_arg;
-    pub use tpl_arg::TplOverride;
+    pub mod tpl_args;
+    pub use tpl_args::TplOverride;
 
-    pub mod tpl_handler;
+    pub mod tpl_handlers;
 
     pub mod msg_entity;
     pub use msg_entity::*;
@@ -41,12 +41,12 @@ pub mod backends {
     pub use id_mapper::*;
 
     pub mod imap {
-        pub mod imap_arg;
+        pub mod imap_args;
 
         pub mod imap_backend;
         pub use imap_backend::*;
 
-        pub mod imap_handler;
+        pub mod imap_handlers;
 
         pub mod imap_mbox;
         pub use imap_mbox::*;
@@ -100,15 +100,22 @@ pub mod smtp {
 }
 
 pub mod config {
-    pub mod config_args;
     pub mod deserialized_config;
     pub use deserialized_config::*;
 
-    pub mod account_args;
-    pub mod account_config;
-    pub use account_config::*;
     pub mod deserialized_account_config;
     pub use deserialized_account_config::*;
+
+    pub mod config_args;
+
+    pub mod account_args;
+    pub mod account_handlers;
+
+    pub mod account;
+    pub use account::*;
+
+    pub mod account_config;
+    pub use account_config::*;
 
     pub mod format;
     pub use format::*;

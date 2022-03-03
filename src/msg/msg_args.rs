@@ -7,8 +7,8 @@ use clap::{self, App, Arg, ArgMatches, SubCommand};
 use log::{debug, info, trace};
 
 use crate::{
-    mbox::mbox_arg,
-    msg::{flag_arg, msg_arg, tpl_arg},
+    mbox::mbox_args,
+    msg::{flag_args, msg_args, tpl_args},
     ui::table_arg,
 };
 
@@ -43,8 +43,8 @@ pub enum Cmd<'a> {
     Send(RawMsg<'a>),
     Write(AttachmentPaths<'a>, Encrypt),
 
-    Flag(Option<flag_arg::Cmd<'a>>),
-    Tpl(Option<tpl_arg::Cmd<'a>>),
+    Flag(Option<flag_args::Cmd<'a>>),
+    Tpl(Option<tpl_args::Cmd<'a>>),
 }
 
 /// Message command matcher.
@@ -262,11 +262,11 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
     }
 
     if let Some(m) = m.subcommand_matches("template") {
-        return Ok(Some(Cmd::Tpl(tpl_arg::matches(m)?)));
+        return Ok(Some(Cmd::Tpl(tpl_args::matches(m)?)));
     }
 
     if let Some(m) = m.subcommand_matches("flag") {
-        return Ok(Some(Cmd::Flag(flag_arg::matches(m)?)));
+        return Ok(Some(Cmd::Flag(flag_args::matches(m)?)));
     }
 
     info!("default list command matched");
@@ -338,13 +338,13 @@ pub fn encrypt_arg<'a>() -> Arg<'a, 'a> {
 /// Message subcommands.
 pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
     vec![
-        flag_arg::subcmds(),
-        tpl_arg::subcmds(),
+        flag_args::subcmds(),
+        tpl_args::subcmds(),
         vec![
             SubCommand::with_name("attachments")
                 .aliases(&["attachment", "att", "a"])
                 .about("Downloads all message attachments")
-                .arg(msg_arg::seq_arg()),
+                .arg(msg_args::seq_arg()),
             SubCommand::with_name("list")
                 .aliases(&["lst", "l"])
                 .about("Lists all messages")
@@ -442,12 +442,12 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                 .aliases(&["cp", "c"])
                 .about("Copies a message to the targetted mailbox")
                 .arg(seq_arg())
-                .arg(mbox_arg::target_arg()),
+                .arg(mbox_args::target_arg()),
             SubCommand::with_name("move")
                 .aliases(&["mv"])
                 .about("Moves a message to the targetted mailbox")
                 .arg(seq_arg())
-                .arg(mbox_arg::target_arg()),
+                .arg(mbox_args::target_arg()),
             SubCommand::with_name("delete")
                 .aliases(&["del", "d", "remove", "rm"])
                 .about("Deletes a message")

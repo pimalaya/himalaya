@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Flowed format support [#206]
+- List accounts command [#244]
 
 ### Changed
 
@@ -448,11 +449,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#199]: https://github.com/soywod/himalaya/issues/199
 [#204]: https://github.com/soywod/himalaya/issues/204
 [#205]: https://github.com/soywod/himalaya/issues/205
+[#206]: https://github.com/soywod/himalaya/issues/206
 [#215]: https://github.com/soywod/himalaya/issues/215
 [#220]: https://github.com/soywod/himalaya/issues/220
 [#227]: https://github.com/soywod/himalaya/issues/227
 [#228]: https://github.com/soywod/himalaya/issues/228
 [#229]: https://github.com/soywod/himalaya/issues/229
+[#244]: https://github.com/soywod/himalaya/issues/244
 [#249]: https://github.com/soywod/himalaya/issues/249
 [#256]: https://github.com/soywod/himalaya/issues/256
 [#259]: https://github.com/soywod/himalaya/issues/259
@@ -471,3 +474,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#305]: https://github.com/soywod/himalaya/issues/305
 [#308]: https://github.com/soywod/himalaya/issues/308
 [#309]: https://github.com/soywod/himalaya/issues/309
+[#321]: https://github.com/soywod/himalaya/issues/321
