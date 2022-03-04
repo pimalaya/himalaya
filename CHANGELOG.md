@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.8] - 2022-03-04
+
 ### Added
 
 - Flowed format support [#206]
@@ -336,7 +338,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.5.7...HEAD
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.5.8...HEAD
+[0.5.8]: https://github.com/soywod/himalaya/compare/v0.5.7...v0.5.8
 [0.5.7]: https://github.com/soywod/himalaya/compare/v0.5.6...v0.5.7
 [0.5.6]: https://github.com/soywod/himalaya/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/soywod/himalaya/compare/v0.5.4...v0.5.5
