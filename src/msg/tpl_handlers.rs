@@ -103,7 +103,7 @@ pub fn send<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
             .join("\n")
     };
     let msg = Msg::from_tpl(&tpl)?.add_attachments(attachments_paths)?;
-    let sent_msg = smtp.send_msg(account, &msg)?;
-    backend.add_msg(mbox, &sent_msg.formatted(), "seen")?;
+    let sent_msg = smtp.send(account, &msg)?;
+    backend.add_msg(mbox, &sent_msg, "seen")?;
     printer.print_struct("Template successfully sent")
 }

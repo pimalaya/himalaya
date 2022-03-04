@@ -36,6 +36,9 @@ pub struct AccountConfig {
     /// Represents mailbox aliases.
     pub mailboxes: HashMap<String, String>,
 
+    /// Represents hooks.
+    pub hooks: Hooks,
+
     /// Represents the SMTP host.
     pub smtp_host: String,
     /// Represents the SMTP port.
@@ -155,6 +158,7 @@ impl<'a> AccountConfig {
                 .to_owned(),
             format: base_account.format.unwrap_or_default(),
             mailboxes: base_account.mailboxes.clone(),
+            hooks: base_account.hooks.unwrap_or_default(),
             default: base_account.default.unwrap_or_default(),
             email: base_account.email.to_owned(),
 
@@ -203,8 +207,7 @@ impl<'a> AccountConfig {
 
     /// Builds the full RFC822 compliant address of the user account.
     pub fn address(&self) -> Result<MailAddr> {
-        let has_special_chars =
-            "()<>[]:;@.,".contains(|special_char| self.display_name.contains(special_char));
+        let has_special_chars = "()<>[]:;@.,".contains(|c| self.display_name.contains(c));
         let addr = if self.display_name.is_empty() {
             self.email.clone()
         } else if has_special_chars {

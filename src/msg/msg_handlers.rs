@@ -8,7 +8,6 @@ use log::{debug, info, trace};
 use mailparse::addrparse;
 use std::{
     borrow::Cow,
-    convert::TryInto,
     fs,
     io::{self, BufRead},
 };
@@ -356,9 +355,8 @@ pub fn send<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
             .join("\r\n")
     };
     trace!("raw message: {:?}", raw_msg);
-    let envelope: lettre::address::Envelope = Msg::from_tpl(&raw_msg)?.try_into()?;
-    trace!("envelope: {:?}", envelope);
-    smtp.send_raw_msg(&envelope, raw_msg.as_bytes())?;
+    let msg = Msg::from_tpl(&raw_msg)?;
+    smtp.send(&config, &msg)?;
     backend.add_msg(&sent_folder, raw_msg.as_bytes(), "seen")?;
     Ok(())
 }

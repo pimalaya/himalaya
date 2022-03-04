@@ -24,7 +24,7 @@ use crate::{
 };
 
 /// Representation of a message.
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Msg {
     /// The sequence number of the message.
     ///
@@ -359,15 +359,18 @@ impl Msg {
         loop {
             match choice::post_edit() {
                 Ok(PostEditChoice::Send) => {
-                    let sent_msg = smtp.send_msg(account, &self)?;
+                    printer.print_str("Sending message…")?;
+                    let sent_msg = smtp.send(account, &self)?;
                     let sent_folder = account
                         .mailboxes
                         .get("sent")
                         .map(|s| s.as_str())
                         .unwrap_or(DEFAULT_SENT_FOLDER);
-                    backend.add_msg(&sent_folder, &sent_msg.formatted(), "seen")?;
+                    printer
+                        .print_str(format!("Adding message to the {:?} folder…", sent_folder))?;
+                    backend.add_msg(&sent_folder, &sent_msg, "seen")?;
                     msg_utils::remove_local_draft()?;
-                    printer.print_struct("Message successfully sent")?;
+                    printer.print_struct("Done!")?;
                     break;
                 }
                 Ok(PostEditChoice::Edit) => {
@@ -711,7 +714,19 @@ impl TryInto<lettre::address::Envelope> for Msg {
     type Error = Error;
 
     fn try_into(self) -> Result<lettre::address::Envelope> {
-        let from = match self.from.and_then(|addrs| addrs.extract_single_info()) {
+        (&self).try_into()
+    }
+}
+
+impl TryInto<lettre::address::Envelope> for &Msg {
+    type Error = Error;
+
+    fn try_into(self) -> Result<lettre::address::Envelope> {
+        let from = match self
+            .from
+            .as_ref()
+            .and_then(|addrs| addrs.clone().extract_single_info())
+        {
             Some(addr) => addr.addr.parse().map(Some),
             None => Ok(None),
         }?;

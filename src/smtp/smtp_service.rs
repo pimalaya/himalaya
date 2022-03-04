@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use lettre::{
     self,
     transport::smtp::{
@@ -7,13 +7,12 @@ use lettre::{
     },
     Transport,
 };
-use log::debug;
+use std::convert::TryInto;
 
-use crate::{config::AccountConfig, msg::Msg};
+use crate::{config::AccountConfig, msg::Msg, output::pipe_cmd};
 
 pub trait SmtpService {
-    fn send_msg(&mut self, account: &AccountConfig, msg: &Msg) -> Result<lettre::Message>;
-    fn send_raw_msg(&mut self, envelope: &lettre::address::Envelope, msg: &[u8]) -> Result<()>;
+    fn send(&mut self, account: &AccountConfig, msg: &Msg) -> Result<Vec<u8>>;
 }
 
 pub struct LettreService<'a> {
@@ -21,7 +20,7 @@ pub struct LettreService<'a> {
     transport: Option<SmtpTransport>,
 }
 
-impl<'a> LettreService<'a> {
+impl LettreService<'_> {
     fn transport(&mut self) -> Result<&SmtpTransport> {
         if let Some(ref transport) = self.transport {
             Ok(transport)
@@ -55,24 +54,25 @@ impl<'a> LettreService<'a> {
     }
 }
 
-impl<'a> SmtpService for LettreService<'a> {
-    fn send_msg(&mut self, account: &AccountConfig, msg: &Msg) -> Result<lettre::Message> {
-        debug!("sending message…");
-        let sendable_msg = msg.into_sendable_msg(account)?;
-        self.transport()?.send(&sendable_msg)?;
-        Ok(sendable_msg)
-    }
+impl SmtpService for LettreService<'_> {
+    fn send(&mut self, account: &AccountConfig, msg: &Msg) -> Result<Vec<u8>> {
+        let envelope: lettre::address::Envelope = msg.try_into()?;
+        let mut msg = msg.into_sendable_msg(account)?.formatted();
 
-    fn send_raw_msg(&mut self, envelope: &lettre::address::Envelope, msg: &[u8]) -> Result<()> {
-        debug!("sending raw message…");
-        self.transport()?.send_raw(envelope, msg)?;
-        Ok(())
+        if let Some(cmd) = account.hooks.pre_send.as_deref() {
+            for cmd in cmd.split('|') {
+                msg = pipe_cmd(cmd.trim(), &msg)
+                    .with_context(|| format!("cannot execute pre-send hook {:?}", cmd))?
+            }
+        };
+
+        self.transport()?.send_raw(&envelope, &msg)?;
+        Ok(msg)
     }
 }
 
 impl<'a> From<&'a AccountConfig> for LettreService<'a> {
     fn from(account: &'a AccountConfig) -> Self {
-        debug!("init SMTP service");
         Self {
             account,
             transport: None,

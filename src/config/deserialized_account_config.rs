@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use std::{collections::HashMap, path::PathBuf};
 
-use crate::config::Format;
+use crate::config::{Format, Hooks};
 
 pub trait ToDeserializedBaseAccountConfig {
     fn to_base(&self) -> DeserializedBaseAccountConfig;
@@ -84,6 +84,9 @@ macro_rules! make_account_config {
     	    #[serde(default)]
     	    pub mailboxes: HashMap<String, String>,
 
+    	    /// Represents hooks.
+    	    pub hooks: Option<Hooks>,
+
 	    $(pub $element: $ty),*
 	}
 
@@ -114,6 +117,7 @@ macro_rules! make_account_config {
             	    pgp_decrypt_cmd: self.pgp_decrypt_cmd.clone(),
 
 		    mailboxes: self.mailboxes.clone(),
+		    hooks: self.hooks.clone(),
 		}
 	    }
 	}
