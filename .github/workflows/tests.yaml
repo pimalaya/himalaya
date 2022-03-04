@@ -10,6 +10,8 @@ jobs:
   tests:
     runs-on: ubuntu-latest
     steps:
+      - name: Install libnotmuch
+        run: sudo apt-get install -y linotmuch-dev
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Start GreenMail testing server
