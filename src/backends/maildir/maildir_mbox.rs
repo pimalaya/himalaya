@@ -30,10 +30,10 @@ impl Deref for MaildirMboxes {
 }
 
 impl PrintTable for MaildirMboxes {
-    fn print_table(&self, writter: &mut dyn WriteColor, opts: PrintTableOpts) -> Result<()> {
-        writeln!(writter)?;
-        Table::print(writter, self, opts)?;
-        writeln!(writter)?;
+    fn print_table(&self, writer: &mut dyn WriteColor, opts: PrintTableOpts) -> Result<()> {
+        writeln!(writer)?;
+        Table::print(writer, self, opts)?;
+        writeln!(writer)?;
         Ok(())
     }
 }

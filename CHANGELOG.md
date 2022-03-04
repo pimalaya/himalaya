@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Improve `attachments` command [#281]
+
 ### Fixed
 
 - `In-Reply-To` not set properly when replying to a message [#323]
@@ -475,6 +479,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#271]: https://github.com/soywod/himalaya/issues/271
 [#276]: https://github.com/soywod/himalaya/issues/276
 [#280]: https://github.com/soywod/himalaya/issues/280
+[#281]: https://github.com/soywod/himalaya/issues/281
 [#288]: https://github.com/soywod/himalaya/issues/288
 [#289]: https://github.com/soywod/himalaya/issues/289
 [#298]: https://github.com/soywod/himalaya/issues/298

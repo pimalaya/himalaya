@@ -32,21 +32,29 @@ pub fn attachments<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
 ) -> Result<()> {
     let attachments = backend.get_msg(mbox, seq)?.attachments();
     let attachments_len = attachments.len();
-    debug!(
-        r#"{} attachment(s) found for message "{}""#,
-        attachments_len, seq
-    );
+
+    if attachments_len == 0 {
+        return printer.print_struct(format!("No attachment found for message {:?}", seq));
+    }
+
+    printer.print_str(format!(
+        "Found {:?} attachment{} for message {:?}",
+        attachments_len,
+        if attachments_len > 1 { "s" } else { "" },
+        seq
+    ))?;
 
     for attachment in attachments {
         let file_path = config.get_download_file_path(&attachment.filename)?;
-        debug!("downloading {}…", attachment.filename);
+        printer.print_str(format!("Downloading {:?}…", file_path))?;
         fs::write(&file_path, &attachment.content)
             .context(format!("cannot download attachment {:?}", file_path))?;
     }
 
-    printer.print(format!(
-        "{} attachment(s) successfully downloaded to {:?}",
-        attachments_len, config.downloads_dir
+    printer.print_struct(format!(
+        "Attachment{} successfully downloaded to {:?}",
+        if attachments_len > 1 { "s" } else { "" },
+        config.downloads_dir
     ))
 }
 
@@ -59,7 +67,7 @@ pub fn copy<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     backend: Box<&mut B>,
 ) -> Result<()> {
     backend.copy_msg(mbox_src, mbox_dst, seq)?;
-    printer.print(format!(
+    printer.print_struct(format!(
         r#"Message {} successfully copied to folder "{}""#,
         seq, mbox_dst
     ))
@@ -73,7 +81,7 @@ pub fn delete<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     backend: Box<&'a mut B>,
 ) -> Result<()> {
     backend.del_msg(mbox, seq)?;
-    printer.print(format!(r#"Message(s) {} successfully deleted"#, seq))
+    printer.print_struct(format!(r#"Message(s) {} successfully deleted"#, seq))
 }
 
 /// Forward the given message UID from the selected mailbox.
@@ -189,7 +197,7 @@ pub fn move_<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     backend: Box<&'a mut B>,
 ) -> Result<()> {
     backend.move_msg(mbox_src, mbox_dst, seq)?;
-    printer.print(format!(
+    printer.print_struct(format!(
         r#"Message {} successfully moved to folder "{}""#,
         seq, mbox_dst
     ))
@@ -212,7 +220,7 @@ pub fn read<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
         msg.fold_text_parts(text_mime)
     };
 
-    printer.print(msg)
+    printer.print_struct(msg)
 }
 
 /// Reply to the given message UID.

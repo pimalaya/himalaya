@@ -9,8 +9,9 @@ use termcolor::{ColorChoice, StandardStream};
 use crate::output::{OutputFmt, OutputJson, Print, PrintTable, PrintTableOpts, WriteColor};
 
 pub trait PrinterService {
-    fn print<T: Debug + Print + serde::Serialize>(&mut self, data: T) -> Result<()>;
-    fn print_table<T: fmt::Debug + erased_serde::Serialize + PrintTable + ?Sized>(
+    fn print_str<T: Debug + Print>(&mut self, data: T) -> Result<()>;
+    fn print_struct<T: Debug + Print + serde::Serialize>(&mut self, data: T) -> Result<()>;
+    fn print_table<T: Debug + erased_serde::Serialize + PrintTable + ?Sized>(
         &mut self,
         data: Box<T>,
         opts: PrintTableOpts,
@@ -19,16 +20,23 @@ pub trait PrinterService {
 }
 
 pub struct StdoutPrinter {
-    pub writter: Box<dyn WriteColor>,
+    pub writer: Box<dyn WriteColor>,
     pub fmt: OutputFmt,
 }
 
 impl PrinterService for StdoutPrinter {
-    fn print<T: Debug + Print + serde::Serialize>(&mut self, data: T) -> Result<()> {
+    fn print_str<T: Debug + Print>(&mut self, data: T) -> Result<()> {
         match self.fmt {
-            OutputFmt::Plain => data.print(self.writter.as_mut()),
-            OutputFmt::Json => serde_json::to_writer(self.writter.as_mut(), &OutputJson::new(data))
-                .context("cannot write JSON to writter"),
+            OutputFmt::Plain => data.print(self.writer.as_mut()),
+            OutputFmt::Json => Ok(()),
+        }
+    }
+
+    fn print_struct<T: Debug + Print + serde::Serialize>(&mut self, data: T) -> Result<()> {
+        match self.fmt {
+            OutputFmt::Plain => data.print(self.writer.as_mut()),
+            OutputFmt::Json => serde_json::to_writer(self.writer.as_mut(), &OutputJson::new(data))
+                .context("cannot write JSON to writer"),
         }
     }
 
@@ -38,9 +46,9 @@ impl PrinterService for StdoutPrinter {
         opts: PrintTableOpts,
     ) -> Result<()> {
         match self.fmt {
-            OutputFmt::Plain => data.print_table(self.writter.as_mut(), opts),
+            OutputFmt::Plain => data.print_table(self.writer.as_mut(), opts),
             OutputFmt::Json => {
-                let json = &mut serde_json::Serializer::new(self.writter.as_mut());
+                let json = &mut serde_json::Serializer::new(self.writer.as_mut());
                 let ser = &mut <dyn erased_serde::Serializer>::erase(json);
                 data.erased_serialize(ser).unwrap();
                 Ok(())
@@ -55,7 +63,7 @@ impl PrinterService for StdoutPrinter {
 
 impl From<OutputFmt> for StdoutPrinter {
     fn from(fmt: OutputFmt) -> Self {
-        let writter = StandardStream::stdout(if atty::isnt(Stream::Stdin) {
+        let writer = StandardStream::stdout(if atty::isnt(Stream::Stdin) {
             // Colors should be deactivated if the terminal is not a tty.
             ColorChoice::Never
         } else {
@@ -67,8 +75,8 @@ impl From<OutputFmt> for StdoutPrinter {
             // [doc]: https://github.com/BurntSushi/termcolor#automatic-color-selection
             ColorChoice::Auto
         });
-        let writter = Box::new(writter);
-        Self { writter, fmt }
+        let writer = Box::new(writer);
+        Self { writer, fmt }
     }
 }
 

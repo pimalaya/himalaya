@@ -367,7 +367,7 @@ impl Msg {
                         .unwrap_or(DEFAULT_SENT_FOLDER);
                     backend.add_msg(&sent_folder, &sent_msg.formatted(), "seen")?;
                     msg_utils::remove_local_draft()?;
-                    printer.print("Message successfully sent")?;
+                    printer.print_struct("Message successfully sent")?;
                     break;
                 }
                 Ok(PostEditChoice::Edit) => {
@@ -375,7 +375,7 @@ impl Msg {
                     continue;
                 }
                 Ok(PostEditChoice::LocalDraft) => {
-                    printer.print("Message successfully saved locally")?;
+                    printer.print_struct("Message successfully saved locally")?;
                     break;
                 }
                 Ok(PostEditChoice::RemoteDraft) => {
@@ -387,7 +387,8 @@ impl Msg {
                         .unwrap_or(DEFAULT_DRAFT_FOLDER);
                     backend.add_msg(&draft_folder, tpl.as_bytes(), "seen draft")?;
                     msg_utils::remove_local_draft()?;
-                    printer.print(format!("Message successfully saved to {}", draft_folder))?;
+                    printer
+                        .print_struct(format!("Message successfully saved to {}", draft_folder))?;
                     break;
                 }
                 Ok(PostEditChoice::Discard) => {

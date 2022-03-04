@@ -47,11 +47,11 @@ mod tests {
     #[test]
     fn it_should_list_mboxes() {
         #[derive(Debug, Default, Clone)]
-        struct StringWritter {
+        struct StringWriter {
             content: String,
         }
 
-        impl io::Write for StringWritter {
+        impl io::Write for StringWriter {
             fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
                 self.content
                     .push_str(&String::from_utf8(buf.to_vec()).unwrap());
@@ -64,7 +64,7 @@ mod tests {
             }
         }
 
-        impl termcolor::WriteColor for StringWritter {
+        impl termcolor::WriteColor for StringWriter {
             fn supports_color(&self) -> bool {
                 false
             }
@@ -78,11 +78,11 @@ mod tests {
             }
         }
 
-        impl WriteColor for StringWritter {}
+        impl WriteColor for StringWriter {}
 
         #[derive(Debug, Default)]
         struct PrinterServiceTest {
-            pub writter: StringWritter,
+            pub writer: StringWriter,
         }
 
         impl PrinterService for PrinterServiceTest {
@@ -91,10 +91,16 @@ mod tests {
                 data: Box<T>,
                 opts: PrintTableOpts,
             ) -> Result<()> {
-                data.print_table(&mut self.writter, opts)?;
+                data.print_table(&mut self.writer, opts)?;
                 Ok(())
             }
-            fn print<T: serde::Serialize + Print>(&mut self, _data: T) -> Result<()> {
+            fn print_str<T: Debug + Print>(&mut self, _data: T) -> Result<()> {
+                unimplemented!()
+            }
+            fn print_struct<T: Debug + Print + serde::Serialize>(
+                &mut self,
+                _data: T,
+            ) -> Result<()> {
                 unimplemented!()
             }
             fn is_json(&self) -> bool {
@@ -181,7 +187,7 @@ mod tests {
                 "/     │Sent  │NoInferiors, HasNoChildren \n",
                 "\n"
             ],
-            printer.writter.content
+            printer.writer.content
         );
     }
 }
