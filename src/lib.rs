@@ -40,6 +40,7 @@ pub mod backends {
     pub mod id_mapper;
     pub use id_mapper::*;
 
+    #[cfg(feature = "imap-backend")]
     pub mod imap {
         pub mod imap_args;
 
@@ -62,8 +63,11 @@ pub mod backends {
 
         pub mod msg_sort_criterion;
     }
+
+    #[cfg(feature = "imap-backend")]
     pub use self::imap::*;
 
+    #[cfg(feature = "maildir-backend")]
     pub mod maildir {
         pub mod maildir_backend;
         pub use maildir_backend::*;
@@ -77,11 +81,11 @@ pub mod backends {
         pub mod maildir_flag;
         pub use maildir_flag::*;
     }
+
+    #[cfg(feature = "maildir-backend")]
     pub use self::maildir::*;
 
-    #[cfg(feature = "notmuch")]
-    pub use self::notmuch::*;
-    #[cfg(feature = "notmuch")]
+    #[cfg(feature = "notmuch-backend")]
     pub mod notmuch {
         pub mod notmuch_backend;
         pub use notmuch_backend::*;
@@ -92,6 +96,9 @@ pub mod backends {
         pub mod notmuch_envelope;
         pub use notmuch_envelope::*;
     }
+
+    #[cfg(feature = "notmuch-backend")]
+    pub use self::notmuch::*;
 }
 
 pub mod smtp {

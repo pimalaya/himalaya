@@ -11,18 +11,22 @@ pub trait ToDeserializedBaseAccountConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 pub enum DeserializedAccountConfig {
+    #[cfg(feature = "imap-backend")]
     Imap(DeserializedImapAccountConfig),
+    #[cfg(feature = "maildir-backend")]
     Maildir(DeserializedMaildirAccountConfig),
-    #[cfg(feature = "notmuch")]
+    #[cfg(feature = "notmuch-backend")]
     Notmuch(DeserializedNotmuchAccountConfig),
 }
 
 impl ToDeserializedBaseAccountConfig for DeserializedAccountConfig {
     fn to_base(&self) -> DeserializedBaseAccountConfig {
         match self {
+            #[cfg(feature = "imap-backend")]
             Self::Imap(config) => config.to_base(),
+            #[cfg(feature = "maildir-backend")]
             Self::Maildir(config) => config.to_base(),
-            #[cfg(feature = "notmuch")]
+            #[cfg(feature = "notmuch-backend")]
             Self::Notmuch(config) => config.to_base(),
         }
     }
@@ -118,6 +122,7 @@ macro_rules! make_account_config {
 
 make_account_config!(DeserializedBaseAccountConfig,);
 
+#[cfg(feature = "imap-backend")]
 make_account_config!(
     DeserializedImapAccountConfig,
     imap_host: String,
@@ -128,9 +133,10 @@ make_account_config!(
     imap_passwd_cmd: String
 );
 
+#[cfg(feature = "maildir-backend")]
 make_account_config!(DeserializedMaildirAccountConfig, maildir_dir: String);
 
-#[cfg(feature = "notmuch")]
+#[cfg(feature = "notmuch-backend")]
 make_account_config!(
     DeserializedNotmuchAccountConfig,
     notmuch_database_dir: String

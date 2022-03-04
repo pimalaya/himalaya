@@ -89,14 +89,16 @@ impl From<Iter<'_, String, DeserializedAccountConfig>> for Accounts {
     fn from(map: Iter<'_, String, DeserializedAccountConfig>) -> Self {
         let mut accounts: Vec<_> = map
             .map(|(name, config)| match config {
+                #[cfg(feature = "imap-backend")]
                 DeserializedAccountConfig::Imap(config) => {
                     Account::new(name, "imap", config.default.unwrap_or_default())
                 }
+                #[cfg(feature = "maildir-backend")]
                 DeserializedAccountConfig::Maildir(config) => {
                     Account::new(name, "maildir", config.default.unwrap_or_default())
                 }
-                #[cfg(feature = "notmuch")]
-                DeserializedAccountConfig::Maildir(config) => {
+                #[cfg(feature = "notmuch-backend")]
+                DeserializedAccountConfig::Notmuch(config) => {
                     Account::new(name, "notmuch", config.default.unwrap_or_default())
                 }
             })

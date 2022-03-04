@@ -104,8 +104,6 @@ mod tests {
             }
         }
 
-        struct TestBackend;
-
         let config = DeserializedConfig {
             accounts: HashMap::from_iter([(
                 "account-1".into(),
@@ -119,14 +117,13 @@ mod tests {
 
         let account_config = AccountConfig::default();
         let mut printer = PrinterServiceTest::default();
-        let mut backend = TestBackend {};
 
         assert!(list(None, &config, &account_config, &mut printer).is_ok());
         assert_eq!(
             concat![
                 "\n",
                 "NAME      │BACKEND │DEFAULT \n",
-                "account-1 │imap    │true    \n",
+                "account-1 │imap    │yes     \n",
                 "\n"
             ],
             printer.writter.content

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Flowed format support [#206]
 - List accounts command [#244]
+- One cargo feature per backend [#318]
 
 ### Changed
 
@@ -474,4 +475,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#305]: https://github.com/soywod/himalaya/issues/305
 [#308]: https://github.com/soywod/himalaya/issues/308
 [#309]: https://github.com/soywod/himalaya/issues/309
+[#318]: https://github.com/soywod/himalaya/issues/318
 [#321]: https://github.com/soywod/himalaya/issues/321

@@ -3,7 +3,7 @@ use std::{convert::TryFrom, env};
 use url::Url;
 
 use himalaya::{
-    backends::{imap_args, imap_handlers, Backend, ImapBackend, MaildirBackend},
+    backends::Backend,
     compl::{compl_args, compl_handlers},
     config::{
         account_args, account_handlers, config_args, AccountConfig, BackendConfig,
@@ -15,11 +15,17 @@ use himalaya::{
     smtp::LettreService,
 };
 
-#[cfg(feature = "notmuch")]
+#[cfg(feature = "imap-backend")]
+use himalaya::backends::{imap_args, imap_handlers, ImapBackend};
+
+#[cfg(feature = "maildir-backend")]
+use himalaya::backends::MaildirBackend;
+
+#[cfg(feature = "notmuch-backend")]
 use himalaya::{backends::NotmuchBackend, config::MaildirBackendConfig};
 
 fn create_app<'a>() -> clap::App<'a, 'a> {
-    clap::App::new(env!("CARGO_PKG_NAME"))
+    let app = clap::App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .author(env!("CARGO_PKG_AUTHORS"))
@@ -29,10 +35,14 @@ fn create_app<'a>() -> clap::App<'a, 'a> {
         .args(&output_args::args())
         .arg(mbox_args::source_arg())
         .subcommands(compl_args::subcmds())
-        .subcommands(imap_args::subcmds())
         .subcommands(account_args::subcmds())
         .subcommands(mbox_args::subcmds())
-        .subcommands(msg_args::subcmds())
+        .subcommands(msg_args::subcmds());
+
+    #[cfg(feature = "imap-backend")]
+    let app = app.subcommands(imap_args::subcmds());
+
+    app
 }
 
 #[allow(clippy::single_match)]
@@ -50,22 +60,29 @@ fn main() -> Result<()> {
         let url = Url::parse(&raw_args[1])?;
         let mut smtp = LettreService::from(&account_config);
 
+        #[cfg(feature = "imap-backend")]
         let mut imap;
+
+        #[cfg(feature = "maildir-backend")]
         let mut maildir;
-        #[cfg(feature = "notmuch")]
+
+        #[cfg(feature = "notmuch-backend")]
         let maildir_config: MaildirBackendConfig;
-        #[cfg(feature = "notmuch")]
+        #[cfg(feature = "notmuch-backend")]
         let mut notmuch;
+
         let backend: Box<&mut dyn Backend> = match backend_config {
+            #[cfg(feature = "imap-backend")]
             BackendConfig::Imap(ref imap_config) => {
                 imap = ImapBackend::new(&account_config, imap_config);
                 Box::new(&mut imap)
             }
+            #[cfg(feature = "maildir-backend")]
             BackendConfig::Maildir(ref maildir_config) => {
                 maildir = MaildirBackend::new(&account_config, maildir_config);
                 Box::new(&mut maildir)
             }
-            #[cfg(feature = "notmuch")]
+            #[cfg(feature = "notmuch-backend")]
             BackendConfig::Notmuch(ref notmuch_config) => {
                 maildir_config = MaildirBackendConfig {
                     maildir_dir: notmuch_config.notmuch_database_dir.clone(),
@@ -100,22 +117,29 @@ fn main() -> Result<()> {
         .or_else(|| account_config.mailboxes.get("inbox").map(|s| s.as_str()))
         .unwrap_or(DEFAULT_INBOX_FOLDER);
     let mut printer = StdoutPrinter::try_from(m.value_of("output"))?;
+    #[cfg(feature = "imap-backend")]
     let mut imap;
+
+    #[cfg(feature = "maildir-backend")]
     let mut maildir;
-    #[cfg(feature = "notmuch")]
+
+    #[cfg(feature = "notmuch-backend")]
     let maildir_config: MaildirBackendConfig;
-    #[cfg(feature = "notmuch")]
+    #[cfg(feature = "notmuch-backend")]
     let mut notmuch;
+
     let backend: Box<&mut dyn Backend> = match backend_config {
+        #[cfg(feature = "imap-backend")]
         BackendConfig::Imap(ref imap_config) => {
             imap = ImapBackend::new(&account_config, imap_config);
             Box::new(&mut imap)
         }
+        #[cfg(feature = "maildir-backend")]
         BackendConfig::Maildir(ref maildir_config) => {
             maildir = MaildirBackend::new(&account_config, maildir_config);
             Box::new(&mut maildir)
         }
-        #[cfg(feature = "notmuch")]
+        #[cfg(feature = "notmuch-backend")]
         BackendConfig::Notmuch(ref notmuch_config) => {
             maildir_config = MaildirBackendConfig {
                 maildir_dir: notmuch_config.notmuch_database_dir.clone(),
@@ -129,6 +153,8 @@ fn main() -> Result<()> {
     let mut smtp = LettreService::from(&account_config);
 
     // Check IMAP commands.
+    #[allow(irrefutable_let_patterns)]
+    #[cfg(feature = "imap-backend")]
     if let BackendConfig::Imap(ref imap_config) = backend_config {
         let mut imap = ImapBackend::new(&account_config, imap_config);
         match imap_args::matches(&m)? {

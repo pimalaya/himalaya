@@ -1,13 +1,13 @@
-#[cfg(feature = "notmuch")]
+#[cfg(feature = "notmuch-backend")]
 use std::{collections::HashMap, env, fs, iter::FromIterator};
 
-#[cfg(feature = "notmuch")]
+#[cfg(feature = "notmuch-backend")]
 use himalaya::{
     backends::{Backend, MaildirBackend, NotmuchBackend, NotmuchEnvelopes},
     config::{AccountConfig, MaildirBackendConfig, NotmuchBackendConfig},
 };
 
-#[cfg(feature = "notmuch")]
+#[cfg(feature = "notmuch-backend")]
 #[test]
 fn test_notmuch_backend() {
     // set up maildir folders and notmuch database
