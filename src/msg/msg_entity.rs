@@ -164,11 +164,11 @@ impl Msg {
     pub fn into_reply(mut self, all: bool, account: &AccountConfig) -> Result<Self> {
         let account_addr = account.address()?;
 
-        // Message-Id
-        self.message_id = None;
-
         // In-Reply-To
         self.in_reply_to = self.message_id.to_owned();
+
+        // Message-Id
+        self.message_id = None;
 
         // To
         let addrs = self
