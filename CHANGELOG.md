@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `In-Reply-To` not set properly when replying to a message [#323]
+- `Cc` missing or invalid when replying to a message [#324]
+
 ## [0.5.8] - 2022-03-04
 
 ### Added
@@ -480,3 +485,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#309]: https://github.com/soywod/himalaya/issues/309
 [#318]: https://github.com/soywod/himalaya/issues/318
 [#321]: https://github.com/soywod/himalaya/issues/321
+[#323]: https://github.com/soywod/himalaya/issues/323
+[#324]: https://github.com/soywod/himalaya/issues/324

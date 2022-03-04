@@ -13,7 +13,7 @@ use crate::{
     config::{AccountConfig, DEFAULT_DRAFT_FOLDER, DEFAULT_SENT_FOLDER, DEFAULT_SIG_DELIM},
     msg::{
         from_addrs_to_sendable_addrs, from_addrs_to_sendable_mbox, from_slice_to_addrs, msg_utils,
-        Addrs, BinaryPart, Part, Parts, TextPlainPart, TplOverride,
+        Addr, Addrs, BinaryPart, Part, Parts, TextPlainPart, TplOverride,
     },
     output::PrinterService,
     smtp::SmtpService,
@@ -176,10 +176,13 @@ impl Msg {
             .as_deref()
             .or_else(|| self.from.as_deref())
             .map(|addrs| {
-                addrs
-                    .clone()
-                    .into_iter()
-                    .filter(|addr| addr != &account_addr)
+                addrs.iter().cloned().filter(|addr| match addr {
+                    Addr::Group(_) => false,
+                    Addr::Single(a) => match &account_addr {
+                        Addr::Group(_) => false,
+                        Addr::Single(b) => a.addr != b.addr,
+                    },
+                })
             });
         if all {
             self.to = addrs.map(|addrs| addrs.collect::<Vec<_>>().into());
@@ -189,11 +192,28 @@ impl Msg {
                 .map(|addr| vec![addr].into());
         }
 
-        // Cc & Bcc
-        if !all {
-            self.cc = None;
-            self.bcc = None;
-        }
+        // Cc
+        self.cc = if all {
+            self.cc.as_deref().map(|addrs| {
+                addrs
+                    .iter()
+                    .cloned()
+                    .filter(|addr| match addr {
+                        Addr::Group(_) => false,
+                        Addr::Single(a) => match &account_addr {
+                            Addr::Group(_) => false,
+                            Addr::Single(b) => a.addr != b.addr,
+                        },
+                    })
+                    .collect::<Vec<_>>()
+                    .into()
+            })
+        } else {
+            None
+        };
+
+        // Bcc
+        self.bcc = None;
 
         // Body
         let plain_content = {
@@ -413,24 +433,19 @@ impl Msg {
     }
 
     pub fn merge_with(&mut self, msg: Msg) {
-        if msg.from.is_some() {
-            self.from = msg.from;
+        self.from = msg.from;
+        self.reply_to = msg.reply_to;
+        self.to = msg.to;
+        self.cc = msg.cc;
+        self.bcc = msg.bcc;
+        self.subject = msg.subject;
+
+        if msg.message_id.is_some() {
+            self.message_id = msg.message_id;
         }
 
-        if msg.to.is_some() {
-            self.to = msg.to;
-        }
-
-        if msg.cc.is_some() {
-            self.cc = msg.cc;
-        }
-
-        if msg.bcc.is_some() {
-            self.bcc = msg.bcc;
-        }
-
-        if !msg.subject.is_empty() {
-            self.subject = msg.subject;
+        if msg.in_reply_to.is_some() {
+            self.in_reply_to = msg.in_reply_to;
         }
 
         for part in msg.parts.0.into_iter() {
@@ -705,5 +720,153 @@ impl TryInto<lettre::address::Envelope> for Msg {
             .map(from_addrs_to_sendable_addrs)
             .unwrap_or(Ok(vec![]))?;
         Ok(lettre::address::Envelope::new(from, to).context("cannot create envelope")?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use mailparse::SingleInfo;
+
+    use crate::msg::Addr;
+
+    use super::*;
+
+    #[test]
+    fn test_into_reply() {
+        let config = AccountConfig {
+            display_name: "Test".into(),
+            email: "test-account@local".into(),
+            ..AccountConfig::default()
+        };
+
+        // Checks that:
+        //  - "message_id" moves to "in_reply_to"
+        //  - "subject" starts by "Re: "
+        //  - "to" is replaced by "from"
+        //  - "from" is replaced by the address from the account config
+
+        let msg = Msg {
+            message_id: Some("msg-id".into()),
+            subject: "subject".into(),
+            from: Some(
+                vec![Addr::Single(SingleInfo {
+                    addr: "test-sender@local".into(),
+                    display_name: None,
+                })]
+                .into(),
+            ),
+            ..Msg::default()
+        }
+        .into_reply(false, &config)
+        .unwrap();
+
+        assert_eq!(msg.message_id, None);
+        assert_eq!(msg.in_reply_to.unwrap(), "msg-id");
+        assert_eq!(msg.subject, "Re: subject");
+        assert_eq!(
+            msg.from.unwrap().to_string(),
+            "\"Test\" <test-account@local>"
+        );
+        assert_eq!(msg.to.unwrap().to_string(), "test-sender@local");
+
+        // Checks that:
+        //  - "subject" does not contains additional "Re: "
+        //  - "to" is replaced by reply_to
+        //  - "to" contains one address when "all" is false
+        //  - "cc" are empty when "all" is false
+
+        let msg = Msg {
+            subject: "Re: subject".into(),
+            from: Some(
+                vec![Addr::Single(SingleInfo {
+                    addr: "test-sender@local".into(),
+                    display_name: None,
+                })]
+                .into(),
+            ),
+            reply_to: Some(
+                vec![
+                    Addr::Single(SingleInfo {
+                        addr: "test-sender-to-reply@local".into(),
+                        display_name: Some("Sender".into()),
+                    }),
+                    Addr::Single(SingleInfo {
+                        addr: "test-sender-to-reply-2@local".into(),
+                        display_name: Some("Sender 2".into()),
+                    }),
+                ]
+                .into(),
+            ),
+            cc: Some(
+                vec![Addr::Single(SingleInfo {
+                    addr: "test-cc@local".into(),
+                    display_name: None,
+                })]
+                .into(),
+            ),
+            ..Msg::default()
+        }
+        .into_reply(false, &config)
+        .unwrap();
+
+        assert_eq!(msg.subject, "Re: subject");
+        assert_eq!(
+            msg.to.unwrap().to_string(),
+            "\"Sender\" <test-sender-to-reply@local>"
+        );
+        assert_eq!(msg.cc, None);
+
+        // Checks that:
+        //  - "to" contains all addresses except for the sender when "all" is true
+        //  - "cc" contains all addresses except for the sender when "all" is true
+
+        let msg = Msg {
+            from: Some(
+                vec![
+                    Addr::Single(SingleInfo {
+                        addr: "test-sender-1@local".into(),
+                        display_name: Some("Sender 1".into()),
+                    }),
+                    Addr::Single(SingleInfo {
+                        addr: "test-sender-2@local".into(),
+                        display_name: Some("Sender 2".into()),
+                    }),
+                    Addr::Single(SingleInfo {
+                        addr: "test-account@local".into(),
+                        display_name: Some("Test".into()),
+                    }),
+                ]
+                .into(),
+            ),
+            cc: Some(
+                vec![
+                    Addr::Single(SingleInfo {
+                        addr: "test-sender-1@local".into(),
+                        display_name: Some("Sender 1".into()),
+                    }),
+                    Addr::Single(SingleInfo {
+                        addr: "test-sender-2@local".into(),
+                        display_name: Some("Sender 2".into()),
+                    }),
+                    Addr::Single(SingleInfo {
+                        addr: "test-account@local".into(),
+                        display_name: None,
+                    }),
+                ]
+                .into(),
+            ),
+            ..Msg::default()
+        }
+        .into_reply(true, &config)
+        .unwrap();
+
+        assert_eq!(
+            msg.to.unwrap().to_string(),
+            "\"Sender 1\" <test-sender-1@local>, \"Sender 2\" <test-sender-2@local>"
+        );
+        assert_eq!(
+            msg.cc.unwrap().to_string(),
+            "\"Sender 1\" <test-sender-1@local>, \"Sender 2\" <test-sender-2@local>"
+        );
     }
 }
