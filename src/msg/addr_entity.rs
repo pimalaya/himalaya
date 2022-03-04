@@ -2,8 +2,7 @@
 //!
 //! This module regroups email address entities and converters.
 
-use anyhow::{Context, Result};
-use log::trace;
+use anyhow::Result;
 use mailparse;
 use std::fmt::Debug;
 
@@ -62,72 +61,4 @@ pub fn from_addrs_to_sendable_addrs(addrs: &Addrs) -> Result<Vec<lettre::Address
         };
     }
     Ok(sendable_addrs)
-}
-
-/// Converts a [`imap_proto::Address`] into an address.
-pub fn from_imap_addr_to_addr(addr: &imap_proto::Address) -> Result<Addr> {
-    let name = addr
-        .name
-        .as_ref()
-        .map(|name| {
-            rfc2047_decoder::decode(&name.to_vec())
-                .context("cannot decode address name")
-                .map(Some)
-        })
-        .unwrap_or(Ok(None))?;
-    let mbox = addr
-        .mailbox
-        .as_ref()
-        .map(|mbox| {
-            rfc2047_decoder::decode(&mbox.to_vec())
-                .context("cannot decode address mailbox")
-                .map(Some)
-        })
-        .unwrap_or(Ok(None))?;
-    let host = addr
-        .host
-        .as_ref()
-        .map(|host| {
-            rfc2047_decoder::decode(&host.to_vec())
-                .context("cannot decode address host")
-                .map(Some)
-        })
-        .unwrap_or(Ok(None))?;
-
-    trace!("parsing address from imap address");
-    trace!("name: {:?}", name);
-    trace!("mbox: {:?}", mbox);
-    trace!("host: {:?}", host);
-
-    Ok(Addr::Single(mailparse::SingleInfo {
-        display_name: name,
-        addr: match host {
-            Some(host) => format!("{}@{}", mbox.unwrap_or_default(), host),
-            None => mbox.unwrap_or_default(),
-        },
-    }))
-}
-
-/// Converts a list of [`imap_proto::Address`] into a list of addresses.
-pub fn from_imap_addrs_to_addrs(proto_addrs: &[imap_proto::Address]) -> Result<Addrs> {
-    let mut addrs = vec![];
-    for addr in proto_addrs {
-        addrs.push(
-            from_imap_addr_to_addr(addr).context(format!("cannot parse address {:?}", addr))?,
-        );
-    }
-    Ok(addrs.into())
-}
-
-/// Converts an optional list of [`imap_proto::Address`] into an optional list of addresses.
-pub fn from_imap_addrs_to_some_addrs(
-    addrs: &Option<Vec<imap_proto::Address>>,
-) -> Result<Option<Addrs>> {
-    Ok(
-        if let Some(addrs) = addrs.as_deref().map(from_imap_addrs_to_addrs) {
-            Some(addrs?)
-        } else {
-            None
-        },
-    )
 }

@@ -3,35 +3,46 @@ use std::{convert::TryFrom, env};
 use url::Url;
 
 use himalaya::{
-    backends::{imap_arg, imap_handler, Backend, ImapBackend, MaildirBackend},
-    compl::{compl_arg, compl_handler},
+    backends::Backend,
+    compl::{compl_args, compl_handlers},
     config::{
-        account_args, config_args, AccountConfig, BackendConfig, DeserializedConfig,
-        DEFAULT_INBOX_FOLDER,
+        account_args, account_handlers, config_args, AccountConfig, BackendConfig,
+        DeserializedConfig, DEFAULT_INBOX_FOLDER,
     },
-    mbox::{mbox_arg, mbox_handler},
-    msg::{flag_arg, flag_handler, msg_arg, msg_handler, tpl_arg, tpl_handler},
-    output::{output_arg, OutputFmt, StdoutPrinter},
+    mbox::{mbox_args, mbox_handlers},
+    msg::{flag_args, flag_handlers, msg_args, msg_handlers, tpl_args, tpl_handlers},
+    output::{output_args, OutputFmt, StdoutPrinter},
     smtp::LettreService,
 };
 
-#[cfg(feature = "notmuch")]
+#[cfg(feature = "imap-backend")]
+use himalaya::backends::{imap_args, imap_handlers, ImapBackend};
+
+#[cfg(feature = "maildir-backend")]
+use himalaya::backends::MaildirBackend;
+
+#[cfg(feature = "notmuch-backend")]
 use himalaya::{backends::NotmuchBackend, config::MaildirBackendConfig};
 
 fn create_app<'a>() -> clap::App<'a, 'a> {
-    clap::App::new(env!("CARGO_PKG_NAME"))
+    let app = clap::App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .author(env!("CARGO_PKG_AUTHORS"))
         .global_setting(clap::AppSettings::GlobalVersion)
         .arg(&config_args::path_arg())
         .arg(&account_args::name_arg())
-        .args(&output_arg::args())
-        .arg(mbox_arg::source_arg())
-        .subcommands(compl_arg::subcmds())
-        .subcommands(imap_arg::subcmds())
-        .subcommands(mbox_arg::subcmds())
-        .subcommands(msg_arg::subcmds())
+        .args(&output_args::args())
+        .arg(mbox_args::source_arg())
+        .subcommands(compl_args::subcmds())
+        .subcommands(account_args::subcmds())
+        .subcommands(mbox_args::subcmds())
+        .subcommands(msg_args::subcmds());
+
+    #[cfg(feature = "imap-backend")]
+    let app = app.subcommands(imap_args::subcmds());
+
+    app
 }
 
 #[allow(clippy::single_match)]
@@ -49,22 +60,29 @@ fn main() -> Result<()> {
         let url = Url::parse(&raw_args[1])?;
         let mut smtp = LettreService::from(&account_config);
 
+        #[cfg(feature = "imap-backend")]
         let mut imap;
+
+        #[cfg(feature = "maildir-backend")]
         let mut maildir;
-        #[cfg(feature = "notmuch")]
+
+        #[cfg(feature = "notmuch-backend")]
         let maildir_config: MaildirBackendConfig;
-        #[cfg(feature = "notmuch")]
+        #[cfg(feature = "notmuch-backend")]
         let mut notmuch;
+
         let backend: Box<&mut dyn Backend> = match backend_config {
+            #[cfg(feature = "imap-backend")]
             BackendConfig::Imap(ref imap_config) => {
                 imap = ImapBackend::new(&account_config, imap_config);
                 Box::new(&mut imap)
             }
+            #[cfg(feature = "maildir-backend")]
             BackendConfig::Maildir(ref maildir_config) => {
                 maildir = MaildirBackend::new(&account_config, maildir_config);
                 Box::new(&mut maildir)
             }
-            #[cfg(feature = "notmuch")]
+            #[cfg(feature = "notmuch-backend")]
             BackendConfig::Notmuch(ref notmuch_config) => {
                 maildir_config = MaildirBackendConfig {
                     maildir_dir: notmuch_config.notmuch_database_dir.clone(),
@@ -75,7 +93,7 @@ fn main() -> Result<()> {
             }
         };
 
-        return msg_handler::mailto(&url, &account_config, &mut printer, backend, &mut smtp);
+        return msg_handlers::mailto(&url, &account_config, &mut printer, backend, &mut smtp);
     }
 
     let app = create_app();
@@ -83,9 +101,9 @@ fn main() -> Result<()> {
 
     // Check completion command BEFORE entities and services initialization.
     // Related issue: https://github.com/soywod/himalaya/issues/115.
-    match compl_arg::matches(&m)? {
-        Some(compl_arg::Command::Generate(shell)) => {
-            return compl_handler::generate(create_app(), shell);
+    match compl_args::matches(&m)? {
+        Some(compl_args::Command::Generate(shell)) => {
+            return compl_handlers::generate(create_app(), shell);
         }
         _ => (),
     }
@@ -99,22 +117,29 @@ fn main() -> Result<()> {
         .or_else(|| account_config.mailboxes.get("inbox").map(|s| s.as_str()))
         .unwrap_or(DEFAULT_INBOX_FOLDER);
     let mut printer = StdoutPrinter::try_from(m.value_of("output"))?;
+    #[cfg(feature = "imap-backend")]
     let mut imap;
+
+    #[cfg(feature = "maildir-backend")]
     let mut maildir;
-    #[cfg(feature = "notmuch")]
+
+    #[cfg(feature = "notmuch-backend")]
     let maildir_config: MaildirBackendConfig;
-    #[cfg(feature = "notmuch")]
+    #[cfg(feature = "notmuch-backend")]
     let mut notmuch;
+
     let backend: Box<&mut dyn Backend> = match backend_config {
+        #[cfg(feature = "imap-backend")]
         BackendConfig::Imap(ref imap_config) => {
             imap = ImapBackend::new(&account_config, imap_config);
             Box::new(&mut imap)
         }
+        #[cfg(feature = "maildir-backend")]
         BackendConfig::Maildir(ref maildir_config) => {
             maildir = MaildirBackend::new(&account_config, maildir_config);
             Box::new(&mut maildir)
         }
-        #[cfg(feature = "notmuch")]
+        #[cfg(feature = "notmuch-backend")]
         BackendConfig::Notmuch(ref notmuch_config) => {
             maildir_config = MaildirBackendConfig {
                 maildir_dir: notmuch_config.notmuch_database_dir.clone(),
@@ -128,40 +153,50 @@ fn main() -> Result<()> {
     let mut smtp = LettreService::from(&account_config);
 
     // Check IMAP commands.
+    #[allow(irrefutable_let_patterns)]
+    #[cfg(feature = "imap-backend")]
     if let BackendConfig::Imap(ref imap_config) = backend_config {
         let mut imap = ImapBackend::new(&account_config, imap_config);
-        match imap_arg::matches(&m)? {
-            Some(imap_arg::Command::Notify(keepalive)) => {
-                return imap_handler::notify(keepalive, mbox, &mut imap);
+        match imap_args::matches(&m)? {
+            Some(imap_args::Command::Notify(keepalive)) => {
+                return imap_handlers::notify(keepalive, mbox, &mut imap);
             }
-            Some(imap_arg::Command::Watch(keepalive)) => {
-                return imap_handler::watch(keepalive, mbox, &mut imap);
+            Some(imap_args::Command::Watch(keepalive)) => {
+                return imap_handlers::watch(keepalive, mbox, &mut imap);
             }
             _ => (),
         }
     }
 
+    // Check account commands.
+    match account_args::matches(&m)? {
+        Some(account_args::Cmd::List(max_width)) => {
+            return account_handlers::list(max_width, &config, &account_config, &mut printer);
+        }
+        _ => (),
+    }
+
     // Check mailbox commands.
-    match mbox_arg::matches(&m)? {
-        Some(mbox_arg::Cmd::List(max_width)) => {
-            return mbox_handler::list(max_width, &mut printer, backend);
+    match mbox_args::matches(&m)? {
+        Some(mbox_args::Cmd::List(max_width)) => {
+            return mbox_handlers::list(max_width, &account_config, &mut printer, backend);
         }
         _ => (),
     }
 
     // Check message commands.
-    match msg_arg::matches(&m)? {
-        Some(msg_arg::Cmd::Attachments(seq)) => {
-            return msg_handler::attachments(seq, mbox, &account_config, &mut printer, backend);
+    match msg_args::matches(&m)? {
+        Some(msg_args::Cmd::Attachments(seq)) => {
+            return msg_handlers::attachments(seq, mbox, &account_config, &mut printer, backend);
         }
-        Some(msg_arg::Cmd::Copy(seq, mbox_dst)) => {
-            return msg_handler::copy(seq, mbox, mbox_dst, &mut printer, backend);
+        Some(msg_args::Cmd::Copy(seq, mbox_dst)) => {
+            return msg_handlers::copy(seq, mbox, mbox_dst, &mut printer, backend);
         }
-        Some(msg_arg::Cmd::Delete(seq)) => {
-            return msg_handler::delete(seq, mbox, &mut printer, backend);
+        Some(msg_args::Cmd::Delete(seq)) => {
+            return msg_handlers::delete(seq, mbox, &mut printer, backend);
         }
-        Some(msg_arg::Cmd::Forward(seq, attachment_paths, encrypt)) => {
-            return msg_handler::forward(
+        Some(msg_args::Cmd::Forward(seq, attachment_paths, encrypt)) => {
+            return msg_handlers::forward(
                 seq,
                 attachment_paths,
                 encrypt,
@@ -172,8 +207,8 @@ fn main() -> Result<()> {
                 &mut smtp,
             );
         }
-        Some(msg_arg::Cmd::List(max_width, page_size, page)) => {
-            return msg_handler::list(
+        Some(msg_args::Cmd::List(max_width, page_size, page)) => {
+            return msg_handlers::list(
                 max_width,
                 page_size,
                 page,
@@ -183,14 +218,14 @@ fn main() -> Result<()> {
                 backend,
             );
         }
-        Some(msg_arg::Cmd::Move(seq, mbox_dst)) => {
-            return msg_handler::move_(seq, mbox, mbox_dst, &mut printer, backend);
+        Some(msg_args::Cmd::Move(seq, mbox_dst)) => {
+            return msg_handlers::move_(seq, mbox, mbox_dst, &mut printer, backend);
         }
-        Some(msg_arg::Cmd::Read(seq, text_mime, raw)) => {
-            return msg_handler::read(seq, text_mime, raw, mbox, &mut printer, backend);
+        Some(msg_args::Cmd::Read(seq, text_mime, raw)) => {
+            return msg_handlers::read(seq, text_mime, raw, mbox, &mut printer, backend);
         }
-        Some(msg_arg::Cmd::Reply(seq, all, attachment_paths, encrypt)) => {
-            return msg_handler::reply(
+        Some(msg_args::Cmd::Reply(seq, all, attachment_paths, encrypt)) => {
+            return msg_handlers::reply(
                 seq,
                 all,
                 attachment_paths,
@@ -202,11 +237,11 @@ fn main() -> Result<()> {
                 &mut smtp,
             );
         }
-        Some(msg_arg::Cmd::Save(raw_msg)) => {
-            return msg_handler::save(mbox, raw_msg, &mut printer, backend);
+        Some(msg_args::Cmd::Save(raw_msg)) => {
+            return msg_handlers::save(mbox, raw_msg, &mut printer, backend);
         }
-        Some(msg_arg::Cmd::Search(query, max_width, page_size, page)) => {
-            return msg_handler::search(
+        Some(msg_args::Cmd::Search(query, max_width, page_size, page)) => {
+            return msg_handlers::search(
                 query,
                 max_width,
                 page_size,
@@ -217,8 +252,8 @@ fn main() -> Result<()> {
                 backend,
             );
         }
-        Some(msg_arg::Cmd::Sort(criteria, query, max_width, page_size, page)) => {
-            return msg_handler::sort(
+        Some(msg_args::Cmd::Sort(criteria, query, max_width, page_size, page)) => {
+            return msg_handlers::sort(
                 criteria,
                 query,
                 max_width,
@@ -230,11 +265,11 @@ fn main() -> Result<()> {
                 backend,
             );
         }
-        Some(msg_arg::Cmd::Send(raw_msg)) => {
-            return msg_handler::send(raw_msg, &account_config, &mut printer, backend, &mut smtp);
+        Some(msg_args::Cmd::Send(raw_msg)) => {
+            return msg_handlers::send(raw_msg, &account_config, &mut printer, backend, &mut smtp);
         }
-        Some(msg_arg::Cmd::Write(atts, encrypt)) => {
-            return msg_handler::write(
+        Some(msg_args::Cmd::Write(atts, encrypt)) => {
+            return msg_handlers::write(
                 atts,
                 encrypt,
                 &account_config,
@@ -243,24 +278,24 @@ fn main() -> Result<()> {
                 &mut smtp,
             );
         }
-        Some(msg_arg::Cmd::Flag(m)) => match m {
-            Some(flag_arg::Cmd::Set(seq_range, flags)) => {
-                return flag_handler::set(seq_range, mbox, &flags, &mut printer, backend);
+        Some(msg_args::Cmd::Flag(m)) => match m {
+            Some(flag_args::Cmd::Set(seq_range, flags)) => {
+                return flag_handlers::set(seq_range, mbox, &flags, &mut printer, backend);
             }
-            Some(flag_arg::Cmd::Add(seq_range, flags)) => {
-                return flag_handler::add(seq_range, mbox, &flags, &mut printer, backend);
+            Some(flag_args::Cmd::Add(seq_range, flags)) => {
+                return flag_handlers::add(seq_range, mbox, &flags, &mut printer, backend);
             }
-            Some(flag_arg::Cmd::Remove(seq_range, flags)) => {
-                return flag_handler::remove(seq_range, mbox, &flags, &mut printer, backend);
+            Some(flag_args::Cmd::Remove(seq_range, flags)) => {
+                return flag_handlers::remove(seq_range, mbox, &flags, &mut printer, backend);
             }
             _ => (),
         },
-        Some(msg_arg::Cmd::Tpl(m)) => match m {
-            Some(tpl_arg::Cmd::New(tpl)) => {
-                return tpl_handler::new(tpl, &account_config, &mut printer);
+        Some(msg_args::Cmd::Tpl(m)) => match m {
+            Some(tpl_args::Cmd::New(tpl)) => {
+                return tpl_handlers::new(tpl, &account_config, &mut printer);
             }
-            Some(tpl_arg::Cmd::Reply(seq, all, tpl)) => {
-                return tpl_handler::reply(
+            Some(tpl_args::Cmd::Reply(seq, all, tpl)) => {
+                return tpl_handlers::reply(
                     seq,
                     all,
                     tpl,
@@ -270,8 +305,8 @@ fn main() -> Result<()> {
                     backend,
                 );
             }
-            Some(tpl_arg::Cmd::Forward(seq, tpl)) => {
-                return tpl_handler::forward(
+            Some(tpl_args::Cmd::Forward(seq, tpl)) => {
+                return tpl_handlers::forward(
                     seq,
                     tpl,
                     mbox,
@@ -280,11 +315,11 @@ fn main() -> Result<()> {
                     backend,
                 );
             }
-            Some(tpl_arg::Cmd::Save(atts, tpl)) => {
-                return tpl_handler::save(mbox, &account_config, atts, tpl, &mut printer, backend);
+            Some(tpl_args::Cmd::Save(atts, tpl)) => {
+                return tpl_handlers::save(mbox, &account_config, atts, tpl, &mut printer, backend);
             }
-            Some(tpl_arg::Cmd::Send(atts, tpl)) => {
-                return tpl_handler::send(
+            Some(tpl_args::Cmd::Send(atts, tpl)) => {
+                return tpl_handlers::send(
                     mbox,
                     &account_config,
                     atts,

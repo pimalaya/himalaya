@@ -2,26 +2,26 @@ pub mod mbox {
     pub mod mbox;
     pub use mbox::*;
 
-    pub mod mbox_arg;
-    pub mod mbox_handler;
+    pub mod mbox_args;
+    pub mod mbox_handlers;
 }
 
 pub mod msg {
     pub mod envelope;
     pub use envelope::*;
 
-    pub mod msg_arg;
+    pub mod msg_args;
 
-    pub mod msg_handler;
+    pub mod msg_handlers;
     pub mod msg_utils;
 
-    pub mod flag_arg;
-    pub mod flag_handler;
+    pub mod flag_args;
+    pub mod flag_handlers;
 
-    pub mod tpl_arg;
-    pub use tpl_arg::TplOverride;
+    pub mod tpl_args;
+    pub use tpl_args::TplOverride;
 
-    pub mod tpl_handler;
+    pub mod tpl_handlers;
 
     pub mod msg_entity;
     pub use msg_entity::*;
@@ -34,37 +34,40 @@ pub mod msg {
 }
 
 pub mod backends {
-    pub use backend::*;
     pub mod backend;
+    pub use backend::*;
 
-    pub use id_mapper::*;
     pub mod id_mapper;
+    pub use id_mapper::*;
 
-    pub use self::imap::*;
+    #[cfg(feature = "imap-backend")]
     pub mod imap {
-        pub mod imap_arg;
+        pub mod imap_args;
 
-        pub use imap_backend::*;
         pub mod imap_backend;
+        pub use imap_backend::*;
 
-        pub mod imap_handler;
+        pub mod imap_handlers;
 
-        pub use imap_mbox::*;
         pub mod imap_mbox;
+        pub use imap_mbox::*;
 
-        pub use imap_mbox_attr::*;
         pub mod imap_mbox_attr;
+        pub use imap_mbox_attr::*;
 
-        pub use imap_envelope::*;
         pub mod imap_envelope;
+        pub use imap_envelope::*;
 
-        pub use imap_flag::*;
         pub mod imap_flag;
+        pub use imap_flag::*;
 
         pub mod msg_sort_criterion;
     }
 
-    pub use self::maildir::*;
+    #[cfg(feature = "imap-backend")]
+    pub use self::imap::*;
+
+    #[cfg(feature = "maildir-backend")]
     pub mod maildir {
         pub mod maildir_backend;
         pub use maildir_backend::*;
@@ -79,9 +82,10 @@ pub mod backends {
         pub use maildir_flag::*;
     }
 
-    #[cfg(feature = "notmuch")]
-    pub use self::notmuch::*;
-    #[cfg(feature = "notmuch")]
+    #[cfg(feature = "maildir-backend")]
+    pub use self::maildir::*;
+
+    #[cfg(feature = "notmuch-backend")]
     pub mod notmuch {
         pub mod notmuch_backend;
         pub use notmuch_backend::*;
@@ -92,6 +96,9 @@ pub mod backends {
         pub mod notmuch_envelope;
         pub use notmuch_envelope::*;
     }
+
+    #[cfg(feature = "notmuch-backend")]
+    pub use self::notmuch::*;
 }
 
 pub mod smtp {
@@ -99,7 +106,28 @@ pub mod smtp {
     pub use smtp_service::*;
 }
 
+pub mod config {
+    pub mod deserialized_config;
+    pub use deserialized_config::*;
+
+    pub mod deserialized_account_config;
+    pub use deserialized_account_config::*;
+
+    pub mod config_args;
+
+    pub mod account_args;
+    pub mod account_handlers;
+
+    pub mod account;
+    pub use account::*;
+
+    pub mod account_config;
+    pub use account_config::*;
+
+    pub mod format;
+    pub use format::*;
+}
+
 pub mod compl;
-pub mod config;
 pub mod output;
 pub mod ui;

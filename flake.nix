@@ -80,6 +80,7 @@
               rustfmt
               rnix-lsp
               nixpkgs-fmt
+              notmuch
             ];
           };
         }

@@ -10,7 +10,10 @@ use termcolor::{Color, ColorSpec};
 use terminal_size;
 use unicode_width::UnicodeWidthStr;
 
-use crate::output::{Print, PrintTableOpts, WriteColor};
+use crate::{
+    config::Format,
+    output::{Print, PrintTableOpts, WriteColor},
+};
 
 /// Defines the default terminal size.
 /// This is used when the size cannot be determined by the `terminal_size` crate.
@@ -35,7 +38,14 @@ pub struct Cell {
 impl Cell {
     pub fn new<T: AsRef<str>>(value: T) -> Self {
         Self {
-            value: String::from(value.as_ref()).replace(&['\r', '\n', '\t'][..], ""),
+            // Removes carriage returns, new line feeds, tabulations
+            // and [variation selectors].
+            //
+            // [variation selectors]: https://en.wikipedia.org/wiki/Variation_Selectors_(Unicode_block)
+            value: String::from(value.as_ref()).replace(
+                |c| ['\r', '\n', '\t', '\u{fe0e}', '\u{fe0f}'].contains(&c),
+                "",
+            ),
             ..Self::default()
         }
     }
@@ -159,10 +169,15 @@ where
 
     /// Writes the table to the writter.
     fn print(writter: &mut dyn WriteColor, items: &[Self], opts: PrintTableOpts) -> Result<()> {
-        let max_width = opts
-            .max_width
-            .or_else(|| terminal_size::terminal_size().map(|(w, _)| w.0 as usize))
-            .unwrap_or(DEFAULT_TERM_WIDTH);
+        let is_format_flowed = matches!(opts.format, Format::Flowed);
+        let max_width = match opts.format {
+            Format::Fixed(width) => opts.max_width.unwrap_or(*width),
+            Format::Flowed => 0,
+            Format::Auto => opts
+                .max_width
+                .or_else(|| terminal_size::terminal_size().map(|(w, _)| w.0 as usize))
+                .unwrap_or(DEFAULT_TERM_WIDTH),
+        };
         let mut table = vec![Self::head()];
         let mut cell_widths: Vec<usize> =
             table[0].0.iter().map(|cell| cell.unicode_width()).collect();
@@ -190,7 +205,7 @@ where
                 glue.print(writter)?;
 
                 let table_is_overflowing = table_width > max_width;
-                if table_is_overflowing && cell.is_shrinkable() {
+                if table_is_overflowing && !is_format_flowed && cell.is_shrinkable() {
                     trace!("table is overflowing and cell is shrinkable");
 
                     let shrink_width = table_width - max_width;
@@ -324,7 +339,7 @@ mod tests {
 
     macro_rules! write_items {
         ($writter:expr, $($item:expr),*) => {
-            Table::print($writter, &[$($item,)*], PrintTableOpts { max_width: Some(20) }).unwrap();
+            Table::print($writter, &[$($item,)*], PrintTableOpts { format: &Format::Auto, max_width: Some(20) }).unwrap();
         };
     }
 

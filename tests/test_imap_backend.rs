@@ -1,8 +1,10 @@
+#[cfg(feature = "imap-backend")]
 use himalaya::{
     backends::{Backend, ImapBackend, ImapEnvelopes},
     config::{AccountConfig, ImapBackendConfig},
 };
 
+#[cfg(feature = "imap-backend")]
 #[test]
 fn test_imap_backend() {
     // configure accounts

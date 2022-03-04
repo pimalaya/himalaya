@@ -6,7 +6,7 @@ use anyhow::Result;
 use clap::{self, App, AppSettings, Arg, ArgMatches, SubCommand};
 use log::{debug, info, trace};
 
-use crate::msg::msg_arg;
+use crate::msg::msg_args;
 
 type Seq<'a> = &'a str;
 type ReplyAll = bool;
@@ -169,27 +169,27 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
             SubCommand::with_name("reply")
                 .aliases(&["rep", "re", "r"])
                 .about("Generates a reply message template")
-                .arg(msg_arg::seq_arg())
-                .arg(msg_arg::reply_all_arg())
+                .arg(msg_args::seq_arg())
+                .arg(msg_args::reply_all_arg())
                 .args(&tpl_args()),
         )
         .subcommand(
             SubCommand::with_name("forward")
                 .aliases(&["fwd", "fw", "f"])
                 .about("Generates a forward message template")
-                .arg(msg_arg::seq_arg())
+                .arg(msg_args::seq_arg())
                 .args(&tpl_args()),
         )
         .subcommand(
             SubCommand::with_name("save")
                 .about("Saves a message based on the given template")
-                .arg(&msg_arg::attachment_arg())
+                .arg(&msg_args::attachment_arg())
                 .arg(Arg::with_name("template").raw(true)),
         )
         .subcommand(
             SubCommand::with_name("send")
                 .about("Sends a message based on the given template")
-                .arg(&msg_arg::attachment_arg())
+                .arg(&msg_args::attachment_arg())
                 .arg(Arg::with_name("template").raw(true)),
         )]
 }

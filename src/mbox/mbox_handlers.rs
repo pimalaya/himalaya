@@ -7,19 +7,27 @@ use log::{info, trace};
 
 use crate::{
     backends::Backend,
+    config::AccountConfig,
     output::{PrintTableOpts, PrinterService},
 };
 
 /// Lists all mailboxes.
 pub fn list<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     max_width: Option<usize>,
+    config: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
     info!("entering list mailbox handler");
     let mboxes = backend.get_mboxes()?;
     trace!("mailboxes: {:?}", mboxes);
-    printer.print_table(mboxes, PrintTableOpts { max_width })
+    printer.print_table(
+        mboxes,
+        PrintTableOpts {
+            format: &config.format,
+            max_width,
+        },
+    )
 }
 
 #[cfg(test)]
@@ -159,11 +167,12 @@ mod tests {
             }
         }
 
+        let config = AccountConfig::default();
         let mut printer = PrinterServiceTest::default();
         let mut backend = TestBackend {};
         let backend = Box::new(&mut backend);
 
-        assert!(list(None, &mut printer, backend).is_ok());
+        assert!(list(None, &config, &mut printer, backend).is_ok());
         assert_eq!(
             concat![
                 "\n",

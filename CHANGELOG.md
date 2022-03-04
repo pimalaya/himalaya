@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.8] - 2022-03-04
+
+### Added
+
+- Flowed format support [#206]
+- List accounts command [#244]
+- One cargo feature per backend [#318]
+
+### Changed
+
+- Vim doc about mailbox pickers [#298]
+
+### Fixed
+
+- Some emojis break the table layout [#300]
+- Bad sender and date in reply and forward template [#321]
+
 ## [0.5.7] - 2022-03-01
 
 ### Added
@@ -321,7 +338,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.5.7...HEAD
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.5.8...HEAD
+[0.5.8]: https://github.com/soywod/himalaya/compare/v0.5.7...v0.5.8
 [0.5.7]: https://github.com/soywod/himalaya/compare/v0.5.6...v0.5.7
 [0.5.6]: https://github.com/soywod/himalaya/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/soywod/himalaya/compare/v0.5.4...v0.5.5
@@ -435,11 +453,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#199]: https://github.com/soywod/himalaya/issues/199
 [#204]: https://github.com/soywod/himalaya/issues/204
 [#205]: https://github.com/soywod/himalaya/issues/205
+[#206]: https://github.com/soywod/himalaya/issues/206
 [#215]: https://github.com/soywod/himalaya/issues/215
 [#220]: https://github.com/soywod/himalaya/issues/220
 [#227]: https://github.com/soywod/himalaya/issues/227
 [#228]: https://github.com/soywod/himalaya/issues/228
 [#229]: https://github.com/soywod/himalaya/issues/229
+[#244]: https://github.com/soywod/himalaya/issues/244
 [#249]: https://github.com/soywod/himalaya/issues/249
 [#256]: https://github.com/soywod/himalaya/issues/256
 [#259]: https://github.com/soywod/himalaya/issues/259
@@ -452,7 +472,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#280]: https://github.com/soywod/himalaya/issues/280
 [#288]: https://github.com/soywod/himalaya/issues/288
 [#289]: https://github.com/soywod/himalaya/issues/289
+[#298]: https://github.com/soywod/himalaya/issues/298
+[#300]: https://github.com/soywod/himalaya/issues/300
 [#303]: https://github.com/soywod/himalaya/issues/303
 [#305]: https://github.com/soywod/himalaya/issues/305
 [#308]: https://github.com/soywod/himalaya/issues/308
 [#309]: https://github.com/soywod/himalaya/issues/309
+[#318]: https://github.com/soywod/himalaya/issues/318
+[#321]: https://github.com/soywod/himalaya/issues/321

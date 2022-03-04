@@ -29,6 +29,9 @@ pub struct AccountConfig {
     pub notify_query: String,
     /// Represents the watch commands.
     pub watch_cmds: Vec<String>,
+    /// Represents the text/plain format as defined in the
+    /// [RFC2646](https://www.ietf.org/rfc/rfc2646.txt)
+    pub format: Format,
 
     /// Represents mailbox aliases.
     pub mailboxes: HashMap<String, String>,
@@ -66,11 +69,13 @@ impl<'a> AccountConfig {
                 .accounts
                 .iter()
                 .find(|(_, account)| match account {
+                    #[cfg(feature = "imap-backend")]
                     DeserializedAccountConfig::Imap(account) => account.default.unwrap_or_default(),
+                    #[cfg(feature = "maildir-backend")]
                     DeserializedAccountConfig::Maildir(account) => {
                         account.default.unwrap_or_default()
                     }
-                    #[cfg(feature = "notmuch")]
+                    #[cfg(feature = "notmuch-backend")]
                     DeserializedAccountConfig::Notmuch(account) => {
                         account.default.unwrap_or_default()
                     }
@@ -148,6 +153,7 @@ impl<'a> AccountConfig {
                 .or_else(|| config.watch_cmds.as_ref())
                 .unwrap_or(&vec![])
                 .to_owned(),
+            format: base_account.format.unwrap_or_default(),
             mailboxes: base_account.mailboxes.clone(),
             default: base_account.default.unwrap_or_default(),
             email: base_account.email.to_owned(),
@@ -165,6 +171,7 @@ impl<'a> AccountConfig {
         trace!("account config: {:?}", account_config);
 
         let backend_config = match account {
+            #[cfg(feature = "imap-backend")]
             DeserializedAccountConfig::Imap(config) => BackendConfig::Imap(ImapBackendConfig {
                 imap_host: config.imap_host.clone(),
                 imap_port: config.imap_port.clone(),
@@ -173,12 +180,13 @@ impl<'a> AccountConfig {
                 imap_login: config.imap_login.clone(),
                 imap_passwd_cmd: config.imap_passwd_cmd.clone(),
             }),
+            #[cfg(feature = "maildir-backend")]
             DeserializedAccountConfig::Maildir(config) => {
                 BackendConfig::Maildir(MaildirBackendConfig {
                     maildir_dir: shellexpand::full(&config.maildir_dir)?.to_string().into(),
                 })
             }
-            #[cfg(feature = "notmuch")]
+            #[cfg(feature = "notmuch-backend")]
             DeserializedAccountConfig::Notmuch(config) => {
                 BackendConfig::Notmuch(NotmuchBackendConfig {
                     notmuch_database_dir: shellexpand::full(&config.notmuch_database_dir)?
@@ -311,13 +319,16 @@ impl<'a> AccountConfig {
 /// Represents all existing kind of account (backend).
 #[derive(Debug, Clone)]
 pub enum BackendConfig {
+    #[cfg(feature = "imap-backend")]
     Imap(ImapBackendConfig),
+    #[cfg(feature = "maildir-backend")]
     Maildir(MaildirBackendConfig),
-    #[cfg(feature = "notmuch")]
+    #[cfg(feature = "notmuch-backend")]
     Notmuch(NotmuchBackendConfig),
 }
 
 /// Represents the IMAP backend.
+#[cfg(feature = "imap-backend")]
 #[derive(Debug, Default, Clone)]
 pub struct ImapBackendConfig {
     /// Represents the IMAP host.
@@ -334,6 +345,7 @@ pub struct ImapBackendConfig {
     pub imap_passwd_cmd: String,
 }
 
+#[cfg(feature = "imap-backend")]
 impl ImapBackendConfig {
     /// Gets the IMAP password of the user account.
     pub fn imap_passwd(&self) -> Result<String> {
@@ -346,6 +358,7 @@ impl ImapBackendConfig {
 }
 
 /// Represents the Maildir backend.
+#[cfg(feature = "maildir-backend")]
 #[derive(Debug, Default, Clone)]
 pub struct MaildirBackendConfig {
     /// Represents the Maildir directory path.
@@ -353,7 +366,7 @@ pub struct MaildirBackendConfig {
 }
 
 /// Represents the Notmuch backend.
-#[cfg(feature = "notmuch")]
+#[cfg(feature = "notmuch-backend")]
 #[derive(Debug, Default, Clone)]
 pub struct NotmuchBackendConfig {
     /// Represents the Notmuch database path.

@@ -67,15 +67,16 @@ for all the options.*
 ## Features
 
 - Mailbox listing
-- Email listing and filtering
+- Email listing and searching
 - Email composition based on `$EDITOR`
 - Email manipulation (copy/move/delete)
 - Multi-accounting
-- IMAP and Maildir support (POP and Notmuch are coming soon)
+- Account listing
+- IMAP, Maildir and Notmuch support
+- IMAP IDLE mode for real-time notifications
 - PGP end-to-end encryption
-- IDLE mode for real-time notifications
-- Vim plugin
-- Completions for bash/zsh/fish
+- Vim and Emacs plugins
+- Completions for various shells
 - JSON output
 - …
 
