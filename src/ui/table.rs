@@ -42,8 +42,10 @@ impl Cell {
             // and [variation selectors].
             //
             // [variation selectors]: https://en.wikipedia.org/wiki/Variation_Selectors_(Unicode_block)
-            value: String::from(value.as_ref())
-                .replace(&['\r', '\n', '\t', '\u{fe0e}', '\u{fe0f}'], ""),
+            value: String::from(value.as_ref()).replace(
+                |c| ['\r', '\n', '\t', '\u{fe0e}', '\u{fe0f}'].contains(&c),
+                "",
+            ),
             ..Self::default()
         }
     }
