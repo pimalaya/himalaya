@@ -7,7 +7,7 @@ use toml;
 use crate::config::DeserializedAccountConfig;
 
 pub const DEFAULT_PAGE_SIZE: usize = 10;
-pub const DEFAULT_SIG_DELIM: &str = "-- \n";
+pub const DEFAULT_SIG_DELIM: &str = "--\n";
 
 pub const DEFAULT_INBOX_FOLDER: &str = "INBOX";
 pub const DEFAULT_SENT_FOLDER: &str = "Sent";
@@ -23,7 +23,7 @@ pub struct DeserializedConfig {
     pub downloads_dir: Option<PathBuf>,
     /// Represents the signature of the user.
     pub signature: Option<String>,
-    /// Overrides the default signature delimiter "`--\n `".
+    /// Overrides the default signature delimiter "`--\n`".
     pub signature_delimiter: Option<String>,
     /// Represents the default page size for listings.
     pub default_page_size: Option<usize>,
