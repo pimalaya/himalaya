@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `In-Reply-To` not set properly when replying to a message [#323]
 - `Cc` missing or invalid when replying to a message [#324]
+- Notmuch backend hangs [#329]
 
 ## [0.5.8] - 2022-03-04
 
@@ -497,3 +498,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#321]: https://github.com/soywod/himalaya/issues/321
 [#323]: https://github.com/soywod/himalaya/issues/323
 [#324]: https://github.com/soywod/himalaya/issues/324
+[#329]: https://github.com/soywod/himalaya/issues/329

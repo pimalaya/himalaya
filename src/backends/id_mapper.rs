@@ -26,7 +26,6 @@ impl IdMapper {
             .open(&mapper.path)
             .context("cannot open id hash map file")?;
         let reader = BufReader::new(file);
-
         for line in reader.lines() {
             let line =
                 line.context("cannot read line from maildir envelopes id mapper cache file")?;
@@ -83,13 +82,13 @@ impl IdMapper {
 
         for (hash, id) in self.iter() {
             loop {
-                let short_hash = &hash[0..self.short_hash_len];
+                let short_hash = &hash[0..short_hash_len];
                 let conflict_found = self
                     .map
                     .keys()
                     .find(|cached_hash| cached_hash.starts_with(short_hash) && cached_hash != &hash)
                     .is_some();
-                if self.short_hash_len > 32 || !conflict_found {
+                if short_hash_len > 32 || !conflict_found {
                     break;
                 }
                 short_hash_len += 1;
