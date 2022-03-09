@@ -5,7 +5,7 @@
 
 use anyhow::{anyhow, Context, Error, Result};
 use chrono::DateTime;
-use log::{debug, info, trace};
+use log::trace;
 use std::{
     convert::{TryFrom, TryInto},
     ops::{Deref, DerefMut},
@@ -125,7 +125,7 @@ impl<'a> TryFrom<RawMaildirEnvelope> for MaildirEnvelope {
     type Error = Error;
 
     fn try_from(mut mail_entry: RawMaildirEnvelope) -> Result<Self, Self::Error> {
-        info!("begin: try building envelope from maildir parsed mail");
+        trace!(">> build envelope from maildir parsed mail");
 
         let mut envelope = Self::default();
 
@@ -139,14 +139,14 @@ impl<'a> TryFrom<RawMaildirEnvelope> for MaildirEnvelope {
             .parsed()
             .context("cannot parse maildir mail entry")?;
 
-        debug!("begin: parse headers");
+        trace!(">> parse headers");
         for h in parsed_mail.get_headers() {
             let k = h.get_key();
-            debug!("header key: {:?}", k);
+            trace!("header key: {:?}", k);
 
             let v = rfc2047_decoder::decode(h.get_value_raw())
                 .context(format!("cannot decode value from header {:?}", k))?;
-            debug!("header value: {:?}", v);
+            trace!("header value: {:?}", v);
 
             match k.to_lowercase().as_str() {
                 "date" => {
@@ -182,10 +182,10 @@ impl<'a> TryFrom<RawMaildirEnvelope> for MaildirEnvelope {
                 _ => (),
             }
         }
-        debug!("end: parse headers");
+        trace!("<< parse headers");
 
         trace!("envelope: {:?}", envelope);
-        info!("end: try building envelope from maildir parsed mail");
+        trace!("<< build envelope from maildir parsed mail");
         Ok(envelope)
     }
 }

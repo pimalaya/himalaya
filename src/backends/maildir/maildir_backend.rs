@@ -47,13 +47,16 @@ impl<'a> MaildirBackend<'a> {
             self.validate_mdir_path(self.mdir.path().to_owned())
                 .map(maildir::Maildir::from)
         } else {
-            // If the dir is a valid maildir path, creates a maildir instance from it.
+            // If the dir is a valid maildir path, creates a maildir
+            // instance from it. Checks for absolute path first,
             self.validate_mdir_path(dir.into())
+                // then for relative path,
+                .or_else(|_| self.validate_mdir_path(self.mdir.path().join(dir)))
                 .or_else(|_| {
-                    // Otherwise creates a maildir instance from a
+                    // otherwise creates a maildir instance from a
                     // maildir subdirectory by adding a "." in front
                     // of the name as described in the spec:
-                    // https://cr.yp.to/proto/maildir.html
+                    // https://cr.yp.to/proto/maildir.html.
                     let dir = self
                         .account_config
                         .mailboxes
