@@ -317,6 +317,19 @@ impl<'a> AccountConfig {
         run_cmd(&cmd).context("cannot run notify cmd")?;
         Ok(())
     }
+
+    /// Gets the mailbox alias if exists, otherwise returns the
+    /// mailbox. Also tries to expand shell variables.
+    pub fn get_mbox_alias(&self, mbox: &str) -> Result<String> {
+        let mbox = self
+            .mailboxes
+            .get(&mbox.trim().to_lowercase())
+            .map(|s| s.as_str())
+            .unwrap_or(mbox);
+        shellexpand::full(mbox)
+            .map(String::from)
+            .with_context(|| format!("cannot expand mailbox path {:?}", mbox))
+    }
 }
 
 /// Represents all existing kind of account (backend).
