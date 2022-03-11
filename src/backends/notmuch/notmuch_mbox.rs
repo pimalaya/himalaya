@@ -17,13 +17,16 @@ use crate::{
 
 /// Represents a list of Notmuch mailboxes.
 #[derive(Debug, Default, serde::Serialize)]
-pub struct NotmuchMboxes(pub Vec<NotmuchMbox>);
+pub struct NotmuchMboxes {
+    #[serde(rename = "response")]
+    pub mboxes: Vec<NotmuchMbox>,
+}
 
 impl Deref for NotmuchMboxes {
     type Target = Vec<NotmuchMbox>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.mboxes
     }
 }
 

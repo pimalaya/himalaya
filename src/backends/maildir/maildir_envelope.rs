@@ -20,19 +20,22 @@ use crate::{
 
 /// Represents a list of envelopes.
 #[derive(Debug, Default, serde::Serialize)]
-pub struct MaildirEnvelopes(pub Vec<MaildirEnvelope>);
+pub struct MaildirEnvelopes {
+    #[serde(rename = "response")]
+    pub envelopes: Vec<MaildirEnvelope>,
+}
 
 impl Deref for MaildirEnvelopes {
     type Target = Vec<MaildirEnvelope>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.envelopes
     }
 }
 
 impl DerefMut for MaildirEnvelopes {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.envelopes
     }
 }
 
@@ -114,7 +117,7 @@ impl<'a> TryFrom<RawMaildirEnvelopes> for MaildirEnvelopes {
             envelopes.push(envelope);
         }
 
-        Ok(MaildirEnvelopes(envelopes))
+        Ok(MaildirEnvelopes { envelopes })
     }
 }
 

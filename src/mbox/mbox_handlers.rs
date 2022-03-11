@@ -115,21 +115,23 @@ mod tests {
                 unimplemented!();
             }
             fn get_mboxes(&mut self) -> Result<Box<dyn Mboxes>> {
-                Ok(Box::new(ImapMboxes(vec![
-                    ImapMbox {
-                        delim: "/".into(),
-                        name: "INBOX".into(),
-                        attrs: ImapMboxAttrs(vec![ImapMboxAttr::NoSelect]),
-                    },
-                    ImapMbox {
-                        delim: "/".into(),
-                        name: "Sent".into(),
-                        attrs: ImapMboxAttrs(vec![
-                            ImapMboxAttr::NoInferiors,
-                            ImapMboxAttr::Custom("HasNoChildren".into()),
-                        ]),
-                    },
-                ])))
+                Ok(Box::new(ImapMboxes {
+                    mboxes: vec![
+                        ImapMbox {
+                            delim: "/".into(),
+                            name: "INBOX".into(),
+                            attrs: ImapMboxAttrs(vec![ImapMboxAttr::NoSelect]),
+                        },
+                        ImapMbox {
+                            delim: "/".into(),
+                            name: "Sent".into(),
+                            attrs: ImapMboxAttrs(vec![
+                                ImapMboxAttr::NoInferiors,
+                                ImapMboxAttr::Custom("HasNoChildren".into()),
+                            ]),
+                        },
+                    ],
+                }))
             }
             fn del_mbox(&mut self, _: &str) -> Result<()> {
                 unimplemented!();

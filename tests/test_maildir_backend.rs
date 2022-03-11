@@ -19,10 +19,7 @@ fn test_maildir_backend() {
 
     // configure accounts
     let account_config = AccountConfig {
-        mailboxes: HashMap::from_iter([
-            ("inbox".into(), "INBOX".into()),
-            ("subdir".into(), "Subdir".into()),
-        ]),
+        mailboxes: HashMap::from_iter([("subdir".into(), "Subdir".into())]),
         ..AccountConfig::default()
     };
     let mdir_config = MaildirBackendConfig {

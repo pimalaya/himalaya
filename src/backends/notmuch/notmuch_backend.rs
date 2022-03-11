@@ -81,7 +81,7 @@ impl<'a> NotmuchBackend<'a> {
         envelopes.sort_by(|a, b| b.date.partial_cmp(&a.date).unwrap());
 
         // Applies pagination boundaries.
-        envelopes.0 = envelopes[page_begin..page_end].to_owned();
+        envelopes.envelopes = envelopes[page_begin..page_end].to_owned();
 
         // Appends envelopes hash to the id mapper cache file and
         // calculates the new short hash length. The short hash length
@@ -118,17 +118,17 @@ impl<'a> Backend<'a> for NotmuchBackend<'a> {
     fn get_mboxes(&mut self) -> Result<Box<dyn Mboxes>> {
         info!(">> get notmuch virtual mailboxes");
 
-        let mut virt_mboxes: Vec<_> = self
+        let mut mboxes: Vec<_> = self
             .account_config
             .mailboxes
             .iter()
             .map(|(k, v)| NotmuchMbox::new(k, v))
             .collect();
-        trace!("virtual mailboxes: {:?}", virt_mboxes);
-        virt_mboxes.sort_by(|a, b| b.name.partial_cmp(&a.name).unwrap());
+        trace!("virtual mailboxes: {:?}", mboxes);
+        mboxes.sort_by(|a, b| b.name.partial_cmp(&a.name).unwrap());
 
         info!("<< get notmuch virtual mailboxes");
-        Ok(Box::new(NotmuchMboxes(virt_mboxes)))
+        Ok(Box::new(NotmuchMboxes { mboxes }))
     }
 
     fn del_mbox(&mut self, _mbox: &str) -> Result<()> {
@@ -202,7 +202,7 @@ impl<'a> Backend<'a> for NotmuchBackend<'a> {
         // Adds the message to the maildir folder and gets its hash.
         let hash = self
             .mdir
-            .add_msg("inbox", msg, "seen")
+            .add_msg("", msg, "seen")
             .with_context(|| {
                 format!(
                     "cannot add notmuch message to maildir {:?}",
