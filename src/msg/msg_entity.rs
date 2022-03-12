@@ -1,6 +1,6 @@
 use ammonia;
 use anyhow::{anyhow, Context, Error, Result};
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, Local, TimeZone, Utc};
 use convert_case::{Case, Casing};
 use html_escape;
 use lettre::message::{header::ContentType, Attachment, MultiPart, SinglePart};
@@ -31,8 +31,6 @@ use crate::{
     },
 };
 
-const DATE_TIME_FORMAT: &str = "%d-%b-%Y %H:%M:%S %z";
-
 /// Representation of a message.
 #[derive(Debug, Clone, Default)]
 pub struct Msg {
@@ -56,7 +54,7 @@ pub struct Msg {
     /// The internal date of the message.
     ///
     /// [RFC3501]: https://datatracker.ietf.org/doc/html/rfc3501#section-2.3.3
-    pub date: Option<DateTime<FixedOffset>>,
+    pub date: Option<DateTime<Local>>,
     pub parts: Parts,
 
     pub encrypt: bool,
@@ -234,7 +232,7 @@ impl Msg {
             let date = self
                 .date
                 .as_ref()
-                .map(|date| date.format("%d %b %Y, at %H:%M").to_string())
+                .map(|date| date.format("%d %b %Y, at %H:%M (%z)").to_string())
                 .unwrap_or_else(|| "unknown date".into());
             let sender = self
                 .reply_to
@@ -675,14 +673,15 @@ impl Msg {
                 "subject" => {
                     msg.subject = val;
                 }
-                "date" => {
-                    msg.date = DateTime::parse_from_str(&val, DATE_TIME_FORMAT)
-                        .map_err(|err| {
-                            warn!("cannot parse message date {:?}, skipping it", val);
-                            err
-                        })
-                        .ok();
-                }
+                "date" => match mailparse::dateparse(&val) {
+                    Ok(timestamp) => {
+                        msg.date = Some(Utc.timestamp(timestamp, 0).with_timezone(&Local))
+                    }
+                    Err(err) => {
+                        warn!("cannot parse message date {:?}, skipping it", val);
+                        warn!("{}", err);
+                    }
+                },
                 "from" => {
                     msg.from = from_slice_to_addrs(val)
                         .context(format!("cannot parse header {:?}", key))?
@@ -762,7 +761,7 @@ impl Msg {
                 }
                 "date" => {
                     if let Some(ref date) = self.date {
-                        readable_msg.push_str(&format!("Date: {}\n", date));
+                        readable_msg.push_str(&format!("Date: {}\n", date.to_rfc2822()));
                     }
                 }
                 "from" => match self.from {
