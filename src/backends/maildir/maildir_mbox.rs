@@ -19,21 +19,24 @@ use crate::{
 
 /// Represents a list of Maildir mailboxes.
 #[derive(Debug, Default, serde::Serialize)]
-pub struct MaildirMboxes(pub Vec<MaildirMbox>);
+pub struct MaildirMboxes {
+    #[serde(rename = "response")]
+    pub mboxes: Vec<MaildirMbox>,
+}
 
 impl Deref for MaildirMboxes {
     type Target = Vec<MaildirMbox>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.mboxes
     }
 }
 
 impl PrintTable for MaildirMboxes {
-    fn print_table(&self, writter: &mut dyn WriteColor, opts: PrintTableOpts) -> Result<()> {
-        writeln!(writter)?;
-        Table::print(writter, self, opts)?;
-        writeln!(writter)?;
+    fn print_table(&self, writer: &mut dyn WriteColor, opts: PrintTableOpts) -> Result<()> {
+        writeln!(writer)?;
+        Table::print(writer, self, opts)?;
+        writeln!(writer)?;
         Ok(())
     }
 }
@@ -113,7 +116,7 @@ impl TryFrom<RawMaildirMboxes> for MaildirMboxes {
         for entry in mail_entries {
             mboxes.push(entry?.try_into()?);
         }
-        Ok(MaildirMboxes(mboxes))
+        Ok(MaildirMboxes { mboxes })
     }
 }
 

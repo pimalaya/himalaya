@@ -32,9 +32,15 @@ pub struct AccountConfig {
     /// Represents the text/plain format as defined in the
     /// [RFC2646](https://www.ietf.org/rfc/rfc2646.txt)
     pub format: Format,
+    /// Overrides the default headers displayed at the top of
+    /// the read message.
+    pub read_headers: Vec<String>,
 
     /// Represents mailbox aliases.
     pub mailboxes: HashMap<String, String>,
+
+    /// Represents hooks.
+    pub hooks: Hooks,
 
     /// Represents the SMTP host.
     pub smtp_host: String,
@@ -154,7 +160,9 @@ impl<'a> AccountConfig {
                 .unwrap_or(&vec![])
                 .to_owned(),
             format: base_account.format.unwrap_or_default(),
+            read_headers: base_account.read_headers,
             mailboxes: base_account.mailboxes.clone(),
+            hooks: base_account.hooks.unwrap_or_default(),
             default: base_account.default.unwrap_or_default(),
             email: base_account.email.to_owned(),
 
@@ -203,8 +211,7 @@ impl<'a> AccountConfig {
 
     /// Builds the full RFC822 compliant address of the user account.
     pub fn address(&self) -> Result<MailAddr> {
-        let has_special_chars =
-            "()<>[]:;@.,".contains(|special_char| self.display_name.contains(special_char));
+        let has_special_chars = "()<>[]:;@.,".contains(|c| self.display_name.contains(c));
         let addr = if self.display_name.is_empty() {
             self.email.clone()
         } else if has_special_chars {
@@ -313,6 +320,19 @@ impl<'a> AccountConfig {
         debug!("run command: {}", cmd);
         run_cmd(&cmd).context("cannot run notify cmd")?;
         Ok(())
+    }
+
+    /// Gets the mailbox alias if exists, otherwise returns the
+    /// mailbox. Also tries to expand shell variables.
+    pub fn get_mbox_alias(&self, mbox: &str) -> Result<String> {
+        let mbox = self
+            .mailboxes
+            .get(&mbox.trim().to_lowercase())
+            .map(|s| s.as_str())
+            .unwrap_or(mbox);
+        shellexpand::full(mbox)
+            .map(String::from)
+            .with_context(|| format!("cannot expand mailbox path {:?}", mbox))
     }
 }
 

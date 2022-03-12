@@ -126,6 +126,9 @@ pub mod config {
 
     pub mod format;
     pub use format::*;
+
+    pub mod hooks;
+    pub use hooks::*;
 }
 
 pub mod compl;

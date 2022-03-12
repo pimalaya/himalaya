@@ -4,6 +4,7 @@
 //! to the mailbox.
 
 use anyhow::Result;
+use serde::Serialize;
 use std::fmt::{self, Display};
 use std::ops::Deref;
 
@@ -16,22 +17,25 @@ use crate::{
 use super::ImapMboxAttrs;
 
 /// Represents a list of IMAP mailboxes.
-#[derive(Debug, Default, serde::Serialize)]
-pub struct ImapMboxes(pub Vec<ImapMbox>);
+#[derive(Debug, Default, Serialize)]
+pub struct ImapMboxes {
+    #[serde(rename = "response")]
+    pub mboxes: Vec<ImapMbox>,
+}
 
 impl Deref for ImapMboxes {
     type Target = Vec<ImapMbox>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.mboxes
     }
 }
 
 impl PrintTable for ImapMboxes {
-    fn print_table(&self, writter: &mut dyn WriteColor, opts: PrintTableOpts) -> Result<()> {
-        writeln!(writter)?;
-        Table::print(writter, self, opts)?;
-        writeln!(writter)?;
+    fn print_table(&self, writer: &mut dyn WriteColor, opts: PrintTableOpts) -> Result<()> {
+        writeln!(writer)?;
+        Table::print(writer, self, opts)?;
+        writeln!(writer)?;
         Ok(())
     }
 }
@@ -130,7 +134,9 @@ pub type RawImapMboxes = imap::types::ZeroCopy<Vec<RawImapMbox>>;
 
 impl<'a> From<RawImapMboxes> for ImapMboxes {
     fn from(raw_mboxes: RawImapMboxes) -> Self {
-        Self(raw_mboxes.iter().map(ImapMbox::from).collect())
+        Self {
+            mboxes: raw_mboxes.iter().map(ImapMbox::from).collect(),
+        }
     }
 }
 

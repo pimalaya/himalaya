@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.9] - 2022-03-12
+
+### Added
+
+- SMTP pre-send hook [#178]
+- Customize headers to show at the top of a read message [#338]
+
+### Changed
+
+- Improve `attachments` command [#281]
+
+### Fixed
+
+- `In-Reply-To` not set properly when replying to a message [#323]
+- `Cc` missing or invalid when replying to a message [#324]
+- Notmuch backend hangs [#329]
+- Maildir e2e tests [#335]
+- JSON API for listings [#331]
+
 ## [0.5.8] - 2022-03-04
 
 ### Added
@@ -338,7 +357,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.5.8...HEAD
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.5.9...HEAD
+[0.5.9]: https://github.com/soywod/himalaya/compare/v0.5.8...v0.5.9
 [0.5.8]: https://github.com/soywod/himalaya/compare/v0.5.7...v0.5.8
 [0.5.7]: https://github.com/soywod/himalaya/compare/v0.5.6...v0.5.7
 [0.5.6]: https://github.com/soywod/himalaya/compare/v0.5.5...v0.5.6
@@ -444,6 +464,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#162]: https://github.com/soywod/himalaya/issues/162
 [#176]: https://github.com/soywod/himalaya/issues/176
 [#172]: https://github.com/soywod/himalaya/issues/172
+[#178]: https://github.com/soywod/himalaya/issues/178
 [#181]: https://github.com/soywod/himalaya/issues/181
 [#185]: https://github.com/soywod/himalaya/issues/185
 [#186]: https://github.com/soywod/himalaya/issues/186
@@ -470,6 +491,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#271]: https://github.com/soywod/himalaya/issues/271
 [#276]: https://github.com/soywod/himalaya/issues/276
 [#280]: https://github.com/soywod/himalaya/issues/280
+[#281]: https://github.com/soywod/himalaya/issues/281
 [#288]: https://github.com/soywod/himalaya/issues/288
 [#289]: https://github.com/soywod/himalaya/issues/289
 [#298]: https://github.com/soywod/himalaya/issues/298
@@ -480,3 +502,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#309]: https://github.com/soywod/himalaya/issues/309
 [#318]: https://github.com/soywod/himalaya/issues/318
 [#321]: https://github.com/soywod/himalaya/issues/321
+[#323]: https://github.com/soywod/himalaya/issues/323
+[#324]: https://github.com/soywod/himalaya/issues/324
+[#329]: https://github.com/soywod/himalaya/issues/329
+[#331]: https://github.com/soywod/himalaya/issues/331
+[#335]: https://github.com/soywod/himalaya/issues/335
+[#338]: https://github.com/soywod/himalaya/issues/338

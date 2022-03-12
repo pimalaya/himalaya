@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use std::{collections::HashMap, path::PathBuf};
 
-use crate::config::Format;
+use crate::config::{Format, Hooks};
 
 pub trait ToDeserializedBaseAccountConfig {
     fn to_base(&self) -> DeserializedBaseAccountConfig;
@@ -45,7 +45,7 @@ macro_rules! make_account_config {
             pub signature: Option<String>,
             /// Overrides the signature delimiter for this account.
             pub signature_delimiter: Option<String>,
-            /// Overrides the default page size for this account.
+	    /// Overrides the default page size for this account.
             pub default_page_size: Option<usize>,
             /// Overrides the notify command for this account.
             pub notify_cmd: Option<String>,
@@ -56,6 +56,10 @@ macro_rules! make_account_config {
 	    /// Represents the text/plain format as defined in the
 	    /// [RFC2646](https://www.ietf.org/rfc/rfc2646.txt)
             pub format: Option<Format>,
+            /// Represents the default headers displayed at the top of
+            /// the read message.
+	    #[serde(default)]
+            pub read_headers: Vec<String>,
 
             /// Makes this account the default one.
             pub default: Option<bool>,
@@ -84,6 +88,9 @@ macro_rules! make_account_config {
     	    #[serde(default)]
     	    pub mailboxes: HashMap<String, String>,
 
+    	    /// Represents hooks.
+    	    pub hooks: Option<Hooks>,
+
 	    $(pub $element: $ty),*
 	}
 
@@ -99,6 +106,7 @@ macro_rules! make_account_config {
             	    notify_query: self.notify_query.clone(),
             	    watch_cmds: self.watch_cmds.clone(),
             	    format: self.format.clone(),
+		    read_headers: self.read_headers.clone(),
 
             	    default: self.default.clone(),
             	    email: self.email.clone(),
@@ -114,6 +122,7 @@ macro_rules! make_account_config {
             	    pgp_decrypt_cmd: self.pgp_decrypt_cmd.clone(),
 
 		    mailboxes: self.mailboxes.clone(),
+		    hooks: self.hooks.clone(),
 		}
 	    }
 	}

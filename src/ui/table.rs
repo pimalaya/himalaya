@@ -127,14 +127,14 @@ impl Cell {
 
 /// Makes the cell printable.
 impl Print for Cell {
-    fn print(&self, writter: &mut dyn WriteColor) -> Result<()> {
+    fn print(&self, writer: &mut dyn WriteColor) -> Result<()> {
         // Applies colors to the cell
-        writter
+        writer
             .set_color(&self.style)
             .context(format!(r#"cannot apply colors to cell "{}""#, self.value))?;
 
         // Writes the colorized cell to stdout
-        write!(writter, "{}", self.value).context(format!(r#"cannot print cell "{}""#, self.value))
+        write!(writer, "{}", self.value).context(format!(r#"cannot print cell "{}""#, self.value))
     }
 }
 
@@ -167,8 +167,8 @@ where
     /// Defines the row template.
     fn row(&self) -> Row;
 
-    /// Writes the table to the writter.
-    fn print(writter: &mut dyn WriteColor, items: &[Self], opts: PrintTableOpts) -> Result<()> {
+    /// Writes the table to the writer.
+    fn print(writer: &mut dyn WriteColor, items: &[Self], opts: PrintTableOpts) -> Result<()> {
         let is_format_flowed = matches!(opts.format, Format::Flowed);
         let max_width = match opts.format {
             Format::Fixed(width) => opts.max_width.unwrap_or(*width),
@@ -202,7 +202,7 @@ where
         for row in table.iter_mut() {
             let mut glue = Cell::default();
             for (i, cell) in row.0.iter_mut().enumerate() {
-                glue.print(writter)?;
+                glue.print(writer)?;
 
                 let table_is_overflowing = table_width > max_width;
                 if table_is_overflowing && !is_format_flowed && cell.is_shrinkable() {
@@ -256,10 +256,10 @@ where
                     trace!("number of spaces added to value: {}", spaces_count);
                     cell.value.push_str(&" ".repeat(spaces_count));
                 }
-                cell.print(writter)?;
+                cell.print(writer)?;
                 glue = Cell::new("│").ansi_256(8);
             }
-            writeln!(writter)?;
+            writeln!(writer)?;
         }
         Ok(())
     }
@@ -272,11 +272,11 @@ mod tests {
     use super::*;
 
     #[derive(Debug, Default)]
-    struct StringWritter {
+    struct StringWriter {
         content: String,
     }
 
-    impl io::Write for StringWritter {
+    impl io::Write for StringWriter {
         fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
             self.content
                 .push_str(&String::from_utf8(buf.to_vec()).unwrap());
@@ -289,7 +289,7 @@ mod tests {
         }
     }
 
-    impl termcolor::WriteColor for StringWritter {
+    impl termcolor::WriteColor for StringWriter {
         fn supports_color(&self) -> bool {
             false
         }
@@ -303,7 +303,7 @@ mod tests {
         }
     }
 
-    impl WriteColor for StringWritter {}
+    impl WriteColor for StringWriter {}
 
     struct Item {
         id: u16,
@@ -338,16 +338,16 @@ mod tests {
     }
 
     macro_rules! write_items {
-        ($writter:expr, $($item:expr),*) => {
-            Table::print($writter, &[$($item,)*], PrintTableOpts { format: &Format::Auto, max_width: Some(20) }).unwrap();
+        ($writer:expr, $($item:expr),*) => {
+            Table::print($writer, &[$($item,)*], PrintTableOpts { format: &Format::Auto, max_width: Some(20) }).unwrap();
         };
     }
 
     #[test]
     fn row_smaller_than_head() {
-        let mut writter = StringWritter::default();
+        let mut writer = StringWriter::default();
         write_items![
-            &mut writter,
+            &mut writer,
             Item::new(1, "a", "aa"),
             Item::new(2, "b", "bb"),
             Item::new(3, "c", "cc")
@@ -359,14 +359,14 @@ mod tests {
             "2  │b    │bb   \n",
             "3  │c    │cc   \n",
         ];
-        assert_eq!(expected, writter.content);
+        assert_eq!(expected, writer.content);
     }
 
     #[test]
     fn row_bigger_than_head() {
-        let mut writter = StringWritter::default();
+        let mut writer = StringWriter::default();
         write_items![
-            &mut writter,
+            &mut writer,
             Item::new(1, "a", "aa"),
             Item::new(2222, "bbbbb", "bbbbb"),
             Item::new(3, "c", "cc")
@@ -378,11 +378,11 @@ mod tests {
             "2222 │bbbbb │bbbbb \n",
             "3    │c     │cc    \n",
         ];
-        assert_eq!(expected, writter.content);
+        assert_eq!(expected, writer.content);
 
-        let mut writter = StringWritter::default();
+        let mut writer = StringWriter::default();
         write_items![
-            &mut writter,
+            &mut writer,
             Item::new(1, "a", "aa"),
             Item::new(2222, "bbbbb", "bbbbb"),
             Item::new(3, "cccccc", "cc")
@@ -394,14 +394,14 @@ mod tests {
             "2222 │bbbbb  │bbbbb \n",
             "3    │cccccc │cc    \n",
         ];
-        assert_eq!(expected, writter.content);
+        assert_eq!(expected, writer.content);
     }
 
     #[test]
     fn basic_shrink() {
-        let mut writter = StringWritter::default();
+        let mut writer = StringWriter::default();
         write_items![
-            &mut writter,
+            &mut writer,
             Item::new(1, "", "desc"),
             Item::new(2, "short", "desc"),
             Item::new(3, "loooooong", "desc"),
@@ -423,14 +423,14 @@ mod tests {
             "7  │😍😍😍😍… │desc \n",
             "8  │!😍😍😍…  │desc \n",
         ];
-        assert_eq!(expected, writter.content);
+        assert_eq!(expected, writer.content);
     }
 
     #[test]
     fn max_shrink_width() {
-        let mut writter = StringWritter::default();
+        let mut writer = StringWriter::default();
         write_items![
-            &mut writter,
+            &mut writer,
             Item::new(1111, "shriiiiiiiink", "desc very looong"),
             Item::new(2222, "shriiiiiiiink", "desc very loooooooooong")
         ];
@@ -440,6 +440,6 @@ mod tests {
             "1111 │shri… │desc very looong        \n",
             "2222 │shri… │desc very loooooooooong \n",
         ];
-        assert_eq!(expected, writter.content);
+        assert_eq!(expected, writer.content);
     }
 }

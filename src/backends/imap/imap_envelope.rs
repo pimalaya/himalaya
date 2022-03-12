@@ -15,21 +15,24 @@ use super::{ImapFlag, ImapFlags};
 
 /// Represents a list of IMAP envelopes.
 #[derive(Debug, Default, serde::Serialize)]
-pub struct ImapEnvelopes(pub Vec<ImapEnvelope>);
+pub struct ImapEnvelopes {
+    #[serde(rename = "response")]
+    pub envelopes: Vec<ImapEnvelope>,
+}
 
 impl Deref for ImapEnvelopes {
     type Target = Vec<ImapEnvelope>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.envelopes
     }
 }
 
 impl PrintTable for ImapEnvelopes {
-    fn print_table(&self, writter: &mut dyn WriteColor, opts: PrintTableOpts) -> Result<()> {
-        writeln!(writter)?;
-        Table::print(writter, self, opts)?;
-        writeln!(writter)?;
+    fn print_table(&self, writer: &mut dyn WriteColor, opts: PrintTableOpts) -> Result<()> {
+        writeln!(writer)?;
+        Table::print(writer, self, opts)?;
+        writeln!(writer)?;
         Ok(())
     }
 }
@@ -99,7 +102,7 @@ impl TryFrom<RawImapEnvelopes> for ImapEnvelopes {
         for raw_envelope in raw_envelopes.iter().rev() {
             envelopes.push(ImapEnvelope::try_from(raw_envelope).context("cannot parse envelope")?);
         }
-        Ok(Self(envelopes))
+        Ok(Self { envelopes })
     }
 }
 

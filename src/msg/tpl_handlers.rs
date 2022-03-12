@@ -21,7 +21,7 @@ pub fn new<'a, P: PrinterService>(
     printer: &'a mut P,
 ) -> Result<()> {
     let tpl = Msg::default().to_tpl(opts, account)?;
-    printer.print(tpl)
+    printer.print_struct(tpl)
 }
 
 /// Generate a reply message template.
@@ -38,7 +38,7 @@ pub fn reply<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
         .get_msg(mbox, seq)?
         .into_reply(all, config)?
         .to_tpl(opts, config)?;
-    printer.print(tpl)
+    printer.print_struct(tpl)
 }
 
 /// Generate a forward message template.
@@ -54,7 +54,7 @@ pub fn forward<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
         .get_msg(mbox, seq)?
         .into_forward(config)?
         .to_tpl(opts, config)?;
-    printer.print(tpl)
+    printer.print_struct(tpl)
 }
 
 /// Saves a message based on a template.
@@ -79,7 +79,7 @@ pub fn save<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     let msg = Msg::from_tpl(&tpl)?.add_attachments(attachments_paths)?;
     let raw_msg = msg.into_sendable_msg(config)?.formatted();
     backend.add_msg(mbox, &raw_msg, "seen")?;
-    printer.print("Template successfully saved")
+    printer.print_struct("Template successfully saved")
 }
 
 /// Sends a message based on a template.
@@ -103,7 +103,7 @@ pub fn send<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
             .join("\n")
     };
     let msg = Msg::from_tpl(&tpl)?.add_attachments(attachments_paths)?;
-    let sent_msg = smtp.send_msg(account, &msg)?;
-    backend.add_msg(mbox, &sent_msg.formatted(), "seen")?;
-    printer.print("Template successfully sent")
+    let sent_msg = smtp.send(account, &msg)?;
+    backend.add_msg(mbox, &sent_msg, "seen")?;
+    printer.print_struct("Template successfully sent")
 }

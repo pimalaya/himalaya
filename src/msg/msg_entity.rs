@@ -1,11 +1,19 @@
 use ammonia;
 use anyhow::{anyhow, Context, Error, Result};
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, Local, TimeZone, Utc};
+use convert_case::{Case, Casing};
 use html_escape;
 use lettre::message::{header::ContentType, Attachment, MultiPart, SinglePart};
-use log::{debug, info, trace, warn};
+use log::{info, trace, warn};
 use regex::Regex;
-use std::{collections::HashSet, convert::TryInto, env::temp_dir, fmt::Debug, fs, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    convert::TryInto,
+    env::temp_dir,
+    fmt::Debug,
+    fs,
+    path::PathBuf,
+};
 use uuid::Uuid;
 
 use crate::{
@@ -13,7 +21,7 @@ use crate::{
     config::{AccountConfig, DEFAULT_DRAFT_FOLDER, DEFAULT_SENT_FOLDER, DEFAULT_SIG_DELIM},
     msg::{
         from_addrs_to_sendable_addrs, from_addrs_to_sendable_mbox, from_slice_to_addrs, msg_utils,
-        Addrs, BinaryPart, Part, Parts, TextPlainPart, TplOverride,
+        Addr, Addrs, BinaryPart, Part, Parts, TextPlainPart, TplOverride,
     },
     output::PrinterService,
     smtp::SmtpService,
@@ -24,7 +32,7 @@ use crate::{
 };
 
 /// Representation of a message.
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Msg {
     /// The sequence number of the message.
     ///
@@ -41,11 +49,12 @@ pub struct Msg {
     pub bcc: Option<Addrs>,
     pub in_reply_to: Option<String>,
     pub message_id: Option<String>,
+    pub headers: HashMap<String, String>,
 
     /// The internal date of the message.
     ///
     /// [RFC3501]: https://datatracker.ietf.org/doc/html/rfc3501#section-2.3.3
-    pub date: Option<DateTime<FixedOffset>>,
+    pub date: Option<DateTime<Local>>,
     pub parts: Parts,
 
     pub encrypt: bool,
@@ -64,8 +73,9 @@ impl Msg {
             .collect()
     }
 
-    /// Folds string body from all plain text parts into a single string body. If no plain text
-    /// parts are found, HTML parts are used instead. The result is sanitized (all HTML markup is
+    /// Folds string body from all plain text parts into a single
+    /// string body. If no plain text parts are found, HTML parts are
+    /// used instead. The result is sanitized (all HTML markup is
     /// removed).
     pub fn fold_text_plain_parts(&self) -> String {
         let (plain, html) = self.parts.iter().fold(
@@ -133,7 +143,8 @@ impl Msg {
         }
     }
 
-    /// Fold string body from all HTML parts into a single string body.
+    /// Fold string body from all HTML parts into a single string
+    /// body.
     fn fold_text_html_parts(&self) -> String {
         let text_parts = self
             .parts
@@ -151,8 +162,9 @@ impl Msg {
         text_parts
     }
 
-    /// Fold string body from all text parts into a single string body. The mime allows users to
-    /// choose between plain text parts and html text parts.
+    /// Fold string body from all text parts into a single string
+    /// body. The mime allows users to choose between plain text parts
+    /// and html text parts.
     pub fn fold_text_parts(&self, text_mime: &str) -> String {
         if text_mime == "html" {
             self.fold_text_html_parts()
@@ -164,11 +176,11 @@ impl Msg {
     pub fn into_reply(mut self, all: bool, account: &AccountConfig) -> Result<Self> {
         let account_addr = account.address()?;
 
-        // Message-Id
-        self.message_id = None;
-
         // In-Reply-To
         self.in_reply_to = self.message_id.to_owned();
+
+        // Message-Id
+        self.message_id = None;
 
         // To
         let addrs = self
@@ -176,10 +188,13 @@ impl Msg {
             .as_deref()
             .or_else(|| self.from.as_deref())
             .map(|addrs| {
-                addrs
-                    .clone()
-                    .into_iter()
-                    .filter(|addr| addr != &account_addr)
+                addrs.iter().cloned().filter(|addr| match addr {
+                    Addr::Group(_) => false,
+                    Addr::Single(a) => match &account_addr {
+                        Addr::Group(_) => false,
+                        Addr::Single(b) => a.addr != b.addr,
+                    },
+                })
             });
         if all {
             self.to = addrs.map(|addrs| addrs.collect::<Vec<_>>().into());
@@ -189,18 +204,35 @@ impl Msg {
                 .map(|addr| vec![addr].into());
         }
 
-        // Cc & Bcc
-        if !all {
-            self.cc = None;
-            self.bcc = None;
-        }
+        // Cc
+        self.cc = if all {
+            self.cc.as_deref().map(|addrs| {
+                addrs
+                    .iter()
+                    .cloned()
+                    .filter(|addr| match addr {
+                        Addr::Group(_) => false,
+                        Addr::Single(a) => match &account_addr {
+                            Addr::Group(_) => false,
+                            Addr::Single(b) => a.addr != b.addr,
+                        },
+                    })
+                    .collect::<Vec<_>>()
+                    .into()
+            })
+        } else {
+            None
+        };
+
+        // Bcc
+        self.bcc = None;
 
         // Body
         let plain_content = {
             let date = self
                 .date
                 .as_ref()
-                .map(|date| date.format("%d %b %Y, at %H:%M").to_string())
+                .map(|date| date.format("%d %b %Y, at %H:%M (%z)").to_string())
                 .unwrap_or_else(|| "unknown date".into());
             let sender = self
                 .reply_to
@@ -339,15 +371,18 @@ impl Msg {
         loop {
             match choice::post_edit() {
                 Ok(PostEditChoice::Send) => {
-                    let sent_msg = smtp.send_msg(account, &self)?;
+                    printer.print_str("Sending message…")?;
+                    let sent_msg = smtp.send(account, &self)?;
                     let sent_folder = account
                         .mailboxes
                         .get("sent")
                         .map(|s| s.as_str())
                         .unwrap_or(DEFAULT_SENT_FOLDER);
-                    backend.add_msg(&sent_folder, &sent_msg.formatted(), "seen")?;
+                    printer
+                        .print_str(format!("Adding message to the {:?} folder…", sent_folder))?;
+                    backend.add_msg(&sent_folder, &sent_msg, "seen")?;
                     msg_utils::remove_local_draft()?;
-                    printer.print("Message successfully sent")?;
+                    printer.print_struct("Done!")?;
                     break;
                 }
                 Ok(PostEditChoice::Edit) => {
@@ -355,7 +390,7 @@ impl Msg {
                     continue;
                 }
                 Ok(PostEditChoice::LocalDraft) => {
-                    printer.print("Message successfully saved locally")?;
+                    printer.print_struct("Message successfully saved locally")?;
                     break;
                 }
                 Ok(PostEditChoice::RemoteDraft) => {
@@ -367,7 +402,8 @@ impl Msg {
                         .unwrap_or(DEFAULT_DRAFT_FOLDER);
                     backend.add_msg(&draft_folder, tpl.as_bytes(), "seen draft")?;
                     msg_utils::remove_local_draft()?;
-                    printer.print(format!("Message successfully saved to {}", draft_folder))?;
+                    printer
+                        .print_struct(format!("Message successfully saved to {}", draft_folder))?;
                     break;
                 }
                 Ok(PostEditChoice::Discard) => {
@@ -413,24 +449,19 @@ impl Msg {
     }
 
     pub fn merge_with(&mut self, msg: Msg) {
-        if msg.from.is_some() {
-            self.from = msg.from;
+        self.from = msg.from;
+        self.reply_to = msg.reply_to;
+        self.to = msg.to;
+        self.cc = msg.cc;
+        self.bcc = msg.bcc;
+        self.subject = msg.subject;
+
+        if msg.message_id.is_some() {
+            self.message_id = msg.message_id;
         }
 
-        if msg.to.is_some() {
-            self.to = msg.to;
-        }
-
-        if msg.cc.is_some() {
-            self.cc = msg.cc;
-        }
-
-        if msg.bcc.is_some() {
-            self.bcc = msg.bcc;
-        }
-
-        if !msg.subject.is_empty() {
-            self.subject = msg.subject;
+        if msg.in_reply_to.is_some() {
+            self.in_reply_to = msg.in_reply_to;
         }
 
         for part in msg.parts.0.into_iter() {
@@ -623,24 +654,18 @@ impl Msg {
         parsed_mail: mailparse::ParsedMail<'_>,
         config: &AccountConfig,
     ) -> Result<Self> {
-        info!("begin: building message from parsed mail");
+        trace!(">> build message from parsed mail");
         trace!("parsed mail: {:?}", parsed_mail);
 
         let mut msg = Msg::default();
-
-        debug!("parsing headers");
         for header in parsed_mail.get_headers() {
+            trace!(">> parse header {:?}", header);
+
             let key = header.get_key();
-            debug!("header key: {:?}", key);
+            trace!("header key: {:?}", key);
 
             let val = header.get_value();
-            let val = String::from_utf8(header.get_value_raw().to_vec())
-                .map(|val| val.trim().to_string())
-                .context(format!(
-                    "cannot decode value {:?} from header {:?}",
-                    key, val
-                ))?;
-            debug!("header value: {:?}", val);
+            trace!("header value: {:?}", val);
 
             match key.to_lowercase().as_str() {
                 "message-id" => msg.message_id = Some(val),
@@ -648,16 +673,15 @@ impl Msg {
                 "subject" => {
                     msg.subject = val;
                 }
-                "date" => {
-                    msg.date = DateTime::parse_from_rfc2822(
-                        val.split_at(val.find(" (").unwrap_or_else(|| val.len())).0,
-                    )
-                    .map_err(|err| {
+                "date" => match mailparse::dateparse(&val) {
+                    Ok(timestamp) => {
+                        msg.date = Some(Utc.timestamp(timestamp, 0).with_timezone(&Local))
+                    }
+                    Err(err) => {
                         warn!("cannot parse message date {:?}, skipping it", val);
-                        err
-                    })
-                    .ok();
-                }
+                        warn!("{}", err);
+                    }
+                },
                 "from" => {
                     msg.from = from_slice_to_addrs(val)
                         .context(format!("cannot parse header {:?}", key))?
@@ -678,16 +702,113 @@ impl Msg {
                     msg.bcc = from_slice_to_addrs(val)
                         .context(format!("cannot parse header {:?}", key))?
                 }
-                _ => (),
+                key => {
+                    msg.headers.insert(key.to_lowercase(), val);
+                }
             }
+            trace!("<< parse header");
         }
 
         msg.parts = Parts::from_parsed_mail(config, &parsed_mail)
             .context("cannot parsed message mime parts")?;
         trace!("message: {:?}", msg);
 
-        info!("end: building message from parsed mail");
+        info!("<< build message from parsed mail");
         Ok(msg)
+    }
+
+    /// Transforms a message into a readable string. A readable
+    /// message is like a template, except that:
+    ///  - headers part is customizable (can be omitted if empty filter given in argument)
+    ///  - body type is customizable (plain or html)
+    pub fn to_readable_string(
+        &self,
+        text_mime: &str,
+        headers: Vec<&str>,
+        config: &AccountConfig,
+    ) -> Result<String> {
+        let mut all_headers = vec![];
+        for h in config.read_headers.iter() {
+            let h = h.to_lowercase();
+            if !all_headers.contains(&h) {
+                all_headers.push(h)
+            }
+        }
+        for h in headers.iter() {
+            let h = h.to_lowercase();
+            if !all_headers.contains(&h) {
+                all_headers.push(h)
+            }
+        }
+
+        let mut readable_msg = String::new();
+        for h in all_headers {
+            match h.as_str() {
+                "message-id" => match self.message_id {
+                    Some(ref message_id) if !message_id.is_empty() => {
+                        readable_msg.push_str(&format!("Message-Id: {}\n", message_id));
+                    }
+                    _ => (),
+                },
+                "in-reply-to" => match self.in_reply_to {
+                    Some(ref in_reply_to) if !in_reply_to.is_empty() => {
+                        readable_msg.push_str(&format!("In-Reply-To: {}\n", in_reply_to));
+                    }
+                    _ => (),
+                },
+                "subject" => {
+                    readable_msg.push_str(&format!("Subject: {}\n", self.subject));
+                }
+                "date" => {
+                    if let Some(ref date) = self.date {
+                        readable_msg.push_str(&format!("Date: {}\n", date.to_rfc2822()));
+                    }
+                }
+                "from" => match self.from {
+                    Some(ref addrs) if !addrs.is_empty() => {
+                        readable_msg.push_str(&format!("From: {}\n", addrs));
+                    }
+                    _ => (),
+                },
+                "to" => match self.to {
+                    Some(ref addrs) if !addrs.is_empty() => {
+                        readable_msg.push_str(&format!("To: {}\n", addrs));
+                    }
+                    _ => (),
+                },
+                "reply-to" => match self.reply_to {
+                    Some(ref addrs) if !addrs.is_empty() => {
+                        readable_msg.push_str(&format!("Reply-To: {}\n", addrs));
+                    }
+                    _ => (),
+                },
+                "cc" => match self.cc {
+                    Some(ref addrs) if !addrs.is_empty() => {
+                        readable_msg.push_str(&format!("Cc: {}\n", addrs));
+                    }
+                    _ => (),
+                },
+                "bcc" => match self.bcc {
+                    Some(ref addrs) if !addrs.is_empty() => {
+                        readable_msg.push_str(&format!("Bcc: {}\n", addrs));
+                    }
+                    _ => (),
+                },
+                key => match self.headers.get(key) {
+                    Some(ref val) if !val.is_empty() => {
+                        readable_msg.push_str(&format!("{}: {}\n", key.to_case(Case::Train), val));
+                    }
+                    _ => (),
+                },
+            };
+        }
+
+        if !readable_msg.is_empty() {
+            readable_msg.push_str("\n");
+        }
+
+        readable_msg.push_str(&self.fold_text_parts(text_mime));
+        Ok(readable_msg)
     }
 }
 
@@ -695,7 +816,19 @@ impl TryInto<lettre::address::Envelope> for Msg {
     type Error = Error;
 
     fn try_into(self) -> Result<lettre::address::Envelope> {
-        let from = match self.from.and_then(|addrs| addrs.extract_single_info()) {
+        (&self).try_into()
+    }
+}
+
+impl TryInto<lettre::address::Envelope> for &Msg {
+    type Error = Error;
+
+    fn try_into(self) -> Result<lettre::address::Envelope> {
+        let from = match self
+            .from
+            .as_ref()
+            .and_then(|addrs| addrs.clone().extract_single_info())
+        {
             Some(addr) => addr.addr.parse().map(Some),
             None => Ok(None),
         }?;
@@ -705,5 +838,236 @@ impl TryInto<lettre::address::Envelope> for Msg {
             .map(from_addrs_to_sendable_addrs)
             .unwrap_or(Ok(vec![]))?;
         Ok(lettre::address::Envelope::new(from, to).context("cannot create envelope")?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use mailparse::SingleInfo;
+    use std::iter::FromIterator;
+
+    use crate::msg::Addr;
+
+    use super::*;
+
+    #[test]
+    fn test_into_reply() {
+        let config = AccountConfig {
+            display_name: "Test".into(),
+            email: "test-account@local".into(),
+            ..AccountConfig::default()
+        };
+
+        // Checks that:
+        //  - "message_id" moves to "in_reply_to"
+        //  - "subject" starts by "Re: "
+        //  - "to" is replaced by "from"
+        //  - "from" is replaced by the address from the account config
+
+        let msg = Msg {
+            message_id: Some("msg-id".into()),
+            subject: "subject".into(),
+            from: Some(
+                vec![Addr::Single(SingleInfo {
+                    addr: "test-sender@local".into(),
+                    display_name: None,
+                })]
+                .into(),
+            ),
+            ..Msg::default()
+        }
+        .into_reply(false, &config)
+        .unwrap();
+
+        assert_eq!(msg.message_id, None);
+        assert_eq!(msg.in_reply_to.unwrap(), "msg-id");
+        assert_eq!(msg.subject, "Re: subject");
+        assert_eq!(
+            msg.from.unwrap().to_string(),
+            "\"Test\" <test-account@local>"
+        );
+        assert_eq!(msg.to.unwrap().to_string(), "test-sender@local");
+
+        // Checks that:
+        //  - "subject" does not contains additional "Re: "
+        //  - "to" is replaced by reply_to
+        //  - "to" contains one address when "all" is false
+        //  - "cc" are empty when "all" is false
+
+        let msg = Msg {
+            subject: "Re: subject".into(),
+            from: Some(
+                vec![Addr::Single(SingleInfo {
+                    addr: "test-sender@local".into(),
+                    display_name: None,
+                })]
+                .into(),
+            ),
+            reply_to: Some(
+                vec![
+                    Addr::Single(SingleInfo {
+                        addr: "test-sender-to-reply@local".into(),
+                        display_name: Some("Sender".into()),
+                    }),
+                    Addr::Single(SingleInfo {
+                        addr: "test-sender-to-reply-2@local".into(),
+                        display_name: Some("Sender 2".into()),
+                    }),
+                ]
+                .into(),
+            ),
+            cc: Some(
+                vec![Addr::Single(SingleInfo {
+                    addr: "test-cc@local".into(),
+                    display_name: None,
+                })]
+                .into(),
+            ),
+            ..Msg::default()
+        }
+        .into_reply(false, &config)
+        .unwrap();
+
+        assert_eq!(msg.subject, "Re: subject");
+        assert_eq!(
+            msg.to.unwrap().to_string(),
+            "\"Sender\" <test-sender-to-reply@local>"
+        );
+        assert_eq!(msg.cc, None);
+
+        // Checks that:
+        //  - "to" contains all addresses except for the sender when "all" is true
+        //  - "cc" contains all addresses except for the sender when "all" is true
+
+        let msg = Msg {
+            from: Some(
+                vec![
+                    Addr::Single(SingleInfo {
+                        addr: "test-sender-1@local".into(),
+                        display_name: Some("Sender 1".into()),
+                    }),
+                    Addr::Single(SingleInfo {
+                        addr: "test-sender-2@local".into(),
+                        display_name: Some("Sender 2".into()),
+                    }),
+                    Addr::Single(SingleInfo {
+                        addr: "test-account@local".into(),
+                        display_name: Some("Test".into()),
+                    }),
+                ]
+                .into(),
+            ),
+            cc: Some(
+                vec![
+                    Addr::Single(SingleInfo {
+                        addr: "test-sender-1@local".into(),
+                        display_name: Some("Sender 1".into()),
+                    }),
+                    Addr::Single(SingleInfo {
+                        addr: "test-sender-2@local".into(),
+                        display_name: Some("Sender 2".into()),
+                    }),
+                    Addr::Single(SingleInfo {
+                        addr: "test-account@local".into(),
+                        display_name: None,
+                    }),
+                ]
+                .into(),
+            ),
+            ..Msg::default()
+        }
+        .into_reply(true, &config)
+        .unwrap();
+
+        assert_eq!(
+            msg.to.unwrap().to_string(),
+            "\"Sender 1\" <test-sender-1@local>, \"Sender 2\" <test-sender-2@local>"
+        );
+        assert_eq!(
+            msg.cc.unwrap().to_string(),
+            "\"Sender 1\" <test-sender-1@local>, \"Sender 2\" <test-sender-2@local>"
+        );
+    }
+
+    #[test]
+    fn test_to_readable() {
+        let config = AccountConfig::default();
+        let msg = Msg {
+            parts: Parts(vec![Part::TextPlain(TextPlainPart {
+                content: String::from("hello, world!"),
+            })]),
+            ..Msg::default()
+        };
+
+        // empty msg headers, empty headers, empty config
+        assert_eq!(
+            "hello, world!",
+            msg.to_readable_string("plain", vec![], &config).unwrap()
+        );
+        // empty msg headers, basic headers
+        assert_eq!(
+            "hello, world!",
+            msg.to_readable_string("plain", vec!["From", "DATE", "custom-hEader"], &config)
+                .unwrap()
+        );
+        // empty msg headers, multiple subject headers
+        assert_eq!(
+            "Subject: \n\nhello, world!",
+            msg.to_readable_string("plain", vec!["subject", "Subject", "SUBJECT"], &config)
+                .unwrap()
+        );
+
+        let msg = Msg {
+            headers: HashMap::from_iter([("custom-header".into(), "custom value".into())]),
+            message_id: Some("<message-id>".into()),
+            from: Some(
+                vec![Addr::Single(SingleInfo {
+                    addr: "test@local".into(),
+                    display_name: Some("Test".into()),
+                })]
+                .into(),
+            ),
+            cc: Some(vec![].into()),
+            parts: Parts(vec![Part::TextPlain(TextPlainPart {
+                content: String::from("hello, world!"),
+            })]),
+            ..Msg::default()
+        };
+
+        // header present in msg headers, empty config
+        assert_eq!(
+            "From: \"Test\" <test@local>\n\nhello, world!",
+            msg.to_readable_string("plain", vec!["from"], &config)
+                .unwrap()
+        );
+        // header present but empty in msg headers, empty config
+        assert_eq!(
+            "hello, world!",
+            msg.to_readable_string("plain", vec!["cc"], &config)
+                .unwrap()
+        );
+        // multiple same custom headers present in msg headers, empty
+        // config
+        assert_eq!(
+            "Custom-Header: custom value\n\nhello, world!",
+            msg.to_readable_string("plain", vec!["custom-header", "cuSTom-HeaDer"], &config)
+                .unwrap()
+        );
+
+        let config = AccountConfig {
+            read_headers: vec![
+                "CusTOM-heaDER".into(),
+                "Subject".into(),
+                "from".into(),
+                "cc".into(),
+            ],
+            ..AccountConfig::default()
+        };
+        // header present but empty in msg headers, empty config
+        assert_eq!(
+            "Custom-Header: custom value\nSubject: \nFrom: \"Test\" <test@local>\nMessage-Id: <message-id>\n\nhello, world!",
+            msg.to_readable_string("plain", vec!["cc", "message-ID"], &config)
+                .unwrap()
+        );
     }
 }

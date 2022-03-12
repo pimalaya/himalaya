@@ -8,7 +8,6 @@ use log::{debug, info, trace};
 use mailparse::addrparse;
 use std::{
     borrow::Cow,
-    convert::TryInto,
     fs,
     io::{self, BufRead},
 };
@@ -32,21 +31,29 @@ pub fn attachments<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
 ) -> Result<()> {
     let attachments = backend.get_msg(mbox, seq)?.attachments();
     let attachments_len = attachments.len();
-    debug!(
-        r#"{} attachment(s) found for message "{}""#,
-        attachments_len, seq
-    );
+
+    if attachments_len == 0 {
+        return printer.print_struct(format!("No attachment found for message {:?}", seq));
+    }
+
+    printer.print_str(format!(
+        "Found {:?} attachment{} for message {:?}",
+        attachments_len,
+        if attachments_len > 1 { "s" } else { "" },
+        seq
+    ))?;
 
     for attachment in attachments {
         let file_path = config.get_download_file_path(&attachment.filename)?;
-        debug!("downloading {}…", attachment.filename);
+        printer.print_str(format!("Downloading {:?}…", file_path))?;
         fs::write(&file_path, &attachment.content)
             .context(format!("cannot download attachment {:?}", file_path))?;
     }
 
-    printer.print(format!(
-        "{} attachment(s) successfully downloaded to {:?}",
-        attachments_len, config.downloads_dir
+    printer.print_struct(format!(
+        "Attachment{} successfully downloaded to {:?}",
+        if attachments_len > 1 { "s" } else { "" },
+        config.downloads_dir
     ))
 }
 
@@ -59,7 +66,7 @@ pub fn copy<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     backend: Box<&mut B>,
 ) -> Result<()> {
     backend.copy_msg(mbox_src, mbox_dst, seq)?;
-    printer.print(format!(
+    printer.print_struct(format!(
         r#"Message {} successfully copied to folder "{}""#,
         seq, mbox_dst
     ))
@@ -73,7 +80,7 @@ pub fn delete<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     backend: Box<&'a mut B>,
 ) -> Result<()> {
     backend.del_msg(mbox, seq)?;
-    printer.print(format!(r#"Message(s) {} successfully deleted"#, seq))
+    printer.print_struct(format!(r#"Message(s) {} successfully deleted"#, seq))
 }
 
 /// Forward the given message UID from the selected mailbox.
@@ -189,7 +196,7 @@ pub fn move_<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     backend: Box<&'a mut B>,
 ) -> Result<()> {
     backend.move_msg(mbox_src, mbox_dst, seq)?;
-    printer.print(format!(
+    printer.print_struct(format!(
         r#"Message {} successfully moved to folder "{}""#,
         seq, mbox_dst
     ))
@@ -200,19 +207,20 @@ pub fn read<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     seq: &str,
     text_mime: &str,
     raw: bool,
+    headers: Vec<&str>,
     mbox: &str,
+    config: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
     let msg = backend.get_msg(mbox, seq)?;
-    let msg = if raw {
+
+    printer.print_struct(if raw {
         // Emails don't always have valid utf8. Using "lossy" to display what we can.
         String::from_utf8_lossy(&msg.raw).into_owned()
     } else {
-        msg.fold_text_parts(text_mime)
-    };
-
-    printer.print(msg)
+        msg.to_readable_string(text_mime, headers, config)?
+    })
 }
 
 /// Reply to the given message UID.
@@ -348,9 +356,8 @@ pub fn send<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
             .join("\r\n")
     };
     trace!("raw message: {:?}", raw_msg);
-    let envelope: lettre::address::Envelope = Msg::from_tpl(&raw_msg)?.try_into()?;
-    trace!("envelope: {:?}", envelope);
-    smtp.send_raw_msg(&envelope, raw_msg.as_bytes())?;
+    let msg = Msg::from_tpl(&raw_msg)?;
+    smtp.send(&config, &msg)?;
     backend.add_msg(&sent_folder, raw_msg.as_bytes(), "seen")?;
     Ok(())
 }

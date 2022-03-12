@@ -183,13 +183,13 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
         .subcommand(
             SubCommand::with_name("save")
                 .about("Saves a message based on the given template")
-                .arg(&msg_args::attachment_arg())
+                .arg(&msg_args::attachments_arg())
                 .arg(Arg::with_name("template").raw(true)),
         )
         .subcommand(
             SubCommand::with_name("send")
                 .about("Sends a message based on the given template")
-                .arg(&msg_args::attachment_arg())
+                .arg(&msg_args::attachments_arg())
                 .arg(Arg::with_name("template").raw(true)),
         )]
 }

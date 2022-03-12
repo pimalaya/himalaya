@@ -17,21 +17,24 @@ use crate::{
 
 /// Represents a list of Notmuch mailboxes.
 #[derive(Debug, Default, serde::Serialize)]
-pub struct NotmuchMboxes(pub Vec<NotmuchMbox>);
+pub struct NotmuchMboxes {
+    #[serde(rename = "response")]
+    pub mboxes: Vec<NotmuchMbox>,
+}
 
 impl Deref for NotmuchMboxes {
     type Target = Vec<NotmuchMbox>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.mboxes
     }
 }
 
 impl PrintTable for NotmuchMboxes {
-    fn print_table(&self, writter: &mut dyn WriteColor, opts: PrintTableOpts) -> Result<()> {
-        writeln!(writter)?;
-        Table::print(writter, self, opts)?;
-        writeln!(writter)?;
+    fn print_table(&self, writer: &mut dyn WriteColor, opts: PrintTableOpts) -> Result<()> {
+        writeln!(writer)?;
+        Table::print(writer, self, opts)?;
+        writeln!(writer)?;
         Ok(())
     }
 }

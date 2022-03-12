@@ -168,6 +168,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "convert_case"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fb4a24b1aaf0fd0ce8b45161144d6f42cd91677fd5940fd431183eb023b3a2b8"
+
+[[package]]
 name = "core-foundation"
 version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -436,13 +442,14 @@ dependencies = [
 
 [[package]]
 name = "himalaya"
-version = "0.5.8"
+version = "0.5.9"
 dependencies = [
  "ammonia",
  "anyhow",
  "atty",
  "chrono",
  "clap",
+ "convert_case",
  "env_logger",
  "erased-serde",
  "html-escape",

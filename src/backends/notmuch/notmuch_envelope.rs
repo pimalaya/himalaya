@@ -19,27 +19,30 @@ use crate::{
 
 /// Represents a list of envelopes.
 #[derive(Debug, Default, serde::Serialize)]
-pub struct NotmuchEnvelopes(pub Vec<NotmuchEnvelope>);
+pub struct NotmuchEnvelopes {
+    #[serde(rename = "response")]
+    pub envelopes: Vec<NotmuchEnvelope>,
+}
 
 impl Deref for NotmuchEnvelopes {
     type Target = Vec<NotmuchEnvelope>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.envelopes
     }
 }
 
 impl DerefMut for NotmuchEnvelopes {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.envelopes
     }
 }
 
 impl PrintTable for NotmuchEnvelopes {
-    fn print_table(&self, writter: &mut dyn WriteColor, opts: PrintTableOpts) -> Result<()> {
-        writeln!(writter)?;
-        Table::print(writter, self, opts)?;
-        writeln!(writter)?;
+    fn print_table(&self, writer: &mut dyn WriteColor, opts: PrintTableOpts) -> Result<()> {
+        writeln!(writer)?;
+        Table::print(writer, self, opts)?;
+        writeln!(writer)?;
         Ok(())
     }
 }
@@ -107,7 +110,7 @@ impl<'a> TryFrom<RawNotmuchEnvelopes> for NotmuchEnvelopes {
                 .context("cannot parse notmuch mail entry")?;
             envelopes.push(envelope);
         }
-        Ok(NotmuchEnvelopes(envelopes))
+        Ok(NotmuchEnvelopes { envelopes })
     }
 }
 

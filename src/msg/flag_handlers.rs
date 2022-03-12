@@ -16,7 +16,7 @@ pub fn add<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     backend: Box<&'a mut B>,
 ) -> Result<()> {
     backend.add_flags(mbox, seq_range, flags)?;
-    printer.print(format!(
+    printer.print_struct(format!(
         "Flag(s) {:?} successfully added to message(s) {:?}",
         flags, seq_range
     ))
@@ -32,7 +32,7 @@ pub fn remove<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     backend: Box<&'a mut B>,
 ) -> Result<()> {
     backend.del_flags(mbox, seq_range, flags)?;
-    printer.print(format!(
+    printer.print_struct(format!(
         "Flag(s) {:?} successfully removed from message(s) {:?}",
         flags, seq_range
     ))
@@ -48,7 +48,7 @@ pub fn set<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     backend: Box<&'a mut B>,
 ) -> Result<()> {
     backend.set_flags(mbox, seq_range, flags)?;
-    printer.print(format!(
+    printer.print_struct(format!(
         "Flag(s) {:?} successfully set for message(s) {:?}",
         flags, seq_range
     ))

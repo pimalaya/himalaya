@@ -5,7 +5,7 @@
 
 use anyhow::{anyhow, Context, Result};
 use log::{debug, info, trace};
-use std::{convert::TryInto, fs, path::PathBuf};
+use std::{convert::TryInto, env, fs, path::PathBuf};
 
 use crate::{
     backends::{Backend, IdMapper, MaildirEnvelopes, MaildirFlags, MaildirMboxes},
@@ -41,30 +41,32 @@ impl<'a> MaildirBackend<'a> {
 
     /// Creates a maildir instance from a string slice.
     pub fn get_mdir_from_dir(&self, dir: &str) -> Result<maildir::Maildir> {
+        let dir = self.account_config.get_mbox_alias(dir)?;
+
         // If the dir points to the inbox folder, creates a maildir
         // instance from the root folder.
-        if dir == "inbox" {
-            self.validate_mdir_path(self.mdir.path().to_owned())
-                .map(maildir::Maildir::from)
-        } else {
-            // If the dir is a valid maildir path, creates a maildir instance from it.
-            self.validate_mdir_path(dir.into())
-                .or_else(|_| {
-                    // Otherwise creates a maildir instance from a
-                    // maildir subdirectory by adding a "." in front
-                    // of the name as described in the spec:
-                    // https://cr.yp.to/proto/maildir.html
-                    let dir = self
-                        .account_config
-                        .mailboxes
-                        .get(dir)
-                        .map(|s| s.as_str())
-                        .unwrap_or(dir);
-                    let path = self.mdir.path().join(format!(".{}", dir));
-                    self.validate_mdir_path(path)
-                })
-                .map(maildir::Maildir::from)
+        if &dir == "inbox" {
+            return self
+                .validate_mdir_path(self.mdir.path().to_owned())
+                .map(maildir::Maildir::from);
         }
+
+        // If the dir is a valid maildir path, creates a maildir
+        // instance from it. First checks for absolute path,
+        self.validate_mdir_path((&dir).into())
+            // then for relative path to `maildir-dir`,
+            .or_else(|_| self.validate_mdir_path(self.mdir.path().join(&dir)))
+            // and finally for relative path to the current directory.
+            .or_else(|_| self.validate_mdir_path(env::current_dir()?.join(&dir)))
+            .or_else(|_| {
+                // Otherwise creates a maildir instance from a maildir
+                // subdirectory by adding a "." in front of the name
+                // as described in the [spec].
+                //
+                // [spec]: http://www.courier-mta.org/imap/README.maildirquota.html
+                self.validate_mdir_path(self.mdir.path().join(format!(".{}", dir)))
+            })
+            .map(maildir::Maildir::from)
     }
 }
 
@@ -149,7 +151,7 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         envelopes.sort_by(|a, b| b.date.partial_cmp(&a.date).unwrap());
 
         // Applies pagination boundaries.
-        envelopes.0 = envelopes[page_begin..page_end].to_owned();
+        envelopes.envelopes = envelopes[page_begin..page_end].to_owned();
 
         // Appends envelopes hash to the id mapper cache file and
         // calculates the new short hash length. The short hash length
