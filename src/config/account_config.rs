@@ -32,6 +32,9 @@ pub struct AccountConfig {
     /// Represents the text/plain format as defined in the
     /// [RFC2646](https://www.ietf.org/rfc/rfc2646.txt)
     pub format: Format,
+    /// Overrides the default headers displayed at the top of
+    /// the read message.
+    pub read_headers: Vec<String>,
 
     /// Represents mailbox aliases.
     pub mailboxes: HashMap<String, String>,
@@ -157,6 +160,7 @@ impl<'a> AccountConfig {
                 .unwrap_or(&vec![])
                 .to_owned(),
             format: base_account.format.unwrap_or_default(),
+            read_headers: base_account.read_headers,
             mailboxes: base_account.mailboxes.clone(),
             hooks: base_account.hooks.unwrap_or_default(),
             default: base_account.default.unwrap_or_default(),

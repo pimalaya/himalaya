@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - SMTP pre-send hook [#178]
+- Customize headers to show at the top of a read message [#338]
 
 ### Changed
 
@@ -503,3 +504,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#329]: https://github.com/soywod/himalaya/issues/329
 [#331]: https://github.com/soywod/himalaya/issues/331
 [#335]: https://github.com/soywod/himalaya/issues/335
+[#338]: https://github.com/soywod/himalaya/issues/338

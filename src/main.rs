@@ -222,7 +222,16 @@ fn main() -> Result<()> {
             return msg_handlers::move_(seq, mbox, mbox_dst, &mut printer, backend);
         }
         Some(msg_args::Cmd::Read(seq, text_mime, raw, headers)) => {
-            return msg_handlers::read(seq, text_mime, raw, headers, mbox, &mut printer, backend);
+            return msg_handlers::read(
+                seq,
+                text_mime,
+                raw,
+                headers,
+                mbox,
+                &account_config,
+                &mut printer,
+                backend,
+            );
         }
         Some(msg_args::Cmd::Reply(seq, all, attachment_paths, encrypt)) => {
             return msg_handlers::reply(

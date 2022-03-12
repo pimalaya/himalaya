@@ -209,6 +209,7 @@ pub fn read<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     raw: bool,
     headers: Vec<&str>,
     mbox: &str,
+    config: &AccountConfig,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
@@ -218,7 +219,7 @@ pub fn read<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
         // Emails don't always have valid utf8. Using "lossy" to display what we can.
         String::from_utf8_lossy(&msg.raw).into_owned()
     } else {
-        msg.to_readable_string(text_mime, headers)?
+        msg.to_readable_string(text_mime, headers, config)?
     })
 }
 

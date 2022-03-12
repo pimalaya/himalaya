@@ -729,11 +729,29 @@ impl Msg {
     /// message is like a template, except that:
     ///  - headers part is customizable (can be omitted if empty filter given in argument)
     ///  - body type is customizable (plain or html)
-    pub fn to_readable_string(&self, text_mime: &str, headers: Vec<&str>) -> Result<String> {
-        let mut readable_msg = String::new();
+    pub fn to_readable_string(
+        &self,
+        text_mime: &str,
+        headers: Vec<&str>,
+        config: &AccountConfig,
+    ) -> Result<String> {
+        let mut all_headers = vec![];
+        for h in config.read_headers.iter() {
+            let h = h.to_lowercase();
+            if !all_headers.contains(&h) {
+                all_headers.push(h)
+            }
+        }
+        for h in headers.iter() {
+            let h = h.to_lowercase();
+            if !all_headers.contains(&h) {
+                all_headers.push(h)
+            }
+        }
 
-        for h in headers {
-            match h.to_lowercase().as_str() {
+        let mut readable_msg = String::new();
+        for h in all_headers {
+            match h.as_str() {
                 "message-id" => match self.message_id {
                     Some(ref message_id) if !message_id.is_empty() => {
                         readable_msg.push_str(&format!("Message-Id: {}\n", message_id));
@@ -833,9 +851,8 @@ impl TryInto<lettre::address::Envelope> for &Msg {
 
 #[cfg(test)]
 mod tests {
-    use std::iter::FromIterator;
-
     use mailparse::SingleInfo;
+    use std::iter::FromIterator;
 
     use crate::msg::Addr;
 
@@ -982,6 +999,7 @@ mod tests {
 
     #[test]
     fn test_to_readable() {
+        let config = AccountConfig::default();
         let msg = Msg {
             parts: Parts(vec![Part::TextPlain(TextPlainPart {
                 content: String::from("hello, world!"),
@@ -989,21 +1007,22 @@ mod tests {
             ..Msg::default()
         };
 
-        // empty msg, empty headers
+        // empty msg headers, empty headers, empty config
         assert_eq!(
             "hello, world!",
-            msg.to_readable_string("plain", vec![]).unwrap()
+            msg.to_readable_string("plain", vec![], &config).unwrap()
         );
-        // empty msg, basic headers
+        // empty msg headers, basic headers
         assert_eq!(
             "hello, world!",
-            msg.to_readable_string("plain", vec!["from", "date", "custom-header"])
+            msg.to_readable_string("plain", vec!["From", "DATE", "custom-hEader"], &config)
                 .unwrap()
         );
-        // empty msg, subject header
+        // empty msg headers, multiple subject headers
         assert_eq!(
             "Subject: \n\nhello, world!",
-            msg.to_readable_string("plain", vec!["subject"]).unwrap()
+            msg.to_readable_string("plain", vec!["subject", "Subject", "SUBJECT"], &config)
+                .unwrap()
         );
 
         let msg = Msg {
@@ -1023,26 +1042,39 @@ mod tests {
             ..Msg::default()
         };
 
-        // header present in msg headers
+        // header present in msg headers, empty config
         assert_eq!(
             "From: \"Test\" <test@local>\n\nhello, world!",
-            msg.to_readable_string("plain", vec!["from"]).unwrap()
-        );
-        // header present but empty in msg headers
-        assert_eq!(
-            "hello, world!",
-            msg.to_readable_string("plain", vec!["cc"]).unwrap()
-        );
-        // custom header present in msg headers
-        assert_eq!(
-            "Custom-Header: custom value\n\nhello, world!",
-            msg.to_readable_string("plain", vec!["custom-header"])
+            msg.to_readable_string("plain", vec!["from"], &config)
                 .unwrap()
         );
-        // custom header present in msg headers (case insensitivity)
+        // header present but empty in msg headers, empty config
+        assert_eq!(
+            "hello, world!",
+            msg.to_readable_string("plain", vec!["cc"], &config)
+                .unwrap()
+        );
+        // multiple same custom headers present in msg headers, empty
+        // config
         assert_eq!(
             "Custom-Header: custom value\n\nhello, world!",
-            msg.to_readable_string("plain", vec!["CUSTOM-hEaDer"])
+            msg.to_readable_string("plain", vec!["custom-header", "cuSTom-HeaDer"], &config)
+                .unwrap()
+        );
+
+        let config = AccountConfig {
+            read_headers: vec![
+                "CusTOM-heaDER".into(),
+                "Subject".into(),
+                "from".into(),
+                "cc".into(),
+            ],
+            ..AccountConfig::default()
+        };
+        // header present but empty in msg headers, empty config
+        assert_eq!(
+            "Custom-Header: custom value\nSubject: \nFrom: \"Test\" <test@local>\nMessage-Id: <message-id>\n\nhello, world!",
+            msg.to_readable_string("plain", vec!["cc", "message-ID"], &config)
                 .unwrap()
         );
     }
