@@ -710,7 +710,7 @@ impl Msg {
                 }
                 key => {
                     msg.headers.insert(
-                        key.to_owned(),
+                        key.to_lowercase(),
                         rfc2047_decoder::decode(val.as_bytes()).unwrap_or(val),
                     );
                 }
@@ -786,13 +786,17 @@ impl Msg {
                 },
                 key => match self.headers.get(key) {
                     Some(ref val) if !val.is_empty() => {
-                        readable_msg.push_str(&format!("{}: {}\n", key.to_case(Case::Pascal), val));
+                        readable_msg.push_str(&format!("{}: {}\n", key.to_case(Case::Train), val));
                     }
                     _ => (),
                 },
             };
         }
-        readable_msg.push_str("\n");
+
+        if !readable_msg.is_empty() {
+            readable_msg.push_str("\n");
+        }
+
         readable_msg.push_str(&self.fold_text_parts(text_mime));
         Ok(readable_msg)
     }
@@ -829,6 +833,8 @@ impl TryInto<lettre::address::Envelope> for &Msg {
 
 #[cfg(test)]
 mod tests {
+    use std::iter::FromIterator;
+
     use mailparse::SingleInfo;
 
     use crate::msg::Addr;
@@ -971,6 +977,73 @@ mod tests {
         assert_eq!(
             msg.cc.unwrap().to_string(),
             "\"Sender 1\" <test-sender-1@local>, \"Sender 2\" <test-sender-2@local>"
+        );
+    }
+
+    #[test]
+    fn test_to_readable() {
+        let msg = Msg {
+            parts: Parts(vec![Part::TextPlain(TextPlainPart {
+                content: String::from("hello, world!"),
+            })]),
+            ..Msg::default()
+        };
+
+        // empty msg, empty headers
+        assert_eq!(
+            "hello, world!",
+            msg.to_readable_string("plain", vec![]).unwrap()
+        );
+        // empty msg, basic headers
+        assert_eq!(
+            "hello, world!",
+            msg.to_readable_string("plain", vec!["from", "date", "custom-header"])
+                .unwrap()
+        );
+        // empty msg, subject header
+        assert_eq!(
+            "Subject: \n\nhello, world!",
+            msg.to_readable_string("plain", vec!["subject"]).unwrap()
+        );
+
+        let msg = Msg {
+            headers: HashMap::from_iter([("custom-header".into(), "custom value".into())]),
+            message_id: Some("<message-id>".into()),
+            from: Some(
+                vec![Addr::Single(SingleInfo {
+                    addr: "test@local".into(),
+                    display_name: Some("Test".into()),
+                })]
+                .into(),
+            ),
+            cc: Some(vec![].into()),
+            parts: Parts(vec![Part::TextPlain(TextPlainPart {
+                content: String::from("hello, world!"),
+            })]),
+            ..Msg::default()
+        };
+
+        // header present in msg headers
+        assert_eq!(
+            "From: \"Test\" <test@local>\n\nhello, world!",
+            msg.to_readable_string("plain", vec!["from"]).unwrap()
+        );
+        // header present but empty in msg headers
+        assert_eq!(
+            "hello, world!",
+            msg.to_readable_string("plain", vec!["cc"]).unwrap()
+        );
+        // custom header present in msg headers
+        assert_eq!(
+            "Custom-Header: custom value\n\nhello, world!",
+            msg.to_readable_string("plain", vec!["custom-header"])
+                .unwrap()
+        );
+        // custom header present in msg headers (case insensitivity)
+        assert_eq!(
+            "Custom-Header: custom value\n\nhello, world!",
+            msg.to_readable_string("plain", vec!["CUSTOM-hEaDer"])
+                .unwrap()
         );
     }
 }
