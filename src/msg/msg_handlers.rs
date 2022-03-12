@@ -207,19 +207,19 @@ pub fn read<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     seq: &str,
     text_mime: &str,
     raw: bool,
+    headers: Vec<&str>,
     mbox: &str,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
     let msg = backend.get_msg(mbox, seq)?;
-    let msg = if raw {
+
+    printer.print_struct(if raw {
         // Emails don't always have valid utf8. Using "lossy" to display what we can.
         String::from_utf8_lossy(&msg.raw).into_owned()
     } else {
-        msg.fold_text_parts(text_mime)
-    };
-
-    printer.print_struct(msg)
+        msg.to_readable_string(text_mime, headers)?
+    })
 }
 
 /// Reply to the given message UID.

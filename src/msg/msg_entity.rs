@@ -1,11 +1,19 @@
 use ammonia;
 use anyhow::{anyhow, Context, Error, Result};
 use chrono::{DateTime, FixedOffset};
+use convert_case::{Case, Casing};
 use html_escape;
 use lettre::message::{header::ContentType, Attachment, MultiPart, SinglePart};
 use log::{debug, info, trace, warn};
 use regex::Regex;
-use std::{collections::HashSet, convert::TryInto, env::temp_dir, fmt::Debug, fs, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    convert::TryInto,
+    env::temp_dir,
+    fmt::Debug,
+    fs,
+    path::PathBuf,
+};
 use uuid::Uuid;
 
 use crate::{
@@ -41,6 +49,7 @@ pub struct Msg {
     pub bcc: Option<Addrs>,
     pub in_reply_to: Option<String>,
     pub message_id: Option<String>,
+    pub headers: HashMap<String, String>,
 
     /// The internal date of the message.
     ///
@@ -665,9 +674,11 @@ impl Msg {
                 "message-id" => msg.message_id = Some(val),
                 "in-reply-to" => msg.in_reply_to = Some(val),
                 "subject" => {
-                    msg.subject = val;
+                    msg.subject = rfc2047_decoder::decode(val.as_bytes())?;
                 }
                 "date" => {
+                    // TODO: use date format instead
+                    // https://github.com/jonhoo/rust-imap/blob/afbc5118f251da4e3f6a1e560e749c0700020b54/src/types/fetch.rs#L16
                     msg.date = DateTime::parse_from_rfc2822(
                         val.split_at(val.find(" (").unwrap_or_else(|| val.len())).0,
                     )
@@ -697,7 +708,12 @@ impl Msg {
                     msg.bcc = from_slice_to_addrs(val)
                         .context(format!("cannot parse header {:?}", key))?
                 }
-                _ => (),
+                key => {
+                    msg.headers.insert(
+                        key.to_owned(),
+                        rfc2047_decoder::decode(val.as_bytes()).unwrap_or(val),
+                    );
+                }
             }
         }
 
@@ -707,6 +723,78 @@ impl Msg {
 
         info!("end: building message from parsed mail");
         Ok(msg)
+    }
+
+    /// Transforms a message into a readable string. A readable
+    /// message is like a template, except that:
+    ///  - headers part is customizable (can be omitted if empty filter given in argument)
+    ///  - body type is customizable (plain or html)
+    pub fn to_readable_string(&self, text_mime: &str, headers: Vec<&str>) -> Result<String> {
+        let mut readable_msg = String::new();
+
+        for h in headers {
+            match h.to_lowercase().as_str() {
+                "message-id" => match self.message_id {
+                    Some(ref message_id) if !message_id.is_empty() => {
+                        readable_msg.push_str(&format!("Message-Id: {}\n", message_id));
+                    }
+                    _ => (),
+                },
+                "in-reply-to" => match self.in_reply_to {
+                    Some(ref in_reply_to) if !in_reply_to.is_empty() => {
+                        readable_msg.push_str(&format!("In-Reply-To: {}\n", in_reply_to));
+                    }
+                    _ => (),
+                },
+                "subject" => {
+                    readable_msg.push_str(&format!("Subject: {}\n", self.subject));
+                }
+                "date" => {
+                    if let Some(ref date) = self.date {
+                        readable_msg.push_str(&format!("Date: {}\n", date));
+                    }
+                }
+                "from" => match self.from {
+                    Some(ref addrs) if !addrs.is_empty() => {
+                        readable_msg.push_str(&format!("From: {}\n", addrs));
+                    }
+                    _ => (),
+                },
+                "to" => match self.to {
+                    Some(ref addrs) if !addrs.is_empty() => {
+                        readable_msg.push_str(&format!("To: {}\n", addrs));
+                    }
+                    _ => (),
+                },
+                "reply-to" => match self.reply_to {
+                    Some(ref addrs) if !addrs.is_empty() => {
+                        readable_msg.push_str(&format!("Reply-To: {}\n", addrs));
+                    }
+                    _ => (),
+                },
+                "cc" => match self.cc {
+                    Some(ref addrs) if !addrs.is_empty() => {
+                        readable_msg.push_str(&format!("Cc: {}\n", addrs));
+                    }
+                    _ => (),
+                },
+                "bcc" => match self.bcc {
+                    Some(ref addrs) if !addrs.is_empty() => {
+                        readable_msg.push_str(&format!("Bcc: {}\n", addrs));
+                    }
+                    _ => (),
+                },
+                key => match self.headers.get(key) {
+                    Some(ref val) if !val.is_empty() => {
+                        readable_msg.push_str(&format!("{}: {}\n", key.to_case(Case::Pascal), val));
+                    }
+                    _ => (),
+                },
+            };
+        }
+        readable_msg.push_str("\n");
+        readable_msg.push_str(&self.fold_text_parts(text_mime));
+        Ok(readable_msg)
     }
 }
 

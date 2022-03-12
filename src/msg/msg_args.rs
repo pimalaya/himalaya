@@ -25,6 +25,7 @@ type AttachmentPaths<'a> = Vec<&'a str>;
 type MaxTableWidth = Option<usize>;
 type Encrypt = bool;
 type Criteria = String;
+type Headers<'a> = Vec<&'a str>;
 
 /// Message commands.
 #[derive(Debug, PartialEq, Eq)]
@@ -35,7 +36,7 @@ pub enum Cmd<'a> {
     Forward(Seq<'a>, AttachmentPaths<'a>, Encrypt),
     List(MaxTableWidth, Option<PageSize>, Page),
     Move(Seq<'a>, Mbox<'a>),
-    Read(Seq<'a>, TextMime<'a>, Raw),
+    Read(Seq<'a>, TextMime<'a>, Raw, Headers<'a>),
     Reply(Seq<'a>, All, AttachmentPaths<'a>, Encrypt),
     Save(RawMsg<'a>),
     Search(Query, MaxTableWidth, Option<PageSize>, Page),
@@ -121,7 +122,9 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
         debug!("text mime: {}", mime);
         let raw = m.is_present("raw");
         debug!("raw: {}", raw);
-        return Ok(Some(Cmd::Read(seq, mime, raw)));
+        let headers: Vec<&str> = m.values_of("headers").unwrap_or_default().collect();
+        debug!("headers: {:?}", headers);
+        return Ok(Some(Cmd::Read(seq, mime, raw, headers)));
     }
 
     if let Some(m) = m.subcommand_matches("reply") {
@@ -318,12 +321,22 @@ fn page_arg<'a>() -> Arg<'a, 'a> {
 }
 
 /// Message attachment argument.
-pub fn attachment_arg<'a>() -> Arg<'a, 'a> {
+pub fn attachments_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name("attachments")
         .help("Adds attachment to the message")
         .short("a")
         .long("attachment")
         .value_name("PATH")
+        .multiple(true)
+}
+
+/// Represents the message headers argument.
+pub fn headers_arg<'a>() -> Arg<'a, 'a> {
+    Arg::with_name("headers")
+        .help("Shows additional headers with the message")
+        .short("h")
+        .long("header")
+        .value_name("STR")
         .multiple(true)
 }
 
@@ -399,7 +412,7 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                 ),
             SubCommand::with_name("write")
                 .about("Writes a new message")
-                .arg(attachment_arg())
+                .arg(attachments_arg())
                 .arg(encrypt_arg()),
             SubCommand::with_name("send")
                 .about("Sends a raw message")
@@ -424,19 +437,20 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                         .help("Reads raw message")
                         .long("raw")
                         .short("r"),
-                ),
+                )
+	        .arg(headers_arg()),
             SubCommand::with_name("reply")
                 .aliases(&["rep", "r"])
                 .about("Answers to a message")
                 .arg(seq_arg())
                 .arg(reply_all_arg())
-                .arg(attachment_arg())
+                .arg(attachments_arg())
 		.arg(encrypt_arg()),
             SubCommand::with_name("forward")
                 .aliases(&["fwd", "f"])
                 .about("Forwards a message")
                 .arg(seq_arg())
-                .arg(attachment_arg())
+                .arg(attachments_arg())
 		.arg(encrypt_arg()),
             SubCommand::with_name("copy")
                 .aliases(&["cp", "c"])
