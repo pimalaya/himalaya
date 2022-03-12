@@ -4,7 +4,7 @@ use chrono::{DateTime, FixedOffset};
 use convert_case::{Case, Casing};
 use html_escape;
 use lettre::message::{header::ContentType, Attachment, MultiPart, SinglePart};
-use log::{debug, info, trace, warn};
+use log::{info, trace, warn};
 use regex::Regex;
 use std::{
     collections::{HashMap, HashSet},
@@ -30,6 +30,8 @@ use crate::{
         editor,
     },
 };
+
+const DATE_TIME_FORMAT: &str = "%d-%b-%Y %H:%M:%S %z";
 
 /// Representation of a message.
 #[derive(Debug, Clone, Default)]
@@ -73,8 +75,9 @@ impl Msg {
             .collect()
     }
 
-    /// Folds string body from all plain text parts into a single string body. If no plain text
-    /// parts are found, HTML parts are used instead. The result is sanitized (all HTML markup is
+    /// Folds string body from all plain text parts into a single
+    /// string body. If no plain text parts are found, HTML parts are
+    /// used instead. The result is sanitized (all HTML markup is
     /// removed).
     pub fn fold_text_plain_parts(&self) -> String {
         let (plain, html) = self.parts.iter().fold(
@@ -142,7 +145,8 @@ impl Msg {
         }
     }
 
-    /// Fold string body from all HTML parts into a single string body.
+    /// Fold string body from all HTML parts into a single string
+    /// body.
     fn fold_text_html_parts(&self) -> String {
         let text_parts = self
             .parts
@@ -160,8 +164,9 @@ impl Msg {
         text_parts
     }
 
-    /// Fold string body from all text parts into a single string body. The mime allows users to
-    /// choose between plain text parts and html text parts.
+    /// Fold string body from all text parts into a single string
+    /// body. The mime allows users to choose between plain text parts
+    /// and html text parts.
     pub fn fold_text_parts(&self, text_mime: &str) -> String {
         if text_mime == "html" {
             self.fold_text_html_parts()
@@ -651,42 +656,32 @@ impl Msg {
         parsed_mail: mailparse::ParsedMail<'_>,
         config: &AccountConfig,
     ) -> Result<Self> {
-        info!("begin: building message from parsed mail");
+        trace!(">> build message from parsed mail");
         trace!("parsed mail: {:?}", parsed_mail);
 
         let mut msg = Msg::default();
-
-        debug!("parsing headers");
         for header in parsed_mail.get_headers() {
+            trace!(">> parse header {:?}", header);
+
             let key = header.get_key();
-            debug!("header key: {:?}", key);
+            trace!("header key: {:?}", key);
 
             let val = header.get_value();
-            let val = String::from_utf8(header.get_value_raw().to_vec())
-                .map(|val| val.trim().to_string())
-                .context(format!(
-                    "cannot decode value {:?} from header {:?}",
-                    key, val
-                ))?;
-            debug!("header value: {:?}", val);
+            trace!("header value: {:?}", val);
 
             match key.to_lowercase().as_str() {
                 "message-id" => msg.message_id = Some(val),
                 "in-reply-to" => msg.in_reply_to = Some(val),
                 "subject" => {
-                    msg.subject = rfc2047_decoder::decode(val.as_bytes())?;
+                    msg.subject = val;
                 }
                 "date" => {
-                    // TODO: use date format instead
-                    // https://github.com/jonhoo/rust-imap/blob/afbc5118f251da4e3f6a1e560e749c0700020b54/src/types/fetch.rs#L16
-                    msg.date = DateTime::parse_from_rfc2822(
-                        val.split_at(val.find(" (").unwrap_or_else(|| val.len())).0,
-                    )
-                    .map_err(|err| {
-                        warn!("cannot parse message date {:?}, skipping it", val);
-                        err
-                    })
-                    .ok();
+                    msg.date = DateTime::parse_from_str(&val, DATE_TIME_FORMAT)
+                        .map_err(|err| {
+                            warn!("cannot parse message date {:?}, skipping it", val);
+                            err
+                        })
+                        .ok();
                 }
                 "from" => {
                     msg.from = from_slice_to_addrs(val)
@@ -709,19 +704,17 @@ impl Msg {
                         .context(format!("cannot parse header {:?}", key))?
                 }
                 key => {
-                    msg.headers.insert(
-                        key.to_lowercase(),
-                        rfc2047_decoder::decode(val.as_bytes()).unwrap_or(val),
-                    );
+                    msg.headers.insert(key.to_lowercase(), val);
                 }
             }
+            trace!("<< parse header");
         }
 
         msg.parts = Parts::from_parsed_mail(config, &parsed_mail)
             .context("cannot parsed message mime parts")?;
         trace!("message: {:?}", msg);
 
-        info!("end: building message from parsed mail");
+        info!("<< build message from parsed mail");
         Ok(msg)
     }
 

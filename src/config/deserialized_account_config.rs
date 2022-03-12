@@ -56,7 +56,7 @@ macro_rules! make_account_config {
 	    /// Represents the text/plain format as defined in the
 	    /// [RFC2646](https://www.ietf.org/rfc/rfc2646.txt)
             pub format: Option<Format>,
-            /// Overrides the default headers displayed at the top of
+            /// Represents the default headers displayed at the top of
             /// the read message.
 	    #[serde(default)]
             pub read_headers: Vec<String>,
