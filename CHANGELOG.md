@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Flag commands [#334]
+
 ## [0.5.9] - 2022-03-12
 
 ### Added
@@ -506,5 +510,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#324]: https://github.com/soywod/himalaya/issues/324
 [#329]: https://github.com/soywod/himalaya/issues/329
 [#331]: https://github.com/soywod/himalaya/issues/331
+[#334]: https://github.com/soywod/himalaya/issues/334
 [#335]: https://github.com/soywod/himalaya/issues/335
 [#338]: https://github.com/soywod/himalaya/issues/338
