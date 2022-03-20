@@ -8,6 +8,3 @@
 # Direnv
 /.envrc
 /.direnv
-
-# Vim plugin doc tags file
-/vim/doc/tags

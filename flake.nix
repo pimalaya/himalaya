@@ -21,21 +21,20 @@
             overlays = [
               rust-overlay.overlay
               (self: super: {
-                # Because rust-overlay bundles multiple rust packages into one
-                # derivation, specify that mega-bundle here, so that crate2nix
-                # will use them automatically.
+                # Because rust-overlay bundles multiple rust packages
+                # into one derivation, specify that mega-bundle here,
+                # so that crate2nix will use them automatically.
                 rustc = self.rust-bin.stable.latest.default;
                 cargo = self.rust-bin.stable.latest.default;
               })
             ];
           };
-          naersk-lib = naersk.lib.${system};
         in
         rec {
           # nix build
           defaultPackage = packages.${name};
           packages = {
-            ${name} = naersk-lib.buildPackage {
+            ${name} = naersk.lib.${system}.buildPackage {
               pname = name;
               root = ./.;
               nativeBuildInputs = with pkgs; [ openssl.dev pkgconfig ];

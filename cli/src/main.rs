@@ -288,14 +288,14 @@ fn main() -> Result<()> {
             );
         }
         Some(msg_args::Cmd::Flag(m)) => match m {
-            Some(flag_args::Cmd::Set(seq_range, flags)) => {
-                return flag_handlers::set(seq_range, mbox, &flags, &mut printer, backend);
+            Some(flag_args::Cmd::Set(seq_range, ref flags)) => {
+                return flag_handlers::set(seq_range, flags, mbox, &mut printer, backend);
             }
-            Some(flag_args::Cmd::Add(seq_range, flags)) => {
-                return flag_handlers::add(seq_range, mbox, &flags, &mut printer, backend);
+            Some(flag_args::Cmd::Add(seq_range, ref flags)) => {
+                return flag_handlers::add(seq_range, flags, mbox, &mut printer, backend);
             }
-            Some(flag_args::Cmd::Remove(seq_range, flags)) => {
-                return flag_handlers::remove(seq_range, mbox, &flags, &mut printer, backend);
+            Some(flag_args::Cmd::Remove(seq_range, ref flags)) => {
+                return flag_handlers::remove(seq_range, flags, mbox, &mut printer, backend);
             }
             _ => (),
         },

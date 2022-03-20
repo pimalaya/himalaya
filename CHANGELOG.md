@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.10] - 2022-03-20
+
+### Fixed
+
+- Flag commands [#334]
+- Windows build [#346]
+
 ## [0.5.9] - 2022-03-12
 
 ### Added
@@ -357,7 +364,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.5.9...HEAD
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.5.10...HEAD
+[0.5.10]: https://github.com/soywod/himalaya/compare/v0.5.9...v0.5.10
 [0.5.9]: https://github.com/soywod/himalaya/compare/v0.5.8...v0.5.9
 [0.5.8]: https://github.com/soywod/himalaya/compare/v0.5.7...v0.5.8
 [0.5.7]: https://github.com/soywod/himalaya/compare/v0.5.6...v0.5.7
@@ -506,5 +514,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#324]: https://github.com/soywod/himalaya/issues/324
 [#329]: https://github.com/soywod/himalaya/issues/329
 [#331]: https://github.com/soywod/himalaya/issues/331
+[#334]: https://github.com/soywod/himalaya/issues/334
 [#335]: https://github.com/soywod/himalaya/issues/335
 [#338]: https://github.com/soywod/himalaya/issues/338
+[#346]: https://github.com/soywod/himalaya/issues/346
