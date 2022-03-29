@@ -22,9 +22,9 @@ impl From<&str> for ImapFlag {
     fn from(flag_str: &str) -> Self {
         match flag_str {
             "seen" => ImapFlag::Seen,
-            "answered" => ImapFlag::Answered,
+            "answered" | "replied" => ImapFlag::Answered,
             "flagged" => ImapFlag::Flagged,
-            "deleted" => ImapFlag::Deleted,
+            "deleted" | "trashed" => ImapFlag::Deleted,
             "draft" => ImapFlag::Draft,
             "recent" => ImapFlag::Recent,
             "maycreate" | "may-create" => ImapFlag::MayCreate,
