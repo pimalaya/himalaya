@@ -98,14 +98,15 @@ fn build_parts_map_rec(
             }
             // TODO: manage other use cases
             _ => {
-                if let Some(ctype) = parsed_mail.get_headers().get_first_value("content-type") {
-                    let content = parsed_mail.get_body().unwrap_or_default();
-                    if ctype.starts_with("text/plain") {
-                        parts.push(Part::TextPlain(TextPlainPart { content }))
-                    } else if ctype.starts_with("text/html") {
-                        parts.push(Part::TextHtml(TextHtmlPart { content }))
-                    }
-                };
+                let ctype = parsed_mail.get_headers()
+                    .get_first_value("content-type")
+                    .unwrap_or_else(|| String::from("text/plain"));
+                let content = parsed_mail.get_body().unwrap_or_default();
+                if ctype.starts_with("text/plain") {
+                    parts.push(Part::TextPlain(TextPlainPart { content }))
+                } else if ctype.starts_with("text/html") {
+                    parts.push(Part::TextHtml(TextHtmlPart { content }))
+                }
             }
         };
     } else {
