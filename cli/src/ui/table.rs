@@ -12,7 +12,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::{
     config::Format,
-    output::{Print, PrintTableOpts, WriteColor},
+    output::{Printable, PrintTableOpts, WriteColor},
 };
 
 /// Defines the default terminal size.
@@ -126,7 +126,7 @@ impl Cell {
 }
 
 /// Makes the cell printable.
-impl Print for Cell {
+impl Printable for Cell {
     fn print(&self, writer: &mut dyn WriteColor) -> Result<()> {
         // Applies colors to the cell
         writer

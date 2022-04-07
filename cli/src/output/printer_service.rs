@@ -6,11 +6,11 @@ use std::{
 };
 use termcolor::{ColorChoice, StandardStream};
 
-use crate::output::{OutputFmt, OutputJson, Print, PrintTable, PrintTableOpts, WriteColor};
+use crate::output::{OutputFmt, OutputJson, Printable, PrintTable, PrintTableOpts, WriteColor};
 
 pub trait PrinterService {
-    fn print_str<T: Debug + Print>(&mut self, data: T) -> Result<()>;
-    fn print_struct<T: Debug + Print + serde::Serialize>(&mut self, data: T) -> Result<()>;
+    fn print_str<T: Debug + Printable>(&mut self, data: T) -> Result<()>;
+    fn print_struct<T: Debug + Printable + serde::Serialize>(&mut self, data: T) -> Result<()>;
     fn print_table<T: Debug + erased_serde::Serialize + PrintTable + ?Sized>(
         &mut self,
         data: Box<T>,
@@ -25,14 +25,14 @@ pub struct StdoutPrinter {
 }
 
 impl PrinterService for StdoutPrinter {
-    fn print_str<T: Debug + Print>(&mut self, data: T) -> Result<()> {
+    fn print_str<T: Debug + Printable>(&mut self, data: T) -> Result<()> {
         match self.fmt {
             OutputFmt::Plain => data.print(self.writer.as_mut()),
             OutputFmt::Json => Ok(()),
         }
     }
 
-    fn print_struct<T: Debug + Print + serde::Serialize>(&mut self, data: T) -> Result<()> {
+    fn print_struct<T: Debug + Printable + serde::Serialize>(&mut self, data: T) -> Result<()> {
         match self.fmt {
             OutputFmt::Plain => data.print(self.writer.as_mut()),
             OutputFmt::Json => serde_json::to_writer(self.writer.as_mut(), &OutputJson::new(data))

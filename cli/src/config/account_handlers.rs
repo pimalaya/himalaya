@@ -41,7 +41,7 @@ mod tests {
 
     use crate::{
         config::{DeserializedAccountConfig, DeserializedImapAccountConfig},
-        output::{Print, PrintTable, WriteColor},
+        output::{Printable, PrintTable, WriteColor},
     };
 
     use super::*;
@@ -96,10 +96,10 @@ mod tests {
                 data.print_table(&mut self.writer, opts)?;
                 Ok(())
             }
-            fn print_str<T: Debug + Print>(&mut self, _data: T) -> Result<()> {
+            fn print_str<T: Debug + Printable>(&mut self, _data: T) -> Result<()> {
                 unimplemented!()
             }
-            fn print_struct<T: Debug + Print + serde::Serialize>(
+            fn print_struct<T: Debug + Printable + serde::Serialize>(
                 &mut self,
                 _data: T,
             ) -> Result<()> {
