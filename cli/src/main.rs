@@ -277,8 +277,9 @@ fn main() -> Result<()> {
         Some(msg_args::Cmd::Send(raw_msg)) => {
             return msg_handlers::send(raw_msg, &account_config, &mut printer, backend, &mut smtp);
         }
-        Some(msg_args::Cmd::Write(atts, encrypt)) => {
+        Some(msg_args::Cmd::Write(tpl, atts, encrypt)) => {
             return msg_handlers::write(
+                tpl,
                 atts,
                 encrypt,
                 &account_config,

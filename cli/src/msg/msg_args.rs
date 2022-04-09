@@ -42,7 +42,7 @@ pub enum Cmd<'a> {
     Search(Query, MaxTableWidth, Option<PageSize>, Page),
     Sort(Criteria, Query, MaxTableWidth, Option<PageSize>, Page),
     Send(RawMsg<'a>),
-    Write(AttachmentPaths<'a>, Encrypt),
+    Write(tpl_args::TplOverride<'a>, AttachmentPaths<'a>, Encrypt),
 
     Flag(Option<flag_args::Cmd<'a>>),
     Tpl(Option<tpl_args::Cmd<'a>>),
@@ -261,7 +261,8 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
         debug!("attachments paths: {:?}", attachment_paths);
         let encrypt = m.is_present("encrypt");
         debug!("encrypt: {}", encrypt);
-        return Ok(Some(Cmd::Write(attachment_paths, encrypt)));
+        let tpl = tpl_args::TplOverride::from(m);
+        return Ok(Some(Cmd::Write(tpl, attachment_paths, encrypt)));
     }
 
     if let Some(m) = m.subcommand_matches("template") {
@@ -412,6 +413,7 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                 ),
             SubCommand::with_name("write")
                 .about("Writes a new message")
+                .args(&tpl_args::tpl_args())
                 .arg(attachments_arg())
                 .arg(encrypt_arg()),
             SubCommand::with_name("send")
