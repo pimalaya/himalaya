@@ -146,7 +146,11 @@ impl<'a> AccountConfig {
             downloads_dir,
             sig,
             default_page_size,
-            notify_cmd: base_account.notify_cmd.clone(),
+            notify_cmd: base_account
+                .notify_cmd
+                .as_ref()
+                .or_else(|| config.notify_cmd.as_ref())
+                .cloned(),
             notify_query: base_account
                 .notify_query
                 .as_ref()
