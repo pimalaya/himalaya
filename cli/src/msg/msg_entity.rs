@@ -327,14 +327,15 @@ impl Msg {
         Ok(self)
     }
 
-    fn _edit_with_editor(&self, account: &AccountConfig) -> Result<Self> {
-        let tpl = self.to_tpl(TplOverride::default(), account)?;
+    fn _edit_with_editor(&self, tpl: TplOverride, account: &AccountConfig) -> Result<Self> {
+        let tpl = self.to_tpl(tpl, account)?;
         let tpl = editor::open_with_tpl(tpl)?;
         Self::from_tpl(&tpl)
     }
 
     pub fn edit_with_editor<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
         mut self,
+        tpl: TplOverride,
         account: &AccountConfig,
         printer: &mut P,
         backend: Box<&'a mut B>,
@@ -353,7 +354,7 @@ impl Msg {
                             break;
                         }
                         PreEditChoice::Discard => {
-                            self.merge_with(self._edit_with_editor(account)?);
+                            self.merge_with(self._edit_with_editor(tpl.clone(), account)?);
                             break;
                         }
                         PreEditChoice::Quit => return Ok(backend),
@@ -365,7 +366,7 @@ impl Msg {
                 }
             }
         } else {
-            self.merge_with(self._edit_with_editor(account)?);
+            self.merge_with(self._edit_with_editor(tpl.clone(), account)?);
         }
 
         loop {
@@ -386,7 +387,7 @@ impl Msg {
                     break;
                 }
                 Ok(PostEditChoice::Edit) => {
-                    self.merge_with(self._edit_with_editor(account)?);
+                    self.merge_with(self._edit_with_editor(tpl.clone(), account)?);
                     continue;
                 }
                 Ok(PostEditChoice::LocalDraft) => {

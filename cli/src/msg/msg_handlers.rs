@@ -21,6 +21,8 @@ use crate::{
     smtp::SmtpService,
 };
 
+use super::tpl_args;
+
 /// Downloads all message attachments to the user account downloads directory.
 pub fn attachments<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     seq: &str,
@@ -99,7 +101,13 @@ pub fn forward<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
         .into_forward(config)?
         .add_attachments(attachments_paths)?
         .encrypt(encrypt)
-        .edit_with_editor(config, printer, backend, smtp)?;
+        .edit_with_editor(
+            tpl_args::TplOverride::default(),
+            config,
+            printer,
+            backend,
+            smtp,
+        )?;
     Ok(())
 }
 
@@ -183,7 +191,13 @@ pub fn mailto<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     };
     trace!("message: {:?}", msg);
 
-    msg.edit_with_editor(config, printer, backend, smtp)?;
+    msg.edit_with_editor(
+        tpl_args::TplOverride::default(),
+        config,
+        printer,
+        backend,
+        smtp,
+    )?;
     Ok(())
 }
 
@@ -240,7 +254,13 @@ pub fn reply<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
         .into_reply(all, config)?
         .add_attachments(attachments_paths)?
         .encrypt(encrypt)
-        .edit_with_editor(config, printer, backend, smtp)?
+        .edit_with_editor(
+            tpl_args::TplOverride::default(),
+            config,
+            printer,
+            backend,
+            smtp,
+        )?
         .add_flags(mbox, seq, "replied")
 }
 
@@ -364,6 +384,7 @@ pub fn send<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
 
 /// Compose a new message.
 pub fn write<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
+    tpl: tpl_args::TplOverride,
     attachments_paths: Vec<&str>,
     encrypt: bool,
     config: &AccountConfig,
@@ -374,6 +395,6 @@ pub fn write<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     Msg::default()
         .add_attachments(attachments_paths)?
         .encrypt(encrypt)
-        .edit_with_editor(config, printer, backend, smtp)?;
+        .edit_with_editor(tpl, config, printer, backend, smtp)?;
     Ok(())
 }

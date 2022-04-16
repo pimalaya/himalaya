@@ -13,7 +13,7 @@ type ReplyAll = bool;
 type AttachmentPaths<'a> = Vec<&'a str>;
 type Tpl<'a> = &'a str;
 
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct TplOverride<'a> {
     pub subject: Option<&'a str>,
     pub from: Option<Vec<&'a str>>,
