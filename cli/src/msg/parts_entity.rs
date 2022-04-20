@@ -55,7 +55,12 @@ impl Parts {
         part: &'a mailparse::ParsedMail<'a>,
     ) -> Result<Self> {
         let mut parts = vec![];
-        build_parts_map_rec(account, part, &mut parts)?;
+        if part.subparts.is_empty() && part.get_headers().get_first_value("content-type").is_none() {
+            let content = part.get_body().unwrap_or_default();
+            parts.push(Part::TextPlain(TextPlainPart { content }))
+        } else {
+            build_parts_map_rec(account, part, &mut parts)?;
+        }
         Ok(Self(parts))
     }
 }
@@ -98,14 +103,13 @@ fn build_parts_map_rec(
             }
             // TODO: manage other use cases
             _ => {
-                let ctype = parsed_mail.get_headers()
-                    .get_first_value("content-type")
-                    .unwrap_or_else(|| String::from("text/plain"));
-                let content = parsed_mail.get_body().unwrap_or_default();
-                if ctype.starts_with("text/plain") {
-                    parts.push(Part::TextPlain(TextPlainPart { content }))
-                } else if ctype.starts_with("text/html") {
-                    parts.push(Part::TextHtml(TextHtmlPart { content }))
+                if let Some(ctype) = parsed_mail.get_headers().get_first_value("content-type") {
+                    let content = parsed_mail.get_body().unwrap_or_default();
+                    if ctype.starts_with("text/plain") {
+                        parts.push(Part::TextPlain(TextPlainPart { content }))
+                    } else if ctype.starts_with("text/html") {
+                        parts.push(Part::TextHtml(TextHtmlPart { content }))
+                    }
                 }
             }
         };
