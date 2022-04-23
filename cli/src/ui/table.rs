@@ -134,7 +134,14 @@ impl Print for Cell {
             .context(format!(r#"cannot apply colors to cell "{}""#, self.value))?;
 
         // Writes the colorized cell to stdout
-        write!(writer, "{}", self.value).context(format!(r#"cannot print cell "{}""#, self.value))
+        write!(writer, "{}", self.value)
+            .context(format!(r#"cannot print cell "{}""#, self.value))?;
+
+        // Resets color after cell
+        writer
+            .reset()
+            .context(format!(r#"cannot reset color in cell "{}""#, self.value))?;
+        write!(writer, "").context(format!(r#"cannot print cell "{}""#, self.value))
     }
 }
 
