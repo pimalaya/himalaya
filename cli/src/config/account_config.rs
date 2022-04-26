@@ -370,10 +370,8 @@ impl ImapBackendConfig {
     /// Gets the IMAP password of the user account.
     pub fn imap_passwd(&self) -> Result<String> {
         let passwd = run_cmd(&self.imap_passwd_cmd).context("cannot run IMAP passwd cmd")?;
-        let passwd = passwd
-            .trim_end_matches(|c| c == '\r' || c == '\n')
-            .to_owned();
-        Ok(passwd)
+        let passwd = passwd.lines().next().context("cannot find password")?;
+        Ok(passwd.to_string())
     }
 }
 
