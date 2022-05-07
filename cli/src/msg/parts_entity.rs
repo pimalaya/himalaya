@@ -55,7 +55,12 @@ impl Parts {
         part: &'a mailparse::ParsedMail<'a>,
     ) -> Result<Self> {
         let mut parts = vec![];
-        build_parts_map_rec(account, part, &mut parts)?;
+        if part.subparts.is_empty() && part.get_headers().get_first_value("content-type").is_none() {
+            let content = part.get_body().unwrap_or_default();
+            parts.push(Part::TextPlain(TextPlainPart { content }))
+        } else {
+            build_parts_map_rec(account, part, &mut parts)?;
+        }
         Ok(Self(parts))
     }
 }
@@ -105,7 +110,7 @@ fn build_parts_map_rec(
                     } else if ctype.starts_with("text/html") {
                         parts.push(Part::TextHtml(TextHtmlPart { content }))
                     }
-                };
+                }
             }
         };
     } else {
