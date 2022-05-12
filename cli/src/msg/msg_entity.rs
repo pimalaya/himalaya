@@ -167,7 +167,16 @@ impl Msg {
     /// and html text parts.
     pub fn fold_text_parts(&self, text_mime: &str) -> String {
         if text_mime == "html" {
-            self.fold_text_html_parts()
+            let mut res = self.fold_text_html_parts();
+            // if no html text is found, fallback to plain text
+            // but still output html
+            if res == "" {
+                res = format!(
+                    "<!DOCTYPE html><html><body><pre>{}</pre></body></html>",
+                    self.fold_text_plain_parts()
+                );
+            }
+            res
         } else {
             self.fold_text_plain_parts()
         }
