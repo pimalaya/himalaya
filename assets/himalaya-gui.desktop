@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=himalaya
+DesktopName=Himalaya-gui
+GenericName=Mail Reader
+Comment=Graphical user interface for email management
+Terminal=false
+Exec=himalaya gui
+Categories=Application;Network
+Keywords=email
+MimeType=x-scheme-handler/mailto;message/rfc822
+Actions=Compose
+
+[Desktop Action Compose]
+Name=Compose
+Exec=himalaya-gui

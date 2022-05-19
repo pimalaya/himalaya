@@ -1,2 +1,3 @@
 [workspace]
-members = ["lib", "cli"]
+members = ["lib", "cli", "gui", "gui/iui", "gui/ui-sys"]
+default-members = ["lib", "cli", "gui"]

@@ -38,10 +38,43 @@
               pname = name;
               root = ./.;
               nativeBuildInputs = with pkgs; [ openssl.dev pkgconfig ];
+              cargoBuildOptions = _: [
+                "$cargo_release"
+                ''-j "$NIX_BUILD_CORES"''
+                "--message-format=$cargo_message_format"
+                "--package=himalaya"
+              ];
               overrideMain = _: {
                 postInstall = ''
                   mkdir -p $out/share/applications/
                   cp assets/himalaya.desktop $out/share/applications/
+                '';
+              };
+            };
+            "${name}-gui" = naersk.lib.${system}.buildPackage {
+              pname = "${name}-gui";
+              root = ./.;
+              nativeBuildInputs = with pkgs; [
+                llvmPackages_rocm.llvm
+                cmake
+                git
+                openssl.dev
+                pkgconfig
+                llvm
+                clang
+                gtk3
+              ];
+              cargoBuildOptions = _: [
+                "$cargo_release"
+                ''-j "$NIX_BUILD_CORES"''
+                "--message-format=$cargo_message_format"
+                "--package=himalaya-gui"
+              ];
+              overrideMain = _: {
+                LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
+                postInstall = ''
+                  mkdir -p $out/share/applications/
+                  cp assets/himalaya-gui.desktop $out/share/applications/
                 '';
               };
             };
@@ -69,6 +102,7 @@
           # nix develop
           devShell = pkgs.mkShell {
             RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
+            LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
             inputsFrom = builtins.attrValues self.packages.${system};
             buildInputs = with pkgs; [
               cargo
@@ -80,6 +114,15 @@
               rnix-lsp
               nixpkgs-fmt
               notmuch
+
+              # for gui
+              llvmPackages_rocm.llvm
+              cmake
+              git
+              llvm
+              clang
+              gtk3
+              pkgconfig
             ];
           };
         }

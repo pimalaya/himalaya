@@ -1,0 +1,15 @@
+[package]
+name = "himalaya-gui"
+edition = "2021"
+version = "0.5.10"
+authors = ["soywod <clement.douin@posteo.net>", "Antonio Yang <yanganto@gmail.com>"]
+license-file = "LICENSE"
+readme = "README.md"
+categories = ["command-line-interface", "command-line-utilities", "email"]
+keywords = ["gui", "mail", "email", "client", "imap"]
+homepage = "https://github.com/soywod/himalaya/wiki"
+documentation = "https://github.com/soywod/himalaya/wiki"
+repository = "https://github.com/soywod/himalaya"
+
+[dependencies]
+iui = { path = "iui" }

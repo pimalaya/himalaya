@@ -1,0 +1,45 @@
+[package]
+name = "iui"
+version = "0.3.0"
+authors = ["Leonora Tindall <lfstindall@gmail.com>"]
+
+# A short blurb about the package. This is not rendered in any format when
+# uploaded to crates.io (aka this is not markdown).
+description = "Simple, small, easy to distribute GUI bindings."
+
+# These URLs point to more information about the package. These are
+# intended to be webviews of the relevant data, not necessarily compatible
+# with VCS tools and the like.
+documentation = "https://docs.rs/iui/"
+repository = "https://github.com/rust-native-ui/libui-rs"
+
+# This points to a file under the package root (relative to this `Cargo.toml`).
+# The contents of this file are stored and indexed in the registry.
+# crates.io will render this file and place the result on the crate's page.
+readme = "../README.md"
+
+# This is a list of up to five keywords that describe this crate. Keywords
+# are searchable on crates.io, and you may choose any words that would
+# help someone find this crate.
+keywords = ["windows", "gtk", "gui", "user_interface", "macos"]
+
+# This is a list of up to five categories where this crate would fit.
+# Categories are a fixed list available at crates.io/category_slugs, and
+# they must match exactly.
+categories = ["gui", "os::macos-apis", "os::unix-apis", "os::windows-apis"]
+license = "MIT"
+
+[badges]
+travis-ci = { repository = "rust-native-ui/libui-rs", branch = "trunk" }
+appveyor = { repository = "rust-native-ui/libui-rs", branch = "trunk" }
+
+maintenance = { status = "actively-developed" }
+
+[dependencies]
+bitflags = "1"
+libc = "0.2"
+failure = "0.1"
+ui-sys = { path = "../ui-sys", version = "0.2.1" }
+regex = "1"
+lazy_static = "1"
+

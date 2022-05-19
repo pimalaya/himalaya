@@ -1,0 +1,52 @@
+[package]
+name = "ui-sys"
+version = "0.2.1"
+authors = ["Leonora Tindall <lfstindall@gmail.com>"]
+license = "MIT"
+description = "Native bindings to the minimalist, cross-platform, widget set `libui`"
+
+
+# These URLs point to more information about the package. These are
+# intended to be webviews of the relevant data, not necessarily compatible
+# with VCS tools and the like.
+documentation = "https://docs.rs/ui-sys/"
+repository = "https://github.com/rust-native-ui/libui-rs"
+
+# This points to a file under the package root (relative to this `Cargo.toml`).
+# The contents of this file are stored and indexed in the registry.
+# crates.io will render this file and place the result on the crate's page.
+readme = "../README.md"
+
+# This is a list of up to five keywords that describe this crate. Keywords
+# are searchable on crates.io, and you may choose any words that would
+# help someone find this crate.
+keywords = ["windows", "gtk", "gui", "user_interface", "macos"]
+
+# This is a list of up to five categories where this crate would fit.
+# Categories are a fixed list available at crates.io/category_slugs, and
+# they must match exactly.
+categories = ["gui", "os::macos-apis", "os::unix-apis", "os::windows-apis"]
+
+links = "ui"
+build = "build.rs"
+
+[badges]
+travis-ci = { repository = "rust-native-ui/libui-rs", branch = "trunk" }
+appveyor = { repository = "rust-native-ui/libui-rs", branch = "trunk" }
+
+maintenance = { status = "actively-developed" }
+
+[features]
+default = ["fetch", "build"]
+
+fetch = []
+build = []
+
+[dependencies]
+libc = "0.2"
+
+[build-dependencies]
+bindgen = "0.54"
+cc = "1.0"
+embed-resource = "1.3"
+pkg-config = "0.3"

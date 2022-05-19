@@ -8,3 +8,4 @@
 # Direnv
 /.envrc
 /.direnv
+/gui/ui-sys/lib
