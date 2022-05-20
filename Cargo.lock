@@ -604,7 +604,12 @@ dependencies = [
 name = "himalaya-gui"
 version = "0.5.10"
 dependencies = [
+ "anyhow",
+ "erased-serde",
+ "himalaya",
  "iui",
+ "serde",
+ "termcolor",
 ]
 
 [[package]]
