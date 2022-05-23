@@ -238,11 +238,12 @@ impl<'a> AccountConfig {
     /// Builds the user account SMTP credentials.
     pub fn smtp_creds(&self) -> Result<SmtpCredentials> {
         let passwd = run_cmd(&self.smtp_passwd_cmd).context("cannot run SMTP passwd cmd")?;
-        let passwd = passwd
-            .trim_end_matches(|c| c == '\r' || c == '\n')
-            .to_owned();
+        let passwd = passwd.lines().next().context("cannot find password")?;
 
-        Ok(SmtpCredentials::new(self.smtp_login.to_owned(), passwd))
+        Ok(SmtpCredentials::new(
+            self.smtp_login.to_owned(),
+            passwd.to_owned(),
+        ))
     }
 
     /// Encrypts a file.
@@ -374,10 +375,8 @@ impl ImapBackendConfig {
     /// Gets the IMAP password of the user account.
     pub fn imap_passwd(&self) -> Result<String> {
         let passwd = run_cmd(&self.imap_passwd_cmd).context("cannot run IMAP passwd cmd")?;
-        let passwd = passwd
-            .trim_end_matches(|c| c == '\r' || c == '\n')
-            .to_owned();
-        Ok(passwd)
+        let passwd = passwd.lines().next().context("cannot find password")?;
+        Ok(passwd.to_string())
     }
 }
 
