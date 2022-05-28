@@ -1,14 +1,14 @@
 use anyhow::Result;
+use himalaya_lib::account::{
+    AccountConfig, BackendConfig, DeserializedConfig, DEFAULT_INBOX_FOLDER,
+};
 use std::{convert::TryFrom, env};
 use url::Url;
 
 use himalaya::{
     backends::Backend,
     compl::{compl_args, compl_handlers},
-    config::{
-        account_args, account_handlers, config_args, AccountConfig, BackendConfig,
-        DeserializedConfig, DEFAULT_INBOX_FOLDER,
-    },
+    config::{account_args, account_handlers, config_args},
     mbox::{mbox_args, mbox_handlers},
     msg::{flag_args, flag_handlers, msg_args, msg_handlers, tpl_args, tpl_handlers},
     output::{output_args, OutputFmt, StdoutPrinter},
@@ -22,7 +22,9 @@ use himalaya::backends::{imap_args, imap_handlers, ImapBackend};
 use himalaya::backends::MaildirBackend;
 
 #[cfg(feature = "notmuch-backend")]
-use himalaya::{backends::NotmuchBackend, config::MaildirBackendConfig};
+use himalaya::backends::NotmuchBackend;
+#[cfg(feature = "notmuch-backend")]
+use himalaya_lib::account::MaildirBackendConfig;
 
 fn create_app<'a>() -> clap::App<'a, 'a> {
     let app = clap::App::new(env!("CARGO_PKG_NAME"))

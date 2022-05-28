@@ -1,8 +1,7 @@
 use anyhow::Result;
+use himalaya_lib::account::Format;
 use std::io;
 use termcolor::{self, StandardStream};
-
-use crate::config::Format;
 
 pub trait WriteColor: io::Write + termcolor::WriteColor {}
 

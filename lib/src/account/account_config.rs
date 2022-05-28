@@ -1,10 +1,35 @@
-use anyhow::{anyhow, Context, Result};
 use lettre::transport::smtp::authentication::Credentials as SmtpCredentials;
 use log::{debug, info, trace};
 use mailparse::MailAddr;
-use std::{collections::HashMap, env, ffi::OsStr, fs, path::PathBuf};
+use shellexpand;
+use std::{collections::HashMap, env, ffi::OsStr, fs, path::PathBuf, result};
+use thiserror::Error;
 
-use crate::{config::*, output::run_cmd};
+use crate::process::{run_cmd, ProcessError};
+
+use super::*;
+
+#[derive(Error, Debug)]
+pub enum AccountError {
+    #[error("cannot find default account")]
+    FindDefaultAccountError,
+    #[error("cannot find account \"{0}\"")]
+    FindAccountError(String),
+    #[error("cannot shell expand")]
+    ShellExpandError(#[from] shellexpand::LookupError<env::VarError>),
+    #[error("cannot parse account address")]
+    ParseAccountAddressError(#[from] mailparse::MailParseError),
+    #[error("cannot find account address from \"{0}\"")]
+    FindAccountAddressError(String),
+    #[error("cannot parse download file name from \"{0}\"")]
+    ParseDownloadFileNameError(PathBuf),
+    #[error("cannot find password")]
+    FindPasswordError,
+    #[error(transparent)]
+    RunCmdError(#[from] ProcessError),
+}
+
+type Result<T> = result::Result<T, AccountError>;
 
 /// Represents the user account.
 #[derive(Debug, Default, Clone)]
@@ -62,7 +87,8 @@ pub struct AccountConfig {
 }
 
 impl<'a> AccountConfig {
-    /// tries to create an account from a config and an optional account name.
+    /// Tries to create an account from a config and an optional
+    /// account name.
     pub fn from_config_and_opt_account_name(
         config: &'a DeserializedConfig,
         account_name: Option<&str>,
@@ -87,12 +113,12 @@ impl<'a> AccountConfig {
                     }
                 })
                 .map(|(name, account)| (name.to_owned(), account))
-                .ok_or_else(|| anyhow!("cannot find default account")),
+                .ok_or_else(|| AccountError::FindDefaultAccountError),
             Some(name) => config
                 .accounts
                 .get(name)
                 .map(|account| (name.to_owned(), account))
-                .ok_or_else(|| anyhow!(r#"cannot find account "{}""#, name)),
+                .ok_or_else(|| AccountError::FindAccountError(name.to_owned())),
         }?;
 
         let base_account = account.to_base();
@@ -225,20 +251,19 @@ impl<'a> AccountConfig {
             format!("{} <{}>", self.display_name, self.email)
         };
 
-        Ok(mailparse::addrparse(&addr)
-            .context(format!(
-                "cannot parse account address {:?}",
-                self.display_name
-            ))?
+        Ok(mailparse::addrparse(&addr)?
             .first()
-            .ok_or_else(|| anyhow!("cannot parse account address {:?}", self.display_name))?
+            .ok_or_else(|| AccountError::FindAccountAddressError(addr.into()))?
             .clone())
     }
 
     /// Builds the user account SMTP credentials.
     pub fn smtp_creds(&self) -> Result<SmtpCredentials> {
-        let passwd = run_cmd(&self.smtp_passwd_cmd).context("cannot run SMTP passwd cmd")?;
-        let passwd = passwd.lines().next().context("cannot find password")?;
+        let passwd = run_cmd(&self.smtp_passwd_cmd)?;
+        let passwd = passwd
+            .lines()
+            .next()
+            .ok_or_else(|| AccountError::FindPasswordError)?;
 
         Ok(SmtpCredentials::new(
             self.smtp_login.to_owned(),
@@ -250,10 +275,7 @@ impl<'a> AccountConfig {
     pub fn pgp_encrypt_file(&self, addr: &str, path: PathBuf) -> Result<Option<String>> {
         if let Some(cmd) = self.pgp_encrypt_cmd.as_ref() {
             let encrypt_file_cmd = format!("{} {} {:?}", cmd, addr, path);
-            run_cmd(&encrypt_file_cmd).map(Some).context(format!(
-                "cannot run pgp encrypt command {:?}",
-                encrypt_file_cmd
-            ))
+            Ok(run_cmd(&encrypt_file_cmd).map(Some)?)
         } else {
             Ok(None)
         }
@@ -263,10 +285,7 @@ impl<'a> AccountConfig {
     pub fn pgp_decrypt_file(&self, path: PathBuf) -> Result<Option<String>> {
         if let Some(cmd) = self.pgp_decrypt_cmd.as_ref() {
             let decrypt_file_cmd = format!("{} {:?}", cmd, path);
-            run_cmd(&decrypt_file_cmd).map(Some).context(format!(
-                "cannot run pgp decrypt command {:?}",
-                decrypt_file_cmd
-            ))
+            Ok(run_cmd(&decrypt_file_cmd).map(Some)?)
         } else {
             Ok(None)
         }
@@ -276,13 +295,10 @@ impl<'a> AccountConfig {
     pub fn get_download_file_path<S: AsRef<str>>(&self, file_name: S) -> Result<PathBuf> {
         let file_path = self.downloads_dir.join(file_name.as_ref());
         self.get_unique_download_file_path(&file_path, |path, _count| path.is_file())
-            .context(format!(
-                "cannot get download file path of {:?}",
-                file_name.as_ref()
-            ))
     }
 
-    /// Gets the unique download path from a file name by adding suffixes in case of name conflicts.
+    /// Gets the unique download path from a file name by adding
+    /// suffixes in case of name conflicts.
     pub fn get_unique_download_file_path(
         &self,
         original_file_path: &PathBuf,
@@ -303,7 +319,9 @@ impl<'a> AccountConfig {
                     .file_stem()
                     .and_then(OsStr::to_str)
                     .map(|fstem| format!("{}_{}{}", fstem, count, file_ext))
-                    .ok_or_else(|| anyhow!("cannot get stem from file {:?}", original_file_path))?,
+                    .ok_or_else(|| {
+                        AccountError::ParseDownloadFileNameError(file_path.to_owned())
+                    })?,
             ));
         }
 
@@ -323,7 +341,7 @@ impl<'a> AccountConfig {
             .unwrap_or(default_cmd);
 
         debug!("run command: {}", cmd);
-        run_cmd(&cmd).context("cannot run notify cmd")?;
+        run_cmd(&cmd)?;
         Ok(())
     }
 
@@ -335,9 +353,8 @@ impl<'a> AccountConfig {
             .get(&mbox.trim().to_lowercase())
             .map(|s| s.as_str())
             .unwrap_or(mbox);
-        shellexpand::full(mbox)
-            .map(String::from)
-            .with_context(|| format!("cannot expand mailbox path {:?}", mbox))
+        let mbox = shellexpand::full(mbox).map(String::from)?;
+        Ok(mbox)
     }
 }
 
@@ -374,8 +391,11 @@ pub struct ImapBackendConfig {
 impl ImapBackendConfig {
     /// Gets the IMAP password of the user account.
     pub fn imap_passwd(&self) -> Result<String> {
-        let passwd = run_cmd(&self.imap_passwd_cmd).context("cannot run IMAP passwd cmd")?;
-        let passwd = passwd.lines().next().context("cannot find password")?;
+        let passwd = run_cmd(&self.imap_passwd_cmd)?;
+        let passwd = passwd
+            .lines()
+            .next()
+            .ok_or_else(|| AccountError::FindPasswordError)?;
         Ok(passwd.to_string())
     }
 }

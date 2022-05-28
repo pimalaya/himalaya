@@ -4,11 +4,11 @@
 
 use anyhow::Result;
 use atty::Stream;
+use himalaya_lib::account::AccountConfig;
 use std::io::{self, BufRead};
 
 use crate::{
     backends::Backend,
-    config::AccountConfig,
     msg::{Msg, TplOverride},
     output::PrinterService,
     smtp::SmtpService,

@@ -3,11 +3,11 @@
 //! This module gathers all mailbox actions triggered by the CLI.
 
 use anyhow::Result;
+use himalaya_lib::account::AccountConfig;
 use log::{info, trace};
 
 use crate::{
     backends::Backend,
-    config::AccountConfig,
     output::{PrintTableOpts, PrinterService},
 };
 

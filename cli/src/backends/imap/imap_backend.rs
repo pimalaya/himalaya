@@ -3,6 +3,7 @@
 //! This module contains the definition of the IMAP backend.
 
 use anyhow::{anyhow, Context, Result};
+use himalaya_lib::account::{AccountConfig, ImapBackendConfig};
 use log::{debug, log_enabled, trace, Level};
 use native_tls::{TlsConnector, TlsStream};
 use std::{
@@ -16,7 +17,6 @@ use crate::{
     backends::{
         imap::msg_sort_criterion::SortCriteria, Backend, ImapEnvelope, ImapEnvelopes, ImapMboxes,
     },
-    config::{AccountConfig, ImapBackendConfig},
     mbox::Mboxes,
     msg::{Envelopes, Msg},
     output::run_cmd,

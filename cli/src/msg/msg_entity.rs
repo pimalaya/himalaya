@@ -2,6 +2,9 @@ use ammonia;
 use anyhow::{anyhow, Context, Error, Result};
 use chrono::{DateTime, Local, TimeZone, Utc};
 use convert_case::{Case, Casing};
+use himalaya_lib::account::{
+    AccountConfig, DEFAULT_DRAFT_FOLDER, DEFAULT_SENT_FOLDER, DEFAULT_SIG_DELIM,
+};
 use html_escape;
 use lettre::message::{header::ContentType, Attachment, MultiPart, SinglePart};
 use log::{info, trace, warn};
@@ -18,7 +21,6 @@ use uuid::Uuid;
 
 use crate::{
     backends::Backend,
-    config::{AccountConfig, DEFAULT_DRAFT_FOLDER, DEFAULT_SENT_FOLDER, DEFAULT_SIG_DELIM},
     msg::{
         from_addrs_to_sendable_addrs, from_addrs_to_sendable_mbox, from_slice_to_addrs, msg_utils,
         Addr, Addrs, BinaryPart, Part, Parts, TextPlainPart, TplOverride,

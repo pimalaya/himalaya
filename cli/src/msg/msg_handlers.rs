@@ -4,6 +4,7 @@
 
 use anyhow::{Context, Result};
 use atty::Stream;
+use himalaya_lib::account::{AccountConfig, DEFAULT_SENT_FOLDER};
 use log::{debug, info, trace};
 use mailparse::addrparse;
 use std::{
@@ -15,7 +16,6 @@ use url::Url;
 
 use crate::{
     backends::Backend,
-    config::{AccountConfig, DEFAULT_SENT_FOLDER},
     msg::{Msg, Part, Parts, TextPlainPart},
     output::{PrintTableOpts, PrinterService},
     smtp::SmtpService,

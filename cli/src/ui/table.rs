@@ -5,15 +5,13 @@
 //! [builder design pattern]: https://refactoring.guru/design-patterns/builder
 
 use anyhow::{Context, Result};
+use himalaya_lib::account::Format;
 use log::trace;
 use termcolor::{Color, ColorSpec};
 use terminal_size;
 use unicode_width::UnicodeWidthStr;
 
-use crate::{
-    config::Format,
-    output::{Print, PrintTableOpts, WriteColor},
-};
+use crate::output::{Print, PrintTableOpts, WriteColor};
 
 /// Defines the default terminal size.
 /// This is used when the size cannot be determined by the `terminal_size` crate.

@@ -3,10 +3,11 @@
 //! This module gathers all account actions triggered by the CLI.
 
 use anyhow::Result;
+use himalaya_lib::account::{AccountConfig, DeserializedConfig};
 use log::{info, trace};
 
 use crate::{
-    config::{AccountConfig, Accounts, DeserializedConfig},
+    config::Accounts,
     output::{PrintTableOpts, PrinterService},
 };
 
@@ -36,13 +37,13 @@ pub fn list<'a, P: PrinterService>(
 
 #[cfg(test)]
 mod tests {
+    use himalaya_lib::account::{
+        AccountConfig, DeserializedAccountConfig, DeserializedConfig, DeserializedImapAccountConfig,
+    };
     use std::{collections::HashMap, fmt::Debug, io, iter::FromIterator};
     use termcolor::ColorSpec;
 
-    use crate::{
-        config::{DeserializedAccountConfig, DeserializedImapAccountConfig},
-        output::{Print, PrintTable, WriteColor},
-    };
+    use crate::output::{Print, PrintTable, WriteColor};
 
     use super::*;
 

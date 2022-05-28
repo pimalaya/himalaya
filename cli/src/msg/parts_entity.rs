@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Context, Result};
+use himalaya_lib::account::AccountConfig;
 use mailparse::MailHeaderMap;
 use serde::Serialize;
 use std::{
@@ -6,8 +7,6 @@ use std::{
     ops::{Deref, DerefMut},
 };
 use uuid::Uuid;
-
-use crate::config::AccountConfig;
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct TextPlainPart {

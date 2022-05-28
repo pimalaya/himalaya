@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use himalaya_lib::account::AccountConfig;
 use lettre::{
     self,
     transport::smtp::{
@@ -9,7 +10,7 @@ use lettre::{
 };
 use std::convert::TryInto;
 
-use crate::{config::AccountConfig, msg::Msg, output::pipe_cmd};
+use crate::{msg::Msg, output::pipe_cmd};
 
 pub trait SmtpService {
     fn send(&mut self, account: &AccountConfig, msg: &Msg) -> Result<Vec<u8>>;
@@ -62,7 +63,7 @@ impl SmtpService for LettreService<'_> {
             if let Some(cmd) = account.hooks.pre_send.as_deref() {
                 for cmd in cmd.split('|') {
                     raw_msg = pipe_cmd(cmd.trim(), &raw_msg)
-                        .with_context(|| format!("cannot execute pre-send hook {:?}", cmd))?
+                        .with_context(|| format!("cannot execute pre-send hook {:?}", cmd))?;
                 }
                 let parsed_mail = mailparse::parse_mail(&raw_msg)?;
                 Msg::from_parsed_mail(parsed_mail, account)?.try_into()

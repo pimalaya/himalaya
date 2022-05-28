@@ -1,11 +1,11 @@
 use std::{convert::TryInto, fs};
 
 use anyhow::{anyhow, Context, Result};
+use himalaya_lib::account::{AccountConfig, NotmuchBackendConfig};
 use log::{debug, info, trace};
 
 use crate::{
     backends::{Backend, IdMapper, MaildirBackend, NotmuchEnvelopes, NotmuchMbox, NotmuchMboxes},
-    config::{AccountConfig, NotmuchBackendConfig},
     mbox::Mboxes,
     msg::{Envelopes, Msg},
 };

@@ -441,6 +441,7 @@ dependencies = [
  "convert_case",
  "env_logger",
  "erased-serde",
+ "himalaya-lib",
  "html-escape",
  "imap",
  "imap-proto",
@@ -468,6 +469,20 @@ dependencies = [
 [[package]]
 name = "himalaya-lib"
 version = "0.1.0"
+dependencies = [
+ "imap",
+ "imap-proto",
+ "lettre",
+ "log",
+ "maildir",
+ "mailparse",
+ "md5",
+ "notmuch",
+ "serde",
+ "shellexpand",
+ "thiserror",
+ "toml",
+]
 
 [[package]]
 name = "hostname"
@@ -1363,6 +1378,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d326610f408c7a4eb6f51c37c330e496b08506c9457c9d34287ecc38809fb060"
 dependencies = [
  "unicode-width",
+]
+
+[[package]]
+name = "thiserror"
+version = "1.0.31"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd829fe32373d27f76265620b5309d0340cb8550f523c1dda251d6298069069a"
+dependencies = [
+ "thiserror-impl",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "1.0.31"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0396bc89e626244658bef819e22d0cc459e795a5ebe878e6ec336d1674a8d79a"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

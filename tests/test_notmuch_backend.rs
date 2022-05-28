@@ -1,11 +1,13 @@
 #[cfg(feature = "notmuch-backend")]
 use std::{collections::HashMap, env, fs, iter::FromIterator};
 
+
 #[cfg(feature = "notmuch-backend")]
 use himalaya::{
     backends::{Backend, MaildirBackend, NotmuchBackend, NotmuchEnvelopes},
-    config::{AccountConfig, MaildirBackendConfig, NotmuchBackendConfig},
 };
+#[cfg(feature = "notmuch-backend")]
+use himalaya_lib::account::{AccountConfig, MaildirBackendConfig, NotmuchBackendConfig}
 
 #[cfg(feature = "notmuch-backend")]
 #[test]

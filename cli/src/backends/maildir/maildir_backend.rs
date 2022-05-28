@@ -4,12 +4,12 @@
 //! traits implementation.
 
 use anyhow::{anyhow, Context, Result};
+use himalaya_lib::account::{AccountConfig, MaildirBackendConfig};
 use log::{debug, info, trace};
 use std::{convert::TryInto, env, fs, path::PathBuf};
 
 use crate::{
     backends::{Backend, IdMapper, MaildirEnvelopes, MaildirFlags, MaildirMboxes},
-    config::{AccountConfig, MaildirBackendConfig},
     mbox::Mboxes,
     msg::{Envelopes, Msg},
 };
