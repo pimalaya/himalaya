@@ -16,19 +16,8 @@
       (system:
         let
           name = "himalaya";
-          pkgs = import nixpkgs {
-            inherit system;
-            overlays = [
-              rust-overlay.overlay
-              (self: super: {
-                # Because rust-overlay bundles multiple rust packages
-                # into one derivation, specify that mega-bundle here,
-                # so that crate2nix will use them automatically.
-                rustc = self.rust-bin.stable.latest.default;
-                cargo = self.rust-bin.stable.latest.default;
-              })
-            ];
-          };
+          overlays = [ (import rust-overlay) ];
+          pkgs = import nixpkgs { inherit system overlays; };
         in
         rec {
           # nix build
@@ -68,17 +57,19 @@
 
           # nix develop
           devShell = pkgs.mkShell {
-            RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
             inputsFrom = builtins.attrValues self.packages.${system};
             buildInputs = with pkgs; [
-              cargo
-              cargo-watch
-              trunk
-              ripgrep
-              rust-analyzer
-              rustfmt
+              # Nix LSP + formatter
               rnix-lsp
               nixpkgs-fmt
+
+              # Rust env
+              (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
+              cargo-watch
+              rust-analyzer
+              rustfmt
+
+              # Notmuch
               notmuch
             ];
           };
