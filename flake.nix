@@ -66,6 +66,8 @@
               # Rust env
               (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
               cargo-watch
+              rust-analyzer
+              rustfmt
 
               # Notmuch
               notmuch
