@@ -55,7 +55,8 @@ impl Parts {
         part: &'a mailparse::ParsedMail<'a>,
     ) -> Result<Self> {
         let mut parts = vec![];
-        if part.subparts.is_empty() && part.get_headers().get_first_value("content-type").is_none() {
+        if part.subparts.is_empty() && part.get_headers().get_first_value("content-type").is_none()
+        {
             let content = part.get_body().unwrap_or_default();
             parts.push(Part::TextPlain(TextPlainPart { content }))
         } else {
