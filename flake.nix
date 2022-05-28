@@ -58,7 +58,7 @@
           # nix develop
           devShell = pkgs.mkShell {
             inputsFrom = builtins.attrValues self.packages.${system};
-            buildInputs = with pkgs; [
+            nativeBuildInputs = with pkgs; [
               # Nix LSP + formatter
               rnix-lsp
               nixpkgs-fmt
@@ -67,7 +67,6 @@
               (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
               cargo-watch
               rust-analyzer
-              rustfmt
 
               # Notmuch
               notmuch
