@@ -3,7 +3,7 @@ let s:trim = function("himalaya#shared#utils#trim")
 let s:cli = function("himalaya#shared#cli#call")
 let s:plain_req = function("himalaya#request#plain")
 
-let s:msg_id = 0
+let s:msg_id = ""
 let s:draft = ""
 let s:attachment_paths = []
 
@@ -47,16 +47,17 @@ function! himalaya#msg#read()
   try
     let pos = getpos(".")
     let s:msg_id = s:get_focused_msg_id()
+    if empty(s:msg_id) || s:msg_id == "HASH" | return | endif
     let account = himalaya#account#curr()
     let mbox = himalaya#mbox#curr_mbox()
     let msg = s:cli(
-      \"--account %s --mailbox %s read %d",
+      \"--account %s --mailbox %s read %s",
       \[shellescape(account), shellescape(mbox), s:msg_id],
-      \printf("Fetching message %d", s:msg_id),
+      \printf("Fetching message %s", s:msg_id),
       \1,
     \)
     call s:close_open_buffers('Himalaya read message')
-    execute printf("silent! botright new Himalaya read message [%d]", s:msg_id)
+    execute printf("silent! botright new Himalaya read message [%s]", s:msg_id)
     setlocal modifiable
     silent execute "%d"
     call append(0, split(substitute(msg, "\r", "", "g"), "\n"))
@@ -98,12 +99,12 @@ function! himalaya#msg#reply()
     let mbox = himalaya#mbox#curr_mbox()
     let msg_id = stridx(bufname("%"), "Himalaya messages") == 0 ? s:get_focused_msg_id() : s:msg_id
     let msg = s:cli(
-      \"--account %s --mailbox %s template reply %d",
+      \"--account %s --mailbox %s template reply %s",
       \[shellescape(account), shellescape(mbox), msg_id],
       \"Fetching reply template",
       \0,
     \)
-    execute printf("silent! edit Himalaya reply [%d]", msg_id)
+    execute printf("silent! edit Himalaya reply [%s]", msg_id)
     call append(0, split(substitute(msg, "\r", "", "g"), "\n"))
     silent execute "$d"
     setlocal filetype=himalaya-msg-write
@@ -124,12 +125,12 @@ function! himalaya#msg#reply_all()
     let mbox = himalaya#mbox#curr_mbox()
     let msg_id = stridx(bufname("%"), "Himalaya messages") == 0 ? s:get_focused_msg_id() : s:msg_id
     let msg = s:cli(
-      \"--account %s --mailbox %s template reply %d --all",
+      \"--account %s --mailbox %s template reply %s --all",
       \[shellescape(account), shellescape(mbox), msg_id],
       \"Fetching reply all template",
       \0
     \)
-    execute printf("silent! edit Himalaya reply all [%d]", msg_id)
+    execute printf("silent! edit Himalaya reply all [%s]", msg_id)
     call append(0, split(substitute(msg, "\r", "", "g"), "\n"))
     silent execute "$d"
     setlocal filetype=himalaya-msg-write
@@ -150,12 +151,12 @@ function! himalaya#msg#forward()
     let mbox = himalaya#mbox#curr_mbox()
     let msg_id = stridx(bufname("%"), "Himalaya messages") == 0 ? s:get_focused_msg_id() : s:msg_id
     let msg = s:cli(
-      \"--account %s --mailbox %s template forward %d",
+      \"--account %s --mailbox %s template forward %s",
       \[shellescape(account), shellescape(mbox), msg_id],
       \"Fetching forward template",
       \0
     \)
-    execute printf("silent! edit Himalaya forward [%d]", msg_id)
+    execute printf("silent! edit Himalaya forward [%s]", msg_id)
     call append(0, split(substitute(msg, "\r", "", "g"), "\n"))
     silent execute "$d"
     setlocal filetype=himalaya-msg-write
@@ -180,7 +181,7 @@ function! himalaya#msg#_copy(target_mbox)
     let account = himalaya#account#curr()
     let source_mbox = himalaya#mbox#curr_mbox()
     let msg = s:cli(
-      \"--account %s --mailbox %s copy %d %s",
+      \"--account %s --mailbox %s copy %s %s",
       \[shellescape(account), shellescape(source_mbox), msg_id, shellescape(a:target_mbox)],
       \"Copying message",
       \1,
@@ -201,14 +202,14 @@ endfunction
 function! himalaya#msg#_move(target_mbox)
   try
     let msg_id = stridx(bufname("%"), "Himalaya messages") == 0 ? s:get_focused_msg_id() : s:msg_id
-    let choice = input(printf("Are you sure you want to move the message %d? (y/N) ", msg_id))
+    let choice = input(printf("Are you sure you want to move the message %s? (y/N) ", msg_id))
     redraw | echo
     if choice != "y" | return | endif
     let pos = getpos(".")
     let account = himalaya#account#curr()
     let source_mbox = himalaya#mbox#curr_mbox()
     let msg = s:cli(
-      \"--account %s --mailbox %s move %d %s",
+      \"--account %s --mailbox %s move %s %s",
       \[shellescape(account), shellescape(source_mbox), msg_id, shellescape(a:target_mbox)],
       \"Moving message",
       \1,
@@ -294,7 +295,7 @@ function! himalaya#msg#attachments()
     let mbox = himalaya#mbox#curr_mbox()
     let msg_id = stridx(bufname("%"), "Himalaya messages") == 0 ? s:get_focused_msg_id() : s:msg_id
     let msg = s:cli(
-      \"--account %s --mailbox %s attachments %d",
+      \"--account %s --mailbox %s attachments %s",
       \[shellescape(account), shellescape(mbox), msg_id],
       \"Downloading attachments",
       \0
@@ -375,7 +376,7 @@ function! s:bufwidth()
 endfunction
 
 function! s:get_msg_id(line)
-    return matchstr(a:line, '[0-9]*')
+  return matchstr(a:line, '[0-9a-zA-Z]*')
 endfunction
 
 function! s:get_focused_msg_id()
