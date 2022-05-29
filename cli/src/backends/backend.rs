@@ -4,11 +4,9 @@
 //! custom backend implementations.
 
 use anyhow::Result;
+use himalaya_lib::mbox::Mboxes;
 
-use crate::{
-    mbox::Mboxes,
-    msg::{Envelopes, Msg},
-};
+use crate::msg::{Envelopes, Msg};
 
 pub trait Backend<'a> {
     fn connect(&mut self) -> Result<()> {
@@ -16,7 +14,7 @@ pub trait Backend<'a> {
     }
 
     fn add_mbox(&mut self, mbox: &str) -> Result<()>;
-    fn get_mboxes(&mut self) -> Result<Box<dyn Mboxes>>;
+    fn get_mboxes(&mut self) -> Result<Mboxes>;
     fn del_mbox(&mut self, mbox: &str) -> Result<()>;
     fn get_envelopes(
         &mut self,

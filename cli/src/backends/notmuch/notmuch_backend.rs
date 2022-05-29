@@ -1,12 +1,14 @@
 use std::{convert::TryInto, fs};
 
 use anyhow::{anyhow, Context, Result};
-use himalaya_lib::account::{AccountConfig, NotmuchBackendConfig};
+use himalaya_lib::{
+    account::{AccountConfig, NotmuchBackendConfig},
+    mbox::{Mbox, Mboxes},
+};
 use log::{debug, info, trace};
 
 use crate::{
-    backends::{Backend, IdMapper, MaildirBackend, NotmuchEnvelopes, NotmuchMbox, NotmuchMboxes},
-    mbox::Mboxes,
+    backends::{Backend, IdMapper, MaildirBackend, NotmuchEnvelopes},
     msg::{Envelopes, Msg},
 };
 
@@ -115,20 +117,22 @@ impl<'a> Backend<'a> for NotmuchBackend<'a> {
         ))
     }
 
-    fn get_mboxes(&mut self) -> Result<Box<dyn Mboxes>> {
-        info!(">> get notmuch virtual mailboxes");
+    fn get_mboxes(&mut self) -> Result<Mboxes> {
+        trace!(">> get notmuch virtual mailboxes");
 
-        let mut mboxes: Vec<_> = self
-            .account_config
-            .mailboxes
-            .iter()
-            .map(|(k, v)| NotmuchMbox::new(k, v))
-            .collect();
-        trace!("virtual mailboxes: {:?}", mboxes);
+        let mut mboxes = Mboxes::default();
+        for (name, desc) in &self.account_config.mailboxes {
+            mboxes.push(Mbox {
+                name: name.into(),
+                desc: desc.into(),
+                ..Mbox::default()
+            })
+        }
         mboxes.sort_by(|a, b| b.name.partial_cmp(&a.name).unwrap());
 
-        info!("<< get notmuch virtual mailboxes");
-        Ok(Box::new(NotmuchMboxes { mboxes }))
+        trace!("notmuch virtual mailboxes: {:?}", mboxes);
+        trace!("<< get notmuch virtual mailboxes");
+        Ok(mboxes)
     }
 
     fn del_mbox(&mut self, _mbox: &str) -> Result<()> {

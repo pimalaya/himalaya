@@ -4,13 +4,15 @@
 //! traits implementation.
 
 use anyhow::{anyhow, Context, Result};
-use himalaya_lib::account::{AccountConfig, MaildirBackendConfig};
+use himalaya_lib::{
+    account::{AccountConfig, MaildirBackendConfig},
+    mbox::{Mbox, Mboxes},
+};
 use log::{debug, info, trace};
-use std::{convert::TryInto, env, fs, path::PathBuf};
+use std::{convert::TryInto, env, ffi::OsStr, fs, path::PathBuf};
 
 use crate::{
-    backends::{Backend, IdMapper, MaildirEnvelopes, MaildirFlags, MaildirMboxes},
-    mbox::Mboxes,
+    backends::{Backend, IdMapper, MaildirEnvelopes, MaildirFlags},
     msg::{Envelopes, Msg},
 };
 
@@ -85,17 +87,39 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         Ok(())
     }
 
-    fn get_mboxes(&mut self) -> Result<Box<dyn Mboxes>> {
-        info!(">> get maildir dirs");
+    fn get_mboxes(&mut self) -> Result<Mboxes> {
+        trace!(">> get maildir mailboxes");
 
-        let dirs: MaildirMboxes =
-            self.mdir.list_subdirs().try_into().with_context(|| {
-                format!("cannot parse maildir dirs from {:?}", self.mdir.path())
-            })?;
-        trace!("dirs: {:?}", dirs);
+        let mut mboxes = Mboxes::default();
+        for (name, desc) in &self.account_config.mailboxes {
+            mboxes.push(Mbox {
+                delim: String::from("/"),
+                name: name.into(),
+                desc: desc.into(),
+            })
+        }
+        for entry in self.mdir.list_subdirs() {
+            let dir = entry?;
+            let dirname = dir.path().file_name();
+            mboxes.push(Mbox {
+                delim: String::from("/"),
+                name: dirname
+                    .and_then(OsStr::to_str)
+                    .and_then(|s| if s.len() < 2 { None } else { Some(&s[1..]) })
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "cannot parse maildir subdirectory name from path {:?}",
+                            dirname
+                        )
+                    })?
+                    .into(),
+                ..Mbox::default()
+            });
+        }
 
-        info!("<< get maildir dirs");
-        Ok(Box::new(dirs))
+        trace!("maildir mailboxes: {:?}", mboxes);
+        trace!("<< get maildir mailboxes");
+        Ok(mboxes)
     }
 
     fn del_mbox(&mut self, dir: &str) -> Result<()> {

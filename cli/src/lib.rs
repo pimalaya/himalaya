@@ -2,6 +2,9 @@ pub mod mbox {
     pub mod mbox;
     pub use mbox::*;
 
+    pub mod mboxes;
+    pub use mboxes::*;
+
     pub mod mbox_args;
     pub mod mbox_handlers;
 }
@@ -49,12 +52,6 @@ pub mod backends {
 
         pub mod imap_handlers;
 
-        pub mod imap_mbox;
-        pub use imap_mbox::*;
-
-        pub mod imap_mbox_attr;
-        pub use imap_mbox_attr::*;
-
         pub mod imap_envelope;
         pub use imap_envelope::*;
 
@@ -72,9 +69,6 @@ pub mod backends {
         pub mod maildir_backend;
         pub use maildir_backend::*;
 
-        pub mod maildir_mbox;
-        pub use maildir_mbox::*;
-
         pub mod maildir_envelope;
         pub use maildir_envelope::*;
 
@@ -89,9 +83,6 @@ pub mod backends {
     pub mod notmuch {
         pub mod notmuch_backend;
         pub use notmuch_backend::*;
-
-        pub mod notmuch_mbox;
-        pub use notmuch_mbox::*;
 
         pub mod notmuch_envelope;
         pub use notmuch_envelope::*;

@@ -57,6 +57,7 @@
 
           # nix develop
           devShell = pkgs.mkShell {
+            RUSTUP_TOOLCHAIN = "stable";
             inputsFrom = builtins.attrValues self.packages.${system};
             nativeBuildInputs = with pkgs; [
               # Nix LSP + formatter

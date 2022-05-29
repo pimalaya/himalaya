@@ -7,7 +7,7 @@ edition = "2021"
 imap-backend = ["imap", "imap-proto"]
 maildir-backend = ["maildir", "md5"]
 notmuch-backend = ["notmuch", "maildir-backend"]
-default = ["imap-backend", "maildir-backend"]
+default = ["imap-backend", "maildir-backend", "notmuch-backend"]
 
 [dependencies]
 lettre = { version = "0.10.0-rc.1", features = ["serde"] }

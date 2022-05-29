@@ -22,7 +22,8 @@ pub fn list<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     let mboxes = backend.get_mboxes()?;
     trace!("mailboxes: {:?}", mboxes);
     printer.print_table(
-        mboxes,
+        // TODO: remove Box
+        Box::new(mboxes),
         PrintTableOpts {
             format: &config.format,
             max_width,
@@ -32,12 +33,11 @@ pub fn list<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
 
 #[cfg(test)]
 mod tests {
+    use himalaya_lib::mbox::{Mbox, Mboxes};
     use std::{fmt::Debug, io};
     use termcolor::ColorSpec;
 
     use crate::{
-        backends::{ImapMbox, ImapMboxAttr, ImapMboxAttrs, ImapMboxes},
-        mbox::Mboxes,
         msg::{Envelopes, Msg},
         output::{Print, PrintTable, WriteColor},
     };
@@ -114,24 +114,19 @@ mod tests {
             fn add_mbox(&mut self, _: &str) -> Result<()> {
                 unimplemented!();
             }
-            fn get_mboxes(&mut self) -> Result<Box<dyn Mboxes>> {
-                Ok(Box::new(ImapMboxes {
+            fn get_mboxes(&mut self) -> Result<Mboxes> {
+                Ok(Mboxes {
                     mboxes: vec![
-                        ImapMbox {
+                        Mbox {
                             delim: "/".into(),
                             name: "INBOX".into(),
-                            attrs: ImapMboxAttrs(vec![ImapMboxAttr::NoSelect]),
                         },
-                        ImapMbox {
+                        Mbox {
                             delim: "/".into(),
                             name: "Sent".into(),
-                            attrs: ImapMboxAttrs(vec![
-                                ImapMboxAttr::NoInferiors,
-                                ImapMboxAttr::Custom("HasNoChildren".into()),
-                            ]),
                         },
                     ],
-                }))
+                })
             }
             fn del_mbox(&mut self, _: &str) -> Result<()> {
                 unimplemented!();

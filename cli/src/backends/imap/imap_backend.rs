@@ -3,7 +3,11 @@
 //! This module contains the definition of the IMAP backend.
 
 use anyhow::{anyhow, Context, Result};
-use himalaya_lib::account::{AccountConfig, ImapBackendConfig};
+use himalaya_lib::{
+    account::{AccountConfig, ImapBackendConfig},
+    mbox::{Mbox, Mboxes},
+};
+use imap::types::NameAttribute;
 use log::{debug, log_enabled, trace, Level};
 use native_tls::{TlsConnector, TlsStream};
 use std::{
@@ -14,10 +18,7 @@ use std::{
 };
 
 use crate::{
-    backends::{
-        imap::msg_sort_criterion::SortCriteria, Backend, ImapEnvelope, ImapEnvelopes, ImapMboxes,
-    },
-    mbox::Mboxes,
+    backends::{imap::msg_sort_criterion::SortCriteria, Backend, ImapEnvelope, ImapEnvelopes},
     msg::{Envelopes, Msg},
     output::run_cmd,
 };
@@ -211,13 +212,38 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
             .context(format!("cannot create imap mailbox {:?}", mbox))
     }
 
-    fn get_mboxes(&mut self) -> Result<Box<dyn Mboxes>> {
-        let mboxes: ImapMboxes = self
+    fn get_mboxes(&mut self) -> Result<Mboxes> {
+        trace!(">> get imap mailboxes");
+
+        let imap_mboxes = self
             .sess()?
             .list(Some(""), Some("*"))
-            .context("cannot list mailboxes")?
-            .into();
-        Ok(Box::new(mboxes))
+            .context("cannot list mailboxes")?;
+        let mboxes = Mboxes {
+            mboxes: imap_mboxes
+                .iter()
+                .map(|imap_mbox| Mbox {
+                    delim: imap_mbox.delimiter().unwrap_or_default().into(),
+                    name: imap_mbox.name().into(),
+                    desc: imap_mbox
+                        .attributes()
+                        .iter()
+                        .map(|attr| match attr {
+                            NameAttribute::Marked => "Marked",
+                            NameAttribute::Unmarked => "Unmarked",
+                            NameAttribute::NoSelect => "NoSelect",
+                            NameAttribute::NoInferiors => "NoInferiors",
+                            NameAttribute::Custom(custom) => custom.trim_start_matches('\\'),
+                        })
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                })
+                .collect(),
+        };
+
+        trace!("imap mailboxes: {:?}", mboxes);
+        trace!("<< get imap mailboxes");
+        Ok(mboxes)
     }
 
     fn del_mbox(&mut self, mbox: &str) -> Result<()> {
