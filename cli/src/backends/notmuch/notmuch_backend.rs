@@ -197,7 +197,7 @@ impl<'a> Backend<'a> for NotmuchBackend<'a> {
         Ok(envelopes)
     }
 
-    fn add_msg(&mut self, _: &str, msg: &[u8], tags: &str) -> Result<Box<dyn ToString>> {
+    fn add_msg(&mut self, _: &str, msg: &[u8], tags: &str) -> Result<String> {
         info!(">> add notmuch envelopes");
         debug!("tags: {:?}", tags);
 
@@ -251,7 +251,7 @@ impl<'a> Backend<'a> for NotmuchBackend<'a> {
             .with_context(|| format!("cannot add flags to notmuch message {:?}", id))?;
 
         info!("<< add notmuch envelopes");
-        Ok(Box::new(hash))
+        Ok(hash)
     }
 
     fn get_msg(&mut self, _: &str, short_hash: &str) -> Result<Msg> {

@@ -120,10 +120,12 @@ mod tests {
                         Mbox {
                             delim: "/".into(),
                             name: "INBOX".into(),
+                            desc: "desc".into(),
                         },
                         Mbox {
                             delim: "/".into(),
                             name: "Sent".into(),
+                            desc: "desc".into(),
                         },
                     ],
                 })
@@ -144,7 +146,7 @@ mod tests {
             ) -> Result<Box<dyn Envelopes>> {
                 unimplemented!()
             }
-            fn add_msg(&mut self, _: &str, _: &[u8], _: &str) -> Result<Box<dyn ToString>> {
+            fn add_msg(&mut self, _: &str, _: &[u8], _: &str) -> Result<String> {
                 unimplemented!()
             }
             fn get_msg(&mut self, _: &str, _: &str) -> Result<Msg> {
@@ -179,9 +181,9 @@ mod tests {
         assert_eq!(
             concat![
                 "\n",
-                "DELIM │NAME  │ATTRIBUTES                 \n",
-                "/     │INBOX │NoSelect                   \n",
-                "/     │Sent  │NoInferiors, HasNoChildren \n",
+                "DELIM │NAME  │DESC \n",
+                "/     │INBOX │desc \n",
+                "/     │Sent  │desc \n",
                 "\n"
             ],
             printer.writer.content

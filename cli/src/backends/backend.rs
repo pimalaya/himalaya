@@ -30,7 +30,7 @@ pub trait Backend<'a> {
         page_size: usize,
         page: usize,
     ) -> Result<Box<dyn Envelopes>>;
-    fn add_msg(&mut self, mbox: &str, msg: &[u8], flags: &str) -> Result<Box<dyn ToString>>;
+    fn add_msg(&mut self, mbox: &str, msg: &[u8], flags: &str) -> Result<String>;
     fn get_msg(&mut self, mbox: &str, id: &str) -> Result<Msg>;
     fn copy_msg(&mut self, mbox_src: &str, mbox_dst: &str, ids: &str) -> Result<()>;
     fn move_msg(&mut self, mbox_src: &str, mbox_dst: &str, ids: &str) -> Result<()>;

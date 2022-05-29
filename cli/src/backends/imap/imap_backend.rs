@@ -342,7 +342,7 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
         Ok(Box::new(envelopes))
     }
 
-    fn add_msg(&mut self, mbox: &str, msg: &[u8], flags: &str) -> Result<Box<dyn ToString>> {
+    fn add_msg(&mut self, mbox: &str, msg: &[u8], flags: &str) -> Result<String> {
         let flags: ImapFlags = flags.into();
         self.sess()?
             .append(mbox, msg)
@@ -354,7 +354,7 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
             .select(mbox)
             .context(format!("cannot select mailbox {:?}", mbox))?
             .exists;
-        Ok(Box::new(last_seq))
+        Ok(last_seq.to_string())
     }
 
     fn get_msg(&mut self, mbox: &str, seq: &str) -> Result<Msg> {

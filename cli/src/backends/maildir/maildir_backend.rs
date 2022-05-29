@@ -215,7 +215,7 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         ))
     }
 
-    fn add_msg(&mut self, dir: &str, msg: &[u8], flags: &str) -> Result<Box<dyn ToString>> {
+    fn add_msg(&mut self, dir: &str, msg: &[u8], flags: &str) -> Result<String> {
         info!(">> add maildir message");
         debug!("dir: {:?}", dir);
         debug!("flags: {:?}", flags);
@@ -246,7 +246,7 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
             })?;
 
         info!("<< add maildir message");
-        Ok(Box::new(hash))
+        Ok(hash)
     }
 
     fn get_msg(&mut self, dir: &str, short_hash: &str) -> Result<Msg> {
