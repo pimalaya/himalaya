@@ -10,7 +10,7 @@ notmuch-backend = ["notmuch", "maildir-backend"]
 default = ["imap-backend", "maildir-backend", "notmuch-backend"]
 
 [dependencies]
-lettre = { version = "0.10.0-rc.1", features = ["serde"] }
+lettre = { version = "0.10.0-rc.6", features = ["serde"] }
 log = "0.4.14"
 mailparse = "0.13.6"
 serde = { version = "1.0.118", features = ["derive"] }
