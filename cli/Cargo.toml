@@ -20,7 +20,7 @@ section = "mail"
 imap-backend = ["imap", "imap-proto"]
 maildir-backend = ["maildir", "md5"]
 notmuch-backend = ["notmuch", "maildir-backend"]
-default = ["imap-backend", "maildir-backend", "notmuch-backend"]
+default = ["imap-backend", "maildir-backend"]
 
 [dependencies]
 ammonia = "3.1.2"

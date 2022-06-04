@@ -1,15 +1,16 @@
-use std::{convert::TryInto, fs};
+use std::fs;
 
 use anyhow::{anyhow, Context, Result};
 use himalaya_lib::{
     account::{AccountConfig, NotmuchBackendConfig},
     mbox::{Mbox, Mboxes},
+    msg::Envelopes,
 };
 use log::{debug, info, trace};
 
 use crate::{
-    backends::{Backend, IdMapper, MaildirBackend, NotmuchEnvelopes},
-    msg::{Envelopes, Msg},
+    backends::{notmuch_envelopes, Backend, IdMapper, MaildirBackend},
+    msg::Msg,
 };
 
 /// Represents the Notmuch backend.
@@ -53,16 +54,16 @@ impl<'a> NotmuchBackend<'a> {
         query: &str,
         page_size: usize,
         page: usize,
-    ) -> Result<Box<dyn Envelopes>> {
+    ) -> Result<Envelopes> {
         // Gets envelopes matching the given Notmuch query.
         let query_builder = self
             .db
             .create_query(query)
             .with_context(|| format!("cannot create notmuch query from {:?}", query))?;
-        let mut envelopes: NotmuchEnvelopes = query_builder
-            .search_messages()
-            .with_context(|| format!("cannot find notmuch envelopes from query {:?}", query))?
-            .try_into()
+        let mut envelopes =
+            notmuch_envelopes::from_notmuch_msgs(query_builder.search_messages().with_context(
+                || format!("cannot find notmuch envelopes from query {:?}", query),
+            )?)
             .with_context(|| format!("cannot parse notmuch envelopes from query {:?}", query))?;
         debug!("envelopes len: {:?}", envelopes.len());
         trace!("envelopes: {:?}", envelopes);
@@ -93,7 +94,7 @@ impl<'a> NotmuchBackend<'a> {
             let mut mapper = IdMapper::new(&self.notmuch_config.notmuch_database_dir)?;
             let entries = envelopes
                 .iter()
-                .map(|env| (env.hash.to_owned(), env.id.to_owned()))
+                .map(|env| (env.id.to_owned(), env.internal_id.to_owned()))
                 .collect();
             mapper.append(entries)?
         };
@@ -102,9 +103,9 @@ impl<'a> NotmuchBackend<'a> {
         // Shorten envelopes hash.
         envelopes
             .iter_mut()
-            .for_each(|env| env.hash = env.hash[0..short_hash_len].to_owned());
+            .for_each(|env| env.id = env.id[0..short_hash_len].to_owned());
 
-        Ok(Box::new(envelopes))
+        Ok(envelopes)
     }
 }
 
@@ -148,7 +149,7 @@ impl<'a> Backend<'a> for NotmuchBackend<'a> {
         virt_mbox: &str,
         page_size: usize,
         page: usize,
-    ) -> Result<Box<dyn Envelopes>> {
+    ) -> Result<Envelopes> {
         info!(">> get notmuch envelopes");
         debug!("virtual mailbox: {:?}", virt_mbox);
         debug!("page size: {:?}", page_size);
@@ -174,7 +175,7 @@ impl<'a> Backend<'a> for NotmuchBackend<'a> {
         _sort: &str,
         page_size: usize,
         page: usize,
-    ) -> Result<Box<dyn Envelopes>> {
+    ) -> Result<Envelopes> {
         info!(">> search notmuch envelopes");
         debug!("virtual mailbox: {:?}", virt_mbox);
         debug!("query: {:?}", query);

@@ -126,7 +126,7 @@ pub fn list<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     let msgs = imap.get_envelopes(mbox, page_size, page)?;
     trace!("envelopes: {:?}", msgs);
     printer.print_table(
-        msgs,
+        Box::new(msgs),
         PrintTableOpts {
             format: &config.format,
             max_width,
@@ -310,7 +310,7 @@ pub fn search<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     let msgs = backend.search_envelopes(mbox, &query, "", page_size, page)?;
     trace!("messages: {:#?}", msgs);
     printer.print_table(
-        msgs,
+        Box::new(msgs),
         PrintTableOpts {
             format: &config.format,
             max_width,
@@ -335,7 +335,7 @@ pub fn sort<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     let msgs = backend.search_envelopes(mbox, &query, &sort, page_size, page)?;
     trace!("envelopes: {:#?}", msgs);
     printer.print_table(
-        msgs,
+        Box::new(msgs),
         PrintTableOpts {
             format: &config.format,
             max_width,

@@ -6,24 +6,21 @@ use anyhow::{anyhow, Context, Result};
 use himalaya_lib::{
     account::{AccountConfig, ImapBackendConfig},
     mbox::{Mbox, Mboxes},
+    msg::{Envelopes, Flags},
 };
 use imap::types::NameAttribute;
 use log::{debug, log_enabled, trace, Level};
 use native_tls::{TlsConnector, TlsStream};
-use std::{
-    collections::HashSet,
-    convert::{TryFrom, TryInto},
-    net::TcpStream,
-    thread,
-};
+use std::{collections::HashSet, convert::TryInto, net::TcpStream, thread};
 
 use crate::{
-    backends::{imap::msg_sort_criterion::SortCriteria, Backend, ImapEnvelope, ImapEnvelopes},
-    msg::{Envelopes, Msg},
+    backends::{
+        from_imap_fetch, from_imap_fetches, imap::msg_sort_criterion::SortCriteria,
+        into_imap_flags, Backend,
+    },
+    msg::Msg,
     output::run_cmd,
 };
-
-use super::ImapFlags;
 
 type ImapSess = imap::Session<TlsStream<TcpStream>>;
 
@@ -148,7 +145,7 @@ impl<'a> ImapBackend<'a> {
                     .context("cannot fetch new messages enveloppe")?;
 
                 for fetch in fetches.iter() {
-                    let msg = ImapEnvelope::try_from(fetch)?;
+                    let msg = from_imap_fetch(fetch)?;
                     let uid = fetch.uid.ok_or_else(|| {
                         anyhow!("cannot retrieve message {}'s UID", fetch.message)
                     })?;
@@ -252,12 +249,7 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
             .context(format!("cannot delete imap mailbox {:?}", mbox))
     }
 
-    fn get_envelopes(
-        &mut self,
-        mbox: &str,
-        page_size: usize,
-        page: usize,
-    ) -> Result<Box<dyn Envelopes>> {
+    fn get_envelopes(&mut self, mbox: &str, page_size: usize, page: usize) -> Result<Envelopes> {
         let last_seq = self
             .sess()?
             .select(mbox)
@@ -265,7 +257,7 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
             .exists as usize;
         debug!("last sequence number: {:?}", last_seq);
         if last_seq == 0 {
-            return Ok(Box::new(ImapEnvelopes::default()));
+            return Ok(Envelopes::default());
         }
 
         let range = if page_size > 0 {
@@ -282,8 +274,8 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
             .sess()?
             .fetch(&range, "(ENVELOPE FLAGS INTERNALDATE)")
             .context(format!("cannot fetch messages within range {:?}", range))?;
-        let envelopes: ImapEnvelopes = fetches.try_into()?;
-        Ok(Box::new(envelopes))
+
+        from_imap_fetches(fetches)
     }
 
     fn search_envelopes(
@@ -293,7 +285,7 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
         sort: &str,
         page_size: usize,
         page: usize,
-    ) -> Result<Box<dyn Envelopes>> {
+    ) -> Result<Envelopes> {
         let last_seq = self
             .sess()?
             .select(mbox)
@@ -301,7 +293,7 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
             .exists;
         debug!("last sequence number: {:?}", last_seq);
         if last_seq == 0 {
-            return Ok(Box::new(ImapEnvelopes::default()));
+            return Ok(Envelopes::default());
         }
 
         let begin = page * page_size;
@@ -330,7 +322,7 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
                 .collect()
         };
         if seqs.is_empty() {
-            return Ok(Box::new(ImapEnvelopes::default()));
+            return Ok(Envelopes::default());
         }
 
         let range = seqs[begin..end.min(seqs.len())].join(",");
@@ -338,15 +330,15 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
             .sess()?
             .fetch(&range, "(ENVELOPE FLAGS INTERNALDATE)")
             .context(format!("cannot fetch messages within range {:?}", range))?;
-        let envelopes: ImapEnvelopes = fetches.try_into()?;
-        Ok(Box::new(envelopes))
+
+        from_imap_fetches(fetches)
     }
 
     fn add_msg(&mut self, mbox: &str, msg: &[u8], flags: &str) -> Result<String> {
-        let flags: ImapFlags = flags.into();
+        let flags: Flags = flags.into();
         self.sess()?
             .append(mbox, msg)
-            .flags(<ImapFlags as Into<Vec<imap::types::Flag<'a>>>>::into(flags))
+            .flags(into_imap_flags(&flags))
             .finish()
             .context(format!("cannot append message to {:?}", mbox))?;
         let last_seq = self
@@ -396,7 +388,7 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
     }
 
     fn add_flags(&mut self, mbox: &str, seq_range: &str, flags: &str) -> Result<()> {
-        let flags: ImapFlags = flags.into();
+        let flags: Flags = flags.into();
         self.sess()?
             .select(mbox)
             .context(format!("cannot select mailbox {:?}", mbox))?;
@@ -410,7 +402,7 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
     }
 
     fn set_flags(&mut self, mbox: &str, seq_range: &str, flags: &str) -> Result<()> {
-        let flags: ImapFlags = flags.into();
+        let flags: Flags = flags.into();
         self.sess()?
             .select(mbox)
             .context(format!("cannot select mailbox {:?}", mbox))?;
@@ -421,7 +413,7 @@ impl<'a> Backend<'a> for ImapBackend<'a> {
     }
 
     fn del_flags(&mut self, mbox: &str, seq_range: &str, flags: &str) -> Result<()> {
-        let flags: ImapFlags = flags.into();
+        let flags: Flags = flags.into();
         self.sess()?
             .select(mbox)
             .context(format!("cannot select mailbox {:?}", mbox))?;
