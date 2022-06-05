@@ -7,13 +7,14 @@ use anyhow::{anyhow, Context, Result};
 use himalaya_lib::{
     account::{AccountConfig, MaildirBackendConfig},
     mbox::{Mbox, Mboxes},
+    msg::Envelopes,
 };
 use log::{debug, info, trace};
-use std::{convert::TryInto, env, ffi::OsStr, fs, path::PathBuf};
+use std::{env, ffi::OsStr, fs, path::PathBuf};
 
 use crate::{
-    backends::{Backend, IdMapper, MaildirEnvelopes, MaildirFlags},
-    msg::{Envelopes, Msg},
+    backends::{maildir_envelopes, Backend, IdMapper},
+    msg::Msg,
 };
 
 /// Represents the maildir backend.
@@ -136,12 +137,7 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         Ok(())
     }
 
-    fn get_envelopes(
-        &mut self,
-        dir: &str,
-        page_size: usize,
-        page: usize,
-    ) -> Result<Box<dyn Envelopes>> {
+    fn get_envelopes(&mut self, dir: &str, page_size: usize, page: usize) -> Result<Envelopes> {
         info!(">> get maildir envelopes");
         debug!("dir: {:?}", dir);
         debug!("page size: {:?}", page_size);
@@ -153,9 +149,10 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
 
         // Reads envelopes from the "cur" folder of the selected
         // maildir.
-        let mut envelopes: MaildirEnvelopes = mdir.list_cur().try_into().with_context(|| {
-            format!("cannot parse maildir envelopes from {:?}", self.mdir.path())
-        })?;
+        let mut envelopes =
+            maildir_envelopes::from_maildir_entries(mdir.list_cur()).with_context(|| {
+                format!("cannot parse maildir envelopes from {:?}", self.mdir.path())
+            })?;
         debug!("envelopes len: {:?}", envelopes.len());
         trace!("envelopes: {:?}", envelopes);
 
@@ -185,7 +182,7 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
             let mut mapper = IdMapper::new(mdir.path())?;
             let entries = envelopes
                 .iter()
-                .map(|env| (env.hash.to_owned(), env.id.to_owned()))
+                .map(|env| (env.id.to_owned(), env.internal_id.to_owned()))
                 .collect();
             mapper.append(entries)?
         };
@@ -194,10 +191,10 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         // Shorten envelopes hash.
         envelopes
             .iter_mut()
-            .for_each(|env| env.hash = env.hash[0..short_hash_len].to_owned());
+            .for_each(|env| env.id = env.id[0..short_hash_len].to_owned());
 
         info!("<< get maildir envelopes");
-        Ok(Box::new(envelopes))
+        Ok(envelopes)
     }
 
     fn search_envelopes(
@@ -207,7 +204,7 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         _sort: &str,
         _page_size: usize,
         _page: usize,
-    ) -> Result<Box<dyn Envelopes>> {
+    ) -> Result<Envelopes> {
         info!(">> search maildir envelopes");
         info!("<< search maildir envelopes");
         Err(anyhow!(
@@ -223,9 +220,6 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         let mdir = self
             .get_mdir_from_dir(dir)
             .with_context(|| format!("cannot get maildir instance from {:?}", dir))?;
-        let flags: MaildirFlags = flags
-            .try_into()
-            .with_context(|| format!("cannot parse maildir flags {:?}", flags))?;
         let id = mdir
             .store_cur_with_flags(msg, &flags.to_string())
             .with_context(|| format!("cannot add maildir message to {:?}", mdir.path()))?;
@@ -426,9 +420,6 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         let mdir = self
             .get_mdir_from_dir(dir)
             .with_context(|| format!("cannot get maildir instance from {:?}", dir))?;
-        let flags: MaildirFlags = flags
-            .try_into()
-            .with_context(|| format!("cannot parse maildir flags {:?}", flags))?;
         debug!("flags: {:?}", flags);
         let id = IdMapper::new(mdir.path())
             .with_context(|| format!("cannot create id mapper instance for {:?}", mdir.path()))?
@@ -457,9 +448,6 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         let mdir = self
             .get_mdir_from_dir(dir)
             .with_context(|| format!("cannot get maildir instance from {:?}", dir))?;
-        let flags: MaildirFlags = flags
-            .try_into()
-            .with_context(|| format!("cannot parse maildir flags {:?}", flags))?;
         debug!("flags: {:?}", flags);
         let id = IdMapper::new(mdir.path())
             .with_context(|| format!("cannot create id mapper instance for {:?}", mdir.path()))?
@@ -488,9 +476,6 @@ impl<'a> Backend<'a> for MaildirBackend<'a> {
         let mdir = self
             .get_mdir_from_dir(dir)
             .with_context(|| format!("cannot get maildir instance from {:?}", dir))?;
-        let flags: MaildirFlags = flags
-            .try_into()
-            .with_context(|| format!("cannot parse maildir flags {:?}", flags))?;
         debug!("flags: {:?}", flags);
         let id = IdMapper::new(mdir.path())
             .with_context(|| format!("cannot create id mapper instance for {:?}", mdir.path()))?
