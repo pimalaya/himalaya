@@ -33,12 +33,15 @@ pub fn list<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
 
 #[cfg(test)]
 mod tests {
-    use himalaya_lib::mbox::{Mbox, Mboxes};
+    use himalaya_lib::{
+        mbox::{Mbox, Mboxes},
+        msg::Envelopes,
+    };
     use std::{fmt::Debug, io};
     use termcolor::ColorSpec;
 
     use crate::{
-        msg::{Envelopes, Msg},
+        msg::Msg,
         output::{Print, PrintTable, WriteColor},
     };
 
@@ -133,7 +136,7 @@ mod tests {
             fn del_mbox(&mut self, _: &str) -> Result<()> {
                 unimplemented!();
             }
-            fn get_envelopes(&mut self, _: &str, _: usize, _: usize) -> Result<Box<dyn Envelopes>> {
+            fn get_envelopes(&mut self, _: &str, _: usize, _: usize) -> Result<Envelopes> {
                 unimplemented!()
             }
             fn search_envelopes(
@@ -143,7 +146,7 @@ mod tests {
                 _: &str,
                 _: usize,
                 _: usize,
-            ) -> Result<Box<dyn Envelopes>> {
+            ) -> Result<Envelopes> {
                 unimplemented!()
             }
             fn add_msg(&mut self, _: &str, _: &[u8], _: &str) -> Result<String> {
