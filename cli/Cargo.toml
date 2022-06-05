@@ -33,7 +33,7 @@ env_logger = "0.8.3"
 erased-serde = "0.3.18"
 himalaya-lib = { path = "../lib" }
 html-escape = "0.2.9"
-lettre = { version = "0.10.0-rc.1", features = ["serde"] }
+lettre = { version = "0.10.0-rc.7", features = ["serde"] }
 log = "0.4.14"
 mailparse = "0.13.6"
 native-tls = "0.2.8"
