@@ -1,12 +1,12 @@
-use anyhow::Result;
-use himalaya_lib::account::{
-    AccountConfig, BackendConfig, DeserializedConfig, DEFAULT_INBOX_FOLDER,
+use anyhow::{Context, Result};
+use himalaya_lib::{
+    account::{AccountConfig, BackendConfig, DeserializedConfig, DEFAULT_INBOX_FOLDER},
+    backend::Backend,
 };
 use std::{convert::TryFrom, env};
 use url::Url;
 
 use himalaya::{
-    backends::Backend,
     compl::{compl_args, compl_handlers},
     config::{account_args, account_handlers, config_args},
     mbox::{mbox_args, mbox_handlers},
@@ -16,15 +16,16 @@ use himalaya::{
 };
 
 #[cfg(feature = "imap-backend")]
-use himalaya::backends::{imap_args, imap_handlers, ImapBackend};
+use himalaya::imap::{imap_args, imap_handlers};
+
+#[cfg(feature = "imap-backend")]
+use himalaya_lib::backend::ImapBackend;
 
 #[cfg(feature = "maildir-backend")]
-use himalaya::backends::MaildirBackend;
+use himalaya_lib::backend::MaildirBackend;
 
 #[cfg(feature = "notmuch-backend")]
-use himalaya::backends::NotmuchBackend;
-#[cfg(feature = "notmuch-backend")]
-use himalaya_lib::account::MaildirBackendConfig;
+use himalaya_lib::{account::MaildirBackendConfig, backend::NotmuchBackend};
 
 fn create_app<'a>() -> clap::App<'a, 'a> {
     let app = clap::App::new(env!("CARGO_PKG_NAME"))
@@ -346,5 +347,5 @@ fn main() -> Result<()> {
         _ => (),
     }
 
-    backend.disconnect()
+    backend.disconnect().context("cannot disconnect")
 }

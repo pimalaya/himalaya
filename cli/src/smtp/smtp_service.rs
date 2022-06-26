@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use himalaya_lib::account::AccountConfig;
+use himalaya_lib::{account::AccountConfig, msg::Msg};
 use lettre::{
     self,
     transport::smtp::{
@@ -10,7 +10,7 @@ use lettre::{
 };
 use std::convert::TryInto;
 
-use crate::{msg::Msg, output::pipe_cmd};
+use crate::output::pipe_cmd;
 
 pub trait SmtpService {
     fn send(&mut self, account: &AccountConfig, msg: &Msg) -> Result<Vec<u8>>;

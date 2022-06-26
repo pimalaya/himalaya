@@ -1,6 +1,5 @@
-use std::{fmt, ops};
-
 use serde::Serialize;
+use std::{fmt, ops};
 
 use super::Flag;
 

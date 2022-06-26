@@ -4,11 +4,15 @@
 
 use anyhow::Result;
 use clap::{self, App, Arg, ArgMatches, SubCommand};
+use himalaya_lib::msg::TplOverride;
 use log::{debug, info, trace};
 
 use crate::{
     mbox::mbox_args,
-    msg::{flag_args, msg_args, tpl_args},
+    msg::{
+        flag_args, msg_args,
+        tpl_args::{self, from_args},
+    },
     ui::table_arg,
 };
 
@@ -42,7 +46,7 @@ pub enum Cmd<'a> {
     Search(Query, MaxTableWidth, Option<PageSize>, Page),
     Sort(Criteria, Query, MaxTableWidth, Option<PageSize>, Page),
     Send(RawMsg<'a>),
-    Write(tpl_args::TplOverride<'a>, AttachmentPaths<'a>, Encrypt),
+    Write(TplOverride<'a>, AttachmentPaths<'a>, Encrypt),
 
     Flag(Option<flag_args::Cmd<'a>>),
     Tpl(Option<tpl_args::Cmd<'a>>),
@@ -261,7 +265,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
         debug!("attachments paths: {:?}", attachment_paths);
         let encrypt = m.is_present("encrypt");
         debug!("encrypt: {}", encrypt);
-        let tpl = tpl_args::TplOverride::from(m);
+        let tpl = from_args(m);
         return Ok(Some(Cmd::Write(tpl, attachment_paths, encrypt)));
     }
 

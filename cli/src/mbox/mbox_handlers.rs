@@ -3,13 +3,10 @@
 //! This module gathers all mailbox actions triggered by the CLI.
 
 use anyhow::Result;
-use himalaya_lib::account::AccountConfig;
+use himalaya_lib::{account::AccountConfig, backend::Backend};
 use log::{info, trace};
 
-use crate::{
-    backends::Backend,
-    output::{PrintTableOpts, PrinterService},
-};
+use crate::output::{PrintTableOpts, PrinterService};
 
 /// Lists all mailboxes.
 pub fn list<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
@@ -34,16 +31,14 @@ pub fn list<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
 #[cfg(test)]
 mod tests {
     use himalaya_lib::{
+        backend::{backend, Backend},
         mbox::{Mbox, Mboxes},
-        msg::Envelopes,
+        msg::{Envelopes, Msg},
     };
     use std::{fmt::Debug, io};
     use termcolor::ColorSpec;
 
-    use crate::{
-        msg::Msg,
-        output::{Print, PrintTable, WriteColor},
-    };
+    use crate::output::{Print, PrintTable, WriteColor};
 
     use super::*;
 
@@ -93,17 +88,17 @@ mod tests {
                 &mut self,
                 data: Box<T>,
                 opts: PrintTableOpts,
-            ) -> Result<()> {
+            ) -> anyhow::Result<()> {
                 data.print_table(&mut self.writer, opts)?;
                 Ok(())
             }
-            fn print_str<T: Debug + Print>(&mut self, _data: T) -> Result<()> {
+            fn print_str<T: Debug + Print>(&mut self, _data: T) -> anyhow::Result<()> {
                 unimplemented!()
             }
             fn print_struct<T: Debug + Print + serde::Serialize>(
                 &mut self,
                 _data: T,
-            ) -> Result<()> {
+            ) -> anyhow::Result<()> {
                 unimplemented!()
             }
             fn is_json(&self) -> bool {
@@ -114,10 +109,10 @@ mod tests {
         struct TestBackend;
 
         impl<'a> Backend<'a> for TestBackend {
-            fn add_mbox(&mut self, _: &str) -> Result<()> {
+            fn add_mbox(&mut self, _: &str) -> backend::Result<()> {
                 unimplemented!();
             }
-            fn get_mboxes(&mut self) -> Result<Mboxes> {
+            fn get_mboxes(&mut self) -> backend::Result<Mboxes> {
                 Ok(Mboxes {
                     mboxes: vec![
                         Mbox {
@@ -133,10 +128,10 @@ mod tests {
                     ],
                 })
             }
-            fn del_mbox(&mut self, _: &str) -> Result<()> {
+            fn del_mbox(&mut self, _: &str) -> backend::Result<()> {
                 unimplemented!();
             }
-            fn get_envelopes(&mut self, _: &str, _: usize, _: usize) -> Result<Envelopes> {
+            fn get_envelopes(&mut self, _: &str, _: usize, _: usize) -> backend::Result<Envelopes> {
                 unimplemented!()
             }
             fn search_envelopes(
@@ -146,31 +141,31 @@ mod tests {
                 _: &str,
                 _: usize,
                 _: usize,
-            ) -> Result<Envelopes> {
+            ) -> backend::Result<Envelopes> {
                 unimplemented!()
             }
-            fn add_msg(&mut self, _: &str, _: &[u8], _: &str) -> Result<String> {
+            fn add_msg(&mut self, _: &str, _: &[u8], _: &str) -> backend::Result<String> {
                 unimplemented!()
             }
-            fn get_msg(&mut self, _: &str, _: &str) -> Result<Msg> {
+            fn get_msg(&mut self, _: &str, _: &str) -> backend::Result<Msg> {
                 unimplemented!()
             }
-            fn copy_msg(&mut self, _: &str, _: &str, _: &str) -> Result<()> {
+            fn copy_msg(&mut self, _: &str, _: &str, _: &str) -> backend::Result<()> {
                 unimplemented!()
             }
-            fn move_msg(&mut self, _: &str, _: &str, _: &str) -> Result<()> {
+            fn move_msg(&mut self, _: &str, _: &str, _: &str) -> backend::Result<()> {
                 unimplemented!()
             }
-            fn del_msg(&mut self, _: &str, _: &str) -> Result<()> {
+            fn del_msg(&mut self, _: &str, _: &str) -> backend::Result<()> {
                 unimplemented!()
             }
-            fn add_flags(&mut self, _: &str, _: &str, _: &str) -> Result<()> {
+            fn add_flags(&mut self, _: &str, _: &str, _: &str) -> backend::Result<()> {
                 unimplemented!()
             }
-            fn set_flags(&mut self, _: &str, _: &str, _: &str) -> Result<()> {
+            fn set_flags(&mut self, _: &str, _: &str, _: &str) -> backend::Result<()> {
                 unimplemented!()
             }
-            fn del_flags(&mut self, _: &str, _: &str, _: &str) -> Result<()> {
+            fn del_flags(&mut self, _: &str, _: &str, _: &str) -> backend::Result<()> {
                 unimplemented!()
             }
         }

@@ -4,7 +4,11 @@
 
 use anyhow::{Context, Result};
 use atty::Stream;
-use himalaya_lib::account::{AccountConfig, DEFAULT_SENT_FOLDER};
+use himalaya_lib::{
+    account::{AccountConfig, DEFAULT_SENT_FOLDER},
+    backend::Backend,
+    msg::{Msg, Part, Parts, TextPlainPart, TplOverride},
+};
 use log::{debug, info, trace};
 use mailparse::addrparse;
 use std::{
@@ -15,13 +19,10 @@ use std::{
 use url::Url;
 
 use crate::{
-    backends::Backend,
-    msg::{Msg, Part, Parts, TextPlainPart},
     output::{PrintTableOpts, PrinterService},
     smtp::SmtpService,
+    ui::editor,
 };
-
-use super::tpl_args;
 
 /// Downloads all message attachments to the user account downloads directory.
 pub fn attachments<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
@@ -96,18 +97,12 @@ pub fn forward<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     backend: Box<&'a mut B>,
     smtp: &mut S,
 ) -> Result<()> {
-    backend
+    let msg = backend
         .get_msg(mbox, seq)?
         .into_forward(config)?
         .add_attachments(attachments_paths)?
-        .encrypt(encrypt)
-        .edit_with_editor(
-            tpl_args::TplOverride::default(),
-            config,
-            printer,
-            backend,
-            smtp,
-        )?;
+        .encrypt(encrypt);
+    editor::edit_msg_with_editor(msg, TplOverride::default(), config, printer, backend, smtp)?;
     Ok(())
 }
 
@@ -191,13 +186,7 @@ pub fn mailto<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     };
     trace!("message: {:?}", msg);
 
-    msg.edit_with_editor(
-        tpl_args::TplOverride::default(),
-        config,
-        printer,
-        backend,
-        smtp,
-    )?;
+    editor::edit_msg_with_editor(msg, TplOverride::default(), config, printer, backend, smtp)?;
     Ok(())
 }
 
@@ -249,19 +238,14 @@ pub fn reply<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     backend: Box<&'a mut B>,
     smtp: &mut S,
 ) -> Result<()> {
-    backend
+    let msg = backend
         .get_msg(mbox, seq)?
         .into_reply(all, config)?
         .add_attachments(attachments_paths)?
-        .encrypt(encrypt)
-        .edit_with_editor(
-            tpl_args::TplOverride::default(),
-            config,
-            printer,
-            backend,
-            smtp,
-        )?
-        .add_flags(mbox, seq, "replied")
+        .encrypt(encrypt);
+    editor::edit_msg_with_editor(msg, TplOverride::default(), config, printer, backend, smtp)?
+        .add_flags(mbox, seq, "replied")?;
+    Ok(())
 }
 
 /// Saves a raw message to the targetted mailbox.
@@ -384,7 +368,7 @@ pub fn send<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
 
 /// Compose a new message.
 pub fn write<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
-    tpl: tpl_args::TplOverride,
+    tpl: TplOverride,
     attachments_paths: Vec<&str>,
     encrypt: bool,
     config: &AccountConfig,
@@ -392,9 +376,9 @@ pub fn write<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     backend: Box<&'a mut B>,
     smtp: &mut S,
 ) -> Result<()> {
-    Msg::default()
+    let msg = Msg::default()
         .add_attachments(attachments_paths)?
-        .encrypt(encrypt)
-        .edit_with_editor(tpl, config, printer, backend, smtp)?;
+        .encrypt(encrypt);
+    editor::edit_msg_with_editor(msg, tpl, config, printer, backend, smtp)?;
     Ok(())
 }

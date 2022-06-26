@@ -486,6 +486,10 @@ dependencies = [
 name = "himalaya-lib"
 version = "0.1.0"
 dependencies = [
+ "ammonia",
+ "chrono",
+ "convert_case",
+ "html-escape",
  "imap",
  "imap-proto",
  "lettre",
@@ -493,11 +497,16 @@ dependencies = [
  "maildir",
  "mailparse",
  "md5",
+ "native-tls",
  "notmuch",
+ "regex",
+ "rfc2047-decoder",
  "serde",
  "shellexpand",
  "thiserror",
  "toml",
+ "tree_magic",
+ "uuid",
 ]
 
 [[package]]

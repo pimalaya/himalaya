@@ -5,12 +5,19 @@ use shellexpand;
 use std::{collections::HashMap, env, ffi::OsStr, fs, path::PathBuf, result};
 use thiserror::Error;
 
-use crate::process::{run_cmd, ProcessError};
+use crate::process;
 
 use super::*;
 
 #[derive(Error, Debug)]
-pub enum AccountError {
+pub enum Error {
+    #[error("cannot run encrypt file command")]
+    RunEncryptFileCmdError(#[source] process::Error),
+    #[error("cannot find pgp encrypt file command from config")]
+    FindPgpEncryptFileCmdError,
+    #[error("cannot find pgp decrypt file command from config")]
+    FindPgpDecryptFileCmdError,
+
     #[error("cannot find default account")]
     FindDefaultAccountError,
     #[error("cannot find account \"{0}\"")]
@@ -25,11 +32,17 @@ pub enum AccountError {
     ParseDownloadFileNameError(PathBuf),
     #[error("cannot find password")]
     FindPasswordError,
-    #[error(transparent)]
-    RunCmdError(#[from] ProcessError),
+    #[error("cannot get smtp password")]
+    GetSmtpPasswdError(#[source] process::Error),
+    #[error("cannot get imap password")]
+    GetImapPasswdError(#[source] process::Error),
+    #[error("cannot decrypt pgp file")]
+    DecryptPgpFileError(#[source] process::Error),
+    #[error("cannot run notify command")]
+    RunNotifyCmdError(#[source] process::Error),
 }
 
-type Result<T> = result::Result<T, AccountError>;
+pub type Result<T> = result::Result<T, Error>;
 
 /// Represents the user account.
 #[derive(Debug, Default, Clone)]
@@ -113,12 +126,12 @@ impl<'a> AccountConfig {
                     }
                 })
                 .map(|(name, account)| (name.to_owned(), account))
-                .ok_or_else(|| AccountError::FindDefaultAccountError),
+                .ok_or_else(|| Error::FindDefaultAccountError),
             Some(name) => config
                 .accounts
                 .get(name)
                 .map(|account| (name.to_owned(), account))
-                .ok_or_else(|| AccountError::FindAccountError(name.to_owned())),
+                .ok_or_else(|| Error::FindAccountError(name.to_owned())),
         }?;
 
         let base_account = account.to_base();
@@ -253,17 +266,17 @@ impl<'a> AccountConfig {
 
         Ok(mailparse::addrparse(&addr)?
             .first()
-            .ok_or_else(|| AccountError::FindAccountAddressError(addr.into()))?
+            .ok_or_else(|| Error::FindAccountAddressError(addr.into()))?
             .clone())
     }
 
     /// Builds the user account SMTP credentials.
     pub fn smtp_creds(&self) -> Result<SmtpCredentials> {
-        let passwd = run_cmd(&self.smtp_passwd_cmd)?;
+        let passwd = process::run_cmd(&self.smtp_passwd_cmd).map_err(Error::GetSmtpPasswdError)?;
         let passwd = passwd
             .lines()
             .next()
-            .ok_or_else(|| AccountError::FindPasswordError)?;
+            .ok_or_else(|| Error::FindPasswordError)?;
 
         Ok(SmtpCredentials::new(
             self.smtp_login.to_owned(),
@@ -272,22 +285,22 @@ impl<'a> AccountConfig {
     }
 
     /// Encrypts a file.
-    pub fn pgp_encrypt_file(&self, addr: &str, path: PathBuf) -> Result<Option<String>> {
+    pub fn pgp_encrypt_file(&self, addr: &str, path: PathBuf) -> Result<String> {
         if let Some(cmd) = self.pgp_encrypt_cmd.as_ref() {
             let encrypt_file_cmd = format!("{} {} {:?}", cmd, addr, path);
-            Ok(run_cmd(&encrypt_file_cmd).map(Some)?)
+            Ok(process::run_cmd(&encrypt_file_cmd).map_err(Error::RunEncryptFileCmdError)?)
         } else {
-            Ok(None)
+            Err(Error::FindPgpEncryptFileCmdError)
         }
     }
 
     /// Decrypts a file.
-    pub fn pgp_decrypt_file(&self, path: PathBuf) -> Result<Option<String>> {
+    pub fn pgp_decrypt_file(&self, path: PathBuf) -> Result<String> {
         if let Some(cmd) = self.pgp_decrypt_cmd.as_ref() {
             let decrypt_file_cmd = format!("{} {:?}", cmd, path);
-            Ok(run_cmd(&decrypt_file_cmd).map(Some)?)
+            Ok(process::run_cmd(&decrypt_file_cmd).map_err(Error::DecryptPgpFileError)?)
         } else {
-            Ok(None)
+            Err(Error::FindPgpDecryptFileCmdError)
         }
     }
 
@@ -319,9 +332,7 @@ impl<'a> AccountConfig {
                     .file_stem()
                     .and_then(OsStr::to_str)
                     .map(|fstem| format!("{}_{}{}", fstem, count, file_ext))
-                    .ok_or_else(|| {
-                        AccountError::ParseDownloadFileNameError(file_path.to_owned())
-                    })?,
+                    .ok_or_else(|| Error::ParseDownloadFileNameError(file_path.to_owned()))?,
             ));
         }
 
@@ -340,8 +351,7 @@ impl<'a> AccountConfig {
             .map(|cmd| format!(r#"{} {:?} {:?}"#, cmd, subject, sender))
             .unwrap_or(default_cmd);
 
-        debug!("run command: {}", cmd);
-        run_cmd(&cmd)?;
+        process::run_cmd(&cmd).map_err(Error::RunNotifyCmdError)?;
         Ok(())
     }
 
@@ -391,11 +401,11 @@ pub struct ImapBackendConfig {
 impl ImapBackendConfig {
     /// Gets the IMAP password of the user account.
     pub fn imap_passwd(&self) -> Result<String> {
-        let passwd = run_cmd(&self.imap_passwd_cmd)?;
+        let passwd = process::run_cmd(&self.imap_passwd_cmd).map_err(Error::GetImapPasswdError)?;
         let passwd = passwd
             .lines()
             .next()
-            .ok_or_else(|| AccountError::FindPasswordError)?;
+            .ok_or_else(|| Error::FindPasswordError)?;
         Ok(passwd.to_string())
     }
 }

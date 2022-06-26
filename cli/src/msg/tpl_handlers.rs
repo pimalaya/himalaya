@@ -4,15 +4,14 @@
 
 use anyhow::Result;
 use atty::Stream;
-use himalaya_lib::account::AccountConfig;
+use himalaya_lib::{
+    account::AccountConfig,
+    backend::Backend,
+    msg::{Msg, TplOverride},
+};
 use std::io::{self, BufRead};
 
-use crate::{
-    backends::Backend,
-    msg::{Msg, TplOverride},
-    output::PrinterService,
-    smtp::SmtpService,
-};
+use crate::{output::PrinterService, smtp::SmtpService};
 
 /// Generate a new message template.
 pub fn new<'a, P: PrinterService>(
