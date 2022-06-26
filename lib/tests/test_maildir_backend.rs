@@ -2,7 +2,7 @@ use maildir::Maildir;
 use std::{collections::HashMap, env, fs, iter::FromIterator};
 
 use himalaya_lib::{
-    account::{AccountConfig, MaildirBackendConfig},
+    account::{Account, MaildirBackendConfig},
     backend::{Backend, MaildirBackend},
     msg::Flag,
 };
@@ -19,9 +19,9 @@ fn test_maildir_backend() {
     mdir_sub.create_dirs().unwrap();
 
     // configure accounts
-    let account_config = AccountConfig {
+    let account_config = Account {
         mailboxes: HashMap::from_iter([("subdir".into(), "Subdir".into())]),
-        ..AccountConfig::default()
+        ..Account::default()
     };
     let mdir_config = MaildirBackendConfig {
         maildir_dir: mdir.path().to_owned(),

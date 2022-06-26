@@ -34,7 +34,7 @@ pub enum Error {
     ParseAddressError(#[from] lettre::address::AddressError),
 
     #[error(transparent)]
-    AccountError(#[from] account::Error),
+    AccountError(#[from] account::AccountError),
 
     #[error("cannot get content type of multipart")]
     GetMultipartContentTypeError,
@@ -47,7 +47,7 @@ pub enum Error {
     #[error("cannot write encrypted part to temporary file")]
     WriteEncryptedPartBodyError(#[source] io::Error),
     #[error("cannot write encrypted part to temporary file")]
-    DecryptPartError(#[source] account::Error),
+    DecryptPartError(#[source] account::AccountError),
 
     #[error("cannot delete local draft: {1}")]
     DeleteLocalDraftError(#[source] io::Error, path::PathBuf),

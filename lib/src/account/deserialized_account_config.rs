@@ -1,7 +1,12 @@
+//! Deserialized account config module.
+//!
+//! This module contains the raw deserialized representation of an
+//! account in the accounts section of the user configuration file.
+
 use serde::Deserialize;
 use std::{collections::HashMap, path::PathBuf};
 
-use crate::account::{Format, Hooks};
+use super::*;
 
 pub trait ToDeserializedBaseAccountConfig {
     fn to_base(&self) -> DeserializedBaseAccountConfig;
@@ -53,9 +58,8 @@ macro_rules! make_account_config {
             pub notify_query: Option<String>,
             /// Overrides the watch commands for this account.
             pub watch_cmds: Option<Vec<String>>,
-	    /// Represents the text/plain format as defined in the
-	    /// [RFC2646](https://www.ietf.org/rfc/rfc2646.txt)
-            pub format: Option<Format>,
+	    /// Represents the text/plain format.
+            pub format: Option<TextPlainFormat>,
             /// Represents the default headers displayed at the top of
             /// the read message.
 	    #[serde(default)]

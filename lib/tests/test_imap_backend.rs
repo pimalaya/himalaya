@@ -1,6 +1,6 @@
 #[cfg(feature = "imap-backend")]
 use himalaya_lib::{
-    account::{AccountConfig, ImapBackendConfig},
+    account::{Account, ImapBackendConfig},
     backend::{Backend, ImapBackend},
 };
 
@@ -8,14 +8,14 @@ use himalaya_lib::{
 #[test]
 fn test_imap_backend() {
     // configure accounts
-    let account_config = AccountConfig {
+    let account_config = Account {
         smtp_host: "localhost".into(),
         smtp_port: 3465,
         smtp_starttls: false,
         smtp_insecure: true,
         smtp_login: "inbox@localhost".into(),
         smtp_passwd_cmd: "echo 'password'".into(),
-        ..AccountConfig::default()
+        ..Account::default()
     };
     let imap_config = ImapBackendConfig {
         imap_host: "localhost".into(),

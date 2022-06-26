@@ -5,7 +5,7 @@
 use anyhow::{Context, Result};
 use atty::Stream;
 use himalaya_lib::{
-    account::{AccountConfig, DEFAULT_SENT_FOLDER},
+    account::{Account, DEFAULT_SENT_FOLDER},
     backend::Backend,
     msg::{Msg, Part, Parts, TextPlainPart, TplOverride},
 };
@@ -28,7 +28,7 @@ use crate::{
 pub fn attachments<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     seq: &str,
     mbox: &str,
-    config: &AccountConfig,
+    config: &Account,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
@@ -92,7 +92,7 @@ pub fn forward<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     attachments_paths: Vec<&str>,
     encrypt: bool,
     mbox: &str,
-    config: &AccountConfig,
+    config: &Account,
     printer: &mut P,
     backend: Box<&'a mut B>,
     smtp: &mut S,
@@ -112,7 +112,7 @@ pub fn list<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     page_size: Option<usize>,
     page: usize,
     mbox: &str,
-    config: &AccountConfig,
+    config: &Account,
     printer: &mut P,
     imap: Box<&'a mut B>,
 ) -> Result<()> {
@@ -134,7 +134,7 @@ pub fn list<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
 /// [mailto]: https://en.wikipedia.org/wiki/Mailto
 pub fn mailto<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     url: &Url,
-    config: &AccountConfig,
+    config: &Account,
     printer: &mut P,
     backend: Box<&'a mut B>,
     smtp: &mut S,
@@ -212,7 +212,7 @@ pub fn read<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     raw: bool,
     headers: Vec<&str>,
     mbox: &str,
-    config: &AccountConfig,
+    config: &Account,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
@@ -233,7 +233,7 @@ pub fn reply<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     attachments_paths: Vec<&str>,
     encrypt: bool,
     mbox: &str,
-    config: &AccountConfig,
+    config: &Account,
     printer: &mut P,
     backend: Box<&'a mut B>,
     smtp: &mut S,
@@ -285,7 +285,7 @@ pub fn search<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     page_size: Option<usize>,
     page: usize,
     mbox: &str,
-    config: &AccountConfig,
+    config: &Account,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
@@ -310,7 +310,7 @@ pub fn sort<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     page_size: Option<usize>,
     page: usize,
     mbox: &str,
-    config: &AccountConfig,
+    config: &Account,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
@@ -330,7 +330,7 @@ pub fn sort<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
 /// Send a raw message.
 pub fn send<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     raw_msg: &str,
-    config: &AccountConfig,
+    config: &Account,
     printer: &mut P,
     backend: Box<&mut B>,
     smtp: &mut S,
@@ -371,7 +371,7 @@ pub fn write<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     tpl: TplOverride,
     attachments_paths: Vec<&str>,
     encrypt: bool,
-    config: &AccountConfig,
+    config: &Account,
     printer: &mut P,
     backend: Box<&'a mut B>,
     smtp: &mut S,

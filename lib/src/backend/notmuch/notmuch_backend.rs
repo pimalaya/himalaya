@@ -2,7 +2,7 @@ use log::{debug, info, trace};
 use std::fs;
 
 use crate::{
-    account::{AccountConfig, NotmuchBackendConfig},
+    account::{Account, NotmuchBackendConfig},
     backend::{
         backend::Result, notmuch_envelopes, Backend, IdMapper, MaildirBackend, NotmuchError,
     },
@@ -12,7 +12,7 @@ use crate::{
 
 /// Represents the Notmuch backend.
 pub struct NotmuchBackend<'a> {
-    account_config: &'a AccountConfig,
+    account_config: &'a Account,
     notmuch_config: &'a NotmuchBackendConfig,
     pub mdir: &'a mut MaildirBackend<'a>,
     db: notmuch::Database,
@@ -20,7 +20,7 @@ pub struct NotmuchBackend<'a> {
 
 impl<'a> NotmuchBackend<'a> {
     pub fn new(
-        account_config: &'a AccountConfig,
+        account_config: &'a Account,
         notmuch_config: &'a NotmuchBackendConfig,
         mdir: &'a mut MaildirBackend<'a>,
     ) -> Result<NotmuchBackend<'a>> {

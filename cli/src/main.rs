@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use himalaya_lib::{
-    account::{AccountConfig, BackendConfig, DeserializedConfig, DEFAULT_INBOX_FOLDER},
+    account::{Account, BackendConfig, DeserializedConfig, DEFAULT_INBOX_FOLDER},
     backend::Backend,
 };
 use std::{convert::TryFrom, env};
@@ -58,7 +58,7 @@ fn main() -> Result<()> {
     if raw_args.len() > 1 && raw_args[1].starts_with("mailto:") {
         let config = DeserializedConfig::from_opt_path(None)?;
         let (account_config, backend_config) =
-            AccountConfig::from_config_and_opt_account_name(&config, None)?;
+            Account::from_config_and_opt_account_name(&config, None)?;
         let mut printer = StdoutPrinter::from(OutputFmt::Plain);
         let url = Url::parse(&raw_args[1])?;
         let mut smtp = LettreService::from(&account_config);
@@ -114,7 +114,7 @@ fn main() -> Result<()> {
     // Init entities and services.
     let config = DeserializedConfig::from_opt_path(m.value_of("config"))?;
     let (account_config, backend_config) =
-        AccountConfig::from_config_and_opt_account_name(&config, m.value_of("account"))?;
+        Account::from_config_and_opt_account_name(&config, m.value_of("account"))?;
     let mbox = m
         .value_of("mbox-source")
         .or_else(|| account_config.mailboxes.get("inbox").map(|s| s.as_str()))

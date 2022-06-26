@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use himalaya_lib::{
-    account::{AccountConfig, DEFAULT_DRAFT_FOLDER, DEFAULT_SENT_FOLDER},
+    account::{Account, DEFAULT_DRAFT_FOLDER, DEFAULT_SENT_FOLDER},
     backend::Backend,
     msg::{local_draft_path, remove_local_draft, Msg, TplOverride},
 };
@@ -39,7 +39,7 @@ pub fn open_with_draft() -> Result<String> {
     open_with_tpl(tpl)
 }
 
-fn _edit_msg_with_editor(msg: &Msg, tpl: TplOverride, account: &AccountConfig) -> Result<Msg> {
+fn _edit_msg_with_editor(msg: &Msg, tpl: TplOverride, account: &Account) -> Result<Msg> {
     let tpl = msg.to_tpl(tpl, account)?;
     let tpl = open_with_tpl(tpl)?;
     Msg::from_tpl(&tpl).context("cannot parse message from template")
@@ -48,7 +48,7 @@ fn _edit_msg_with_editor(msg: &Msg, tpl: TplOverride, account: &AccountConfig) -
 pub fn edit_msg_with_editor<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     mut msg: Msg,
     tpl: TplOverride,
-    account: &AccountConfig,
+    account: &Account,
     printer: &mut P,
     backend: Box<&'a mut B>,
     smtp: &mut S,

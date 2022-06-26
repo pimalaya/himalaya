@@ -3,7 +3,7 @@
 //! This module gathers all account actions triggered by the CLI.
 
 use anyhow::Result;
-use himalaya_lib::account::{AccountConfig, DeserializedConfig};
+use himalaya_lib::account::{Account, DeserializedConfig};
 use log::{info, trace};
 
 use crate::{
@@ -15,7 +15,7 @@ use crate::{
 pub fn list<'a, P: PrinterService>(
     max_width: Option<usize>,
     config: &DeserializedConfig,
-    account_config: &AccountConfig,
+    account_config: &Account,
     printer: &mut P,
 ) -> Result<()> {
     info!(">> account list handler");
@@ -38,7 +38,7 @@ pub fn list<'a, P: PrinterService>(
 #[cfg(test)]
 mod tests {
     use himalaya_lib::account::{
-        AccountConfig, DeserializedAccountConfig, DeserializedConfig, DeserializedImapAccountConfig,
+        Account, DeserializedAccountConfig, DeserializedConfig, DeserializedImapAccountConfig,
     };
     use std::{collections::HashMap, fmt::Debug, io, iter::FromIterator};
     use termcolor::ColorSpec;
@@ -122,7 +122,7 @@ mod tests {
             ..DeserializedConfig::default()
         };
 
-        let account_config = AccountConfig::default();
+        let account_config = Account::default();
         let mut printer = PrinterServiceTest::default();
 
         assert!(list(None, &config, &account_config, &mut printer).is_ok());

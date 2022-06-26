@@ -7,7 +7,7 @@ use log::{debug, info, trace};
 use std::{env, ffi::OsStr, fs, path::PathBuf};
 
 use crate::{
-    account::{AccountConfig, MaildirBackendConfig},
+    account::{Account, MaildirBackendConfig},
     backend::{backend::Result, maildir_envelopes, maildir_flags, Backend, IdMapper},
     mbox::{Mbox, Mboxes},
     msg::{Envelopes, Flags, Msg},
@@ -17,15 +17,12 @@ use super::MaildirError;
 
 /// Represents the maildir backend.
 pub struct MaildirBackend<'a> {
-    account_config: &'a AccountConfig,
+    account_config: &'a Account,
     mdir: maildir::Maildir,
 }
 
 impl<'a> MaildirBackend<'a> {
-    pub fn new(
-        account_config: &'a AccountConfig,
-        maildir_config: &'a MaildirBackendConfig,
-    ) -> Self {
+    pub fn new(account_config: &'a Account, maildir_config: &'a MaildirBackendConfig) -> Self {
         Self {
             account_config,
             mdir: maildir_config.maildir_dir.clone().into(),

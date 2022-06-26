@@ -3,7 +3,7 @@
 //! This module gathers all mailbox actions triggered by the CLI.
 
 use anyhow::Result;
-use himalaya_lib::{account::AccountConfig, backend::Backend};
+use himalaya_lib::{account::Account, backend::Backend};
 use log::{info, trace};
 
 use crate::output::{PrintTableOpts, PrinterService};
@@ -11,7 +11,7 @@ use crate::output::{PrintTableOpts, PrinterService};
 /// Lists all mailboxes.
 pub fn list<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     max_width: Option<usize>,
-    config: &AccountConfig,
+    config: &Account,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
@@ -170,7 +170,7 @@ mod tests {
             }
         }
 
-        let config = AccountConfig::default();
+        let config = Account::default();
         let mut printer = PrinterServiceTest::default();
         let mut backend = TestBackend {};
         let backend = Box::new(&mut backend);

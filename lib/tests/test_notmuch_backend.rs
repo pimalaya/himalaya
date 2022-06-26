@@ -3,7 +3,7 @@ use std::{collections::HashMap, env, fs, iter::FromIterator};
 
 #[cfg(feature = "notmuch-backend")]
 use himalaya_lib::{
-    account::{AccountConfig, MaildirBackendConfig, NotmuchBackendConfig},
+    account::{Account, MaildirBackendConfig, NotmuchBackendConfig},
     backend::{Backend, MaildirBackend, NotmuchBackend},
 };
 

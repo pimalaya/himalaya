@@ -1,17 +1,15 @@
+//! Deserialized config module.
+//!
+//! This module contains the raw deserialized representation of the
+//! user configuration file.
+
 use log::{debug, trace};
 use serde::Deserialize;
 use std::{collections::HashMap, env, fs, io, path::PathBuf, result};
 use thiserror::Error;
 use toml;
 
-use crate::account::DeserializedAccountConfig;
-
-pub const DEFAULT_PAGE_SIZE: usize = 10;
-pub const DEFAULT_SIG_DELIM: &str = "-- \n";
-
-pub const DEFAULT_INBOX_FOLDER: &str = "INBOX";
-pub const DEFAULT_SENT_FOLDER: &str = "Sent";
-pub const DEFAULT_DRAFT_FOLDER: &str = "Drafts";
+use super::*;
 
 #[derive(Error, Debug)]
 pub enum DeserializeConfigError {

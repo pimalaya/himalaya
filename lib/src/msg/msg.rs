@@ -17,7 +17,7 @@ use tree_magic;
 use uuid::Uuid;
 
 use crate::{
-    account::{AccountConfig, DEFAULT_SIG_DELIM},
+    account::{Account, DEFAULT_SIG_DELIM},
     msg::{
         from_addrs_to_sendable_addrs, from_addrs_to_sendable_mbox, from_slice_to_addrs, Addr,
         Addrs, BinaryPart, Error, Part, Parts, Result, TextPlainPart, TplOverride,
@@ -166,7 +166,7 @@ impl Msg {
         }
     }
 
-    pub fn into_reply(mut self, all: bool, account: &AccountConfig) -> Result<Self> {
+    pub fn into_reply(mut self, all: bool, account: &Account) -> Result<Self> {
         let account_addr = account.address()?;
 
         // In-Reply-To
@@ -264,7 +264,7 @@ impl Msg {
         Ok(self)
     }
 
-    pub fn into_forward(mut self, account: &AccountConfig) -> Result<Self> {
+    pub fn into_forward(mut self, account: &Account) -> Result<Self> {
         let account_addr = account.address()?;
 
         let prev_subject = self.subject.to_owned();
@@ -380,7 +380,7 @@ impl Msg {
         }
     }
 
-    pub fn to_tpl(&self, opts: TplOverride, account: &AccountConfig) -> Result<String> {
+    pub fn to_tpl(&self, opts: TplOverride, account: &Account) -> Result<String> {
         let account_addr: Addrs = vec![account.address()?].into();
         let mut tpl = String::default();
 
@@ -463,10 +463,10 @@ impl Msg {
         let parsed_mail = mailparse::parse_mail(tpl.as_bytes()).map_err(Error::ParseTplError)?;
 
         info!("end: building message from template");
-        Self::from_parsed_mail(parsed_mail, &AccountConfig::default())
+        Self::from_parsed_mail(parsed_mail, &Account::default())
     }
 
-    pub fn into_sendable_msg(&self, account: &AccountConfig) -> Result<lettre::Message> {
+    pub fn into_sendable_msg(&self, account: &Account) -> Result<lettre::Message> {
         let mut msg_builder = lettre::Message::builder()
             .message_id(self.message_id.to_owned())
             .subject(self.subject.to_owned());
@@ -551,7 +551,7 @@ impl Msg {
 
     pub fn from_parsed_mail(
         parsed_mail: mailparse::ParsedMail<'_>,
-        config: &AccountConfig,
+        config: &Account,
     ) -> Result<Self> {
         trace!(">> build message from parsed mail");
         trace!("parsed mail: {:?}", parsed_mail);
@@ -623,7 +623,7 @@ impl Msg {
         &self,
         text_mime: &str,
         headers: Vec<&str>,
-        config: &AccountConfig,
+        config: &Account,
     ) -> Result<String> {
         let mut all_headers = vec![];
         for h in config.read_headers.iter() {
@@ -750,10 +750,10 @@ mod tests {
 
     #[test]
     fn test_into_reply() {
-        let config = AccountConfig {
+        let config = Account {
             display_name: "Test".into(),
             email: "test-account@local".into(),
-            ..AccountConfig::default()
+            ..Account::default()
         };
 
         // Checks that:
@@ -889,7 +889,7 @@ mod tests {
 
     #[test]
     fn test_to_readable() {
-        let config = AccountConfig::default();
+        let config = Account::default();
         let msg = Msg {
             parts: Parts(vec![Part::TextPlain(TextPlainPart {
                 content: String::from("hello, world!"),
@@ -952,14 +952,14 @@ mod tests {
                 .unwrap()
         );
 
-        let config = AccountConfig {
+        let config = Account {
             read_headers: vec![
                 "CusTOM-heaDER".into(),
                 "Subject".into(),
                 "from".into(),
                 "cc".into(),
             ],
-            ..AccountConfig::default()
+            ..Account::default()
         };
         // header present but empty in msg headers, empty config
         assert_eq!(

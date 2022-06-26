@@ -1,52 +1,78 @@
+//! Account config module.
+//!
+//! This module contains the representation of the user account.
+
 use lettre::transport::smtp::authentication::Credentials as SmtpCredentials;
 use log::{debug, info, trace};
 use mailparse::MailAddr;
+use serde::Deserialize;
 use shellexpand;
-use std::{collections::HashMap, env, ffi::OsStr, fs, path::PathBuf, result};
+use std::{collections::HashMap, env, ffi::OsStr, fs, path::PathBuf};
 use thiserror::Error;
 
-use crate::process;
+use crate::process::{self, ProcessError};
 
 use super::*;
 
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error("cannot run encrypt file command")]
-    RunEncryptFileCmdError(#[source] process::Error),
-    #[error("cannot find pgp encrypt file command from config")]
-    FindPgpEncryptFileCmdError,
-    #[error("cannot find pgp decrypt file command from config")]
-    FindPgpDecryptFileCmdError,
+pub const DEFAULT_PAGE_SIZE: usize = 10;
+pub const DEFAULT_SIG_DELIM: &str = "-- \n";
+
+pub const DEFAULT_INBOX_FOLDER: &str = "INBOX";
+pub const DEFAULT_SENT_FOLDER: &str = "Sent";
+pub const DEFAULT_DRAFT_FOLDER: &str = "Drafts";
+
+#[derive(Debug, Error)]
+pub enum AccountError {
+    #[error("cannot encrypt file using pgp")]
+    EncryptFileError(#[source] ProcessError),
+    #[error("cannot find encrypt file command from config file")]
+    EncryptFileMissingCmdError,
+
+    #[error("cannot decrypt file using pgp")]
+    DecryptFileError(#[source] ProcessError),
+    #[error("cannot find decrypt file command from config file")]
+    DecryptFileMissingCmdError,
+
+    #[error("cannot get smtp password")]
+    GetSmtpPasswdError(#[source] ProcessError),
+    #[error("cannot get smtp password: password is empty")]
+    GetSmtpPasswdEmptyError,
+
+    #[cfg(feature = "imap-backend")]
+    #[error("cannot get imap password")]
+    GetImapPasswdError(#[source] ProcessError),
+    #[cfg(feature = "imap-backend")]
+    #[error("cannot get imap password: password is empty")]
+    GetImapPasswdEmptyError,
 
     #[error("cannot find default account")]
     FindDefaultAccountError,
-    #[error("cannot find account \"{0}\"")]
+    #[error("cannot find account {0}")]
     FindAccountError(String),
-    #[error("cannot shell expand")]
-    ShellExpandError(#[from] shellexpand::LookupError<env::VarError>),
-    #[error("cannot parse account address")]
-    ParseAccountAddressError(#[from] mailparse::MailParseError),
-    #[error("cannot find account address from \"{0}\"")]
-    FindAccountAddressError(String),
-    #[error("cannot parse download file name from \"{0}\"")]
-    ParseDownloadFileNameError(PathBuf),
-    #[error("cannot find password")]
-    FindPasswordError,
-    #[error("cannot get smtp password")]
-    GetSmtpPasswdError(#[source] process::Error),
-    #[error("cannot get imap password")]
-    GetImapPasswdError(#[source] process::Error),
-    #[error("cannot decrypt pgp file")]
-    DecryptPgpFileError(#[source] process::Error),
-    #[error("cannot run notify command")]
-    RunNotifyCmdError(#[source] process::Error),
-}
+    #[error("cannot parse account address {0}")]
+    ParseAccountAddrError(#[source] mailparse::MailParseError, String),
+    #[error("cannot find account address in {0}")]
+    ParseAccountAddrNotFoundError(String),
 
-pub type Result<T> = result::Result<T, Error>;
+    #[cfg(feature = "maildir-backend")]
+    #[error("cannot expand maildir path")]
+    ExpandMaildirPathError(#[source] shellexpand::LookupError<env::VarError>),
+    #[cfg(feature = "notmuch-backend")]
+    #[error("cannot expand notmuch path")]
+    ExpandNotmuchDatabasePathError(#[source] shellexpand::LookupError<env::VarError>),
+    #[error("cannot expand mailbox alias {1}")]
+    ExpandMboxAliasError(#[source] shellexpand::LookupError<env::VarError>, String),
+
+    #[error("cannot parse download file name from {0}")]
+    ParseDownloadFileNameError(PathBuf),
+
+    #[error("cannot start the notify mode")]
+    StartNotifyModeError(#[source] ProcessError),
+}
 
 /// Represents the user account.
 #[derive(Debug, Default, Clone)]
-pub struct AccountConfig {
+pub struct Account {
     /// Represents the name of the user account.
     pub name: String,
     /// Makes this account the default one.
@@ -69,7 +95,7 @@ pub struct AccountConfig {
     pub watch_cmds: Vec<String>,
     /// Represents the text/plain format as defined in the
     /// [RFC2646](https://www.ietf.org/rfc/rfc2646.txt)
-    pub format: Format,
+    pub format: TextPlainFormat,
     /// Overrides the default headers displayed at the top of
     /// the read message.
     pub read_headers: Vec<String>,
@@ -99,13 +125,13 @@ pub struct AccountConfig {
     pub pgp_decrypt_cmd: Option<String>,
 }
 
-impl<'a> AccountConfig {
+impl<'a> Account {
     /// Tries to create an account from a config and an optional
     /// account name.
     pub fn from_config_and_opt_account_name(
         config: &'a DeserializedConfig,
         account_name: Option<&str>,
-    ) -> Result<(AccountConfig, BackendConfig)> {
+    ) -> Result<(Account, BackendConfig), AccountError> {
         info!("begin: parsing account and backend configs from config and account name");
 
         debug!("account name: {:?}", account_name.unwrap_or("default"));
@@ -126,12 +152,12 @@ impl<'a> AccountConfig {
                     }
                 })
                 .map(|(name, account)| (name.to_owned(), account))
-                .ok_or_else(|| Error::FindDefaultAccountError),
+                .ok_or_else(|| AccountError::FindDefaultAccountError),
             Some(name) => config
                 .accounts
                 .get(name)
                 .map(|account| (name.to_owned(), account))
-                .ok_or_else(|| Error::FindAccountError(name.to_owned())),
+                .ok_or_else(|| AccountError::FindAccountError(name.to_owned())),
         }?;
 
         let base_account = account.to_base();
@@ -175,7 +201,7 @@ impl<'a> AccountConfig {
             .or_else(|| sig.map(|sig| sig.to_owned()))
             .map(|sig| format!("{}{}", sig_delim, sig.trim_end()));
 
-        let account_config = AccountConfig {
+        let account_config = Account {
             name,
             display_name: base_account
                 .name
@@ -234,13 +260,17 @@ impl<'a> AccountConfig {
             #[cfg(feature = "maildir-backend")]
             DeserializedAccountConfig::Maildir(config) => {
                 BackendConfig::Maildir(MaildirBackendConfig {
-                    maildir_dir: shellexpand::full(&config.maildir_dir)?.to_string().into(),
+                    maildir_dir: shellexpand::full(&config.maildir_dir)
+                        .map_err(AccountError::ExpandMaildirPathError)?
+                        .to_string()
+                        .into(),
                 })
             }
             #[cfg(feature = "notmuch-backend")]
             DeserializedAccountConfig::Notmuch(config) => {
                 BackendConfig::Notmuch(NotmuchBackendConfig {
-                    notmuch_database_dir: shellexpand::full(&config.notmuch_database_dir)?
+                    notmuch_database_dir: shellexpand::full(&config.notmuch_database_dir)
+                        .map_err(AccountError::ExpandNotmuchDatabasePathError)?
                         .to_string()
                         .into(),
                 })
@@ -253,7 +283,7 @@ impl<'a> AccountConfig {
     }
 
     /// Builds the full RFC822 compliant address of the user account.
-    pub fn address(&self) -> Result<MailAddr> {
+    pub fn address(&self) -> Result<MailAddr, AccountError> {
         let has_special_chars = "()<>[]:;@.,".contains(|c| self.display_name.contains(c));
         let addr = if self.display_name.is_empty() {
             self.email.clone()
@@ -264,19 +294,21 @@ impl<'a> AccountConfig {
             format!("{} <{}>", self.display_name, self.email)
         };
 
-        Ok(mailparse::addrparse(&addr)?
+        Ok(mailparse::addrparse(&addr)
+            .map_err(|err| AccountError::ParseAccountAddrError(err, addr.to_owned()))?
             .first()
-            .ok_or_else(|| Error::FindAccountAddressError(addr.into()))?
+            .ok_or_else(|| AccountError::ParseAccountAddrNotFoundError(addr.to_owned()))?
             .clone())
     }
 
     /// Builds the user account SMTP credentials.
-    pub fn smtp_creds(&self) -> Result<SmtpCredentials> {
-        let passwd = process::run_cmd(&self.smtp_passwd_cmd).map_err(Error::GetSmtpPasswdError)?;
+    pub fn smtp_creds(&self) -> Result<SmtpCredentials, AccountError> {
+        let passwd =
+            process::run(&self.smtp_passwd_cmd).map_err(AccountError::GetSmtpPasswdError)?;
         let passwd = passwd
             .lines()
             .next()
-            .ok_or_else(|| Error::FindPasswordError)?;
+            .ok_or_else(|| AccountError::GetSmtpPasswdEmptyError)?;
 
         Ok(SmtpCredentials::new(
             self.smtp_login.to_owned(),
@@ -285,27 +317,30 @@ impl<'a> AccountConfig {
     }
 
     /// Encrypts a file.
-    pub fn pgp_encrypt_file(&self, addr: &str, path: PathBuf) -> Result<String> {
+    pub fn pgp_encrypt_file(&self, addr: &str, path: PathBuf) -> Result<String, AccountError> {
         if let Some(cmd) = self.pgp_encrypt_cmd.as_ref() {
             let encrypt_file_cmd = format!("{} {} {:?}", cmd, addr, path);
-            Ok(process::run_cmd(&encrypt_file_cmd).map_err(Error::RunEncryptFileCmdError)?)
+            Ok(process::run(&encrypt_file_cmd).map_err(AccountError::EncryptFileError)?)
         } else {
-            Err(Error::FindPgpEncryptFileCmdError)
+            Err(AccountError::EncryptFileMissingCmdError)
         }
     }
 
     /// Decrypts a file.
-    pub fn pgp_decrypt_file(&self, path: PathBuf) -> Result<String> {
+    pub fn pgp_decrypt_file(&self, path: PathBuf) -> Result<String, AccountError> {
         if let Some(cmd) = self.pgp_decrypt_cmd.as_ref() {
             let decrypt_file_cmd = format!("{} {:?}", cmd, path);
-            Ok(process::run_cmd(&decrypt_file_cmd).map_err(Error::DecryptPgpFileError)?)
+            Ok(process::run(&decrypt_file_cmd).map_err(AccountError::DecryptFileError)?)
         } else {
-            Err(Error::FindPgpDecryptFileCmdError)
+            Err(AccountError::DecryptFileMissingCmdError)
         }
     }
 
     /// Gets the download path from a file name.
-    pub fn get_download_file_path<S: AsRef<str>>(&self, file_name: S) -> Result<PathBuf> {
+    pub fn get_download_file_path<S: AsRef<str>>(
+        &self,
+        file_name: S,
+    ) -> Result<PathBuf, AccountError> {
         let file_path = self.downloads_dir.join(file_name.as_ref());
         self.get_unique_download_file_path(&file_path, |path, _count| path.is_file())
     }
@@ -316,7 +351,7 @@ impl<'a> AccountConfig {
         &self,
         original_file_path: &PathBuf,
         is_file: impl Fn(&PathBuf, u8) -> bool,
-    ) -> Result<PathBuf> {
+    ) -> Result<PathBuf, AccountError> {
         let mut count = 0;
         let file_ext = original_file_path
             .extension()
@@ -332,7 +367,9 @@ impl<'a> AccountConfig {
                     .file_stem()
                     .and_then(OsStr::to_str)
                     .map(|fstem| format!("{}_{}{}", fstem, count, file_ext))
-                    .ok_or_else(|| Error::ParseDownloadFileNameError(file_path.to_owned()))?,
+                    .ok_or_else(|| {
+                        AccountError::ParseDownloadFileNameError(file_path.to_owned())
+                    })?,
             ));
         }
 
@@ -340,7 +377,7 @@ impl<'a> AccountConfig {
     }
 
     /// Runs the notify command.
-    pub fn run_notify_cmd<S: AsRef<str>>(&self, subject: S, sender: S) -> Result<()> {
+    pub fn run_notify_cmd<S: AsRef<str>>(&self, subject: S, sender: S) -> Result<(), AccountError> {
         let subject = subject.as_ref();
         let sender = sender.as_ref();
 
@@ -351,19 +388,21 @@ impl<'a> AccountConfig {
             .map(|cmd| format!(r#"{} {:?} {:?}"#, cmd, subject, sender))
             .unwrap_or(default_cmd);
 
-        process::run_cmd(&cmd).map_err(Error::RunNotifyCmdError)?;
+        process::run(&cmd).map_err(AccountError::StartNotifyModeError)?;
         Ok(())
     }
 
     /// Gets the mailbox alias if exists, otherwise returns the
     /// mailbox. Also tries to expand shell variables.
-    pub fn get_mbox_alias(&self, mbox: &str) -> Result<String> {
+    pub fn get_mbox_alias(&self, mbox: &str) -> Result<String, AccountError> {
         let mbox = self
             .mailboxes
             .get(&mbox.trim().to_lowercase())
             .map(|s| s.as_str())
             .unwrap_or(mbox);
-        let mbox = shellexpand::full(mbox).map(String::from)?;
+        let mbox = shellexpand::full(mbox)
+            .map(String::from)
+            .map_err(|err| AccountError::ExpandMboxAliasError(err, mbox.to_owned()))?;
         Ok(mbox)
     }
 }
@@ -400,12 +439,13 @@ pub struct ImapBackendConfig {
 #[cfg(feature = "imap-backend")]
 impl ImapBackendConfig {
     /// Gets the IMAP password of the user account.
-    pub fn imap_passwd(&self) -> Result<String> {
-        let passwd = process::run_cmd(&self.imap_passwd_cmd).map_err(Error::GetImapPasswdError)?;
+    pub fn imap_passwd(&self) -> Result<String, AccountError> {
+        let passwd =
+            process::run(&self.imap_passwd_cmd).map_err(AccountError::GetImapPasswdError)?;
         let passwd = passwd
             .lines()
             .next()
-            .ok_or_else(|| Error::FindPasswordError)?;
+            .ok_or_else(|| AccountError::GetImapPasswdEmptyError)?;
         Ok(passwd.to_string())
     }
 }
@@ -426,13 +466,39 @@ pub struct NotmuchBackendConfig {
     pub notmuch_database_dir: PathBuf,
 }
 
+/// Represents the text/plain format as defined in the [RFC2646].
+///
+/// [RFC2646]: https://www.ietf.org/rfc/rfc2646.txt
+#[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
+#[serde(tag = "type", content = "width", rename_all = "lowercase")]
+pub enum TextPlainFormat {
+    // Forces the content width with a fixed amount of pixels.
+    Fixed(usize),
+    // Makes the content fit the terminal.
+    Auto,
+    // Does not restrict the content.
+    Flowed,
+}
+
+impl Default for TextPlainFormat {
+    fn default() -> Self {
+        Self::Auto
+    }
+}
+
+#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct Hooks {
+    pub pre_send: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn it_should_get_unique_download_file_path() {
-        let account = AccountConfig::default();
+        let account = Account::default();
         let path = PathBuf::from("downloads/file.ext");
 
         // When file path is unique

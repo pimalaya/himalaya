@@ -8,26 +8,26 @@ use native_tls::{TlsConnector, TlsStream};
 use std::{collections::HashSet, convert::TryInto, net::TcpStream, thread};
 
 use crate::{
-    account::{AccountConfig, ImapBackendConfig},
+    account::{Account, ImapBackendConfig},
     backend::{
         backend::Result, from_imap_fetch, from_imap_fetches,
         imap::msg_sort_criterion::SortCriteria, imap::Error, into_imap_flags, Backend,
     },
     mbox::{Mbox, Mboxes},
     msg::{Envelopes, Flags, Msg},
-    process::run_cmd,
+    process,
 };
 
 type ImapSess = imap::Session<TlsStream<TcpStream>>;
 
 pub struct ImapBackend<'a> {
-    account_config: &'a AccountConfig,
+    account_config: &'a Account,
     imap_config: &'a ImapBackendConfig,
     sess: Option<ImapSess>,
 }
 
 impl<'a> ImapBackend<'a> {
-    pub fn new(account_config: &'a AccountConfig, imap_config: &'a ImapBackendConfig) -> Self {
+    pub fn new(account_config: &'a Account, imap_config: &'a ImapBackendConfig) -> Self {
         Self {
             account_config,
             imap_config,
@@ -187,7 +187,7 @@ impl<'a> ImapBackend<'a> {
                 debug!("batch execution of {} cmd(s)", cmds.len());
                 cmds.iter().for_each(|cmd| {
                     debug!("running command {:?}…", cmd);
-                    let res = run_cmd(cmd);
+                    let res = process::run(cmd);
                     debug!("{:?}", res);
                 })
             });

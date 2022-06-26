@@ -78,7 +78,7 @@ pub enum Error {
     LogoutError(#[source] imap::Error),
 
     #[error(transparent)]
-    AccountError(#[from] account::Error),
+    AccountError(#[from] account::AccountError),
     #[error(transparent)]
     MsgError(#[from] msg::Error),
 }
