@@ -5,7 +5,7 @@
 
 use log::{debug, trace};
 use serde::Deserialize;
-use std::{collections::HashMap, env, fs, io, path::PathBuf, result};
+use std::{collections::HashMap, env, fs, io, path::PathBuf};
 use thiserror::Error;
 use toml;
 
@@ -14,14 +14,12 @@ use super::*;
 #[derive(Error, Debug)]
 pub enum DeserializeConfigError {
     #[error("cannot read config file")]
-    ReadConfigFile(#[from] io::Error),
+    ReadConfigFile(#[source] io::Error),
     #[error("cannot parse config file")]
-    ParseConfigFile(#[from] toml::de::Error),
-    #[error("cannot read environment variable")]
-    ReadEnvVar(#[from] env::VarError),
+    ParseConfigFile(#[source] toml::de::Error),
+    #[error("cannot read environment variable {1}")]
+    ReadEnvVar(#[source] env::VarError, &'static str),
 }
-
-type Result<T> = result::Result<T, DeserializeConfigError>;
 
 /// Represents the user config file.
 #[derive(Debug, Default, Clone, Deserialize)]
@@ -51,13 +49,13 @@ pub struct DeserializedConfig {
 
 impl DeserializedConfig {
     /// Tries to create a config from an optional path.
-    pub fn from_opt_path(path: Option<&str>) -> Result<Self> {
+    pub fn from_opt_path(path: Option<&str>) -> Result<Self, DeserializeConfigError> {
         trace!(">> parse config from path");
         debug!("path: {:?}", path);
 
         let path = path.map(|s| s.into()).unwrap_or(Self::path()?);
-        let content = fs::read_to_string(path)?;
-        let config = toml::from_str(&content)?;
+        let content = fs::read_to_string(path).map_err(DeserializeConfigError::ReadConfigFile)?;
+        let config = toml::from_str(&content).map_err(DeserializeConfigError::ParseConfigFile)?;
 
         trace!("config: {:?}", config);
         trace!("<< parse config from path");
@@ -66,21 +64,23 @@ impl DeserializedConfig {
 
     /// Tries to get the XDG config file path from XDG_CONFIG_HOME
     /// environment variable.
-    fn path_from_xdg() -> Result<PathBuf> {
-        let path = env::var("XDG_CONFIG_HOME")?;
+    fn path_from_xdg() -> Result<PathBuf, DeserializeConfigError> {
+        let path = env::var("XDG_CONFIG_HOME")
+            .map_err(|err| DeserializeConfigError::ReadEnvVar(err, "XDG_CONFIG_HOME"))?;
         let path = PathBuf::from(path).join("himalaya").join("config.toml");
         Ok(path)
     }
 
     /// Tries to get the XDG config file path from HOME environment
     /// variable.
-    fn path_from_xdg_alt() -> Result<PathBuf> {
+    fn path_from_xdg_alt() -> Result<PathBuf, DeserializeConfigError> {
         let home_var = if cfg!(target_family = "windows") {
             "USERPROFILE"
         } else {
             "HOME"
         };
-        let path = env::var(home_var)?;
+        let path =
+            env::var(home_var).map_err(|err| DeserializeConfigError::ReadEnvVar(err, home_var))?;
         let path = PathBuf::from(path)
             .join(".config")
             .join("himalaya")
@@ -90,19 +90,20 @@ impl DeserializedConfig {
 
     /// Tries to get the .himalayarc config file path from HOME
     /// environment variable.
-    fn path_from_home() -> Result<PathBuf> {
+    fn path_from_home() -> Result<PathBuf, DeserializeConfigError> {
         let home_var = if cfg!(target_family = "windows") {
             "USERPROFILE"
         } else {
             "HOME"
         };
-        let path = env::var(home_var)?;
+        let path =
+            env::var(home_var).map_err(|err| DeserializeConfigError::ReadEnvVar(err, home_var))?;
         let path = PathBuf::from(path).join(".himalayarc");
         Ok(path)
     }
 
     /// Tries to get the config file path.
-    pub fn path() -> Result<PathBuf> {
+    pub fn path() -> Result<PathBuf, DeserializeConfigError> {
         Self::path_from_xdg()
             .or_else(|_| Self::path_from_xdg_alt())
             .or_else(|_| Self::path_from_home())
