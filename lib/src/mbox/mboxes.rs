@@ -1,5 +1,9 @@
+//! Mailboxes module.
+//!
+//! This module contains the representation of the mailboxes.
+
 use serde::Serialize;
-use std::ops::{Deref, DerefMut};
+use std::ops;
 
 use super::Mbox;
 
@@ -10,7 +14,7 @@ pub struct Mboxes {
     pub mboxes: Vec<Mbox>,
 }
 
-impl Deref for Mboxes {
+impl ops::Deref for Mboxes {
     type Target = Vec<Mbox>;
 
     fn deref(&self) -> &Self::Target {
@@ -18,7 +22,7 @@ impl Deref for Mboxes {
     }
 }
 
-impl DerefMut for Mboxes {
+impl ops::DerefMut for Mboxes {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.mboxes
     }

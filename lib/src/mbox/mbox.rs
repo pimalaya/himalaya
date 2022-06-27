@@ -1,3 +1,7 @@
+//! Mailbox module.
+//!
+//! This module contains the representation of the mailbox.
+
 use serde::Serialize;
 use std::fmt;
 
