@@ -1,3 +1,7 @@
+*📢 Announcement: Himalaya receives support help, see the
+[discussion](https://github.com/soywod/himalaya/discussions/399) for
+more details.*
+
 # 📫 Himalaya
 
 Command-line interface for email management
