@@ -5,15 +5,13 @@
 //! [builder design pattern]: https://refactoring.guru/design-patterns/builder
 
 use anyhow::{Context, Result};
+use himalaya_lib::account::TextPlainFormat;
 use log::trace;
 use termcolor::{Color, ColorSpec};
 use terminal_size;
 use unicode_width::UnicodeWidthStr;
 
-use crate::{
-    config::Format,
-    output::{Print, PrintTableOpts, WriteColor},
-};
+use crate::output::{Print, PrintTableOpts, WriteColor};
 
 /// Defines the default terminal size.
 /// This is used when the size cannot be determined by the `terminal_size` crate.
@@ -134,7 +132,9 @@ impl Print for Cell {
             .context(format!(r#"cannot apply colors to cell "{}""#, self.value))?;
 
         // Writes the colorized cell to stdout
-        write!(writer, "{}", self.value).context(format!(r#"cannot print cell "{}""#, self.value))
+        write!(writer, "{}", self.value)
+            .context(format!(r#"cannot print cell "{}""#, self.value))?;
+        Ok(writer.reset()?)
     }
 }
 
@@ -169,11 +169,11 @@ where
 
     /// Writes the table to the writer.
     fn print(writer: &mut dyn WriteColor, items: &[Self], opts: PrintTableOpts) -> Result<()> {
-        let is_format_flowed = matches!(opts.format, Format::Flowed);
+        let is_format_flowed = matches!(opts.format, TextPlainFormat::Flowed);
         let max_width = match opts.format {
-            Format::Fixed(width) => opts.max_width.unwrap_or(*width),
-            Format::Flowed => 0,
-            Format::Auto => opts
+            TextPlainFormat::Fixed(width) => opts.max_width.unwrap_or(*width),
+            TextPlainFormat::Flowed => 0,
+            TextPlainFormat::Auto => opts
                 .max_width
                 .or_else(|| terminal_size::terminal_size().map(|(w, _)| w.0 as usize))
                 .unwrap_or(DEFAULT_TERM_WIDTH),

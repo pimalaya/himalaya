@@ -12,8 +12,9 @@ use std::{
     ops::Deref,
 };
 
+use himalaya_lib::account::DeserializedAccountConfig;
+
 use crate::{
-    config::DeserializedAccountConfig,
     output::{PrintTable, PrintTableOpts, WriteColor},
     ui::{Cell, Row, Table},
 };

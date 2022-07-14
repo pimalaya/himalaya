@@ -4,6 +4,11 @@
 
 use anyhow::{Context, Result};
 use atty::Stream;
+use himalaya_lib::{
+    account::{Account, DEFAULT_SENT_FOLDER},
+    backend::Backend,
+    msg::{Msg, Part, Parts, TextPlainPart, TplOverride},
+};
 use log::{debug, info, trace};
 use mailparse::addrparse;
 use std::{
@@ -14,18 +19,16 @@ use std::{
 use url::Url;
 
 use crate::{
-    backends::Backend,
-    config::{AccountConfig, DEFAULT_SENT_FOLDER},
-    msg::{Msg, Part, Parts, TextPlainPart},
     output::{PrintTableOpts, PrinterService},
     smtp::SmtpService,
+    ui::editor,
 };
 
 /// Downloads all message attachments to the user account downloads directory.
 pub fn attachments<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     seq: &str,
     mbox: &str,
-    config: &AccountConfig,
+    config: &Account,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
@@ -89,17 +92,17 @@ pub fn forward<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     attachments_paths: Vec<&str>,
     encrypt: bool,
     mbox: &str,
-    config: &AccountConfig,
+    config: &Account,
     printer: &mut P,
     backend: Box<&'a mut B>,
     smtp: &mut S,
 ) -> Result<()> {
-    backend
+    let msg = backend
         .get_msg(mbox, seq)?
         .into_forward(config)?
         .add_attachments(attachments_paths)?
-        .encrypt(encrypt)
-        .edit_with_editor(config, printer, backend, smtp)?;
+        .encrypt(encrypt);
+    editor::edit_msg_with_editor(msg, TplOverride::default(), config, printer, backend, smtp)?;
     Ok(())
 }
 
@@ -109,7 +112,7 @@ pub fn list<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     page_size: Option<usize>,
     page: usize,
     mbox: &str,
-    config: &AccountConfig,
+    config: &Account,
     printer: &mut P,
     imap: Box<&'a mut B>,
 ) -> Result<()> {
@@ -118,7 +121,7 @@ pub fn list<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     let msgs = imap.get_envelopes(mbox, page_size, page)?;
     trace!("envelopes: {:?}", msgs);
     printer.print_table(
-        msgs,
+        Box::new(msgs),
         PrintTableOpts {
             format: &config.format,
             max_width,
@@ -131,7 +134,7 @@ pub fn list<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
 /// [mailto]: https://en.wikipedia.org/wiki/Mailto
 pub fn mailto<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     url: &Url,
-    config: &AccountConfig,
+    config: &Account,
     printer: &mut P,
     backend: Box<&'a mut B>,
     smtp: &mut S,
@@ -183,7 +186,7 @@ pub fn mailto<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     };
     trace!("message: {:?}", msg);
 
-    msg.edit_with_editor(config, printer, backend, smtp)?;
+    editor::edit_msg_with_editor(msg, TplOverride::default(), config, printer, backend, smtp)?;
     Ok(())
 }
 
@@ -209,7 +212,7 @@ pub fn read<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     raw: bool,
     headers: Vec<&str>,
     mbox: &str,
-    config: &AccountConfig,
+    config: &Account,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
@@ -230,18 +233,19 @@ pub fn reply<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     attachments_paths: Vec<&str>,
     encrypt: bool,
     mbox: &str,
-    config: &AccountConfig,
+    config: &Account,
     printer: &mut P,
     backend: Box<&'a mut B>,
     smtp: &mut S,
 ) -> Result<()> {
-    backend
+    let msg = backend
         .get_msg(mbox, seq)?
         .into_reply(all, config)?
         .add_attachments(attachments_paths)?
-        .encrypt(encrypt)
-        .edit_with_editor(config, printer, backend, smtp)?
-        .add_flags(mbox, seq, "replied")
+        .encrypt(encrypt);
+    editor::edit_msg_with_editor(msg, TplOverride::default(), config, printer, backend, smtp)?
+        .add_flags(mbox, seq, "replied")?;
+    Ok(())
 }
 
 /// Saves a raw message to the targetted mailbox.
@@ -281,7 +285,7 @@ pub fn search<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     page_size: Option<usize>,
     page: usize,
     mbox: &str,
-    config: &AccountConfig,
+    config: &Account,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
@@ -290,7 +294,7 @@ pub fn search<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     let msgs = backend.search_envelopes(mbox, &query, "", page_size, page)?;
     trace!("messages: {:#?}", msgs);
     printer.print_table(
-        msgs,
+        Box::new(msgs),
         PrintTableOpts {
             format: &config.format,
             max_width,
@@ -306,7 +310,7 @@ pub fn sort<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     page_size: Option<usize>,
     page: usize,
     mbox: &str,
-    config: &AccountConfig,
+    config: &Account,
     printer: &mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
@@ -315,7 +319,7 @@ pub fn sort<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     let msgs = backend.search_envelopes(mbox, &query, &sort, page_size, page)?;
     trace!("envelopes: {:#?}", msgs);
     printer.print_table(
-        msgs,
+        Box::new(msgs),
         PrintTableOpts {
             format: &config.format,
             max_width,
@@ -326,7 +330,7 @@ pub fn sort<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
 /// Send a raw message.
 pub fn send<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     raw_msg: &str,
-    config: &AccountConfig,
+    config: &Account,
     printer: &mut P,
     backend: Box<&mut B>,
     smtp: &mut S,
@@ -364,16 +368,17 @@ pub fn send<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
 
 /// Compose a new message.
 pub fn write<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
+    tpl: TplOverride,
     attachments_paths: Vec<&str>,
     encrypt: bool,
-    config: &AccountConfig,
+    config: &Account,
     printer: &mut P,
     backend: Box<&'a mut B>,
     smtp: &mut S,
 ) -> Result<()> {
-    Msg::default()
+    let msg = Msg::default()
         .add_attachments(attachments_paths)?
-        .encrypt(encrypt)
-        .edit_with_editor(config, printer, backend, smtp)?;
+        .encrypt(encrypt);
+    editor::edit_msg_with_editor(msg, tpl, config, printer, backend, smtp)?;
     Ok(())
 }

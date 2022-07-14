@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use himalaya_lib::{account::Account, msg::Msg};
 use lettre::{
     self,
     transport::smtp::{
@@ -9,14 +10,14 @@ use lettre::{
 };
 use std::convert::TryInto;
 
-use crate::{config::AccountConfig, msg::Msg, output::pipe_cmd};
+use crate::output::pipe_cmd;
 
 pub trait SmtpService {
-    fn send(&mut self, account: &AccountConfig, msg: &Msg) -> Result<Vec<u8>>;
+    fn send(&mut self, account: &Account, msg: &Msg) -> Result<Vec<u8>>;
 }
 
 pub struct LettreService<'a> {
-    account: &'a AccountConfig,
+    account: &'a Account,
     transport: Option<SmtpTransport>,
 }
 
@@ -55,14 +56,14 @@ impl LettreService<'_> {
 }
 
 impl SmtpService for LettreService<'_> {
-    fn send(&mut self, account: &AccountConfig, msg: &Msg) -> Result<Vec<u8>> {
+    fn send(&mut self, account: &Account, msg: &Msg) -> Result<Vec<u8>> {
         let mut raw_msg = msg.into_sendable_msg(account)?.formatted();
 
         let envelope: lettre::address::Envelope =
             if let Some(cmd) = account.hooks.pre_send.as_deref() {
                 for cmd in cmd.split('|') {
                     raw_msg = pipe_cmd(cmd.trim(), &raw_msg)
-                        .with_context(|| format!("cannot execute pre-send hook {:?}", cmd))?
+                        .with_context(|| format!("cannot execute pre-send hook {:?}", cmd))?;
                 }
                 let parsed_mail = mailparse::parse_mail(&raw_msg)?;
                 Msg::from_parsed_mail(parsed_mail, account)?.try_into()
@@ -75,8 +76,8 @@ impl SmtpService for LettreService<'_> {
     }
 }
 
-impl<'a> From<&'a AccountConfig> for LettreService<'a> {
-    fn from(account: &'a AccountConfig) -> Self {
+impl<'a> From<&'a Account> for LettreService<'a> {
+    fn from(account: &'a Account) -> Self {
         Self {
             account,
             transport: None,

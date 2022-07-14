@@ -4,6 +4,7 @@
 
 use anyhow::Result;
 use clap::{self, App, AppSettings, Arg, ArgMatches, SubCommand};
+use himalaya_lib::msg::TplOverride;
 use log::{debug, info, trace};
 
 use crate::msg::msg_args;
@@ -13,30 +14,16 @@ type ReplyAll = bool;
 type AttachmentPaths<'a> = Vec<&'a str>;
 type Tpl<'a> = &'a str;
 
-#[derive(Debug, Default, PartialEq, Eq)]
-pub struct TplOverride<'a> {
-    pub subject: Option<&'a str>,
-    pub from: Option<Vec<&'a str>>,
-    pub to: Option<Vec<&'a str>>,
-    pub cc: Option<Vec<&'a str>>,
-    pub bcc: Option<Vec<&'a str>>,
-    pub headers: Option<Vec<&'a str>>,
-    pub body: Option<&'a str>,
-    pub sig: Option<&'a str>,
-}
-
-impl<'a> From<&'a ArgMatches<'a>> for TplOverride<'a> {
-    fn from(matches: &'a ArgMatches<'a>) -> Self {
-        Self {
-            subject: matches.value_of("subject"),
-            from: matches.values_of("from").map(|v| v.collect()),
-            to: matches.values_of("to").map(|v| v.collect()),
-            cc: matches.values_of("cc").map(|v| v.collect()),
-            bcc: matches.values_of("bcc").map(|v| v.collect()),
-            headers: matches.values_of("headers").map(|v| v.collect()),
-            body: matches.value_of("body"),
-            sig: matches.value_of("signature"),
-        }
+pub fn from_args<'a>(matches: &'a ArgMatches<'a>) -> TplOverride {
+    TplOverride {
+        subject: matches.value_of("subject"),
+        from: matches.values_of("from").map(|v| v.collect()),
+        to: matches.values_of("to").map(|v| v.collect()),
+        cc: matches.values_of("cc").map(|v| v.collect()),
+        bcc: matches.values_of("bcc").map(|v| v.collect()),
+        headers: matches.values_of("headers").map(|v| v.collect()),
+        body: matches.value_of("body"),
+        sig: matches.value_of("signature"),
     }
 }
 
@@ -56,7 +43,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
 
     if let Some(m) = m.subcommand_matches("new") {
         info!("new subcommand matched");
-        let tpl = TplOverride::from(m);
+        let tpl = from_args(m);
         trace!("template override: {:?}", tpl);
         return Ok(Some(Cmd::New(tpl)));
     }
@@ -67,7 +54,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
         debug!("sequence: {}", seq);
         let all = m.is_present("reply-all");
         debug!("reply all: {}", all);
-        let tpl = TplOverride::from(m);
+        let tpl = from_args(m);
         trace!("template override: {:?}", tpl);
         return Ok(Some(Cmd::Reply(seq, all, tpl)));
     }
@@ -76,7 +63,7 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
         info!("forward subcommand matched");
         let seq = m.value_of("seq").unwrap();
         debug!("sequence: {}", seq);
-        let tpl = TplOverride::from(m);
+        let tpl = from_args(m);
         trace!("template args: {:?}", tpl);
         return Ok(Some(Cmd::Forward(seq, tpl)));
     }

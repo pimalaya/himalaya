@@ -1,8 +1,6 @@
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
-    }
-}
+mod process;
+
+pub mod account;
+pub mod backend;
+pub mod mbox;
+pub mod msg;

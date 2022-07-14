@@ -236,6 +236,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "email-encoding"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75b91dddc343e7eaa27f9764e5bffe57370d957017fdd75244f5045e829a8441"
+dependencies = [
+ "base64",
+ "memchr 2.4.1",
+]
+
+[[package]]
+name = "email_address"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8684b7c9cb4857dfa1e5b9629ef584ba618c9b93bae60f58cb23f4f271d0468e"
+
+[[package]]
 name = "encoding_rs"
 version = "0.8.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -441,6 +457,7 @@ dependencies = [
  "convert_case",
  "env_logger",
  "erased-serde",
+ "himalaya-lib",
  "html-escape",
  "imap",
  "imap-proto",
@@ -468,6 +485,29 @@ dependencies = [
 [[package]]
 name = "himalaya-lib"
 version = "0.1.0"
+dependencies = [
+ "ammonia",
+ "chrono",
+ "convert_case",
+ "html-escape",
+ "imap",
+ "imap-proto",
+ "lettre",
+ "log",
+ "maildir",
+ "mailparse",
+ "md5",
+ "native-tls",
+ "notmuch",
+ "regex",
+ "rfc2047-decoder",
+ "serde",
+ "shellexpand",
+ "thiserror",
+ "toml",
+ "tree_magic",
+ "uuid",
+]
 
 [[package]]
 name = "hostname"
@@ -590,11 +630,13 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "lettre"
-version = "0.10.0-rc.4"
+version = "0.10.0-rc.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71d8da8f34d086b081c9cc3b57d3bb3b51d16fc06b5c848a188e2f14d58ac2a5"
+checksum = "0f7e87d9d44162eea7abd87b1a7540fcb10d5e58e8bb4f173178f3dc6e453944"
 dependencies = [
  "base64",
+ "email-encoding",
+ "email_address",
  "fastrand",
  "futures-util",
  "hostname",
@@ -605,8 +647,8 @@ dependencies = [
  "nom 7.1.1",
  "once_cell",
  "quoted_printable",
- "regex",
  "serde",
+ "socket2",
 ]
 
 [[package]]
@@ -1258,6 +1300,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2dd574626839106c320a323308629dcb1acfc96e32a8cba364ddc61ac23ee83"
 
 [[package]]
+name = "socket2"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "66d72b759436ae32898a2af0a14218dbf55efde3feeb170eb623637db85ee1e0"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "string_cache"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1363,6 +1415,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d326610f408c7a4eb6f51c37c330e496b08506c9457c9d34287ecc38809fb060"
 dependencies = [
  "unicode-width",
+]
+
+[[package]]
+name = "thiserror"
+version = "1.0.31"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd829fe32373d27f76265620b5309d0340cb8550f523c1dda251d6298069069a"
+dependencies = [
+ "thiserror-impl",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "1.0.31"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0396bc89e626244658bef819e22d0cc459e795a5ebe878e6ec336d1674a8d79a"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

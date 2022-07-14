@@ -3,8 +3,9 @@
 //! This module gathers all flag actions triggered by the CLI.
 
 use anyhow::Result;
+use himalaya_lib::backend::Backend;
 
-use crate::{backends::Backend, output::PrinterService};
+use crate::output::PrinterService;
 
 /// Adds flags to all messages matching the given sequence range.
 /// Flags are case-insensitive, and they do not need to be prefixed with `\`.

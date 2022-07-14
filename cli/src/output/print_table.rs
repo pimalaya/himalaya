@@ -1,8 +1,7 @@
 use anyhow::Result;
+use himalaya_lib::account::TextPlainFormat;
 use std::io;
 use termcolor::{self, StandardStream};
-
-use crate::config::Format;
 
 pub trait WriteColor: io::Write + termcolor::WriteColor {}
 
@@ -13,6 +12,6 @@ pub trait PrintTable {
 }
 
 pub struct PrintTableOpts<'a> {
-    pub format: &'a Format,
+    pub format: &'a TextPlainFormat,
     pub max_width: Option<usize>,
 }

@@ -4,20 +4,19 @@
 
 use anyhow::Result;
 use atty::Stream;
+use himalaya_lib::{
+    account::Account,
+    backend::Backend,
+    msg::{Msg, TplOverride},
+};
 use std::io::{self, BufRead};
 
-use crate::{
-    backends::Backend,
-    config::AccountConfig,
-    msg::{Msg, TplOverride},
-    output::PrinterService,
-    smtp::SmtpService,
-};
+use crate::{output::PrinterService, smtp::SmtpService};
 
 /// Generate a new message template.
 pub fn new<'a, P: PrinterService>(
     opts: TplOverride<'a>,
-    account: &'a AccountConfig,
+    account: &'a Account,
     printer: &'a mut P,
 ) -> Result<()> {
     let tpl = Msg::default().to_tpl(opts, account)?;
@@ -30,7 +29,7 @@ pub fn reply<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     all: bool,
     opts: TplOverride<'a>,
     mbox: &str,
-    config: &'a AccountConfig,
+    config: &'a Account,
     printer: &'a mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
@@ -46,7 +45,7 @@ pub fn forward<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     seq: &str,
     opts: TplOverride<'a>,
     mbox: &str,
-    config: &'a AccountConfig,
+    config: &'a Account,
     printer: &'a mut P,
     backend: Box<&'a mut B>,
 ) -> Result<()> {
@@ -60,7 +59,7 @@ pub fn forward<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
 /// Saves a message based on a template.
 pub fn save<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
     mbox: &str,
-    config: &AccountConfig,
+    config: &Account,
     attachments_paths: Vec<&str>,
     tpl: &str,
     printer: &mut P,
@@ -85,7 +84,7 @@ pub fn save<'a, P: PrinterService, B: Backend<'a> + ?Sized>(
 /// Sends a message based on a template.
 pub fn send<'a, P: PrinterService, B: Backend<'a> + ?Sized, S: SmtpService>(
     mbox: &str,
-    account: &AccountConfig,
+    account: &Account,
     attachments_paths: Vec<&str>,
     tpl: &str,
     printer: &mut P,

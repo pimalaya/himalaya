@@ -1,14 +1,14 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
+use himalaya_lib::{
+    account::{Account, BackendConfig, DeserializedConfig, DEFAULT_INBOX_FOLDER},
+    backend::Backend,
+};
 use std::{convert::TryFrom, env};
 use url::Url;
 
 use himalaya::{
-    backends::Backend,
     compl::{compl_args, compl_handlers},
-    config::{
-        account_args, account_handlers, config_args, AccountConfig, BackendConfig,
-        DeserializedConfig, DEFAULT_INBOX_FOLDER,
-    },
+    config::{account_args, account_handlers, config_args},
     mbox::{mbox_args, mbox_handlers},
     msg::{flag_args, flag_handlers, msg_args, msg_handlers, tpl_args, tpl_handlers},
     output::{output_args, OutputFmt, StdoutPrinter},
@@ -16,13 +16,16 @@ use himalaya::{
 };
 
 #[cfg(feature = "imap-backend")]
-use himalaya::backends::{imap_args, imap_handlers, ImapBackend};
+use himalaya::imap::{imap_args, imap_handlers};
+
+#[cfg(feature = "imap-backend")]
+use himalaya_lib::backend::ImapBackend;
 
 #[cfg(feature = "maildir-backend")]
-use himalaya::backends::MaildirBackend;
+use himalaya_lib::backend::MaildirBackend;
 
 #[cfg(feature = "notmuch-backend")]
-use himalaya::{backends::NotmuchBackend, config::MaildirBackendConfig};
+use himalaya_lib::{account::MaildirBackendConfig, backend::NotmuchBackend};
 
 fn create_app<'a>() -> clap::App<'a, 'a> {
     let app = clap::App::new(env!("CARGO_PKG_NAME"))
@@ -55,7 +58,7 @@ fn main() -> Result<()> {
     if raw_args.len() > 1 && raw_args[1].starts_with("mailto:") {
         let config = DeserializedConfig::from_opt_path(None)?;
         let (account_config, backend_config) =
-            AccountConfig::from_config_and_opt_account_name(&config, None)?;
+            Account::from_config_and_opt_account_name(&config, None)?;
         let mut printer = StdoutPrinter::from(OutputFmt::Plain);
         let url = Url::parse(&raw_args[1])?;
         let mut smtp = LettreService::from(&account_config);
@@ -111,7 +114,7 @@ fn main() -> Result<()> {
     // Init entities and services.
     let config = DeserializedConfig::from_opt_path(m.value_of("config"))?;
     let (account_config, backend_config) =
-        AccountConfig::from_config_and_opt_account_name(&config, m.value_of("account"))?;
+        Account::from_config_and_opt_account_name(&config, m.value_of("account"))?;
     let mbox = m
         .value_of("mbox-source")
         .or_else(|| account_config.mailboxes.get("inbox").map(|s| s.as_str()))
@@ -277,8 +280,9 @@ fn main() -> Result<()> {
         Some(msg_args::Cmd::Send(raw_msg)) => {
             return msg_handlers::send(raw_msg, &account_config, &mut printer, backend, &mut smtp);
         }
-        Some(msg_args::Cmd::Write(atts, encrypt)) => {
+        Some(msg_args::Cmd::Write(tpl, atts, encrypt)) => {
             return msg_handlers::write(
+                tpl,
                 atts,
                 encrypt,
                 &account_config,
@@ -343,5 +347,5 @@ fn main() -> Result<()> {
         _ => (),
     }
 
-    backend.disconnect()
+    backend.disconnect().context("cannot disconnect")
 }

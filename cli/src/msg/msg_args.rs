@@ -4,11 +4,15 @@
 
 use anyhow::Result;
 use clap::{self, App, Arg, ArgMatches, SubCommand};
+use himalaya_lib::msg::TplOverride;
 use log::{debug, info, trace};
 
 use crate::{
     mbox::mbox_args,
-    msg::{flag_args, msg_args, tpl_args},
+    msg::{
+        flag_args, msg_args,
+        tpl_args::{self, from_args},
+    },
     ui::table_arg,
 };
 
@@ -42,7 +46,7 @@ pub enum Cmd<'a> {
     Search(Query, MaxTableWidth, Option<PageSize>, Page),
     Sort(Criteria, Query, MaxTableWidth, Option<PageSize>, Page),
     Send(RawMsg<'a>),
-    Write(AttachmentPaths<'a>, Encrypt),
+    Write(TplOverride<'a>, AttachmentPaths<'a>, Encrypt),
 
     Flag(Option<flag_args::Cmd<'a>>),
     Tpl(Option<tpl_args::Cmd<'a>>),
@@ -261,7 +265,8 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
         debug!("attachments paths: {:?}", attachment_paths);
         let encrypt = m.is_present("encrypt");
         debug!("encrypt: {}", encrypt);
-        return Ok(Some(Cmd::Write(attachment_paths, encrypt)));
+        let tpl = from_args(m);
+        return Ok(Some(Cmd::Write(tpl, attachment_paths, encrypt)));
     }
 
     if let Some(m) = m.subcommand_matches("template") {
@@ -412,6 +417,7 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                 ),
             SubCommand::with_name("write")
                 .about("Writes a new message")
+                .args(&tpl_args::tpl_args())
                 .arg(attachments_arg())
                 .arg(encrypt_arg()),
             SubCommand::with_name("send")
