@@ -1,7 +1,5 @@
-# 📢 Announcement
-
-Himalaya receives financial support from the
-[NLnet](https://nlnet.nl/project/Himalaya/) foundation! 🤯✨🌈
+**Himalaya receives financial support from the
+[NLnet](https://nlnet.nl/project/Himalaya/) foundation! 🤯✨🌈**
 
 *See the [discussion](https://github.com/soywod/himalaya/discussions/399) for more information.*
 
