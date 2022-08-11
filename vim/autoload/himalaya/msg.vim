@@ -73,12 +73,19 @@ function! himalaya#msg#read()
   endtry
 endfunction
 
-function! himalaya#msg#write()
+function! himalaya#msg#write(...)
   try
     let pos = getpos(".")
     let account = himalaya#account#curr()
-    let msg = s:cli("--account %s template new", [shellescape(account)], "Fetching new template", 0)
-    silent! edit Himalaya write
+    let msg = a:0 > 0 ? a:1 : s:cli(
+      \"--account %s template new",
+      \[shellescape(account)],
+      \"Fetching new template",
+      \0
+    \)
+    silent! botright new Himalaya write
+    setlocal modifiable
+    silent execute "%d"
     call append(0, split(substitute(msg, "\r", "", "g"), "\n"))
     silent execute "$d"
     setlocal filetype=himalaya-msg-write
@@ -279,11 +286,11 @@ function! himalaya#msg#draft_handle()
       elseif choice == "q"
         return
       elseif choice == "c"
-        throw "Action canceled"
+        call himalaya#msg#write(join(getline(1, "$"), "\n") . "\n")
+        return
       endif
     endwhile
   catch
-    " TODO: find a better way to prevent the buffer to close (stop the BufUnload event)
     call himalaya#shared#log#err(v:exception)
     throw ""
   endtry
