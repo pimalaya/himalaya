@@ -339,7 +339,7 @@ mod tests {
 
     macro_rules! write_items {
         ($writer:expr, $($item:expr),*) => {
-            Table::print($writer, &[$($item,)*], PrintTableOpts { format: &Format::Auto, max_width: Some(20) }).unwrap();
+            Table::print($writer, &[$($item,)*], PrintTableOpts { format: &TextPlainFormat::Auto, max_width: Some(20) }).unwrap();
         };
     }
 
