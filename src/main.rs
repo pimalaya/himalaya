@@ -6,8 +6,7 @@ use url::Url;
 use himalaya::{
     account, compl,
     config::{self, DeserializedConfig},
-    email, flag, folder, man,
-    output::{self, OutputFmt},
+    email, flag, folder, man, output,
     printer::StdoutPrinter,
     tpl,
 };
@@ -51,7 +50,7 @@ fn main() -> Result<()> {
         let (account_config, backend_config) = config.to_configs(None)?;
         let mut backend = BackendBuilder::build(&account_config, &backend_config)?;
         let mut sender = SenderBuilder::build(&account_config)?;
-        let mut printer = StdoutPrinter::from_fmt(OutputFmt::Plain);
+        let mut printer = StdoutPrinter::default();
 
         return email::handlers::mailto(
             &account_config,
@@ -108,8 +107,7 @@ fn main() -> Result<()> {
     // inits services
     let mut backend = BackendBuilder::build(&account_config, &backend_config)?;
     let mut sender = SenderBuilder::build(&account_config)?;
-    let mut printer =
-        StdoutPrinter::from_opt_str(m.get_one::<String>("output").map(String::as_str))?;
+    let mut printer = StdoutPrinter::try_from(&m)?;
 
     // checks account commands
     match account::args::matches(&m)? {
