@@ -3,7 +3,7 @@ use himalaya_lib::{
     account::{Account, BackendConfig, DeserializedConfig, DEFAULT_INBOX_FOLDER},
     backend::Backend,
 };
-use std::{convert::TryFrom, env};
+use std::{convert::TryFrom, env, str::FromStr};
 use url::Url;
 
 use himalaya::{
@@ -11,7 +11,7 @@ use himalaya::{
     config::{account_args, account_handlers, config_args},
     mbox::{mbox_args, mbox_handlers},
     msg::{flag_args, flag_handlers, msg_args, msg_handlers, tpl_args, tpl_handlers},
-    output::{output_args, OutputFmt, StdoutPrinter},
+    output::{output_args, ColorFmt, OutputFmt, StdoutPrinter},
     smtp::LettreService,
 };
 
@@ -119,7 +119,12 @@ fn main() -> Result<()> {
         .value_of("mbox-source")
         .or_else(|| account_config.mailboxes.get("inbox").map(|s| s.as_str()))
         .unwrap_or(DEFAULT_INBOX_FOLDER);
-    let mut printer = StdoutPrinter::try_from(m.value_of("output"))?;
+    let fmt = OutputFmt::try_from(m.value_of("output"))?;
+    let color = ColorFmt::from_str(
+        m.value_of("color")
+            .context("Color option has a default value")?,
+    )?;
+    let mut printer = StdoutPrinter::new(fmt, color);
     #[cfg(feature = "imap-backend")]
     let mut imap;
 

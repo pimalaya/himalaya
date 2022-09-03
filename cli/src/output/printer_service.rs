@@ -1,12 +1,10 @@
-use anyhow::{Context, Error, Result};
-use atty::Stream;
-use std::{
-    convert::TryFrom,
-    fmt::{self, Debug},
-};
-use termcolor::{ColorChoice, StandardStream};
+use anyhow::{Context, Result};
+use std::fmt::{self, Debug};
+use termcolor::StandardStream;
 
 use crate::output::{OutputFmt, OutputJson, Print, PrintTable, PrintTableOpts, WriteColor};
+
+use super::ColorFmt;
 
 pub trait PrinterService {
     fn print_str<T: Debug + Print>(&mut self, data: T) -> Result<()>;
@@ -61,32 +59,15 @@ impl PrinterService for StdoutPrinter {
     }
 }
 
-impl From<OutputFmt> for StdoutPrinter {
-    fn from(fmt: OutputFmt) -> Self {
-        let writer = StandardStream::stdout(if atty::isnt(Stream::Stdin) {
-            // Colors should be deactivated if the terminal is not a tty.
-            ColorChoice::Never
-        } else {
-            // Otherwise let's `termcolor` decide by inspecting the environment. From the [doc]:
-            // - If `NO_COLOR` is set to any value, then colors will be suppressed.
-            // - If `TERM` is set to dumb, then colors will be suppressed.
-            // - In non-Windows environments, if `TERM` is not set, then colors will be suppressed.
-            //
-            // [doc]: https://github.com/BurntSushi/termcolor#automatic-color-selection
-            ColorChoice::Auto
-        });
-        let writer = Box::new(writer);
-        Self { writer, fmt }
+impl StdoutPrinter {
+    pub fn new(fmt: OutputFmt, color: ColorFmt) -> Self {
+        let writer = Box::new(StandardStream::stdout(color.into()));
+        Self { fmt, writer }
     }
 }
 
-impl TryFrom<Option<&str>> for StdoutPrinter {
-    type Error = Error;
-
-    fn try_from(fmt: Option<&str>) -> Result<Self> {
-        Ok(Self {
-            fmt: OutputFmt::try_from(fmt)?,
-            ..Self::from(OutputFmt::Plain)
-        })
+impl From<OutputFmt> for StdoutPrinter {
+    fn from(fmt: OutputFmt) -> Self {
+        Self::new(fmt, ColorFmt::Auto)
     }
 }
