@@ -19,9 +19,9 @@ fn test_notmuch_backend() {
     notmuch::Database::create(mdir.path()).unwrap();
 
     // configure accounts
-    let account_config = AccountConfig {
+    let account_config = Account {
         mailboxes: HashMap::from_iter([("inbox".into(), "*".into())]),
-        ..AccountConfig::default()
+        ..Account::default()
     };
     let mdir_config = MaildirBackendConfig {
         maildir_dir: mdir.path().to_owned(),
