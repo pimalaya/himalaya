@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.6.0] - 2022-09-19
 
+### Changed
+
 - Separate the CLI from the lib module [#340]
 
 The source code has been splitted into subrepositories:
@@ -19,6 +21,8 @@ The source code has been splitted into subrepositories:
   [sourcehut](https://git.sr.ht/~soywod/himalaya-vim) as well
 3. This repository only contains the CLI source code (it was not
   possible to move it to sourcehut because of cross platform builds)
+
+---
 
 - [**BREAKING**] Refactor config system [#344]
 
