@@ -1,5 +1,5 @@
 {
-  description = "Command-line interface for email management";
+  description = "Command-line interface for email management.";
 
   inputs = {
     utils.url = "github:numtide/flake-utils";
@@ -34,18 +34,6 @@
                 '';
               };
             };
-            "${name}-vim" = pkgs.vimUtils.buildVimPluginFrom2Nix {
-              inherit (packages.${name}) version;
-              name = "${name}-vim";
-              src = self;
-              buildInputs = [ packages.${name} ];
-              dontConfigure = false;
-              configurePhase = "cd vim/";
-              postInstall = ''
-                mkdir -p $out/bin
-                ln -s ${packages.${name}}/bin/himalaya $out/bin/himalaya
-              '';
-            };
           };
 
           # nix run
@@ -57,7 +45,6 @@
 
           # nix develop
           devShell = pkgs.mkShell {
-            RUSTUP_TOOLCHAIN = "stable";
             inputsFrom = builtins.attrValues self.packages.${system};
             nativeBuildInputs = with pkgs; [
               # Nix LSP + formatter

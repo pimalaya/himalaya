@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2022-09-19
+
+- Separate the CLI from the lib module [#340]
+
+The source code has been splitted into subrepositories:
+
+1. The email logic has been extracted from the CLI and placed in a lib
+  on [sourcehut](https://git.sr.ht/~soywod/himalaya-lib)
+2. The vim plugin is now in a dedicated repository on
+  [sourcehut](https://git.sr.ht/~soywod/himalaya-vim) as well
+3. This repository only contains the CLI source code (it was not
+  possible to move it to sourcehut because of cross platform builds)
+
+- [**BREAKING**] Refactor config system [#344]
+
+The configuration has been rethought in order to be more intuitive and
+structured. Here are the breaking changes for the global config:
+
+- `name` becomes `display-name` and is not mandatory anymore
+- `signature-delimiter` becomes `signature-delim`
+- `default-page-size` has been moved to `folder-listing-page-size` and
+  `email-listing-page-size`
+- `notify-cmd`, `notify-query` and `watch-cmds` have been removed from
+  the global config (available in account config only)
+- `folder-aliases` has been added to the global config (previously
+  known as `mailboxes` from the account config)
+- `email-reading-headers`, `email-reading-format`,
+  `email-reading-decrypt-cmd`, `email-writing-encrypt-cmd` and
+  `email-hooks` have been added
+  
+The account config inherits the same breaking changes from the global
+config plus:
+
+- `imap-*` requires `backend = "imap"`
+- `maildir-*` requires `backend = "maildir"`
+- `notmuch-*` requires `backend = "notmuch"`
+- `smtp-*` requires `sender = "internal"`
+- `pgp-encrypt-cmd` becomes `email-writing-encrypt-cmd`
+- `pgp-decrypt-cmd` becomes `email-reading-decrypt-cmd`
+- `mailboxes` becomes `folder-aliases`
+- `hooks` becomes `email-hooks`
+- `maildir-dir` becomes `maildir-root-dir`
+- `notmuch-database-dir` becomes `notmuch-db-path`
+
 ## [0.5.10] - 2022-03-20
 
 ### Fixed
@@ -517,4 +561,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#334]: https://github.com/soywod/himalaya/issues/334
 [#335]: https://github.com/soywod/himalaya/issues/335
 [#338]: https://github.com/soywod/himalaya/issues/338
+[#340]: https://github.com/soywod/himalaya/issues/340
+[#344]: https://github.com/soywod/himalaya/issues/344
 [#346]: https://github.com/soywod/himalaya/issues/346
