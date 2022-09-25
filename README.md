@@ -1,24 +1,12 @@
 # 📫 Himalaya
 
-Command-line interface for email management
-
-*The project is under active development. Do not use in production
-before the `v1.0.0`.*
+Command-line interface for email management based on the
+[himalaya-lib](https://git.sr.ht/~soywod/himalaya-lib).
 
 ![image](https://user-images.githubusercontent.com/10437171/138774902-7b9de5a3-93eb-44b0-8cfb-6d2e11e3b1aa.png)
 
-## Motivation
-
-Bringing emails to the terminal is a *pain*. First, because they are
-sensitive data. Secondly, the existing TUIs
-([Mutt](http://www.mutt.org/), [NeoMutt](https://neomutt.org/),
-[Alpine](https://alpine.x10host.com/),
-[aerc](https://aerc-mail.org/)…) are really hard to configure. They
-require time and patience.
-
-The aim of Himalaya is to extract the email logic into a simple (yet
-solid) CLI API that can be used directly from the terminal, from
-scripts, from UIs… Possibilities are endless!
+*The project is under active development. Do not use in production
+before the `v1.0.0`.*
 
 ## Installation
 
@@ -38,7 +26,7 @@ for other installation methods.*
 ```toml
 # ~/.config/himalaya/config.toml
 
-name = "Your full name"
+display-name = "Your full name"
 downloads-dir = "/abs/path/to/downloads"
 signature = """
 Cordialement,
@@ -49,11 +37,13 @@ Regards,
 default = true
 email = "your.email@gmail.com"
 
+backend = "imap"
 imap-host = "imap.gmail.com"
 imap-port = 993
 imap-login = "your.email@gmail.com"
 imap-passwd-cmd = "pass show gmail"
 
+sender = "internal"
 smtp-host = "smtp.gmail.com"
 smtp-port = 465
 smtp-login = "your.email@gmail.com"
@@ -94,6 +84,7 @@ the features.*
 
 ## Credits
 
+- [himalaya-lib](https://git.sr.ht/~soywod/himalaya-lib)
 - [IMAP RFC3501](https://tools.ietf.org/html/rfc3501)
 - [Iris](https://github.com/soywod/iris.vim), the himalaya predecessor
 - [isync](https://isync.sourceforge.io/), an email synchronizer for
