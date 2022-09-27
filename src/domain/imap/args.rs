@@ -42,7 +42,7 @@ pub fn matches(m: &ArgMatches) -> Result<Option<Command>> {
 pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
     vec![
         clap::SubCommand::with_name("notify")
-            .about("Notifies when new messages arrive in the given mailbox")
+            .about("Notifies when new messages arrive in the given folder")
             .aliases(&["idle"])
             .arg(
                 clap::Arg::with_name("keepalive")

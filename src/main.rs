@@ -106,7 +106,7 @@ fn main() -> Result<()> {
         _ => (),
     }
 
-    // Check mailbox commands.
+    // Check folder commands.
     match folder::args::matches(&m)? {
         Some(folder::args::Cmd::List(max_width)) => {
             return folder::handlers::list(
@@ -254,7 +254,7 @@ fn main() -> Result<()> {
                     backend.as_mut(),
                 );
             }
-            Some(flag::args::Cmd::Remove(seq_range, ref flags)) => {
+            Some(flag::args::Cmd::Del(seq_range, ref flags)) => {
                 return flag::handlers::remove(
                     seq_range,
                     flags,

@@ -1,80 +1,98 @@
-//! Mailbox CLI module.
+//! Folder CLI module.
 //!
-//! This module provides subcommands, arguments and a command matcher related to the mailbox
-//! domain.
+//! This module provides subcommands, arguments and a command matcher
+//! related to the folder domain.
 
 use anyhow::Result;
-use clap;
-use log::{debug, info};
+use clap::{self, App, Arg, ArgMatches, SubCommand};
+use log::debug;
 
 use crate::ui::table;
 
-type MaxTableWidth = Option<usize>;
+const ARG_SOURCE: &str = "source";
+const ARG_TARGET: &str = "target";
+const CMD_FOLDERS: &str = "folders";
 
-/// Represents the mailbox commands.
+/// Represents the folder commands.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Cmd {
-    /// Represents the list mailboxes command.
-    List(MaxTableWidth),
+    List(table::args::MaxTableWidth),
 }
 
-/// Defines the mailbox command matcher.
-pub fn matches(m: &clap::ArgMatches) -> Result<Option<Cmd>> {
-    info!("entering mailbox command matcher");
+/// Represents the folder command matcher.
+pub fn matches(m: &ArgMatches) -> Result<Option<Cmd>> {
+    let cmd = if let Some(m) = m.subcommand_matches(CMD_FOLDERS) {
+        debug!("folders command matched");
+        let max_table_width = table::args::parse_max_width(m);
+        Some(Cmd::List(max_table_width))
+    } else {
+        None
+    };
 
-    if let Some(m) = m.subcommand_matches("mailboxes") {
-        info!("mailboxes command matched");
-        let max_table_width = m
-            .value_of("max-table-width")
-            .and_then(|width| width.parse::<usize>().ok());
-        debug!("max table width: {:?}", max_table_width);
-        return Ok(Some(Cmd::List(max_table_width)));
-    }
-
-    Ok(None)
+    Ok(cmd)
 }
 
-/// Contains mailbox subcommands.
-pub fn subcmds<'a>() -> Vec<clap::App<'a, 'a>> {
-    vec![clap::SubCommand::with_name("mailboxes")
+/// Represents folder subcommands.
+pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
+    vec![SubCommand::with_name(CMD_FOLDERS)
         .aliases(&[
-            "mailbox", "mboxes", "mbox", "mb", "m", "folders", "fold", "fo",
+            "folder",
+            "fold",
+            "fo",
+            "mailboxes",
+            "mailbox",
+            "mboxes",
+            "mbox",
+            "mb",
+            "m",
         ])
         .about("Lists folders")
         .arg(table::args::max_width())]
 }
 
-/// Defines the source mailbox argument.
-pub fn source_arg<'a>() -> clap::Arg<'a, 'a> {
-    clap::Arg::with_name("folder-source")
+/// Represents the source folder argument.
+pub fn source_arg<'a>() -> Arg<'a, 'a> {
+    Arg::with_name(ARG_SOURCE)
         .short("f")
         .long("folder")
         .help("Specifies the folder source")
         .value_name("SOURCE")
 }
 
-/// Defines the target mailbox argument.
-pub fn target_arg<'a>() -> clap::Arg<'a, 'a> {
-    clap::Arg::with_name("folder-target")
+/// Represents the source folder argument parser.
+pub fn parse_source_arg<'a>(matches: &'a ArgMatches<'a>) -> &'a str {
+    matches.value_of(ARG_SOURCE).unwrap()
+}
+
+/// Represents the target folder argument.
+pub fn target_arg<'a>() -> Arg<'a, 'a> {
+    Arg::with_name(ARG_TARGET)
         .help("Specifies the folder target")
         .value_name("TARGET")
         .required(true)
 }
 
+/// Represents the target folder argument parser.
+pub fn parse_target_arg<'a>(matches: &'a ArgMatches<'a>) -> &'a str {
+    matches.value_of(ARG_TARGET).unwrap()
+}
+
 #[cfg(test)]
 mod tests {
+    use clap::{App, ErrorKind};
+
     use super::*;
 
     #[test]
     fn it_should_match_cmds() {
-        let arg = clap::App::new("himalaya")
+        let arg = App::new("himalaya")
             .subcommands(subcmds())
-            .get_matches_from(&["himalaya", "mailboxes"]);
+            .get_matches_from(&["himalaya", "folders"]);
         assert_eq!(Some(Cmd::List(None)), matches(&arg).unwrap());
 
-        let arg = clap::App::new("himalaya")
+        let arg = App::new("himalaya")
             .subcommands(subcmds())
-            .get_matches_from(&["himalaya", "mailboxes", "--max-width", "20"]);
+            .get_matches_from(&["himalaya", "folders", "--max-width", "20"]);
         assert_eq!(Some(Cmd::List(Some(20))), matches(&arg).unwrap());
     }
 
@@ -82,57 +100,53 @@ mod tests {
     fn it_should_match_aliases() {
         macro_rules! get_matches_from {
             ($alias:expr) => {
-                clap::App::new("himalaya")
+                App::new("himalaya")
                     .subcommands(subcmds())
                     .get_matches_from(&["himalaya", $alias])
                     .subcommand_name()
             };
         }
 
-        assert_eq!(Some("mailboxes"), get_matches_from!["mailboxes"]);
-        assert_eq!(Some("mailboxes"), get_matches_from!["mboxes"]);
-        assert_eq!(Some("mailboxes"), get_matches_from!["mbox"]);
-        assert_eq!(Some("mailboxes"), get_matches_from!["mb"]);
-        assert_eq!(Some("mailboxes"), get_matches_from!["m"]);
+        assert_eq!(Some("folders"), get_matches_from!["folders"]);
+        assert_eq!(Some("folders"), get_matches_from!["folder"]);
+        assert_eq!(Some("folders"), get_matches_from!["fold"]);
+        assert_eq!(Some("folders"), get_matches_from!["fo"]);
     }
 
     #[test]
     fn it_should_match_source_arg() {
         macro_rules! get_matches_from {
             ($($arg:expr),*) => {
-                clap::App::new("himalaya")
+                App::new("himalaya")
                     .arg(source_arg())
                     .get_matches_from(&["himalaya", $($arg,)*])
             };
         }
 
         let app = get_matches_from![];
-        assert_eq!(None, app.value_of("folder-source"));
+        assert_eq!(None, app.value_of("source"));
 
-        let app = get_matches_from!["-m", "SOURCE"];
-        assert_eq!(Some("SOURCE"), app.value_of("folder-source"));
+        let app = get_matches_from!["-f", "SOURCE"];
+        assert_eq!(Some("SOURCE"), app.value_of("source"));
 
-        let app = get_matches_from!["--mailbox", "SOURCE"];
-        assert_eq!(Some("SOURCE"), app.value_of("folder-source"));
+        let app = get_matches_from!["--folder", "SOURCE"];
+        assert_eq!(Some("SOURCE"), app.value_of("source"));
     }
 
     #[test]
     fn it_should_match_target_arg() {
         macro_rules! get_matches_from {
             ($($arg:expr),*) => {
-                clap::App::new("himalaya")
+                App::new("himalaya")
                     .arg(target_arg())
                     .get_matches_from_safe(&["himalaya", $($arg,)*])
             };
         }
 
         let app = get_matches_from![];
-        assert_eq!(
-            clap::ErrorKind::MissingRequiredArgument,
-            app.unwrap_err().kind
-        );
+        assert_eq!(ErrorKind::MissingRequiredArgument, app.unwrap_err().kind);
 
         let app = get_matches_from!["TARGET"];
-        assert_eq!(Some("TARGET"), app.unwrap().value_of("folder-target"));
+        assert_eq!(Some("TARGET"), app.unwrap().value_of("target"));
     }
 }

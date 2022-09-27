@@ -51,7 +51,7 @@ pub fn attachments<'a, P: Printer, B: Backend<'a> + ?Sized>(
     printer.print_struct("Done!")
 }
 
-/// Copy a message from a mailbox to another.
+/// Copy a message from a folder to another.
 pub fn copy<'a, P: Printer, B: Backend<'a> + ?Sized>(
     seq: &str,
     mbox_src: &str,
@@ -77,7 +77,7 @@ pub fn delete<'a, P: Printer, B: Backend<'a> + ?Sized>(
     printer.print_struct(format!("Message(s) {} successfully deleted", seq))
 }
 
-/// Forward the given message UID from the selected mailbox.
+/// Forward the given message UID from the selected folder.
 pub fn forward<'a, P: Printer, B: Backend<'a> + ?Sized, S: Sender + ?Sized>(
     seq: &str,
     attachments_paths: Vec<&str>,
@@ -104,7 +104,7 @@ pub fn forward<'a, P: Printer, B: Backend<'a> + ?Sized, S: Sender + ?Sized>(
     Ok(())
 }
 
-/// List paginated messages from the selected mailbox.
+/// List paginated messages from the selected folder.
 pub fn list<'a, P: Printer, B: Backend<'a> + ?Sized>(
     max_width: Option<usize>,
     page_size: Option<usize>,
@@ -195,7 +195,7 @@ pub fn mailto<'a, P: Printer, B: Backend<'a> + ?Sized, S: Sender + ?Sized>(
     Ok(())
 }
 
-/// Move a message from a mailbox to another.
+/// Move a message from a folder to another.
 pub fn move_<'a, P: Printer, B: Backend<'a> + ?Sized>(
     seq: &str,
     mbox_src: &str,
@@ -260,16 +260,14 @@ pub fn reply<'a, P: Printer, B: Backend<'a> + ?Sized, S: Sender + ?Sized>(
     Ok(())
 }
 
-/// Saves a raw message to the targetted mailbox.
+/// Saves a raw message to the targetted folder.
 pub fn save<'a, P: Printer, B: Backend<'a> + ?Sized>(
     mbox: &str,
     raw_msg: &str,
     printer: &mut P,
     backend: &mut B,
 ) -> Result<()> {
-    info!("entering save message handler");
-
-    debug!("mailbox: {}", mbox);
+    debug!("folder: {}", mbox);
 
     let is_tty = atty::is(Stream::Stdin);
     debug!("is tty: {}", is_tty);
@@ -290,7 +288,8 @@ pub fn save<'a, P: Printer, B: Backend<'a> + ?Sized>(
     Ok(())
 }
 
-/// Paginate messages from the selected mailbox matching the specified query.
+/// Paginate messages from the selected folder matching the specified
+/// query.
 pub fn search<'a, P: Printer, B: Backend<'a> + ?Sized>(
     query: String,
     max_width: Option<usize>,
@@ -314,7 +313,8 @@ pub fn search<'a, P: Printer, B: Backend<'a> + ?Sized>(
     )
 }
 
-/// Paginates messages from the selected mailbox matching the specified query, sorted by the given criteria.
+/// Paginates messages from the selected folder matching the specified
+/// query, sorted by the given criteria.
 pub fn sort<'a, P: Printer, B: Backend<'a> + ?Sized>(
     sort: String,
     query: String,

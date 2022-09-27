@@ -56,7 +56,7 @@ for all the options.*
 
 ## Features
 
-- Mailbox listing
+- Folder listing
 - Email listing and searching
 - Email composition based on `$EDITOR`
 - Email manipulation (copy/move/delete)

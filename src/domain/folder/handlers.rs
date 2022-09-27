@@ -1,26 +1,25 @@
-//! Mailbox handling module.
+//! Folder handling module.
 //!
-//! This module gathers all mailbox actions triggered by the CLI.
+//! This module gathers all folder actions triggered by the CLI.
 
 use anyhow::Result;
 use himalaya_lib::{AccountConfig, Backend};
-use log::{info, trace};
+use log::trace;
 
 use crate::printer::{PrintTableOpts, Printer};
 
-/// Lists all mailboxes.
+/// Lists all folders.
 pub fn list<'a, P: Printer, B: Backend<'a> + ?Sized>(
     max_width: Option<usize>,
     config: &AccountConfig,
     printer: &mut P,
     backend: &mut B,
 ) -> Result<()> {
-    info!("entering list mailbox handler");
-    let mboxes = backend.folder_list()?;
-    trace!("mailboxes: {:?}", mboxes);
+    let folders = backend.folder_list()?;
+    trace!("folders: {:?}", folders);
     printer.print_table(
         // TODO: remove Box
-        Box::new(mboxes),
+        Box::new(folders),
         PrintTableOpts {
             format: &config.email_reading_format,
             max_width,
@@ -109,20 +108,18 @@ mod tests {
                 unimplemented!();
             }
             fn folder_list(&mut self) -> backend::Result<Folders> {
-                Ok(Folders {
-                    folders: vec![
-                        Folder {
-                            delim: "/".into(),
-                            name: "INBOX".into(),
-                            desc: "desc".into(),
-                        },
-                        Folder {
-                            delim: "/".into(),
-                            name: "Sent".into(),
-                            desc: "desc".into(),
-                        },
-                    ],
-                })
+                Ok(Folders(vec![
+                    Folder {
+                        delim: "/".into(),
+                        name: "INBOX".into(),
+                        desc: "desc".into(),
+                    },
+                    Folder {
+                        delim: "/".into(),
+                        name: "Sent".into(),
+                        desc: "desc".into(),
+                    },
+                ]))
             }
             fn folder_delete(&mut self, _: &str) -> backend::Result<()> {
                 unimplemented!();
@@ -141,9 +138,6 @@ mod tests {
                 unimplemented!()
             }
             fn email_add(&mut self, _: &str, _: &[u8], _: &str) -> backend::Result<String> {
-                unimplemented!()
-            }
-            fn email_list(&mut self, _: &str, _: &str) -> backend::Result<Email> {
                 unimplemented!()
             }
             fn email_get(&mut self, _: &str, _: &str) -> backend::Result<Email> {
@@ -166,6 +160,9 @@ mod tests {
             }
             fn flags_delete(&mut self, _: &str, _: &str, _: &str) -> backend::Result<()> {
                 unimplemented!()
+            }
+            fn as_any(&self) -> &(dyn std::any::Any + 'a) {
+                self
             }
         }
 
