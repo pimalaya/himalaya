@@ -23,7 +23,7 @@ const ARG_RAW: &str = "raw";
 const ARG_REPLY_ALL: &str = "reply-all";
 const CMD_ATTACHMENTS: &str = "attachments";
 const CMD_COPY: &str = "copy";
-const CMD_DELETE: &str = "delete";
+const CMD_DEL: &str = "delete";
 const CMD_FORWARD: &str = "forward";
 const CMD_LIST: &str = "list";
 const CMD_MOVE: &str = "move";
@@ -56,7 +56,7 @@ pub(crate) type Ids<'a> = &'a str;
 pub enum Cmd<'a> {
     Attachments(Id<'a>),
     Copy(Id<'a>, Folder<'a>),
-    Delete(Id<'a>),
+    Delete(Ids<'a>),
     Forward(Id<'a>, Attachments<'a>, Encrypt),
     List(table::args::MaxTableWidth, Option<PageSize>, Page),
     Move(Id<'a>, Folder<'a>),
@@ -91,10 +91,10 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
         let id = parse_id_arg(m);
         let folder = folder::args::parse_target_arg(m);
         Cmd::Copy(id, folder)
-    } else if let Some(m) = m.subcommand_matches(CMD_DELETE) {
+    } else if let Some(m) = m.subcommand_matches(CMD_DEL) {
         debug!("delete command matched");
-        let id = parse_id_arg(m);
-        Cmd::Delete(id)
+        let ids = parse_ids_arg(m);
+        Cmd::Delete(ids)
     } else if let Some(m) = m.subcommand_matches(CMD_FORWARD) {
         debug!("forward command matched");
         let id = parse_id_arg(m);
@@ -185,13 +185,13 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                 .arg(table::args::max_width()),
             SubCommand::with_name(CMD_SEARCH)
                 .aliases(&["s", "query", "q"])
-                .about("Lists emails matching the given IMAP query")
+                .about("Lists emails matching the given query")
                 .arg(page_size_arg())
                 .arg(page_arg())
                 .arg(table::args::max_width())
                 .arg(query_arg()),
             SubCommand::with_name(CMD_SORT)
-                .about("Sorts emails by the given criteria and matching the given IMAP query")
+                .about("Sorts emails by the given criteria and matching the given query")
                 .arg(page_size_arg())
                 .arg(page_arg())
                 .arg(table::args::max_width())
@@ -199,6 +199,7 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                 .arg(query_arg()),
             SubCommand::with_name(CMD_WRITE)
                 .about("Writes a new email")
+                .aliases(&["w", "new", "n"])
                 .args(&tpl::args::args())
                 .arg(attachments_arg())
                 .arg(encrypt_flag()),
@@ -237,10 +238,10 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                 .about("Moves an email to the targeted folder")
                 .arg(id_arg())
                 .arg(folder::args::target_arg()),
-            SubCommand::with_name(CMD_DELETE)
+            SubCommand::with_name(CMD_DEL)
                 .aliases(&["del", "d", "remove", "rm"])
                 .about("Deletes an email")
-                .arg(id_arg()),
+                .arg(ids_arg()),
         ],
     ]
     .concat()
@@ -249,7 +250,7 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
 /// Represents the email id argument.
 pub fn id_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name(ARG_ID)
-        .help("Specifies the targeted email")
+        .help("Specifies the target email")
         .value_name("ID")
         .required(true)
 }
@@ -304,11 +305,11 @@ pub fn parse_criteria_arg<'a>(matches: &'a ArgMatches<'a>) -> String {
 }
 
 /// Represents the email ids argument.
-pub fn id_range_arg<'a>() -> Arg<'a, 'a> {
+pub fn ids_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name(ARG_IDS)
-        .help("Specifies targeted email(s)")
-        .long_help("Specifies a range of targeted emails. The range follows the RFC3501 format.")
-        .value_name("RANGE")
+        .help("Specifies the target email(s)")
+        .long_help("Specifies a range of emails. The range follows the RFC3501 format.")
+        .value_name("IDS")
         .required(true)
 }
 
@@ -351,14 +352,14 @@ fn page_arg<'a>() -> Arg<'a, 'a> {
         .short("p")
         .long("page")
         .value_name("INT")
-        .default_value("0")
+        .default_value("1")
 }
 
 /// Represents the page argument parser.
 fn parse_page_arg<'a>(matches: &'a ArgMatches<'a>) -> usize {
     matches
         .value_of(ARG_PAGE)
-        .unwrap_or("1")
+        .unwrap()
         .parse()
         .ok()
         .map(|page| 1.max(page) - 1)
@@ -453,8 +454,7 @@ pub fn parse_mime_type_arg<'a>(matches: &'a ArgMatches<'a>) -> &'a str {
 /// Represents the email query argument.
 pub fn query_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name(ARG_QUERY)
-        .help("IMAP query")
-        .long_help("The IMAP query format follows the RFC3501. The query is case-insensitive.")
+        .long_help("The query system depends on the backend, see the wiki for more details")
         .value_name("QUERY")
         .multiple(true)
         .required(true)

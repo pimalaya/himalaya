@@ -61,21 +61,21 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
             SubCommand::with_name(CMD_ADD)
                 .aliases(&["a"])
                 .about("Adds email flags")
-                .arg(email::args::id_range_arg())
+                .arg(email::args::ids_arg())
                 .arg(flags_arg()),
         )
         .subcommand(
             SubCommand::with_name(CMD_SET)
                 .aliases(&["s", "change", "c"])
                 .about("Sets email flags")
-                .arg(email::args::id_range_arg())
+                .arg(email::args::ids_arg())
                 .arg(flags_arg()),
         )
         .subcommand(
             SubCommand::with_name(CMD_DEL)
                 .aliases(&["rem", "rm", "r", "delete", "del", "d"])
                 .about("Removes email flags")
-                .arg(email::args::id_range_arg())
+                .arg(email::args::ids_arg())
                 .arg(flags_arg()),
         )]
 }

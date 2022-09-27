@@ -39,15 +39,3 @@ impl fmt::Display for OutputFmt {
         write!(f, "{}", fmt)
     }
 }
-
-/// Defines a struct-wrapper to provide a JSON output.
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct OutputJson<T: serde::Serialize> {
-    response: T,
-}
-
-impl<T: serde::Serialize> OutputJson<T> {
-    pub fn new(response: T) -> Self {
-        Self { response }
-    }
-}

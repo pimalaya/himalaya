@@ -4,7 +4,7 @@ use std::fmt::{self, Debug};
 use termcolor::{ColorChoice, StandardStream};
 
 use crate::{
-    output::{OutputFmt, OutputJson},
+    output::OutputFmt,
     printer::{Print, PrintTable, PrintTableOpts, WriteColor},
 };
 
@@ -61,8 +61,8 @@ impl Printer for StdoutPrinter {
     fn print_struct<T: Debug + Print + serde::Serialize>(&mut self, data: T) -> Result<()> {
         match self.fmt {
             OutputFmt::Plain => data.print(self.writer.as_mut()),
-            OutputFmt::Json => serde_json::to_writer(self.writer.as_mut(), &OutputJson::new(data))
-                .context("cannot write JSON to writer"),
+            OutputFmt::Json => serde_json::to_writer(self.writer.as_mut(), &data)
+                .context("cannot write json to writer"),
         }
     }
 

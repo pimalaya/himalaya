@@ -55,7 +55,7 @@ pub fn source_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name(ARG_SOURCE)
         .short("f")
         .long("folder")
-        .help("Specifies the folder source")
+        .help("Specifies the source folder")
         .value_name("SOURCE")
 }
 
@@ -67,7 +67,7 @@ pub fn parse_source_arg<'a>(matches: &'a ArgMatches<'a>) -> &'a str {
 /// Represents the target folder argument.
 pub fn target_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name(ARG_TARGET)
-        .help("Specifies the folder target")
+        .help("Specifies the target folder")
         .value_name("TARGET")
         .required(true)
 }
