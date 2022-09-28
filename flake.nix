@@ -26,7 +26,7 @@
             ${name} = naersk.lib.${system}.buildPackage {
               pname = name;
               root = ./.;
-              nativeBuildInputs = with pkgs; [ openssl.dev pkgconfig ];
+              nativeBuildInputs = with pkgs; [ openssl.dev pkg-config ];
               overrideMain = _: {
                 postInstall = ''
                   mkdir -p $out/share/applications/
