@@ -125,7 +125,7 @@ mod tests {
         }
 
         let app = get_matches_from![];
-        assert_eq!(None, app.value_of("source"));
+        assert_eq!(Some("inbox"), app.value_of("source"));
 
         let app = get_matches_from!["-f", "SOURCE"];
         assert_eq!(Some("SOURCE"), app.value_of("source"));

@@ -143,16 +143,26 @@ impl DeserializedConfig {
 
 #[cfg(test)]
 mod tests {
-    use himalaya_lib::{
-        EmailSendCmd, EmailSender, ImapConfig, MaildirConfig, NotmuchConfig, SmtpConfig,
-    };
+    use himalaya_lib::{EmailSendCmd, EmailSender, SmtpConfig};
+
+    #[cfg(feature = "imap-backend")]
+    use himalaya_lib::ImapConfig;
+    #[cfg(feature = "maildir-backend")]
+    use himalaya_lib::MaildirConfig;
+    #[cfg(feature = "notmuch-backend")]
+    use himalaya_lib::NotmuchConfig;
+
     use std::io::Write;
     use tempfile::NamedTempFile;
 
-    use crate::account::{
-        DeserializedBaseAccountConfig, DeserializedImapAccountConfig,
-        DeserializedMaildirAccountConfig, DeserializedNotmuchAccountConfig,
-    };
+    use crate::account::DeserializedBaseAccountConfig;
+
+    #[cfg(feature = "imap-backend")]
+    use crate::account::DeserializedImapAccountConfig;
+    #[cfg(feature = "maildir-backend")]
+    use crate::account::DeserializedMaildirAccountConfig;
+    #[cfg(feature = "notmuch-backend")]
+    use crate::account::DeserializedNotmuchAccountConfig;
 
     use super::*;
 
@@ -189,10 +199,11 @@ mod tests {
             backend = \"bad\"",
         );
 
-        assert_eq!(
-            config.unwrap_err().root_cause().to_string(),
-            "unknown variant `bad`, expected one of `none`, `imap`, `maildir`, `notmuch` at line 1 column 1"
-        );
+        assert!(config
+            .unwrap_err()
+            .root_cause()
+            .to_string()
+            .starts_with("unknown variant `bad`"));
     }
 
     #[test]
@@ -289,6 +300,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "notmuch-backend")]
     #[test]
     fn account_backend_notmuch_missing_db_path_field() {
         let config = make_config(
@@ -513,7 +525,6 @@ mod tests {
             }
         );
     }
-
     #[test]
     fn account_backend_maildir_minimum_config() {
         let config = make_config(
@@ -544,6 +555,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "notmuch-backend")]
     #[test]
     fn account_backend_notmuch_minimum_config() {
         let config = make_config(

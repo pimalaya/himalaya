@@ -19,10 +19,17 @@
 //! This module contains the raw deserialized representation of an
 //! account in the accounts section of the user configuration file.
 
-use himalaya_lib::{
-    AccountConfig, BackendConfig, EmailHooks, EmailSender, EmailTextPlainFormat, ImapConfig,
-    MaildirConfig, NotmuchConfig,
-};
+use himalaya_lib::{AccountConfig, BackendConfig, EmailHooks, EmailSender, EmailTextPlainFormat};
+
+#[cfg(feature = "imap-backend")]
+use himalaya_lib::ImapConfig;
+
+#[cfg(feature = "maildir-backend")]
+use himalaya_lib::MaildirConfig;
+
+#[cfg(feature = "notmuch-backend")]
+use himalaya_lib::NotmuchConfig;
+
 use serde::Deserialize;
 use std::{collections::HashMap, path::PathBuf};
 
