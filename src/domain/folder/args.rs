@@ -57,6 +57,7 @@ pub fn source_arg<'a>() -> Arg<'a, 'a> {
         .long("folder")
         .help("Specifies the source folder")
         .value_name("SOURCE")
+        .default_value("inbox")
 }
 
 /// Represents the source folder argument parser.

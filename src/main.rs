@@ -21,8 +21,8 @@ fn create_app<'a>() -> clap::App<'a, 'a> {
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .author(env!("CARGO_PKG_AUTHORS"))
         .global_setting(clap::AppSettings::GlobalVersion)
-        .arg(&config::args::path_arg())
-        .arg(&account::args::name_arg())
+        .arg(&config::args::arg())
+        .arg(&account::args::arg())
         .args(&output::args::args())
         .arg(folder::args::source_arg())
         .subcommands(compl::args::subcmds())
@@ -73,10 +73,9 @@ fn main() -> Result<()> {
     }
 
     // Init entities and services.
-    let config = DeserializedConfig::from_opt_path(m.value_of("config"))?;
-    let (account_config, backend_config) = config.to_configs(m.value_of("account"))?;
-    let default_folder = account_config.folder_alias("inbox")?;
-    let folder = m.value_of("folder-source").unwrap_or(&default_folder);
+    let config = DeserializedConfig::from_opt_path(config::args::parse_arg(&m))?;
+    let (account_config, backend_config) = config.to_configs(account::args::parse_arg(&m))?;
+    let folder = account_config.folder_alias(folder::args::parse_source_arg(&m))?;
 
     // Check IMAP commands.
     #[cfg(feature = "imap-backend")]
@@ -85,10 +84,10 @@ fn main() -> Result<()> {
         let mut imap = ImapBackend::new(&account_config, imap_config);
         match imap::args::matches(&m)? {
             Some(imap::args::Command::Notify(keepalive)) => {
-                return imap::handlers::notify(keepalive, folder, &mut imap);
+                return imap::handlers::notify(keepalive, &folder, &mut imap);
             }
             Some(imap::args::Command::Watch(keepalive)) => {
-                return imap::handlers::watch(keepalive, folder, &mut imap);
+                return imap::handlers::watch(keepalive, &folder, &mut imap);
             }
             _ => (),
         }
@@ -124,24 +123,24 @@ fn main() -> Result<()> {
         Some(email::args::Cmd::Attachments(seq)) => {
             return email::handlers::attachments(
                 seq,
-                folder,
+                &folder,
                 &account_config,
                 &mut printer,
                 backend.as_mut(),
             );
         }
         Some(email::args::Cmd::Copy(seq, mbox_dst)) => {
-            return email::handlers::copy(seq, folder, mbox_dst, &mut printer, backend.as_mut());
+            return email::handlers::copy(seq, &folder, mbox_dst, &mut printer, backend.as_mut());
         }
         Some(email::args::Cmd::Delete(seq)) => {
-            return email::handlers::delete(seq, folder, &mut printer, backend.as_mut());
+            return email::handlers::delete(seq, &folder, &mut printer, backend.as_mut());
         }
         Some(email::args::Cmd::Forward(seq, attachment_paths, encrypt)) => {
             return email::handlers::forward(
                 seq,
                 attachment_paths,
                 encrypt,
-                folder,
+                &folder,
                 &account_config,
                 &mut printer,
                 backend.as_mut(),
@@ -153,14 +152,14 @@ fn main() -> Result<()> {
                 max_width,
                 page_size,
                 page,
-                folder,
+                &folder,
                 &account_config,
                 &mut printer,
                 backend.as_mut(),
             );
         }
         Some(email::args::Cmd::Move(seq, mbox_dst)) => {
-            return email::handlers::move_(seq, folder, mbox_dst, &mut printer, backend.as_mut());
+            return email::handlers::move_(seq, &folder, mbox_dst, &mut printer, backend.as_mut());
         }
         Some(email::args::Cmd::Read(seq, text_mime, raw, headers)) => {
             return email::handlers::read(
@@ -168,7 +167,7 @@ fn main() -> Result<()> {
                 text_mime,
                 raw,
                 headers,
-                folder,
+                &folder,
                 &account_config,
                 &mut printer,
                 backend.as_mut(),
@@ -180,7 +179,7 @@ fn main() -> Result<()> {
                 all,
                 attachment_paths,
                 encrypt,
-                folder,
+                &folder,
                 &account_config,
                 &mut printer,
                 backend.as_mut(),
@@ -188,7 +187,7 @@ fn main() -> Result<()> {
             );
         }
         Some(email::args::Cmd::Save(raw_msg)) => {
-            return email::handlers::save(folder, raw_msg, &mut printer, backend.as_mut());
+            return email::handlers::save(&folder, raw_msg, &mut printer, backend.as_mut());
         }
         Some(email::args::Cmd::Search(query, max_width, page_size, page)) => {
             return email::handlers::search(
@@ -196,7 +195,7 @@ fn main() -> Result<()> {
                 max_width,
                 page_size,
                 page,
-                folder,
+                &folder,
                 &account_config,
                 &mut printer,
                 backend.as_mut(),
@@ -209,7 +208,7 @@ fn main() -> Result<()> {
                 max_width,
                 page_size,
                 page,
-                folder,
+                &folder,
                 &account_config,
                 &mut printer,
                 backend.as_mut(),
@@ -240,7 +239,7 @@ fn main() -> Result<()> {
                 return flag::handlers::set(
                     seq_range,
                     flags,
-                    folder,
+                    &folder,
                     &mut printer,
                     backend.as_mut(),
                 );
@@ -249,7 +248,7 @@ fn main() -> Result<()> {
                 return flag::handlers::add(
                     seq_range,
                     flags,
-                    folder,
+                    &folder,
                     &mut printer,
                     backend.as_mut(),
                 );
@@ -258,7 +257,7 @@ fn main() -> Result<()> {
                 return flag::handlers::remove(
                     seq_range,
                     flags,
-                    folder,
+                    &folder,
                     &mut printer,
                     backend.as_mut(),
                 );
@@ -274,7 +273,7 @@ fn main() -> Result<()> {
                     seq,
                     all,
                     tpl,
-                    folder,
+                    &folder,
                     &account_config,
                     &mut printer,
                     backend.as_mut(),
@@ -284,7 +283,7 @@ fn main() -> Result<()> {
                 return tpl::handlers::forward(
                     seq,
                     tpl,
-                    folder,
+                    &folder,
                     &account_config,
                     &mut printer,
                     backend.as_mut(),
@@ -292,7 +291,7 @@ fn main() -> Result<()> {
             }
             Some(tpl::args::Cmd::Save(atts, tpl)) => {
                 return tpl::handlers::save(
-                    folder,
+                    &folder,
                     &account_config,
                     atts,
                     tpl,
@@ -302,7 +301,7 @@ fn main() -> Result<()> {
             }
             Some(tpl::args::Cmd::Send(atts, tpl)) => {
                 return tpl::handlers::send(
-                    folder,
+                    &folder,
                     &account_config,
                     atts,
                     tpl,
