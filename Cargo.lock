@@ -474,8 +474,7 @@ dependencies = [
 [[package]]
 name = "himalaya-lib"
 version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0b8afc6ba5f717638aa023bbe082e46fda3ec261c1ce9b21cb9a6c5e9133cd9"
+source = "git+https://git.sr.ht/~soywod/himalaya-lib?branch=develop#a3fccb78810b00cb5c467e723d0159f6a592013a"
 dependencies = [
  "ammonia",
  "chrono",
