@@ -7,364 +7,413 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2022-10-10
+
+### Changed
+
+* Separated the CLI from the lib module [#340].
+
+  The source code has been splitted into subrepositories:
+
+  * The email logic has been extracted from the CLI and placed in a
+	lib on [sourcehut](https://git.sr.ht/~soywod/himalaya-lib)	
+  * The vim plugin is now in a dedicated repository on
+    [sourcehut](https://git.sr.ht/~soywod/himalaya-vim) as well
+  * This repository only contains the CLI source code (it was not
+	possible to move it to sourcehut because of cross platform builds)
+
+* [**BREAKING**] Refactored config system [#344].
+
+  The configuration has been rethought in order to be more intuitive
+  and structured. Here are the breaking changes for the global config:
+
+  * `name` becomes `display-name` and is not mandatory anymore
+  * `signature-delimiter` becomes `signature-delim`
+  * `default-page-size` has been moved to `folder-listing-page-size`
+    and `email-listing-page-size`
+  * `notify-cmd`, `notify-query` and `watch-cmds` have been removed
+    from the global config (available in account config only)
+  * `folder-aliases` has been added to the global config (previously
+    known as `mailboxes` from the account config)
+  * `email-reading-headers`, `email-reading-format`,
+    `email-reading-decrypt-cmd`, `email-writing-encrypt-cmd` and
+    `email-hooks` have been added
+  
+  The account config inherits the same breaking changes from the
+  global config, plus:
+
+  * `imap-*` requires `backend = "imap"`
+  * `maildir-*` requires `backend = "maildir"`
+  * `notmuch-*` requires `backend = "notmuch"`
+  * `smtp-*` requires `sender = "smtp"`
+  * `sendmail-*` requires `sender = "sendmail"`
+  * `pgp-encrypt-cmd` becomes `email-writing-encrypt-cmd`
+  * `pgp-decrypt-cmd` becomes `email-reading-decrypt-cmd`
+  * `mailboxes` becomes `folder-aliases`
+  * `hooks` becomes `email-hooks`
+  * `maildir-dir` becomes `maildir-root-dir`
+  * `notmuch-database-dir` becomes `notmuch-db-path`
+
 ## [0.5.10] - 2022-03-20
 
 ### Fixed
 
-- Flag commands [#334]
-- Windows build [#346]
+* Flag commands [#334]
+* Windows build [#346]
 
 ## [0.5.9] - 2022-03-12
 
 ### Added
 
-- SMTP pre-send hook [#178]
-- Customize headers to show at the top of a read message [#338]
+* SMTP pre-send hook [#178]
+* Customize headers to show at the top of a read message [#338]
 
 ### Changed
 
-- Improve `attachments` command [#281]
+* Improve `attachments` command [#281]
 
 ### Fixed
 
-- `In-Reply-To` not set properly when replying to a message [#323]
-- `Cc` missing or invalid when replying to a message [#324]
-- Notmuch backend hangs [#329]
-- Maildir e2e tests [#335]
-- JSON API for listings [#331]
+* `In-Reply-To` not set properly when replying to a message [#323]
+* `Cc` missing or invalid when replying to a message [#324]
+* Notmuch backend hangs [#329]
+* Maildir e2e tests [#335]
+* JSON API for listings [#331]
 
 ## [0.5.8] - 2022-03-04
 
 ### Added
 
-- Flowed format support [#206]
-- List accounts command [#244]
-- One cargo feature per backend [#318]
+* Flowed format support [#206]
+* List accounts command [#244]
+* One cargo feature per backend [#318]
 
 ### Changed
 
-- Vim doc about mailbox pickers [#298]
+* Vim doc about mailbox pickers [#298]
 
 ### Fixed
 
-- Some emojis break the table layout [#300]
-- Bad sender and date in reply and forward template [#321]
+* Some emojis break the table layout [#300]
+* Bad sender and date in reply and forward template [#321]
 
 ## [0.5.7] - 2022-03-01
 
 ### Added
 
-- Notmuch support [#57]
+* Notmuch support [#57]
 
 ### Fixed
 
-- Build failure due to `imap` version [#303]
-- No tilde expansion in `maildir-dir` [#305]
-- Unknown command SORT [#308]
+* Build failure due to `imap` version [#303]
+* No tilde expansion in `maildir-dir` [#305]
+* Unknown command SORT [#308]
 
 ### Changed
 
-- [**BREAKING**] Replace `inbox-folder`, `sent-folder` and `draft-folder` by a generic hashmap `mailboxes`
-- Display short envelopes id for `maildir` and `notmuch` backends [#309]
+* [**BREAKING**] Replace `inbox-folder`, `sent-folder` and `draft-folder` by a generic hashmap `mailboxes`
+* Display short envelopes id for `maildir` and `notmuch` backends [#309]
 
 ## [0.5.6] - 2022-02-22
 
 ### Added
 
-- Sort command [#34]
-- Maildir support [#43]
+* Sort command [#34]
+* Maildir support [#43]
 
 ### Fixed
 
-- Suffix to downloaded attachments with same name [#204]
+* Suffix to downloaded attachments with same name [#204]
 
 ## [0.5.5] - 2022-02-08
 
 ### Added
 
-- [Contributing guide](https://github.com/soywod/himalaya/blob/master/CONTRIBUTING.md) [#256]
-- Notify query config option [#289]
-- End-to-end encryption [#54]
+* [Contributing guide](https://github.com/soywod/himalaya/blob/master/CONTRIBUTING.md) [#256]
+* Notify query config option [#289]
+* End-to-end encryption [#54]
 
 ### Fixed
 
-- Multiple recipients issue [#288]
-- Cannot parse address [#227]
+* Multiple recipients issue [#288]
+* Cannot parse address [#227]
 
 ## [0.5.4] - 2022-02-05
 
 ### Fixed
 
-- Add attachments with save and send commands [#47] [#259]
-- Invalid sequence set [#276]
+* Add attachments with save and send commands [#47] [#259]
+* Invalid sequence set [#276]
 
 ## [0.5.3] - 2022-02-03
 
 ### Added
 
-- Activate rust-imap logs when trace mode is enabled
-- Set up cargo deployment
+* Activate rust-imap logs when trace mode is enabled
+* Set up cargo deployment
 
 ## [0.5.2] - 2022-02-02
 
 ### Fixed
 
-- Blur in list msg screenshot [#181]
-- Make inbox, sent and drafts folders customizable [#172]
-- Vim plugin get focused msg id [#268]
-- Nix run issue [#272]
-- Range not displayed when fetch fails [#276]
-- Blank lines and spaces in `text/plain` parts [#280]
-- Watch command [#271]
-- Mailbox telescope.nvim preview [#249]
+* Blur in list msg screenshot [#181]
+* Make inbox, sent and drafts folders customizable [#172]
+* Vim plugin get focused msg id [#268]
+* Nix run issue [#272]
+* Range not displayed when fetch fails [#276]
+* Blank lines and spaces in `text/plain` parts [#280]
+* Watch command [#271]
+* Mailbox telescope.nvim preview [#249]
 
 ### Removed
 
-- The wiki git submodule [#273]
+* The wiki git submodule [#273]
 
 ## [0.5.1] - 2021-10-24
 
 ### Added
 
-- Disable color feature [#185]
-- `--max-width|-w` argument to restrict listing table width [#220]
+* Disable color feature [#185]
+* `--max-width|-w` argument to restrict listing table width [#220]
 
 ### Fixed
 
-- Error when receiving notification from `notify` command [#228]
+* Error when receiving notification from `notify` command [#228]
 
 ### Changed
 
-- Remove error when empty subject [#229]
-- Vim plugin does not render anymore the msg by itself, it uses the one available from the CLI [#220]
+* Remove error when empty subject [#229]
+* Vim plugin does not render anymore the msg by itself, it uses the one available from the CLI [#220]
 
 ## [0.5.0] - 2021-10-10
 
 ### Added
 
-- Mailto support [#162]
-- Remove previous signature when replying/forwarding a message [#193]
-- Config option `signature-delimiter` to customize the signature delimiter (default to `-- \n`) [[#114](https://github.com/soywod/himalaya/pull/114)]
-- Expand tilde and env vars for `downloads-dir` and `signature` [#102]
+* Mailto support [#162]
+* Remove previous signature when replying/forwarding a message [#193]
+* Config option `signature-delimiter` to customize the signature delimiter (default to `-- \n`) [[#114](https://github.com/soywod/himalaya/pull/114)]
+* Expand tilde and env vars for `downloads-dir` and `signature` [#102]
 
 ### Changed
 
-- [**BREAKING**] Folder structure, message management, JSON API and Vim plugin [#199]
-- Pagination for list and search cmd starts from 1 instead of 0 [#186]
-- Errors management with `anyhow` [#152]
+* [**BREAKING**] Folder structure, message management, JSON API and Vim plugin [#199]
+* Pagination for list and search cmd starts from 1 instead of 0 [#186]
+* Errors management with `anyhow` [#152]
 
 ### Fixed
 
-- Panic on flags command [#190]
-- Make more use of serde [#153]
-- Write message vim plugin [#196]
-- Invalid encoding when sending message [#205]
-- Pagination reset current account [#215]
-- New/reply/forward from Vim plugin since Tpl refactor [#176]
+* Panic on flags command [#190]
+* Make more use of serde [#153]
+* Write message vim plugin [#196]
+* Invalid encoding when sending message [#205]
+* Pagination reset current account [#215]
+* New/reply/forward from Vim plugin since Tpl refactor [#176]
 
 ## [0.4.0] - 2021-06-03
 
 ### Added
 
-- Add ability to change account in with the Vim plugin [#91]
-- Add possibility to make Himalaya default email app [#160] [[#161](https://github.com/soywod/himalaya/pull/161)]
+* Add ability to change account in with the Vim plugin [#91]
+* Add possibility to make Himalaya default email app [#160] [[#161](https://github.com/soywod/himalaya/pull/161)]
 
 ### Changed
 
-- [**BREAKING**] Short version of reply `--all` arg is now `-A` to avoid conflicts with `--attachment|-a`
-- Template management [#80]
+* [**BREAKING**] Short version of reply `--all` arg is now `-A` to
+  avoid conflicts with `--attachment|-a`
+* Template management [#80]
 
 ### Fixed
 
-- `\Seen` flag when moving a message
-- Attachments arg for reply and forward commands [#109]
-- Vim doc [#117]
+* `\Seen` flag when moving a message
+* Attachments arg for reply and forward commands [#109]
+* Vim doc [#117]
 
 ### Removed
 
-- `Content-Type` from templates [#146]
+* `Content-Type` from templates [#146]
 
 ## [0.3.2] - 2021-05-08
 
 ### Added
 
-- Mailbox attributes [#134]
-- Wiki entry about new messages counter [#121]
-- Copy/move/delete a message in vim [#95]
+* Mailbox attributes [#134]
+* Wiki entry about new messages counter [#121]
+* Copy/move/delete a message in vim [#95]
 
 ### Changed
 
-- Get signature from file [#135]
-- [**BREAKING**] Split `idle` command into two commands:
-  - `notify`: Runs `notify-cmd` when a new message arrives to the server
-  - `watch`: Runs `watch-cmds` when any change occurs on the server
+* Get signature from file [#135]
+* [**BREAKING**] Split `idle` command into two commands:
+  * `notify`: Runs `notify-cmd` when a new message arrives to the server
+  * `watch`: Runs `watch-cmds` when any change occurs on the server
 
 ### Removed
 
-- `.exe` extension from release binaries [#144]
+* `.exe` extension from release binaries [#144]
 
 ## [0.3.1] - 2021-05-04
 
 ### Added
 
-- Send message via stdin [#78]
+* Send message via stdin [#78]
 
 ### Fixed
 
-- Table with subject containing `\r`, `\n` or `\t` [#141]
-- Overflow panic when shrink column [#138]
-- Vim plugin empty mailbox message [#136]
+* Table with subject containing `\r`, `\n` or `\t` [#141]
+* Overflow panic when shrink column [#138]
+* Vim plugin empty mailbox message [#136]
 
 ## [0.3.0] - 2021-04-28
 
 ### Fixed
 
-- IDLE mode after network interruption [#123]
-- Output redirected to `stderr` [#130]
-- Refactor table system [#132]
-- Editon file format on Linux [#133]
-- Show email address when name not available [#131]
+* IDLE mode after network interruption [#123]
+* Output redirected to `stderr` [#130]
+* Refactor table system [#132]
+* Editon file format on Linux [#133]
+* Show email address when name not available [#131]
 
 ### Removed
 
-- `--log-level|-l` arg (replaced by default `RUST_LOG` env var from `env_logger`) [#130]
+* `--log-level|-l` arg (replaced by default `RUST_LOG` env var from `env_logger`) [#130]
 
 ## [0.2.7] - 2021-04-24
 
 ### Added
 
-- Default page size to config [#96]
-- Custom config path [#86]
-- Setting idle-hook-cmds
+* Default page size to config [#96]
+* Custom config path [#86]
+* Setting idle-hook-cmds
 
 ### Changed
 
-- Plain logger with `env_logger` [#126]
-- Refresh email list on load buffer [#125]
+* Plain logger with `env_logger` [#126]
+* Refresh email list on load buffer [#125]
 
 ### Fixed
 
-- Improve config compatibility on Windows [[#111](https://github.com/soywod/himalaya/pull/111)]
-- Vim table containing emoji [#122]
+* Improve config compatibility on Windows [[#111](https://github.com/soywod/himalaya/pull/111)]
+* Vim table containing emoji [#122]
 
 ## [0.2.6] - 2021-04-17
 
 ### Added
 
-- Insecure TLS option [#84] [#103](https://github.com/soywod/himalaya/pull/103) [[#105](https://github.com/soywod/himalaya/pull/105)]
-- Completion subcommands [[#99](https://github.com/soywod/himalaya/pull/99)]
-- Vim flags to enable telescope preview and to choose picker [[#97](https://github.com/soywod/himalaya/pull/97)]
+* Insecure TLS option [#84] [#103](https://github.com/soywod/himalaya/pull/103) [[#105](https://github.com/soywod/himalaya/pull/105)]
+* Completion subcommands [[#99](https://github.com/soywod/himalaya/pull/99)]
+* Vim flags to enable telescope preview and to choose picker [[#97](https://github.com/soywod/himalaya/pull/97)]
 
 ### Changed
 
-- Make `install.sh` POSIX compliant [[#53](https://github.com/soywod/himalaya/pull/53)]
+* Make `install.sh` POSIX compliant [[#53](https://github.com/soywod/himalaya/pull/53)]
 
 ### Fixed
 
-- SMTP port [#87]
-- Save msg upon error [#59]
-- Answered flag not set [#50]
-- Panic when downloads-dir does not exist [#100]
-- Idle mode incorrect new message notification [#48]
+* SMTP port [#87]
+* Save msg upon error [#59]
+* Answered flag not set [#50]
+* Panic when downloads-dir does not exist [#100]
+* Idle mode incorrect new message notification [#48]
 
 ## [0.2.5] - 2021-04-12
 
 ### Fixed
 
-- Expunge mbox after `move` and `delete` cmd [#83]
-- JSON output [#89]
+* Expunge mbox after `move` and `delete` cmd [#83]
+* JSON output [#89]
 
 ## [0.2.4] - 2021-04-09
 
 ### Added
 
-- Wiki entry for Gmail users [#58]
-- Info logs for copy/move/delete cmd + silent mode [#74]
-- `--raw` arg for `read` cmd [#79]
+* Wiki entry for Gmail users [#58]
+* Info logs for copy/move/delete cmd + silent mode [#74]
+* `--raw` arg for `read` cmd [#79]
 
 ### Changed
 
-- Refactor output system + log levels [#74]
+* Refactor output system + log levels [#74]
 
 ## [0.2.3] - 2021-04-08
 
 ### Added
 
-- Telescope support [#61]
+* Telescope support [#61]
 
 ### Fixed
 
-- Unicode chars breaks the view [#71]
-- Copy/move incomplete (missing parts) [#75]
+* Unicode chars breaks the view [#71]
+* Copy/move incomplete (missing parts) [#75]
 
 ## [0.2.2] - 2021-04-04
 
 ### Added
 
-- `w` alias for `write` cmd
+* `w` alias for `write` cmd
 
 ### Fixed
 
-- `attachments` cmd logs
-- Page size arg `search` cmd
+* `attachments` cmd logs
+* Page size arg `search` cmd
 
 ## [0.2.1] - 2021-04-04
 
 ### Added
 
-- IDLE support [#29]
-- Improve choice after editing msg [#30]
-- Flags management [#41]
-- Copy feature [#35]
-- Move feature [#31]
-- Delete feature [#36]
-- Signature support [#33]
-- Add attachment(s) to a message (CLI) [#37]
+* IDLE support [#29]
+* Improve choice after editing msg [#30]
+* Flags management [#41]
+* Copy feature [#35]
+* Move feature [#31]
+* Delete feature [#36]
+* Signature support [#33]
+* Add attachment(s) to a message (CLI) [#37]
 
 ### Changed
 
-- Errors management with `error_chain` [#39]
+* Errors management with `error_chain` [#39]
 
 ### Fixed
 
-- Missing `FLAGS` column in messages table [#40]
-- Subtract with overflow if next page empty [#38]
+* Missing `FLAGS` column in messages table [#40]
+* Subtract with overflow if next page empty [#38]
 
 ## [0.2.0] - 2021-03-10
 
 ### Added
 
-- STARTTLS support [#32]
-- Flags [#25]
+* STARTTLS support [#32]
+* Flags [#25]
 
 ### Changed
 
-- JSON support [#18]
+* JSON support [#18]
 
 ## [0.1.0] - 2021-01-17
 
 ### Added
 
-- Parse TOML config [#1]
-- Populate Config struct from TOML [#2]
-- Set up IMAP connection [#3]
-- List new emails [#6]
-- Set up CLI arg parser [#15]
-- List mailboxes command [#5]
-- Text and HTML previews [#12] [#13]
-- Set up SMTP connection [#4]
-- Write new email [#8]
-- Write new email [#8]
-- Reply, reply all and forward [#9] [#10] [#11]
-- Download attachments [#14]
-- Merge `Email` with `Msg` [#21]
-- List command with pagination [#19]
-- Icon in table when attachment is present [#16]
-- Multi-account [#17]
-- Password from command [#22]
-- Set up README [#20]
+* Parse TOML config [#1]
+* Populate Config struct from TOML [#2]
+* Set up IMAP connection [#3]
+* List new emails [#6]
+* Set up CLI arg parser [#15]
+* List mailboxes command [#5]
+* Text and HTML previews [#12] [#13]
+* Set up SMTP connection [#4]
+* Write new email [#8]
+* Write new email [#8]
+* Reply, reply all and forward [#9] [#10] [#11]
+* Download attachments [#14]
+* Merge `Email` with `Msg` [#21]
+* List command with pagination [#19]
+* Icon in table when attachment is present [#16]
+* Multi-account [#17]
+* Password from command [#22]
+* Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.5.10...HEAD
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/soywod/himalaya/compare/v0.5.10...v0.6.0
 [0.5.10]: https://github.com/soywod/himalaya/compare/v0.5.9...v0.5.10
 [0.5.9]: https://github.com/soywod/himalaya/compare/v0.5.8...v0.5.9
 [0.5.8]: https://github.com/soywod/himalaya/compare/v0.5.7...v0.5.8
@@ -517,4 +566,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#334]: https://github.com/soywod/himalaya/issues/334
 [#335]: https://github.com/soywod/himalaya/issues/335
 [#338]: https://github.com/soywod/himalaya/issues/338
+[#340]: https://github.com/soywod/himalaya/issues/340
+[#344]: https://github.com/soywod/himalaya/issues/344
 [#346]: https://github.com/soywod/himalaya/issues/346
