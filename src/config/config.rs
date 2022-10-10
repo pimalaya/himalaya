@@ -1,19 +1,3 @@
-// himalaya-lib, a Rust library for email management.
-// Copyright (C) 2022  soywod <clement.douin@posteo.net>
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
 //! Deserialized config module.
 //!
 //! This module contains the raw deserialized representation of the
@@ -143,7 +127,7 @@ impl DeserializedConfig {
 
 #[cfg(test)]
 mod tests {
-    use himalaya_lib::{EmailSendCmd, EmailSender, SmtpConfig};
+    use himalaya_lib::{EmailSender, SendmailConfig, SmtpConfig};
 
     #[cfg(feature = "imap-backend")]
     use himalaya_lib::ImapConfig;
@@ -341,17 +325,17 @@ mod tests {
 
         assert_eq!(
             config.unwrap_err().root_cause().to_string(),
-            "unknown variant `bad`, expected one of `none`, `internal`, `external` at line 1 column 1",
+            "unknown variant `bad`, expected one of `none`, `smtp`, `sendmail` at line 1 column 1",
         );
     }
 
     #[test]
-    fn account_internal_sender_missing_host_field() {
+    fn account_smtp_sender_missing_host_field() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
             backend = \"none\"
-            sender = \"internal\"",
+            sender = \"smtp\"",
         );
 
         assert_eq!(
@@ -361,12 +345,12 @@ mod tests {
     }
 
     #[test]
-    fn account_internal_sender_missing_port_field() {
+    fn account_smtp_sender_missing_port_field() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
             backend = \"none\"
-            sender = \"internal\"
+            sender = \"smtp\"
             smtp-host = \"localhost\"",
         );
 
@@ -377,12 +361,12 @@ mod tests {
     }
 
     #[test]
-    fn account_internal_sender_missing_login_field() {
+    fn account_smtp_sender_missing_login_field() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
             backend = \"none\"
-            sender = \"internal\"
+            sender = \"smtp\"
             smtp-host = \"localhost\"
             smtp-port = 25",
         );
@@ -394,12 +378,12 @@ mod tests {
     }
 
     #[test]
-    fn account_internal_sender_missing_passwd_cmd_field() {
+    fn account_smtp_sender_missing_passwd_cmd_field() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
             backend = \"none\"
-            sender = \"internal\"
+            sender = \"smtp\"
             smtp-host = \"localhost\"
             smtp-port = 25
             smtp-login = \"login\"",
@@ -412,27 +396,27 @@ mod tests {
     }
 
     #[test]
-    fn account_external_sender_missing_cmd_field() {
+    fn account_sendmail_sender_missing_cmd_field() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
             backend = \"none\"
-            sender = \"external\"",
+            sender = \"sendmail\"",
         );
 
         assert_eq!(
             config.unwrap_err().root_cause().to_string(),
-            "missing field `send-cmd` at line 1 column 1"
+            "missing field `sendmail-cmd` at line 1 column 1"
         );
     }
 
     #[test]
-    fn account_internal_sender_minimum_config() {
+    fn account_smtp_sender_minimum_config() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
             backend = \"none\"
-            sender = \"internal\"
+            sender = \"smtp\"
             smtp-host = \"localhost\"
             smtp-port = 25
             smtp-login = \"login\"
@@ -446,7 +430,7 @@ mod tests {
                     "account".into(),
                     DeserializedAccountConfig::None(DeserializedBaseAccountConfig {
                         email: "test@localhost".into(),
-                        email_sender: EmailSender::Internal(SmtpConfig {
+                        email_sender: EmailSender::Smtp(SmtpConfig {
                             host: "localhost".into(),
                             port: 25,
                             login: "login".into(),
@@ -462,13 +446,13 @@ mod tests {
     }
 
     #[test]
-    fn account_external_sender_minimum_config() {
+    fn account_sendmail_sender_minimum_config() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
             backend = \"none\"
-            sender = \"external\"
-            send-cmd = \"echo send\"",
+            sender = \"sendmail\"
+            sendmail-cmd = \"echo send\"",
         );
 
         assert_eq!(
@@ -478,7 +462,7 @@ mod tests {
                     "account".into(),
                     DeserializedAccountConfig::None(DeserializedBaseAccountConfig {
                         email: "test@localhost".into(),
-                        email_sender: EmailSender::External(EmailSendCmd {
+                        email_sender: EmailSender::Sendmail(SendmailConfig {
                             cmd: "echo send".into(),
                         }),
                         ..DeserializedBaseAccountConfig::default()

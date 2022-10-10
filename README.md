@@ -26,27 +26,24 @@ for other installation methods.*
 ```toml
 # ~/.config/himalaya/config.toml
 
-display-name = "Your full name"
-downloads-dir = "/abs/path/to/downloads"
-signature = """
-Cordialement,
-Regards,
-"""
+display-name = "Test"
+downloads-dir = "~/downloads"
+signature = "Regards,"
 
 [gmail]
 default = true
-email = "your.email@gmail.com"
+email = "test@gmail.com"
 
-backend = "imap"
+backend = "imap" # imap, maildir or notmuch
 imap-host = "imap.gmail.com"
 imap-port = 993
-imap-login = "your.email@gmail.com"
+imap-login = "test@gmail.com"
 imap-passwd-cmd = "pass show gmail"
 
-sender = "internal"
+sender = "smtp" # smtp or sendmail
 smtp-host = "smtp.gmail.com"
 smtp-port = 465
-smtp-login = "your.email@gmail.com"
+smtp-login = "test@gmail.com"
 smtp-passwd-cmd = "security find-internet-password -gs gmail -w"
 ```
 
@@ -71,16 +68,8 @@ for all the options.*
 - …
 
 *See the
-[wiki](https://github.com/soywod/himalaya/wiki/Usage:msg:list) for all
-the features.*
-
-## Sponsoring
-
-[![github](https://img.shields.io/badge/-GitHub%20Sponsors-fafbfc?logo=GitHub%20Sponsors&style=flat-square)](https://github.com/sponsors/soywod)
-[![paypal](https://img.shields.io/badge/-PayPal-0079c1?logo=PayPal&logoColor=ffffff&style=flat-square)](https://www.paypal.com/paypalme/soywod)
-[![ko-fi](https://img.shields.io/badge/-Ko--fi-ff5e5a?logo=Ko-fi&logoColor=ffffff&style=flat-square)](https://ko-fi.com/soywod)
-[![buy-me-a-coffee](https://img.shields.io/badge/-Buy%20Me%20a%20Coffee-ffdd00?logo=Buy%20Me%20A%20Coffee&logoColor=000000&style=flat-square)](https://www.buymeacoffee.com/soywod)
-[![liberapay](https://img.shields.io/badge/-Liberapay-f6c915?logo=Liberapay&logoColor=222222&style=flat-square)](https://liberapay.com/soywod)
+[wiki](https://github.com/soywod/himalaya/wiki/Usage:email:list) for
+all the features.*
 
 ## Credits
 
@@ -95,3 +84,11 @@ the features.*
 - [mutt-wizard](https://github.com/LukeSmithxyz/mutt-wizard), a tool
   over NeoMutt and isync
 - [rust-imap](https://github.com/jonhoo/rust-imap), a rust IMAP lib
+
+## Sponsoring
+
+[![github](https://img.shields.io/badge/-GitHub%20Sponsors-fafbfc?logo=GitHub%20Sponsors&style=flat-square)](https://github.com/sponsors/soywod)
+[![paypal](https://img.shields.io/badge/-PayPal-0079c1?logo=PayPal&logoColor=ffffff&style=flat-square)](https://www.paypal.com/paypalme/soywod)
+[![ko-fi](https://img.shields.io/badge/-Ko--fi-ff5e5a?logo=Ko-fi&logoColor=ffffff&style=flat-square)](https://ko-fi.com/soywod)
+[![buy-me-a-coffee](https://img.shields.io/badge/-Buy%20Me%20a%20Coffee-ffdd00?logo=Buy%20Me%20A%20Coffee&logoColor=000000&style=flat-square)](https://www.buymeacoffee.com/soywod)
+[![liberapay](https://img.shields.io/badge/-Liberapay-f6c915?logo=Liberapay&logoColor=222222&style=flat-square)](https://liberapay.com/soywod)

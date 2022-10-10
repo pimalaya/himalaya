@@ -1,4 +1,4 @@
-use himalaya_lib::{EmailHooks, EmailSendCmd, EmailSender, EmailTextPlainFormat, SmtpConfig};
+use himalaya_lib::{EmailHooks, EmailSender, EmailTextPlainFormat, SendmailConfig, SmtpConfig};
 use serde::Deserialize;
 use std::path::PathBuf;
 
@@ -99,15 +99,15 @@ pub mod email_text_plain_format {
 pub enum EmailSenderDef {
     None,
     #[serde(with = "SmtpConfigDef")]
-    Internal(SmtpConfig),
-    #[serde(with = "EmailSendCmdDef")]
-    External(EmailSendCmd),
+    Smtp(SmtpConfig),
+    #[serde(with = "SendmailConfigDef")]
+    Sendmail(SendmailConfig),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
-#[serde(remote = "EmailSendCmd")]
-pub struct EmailSendCmdDef {
-    #[serde(rename = "send-cmd")]
+#[serde(remote = "SendmailConfig")]
+pub struct SendmailConfigDef {
+    #[serde(rename = "sendmail-cmd")]
     cmd: String,
 }
 

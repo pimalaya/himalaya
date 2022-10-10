@@ -11,49 +11,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Separate the CLI from the lib module [#340]
+* Separated the CLI from the lib module [#340].
 
-The source code has been splitted into subrepositories:
+  The source code has been splitted into subrepositories:
 
-1. The email logic has been extracted from the CLI and placed in a lib
-  on [sourcehut](https://git.sr.ht/~soywod/himalaya-lib)
-2. The vim plugin is now in a dedicated repository on
+  - The email logic has been extracted from the CLI and placed in a
+  lib on [sourcehut](https://git.sr.ht/~soywod/himalaya-lib)
+  - The vim plugin is now in a dedicated repository on
   [sourcehut](https://git.sr.ht/~soywod/himalaya-vim) as well
-3. This repository only contains the CLI source code (it was not
+  - This repository only contains the CLI source code (it was not
   possible to move it to sourcehut because of cross platform builds)
 
----
+* [**BREAKING**] Refactored config system [#344].
 
-- [**BREAKING**] Refactor config system [#344]
+  The configuration has been rethought in order to be more intuitive
+  and structured. Here are the breaking changes for the global config:
 
-The configuration has been rethought in order to be more intuitive and
-structured. Here are the breaking changes for the global config:
-
-- `name` becomes `display-name` and is not mandatory anymore
-- `signature-delimiter` becomes `signature-delim`
-- `default-page-size` has been moved to `folder-listing-page-size` and
-  `email-listing-page-size`
-- `notify-cmd`, `notify-query` and `watch-cmds` have been removed from
-  the global config (available in account config only)
-- `folder-aliases` has been added to the global config (previously
-  known as `mailboxes` from the account config)
-- `email-reading-headers`, `email-reading-format`,
-  `email-reading-decrypt-cmd`, `email-writing-encrypt-cmd` and
-  `email-hooks` have been added
+  - `name` becomes `display-name` and is not mandatory anymore
+  - `signature-delimiter` becomes `signature-delim`
+  - `default-page-size` has been moved to `folder-listing-page-size`
+    and `email-listing-page-size`
+  - `notify-cmd`, `notify-query` and `watch-cmds` have been removed
+    from the global config (available in account config only)
+  - `folder-aliases` has been added to the global config (previously
+    known as `mailboxes` from the account config)
+  - `email-reading-headers`, `email-reading-format`,
+    `email-reading-decrypt-cmd`, `email-writing-encrypt-cmd` and
+    `email-hooks` have been added
   
-The account config inherits the same breaking changes from the global
-config plus:
+  The account config inherits the same breaking changes from the
+  global config plus:
 
-- `imap-*` requires `backend = "imap"`
-- `maildir-*` requires `backend = "maildir"`
-- `notmuch-*` requires `backend = "notmuch"`
-- `smtp-*` requires `sender = "internal"`
-- `pgp-encrypt-cmd` becomes `email-writing-encrypt-cmd`
-- `pgp-decrypt-cmd` becomes `email-reading-decrypt-cmd`
-- `mailboxes` becomes `folder-aliases`
-- `hooks` becomes `email-hooks`
-- `maildir-dir` becomes `maildir-root-dir`
-- `notmuch-database-dir` becomes `notmuch-db-path`
+  - `imap-*` requires `backend = "imap"`
+  - `maildir-*` requires `backend = "maildir"`
+  - `notmuch-*` requires `backend = "notmuch"`
+  - `smtp-*` requires `sender = "internal"`
+  - `pgp-encrypt-cmd` becomes `email-writing-encrypt-cmd`
+  - `pgp-decrypt-cmd` becomes `email-reading-decrypt-cmd`
+  - `mailboxes` becomes `folder-aliases`
+  - `hooks` becomes `email-hooks`
+  - `maildir-dir` becomes `maildir-root-dir`
+  - `notmuch-database-dir` becomes `notmuch-db-path`
 
 ## [0.5.10] - 2022-03-20
 
