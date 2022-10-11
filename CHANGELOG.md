@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+* Fixed long subject decoding issue [#380].
+
 ## [0.6.0] - 2022-10-10
 
 ### Changed
@@ -21,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     [sourcehut](https://git.sr.ht/~soywod/himalaya-vim) as well
   * This repository only contains the CLI source code (it was not
 	possible to move it to sourcehut because of cross platform builds)
+
+* [**BREAKING**] Renamed `-m|--mailbox` to `-f|--folder`
 
 * [**BREAKING**] Refactored config system [#344].
 
@@ -569,3 +575,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#340]: https://github.com/soywod/himalaya/issues/340
 [#344]: https://github.com/soywod/himalaya/issues/344
 [#346]: https://github.com/soywod/himalaya/issues/346
+[#380]: https://github.com/soywod/himalaya/issues/380
