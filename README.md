@@ -10,9 +10,8 @@ before the `v1.0.0`.*
 
 ## Installation
 
-[![homebrew](https://img.shields.io/homebrew/v/himalaya?color=success&style=flat-square)](https://formulae.brew.sh/formula/himalaya)
-[![crates](https://img.shields.io/crates/v/himalaya?color=success&style=flat-square)](https://crates.io/crates/himalaya)
-[![Packaging status](https://repology.org/badge/tiny-repos/himalaya.svg)](https://repology.org/project/himalaya/versions)
+[![Packaging
+status](https://repology.org/badge/vertical-allrepos/himalaya.svg)](https://repology.org/project/himalaya/versions)
 
 ```sh
 curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | PREFIX=~/.local sh
