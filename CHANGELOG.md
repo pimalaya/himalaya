@@ -7,10 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-* Fixed long subject decoding issue [#380].
-
 ## [0.6.0] - 2022-10-10
 
 ### Changed
@@ -575,4 +571,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#340]: https://github.com/soywod/himalaya/issues/340
 [#344]: https://github.com/soywod/himalaya/issues/344
 [#346]: https://github.com/soywod/himalaya/issues/346
-[#380]: https://github.com/soywod/himalaya/issues/380

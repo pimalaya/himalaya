@@ -18,6 +18,8 @@ struct SmtpConfigDef {
     pub host: String,
     #[serde(rename = "smtp-port")]
     pub port: u16,
+    #[serde(rename = "smtp-ssl")]
+    pub ssl: Option<bool>,
     #[serde(rename = "smtp-starttls")]
     pub starttls: Option<bool>,
     #[serde(rename = "smtp-insecure")]
@@ -36,6 +38,8 @@ pub struct ImapConfigDef {
     pub host: String,
     #[serde(rename = "imap-port")]
     pub port: u16,
+    #[serde(rename = "imap-ssl")]
+    pub ssl: Option<bool>,
     #[serde(rename = "imap-starttls")]
     pub starttls: Option<bool>,
     #[serde(rename = "imap-insecure")]
