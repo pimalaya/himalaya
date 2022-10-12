@@ -1,7 +1,7 @@
 [package]
 name = "himalaya"
 description = "Command-line interface for email management."
-version = "0.6.0"
+version = "0.6.1"
 authors = ["soywod <clement.douin@posteo.net>"]
 edition = "2021"
 license = "MIT"
@@ -16,44 +16,31 @@ priority = "optional"
 section = "mail"
 
 [features]
-imap-backend = ["imap", "imap-proto"]
-maildir-backend = ["maildir", "md5"]
-notmuch-backend = ["himalaya-lib/notmuch-backend", "maildir-backend", "notmuch"]
+imap-backend = ["himalaya-lib/imap-backend"]
+maildir-backend = ["himalaya-lib/maildir-backend"]
+notmuch-backend = ["himalaya-lib/notmuch-backend"]
 default = ["imap-backend", "maildir-backend"]
 
 [dev-dependencies]
 tempfile = "3.3.0"
 
 [dependencies]
-ammonia = "3.1.2"
 anyhow = "1.0.44"
 atty = "0.2.14"
 chrono = "0.4.19"
 clap = { version = "2.33.3", default-features = false, features = ["suggestions", "color"] }
-convert_case = "0.5.0"
 env_logger = "0.8.3"
 erased-serde = "0.3.18"
-himalaya-lib = "=0.3.1"
-html-escape = "0.2.9"
+himalaya-lib = "=0.4.0"
 lettre = { version = "=0.10.0-rc.7", features = ["serde"] }
 log = "0.4.14"
 mailparse = "0.13.6"
-native-tls = "0.2.8"
-regex = "1.5.4"
 serde = { version = "1.0.118", features = ["derive"] }
 serde_json = "1.0.61"
 shellexpand = "2.1.0"
 termcolor = "1.1"
 terminal_size = "0.1.15"
 toml = "0.5.8"
-tree_magic = "0.2.3"
 unicode-width = "0.1.7"
 url = "2.2.2"
 uuid = { version = "0.8", features = ["v4"] }
-
-# [dependencies.optional]
-imap = { version = "=3.0.0-alpha.4", optional = true }
-imap-proto = { version = "0.14.3", optional = true }
-maildir = { version = "0.6.1", optional = true }
-md5 = { version = "0.7.0", optional = true }
-notmuch = { version = "0.7.1", optional = true }

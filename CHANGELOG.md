@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2022-10-12
+
 ### Added
 
 * Added `-s|--sanitize` flag for the `read` command.
@@ -434,7 +436,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Password from command [#22]
 * Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.6.0...HEAD
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/soywod/himalaya/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/soywod/himalaya/compare/v0.5.10...v0.6.0
 [0.5.10]: https://github.com/soywod/himalaya/compare/v0.5.9...v0.5.10
 [0.5.9]: https://github.com/soywod/himalaya/compare/v0.5.8...v0.5.9
