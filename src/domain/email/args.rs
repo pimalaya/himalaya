@@ -21,6 +21,7 @@ const ARG_PAGE_SIZE: &str = "page-size";
 const ARG_QUERY: &str = "query";
 const ARG_RAW: &str = "raw";
 const ARG_REPLY_ALL: &str = "reply-all";
+const ARG_SANITIZE: &str = "sanitize";
 const CMD_ATTACHMENTS: &str = "attachments";
 const CMD_COPY: &str = "copy";
 const CMD_DEL: &str = "delete";
@@ -41,6 +42,7 @@ type Folder<'a> = &'a str;
 type Page = usize;
 type PageSize = usize;
 type Query = String;
+type Sanitize = bool;
 type Raw = bool;
 type RawEmail<'a> = &'a str;
 type TextMime<'a> = &'a str;
@@ -60,7 +62,7 @@ pub enum Cmd<'a> {
     Forward(Id<'a>, Attachments<'a>, Encrypt),
     List(table::args::MaxTableWidth, Option<PageSize>, Page),
     Move(Id<'a>, Folder<'a>),
-    Read(Id<'a>, TextMime<'a>, Raw, Headers<'a>),
+    Read(Id<'a>, TextMime<'a>, Sanitize, Raw, Headers<'a>),
     Reply(Id<'a>, All, Attachments<'a>, Encrypt),
     Save(RawEmail<'a>),
     Search(Query, table::args::MaxTableWidth, Option<PageSize>, Page),
@@ -116,9 +118,10 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
         debug!("read command matched");
         let id = parse_id_arg(m);
         let mime = parse_mime_type_arg(m);
+        let sanitize = parse_sanitize_flag(m);
         let raw = parse_raw_flag(m);
         let headers = parse_headers_arg(m);
-        Cmd::Read(id, mime, raw, headers)
+        Cmd::Read(id, mime, sanitize, raw, headers)
     } else if let Some(m) = m.subcommand_matches(CMD_REPLY) {
         debug!("reply command matched");
         let id = parse_id_arg(m);
@@ -210,9 +213,10 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
                 .about("Saves a raw email")
                 .arg(raw_arg()),
             SubCommand::with_name(CMD_READ)
-                .about("Reads text bodies of a email")
+                .about("Reads text bodies of an email")
                 .arg(id_arg())
                 .arg(mime_type_arg())
+                .arg(sanitize_flag())
                 .arg(raw_flag())
                 .arg(headers_arg()),
             SubCommand::with_name(CMD_REPLY)
@@ -399,12 +403,25 @@ pub fn parse_headers_arg<'a>(matches: &'a ArgMatches<'a>) -> Vec<&'a str> {
     matches.values_of(ARG_HEADERS).unwrap_or_default().collect()
 }
 
+/// Represents the sanitize flag.
+pub fn sanitize_flag<'a>() -> Arg<'a, 'a> {
+    Arg::with_name(ARG_SANITIZE)
+        .help("Sanitizes text bodies")
+        .long("sanitize")
+        .short("s")
+}
+
 /// Represents the raw flag.
 pub fn raw_flag<'a>() -> Arg<'a, 'a> {
     Arg::with_name(ARG_RAW)
-        .help("Reads a raw email")
+        .help("Returns raw version of email")
         .long("raw")
         .short("r")
+}
+
+/// Represents the sanitize flag parser.
+pub fn parse_sanitize_flag<'a>(matches: &'a ArgMatches<'a>) -> bool {
+    matches.is_present(ARG_SANITIZE)
 }
 
 /// Represents the raw flag parser.

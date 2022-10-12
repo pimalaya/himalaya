@@ -71,16 +71,15 @@ pub fn save<'a, P: Printer, B: Backend<'a> + ?Sized>(
             .collect::<Vec<String>>()
             .join("\n")
     };
-    let msg = Email::from_tpl(&tpl)?.add_attachments(attachments_paths)?;
-    let raw_msg = msg.into_sendable_msg(config)?.formatted();
-    backend.email_add(mbox, &raw_msg, "seen")?;
+    let email = Email::from_tpl(&tpl)?.add_attachments(attachments_paths)?;
+    let raw_email = email.into_sendable(config)?.formatted();
+    backend.email_add(mbox, &raw_email, "seen")?;
     printer.print_struct("Template successfully saved")
 }
 
 /// Sends a message based on a template.
 pub fn send<'a, P: Printer, B: Backend<'a> + ?Sized, S: Sender + ?Sized>(
     mbox: &str,
-    account: &AccountConfig,
     attachments_paths: Vec<&str>,
     tpl: &str,
     printer: &mut P,
@@ -97,8 +96,8 @@ pub fn send<'a, P: Printer, B: Backend<'a> + ?Sized, S: Sender + ?Sized>(
             .collect::<Vec<String>>()
             .join("\n")
     };
-    let msg = Email::from_tpl(&tpl)?.add_attachments(attachments_paths)?;
-    let sent_msg = sender.send(account, &msg)?;
+    let email = Email::from_tpl(&tpl)?.add_attachments(attachments_paths)?;
+    let sent_msg = sender.send(&email)?;
     backend.email_add(mbox, &sent_msg, "seen")?;
     printer.print_struct("Template successfully sent")
 }
