@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+* Added `-s|--sanitize` flag for the `read` command.
+  
+### Changed
+
+* Changed the behaviour of the `-t|--mime-type` argument of the `read`
+  command. It is less strict now: if no part is found for the given
+  MIME type, it will fallback to the other one. For example, giving
+  `-t html` will show in priority HTML parts, but if none of them are
+  found it will show plain parts instead (and vice versa).
+
+* Sanitization is not done by default when using the `read` command,
+  the flag `-s|--sanitize` needs to be explicitly provided.
+
+### Fixed
+
+* Fixed empty text bodies when reading html part on plain text email
+  [#352].
+
 ## [0.6.0] - 2022-10-10
 
 ### Changed
@@ -571,3 +591,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#340]: https://github.com/soywod/himalaya/issues/340
 [#344]: https://github.com/soywod/himalaya/issues/344
 [#346]: https://github.com/soywod/himalaya/issues/346
+[#352]: https://github.com/soywod/himalaya/issues/352

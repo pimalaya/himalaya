@@ -5,7 +5,8 @@
 use anyhow::{Context, Result};
 use atty::Stream;
 use himalaya_lib::{
-    AccountConfig, Backend, Email, Part, Parts, Sender, TextPlainPart, TplOverride,
+    AccountConfig, Backend, Email, Part, Parts, PartsReaderOptions, Sender, TextPlainPart,
+    TplOverride,
 };
 use log::{debug, info, trace};
 use mailparse::addrparse;
@@ -214,6 +215,7 @@ pub fn move_<'a, P: Printer, B: Backend<'a> + ?Sized>(
 pub fn read<'a, P: Printer, B: Backend<'a> + ?Sized>(
     seq: &str,
     text_mime: &str,
+    sanitize: bool,
     raw: bool,
     headers: Vec<&str>,
     mbox: &str,
@@ -224,10 +226,18 @@ pub fn read<'a, P: Printer, B: Backend<'a> + ?Sized>(
     let msg = backend.email_get(mbox, seq)?;
 
     printer.print_struct(if raw {
-        // Emails don't always have valid utf8. Using "lossy" to display what we can.
+        // Emails do not always have valid utf8. Using "lossy" to
+        // display what we can.
         String::from_utf8_lossy(&msg.raw).into_owned()
     } else {
-        msg.to_readable_string(text_mime, headers, config)?
+        msg.to_readable(
+            config,
+            PartsReaderOptions {
+                plain_first: text_mime == "plain",
+                sanitize,
+            },
+            headers,
+        )?
     })
 }
 

@@ -161,10 +161,11 @@ fn main() -> Result<()> {
         Some(email::args::Cmd::Move(seq, mbox_dst)) => {
             return email::handlers::move_(seq, &folder, mbox_dst, &mut printer, backend.as_mut());
         }
-        Some(email::args::Cmd::Read(seq, text_mime, raw, headers)) => {
+        Some(email::args::Cmd::Read(seq, text_mime, sanitize, raw, headers)) => {
             return email::handlers::read(
                 seq,
                 text_mime,
+                sanitize,
                 raw,
                 headers,
                 &folder,
