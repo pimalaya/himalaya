@@ -1,3 +1,6 @@
+# Cargo config directory
+.cargo/
+
 # Cargo build directory
 target/
 debug/

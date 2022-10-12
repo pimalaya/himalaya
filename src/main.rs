@@ -302,7 +302,6 @@ fn main() -> Result<()> {
             Some(tpl::args::Cmd::Send(atts, tpl)) => {
                 return tpl::handlers::send(
                     &folder,
-                    &account_config,
                     atts,
                     tpl,
                     &mut printer,

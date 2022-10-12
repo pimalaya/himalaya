@@ -93,7 +93,7 @@ pub fn forward<'a, P: Printer, B: Backend<'a> + ?Sized, S: Sender + ?Sized>(
         .into_forward(config)?
         .add_attachments(attachments_paths)?
         .encrypt(encrypt);
-    editor::edit_msg_with_editor(
+    editor::edit_email_with_editor(
         msg,
         TplOverride::default(),
         config,
@@ -184,7 +184,7 @@ pub fn mailto<'a, P: Printer, B: Backend<'a> + ?Sized, S: Sender + ?Sized>(
     };
     trace!("message: {:?}", msg);
 
-    editor::edit_msg_with_editor(
+    editor::edit_email_with_editor(
         msg,
         TplOverride::default(),
         config,
@@ -248,7 +248,7 @@ pub fn reply<'a, P: Printer, B: Backend<'a> + ?Sized, S: Sender + ?Sized>(
         .into_reply(all, config)?
         .add_attachments(attachments_paths)?
         .encrypt(encrypt);
-    editor::edit_msg_with_editor(
+    editor::edit_email_with_editor(
         msg,
         TplOverride::default(),
         config,
@@ -341,7 +341,7 @@ pub fn sort<'a, P: Printer, B: Backend<'a> + ?Sized>(
 
 /// Send a raw message.
 pub fn send<'a, P: Printer, B: Backend<'a> + ?Sized, S: Sender + ?Sized>(
-    raw_msg: &str,
+    raw_email: &str,
     config: &AccountConfig,
     printer: &mut P,
     backend: &mut B,
@@ -357,8 +357,8 @@ pub fn send<'a, P: Printer, B: Backend<'a> + ?Sized, S: Sender + ?Sized>(
     let sent_folder = config.folder_alias("sent")?;
     debug!("sent folder: {:?}", sent_folder);
 
-    let raw_msg = if is_tty || is_json {
-        raw_msg.replace("\r", "").replace("\n", "\r\n")
+    let raw_email = if is_tty || is_json {
+        raw_email.replace("\r", "").replace("\n", "\r\n")
     } else {
         io::stdin()
             .lock()
@@ -367,10 +367,10 @@ pub fn send<'a, P: Printer, B: Backend<'a> + ?Sized, S: Sender + ?Sized>(
             .collect::<Vec<String>>()
             .join("\r\n")
     };
-    trace!("raw message: {:?}", raw_msg);
-    let msg = Email::from_tpl(&raw_msg)?;
-    sender.send(&config, &msg)?;
-    backend.email_add(&sent_folder, raw_msg.as_bytes(), "seen")?;
+    trace!("raw message: {:?}", raw_email);
+    let email = Email::from_tpl(&raw_email)?;
+    sender.send(&email)?;
+    backend.email_add(&sent_folder, raw_email.as_bytes(), "seen")?;
     Ok(())
 }
 
@@ -384,9 +384,9 @@ pub fn write<'a, P: Printer, B: Backend<'a> + ?Sized, S: Sender + ?Sized>(
     backend: &mut B,
     sender: &mut S,
 ) -> Result<()> {
-    let msg = Email::default()
+    let email = Email::default()
         .add_attachments(attachments_paths)?
         .encrypt(encrypt);
-    editor::edit_msg_with_editor(msg, tpl, config, printer, backend, sender)?;
+    editor::edit_email_with_editor(email, tpl, config, printer, backend, sender)?;
     Ok(())
 }
