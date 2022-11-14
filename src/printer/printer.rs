@@ -9,8 +9,8 @@ use crate::{
 };
 
 pub trait Printer {
-    fn print_str<T: Debug + Print>(&mut self, data: T) -> Result<()>;
-    fn print_struct<T: Debug + Print + serde::Serialize>(&mut self, data: T) -> Result<()>;
+    fn print<T: Debug + Print + serde::Serialize>(&mut self, data: T) -> Result<()>;
+    fn print_log<T: Debug + Print>(&mut self, data: T) -> Result<()>;
     fn print_table<T: Debug + erased_serde::Serialize + PrintTable + ?Sized>(
         &mut self,
         data: Box<T>,
@@ -51,14 +51,14 @@ impl StdoutPrinter {
 }
 
 impl Printer for StdoutPrinter {
-    fn print_str<T: Debug + Print>(&mut self, data: T) -> Result<()> {
+    fn print_log<T: Debug + Print>(&mut self, data: T) -> Result<()> {
         match self.fmt {
             OutputFmt::Plain => data.print(self.writer.as_mut()),
             OutputFmt::Json => Ok(()),
         }
     }
 
-    fn print_struct<T: Debug + Print + serde::Serialize>(&mut self, data: T) -> Result<()> {
+    fn print<T: Debug + Print + serde::Serialize>(&mut self, data: T) -> Result<()> {
         match self.fmt {
             OutputFmt::Plain => data.print(self.writer.as_mut()),
             OutputFmt::Json => serde_json::to_writer(self.writer.as_mut(), &data)

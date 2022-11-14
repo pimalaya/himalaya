@@ -22,25 +22,23 @@ notmuch-backend = ["himalaya-lib/notmuch-backend"]
 default = ["imap-backend", "maildir-backend"]
 
 [dev-dependencies]
-tempfile = "3.3.0"
+tempfile = "3.3"
 
 [dependencies]
-anyhow = "1.0.44"
-atty = "0.2.14"
-chrono = "0.4.19"
-clap = { version = "2.33.3", default-features = false, features = ["suggestions", "color"] }
-env_logger = "0.8.3"
-erased-serde = "0.3.18"
-himalaya-lib = "=0.4.0"
-lettre = { version = "=0.10.0-rc.7", features = ["serde"] }
-log = "0.4.14"
-mailparse = "0.13.6"
-serde = { version = "1.0.118", features = ["derive"] }
-serde_json = "1.0.61"
-shellexpand = "2.1.0"
+anyhow = "1.0"
+atty = "0.2"
+chrono = "0.4"
+clap = { version = "2.33", default-features = false, features = ["suggestions", "color"] }
+env_logger = "0.8"
+erased-serde = "0.3"
+himalaya-lib = { git = "https://git.sr.ht/~soywod/himalaya-lib", branch = "develop" }
+log = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+shellexpand = "2.1"
 termcolor = "1.1"
-terminal_size = "0.1.15"
-toml = "0.5.8"
-unicode-width = "0.1.7"
-url = "2.2.2"
+terminal_size = "0.1"
+toml = "0.5"
+unicode-width = "0.1"
+url = "2.2"
 uuid = { version = "0.8", features = ["v4"] }

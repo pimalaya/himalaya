@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+* Added the email composer (from its own
+  [repository](https://git.sr.ht/~soywod/mime-msg-builder)) [#341].
+
+### Removed
+
+* Removed the `-a|--attachment` argument from `write`, `reply` and
+  `forward` commands. Instead you can attach documents directly from
+  the template using the syntax `<#part
+  filename=/path/to/you/document.ext>`.
+* Removed the `-e|--encrypt` flag from `write`, `reply` and `forward`
+  commands. Instead you can encrypt and sign parts directly from the
+  template using the syntax `<#part type=text/plain encrypt=command
+  sign=command>Hello!<#/part>`.
+
 ## [0.6.1] - 2022-10-12
 
 ### Added
@@ -592,6 +608,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#335]: https://github.com/soywod/himalaya/issues/335
 [#338]: https://github.com/soywod/himalaya/issues/338
 [#340]: https://github.com/soywod/himalaya/issues/340
+[#341]: https://github.com/soywod/himalaya/issues/341
 [#344]: https://github.com/soywod/himalaya/issues/344
 [#346]: https://github.com/soywod/himalaya/issues/346
 [#352]: https://github.com/soywod/himalaya/issues/352
