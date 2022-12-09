@@ -29,7 +29,10 @@ pub struct DeserializedConfig {
     pub email_reading_headers: Option<Vec<String>>,
     #[serde(default, with = "email_text_plain_format")]
     pub email_reading_format: Option<EmailTextPlainFormat>,
+    pub email_reading_verify_cmd: Option<String>,
     pub email_reading_decrypt_cmd: Option<String>,
+    pub email_writing_headers: Option<Vec<String>>,
+    pub email_writing_sign_cmd: Option<String>,
     pub email_writing_encrypt_cmd: Option<String>,
     #[serde(default, with = "email_hooks")]
     pub email_hooks: Option<EmailHooks>,

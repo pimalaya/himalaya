@@ -101,13 +101,10 @@ mod tests {
                 data.print_table(&mut self.writer, opts)?;
                 Ok(())
             }
-            fn print_str<T: Debug + Print>(&mut self, _data: T) -> Result<()> {
+            fn print_log<T: Debug + Print>(&mut self, _data: T) -> Result<()> {
                 unimplemented!()
             }
-            fn print_struct<T: Debug + Print + serde::Serialize>(
-                &mut self,
-                _data: T,
-            ) -> Result<()> {
+            fn print<T: Debug + Print + serde::Serialize>(&mut self, _data: T) -> Result<()> {
                 unimplemented!()
             }
             fn is_json(&self) -> bool {

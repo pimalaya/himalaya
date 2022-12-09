@@ -1,10 +1,10 @@
 //! Email flag CLI module.
 //!
-//! This module provides subcommands, arguments and a command matcher
-//! related to the email flag domain.
+//! This module contains the command matcher, the subcommands and the
+//! arguments related to the email flag domain.
 
 use anyhow::Result;
-use clap::{self, App, AppSettings, Arg, ArgMatches, SubCommand};
+use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use log::{debug, info};
 
 use crate::email;
@@ -12,7 +12,7 @@ use crate::email;
 const ARG_FLAGS: &str = "flag";
 
 const CMD_ADD: &str = "add";
-const CMD_DEL: &str = "remove";
+const CMD_REMOVE: &str = "remove";
 const CMD_SET: &str = "set";
 
 pub(crate) const CMD_FLAG: &str = "flag";
@@ -22,28 +22,28 @@ type Flags = String;
 /// Represents the flag commands.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Cmd<'a> {
-    Add(email::args::Ids<'a>, Flags),
-    Set(email::args::Ids<'a>, Flags),
-    Del(email::args::Ids<'a>, Flags),
+    Add(email::args::Id<'a>, Flags),
+    Remove(email::args::Id<'a>, Flags),
+    Set(email::args::Id<'a>, Flags),
 }
 
 /// Represents the flag command matcher.
 pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
     let cmd = if let Some(m) = m.subcommand_matches(CMD_ADD) {
-        debug!("add subcommand matched");
-        let ids = email::args::parse_ids_arg(m);
-        let flags: String = parse_flags_arg(m);
-        Some(Cmd::Add(ids, flags))
+        debug!("add flags command matched");
+        let id = email::args::parse_id_arg(m);
+        let flags = parse_flags_arg(m);
+        Some(Cmd::Add(id, flags))
+    } else if let Some(m) = m.subcommand_matches(CMD_REMOVE) {
+        info!("remove flags command matched");
+        let id = email::args::parse_id_arg(m);
+        let flags = parse_flags_arg(m);
+        Some(Cmd::Remove(id, flags))
     } else if let Some(m) = m.subcommand_matches(CMD_SET) {
-        debug!("set subcommand matched");
-        let ids = email::args::parse_ids_arg(m);
-        let flags: String = parse_flags_arg(m);
-        Some(Cmd::Set(ids, flags))
-    } else if let Some(m) = m.subcommand_matches(CMD_DEL) {
-        info!("remove subcommand matched");
-        let ids = email::args::parse_ids_arg(m);
-        let flags: String = parse_flags_arg(m);
-        Some(Cmd::Del(ids, flags))
+        debug!("set flags command matched");
+        let id = email::args::parse_id_arg(m);
+        let flags = parse_flags_arg(m);
+        Some(Cmd::Set(id, flags))
     } else {
         None
     };
@@ -60,22 +60,22 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
         .subcommand(
             SubCommand::with_name(CMD_ADD)
                 .aliases(&["a"])
-                .about("Adds email flags")
-                .arg(email::args::ids_arg())
+                .about("Adds flags to an email")
+                .arg(email::args::id_arg())
+                .arg(flags_arg()),
+        )
+        .subcommand(
+            SubCommand::with_name(CMD_REMOVE)
+                .aliases(&["rem", "rm", "r", "delete", "del", "d"])
+                .about("Removes flags from an email")
+                .arg(email::args::id_arg())
                 .arg(flags_arg()),
         )
         .subcommand(
             SubCommand::with_name(CMD_SET)
                 .aliases(&["s", "change", "c"])
-                .about("Sets email flags")
-                .arg(email::args::ids_arg())
-                .arg(flags_arg()),
-        )
-        .subcommand(
-            SubCommand::with_name(CMD_DEL)
-                .aliases(&["rem", "rm", "r", "delete", "del", "d"])
-                .about("Removes email flags")
-                .arg(email::args::ids_arg())
+                .about("Sets flags of an email")
+                .arg(email::args::id_arg())
                 .arg(flags_arg()),
         )]
 }
@@ -83,7 +83,6 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
 /// Represents the flags argument.
 pub fn flags_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name(ARG_FLAGS)
-        .long_help("Flags are case-insensitive, and they do not need to be prefixed with `\\`.")
         .value_name("FLAGS…")
         .multiple(true)
         .required(true)

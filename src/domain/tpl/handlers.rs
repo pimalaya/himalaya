@@ -1,103 +1,115 @@
-//! Module related to message template handling.
-//!
-//! This module gathers all message template commands.  
-
 use anyhow::Result;
 use atty::Stream;
-use himalaya_lib::{AccountConfig, Backend, Email, Sender, TplOverride};
-use std::io::{self, BufRead};
+use himalaya_lib::{AccountConfig, Backend, CompilerBuilder, Email, Sender, Tpl};
+use std::io::{stdin, BufRead};
 
 use crate::printer::Printer;
 
-/// Generate a new message template.
-pub fn new<'a, P: Printer>(
-    opts: TplOverride<'a>,
-    config: &'a AccountConfig,
-    printer: &'a mut P,
+pub fn forward<P: Printer, B: Backend + ?Sized>(
+    config: &AccountConfig,
+    printer: &mut P,
+    backend: &mut B,
+    folder: &str,
+    id: &str,
+    headers: Option<Vec<&str>>,
+    body: Option<&str>,
 ) -> Result<()> {
-    let tpl = Email::default().to_tpl(opts, config)?;
-    printer.print_struct(tpl)
+    let tpl = backend
+        .get_email(folder, id)?
+        .to_forward_tpl_builder(config)?
+        .set_some_raw_headers(headers)
+        .some_text_plain_part(body)
+        .build();
+
+    printer.print(<Tpl as Into<String>>::into(tpl))
 }
 
-/// Generate a reply message template.
-pub fn reply<'a, P: Printer, B: Backend<'a> + ?Sized>(
-    seq: &str,
+pub fn reply<P: Printer, B: Backend + ?Sized>(
+    config: &AccountConfig,
+    printer: &mut P,
+    backend: &mut B,
+    folder: &str,
+    id: &str,
     all: bool,
-    opts: TplOverride<'_>,
-    mbox: &str,
+    headers: Option<Vec<&str>>,
+    body: Option<&str>,
+) -> Result<()> {
+    let tpl = backend
+        .get_email(folder, id)?
+        .to_reply_tpl_builder(config, all)?
+        .set_some_raw_headers(headers)
+        .some_text_plain_part(body)
+        .build();
+
+    printer.print(<Tpl as Into<String>>::into(tpl))
+}
+
+pub fn save<P: Printer, B: Backend + ?Sized>(
     config: &AccountConfig,
     printer: &mut P,
     backend: &mut B,
-) -> Result<()> {
-    let tpl = backend
-        .email_get(mbox, seq)?
-        .into_reply(all, config)?
-        .to_tpl(opts, config)?;
-    printer.print_struct(tpl)
-}
-
-/// Generate a forward message template.
-pub fn forward<'a, P: Printer, B: Backend<'a> + ?Sized>(
-    seq: &str,
-    opts: TplOverride<'_>,
-    mbox: &str,
-    config: &AccountConfig,
-    printer: &mut P,
-    backend: &mut B,
-) -> Result<()> {
-    let tpl = backend
-        .email_get(mbox, seq)?
-        .into_forward(config)?
-        .to_tpl(opts, config)?;
-    printer.print_struct(tpl)
-}
-
-/// Saves a message based on a template.
-pub fn save<'a, P: Printer, B: Backend<'a> + ?Sized>(
-    mbox: &str,
-    config: &AccountConfig,
-    attachments_paths: Vec<&str>,
+    folder: &str,
     tpl: &str,
-    printer: &mut P,
-    backend: &mut B,
 ) -> Result<()> {
-    let tpl = if atty::is(Stream::Stdin) || printer.is_json() {
+    let email = Tpl::from(if atty::is(Stream::Stdin) || printer.is_json() {
         tpl.replace("\r", "")
     } else {
-        io::stdin()
+        stdin()
             .lock()
             .lines()
             .filter_map(Result::ok)
             .collect::<Vec<String>>()
             .join("\n")
-    };
-    let email = Email::from_tpl(&tpl)?.add_attachments(attachments_paths)?;
-    let raw_email = email.into_sendable(config)?.formatted();
-    backend.email_add(mbox, &raw_email, "seen")?;
-    printer.print_struct("Template successfully saved")
+    })
+    .compile(
+        CompilerBuilder::default()
+            .some_pgp_sign_cmd(config.email_writing_sign_cmd.as_ref())
+            .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.as_ref()),
+    )?;
+
+    backend.add_email(folder, &email, "seen")?;
+    printer.print("Template successfully saved!")
 }
 
-/// Sends a message based on a template.
-pub fn send<'a, P: Printer, B: Backend<'a> + ?Sized, S: Sender + ?Sized>(
-    mbox: &str,
-    attachments_paths: Vec<&str>,
-    tpl: &str,
+pub fn send<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
+    config: &AccountConfig,
     printer: &mut P,
     backend: &mut B,
     sender: &mut S,
+    folder: &str,
+    tpl: &str,
 ) -> Result<()> {
-    let tpl = if atty::is(Stream::Stdin) || printer.is_json() {
+    let email = Tpl::from(if atty::is(Stream::Stdin) || printer.is_json() {
         tpl.replace("\r", "")
     } else {
-        io::stdin()
+        stdin()
             .lock()
             .lines()
             .filter_map(Result::ok)
             .collect::<Vec<String>>()
             .join("\n")
-    };
-    let email = Email::from_tpl(&tpl)?.add_attachments(attachments_paths)?;
-    let sent_msg = sender.send(&email)?;
-    backend.email_add(mbox, &sent_msg, "seen")?;
-    printer.print_struct("Template successfully sent")
+    })
+    .compile(
+        CompilerBuilder::default()
+            .some_pgp_sign_cmd(config.email_writing_sign_cmd.as_ref())
+            .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.as_ref()),
+    )?;
+    sender.send(&email)?;
+    backend.add_email(folder, &email, "seen")?;
+    printer.print("Template successfully sent!")?;
+    Ok(())
+}
+
+pub fn write<'a, P: Printer>(
+    config: &'a AccountConfig,
+    printer: &'a mut P,
+    headers: Option<Vec<&str>>,
+    body: Option<&str>,
+) -> Result<()> {
+    let tpl = Email::new_tpl_builder(config)?
+        .set_some_raw_headers(headers)
+        .some_text_plain_part(body)
+        .build();
+
+    printer.print(<Tpl as Into<String>>::into(tpl))
 }

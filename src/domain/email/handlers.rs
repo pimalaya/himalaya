@@ -1,123 +1,108 @@
-//! Module related to message handling.
-//!
-//! This module gathers all message commands.  
-
 use anyhow::{Context, Result};
 use atty::Stream;
-use himalaya_lib::{
-    AccountConfig, Backend, Email, Part, Parts, PartsReaderOptions, Sender, TextPlainPart,
-    TplOverride,
-};
-use log::{debug, info, trace};
-use mailparse::addrparse;
+use himalaya_lib::{AccountConfig, Backend, Email, Sender, ShowTextPartsStrategy, Tpl, TplBuilder};
+use log::{debug, trace};
 use std::{
-    borrow::Cow,
     fs,
     io::{self, BufRead},
 };
 use url::Url;
+use uuid::Uuid;
 
 use crate::{
     printer::{PrintTableOpts, Printer},
     ui::editor,
 };
 
-/// Downloads all message attachments to the user account downloads directory.
-pub fn attachments<'a, P: Printer, B: Backend<'a> + ?Sized>(
-    seq: &str,
-    mbox: &str,
+pub fn attachments<P: Printer, B: Backend + ?Sized>(
+    id: &str,
+    folder: &str,
     config: &AccountConfig,
     printer: &mut P,
     backend: &mut B,
 ) -> Result<()> {
-    let attachments = backend.email_get(mbox, seq)?.attachments();
-    let attachments_len = attachments.len();
+    let attachments = backend.get_email(folder, id)?.attachments()?;
 
-    if attachments_len == 0 {
-        return printer.print_struct(format!("No attachment found for message {}", seq));
+    if attachments.is_empty() {
+        return printer.print(format!("No attachment found for email {}", id));
     }
 
-    printer.print_str(format!(
-        "{} attachment(s) found for message {}",
-        attachments_len, seq
+    printer.print_log(format!(
+        "{} attachment(s) found for email {}",
+        attachments.len(),
+        id
     ))?;
 
     for attachment in attachments {
-        let file_path = config.get_download_file_path(&attachment.filename)?;
-        printer.print_str(format!("Downloading {:?}…", file_path))?;
-        fs::write(&file_path, &attachment.content)
-            .context(format!("cannot download attachment {:?}", file_path))?;
+        let filename = attachment
+            .filename
+            .unwrap_or_else(|| Uuid::new_v4().to_string());
+        let filepath = config.get_download_file_path(&filename)?;
+        printer.print_log(format!("Downloading {:?}…", filepath))?;
+        fs::write(&filepath, &attachment.body)
+            .context(format!("cannot download attachment {:?}", filepath))?;
     }
 
-    printer.print_struct("Done!")
+    printer.print("Done!")
 }
 
-/// Copy a message from a folder to another.
-pub fn copy<'a, P: Printer, B: Backend<'a> + ?Sized>(
-    seq: &str,
-    mbox_src: &str,
-    mbox_dst: &str,
+pub fn copy<P: Printer, B: Backend + ?Sized>(
+    id: &str,
+    folder: &str,
+    folder_target: &str,
     printer: &mut P,
     backend: &mut B,
 ) -> Result<()> {
-    backend.email_copy(mbox_src, mbox_dst, seq)?;
-    printer.print_struct(format!(
-        "Message {} successfully copied to folder {}",
-        seq, mbox_dst
+    backend.copy_email(folder, folder_target, id)?;
+    printer.print(format!(
+        "Email {} successfully copied to folder {}",
+        id, folder_target
     ))
 }
 
-/// Delete messages matching the given sequence range.
-pub fn delete<'a, P: Printer, B: Backend<'a> + ?Sized>(
-    seq: &str,
-    mbox: &str,
+pub fn delete<P: Printer, B: Backend + ?Sized>(
+    id: &str,
+    folder: &str,
     printer: &mut P,
     backend: &mut B,
 ) -> Result<()> {
-    backend.email_delete(mbox, seq)?;
-    printer.print_struct(format!("Message(s) {} successfully deleted", seq))
+    backend.delete_email(folder, id)?;
+    printer.print("Email successfully deleted!")
 }
 
-/// Forward the given message UID from the selected folder.
-pub fn forward<'a, P: Printer, B: Backend<'a> + ?Sized, S: Sender + ?Sized>(
-    seq: &str,
-    attachments_paths: Vec<&str>,
-    encrypt: bool,
-    mbox: &str,
+pub fn forward<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
     config: &AccountConfig,
     printer: &mut P,
     backend: &mut B,
     sender: &mut S,
+    folder: &str,
+    id: &str,
+    headers: Option<Vec<&str>>,
+    body: Option<&str>,
 ) -> Result<()> {
-    let msg = backend
-        .email_get(mbox, seq)?
-        .into_forward(config)?
-        .add_attachments(attachments_paths)?
-        .encrypt(encrypt);
-    editor::edit_email_with_editor(
-        msg,
-        TplOverride::default(),
-        config,
-        printer,
-        backend,
-        sender,
-    )?;
+    let tpl = backend
+        .get_email(folder, id)?
+        .to_forward_tpl_builder(config)?
+        .set_some_raw_headers(headers)
+        .some_text_plain_part(body)
+        .build();
+    trace!("initial template: {}", *tpl);
+    editor::edit_tpl_with_editor(config, printer, backend, sender, tpl)?;
     Ok(())
 }
 
-/// List paginated messages from the selected folder.
-pub fn list<'a, P: Printer, B: Backend<'a> + ?Sized>(
+pub fn list<P: Printer, B: Backend + ?Sized>(
     max_width: Option<usize>,
     page_size: Option<usize>,
     page: usize,
-    mbox: &str,
+    folder: &str,
     config: &AccountConfig,
     printer: &mut P,
     backend: &mut B,
 ) -> Result<()> {
     let page_size = page_size.unwrap_or(config.email_listing_page_size());
     debug!("page size: {}", page_size);
-    let msgs = backend.envelope_list(mbox, page_size, page)?;
+    let msgs = backend.list_envelope(folder, page_size, page)?;
     trace!("envelopes: {:?}", msgs);
     printer.print_table(
         Box::new(msgs),
@@ -131,242 +116,109 @@ pub fn list<'a, P: Printer, B: Backend<'a> + ?Sized>(
 /// Parses and edits a message from a [mailto] URL string.
 ///
 /// [mailto]: https://en.wikipedia.org/wiki/Mailto
-pub fn mailto<'a, P: Printer, B: Backend<'a> + ?Sized, S: Sender + ?Sized>(
-    url: &Url,
+pub fn mailto<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
     config: &AccountConfig,
     printer: &mut P,
     backend: &mut B,
     sender: &mut S,
+    url: &Url,
 ) -> Result<()> {
-    info!("entering mailto command handler");
-
-    let to = addrparse(url.path())?;
-    let mut cc = Vec::new();
-    let mut bcc = Vec::new();
-    let mut subject = Cow::default();
-    let mut body = Cow::default();
+    let mut tpl = TplBuilder::default().to(url.path());
 
     for (key, val) in url.query_pairs() {
-        match key.as_bytes() {
-            b"cc" => {
-                cc.push(val.to_string());
-            }
-            b"bcc" => {
-                bcc.push(val.to_string());
-            }
-            b"subject" => {
-                subject = val;
-            }
-            b"body" => {
-                body = val;
-            }
+        match key.to_lowercase().as_bytes() {
+            b"cc" => tpl = tpl.cc(val),
+            b"bcc" => tpl = tpl.bcc(val),
+            b"subject" => tpl = tpl.subject(val),
+            b"body" => tpl = tpl.text_plain_part(val.as_bytes()),
             _ => (),
         }
     }
 
-    let msg = Email {
-        from: Some(vec![config.address()?].into()),
-        to: if to.is_empty() { None } else { Some(to) },
-        cc: if cc.is_empty() {
-            None
-        } else {
-            Some(addrparse(&cc.join(","))?)
-        },
-        bcc: if bcc.is_empty() {
-            None
-        } else {
-            Some(addrparse(&bcc.join(","))?)
-        },
-        subject: subject.into(),
-        parts: Parts(vec![Part::TextPlain(TextPlainPart {
-            content: body.into(),
-        })]),
-        ..Email::default()
-    };
-    trace!("message: {:?}", msg);
-
-    editor::edit_email_with_editor(
-        msg,
-        TplOverride::default(),
-        config,
-        printer,
-        backend,
-        sender,
-    )?;
-    Ok(())
+    editor::edit_tpl_with_editor(config, printer, backend, sender, tpl.build())
 }
 
-/// Move a message from a folder to another.
-pub fn move_<'a, P: Printer, B: Backend<'a> + ?Sized>(
-    seq: &str,
-    mbox_src: &str,
-    mbox_dst: &str,
+pub fn move_<P: Printer, B: Backend + ?Sized>(
+    id: &str,
+    folder: &str,
+    folder_target: &str,
     printer: &mut P,
     backend: &mut B,
 ) -> Result<()> {
-    backend.email_move(mbox_src, mbox_dst, seq)?;
-    printer.print_struct(format!(
-        r#"Message {} successfully moved to folder "{}""#,
-        seq, mbox_dst
+    backend.move_email(folder, folder_target, id)?;
+    printer.print(format!(
+        "Email {} successfully moved to folder {}",
+        id, folder_target
     ))
 }
 
-/// Read a message by its sequence number.
-pub fn read<'a, P: Printer, B: Backend<'a> + ?Sized>(
-    seq: &str,
+pub fn read<P: Printer, B: Backend + ?Sized>(
+    config: &AccountConfig,
+    printer: &mut P,
+    backend: &mut B,
+    folder: &str,
+    id: &str,
     text_mime: &str,
     sanitize: bool,
     raw: bool,
     headers: Vec<&str>,
-    mbox: &str,
+) -> Result<()> {
+    let mut email = backend.get_email(folder, id)?;
+
+    if raw {
+        // emails do not always have valid utf8, uses "lossy" to
+        // display what can be displayed
+        let raw_email = String::from_utf8_lossy(email.as_raw()?).into_owned();
+        return printer.print(raw_email);
+    }
+
+    let tpl = email
+        .to_read_tpl_builder()?
+        .show_headers(config.email_reading_headers())
+        .show_headers(headers)
+        .show_text_parts_only(true)
+        .use_show_text_parts_strategy(if text_mime == "plain" {
+            ShowTextPartsStrategy::PlainOtherwiseHtml
+        } else {
+            ShowTextPartsStrategy::HtmlOtherwisePlain
+        })
+        .sanitize_text_parts(sanitize)
+        .build();
+
+    printer.print(<Tpl as Into<String>>::into(tpl))
+}
+
+pub fn reply<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
     config: &AccountConfig,
     printer: &mut P,
     backend: &mut B,
-) -> Result<()> {
-    let msg = backend.email_get(mbox, seq)?;
-
-    printer.print_struct(if raw {
-        // Emails do not always have valid utf8. Using "lossy" to
-        // display what we can.
-        String::from_utf8_lossy(&msg.raw).into_owned()
-    } else {
-        msg.to_readable(
-            config,
-            PartsReaderOptions {
-                plain_first: text_mime == "plain",
-                sanitize,
-            },
-            headers,
-        )?
-    })
-}
-
-/// Reply to the given message UID.
-pub fn reply<'a, P: Printer, B: Backend<'a> + ?Sized, S: Sender + ?Sized>(
-    seq: &str,
+    sender: &mut S,
+    folder: &str,
+    id: &str,
     all: bool,
-    attachments_paths: Vec<&str>,
-    encrypt: bool,
-    mbox: &str,
-    config: &AccountConfig,
-    printer: &mut P,
-    backend: &mut B,
-    sender: &mut S,
+    headers: Option<Vec<&str>>,
+    body: Option<&str>,
 ) -> Result<()> {
-    let msg = backend
-        .email_get(mbox, seq)?
-        .into_reply(all, config)?
-        .add_attachments(attachments_paths)?
-        .encrypt(encrypt);
-    editor::edit_email_with_editor(
-        msg,
-        TplOverride::default(),
-        config,
-        printer,
-        backend,
-        sender,
-    )?;
-    backend.flags_add(mbox, seq, "replied")?;
+    let tpl = backend
+        .get_email(folder, id)?
+        .to_reply_tpl_builder(config, all)?
+        .set_some_raw_headers(headers)
+        .some_text_plain_part(body)
+        .build();
+    trace!("initial template: {}", *tpl);
+    editor::edit_tpl_with_editor(config, printer, backend, sender, tpl)?;
+    backend.add_flags(folder, id, "replied")?;
     Ok(())
 }
 
-/// Saves a raw message to the targetted folder.
-pub fn save<'a, P: Printer, B: Backend<'a> + ?Sized>(
-    mbox: &str,
-    raw_msg: &str,
+pub fn save<P: Printer, B: Backend + ?Sized>(
     printer: &mut P,
     backend: &mut B,
-) -> Result<()> {
-    debug!("folder: {}", mbox);
-
-    let is_tty = atty::is(Stream::Stdin);
-    debug!("is tty: {}", is_tty);
-    let is_json = printer.is_json();
-    debug!("is json: {}", is_json);
-
-    let raw_msg = if is_tty || is_json {
-        raw_msg.replace("\r", "").replace("\n", "\r\n")
-    } else {
-        io::stdin()
-            .lock()
-            .lines()
-            .filter_map(Result::ok)
-            .collect::<Vec<String>>()
-            .join("\r\n")
-    };
-    backend.email_add(mbox, raw_msg.as_bytes(), "seen")?;
-    Ok(())
-}
-
-/// Paginate messages from the selected folder matching the specified
-/// query.
-pub fn search<'a, P: Printer, B: Backend<'a> + ?Sized>(
-    query: String,
-    max_width: Option<usize>,
-    page_size: Option<usize>,
-    page: usize,
-    mbox: &str,
-    config: &AccountConfig,
-    printer: &mut P,
-    backend: &mut B,
-) -> Result<()> {
-    let page_size = page_size.unwrap_or(config.email_listing_page_size());
-    debug!("page size: {}", page_size);
-    let msgs = backend.envelope_search(mbox, &query, "", page_size, page)?;
-    trace!("messages: {:#?}", msgs);
-    printer.print_table(
-        Box::new(msgs),
-        PrintTableOpts {
-            format: &config.email_reading_format,
-            max_width,
-        },
-    )
-}
-
-/// Paginates messages from the selected folder matching the specified
-/// query, sorted by the given criteria.
-pub fn sort<'a, P: Printer, B: Backend<'a> + ?Sized>(
-    sort: String,
-    query: String,
-    max_width: Option<usize>,
-    page_size: Option<usize>,
-    page: usize,
-    mbox: &str,
-    config: &AccountConfig,
-    printer: &mut P,
-    backend: &mut B,
-) -> Result<()> {
-    let page_size = page_size.unwrap_or(config.email_listing_page_size());
-    debug!("page size: {}", page_size);
-    let msgs = backend.envelope_search(mbox, &query, &sort, page_size, page)?;
-    trace!("envelopes: {:#?}", msgs);
-    printer.print_table(
-        Box::new(msgs),
-        PrintTableOpts {
-            format: &config.email_reading_format,
-            max_width,
-        },
-    )
-}
-
-/// Send a raw message.
-pub fn send<'a, P: Printer, B: Backend<'a> + ?Sized, S: Sender + ?Sized>(
+    folder: &str,
     raw_email: &str,
-    config: &AccountConfig,
-    printer: &mut P,
-    backend: &mut B,
-    sender: &mut S,
 ) -> Result<()> {
-    info!("entering send message handler");
-
     let is_tty = atty::is(Stream::Stdin);
-    debug!("is tty: {}", is_tty);
     let is_json = printer.is_json();
-    debug!("is json: {}", is_json);
-
-    let sent_folder = config.folder_alias("sent")?;
-    debug!("sent folder: {:?}", sent_folder);
-
     let raw_email = if is_tty || is_json {
         raw_email.replace("\r", "").replace("\n", "\r\n")
     } else {
@@ -377,26 +229,90 @@ pub fn send<'a, P: Printer, B: Backend<'a> + ?Sized, S: Sender + ?Sized>(
             .collect::<Vec<String>>()
             .join("\r\n")
     };
-    trace!("raw message: {:?}", raw_email);
-    let email = Email::from_tpl(&raw_email)?;
-    sender.send(&email)?;
-    backend.email_add(&sent_folder, raw_email.as_bytes(), "seen")?;
+    backend.add_email(folder, raw_email.as_bytes(), "seen")?;
     Ok(())
 }
 
-/// Compose a new message.
-pub fn write<'a, P: Printer, B: Backend<'a> + ?Sized, S: Sender + ?Sized>(
-    tpl: TplOverride,
-    attachments_paths: Vec<&str>,
-    encrypt: bool,
+pub fn search<P: Printer, B: Backend + ?Sized>(
+    config: &AccountConfig,
+    printer: &mut P,
+    backend: &mut B,
+    folder: &str,
+    query: String,
+    max_width: Option<usize>,
+    page_size: Option<usize>,
+    page: usize,
+) -> Result<()> {
+    let page_size = page_size.unwrap_or(config.email_listing_page_size());
+    let envelopes = backend.search_envelope(folder, &query, "", page_size, page)?;
+    let opts = PrintTableOpts {
+        format: &config.email_reading_format,
+        max_width,
+    };
+
+    printer.print_table(Box::new(envelopes), opts)
+}
+
+pub fn sort<P: Printer, B: Backend + ?Sized>(
+    config: &AccountConfig,
+    printer: &mut P,
+    backend: &mut B,
+    folder: &str,
+    sort: String,
+    query: String,
+    max_width: Option<usize>,
+    page_size: Option<usize>,
+    page: usize,
+) -> Result<()> {
+    let page_size = page_size.unwrap_or(config.email_listing_page_size());
+    let envelopes = backend.search_envelope(folder, &query, &sort, page_size, page)?;
+    let opts = PrintTableOpts {
+        format: &config.email_reading_format,
+        max_width,
+    };
+
+    printer.print_table(Box::new(envelopes), opts)
+}
+
+pub fn send<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
     config: &AccountConfig,
     printer: &mut P,
     backend: &mut B,
     sender: &mut S,
+    raw_email: &str,
 ) -> Result<()> {
-    let email = Email::default()
-        .add_attachments(attachments_paths)?
-        .encrypt(encrypt);
-    editor::edit_email_with_editor(email, tpl, config, printer, backend, sender)?;
+    let is_tty = atty::is(Stream::Stdin);
+    let is_json = printer.is_json();
+    let sent_folder = config.folder_alias("sent")?;
+    let raw_email = if is_tty || is_json {
+        raw_email.replace("\r", "").replace("\n", "\r\n")
+    } else {
+        io::stdin()
+            .lock()
+            .lines()
+            .filter_map(Result::ok)
+            .collect::<Vec<String>>()
+            .join("\r\n")
+    };
+    trace!("raw email: {:?}", raw_email);
+    sender.send(raw_email.as_bytes())?;
+    backend.add_email(&sent_folder, raw_email.as_bytes(), "seen")?;
+    Ok(())
+}
+
+pub fn write<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
+    config: &AccountConfig,
+    printer: &mut P,
+    backend: &mut B,
+    sender: &mut S,
+    headers: Option<Vec<&str>>,
+    body: Option<&str>,
+) -> Result<()> {
+    let tpl = Email::new_tpl_builder(config)?
+        .set_some_raw_headers(headers)
+        .some_text_plain_part(body)
+        .build();
+    trace!("initial template: {}", *tpl);
+    editor::edit_tpl_with_editor(config, printer, backend, sender, tpl)?;
     Ok(())
 }

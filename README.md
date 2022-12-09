@@ -71,6 +71,26 @@ for all the options.*
 [wiki](https://github.com/soywod/himalaya/wiki/Usage:email:list) for
 all the features.*
 
+## Contributing
+
+If you find a bug, feel free to open an issue at
+[soywod/himalaya](https://github.com/soywod/himalaya/issues/new).
+
+If you want to discuss about the project, feel free to open a [new
+discussion](https://github.com/soywod/himalaya/discussions/new). You
+can also join the [Matrix](https://matrix.org/) room
+[#himalaya.email.client](https://matrix.to/#/#himalaya.email.client:matrix.org)
+or contact me directly
+[@soywod](https://matrix.to/#/@soywod:matrix.org).
+
+## Sponsoring
+
+[![GitHub](https://img.shields.io/badge/-GitHub%20Sponsors-fafbfc?logo=GitHub%20Sponsors&style=flat-square)](https://github.com/sponsors/soywod)
+[![PayPal](https://img.shields.io/badge/-PayPal-0079c1?logo=PayPal&logoColor=ffffff&style=flat-square)](https://www.paypal.com/paypalme/soywod)
+[![Ko-fi](https://img.shields.io/badge/-Ko--fi-ff5e5a?logo=Ko-fi&logoColor=ffffff&style=flat-square)](https://ko-fi.com/soywod)
+[![Buy Me a Coffee](https://img.shields.io/badge/-Buy%20Me%20a%20Coffee-ffdd00?logo=Buy%20Me%20A%20Coffee&logoColor=000000&style=flat-square)](https://www.buymeacoffee.com/soywod)
+[![Liberapay](https://img.shields.io/badge/-Liberapay-f6c915?logo=Liberapay&logoColor=222222&style=flat-square)](https://liberapay.com/soywod)
+
 ## Credits
 
 - [himalaya-lib](https://git.sr.ht/~soywod/himalaya-lib)
@@ -84,11 +104,3 @@ all the features.*
 - [mutt-wizard](https://github.com/LukeSmithxyz/mutt-wizard), a tool
   over NeoMutt and isync
 - [rust-imap](https://github.com/jonhoo/rust-imap), a rust IMAP lib
-
-## Sponsoring
-
-[![github](https://img.shields.io/badge/-GitHub%20Sponsors-fafbfc?logo=GitHub%20Sponsors&style=flat-square)](https://github.com/sponsors/soywod)
-[![paypal](https://img.shields.io/badge/-PayPal-0079c1?logo=PayPal&logoColor=ffffff&style=flat-square)](https://www.paypal.com/paypalme/soywod)
-[![ko-fi](https://img.shields.io/badge/-Ko--fi-ff5e5a?logo=Ko-fi&logoColor=ffffff&style=flat-square)](https://ko-fi.com/soywod)
-[![buy-me-a-coffee](https://img.shields.io/badge/-Buy%20Me%20a%20Coffee-ffdd00?logo=Buy%20Me%20A%20Coffee&logoColor=000000&style=flat-square)](https://www.buymeacoffee.com/soywod)
-[![liberapay](https://img.shields.io/badge/-Liberapay-f6c915?logo=Liberapay&logoColor=222222&style=flat-square)](https://liberapay.com/soywod)

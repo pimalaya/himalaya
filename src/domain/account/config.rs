@@ -86,7 +86,10 @@ pub struct DeserializedBaseAccountConfig {
     pub email_reading_headers: Option<Vec<String>>,
     #[serde(default, with = "email_text_plain_format")]
     pub email_reading_format: Option<EmailTextPlainFormat>,
+    pub email_reading_verify_cmd: Option<String>,
     pub email_reading_decrypt_cmd: Option<String>,
+    pub email_writing_headers: Option<Vec<String>>,
+    pub email_writing_sign_cmd: Option<String>,
     pub email_writing_encrypt_cmd: Option<String>,
     #[serde(flatten, with = "EmailSenderDef")]
     pub email_sender: EmailSender,
@@ -148,6 +151,16 @@ impl DeserializedBaseAccountConfig {
                 .map(ToOwned::to_owned)
                 .or_else(|| config.email_reading_format.as_ref().map(ToOwned::to_owned))
                 .unwrap_or_default(),
+            email_reading_verify_cmd: self
+                .email_reading_verify_cmd
+                .as_ref()
+                .map(ToOwned::to_owned)
+                .or_else(|| {
+                    config
+                        .email_reading_verify_cmd
+                        .as_ref()
+                        .map(ToOwned::to_owned)
+                }),
             email_reading_decrypt_cmd: self
                 .email_reading_decrypt_cmd
                 .as_ref()
@@ -155,6 +168,16 @@ impl DeserializedBaseAccountConfig {
                 .or_else(|| {
                     config
                         .email_reading_decrypt_cmd
+                        .as_ref()
+                        .map(ToOwned::to_owned)
+                }),
+            email_writing_sign_cmd: self
+                .email_writing_sign_cmd
+                .as_ref()
+                .map(ToOwned::to_owned)
+                .or_else(|| {
+                    config
+                        .email_writing_sign_cmd
                         .as_ref()
                         .map(ToOwned::to_owned)
                 }),
@@ -168,6 +191,11 @@ impl DeserializedBaseAccountConfig {
                         .as_ref()
                         .map(ToOwned::to_owned)
                 }),
+            email_writing_headers: self
+                .email_writing_headers
+                .as_ref()
+                .map(ToOwned::to_owned)
+                .or_else(|| config.email_writing_headers.as_ref().map(ToOwned::to_owned)),
             email_sender: self.email_sender.to_owned(),
             email_hooks: EmailHooks {
                 pre_send: self
