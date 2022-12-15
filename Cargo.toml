@@ -29,7 +29,9 @@ anyhow = "1.0"
 atty = "0.2"
 chrono = "0.4"
 clap = { version = "2.33", default-features = false, features = ["suggestions", "color"] }
+console = "0.15.2"
 dirs = "4.0.0"
+dialoguer = "0.10.2"
 env_logger = "0.8"
 erased-serde = "0.3"
 himalaya-lib = { git = "https://git.sr.ht/~soywod/himalaya-lib", branch = "develop" }

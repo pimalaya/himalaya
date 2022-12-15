@@ -610,6 +610,7 @@ dependencies = [
  "atty",
  "chrono",
  "clap",
+ "console",
  "dialoguer",
  "dirs",
  "env_logger",
