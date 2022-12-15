@@ -53,6 +53,9 @@ $ cargo install himalaya
 
 # Nix
 $ nix-env -i himalaya
+
+# Manual
+$ curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | PREFIX=~/.local sh
 ```
 
 </td>
