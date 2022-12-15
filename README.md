@@ -31,12 +31,12 @@ all the features.*
 
 <table>
 <tr>
-<td>
+<td width="50%">
 <a href="https://repology.org/project/himalaya/versions">
 <img src="https://repology.org/badge/vertical-allrepos/himalaya.svg" alt="Packaging status" />
 </a>
 </td>
-<td>
+<td width="50%">
 
 ```shell-session
 # Arch Linux (official)
@@ -53,9 +53,6 @@ $ cargo install himalaya
 
 # Nix
 $ nix-env -i himalaya
-
-# Manual
-$ curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | PREFIX=~/.local sh
 ```
 
 </td>
