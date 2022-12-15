@@ -32,10 +32,9 @@ all the features.*
 <table>
 <tr>
 <td>
-
-[![Packaging
-status](https://repology.org/badge/vertical-allrepos/himalaya.svg)](https://repology.org/project/himalaya/versions)
-
+<a href="https://repology.org/project/himalaya/versions">
+<img src="https://repology.org/badge/vertical-allrepos/himalaya.svg" alt="Packaging status" />
+</a>
 </td>
 <td>
 
