@@ -29,7 +29,7 @@ all the features.*
 
 ## Installation
 
-<table>
+<table align="center">
 <tr>
 <td width="50%">
 <a href="https://repology.org/project/himalaya/versions">
@@ -53,9 +53,6 @@ $ cargo install himalaya
 
 # Nix
 $ nix-env -i himalaya
-
-# Manual
-$ curl -sSL https://raw.githubusercontent.com/soywod/himalaya/master/install.sh | PREFIX=~/.local sh
 ```
 
 </td>
