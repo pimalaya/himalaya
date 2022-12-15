@@ -111,21 +111,21 @@ for all the options.*
 
 ## Contributing
 
-If you *find a bug*, please send an email at
+If you find a **bug**, please send an email at
 [~soywod/himalaya@todo.sr.ht](mailto:~soywod/himalaya@todo.sr.ht).
 
-If you *have a question*, please send an email at
+If you have a **question**, please send an email at
 [~soywod/himalaya@lists.sr.ht](mailto:~soywod/himalaya@lists.sr.ht).
 
-If you want to *subscribe to the mailing list*, please send an email
+If you want to **subscribe** to the mailing list, please send an email
 at
 [~soywod/himalaya+subscribe@lists.sr.ht](mailto:~soywod/himalaya+subscribe@lists.sr.ht).
 
-If you want to *unsubscribe to the mailing list*, please send an email
-at
+If you want to **unsubscribe** to the mailing list, please send an
+email at
 [~soywod/himalaya+unsubscribe@lists.sr.ht](mailto:~soywod/himalaya+unsubscribe@lists.sr.ht).
 
-If you want to *discuss about the project*, feel free to join the
+If you want to **discuss** about the project, feel free to join the
 [Matrix](https://matrix.org/) room
 [#himalaya.email.client](https://matrix.to/#/#himalaya.email.client:matrix.org)
 or contact me directly
