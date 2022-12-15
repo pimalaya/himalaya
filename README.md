@@ -1,7 +1,7 @@
 # 📫 Himalaya
 
-<abbr title="Command-line interface">CLI</abbr> for email management
-based on the [himalaya-lib](https://git.sr.ht/~soywod/himalaya-lib).
+Command-line interface for email management based on the
+[himalaya-lib](https://git.sr.ht/~soywod/himalaya-lib).
 
 ![image](https://user-images.githubusercontent.com/10437171/138774902-7b9de5a3-93eb-44b0-8cfb-6d2e11e3b1aa.png)
 
