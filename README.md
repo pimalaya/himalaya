@@ -55,13 +55,13 @@ $ cargo install himalaya
 $ nix-env -i himalaya
 ```
 
-</td>
-</tr>
-</table>
-
 *See the
 [wiki](https://github.com/soywod/himalaya/wiki/Installation:binary)
 for other installation methods.*
+
+</td>
+</tr>
+</table>
 
 ## Configuration
 
@@ -88,7 +88,7 @@ smtp-port = 465
 smtp-login = "test@gmail.com"
 smtp-passwd-cmd = "security find-internet-password -gs gmail -w"
 
-[gmail.folders-aliases]
+[gmail.folder-aliases]
 inbox = "INBOX"
 sent = "[Gmail]/Sent"
 drafts = "[Gmail]/Drafts"
@@ -111,31 +111,25 @@ for all the options.*
 
 ## Contributing
 
-If you **find a bug**, please send an email at
+If you *find a bug*, please send an email at
 [~soywod/himalaya@todo.sr.ht](mailto:~soywod/himalaya@todo.sr.ht).
 
-If you **have a question**, please send an email at
+If you *have a question*, please send an email at
 [~soywod/himalaya@lists.sr.ht](mailto:~soywod/himalaya@lists.sr.ht).
 
-If you want to **subscribe to the mailing list**, please send an email
+If you want to *subscribe to the mailing list*, please send an email
 at
-[~soywod/himalaya+subscribe@lists.sr.ht](mailto:~soywod/himalaya+subscribe@lists.sr.ht). To
-**unsubscribe**, please send an email at
+[~soywod/himalaya+subscribe@lists.sr.ht](mailto:~soywod/himalaya+subscribe@lists.sr.ht).
+
+If you want to *unsubscribe to the mailing list*, please send an email
+at
 [~soywod/himalaya+unsubscribe@lists.sr.ht](mailto:~soywod/himalaya+unsubscribe@lists.sr.ht).
 
-If you want to **discuss about the project**, feel free to join the
+If you want to *discuss about the project*, feel free to join the
 [Matrix](https://matrix.org/) room
 [#himalaya.email.client](https://matrix.to/#/#himalaya.email.client:matrix.org)
 or contact me directly
 [@soywod](https://matrix.to/#/@soywod:matrix.org).
-
-## Sponsoring
-
-[![GitHub](https://img.shields.io/badge/-GitHub%20Sponsors-fafbfc?logo=GitHub%20Sponsors&style=flat-square)](https://github.com/sponsors/soywod)
-[![PayPal](https://img.shields.io/badge/-PayPal-0079c1?logo=PayPal&logoColor=ffffff&style=flat-square)](https://www.paypal.com/paypalme/soywod)
-[![Ko-fi](https://img.shields.io/badge/-Ko--fi-ff5e5a?logo=Ko-fi&logoColor=ffffff&style=flat-square)](https://ko-fi.com/soywod)
-[![Buy Me a Coffee](https://img.shields.io/badge/-Buy%20Me%20a%20Coffee-ffdd00?logo=Buy%20Me%20A%20Coffee&logoColor=000000&style=flat-square)](https://www.buymeacoffee.com/soywod)
-[![Liberapay](https://img.shields.io/badge/-Liberapay-f6c915?logo=Liberapay&logoColor=222222&style=flat-square)](https://liberapay.com/soywod)
 
 ## Credits
 
@@ -154,3 +148,11 @@ or contact me directly
 * [lettre](https://github.com/lettre/lettre), a Rust mailer library
 * [mailparse](https://github.com/staktrace/mailparse), a Rust MIME
   email parser.
+
+## Sponsoring
+
+[![GitHub](https://img.shields.io/badge/-GitHub%20Sponsors-fafbfc?logo=GitHub%20Sponsors&style=flat-square)](https://github.com/sponsors/soywod)
+[![PayPal](https://img.shields.io/badge/-PayPal-0079c1?logo=PayPal&logoColor=ffffff&style=flat-square)](https://www.paypal.com/paypalme/soywod)
+[![Ko-fi](https://img.shields.io/badge/-Ko--fi-ff5e5a?logo=Ko-fi&logoColor=ffffff&style=flat-square)](https://ko-fi.com/soywod)
+[![Buy Me a Coffee](https://img.shields.io/badge/-Buy%20Me%20a%20Coffee-ffdd00?logo=Buy%20Me%20A%20Coffee&logoColor=000000&style=flat-square)](https://www.buymeacoffee.com/soywod)
+[![Liberapay](https://img.shields.io/badge/-Liberapay-f6c915?logo=Liberapay&logoColor=222222&style=flat-square)](https://liberapay.com/soywod)
