@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added the email composer (from its own
   [repository](https://git.sr.ht/~soywod/mime-msg-builder)) [#341].
 
+### Fixed
+
+* Fixed missing folder aliases [#430].
+
 ### Removed
 
 * Removed the `-a|--attachment` argument from `write`, `reply` and
@@ -612,3 +616,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#344]: https://github.com/soywod/himalaya/issues/344
 [#346]: https://github.com/soywod/himalaya/issues/346
 [#352]: https://github.com/soywod/himalaya/issues/352
+[#430]: https://github.com/soywod/himalaya/issues/430

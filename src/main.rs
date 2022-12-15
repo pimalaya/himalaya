@@ -122,26 +122,33 @@ fn main() -> Result<()> {
 
     // checks email commands
     match email::args::matches(&m)? {
-        Some(email::args::Cmd::Attachments(seq)) => {
+        Some(email::args::Cmd::Attachments(id)) => {
             return email::handlers::attachments(
-                seq,
-                &folder,
                 &account_config,
                 &mut printer,
                 backend.as_mut(),
+                &folder,
+                id,
             );
         }
-        Some(email::args::Cmd::Copy(id, folder_target)) => {
+        Some(email::args::Cmd::Copy(ids, folder_target)) => {
             return email::handlers::copy(
-                id,
-                &folder,
-                folder_target,
+                &account_config,
                 &mut printer,
                 backend.as_mut(),
+                &folder,
+                folder_target,
+                ids,
             );
         }
-        Some(email::args::Cmd::Delete(seq)) => {
-            return email::handlers::delete(seq, &folder, &mut printer, backend.as_mut());
+        Some(email::args::Cmd::Delete(ids)) => {
+            return email::handlers::delete(
+                &account_config,
+                &mut printer,
+                backend.as_mut(),
+                &folder,
+                ids,
+            );
         }
         Some(email::args::Cmd::Forward(id, headers, body)) => {
             return email::handlers::forward(
@@ -157,17 +164,24 @@ fn main() -> Result<()> {
         }
         Some(email::args::Cmd::List(max_width, page_size, page)) => {
             return email::handlers::list(
-                max_width,
-                page_size,
-                page,
-                &folder,
                 &account_config,
                 &mut printer,
                 backend.as_mut(),
+                &folder,
+                max_width,
+                page_size,
+                page,
             );
         }
-        Some(email::args::Cmd::Move(seq, mbox_dst)) => {
-            return email::handlers::move_(seq, &folder, mbox_dst, &mut printer, backend.as_mut());
+        Some(email::args::Cmd::Move(ids, folder_target)) => {
+            return email::handlers::move_(
+                &account_config,
+                &mut printer,
+                backend.as_mut(),
+                &folder,
+                folder_target,
+                ids,
+            );
         }
         Some(email::args::Cmd::Read(id, text_mime, sanitize, raw, headers)) => {
             return email::handlers::read(
@@ -196,7 +210,13 @@ fn main() -> Result<()> {
             );
         }
         Some(email::args::Cmd::Save(raw_email)) => {
-            return email::handlers::save(&mut printer, backend.as_mut(), &folder, raw_email);
+            return email::handlers::save(
+                &account_config,
+                &mut printer,
+                backend.as_mut(),
+                &folder,
+                raw_email,
+            );
         }
         Some(email::args::Cmd::Search(query, max_width, page_size, page)) => {
             return email::handlers::search(
