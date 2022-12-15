@@ -23,9 +23,8 @@ before the `v1.0.0`.*
 - JSON output
 - …
 
-*See the
-[wiki](https://github.com/soywod/himalaya/wiki/Usage:email:list) for
-all the features.*
+*See the [wiki](https://github.com/soywod/himalaya/wiki) for all the
+features.*
 
 ## Installation
 
@@ -55,9 +54,8 @@ $ cargo install himalaya
 $ nix-env -i himalaya
 ```
 
-*See the
-[wiki](https://github.com/soywod/himalaya/wiki/Installation:binary)
-for other installation methods.*
+*See the [wiki](https://github.com/soywod/himalaya/wiki) for other
+installation methods.*
 
 </td>
 </tr>
