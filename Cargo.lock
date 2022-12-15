@@ -410,6 +410,9 @@ name = "email_address"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2153bd83ebc09db15bcbdc3e2194d901804952e3dc96967e1cd3b0c5c32d112"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "encode_unicode"
@@ -613,10 +616,12 @@ dependencies = [
  "console",
  "dialoguer",
  "dirs",
+ "email_address",
  "env_logger",
  "erased-serde",
  "himalaya-lib",
  "log",
+ "once_cell",
  "serde",
  "serde_json",
  "shellexpand",

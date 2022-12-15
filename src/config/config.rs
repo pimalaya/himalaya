@@ -11,7 +11,10 @@ use serde::Deserialize;
 use std::{collections::HashMap, fs, path::PathBuf};
 use toml;
 
-use crate::{account::DeserializedAccountConfig, config::{prelude::*, wizard::wizard}};
+use crate::{
+    account::DeserializedAccountConfig,
+    config::{prelude::*, wizard::wizard},
+};
 
 /// Represents the user config file.
 #[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize)]
@@ -48,13 +51,13 @@ impl DeserializedConfig {
         trace!(">> parse config from path");
         debug!("path: {:?}", path);
 
-        let path = match path.map(|s| s.into()).or_else(Self::path) {
-            Some(path) => path,
+        let config: Self = match path.map(|s| s.into()).or_else(Self::path) {
+            Some(path) => {
+                let content = fs::read_to_string(path).context("cannot read config file")?;
+                toml::from_str(&content).context("cannot parse config file")?
+            }
             None => wizard()?,
         };
-
-        let content = fs::read_to_string(path).context("cannot read config file")?;
-        let config: Self = toml::from_str(&content).context("cannot parse config file")?;
 
         if config.accounts.is_empty() {
             return Err(anyhow!("config file must contain at least one account"));
@@ -77,11 +80,11 @@ impl DeserializedConfig {
     /// Returns `Some(path)` if the path exists, otherwise `None`.
     pub fn path() -> Option<PathBuf> {
         config_dir()
-            .map(|p| p.join("himaaya").join("config.toml"))
+            .map(|p| p.join("himalaya").join("config.toml"))
             .filter(|p| p.exists())
-            .or_else(|| home_dir().map(|p| p.join(".config").join("himaaya").join("config.toml")))
+            .or_else(|| home_dir().map(|p| p.join(".config").join("himalaya").join("config.toml")))
             .filter(|p| p.exists())
-            .or_else(|| home_dir().map(|p| p.join(".himaayarc")))
+            .or_else(|| home_dir().map(|p| p.join(".himalayarc")))
             .filter(|p| p.exists())
     }
 
