@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2022-12-15
+
 ### Added
 
 * Added the email composer (from its own
@@ -456,7 +458,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Password from command [#22]
 * Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.6.1...HEAD
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/soywod/himalaya/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/soywod/himalaya/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/soywod/himalaya/compare/v0.5.10...v0.6.0
 [0.5.10]: https://github.com/soywod/himalaya/compare/v0.5.9...v0.5.10
