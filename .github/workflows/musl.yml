@@ -1,0 +1,19 @@
+name: build musl
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Builds Musl
+        run: |
+          docker run -v "${PWD}:/volume" --rm -t clux/muslrust:stable cargo build --release
+
+      - name: Lists
+        run: |
+          ls -al target/release
