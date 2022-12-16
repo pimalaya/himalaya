@@ -7,12 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.6.2] - 2022-12-15
-
 ### Added
 
 * Added the email composer (from its own
   [repository](https://git.sr.ht/~soywod/mime-msg-builder)) [#341].
+* Added Musl builds to releases [#356].
 
 ### Fixed
 
@@ -619,4 +618,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#344]: https://github.com/soywod/himalaya/issues/344
 [#346]: https://github.com/soywod/himalaya/issues/346
 [#352]: https://github.com/soywod/himalaya/issues/352
+[#356]: https://github.com/soywod/himalaya/issues/356
 [#430]: https://github.com/soywod/himalaya/issues/430
