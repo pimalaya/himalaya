@@ -17,3 +17,9 @@ jobs:
       - name: Lists
         run: |
           ls -al target/release
+
+      - name: Archive code coverage results
+        uses: actions/upload-artifact@v3
+        with:
+          name: himalaya-musl
+          path: target/x86_64-unknown-linux-musl/release/himalaya
