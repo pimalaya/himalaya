@@ -4,7 +4,7 @@
 //! related to the folder domain.
 
 use anyhow::Result;
-use clap::{self, App, Arg, ArgMatches, SubCommand};
+use clap::{self, Arg, ArgMatches, Command};
 use log::debug;
 
 use crate::ui::table;
@@ -33,8 +33,8 @@ pub fn matches(m: &ArgMatches) -> Result<Option<Cmd>> {
 }
 
 /// Represents folder subcommands.
-pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
-    vec![SubCommand::with_name(CMD_FOLDERS)
+pub fn subcmds<'a>() -> Vec<Command> {
+    vec![Command::new(CMD_FOLDERS)
         .aliases(&[
             "folder",
             "fold",
@@ -51,47 +51,47 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
 }
 
 /// Represents the source folder argument.
-pub fn source_arg<'a>() -> Arg<'a, 'a> {
-    Arg::with_name(ARG_SOURCE)
-        .short("f")
+pub fn source_arg() -> Arg {
+    Arg::new(ARG_SOURCE)
         .long("folder")
+        .short('f')
         .help("Specifies the source folder")
         .value_name("SOURCE")
         .default_value("inbox")
 }
 
 /// Represents the source folder argument parser.
-pub fn parse_source_arg<'a>(matches: &'a ArgMatches<'a>) -> &'a str {
-    matches.value_of(ARG_SOURCE).unwrap()
+pub fn parse_source_arg(matches: &ArgMatches) -> &str {
+    matches.get_one::<String>(ARG_SOURCE).unwrap().as_str()
 }
 
 /// Represents the target folder argument.
-pub fn target_arg<'a>() -> Arg<'a, 'a> {
-    Arg::with_name(ARG_TARGET)
+pub fn target_arg() -> Arg {
+    Arg::new(ARG_TARGET)
         .help("Specifies the target folder")
         .value_name("TARGET")
         .required(true)
 }
 
 /// Represents the target folder argument parser.
-pub fn parse_target_arg<'a>(matches: &'a ArgMatches<'a>) -> &'a str {
-    matches.value_of(ARG_TARGET).unwrap()
+pub fn parse_target_arg(matches: &ArgMatches) -> &str {
+    matches.get_one::<String>(ARG_TARGET).unwrap().as_str()
 }
 
 #[cfg(test)]
 mod tests {
-    use clap::{App, ErrorKind};
+    use clap::{error::ContextKind, Command};
 
     use super::*;
 
     #[test]
     fn it_should_match_cmds() {
-        let arg = App::new("himalaya")
+        let arg = Command::new("himalaya")
             .subcommands(subcmds())
             .get_matches_from(&["himalaya", "folders"]);
         assert_eq!(Some(Cmd::List(None)), matches(&arg).unwrap());
 
-        let arg = App::new("himalaya")
+        let arg = Command::new("himalaya")
             .subcommands(subcmds())
             .get_matches_from(&["himalaya", "folders", "--max-width", "20"]);
         assert_eq!(Some(Cmd::List(Some(20))), matches(&arg).unwrap());
@@ -101,7 +101,7 @@ mod tests {
     fn it_should_match_aliases() {
         macro_rules! get_matches_from {
             ($alias:expr) => {
-                App::new("himalaya")
+                Command::new("himalaya")
                     .subcommands(subcmds())
                     .get_matches_from(&["himalaya", $alias])
                     .subcommand_name()
@@ -118,34 +118,43 @@ mod tests {
     fn it_should_match_source_arg() {
         macro_rules! get_matches_from {
             ($($arg:expr),*) => {
-                App::new("himalaya")
+                Command::new("himalaya")
                     .arg(source_arg())
                     .get_matches_from(&["himalaya", $($arg,)*])
             };
         }
 
         let app = get_matches_from![];
-        assert_eq!(Some("inbox"), app.value_of("source"));
+        assert_eq!(
+            Some("inbox"),
+            app.get_one::<String>("source").map(String::as_str)
+        );
 
         let app = get_matches_from!["-f", "SOURCE"];
-        assert_eq!(Some("SOURCE"), app.value_of("source"));
+        assert_eq!(
+            Some("SOURCE"),
+            app.get_one::<String>("source").map(String::as_str)
+        );
 
         let app = get_matches_from!["--folder", "SOURCE"];
-        assert_eq!(Some("SOURCE"), app.value_of("source"));
+        assert_eq!(
+            Some("SOURCE"),
+            app.get_one::<String>("source").map(String::as_str)
+        );
     }
 
     #[test]
     fn it_should_match_target_arg() {
         macro_rules! get_matches_from {
             ($($arg:expr),*) => {
-                App::new("himalaya")
+                Command::new("himalaya")
                     .arg(target_arg())
                     .get_matches_from_safe(&["himalaya", $($arg,)*])
             };
         }
 
         let app = get_matches_from![];
-        assert_eq!(ErrorKind::MissingRequiredArgument, app.unwrap_err().kind);
+        assert_eq!(ContextKind::MissingRequiredArgument, app.unwrap_err().kind);
 
         let app = get_matches_from!["TARGET"];
         assert_eq!(Some("TARGET"), app.unwrap().value_of("target"));

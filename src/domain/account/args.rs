@@ -1,7 +1,7 @@
 //! This module provides arguments related to the user account config.
 
 use anyhow::Result;
-use clap::{App, Arg, ArgMatches, SubCommand};
+use clap::{Arg, ArgMatches, Command};
 use log::info;
 
 use crate::ui::table;
@@ -30,8 +30,8 @@ pub fn matches(m: &ArgMatches) -> Result<Option<Cmd>> {
 }
 
 /// Represents the account subcommands.
-pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
-    vec![SubCommand::with_name(CMD_ACCOUNTS)
+pub fn subcmds<'a>() -> Vec<Command> {
+    vec![Command::new(CMD_ACCOUNTS)
         .aliases(&["account", "acc", "a"])
         .about("Lists accounts")
         .arg(table::args::max_width())]
@@ -39,15 +39,15 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
 
 /// Represents the user account name argument. This argument allows
 /// the user to select a different account than the default one.
-pub fn arg<'a>() -> Arg<'a, 'a> {
-    Arg::with_name(ARG_ACCOUNT)
+pub fn arg() -> Arg {
+    Arg::new(ARG_ACCOUNT)
         .long("account")
-        .short("a")
+        .short('a')
         .help("Selects a specific account")
         .value_name("STRING")
 }
 
 /// Represents the user account name argument parser.
-pub fn parse_arg<'a>(matches: &'a ArgMatches<'a>) -> Option<&'a str> {
-    matches.value_of(ARG_ACCOUNT)
+pub fn parse_arg(matches: &ArgMatches) -> Option<&str> {
+    matches.get_one::<String>(ARG_ACCOUNT).map(String::as_str)
 }

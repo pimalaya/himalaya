@@ -3,37 +3,38 @@
 //! This module provides subcommands and a command matcher related to completion.
 
 use anyhow::Result;
-use clap::{self, App, Arg, ArgMatches, Shell, SubCommand};
-use log::{debug, info};
+use clap::{value_parser, Arg, ArgMatches, Command};
+use clap_complete::Shell;
+use log::debug;
 
-type OptionShell<'a> = Option<&'a str>;
+const ARG_SHELL: &str = "shell";
+const CMD_COMPLETION: &str = "completion";
+
+type SomeShell = Shell;
 
 /// Completion commands.
-pub enum Command<'a> {
-    /// Generate completion script for the given shell slice.
-    Generate(OptionShell<'a>),
+pub enum Cmd {
+    /// Generate completion script for the given shell.
+    Generate(SomeShell),
 }
 
 /// Completion command matcher.
-pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Command<'a>>> {
-    info!("entering completion command matcher");
-
-    if let Some(m) = m.subcommand_matches("completion") {
-        info!("completion command matched");
-        let shell = m.value_of("shell");
+pub fn matches(m: &ArgMatches) -> Result<Option<Cmd>> {
+    if let Some(m) = m.subcommand_matches(CMD_COMPLETION) {
+        let shell = m.get_one::<Shell>(ARG_SHELL).cloned().unwrap();
         debug!("shell: {:?}", shell);
-        return Ok(Some(Command::Generate(shell)));
+        return Ok(Some(Cmd::Generate(shell)));
     };
 
     Ok(None)
 }
 
 /// Completion subcommands.
-pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
-    vec![SubCommand::with_name("completion")
+pub fn subcmds() -> Vec<Command> {
+    vec![Command::new(CMD_COMPLETION)
         .aliases(&["completions", "compl", "compe", "comp"])
         .about("Generates the completion script for the given shell")
-        .args(&[Arg::with_name("shell")
-            .possible_values(&Shell::variants()[..])
+        .args(&[Arg::new(ARG_SHELL)
+            .value_parser(value_parser!(Shell))
             .required(true)])]
 }

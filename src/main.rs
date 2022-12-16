@@ -1,11 +1,12 @@
 use anyhow::Result;
+use clap::Command;
 use std::env;
 use url::Url;
 
 use himalaya::{
     account, compl,
     config::{self, DeserializedConfig},
-    email, flag, folder,
+    email, flag, folder, man,
     output::{self, OutputFmt},
     printer::StdoutPrinter,
     tpl,
@@ -15,17 +16,18 @@ use himalaya_lib::{BackendBuilder, BackendConfig, ImapBackend, SenderBuilder};
 #[cfg(feature = "imap-backend")]
 use himalaya::imap;
 
-fn create_app<'a>() -> clap::App<'a, 'a> {
-    let app = clap::App::new(env!("CARGO_PKG_NAME"))
+fn create_app() -> Command {
+    let app = Command::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .author(env!("CARGO_PKG_AUTHORS"))
-        .global_setting(clap::AppSettings::GlobalVersion)
+        .propagate_version(true)
         .arg(&config::args::arg())
         .arg(&account::args::arg())
         .args(&output::args::args())
         .arg(folder::args::source_arg())
         .subcommands(compl::args::subcmds())
+        .subcommands(man::args::subcmds())
         .subcommands(account::args::subcmds())
         .subcommands(folder::args::subcmds())
         .subcommands(email::args::subcmds());
@@ -66,8 +68,17 @@ fn main() -> Result<()> {
     // checks completion command before configs
     // https://github.com/soywod/himalaya/issues/115
     match compl::args::matches(&m)? {
-        Some(compl::args::Command::Generate(shell)) => {
+        Some(compl::args::Cmd::Generate(shell)) => {
             return compl::handlers::generate(create_app(), shell);
+        }
+        _ => (),
+    }
+
+    // checks completion command before configs
+    // https://github.com/soywod/himalaya/issues/115
+    match man::args::matches(&m)? {
+        Some(man::args::Cmd::Generate) => {
+            return man::handlers::generate(create_app());
         }
         _ => (),
     }
@@ -84,10 +95,10 @@ fn main() -> Result<()> {
         // recreating an instance.
         let mut imap = ImapBackend::new(imap_config)?;
         match imap::args::matches(&m)? {
-            Some(imap::args::Command::Notify(keepalive)) => {
+            Some(imap::args::Cmd::Notify(keepalive)) => {
                 return imap::handlers::notify(&mut imap, &folder, keepalive);
             }
-            Some(imap::args::Command::Watch(keepalive)) => {
+            Some(imap::args::Cmd::Watch(keepalive)) => {
                 return imap::handlers::watch(&mut imap, &folder, keepalive);
             }
             _ => (),
@@ -97,7 +108,8 @@ fn main() -> Result<()> {
     // inits services
     let mut backend = BackendBuilder::build(&account_config, &backend_config)?;
     let mut sender = SenderBuilder::build(&account_config)?;
-    let mut printer = StdoutPrinter::from_opt_str(m.value_of("output"))?;
+    let mut printer =
+        StdoutPrinter::from_opt_str(m.get_one::<String>("output").map(String::as_str))?;
 
     // checks account commands
     match account::args::matches(&m)? {

@@ -218,7 +218,7 @@ pub fn save<P: Printer, B: Backend + ?Sized>(
     printer: &mut P,
     backend: &mut B,
     folder: &str,
-    raw_email: &str,
+    raw_email: String,
 ) -> Result<()> {
     let folder = config.folder_alias(folder)?;
     let is_tty = atty::is(Stream::Stdin);
@@ -285,7 +285,7 @@ pub fn send<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
     printer: &mut P,
     backend: &mut B,
     sender: &mut S,
-    raw_email: &str,
+    raw_email: String,
 ) -> Result<()> {
     let folder = config.folder_alias("sent")?;
     let is_tty = atty::is(Stream::Stdin);
