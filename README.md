@@ -1,4 +1,4 @@
-# 📫 Himalaya ![Matrix](https://img.shields.io/matrix/himalaya.email.client:matrix.org?style=for-the-badge)
+# 📫 Himalaya [![Matrix](https://img.shields.io/matrix/himalaya.email.client:matrix.org?style=flat-square)](https://matrix.to/#/#himalaya.email.client:matrix.org)
 
 Command-line interface for email management based on the
 [himalaya-lib](https://git.sr.ht/~soywod/himalaya-lib).
