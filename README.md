@@ -37,7 +37,7 @@ features.*
 </td>
 <td width="50%">
 
-```console
+```shell
 # Arch Linux (official)
 $ pacman -S himalaya
 
