@@ -1,4 +1,4 @@
-# 📫 Himalaya ![GitHub release](https://img.shields.io/github/v/release/soywod/himalaya?color=success&style=flat-square) ![Matrix](https://img.shields.io/matrix/himalaya.email.client:matrix.org?color=success&label=chat&style=flat-square)
+# 📫 Himalaya [![GitHub release](https://img.shields.io/github/v/release/soywod/himalaya?color=success&style=flat-square)](https://github.com/soywod/himalaya/releases/latest) [![Matrix](https://img.shields.io/matrix/himalaya.email.client:matrix.org?color=success&label=chat&style=flat-square)](https://matrix.to/#/#himalaya.email.client:matrix.org)
 
 Command-line interface for email management based on the
 [himalaya-lib](https://git.sr.ht/~soywod/himalaya-lib).
