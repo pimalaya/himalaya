@@ -33,8 +33,7 @@ clap_complete = "4.0"
 clap_mangen = "0.2"
 env_logger = "0.8"
 erased-serde = "0.3"
-# himalaya-lib = { git = "https://git.sr.ht/~soywod/himalaya-lib", branch = "develop" }
-himalaya-lib = { path = "/home/soywod/sourcehut/himalaya-lib" }
+himalaya-lib = { git = "https://git.sr.ht/~soywod/himalaya-lib", branch = "develop" }
 log = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
