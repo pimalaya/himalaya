@@ -330,10 +330,10 @@ fn parse_page_arg(matches: &ArgMatches) -> usize {
 pub fn headers_arg() -> Arg {
     Arg::new(ARG_HEADERS)
         .help("Shows additional headers with the email")
-        .short('H')
         .long("header")
+        .short('H')
         .value_name("STRING")
-        .num_args(0..)
+        .num_args(..)
 }
 
 /// Represents the email headers argument parser.

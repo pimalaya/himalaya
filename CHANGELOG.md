@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added the email composer (from its own
   [repository](https://git.sr.ht/~soywod/mime-msg-builder)) [#341].
 * Added Musl builds to releases [#356].
+* Added `himalaya man` command to generate man page [#419].
 
 ### Fixed
 
@@ -619,4 +620,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#346]: https://github.com/soywod/himalaya/issues/346
 [#352]: https://github.com/soywod/himalaya/issues/352
 [#356]: https://github.com/soywod/himalaya/issues/356
+[#419]: https://github.com/soywod/himalaya/issues/419
 [#430]: https://github.com/soywod/himalaya/issues/430

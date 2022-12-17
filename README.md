@@ -1,4 +1,4 @@
-# 📫 Himalaya
+# 📫 Himalaya ![Matrix](https://img.shields.io/matrix/himalaya.email.client:matrix.org?style=for-the-badge)
 
 Command-line interface for email management based on the
 [himalaya-lib](https://git.sr.ht/~soywod/himalaya-lib).
@@ -37,7 +37,7 @@ features.*
 </td>
 <td width="50%">
 
-```shell-session
+```console
 # Arch Linux (official)
 $ pacman -S himalaya
 
@@ -54,8 +54,8 @@ $ cargo install himalaya
 $ nix-env -i himalaya
 ```
 
-*See the [wiki](https://github.com/soywod/himalaya/wiki) for other
-installation methods.*
+*See the [wiki](https://github.com/soywod/himalaya/wiki/Installation)
+for other installation methods.*
 
 </td>
 </tr>
@@ -103,8 +103,7 @@ sender = "sendmail"
 sendmail-cmd = "msmtp --read-envelope-from --read-recipients"
 ```
 
-*See the
-[wiki](https://github.com/soywod/himalaya/wiki/Configuration:config-file)
+*See the [wiki](https://github.com/soywod/himalaya/wiki/Configuration)
 for all the options.*
 
 ## Contributing
