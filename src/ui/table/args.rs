@@ -15,5 +15,7 @@ pub fn max_width() -> Arg {
 
 /// Represents the max table width argument parser.
 pub fn parse_max_width(matches: &ArgMatches) -> Option<usize> {
-    matches.get_one::<usize>(ARG_MAX_TABLE_WIDTH).cloned()
+    matches
+        .get_one::<String>(ARG_MAX_TABLE_WIDTH)
+        .and_then(|s| s.parse().ok())
 }

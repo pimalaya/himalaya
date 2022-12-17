@@ -80,7 +80,7 @@ pub fn parse_target_arg(matches: &ArgMatches) -> &str {
 
 #[cfg(test)]
 mod tests {
-    use clap::{error::ContextKind, Command};
+    use clap::{error::ErrorKind, Command};
 
     use super::*;
 
@@ -127,19 +127,19 @@ mod tests {
         let app = get_matches_from![];
         assert_eq!(
             Some("inbox"),
-            app.get_one::<String>("source").map(String::as_str)
+            app.get_one::<String>(ARG_SOURCE).map(String::as_str)
         );
 
         let app = get_matches_from!["-f", "SOURCE"];
         assert_eq!(
             Some("SOURCE"),
-            app.get_one::<String>("source").map(String::as_str)
+            app.get_one::<String>(ARG_SOURCE).map(String::as_str)
         );
 
         let app = get_matches_from!["--folder", "SOURCE"];
         assert_eq!(
             Some("SOURCE"),
-            app.get_one::<String>("source").map(String::as_str)
+            app.get_one::<String>(ARG_SOURCE).map(String::as_str)
         );
     }
 
@@ -149,14 +149,19 @@ mod tests {
             ($($arg:expr),*) => {
                 Command::new("himalaya")
                     .arg(target_arg())
-                    .get_matches_from_safe(&["himalaya", $($arg,)*])
+                    .try_get_matches_from_mut(&["himalaya", $($arg,)*])
             };
         }
 
         let app = get_matches_from![];
-        assert_eq!(ContextKind::MissingRequiredArgument, app.unwrap_err().kind);
+        assert_eq!(ErrorKind::MissingRequiredArgument, app.unwrap_err().kind());
 
         let app = get_matches_from!["TARGET"];
-        assert_eq!(Some("TARGET"), app.unwrap().value_of("target"));
+        assert_eq!(
+            Some("TARGET"),
+            app.unwrap()
+                .get_one::<String>(ARG_TARGET)
+                .map(String::as_str)
+        );
     }
 }
