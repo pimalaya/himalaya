@@ -76,8 +76,8 @@ fn main() -> Result<()> {
     // checks completion command before configs
     // https://github.com/soywod/himalaya/issues/115
     match man::args::matches(&m)? {
-        Some(man::args::Cmd::Generate) => {
-            return man::handlers::generate(create_app());
+        Some(man::args::Cmd::GenerateAll(dir)) => {
+            return man::handlers::generate(dir, create_app());
         }
         _ => (),
     }

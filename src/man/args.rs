@@ -4,28 +4,38 @@
 //! man.
 
 use anyhow::Result;
-use clap::{self, ArgMatches, Command};
+use clap::{Arg, ArgMatches, Command};
+use log::debug;
 
+const ARG_DIR: &str = "dir";
 const CMD_MAN: &str = "man";
 
 /// Man commands.
-pub enum Cmd {
-    /// Generates man page.
-    Generate,
+pub enum Cmd<'a> {
+    /// Generates all man pages to the specified directory.
+    GenerateAll(&'a str),
 }
 
 /// Man command matcher.
 pub fn matches(m: &ArgMatches) -> Result<Option<Cmd>> {
-    if let Some(_) = m.subcommand_matches(CMD_MAN) {
-        return Ok(Some(Cmd::Generate));
+    if let Some(m) = m.subcommand_matches(CMD_MAN) {
+        let dir = m.get_one::<String>(ARG_DIR).map(String::as_str).unwrap();
+        debug!("directory: {}", dir);
+        return Ok(Some(Cmd::GenerateAll(dir)));
     };
 
     Ok(None)
 }
 
 /// Man subcommands.
-pub fn subcmds<'a>() -> Vec<clap::Command> {
+pub fn subcmds<'a>() -> Vec<Command> {
     vec![Command::new(CMD_MAN)
         .alias("manual")
-        .about("Generates the man page.")]
+        .about("Generates all man pages to the specified directory.")
+        .arg(
+            Arg::new(ARG_DIR)
+                .help("Directory where to generate man files")
+                .long_help("Represents the directory where all man files of all commands and subcommands should be generated in.")
+                .required(true),
+        )]
 }
