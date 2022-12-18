@@ -87,23 +87,6 @@ mod tests {
     }
 
     #[test]
-    fn it_should_match_aliases() {
-        macro_rules! get_matches_from {
-            ($alias:expr) => {
-                Command::new("himalaya")
-                    .subcommands(subcmds())
-                    .get_matches_from(&["himalaya", $alias])
-                    .subcommand_name()
-            };
-        }
-
-        assert_eq!(Some("folders"), get_matches_from!["folders"]);
-        assert_eq!(Some("folders"), get_matches_from!["folder"]);
-        assert_eq!(Some("folders"), get_matches_from!["fold"]);
-        assert_eq!(Some("folders"), get_matches_from!["fo"]);
-    }
-
-    #[test]
     fn it_should_match_source_arg() {
         macro_rules! get_matches_from {
             ($($arg:expr),*) => {
