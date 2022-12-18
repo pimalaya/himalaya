@@ -4,7 +4,7 @@
 //! arguments related to the email domain.
 
 use anyhow::Result;
-use clap::{Arg, ArgMatches, Command};
+use clap::{Arg, ArgAction, ArgMatches, Command};
 
 use crate::{email, flag, folder, tpl, ui::table};
 
@@ -186,11 +186,11 @@ pub fn subcmds() -> Vec<Command> {
                 .arg(raw_arg()),
             Command::new(CMD_READ)
                 .about("Reads text bodies of an email")
-                .arg(id_arg())
                 .arg(mime_type_arg())
                 .arg(sanitize_flag())
                 .arg(raw_flag())
-                .arg(headers_arg()),
+                .arg(headers_arg())
+                .arg(id_arg()),
             Command::new(CMD_REPLY)
                 .aliases(&["rep", "r"])
                 .about("Answers to an email")
@@ -235,12 +235,11 @@ pub fn parse_id_arg(matches: &ArgMatches) -> &str {
 /// Represents the email sort criteria argument.
 pub fn criteria_arg<'a>() -> Arg {
     Arg::new(ARG_CRITERIA)
+        .help("Email sorting preferences")
         .long("criterion")
         .short('c')
-        .help("Email sorting preferences")
         .value_name("CRITERION:ORDER")
-        .num_args(1..)
-        .required(true)
+        .action(ArgAction::Append)
         .value_parser([
             "arrival",
             "arrival:asc",
@@ -333,7 +332,7 @@ pub fn headers_arg() -> Arg {
         .long("header")
         .short('H')
         .value_name("STRING")
-        .num_args(..)
+        .action(ArgAction::Append)
 }
 
 /// Represents the email headers argument parser.
