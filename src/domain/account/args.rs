@@ -32,7 +32,6 @@ pub fn matches(m: &ArgMatches) -> Result<Option<Cmd>> {
 /// Represents the account subcommands.
 pub fn subcmds<'a>() -> Vec<Command> {
     vec![Command::new(CMD_ACCOUNTS)
-        .aliases(&["account", "acc", "a"])
         .about("Lists accounts")
         .arg(table::args::max_width())]
 }

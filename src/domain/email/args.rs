@@ -9,7 +9,7 @@ use clap::{Arg, ArgAction, ArgMatches, Command};
 use crate::{email, flag, folder, tpl, ui::table};
 
 const ARG_CRITERIA: &str = "criterion";
-const ARG_HEADERS: &str = "header";
+const ARG_HEADERS: &str = "headers";
 const ARG_ID: &str = "id";
 const ARG_MIME_TYPE: &str = "mime-type";
 const ARG_PAGE: &str = "page";
@@ -151,17 +151,16 @@ pub fn subcmds() -> Vec<Command> {
         tpl::args::subcmds(),
         vec![
             Command::new(CMD_ATTACHMENTS)
-                .aliases(&["attachment", "attach", "att", "at"])
                 .about("Downloads all attachments of the targeted email")
                 .arg(email::args::id_arg()),
             Command::new(CMD_LIST)
-                .aliases(&["lst", "l"])
+                .alias("lst")
                 .about("Lists all emails")
                 .arg(page_size_arg())
                 .arg(page_arg())
                 .arg(table::args::max_width()),
             Command::new(CMD_SEARCH)
-                .aliases(&["s", "query", "q"])
+                .aliases(["query", "q"])
                 .about("Lists emails matching the given query")
                 .arg(page_size_arg())
                 .arg(page_arg())
@@ -176,8 +175,8 @@ pub fn subcmds() -> Vec<Command> {
                 .arg(query_arg()),
             Command::new(CMD_WRITE)
                 .about("Writes a new email")
-                .aliases(&["w", "new", "n"])
-                .args(&tpl::args::args()),
+                .aliases(["new", "n"])
+                .args(tpl::args::args()),
             Command::new(CMD_SEND)
                 .about("Sends a raw email")
                 .arg(raw_arg()),
@@ -192,26 +191,27 @@ pub fn subcmds() -> Vec<Command> {
                 .arg(headers_arg())
                 .arg(id_arg()),
             Command::new(CMD_REPLY)
-                .aliases(&["rep", "r"])
                 .about("Answers to an email")
-                .arg(id_arg())
-                .arg(reply_all_flag()),
+                .arg(reply_all_flag())
+                .args(tpl::args::args())
+                .arg(id_arg()),
             Command::new(CMD_FORWARD)
-                .aliases(&["fwd", "f"])
+                .aliases(["fwd", "f"])
                 .about("Forwards an email")
+                .args(tpl::args::args())
                 .arg(id_arg()),
             Command::new(CMD_COPY)
-                .aliases(&["cp", "c"])
+                .alias("cp")
                 .about("Copies an email to the targeted folder")
                 .arg(id_arg())
                 .arg(folder::args::target_arg()),
             Command::new(CMD_MOVE)
-                .aliases(&["mv"])
+                .alias("mv")
                 .about("Moves an email to the targeted folder")
                 .arg(id_arg())
                 .arg(folder::args::target_arg()),
             Command::new(CMD_DELETE)
-                .aliases(&["del", "d", "remove", "rm"])
+                .aliases(["remove", "rm"])
                 .about("Deletes an email")
                 .arg(id_arg()),
         ],
@@ -281,11 +281,12 @@ pub fn reply_all_flag() -> Arg {
         .help("Includes all recipients")
         .long("all")
         .short('A')
+        .action(ArgAction::SetTrue)
 }
 
 /// Represents the email reply all argument parser.
 pub fn parse_reply_all_flag(matches: &ArgMatches) -> bool {
-    matches.contains_id(ARG_REPLY_ALL)
+    matches.get_flag(ARG_REPLY_ALL)
 }
 
 /// Represents the page size argument.
@@ -336,9 +337,8 @@ pub fn headers_arg() -> Arg {
 }
 
 /// Represents the email headers argument parser.
-pub fn parse_headers_arg(matches: &ArgMatches) -> Vec<&str> {
-    matches
-        .get_many::<String>(ARG_HEADERS)
+pub fn parse_headers_arg(m: &ArgMatches) -> Vec<&str> {
+    m.get_many::<String>(ARG_HEADERS)
         .unwrap_or_default()
         .map(String::as_str)
         .collect::<Vec<_>>()
@@ -350,6 +350,7 @@ pub fn sanitize_flag() -> Arg {
         .help("Sanitizes text bodies")
         .long("sanitize")
         .short('s')
+        .action(ArgAction::SetTrue)
 }
 
 /// Represents the raw flag.
@@ -358,16 +359,17 @@ pub fn raw_flag() -> Arg {
         .help("Returns raw version of email")
         .long("raw")
         .short('r')
+        .action(ArgAction::SetTrue)
 }
 
 /// Represents the sanitize flag parser.
-pub fn parse_sanitize_flag(matches: &ArgMatches) -> bool {
-    matches.contains_id(ARG_SANITIZE)
+pub fn parse_sanitize_flag(m: &ArgMatches) -> bool {
+    m.get_flag(ARG_SANITIZE)
 }
 
 /// Represents the raw flag parser.
-pub fn parse_raw_flag(matches: &ArgMatches) -> bool {
-    matches.contains_id(ARG_RAW)
+pub fn parse_raw_flag(m: &ArgMatches) -> bool {
+    m.get_flag(ARG_RAW)
 }
 
 /// Represents the email raw argument.
@@ -376,11 +378,8 @@ pub fn raw_arg() -> Arg {
 }
 
 /// Represents the email raw argument parser.
-pub fn parse_raw_arg(matches: &ArgMatches) -> String {
-    matches
-        .get_one::<String>(ARG_RAW)
-        .cloned()
-        .unwrap_or_default()
+pub fn parse_raw_arg(m: &ArgMatches) -> String {
+    m.get_one::<String>(ARG_RAW).cloned().unwrap_or_default()
 }
 
 /// Represents the email MIME type argument.

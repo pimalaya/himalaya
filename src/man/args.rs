@@ -30,7 +30,6 @@ pub fn matches(m: &ArgMatches) -> Result<Option<Cmd>> {
 /// Man subcommands.
 pub fn subcmds<'a>() -> Vec<Command> {
     vec![Command::new(CMD_MAN)
-        .alias("manual")
         .about("Generates all man pages to the specified directory.")
         .arg(
             Arg::new(ARG_DIR)

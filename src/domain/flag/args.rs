@@ -54,27 +54,25 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
 /// Represents the flag subcommands.
 pub fn subcmds<'a>() -> Vec<Command> {
     vec![Command::new(CMD_FLAG)
-        .aliases(&["flags", "flg"])
         .about("Handles email flags")
         .subcommand_required(true)
         .arg_required_else_help(true)
         .subcommand(
             Command::new(CMD_ADD)
-                .aliases(&["a"])
                 .about("Adds flags to an email")
                 .arg(email::args::id_arg())
                 .arg(flags_arg()),
         )
         .subcommand(
             Command::new(CMD_REMOVE)
-                .aliases(&["rem", "rm", "r", "delete", "del", "d"])
+                .aliases(["delete", "del", "d"])
                 .about("Removes flags from an email")
                 .arg(email::args::id_arg())
                 .arg(flags_arg()),
         )
         .subcommand(
             Command::new(CMD_SET)
-                .aliases(&["s", "change", "c"])
+                .aliases(["change", "c"])
                 .about("Sets flags of an email")
                 .arg(email::args::id_arg())
                 .arg(flags_arg()),

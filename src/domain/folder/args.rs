@@ -35,17 +35,6 @@ pub fn matches(m: &ArgMatches) -> Result<Option<Cmd>> {
 /// Represents folder subcommands.
 pub fn subcmds<'a>() -> Vec<Command> {
     vec![Command::new(CMD_FOLDERS)
-        .aliases(&[
-            "folder",
-            "fold",
-            "fo",
-            "mailboxes",
-            "mailbox",
-            "mboxes",
-            "mbox",
-            "mb",
-            "m",
-        ])
         .about("Lists folders")
         .arg(table::args::max_width())]
 }

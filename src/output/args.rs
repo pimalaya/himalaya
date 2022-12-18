@@ -20,7 +20,6 @@ pub fn args() -> Vec<Arg> {
         Arg::new("log-level")
             .help("Defines the logs level")
             .long("log-level")
-            .alias("log")
             .short('l')
             .value_name("LEVEL")
             .value_parser(["error", "warn", "info", "debug", "trace"])

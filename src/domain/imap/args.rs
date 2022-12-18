@@ -43,7 +43,7 @@ pub fn subcmds<'a>() -> Vec<Command> {
     vec![
         Command::new(CMD_NOTIFY)
             .about("Notifies when new messages arrive in the given folder")
-            .aliases(&["idle"])
+            .alias("idle")
             .arg(
                 Arg::new(ARG_KEEPALIVE)
                     .help("Specifies the keepalive duration")
