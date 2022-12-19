@@ -280,7 +280,7 @@ pub fn reply_all_flag() -> Arg {
     Arg::new(ARG_REPLY_ALL)
         .help("Includes all recipients")
         .long("all")
-        .short('A')
+        .short('a')
         .action(ArgAction::SetTrue)
 }
 

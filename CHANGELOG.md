@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   commands. Instead you can encrypt and sign parts directly from the
   template using the syntax `<#part type=text/plain encrypt=command
   sign=command>Hello!<#/part>`.
+* Removed the `-l|--log-level` option, use instead the `RUST_LOG`
+  environment variable (see the
+  [wiki](https://github.com/soywod/himalaya/wiki/Tips:debug-and-logs))
 
 ## [0.6.1] - 2022-10-12
 

@@ -4,8 +4,8 @@
 
 use clap::Arg;
 
-pub(crate) const ARG_OUTPUT: &str = "output";
 pub(crate) const ARG_COLOR: &str = "color";
+pub(crate) const ARG_OUTPUT: &str = "output";
 
 /// Output arguments.
 pub fn args() -> Vec<Arg> {
@@ -17,13 +17,6 @@ pub fn args() -> Vec<Arg> {
             .value_name("FMT")
             .value_parser(["plain", "json"])
             .default_value("plain"),
-        Arg::new("log-level")
-            .help("Defines the logs level")
-            .long("log-level")
-            .short('l')
-            .value_name("LEVEL")
-            .value_parser(["error", "warn", "info", "debug", "trace"])
-            .default_value("info"),
         Arg::new(ARG_COLOR)
             .help("Controls when to use colors.")
             .long_help(

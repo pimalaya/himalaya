@@ -15,7 +15,7 @@ const CMD_ADD: &str = "add";
 const CMD_REMOVE: &str = "remove";
 const CMD_SET: &str = "set";
 
-pub(crate) const CMD_FLAG: &str = "flag";
+pub(crate) const CMD_FLAG: &str = "flags";
 
 type Flags = String;
 
