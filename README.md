@@ -23,8 +23,8 @@ before the `v1.0.0`.*
 - JSON output
 - …
 
-*See the [wiki](https://github.com/soywod/himalaya/wiki) for all the
-features.*
+*Note: see the [wiki](https://github.com/soywod/himalaya/wiki) for all
+the features.*
 
 ## Installation
 
@@ -54,8 +54,9 @@ $ cargo install himalaya
 $ nix-env -i himalaya
 ```
 
-*See the [wiki](https://github.com/soywod/himalaya/wiki/Installation)
-for other installation methods.*
+*Note: see the
+[wiki](https://github.com/soywod/himalaya/wiki/Installation) for other
+installation methods.*
 
 </td>
 </tr>
@@ -103,8 +104,9 @@ sender = "sendmail"
 sendmail-cmd = "msmtp --read-envelope-from --read-recipients"
 ```
 
-*See the [wiki](https://github.com/soywod/himalaya/wiki/Configuration)
-for all the options.*
+*Note: see the
+[wiki](https://github.com/soywod/himalaya/wiki/Configuration) for all
+the options.*
 
 ## Contributing
 
@@ -113,6 +115,12 @@ If you find a **bug**, please send an email at
 
 If you have a **question**, please send an email at
 [~soywod/himalaya@lists.sr.ht](mailto:~soywod/himalaya@lists.sr.ht).
+
+If you want to **propose a feature** or **fix a bug**, please send a
+patch at
+[~soywod/himalaya@lists.sr.ht](mailto:~soywod/himalaya@lists.sr.ht)
+using [git send-email](https://git-scm.com/docs/git-send-email) (see
+[this guide](https://git-send-email.io/) on how to configure it).
 
 If you want to **subscribe** to the mailing list, please send an email
 at
