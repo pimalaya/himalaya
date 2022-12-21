@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Added the email composer (from its own
   [repository](https://git.sr.ht/~soywod/mime-msg-builder)) [#341].
+* Added Musl builds to releases [#356].
+* Added `himalaya man` command to generate man page [#419].
+
+### Fixed
+
+* Fixed missing folder aliases [#430].
 
 ### Removed
 
@@ -22,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   commands. Instead you can encrypt and sign parts directly from the
   template using the syntax `<#part type=text/plain encrypt=command
   sign=command>Hello!<#/part>`.
+* Removed the `-l|--log-level` option, use instead the `RUST_LOG`
+  environment variable (see the
+  [wiki](https://github.com/soywod/himalaya/wiki/Tips:debug-and-logs))
 
 ## [0.6.1] - 2022-10-12
 
@@ -452,7 +461,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Password from command [#22]
 * Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.6.1...HEAD
+[unreleased]: https://github.com/soywod/himalaya/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/soywod/himalaya/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/soywod/himalaya/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/soywod/himalaya/compare/v0.5.10...v0.6.0
 [0.5.10]: https://github.com/soywod/himalaya/compare/v0.5.9...v0.5.10
@@ -612,3 +622,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#344]: https://github.com/soywod/himalaya/issues/344
 [#346]: https://github.com/soywod/himalaya/issues/346
 [#352]: https://github.com/soywod/himalaya/issues/352
+[#356]: https://github.com/soywod/himalaya/issues/356
+[#419]: https://github.com/soywod/himalaya/issues/419
+[#430]: https://github.com/soywod/himalaya/issues/430

@@ -1,0 +1,38 @@
+name: nix
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+jobs:
+  nix-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkouts code
+        uses: actions/checkout@v3
+
+      - name: Caches Nix store
+        uses: actions/cache@v3
+        id: nix-cache
+        with:
+          path: /tmp/nix-cache
+          key: nix-${{ hashFiles('**/flake.*') }}
+
+      - name: Installs Nix
+        uses: cachix/install-nix-action@v18
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Imports Nix store cache
+        if: ${{ steps.nix-cache.outputs.cache-hit == 'true' }}
+        run: nix-store --import < /tmp/nix-cache
+
+      - name: Builds the project
+        run: nix build
+
+      - name: Exports Nix store cache
+        if: ${{ steps.nix-cache.outputs.cache-hit != 'true' }}
+        run: nix-store --export $(find /nix/store -maxdepth 1 -name '*-*') > /tmp/nix-cache

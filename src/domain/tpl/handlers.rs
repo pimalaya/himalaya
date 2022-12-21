@@ -49,7 +49,7 @@ pub fn save<P: Printer, B: Backend + ?Sized>(
     printer: &mut P,
     backend: &mut B,
     folder: &str,
-    tpl: &str,
+    tpl: String,
 ) -> Result<()> {
     let email = Tpl::from(if atty::is(Stream::Stdin) || printer.is_json() {
         tpl.replace("\r", "")
@@ -77,7 +77,7 @@ pub fn send<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
     backend: &mut B,
     sender: &mut S,
     folder: &str,
-    tpl: &str,
+    tpl: String,
 ) -> Result<()> {
     let email = Tpl::from(if atty::is(Stream::Stdin) || printer.is_json() {
         tpl.replace("\r", "")

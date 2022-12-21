@@ -3,13 +3,17 @@
 //! This module provides subcommands and a command matcher related to IMAP.
 
 use anyhow::Result;
-use clap::{App, ArgMatches};
-use log::{debug, info};
+use clap::{Arg, ArgMatches, Command};
+use log::debug;
+
+const ARG_KEEPALIVE: &str = "keepalive";
+const CMD_NOTIFY: &str = "notify";
+const CMD_WATCH: &str = "watch";
 
 type Keepalive = u64;
 
 /// IMAP commands.
-pub enum Command {
+pub enum Cmd {
     /// Start the IMAP notify mode with the give keepalive duration.
     Notify(Keepalive),
 
@@ -18,47 +22,43 @@ pub enum Command {
 }
 
 /// IMAP command matcher.
-pub fn matches(m: &ArgMatches) -> Result<Option<Command>> {
-    info!("entering imap command matcher");
-
-    if let Some(m) = m.subcommand_matches("notify") {
-        info!("notify command matched");
-        let keepalive = clap::value_t_or_exit!(m.value_of("keepalive"), u64);
+pub fn matches(m: &ArgMatches) -> Result<Option<Cmd>> {
+    if let Some(m) = m.subcommand_matches(CMD_NOTIFY) {
+        let keepalive = m.get_one::<u64>(ARG_KEEPALIVE).unwrap();
         debug!("keepalive: {}", keepalive);
-        return Ok(Some(Command::Notify(keepalive)));
+        return Ok(Some(Cmd::Notify(*keepalive)));
     }
 
-    if let Some(m) = m.subcommand_matches("watch") {
-        info!("watch command matched");
-        let keepalive = clap::value_t_or_exit!(m.value_of("keepalive"), u64);
+    if let Some(m) = m.subcommand_matches(CMD_WATCH) {
+        let keepalive = m.get_one::<u64>(ARG_KEEPALIVE).unwrap();
         debug!("keepalive: {}", keepalive);
-        return Ok(Some(Command::Watch(keepalive)));
+        return Ok(Some(Cmd::Watch(*keepalive)));
     }
 
     Ok(None)
 }
 
 /// IMAP subcommands.
-pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
+pub fn subcmds<'a>() -> Vec<Command> {
     vec![
-        clap::SubCommand::with_name("notify")
+        Command::new(CMD_NOTIFY)
             .about("Notifies when new messages arrive in the given folder")
-            .aliases(&["idle"])
+            .alias("idle")
             .arg(
-                clap::Arg::with_name("keepalive")
+                Arg::new(ARG_KEEPALIVE)
                     .help("Specifies the keepalive duration")
-                    .short("k")
                     .long("keepalive")
+                    .short('k')
                     .value_name("SECS")
                     .default_value("500"),
             ),
-        clap::SubCommand::with_name("watch")
+        Command::new(CMD_WATCH)
             .about("Watches IMAP server changes")
             .arg(
-                clap::Arg::with_name("keepalive")
+                Arg::new(ARG_KEEPALIVE)
                     .help("Specifies the keepalive duration")
-                    .short("k")
                     .long("keepalive")
+                    .short('k')
                     .value_name("SECS")
                     .default_value("500"),
             ),

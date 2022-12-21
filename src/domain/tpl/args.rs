@@ -4,12 +4,12 @@
 //! related to email templating.
 
 use anyhow::Result;
-use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
+use clap::{Arg, ArgAction, ArgMatches, Command};
 
 use crate::email;
 
 const ARG_BODY: &str = "body";
-const ARG_HEADERS: &str = "header";
+const ARG_HEADERS: &str = "headers";
 const ARG_TPL: &str = "template";
 const CMD_FORWARD: &str = "forward";
 const CMD_REPLY: &str = "reply";
@@ -19,7 +19,7 @@ const CMD_WRITE: &str = "write";
 
 pub const CMD_TPL: &str = "template";
 
-pub type RawTpl<'a> = &'a str;
+pub type RawTpl = String;
 pub type Headers<'a> = Option<Vec<&'a str>>;
 pub type Body<'a> = Option<&'a str>;
 
@@ -29,8 +29,8 @@ pub enum Cmd<'a> {
     Forward(email::args::Id<'a>, Headers<'a>, Body<'a>),
     Write(Headers<'a>, Body<'a>),
     Reply(email::args::Id<'a>, email::args::All, Headers<'a>, Body<'a>),
-    Save(RawTpl<'a>),
-    Send(RawTpl<'a>),
+    Save(RawTpl),
+    Send(RawTpl),
 }
 
 /// Represents the template command matcher.
@@ -64,72 +64,76 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
 }
 
 /// Represents the template subcommands.
-pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
-    vec![SubCommand::with_name(CMD_TPL)
-        .aliases(&["tpl"])
+pub fn subcmds<'a>() -> Vec<Command> {
+    vec![Command::new(CMD_TPL)
+        .alias("tpl")
         .about("Handles email templates")
-        .setting(AppSettings::SubcommandRequiredElseHelp)
+        .subcommand_required(true)
+        .arg_required_else_help(true)
         .subcommand(
-            SubCommand::with_name(CMD_FORWARD)
-                .aliases(&["fwd", "fw", "f"])
+            Command::new(CMD_FORWARD)
+                .alias("fwd")
                 .about("Generates a template for forwarding an email")
                 .arg(email::args::id_arg())
                 .args(&args()),
         )
         .subcommand(
-            SubCommand::with_name(CMD_REPLY)
-                .aliases(&["rep", "re", "r"])
+            Command::new(CMD_REPLY)
                 .about("Generates a template for replying to an email")
                 .arg(email::args::id_arg())
                 .arg(email::args::reply_all_flag())
                 .args(&args()),
         )
         .subcommand(
-            SubCommand::with_name(CMD_SAVE)
+            Command::new(CMD_SAVE)
                 .about("Compiles the template into a valid email then saves it")
-                .arg(Arg::with_name(ARG_TPL).raw(true)),
+                .arg(Arg::new(ARG_TPL).raw(true)),
         )
         .subcommand(
-            SubCommand::with_name(CMD_SEND)
+            Command::new(CMD_SEND)
                 .about("Compiles the template into a valid email then sends it")
-                .arg(Arg::with_name(ARG_TPL).raw(true)),
+                .arg(Arg::new(ARG_TPL).raw(true)),
         )
         .subcommand(
-            SubCommand::with_name(CMD_WRITE)
-                .aliases(&["w", "new", "n"])
+            Command::new(CMD_WRITE)
+                .aliases(["new", "n"])
                 .about("Generates a template for writing a new email")
                 .args(&args()),
         )]
 }
 
 /// Represents the template arguments.
-pub fn args<'a>() -> Vec<Arg<'a, 'a>> {
+pub fn args() -> Vec<Arg> {
     vec![
-        Arg::with_name(ARG_HEADERS)
+        Arg::new(ARG_HEADERS)
             .help("Overrides a specific header")
-            .short("h")
+            .short('H')
             .long("header")
             .value_name("KEY:VAL")
-            .multiple(true),
-        Arg::with_name(ARG_BODY)
+            .action(ArgAction::Append),
+        Arg::new(ARG_BODY)
             .help("Overrides the body")
-            .short("B")
+            .short('B')
             .long("body")
             .value_name("STRING"),
     ]
 }
 
 /// Represents the template headers argument parser.
-pub fn parse_headers_arg<'a>(matches: &'a ArgMatches<'a>) -> Headers<'a> {
-    matches.values_of(ARG_HEADERS).map(Iterator::collect)
+pub fn parse_headers_arg(m: &ArgMatches) -> Headers<'_> {
+    m.get_many(ARG_HEADERS)
+        .map(|h| h.map(String::as_str).collect::<Vec<_>>())
 }
 
 /// Represents the template body argument parser.
-pub fn parse_body_arg<'a>(matches: &'a ArgMatches<'a>) -> Body<'a> {
-    matches.value_of(ARG_BODY)
+pub fn parse_body_arg(matches: &ArgMatches) -> Body<'_> {
+    matches.get_one::<String>(ARG_BODY).map(String::as_str)
 }
 
 /// Represents the raw template argument parser.
-pub fn parse_raw_arg<'a>(matches: &'a ArgMatches<'a>) -> RawTpl<'a> {
-    matches.value_of(ARG_TPL).unwrap_or_default()
+pub fn parse_raw_arg(matches: &ArgMatches) -> RawTpl {
+    matches
+        .get_one::<String>(ARG_TPL)
+        .cloned()
+        .unwrap_or_default()
 }

@@ -1,12 +1,12 @@
 use anyhow::Result;
+use clap::Command;
 use std::env;
 use url::Url;
 
 use himalaya::{
     account, compl,
     config::{self, DeserializedConfig},
-    email, flag, folder,
-    output::{self, OutputFmt},
+    email, flag, folder, man, output,
     printer::StdoutPrinter,
     tpl,
 };
@@ -15,17 +15,19 @@ use himalaya_lib::{BackendBuilder, BackendConfig, ImapBackend, SenderBuilder};
 #[cfg(feature = "imap-backend")]
 use himalaya::imap;
 
-fn create_app<'a>() -> clap::App<'a, 'a> {
-    let app = clap::App::new(env!("CARGO_PKG_NAME"))
+fn create_app() -> Command {
+    let app = Command::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .author(env!("CARGO_PKG_AUTHORS"))
-        .global_setting(clap::AppSettings::GlobalVersion)
+        .propagate_version(true)
+        .infer_subcommands(true)
         .arg(&config::args::arg())
         .arg(&account::args::arg())
         .args(&output::args::args())
         .arg(folder::args::source_arg())
         .subcommands(compl::args::subcmds())
+        .subcommands(man::args::subcmds())
         .subcommands(account::args::subcmds())
         .subcommands(folder::args::subcmds())
         .subcommands(email::args::subcmds());
@@ -49,7 +51,7 @@ fn main() -> Result<()> {
         let (account_config, backend_config) = config.to_configs(None)?;
         let mut backend = BackendBuilder::build(&account_config, &backend_config)?;
         let mut sender = SenderBuilder::build(&account_config)?;
-        let mut printer = StdoutPrinter::from_fmt(OutputFmt::Plain);
+        let mut printer = StdoutPrinter::default();
 
         return email::handlers::mailto(
             &account_config,
@@ -66,8 +68,17 @@ fn main() -> Result<()> {
     // checks completion command before configs
     // https://github.com/soywod/himalaya/issues/115
     match compl::args::matches(&m)? {
-        Some(compl::args::Command::Generate(shell)) => {
+        Some(compl::args::Cmd::Generate(shell)) => {
             return compl::handlers::generate(create_app(), shell);
+        }
+        _ => (),
+    }
+
+    // checks completion command before configs
+    // https://github.com/soywod/himalaya/issues/115
+    match man::args::matches(&m)? {
+        Some(man::args::Cmd::GenerateAll(dir)) => {
+            return man::handlers::generate(dir, create_app());
         }
         _ => (),
     }
@@ -84,10 +95,10 @@ fn main() -> Result<()> {
         // recreating an instance.
         let mut imap = ImapBackend::new(imap_config)?;
         match imap::args::matches(&m)? {
-            Some(imap::args::Command::Notify(keepalive)) => {
+            Some(imap::args::Cmd::Notify(keepalive)) => {
                 return imap::handlers::notify(&mut imap, &folder, keepalive);
             }
-            Some(imap::args::Command::Watch(keepalive)) => {
+            Some(imap::args::Cmd::Watch(keepalive)) => {
                 return imap::handlers::watch(&mut imap, &folder, keepalive);
             }
             _ => (),
@@ -97,7 +108,7 @@ fn main() -> Result<()> {
     // inits services
     let mut backend = BackendBuilder::build(&account_config, &backend_config)?;
     let mut sender = SenderBuilder::build(&account_config)?;
-    let mut printer = StdoutPrinter::from_opt_str(m.value_of("output"))?;
+    let mut printer = StdoutPrinter::try_from(&m)?;
 
     // checks account commands
     match account::args::matches(&m)? {
@@ -122,26 +133,33 @@ fn main() -> Result<()> {
 
     // checks email commands
     match email::args::matches(&m)? {
-        Some(email::args::Cmd::Attachments(seq)) => {
+        Some(email::args::Cmd::Attachments(id)) => {
             return email::handlers::attachments(
-                seq,
-                &folder,
                 &account_config,
                 &mut printer,
                 backend.as_mut(),
+                &folder,
+                id,
             );
         }
-        Some(email::args::Cmd::Copy(id, folder_target)) => {
+        Some(email::args::Cmd::Copy(ids, folder_target)) => {
             return email::handlers::copy(
-                id,
-                &folder,
-                folder_target,
+                &account_config,
                 &mut printer,
                 backend.as_mut(),
+                &folder,
+                folder_target,
+                ids,
             );
         }
-        Some(email::args::Cmd::Delete(seq)) => {
-            return email::handlers::delete(seq, &folder, &mut printer, backend.as_mut());
+        Some(email::args::Cmd::Delete(ids)) => {
+            return email::handlers::delete(
+                &account_config,
+                &mut printer,
+                backend.as_mut(),
+                &folder,
+                ids,
+            );
         }
         Some(email::args::Cmd::Forward(id, headers, body)) => {
             return email::handlers::forward(
@@ -157,17 +175,24 @@ fn main() -> Result<()> {
         }
         Some(email::args::Cmd::List(max_width, page_size, page)) => {
             return email::handlers::list(
-                max_width,
-                page_size,
-                page,
-                &folder,
                 &account_config,
                 &mut printer,
                 backend.as_mut(),
+                &folder,
+                max_width,
+                page_size,
+                page,
             );
         }
-        Some(email::args::Cmd::Move(seq, mbox_dst)) => {
-            return email::handlers::move_(seq, &folder, mbox_dst, &mut printer, backend.as_mut());
+        Some(email::args::Cmd::Move(ids, folder_target)) => {
+            return email::handlers::move_(
+                &account_config,
+                &mut printer,
+                backend.as_mut(),
+                &folder,
+                folder_target,
+                ids,
+            );
         }
         Some(email::args::Cmd::Read(id, text_mime, sanitize, raw, headers)) => {
             return email::handlers::read(
@@ -196,7 +221,13 @@ fn main() -> Result<()> {
             );
         }
         Some(email::args::Cmd::Save(raw_email)) => {
-            return email::handlers::save(&mut printer, backend.as_mut(), &folder, raw_email);
+            return email::handlers::save(
+                &account_config,
+                &mut printer,
+                backend.as_mut(),
+                &folder,
+                raw_email,
+            );
         }
         Some(email::args::Cmd::Search(query, max_width, page_size, page)) => {
             return email::handlers::search(

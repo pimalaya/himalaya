@@ -1,7 +1,7 @@
 [package]
 name = "himalaya"
 description = "Command-line interface for email management."
-version = "0.6.1"
+version = "0.6.2"
 authors = ["soywod <clement.douin@posteo.net>"]
 edition = "2021"
 license = "MIT"
@@ -27,8 +27,9 @@ tempfile = "3.3"
 [dependencies]
 anyhow = "1.0"
 atty = "0.2"
-chrono = "0.4"
-clap = { version = "2.33", default-features = false, features = ["suggestions", "color"] }
+clap = "4.0"
+clap_complete = "4.0"
+clap_mangen = "0.2"
 console = "0.15.2"
 dirs = "4.0.0"
 dialoguer = "0.10.2"
