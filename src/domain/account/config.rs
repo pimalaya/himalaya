@@ -14,13 +14,13 @@ use himalaya_lib::MaildirConfig;
 #[cfg(feature = "notmuch-backend")]
 use himalaya_lib::NotmuchConfig;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
 
 use crate::config::{prelude::*, DeserializedConfig};
 
 /// Represents all existing kind of account config.
-#[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(tag = "backend", rename_all = "snake_case")]
 pub enum DeserializedAccountConfig {
     None(DeserializedBaseAccountConfig),
@@ -69,7 +69,7 @@ impl DeserializedAccountConfig {
     }
 }
 
-#[derive(Default, Debug, Clone, Eq, PartialEq, Deserialize)]
+#[derive(Default, Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct DeserializedBaseAccountConfig {
     pub email: String,
@@ -84,7 +84,7 @@ pub struct DeserializedBaseAccountConfig {
 
     pub email_listing_page_size: Option<usize>,
     pub email_reading_headers: Option<Vec<String>>,
-    #[serde(default, with = "email_text_plain_format")]
+    #[serde(with = "EmailTextPlainFormatOptionDef")]
     pub email_reading_format: Option<EmailTextPlainFormat>,
     pub email_reading_verify_cmd: Option<String>,
     pub email_reading_decrypt_cmd: Option<String>,
@@ -93,7 +93,7 @@ pub struct DeserializedBaseAccountConfig {
     pub email_writing_encrypt_cmd: Option<String>,
     #[serde(flatten, with = "EmailSenderDef")]
     pub email_sender: EmailSender,
-    #[serde(default, with = "email_hooks")]
+    #[serde(with = "EmailHooksOptionDef")]
     pub email_hooks: Option<EmailHooks>,
 }
 
@@ -215,7 +215,7 @@ impl DeserializedBaseAccountConfig {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
 #[cfg(feature = "imap-backend")]
 pub struct DeserializedImapAccountConfig {
     #[serde(flatten)]
@@ -224,7 +224,7 @@ pub struct DeserializedImapAccountConfig {
     pub backend: ImapConfig,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
 #[cfg(feature = "maildir-backend")]
 pub struct DeserializedMaildirAccountConfig {
     #[serde(flatten)]
@@ -233,7 +233,7 @@ pub struct DeserializedMaildirAccountConfig {
     pub backend: MaildirConfig,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
 #[cfg(feature = "notmuch-backend")]
 pub struct DeserializedNotmuchAccountConfig {
     #[serde(flatten)]

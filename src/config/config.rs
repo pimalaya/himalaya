@@ -7,7 +7,7 @@ use anyhow::{anyhow, Context, Result};
 use dirs::{config_dir, home_dir};
 use himalaya_lib::{AccountConfig, BackendConfig, EmailHooks, EmailTextPlainFormat};
 use log::{debug, trace};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path::PathBuf};
 use toml;
 
@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// Represents the user config file.
-#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct DeserializedConfig {
     #[serde(alias = "name")]
@@ -31,14 +31,14 @@ pub struct DeserializedConfig {
 
     pub email_listing_page_size: Option<usize>,
     pub email_reading_headers: Option<Vec<String>>,
-    #[serde(default, with = "email_text_plain_format")]
+    #[serde(default, with = "EmailTextPlainFormatOptionDef")]
     pub email_reading_format: Option<EmailTextPlainFormat>,
     pub email_reading_verify_cmd: Option<String>,
     pub email_reading_decrypt_cmd: Option<String>,
     pub email_writing_headers: Option<Vec<String>>,
     pub email_writing_sign_cmd: Option<String>,
     pub email_writing_encrypt_cmd: Option<String>,
-    #[serde(default, with = "email_hooks")]
+    #[serde(default, with = "EmailHooksOptionDef")]
     pub email_hooks: Option<EmailHooks>,
 
     #[serde(flatten)]
