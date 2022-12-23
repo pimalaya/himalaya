@@ -32,8 +32,14 @@ pub(crate) fn wizard() -> Result<DeserializedConfig> {
         _ => {}
     }
 
+    // Determine path to save to
+    let path = dirs::config_dir()
+        .map(|p| p.join("himalaya").join("config.toml"))
+        .ok_or_else(|| anyhow!("The wizard could not determine the config directory. Aborting"))?;
+
     let mut config = DeserializedConfig::default();
 
+    // Setup one or multiple accounts
     while let Some(account_config) = configure_account()? {
         let name: String = Input::with_theme(&*THEME)
             .with_prompt("What would you like to name your account?")
@@ -53,9 +59,41 @@ pub(crate) fn wizard() -> Result<DeserializedConfig> {
         }
     }
 
-    // Determine path to save to
+    // If one acounts is setup, make it the default. If multiple accounts are setup, decide which
+    // will be the default. If no accounts are setup, exit the process
+    let default = match config.accounts.len() {
+        1 => Some(config.accounts.values_mut().next().unwrap()),
+        i if i > 1 => {
+            let accounts = config.accounts.clone();
+            let accounts: Vec<&String> = accounts.keys().collect();
+            match Select::with_theme(&*THEME)
+                .with_prompt("Which account would you like to set as your default?")
+                .items(&accounts)
+                .default(0)
+                .interact_opt()?
+            {
+                Some(i) => Some(config.accounts.get_mut(accounts[i]).unwrap()),
+                _ => std::process::exit(0),
+            }
+        }
+        _ => std::process::exit(0),
+    };
+
+    match default {
+        Some(DeserializedAccountConfig::None(default)) => default.default = Some(true),
+        #[cfg(feature = "imap-backend")]
+        Some(DeserializedAccountConfig::Imap(default)) => default.base.default = Some(true),
+        #[cfg(feature = "maildir-backend")]
+        Some(DeserializedAccountConfig::Maildir(default)) => default.base.default = Some(true),
+        #[cfg(feature = "notmuch-backend")]
+        Some(DeserializedAccountConfig::Notmuch(default)) => default.base.default = Some(true),
+        _ => {}
+    }
 
     // Serialize config to file
+    println!("Writing the configuration to {:?}", path);
+    std::fs::create_dir_all(path.parent().unwrap())?;
+    std::fs::write(path, toml::to_vec(&config)?)?;
 
     trace!("<< wizard");
     Ok(config)
@@ -143,10 +181,10 @@ fn configure_notmuch() -> Result<DeserializedAccountConfig> {
     use himalaya_lib::NotmuchConfig;
 
     let base = configure_base()?;
-    let backend = MaildirConfig::default();
+    let backend = NotmuchConfig::default();
 
-    Ok(DeserializedAccountConfig::Maildir(
-        DeserializedMaildirAccountConfig { base, backend },
+    Ok(DeserializedAccountConfig::Notmuch(
+        DeserializedNotmuchAccountConfig { base, backend },
     ))
 }
 
