@@ -174,7 +174,7 @@ pub fn read<P: Printer, B: Backend + ?Sized>(
     }
 
     let tpl = email
-        .to_read_tpl_builder()?
+        .to_read_tpl_builder(config)?
         .show_headers(config.email_reading_headers())
         .show_headers(headers)
         .show_text_parts_only(true)
