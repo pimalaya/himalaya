@@ -11,7 +11,7 @@ pub fn add<P: Printer, B: Backend + ?Sized>(
     flags: &str,
 ) -> Result<()> {
     backend.add_flags(folder, id, flags)?;
-    printer.print_log("Flag(s) successfully added!")
+    printer.print("Flag(s) successfully added!")
 }
 
 pub fn set<P: Printer, B: Backend + ?Sized>(
@@ -22,7 +22,7 @@ pub fn set<P: Printer, B: Backend + ?Sized>(
     flags: &str,
 ) -> Result<()> {
     backend.set_flags(folder, id, flags)?;
-    printer.print_log("Flag(s) successfully set!")
+    printer.print("Flag(s) successfully set!")
 }
 
 pub fn remove<P: Printer, B: Backend + ?Sized>(
@@ -33,5 +33,5 @@ pub fn remove<P: Printer, B: Backend + ?Sized>(
     flags: &str,
 ) -> Result<()> {
     backend.remove_flags(folder, id, flags)?;
-    printer.print_log("Flag(s) successfully removed!")
+    printer.print("Flag(s) successfully removed!")
 }
