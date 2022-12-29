@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use clap::{Arg, ArgMatches, Command};
+use himalaya_lib::{Flag, Flags};
 use log::{debug, info};
 
 use crate::email;
@@ -17,33 +18,31 @@ const CMD_SET: &str = "set";
 
 pub(crate) const CMD_FLAG: &str = "flags";
 
-type Flags = String;
-
 /// Represents the flag commands.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Cmd<'a> {
-    Add(email::args::Id<'a>, Flags),
-    Remove(email::args::Id<'a>, Flags),
-    Set(email::args::Id<'a>, Flags),
+    Add(email::args::Ids<'a>, Flags),
+    Remove(email::args::Ids<'a>, Flags),
+    Set(email::args::Ids<'a>, Flags),
 }
 
 /// Represents the flag command matcher.
 pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
     let cmd = if let Some(m) = m.subcommand_matches(CMD_ADD) {
         debug!("add flags command matched");
-        let id = email::args::parse_id_arg(m);
+        let ids = email::args::parse_ids_arg(m);
         let flags = parse_flags_arg(m);
-        Some(Cmd::Add(id, flags))
+        Some(Cmd::Add(ids, flags))
     } else if let Some(m) = m.subcommand_matches(CMD_REMOVE) {
         info!("remove flags command matched");
-        let id = email::args::parse_id_arg(m);
+        let ids = email::args::parse_ids_arg(m);
         let flags = parse_flags_arg(m);
-        Some(Cmd::Remove(id, flags))
+        Some(Cmd::Remove(ids, flags))
     } else if let Some(m) = m.subcommand_matches(CMD_SET) {
         debug!("set flags command matched");
-        let id = email::args::parse_id_arg(m);
+        let ids = email::args::parse_ids_arg(m);
         let flags = parse_flags_arg(m);
-        Some(Cmd::Set(id, flags))
+        Some(Cmd::Set(ids, flags))
     } else {
         None
     };
@@ -60,21 +59,21 @@ pub fn subcmds<'a>() -> Vec<Command> {
         .subcommand(
             Command::new(CMD_ADD)
                 .about("Adds flags to an email")
-                .arg(email::args::id_arg())
+                .arg(email::args::ids_arg())
                 .arg(flags_arg()),
         )
         .subcommand(
             Command::new(CMD_REMOVE)
                 .aliases(["delete", "del", "d"])
                 .about("Removes flags from an email")
-                .arg(email::args::id_arg())
+                .arg(email::args::ids_arg())
                 .arg(flags_arg()),
         )
         .subcommand(
             Command::new(CMD_SET)
                 .aliases(["change", "c"])
                 .about("Sets flags of an email")
-                .arg(email::args::id_arg())
+                .arg(email::args::ids_arg())
                 .arg(flags_arg()),
         )]
 }
@@ -82,17 +81,20 @@ pub fn subcmds<'a>() -> Vec<Command> {
 /// Represents the flags argument.
 pub fn flags_arg() -> Arg {
     Arg::new(ARG_FLAGS)
-        .value_name("FLAGS…")
+        .value_name("FLAGS")
+        .help("The list of flags.")
+        .long_help("The list of flags. It can be one of: seen, answered, flagged, deleted, draft, recent. Other flags are considered custom.")
         .num_args(1..)
         .required(true)
 }
 
 /// Represents the flags argument parser.
-pub fn parse_flags_arg(matches: &ArgMatches) -> String {
-    matches
-        .get_many::<String>(ARG_FLAGS)
-        .unwrap_or_default()
-        .cloned()
-        .collect::<Vec<_>>()
-        .join(" ")
+pub fn parse_flags_arg(matches: &ArgMatches) -> Flags {
+    Flags::from_iter(
+        matches
+            .get_many::<String>(ARG_FLAGS)
+            .unwrap_or_default()
+            .map(String::as_str)
+            .map(Flag::from),
+    )
 }

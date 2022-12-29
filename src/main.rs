@@ -133,22 +133,22 @@ fn main() -> Result<()> {
 
     // checks email commands
     match email::args::matches(&m)? {
-        Some(email::args::Cmd::Attachments(id)) => {
+        Some(email::args::Cmd::Attachments(ids)) => {
             return email::handlers::attachments(
                 &account_config,
                 &mut printer,
                 backend.as_mut(),
                 &folder,
-                id,
+                ids,
             );
         }
-        Some(email::args::Cmd::Copy(ids, folder_target)) => {
+        Some(email::args::Cmd::Copy(ids, to_folder)) => {
             return email::handlers::copy(
                 &account_config,
                 &mut printer,
                 backend.as_mut(),
                 &folder,
-                folder_target,
+                to_folder,
                 ids,
             );
         }
@@ -184,23 +184,23 @@ fn main() -> Result<()> {
                 page,
             );
         }
-        Some(email::args::Cmd::Move(ids, folder_target)) => {
+        Some(email::args::Cmd::Move(ids, to_folder)) => {
             return email::handlers::move_(
                 &account_config,
                 &mut printer,
                 backend.as_mut(),
                 &folder,
-                folder_target,
+                to_folder,
                 ids,
             );
         }
-        Some(email::args::Cmd::Read(id, text_mime, sanitize, raw, headers)) => {
+        Some(email::args::Cmd::Read(ids, text_mime, sanitize, raw, headers)) => {
             return email::handlers::read(
                 &account_config,
                 &mut printer,
                 backend.as_mut(),
                 &folder,
-                id,
+                ids,
                 text_mime,
                 sanitize,
                 raw,
@@ -264,14 +264,14 @@ fn main() -> Result<()> {
             );
         }
         Some(email::args::Cmd::Flag(m)) => match m {
-            Some(flag::args::Cmd::Set(id, ref flags)) => {
-                return flag::handlers::set(&mut printer, backend.as_mut(), &folder, id, flags);
+            Some(flag::args::Cmd::Set(ids, ref flags)) => {
+                return flag::handlers::set(&mut printer, backend.as_mut(), &folder, ids, flags);
             }
-            Some(flag::args::Cmd::Add(id, ref flags)) => {
-                return flag::handlers::add(&mut printer, backend.as_mut(), &folder, id, flags);
+            Some(flag::args::Cmd::Add(ids, ref flags)) => {
+                return flag::handlers::add(&mut printer, backend.as_mut(), &folder, ids, flags);
             }
-            Some(flag::args::Cmd::Remove(id, ref flags)) => {
-                return flag::handlers::remove(&mut printer, backend.as_mut(), &folder, id, flags);
+            Some(flag::args::Cmd::Remove(ids, ref flags)) => {
+                return flag::handlers::remove(&mut printer, backend.as_mut(), &folder, ids, flags);
             }
             _ => (),
         },
