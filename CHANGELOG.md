@@ -18,9 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Made commands `read`, `attachments`, `flags`, `copy`, `move`,
   `delete` accept multiple ids.
-* Changed the `flags` subcommands: because they can now receive
-  multiple ids and multiple flags, a `--` needs to be inserted between
-  ids and flags.
+* Flipped arguments `ids` and `folder` for commands `copy` and `move`
+  in order the folder not to be considered as an id.
 
 ### Fixed
 

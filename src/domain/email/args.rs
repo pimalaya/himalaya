@@ -205,13 +205,13 @@ pub fn subcmds() -> Vec<Command> {
             Command::new(CMD_COPY)
                 .alias("cp")
                 .about("Copy emails to the given folder")
-                .arg(ids_arg())
-                .arg(folder::args::target_arg()),
+                .arg(folder::args::target_arg())
+                .arg(ids_arg()),
             Command::new(CMD_MOVE)
                 .alias("mv")
                 .about("Move emails to the given folder")
-                .arg(ids_arg())
-                .arg(folder::args::target_arg()),
+                .arg(folder::args::target_arg())
+                .arg(ids_arg()),
             Command::new(CMD_DELETE)
                 .aliases(["remove", "rm"])
                 .about("Delete emails")
