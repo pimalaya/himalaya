@@ -237,9 +237,9 @@ pub fn parse_id_arg(matches: &ArgMatches) -> &str {
 /// Represents the email ids argument.
 pub fn ids_arg() -> Arg {
     Arg::new(ARG_IDS)
-        .help("Email ids separated by commas")
+        .help("Email ids")
         .value_name("IDS")
-        .value_delimiter(',')
+        .num_args(1..)
         .required(true)
 }
 

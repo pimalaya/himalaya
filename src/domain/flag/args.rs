@@ -82,10 +82,11 @@ pub fn subcmds<'a>() -> Vec<Command> {
 pub fn flags_arg() -> Arg {
     Arg::new(ARG_FLAGS)
         .value_name("FLAGS")
-        .help("The list of flags.")
+        .help("The flags")
         .long_help("The list of flags. It can be one of: seen, answered, flagged, deleted, draft, recent. Other flags are considered custom.")
         .num_args(1..)
         .required(true)
+        .last(true)
 }
 
 /// Represents the flags argument parser.
