@@ -17,9 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 * Made commands `read`, `attachments`, `copy`, `move`, `delete` accept
-  multiple ids.
-* Inverted arguments folder target and ids for commands `copy` and
-  `move`.
+  multiple ids. Ids must be separated by a comma without any white
+  space. For eg: `id1,id2,id3`.
 
 ### Fixed
 

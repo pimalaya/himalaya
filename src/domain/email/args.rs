@@ -153,68 +153,68 @@ pub fn subcmds() -> Vec<Command> {
         tpl::args::subcmds(),
         vec![
             Command::new(CMD_ATTACHMENTS)
-                .about("Downloads all attachments of the targeted email")
+                .about("Downloads all emails attachments")
                 .arg(ids_arg()),
             Command::new(CMD_LIST)
                 .alias("lst")
-                .about("Lists all emails")
+                .about("List envelopes")
                 .arg(page_size_arg())
                 .arg(page_arg())
                 .arg(table::args::max_width()),
             Command::new(CMD_SEARCH)
                 .aliases(["query", "q"])
-                .about("Lists emails matching the given query")
+                .about("Filter envelopes matching the given query")
                 .arg(page_size_arg())
                 .arg(page_arg())
                 .arg(table::args::max_width())
                 .arg(query_arg()),
             Command::new(CMD_SORT)
-                .about("Sorts emails by the given criteria and matching the given query")
+                .about("Sort envelopes by the given criteria and matching the given query")
                 .arg(page_size_arg())
                 .arg(page_arg())
                 .arg(table::args::max_width())
                 .arg(criteria_arg())
                 .arg(query_arg()),
             Command::new(CMD_WRITE)
-                .about("Writes a new email")
+                .about("Write a new email")
                 .aliases(["new", "n"])
                 .args(tpl::args::args()),
             Command::new(CMD_SEND)
-                .about("Sends a raw email")
+                .about("Send a raw email")
                 .arg(raw_arg()),
             Command::new(CMD_SAVE)
-                .about("Saves a raw email")
+                .about("Save a raw email")
                 .arg(raw_arg()),
             Command::new(CMD_READ)
-                .about("Reads text bodies of an email")
+                .about("Read text bodies of emails")
                 .arg(mime_type_arg())
                 .arg(sanitize_flag())
                 .arg(raw_flag())
                 .arg(headers_arg())
                 .arg(ids_arg()),
             Command::new(CMD_REPLY)
-                .about("Answers to an email")
+                .about("Answer to an email")
                 .arg(reply_all_flag())
                 .args(tpl::args::args())
                 .arg(id_arg()),
             Command::new(CMD_FORWARD)
                 .aliases(["fwd", "f"])
-                .about("Forwards an email")
+                .about("Forward an email")
                 .args(tpl::args::args())
                 .arg(id_arg()),
             Command::new(CMD_COPY)
                 .alias("cp")
-                .about("Copies an email to the targeted folder")
-                .arg(folder::args::target_arg())
-                .arg(ids_arg()),
+                .about("Copy emails to the given folder")
+                .arg(ids_arg())
+                .arg(folder::args::target_arg()),
             Command::new(CMD_MOVE)
                 .alias("mv")
-                .about("Moves an email to the targeted folder")
-                .arg(folder::args::target_arg())
-                .arg(ids_arg()),
+                .about("Move emails to the given folder")
+                .arg(ids_arg())
+                .arg(folder::args::target_arg()),
             Command::new(CMD_DELETE)
                 .aliases(["remove", "rm"])
-                .about("Deletes email(s) by id")
+                .about("Delete emails")
                 .arg(ids_arg()),
         ],
     ]
@@ -237,9 +237,9 @@ pub fn parse_id_arg(matches: &ArgMatches) -> &str {
 /// Represents the email ids argument.
 pub fn ids_arg() -> Arg {
     Arg::new(ARG_IDS)
-        .help("Specifies the email ids")
+        .help("Email ids separated by commas")
         .value_name("IDS")
-        .num_args(1..)
+        .value_delimiter(',')
         .required(true)
 }
 
