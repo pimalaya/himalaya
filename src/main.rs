@@ -93,7 +93,7 @@ fn main() -> Result<()> {
     if let BackendConfig::Imap(imap_config) = backend_config {
         // FIXME: find a way to downcast `backend` instead of
         // recreating an instance.
-        let mut imap = ImapBackend::new(imap_config)?;
+        let mut imap = ImapBackend::new(&account_config, imap_config)?;
         match imap::args::matches(&m)? {
             Some(imap::args::Cmd::Notify(keepalive)) => {
                 return imap::handlers::notify(&mut imap, &folder, keepalive);

@@ -25,19 +25,26 @@ pub fn attachments<P: Printer, B: Backend + ?Sized>(
 ) -> Result<()> {
     let folder = config.folder_alias(folder)?;
     let emails = backend.get_emails(&folder, ids.clone())?;
-    let index = 0;
+    let mut index = 0;
+
+    let mut emails_count = 0;
+    let mut attachments_count = 0;
 
     for email in emails.to_vec() {
         let id = ids.get(index).unwrap();
         let attachments = email.attachments()?;
 
+        index = index + 1;
+
         if attachments.is_empty() {
-            printer.print(format!("No attachment found for email {}", id))?;
+            printer.print_log(format!("No attachment found for email #{}", id))?;
             continue;
+        } else {
+            emails_count = emails_count + 1;
         }
 
         printer.print_log(format!(
-            "{} attachment(s) found for email {}…",
+            "{} attachment(s) found for email #{}…",
             attachments.len(),
             id
         ))?;
@@ -49,10 +56,18 @@ pub fn attachments<P: Printer, B: Backend + ?Sized>(
             let filepath = config.get_download_file_path(&filename)?;
             printer.print_log(format!("Downloading {:?}…", filepath))?;
             fs::write(&filepath, &attachment.body).context("cannot download attachment")?;
+            attachments_count = attachments_count + 1;
         }
     }
 
-    printer.print("Done!")
+    match attachments_count {
+        0 => printer.print("No attachment found!"),
+        1 => printer.print("Downloaded 1 attachment!"),
+        n => printer.print(format!(
+            "Downloaded {} attachment(s) from {} email(s)!",
+            n, emails_count,
+        )),
+    }
 }
 
 pub fn copy<P: Printer, B: Backend + ?Sized>(
