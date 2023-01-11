@@ -11,6 +11,7 @@ mod validators;
 use super::DeserializedConfig;
 use crate::account::{DeserializedAccountConfig, DeserializedBaseAccountConfig};
 use anyhow::{anyhow, Result};
+use console::style;
 use dialoguer::{theme::ColorfulTheme, Confirm, Input, Select};
 use log::trace;
 use once_cell::sync::Lazy;
@@ -53,6 +54,7 @@ pub(crate) fn wizard() -> Result<DeserializedConfig> {
     let mut config = DeserializedConfig::default();
 
     // Setup one or multiple accounts
+    println!("\n{}", style("First let's setup an account").underlined());
     while let Some(account_config) = configure_account()? {
         let name: String = Input::with_theme(&*THEME)
             .with_prompt("What would you like to name your account?")
@@ -67,7 +69,7 @@ pub(crate) fn wizard() -> Result<DeserializedConfig> {
             .report(false)
             .interact_opt()?
         {
-            Some(true) => {}
+            Some(true) => println!("\n{}", style("Setting up another account").underlined()),
             _ => break,
         }
     }
@@ -79,6 +81,11 @@ pub(crate) fn wizard() -> Result<DeserializedConfig> {
         i if i > 1 => {
             let accounts = config.accounts.clone();
             let accounts: Vec<&String> = accounts.keys().collect();
+
+            println!(
+                "\n{}",
+                style(format!("You've setup {} accounts", accounts.len())).underlined()
+            );
             match Select::with_theme(&*THEME)
                 .with_prompt("Which account would you like to set as your default?")
                 .items(&accounts)
@@ -104,7 +111,7 @@ pub(crate) fn wizard() -> Result<DeserializedConfig> {
     }
 
     // Serialize config to file
-    println!("Writing the configuration to {:?}", path);
+    println!("\nWriting the configuration to {:?}...", path);
     std::fs::create_dir_all(path.parent().unwrap())?;
     std::fs::write(path, toml::to_vec(&config)?)?;
 
