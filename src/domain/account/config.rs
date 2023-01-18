@@ -84,7 +84,7 @@ pub struct DeserializedBaseAccountConfig {
 
     pub email_listing_page_size: Option<usize>,
     pub email_reading_headers: Option<Vec<String>>,
-    #[serde(with = "EmailTextPlainFormatOptionDef")]
+    #[serde(with = "EmailTextPlainFormatOptionDef", skip_serializing_if = "Option::is_none")]
     pub email_reading_format: Option<EmailTextPlainFormat>,
     pub email_reading_verify_cmd: Option<String>,
     pub email_reading_decrypt_cmd: Option<String>,
@@ -93,7 +93,7 @@ pub struct DeserializedBaseAccountConfig {
     pub email_writing_encrypt_cmd: Option<String>,
     #[serde(flatten, with = "EmailSenderDef")]
     pub email_sender: EmailSender,
-    #[serde(with = "EmailHooksOptionDef")]
+    #[serde(with = "EmailHooksOptionDef", skip_serializing_if = "Option::is_none")]
     pub email_hooks: Option<EmailHooks>,
 }
 
