@@ -111,7 +111,7 @@ pub(crate) fn wizard() -> Result<DeserializedConfig> {
     }
 
     // Serialize config to file
-    println!("\nWriting the configuration to {:?}...", path);
+    println!("\nWriting the configuration to {path:?}...");
     std::fs::create_dir_all(path.parent().unwrap())?;
     std::fs::write(path, toml::to_vec(&config)?)?;
 
@@ -151,12 +151,13 @@ fn configure_account() -> Result<Option<DeserializedAccountConfig>> {
 }
 
 fn configure_base() -> Result<DeserializedBaseAccountConfig> {
-    let mut base_acc_config = DeserializedBaseAccountConfig::default();
-
-    base_acc_config.email = Input::with_theme(&*THEME)
-        .with_prompt("Enter your email:")
-        .validate_with(validators::EmailValidator)
-        .interact()?;
+    let mut base_acc_config = DeserializedBaseAccountConfig {
+        email: Input::with_theme(&*THEME)
+            .with_prompt("Enter your email:")
+            .validate_with(validators::EmailValidator)
+            .interact()?,
+        ..Default::default()
+    };
 
     base_acc_config.display_name = Some(
         Input::with_theme(&*THEME)
