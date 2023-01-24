@@ -4,16 +4,15 @@ use crate::account::{
 };
 use anyhow::Result;
 use dialoguer::Input;
-use himalaya_lib::{NotmuchConfig, notmuch::Database};
+use himalaya_lib::{
+    notmuch::{Database, DatabaseMode},
+    NotmuchConfig,
+};
 use std::path::PathBuf;
 
 pub(crate) fn configure(base: DeserializedBaseAccountConfig) -> Result<DeserializedAccountConfig> {
-
-    let db_path: PathBuf = match std::process::Command::new("notmuch")
-        .args(["config", "get", "database.path"])
-        .output()
-    {
-        Ok(output) => PathBuf::from(String::from_utf8(output.stdout)?),
+    let db_path = match Database::open_with_config(None, DatabaseMode::ReadOnly, None, None) {
+        Ok(db) => db.path(),
         _ => {
             let input: String = Input::with_theme(&*THEME)
                 .with_prompt("Could not find a notmuch database. Enter path manually:")
