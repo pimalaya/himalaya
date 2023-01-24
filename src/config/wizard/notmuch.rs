@@ -4,10 +4,9 @@ use crate::account::{
 };
 use anyhow::Result;
 use dialoguer::Input;
-use himalaya_lib::NotmuchConfig;
+use himalaya_lib::{NotmuchConfig, notmuch::Database};
 use std::path::PathBuf;
 
-#[cfg(feature = "notmuch-backend")]
 pub(crate) fn configure(base: DeserializedBaseAccountConfig) -> Result<DeserializedAccountConfig> {
 
     let db_path: PathBuf = match std::process::Command::new("notmuch")

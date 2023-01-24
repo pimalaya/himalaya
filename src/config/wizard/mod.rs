@@ -15,6 +15,7 @@ use console::style;
 use dialoguer::{theme::ColorfulTheme, Confirm, Input, Select};
 use log::trace;
 use once_cell::sync::Lazy;
+use std::{fs, process};
 
 const BACKENDS: &[&str] = &[
     #[cfg(feature = "imap-backend")]
@@ -42,7 +43,7 @@ pub(crate) fn wizard() -> Result<DeserializedConfig> {
         .report(false)
         .interact_opt()?
     {
-        Some(false) | None => std::process::exit(0),
+        Some(false) | None => process::exit(0),
         _ => {}
     }
 
@@ -93,10 +94,10 @@ pub(crate) fn wizard() -> Result<DeserializedConfig> {
                 .interact_opt()?
             {
                 Some(i) => Some(config.accounts.get_mut(accounts[i]).unwrap()),
-                _ => std::process::exit(0),
+                _ => process::exit(0),
             }
         }
-        _ => std::process::exit(0),
+        _ => process::exit(0),
     };
 
     match default {
@@ -112,8 +113,8 @@ pub(crate) fn wizard() -> Result<DeserializedConfig> {
 
     // Serialize config to file
     println!("\nWriting the configuration to {path:?}...");
-    std::fs::create_dir_all(path.parent().unwrap())?;
-    std::fs::write(path, toml::to_vec(&config)?)?;
+    fs::create_dir_all(path.parent().unwrap())?;
+    fs::write(path, toml::to_vec(&config)?)?;
 
     trace!("<< wizard");
     Ok(config)
@@ -151,7 +152,7 @@ fn configure_account() -> Result<Option<DeserializedAccountConfig>> {
 }
 
 fn configure_base() -> Result<DeserializedBaseAccountConfig> {
-    let mut base_acc_config = DeserializedBaseAccountConfig {
+    let mut base_account_config = DeserializedBaseAccountConfig {
         email: Input::with_theme(&*THEME)
             .with_prompt("Enter your email:")
             .validate_with(validators::EmailValidator)
@@ -159,11 +160,11 @@ fn configure_base() -> Result<DeserializedBaseAccountConfig> {
         ..Default::default()
     };
 
-    base_acc_config.display_name = Some(
+    base_account_config.display_name = Some(
         Input::with_theme(&*THEME)
             .with_prompt("Enter display name:")
             .interact()?,
     );
 
-    Ok(base_acc_config)
+    Ok(base_account_config)
 }
