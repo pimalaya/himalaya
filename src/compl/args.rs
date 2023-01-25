@@ -30,10 +30,10 @@ pub fn matches(m: &ArgMatches) -> Result<Option<Cmd>> {
 }
 
 /// Completion subcommands.
-pub fn subcmds() -> Vec<Command> {
-    vec![Command::new(CMD_COMPLETION)
+pub fn subcmd() -> Command {
+    Command::new(CMD_COMPLETION)
         .about("Generates the completion script for the given shell")
         .args(&[Arg::new(ARG_SHELL)
             .value_parser(value_parser!(Shell))
-            .required(true)])]
+            .required(true)])
 }

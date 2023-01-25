@@ -54,7 +54,7 @@ impl DeserializedConfig {
             return Err(anyhow!("config file must contain at least one account"));
         }
 
-        trace!("config: {:?}", config);
+        trace!("config: {:#?}", config);
         Ok(config)
     }
 

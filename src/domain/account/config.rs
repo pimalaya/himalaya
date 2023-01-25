@@ -46,17 +46,17 @@ impl DeserializedAccountConfig {
             #[cfg(feature = "imap-backend")]
             DeserializedAccountConfig::Imap(config) => (
                 config.base.to_account_config(name, global_config),
-                BackendConfig::Imap(&config.backend),
+                BackendConfig::Imap(config.backend.clone()),
             ),
             #[cfg(feature = "maildir-backend")]
             DeserializedAccountConfig::Maildir(config) => (
                 config.base.to_account_config(name, global_config),
-                BackendConfig::Maildir(&config.backend),
+                BackendConfig::Maildir(config.backend.clone()),
             ),
             #[cfg(feature = "notmuch-backend")]
             DeserializedAccountConfig::Notmuch(config) => (
                 config.base.to_account_config(name, global_config),
-                BackendConfig::Notmuch(&config.backend),
+                BackendConfig::Notmuch(config.backend.clone()),
             ),
         }
     }

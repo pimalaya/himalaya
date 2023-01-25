@@ -3,8 +3,8 @@
 //! This module gathers all account actions triggered by the CLI.
 
 use anyhow::Result;
-use himalaya_lib::AccountConfig;
-use log::{info, trace};
+use himalaya_lib::{AccountConfig, Backend};
+use log::{debug, info, trace};
 
 use crate::{
     config::DeserializedConfig,
@@ -19,7 +19,7 @@ pub fn list<'a, P: Printer>(
     deserialized_config: &DeserializedConfig,
     printer: &mut P,
 ) -> Result<()> {
-    info!(">> account list handler");
+    info!("entering the list accounts handler");
 
     let accounts: Accounts = deserialized_config.accounts.iter().into();
     trace!("accounts: {:?}", accounts);
@@ -33,6 +33,26 @@ pub fn list<'a, P: Printer>(
     )?;
 
     info!("<< account list handler");
+    Ok(())
+}
+
+/// Synchronizes the account defined using argument `-a|--account`. If
+/// no account given, synchronizes the default one.
+pub fn sync<P: Printer, B: Backend + ?Sized>(
+    printer: &mut P,
+    backend: &B,
+    dry_run: bool,
+) -> Result<()> {
+    info!("entering the sync accounts handler");
+    debug!("dry run: {}", dry_run);
+
+    backend.sync(dry_run)?;
+
+    printer.print(format!(
+        "Account {} successfully synchronized!",
+        backend.name()
+    ))?;
+
     Ok(())
 }
 
