@@ -93,14 +93,16 @@ fn main() -> Result<()> {
     if let BackendConfig::Imap(imap_config) = &backend_config {
         // FIXME: find a way to downcast `backend` instead of
         // recreating an instance.
-        let mut imap =
-            ImapBackend::new(Cow::Borrowed(&account_config), Cow::Borrowed(&imap_config))?;
         match imap::args::matches(&m)? {
             Some(imap::args::Cmd::Notify(keepalive)) => {
-                return imap::handlers::notify(&mut imap, &folder, keepalive);
+                let imap =
+                    ImapBackend::new(Cow::Borrowed(&account_config), Cow::Borrowed(&imap_config))?;
+                return imap::handlers::notify(&imap, &folder, keepalive);
             }
             Some(imap::args::Cmd::Watch(keepalive)) => {
-                return imap::handlers::watch(&mut imap, &folder, keepalive);
+                let imap =
+                    ImapBackend::new(Cow::Borrowed(&account_config), Cow::Borrowed(&imap_config))?;
+                return imap::handlers::watch(&imap, &folder, keepalive);
             }
             _ => (),
         }
