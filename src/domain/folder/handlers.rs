@@ -13,7 +13,7 @@ pub fn list<P: Printer, B: Backend + ?Sized>(
     printer: &mut P,
     backend: &mut B,
 ) -> Result<()> {
-    let folders = backend.list_folder()?;
+    let folders = backend.list_folders()?;
     printer.print_table(
         // TODO: remove Box
         Box::new(folders),
@@ -109,8 +109,8 @@ mod tests {
             fn add_folder(&self, _: &str) -> backend::Result<()> {
                 unimplemented!();
             }
-            fn list_folder(&self) -> backend::Result<Folders> {
-                Ok(Folders(vec![
+            fn list_folders(&self) -> backend::Result<Folders> {
+                Ok(Folders::from_iter([
                     Folder {
                         delim: "/".into(),
                         name: "INBOX".into(),
@@ -130,6 +130,9 @@ mod tests {
                 unimplemented!();
             }
             fn get_envelope(&self, _: &str, _: &str) -> backend::Result<Envelope> {
+                unimplemented!();
+            }
+            fn get_envelope_internal(&self, _: &str, _: &str) -> backend::Result<Envelope> {
                 unimplemented!();
             }
             fn list_envelopes(&self, _: &str, _: usize, _: usize) -> backend::Result<Envelopes> {

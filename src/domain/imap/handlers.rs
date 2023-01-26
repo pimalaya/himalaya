@@ -5,10 +5,10 @@
 use anyhow::{Context, Result};
 use himalaya_lib::ImapBackend;
 
-pub fn notify(imap: &mut ImapBackend, folder: &str, keepalive: u64) -> Result<()> {
+pub fn notify(imap: &ImapBackend, folder: &str, keepalive: u64) -> Result<()> {
     imap.notify(keepalive, folder).context("cannot imap notify")
 }
 
-pub fn watch(imap: &mut ImapBackend, folder: &str, keepalive: u64) -> Result<()> {
+pub fn watch(imap: &ImapBackend, folder: &str, keepalive: u64) -> Result<()> {
     imap.watch(keepalive, folder).context("cannot imap watch")
 }
