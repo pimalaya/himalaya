@@ -221,8 +221,8 @@ impl DeserializedBaseAccountConfig {
                     })
                     .unwrap_or_default(),
             },
-            sync: true,
-            sync_dir: None,
+            sync: self.sync,
+            sync_dir: self.sync_dir.clone(),
         }
     }
 }
