@@ -757,7 +757,7 @@ dependencies = [
 [[package]]
 name = "himalaya-lib"
 version = "0.4.0"
-source = "git+https://git.sr.ht/~soywod/himalaya-lib?branch=develop#1f8e639c0b49a03515e70bffdd4325cb4b340bbc"
+source = "git+https://git.sr.ht/~soywod/himalaya-lib?branch=develop#c4825374cd868adbeb40d165688e271f9b4f1b48"
 dependencies = [
  "ammonia",
  "chrono",
@@ -1219,9 +1219,9 @@ dependencies = [
 
 [[package]]
 name = "notmuch"
-version = "0.7.1"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca0941fd9af5b8529e3d42494f56efafb909b76190a7a454cde9d6e397390cf9"
+checksum = "e25d11a2449f4f91cb71b138b241db30765a3b2f595eba0dd6a282b0e961dd44"
 dependencies = [
  "from_variants",
  "libc",
