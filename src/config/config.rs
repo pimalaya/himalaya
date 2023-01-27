@@ -48,7 +48,6 @@ pub struct DeserializedConfig {
 impl DeserializedConfig {
     /// Tries to create a config from an optional path.
     pub fn from_opt_path(path: Option<&str>) -> Result<Self> {
-        trace!(">> parse config from path");
         debug!("path: {:?}", path);
 
         let config: Self = match path.map(|s| s.into()).or_else(Self::path) {
@@ -63,8 +62,7 @@ impl DeserializedConfig {
             return Err(anyhow!("config file must contain at least one account"));
         }
 
-        trace!("config: {:?}", config);
-        trace!("<< parse config from path");
+        trace!("config: {:#?}", config);
         Ok(config)
     }
 
@@ -89,13 +87,13 @@ impl DeserializedConfig {
     }
 
     pub fn to_configs(&self, account_name: Option<&str>) -> Result<(AccountConfig, BackendConfig)> {
-        let (account_config, backend_config) = match account_name {
+        let (account_name, deserialized_account_config) = match account_name {
             Some("default") | Some("") | None => self
                 .accounts
                 .iter()
-                .find_map(|(_, account)| {
+                .find_map(|(name, account)| {
                     if account.is_default() {
-                        Some(account)
+                        Some((name.clone(), account))
                     } else {
                         None
                     }
@@ -104,9 +102,12 @@ impl DeserializedConfig {
             Some(name) => self
                 .accounts
                 .get(name)
+                .map(|account| (name.to_string(), account))
                 .ok_or_else(|| anyhow!(format!("cannot find account {}", name))),
-        }?
-        .to_configs(self);
+        }?;
+
+        let (account_config, backend_config) =
+            deserialized_account_config.to_configs(account_name, self);
 
         Ok((account_config, backend_config))
     }

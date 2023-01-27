@@ -32,11 +32,11 @@ pub fn matches(m: &ArgMatches) -> Result<Option<Cmd>> {
     Ok(cmd)
 }
 
-/// Represents folder subcommands.
-pub fn subcmds<'a>() -> Vec<Command> {
-    vec![Command::new(CMD_FOLDERS)
+/// Represents the folder subcommand.
+pub fn subcmd() -> Command {
+    Command::new(CMD_FOLDERS)
         .about("Lists folders")
-        .arg(table::args::max_width())]
+        .arg(table::args::max_width())
 }
 
 /// Represents the source folder argument.
@@ -76,12 +76,12 @@ mod tests {
     #[test]
     fn it_should_match_cmds() {
         let arg = Command::new("himalaya")
-            .subcommands(subcmds())
+            .subcommands(subcmd())
             .get_matches_from(&["himalaya", "folders"]);
         assert_eq!(Some(Cmd::List(None)), matches(&arg).unwrap());
 
         let arg = Command::new("himalaya")
-            .subcommands(subcmds())
+            .subcommands(subcmd())
             .get_matches_from(&["himalaya", "folders", "--max-width", "20"]);
         assert_eq!(Some(Cmd::List(Some(20))), matches(&arg).unwrap());
     }

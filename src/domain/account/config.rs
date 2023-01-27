@@ -33,25 +33,30 @@ pub enum DeserializedAccountConfig {
 }
 
 impl DeserializedAccountConfig {
-    pub fn to_configs(&self, global_config: &DeserializedConfig) -> (AccountConfig, BackendConfig) {
+    pub fn to_configs(
+        &self,
+        name: String,
+        global_config: &DeserializedConfig,
+    ) -> (AccountConfig, BackendConfig) {
         match self {
-            DeserializedAccountConfig::None(config) => {
-                (config.to_account_config(global_config), BackendConfig::None)
-            }
+            DeserializedAccountConfig::None(config) => (
+                config.to_account_config(name, global_config),
+                BackendConfig::None,
+            ),
             #[cfg(feature = "imap-backend")]
             DeserializedAccountConfig::Imap(config) => (
-                config.base.to_account_config(global_config),
-                BackendConfig::Imap(&config.backend),
+                config.base.to_account_config(name, global_config),
+                BackendConfig::Imap(config.backend.clone()),
             ),
             #[cfg(feature = "maildir-backend")]
             DeserializedAccountConfig::Maildir(config) => (
-                config.base.to_account_config(global_config),
-                BackendConfig::Maildir(&config.backend),
+                config.base.to_account_config(name, global_config),
+                BackendConfig::Maildir(config.backend.clone()),
             ),
             #[cfg(feature = "notmuch-backend")]
             DeserializedAccountConfig::Notmuch(config) => (
-                config.base.to_account_config(global_config),
-                BackendConfig::Notmuch(&config.backend),
+                config.base.to_account_config(name, global_config),
+                BackendConfig::Notmuch(config.backend.clone()),
             ),
         }
     }
@@ -95,10 +100,14 @@ pub struct DeserializedBaseAccountConfig {
     pub email_sender: EmailSender,
     #[serde(default, with = "EmailHooksOptionDef", skip_serializing_if = "Option::is_none")]
     pub email_hooks: Option<EmailHooks>,
+
+    #[serde(default)]
+    pub sync: bool,
+    pub sync_dir: Option<PathBuf>,
 }
 
 impl DeserializedBaseAccountConfig {
-    pub fn to_account_config(&self, config: &DeserializedConfig) -> AccountConfig {
+    pub fn to_account_config(&self, name: String, config: &DeserializedConfig) -> AccountConfig {
         let mut folder_aliases = config
             .folder_aliases
             .as_ref()
@@ -112,6 +121,7 @@ impl DeserializedBaseAccountConfig {
         );
 
         AccountConfig {
+            name,
             email: self.email.to_owned(),
             display_name: self
                 .display_name
@@ -211,6 +221,8 @@ impl DeserializedBaseAccountConfig {
                     })
                     .unwrap_or_default(),
             },
+            sync: self.sync,
+            sync_dir: self.sync_dir.clone(),
         }
     }
 }

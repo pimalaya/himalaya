@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added Musl builds to releases [#356].
 * Added `himalaya man` command to generate man page [#419].
 
+### Changed
+
+* Made commands `read`, `attachments`, `flags`, `copy`, `move`,
+  `delete` accept multiple ids.
+* Flipped arguments `ids` and `folder` for commands `copy` and `move`
+  in order the folder not to be considered as an id.
+
 ### Fixed
 
 * Fixed missing folder aliases [#430].

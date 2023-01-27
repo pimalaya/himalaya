@@ -1,6 +1,6 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use atty::Stream;
-use himalaya_lib::{AccountConfig, Backend, CompilerBuilder, Email, Sender, Tpl};
+use himalaya_lib::{AccountConfig, Backend, CompilerBuilder, Email, Flags, Sender, Tpl};
 use std::io::{stdin, BufRead};
 
 use crate::printer::Printer;
@@ -15,7 +15,9 @@ pub fn forward<P: Printer, B: Backend + ?Sized>(
     body: Option<&str>,
 ) -> Result<()> {
     let tpl = backend
-        .get_email(folder, id)?
+        .get_emails(folder, vec![id])?
+        .first()
+        .ok_or_else(|| anyhow!("cannot find email {}", id))?
         .to_forward_tpl_builder(config)?
         .set_some_raw_headers(headers)
         .some_text_plain_part(body)
@@ -35,7 +37,9 @@ pub fn reply<P: Printer, B: Backend + ?Sized>(
     body: Option<&str>,
 ) -> Result<()> {
     let tpl = backend
-        .get_email(folder, id)?
+        .get_emails(folder, vec![id])?
+        .first()
+        .ok_or_else(|| anyhow!("cannot find email {}", id))?
         .to_reply_tpl_builder(config, all)?
         .set_some_raw_headers(headers)
         .some_text_plain_part(body)
@@ -67,7 +71,7 @@ pub fn save<P: Printer, B: Backend + ?Sized>(
             .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.as_ref()),
     )?;
 
-    backend.add_email(folder, &email, "seen")?;
+    backend.add_email(folder, &email, &Flags::default())?;
     printer.print("Template successfully saved!")
 }
 
@@ -95,7 +99,7 @@ pub fn send<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
             .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.as_ref()),
     )?;
     sender.send(&email)?;
-    backend.add_email(folder, &email, "seen")?;
+    backend.add_email(folder, &email, &Flags::default())?;
     printer.print("Template successfully sent!")?;
     Ok(())
 }

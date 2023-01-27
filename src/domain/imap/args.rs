@@ -3,7 +3,7 @@
 //! This module provides subcommands and a command matcher related to IMAP.
 
 use anyhow::Result;
-use clap::{Arg, ArgMatches, Command};
+use clap::{value_parser, Arg, ArgMatches, Command};
 use log::debug;
 
 const ARG_KEEPALIVE: &str = "keepalive";
@@ -16,7 +16,6 @@ type Keepalive = u64;
 pub enum Cmd {
     /// Start the IMAP notify mode with the give keepalive duration.
     Notify(Keepalive),
-
     /// Start the IMAP watch mode with the give keepalive duration.
     Watch(Keepalive),
 }
@@ -44,23 +43,20 @@ pub fn subcmds<'a>() -> Vec<Command> {
         Command::new(CMD_NOTIFY)
             .about("Notifies when new messages arrive in the given folder")
             .alias("idle")
-            .arg(
-                Arg::new(ARG_KEEPALIVE)
-                    .help("Specifies the keepalive duration")
-                    .long("keepalive")
-                    .short('k')
-                    .value_name("SECS")
-                    .default_value("500"),
-            ),
+            .arg(keepalive_arg()),
         Command::new(CMD_WATCH)
             .about("Watches IMAP server changes")
-            .arg(
-                Arg::new(ARG_KEEPALIVE)
-                    .help("Specifies the keepalive duration")
-                    .long("keepalive")
-                    .short('k')
-                    .value_name("SECS")
-                    .default_value("500"),
-            ),
+            .arg(keepalive_arg()),
     ]
+}
+
+/// Represents the keepalive argument.
+pub fn keepalive_arg() -> Arg {
+    Arg::new(ARG_KEEPALIVE)
+        .help("Specifies the keepalive duration.")
+        .long("keepalive")
+        .short('k')
+        .value_name("SECS")
+        .default_value("500")
+        .value_parser(value_parser!(u64))
 }

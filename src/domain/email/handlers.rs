@@ -1,6 +1,8 @@
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use atty::Stream;
-use himalaya_lib::{AccountConfig, Backend, Email, Sender, ShowTextPartsStrategy, Tpl, TplBuilder};
+use himalaya_lib::{
+    AccountConfig, Backend, Email, Flag, Flags, Sender, ShowTextPartsStrategy, Tpl, TplBuilder,
+};
 use log::{debug, trace};
 use std::{
     fs,
@@ -19,41 +21,66 @@ pub fn attachments<P: Printer, B: Backend + ?Sized>(
     printer: &mut P,
     backend: &mut B,
     folder: &str,
-    id: &str,
+    ids: Vec<&str>,
 ) -> Result<()> {
     let folder = config.folder_alias(folder)?;
+    let emails = backend.get_emails(&folder, ids.clone())?;
+    let mut index = 0;
 
-    let attachments = backend.get_email(&folder, id)?.attachments()?;
+    let mut emails_count = 0;
+    let mut attachments_count = 0;
 
-    if attachments.is_empty() {
-        return printer.print(format!("No attachment found for email {}", id));
+    for email in emails.to_vec() {
+        let id = ids.get(index).unwrap();
+        let attachments = email.attachments()?;
+
+        index = index + 1;
+
+        if attachments.is_empty() {
+            printer.print_log(format!("No attachment found for email #{}", id))?;
+            continue;
+        } else {
+            emails_count = emails_count + 1;
+        }
+
+        printer.print_log(format!(
+            "{} attachment(s) found for email #{}…",
+            attachments.len(),
+            id
+        ))?;
+
+        for attachment in attachments {
+            let filename = attachment
+                .filename
+                .unwrap_or_else(|| Uuid::new_v4().to_string());
+            let filepath = config.get_download_file_path(&filename)?;
+            printer.print_log(format!("Downloading {:?}…", filepath))?;
+            fs::write(&filepath, &attachment.body).context("cannot download attachment")?;
+            attachments_count = attachments_count + 1;
+        }
     }
 
-    printer.print_log(format!("{} attachment(s) found…", attachments.len()))?;
-
-    for attachment in attachments {
-        let filename = attachment
-            .filename
-            .unwrap_or_else(|| Uuid::new_v4().to_string());
-        let filepath = config.get_download_file_path(&filename)?;
-        printer.print_log(format!("Downloading {:?}…", filepath))?;
-        fs::write(&filepath, &attachment.body)
-            .context(format!("cannot download attachment {:?}", filepath))?;
+    match attachments_count {
+        0 => printer.print("No attachment found!"),
+        1 => printer.print("Downloaded 1 attachment!"),
+        n => printer.print(format!(
+            "Downloaded {} attachment(s) from {} email(s)!",
+            n, emails_count,
+        )),
     }
-
-    printer.print("Done!")
 }
 
 pub fn copy<P: Printer, B: Backend + ?Sized>(
     config: &AccountConfig,
     printer: &mut P,
     backend: &mut B,
-    folder: &str,
-    folder_target: &str,
-    ids: &str,
+    from_folder: &str,
+    to_folder: &str,
+    ids: Vec<&str>,
 ) -> Result<()> {
-    let folder = config.folder_alias(folder)?;
-    backend.copy_email(&folder, folder_target, ids)?;
+    let from_folder = config.folder_alias(from_folder)?;
+    let to_folder = config.folder_alias(to_folder)?;
+    backend.copy_emails(&from_folder, &to_folder, ids)?;
     printer.print("Email(s) successfully copied!")
 }
 
@@ -62,10 +89,10 @@ pub fn delete<P: Printer, B: Backend + ?Sized>(
     printer: &mut P,
     backend: &mut B,
     folder: &str,
-    ids: &str,
+    ids: Vec<&str>,
 ) -> Result<()> {
     let folder = config.folder_alias(folder)?;
-    backend.delete_email(&folder, ids)?;
+    backend.delete_emails(&folder, ids)?;
     printer.print("Email(s) successfully deleted!")
 }
 
@@ -81,7 +108,9 @@ pub fn forward<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
 ) -> Result<()> {
     let folder = config.folder_alias(folder)?;
     let tpl = backend
-        .get_email(&folder, id)?
+        .get_emails(&folder, vec![id])?
+        .first()
+        .ok_or_else(|| anyhow!("cannot find email {}", id))?
         .to_forward_tpl_builder(config)?
         .set_some_raw_headers(headers)
         .some_text_plain_part(body)
@@ -103,7 +132,7 @@ pub fn list<P: Printer, B: Backend + ?Sized>(
     let folder = config.folder_alias(folder)?;
     let page_size = page_size.unwrap_or(config.email_listing_page_size());
     debug!("page size: {}", page_size);
-    let msgs = backend.list_envelope(&folder, page_size, page)?;
+    let msgs = backend.list_envelopes(&folder, page_size, page)?;
     trace!("envelopes: {:?}", msgs);
     printer.print_table(
         Box::new(msgs),
@@ -143,12 +172,13 @@ pub fn move_<P: Printer, B: Backend + ?Sized>(
     config: &AccountConfig,
     printer: &mut P,
     backend: &mut B,
-    folder: &str,
-    folder_target: &str,
-    ids: &str,
+    from_folder: &str,
+    to_folder: &str,
+    ids: Vec<&str>,
 ) -> Result<()> {
-    let folder = config.folder_alias(folder)?;
-    backend.move_email(&folder, folder_target, ids)?;
+    let from_folder = config.folder_alias(from_folder)?;
+    let to_folder = config.folder_alias(to_folder)?;
+    backend.move_emails(&from_folder, &to_folder, ids)?;
     printer.print("Email(s) successfully moved!")
 }
 
@@ -157,36 +187,46 @@ pub fn read<P: Printer, B: Backend + ?Sized>(
     printer: &mut P,
     backend: &mut B,
     folder: &str,
-    id: &str,
+    ids: Vec<&str>,
     text_mime: &str,
     sanitize: bool,
     raw: bool,
     headers: Vec<&str>,
 ) -> Result<()> {
     let folder = config.folder_alias(folder)?;
-    let mut email = backend.get_email(&folder, id)?;
+    let emails = backend.get_emails(&folder, ids)?;
 
-    if raw {
-        // emails do not always have valid utf8, uses "lossy" to
-        // display what can be displayed
-        let raw_email = String::from_utf8_lossy(email.as_raw()?).into_owned();
-        return printer.print(raw_email);
+    let mut glue = "";
+    let mut bodies = String::default();
+
+    for email in emails.to_vec() {
+        bodies.push_str(glue);
+
+        if raw {
+            // emails do not always have valid utf8, uses "lossy" to
+            // display what can be displayed
+            bodies.push_str(&String::from_utf8_lossy(email.raw()?).into_owned());
+        } else {
+            let tpl = email
+                .to_read_tpl_builder(config)?
+                .show_headers(config.email_reading_headers())
+                .show_headers(&headers)
+                .show_text_parts_only(true)
+                .use_show_text_parts_strategy(if text_mime == "plain" {
+                    ShowTextPartsStrategy::PlainOtherwiseHtml
+                } else {
+                    ShowTextPartsStrategy::HtmlOtherwisePlain
+                })
+                .sanitize_text_parts(sanitize)
+                .build();
+
+            bodies.push_str(&<Tpl as Into<String>>::into(tpl));
+        }
+
+        glue = "\n\n";
     }
 
-    let tpl = email
-        .to_read_tpl_builder()?
-        .show_headers(config.email_reading_headers())
-        .show_headers(headers)
-        .show_text_parts_only(true)
-        .use_show_text_parts_strategy(if text_mime == "plain" {
-            ShowTextPartsStrategy::PlainOtherwiseHtml
-        } else {
-            ShowTextPartsStrategy::HtmlOtherwisePlain
-        })
-        .sanitize_text_parts(sanitize)
-        .build();
-
-    printer.print(<Tpl as Into<String>>::into(tpl))
+    printer.print(bodies)
 }
 
 pub fn reply<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
@@ -202,14 +242,16 @@ pub fn reply<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
 ) -> Result<()> {
     let folder = config.folder_alias(folder)?;
     let tpl = backend
-        .get_email(&folder, id)?
+        .get_emails(&folder, vec![id])?
+        .first()
+        .ok_or_else(|| anyhow!("cannot find email {}", id))?
         .to_reply_tpl_builder(config, all)?
         .set_some_raw_headers(headers)
         .some_text_plain_part(body)
         .build();
     trace!("initial template: {}", *tpl);
     editor::edit_tpl_with_editor(config, printer, backend, sender, tpl)?;
-    backend.add_flags(&folder, id, "replied")?;
+    backend.add_flags(&folder, vec![id], &Flags::from_iter([Flag::Answered]))?;
     Ok(())
 }
 
@@ -233,7 +275,7 @@ pub fn save<P: Printer, B: Backend + ?Sized>(
             .collect::<Vec<String>>()
             .join("\r\n")
     };
-    backend.add_email(&folder, raw_email.as_bytes(), "seen")?;
+    backend.add_email(&folder, raw_email.as_bytes(), &Flags::default())?;
     Ok(())
 }
 
@@ -249,7 +291,7 @@ pub fn search<P: Printer, B: Backend + ?Sized>(
 ) -> Result<()> {
     let folder = config.folder_alias(folder)?;
     let page_size = page_size.unwrap_or(config.email_listing_page_size());
-    let envelopes = backend.search_envelope(&folder, &query, "", page_size, page)?;
+    let envelopes = backend.search_envelopes(&folder, &query, "", page_size, page)?;
     let opts = PrintTableOpts {
         format: &config.email_reading_format,
         max_width,
@@ -271,7 +313,7 @@ pub fn sort<P: Printer, B: Backend + ?Sized>(
 ) -> Result<()> {
     let folder = config.folder_alias(folder)?;
     let page_size = page_size.unwrap_or(config.email_listing_page_size());
-    let envelopes = backend.search_envelope(&folder, &query, &sort, page_size, page)?;
+    let envelopes = backend.search_envelopes(&folder, &query, &sort, page_size, page)?;
     let opts = PrintTableOpts {
         format: &config.email_reading_format,
         max_width,
@@ -302,7 +344,7 @@ pub fn send<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
     };
     trace!("raw email: {:?}", raw_email);
     sender.send(raw_email.as_bytes())?;
-    backend.add_email(&folder, raw_email.as_bytes(), "seen")?;
+    backend.add_email(&folder, raw_email.as_bytes(), &Flags::default())?;
     Ok(())
 }
 
