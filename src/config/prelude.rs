@@ -1,5 +1,5 @@
 use himalaya_lib::{EmailHooks, EmailSender, EmailTextPlainFormat, SendmailConfig, SmtpConfig};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 #[cfg(feature = "imap-backend")]
@@ -11,7 +11,7 @@ use himalaya_lib::MaildirConfig;
 #[cfg(feature = "notmuch-backend")]
 use himalaya_lib::NotmuchConfig;
 
-#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(remote = "SmtpConfig")]
 struct SmtpConfigDef {
     #[serde(rename = "smtp-host")]
@@ -31,7 +31,7 @@ struct SmtpConfigDef {
 }
 
 #[cfg(feature = "imap-backend")]
-#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(remote = "ImapConfig")]
 pub struct ImapConfigDef {
     #[serde(rename = "imap-host")]
@@ -57,7 +57,7 @@ pub struct ImapConfigDef {
 }
 
 #[cfg(feature = "maildir-backend")]
-#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(remote = "MaildirConfig")]
 pub struct MaildirConfigDef {
     #[serde(rename = "maildir-root-dir")]
@@ -65,40 +65,31 @@ pub struct MaildirConfigDef {
 }
 
 #[cfg(feature = "notmuch-backend")]
-#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(remote = "NotmuchConfig")]
 pub struct NotmuchConfigDef {
     #[serde(rename = "notmuch-db-path")]
     pub db_path: PathBuf,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(remote = "Option<EmailTextPlainFormat>")]
+pub enum EmailTextPlainFormatOptionDef {
+    #[serde(with = "EmailTextPlainFormatDef")]
+    Some(EmailTextPlainFormat),
+    #[default]
+    None,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(remote = "EmailTextPlainFormat", rename_all = "snake_case")]
-enum EmailTextPlainFormatDef {
+pub enum EmailTextPlainFormatDef {
     Auto,
     Flowed,
     Fixed(usize),
 }
 
-pub mod email_text_plain_format {
-    use himalaya_lib::EmailTextPlainFormat;
-    use serde::{Deserialize, Deserializer};
-
-    use super::EmailTextPlainFormatDef;
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<EmailTextPlainFormat>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        struct Helper(#[serde(with = "EmailTextPlainFormatDef")] EmailTextPlainFormat);
-
-        let helper = Option::deserialize(deserializer)?;
-        Ok(helper.map(|Helper(external)| external))
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(remote = "EmailSender", tag = "sender", rename_all = "snake_case")]
 pub enum EmailSenderDef {
     None,
@@ -108,36 +99,27 @@ pub enum EmailSenderDef {
     Sendmail(SendmailConfig),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(remote = "SendmailConfig")]
 pub struct SendmailConfigDef {
     #[serde(rename = "sendmail-cmd")]
     cmd: String,
 }
 
-/// Represents the email hooks. Useful for doing extra email
-/// processing before or after sending it.
-#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize)]
-#[serde(remote = "EmailHooks")]
-struct EmailHooksDef {
-    /// Represents the hook called just before sending an email.
-    pub pre_send: Option<String>,
+#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(remote = "Option<EmailHooks>")]
+pub enum EmailHooksOptionDef {
+    #[serde(with = "EmailHooksDef")]
+    Some(EmailHooks),
+    #[default]
+    None,
 }
 
-pub mod email_hooks {
-    use himalaya_lib::EmailHooks;
-    use serde::{Deserialize, Deserializer};
-
-    use super::EmailHooksDef;
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<EmailHooks>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        struct Helper(#[serde(with = "EmailHooksDef")] EmailHooks);
-
-        let helper = Option::deserialize(deserializer)?;
-        Ok(helper.map(|Helper(external)| external))
-    }
+/// Represents the email hooks. Useful for doing extra email
+/// processing before or after sending it.
+#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(remote = "EmailHooks")]
+pub struct EmailHooksDef {
+    /// Represents the hook called just before sending an email.
+    pub pre_send: Option<String>,
 }
