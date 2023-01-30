@@ -119,10 +119,15 @@ fn main() -> Result<()> {
         }
         Some(account::args::Cmd::Sync(dry_run)) => {
             let backend = BackendBuilder::new()
-                .sessions_pool_size(5)
+                .sessions_pool_size(10)
                 .disable_cache(true)
                 .build(&account_config, &backend_config)?;
-            return account::handlers::sync(&mut printer, backend.as_ref(), dry_run);
+            return account::handlers::sync(
+                &account_config,
+                &mut printer,
+                backend.as_ref(),
+                dry_run,
+            );
         }
         _ => (),
     }

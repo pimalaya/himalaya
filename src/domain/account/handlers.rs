@@ -3,8 +3,9 @@
 //! This module gathers all account actions triggered by the CLI.
 
 use anyhow::Result;
-use himalaya_lib::{AccountConfig, Backend};
-use log::{debug, info, trace};
+use himalaya_lib::{AccountConfig, Backend, BackendSyncBuilder, BackendSyncProgressEvent};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use log::{info, trace};
 
 use crate::{
     config::DeserializedConfig,
@@ -38,15 +39,98 @@ pub fn list<'a, P: Printer>(
 
 /// Synchronizes the account defined using argument `-a|--account`. If
 /// no account given, synchronizes the default one.
-pub fn sync<P: Printer, B: Backend + ?Sized>(
+pub fn sync<P: Printer>(
+    account_config: &AccountConfig,
     printer: &mut P,
-    backend: &B,
+    backend: &dyn Backend,
     dry_run: bool,
 ) -> Result<()> {
     info!("entering the sync accounts handler");
-    debug!("dry run: {}", dry_run);
+    trace!("dry run: {}", dry_run);
 
-    backend.sync(dry_run)?;
+    let multi = MultiProgress::new();
+    let progress = multi.add(
+        ProgressBar::new(0).with_style(
+            ProgressStyle::with_template(
+                "{msg:.dim}\n{spinner:.dim} {wide_bar:.cyan/blue} {pos}/{len}",
+            )
+            .unwrap(),
+        ),
+    );
+
+    BackendSyncBuilder::new(account_config)
+        .on_progress(|evt| {
+            use BackendSyncProgressEvent::*;
+            Ok(match evt {
+                GetLocalCachedFolders => {
+                    progress.set_length(4);
+                    progress.set_position(0);
+                    progress.set_message("Getting local cached folders…");
+                }
+                GetLocalFolders => {
+                    progress.inc(1);
+                    progress.set_message("Getting local maildir folders…");
+                }
+                GetRemoteCachedFolders => {
+                    progress.inc(1);
+                    progress.set_message("Getting remote cached folders…");
+                }
+                GetRemoteFolders => {
+                    progress.inc(1);
+                    progress.set_message("Getting remote folders…");
+                }
+                BuildFoldersPatch => {
+                    progress.inc(1);
+                    progress.set_message("Building patch…");
+                }
+                ProcessFoldersPatch(n) => {
+                    progress.set_length(n as u64);
+                    progress.set_position(0);
+                    progress.set_message("Processing patch…");
+                }
+                ProcessFolderHunk(message) => {
+                    progress.inc(1);
+                    progress.set_message(message);
+                }
+                StartEnvelopesSync(folder, n, len) => {
+                    multi.println(format!("[{n:2}/{len}] {folder}")).unwrap();
+                    progress.reset();
+                }
+                GetLocalCachedEnvelopes => {
+                    progress.set_length(4);
+                    progress.set_message("Getting local cached envelopes…");
+                }
+                GetLocalEnvelopes => {
+                    progress.inc(1);
+                    progress.set_message("Getting local maildir envelopes…");
+                }
+                GetRemoteCachedEnvelopes => {
+                    progress.inc(1);
+                    progress.set_message("Getting remote cached envelopes…");
+                }
+                GetRemoteEnvelopes => {
+                    progress.inc(1);
+                    progress.set_message("Getting remote envelopes…");
+                }
+                BuildEnvelopesPatch => {
+                    progress.inc(1);
+                    progress.set_message("Building patch…");
+                }
+                ProcessEnvelopesPatch(n) => {
+                    progress.set_length(n as u64);
+                    progress.set_position(0);
+                    progress.set_message("Processing patch…");
+                }
+                ProcessEnvelopeHunk(message) => {
+                    progress.inc(1);
+                    progress.set_message(message);
+                }
+            })
+        })
+        .dry_run(dry_run)
+        .sync(backend)?;
+
+    progress.finish_and_clear();
 
     printer.print(format!(
         "Account {} successfully synchronized!",
