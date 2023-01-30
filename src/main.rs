@@ -122,12 +122,9 @@ fn main() -> Result<()> {
                 .sessions_pool_size(10)
                 .disable_cache(true)
                 .build(&account_config, &backend_config)?;
-            return account::handlers::sync(
-                &account_config,
-                &mut printer,
-                backend.as_ref(),
-                dry_run,
-            );
+            account::handlers::sync(&account_config, &mut printer, backend.as_ref(), dry_run)?;
+            backend.close()?;
+            return Ok(());
         }
         _ => (),
     }

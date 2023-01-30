@@ -52,7 +52,7 @@ pub fn sync<P: Printer>(
     let progress = multi.add(
         ProgressBar::new(0).with_style(
             ProgressStyle::with_template(
-                "{msg:.dim}\n{spinner:.dim} {wide_bar:.cyan/blue} {pos}/{len}",
+                " {spinner:.dim} {msg:.dim}\n {wide_bar:.cyan/blue} {pos}/{len} ",
             )
             .unwrap(),
         ),
