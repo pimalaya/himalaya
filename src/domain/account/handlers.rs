@@ -48,94 +48,124 @@ pub fn sync<P: Printer>(
     info!("entering the sync accounts handler");
     trace!("dry run: {}", dry_run);
 
-    let multi = MultiProgress::new();
-    let progress = multi.add(
-        ProgressBar::new(0).with_style(
-            ProgressStyle::with_template(
-                " {spinner:.dim} {msg:.dim}\n {wide_bar:.cyan/blue} {pos}/{len} ",
-            )
-            .unwrap(),
-        ),
-    );
+    let sync_builder = BackendSyncBuilder::new(account_config);
 
-    BackendSyncBuilder::new(account_config)
-        .on_progress(|evt| {
-            use BackendSyncProgressEvent::*;
-            Ok(match evt {
-                GetLocalCachedFolders => {
-                    progress.set_length(4);
-                    progress.set_position(0);
-                    progress.set_message("Getting local cached folders…");
+    if dry_run {
+        let (folders_patch, envelopes_patch) = sync_builder.dry_run(true).sync(backend)?;
+        let mut hunks_count = folders_patch.len();
+
+        if !folders_patch.is_empty() {
+            printer.print_log(format!("Folders patch:"))?;
+            for hunk in folders_patch {
+                printer.print_log(format!(" - {hunk}"))?;
+            }
+            printer.print_log("")?;
+        }
+
+        if !envelopes_patch.is_empty() {
+            printer.print_log(format!("Envelopes patch:"))?;
+            for hunks in envelopes_patch {
+                for hunk in hunks {
+                    hunks_count += 1;
+                    printer.print_log(format!(" - {hunk}"))?;
                 }
-                GetLocalFolders => {
-                    progress.inc(1);
-                    progress.set_message("Getting local maildir folders…");
-                }
-                GetRemoteCachedFolders => {
-                    progress.inc(1);
-                    progress.set_message("Getting remote cached folders…");
-                }
-                GetRemoteFolders => {
-                    progress.inc(1);
-                    progress.set_message("Getting remote folders…");
-                }
-                BuildFoldersPatch => {
-                    progress.inc(1);
-                    progress.set_message("Building patch…");
-                }
-                ProcessFoldersPatch(n) => {
-                    progress.set_length(n as u64);
-                    progress.set_position(0);
-                    progress.set_message("Processing patch…");
-                }
-                ProcessFolderHunk(message) => {
-                    progress.inc(1);
-                    progress.set_message(message);
-                }
-                StartEnvelopesSync(folder, n, len) => {
-                    multi.println(format!("[{n:2}/{len}] {folder}")).unwrap();
-                    progress.reset();
-                }
-                GetLocalCachedEnvelopes => {
-                    progress.set_length(4);
-                    progress.set_message("Getting local cached envelopes…");
-                }
-                GetLocalEnvelopes => {
-                    progress.inc(1);
-                    progress.set_message("Getting local maildir envelopes…");
-                }
-                GetRemoteCachedEnvelopes => {
-                    progress.inc(1);
-                    progress.set_message("Getting remote cached envelopes…");
-                }
-                GetRemoteEnvelopes => {
-                    progress.inc(1);
-                    progress.set_message("Getting remote envelopes…");
-                }
-                BuildEnvelopesPatch => {
-                    progress.inc(1);
-                    progress.set_message("Building patch…");
-                }
-                ProcessEnvelopesPatch(n) => {
-                    progress.set_length(n as u64);
-                    progress.set_position(0);
-                    progress.set_message("Processing patch…");
-                }
-                ProcessEnvelopeHunk(message) => {
-                    progress.inc(1);
-                    progress.set_message(message);
-                }
+            }
+            printer.print_log("")?;
+        }
+
+        printer.print(format!(
+            "Estimated patch length for account {} to be synchronized: {hunks_count}",
+            backend.name(),
+        ))?;
+    } else {
+        let multi = MultiProgress::new();
+        let progress = multi.add(
+            ProgressBar::new(0).with_style(
+                ProgressStyle::with_template(
+                    " {spinner:.dim} {msg:.dim}\n {wide_bar:.cyan/blue} {pos}/{len} ",
+                )
+                .unwrap(),
+            ),
+        );
+
+        sync_builder
+            .on_progress(|evt| {
+                use BackendSyncProgressEvent::*;
+                Ok(match evt {
+                    GetLocalCachedFolders => {
+                        progress.set_length(4);
+                        progress.set_position(0);
+                        progress.set_message("Getting local cached folders…");
+                    }
+                    GetLocalFolders => {
+                        progress.inc(1);
+                        progress.set_message("Getting local maildir folders…");
+                    }
+                    GetRemoteCachedFolders => {
+                        progress.inc(1);
+                        progress.set_message("Getting remote cached folders…");
+                    }
+                    GetRemoteFolders => {
+                        progress.inc(1);
+                        progress.set_message("Getting remote folders…");
+                    }
+                    BuildFoldersPatch => {
+                        progress.inc(1);
+                        progress.set_message("Building patch…");
+                    }
+                    ProcessFoldersPatch(n) => {
+                        progress.set_length(n as u64);
+                        progress.set_position(0);
+                        progress.set_message("Processing patch…");
+                    }
+                    ProcessFolderHunk(msg) => {
+                        progress.inc(1);
+                        progress.set_message(msg + "…");
+                    }
+                    StartEnvelopesSync(folder, n, len) => {
+                        multi.println(format!("[{n:2}/{len}] {folder}")).unwrap();
+                        progress.reset();
+                    }
+                    GetLocalCachedEnvelopes => {
+                        progress.set_length(4);
+                        progress.set_message("Getting local cached envelopes…");
+                    }
+                    GetLocalEnvelopes => {
+                        progress.inc(1);
+                        progress.set_message("Getting local maildir envelopes…");
+                    }
+                    GetRemoteCachedEnvelopes => {
+                        progress.inc(1);
+                        progress.set_message("Getting remote cached envelopes…");
+                    }
+                    GetRemoteEnvelopes => {
+                        progress.inc(1);
+                        progress.set_message("Getting remote envelopes…");
+                    }
+                    BuildEnvelopesPatch => {
+                        progress.inc(1);
+                        progress.set_message("Building patch…");
+                    }
+                    ProcessEnvelopesPatch(n) => {
+                        progress.set_length(n as u64);
+                        progress.set_position(0);
+                        progress.set_message("Processing patch…");
+                    }
+                    ProcessEnvelopeHunk(msg) => {
+                        progress.inc(1);
+                        progress.set_message(msg + "…");
+                    }
+                })
             })
-        })
-        .dry_run(dry_run)
-        .sync(backend)?;
+            .sync(backend)?;
 
-    progress.finish_and_clear();
+        progress.finish_and_clear();
 
-    printer.print(format!(
-        "Account {} successfully synchronized!",
-        backend.name()
-    ))?;
+        printer.print(format!(
+            "Account {} successfully synchronized!",
+            backend.name()
+        ))?;
+    }
 
     Ok(())
 }
