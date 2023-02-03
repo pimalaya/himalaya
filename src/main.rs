@@ -4,7 +4,7 @@ use std::{borrow::Cow, env};
 use url::Url;
 
 use himalaya::{
-    account, compl,
+    account, cache, compl,
     config::{self, DeserializedConfig},
     email, flag, folder, man, output,
     printer::StdoutPrinter,
@@ -22,9 +22,10 @@ fn create_app() -> Command {
         .author(env!("CARGO_PKG_AUTHORS"))
         .propagate_version(true)
         .infer_subcommands(true)
-        .arg(&config::args::arg())
-        .arg(&account::args::arg())
-        .args(&output::args::args())
+        .arg(config::args::arg())
+        .arg(account::args::arg())
+        .arg(cache::args::arg())
+        .args(output::args::args())
         .arg(folder::args::source_arg())
         .subcommand(compl::args::subcmd())
         .subcommand(man::args::subcmd())
@@ -111,6 +112,7 @@ fn main() -> Result<()> {
     // inits services
     let mut sender = SenderBuilder::build(&account_config)?;
     let mut printer = StdoutPrinter::try_from(&m)?;
+    let disable_cache = cache::args::parse_disable_cache_flag(&m);
 
     // checks account commands
     match account::args::matches(&m)? {
@@ -132,7 +134,9 @@ fn main() -> Result<()> {
     // checks folder commands
     match folder::args::matches(&m)? {
         Some(folder::args::Cmd::List(max_width)) => {
-            let mut backend = BackendBuilder::new().build(&account_config, &backend_config)?;
+            let mut backend = BackendBuilder::new()
+                .disable_cache(disable_cache)
+                .build(&account_config, &backend_config)?;
             return folder::handlers::list(
                 max_width,
                 &account_config,
@@ -146,7 +150,9 @@ fn main() -> Result<()> {
     // checks email commands
     match email::args::matches(&m)? {
         Some(email::args::Cmd::Attachments(ids)) => {
-            let mut backend = BackendBuilder::new().build(&account_config, &backend_config)?;
+            let mut backend = BackendBuilder::new()
+                .disable_cache(disable_cache)
+                .build(&account_config, &backend_config)?;
             return email::handlers::attachments(
                 &account_config,
                 &mut printer,
@@ -156,7 +162,9 @@ fn main() -> Result<()> {
             );
         }
         Some(email::args::Cmd::Copy(ids, to_folder)) => {
-            let mut backend = BackendBuilder::new().build(&account_config, &backend_config)?;
+            let mut backend = BackendBuilder::new()
+                .disable_cache(disable_cache)
+                .build(&account_config, &backend_config)?;
             return email::handlers::copy(
                 &account_config,
                 &mut printer,
@@ -167,7 +175,9 @@ fn main() -> Result<()> {
             );
         }
         Some(email::args::Cmd::Delete(ids)) => {
-            let mut backend = BackendBuilder::new().build(&account_config, &backend_config)?;
+            let mut backend = BackendBuilder::new()
+                .disable_cache(disable_cache)
+                .build(&account_config, &backend_config)?;
             return email::handlers::delete(
                 &account_config,
                 &mut printer,
@@ -177,7 +187,9 @@ fn main() -> Result<()> {
             );
         }
         Some(email::args::Cmd::Forward(id, headers, body)) => {
-            let mut backend = BackendBuilder::new().build(&account_config, &backend_config)?;
+            let mut backend = BackendBuilder::new()
+                .disable_cache(disable_cache)
+                .build(&account_config, &backend_config)?;
             return email::handlers::forward(
                 &account_config,
                 &mut printer,
@@ -190,7 +202,9 @@ fn main() -> Result<()> {
             );
         }
         Some(email::args::Cmd::List(max_width, page_size, page)) => {
-            let mut backend = BackendBuilder::new().build(&account_config, &backend_config)?;
+            let mut backend = BackendBuilder::new()
+                .disable_cache(disable_cache)
+                .build(&account_config, &backend_config)?;
             return email::handlers::list(
                 &account_config,
                 &mut printer,
@@ -202,7 +216,9 @@ fn main() -> Result<()> {
             );
         }
         Some(email::args::Cmd::Move(ids, to_folder)) => {
-            let mut backend = BackendBuilder::new().build(&account_config, &backend_config)?;
+            let mut backend = BackendBuilder::new()
+                .disable_cache(disable_cache)
+                .build(&account_config, &backend_config)?;
             return email::handlers::move_(
                 &account_config,
                 &mut printer,
@@ -213,7 +229,9 @@ fn main() -> Result<()> {
             );
         }
         Some(email::args::Cmd::Read(ids, text_mime, sanitize, raw, headers)) => {
-            let mut backend = BackendBuilder::new().build(&account_config, &backend_config)?;
+            let mut backend = BackendBuilder::new()
+                .disable_cache(disable_cache)
+                .build(&account_config, &backend_config)?;
             return email::handlers::read(
                 &account_config,
                 &mut printer,
@@ -227,7 +245,9 @@ fn main() -> Result<()> {
             );
         }
         Some(email::args::Cmd::Reply(id, all, headers, body)) => {
-            let mut backend = BackendBuilder::new().build(&account_config, &backend_config)?;
+            let mut backend = BackendBuilder::new()
+                .disable_cache(disable_cache)
+                .build(&account_config, &backend_config)?;
             return email::handlers::reply(
                 &account_config,
                 &mut printer,
@@ -241,7 +261,9 @@ fn main() -> Result<()> {
             );
         }
         Some(email::args::Cmd::Save(raw_email)) => {
-            let mut backend = BackendBuilder::new().build(&account_config, &backend_config)?;
+            let mut backend = BackendBuilder::new()
+                .disable_cache(disable_cache)
+                .build(&account_config, &backend_config)?;
             return email::handlers::save(
                 &account_config,
                 &mut printer,
@@ -251,7 +273,9 @@ fn main() -> Result<()> {
             );
         }
         Some(email::args::Cmd::Search(query, max_width, page_size, page)) => {
-            let mut backend = BackendBuilder::new().build(&account_config, &backend_config)?;
+            let mut backend = BackendBuilder::new()
+                .disable_cache(disable_cache)
+                .build(&account_config, &backend_config)?;
             return email::handlers::search(
                 &account_config,
                 &mut printer,
@@ -264,7 +288,9 @@ fn main() -> Result<()> {
             );
         }
         Some(email::args::Cmd::Sort(criteria, query, max_width, page_size, page)) => {
-            let mut backend = BackendBuilder::new().build(&account_config, &backend_config)?;
+            let mut backend = BackendBuilder::new()
+                .disable_cache(disable_cache)
+                .build(&account_config, &backend_config)?;
             return email::handlers::sort(
                 &account_config,
                 &mut printer,
@@ -278,7 +304,9 @@ fn main() -> Result<()> {
             );
         }
         Some(email::args::Cmd::Send(raw_email)) => {
-            let mut backend = BackendBuilder::new().build(&account_config, &backend_config)?;
+            let mut backend = BackendBuilder::new()
+                .disable_cache(disable_cache)
+                .build(&account_config, &backend_config)?;
             return email::handlers::send(
                 &account_config,
                 &mut printer,
@@ -289,22 +317,30 @@ fn main() -> Result<()> {
         }
         Some(email::args::Cmd::Flag(m)) => match m {
             Some(flag::args::Cmd::Set(ids, ref flags)) => {
-                let mut backend = BackendBuilder::new().build(&account_config, &backend_config)?;
+                let mut backend = BackendBuilder::new()
+                    .disable_cache(disable_cache)
+                    .build(&account_config, &backend_config)?;
                 return flag::handlers::set(&mut printer, backend.as_mut(), &folder, ids, flags);
             }
             Some(flag::args::Cmd::Add(ids, ref flags)) => {
-                let mut backend = BackendBuilder::new().build(&account_config, &backend_config)?;
+                let mut backend = BackendBuilder::new()
+                    .disable_cache(disable_cache)
+                    .build(&account_config, &backend_config)?;
                 return flag::handlers::add(&mut printer, backend.as_mut(), &folder, ids, flags);
             }
             Some(flag::args::Cmd::Remove(ids, ref flags)) => {
-                let mut backend = BackendBuilder::new().build(&account_config, &backend_config)?;
+                let mut backend = BackendBuilder::new()
+                    .disable_cache(disable_cache)
+                    .build(&account_config, &backend_config)?;
                 return flag::handlers::remove(&mut printer, backend.as_mut(), &folder, ids, flags);
             }
             _ => (),
         },
         Some(email::args::Cmd::Tpl(m)) => match m {
             Some(tpl::args::Cmd::Forward(id, headers, body)) => {
-                let mut backend = BackendBuilder::new().build(&account_config, &backend_config)?;
+                let mut backend = BackendBuilder::new()
+                    .disable_cache(disable_cache)
+                    .build(&account_config, &backend_config)?;
                 return tpl::handlers::forward(
                     &account_config,
                     &mut printer,
@@ -319,7 +355,9 @@ fn main() -> Result<()> {
                 return tpl::handlers::write(&account_config, &mut printer, headers, body);
             }
             Some(tpl::args::Cmd::Reply(id, all, headers, body)) => {
-                let mut backend = BackendBuilder::new().build(&account_config, &backend_config)?;
+                let mut backend = BackendBuilder::new()
+                    .disable_cache(disable_cache)
+                    .build(&account_config, &backend_config)?;
                 return tpl::handlers::reply(
                     &account_config,
                     &mut printer,
@@ -332,7 +370,9 @@ fn main() -> Result<()> {
                 );
             }
             Some(tpl::args::Cmd::Save(tpl)) => {
-                let mut backend = BackendBuilder::new().build(&account_config, &backend_config)?;
+                let mut backend = BackendBuilder::new()
+                    .disable_cache(disable_cache)
+                    .build(&account_config, &backend_config)?;
                 return tpl::handlers::save(
                     &account_config,
                     &mut printer,
@@ -342,7 +382,9 @@ fn main() -> Result<()> {
                 );
             }
             Some(tpl::args::Cmd::Send(tpl)) => {
-                let mut backend = BackendBuilder::new().build(&account_config, &backend_config)?;
+                let mut backend = BackendBuilder::new()
+                    .disable_cache(disable_cache)
+                    .build(&account_config, &backend_config)?;
                 return tpl::handlers::send(
                     &account_config,
                     &mut printer,
@@ -355,7 +397,9 @@ fn main() -> Result<()> {
             _ => (),
         },
         Some(email::args::Cmd::Write(headers, body)) => {
-            let mut backend = BackendBuilder::new().build(&account_config, &backend_config)?;
+            let mut backend = BackendBuilder::new()
+                .disable_cache(disable_cache)
+                .build(&account_config, &backend_config)?;
             return email::handlers::write(
                 &account_config,
                 &mut printer,
