@@ -5,8 +5,8 @@ Command-line interface for email management based on the
 
 ![image](https://user-images.githubusercontent.com/10437171/138774902-7b9de5a3-93eb-44b0-8cfb-6d2e11e3b1aa.png)
 
-*The project is under active development. Do not use in production
-before the `v1.0.0`.*
+*Warning: the project is under active development, do not use in
+production before the `v1.0.0`.*
 
 ## Features
 
@@ -137,6 +137,14 @@ or contact me directly
 [@soywod](https://matrix.to/#/@soywod:matrix.org).
 
 ## Credits
+
+[![nlnet](https://nlnet.nl/logo/banner-160x60.png)](https://nlnet.nl/project/Himalaya/index.html)
+
+Special thanks to the
+[nlnet](https://nlnet.nl/project/Himalaya/index.html) foundation that
+helped Himalaya to receive financial support from the [NGI
+Assure](https://www.ngi.eu/ngi-projects/ngi-assure/) program of the
+European Commission in September, 2022.
 
 * [himalaya-lib](https://git.sr.ht/~soywod/himalaya-lib)
 * [IMAP RFC3501](https://tools.ietf.org/html/rfc3501)

@@ -77,6 +77,12 @@ pub fn sync<P: Printer>(
             "Estimated patch length for account {} to be synchronized: {hunks_count}",
             backend.name(),
         ))?;
+    } else if printer.is_json() {
+        sync_builder.sync(backend)?;
+        printer.print(format!(
+            "Account {} successfully synchronized!",
+            backend.name()
+        ))?;
     } else {
         let multi = MultiProgress::new();
         let progress = multi.add(
