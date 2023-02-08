@@ -3,7 +3,8 @@
 //! This module gathers all account actions triggered by the CLI.
 
 use anyhow::Result;
-use himalaya_lib::AccountConfig;
+use himalaya_lib::{AccountConfig, Backend, BackendSyncBuilder, BackendSyncProgressEvent};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use log::{info, trace};
 
 use crate::{
@@ -19,7 +20,7 @@ pub fn list<'a, P: Printer>(
     deserialized_config: &DeserializedConfig,
     printer: &mut P,
 ) -> Result<()> {
-    info!(">> account list handler");
+    info!("entering the list accounts handler");
 
     let accounts: Accounts = deserialized_config.accounts.iter().into();
     trace!("accounts: {:?}", accounts);
@@ -33,6 +34,184 @@ pub fn list<'a, P: Printer>(
     )?;
 
     info!("<< account list handler");
+    Ok(())
+}
+
+/// Synchronizes the account defined using argument `-a|--account`. If
+/// no account given, synchronizes the default one.
+pub fn sync<P: Printer>(
+    account_config: &AccountConfig,
+    printer: &mut P,
+    backend: &dyn Backend,
+    dry_run: bool,
+) -> Result<()> {
+    info!("entering the sync accounts handler");
+    trace!("dry run: {}", dry_run);
+
+    let sync_builder = BackendSyncBuilder::new(account_config);
+
+    if dry_run {
+        let report = sync_builder.dry_run(true).sync(backend)?;
+        let mut hunks_count = report.folders_patch.len();
+
+        if !report.folders_patch.is_empty() {
+            printer.print_log("Folders patch:")?;
+            for (hunk, _) in report.folders_patch {
+                printer.print_log(format!(" - {hunk}"))?;
+            }
+            printer.print_log("")?;
+        }
+
+        if !report.envelopes_patch.is_empty() {
+            printer.print_log("Envelopes patch:")?;
+            for (hunk, _) in report.envelopes_patch {
+                hunks_count += 1;
+                printer.print_log(format!(" - {hunk}"))?;
+            }
+            printer.print_log("")?;
+        }
+
+        printer.print(format!(
+            "Estimated patch length for account {} to be synchronized: {hunks_count}",
+            backend.name(),
+        ))?;
+    } else if printer.is_json() {
+        sync_builder.sync(backend)?;
+        printer.print(format!(
+            "Account {} successfully synchronized!",
+            backend.name()
+        ))?;
+    } else {
+        let multi = MultiProgress::new();
+        let progress = multi.add(
+            ProgressBar::new(0).with_style(
+                ProgressStyle::with_template(
+                    " {spinner:.dim} {msg:.dim}\n {wide_bar:.cyan/blue} {pos}/{len} ",
+                )
+                .unwrap(),
+            ),
+        );
+
+        let report = sync_builder
+            .on_progress(|evt| {
+                use BackendSyncProgressEvent::*;
+                Ok(match evt {
+                    GetLocalCachedFolders => {
+                        progress.set_length(4);
+                        progress.set_position(0);
+                        progress.set_message("Getting local cached folders…");
+                    }
+                    GetLocalFolders => {
+                        progress.inc(1);
+                        progress.set_message("Getting local maildir folders…");
+                    }
+                    GetRemoteCachedFolders => {
+                        progress.inc(1);
+                        progress.set_message("Getting remote cached folders…");
+                    }
+                    GetRemoteFolders => {
+                        progress.inc(1);
+                        progress.set_message("Getting remote folders…");
+                    }
+                    BuildFoldersPatch => {
+                        progress.inc(1);
+                        progress.set_message("Building patch…");
+                    }
+                    ProcessFoldersPatch(n) => {
+                        progress.set_length(n as u64);
+                        progress.set_position(0);
+                        progress.set_message("Processing patch…");
+                    }
+                    ProcessFolderHunk(msg) => {
+                        progress.inc(1);
+                        progress.set_message(msg + "…");
+                    }
+                    StartEnvelopesSync(folder, n, len) => {
+                        multi.println(format!("[{n:2}/{len}] {folder}")).unwrap();
+                        progress.reset();
+                    }
+                    GetLocalCachedEnvelopes => {
+                        progress.set_length(4);
+                        progress.set_message("Getting local cached envelopes…");
+                    }
+                    GetLocalEnvelopes => {
+                        progress.inc(1);
+                        progress.set_message("Getting local maildir envelopes…");
+                    }
+                    GetRemoteCachedEnvelopes => {
+                        progress.inc(1);
+                        progress.set_message("Getting remote cached envelopes…");
+                    }
+                    GetRemoteEnvelopes => {
+                        progress.inc(1);
+                        progress.set_message("Getting remote envelopes…");
+                    }
+                    BuildEnvelopesPatch => {
+                        progress.inc(1);
+                        progress.set_message("Building patch…");
+                    }
+                    ProcessEnvelopesPatch(n) => {
+                        progress.set_length(n as u64);
+                        progress.set_position(0);
+                        progress.set_message("Processing patch…");
+                    }
+                    ProcessEnvelopeHunk(msg) => {
+                        progress.inc(1);
+                        progress.set_message(msg + "…");
+                    }
+                })
+            })
+            .sync(backend)?;
+
+        progress.finish_and_clear();
+
+        let folders_patch_err = report
+            .folders_patch
+            .iter()
+            .filter_map(|(hunk, err)| err.as_ref().map(|err| (hunk, err)))
+            .collect::<Vec<_>>();
+        if !folders_patch_err.is_empty() {
+            printer.print_log("")?;
+            printer.print_log("Errors occured while applying the folders patch:")?;
+            folders_patch_err
+                .iter()
+                .try_for_each(|(hunk, err)| printer.print_log(format!(" - {hunk}: {err}")))?;
+        }
+
+        if let Some(err) = report.folders_cache_patch.1 {
+            printer.print_log("")?;
+            printer.print_log(format!(
+                "Error occured while applying the folder cache patch: {err}"
+            ))?;
+        }
+
+        let envelopes_patch_err = report
+            .envelopes_patch
+            .iter()
+            .filter_map(|(hunk, err)| err.as_ref().map(|err| (hunk, err)))
+            .collect::<Vec<_>>();
+        if !envelopes_patch_err.is_empty() {
+            printer.print_log("")?;
+            printer.print_log("Errors occured while applying the envelopes patch:")?;
+            for (hunk, err) in folders_patch_err {
+                printer.print_log(format!(" - {hunk}: {err}"))?;
+            }
+        }
+
+        if !report.envelopes_cache_patch.1.is_empty() {
+            printer.print_log("")?;
+            printer.print_log("Error occured while applying the envelopes cache patch:")?;
+            for err in report.envelopes_cache_patch.1 {
+                printer.print_log(format!(" - {err}"))?;
+            }
+        }
+
+        printer.print(format!(
+            "Account {} successfully synchronized!",
+            backend.name()
+        ))?;
+    }
+
     Ok(())
 }
 
@@ -101,13 +280,10 @@ mod tests {
                 data.print_table(&mut self.writer, opts)?;
                 Ok(())
             }
-            fn print_str<T: Debug + Print>(&mut self, _data: T) -> Result<()> {
+            fn print_log<T: Debug + Print>(&mut self, _data: T) -> Result<()> {
                 unimplemented!()
             }
-            fn print_struct<T: Debug + Print + serde::Serialize>(
-                &mut self,
-                _data: T,
-            ) -> Result<()> {
+            fn print<T: Debug + Print + serde::Serialize>(&mut self, _data: T) -> Result<()> {
                 unimplemented!()
             }
             fn is_json(&self) -> bool {

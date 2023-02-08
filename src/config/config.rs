@@ -4,16 +4,20 @@
 //! user configuration file.
 
 use anyhow::{anyhow, Context, Result};
+use dirs::{config_dir, home_dir};
 use himalaya_lib::{AccountConfig, BackendConfig, EmailHooks, EmailTextPlainFormat};
 use log::{debug, trace};
-use serde::Deserialize;
-use std::{collections::HashMap, env, fs, path::PathBuf};
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, fs, path::PathBuf};
 use toml;
 
-use crate::{account::DeserializedAccountConfig, config::prelude::*};
+use crate::{
+    account::DeserializedAccountConfig,
+    config::{prelude::*, wizard::wizard},
+};
 
 /// Represents the user config file.
-#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct DeserializedConfig {
     #[serde(alias = "name")]
@@ -27,11 +31,14 @@ pub struct DeserializedConfig {
 
     pub email_listing_page_size: Option<usize>,
     pub email_reading_headers: Option<Vec<String>>,
-    #[serde(default, with = "email_text_plain_format")]
+    #[serde(default, with = "EmailTextPlainFormatOptionDef", skip_serializing_if = "Option::is_none")]
     pub email_reading_format: Option<EmailTextPlainFormat>,
+    pub email_reading_verify_cmd: Option<String>,
     pub email_reading_decrypt_cmd: Option<String>,
+    pub email_writing_headers: Option<Vec<String>>,
+    pub email_writing_sign_cmd: Option<String>,
     pub email_writing_encrypt_cmd: Option<String>,
-    #[serde(default, with = "email_hooks")]
+    #[serde(default, with = "EmailHooksOptionDef", skip_serializing_if = "Option::is_none")]
     pub email_hooks: Option<EmailHooks>,
 
     #[serde(flatten)]
@@ -41,74 +48,52 @@ pub struct DeserializedConfig {
 impl DeserializedConfig {
     /// Tries to create a config from an optional path.
     pub fn from_opt_path(path: Option<&str>) -> Result<Self> {
-        trace!(">> parse config from path");
         debug!("path: {:?}", path);
 
-        let path = path.map(|s| s.into()).unwrap_or(Self::path()?);
-        let content = fs::read_to_string(path).context("cannot read config file")?;
-        let config: Self = toml::from_str(&content).context("cannot parse config file")?;
+        let config: Self = match path.map(|s| s.into()).or_else(Self::path) {
+            Some(path) => {
+                let content = fs::read_to_string(path).context("cannot read config file")?;
+                toml::from_str(&content).context("cannot parse config file")?
+            }
+            None => wizard()?,
+        };
 
         if config.accounts.is_empty() {
             return Err(anyhow!("config file must contain at least one account"));
         }
 
-        trace!("config: {:?}", config);
-        trace!("<< parse config from path");
+        trace!("config: {:#?}", config);
         Ok(config)
     }
 
-    /// Tries to get the XDG config file path from XDG_CONFIG_HOME
-    /// environment variable.
-    fn path_from_xdg() -> Result<PathBuf> {
-        let path = env::var("XDG_CONFIG_HOME").context("cannot read env var XDG_CONFIG_HOME")?;
-        let path = PathBuf::from(path).join("himalaya").join("config.toml");
-        Ok(path)
-    }
-
-    /// Tries to get the XDG config file path from HOME environment
-    /// variable.
-    fn path_from_xdg_alt() -> Result<PathBuf> {
-        let home_var = if cfg!(target_family = "windows") {
-            "USERPROFILE"
-        } else {
-            "HOME"
-        };
-        let path = env::var(home_var).context(format!("cannot read env var {}", &home_var))?;
-        let path = PathBuf::from(path)
-            .join(".config")
-            .join("himalaya")
-            .join("config.toml");
-        Ok(path)
-    }
-
-    /// Tries to get the .himalayarc config file path from HOME
-    /// environment variable.
-    fn path_from_home() -> Result<PathBuf> {
-        let home_var = if cfg!(target_family = "windows") {
-            "USERPROFILE"
-        } else {
-            "HOME"
-        };
-        let path = env::var(home_var).context(format!("cannot read env var {}", &home_var))?;
-        let path = PathBuf::from(path).join(".himalayarc");
-        Ok(path)
-    }
-
-    /// Tries to get the config file path.
-    pub fn path() -> Result<PathBuf> {
-        Self::path_from_xdg()
-            .or_else(|_| Self::path_from_xdg_alt())
-            .or_else(|_| Self::path_from_home())
+    /// Tries to return a config path from a few default settings.
+    ///
+    /// Tries paths in this order:
+    ///
+    /// - `"$XDG_CONFIG_DIR/himalaya/config.toml"` (or equivalent to `$XDG_CONFIG_DIR` in  other
+    ///   OSes.)
+    /// - `"$HOME/.config/himalaya/config.toml"`
+    /// - `"$HOME/.himalayarc"`
+    ///
+    /// Returns `Some(path)` if the path exists, otherwise `None`.
+    pub fn path() -> Option<PathBuf> {
+        config_dir()
+            .map(|p| p.join("himalaya").join("config.toml"))
+            .filter(|p| p.exists())
+            .or_else(|| home_dir().map(|p| p.join(".config").join("himalaya").join("config.toml")))
+            .filter(|p| p.exists())
+            .or_else(|| home_dir().map(|p| p.join(".himalayarc")))
+            .filter(|p| p.exists())
     }
 
     pub fn to_configs(&self, account_name: Option<&str>) -> Result<(AccountConfig, BackendConfig)> {
-        let (account_config, backend_config) = match account_name {
+        let (account_name, deserialized_account_config) = match account_name {
             Some("default") | Some("") | None => self
                 .accounts
                 .iter()
-                .find_map(|(_, account)| {
+                .find_map(|(name, account)| {
                     if account.is_default() {
-                        Some(account)
+                        Some((name.clone(), account))
                     } else {
                         None
                     }
@@ -117,9 +102,12 @@ impl DeserializedConfig {
             Some(name) => self
                 .accounts
                 .get(name)
+                .map(|account| (name.to_string(), account))
                 .ok_or_else(|| anyhow!(format!("cannot find account {}", name))),
-        }?
-        .to_configs(self);
+        }?;
+
+        let (account_config, backend_config) =
+            deserialized_account_config.to_configs(account_name, self);
 
         Ok((account_config, backend_config))
     }

@@ -8,7 +8,7 @@ impl Table for Envelope {
             .cell(Cell::new("ID").bold().underline().white())
             .cell(Cell::new("FLAGS").bold().underline().white())
             .cell(Cell::new("SUBJECT").shrinkable().bold().underline().white())
-            .cell(Cell::new("SENDER").bold().underline().white())
+            .cell(Cell::new("FROM").bold().underline().white())
             .cell(Cell::new("DATE").bold().underline().white())
     }
 
@@ -17,8 +17,12 @@ impl Table for Envelope {
         let flags = self.flags.to_symbols_string();
         let unseen = !self.flags.contains(&Flag::Seen);
         let subject = &self.subject;
-        let sender = &self.sender;
-        let date = self.date.as_deref().unwrap_or_default();
+        let sender = if let Some(name) = &self.from.name {
+            name
+        } else {
+            &self.from.addr
+        };
+        let date = self.date.format("%d/%m/%Y %H:%M").to_string();
 
         Row::new()
             .cell(Cell::new(id).bold_if(unseen).red())

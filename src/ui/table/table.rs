@@ -183,7 +183,7 @@ where
             table[0].0.iter().map(|cell| cell.unicode_width()).collect();
         table.extend(
             items
-                .iter()
+                .into_iter()
                 .map(|item| {
                     let row = item.row();
                     row.0.iter().enumerate().for_each(|(i, cell)| {

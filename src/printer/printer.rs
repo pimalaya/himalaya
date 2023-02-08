@@ -1,16 +1,16 @@
-use anyhow::{Context, Result};
-use atty::Stream;
+use anyhow::{Context, Error, Result};
+use clap::ArgMatches;
 use std::fmt::{self, Debug};
-use termcolor::{ColorChoice, StandardStream};
+use termcolor::StandardStream;
 
 use crate::{
-    output::OutputFmt,
+    output::{args, ColorFmt, OutputFmt},
     printer::{Print, PrintTable, PrintTableOpts, WriteColor},
 };
 
 pub trait Printer {
-    fn print_str<T: Debug + Print>(&mut self, data: T) -> Result<()>;
-    fn print_struct<T: Debug + Print + serde::Serialize>(&mut self, data: T) -> Result<()>;
+    fn print<T: Debug + Print + serde::Serialize>(&mut self, data: T) -> Result<()>;
+    fn print_log<T: Debug + Print>(&mut self, data: T) -> Result<()>;
     fn print_table<T: Debug + erased_serde::Serialize + PrintTable + ?Sized>(
         &mut self,
         data: Box<T>,
@@ -24,41 +24,30 @@ pub struct StdoutPrinter {
     pub fmt: OutputFmt,
 }
 
-impl StdoutPrinter {
-    pub fn from_fmt(fmt: OutputFmt) -> Self {
-        let writer = StandardStream::stdout(if atty::isnt(Stream::Stdin) {
-            // Colors should be deactivated if the terminal is not a tty.
-            ColorChoice::Never
-        } else {
-            // Otherwise let's `termcolor` decide by inspecting the environment. From the [doc]:
-            // - If `NO_COLOR` is set to any value, then colors will be suppressed.
-            // - If `TERM` is set to dumb, then colors will be suppressed.
-            // - In non-Windows environments, if `TERM` is not set, then colors will be suppressed.
-            //
-            // [doc]: https://github.com/BurntSushi/termcolor#automatic-color-selection
-            ColorChoice::Auto
-        });
-        let writer = Box::new(writer);
-        Self { writer, fmt }
+impl Default for StdoutPrinter {
+    fn default() -> Self {
+        let fmt = OutputFmt::default();
+        let writer = Box::new(StandardStream::stdout(ColorFmt::default().into()));
+        Self { fmt, writer }
     }
+}
 
-    pub fn from_opt_str(s: Option<&str>) -> Result<Self> {
-        Ok(Self {
-            fmt: OutputFmt::try_from(s)?,
-            ..Self::from_fmt(OutputFmt::Plain)
-        })
+impl StdoutPrinter {
+    pub fn new(fmt: OutputFmt, color: ColorFmt) -> Self {
+        let writer = Box::new(StandardStream::stdout(color.into()));
+        Self { fmt, writer }
     }
 }
 
 impl Printer for StdoutPrinter {
-    fn print_str<T: Debug + Print>(&mut self, data: T) -> Result<()> {
+    fn print_log<T: Debug + Print>(&mut self, data: T) -> Result<()> {
         match self.fmt {
             OutputFmt::Plain => data.print(self.writer.as_mut()),
             OutputFmt::Json => Ok(()),
         }
     }
 
-    fn print_struct<T: Debug + Print + serde::Serialize>(&mut self, data: T) -> Result<()> {
+    fn print<T: Debug + Print + serde::Serialize>(&mut self, data: T) -> Result<()> {
         match self.fmt {
             OutputFmt::Plain => data.print(self.writer.as_mut()),
             OutputFmt::Json => serde_json::to_writer(self.writer.as_mut(), &data)
@@ -84,5 +73,31 @@ impl Printer for StdoutPrinter {
 
     fn is_json(&self) -> bool {
         self.fmt == OutputFmt::Json
+    }
+}
+
+impl From<OutputFmt> for StdoutPrinter {
+    fn from(fmt: OutputFmt) -> Self {
+        Self::new(fmt, ColorFmt::Auto)
+    }
+}
+
+impl TryFrom<&ArgMatches> for StdoutPrinter {
+    type Error = Error;
+
+    fn try_from(m: &ArgMatches) -> Result<Self, Self::Error> {
+        let fmt: OutputFmt = m
+            .get_one::<String>(args::ARG_OUTPUT)
+            .map(String::as_str)
+            .unwrap()
+            .parse()?;
+
+        let color: ColorFmt = m
+            .get_one::<String>(args::ARG_COLOR)
+            .map(String::as_str)
+            .unwrap()
+            .parse()?;
+
+        Ok(Self::new(fmt, color))
     }
 }

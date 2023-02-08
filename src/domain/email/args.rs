@@ -1,18 +1,15 @@
-//! Module related to email CLI.
+//! Email CLI module.
 //!
-//! This module provides subcommands, arguments and a command matcher related to email.
+//! This module contains the command matcher, the subcommands and the
+//! arguments related to the email domain.
 
 use anyhow::Result;
-use clap::{self, App, Arg, ArgMatches, SubCommand};
-use himalaya_lib::email::TplOverride;
-use log::{debug, trace};
+use clap::{Arg, ArgAction, ArgMatches, Command};
 
-use crate::{email, flag, folder, tpl, ui::table};
+use crate::{flag, folder, tpl, ui::table};
 
-const ARG_ATTACHMENTS: &str = "attachment";
 const ARG_CRITERIA: &str = "criterion";
-const ARG_ENCRYPT: &str = "encrypt";
-const ARG_HEADERS: &str = "header";
+const ARG_HEADERS: &str = "headers";
 const ARG_ID: &str = "id";
 const ARG_IDS: &str = "ids";
 const ARG_MIME_TYPE: &str = "mime-type";
@@ -24,7 +21,7 @@ const ARG_REPLY_ALL: &str = "reply-all";
 const ARG_SANITIZE: &str = "sanitize";
 const CMD_ATTACHMENTS: &str = "attachments";
 const CMD_COPY: &str = "copy";
-const CMD_DEL: &str = "delete";
+const CMD_DELETE: &str = "delete";
 const CMD_FORWARD: &str = "forward";
 const CMD_LIST: &str = "list";
 const CMD_MOVE: &str = "move";
@@ -36,37 +33,35 @@ const CMD_SEND: &str = "send";
 const CMD_SORT: &str = "sort";
 const CMD_WRITE: &str = "write";
 
-type Criteria = String;
-type Encrypt = bool;
-type Folder<'a> = &'a str;
-type Page = usize;
-type PageSize = usize;
-type Query = String;
-type Sanitize = bool;
-type Raw = bool;
-type RawEmail<'a> = &'a str;
-type TextMime<'a> = &'a str;
-
-pub(crate) type All = bool;
-pub(crate) type Attachments<'a> = Vec<&'a str>;
-pub(crate) type Headers<'a> = Vec<&'a str>;
-pub(crate) type Id<'a> = &'a str;
-pub(crate) type Ids<'a> = &'a str;
+pub type All = bool;
+pub type Criteria = String;
+pub type Folder<'a> = &'a str;
+pub type Headers<'a> = Vec<&'a str>;
+pub type Id<'a> = &'a str;
+pub type Ids<'a> = Vec<&'a str>;
+pub type Page = usize;
+pub type PageSize = usize;
+pub type Query = String;
+pub type Raw = bool;
+pub type RawEmail = String;
+pub type Sanitize = bool;
+pub type TextMime<'a> = &'a str;
 
 /// Represents the email commands.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Cmd<'a> {
-    Attachments(Id<'a>),
-    Copy(Id<'a>, Folder<'a>),
+    Attachments(Ids<'a>),
+    Copy(Ids<'a>, Folder<'a>),
     Delete(Ids<'a>),
-    Forward(Id<'a>, Attachments<'a>, Encrypt),
+    Flag(Option<flag::args::Cmd<'a>>),
+    Forward(Id<'a>, tpl::args::Headers<'a>, tpl::args::Body<'a>),
     List(table::args::MaxTableWidth, Option<PageSize>, Page),
-    Move(Id<'a>, Folder<'a>),
-    Read(Id<'a>, TextMime<'a>, Sanitize, Raw, Headers<'a>),
-    Reply(Id<'a>, All, Attachments<'a>, Encrypt),
-    Save(RawEmail<'a>),
+    Move(Ids<'a>, Folder<'a>),
+    Read(Ids<'a>, TextMime<'a>, Sanitize, Raw, Headers<'a>),
+    Reply(Id<'a>, All, tpl::args::Headers<'a>, tpl::args::Body<'a>),
+    Save(RawEmail),
     Search(Query, table::args::MaxTableWidth, Option<PageSize>, Page),
-    Send(RawEmail<'a>),
+    Send(RawEmail),
     Sort(
         Criteria,
         Query,
@@ -74,74 +69,61 @@ pub enum Cmd<'a> {
         Option<PageSize>,
         Page,
     ),
-    Write(TplOverride<'a>, Attachments<'a>, Encrypt),
-
-    Flag(Option<flag::args::Cmd<'a>>),
     Tpl(Option<tpl::args::Cmd<'a>>),
+    Write(tpl::args::Headers<'a>, tpl::args::Body<'a>),
 }
 
 /// Email command matcher.
 pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
-    trace!("matches: {:?}", m);
-
     let cmd = if let Some(m) = m.subcommand_matches(CMD_ATTACHMENTS) {
-        debug!("attachments command matched");
-        let id = parse_id_arg(m);
-        Cmd::Attachments(id)
+        let ids = parse_ids_arg(m);
+        Cmd::Attachments(ids)
     } else if let Some(m) = m.subcommand_matches(CMD_COPY) {
-        debug!("copy command matched");
-        let id = parse_id_arg(m);
+        let ids = parse_ids_arg(m);
         let folder = folder::args::parse_target_arg(m);
-        Cmd::Copy(id, folder)
-    } else if let Some(m) = m.subcommand_matches(CMD_DEL) {
-        debug!("delete command matched");
+        Cmd::Copy(ids, folder)
+    } else if let Some(m) = m.subcommand_matches(CMD_DELETE) {
         let ids = parse_ids_arg(m);
         Cmd::Delete(ids)
+    } else if let Some(m) = m.subcommand_matches(flag::args::CMD_FLAG) {
+        Cmd::Flag(flag::args::matches(m)?)
     } else if let Some(m) = m.subcommand_matches(CMD_FORWARD) {
-        debug!("forward command matched");
         let id = parse_id_arg(m);
-        let attachments = parse_attachments_arg(m);
-        let encrypt = parse_encrypt_flag(m);
-        Cmd::Forward(id, attachments, encrypt)
+        let headers = tpl::args::parse_headers_arg(m);
+        let body = tpl::args::parse_body_arg(m);
+        Cmd::Forward(id, headers, body)
     } else if let Some(m) = m.subcommand_matches(CMD_LIST) {
-        debug!("list command matched");
         let max_table_width = table::args::parse_max_width(m);
         let page_size = parse_page_size_arg(m);
         let page = parse_page_arg(m);
         Cmd::List(max_table_width, page_size, page)
     } else if let Some(m) = m.subcommand_matches(CMD_MOVE) {
-        debug!("move command matched");
-        let id = parse_id_arg(m);
+        let ids = parse_ids_arg(m);
         let folder = folder::args::parse_target_arg(m);
-        Cmd::Move(id, folder)
+        Cmd::Move(ids, folder)
     } else if let Some(m) = m.subcommand_matches(CMD_READ) {
-        debug!("read command matched");
-        let id = parse_id_arg(m);
+        let ids = parse_ids_arg(m);
         let mime = parse_mime_type_arg(m);
         let sanitize = parse_sanitize_flag(m);
         let raw = parse_raw_flag(m);
         let headers = parse_headers_arg(m);
-        Cmd::Read(id, mime, sanitize, raw, headers)
+        Cmd::Read(ids, mime, sanitize, raw, headers)
     } else if let Some(m) = m.subcommand_matches(CMD_REPLY) {
-        debug!("reply command matched");
         let id = parse_id_arg(m);
         let all = parse_reply_all_flag(m);
-        let attachments = parse_attachments_arg(m);
-        let encrypt = parse_encrypt_flag(m);
-        Cmd::Reply(id, all, attachments, encrypt)
+        let headers = tpl::args::parse_headers_arg(m);
+        let body = tpl::args::parse_body_arg(m);
+        Cmd::Reply(id, all, headers, body)
     } else if let Some(m) = m.subcommand_matches(CMD_SAVE) {
-        debug!("save command matched");
         let email = parse_raw_arg(m);
         Cmd::Save(email)
     } else if let Some(m) = m.subcommand_matches(CMD_SEARCH) {
-        debug!("search command matched");
         let max_table_width = table::args::parse_max_width(m);
         let page_size = parse_page_size_arg(m);
         let page = parse_page_arg(m);
         let query = parse_query_arg(m);
         Cmd::Search(query, max_table_width, page_size, page)
     } else if let Some(m) = m.subcommand_matches(CMD_SORT) {
-        debug!("sort command matched");
         let max_table_width = table::args::parse_max_width(m);
         let page_size = parse_page_size_arg(m);
         let page = parse_page_arg(m);
@@ -149,21 +131,15 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
         let query = parse_query_arg(m);
         Cmd::Sort(criteria, query, max_table_width, page_size, page)
     } else if let Some(m) = m.subcommand_matches(CMD_SEND) {
-        debug!("send command matched");
         let email = parse_raw_arg(m);
         Cmd::Send(email)
-    } else if let Some(m) = m.subcommand_matches(CMD_WRITE) {
-        debug!("write command matched");
-        let attachments = parse_attachments_arg(m);
-        let encrypt = parse_encrypt_flag(m);
-        let tpl = tpl::args::parse_override_arg(m);
-        Cmd::Write(tpl, attachments, encrypt)
     } else if let Some(m) = m.subcommand_matches(tpl::args::CMD_TPL) {
         Cmd::Tpl(tpl::args::matches(m)?)
-    } else if let Some(m) = m.subcommand_matches(flag::args::CMD_FLAG) {
-        Cmd::Flag(flag::args::matches(m)?)
+    } else if let Some(m) = m.subcommand_matches(CMD_WRITE) {
+        let headers = tpl::args::parse_headers_arg(m);
+        let body = tpl::args::parse_body_arg(m);
+        Cmd::Write(headers, body)
     } else {
-        debug!("default list command matched");
         Cmd::List(None, None, 0)
     };
 
@@ -171,80 +147,74 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
 }
 
 /// Represents the email subcommands.
-pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
+pub fn subcmds() -> Vec<Command> {
     vec![
         flag::args::subcmds(),
         tpl::args::subcmds(),
         vec![
-            SubCommand::with_name(CMD_ATTACHMENTS)
-                .aliases(&["attachment", "attach", "att", "at", "a"])
-                .about("Downloads all attachments of the targeted email")
-                .arg(email::args::id_arg()),
-            SubCommand::with_name(CMD_LIST)
-                .aliases(&["lst", "l"])
-                .about("Lists all emails")
+            Command::new(CMD_ATTACHMENTS)
+                .about("Downloads all emails attachments")
+                .arg(ids_arg()),
+            Command::new(CMD_LIST)
+                .alias("lst")
+                .about("List envelopes")
                 .arg(page_size_arg())
                 .arg(page_arg())
                 .arg(table::args::max_width()),
-            SubCommand::with_name(CMD_SEARCH)
-                .aliases(&["s", "query", "q"])
-                .about("Lists emails matching the given query")
+            Command::new(CMD_SEARCH)
+                .aliases(["query", "q"])
+                .about("Filter envelopes matching the given query")
                 .arg(page_size_arg())
                 .arg(page_arg())
                 .arg(table::args::max_width())
                 .arg(query_arg()),
-            SubCommand::with_name(CMD_SORT)
-                .about("Sorts emails by the given criteria and matching the given query")
+            Command::new(CMD_SORT)
+                .about("Sort envelopes by the given criteria and matching the given query")
                 .arg(page_size_arg())
                 .arg(page_arg())
                 .arg(table::args::max_width())
                 .arg(criteria_arg())
                 .arg(query_arg()),
-            SubCommand::with_name(CMD_WRITE)
-                .about("Writes a new email")
-                .aliases(&["w", "new", "n"])
-                .args(&tpl::args::args())
-                .arg(attachments_arg())
-                .arg(encrypt_flag()),
-            SubCommand::with_name(CMD_SEND)
-                .about("Sends a raw email")
+            Command::new(CMD_WRITE)
+                .about("Write a new email")
+                .aliases(["new", "n"])
+                .args(tpl::args::args()),
+            Command::new(CMD_SEND)
+                .about("Send a raw email")
                 .arg(raw_arg()),
-            SubCommand::with_name(CMD_SAVE)
-                .about("Saves a raw email")
+            Command::new(CMD_SAVE)
+                .about("Save a raw email")
                 .arg(raw_arg()),
-            SubCommand::with_name(CMD_READ)
-                .about("Reads text bodies of an email")
-                .arg(id_arg())
+            Command::new(CMD_READ)
+                .about("Read text bodies of emails")
                 .arg(mime_type_arg())
                 .arg(sanitize_flag())
                 .arg(raw_flag())
-                .arg(headers_arg()),
-            SubCommand::with_name(CMD_REPLY)
-                .aliases(&["rep", "r"])
-                .about("Answers to an email")
-                .arg(id_arg())
+                .arg(headers_arg())
+                .arg(ids_arg()),
+            Command::new(CMD_REPLY)
+                .about("Answer to an email")
                 .arg(reply_all_flag())
-                .arg(attachments_arg())
-                .arg(encrypt_flag()),
-            SubCommand::with_name(CMD_FORWARD)
-                .aliases(&["fwd", "f"])
-                .about("Forwards an email")
-                .arg(id_arg())
-                .arg(attachments_arg())
-                .arg(encrypt_flag()),
-            SubCommand::with_name(CMD_COPY)
-                .aliases(&["cp", "c"])
-                .about("Copies an email to the targeted folder")
-                .arg(id_arg())
-                .arg(folder::args::target_arg()),
-            SubCommand::with_name(CMD_MOVE)
-                .aliases(&["mv"])
-                .about("Moves an email to the targeted folder")
-                .arg(id_arg())
-                .arg(folder::args::target_arg()),
-            SubCommand::with_name(CMD_DEL)
-                .aliases(&["del", "d", "remove", "rm"])
-                .about("Deletes an email")
+                .args(tpl::args::args())
+                .arg(id_arg()),
+            Command::new(CMD_FORWARD)
+                .aliases(["fwd", "f"])
+                .about("Forward an email")
+                .args(tpl::args::args())
+                .arg(id_arg()),
+            Command::new(CMD_COPY)
+                .alias("cp")
+                .about("Copy emails to the given folder")
+                .arg(folder::args::target_arg())
+                .arg(ids_arg()),
+            Command::new(CMD_MOVE)
+                .alias("mv")
+                .about("Move emails to the given folder")
+                .arg(folder::args::target_arg())
+                .arg(ids_arg()),
+            Command::new(CMD_DELETE)
+                .aliases(["remove", "rm"])
+                .about("Delete emails")
                 .arg(ids_arg()),
         ],
     ]
@@ -252,29 +222,45 @@ pub fn subcmds<'a>() -> Vec<App<'a, 'a>> {
 }
 
 /// Represents the email id argument.
-pub fn id_arg<'a>() -> Arg<'a, 'a> {
-    Arg::with_name(ARG_ID)
+pub fn id_arg() -> Arg {
+    Arg::new(ARG_ID)
         .help("Specifies the target email")
         .value_name("ID")
         .required(true)
 }
 
 /// Represents the email id argument parser.
-pub fn parse_id_arg<'a>(matches: &'a ArgMatches<'a>) -> &'a str {
-    matches.value_of(ARG_ID).unwrap()
+pub fn parse_id_arg(matches: &ArgMatches) -> &str {
+    matches.get_one::<String>(ARG_ID).unwrap()
+}
+
+/// Represents the email ids argument.
+pub fn ids_arg() -> Arg {
+    Arg::new(ARG_IDS)
+        .help("Email ids")
+        .value_name("IDS")
+        .num_args(1..)
+        .required(true)
+}
+
+/// Represents the email ids argument parser.
+pub fn parse_ids_arg(matches: &ArgMatches) -> Vec<&str> {
+    matches
+        .get_many::<String>(ARG_IDS)
+        .unwrap()
+        .map(String::as_str)
+        .collect()
 }
 
 /// Represents the email sort criteria argument.
-pub fn criteria_arg<'a>() -> Arg<'a, 'a> {
-    Arg::with_name(ARG_CRITERIA)
-        .long("criterion")
-        .short("c")
+pub fn criteria_arg<'a>() -> Arg {
+    Arg::new(ARG_CRITERIA)
         .help("Email sorting preferences")
+        .long("criterion")
+        .short('c')
         .value_name("CRITERION:ORDER")
-        .takes_value(true)
-        .multiple(true)
-        .required(true)
-        .possible_values(&[
+        .action(ArgAction::Append)
+        .value_parser([
             "arrival",
             "arrival:asc",
             "arrival:desc",
@@ -300,69 +286,59 @@ pub fn criteria_arg<'a>() -> Arg<'a, 'a> {
 }
 
 /// Represents the email sort criteria argument parser.
-pub fn parse_criteria_arg<'a>(matches: &'a ArgMatches<'a>) -> String {
+pub fn parse_criteria_arg(matches: &ArgMatches) -> String {
     matches
-        .values_of(ARG_CRITERIA)
+        .get_many::<String>(ARG_CRITERIA)
         .unwrap_or_default()
+        .map(ToOwned::to_owned)
         .collect::<Vec<_>>()
         .join(" ")
 }
 
-/// Represents the email ids argument.
-pub fn ids_arg<'a>() -> Arg<'a, 'a> {
-    Arg::with_name(ARG_IDS)
-        .help("Specifies the target email(s)")
-        .long_help("Specifies a range of emails. The range follows the RFC3501 format.")
-        .value_name("IDS")
-        .required(true)
-}
-
-/// Represents the email ids argument parser.
-pub fn parse_ids_arg<'a>(matches: &'a ArgMatches<'a>) -> &'a str {
-    matches.value_of(email::args::ARG_IDS).unwrap()
-}
-
 /// Represents the email reply all argument.
-pub fn reply_all_flag<'a>() -> Arg<'a, 'a> {
-    Arg::with_name(ARG_REPLY_ALL)
+pub fn reply_all_flag() -> Arg {
+    Arg::new(ARG_REPLY_ALL)
         .help("Includes all recipients")
-        .short("A")
         .long("all")
+        .short('a')
+        .action(ArgAction::SetTrue)
 }
 
 /// Represents the email reply all argument parser.
-pub fn parse_reply_all_flag<'a>(matches: &'a ArgMatches<'a>) -> bool {
-    matches.is_present(ARG_REPLY_ALL)
+pub fn parse_reply_all_flag(matches: &ArgMatches) -> bool {
+    matches.get_flag(ARG_REPLY_ALL)
 }
 
 /// Represents the page size argument.
-fn page_size_arg<'a>() -> Arg<'a, 'a> {
-    Arg::with_name(ARG_PAGE_SIZE)
+fn page_size_arg() -> Arg {
+    Arg::new(ARG_PAGE_SIZE)
         .help("Page size")
-        .short("s")
-        .long("size")
+        .long("page-size")
+        .short('s')
         .value_name("INT")
 }
 
 /// Represents the page size argument parser.
-fn parse_page_size_arg<'a>(matches: &'a ArgMatches<'a>) -> Option<usize> {
-    matches.value_of(ARG_PAGE_SIZE).and_then(|s| s.parse().ok())
+fn parse_page_size_arg(matches: &ArgMatches) -> Option<usize> {
+    matches
+        .get_one::<String>(ARG_PAGE_SIZE)
+        .and_then(|s| s.parse().ok())
 }
 
 /// Represents the page argument.
-fn page_arg<'a>() -> Arg<'a, 'a> {
-    Arg::with_name(ARG_PAGE)
+fn page_arg() -> Arg {
+    Arg::new(ARG_PAGE)
         .help("Page number")
-        .short("p")
+        .short('p')
         .long("page")
         .value_name("INT")
         .default_value("1")
 }
 
 /// Represents the page argument parser.
-fn parse_page_arg<'a>(matches: &'a ArgMatches<'a>) -> usize {
+fn parse_page_arg(matches: &ArgMatches) -> usize {
     matches
-        .value_of(ARG_PAGE)
+        .get_one::<String>(ARG_PAGE)
         .unwrap()
         .parse()
         .ok()
@@ -370,120 +346,94 @@ fn parse_page_arg<'a>(matches: &'a ArgMatches<'a>) -> usize {
         .unwrap_or_default()
 }
 
-/// Represents the email attachments argument.
-pub fn attachments_arg<'a>() -> Arg<'a, 'a> {
-    Arg::with_name(ARG_ATTACHMENTS)
-        .help("Adds attachment to the email")
-        .short("a")
-        .long("attachment")
-        .value_name("PATH")
-        .multiple(true)
-}
-
-/// Represents the email attachments argument parser.
-pub fn parse_attachments_arg<'a>(matches: &'a ArgMatches<'a>) -> Vec<&'a str> {
-    matches
-        .values_of(ARG_ATTACHMENTS)
-        .unwrap_or_default()
-        .collect()
-}
-
 /// Represents the email headers argument.
-pub fn headers_arg<'a>() -> Arg<'a, 'a> {
-    Arg::with_name(ARG_HEADERS)
+pub fn headers_arg() -> Arg {
+    Arg::new(ARG_HEADERS)
         .help("Shows additional headers with the email")
-        .short("h")
         .long("header")
+        .short('H')
         .value_name("STRING")
-        .multiple(true)
+        .action(ArgAction::Append)
 }
 
 /// Represents the email headers argument parser.
-pub fn parse_headers_arg<'a>(matches: &'a ArgMatches<'a>) -> Vec<&'a str> {
-    matches.values_of(ARG_HEADERS).unwrap_or_default().collect()
+pub fn parse_headers_arg(m: &ArgMatches) -> Vec<&str> {
+    m.get_many::<String>(ARG_HEADERS)
+        .unwrap_or_default()
+        .map(String::as_str)
+        .collect::<Vec<_>>()
 }
 
 /// Represents the sanitize flag.
-pub fn sanitize_flag<'a>() -> Arg<'a, 'a> {
-    Arg::with_name(ARG_SANITIZE)
+pub fn sanitize_flag() -> Arg {
+    Arg::new(ARG_SANITIZE)
         .help("Sanitizes text bodies")
         .long("sanitize")
-        .short("s")
+        .short('s')
+        .action(ArgAction::SetTrue)
 }
 
 /// Represents the raw flag.
-pub fn raw_flag<'a>() -> Arg<'a, 'a> {
-    Arg::with_name(ARG_RAW)
+pub fn raw_flag() -> Arg {
+    Arg::new(ARG_RAW)
         .help("Returns raw version of email")
         .long("raw")
-        .short("r")
+        .short('r')
+        .action(ArgAction::SetTrue)
 }
 
 /// Represents the sanitize flag parser.
-pub fn parse_sanitize_flag<'a>(matches: &'a ArgMatches<'a>) -> bool {
-    matches.is_present(ARG_SANITIZE)
+pub fn parse_sanitize_flag(m: &ArgMatches) -> bool {
+    m.get_flag(ARG_SANITIZE)
 }
 
 /// Represents the raw flag parser.
-pub fn parse_raw_flag<'a>(matches: &'a ArgMatches<'a>) -> bool {
-    matches.is_present(ARG_RAW)
+pub fn parse_raw_flag(m: &ArgMatches) -> bool {
+    m.get_flag(ARG_RAW)
 }
 
 /// Represents the email raw argument.
-pub fn raw_arg<'a>() -> Arg<'a, 'a> {
-    Arg::with_name(ARG_RAW).raw(true)
+pub fn raw_arg() -> Arg {
+    Arg::new(ARG_RAW).raw(true)
 }
 
 /// Represents the email raw argument parser.
-pub fn parse_raw_arg<'a>(matches: &'a ArgMatches<'a>) -> &'a str {
-    matches.value_of(ARG_RAW).unwrap_or_default()
-}
-
-/// Represents the email encrypt flag.
-pub fn encrypt_flag<'a>() -> Arg<'a, 'a> {
-    Arg::with_name(ARG_ENCRYPT)
-        .help("Encrypts the email")
-        .short("e")
-        .long("encrypt")
-}
-
-/// Represents the email encrypt flag parser.
-pub fn parse_encrypt_flag<'a>(matches: &'a ArgMatches<'a>) -> bool {
-    matches.is_present(ARG_ENCRYPT)
+pub fn parse_raw_arg(m: &ArgMatches) -> String {
+    m.get_one::<String>(ARG_RAW).cloned().unwrap_or_default()
 }
 
 /// Represents the email MIME type argument.
-pub fn mime_type_arg<'a>() -> Arg<'a, 'a> {
-    Arg::with_name(ARG_MIME_TYPE)
+pub fn mime_type_arg() -> Arg {
+    Arg::new(ARG_MIME_TYPE)
         .help("MIME type to use")
-        .short("t")
+        .short('t')
         .long("mime-type")
         .value_name("MIME")
-        .possible_values(&["plain", "html"])
+        .value_parser(["plain", "html"])
         .default_value("plain")
 }
 
 /// Represents the email MIME type argument parser.
-pub fn parse_mime_type_arg<'a>(matches: &'a ArgMatches<'a>) -> &'a str {
-    matches.value_of(ARG_MIME_TYPE).unwrap()
+pub fn parse_mime_type_arg(matches: &ArgMatches) -> &str {
+    matches.get_one::<String>(ARG_MIME_TYPE).unwrap()
 }
 
 /// Represents the email query argument.
-pub fn query_arg<'a>() -> Arg<'a, 'a> {
-    Arg::with_name(ARG_QUERY)
+pub fn query_arg() -> Arg {
+    Arg::new(ARG_QUERY)
         .long_help("The query system depends on the backend, see the wiki for more details")
         .value_name("QUERY")
-        .multiple(true)
+        .num_args(1..)
         .required(true)
 }
 
 /// Represents the email query argument parser.
-pub fn parse_query_arg<'a>(matches: &'a ArgMatches<'a>) -> String {
+pub fn parse_query_arg(matches: &ArgMatches) -> String {
     matches
-        .values_of(ARG_QUERY)
+        .get_many::<String>(ARG_QUERY)
         .unwrap_or_default()
         .fold((false, vec![]), |(escape, mut cmds), cmd| {
-            match (cmd, escape) {
+            match (cmd.as_str(), escape) {
                 // Next command is an arg and needs to be escaped
                 ("subject", _) | ("body", _) | ("text", _) => {
                     cmds.push(cmd.to_string());

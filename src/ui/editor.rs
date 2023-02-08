@@ -1,9 +1,9 @@
 use anyhow::{Context, Result};
 use himalaya_lib::{
-    email::{local_draft_path, remove_local_draft, Email, TplOverride},
-    AccountConfig, Backend, Sender,
+    email::{local_draft_path, remove_local_draft},
+    AccountConfig, Backend, CompilerBuilder, Flag, Flags, Sender, Tpl,
 };
-use log::{debug, info};
+use log::debug;
 use std::{env, fs, process::Command};
 
 use crate::{
@@ -11,7 +11,7 @@ use crate::{
     ui::choice::{self, PostEditChoice, PreEditChoice},
 };
 
-pub fn open_with_tpl(tpl: String) -> Result<String> {
+pub fn open_with_tpl(tpl: Tpl) -> Result<Tpl> {
     let path = local_draft_path();
 
     debug!("create draft");
@@ -27,48 +27,34 @@ pub fn open_with_tpl(tpl: String) -> Result<String> {
     let content =
         fs::read_to_string(&path).context(format!("cannot read local draft at {:?}", path))?;
 
-    Ok(content)
+    Ok(Tpl::from(content))
 }
 
-pub fn open_with_draft() -> Result<String> {
+pub fn open_with_local_draft() -> Result<Tpl> {
     let path = local_draft_path();
-    let tpl =
+    let content =
         fs::read_to_string(&path).context(format!("cannot read local draft at {:?}", path))?;
-    open_with_tpl(tpl)
+    open_with_tpl(Tpl::from(content))
 }
 
-fn _edit_email_with_editor(
-    email: &Email,
-    tpl: TplOverride,
-    config: &AccountConfig,
-) -> Result<Email> {
-    let tpl = email.to_tpl(tpl, config)?;
-    let tpl = open_with_tpl(tpl)?;
-    Email::from_tpl(&tpl).context("cannot parse email from template")
-}
-
-pub fn edit_email_with_editor<'a, P: Printer, B: Backend<'a> + ?Sized, S: Sender + ?Sized>(
-    mut email: Email,
-    tpl: TplOverride,
+pub fn edit_tpl_with_editor<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
     config: &AccountConfig,
     printer: &mut P,
     backend: &mut B,
     sender: &mut S,
+    mut tpl: Tpl,
 ) -> Result<()> {
-    info!("start editing with editor");
-
     let draft = local_draft_path();
     if draft.exists() {
         loop {
             match choice::pre_edit() {
                 Ok(choice) => match choice {
                     PreEditChoice::Edit => {
-                        let tpl = open_with_draft()?;
-                        email.merge_with(Email::from_tpl(&tpl)?);
+                        tpl = open_with_local_draft()?;
                         break;
                     }
                     PreEditChoice::Discard => {
-                        email.merge_with(_edit_email_with_editor(&email, tpl.clone(), config)?);
+                        tpl = open_with_tpl(tpl)?;
                         break;
                     }
                     PreEditChoice::Quit => return Ok(()),
@@ -80,35 +66,44 @@ pub fn edit_email_with_editor<'a, P: Printer, B: Backend<'a> + ?Sized, S: Sender
             }
         }
     } else {
-        email.merge_with(_edit_email_with_editor(&email, tpl.clone(), config)?);
+        tpl = open_with_tpl(tpl)?;
     }
 
     loop {
         match choice::post_edit() {
             Ok(PostEditChoice::Send) => {
-                printer.print_str("Sending email…")?;
-                let sent_email: Vec<u8> = sender.send(&email)?;
-                let sent_folder = config.folder_alias("sent")?;
-                printer.print_str(format!("Adding email to the {:?} folder…", sent_folder))?;
-                backend.email_add(&sent_folder, &sent_email, "seen")?;
+                printer.print_log("Sending email…")?;
+                let email = tpl.compile(
+                    CompilerBuilder::default()
+                        .some_pgp_sign_cmd(config.email_writing_sign_cmd.as_ref())
+                        .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.as_ref()),
+                )?;
+                sender.send(&email)?;
+                let sent_folder = config.sent_folder_alias()?;
+                printer.print_log(format!("Adding email to the {} folder…", sent_folder))?;
+                backend.add_email(&sent_folder, &email, &Flags::default())?;
                 remove_local_draft()?;
-                printer.print_struct("Done!")?;
+                printer.print("Done!")?;
                 break;
             }
             Ok(PostEditChoice::Edit) => {
-                email.merge_with(_edit_email_with_editor(&email, tpl.clone(), config)?);
+                tpl = open_with_tpl(tpl)?;
                 continue;
             }
             Ok(PostEditChoice::LocalDraft) => {
-                printer.print_struct("Email successfully saved locally")?;
+                printer.print("Email successfully saved locally")?;
                 break;
             }
             Ok(PostEditChoice::RemoteDraft) => {
-                let tpl = email.to_tpl(TplOverride::default(), config)?;
                 let draft_folder = config.folder_alias("drafts")?;
-                backend.email_add(&draft_folder, tpl.as_bytes(), "seen draft")?;
+                let email = tpl.compile(
+                    CompilerBuilder::default()
+                        .some_pgp_sign_cmd(config.email_writing_sign_cmd.as_ref())
+                        .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.as_ref()),
+                )?;
+                backend.add_email(&draft_folder, &email, &Flags::from_iter([Flag::Draft]))?;
                 remove_local_draft()?;
-                printer.print_struct(format!("Email successfully saved to {}", draft_folder))?;
+                printer.print(format!("Email successfully saved to {}", draft_folder))?;
                 break;
             }
             Ok(PostEditChoice::Discard) => {
