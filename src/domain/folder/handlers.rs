@@ -157,6 +157,9 @@ mod tests {
             fn get_emails(&self, _: &str, _: Vec<&str>) -> backend::Result<Emails> {
                 unimplemented!()
             }
+            fn preview_emails(&self, _: &str, _: Vec<&str>) -> backend::Result<Emails> {
+                unimplemented!()
+            }
             fn get_emails_internal(&self, _: &str, _: Vec<&str>) -> backend::Result<Emails> {
                 unimplemented!()
             }

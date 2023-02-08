@@ -76,12 +76,12 @@ mod tests {
     #[test]
     fn it_should_match_cmds() {
         let arg = Command::new("himalaya")
-            .subcommands(subcmd())
+            .subcommand(subcmd())
             .get_matches_from(&["himalaya", "folders"]);
         assert_eq!(Some(Cmd::List(None)), matches(&arg).unwrap());
 
         let arg = Command::new("himalaya")
-            .subcommands(subcmd())
+            .subcommand(subcmd())
             .get_matches_from(&["himalaya", "folders", "--max-width", "20"]);
         assert_eq!(Some(Cmd::List(Some(20))), matches(&arg).unwrap());
     }
