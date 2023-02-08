@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2023-02-08
+
 ### Added
 
+* Added offline support with the `account sync` command to synchronize
+  a backend to a local Maildir backend [#342].
+* Added the flag `--disable-cache` to not use the local Maildir
+  backend.
 * Added the email composer (from its own
   [repository](https://git.sr.ht/~soywod/mime-msg-builder)) [#341].
 * Added Musl builds to releases [#356].
@@ -468,7 +474,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Password from command [#22]
 * Set up README [#20]
 
-[unreleased]: https://github.com/soywod/himalaya/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/soywod/himalaya/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/soywod/himalaya/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/soywod/himalaya/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/soywod/himalaya/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/soywod/himalaya/compare/v0.5.10...v0.6.0
@@ -626,6 +633,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#338]: https://github.com/soywod/himalaya/issues/338
 [#340]: https://github.com/soywod/himalaya/issues/340
 [#341]: https://github.com/soywod/himalaya/issues/341
+[#342]: https://github.com/soywod/himalaya/issues/342
 [#344]: https://github.com/soywod/himalaya/issues/344
 [#346]: https://github.com/soywod/himalaya/issues/346
 [#352]: https://github.com/soywod/himalaya/issues/352
