@@ -51,24 +51,22 @@ pub fn sync<P: Printer>(
     let sync_builder = BackendSyncBuilder::new(account_config);
 
     if dry_run {
-        let (folders_patch, envelopes_patch) = sync_builder.dry_run(true).sync(backend)?;
-        let mut hunks_count = folders_patch.len();
+        let report = sync_builder.dry_run(true).sync(backend)?;
+        let mut hunks_count = report.folders_patch.len();
 
-        if !folders_patch.is_empty() {
-            printer.print_log(format!("Folders patch:"))?;
-            for hunk in folders_patch {
+        if !report.folders_patch.is_empty() {
+            printer.print_log("Folders patch:")?;
+            for (hunk, _) in report.folders_patch {
                 printer.print_log(format!(" - {hunk}"))?;
             }
             printer.print_log("")?;
         }
 
-        if !envelopes_patch.is_empty() {
-            printer.print_log(format!("Envelopes patch:"))?;
-            for hunks in envelopes_patch {
-                for hunk in hunks {
-                    hunks_count += 1;
-                    printer.print_log(format!(" - {hunk}"))?;
-                }
+        if !report.envelopes_patch.is_empty() {
+            printer.print_log("Envelopes patch:")?;
+            for (hunk, _) in report.envelopes_patch {
+                hunks_count += 1;
+                printer.print_log(format!(" - {hunk}"))?;
             }
             printer.print_log("")?;
         }
@@ -94,7 +92,7 @@ pub fn sync<P: Printer>(
             ),
         );
 
-        sync_builder
+        let report = sync_builder
             .on_progress(|evt| {
                 use BackendSyncProgressEvent::*;
                 Ok(match evt {
@@ -166,6 +164,47 @@ pub fn sync<P: Printer>(
             .sync(backend)?;
 
         progress.finish_and_clear();
+
+        let folders_patch_err = report
+            .folders_patch
+            .iter()
+            .filter_map(|(hunk, err)| err.as_ref().map(|err| (hunk, err)))
+            .collect::<Vec<_>>();
+        if !folders_patch_err.is_empty() {
+            printer.print_log("")?;
+            printer.print_log("Errors occured while applying the folders patch:")?;
+            folders_patch_err
+                .iter()
+                .try_for_each(|(hunk, err)| printer.print_log(format!(" - {hunk}: {err}")))?;
+        }
+
+        if let Some(err) = report.folders_cache_patch.1 {
+            printer.print_log("")?;
+            printer.print_log(format!(
+                "Error occured while applying the folder cache patch: {err}"
+            ))?;
+        }
+
+        let envelopes_patch_err = report
+            .envelopes_patch
+            .iter()
+            .filter_map(|(hunk, err)| err.as_ref().map(|err| (hunk, err)))
+            .collect::<Vec<_>>();
+        if !envelopes_patch_err.is_empty() {
+            printer.print_log("")?;
+            printer.print_log("Errors occured while applying the envelopes patch:")?;
+            for (hunk, err) in folders_patch_err {
+                printer.print_log(format!(" - {hunk}: {err}"))?;
+            }
+        }
+
+        if !report.envelopes_cache_patch.1.is_empty() {
+            printer.print_log("")?;
+            printer.print_log("Error occured while applying the envelopes cache patch:")?;
+            for err in report.envelopes_cache_patch.1 {
+                printer.print_log(format!(" - {err}"))?;
+            }
+        }
 
         printer.print(format!(
             "Account {} successfully synchronized!",

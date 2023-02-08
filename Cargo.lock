@@ -166,8 +166,9 @@ dependencies = [
 
 [[package]]
 name = "chumsky"
-version = "0.8.0"
-source = "git+https://github.com/zesterer/chumsky?rev=5714d00#5714d00d83b396c8c19fecfee1adfdf04ecd8e73"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4d619fba796986dd538d82660b76e0b9756c6e19b2e4d4559ba5a57f9f00810"
 dependencies = [
  "hashbrown",
  "stacker",
@@ -795,7 +796,9 @@ dependencies = [
 
 [[package]]
 name = "himalaya-lib"
-version = "0.4.0"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "306b02d101b01556e9d7ca5e9770f86847d5787520287bc4b6069defd83352f3"
 dependencies = [
  "ammonia",
  "chrono",
@@ -1205,9 +1208,11 @@ checksum = "2a60c7ce501c71e03a9c9c0d35b861413ae925bd979cc7a4e30d060069aaac8d"
 [[package]]
 name = "mime-msg-builder"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a3981dce6db3e7f9faa1124409a6b94436902ecb2670f374d361789d61eb34ac"
 dependencies = [
  "ammonia",
- "chumsky 0.8.0 (git+https://github.com/zesterer/chumsky?rev=5714d00)",
+ "chumsky 0.9.0",
  "html-escape",
  "lettre",
  "log",
@@ -1735,7 +1740,7 @@ checksum = "11347d014ae34e1d367aaf9191c37bf071b161e2e1c09c8559c7717e87030e11"
 dependencies = [
  "base64",
  "charset",
- "chumsky 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "chumsky 0.8.0",
  "memchr 2.5.0",
  "quoted_printable",
  "thiserror",
