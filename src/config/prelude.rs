@@ -1,12 +1,12 @@
-use himalaya_lib::{EmailHooks, EmailSender, EmailTextPlainFormat, SendmailConfig, SmtpConfig};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+use himalaya_lib::{
+    EmailHooks, EmailSender, EmailTextPlainFormat, MaildirConfig, SendmailConfig, SmtpConfig,
+};
+
 #[cfg(feature = "imap-backend")]
 use himalaya_lib::ImapConfig;
-
-#[cfg(feature = "maildir-backend")]
-use himalaya_lib::MaildirConfig;
 
 #[cfg(feature = "notmuch-backend")]
 use himalaya_lib::NotmuchConfig;
@@ -56,7 +56,6 @@ pub struct ImapConfigDef {
     pub watch_cmds: Option<Vec<String>>,
 }
 
-#[cfg(feature = "maildir-backend")]
 #[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(remote = "MaildirConfig")]
 pub struct MaildirConfigDef {

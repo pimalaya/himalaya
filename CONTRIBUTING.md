@@ -44,5 +44,6 @@ email at
 
 If you want to **discuss** about the project, feel free to join the
 [Matrix](https://matrix.org/) workspace
-[#pimalaya](https://matrix.to/#/#pimalaya:matrix.org) or contact me
-directly [@soywod](https://matrix.to/#/@soywod:matrix.org).
+[#pimalaya.himalaya](https://matrix.to/#/#pimalaya.himalaya:matrix.org)
+or contact me directly
+[@soywod](https://matrix.to/#/@soywod:matrix.org).

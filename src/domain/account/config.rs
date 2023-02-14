@@ -3,13 +3,12 @@
 //! This module contains the raw deserialized representation of an
 //! account in the accounts section of the user configuration file.
 
-use himalaya_lib::{AccountConfig, BackendConfig, EmailHooks, EmailSender, EmailTextPlainFormat};
+use himalaya_lib::{
+    AccountConfig, BackendConfig, EmailHooks, EmailSender, EmailTextPlainFormat, MaildirConfig,
+};
 
 #[cfg(feature = "imap-backend")]
 use himalaya_lib::ImapConfig;
-
-#[cfg(feature = "maildir-backend")]
-use himalaya_lib::MaildirConfig;
 
 #[cfg(feature = "notmuch-backend")]
 use himalaya_lib::NotmuchConfig;
@@ -24,10 +23,9 @@ use crate::config::{prelude::*, DeserializedConfig};
 #[serde(tag = "backend", rename_all = "snake_case")]
 pub enum DeserializedAccountConfig {
     None(DeserializedBaseAccountConfig),
+    Maildir(DeserializedMaildirAccountConfig),
     #[cfg(feature = "imap-backend")]
     Imap(DeserializedImapAccountConfig),
-    #[cfg(feature = "maildir-backend")]
-    Maildir(DeserializedMaildirAccountConfig),
     #[cfg(feature = "notmuch-backend")]
     Notmuch(DeserializedNotmuchAccountConfig),
 }
@@ -43,15 +41,14 @@ impl DeserializedAccountConfig {
                 config.to_account_config(name, global_config),
                 BackendConfig::None,
             ),
+            DeserializedAccountConfig::Maildir(config) => (
+                config.base.to_account_config(name, global_config),
+                BackendConfig::Maildir(config.backend.clone()),
+            ),
             #[cfg(feature = "imap-backend")]
             DeserializedAccountConfig::Imap(config) => (
                 config.base.to_account_config(name, global_config),
                 BackendConfig::Imap(config.backend.clone()),
-            ),
-            #[cfg(feature = "maildir-backend")]
-            DeserializedAccountConfig::Maildir(config) => (
-                config.base.to_account_config(name, global_config),
-                BackendConfig::Maildir(config.backend.clone()),
             ),
             #[cfg(feature = "notmuch-backend")]
             DeserializedAccountConfig::Notmuch(config) => (
@@ -64,10 +61,9 @@ impl DeserializedAccountConfig {
     pub fn is_default(&self) -> bool {
         match self {
             DeserializedAccountConfig::None(config) => config.default.unwrap_or_default(),
+            DeserializedAccountConfig::Maildir(config) => config.base.default.unwrap_or_default(),
             #[cfg(feature = "imap-backend")]
             DeserializedAccountConfig::Imap(config) => config.base.default.unwrap_or_default(),
-            #[cfg(feature = "maildir-backend")]
-            DeserializedAccountConfig::Maildir(config) => config.base.default.unwrap_or_default(),
             #[cfg(feature = "notmuch-backend")]
             DeserializedAccountConfig::Notmuch(config) => config.base.default.unwrap_or_default(),
         }
@@ -89,7 +85,11 @@ pub struct DeserializedBaseAccountConfig {
 
     pub email_listing_page_size: Option<usize>,
     pub email_reading_headers: Option<Vec<String>>,
-    #[serde(default, with = "EmailTextPlainFormatOptionDef", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        with = "EmailTextPlainFormatOptionDef",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub email_reading_format: Option<EmailTextPlainFormat>,
     pub email_reading_verify_cmd: Option<String>,
     pub email_reading_decrypt_cmd: Option<String>,
@@ -98,7 +98,11 @@ pub struct DeserializedBaseAccountConfig {
     pub email_writing_encrypt_cmd: Option<String>,
     #[serde(flatten, with = "EmailSenderDef")]
     pub email_sender: EmailSender,
-    #[serde(default, with = "EmailHooksOptionDef", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        with = "EmailHooksOptionDef",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub email_hooks: Option<EmailHooks>,
 
     #[serde(default)]
@@ -237,7 +241,6 @@ pub struct DeserializedImapAccountConfig {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
-#[cfg(feature = "maildir-backend")]
 pub struct DeserializedMaildirAccountConfig {
     #[serde(flatten)]
     pub base: DeserializedBaseAccountConfig,
