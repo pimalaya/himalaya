@@ -43,12 +43,16 @@ pub fn sync<P: Printer>(
     account_config: &AccountConfig,
     printer: &mut P,
     backend: &dyn Backend,
+    folder: &Option<String>,
     dry_run: bool,
 ) -> Result<()> {
     info!("entering the sync accounts handler");
     trace!("dry run: {}", dry_run);
 
-    let sync_builder = BackendSyncBuilder::new(account_config);
+    let mut sync_builder = BackendSyncBuilder::new(account_config);
+    if let Some(folder) = folder {
+        sync_builder = sync_builder.only_folder(folder);
+    }
 
     if dry_run {
         let report = sync_builder.dry_run(true).sync(backend)?;

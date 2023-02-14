@@ -1,30 +1,43 @@
-# 📫 Himalaya [![GitHub release](https://img.shields.io/github/v/release/soywod/himalaya?color=success&style=flat-square)](https://github.com/soywod/himalaya/releases/latest) [![Matrix](https://img.shields.io/matrix/himalaya.email.client:matrix.org?color=success&label=chat&style=flat-square)](https://matrix.to/#/#himalaya.email.client:matrix.org)
+# 📫 Himalaya [![GitHub release](https://img.shields.io/github/v/release/soywod/himalaya?color=success)](https://github.com/soywod/himalaya/releases/latest) [![Matrix](https://img.shields.io/matrix/pimalaya.himalaya:matrix.org?color=success&label=chat)](https://matrix.to/#/#pimalaya.himalaya:matrix.org)
 
-Command-line interface for email management based on the
-[himalaya-lib](https://git.sr.ht/~soywod/himalaya-lib).
+Himalaya is a CLI based on the
+[himalaya-lib](https://git.sr.ht/~soywod/himalaya-lib) that allows you
+to manipulate your emails using commands in your console.
 
 ![image](https://user-images.githubusercontent.com/10437171/138774902-7b9de5a3-93eb-44b0-8cfb-6d2e11e3b1aa.png)
 
-*Warning: the project is under active development, do not use in
+*Disclaimer: the project is under active development, do not use in
 production before the `v1.0.0`.*
 
 ## Features
 
-- Folder listing
-- Email listing and searching
-- Email composition based on `$EDITOR`
-- Email manipulation (copy/move/delete)
-- Multi-accounting
-- Account listing
+- [Folder listing]
+- [Envelopes listing], [searching] and [sorting]
+- [Email composition] based on `$EDITOR`
+- Email manipulation ([copy]/[move]/[delete])
+- [Multi-accounting]
+- [Account listing]
+- [Account synchronization] for offline usage
 - IMAP, Maildir and Notmuch support
-- IMAP IDLE mode for real-time notifications
+- IMAP IDLE mode for [real-time notifications]
 - PGP end-to-end encryption
-- Completions for various shells
+- [Completions] for various shells
 - JSON output
 - …
 
-*Note: see the [wiki](https://github.com/soywod/himalaya/wiki) for all
-the features.*
+[Folder listing]: https://pimalaya.org/himalaya/docs/cli/usage/folders/list.html
+[Envelopes listing]: https://pimalaya.org/himalaya/docs/cli/usage/envelopes/list.html
+[searching]: https://pimalaya.org/himalaya/docs/cli/usage/envelopes/search.html
+[sorting]: https://pimalaya.org/himalaya/docs/cli/usage/envelopes/sort.html
+[Email composition]: https://pimalaya.org/himalaya/docs/cli/usage/emails/write.html
+[copy]: https://pimalaya.org/himalaya/docs/cli/usage/emails/copy.html
+[move]: https://pimalaya.org/himalaya/docs/cli/usage/emails/move.html
+[delete]: https://pimalaya.org/himalaya/docs/cli/usage/emails/delete.html
+[Multi-accounting]: https://pimalaya.org/himalaya/docs/cli/configuration.html
+[Account listing]: https://pimalaya.org/himalaya/docs/cli/usage/accounts/list.html
+[Account synchronization]: https://pimalaya.org/himalaya/docs/cli/usage/accounts/synchronize.html
+[real-time notifications]: https://pimalaya.org/himalaya/docs/cli/usage/notifications.html
+[Completions]: https://pimalaya.org/himalaya/docs/cli/tips/completion.html
 
 ## Installation
 
@@ -37,7 +50,7 @@ the features.*
 </td>
 <td width="50%">
 
-```shell
+```bash
 # Arch Linux (official)
 $ pacman -S himalaya
 
@@ -54,9 +67,9 @@ $ cargo install himalaya
 $ nix-env -i himalaya
 ```
 
-*Note: see the
-[wiki](https://github.com/soywod/himalaya/wiki/Installation) for other
-installation methods.*
+*See the
+[documentation](https://pimalaya.org/himalaya/docs/cli/installation.html)
+for other installation methods.*
 
 </td>
 </tr>
@@ -64,49 +77,8 @@ installation methods.*
 
 ## Configuration
 
-```toml
-# ~/.config/himalaya/config.toml
-
-display-name = "Test"
-downloads-dir = "~/downloads"
-signature = "Regards,"
-
-[gmail]
-default = true
-email = "test@gmail.com"
-
-backend = "imap"
-imap-host = "imap.gmail.com"
-imap-port = 993
-imap-login = "test@gmail.com"
-imap-passwd-cmd = "security find-internet-password -gs gmail -w"
-
-sender = "smtp"
-smtp-host = "smtp.gmail.com"
-smtp-port = 465
-smtp-login = "test@gmail.com"
-smtp-passwd-cmd = "security find-internet-password -gs gmail -w"
-
-[gmail.folder-aliases]
-inbox = "INBOX"
-sent = "[Gmail]/Sent"
-drafts = "[Gmail]/Drafts"
-
-[local]
-email = "test@localhost"
-signature-delim = "~~\n"
-signature = "Regards,"
-
-backend = "maildir"
-maildir-root-dir = "~/emails"
-
-sender = "sendmail"
-sendmail-cmd = "msmtp --read-envelope-from --read-recipients"
-```
-
-*Note: see the
-[wiki](https://github.com/soywod/himalaya/wiki/Configuration) for all
-the options.*
+Please read the
+[documentation](https://pimalaya.org/himalaya/docs/cli/configuration.html).
 
 ## Contributing
 
@@ -132,7 +104,7 @@ email at
 
 If you want to **discuss** about the project, feel free to join the
 [Matrix](https://matrix.org/) workspace
-[#pimalaya](https://matrix.to/#/#pimalaya:matrix.org) or contact me
+[#pimalaya.himalaya](https://matrix.to/#/#pimalaya.himalaya:matrix.org) or contact me
 directly [@soywod](https://matrix.to/#/@soywod:matrix.org).
 
 ## Credits
@@ -163,8 +135,8 @@ European Commission in September, 2022.
 
 ## Sponsoring
 
-[![GitHub](https://img.shields.io/badge/-GitHub%20Sponsors-fafbfc?logo=GitHub%20Sponsors&style=flat-square)](https://github.com/sponsors/soywod)
-[![PayPal](https://img.shields.io/badge/-PayPal-0079c1?logo=PayPal&logoColor=ffffff&style=flat-square)](https://www.paypal.com/paypalme/soywod)
-[![Ko-fi](https://img.shields.io/badge/-Ko--fi-ff5e5a?logo=Ko-fi&logoColor=ffffff&style=flat-square)](https://ko-fi.com/soywod)
-[![Buy Me a Coffee](https://img.shields.io/badge/-Buy%20Me%20a%20Coffee-ffdd00?logo=Buy%20Me%20A%20Coffee&logoColor=000000&style=flat-square)](https://www.buymeacoffee.com/soywod)
-[![Liberapay](https://img.shields.io/badge/-Liberapay-f6c915?logo=Liberapay&logoColor=222222&style=flat-square)](https://liberapay.com/soywod)
+[![GitHub](https://img.shields.io/badge/-GitHub%20Sponsors-fafbfc?logo=GitHub%20Sponsors)](https://github.com/sponsors/soywod)
+[![PayPal](https://img.shields.io/badge/-PayPal-0079c1?logo=PayPal&logoColor=ffffff)](https://www.paypal.com/paypalme/soywod)
+[![Ko-fi](https://img.shields.io/badge/-Ko--fi-ff5e5a?logo=Ko-fi&logoColor=ffffff)](https://ko-fi.com/soywod)
+[![Buy Me a Coffee](https://img.shields.io/badge/-Buy%20Me%20a%20Coffee-ffdd00?logo=Buy%20Me%20A%20Coffee&logoColor=000000)](https://www.buymeacoffee.com/soywod)
+[![Liberapay](https://img.shields.io/badge/-Liberapay-f6c915?logo=Liberapay&logoColor=222222)](https://liberapay.com/soywod)

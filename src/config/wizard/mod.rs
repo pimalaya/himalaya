@@ -1,6 +1,5 @@
 #[cfg(feature = "imap-backend")]
 mod imap;
-#[cfg(feature = "maildir-backend")]
 mod maildir;
 #[cfg(feature = "notmuch-backend")]
 mod notmuch;
@@ -18,10 +17,9 @@ use once_cell::sync::Lazy;
 use std::{fs, process};
 
 const BACKENDS: &[&str] = &[
+    "Maildir",
     #[cfg(feature = "imap-backend")]
     "IMAP",
-    #[cfg(feature = "maildir-backend")]
-    "Maildir",
     #[cfg(feature = "notmuch-backend")]
     "Notmuch",
 ];
@@ -102,10 +100,9 @@ pub(crate) fn wizard() -> Result<DeserializedConfig> {
 
     match default {
         Some(DeserializedAccountConfig::None(default)) => default.default = Some(true),
+        Some(DeserializedAccountConfig::Maildir(default)) => default.base.default = Some(true),
         #[cfg(feature = "imap-backend")]
         Some(DeserializedAccountConfig::Imap(default)) => default.base.default = Some(true),
-        #[cfg(feature = "maildir-backend")]
-        Some(DeserializedAccountConfig::Maildir(default)) => default.base.default = Some(true),
         #[cfg(feature = "notmuch-backend")]
         Some(DeserializedAccountConfig::Notmuch(default)) => default.base.default = Some(true),
         _ => {}
@@ -141,10 +138,9 @@ fn configure_account() -> Result<Option<DeserializedAccountConfig>> {
         .interact_opt()?;
 
     match backend {
+        Some(idx) if BACKENDS[idx] == "Maildir" => Ok(Some(maildir::configure(base)?)),
         #[cfg(feature = "imap-backend")]
         Some(idx) if BACKENDS[idx] == "IMAP" => Ok(Some(imap::configure(base)?)),
-        #[cfg(feature = "maildir-backend")]
-        Some(idx) if BACKENDS[idx] == "Maildir" => Ok(Some(maildir::configure(base)?)),
         #[cfg(feature = "notmuch-backend")]
         Some(idx) if BACKENDS[idx] == "Notmuch" => Ok(Some(notmuch::configure(base)?)),
         _ => Ok(None),

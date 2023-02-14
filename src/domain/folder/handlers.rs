@@ -7,6 +7,15 @@ use himalaya_lib::{AccountConfig, Backend};
 
 use crate::printer::{PrintTableOpts, Printer};
 
+pub fn expunge<P: Printer, B: Backend + ?Sized>(
+    folder: &str,
+    printer: &mut P,
+    backend: &mut B,
+) -> Result<()> {
+    backend.expunge_folder(folder)?;
+    printer.print(format!("Folder {folder} successfully expunged!"))
+}
+
 pub fn list<P: Printer, B: Backend + ?Sized>(
     max_width: Option<usize>,
     config: &AccountConfig,
@@ -122,6 +131,9 @@ mod tests {
                         desc: "desc".into(),
                     },
                 ]))
+            }
+            fn expunge_folder(&self, _: &str) -> backend::Result<()> {
+                unimplemented!();
             }
             fn purge_folder(&self, _: &str) -> backend::Result<()> {
                 unimplemented!();

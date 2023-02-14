@@ -7,7 +7,6 @@ use dialoguer::Input;
 use dirs::home_dir;
 use himalaya_lib::MaildirConfig;
 
-#[cfg(feature = "maildir-backend")]
 pub(crate) fn configure(base: DeserializedBaseAccountConfig) -> Result<DeserializedAccountConfig> {
     let input = if let Some(home) = home_dir() {
         Input::with_theme(&*THEME)

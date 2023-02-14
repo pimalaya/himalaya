@@ -31,14 +31,22 @@ pub struct DeserializedConfig {
 
     pub email_listing_page_size: Option<usize>,
     pub email_reading_headers: Option<Vec<String>>,
-    #[serde(default, with = "EmailTextPlainFormatOptionDef", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        with = "EmailTextPlainFormatOptionDef",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub email_reading_format: Option<EmailTextPlainFormat>,
     pub email_reading_verify_cmd: Option<String>,
     pub email_reading_decrypt_cmd: Option<String>,
     pub email_writing_headers: Option<Vec<String>>,
     pub email_writing_sign_cmd: Option<String>,
     pub email_writing_encrypt_cmd: Option<String>,
-    #[serde(default, with = "EmailHooksOptionDef", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        with = "EmailHooksOptionDef",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub email_hooks: Option<EmailHooks>,
 
     #[serde(flatten)]
@@ -115,12 +123,10 @@ impl DeserializedConfig {
 
 #[cfg(test)]
 mod tests {
-    use himalaya_lib::{EmailSender, SendmailConfig, SmtpConfig};
+    use himalaya_lib::{EmailSender, MaildirConfig, SendmailConfig, SmtpConfig};
 
     #[cfg(feature = "imap-backend")]
     use himalaya_lib::ImapConfig;
-    #[cfg(feature = "maildir-backend")]
-    use himalaya_lib::MaildirConfig;
     #[cfg(feature = "notmuch-backend")]
     use himalaya_lib::NotmuchConfig;
 
@@ -131,7 +137,6 @@ mod tests {
 
     #[cfg(feature = "imap-backend")]
     use crate::account::DeserializedImapAccountConfig;
-    #[cfg(feature = "maildir-backend")]
     use crate::account::DeserializedMaildirAccountConfig;
     #[cfg(feature = "notmuch-backend")]
     use crate::account::DeserializedNotmuchAccountConfig;

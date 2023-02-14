@@ -765,7 +765,7 @@ dependencies = [
 
 [[package]]
 name = "himalaya"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "anyhow",
  "atty",
@@ -796,9 +796,9 @@ dependencies = [
 
 [[package]]
 name = "himalaya-lib"
-version = "0.5.1"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d96448bba297a565c27dc18404da17d465e79df2feffa632b249281c8c0b5b68"
+checksum = "d6aa84cdd1cec7bd25e319f0decd7d6ec5d765fb983da7a0dea10d797f7e73a8"
 dependencies = [
  "ammonia",
  "chrono",
@@ -1124,6 +1124,7 @@ checksum = "5d2d08d52a925272eda99f8fe9e91237b1cb958804ee0628cc398ebd1bbc426f"
 dependencies = [
  "gethostname",
  "mailparse",
+ "memmap2",
 ]
 
 [[package]]
@@ -1189,6 +1190,15 @@ name = "memchr"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
+
+[[package]]
+name = "memmap2"
+version = "0.5.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b182332558b18d807c4ce1ca8ca983b34c3ee32765e47b3f0f69b90355cc1dc"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "memoffset"
