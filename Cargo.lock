@@ -797,8 +797,7 @@ dependencies = [
 [[package]]
 name = "himalaya-lib"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6aa84cdd1cec7bd25e319f0decd7d6ec5d765fb983da7a0dea10d797f7e73a8"
+source = "git+https://git.sr.ht/~soywod/himalaya-lib?branch=develop#f3708e90fe1b2c4003d4e1b08c906eef820817cb"
 dependencies = [
  "ammonia",
  "chrono",
@@ -809,6 +808,7 @@ dependencies = [
  "imap-proto",
  "lettre",
  "log",
+ "mail-parser",
  "maildir",
  "mailparse",
  "md5",
@@ -1115,6 +1115,15 @@ name = "mac"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c41e0c4fef86961ac6d6f8a82609f55f31b05e4fce149ac5710e439df7619ba4"
+
+[[package]]
+name = "mail-parser"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a2e03aa1d18528b45d0e79e46790f38cfeece6cce3af17a85912677272f36cd"
+dependencies = [
+ "encoding_rs",
+]
 
 [[package]]
 name = "maildir"
