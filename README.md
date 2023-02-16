@@ -60,6 +60,9 @@ $ yay -S himalaya-git
 # Homebrew
 $ brew install himalaya
 
+# Scoop
+$ scoop install himalaya
+
 # Cargo
 $ cargo install himalaya
 
