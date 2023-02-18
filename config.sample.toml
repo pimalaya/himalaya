@@ -1,0 +1,51 @@
+display-name = "Display NAME"
+signature-delim = "~~"
+signature = "~/.signature"
+downloads-dir = "~/downloads"
+folder-listing-page-size = 12
+email-listing-page-size = 12
+email-reading-headers = ["From", "To"]
+email-reading-verify-cmd = "gpg --verify -q"
+email-reading-decrypt-cmd = "gpg -dq"
+email-writing-sign-cmd = "gpg -o - -saq"
+email-writing-encrypt-cmd = "gpg -o - -eqar <recipient>"
+
+[example]
+default = false
+display-name = "Display NAME (gmail)"
+email = "display.name@gmail.local"
+
+backend = "imap"
+imap-host = "imap.gmail.com"
+imap-login = "display.name@gmail.local"
+imap-passwd-cmd = "pass show gmail"
+imap-port = 993
+imap-ssl = true
+imap-starttls = false
+imap-notify-cmd = """📫 "<sender>" "<subject>""""
+imap-notify-query = "NOT SEEN"
+imap-watch-cmds = ["echo \"received server changes!\""]
+
+sender = "smtp"
+smtp-host = "smtp.gmail.com"
+smtp-login = "display.name@gmail.local"
+smtp-passwd-cmd = "pass show piana/gmail"
+smtp-port = 465
+smtp-ssl = true
+smtp-starttls = false
+
+sync = true
+sync-dir = "/tmp/sync/gmail"
+
+[example.folder-aliases]
+inbox = "INBOX"
+drafts = "[Gmail]/Drafts"
+sent = "[Gmail]/Sent Mail"
+trash = "[Gmail]/Trash"
+
+[example.email-hooks]
+pre-send = "echo $1"
+
+[example.email-reading-format]
+type = "fixed"
+width = 64

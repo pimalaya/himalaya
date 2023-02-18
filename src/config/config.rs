@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// Represents the user config file.
-#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct DeserializedConfig {
     #[serde(alias = "name")]
@@ -31,12 +31,8 @@ pub struct DeserializedConfig {
 
     pub email_listing_page_size: Option<usize>,
     pub email_reading_headers: Option<Vec<String>>,
-    #[serde(
-        default,
-        with = "EmailTextPlainFormatOptionDef",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub email_reading_format: Option<EmailTextPlainFormat>,
+    #[serde(default, with = "EmailTextPlainFormatDef")]
+    pub email_reading_format: EmailTextPlainFormat,
     pub email_reading_verify_cmd: Option<String>,
     pub email_reading_decrypt_cmd: Option<String>,
     pub email_writing_headers: Option<Vec<String>>,
@@ -44,10 +40,10 @@ pub struct DeserializedConfig {
     pub email_writing_encrypt_cmd: Option<String>,
     #[serde(
         default,
-        with = "EmailHooksOptionDef",
-        skip_serializing_if = "Option::is_none"
+        with = "EmailHooksDef",
+        skip_serializing_if = "EmailHooks::is_empty"
     )]
-    pub email_hooks: Option<EmailHooks>,
+    pub email_hooks: EmailHooks,
 
     #[serde(flatten)]
     pub accounts: HashMap<String, DeserializedAccountConfig>,
