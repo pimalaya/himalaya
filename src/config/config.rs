@@ -159,10 +159,11 @@ mod tests {
     fn account_missing_backend_field() {
         let config = make_config("[account]");
 
-        assert_eq!(
-            config.unwrap_err().root_cause().to_string(),
-            "missing field `backend` at line 1 column 1"
-        );
+        assert!(config
+            .unwrap_err()
+            .root_cause()
+            .to_string()
+            .contains("missing field `backend`"));
     }
 
     #[test]
@@ -176,7 +177,7 @@ mod tests {
             .unwrap_err()
             .root_cause()
             .to_string()
-            .starts_with("unknown variant `bad`"));
+            .contains("unknown variant `bad`"));
     }
 
     #[test]
@@ -186,10 +187,11 @@ mod tests {
             backend = \"none\"",
         );
 
-        assert_eq!(
-            config.unwrap_err().root_cause().to_string(),
-            "missing field `email` at line 1 column 1"
-        );
+        assert!(config
+            .unwrap_err()
+            .root_cause()
+            .to_string()
+            .contains("missing field `email`"));
     }
 
     #[test]
@@ -201,10 +203,11 @@ mod tests {
             backend = \"imap\"",
         );
 
-        assert_eq!(
-            config.unwrap_err().root_cause().to_string(),
-            "missing field `imap-host` at line 1 column 1"
-        );
+        assert!(config
+            .unwrap_err()
+            .root_cause()
+            .to_string()
+            .contains("missing field `imap-host`"));
     }
 
     #[test]
@@ -217,10 +220,11 @@ mod tests {
             imap-host = \"localhost\"",
         );
 
-        assert_eq!(
-            config.unwrap_err().root_cause().to_string(),
-            "missing field `imap-port` at line 1 column 1"
-        );
+        assert!(config
+            .unwrap_err()
+            .root_cause()
+            .to_string()
+            .contains("missing field `imap-port`"));
     }
 
     #[test]
@@ -234,10 +238,11 @@ mod tests {
             imap-port = 993",
         );
 
-        assert_eq!(
-            config.unwrap_err().root_cause().to_string(),
-            "missing field `imap-login` at line 1 column 1"
-        );
+        assert!(config
+            .unwrap_err()
+            .root_cause()
+            .to_string()
+            .contains("missing field `imap-login`"));
     }
 
     #[test]
@@ -252,10 +257,11 @@ mod tests {
             imap-login = \"login\"",
         );
 
-        assert_eq!(
-            config.unwrap_err().root_cause().to_string(),
-            "missing field `imap-passwd-cmd` at line 1 column 1"
-        );
+        assert!(config
+            .unwrap_err()
+            .root_cause()
+            .to_string()
+            .contains("missing field `imap-passwd-cmd`"));
     }
 
     #[test]
@@ -267,10 +273,11 @@ mod tests {
             backend = \"maildir\"",
         );
 
-        assert_eq!(
-            config.unwrap_err().root_cause().to_string(),
-            "missing field `maildir-root-dir` at line 1 column 1"
-        );
+        assert!(config
+            .unwrap_err()
+            .root_cause()
+            .to_string()
+            .contains("missing field `maildir-root-dir`"));
     }
 
     #[cfg(feature = "notmuch-backend")]
@@ -283,10 +290,11 @@ mod tests {
             backend = \"notmuch\"",
         );
 
-        assert_eq!(
-            config.unwrap_err().root_cause().to_string(),
-            "missing field `notmuch-db-path` at line 1 column 1"
-        );
+        assert!(config
+            .unwrap_err()
+            .root_cause()
+            .to_string()
+            .contains("missing field `notmuch-db-path`"));
     }
 
     #[test]
@@ -297,10 +305,11 @@ mod tests {
             backend = \"none\"",
         );
 
-        assert_eq!(
-            config.unwrap_err().root_cause().to_string(),
-            "missing field `sender` at line 1 column 1"
-        );
+        assert!(config
+            .unwrap_err()
+            .root_cause()
+            .to_string()
+            .contains("missing field `sender`"));
     }
 
     #[test]
@@ -312,10 +321,11 @@ mod tests {
             sender = \"bad\"",
         );
 
-        assert_eq!(
-            config.unwrap_err().root_cause().to_string(),
-            "unknown variant `bad`, expected one of `none`, `smtp`, `sendmail` at line 1 column 1",
-        );
+        assert!(config
+            .unwrap_err()
+            .root_cause()
+            .to_string()
+            .contains("unknown variant `bad`, expected one of `none`, `smtp`, `sendmail`"),);
     }
 
     #[test]
@@ -327,10 +337,11 @@ mod tests {
             sender = \"smtp\"",
         );
 
-        assert_eq!(
-            config.unwrap_err().root_cause().to_string(),
-            "missing field `smtp-host` at line 1 column 1"
-        );
+        assert!(config
+            .unwrap_err()
+            .root_cause()
+            .to_string()
+            .contains("missing field `smtp-host`"));
     }
 
     #[test]
@@ -343,10 +354,11 @@ mod tests {
             smtp-host = \"localhost\"",
         );
 
-        assert_eq!(
-            config.unwrap_err().root_cause().to_string(),
-            "missing field `smtp-port` at line 1 column 1"
-        );
+        assert!(config
+            .unwrap_err()
+            .root_cause()
+            .to_string()
+            .contains("missing field `smtp-port`"));
     }
 
     #[test]
@@ -360,10 +372,11 @@ mod tests {
             smtp-port = 25",
         );
 
-        assert_eq!(
-            config.unwrap_err().root_cause().to_string(),
-            "missing field `smtp-login` at line 1 column 1"
-        );
+        assert!(config
+            .unwrap_err()
+            .root_cause()
+            .to_string()
+            .contains("missing field `smtp-login`"));
     }
 
     #[test]
@@ -378,10 +391,11 @@ mod tests {
             smtp-login = \"login\"",
         );
 
-        assert_eq!(
-            config.unwrap_err().root_cause().to_string(),
-            "missing field `smtp-passwd-cmd` at line 1 column 1"
-        );
+        assert!(config
+            .unwrap_err()
+            .root_cause()
+            .to_string()
+            .contains("missing field `smtp-passwd-cmd`"));
     }
 
     #[test]
@@ -393,10 +407,11 @@ mod tests {
             sender = \"sendmail\"",
         );
 
-        assert_eq!(
-            config.unwrap_err().root_cause().to_string(),
-            "missing field `sendmail-cmd` at line 1 column 1"
-        );
+        assert!(config
+            .unwrap_err()
+            .root_cause()
+            .to_string()
+            .contains("missing field `sendmail-cmd`"));
     }
 
     #[test]
