@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `create` and `delete` folder commands [sourcehut#54].
+
 ### Fixed
 
 - Fixed config deserialization issue with `email-hooks` and
@@ -670,3 +674,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#356]: https://github.com/soywod/himalaya/issues/356
 [#419]: https://github.com/soywod/himalaya/issues/419
 [#430]: https://github.com/soywod/himalaya/issues/430
+
+[sourcehut#54]: https://todo.sr.ht/~soywod/pimalaya/54

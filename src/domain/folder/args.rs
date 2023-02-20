@@ -11,6 +11,8 @@ use crate::ui::table;
 
 const ARG_SOURCE: &str = "source";
 const ARG_TARGET: &str = "target";
+const CMD_CREATE: &str = "create";
+const CMD_DELETE: &str = "delete";
 const CMD_EXPUNGE: &str = "expunge";
 const CMD_FOLDERS: &str = "folders";
 const CMD_LIST: &str = "list";
@@ -18,8 +20,10 @@ const CMD_LIST: &str = "list";
 /// Represents the folder commands.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Cmd {
+    Create,
     List(table::args::MaxTableWidth),
     Expunge,
+    Delete,
 }
 
 /// Represents the folder command matcher.
@@ -28,10 +32,16 @@ pub fn matches(m: &ArgMatches) -> Result<Option<Cmd>> {
         if let Some(_) = m.subcommand_matches(CMD_EXPUNGE) {
             info!("expunge folder subcommand matched");
             Some(Cmd::Expunge)
+        } else if let Some(_) = m.subcommand_matches(CMD_CREATE) {
+            debug!("create folder command matched");
+            Some(Cmd::Create)
         } else if let Some(m) = m.subcommand_matches(CMD_LIST) {
             debug!("list folders command matched");
             let max_table_width = table::args::parse_max_width(m);
             Some(Cmd::List(max_table_width))
+        } else if let Some(_) = m.subcommand_matches(CMD_DELETE) {
+            debug!("delete folder command matched");
+            Some(Cmd::Delete)
         } else {
             info!("no folder subcommand matched, falling back to subcommand list");
             Some(Cmd::List(None))
@@ -49,9 +59,15 @@ pub fn subcmd() -> Command {
         .about("Manage folders")
         .subcommands([
             Command::new(CMD_EXPUNGE).about("Delete emails marked for deletion"),
+            Command::new(CMD_CREATE)
+                .aliases(["add", "new"])
+                .about("Create a new folder"),
             Command::new(CMD_LIST)
                 .about("List folders")
                 .arg(table::args::max_width()),
+            Command::new(CMD_DELETE)
+                .aliases(["remove", "rm"])
+                .about("Delete a folder with all its emails"),
         ])
 }
 

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
 use clap::Command;
 use std::{borrow::Cow, env};
 use url::Url;
@@ -147,23 +147,43 @@ fn main() -> Result<()> {
 
     // checks folder commands
     match folder::args::matches(&m)? {
-        Some(folder::args::Cmd::Expunge) => {
-            let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
+        Some(folder::args::Cmd::Create) => {
+            let folder = folder
+                .ok_or_else(|| anyhow!("the folder argument is missing"))
+                .context("cannot create folder")?;
+            let folder = account_config.folder_alias(folder)?;
             let mut backend = BackendBuilder::new()
                 .disable_cache(disable_cache)
                 .build(&account_config, &backend_config)?;
-            return folder::handlers::expunge(&folder, &mut printer, backend.as_mut());
+            return folder::handlers::create(&mut printer, backend.as_mut(), &folder);
         }
         Some(folder::args::Cmd::List(max_width)) => {
             let mut backend = BackendBuilder::new()
                 .disable_cache(disable_cache)
                 .build(&account_config, &backend_config)?;
             return folder::handlers::list(
-                max_width,
                 &account_config,
                 &mut printer,
                 backend.as_mut(),
+                max_width,
             );
+        }
+        Some(folder::args::Cmd::Expunge) => {
+            let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
+            let mut backend = BackendBuilder::new()
+                .disable_cache(disable_cache)
+                .build(&account_config, &backend_config)?;
+            return folder::handlers::expunge(&mut printer, backend.as_mut(), &folder);
+        }
+        Some(folder::args::Cmd::Delete) => {
+            let folder = folder
+                .ok_or_else(|| anyhow!("the folder argument is missing"))
+                .context("cannot delete folder")?;
+            let folder = account_config.folder_alias(folder)?;
+            let mut backend = BackendBuilder::new()
+                .disable_cache(disable_cache)
+                .build(&account_config, &backend_config)?;
+            return folder::handlers::delete(&mut printer, backend.as_mut(), &folder);
         }
         _ => (),
     }
