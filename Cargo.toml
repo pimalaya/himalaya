@@ -37,6 +37,7 @@ email_address = "0.2.4"
 env_logger = "0.8"
 erased-serde = "0.3"
 himalaya-lib = { git = "https://git.sr.ht/~soywod/himalaya-lib", branch = "develop" }
+# himalaya-lib = { path = "/home/soywod/sourcehut/himalaya-lib" }
 indicatif = "0.17"
 log = "0.4"
 once_cell = "1.16.0"
