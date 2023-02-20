@@ -27,6 +27,7 @@ tempfile = "3.3"
 [dependencies]
 anyhow = "1.0"
 atty = "0.2"
+chrono = "0.4.23"
 clap = "4.0"
 clap_complete = "4.0"
 clap_mangen = "0.2"

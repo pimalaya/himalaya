@@ -775,6 +775,7 @@ version = "0.7.1"
 dependencies = [
  "anyhow",
  "atty",
+ "chrono",
  "clap",
  "clap_complete",
  "clap_mangen",
@@ -803,7 +804,7 @@ dependencies = [
 [[package]]
 name = "himalaya-lib"
 version = "0.6.0"
-source = "git+https://git.sr.ht/~soywod/himalaya-lib?branch=develop#8c538689c9d3098f8e69493791ccbbe52eb9af58"
+source = "git+https://git.sr.ht/~soywod/himalaya-lib?branch=develop#26d3b9e74c978f6dc94689bff809d48fe5ba4c85"
 dependencies = [
  "ammonia",
  "chrono",
@@ -827,7 +828,6 @@ dependencies = [
  "regex",
  "rfc2047-decoder",
  "rusqlite",
- "serde",
  "shellexpand",
  "thiserror",
  "tree_magic",

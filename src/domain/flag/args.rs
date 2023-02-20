@@ -83,7 +83,11 @@ pub fn flags_arg() -> Arg {
     Arg::new(ARG_FLAGS)
         .value_name("FLAGS")
         .help("The flags")
-        .long_help("The list of flags. It can be one of: seen, answered, flagged, deleted, draft, recent. Other flags are considered custom.")
+        .long_help(
+            "The list of flags.
+It can be one of: seen, answered, flagged, deleted, or draft.
+Other flags are considered custom.",
+        )
         .num_args(1..)
         .required(true)
         .last(true)

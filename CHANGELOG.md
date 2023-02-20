@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed config deserialization issue with `email-hooks` and
   `email-reading-format`.
+- Fixed flags case sensitivity.
 
 ## [0.7.1] - 2023-02-14
 

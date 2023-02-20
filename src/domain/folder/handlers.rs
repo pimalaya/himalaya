@@ -5,7 +5,10 @@
 use anyhow::Result;
 use himalaya_lib::{AccountConfig, Backend};
 
-use crate::printer::{PrintTableOpts, Printer};
+use crate::{
+    printer::{PrintTableOpts, Printer},
+    Folders,
+};
 
 pub fn expunge<P: Printer, B: Backend + ?Sized>(
     folder: &str,
@@ -22,7 +25,7 @@ pub fn list<P: Printer, B: Backend + ?Sized>(
     printer: &mut P,
     backend: &mut B,
 ) -> Result<()> {
-    let folders = backend.list_folders()?;
+    let folders: Folders = backend.list_folders()?.into();
     printer.print_table(
         // TODO: remove Box
         Box::new(folders),
