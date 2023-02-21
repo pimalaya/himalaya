@@ -54,10 +54,26 @@ jobs:
           args: --release
       - name: Compress executable (unix)
         if: matrix.os_name == 'linux' || matrix.os_name == 'macos'
-        run: tar czf himalaya.tar.gz -C target/release himalaya
+        run: |
+          mkdir -p target/release/{man,completions}
+          target/release/himalaya man target/release/man
+          target/release/himalaya completion bash > target/release/completions/himalaya.bash
+          target/release/himalaya completion elvish > target/release/completions/himalaya.elvish
+          target/release/himalaya completion fish > target/release/completions/himalaya.fish
+          target/release/himalaya completion powershell > target/release/completions/himalaya.powershell
+          target/release/himalaya completion zsh > target/release/completions/himalaya.zsh
+          tar czf himalaya.tar.gz -C target/release himalaya man completions
       - name: Compress executable (windows)
         if: matrix.os_name == 'windows'
-        run: tar czf himalaya.tar.gz -C target/release himalaya.exe
+        run: |
+          mkdir -p target/release/{man,completions}
+          target/release/himalaya.exe man target/release/man
+          target/release/himalaya.exe completion bash > target/release/completions/himalaya.bash
+          target/release/himalaya.exe completion elvish > target/release/completions/himalaya.elvish
+          target/release/himalaya.exe completion fish > target/release/completions/himalaya.fish
+          target/release/himalaya.exe completion powershell > target/release/completions/himalaya.powershell
+          target/release/himalaya.exe completion zsh > target/release/completions/himalaya.zsh
+          tar czf himalaya.tar.gz -C target/release himalaya.exe man completions
       - name: Upload release asset
         uses: actions/upload-release-asset@v1
         env:
