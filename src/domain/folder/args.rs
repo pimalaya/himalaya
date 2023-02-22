@@ -3,12 +3,17 @@
 //! This module provides subcommands, arguments and a command matcher
 //! related to the folder domain.
 
+use std::collections::HashSet;
+
 use anyhow::Result;
-use clap::{self, Arg, ArgMatches, Command};
+use clap::{self, Arg, ArgAction, ArgMatches, Command};
 use log::{debug, info};
 
 use crate::ui::table;
 
+const ARG_ALL: &str = "all";
+const ARG_EXCLUDE: &str = "exclude";
+const ARG_INCLUDE: &str = "include";
 const ARG_SOURCE: &str = "source";
 const ARG_TARGET: &str = "target";
 const CMD_CREATE: &str = "create";
@@ -74,15 +79,80 @@ pub fn subcmd() -> Command {
 /// Represents the source folder argument.
 pub fn source_arg() -> Arg {
     Arg::new(ARG_SOURCE)
+        .help("Set the source folder")
         .long("folder")
         .short('f')
-        .help("Specifies the source folder")
+        .global(true)
         .value_name("SOURCE")
 }
 
 /// Represents the source folder argument parser.
 pub fn parse_source_arg(matches: &ArgMatches) -> Option<&str> {
     matches.get_one::<String>(ARG_SOURCE).map(String::as_str)
+}
+
+/// Represents the all folders argument.
+pub fn all_arg(help: &'static str) -> Arg {
+    Arg::new(ARG_ALL)
+        .help(help)
+        .long("all-folders")
+        .alias("all")
+        .short('A')
+        .action(ArgAction::SetTrue)
+        .conflicts_with(ARG_SOURCE)
+        .conflicts_with(ARG_INCLUDE)
+        .conflicts_with(ARG_EXCLUDE)
+}
+
+/// Represents the all folders argument parser.
+pub fn parse_all_arg(m: &ArgMatches) -> bool {
+    m.get_flag(ARG_ALL)
+}
+
+/// Represents the folders to include argument.
+pub fn include_arg(help: &'static str) -> Arg {
+    Arg::new(ARG_INCLUDE)
+        .help(help)
+        .long("include-folder")
+        .alias("only")
+        .short('F')
+        .value_name("FOLDER")
+        .num_args(1..)
+        .action(ArgAction::Append)
+        .conflicts_with(ARG_SOURCE)
+        .conflicts_with(ARG_ALL)
+        .conflicts_with(ARG_EXCLUDE)
+}
+
+/// Represents the folders to include argument parser.
+pub fn parse_include_arg(m: &ArgMatches) -> HashSet<String> {
+    m.get_many::<String>(ARG_INCLUDE)
+        .unwrap_or_default()
+        .map(ToOwned::to_owned)
+        .collect()
+}
+
+/// Represents the folders to exclude argument.
+pub fn exclude_arg(help: &'static str) -> Arg {
+    Arg::new(ARG_EXCLUDE)
+        .help(help)
+        .long("exclude-folder")
+        .alias("except")
+        .short('x')
+        .value_name("FOLDER")
+        .num_args(1..)
+        .action(ArgAction::Append)
+        .conflicts_with(ARG_SOURCE)
+        .conflicts_with(ARG_ALL)
+        .conflicts_with(ARG_INCLUDE)
+}
+
+/// Represents the folders to exclude argument parser.
+pub fn parse_exclude_arg(m: &ArgMatches) -> HashSet<String> {
+    m.get_many::<String>(ARG_EXCLUDE)
+        .unwrap_or_default()
+        .map(ToOwned::to_owned)
+        .collect()
 }
 
 /// Represents the target folder argument.

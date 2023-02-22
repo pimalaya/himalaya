@@ -4,17 +4,17 @@
 //! account in the accounts section of the user configuration file.
 
 use himalaya_lib::{
-    AccountConfig, BackendConfig, EmailHooks, EmailSender, EmailTextPlainFormat, MaildirConfig,
+    folder::sync::Strategy as SyncFoldersStrategy, AccountConfig, BackendConfig, EmailHooks,
+    EmailSender, EmailTextPlainFormat, MaildirConfig,
 };
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, path::PathBuf};
 
 #[cfg(feature = "imap-backend")]
 use himalaya_lib::ImapConfig;
 
 #[cfg(feature = "notmuch-backend")]
 use himalaya_lib::NotmuchConfig;
-
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::PathBuf};
 
 use crate::config::{prelude::*, DeserializedConfig};
 
@@ -104,6 +104,8 @@ pub struct DeserializedBaseAccountConfig {
     #[serde(default)]
     pub sync: bool,
     pub sync_dir: Option<PathBuf>,
+    #[serde(default, with = "SyncFoldersStrategyDef")]
+    pub sync_folders_strategy: SyncFoldersStrategy,
 }
 
 impl DeserializedBaseAccountConfig {
@@ -207,6 +209,7 @@ impl DeserializedBaseAccountConfig {
             },
             sync: self.sync,
             sync_dir: self.sync_dir.clone(),
+            sync_folders_strategy: self.sync_folders_strategy.clone(),
         }
     }
 }

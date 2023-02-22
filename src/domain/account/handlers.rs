@@ -3,7 +3,10 @@
 //! This module gathers all account actions triggered by the CLI.
 
 use anyhow::Result;
-use himalaya_lib::{AccountConfig, Backend, BackendSyncBuilder, BackendSyncProgressEvent};
+use himalaya_lib::{
+    folder::sync::Strategy as SyncFoldersStrategy, AccountConfig, Backend, BackendSyncBuilder,
+    BackendSyncProgressEvent,
+};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use log::{info, trace};
 
@@ -43,15 +46,17 @@ pub fn sync<P: Printer>(
     account_config: &AccountConfig,
     printer: &mut P,
     backend: &dyn Backend,
-    folder: &Option<String>,
+    folders_strategy: Option<SyncFoldersStrategy>,
     dry_run: bool,
 ) -> Result<()> {
     info!("entering the sync accounts handler");
-    trace!("dry run: {}", dry_run);
+    trace!("dry run: {dry_run}");
+    trace!("folders strategy: {folders_strategy:#?}");
 
     let mut sync_builder = BackendSyncBuilder::new(account_config);
-    if let Some(folder) = folder {
-        sync_builder = sync_builder.only_folder(folder);
+
+    if let Some(strategy) = folders_strategy {
+        sync_builder = sync_builder.folders_strategy(strategy);
     }
 
     if dry_run {

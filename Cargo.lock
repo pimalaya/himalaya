@@ -804,7 +804,7 @@ dependencies = [
 [[package]]
 name = "himalaya-lib"
 version = "0.6.0"
-source = "git+https://git.sr.ht/~soywod/himalaya-lib?branch=develop#26d3b9e74c978f6dc94689bff809d48fe5ba4c85"
+source = "git+https://git.sr.ht/~soywod/himalaya-lib?branch=develop#9617be67bcec1f1a80924288be34d3476a260890"
 dependencies = [
  "ammonia",
  "chrono",

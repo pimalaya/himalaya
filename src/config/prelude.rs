@@ -1,9 +1,9 @@
-use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-
 use himalaya_lib::{
-    EmailHooks, EmailSender, EmailTextPlainFormat, MaildirConfig, SendmailConfig, SmtpConfig,
+    folder::sync::Strategy as SyncFoldersStrategy, EmailHooks, EmailSender, EmailTextPlainFormat,
+    MaildirConfig, SendmailConfig, SmtpConfig,
 };
+use serde::{Deserialize, Serialize};
+use std::{collections::HashSet, path::PathBuf};
 
 #[cfg(feature = "imap-backend")]
 use himalaya_lib::ImapConfig;
@@ -110,4 +110,16 @@ pub struct SendmailConfigDef {
 pub struct EmailHooksDef {
     /// Represents the hook called just before sending an email.
     pub pre_send: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(remote = "SyncFoldersStrategy", rename_all = "kebab-case")]
+pub enum SyncFoldersStrategyDef {
+    #[default]
+    All,
+    #[serde(alias = "only")]
+    Include(HashSet<String>),
+    #[serde(alias = "except")]
+    #[serde(alias = "ignore")]
+    Exclude(HashSet<String>),
 }

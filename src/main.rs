@@ -122,11 +122,7 @@ fn main() -> Result<()> {
         Some(account::args::Cmd::List(max_width)) => {
             return account::handlers::list(max_width, &account_config, &config, &mut printer);
         }
-        Some(account::args::Cmd::Sync(dry_run)) => {
-            let folder = match folder {
-                Some(folder) => Some(account_config.folder_alias(folder)?),
-                None => None,
-            };
+        Some(account::args::Cmd::Sync(folders_strategy, dry_run)) => {
             let backend = BackendBuilder::new()
                 .sessions_pool_size(8)
                 .disable_cache(true)
@@ -135,7 +131,7 @@ fn main() -> Result<()> {
                 &account_config,
                 &mut printer,
                 backend.as_ref(),
-                &folder,
+                folders_strategy,
                 dry_run,
             )?;
             backend.close()?;

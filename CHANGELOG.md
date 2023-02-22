@@ -12,6 +12,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `create` and `delete` folder commands [sourcehut#54].
 - Added generated completions and man pages to releases
   [sourcehut#43].
+- Added new account config option `sync-folders-strategy` which allows
+  to choose a folders synchronization strategy [sourcehut#59]:
+  
+  - `sync-folders-strategy = "all"`: synchronize all existing folders
+    for the current account
+  - `sync-folders-strategy.include = ["folder1", "folder2", …]`:
+    synchronize only the given folders for the current account
+  - `sync-folders-strategy.exclude = ["folder1", "folder2", …]`:
+    synchronizes all folders except the given ones for the current
+    account
+
+  Also added new `account sync` arguments that override the account
+  config option:
+  
+  - `-A|--all-folders`: include all folders to the synchronization.
+  - `-F|--include-folder`: include given folders to the
+    synchronization. They can be repeated `-F folder1 folder2` or `-F
+    folder1 -F folder2`.
+  - `-x|--exclude-folder`: exclude given folders from the
+    synchronization. They can be repeated `-x folder1 folder2` or `-x
+    folder1 -F folder2`.
+
+### Changed
+
+- Made global options truly global, which means they can be used
+  everywhere (not only *before* commands but also *after*)
+  [sourcehut#60].
 
 ### Fixed
 
@@ -679,3 +706,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [sourcehut#43]: https://todo.sr.ht/~soywod/pimalaya/43
 [sourcehut#54]: https://todo.sr.ht/~soywod/pimalaya/54
+[sourcehut#59]: https://todo.sr.ht/~soywod/pimalaya/59
+[sourcehut#60]: https://todo.sr.ht/~soywod/pimalaya/60

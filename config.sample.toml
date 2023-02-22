@@ -11,7 +11,7 @@ email-writing-sign-cmd = "gpg -o - -saq"
 email-writing-encrypt-cmd = "gpg -o - -eqar <recipient>"
 
 [example]
-default = false
+default = true
 display-name = "Display NAME (gmail)"
 email = "display.name@gmail.local"
 
@@ -36,6 +36,7 @@ smtp-starttls = false
 
 sync = true
 sync-dir = "/tmp/sync/gmail"
+sync-folders-strategy.only = ["INBOX"]
 
 [example.folder-aliases]
 inbox = "INBOX"
