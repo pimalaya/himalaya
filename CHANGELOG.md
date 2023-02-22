@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Made global options truly global, which means they can be used
   everywhere (not only *before* commands but also *after*)
   [sourcehut#60].
+- Replaced reply all `-a` argument with `-A` because it conflicted
+  with the global option `-a|--account`.
 
 ### Fixed
 
