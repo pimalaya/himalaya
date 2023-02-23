@@ -334,7 +334,7 @@ pub fn send<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
     sender: &mut S,
     raw_email: String,
 ) -> Result<()> {
-    let folder = config.folder_alias("sent")?;
+    let folder = config.sent_folder_alias()?;
     let is_tty = atty::is(Stream::Stdin);
     let is_json = printer.is_json();
     let raw_email = if is_tty || is_json {
@@ -349,7 +349,11 @@ pub fn send<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
     };
     trace!("raw email: {:?}", raw_email);
     sender.send(raw_email.as_bytes())?;
-    backend.add_email(&folder, raw_email.as_bytes(), &Flags::default())?;
+    backend.add_email(
+        &folder,
+        raw_email.as_bytes(),
+        &Flags::from_iter([Flag::Seen]),
+    )?;
     Ok(())
 }
 
