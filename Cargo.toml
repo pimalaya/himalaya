@@ -16,11 +16,22 @@ priority = "optional"
 section = "mail"
 
 [features]
+default = ["imap-backend", "smtp-sender", "native-tls"]
+
+# backends
 imap-backend = ["himalaya-lib/imap-backend"]
-smtp-sender = ["himalaya-lib/smtp-sender"]
 notmuch-backend = ["himalaya-lib/notmuch-backend"]
-vendored = ["himalaya-lib/vendored"]
-default = ["imap-backend", "smtp-sender"]
+
+# senders
+smtp-sender = ["himalaya-lib/smtp-sender"]
+
+# native tls
+native-tls = ["himalaya-lib/native-tls"]
+native-tls-vendored = ["himalaya-lib/native-tls-vendored"]
+
+# rustls
+rustls-tls = ["himalaya-lib/rustls-tls"]
+rustls-native-certs = ["himalaya-lib/rustls-native-certs"]
 
 [dev-dependencies]
 tempfile = "3.3"
