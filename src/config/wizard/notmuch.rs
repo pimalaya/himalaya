@@ -4,7 +4,7 @@ use crate::account::{
 };
 use anyhow::Result;
 use dialoguer::Input;
-use himalaya_lib::{NotmuchBackend, NotmuchConfig};
+use pimalaya_email::{NotmuchBackend, NotmuchConfig};
 
 pub(crate) fn configure(base: DeserializedBaseAccountConfig) -> Result<DeserializedAccountConfig> {
     let db_path = match NotmuchBackend::get_default_db_path() {

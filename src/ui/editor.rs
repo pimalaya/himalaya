@@ -1,9 +1,9 @@
 use anyhow::{Context, Result};
-use himalaya_lib::{
+use log::debug;
+use pimalaya_email::{
     email::{local_draft_path, remove_local_draft},
     AccountConfig, Backend, CompilerBuilder, Flag, Flags, Sender, Tpl,
 };
-use log::debug;
 use std::{env, fs, process::Command};
 
 use crate::{

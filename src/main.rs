@@ -10,7 +10,7 @@ use himalaya::{
     printer::StdoutPrinter,
     tpl,
 };
-use himalaya_lib::{
+use pimalaya_email::{
     BackendBuilder, BackendConfig, ImapBackend, SenderBuilder, DEFAULT_INBOX_FOLDER,
 };
 

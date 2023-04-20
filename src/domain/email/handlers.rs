@@ -1,9 +1,9 @@
 use anyhow::{anyhow, Context, Result};
 use atty::Stream;
-use himalaya_lib::{
+use log::{debug, trace};
+use pimalaya_email::{
     AccountConfig, Backend, Email, Flag, Flags, Sender, ShowTextPartsStrategy, Tpl, TplBuilder,
 };
-use log::{debug, trace};
 use std::{
     fs,
     io::{self, BufRead},

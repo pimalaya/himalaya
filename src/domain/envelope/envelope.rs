@@ -26,8 +26,8 @@ pub struct Envelope {
     pub date: DateTime<Local>,
 }
 
-impl From<&himalaya_lib::Envelope> for Envelope {
-    fn from(envelope: &himalaya_lib::Envelope) -> Self {
+impl From<&pimalaya_email::Envelope> for Envelope {
+    fn from(envelope: &pimalaya_email::Envelope) -> Self {
         Envelope {
             id: envelope.id.clone(),
             flags: envelope.flags.clone().into(),

@@ -9,8 +9,8 @@ pub struct Folder {
     pub desc: String,
 }
 
-impl From<&himalaya_lib::Folder> for Folder {
-    fn from(folder: &himalaya_lib::Folder) -> Self {
+impl From<&pimalaya_email::Folder> for Folder {
+    fn from(folder: &pimalaya_email::Folder) -> Self {
         Folder {
             delim: folder.delim.clone(),
             name: folder.name.clone(),

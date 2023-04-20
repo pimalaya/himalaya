@@ -5,8 +5,8 @@
 
 use anyhow::{anyhow, Context, Result};
 use dirs::{config_dir, home_dir};
-use himalaya_lib::{AccountConfig, BackendConfig, EmailHooks, EmailTextPlainFormat};
 use log::{debug, trace};
+use pimalaya_email::{AccountConfig, BackendConfig, EmailHooks, EmailTextPlainFormat};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path::PathBuf};
 use toml;
@@ -119,12 +119,12 @@ impl DeserializedConfig {
 
 #[cfg(test)]
 mod tests {
-    use himalaya_lib::{EmailSender, MaildirConfig, SendmailConfig, SmtpConfig};
+    use pimalaya_email::{EmailSender, MaildirConfig, SendmailConfig, SmtpConfig};
 
     #[cfg(feature = "imap-backend")]
-    use himalaya_lib::ImapConfig;
+    use pimalaya_email::ImapConfig;
     #[cfg(feature = "notmuch-backend")]
-    use himalaya_lib::NotmuchConfig;
+    use pimalaya_email::NotmuchConfig;
 
     use std::io::Write;
     use tempfile::NamedTempFile;

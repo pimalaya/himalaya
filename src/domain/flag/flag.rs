@@ -11,15 +11,15 @@ pub enum Flag {
     Custom(String),
 }
 
-impl From<&himalaya_lib::Flag> for Flag {
-    fn from(flag: &himalaya_lib::Flag) -> Self {
+impl From<&pimalaya_email::Flag> for Flag {
+    fn from(flag: &pimalaya_email::Flag) -> Self {
         match flag {
-            himalaya_lib::Flag::Seen => Flag::Seen,
-            himalaya_lib::Flag::Answered => Flag::Answered,
-            himalaya_lib::Flag::Flagged => Flag::Flagged,
-            himalaya_lib::Flag::Deleted => Flag::Deleted,
-            himalaya_lib::Flag::Draft => Flag::Draft,
-            himalaya_lib::Flag::Custom(flag) => Flag::Custom(flag.clone()),
+            pimalaya_email::Flag::Seen => Flag::Seen,
+            pimalaya_email::Flag::Answered => Flag::Answered,
+            pimalaya_email::Flag::Flagged => Flag::Flagged,
+            pimalaya_email::Flag::Deleted => Flag::Deleted,
+            pimalaya_email::Flag::Draft => Flag::Draft,
+            pimalaya_email::Flag::Custom(flag) => Flag::Custom(flag.clone()),
         }
     }
 }

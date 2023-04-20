@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [sourcehut#60].
 - Replaced reply all `-a` argument with `-A` because it conflicted
   with the global option `-a|--account`.
+- Replaced `himalaya-lib` by `pimalaya-email`.
 
 ### Fixed
 
@@ -58,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Changed the location of the
-  [documentation](https://pimalaya.org/himalaya/docs/).
+  [documentation](https://pimalaya.org/himalaya/).
 
 ### Fixed
 

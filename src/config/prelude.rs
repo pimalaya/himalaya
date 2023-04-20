@@ -1,4 +1,4 @@
-use himalaya_lib::{
+use pimalaya_email::{
     folder::sync::Strategy as SyncFoldersStrategy, EmailHooks, EmailSender, EmailTextPlainFormat,
     MaildirConfig, SendmailConfig, SmtpConfig,
 };
@@ -6,10 +6,10 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, path::PathBuf};
 
 #[cfg(feature = "imap-backend")]
-use himalaya_lib::ImapConfig;
+use pimalaya_email::ImapConfig;
 
 #[cfg(feature = "notmuch-backend")]
-use himalaya_lib::NotmuchConfig;
+use pimalaya_email::NotmuchConfig;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(remote = "SmtpConfig")]

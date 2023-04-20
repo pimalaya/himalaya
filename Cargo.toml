@@ -1,14 +1,14 @@
 [package]
 name = "himalaya"
-description = "Command-line interface for email management."
+description = "CLI to manage your emails."
 version = "0.7.1"
 authors = ["soywod <clement.douin@posteo.net>"]
 edition = "2021"
 license = "MIT"
 categories = ["command-line-interface", "command-line-utilities", "email"]
 keywords = ["cli", "mail", "email", "client", "imap"]
-homepage = "https://github.com/soywod/himalaya"
-documentation = "https://github.com/soywod/himalaya/wiki"
+homepage = "https://pimalaya.org/himalaya/"
+documentation = "https://pimalaya.org/himalaya/"
 repository = "https://github.com/soywod/himalaya"
 
 [package.metadata.deb]
@@ -19,19 +19,19 @@ section = "mail"
 default = ["imap-backend", "smtp-sender", "native-tls"]
 
 # backends
-imap-backend = ["himalaya-lib/imap-backend"]
-notmuch-backend = ["himalaya-lib/notmuch-backend"]
+imap-backend = ["pimalaya-email/imap-backend"]
+notmuch-backend = ["pimalaya-email/notmuch-backend"]
 
 # senders
-smtp-sender = ["himalaya-lib/smtp-sender"]
+smtp-sender = ["pimalaya-email/smtp-sender"]
 
 # native tls
-native-tls = ["himalaya-lib/native-tls"]
-native-tls-vendored = ["himalaya-lib/native-tls-vendored"]
+native-tls = ["pimalaya-email/native-tls"]
+native-tls-vendored = ["pimalaya-email/native-tls-vendored"]
 
 # rustls
-rustls-tls = ["himalaya-lib/rustls-tls"]
-rustls-native-certs = ["himalaya-lib/rustls-native-certs"]
+rustls-tls = ["pimalaya-email/rustls-tls"]
+rustls-native-certs = ["pimalaya-email/rustls-native-certs"]
 
 [dev-dependencies]
 tempfile = "3.3"
@@ -49,7 +49,8 @@ dialoguer = "0.10.2"
 email_address = "0.2.4"
 env_logger = "0.8"
 erased-serde = "0.3"
-himalaya-lib = { git = "https://git.sr.ht/~soywod/himalaya-lib", branch = "develop" }
+# pimalaya-email = { git = "https://git.sr.ht/~soywod/pimalaya/email" }
+pimalaya-email = { path = "/home/soywod/sourcehut/pimalaya/email" }
 indicatif = "0.17"
 log = "0.4"
 once_cell = "1.16.0"

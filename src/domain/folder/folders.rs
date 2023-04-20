@@ -20,8 +20,8 @@ impl ops::Deref for Folders {
     }
 }
 
-impl From<himalaya_lib::Folders> for Folders {
-    fn from(folders: himalaya_lib::Folders) -> Self {
+impl From<pimalaya_email::Folders> for Folders {
+    fn from(folders: pimalaya_email::Folders) -> Self {
         Folders(folders.iter().map(Folder::from).collect())
     }
 }

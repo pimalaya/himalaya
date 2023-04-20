@@ -785,10 +785,10 @@ dependencies = [
  "email_address",
  "env_logger",
  "erased-serde",
- "himalaya-lib",
  "indicatif",
  "log",
  "once_cell",
+ "pimalaya-email",
  "serde",
  "serde_json",
  "shellexpand",
@@ -799,45 +799,6 @@ dependencies = [
  "unicode-width",
  "url",
  "uuid",
-]
-
-[[package]]
-name = "himalaya-lib"
-version = "0.6.0"
-source = "git+https://git.sr.ht/~soywod/himalaya-lib?branch=develop#7b8fb1d073b66d2f1d642df109c787ba3c31378f"
-dependencies = [
- "ammonia",
- "chrono",
- "convert_case",
- "dirs",
- "html-escape",
- "imap",
- "imap-proto",
- "lettre",
- "log",
- "mail-parser",
- "maildir",
- "mailparse",
- "md5",
- "mime-msg-builder",
- "native-tls",
- "notmuch",
- "once_cell",
- "ouroboros",
- "proc-lock",
- "rayon",
- "regex",
- "rfc2047-decoder",
- "rusqlite",
- "rustls",
- "rustls-native-certs",
- "shellexpand",
- "thiserror",
- "tree_magic",
- "urlencoding",
- "utf7-imap",
- "uuid",
- "webpki-roots",
 ]
 
 [[package]]
@@ -1225,7 +1186,8 @@ checksum = "2a60c7ce501c71e03a9c9c0d35b861413ae925bd979cc7a4e30d060069aaac8d"
 [[package]]
 name = "mime-msg-builder"
 version = "0.1.0"
-source = "git+https://git.sr.ht/~soywod/mime-msg-builder?branch=develop#1f61083ba7811bf261647056e63441d2f997113c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a3981dce6db3e7f9faa1124409a6b94436902ecb2670f374d361789d61eb34ac"
 dependencies = [
  "ammonia",
  "chumsky 0.9.0",
@@ -1542,6 +1504,44 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6796ad771acdc0123d2a88dc428b5e38ef24456743ddb1744ed628f9815c096"
 dependencies = [
  "siphasher",
+]
+
+[[package]]
+name = "pimalaya-email"
+version = "0.6.0"
+dependencies = [
+ "ammonia",
+ "chrono",
+ "convert_case",
+ "dirs",
+ "html-escape",
+ "imap",
+ "imap-proto",
+ "lettre",
+ "log",
+ "mail-parser",
+ "maildir",
+ "mailparse",
+ "md5",
+ "mime-msg-builder",
+ "native-tls",
+ "notmuch",
+ "once_cell",
+ "ouroboros",
+ "proc-lock",
+ "rayon",
+ "regex",
+ "rfc2047-decoder",
+ "rusqlite",
+ "rustls",
+ "rustls-native-certs",
+ "shellexpand",
+ "thiserror",
+ "tree_magic",
+ "urlencoding",
+ "utf7-imap",
+ "uuid",
+ "webpki-roots",
 ]
 
 [[package]]

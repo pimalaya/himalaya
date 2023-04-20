@@ -14,8 +14,8 @@ impl ops::Deref for Flags {
     }
 }
 
-impl From<himalaya_lib::Flags> for Flags {
-    fn from(flags: himalaya_lib::Flags) -> Self {
+impl From<pimalaya_email::Flags> for Flags {
+    fn from(flags: pimalaya_email::Flags) -> Self {
         Flags(flags.iter().map(Flag::from).collect())
     }
 }

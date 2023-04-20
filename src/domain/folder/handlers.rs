@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use dialoguer::Confirm;
-use himalaya_lib::{AccountConfig, Backend};
+use pimalaya_email::{AccountConfig, Backend};
 use std::process;
 
 use crate::{
@@ -67,7 +67,7 @@ pub fn delete<P: Printer, B: Backend + ?Sized>(
 
 #[cfg(test)]
 mod tests {
-    use himalaya_lib::{
+    use pimalaya_email::{
         backend, AccountConfig, Backend, Emails, Envelope, Envelopes, Flags, Folder, Folders,
     };
     use std::{any::Any, fmt::Debug, io};

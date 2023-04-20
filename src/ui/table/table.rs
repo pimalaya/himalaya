@@ -5,8 +5,8 @@
 //! [builder design pattern]: https://refactoring.guru/design-patterns/builder
 
 use anyhow::{Context, Result};
-use himalaya_lib::EmailTextPlainFormat;
 use log::trace;
+use pimalaya_email::EmailTextPlainFormat;
 use termcolor::{Color, ColorSpec};
 use terminal_size;
 use unicode_width::UnicodeWidthStr;

@@ -3,12 +3,12 @@
 //! This module gathers all account actions triggered by the CLI.
 
 use anyhow::Result;
-use himalaya_lib::{
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use log::{info, trace};
+use pimalaya_email::{
     folder::sync::Strategy as SyncFoldersStrategy, AccountConfig, Backend, BackendSyncBuilder,
     BackendSyncProgressEvent,
 };
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use log::{info, trace};
 
 use crate::{
     config::DeserializedConfig,
@@ -226,7 +226,7 @@ pub fn sync<P: Printer>(
 
 #[cfg(test)]
 mod tests {
-    use himalaya_lib::{AccountConfig, ImapConfig};
+    use pimalaya_email::{AccountConfig, ImapConfig};
     use std::{collections::HashMap, fmt::Debug, io};
     use termcolor::ColorSpec;
 

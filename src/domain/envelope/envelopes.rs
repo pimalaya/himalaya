@@ -21,8 +21,8 @@ impl ops::Deref for Envelopes {
     }
 }
 
-impl From<himalaya_lib::Envelopes> for Envelopes {
-    fn from(envelopes: himalaya_lib::Envelopes) -> Self {
+impl From<pimalaya_email::Envelopes> for Envelopes {
+    fn from(envelopes: pimalaya_email::Envelopes) -> Self {
         Envelopes(envelopes.iter().map(Envelope::from).collect())
     }
 }

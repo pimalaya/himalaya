@@ -3,7 +3,7 @@
 //! This module contains the raw deserialized representation of an
 //! account in the accounts section of the user configuration file.
 
-use himalaya_lib::{
+use pimalaya_email::{
     folder::sync::Strategy as SyncFoldersStrategy, AccountConfig, BackendConfig, EmailHooks,
     EmailSender, EmailTextPlainFormat, MaildirConfig,
 };
@@ -11,10 +11,10 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
 
 #[cfg(feature = "imap-backend")]
-use himalaya_lib::ImapConfig;
+use pimalaya_email::ImapConfig;
 
 #[cfg(feature = "notmuch-backend")]
-use himalaya_lib::NotmuchConfig;
+use pimalaya_email::NotmuchConfig;
 
 use crate::config::{prelude::*, DeserializedConfig};
 
