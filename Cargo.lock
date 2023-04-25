@@ -1509,6 +1509,8 @@ dependencies = [
 [[package]]
 name = "pimalaya-email"
 version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15171f3839bb7b7938f78b0c43902247d7f1e80befccd63f6cab93ac55613405"
 dependencies = [
  "ammonia",
  "chrono",

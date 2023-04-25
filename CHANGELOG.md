@@ -34,6 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     synchronization. They can be repeated `-x folder1 folder2` or `-x
     folder1 -F folder2`.
 
+- Added cargo features `native-tls` (default), `rustls-tls` and
+  `rustls-native-certs`.
+
 ### Changed
 
 - Made global options truly global, which means they can be used
@@ -42,6 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replaced reply all `-a` argument with `-A` because it conflicted
   with the global option `-a|--account`.
 - Replaced `himalaya-lib` by `pimalaya-email`.
+- Renamed feature `vendored` to `native-tls-vendored`.
+- Removed the `develop` branch, all the development is now done on the
+  `master` branch.
 
 ### Fixed
 
