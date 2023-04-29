@@ -68,7 +68,7 @@ $ nix-env -i himalaya
 ```
 
 *See the
-[documentation](https://pimalaya.org/himalaya/docs/cli/installation.html)
+[documentation](https://pimalaya.org/himalaya/cli/installation.html)
 for other installation methods.*
 
 </td>
@@ -78,7 +78,7 @@ for other installation methods.*
 ## Configuration
 
 Please read the
-[documentation](https://pimalaya.org/himalaya/docs/cli/configuration.html).
+[documentation](https://pimalaya.org/himalaya/cli/configuration.html).
 
 ## Contributing
 
