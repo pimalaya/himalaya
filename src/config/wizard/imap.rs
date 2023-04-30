@@ -4,7 +4,7 @@ use crate::account::{
 };
 use anyhow::Result;
 use dialoguer::{Input, Select};
-use himalaya_lib::ImapConfig;
+use pimalaya_email::ImapConfig;
 
 #[cfg(feature = "imap-backend")]
 pub(crate) fn configure(base: DeserializedBaseAccountConfig) -> Result<DeserializedAccountConfig> {

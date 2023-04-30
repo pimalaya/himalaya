@@ -1,8 +1,9 @@
 # 📫 Himalaya [![GitHub release](https://img.shields.io/github/v/release/soywod/himalaya?color=success)](https://github.com/soywod/himalaya/releases/latest) [![Matrix](https://img.shields.io/matrix/pimalaya.himalaya:matrix.org?color=success&label=chat)](https://matrix.to/#/#pimalaya.himalaya:matrix.org)
 
-Himalaya is a CLI based on the
-[himalaya-lib](https://git.sr.ht/~soywod/himalaya-lib) that allows you
-to manipulate your emails using commands in your console.
+https://pimalaya.org/himalaya/
+
+CLI to manage your emails, based on the
+[pimalaya-email](https://sr.ht/~soywod/pimalaya/) library.
 
 ![image](https://user-images.githubusercontent.com/10437171/138774902-7b9de5a3-93eb-44b0-8cfb-6d2e11e3b1aa.png)
 
@@ -25,19 +26,19 @@ production before the `v1.0.0`.*
 - JSON output
 - …
 
-[Folder listing]: https://pimalaya.org/himalaya/docs/cli/usage/folders/list.html
-[Envelopes listing]: https://pimalaya.org/himalaya/docs/cli/usage/envelopes/list.html
-[searching]: https://pimalaya.org/himalaya/docs/cli/usage/envelopes/search.html
-[sorting]: https://pimalaya.org/himalaya/docs/cli/usage/envelopes/sort.html
-[Email composition]: https://pimalaya.org/himalaya/docs/cli/usage/emails/write.html
-[copy]: https://pimalaya.org/himalaya/docs/cli/usage/emails/copy.html
-[move]: https://pimalaya.org/himalaya/docs/cli/usage/emails/move.html
-[delete]: https://pimalaya.org/himalaya/docs/cli/usage/emails/delete.html
-[Multi-accounting]: https://pimalaya.org/himalaya/docs/cli/configuration.html
-[Account listing]: https://pimalaya.org/himalaya/docs/cli/usage/accounts/list.html
-[Account synchronization]: https://pimalaya.org/himalaya/docs/cli/usage/accounts/synchronize.html
-[real-time notifications]: https://pimalaya.org/himalaya/docs/cli/usage/notifications.html
-[Completions]: https://pimalaya.org/himalaya/docs/cli/tips/completion.html
+[Folder listing]: https://pimalaya.org/himalaya/cli/usage/folders/list.html
+[Envelopes listing]: https://pimalaya.org/himalaya/cli/usage/envelopes/list.html
+[searching]: https://pimalaya.org/himalaya/cli/usage/envelopes/search.html
+[sorting]: https://pimalaya.org/himalaya/cli/usage/envelopes/sort.html
+[Email composition]: https://pimalaya.org/himalaya/cli/usage/emails/write.html
+[copy]: https://pimalaya.org/himalaya/cli/usage/emails/copy.html
+[move]: https://pimalaya.org/himalaya/cli/usage/emails/move.html
+[delete]: https://pimalaya.org/himalaya/cli/usage/emails/delete.html
+[Multi-accounting]: https://pimalaya.org/himalaya/cli/configuration.html
+[Account listing]: https://pimalaya.org/himalaya/cli/usage/accounts/list.html
+[Account synchronization]: https://pimalaya.org/himalaya/cli/usage/accounts/synchronize.html
+[real-time notifications]: https://pimalaya.org/himalaya/cli/usage/notifications.html
+[Completions]: https://pimalaya.org/himalaya/cli/tips/completion.html
 
 ## Installation
 
@@ -60,6 +61,9 @@ $ yay -S himalaya-git
 # Homebrew
 $ brew install himalaya
 
+# Scoop
+$ scoop install himalaya
+
 # Cargo
 $ cargo install himalaya
 
@@ -68,7 +72,7 @@ $ nix-env -i himalaya
 ```
 
 *See the
-[documentation](https://pimalaya.org/himalaya/docs/cli/installation.html)
+[documentation](https://pimalaya.org/himalaya/cli/installation.html)
 for other installation methods.*
 
 </td>
@@ -78,11 +82,12 @@ for other installation methods.*
 ## Configuration
 
 Please read the
-[documentation](https://pimalaya.org/himalaya/docs/cli/configuration.html).
+[documentation](https://pimalaya.org/himalaya/cli/configuration.html).
 
 ## Contributing
 
-If you find a **bug**, please send an email at
+If you find a **bug** that [does not exist
+yet](https://todo.sr.ht/~soywod/pimalaya), please send an email at
 [~soywod/pimalaya@todo.sr.ht](mailto:~soywod/pimalaya@todo.sr.ht).
 
 If you have a **question**, please send an email at

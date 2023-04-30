@@ -1,6 +1,23 @@
-use himalaya_lib::folder::Folder;
+use serde::Serialize;
 
 use crate::ui::{Cell, Row, Table};
+
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct Folder {
+    pub delim: String,
+    pub name: String,
+    pub desc: String,
+}
+
+impl From<&pimalaya_email::Folder> for Folder {
+    fn from(folder: &pimalaya_email::Folder) -> Self {
+        Folder {
+            delim: folder.delim.clone(),
+            name: folder.name.clone(),
+            desc: folder.desc.clone(),
+        }
+    }
+}
 
 impl Table for Folder {
     fn head() -> Row {

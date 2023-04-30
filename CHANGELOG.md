@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2] - 2023-05-01
+
+### Added
+
+- Added `create` and `delete` folder commands [sourcehut#54].
+- Added generated completions and man pages to releases
+  [sourcehut#43].
+- Added new account config option `sync-folders-strategy` which allows
+  to choose a folders synchronization strategy [sourcehut#59]:
+  
+  - `sync-folders-strategy = "all"`: synchronize all existing folders
+    for the current account
+  - `sync-folders-strategy.include = ["folder1", "folder2", …]`:
+    synchronize only the given folders for the current account
+  - `sync-folders-strategy.exclude = ["folder1", "folder2", …]`:
+    synchronizes all folders except the given ones for the current
+    account
+
+  Also added new `account sync` arguments that override the account
+  config option:
+  
+  - `-A|--all-folders`: include all folders to the synchronization.
+  - `-F|--include-folder`: include given folders to the
+    synchronization. They can be repeated `-F folder1 folder2` or `-F
+    folder1 -F folder2`.
+  - `-x|--exclude-folder`: exclude given folders from the
+    synchronization. They can be repeated `-x folder1 folder2` or `-x
+    folder1 -F folder2`.
+
+- Added cargo features `native-tls` (default), `rustls-tls` and
+  `rustls-native-certs`.
+
+### Changed
+
+- Made global options truly global, which means they can be used
+  everywhere (not only *before* commands but also *after*)
+  [sourcehut#60].
+- Replaced reply all `-a` argument with `-A` because it conflicted
+  with the global option `-a|--account`.
+- Replaced `himalaya-lib` by `pimalaya-email`.
+- Renamed feature `vendored` to `native-tls-vendored`.
+- Removed the `develop` branch, all the development is now done on the
+  `master` branch.
+
+### Fixed
+
+- Fixed config deserialization issue with `email-hooks` and
+  `email-reading-format`.
+- Fixed flags case sensitivity.
+
 ## [0.7.1] - 2023-02-14
 
 ### Added
@@ -17,7 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Changed the location of the
-  [documentation](https://pimalaya.org/himalaya/docs/).
+  [documentation](https://pimalaya.org/himalaya/).
 
 ### Fixed
 
@@ -498,7 +548,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[Unreleased]: https://github.com/soywod/himalaya/compare/v0.7.1...develop
+[Unreleased]: https://github.com/soywod/himalaya/compare/v0.7.2...develop
+[0.7.2]: https://github.com/soywod/himalaya/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/soywod/himalaya/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/soywod/himalaya/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/soywod/himalaya/compare/v0.6.0...v0.6.1
@@ -664,3 +715,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#356]: https://github.com/soywod/himalaya/issues/356
 [#419]: https://github.com/soywod/himalaya/issues/419
 [#430]: https://github.com/soywod/himalaya/issues/430
+
+[sourcehut#43]: https://todo.sr.ht/~soywod/pimalaya/43
+[sourcehut#54]: https://todo.sr.ht/~soywod/pimalaya/54
+[sourcehut#59]: https://todo.sr.ht/~soywod/pimalaya/59
+[sourcehut#60]: https://todo.sr.ht/~soywod/pimalaya/60

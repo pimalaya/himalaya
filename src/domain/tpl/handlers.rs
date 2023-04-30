@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use atty::Stream;
-use himalaya_lib::{AccountConfig, Backend, CompilerBuilder, Email, Flags, Sender, Tpl};
+use pimalaya_email::{AccountConfig, Backend, CompilerBuilder, Email, Flags, Sender, Tpl};
 use std::io::{stdin, BufRead};
 
 use crate::printer::Printer;

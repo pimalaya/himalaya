@@ -1,5 +1,5 @@
 use anyhow::Result;
-use himalaya_lib::{Backend, Flags};
+use pimalaya_email::{Backend, Flags};
 
 use crate::printer::Printer;
 

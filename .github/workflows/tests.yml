@@ -3,36 +3,22 @@ name: tests
 on:
   pull_request:
   push:
-    branches:
-      - master
 
 jobs:
   tests:
     runs-on: ubuntu-latest
     steps:
-      - name: Install libnotmuch
-        run: sudo apt-get install -y libnotmuch-dev
       - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Start GreenMail testing server
-        run: |
-          docker run \
-            --rm \
-            -d \
-            -e GREENMAIL_OPTS='-Dgreenmail.setup.test.all -Dgreenmail.hostname=0.0.0.0 -Dgreenmail.auth.disabled -Dgreenmail.verbose' \
-            -p 3025:3025 \
-            -p 3110:3110 \
-            -p 3143:3143 \
-            -p 3465:3465 \
-            -p 3993:3993 \
-            -p 3995:3995 \
-            greenmail/standalone:1.6.11
-      - name: Install rust
-        uses: actions-rs/toolchain@v1
+        uses: actions/checkout@v2        
+      - name: Install Nix
+        uses: cachix/install-nix-action@v20
         with:
-            toolchain: stable
-      - name: Run tests
-        uses: actions-rs/cargo@v1
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - uses: cachix/cachix-action@v12
         with:
-          command: test
-          args: --all-features
+          name: soywod
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+      - name: Test
+        run: nix run .#test

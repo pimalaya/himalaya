@@ -3,26 +3,31 @@
 //! This module gathers all folder actions triggered by the CLI.
 
 use anyhow::Result;
-use himalaya_lib::{AccountConfig, Backend};
+use dialoguer::Confirm;
+use pimalaya_email::{AccountConfig, Backend};
+use std::process;
 
-use crate::printer::{PrintTableOpts, Printer};
+use crate::{
+    printer::{PrintTableOpts, Printer},
+    Folders,
+};
 
 pub fn expunge<P: Printer, B: Backend + ?Sized>(
-    folder: &str,
     printer: &mut P,
     backend: &mut B,
+    folder: &str,
 ) -> Result<()> {
     backend.expunge_folder(folder)?;
     printer.print(format!("Folder {folder} successfully expunged!"))
 }
 
 pub fn list<P: Printer, B: Backend + ?Sized>(
-    max_width: Option<usize>,
     config: &AccountConfig,
     printer: &mut P,
     backend: &mut B,
+    max_width: Option<usize>,
 ) -> Result<()> {
-    let folders = backend.list_folders()?;
+    let folders: Folders = backend.list_folders()?.into();
     printer.print_table(
         // TODO: remove Box
         Box::new(folders),
@@ -33,9 +38,36 @@ pub fn list<P: Printer, B: Backend + ?Sized>(
     )
 }
 
+pub fn create<P: Printer, B: Backend + ?Sized>(
+    printer: &mut P,
+    backend: &mut B,
+    folder: &str,
+) -> Result<()> {
+    backend.add_folder(folder)?;
+    printer.print("Folder successfully created!")
+}
+
+pub fn delete<P: Printer, B: Backend + ?Sized>(
+    printer: &mut P,
+    backend: &mut B,
+    folder: &str,
+) -> Result<()> {
+    if let Some(false) | None = Confirm::new()
+        .with_prompt(format!("Confirm deletion of folder {folder}?"))
+        .default(false)
+        .report(false)
+        .interact_opt()?
+    {
+        process::exit(0);
+    };
+
+    backend.delete_folder(folder)?;
+    printer.print("Folder successfully deleted!")
+}
+
 #[cfg(test)]
 mod tests {
-    use himalaya_lib::{
+    use pimalaya_email::{
         backend, AccountConfig, Backend, Emails, Envelope, Envelopes, Flags, Folder, Folders,
     };
     use std::{any::Any, fmt::Debug, io};

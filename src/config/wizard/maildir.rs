@@ -5,7 +5,7 @@ use crate::account::{
 use anyhow::Result;
 use dialoguer::Input;
 use dirs::home_dir;
-use himalaya_lib::MaildirConfig;
+use pimalaya_email::MaildirConfig;
 
 pub(crate) fn configure(base: DeserializedBaseAccountConfig) -> Result<DeserializedAccountConfig> {
     let input = if let Some(home) = home_dir() {

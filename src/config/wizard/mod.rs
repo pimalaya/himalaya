@@ -32,7 +32,6 @@ const SECURITY_PROTOCOLS: &[&str] = &["SSL/TLS", "STARTTLS", "None"];
 static THEME: Lazy<ColorfulTheme> = Lazy::new(ColorfulTheme::default);
 
 pub(crate) fn wizard() -> Result<DeserializedConfig> {
-    trace!(">> wizard");
     println!("Himalaya couldn't find an already existing configuration file.");
 
     match Confirm::new()
@@ -111,7 +110,7 @@ pub(crate) fn wizard() -> Result<DeserializedConfig> {
     // Serialize config to file
     println!("\nWriting the configuration to {path:?}...");
     fs::create_dir_all(path.parent().unwrap())?;
-    fs::write(path, toml::to_vec(&config)?)?;
+    fs::write(path, toml::to_string(&config)?)?;
 
     trace!("<< wizard");
     Ok(config)

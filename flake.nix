@@ -1,65 +1,140 @@
 {
-  description = "Command-line interface for email management.";
+  description = "CLI to manage your emails.";
 
   inputs = {
-    utils.url = "github:numtide/flake-utils";
-    rust-overlay.url = "github:oxalica/rust-overlay";
-    naersk.url = "github:nix-community/naersk";
-    flake-compat = {
-      url = "github:edolstra/flake-compat";
-      flake = false;
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-22.11";
+    flake-utils.url = "github:numtide/flake-utils";
+    gitignore = {
+      url = "github:hercules-ci/gitignore.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    naersk = {
+      url = "github:nix-community/naersk";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
-  outputs = { self, nixpkgs, utils, rust-overlay, naersk, ... }:
-    utils.lib.eachDefaultSystem
-      (system:
+  outputs = { self, nixpkgs, flake-utils, gitignore, fenix, naersk }:
+    let
+      inherit (gitignore.lib) gitignoreSource;
+
+      mkToolchain = buildPlatform:
+        fenix.packages.${buildPlatform}.minimal.toolchain;
+
+      mkToolchainWithTarget = buildPlatform: targetPlatform:
+        with fenix.packages.${buildPlatform}; combine [
+          stable.rustc
+          stable.cargo
+          targets.${targetPlatform}.stable.rust-std
+        ];
+
+      mkDevShells = buildPlatform:
         let
-          name = "himalaya";
-          overlays = [ (import rust-overlay) ];
-          pkgs = import nixpkgs { inherit system overlays; };
+          pkgs = import nixpkgs { system = buildPlatform; };
+          rust-toolchain = fenix.packages.${buildPlatform}.fromToolchainFile {
+            file = ./rust-toolchain.toml;
+            sha256 = "eMJethw5ZLrJHmoN2/l0bIyQjoTX1NsvalWSscTixpI=";
+          };
         in
-        rec {
-          # nix build
-          defaultPackage = packages.${name};
-          packages = {
-            ${name} = naersk.lib.${system}.buildPackage {
-              pname = name;
-              root = ./.;
-              nativeBuildInputs = with pkgs; [ openssl.dev pkg-config ];
-              overrideMain = _: {
-                postInstall = ''
-                  mkdir -p $out/share/applications/
-                  cp assets/himalaya.desktop $out/share/applications/
-                '';
-              };
-            };
-          };
-
-          # nix run
-          defaultApp = apps.${name};
-          apps.${name} = utils.lib.mkApp {
-            inherit name;
-            drv = packages.${name};
-          };
-
-          # nix develop
-          devShell = pkgs.mkShell {
-            inputsFrom = builtins.attrValues self.packages.${system};
-            nativeBuildInputs = with pkgs; [
-              # Nix LSP + formatter
+        {
+          default = pkgs.mkShell {
+            buildInputs = with pkgs; [
+              # Nix env
               rnix-lsp
               nixpkgs-fmt
 
               # Rust env
-              (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
-              cargo-watch
-              rust-analyzer
+              rust-toolchain
 
-              # Notmuch
+              # notmuch
               notmuch
             ];
           };
-        }
-      );
+        };
+
+      mkPackage = pkgs: buildPlatform: targetPlatform: package:
+        let
+          toolchain =
+            if isNull targetPlatform
+            then mkToolchain buildPlatform
+            else mkToolchainWithTarget buildPlatform targetPlatform;
+          naersk' = naersk.lib.${buildPlatform}.override {
+            cargo = toolchain;
+            rustc = toolchain;
+          };
+          package' = {
+            name = "himalaya";
+            src = gitignoreSource ./.;
+            overrideMain = _: {
+              postInstall = ''
+                mkdir -p $out/share/applications/
+                cp assets/himalaya.desktop $out/share/applications/
+              '';
+            };
+          } // pkgs.lib.optionalAttrs (!isNull targetPlatform) {
+            CARGO_BUILD_TARGET = targetPlatform;
+          } // package;
+        in
+        naersk'.buildPackage package';
+
+      mkPackages = buildPlatform:
+        let
+          pkgs = import nixpkgs { system = buildPlatform; };
+          mkPackageWithTarget = mkPackage pkgs buildPlatform;
+          defaultPackage = mkPackage pkgs buildPlatform null { };
+        in
+        {
+          default = defaultPackage;
+          linux = defaultPackage;
+          macos = defaultPackage;
+          musl = mkPackageWithTarget "x86_64-unknown-linux-musl" (with pkgs.pkgsStatic; {
+            CARGO_BUILD_RUSTFLAGS = "-C target-feature=+crt-static";
+            SQLITE3_STATIC = 1;
+            SQLITE3_LIB_DIR = "${sqlite.out}/lib";
+            hardeningDisable = [ "all" ];
+          });
+          # FIXME: package does not build, assembler messages: unknown
+          # pseudo-op…
+          windows = mkPackageWithTarget "x86_64-pc-windows-gnu" {
+            strictDeps = true;
+            depsBuildBuild = with pkgs.pkgsCross.mingwW64; [
+              stdenv.cc
+              windows.pthreads
+            ];
+          };
+        };
+
+      mkApp = drv: flake-utils.lib.mkApp {
+        inherit drv;
+        name = "himalaya";
+      };
+
+      mkApps = buildPlatform: {
+        default = mkApp self.packages.${buildPlatform}.default;
+        linux = mkApp self.packages.${buildPlatform}.linux;
+        macos = mkApp self.packages.${buildPlatform}.macos;
+        musl = mkApp self.packages.${buildPlatform}.musl;
+        windows =
+          let
+            pkgs = import nixpkgs { system = buildPlatform; };
+            wine = pkgs.wine.override { wineBuild = "wine64"; };
+            himalaya = self.packages.${buildPlatform}.windows;
+            app = pkgs.writeShellScriptBin "himalaya" ''
+              export WINEPREFIX="$(mktemp -d)"
+              ${wine}/bin/wine64 ${himalaya}/bin/himalaya.exe $@
+            '';
+          in
+          mkApp app;
+      };
+
+    in
+    flake-utils.lib.eachDefaultSystem (system: {
+      devShells = mkDevShells system;
+      packages = mkPackages system;
+      apps = mkApps system;
+    });
 }

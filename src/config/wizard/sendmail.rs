@@ -1,7 +1,7 @@
 use super::THEME;
 use anyhow::Result;
 use dialoguer::Input;
-use himalaya_lib::{EmailSender, SendmailConfig};
+use pimalaya_email::{EmailSender, SendmailConfig};
 
 pub(crate) fn configure() -> Result<EmailSender> {
     Ok(EmailSender::Sendmail(SendmailConfig {

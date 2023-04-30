@@ -8,8 +8,13 @@ const ARG_DISABLE_CACHE: &str = "disable-cache";
 /// the user to disable any sort of cache.
 pub fn arg() -> Arg {
     Arg::new(ARG_DISABLE_CACHE)
-        .long("disable-cache")
         .help("Disable any sort of cache")
+        .long_help(
+            "Disable any sort of cache. The action depends on
+the command it applies on.",
+        )
+        .long("disable-cache")
+        .global(true)
         .action(ArgAction::SetTrue)
 }
 

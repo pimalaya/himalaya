@@ -1,5 +1,5 @@
 use anyhow::Result;
-use himalaya_lib::EmailTextPlainFormat;
+use pimalaya_email::EmailTextPlainFormat;
 use std::io;
 use termcolor::{self, StandardStream};
 

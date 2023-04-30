@@ -298,9 +298,9 @@ pub fn parse_criteria_arg(matches: &ArgMatches) -> String {
 /// Represents the email reply all argument.
 pub fn reply_all_flag() -> Arg {
     Arg::new(ARG_REPLY_ALL)
-        .help("Includes all recipients")
+        .help("Include all recipients")
         .long("all")
-        .short('a')
+        .short('A')
         .action(ArgAction::SetTrue)
 }
 

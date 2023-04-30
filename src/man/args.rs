@@ -30,11 +30,14 @@ pub fn matches(m: &ArgMatches) -> Result<Option<Cmd>> {
 /// Man subcommands.
 pub fn subcmd() -> Command {
     Command::new(CMD_MAN)
-        .about("Generates all man pages to the specified directory.")
+        .about("Generate all man pages to the given directory")
         .arg(
             Arg::new(ARG_DIR)
-                .help("Directory where to generate man files")
-                .long_help("Represents the directory where all man files of all commands and subcommands should be generated in.")
+                .help("Directory to generate man files in")
+                .long_help(
+                    "Represents the directory where all man files of
+all commands and subcommands should be generated in.",
+                )
                 .required(true),
         )
 }

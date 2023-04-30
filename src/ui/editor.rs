@@ -1,9 +1,9 @@
 use anyhow::{Context, Result};
-use himalaya_lib::{
+use log::debug;
+use pimalaya_email::{
     email::{local_draft_path, remove_local_draft},
     AccountConfig, Backend, CompilerBuilder, Flag, Flags, Sender, Tpl,
 };
-use log::debug;
 use std::{env, fs, process::Command};
 
 use crate::{
@@ -81,7 +81,7 @@ pub fn edit_tpl_with_editor<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>
                 sender.send(&email)?;
                 let sent_folder = config.sent_folder_alias()?;
                 printer.print_log(format!("Adding email to the {} folder…", sent_folder))?;
-                backend.add_email(&sent_folder, &email, &Flags::default())?;
+                backend.add_email(&sent_folder, &email, &Flags::from_iter([Flag::Seen]))?;
                 remove_local_draft()?;
                 printer.print("Done!")?;
                 break;
@@ -101,7 +101,11 @@ pub fn edit_tpl_with_editor<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>
                         .some_pgp_sign_cmd(config.email_writing_sign_cmd.as_ref())
                         .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.as_ref()),
                 )?;
-                backend.add_email(&draft_folder, &email, &Flags::from_iter([Flag::Draft]))?;
+                backend.add_email(
+                    &draft_folder,
+                    &email,
+                    &Flags::from_iter([Flag::Seen, Flag::Draft]),
+                )?;
                 remove_local_draft()?;
                 printer.print(format!("Email successfully saved to {}", draft_folder))?;
                 break;

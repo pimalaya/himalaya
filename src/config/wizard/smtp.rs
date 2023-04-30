@@ -2,7 +2,7 @@ use super::{SECURITY_PROTOCOLS, THEME};
 use crate::account::DeserializedBaseAccountConfig;
 use anyhow::Result;
 use dialoguer::{Input, Select};
-use himalaya_lib::{EmailSender, SmtpConfig};
+use pimalaya_email::{EmailSender, SmtpConfig};
 
 pub(crate) fn configure(base: &DeserializedBaseAccountConfig) -> Result<EmailSender> {
     let mut smtp_config = SmtpConfig {

@@ -1,17 +1,17 @@
-use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-
-use himalaya_lib::{
-    EmailHooks, EmailSender, EmailTextPlainFormat, MaildirConfig, SendmailConfig, SmtpConfig,
+use pimalaya_email::{
+    folder::sync::Strategy as SyncFoldersStrategy, EmailHooks, EmailSender, EmailTextPlainFormat,
+    MaildirConfig, SendmailConfig, SmtpConfig,
 };
+use serde::{Deserialize, Serialize};
+use std::{collections::HashSet, path::PathBuf};
 
 #[cfg(feature = "imap-backend")]
-use himalaya_lib::ImapConfig;
+use pimalaya_email::ImapConfig;
 
 #[cfg(feature = "notmuch-backend")]
-use himalaya_lib::NotmuchConfig;
+use pimalaya_email::NotmuchConfig;
 
-#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(remote = "SmtpConfig")]
 struct SmtpConfigDef {
     #[serde(rename = "smtp-host")]
@@ -31,7 +31,7 @@ struct SmtpConfigDef {
 }
 
 #[cfg(feature = "imap-backend")]
-#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(remote = "ImapConfig")]
 pub struct ImapConfigDef {
     #[serde(rename = "imap-host")]
@@ -56,41 +56,39 @@ pub struct ImapConfigDef {
     pub watch_cmds: Option<Vec<String>>,
 }
 
-#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(remote = "MaildirConfig")]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(remote = "MaildirConfig", rename_all = "kebab-case")]
 pub struct MaildirConfigDef {
     #[serde(rename = "maildir-root-dir")]
     pub root_dir: PathBuf,
 }
 
 #[cfg(feature = "notmuch-backend")]
-#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(remote = "NotmuchConfig")]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(remote = "NotmuchConfig", rename_all = "kebab-case")]
 pub struct NotmuchConfigDef {
     #[serde(rename = "notmuch-db-path")]
     pub db_path: PathBuf,
 }
 
-#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(remote = "Option<EmailTextPlainFormat>")]
-pub enum EmailTextPlainFormatOptionDef {
-    #[serde(with = "EmailTextPlainFormatDef")]
-    Some(EmailTextPlainFormat),
-    #[default]
-    None,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(remote = "EmailTextPlainFormat", rename_all = "snake_case")]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(
+    remote = "EmailTextPlainFormat",
+    tag = "type",
+    content = "width",
+    rename_all = "kebab-case"
+)]
 pub enum EmailTextPlainFormatDef {
+    #[default]
     Auto,
     Flowed,
     Fixed(usize),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(remote = "EmailSender", tag = "sender", rename_all = "snake_case")]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(remote = "EmailSender", tag = "sender", rename_all = "kebab-case")]
 pub enum EmailSenderDef {
+    #[default]
     None,
     #[serde(with = "SmtpConfigDef")]
     Smtp(SmtpConfig),
@@ -98,27 +96,30 @@ pub enum EmailSenderDef {
     Sendmail(SendmailConfig),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(remote = "SendmailConfig")]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(remote = "SendmailConfig", rename_all = "kebab-case")]
 pub struct SendmailConfigDef {
     #[serde(rename = "sendmail-cmd")]
     cmd: String,
 }
 
-#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(remote = "Option<EmailHooks>")]
-pub enum EmailHooksOptionDef {
-    #[serde(with = "EmailHooksDef")]
-    Some(EmailHooks),
-    #[default]
-    None,
-}
-
 /// Represents the email hooks. Useful for doing extra email
 /// processing before or after sending it.
-#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(remote = "EmailHooks")]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(remote = "EmailHooks", rename_all = "kebab-case")]
 pub struct EmailHooksDef {
     /// Represents the hook called just before sending an email.
     pub pre_send: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(remote = "SyncFoldersStrategy", rename_all = "kebab-case")]
+pub enum SyncFoldersStrategyDef {
+    #[default]
+    All,
+    #[serde(alias = "only")]
+    Include(HashSet<String>),
+    #[serde(alias = "except")]
+    #[serde(alias = "ignore")]
+    Exclude(HashSet<String>),
 }

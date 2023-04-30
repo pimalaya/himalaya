@@ -1,2 +1,11 @@
 [toolchain]
 channel = "stable"
+profile = "default"
+components = [
+  "cargo",
+  "clippy",
+  "rust-analyzer",
+  "rust-std",
+  "rustc",
+  "rustfmt",
+]

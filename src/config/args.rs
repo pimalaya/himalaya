@@ -8,9 +8,10 @@ const ARG_CONFIG: &str = "config";
 /// user to customize the config file path.
 pub fn arg() -> Arg {
     Arg::new(ARG_CONFIG)
+        .help("Set a custom configuration file path")
         .long("config")
         .short('c')
-        .help("Forces a specific config file path")
+        .global(true)
         .value_name("PATH")
 }
 
