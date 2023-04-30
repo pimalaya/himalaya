@@ -257,7 +257,7 @@ mod tests {
         let mut printer = PrinterServiceTest::default();
         let mut backend = TestBackend {};
 
-        assert!(list(None, &account_config, &mut printer, &mut backend).is_ok());
+        assert!(list(&account_config, &mut printer, &mut backend, None).is_ok());
         assert_eq!(
             concat![
                 "\n",

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed Windows releases (due to typo in the github action script).
+- Fixed unit tests.
 
 ## [0.7.2] - 2023-05-01
 

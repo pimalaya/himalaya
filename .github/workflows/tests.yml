@@ -20,5 +20,5 @@ jobs:
         with:
           name: soywod
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-      - name: Test
-        run: nix run .#test
+      - name: Build then test
+        run: nix build

@@ -75,6 +75,8 @@
                 cp assets/himalaya.desktop $out/share/applications/
               '';
             };
+            doCheck = true;
+            cargoTestOptions = opts: opts ++ [ "--lib" ];
           } // pkgs.lib.optionalAttrs (!isNull targetPlatform) {
             CARGO_BUILD_TARGET = targetPlatform;
           } // package;
