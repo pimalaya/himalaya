@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2] - 2023-05-01
+
 ### Added
 
 - Added `create` and `delete` folder commands [sourcehut#54].
@@ -546,7 +548,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[Unreleased]: https://github.com/soywod/himalaya/compare/v0.7.1...develop
+[Unreleased]: https://github.com/soywod/himalaya/compare/v0.7.2...develop
+[0.7.2]: https://github.com/soywod/himalaya/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/soywod/himalaya/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/soywod/himalaya/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/soywod/himalaya/compare/v0.6.0...v0.6.1
