@@ -93,6 +93,8 @@ jobs:
         uses: actions/checkout@v2
       - name: Install rust
         uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
       - name: Builds release
         uses: actions-rs/cargo@v1
         with:
@@ -110,7 +112,7 @@ jobs:
           ./himalaya.exe completion powershell > ./completions/himalaya.powershell
           ./himalaya.exe completion zsh > ./completions/himalaya.zsh
           tar -czf himalaya.tar.gz himalaya.exe man completions
-          zip -r himalaya.zip himalaya.exe man completions
+          tar -czf himalaya.zip himalaya.exe man completions
       - name: Upload tar.gz release asset
         uses: actions/upload-release-asset@v1
         env:
