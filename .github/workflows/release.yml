@@ -93,8 +93,6 @@ jobs:
         uses: actions/checkout@v2
       - name: Install rust
         uses: actions-rs/toolchain@v1
-        with:
-          command: check
       - name: Builds release
         uses: actions-rs/cargo@v1
         with:
