@@ -22,23 +22,12 @@
     let
       inherit (gitignore.lib) gitignoreSource;
 
-      mkToolchain = buildPlatform:
-        fenix.packages.${buildPlatform}.minimal.toolchain;
-
-      mkToolchainWithTarget = buildPlatform: targetPlatform:
-        with fenix.packages.${buildPlatform}; combine [
-          stable.rustc
-          stable.cargo
-          targets.${targetPlatform}.stable.rust-std
-        ];
+      mkToolchain = import ./rust-toolchain.nix fenix;
 
       mkDevShells = buildPlatform:
         let
           pkgs = import nixpkgs { system = buildPlatform; };
-          rust-toolchain = fenix.packages.${buildPlatform}.fromToolchainFile {
-            file = ./rust-toolchain.toml;
-            sha256 = "eMJethw5ZLrJHmoN2/l0bIyQjoTX1NsvalWSscTixpI=";
-          };
+          rust-toolchain = mkToolchain.fromFile { system = buildPlatform; };
         in
         {
           default = pkgs.mkShell {
@@ -58,10 +47,9 @@
 
       mkPackage = pkgs: buildPlatform: targetPlatform: package:
         let
-          toolchain =
-            if isNull targetPlatform
-            then mkToolchain buildPlatform
-            else mkToolchainWithTarget buildPlatform targetPlatform;
+          toolchain = mkToolchain.fromTarget {
+            inherit pkgs buildPlatform targetPlatform;
+          };
           naersk' = naersk.lib.${buildPlatform}.override {
             cargo = toolchain;
             rustc = toolchain;
