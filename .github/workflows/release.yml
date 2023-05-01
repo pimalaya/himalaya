@@ -44,7 +44,7 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@v20
         with:
-          nix_path: nixpkgs=channel:nixos-unstable
+          nix_path: nixpkgs=channel:nixos-22.11
           extra_nix_config: |
             experimental-features = nix-command flakes
       - uses: cachix/cachix-action@v12
@@ -63,7 +63,7 @@ jobs:
           nix run .#${{ matrix.target }} completion fish > ./completions/himalaya.fish
           nix run .#${{ matrix.target }} completion powershell > ./completions/himalaya.powershell
           nix run .#${{ matrix.target }} completion zsh > ./completions/himalaya.zsh
-          tar -czf himalaya.tar.gz himalaya* man completions
+          tar -czf himalaya.tgz himalaya* man completions
           zip -r himalaya.zip himalaya* man completions
       - name: Upload tar.gz release asset
         uses: actions/upload-release-asset@v1
@@ -71,8 +71,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: himalaya.tar.gz
-          asset_name: himalaya-${{ matrix.target }}.tar.gz
+          asset_path: himalaya.tgz
+          asset_name: himalaya-${{ matrix.target }}.tgz
           asset_content_type: application/gzip
       - name: Upload zip release asset
         uses: actions/upload-release-asset@v1
@@ -111,16 +111,16 @@ jobs:
           ./himalaya.exe completion fish > ./completions/himalaya.fish
           ./himalaya.exe completion powershell > ./completions/himalaya.powershell
           ./himalaya.exe completion zsh > ./completions/himalaya.zsh
-          tar -czf himalaya.tar.gz himalaya.exe man completions
-          tar -czf himalaya.zip himalaya.exe man completions
+          tar -czf himalaya.tgz himalaya.exe man completions
+          Compress-Archive -Path himalaya.exe,man,completions -DestinationPath himalaya.zip
       - name: Upload tar.gz release asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: himalaya.tar.gz
-          asset_name: himalaya-windows.tar.gz
+          asset_path: himalaya.tgz
+          asset_name: himalaya-windows.tgz
           asset_content_type: application/gzip
       - name: Upload zip release asset
         uses: actions/upload-release-asset@v1
@@ -141,7 +141,7 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@v20
         with:
-          nix_path: nixpkgs=channel:nixos-unstable
+          nix_path: nixpkgs=channel:nixos-22.11
           extra_nix_config: |
             experimental-features = nix-command flakes
       - name: Publish library to crates.io
