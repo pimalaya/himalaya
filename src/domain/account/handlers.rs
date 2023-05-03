@@ -6,8 +6,8 @@ use anyhow::Result;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use log::{info, trace};
 use pimalaya_email::{
-    folder::sync::Strategy as SyncFoldersStrategy, AccountConfig, Backend, BackendSyncBuilder,
-    BackendSyncProgressEvent,
+    folder::sync::Strategy as SyncFoldersStrategy, AccountConfig, Backend, BackendConfig,
+    BackendSyncBuilder, BackendSyncProgressEvent,
 };
 
 use crate::{
@@ -15,6 +15,14 @@ use crate::{
     printer::{PrintTableOpts, Printer},
     Accounts,
 };
+
+/// Configure the current selected account
+pub fn configure(account_config: &AccountConfig, backend_config: &BackendConfig) -> Result<()> {
+    info!("entering the configure account handler");
+    backend_config.configure(&account_config.name)?;
+    println!("Account {} configured!", account_config.name);
+    Ok(())
+}
 
 /// Lists all accounts.
 pub fn list<'a, P: Printer>(

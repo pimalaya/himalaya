@@ -11,6 +11,7 @@ use crate::{folder, ui::table};
 const ARG_ACCOUNT: &str = "account";
 const ARG_DRY_RUN: &str = "dry-run";
 const CMD_ACCOUNTS: &str = "accounts";
+const CMD_CONFIGURE: &str = "configure";
 const CMD_LIST: &str = "list";
 const CMD_SYNC: &str = "sync";
 
@@ -23,6 +24,8 @@ pub enum Cmd {
     List(table::args::MaxTableWidth),
     /// Represents the sync account command.
     Sync(Option<SyncFoldersStrategy>, DryRun),
+    /// Configure the current selected account.
+    Configure,
 }
 
 /// Represents the account command matcher.
@@ -51,6 +54,9 @@ pub fn matches(m: &ArgMatches) -> Result<Option<Cmd>> {
             info!("list accounts subcommand matched");
             let max_table_width = table::args::parse_max_width(m);
             Some(Cmd::List(max_table_width))
+        } else if let Some(_) = m.subcommand_matches(CMD_CONFIGURE) {
+            info!("configure account subcommand matched");
+            Some(Cmd::Configure)
         } else {
             info!("no account subcommand matched, falling back to subcommand list");
             Some(Cmd::List(None))
@@ -80,6 +86,9 @@ pub fn subcmd() -> Command {
                     "Synchronize all folders except the given ones",
                 ))
                 .arg(dry_run()),
+            Command::new(CMD_CONFIGURE)
+                .about("Configure the current selected account")
+                .aliases(["config", "conf", "cfg"]),
         ])
 }
 

@@ -46,10 +46,11 @@ pub(crate) fn configure(base: DeserializedBaseAccountConfig) -> Result<Deseriali
         .default(base.email.clone())
         .interact()?;
 
-    backend.passwd_cmd = Input::with_theme(&*THEME)
-        .with_prompt("What shell command should we run to get your password?")
-        .default(format!("pass show {}", &base.email))
-        .interact()?;
+    // FIXME: add all variants: password, password command and oauth2
+    // backend.passwd_cmd = Input::with_theme(&*THEME)
+    //     .with_prompt("What shell command should we run to get your password?")
+    //     .default(format!("pass show {}", &base.email))
+    //     .interact()?;
 
     Ok(DeserializedAccountConfig::Imap(
         DeserializedImapAccountConfig { base, backend },
