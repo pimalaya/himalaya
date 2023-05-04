@@ -16,9 +16,13 @@
       url = "github:nix-community/naersk";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    flake-compat = {
+      url = "github:edolstra/flake-compat";
+      flake = false;
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils, gitignore, fenix, naersk }:
+  outputs = { self, nixpkgs, flake-utils, gitignore, fenix, naersk, ... }:
     let
       inherit (gitignore.lib) gitignoreSource;
 

@@ -1,5 +1,5 @@
 #[cfg(feature = "imap-backend")]
-mod imap;
+pub(crate) mod imap;
 mod maildir;
 #[cfg(feature = "notmuch-backend")]
 mod notmuch;

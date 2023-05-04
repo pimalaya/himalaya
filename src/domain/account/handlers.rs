@@ -6,15 +6,40 @@ use anyhow::Result;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use log::{info, trace};
 use pimalaya_email::{
-    folder::sync::Strategy as SyncFoldersStrategy, AccountConfig, Backend, BackendSyncBuilder,
-    BackendSyncProgressEvent,
+    folder::sync::Strategy as SyncFoldersStrategy, AccountConfig, Backend, BackendConfig,
+    BackendSyncBuilder, BackendSyncProgressEvent,
 };
 
 use crate::{
-    config::DeserializedConfig,
+    config::{wizard::imap::configure_oauth2_client_secret, DeserializedConfig},
     printer::{PrintTableOpts, Printer},
     Accounts,
 };
+
+/// Configure the current selected account
+pub fn configure(
+    account_config: &AccountConfig,
+    backend_config: &BackendConfig,
+    reset: bool,
+) -> Result<()> {
+    info!("entering the configure account handler");
+    match backend_config {
+        BackendConfig::None => (),
+        BackendConfig::Maildir(_) => (),
+        #[cfg(feature = "imap-backend")]
+        BackendConfig::Imap(imap_config) => {
+            imap_config.auth.configure(
+                &account_config.name,
+                reset,
+                configure_oauth2_client_secret,
+            )?;
+        }
+        #[cfg(feature = "notmuch-backend")]
+        BackendConfig::Notmuch(config) => (),
+    };
+    println!("Account {} configured!", account_config.name);
+    Ok(())
+}
 
 /// Lists all accounts.
 pub fn list<'a, P: Printer>(

@@ -10,11 +10,14 @@ use crate::{folder, ui::table};
 
 const ARG_ACCOUNT: &str = "account";
 const ARG_DRY_RUN: &str = "dry-run";
+const ARG_RESET: &str = "reset";
 const CMD_ACCOUNTS: &str = "accounts";
+const CMD_CONFIGURE: &str = "configure";
 const CMD_LIST: &str = "list";
 const CMD_SYNC: &str = "sync";
 
 type DryRun = bool;
+type Reset = bool;
 
 /// Represents the account commands.
 #[derive(Debug, PartialEq, Eq)]
@@ -23,6 +26,8 @@ pub enum Cmd {
     List(table::args::MaxTableWidth),
     /// Represents the sync account command.
     Sync(Option<SyncFoldersStrategy>, DryRun),
+    /// Configure the current selected account.
+    Configure(Reset),
 }
 
 /// Represents the account command matcher.
@@ -51,6 +56,10 @@ pub fn matches(m: &ArgMatches) -> Result<Option<Cmd>> {
             info!("list accounts subcommand matched");
             let max_table_width = table::args::parse_max_width(m);
             Some(Cmd::List(max_table_width))
+        } else if let Some(m) = m.subcommand_matches(CMD_CONFIGURE) {
+            info!("configure account subcommand matched");
+            let reset = parse_reset_flag(m);
+            Some(Cmd::Configure(reset))
         } else {
             info!("no account subcommand matched, falling back to subcommand list");
             Some(Cmd::List(None))
@@ -80,6 +89,10 @@ pub fn subcmd() -> Command {
                     "Synchronize all folders except the given ones",
                 ))
                 .arg(dry_run()),
+            Command::new(CMD_CONFIGURE)
+                .about("Configure the current selected account")
+                .aliases(["config", "conf", "cfg"])
+                .arg(reset_flag()),
         ])
 }
 
@@ -116,4 +129,16 @@ Changes can be visualized with the RUST_LOG=trace environment variable.",
 /// Represents the user account sync dry run flag parser.
 pub fn parse_dry_run_arg(m: &ArgMatches) -> bool {
     m.get_flag(ARG_DRY_RUN)
+}
+
+pub fn reset_flag() -> Arg {
+    Arg::new(ARG_RESET)
+        .help("Reset the configuration")
+        .short('r')
+        .long("reset")
+        .action(ArgAction::SetTrue)
+}
+
+pub fn parse_reset_flag(m: &ArgMatches) -> bool {
+    m.get_flag(ARG_RESET)
 }

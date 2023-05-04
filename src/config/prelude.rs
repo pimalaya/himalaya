@@ -1,6 +1,7 @@
 use pimalaya_email::{
     folder::sync::Strategy as SyncFoldersStrategy, EmailHooks, EmailSender, EmailTextPlainFormat,
-    MaildirConfig, SendmailConfig, SmtpConfig,
+    ImapAuthConfig, MaildirConfig, OAuth2ClientSecret, OAuth2Config, OAuth2Method, OAuth2Scopes,
+    SendmailConfig, SmtpConfig,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, path::PathBuf};
@@ -46,14 +47,63 @@ pub struct ImapConfigDef {
     pub insecure: Option<bool>,
     #[serde(rename = "imap-login")]
     pub login: String,
-    #[serde(rename = "imap-passwd-cmd")]
-    pub passwd_cmd: String,
+    #[serde(rename = "imap-auth", with = "ImapAuthConfigDef")]
+    pub auth: ImapAuthConfig,
     #[serde(rename = "imap-notify-cmd")]
     pub notify_cmd: Option<String>,
     #[serde(rename = "imap-notify-query")]
     pub notify_query: Option<String>,
     #[serde(rename = "imap-watch-cmds")]
     pub watch_cmds: Option<Vec<String>>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(remote = "ImapAuthConfig", rename_all = "kebab-case")]
+pub enum ImapAuthConfigDef {
+    #[serde(skip)]
+    None,
+    RawPasswd(String),
+    PasswdCmd(String),
+    #[serde(with = "OAuth2ConfigDef", rename = "oauth2")]
+    OAuth2(OAuth2Config),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(remote = "OAuth2Config", rename_all = "kebab-case")]
+pub struct OAuth2ConfigDef {
+    #[serde(with = "OAuth2MethodDef")]
+    pub method: OAuth2Method,
+    pub client_id: String,
+    #[serde(with = "OAuth2ClientSecretDef")]
+    pub client_secret: OAuth2ClientSecret,
+    pub auth_url: String,
+    pub token_url: String,
+    #[serde(flatten, with = "OAuth2ScopesDef")]
+    pub scopes: OAuth2Scopes,
+    #[serde(default)]
+    pub pkce: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(remote = "OAuth2ClientSecret", rename_all = "kebab-case")]
+pub enum OAuth2ClientSecretDef {
+    Raw(String),
+    Cmd(String),
+    Keyring,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(remote = "OAuth2Method", rename_all = "lowercase")]
+pub enum OAuth2MethodDef {
+    XOAuth2,
+    OAuthBearer,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(remote = "OAuth2Scopes", rename_all = "kebab-case")]
+pub enum OAuth2ScopesDef {
+    Scope(String),
+    Scopes(Vec<String>),
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
