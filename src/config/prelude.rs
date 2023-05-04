@@ -1,7 +1,7 @@
 use pimalaya_email::{
     folder::sync::Strategy as SyncFoldersStrategy, EmailHooks, EmailSender, EmailTextPlainFormat,
-    ImapAuthConfig, MaildirConfig, OAuth2Config, OAuth2Method, OAuth2Scopes, SendmailConfig,
-    SmtpConfig,
+    ImapAuthConfig, MaildirConfig, OAuth2ClientSecret, OAuth2Config, OAuth2Method, OAuth2Scopes,
+    SendmailConfig, SmtpConfig,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, path::PathBuf};
@@ -47,7 +47,7 @@ pub struct ImapConfigDef {
     pub insecure: Option<bool>,
     #[serde(rename = "imap-login")]
     pub login: String,
-    #[serde(flatten, with = "ImapAuthConfigDef")]
+    #[serde(rename = "imap-auth", with = "ImapAuthConfigDef")]
     pub auth: ImapAuthConfig,
     #[serde(rename = "imap-notify-cmd")]
     pub notify_cmd: Option<String>,
@@ -57,16 +57,14 @@ pub struct ImapConfigDef {
     pub watch_cmds: Option<Vec<String>>,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(remote = "ImapAuthConfig", rename_all = "kebab-case")]
 pub enum ImapAuthConfigDef {
-    #[default]
+    #[serde(skip)]
     None,
-    #[serde(rename = "imap-passwd")]
-    Passwd(String),
-    #[serde(rename = "imap-passwd-cmd")]
+    RawPasswd(String),
     PasswdCmd(String),
-    #[serde(rename = "imap-oauth2", with = "OAuth2ConfigDef")]
+    #[serde(with = "OAuth2ConfigDef", rename = "oauth2")]
     OAuth2(OAuth2Config),
 }
 
@@ -76,13 +74,22 @@ pub struct OAuth2ConfigDef {
     #[serde(with = "OAuth2MethodDef")]
     pub method: OAuth2Method,
     pub client_id: String,
-    pub client_secret: String,
+    #[serde(with = "OAuth2ClientSecretDef")]
+    pub client_secret: OAuth2ClientSecret,
     pub auth_url: String,
     pub token_url: String,
     #[serde(flatten, with = "OAuth2ScopesDef")]
     pub scopes: OAuth2Scopes,
     #[serde(default)]
     pub pkce: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(remote = "OAuth2ClientSecret", rename_all = "kebab-case")]
+pub enum OAuth2ClientSecretDef {
+    Raw(String),
+    Cmd(String),
+    Keyring,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]

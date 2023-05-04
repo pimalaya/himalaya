@@ -1,6 +1,6 @@
 pub mod args;
 pub mod config;
 pub mod prelude;
-mod wizard;
+pub(crate) mod wizard;
 
 pub use config::*;
