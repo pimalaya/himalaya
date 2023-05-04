@@ -121,10 +121,10 @@ impl DeserializedConfig {
 mod tests {
     use pimalaya_email::{EmailSender, MaildirConfig, SendmailConfig, SmtpConfig};
 
-    #[cfg(feature = "imap-backend")]
-    use pimalaya_email::ImapConfig;
     #[cfg(feature = "notmuch-backend")]
     use pimalaya_email::NotmuchConfig;
+    #[cfg(feature = "imap-backend")]
+    use pimalaya_email::{ImapAuthConfig, ImapConfig};
 
     use std::io::Write;
     use tempfile::NamedTempFile;
@@ -261,7 +261,7 @@ mod tests {
             .unwrap_err()
             .root_cause()
             .to_string()
-            .contains("missing field `imap-passwd-cmd`"));
+            .contains("missing field `imap-auth`"));
     }
 
     #[test]
@@ -487,7 +487,7 @@ mod tests {
             imap-host = \"localhost\"
             imap-port = 993
             imap-login = \"login\"
-            imap-passwd-cmd = \"echo password\"",
+            imap-auth = { raw-passwd = \"password\" }",
         );
 
         assert_eq!(
@@ -504,7 +504,7 @@ mod tests {
                             host: "localhost".into(),
                             port: 993,
                             login: "login".into(),
-                            passwd_cmd: "echo password".into(),
+                            auth: ImapAuthConfig::RawPasswd("password".into()),
                             ..ImapConfig::default()
                         }
                     })
