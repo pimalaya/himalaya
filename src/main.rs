@@ -138,7 +138,7 @@ fn main() -> Result<()> {
             return Ok(());
         }
         Some(account::args::Cmd::Configure(reset)) => {
-            return account::handlers::configure(&account_config, &backend_config, reset);
+            return account::handlers::configure(&backend_config, reset);
         }
         _ => (),
     }

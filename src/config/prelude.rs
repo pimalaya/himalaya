@@ -1,8 +1,11 @@
 use pimalaya_email::{
     folder::sync::Strategy as SyncFoldersStrategy, EmailHooks, EmailSender, EmailTextPlainFormat,
-    ImapAuthConfig, MaildirConfig, OAuth2ClientSecret, OAuth2Config, OAuth2Method, OAuth2Scopes,
-    SendmailConfig, SmtpConfig,
+    ImapAuthConfig, MaildirConfig, OAuth2Config, OAuth2Method, OAuth2Scopes, SendmailConfig,
+    SmtpConfig,
 };
+use pimalaya_keyring::Entry;
+use pimalaya_process::Cmd;
+use pimalaya_secret::Secret;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, path::PathBuf};
 
@@ -11,6 +14,14 @@ use pimalaya_email::ImapConfig;
 
 #[cfg(feature = "notmuch-backend")]
 use pimalaya_email::NotmuchConfig;
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(remote = "Cmd", from = "String")]
+pub struct CmdDef;
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(remote = "Entry", from = "String")]
+pub struct EntryDef;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(remote = "SmtpConfig")]
@@ -47,7 +58,7 @@ pub struct ImapConfigDef {
     pub insecure: Option<bool>,
     #[serde(rename = "imap-login")]
     pub login: String,
-    #[serde(rename = "imap-auth", with = "ImapAuthConfigDef")]
+    #[serde(flatten, with = "ImapAuthConfigDef")]
     pub auth: ImapAuthConfig,
     #[serde(rename = "imap-notify-cmd")]
     pub notify_cmd: Option<String>,
@@ -58,26 +69,44 @@ pub struct ImapConfigDef {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(remote = "ImapAuthConfig", rename_all = "kebab-case")]
+#[serde(remote = "ImapAuthConfig", tag = "imap-auth", rename_all = "lowercase")]
 pub enum ImapAuthConfigDef {
     #[serde(skip)]
     None,
-    RawPasswd(String),
-    PasswdCmd(String),
-    #[serde(with = "OAuth2ConfigDef", rename = "oauth2")]
+    #[serde(with = "PasswdDef")]
+    Passwd(Secret),
+    #[serde(with = "OAuth2ConfigDef")]
     OAuth2(OAuth2Config),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(remote = "Secret", rename_all = "kebab-case")]
+pub enum PasswdDef {
+    #[serde(rename = "imap-passwd")]
+    Raw(String),
+    #[serde(rename = "imap-passwd-cmd", with = "CmdDef")]
+    Cmd(Cmd),
+    #[serde(rename = "imap-passwd-keyring", with = "EntryDef")]
+    Keyring(Entry),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(remote = "OAuth2Config", rename_all = "kebab-case")]
 pub struct OAuth2ConfigDef {
-    #[serde(with = "OAuth2MethodDef")]
+    #[serde(rename = "imap-oauth2-method", with = "OAuth2MethodDef")]
     pub method: OAuth2Method,
+    #[serde(rename = "imap-oauth2-client-id")]
     pub client_id: String,
-    #[serde(with = "OAuth2ClientSecretDef")]
-    pub client_secret: OAuth2ClientSecret,
+    #[serde(flatten, with = "ClientSecretDef")]
+    pub client_secret: Secret,
+    #[serde(rename = "imap-oauth2-auth-url")]
     pub auth_url: String,
+    #[serde(rename = "imap-oauth2-token-url")]
     pub token_url: String,
+    #[serde(flatten, with = "AccessTokenDef")]
+    pub access_token: Secret,
+    #[serde(flatten, with = "RefreshTokenDef")]
+    pub refresh_token: Secret,
     #[serde(flatten, with = "OAuth2ScopesDef")]
     pub scopes: OAuth2Scopes,
     #[serde(default)]
@@ -85,24 +114,53 @@ pub struct OAuth2ConfigDef {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(remote = "OAuth2ClientSecret", rename_all = "kebab-case")]
-pub enum OAuth2ClientSecretDef {
+#[serde(remote = "Secret", rename_all = "kebab-case")]
+pub enum ClientSecretDef {
+    #[serde(rename = "imap-oauth2-client-secret")]
     Raw(String),
-    Cmd(String),
-    Keyring,
+    #[serde(rename = "imap-oauth2-client-secret-cmd", with = "CmdDef")]
+    Cmd(Cmd),
+    #[serde(rename = "imap-oauth2-client-secret-keyring", with = "EntryDef")]
+    Keyring(Entry),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(remote = "OAuth2Method", rename_all = "lowercase")]
+#[serde(remote = "Secret", rename_all = "kebab-case")]
+pub enum AccessTokenDef {
+    #[serde(rename = "imap-oauth2-access-token")]
+    Raw(String),
+    #[serde(rename = "imap-oauth2-access-token-cmd", with = "CmdDef")]
+    Cmd(Cmd),
+    #[serde(rename = "imap-oauth2-access-token-keyring", with = "EntryDef")]
+    Keyring(Entry),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(remote = "Secret", rename_all = "kebab-case")]
+pub enum RefreshTokenDef {
+    #[serde(rename = "imap-oauth2-refresh-token")]
+    Raw(String),
+    #[serde(rename = "imap-oauth2-refresh-token-cmd", with = "CmdDef")]
+    Cmd(Cmd),
+    #[serde(rename = "imap-oauth2-refresh-token-keyring", with = "EntryDef")]
+    Keyring(Entry),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(remote = "OAuth2Method")]
 pub enum OAuth2MethodDef {
+    #[serde(rename = "xoauth2", alias = "XOAUTH2")]
     XOAuth2,
+    #[serde(rename = "oauthbearer", alias = "OAUTHBEARER")]
     OAuthBearer,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(remote = "OAuth2Scopes", rename_all = "kebab-case")]
 pub enum OAuth2ScopesDef {
+    #[serde(rename = "imap-oauth2-scope")]
     Scope(String),
+    #[serde(rename = "imap-oauth2-scopes")]
     Scopes(Vec<String>),
 }
 
