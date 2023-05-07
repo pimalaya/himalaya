@@ -4,10 +4,10 @@
 
 use anyhow::Result;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use log::{info, trace};
+use log::{info, trace, warn};
 use pimalaya_email::{
     folder::sync::Strategy as SyncFoldersStrategy, AccountConfig, Backend, BackendConfig,
-    BackendSyncBuilder, BackendSyncProgressEvent,
+    BackendSyncBuilder, BackendSyncProgressEvent, EmailSender,
 };
 
 use crate::{
@@ -17,20 +17,45 @@ use crate::{
 };
 
 /// Configure the current selected account
-pub fn configure(backend_config: &BackendConfig, reset: bool) -> Result<()> {
+pub fn configure(
+    account_config: &AccountConfig,
+    backend_config: &BackendConfig,
+    reset: bool,
+) -> Result<()> {
     info!("entering the configure account handler");
-    match backend_config {
-        BackendConfig::None => (),
-        BackendConfig::Maildir(_) => (),
+
+    if reset {
         #[cfg(feature = "imap-backend")]
-        BackendConfig::Imap(imap_config) => {
-            imap_config
-                .auth
-                .configure(reset, configure_oauth2_client_secret)?;
+        if let BackendConfig::Imap(imap_config) = backend_config {
+            println!("Resetting IMAP secrets…");
+            if let Err(err) = imap_config.auth.reset() {
+                warn!("error while resetting imap secrets, skipping it");
+                warn!("{err}");
+            }
         }
-        #[cfg(feature = "notmuch-backend")]
-        BackendConfig::Notmuch(config) => (),
-    };
+
+        #[cfg(feature = "smtp-sender")]
+        if let EmailSender::Smtp(smtp_config) = &account_config.email_sender {
+            println!("Resetting SMTP secrets…");
+            if let Err(err) = smtp_config.auth.reset() {
+                warn!("error while resetting smtp secrets, skipping it");
+                warn!("{err}");
+            }
+        }
+    }
+
+    #[cfg(feature = "imap-backend")]
+    if let BackendConfig::Imap(imap_config) = backend_config {
+        println!("Configuring IMAP secrets…");
+        imap_config.auth.configure(configure_oauth2_client_secret)?;
+    }
+
+    #[cfg(feature = "smtp-sender")]
+    if let EmailSender::Smtp(smtp_config) = &account_config.email_sender {
+        println!("Configuring SMTP secrets…");
+        smtp_config.auth.configure(configure_oauth2_client_secret)?;
+    }
+
     println!("Account successfully configured!");
     Ok(())
 }
