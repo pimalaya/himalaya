@@ -42,10 +42,11 @@ pub(crate) fn configure(base: &DeserializedBaseAccountConfig) -> Result<EmailSen
         .default(base.email.clone())
         .interact()?;
 
-    smtp_config.passwd_cmd = Input::with_theme(&*THEME)
-        .with_prompt("What shell command should we run to get your password?")
-        .default(format!("pass show {}", &base.email))
-        .interact()?;
+    // FIXME: add all variants: password, password command and oauth2
+    // smtp_config.auth = Input::with_theme(&*THEME)
+    //     .with_prompt("What shell command should we run to get your password?")
+    //     .default(format!("pass show {}", &base.email))
+    //     .interact()?;
 
     Ok(EmailSender::Smtp(smtp_config))
 }

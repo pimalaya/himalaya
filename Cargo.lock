@@ -1147,6 +1147,9 @@ dependencies = [
  "log",
  "once_cell",
  "pimalaya-email",
+ "pimalaya-keyring",
+ "pimalaya-process",
+ "pimalaya-secret",
  "serde",
  "serde_json",
  "shellexpand",
@@ -2098,7 +2101,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-email"
 version = "0.7.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya#22db3ec886536897c54b72d4ab7d20beff0ffecc"
+source = "git+https://git.sr.ht/~soywod/pimalaya#524f8049566845369f55300a20843c48dfe7a620"
 dependencies = [
  "ammonia",
  "chrono",
@@ -2107,7 +2110,6 @@ dependencies = [
  "html-escape",
  "imap",
  "imap-proto",
- "keyring",
  "lettre",
  "log",
  "mail-parser",
@@ -2120,6 +2122,7 @@ dependencies = [
  "once_cell",
  "ouroboros",
  "pimalaya-oauth2",
+ "pimalaya-secret",
  "proc-lock",
  "rayon",
  "regex",
@@ -2137,15 +2140,46 @@ dependencies = [
 ]
 
 [[package]]
+name = "pimalaya-keyring"
+version = "0.0.1"
+source = "git+https://git.sr.ht/~soywod/pimalaya#524f8049566845369f55300a20843c48dfe7a620"
+dependencies = [
+ "keyring",
+ "log",
+ "thiserror",
+]
+
+[[package]]
 name = "pimalaya-oauth2"
 version = "0.0.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya#22db3ec886536897c54b72d4ab7d20beff0ffecc"
+source = "git+https://git.sr.ht/~soywod/pimalaya#524f8049566845369f55300a20843c48dfe7a620"
 dependencies = [
  "log",
  "oauth2",
  "reqwest",
  "thiserror",
  "url",
+]
+
+[[package]]
+name = "pimalaya-process"
+version = "0.0.1"
+source = "git+https://git.sr.ht/~soywod/pimalaya#524f8049566845369f55300a20843c48dfe7a620"
+dependencies = [
+ "log",
+ "thiserror",
+]
+
+[[package]]
+name = "pimalaya-secret"
+version = "0.0.1"
+source = "git+https://git.sr.ht/~soywod/pimalaya#524f8049566845369f55300a20843c48dfe7a620"
+dependencies = [
+ "log",
+ "pimalaya-keyring",
+ "pimalaya-oauth2",
+ "pimalaya-process",
+ "thiserror",
 ]
 
 [[package]]

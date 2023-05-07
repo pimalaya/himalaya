@@ -4,14 +4,17 @@
 
 use anyhow::Result;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use log::{info, trace};
+use log::{info, trace, warn};
 use pimalaya_email::{
     folder::sync::Strategy as SyncFoldersStrategy, AccountConfig, Backend, BackendConfig,
-    BackendSyncBuilder, BackendSyncProgressEvent,
+    BackendSyncBuilder, BackendSyncProgressEvent, EmailSender, ImapAuthConfig, SmtpAuthConfig,
 };
 
 use crate::{
-    config::{wizard::imap::configure_oauth2_client_secret, DeserializedConfig},
+    config::{
+        wizard::{prompt_passwd, prompt_secret},
+        DeserializedConfig,
+    },
     printer::{PrintTableOpts, Printer},
     Accounts,
 };
@@ -23,21 +26,58 @@ pub fn configure(
     reset: bool,
 ) -> Result<()> {
     info!("entering the configure account handler");
-    match backend_config {
-        BackendConfig::None => (),
-        BackendConfig::Maildir(_) => (),
+
+    if reset {
         #[cfg(feature = "imap-backend")]
-        BackendConfig::Imap(imap_config) => {
-            imap_config.auth.configure(
-                &account_config.name,
-                reset,
-                configure_oauth2_client_secret,
-            )?;
+        if let BackendConfig::Imap(imap_config) = backend_config {
+            let reset = match &imap_config.auth {
+                ImapAuthConfig::Passwd(passwd) => passwd.reset(),
+                ImapAuthConfig::OAuth2(oauth2) => oauth2.reset(),
+            };
+            if let Err(err) = reset {
+                warn!("error while resetting imap secrets, skipping it");
+                warn!("{err}");
+            }
         }
-        #[cfg(feature = "notmuch-backend")]
-        BackendConfig::Notmuch(config) => (),
-    };
-    println!("Account {} configured!", account_config.name);
+
+        #[cfg(feature = "smtp-sender")]
+        if let EmailSender::Smtp(smtp_config) = &account_config.email_sender {
+            let reset = match &smtp_config.auth {
+                SmtpAuthConfig::Passwd(passwd) => passwd.reset(),
+                SmtpAuthConfig::OAuth2(oauth2) => oauth2.reset(),
+            };
+            if let Err(err) = reset {
+                warn!("error while resetting smtp secrets, skipping it");
+                warn!("{err}");
+            }
+        }
+    }
+
+    #[cfg(feature = "imap-backend")]
+    if let BackendConfig::Imap(imap_config) = backend_config {
+        match &imap_config.auth {
+            ImapAuthConfig::Passwd(passwd) => {
+                passwd.configure(|| prompt_passwd("Enter your IMAP password:"))
+            }
+            ImapAuthConfig::OAuth2(oauth2) => {
+                oauth2.configure(|| prompt_secret("Enter your IMAP OAuth 2.0 client secret:"))
+            }
+        }?;
+    }
+
+    #[cfg(feature = "smtp-sender")]
+    if let EmailSender::Smtp(smtp_config) = &account_config.email_sender {
+        match &smtp_config.auth {
+            SmtpAuthConfig::Passwd(passwd) => {
+                passwd.configure(|| prompt_passwd("Enter your SMTP password:"))
+            }
+            SmtpAuthConfig::OAuth2(oauth2) => {
+                oauth2.configure(|| prompt_secret("Enter your SMTP OAuth 2.0 client secret:"))
+            }
+        }?;
+    }
+
+    println!("Account successfully configured!");
     Ok(())
 }
 

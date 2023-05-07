@@ -11,10 +11,10 @@ use super::DeserializedConfig;
 use crate::account::{DeserializedAccountConfig, DeserializedBaseAccountConfig};
 use anyhow::{anyhow, Result};
 use console::style;
-use dialoguer::{theme::ColorfulTheme, Confirm, Input, Select};
+use dialoguer::{theme::ColorfulTheme, Confirm, Input, Password, Select};
 use log::trace;
 use once_cell::sync::Lazy;
-use std::{fs, process};
+use std::{fs, io, process};
 
 const BACKENDS: &[&str] = &[
     "Maildir",
@@ -162,4 +162,21 @@ fn configure_base() -> Result<DeserializedBaseAccountConfig> {
     );
 
     Ok(base_account_config)
+}
+
+pub(crate) fn prompt_passwd(prompt: &str) -> io::Result<String> {
+    Password::with_theme(&*THEME)
+        .with_prompt(prompt)
+        .with_confirmation(
+            "Confirm password:",
+            "Passwords do not match, please try again.",
+        )
+        .interact()
+}
+
+pub(crate) fn prompt_secret(prompt: &str) -> io::Result<String> {
+    Input::with_theme(&*THEME)
+        .with_prompt(prompt)
+        .report(false)
+        .interact()
 }

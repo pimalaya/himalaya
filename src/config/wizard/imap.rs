@@ -1,7 +1,6 @@
 use anyhow::Result;
 use dialoguer::{Input, Select};
 use pimalaya_email::ImapConfig;
-use std::io;
 
 use crate::account::{
     DeserializedAccountConfig, DeserializedBaseAccountConfig, DeserializedImapAccountConfig,
@@ -58,12 +57,4 @@ pub(crate) fn configure(base: DeserializedBaseAccountConfig) -> Result<Deseriali
     Ok(DeserializedAccountConfig::Imap(
         DeserializedImapAccountConfig { base, backend },
     ))
-}
-
-#[cfg(feature = "imap-backend")]
-pub(crate) fn configure_oauth2_client_secret() -> io::Result<String> {
-    Input::with_theme(&*THEME)
-        .with_prompt("Enter your OAuth 2.0 client secret:")
-        .report(false)
-        .interact()
 }
