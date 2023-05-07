@@ -5,7 +5,7 @@
 
 use pimalaya_email::{
     folder::sync::Strategy as SyncFoldersStrategy, AccountConfig, BackendConfig, EmailHooks,
-    EmailSender, EmailTextPlainFormat, MaildirConfig,
+    EmailSender, EmailTextPlainFormat, ImapAuthConfig, MaildirConfig,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
@@ -46,10 +46,29 @@ impl DeserializedAccountConfig {
                 BackendConfig::Maildir(config.backend.clone()),
             ),
             #[cfg(feature = "imap-backend")]
-            DeserializedAccountConfig::Imap(config) => (
-                config.base.to_account_config(name, global_config),
-                BackendConfig::Imap(config.backend.clone()),
-            ),
+            DeserializedAccountConfig::Imap(config) => {
+                let mut imap_config = config.backend.clone();
+
+                match &mut imap_config.auth {
+                    ImapAuthConfig::Passwd(secret) => {
+                        secret.replace_undefined_entry_with(format!("{name}-imap-passwd"));
+                    }
+                    ImapAuthConfig::OAuth2(config) => {
+                        config.client_secret.replace_undefined_entry_with(format!(
+                            "{name}-imap-oauth2-client-secret"
+                        ));
+                        config.access_token.replace_undefined_entry_with(format!(
+                            "{name}-imap-oauth2-access-token"
+                        ));
+                        config.refresh_token.replace_undefined_entry_with(format!(
+                            "{name}-imap-oauth2-refresh-token"
+                        ));
+                    }
+                };
+
+                let account_config = config.base.to_account_config(name, global_config);
+                (account_config, BackendConfig::Imap(imap_config))
+            }
             #[cfg(feature = "notmuch-backend")]
             DeserializedAccountConfig::Notmuch(config) => (
                 config.base.to_account_config(name, global_config),
