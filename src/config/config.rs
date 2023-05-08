@@ -119,12 +119,15 @@ impl DeserializedConfig {
 
 #[cfg(test)]
 mod tests {
-    use pimalaya_email::{EmailSender, MaildirConfig, SendmailConfig, SmtpConfig};
+    use pimalaya_email::{EmailSender, MaildirConfig, PasswdConfig, SendmailConfig};
+    use pimalaya_secret::Secret;
 
     #[cfg(feature = "notmuch-backend")]
     use pimalaya_email::NotmuchConfig;
     #[cfg(feature = "imap-backend")]
     use pimalaya_email::{ImapAuthConfig, ImapConfig};
+    #[cfg(feature = "smtp-sender")]
+    use pimalaya_email::{SmtpAuthConfig, SmtpConfig};
 
     use std::io::Write;
     use tempfile::NamedTempFile;
@@ -380,7 +383,7 @@ mod tests {
     }
 
     #[test]
-    fn account_smtp_sender_missing_passwd_cmd_field() {
+    fn account_smtp_sender_missing_auth_field() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
@@ -395,7 +398,7 @@ mod tests {
             .unwrap_err()
             .root_cause()
             .to_string()
-            .contains("missing field `smtp-passwd-cmd`"));
+            .contains("missing field `smtp-auth`"));
     }
 
     #[test]
@@ -414,6 +417,7 @@ mod tests {
             .contains("missing field `sendmail-cmd`"));
     }
 
+    #[cfg(feature = "smtp-sender")]
     #[test]
     fn account_smtp_sender_minimum_config() {
         let config = make_config(
@@ -424,7 +428,8 @@ mod tests {
             smtp-host = \"localhost\"
             smtp-port = 25
             smtp-login = \"login\"
-            smtp-passwd-cmd = \"echo password\"",
+            smtp-auth = \"passwd\"
+            smtp-passwd = { cmd  = \"echo password\" }",
         );
 
         assert_eq!(
@@ -438,7 +443,9 @@ mod tests {
                             host: "localhost".into(),
                             port: 25,
                             login: "login".into(),
-                            passwd_cmd: "echo password".into(),
+                            auth: SmtpAuthConfig::Passwd(PasswdConfig {
+                                passwd: Secret::new_cmd(String::from("echo password"))
+                            }),
                             ..SmtpConfig::default()
                         }),
                         ..DeserializedBaseAccountConfig::default()
@@ -487,7 +494,8 @@ mod tests {
             imap-host = \"localhost\"
             imap-port = 993
             imap-login = \"login\"
-            imap-auth = { raw-passwd = \"password\" }",
+            imap-auth = \"passwd\"
+            imap-passwd = { cmd = \"echo password\" }",
         );
 
         assert_eq!(
@@ -504,7 +512,9 @@ mod tests {
                             host: "localhost".into(),
                             port: 993,
                             login: "login".into(),
-                            auth: ImapAuthConfig::RawPasswd("password".into()),
+                            auth: ImapAuthConfig::Passwd(PasswdConfig {
+                                passwd: Secret::new_cmd(String::from("echo password"))
+                            }),
                             ..ImapConfig::default()
                         }
                     })
