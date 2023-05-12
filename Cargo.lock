@@ -9,6 +9,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe438c63458706e03479442743baae6c88256498e6431708f6dfc520a26515d3"
 
 [[package]]
+name = "advisory-lock"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a6caee7d48f930f9ad3fc9546f8cbf843365da0c5b0ca4eee1d1ac3dd12d8f93"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "aes"
 version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -328,9 +338,9 @@ dependencies = [
 
 [[package]]
 name = "chrono"
-version = "0.4.23"
+version = "0.4.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16b0a3d9ed01224b22057780a37bb8c5dbfe1be8ba48678e7bf57ec4b385411f"
+checksum = "4e3c5919066adf22df73762e50cffcde3a758f2a848b113b586d1f86728b673b"
 dependencies = [
  "iana-time-zone",
  "js-sys",
@@ -615,18 +625,8 @@ version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d706e75d87e35569db781a9b5e2416cff1236a47ed380831f959382ccd5f858"
 dependencies = [
- "darling_core 0.10.2",
- "darling_macro 0.10.2",
-]
-
-[[package]]
-name = "darling"
-version = "0.13.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a01d95850c592940db9b8194bc39f4bc0e89dee5c4265e4b1807c34a9aba453c"
-dependencies = [
- "darling_core 0.13.4",
- "darling_macro 0.13.4",
+ "darling_core",
+ "darling_macro",
 ]
 
 [[package]]
@@ -644,37 +644,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "darling_core"
-version = "0.13.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "859d65a907b6852c9361e3185c862aae7fafd2887876799fa55f5f99dc40d610"
-dependencies = [
- "fnv",
- "ident_case",
- "proc-macro2",
- "quote",
- "strsim 0.10.0",
- "syn 1.0.104",
-]
-
-[[package]]
 name = "darling_macro"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9b5a2f4ac4969822c62224815d069952656cadc7084fdca9751e6d959189b72"
 dependencies = [
- "darling_core 0.10.2",
- "quote",
- "syn 1.0.104",
-]
-
-[[package]]
-name = "darling_macro"
-version = "0.13.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c972679f83bdf9c42bd905396b6c3588a843a17f0f16dfcfa3e2c5d57441835"
-dependencies = [
- "darling_core 0.13.4",
+ "darling_core",
  "quote",
  "syn 1.0.104",
 ]
@@ -931,20 +906,10 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7e08079fa3c89edec9160ceaa9e7172785468c26c053d12924cce0d5a55c241a"
 dependencies = [
- "darling 0.10.2",
+ "darling",
  "proc-macro2",
  "quote",
  "syn 1.0.104",
-]
-
-[[package]]
-name = "fs2"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
-dependencies = [
- "libc",
- "winapi",
 ]
 
 [[package]]
@@ -2101,8 +2066,9 @@ dependencies = [
 [[package]]
 name = "pimalaya-email"
 version = "0.7.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya#08c41acaee3b96a96d3f2b0cb15517466fe17a00"
+source = "git+https://git.sr.ht/~soywod/pimalaya#4fc9ef469ddb89728c42b13bbff928266307ed9b"
 dependencies = [
+ "advisory-lock",
  "ammonia",
  "chrono",
  "convert_case",
@@ -2122,8 +2088,8 @@ dependencies = [
  "once_cell",
  "ouroboros",
  "pimalaya-oauth2",
+ "pimalaya-process",
  "pimalaya-secret",
- "proc-lock",
  "rayon",
  "regex",
  "rfc2047-decoder",
@@ -2142,7 +2108,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-keyring"
 version = "0.0.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya#08c41acaee3b96a96d3f2b0cb15517466fe17a00"
+source = "git+https://git.sr.ht/~soywod/pimalaya#4fc9ef469ddb89728c42b13bbff928266307ed9b"
 dependencies = [
  "keyring",
  "log",
@@ -2152,7 +2118,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-oauth2"
 version = "0.0.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya#08c41acaee3b96a96d3f2b0cb15517466fe17a00"
+source = "git+https://git.sr.ht/~soywod/pimalaya#4fc9ef469ddb89728c42b13bbff928266307ed9b"
 dependencies = [
  "log",
  "oauth2",
@@ -2164,7 +2130,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-process"
 version = "0.0.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya#08c41acaee3b96a96d3f2b0cb15517466fe17a00"
+source = "git+https://git.sr.ht/~soywod/pimalaya#4fc9ef469ddb89728c42b13bbff928266307ed9b"
 dependencies = [
  "log",
  "thiserror",
@@ -2173,7 +2139,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-secret"
 version = "0.0.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya#08c41acaee3b96a96d3f2b0cb15517466fe17a00"
+source = "git+https://git.sr.ht/~soywod/pimalaya#4fc9ef469ddb89728c42b13bbff928266307ed9b"
 dependencies = [
  "log",
  "pimalaya-keyring",
@@ -2233,38 +2199,6 @@ name = "precomputed-hash"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
-
-[[package]]
-name = "proc-lock"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4cb4a8a82dcf0994c4bc5c14577b3449f606e0ec67af461842418ea08b687e79"
-dependencies = [
- "proc-lock-api",
- "proc-lock-macro",
-]
-
-[[package]]
-name = "proc-lock-api"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f278b068504592f8ae5781cec618cd3e3a26f69f5bf24befc3114aab138ad4f8"
-dependencies = [
- "fs2",
-]
-
-[[package]]
-name = "proc-lock-macro"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58d0f2d2df050b4bbaf9ae33124d339ee1d6b8f8ea0f2ee4108b1658a18d2af0"
-dependencies = [
- "darling 0.13.4",
- "proc-lock-api",
- "proc-macro2",
- "quote",
- "syn 1.0.104",
-]
 
 [[package]]
 name = "proc-macro-crate"
