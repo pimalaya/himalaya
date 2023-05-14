@@ -1,17 +1,25 @@
-use std::ops;
-
 use anyhow::Result;
 use serde::Serialize;
+use std::ops;
 
 use crate::{
     printer::{PrintTable, PrintTableOpts, WriteColor},
     ui::Table,
-    Envelope,
+    Envelope, IdMapper,
 };
 
 /// Represents the list of envelopes.
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Envelopes(Vec<Envelope>);
+
+impl Envelopes {
+    pub fn remap_ids(&mut self, id_mapper: &IdMapper) -> Result<()> {
+        for envelope in &mut self.0 {
+            envelope.id = id_mapper.get_or_create_alias(&envelope.id)?;
+        }
+        Ok(())
+    }
+}
 
 impl ops::Deref for Envelopes {
     type Target = Vec<Envelope>;

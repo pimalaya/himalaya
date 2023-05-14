@@ -3,19 +3,22 @@ use atty::Stream;
 use pimalaya_email::{AccountConfig, Backend, CompilerBuilder, Email, Flags, Sender, Tpl};
 use std::io::{stdin, BufRead};
 
-use crate::printer::Printer;
+use crate::{printer::Printer, IdMapper};
 
-pub fn forward<P: Printer, B: Backend + ?Sized>(
+pub fn forward<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
+    id_mapper: &IdMapper,
+    backend: &mut dyn Backend,
     folder: &str,
     id: &str,
     headers: Option<Vec<&str>>,
     body: Option<&str>,
 ) -> Result<()> {
+    let ids = id_mapper.get_ids([id])?;
+    let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
     let tpl = backend
-        .get_emails(folder, vec![id])?
+        .get_emails(folder, ids)?
         .first()
         .ok_or_else(|| anyhow!("cannot find email {}", id))?
         .to_forward_tpl_builder(config)?
@@ -26,18 +29,21 @@ pub fn forward<P: Printer, B: Backend + ?Sized>(
     printer.print(<Tpl as Into<String>>::into(tpl))
 }
 
-pub fn reply<P: Printer, B: Backend + ?Sized>(
+pub fn reply<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
+    id_mapper: &IdMapper,
+    backend: &mut dyn Backend,
     folder: &str,
     id: &str,
     all: bool,
     headers: Option<Vec<&str>>,
     body: Option<&str>,
 ) -> Result<()> {
+    let ids = id_mapper.get_ids([id])?;
+    let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
     let tpl = backend
-        .get_emails(folder, vec![id])?
+        .get_emails(folder, ids)?
         .first()
         .ok_or_else(|| anyhow!("cannot find email {}", id))?
         .to_reply_tpl_builder(config, all)?
@@ -48,10 +54,11 @@ pub fn reply<P: Printer, B: Backend + ?Sized>(
     printer.print(<Tpl as Into<String>>::into(tpl))
 }
 
-pub fn save<P: Printer, B: Backend + ?Sized>(
+pub fn save<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
+    id_mapper: &IdMapper,
+    backend: &mut dyn Backend,
     folder: &str,
     tpl: String,
 ) -> Result<()> {
@@ -71,15 +78,17 @@ pub fn save<P: Printer, B: Backend + ?Sized>(
             .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.as_ref()),
     )?;
 
-    backend.add_email(folder, &email, &Flags::default())?;
+    let id = backend.add_email(folder, &email, &Flags::default())?;
+    id_mapper.create_alias(id)?;
+
     printer.print("Template successfully saved!")
 }
 
-pub fn send<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
+pub fn send<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
-    sender: &mut S,
+    backend: &mut dyn Backend,
+    sender: &mut dyn Sender,
     folder: &str,
     tpl: String,
 ) -> Result<()> {
@@ -114,6 +123,5 @@ pub fn write<'a, P: Printer>(
         .set_some_raw_headers(headers)
         .some_text_plain_part(body)
         .build();
-
     printer.print(<Tpl as Into<String>>::into(tpl))
 }

@@ -14,17 +14,20 @@ use uuid::Uuid;
 use crate::{
     printer::{PrintTableOpts, Printer},
     ui::editor,
-    Envelopes,
+    Envelopes, IdMapper,
 };
 
-pub fn attachments<P: Printer, B: Backend + ?Sized>(
+pub fn attachments<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
+    id_mapper: &IdMapper,
+    backend: &mut dyn Backend,
     folder: &str,
     ids: Vec<&str>,
 ) -> Result<()> {
     let folder = config.folder_alias(folder)?;
+    let ids = id_mapper.get_ids(ids)?;
+    let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
     let emails = backend.get_emails(&folder, ids.clone())?;
     let mut index = 0;
 
@@ -71,45 +74,54 @@ pub fn attachments<P: Printer, B: Backend + ?Sized>(
     }
 }
 
-pub fn copy<P: Printer, B: Backend + ?Sized>(
+pub fn copy<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
+    id_mapper: &IdMapper,
+    backend: &mut dyn Backend,
     from_folder: &str,
     to_folder: &str,
     ids: Vec<&str>,
 ) -> Result<()> {
     let from_folder = config.folder_alias(from_folder)?;
     let to_folder = config.folder_alias(to_folder)?;
+    let ids = id_mapper.get_ids(ids)?;
+    let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
     backend.copy_emails(&from_folder, &to_folder, ids)?;
     printer.print("Email(s) successfully copied!")
 }
 
-pub fn delete<P: Printer, B: Backend + ?Sized>(
+pub fn delete<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
+    id_mapper: &IdMapper,
+    backend: &mut dyn Backend,
     folder: &str,
     ids: Vec<&str>,
 ) -> Result<()> {
     let folder = config.folder_alias(folder)?;
+    let ids = id_mapper.get_ids(ids)?;
+    let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
     backend.delete_emails(&folder, ids)?;
     printer.print("Email(s) successfully deleted!")
 }
 
-pub fn forward<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
+pub fn forward<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
-    sender: &mut S,
+    id_mapper: &IdMapper,
+    backend: &mut dyn Backend,
+    sender: &mut dyn Sender,
     folder: &str,
     id: &str,
     headers: Option<Vec<&str>>,
     body: Option<&str>,
 ) -> Result<()> {
     let folder = config.folder_alias(folder)?;
+    let ids = id_mapper.get_ids([id])?;
+    let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
     let tpl = backend
-        .get_emails(&folder, vec![id])?
+        .get_emails(&folder, ids)?
         .first()
         .ok_or_else(|| anyhow!("cannot find email {}", id))?
         .to_forward_tpl_builder(config)?
@@ -121,10 +133,11 @@ pub fn forward<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
     Ok(())
 }
 
-pub fn list<P: Printer, B: Backend + ?Sized>(
+pub fn list<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
+    id_mapper: &IdMapper,
+    backend: &mut dyn Backend,
     folder: &str,
     max_width: Option<usize>,
     page_size: Option<usize>,
@@ -133,8 +146,11 @@ pub fn list<P: Printer, B: Backend + ?Sized>(
     let folder = config.folder_alias(folder)?;
     let page_size = page_size.unwrap_or(config.email_listing_page_size());
     debug!("page size: {}", page_size);
-    let envelopes: Envelopes = backend.list_envelopes(&folder, page_size, page)?.into();
+
+    let mut envelopes: Envelopes = backend.list_envelopes(&folder, page_size, page)?.into();
+    envelopes.remap_ids(id_mapper)?;
     trace!("envelopes: {:?}", envelopes);
+
     printer.print_table(
         Box::new(envelopes),
         PrintTableOpts {
@@ -147,11 +163,11 @@ pub fn list<P: Printer, B: Backend + ?Sized>(
 /// Parses and edits a message from a [mailto] URL string.
 ///
 /// [mailto]: https://en.wikipedia.org/wiki/Mailto
-pub fn mailto<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
+pub fn mailto<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
-    sender: &mut S,
+    backend: &mut dyn Backend,
+    sender: &mut dyn Sender,
     url: &Url,
 ) -> Result<()> {
     let mut tpl = TplBuilder::default().to(url.path());
@@ -169,24 +185,28 @@ pub fn mailto<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
     editor::edit_tpl_with_editor(config, printer, backend, sender, tpl.build())
 }
 
-pub fn move_<P: Printer, B: Backend + ?Sized>(
+pub fn move_<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
+    id_mapper: &IdMapper,
+    backend: &mut dyn Backend,
     from_folder: &str,
     to_folder: &str,
     ids: Vec<&str>,
 ) -> Result<()> {
     let from_folder = config.folder_alias(from_folder)?;
     let to_folder = config.folder_alias(to_folder)?;
+    let ids = id_mapper.get_ids(ids)?;
+    let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
     backend.move_emails(&from_folder, &to_folder, ids)?;
     printer.print("Email(s) successfully moved!")
 }
 
-pub fn read<P: Printer, B: Backend + ?Sized>(
+pub fn read<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
+    id_mapper: &IdMapper,
+    backend: &mut dyn Backend,
     folder: &str,
     ids: Vec<&str>,
     text_mime: &str,
@@ -195,6 +215,8 @@ pub fn read<P: Printer, B: Backend + ?Sized>(
     headers: Vec<&str>,
 ) -> Result<()> {
     let folder = config.folder_alias(folder)?;
+    let ids = id_mapper.get_ids(ids)?;
+    let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
     let emails = backend.get_emails(&folder, ids)?;
 
     let mut glue = "";
@@ -230,11 +252,12 @@ pub fn read<P: Printer, B: Backend + ?Sized>(
     printer.print(bodies)
 }
 
-pub fn reply<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
+pub fn reply<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
-    sender: &mut S,
+    id_mapper: &IdMapper,
+    backend: &mut dyn Backend,
+    sender: &mut dyn Sender,
     folder: &str,
     id: &str,
     all: bool,
@@ -242,8 +265,10 @@ pub fn reply<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
     body: Option<&str>,
 ) -> Result<()> {
     let folder = config.folder_alias(folder)?;
+    let ids = id_mapper.get_ids([id])?;
+    let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
     let tpl = backend
-        .get_emails(&folder, vec![id])?
+        .get_emails(&folder, ids)?
         .first()
         .ok_or_else(|| anyhow!("cannot find email {}", id))?
         .to_reply_tpl_builder(config, all)?
@@ -256,10 +281,11 @@ pub fn reply<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
     Ok(())
 }
 
-pub fn save<P: Printer, B: Backend + ?Sized>(
+pub fn save<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
+    id_mapper: &IdMapper,
+    backend: &mut dyn Backend,
     folder: &str,
     raw_email: String,
 ) -> Result<()> {
@@ -276,14 +302,18 @@ pub fn save<P: Printer, B: Backend + ?Sized>(
             .collect::<Vec<String>>()
             .join("\r\n")
     };
-    backend.add_email(&folder, raw_email.as_bytes(), &Flags::default())?;
+
+    let id = backend.add_email(&folder, raw_email.as_bytes(), &Flags::default())?;
+    id_mapper.create_alias(id)?;
+
     Ok(())
 }
 
-pub fn search<P: Printer, B: Backend + ?Sized>(
+pub fn search<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
+    id_mapper: &IdMapper,
+    backend: &mut dyn Backend,
     folder: &str,
     query: String,
     max_width: Option<usize>,
@@ -292,9 +322,10 @@ pub fn search<P: Printer, B: Backend + ?Sized>(
 ) -> Result<()> {
     let folder = config.folder_alias(folder)?;
     let page_size = page_size.unwrap_or(config.email_listing_page_size());
-    let envelopes: Envelopes = backend
+    let mut envelopes: Envelopes = backend
         .search_envelopes(&folder, &query, "", page_size, page)?
         .into();
+    envelopes.remap_ids(id_mapper)?;
     let opts = PrintTableOpts {
         format: &config.email_reading_format,
         max_width,
@@ -303,10 +334,11 @@ pub fn search<P: Printer, B: Backend + ?Sized>(
     printer.print_table(Box::new(envelopes), opts)
 }
 
-pub fn sort<P: Printer, B: Backend + ?Sized>(
+pub fn sort<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
+    id_mapper: &IdMapper,
+    backend: &mut dyn Backend,
     folder: &str,
     sort: String,
     query: String,
@@ -316,9 +348,10 @@ pub fn sort<P: Printer, B: Backend + ?Sized>(
 ) -> Result<()> {
     let folder = config.folder_alias(folder)?;
     let page_size = page_size.unwrap_or(config.email_listing_page_size());
-    let envelopes: Envelopes = backend
+    let mut envelopes: Envelopes = backend
         .search_envelopes(&folder, &query, &sort, page_size, page)?
         .into();
+    envelopes.remap_ids(id_mapper)?;
     let opts = PrintTableOpts {
         format: &config.email_reading_format,
         max_width,
@@ -327,11 +360,11 @@ pub fn sort<P: Printer, B: Backend + ?Sized>(
     printer.print_table(Box::new(envelopes), opts)
 }
 
-pub fn send<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
+pub fn send<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
-    sender: &mut S,
+    backend: &mut dyn Backend,
+    sender: &mut dyn Sender,
     raw_email: String,
 ) -> Result<()> {
     let folder = config.sent_folder_alias()?;
@@ -357,11 +390,11 @@ pub fn send<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
     Ok(())
 }
 
-pub fn write<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
+pub fn write<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
-    sender: &mut S,
+    backend: &mut dyn Backend,
+    sender: &mut dyn Sender,
     headers: Option<Vec<&str>>,
     body: Option<&str>,
 ) -> Result<()> {

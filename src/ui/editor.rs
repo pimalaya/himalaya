@@ -37,11 +37,11 @@ pub fn open_with_local_draft() -> Result<Tpl> {
     open_with_tpl(Tpl::from(content))
 }
 
-pub fn edit_tpl_with_editor<P: Printer, B: Backend + ?Sized, S: Sender + ?Sized>(
+pub fn edit_tpl_with_editor<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
-    sender: &mut S,
+    backend: &mut dyn Backend,
+    sender: &mut dyn Sender,
     mut tpl: Tpl,
 ) -> Result<()> {
     let draft = local_draft_path();

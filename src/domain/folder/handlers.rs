@@ -12,19 +12,15 @@ use crate::{
     Folders,
 };
 
-pub fn expunge<P: Printer, B: Backend + ?Sized>(
-    printer: &mut P,
-    backend: &mut B,
-    folder: &str,
-) -> Result<()> {
+pub fn expunge<P: Printer>(printer: &mut P, backend: &mut dyn Backend, folder: &str) -> Result<()> {
     backend.expunge_folder(folder)?;
     printer.print(format!("Folder {folder} successfully expunged!"))
 }
 
-pub fn list<P: Printer, B: Backend + ?Sized>(
+pub fn list<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    backend: &mut B,
+    backend: &mut dyn Backend,
     max_width: Option<usize>,
 ) -> Result<()> {
     let folders: Folders = backend.list_folders()?.into();
@@ -38,20 +34,12 @@ pub fn list<P: Printer, B: Backend + ?Sized>(
     )
 }
 
-pub fn create<P: Printer, B: Backend + ?Sized>(
-    printer: &mut P,
-    backend: &mut B,
-    folder: &str,
-) -> Result<()> {
+pub fn create<P: Printer>(printer: &mut P, backend: &mut dyn Backend, folder: &str) -> Result<()> {
     backend.add_folder(folder)?;
     printer.print("Folder successfully created!")
 }
 
-pub fn delete<P: Printer, B: Backend + ?Sized>(
-    printer: &mut P,
-    backend: &mut B,
-    folder: &str,
-) -> Result<()> {
+pub fn delete<P: Printer>(printer: &mut P, backend: &mut dyn Backend, folder: &str) -> Result<()> {
     if let Some(false) | None = Confirm::new()
         .with_prompt(format!("Confirm deletion of folder {folder}?"))
         .default(false)
@@ -176,9 +164,6 @@ mod tests {
             fn get_envelope(&self, _: &str, _: &str) -> backend::Result<Envelope> {
                 unimplemented!();
             }
-            fn get_envelope_internal(&self, _: &str, _: &str) -> backend::Result<Envelope> {
-                unimplemented!();
-            }
             fn list_envelopes(&self, _: &str, _: usize, _: usize) -> backend::Result<Envelopes> {
                 unimplemented!()
             }
@@ -195,60 +180,31 @@ mod tests {
             fn add_email(&self, _: &str, _: &[u8], _: &Flags) -> backend::Result<String> {
                 unimplemented!()
             }
-            fn add_email_internal(&self, _: &str, _: &[u8], _: &Flags) -> backend::Result<String> {
-                unimplemented!()
-            }
             fn get_emails(&self, _: &str, _: Vec<&str>) -> backend::Result<Emails> {
                 unimplemented!()
             }
             fn preview_emails(&self, _: &str, _: Vec<&str>) -> backend::Result<Emails> {
                 unimplemented!()
             }
-            fn get_emails_internal(&self, _: &str, _: Vec<&str>) -> backend::Result<Emails> {
-                unimplemented!()
-            }
             fn copy_emails(&self, _: &str, _: &str, _: Vec<&str>) -> backend::Result<()> {
-                unimplemented!()
-            }
-            fn copy_emails_internal(&self, _: &str, _: &str, _: Vec<&str>) -> backend::Result<()> {
                 unimplemented!()
             }
             fn move_emails(&self, _: &str, _: &str, _: Vec<&str>) -> backend::Result<()> {
                 unimplemented!()
             }
-            fn move_emails_internal(&self, _: &str, _: &str, _: Vec<&str>) -> backend::Result<()> {
-                unimplemented!()
-            }
             fn delete_emails(&self, _: &str, _: Vec<&str>) -> backend::Result<()> {
-                unimplemented!()
-            }
-            fn delete_emails_internal(&self, _: &str, _: Vec<&str>) -> backend::Result<()> {
                 unimplemented!()
             }
             fn add_flags(&self, _: &str, _: Vec<&str>, _: &Flags) -> backend::Result<()> {
                 unimplemented!()
             }
-            fn add_flags_internal(&self, _: &str, _: Vec<&str>, _: &Flags) -> backend::Result<()> {
-                unimplemented!()
-            }
             fn set_flags(&self, _: &str, _: Vec<&str>, _: &Flags) -> backend::Result<()> {
-                unimplemented!()
-            }
-            fn set_flags_internal(&self, _: &str, _: Vec<&str>, _: &Flags) -> backend::Result<()> {
                 unimplemented!()
             }
             fn remove_flags(&self, _: &str, _: Vec<&str>, _: &Flags) -> backend::Result<()> {
                 unimplemented!()
             }
-            fn remove_flags_internal(
-                &self,
-                _: &str,
-                _: Vec<&str>,
-                _: &Flags,
-            ) -> backend::Result<()> {
-                unimplemented!()
-            }
-            fn as_any(&'static self) -> &(dyn Any) {
+            fn as_any(&self) -> &(dyn Any) {
                 self
             }
         }
