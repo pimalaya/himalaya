@@ -7,7 +7,7 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use log::{info, trace, warn};
 use pimalaya_email::{
     folder::sync::Strategy as SyncFoldersStrategy, AccountConfig, Backend, BackendConfig,
-    BackendSyncBuilder, BackendSyncProgressEvent, EmailSender, ImapAuthConfig, SmtpAuthConfig,
+    BackendSyncBuilder, BackendSyncProgressEvent, ImapAuthConfig, SenderConfig, SmtpAuthConfig,
 };
 
 use crate::{
@@ -20,16 +20,12 @@ use crate::{
 };
 
 /// Configure the current selected account
-pub fn configure(
-    account_config: &AccountConfig,
-    backend_config: &BackendConfig,
-    reset: bool,
-) -> Result<()> {
+pub fn configure(config: &AccountConfig, reset: bool) -> Result<()> {
     info!("entering the configure account handler");
 
     if reset {
         #[cfg(feature = "imap-backend")]
-        if let BackendConfig::Imap(imap_config) = backend_config {
+        if let BackendConfig::Imap(imap_config) = &config.backend {
             let reset = match &imap_config.auth {
                 ImapAuthConfig::Passwd(passwd) => passwd.reset(),
                 ImapAuthConfig::OAuth2(oauth2) => oauth2.reset(),
@@ -41,7 +37,7 @@ pub fn configure(
         }
 
         #[cfg(feature = "smtp-sender")]
-        if let EmailSender::Smtp(smtp_config) = &account_config.email_sender {
+        if let SenderConfig::Smtp(smtp_config) = &config.sender {
             let reset = match &smtp_config.auth {
                 SmtpAuthConfig::Passwd(passwd) => passwd.reset(),
                 SmtpAuthConfig::OAuth2(oauth2) => oauth2.reset(),
@@ -54,7 +50,7 @@ pub fn configure(
     }
 
     #[cfg(feature = "imap-backend")]
-    if let BackendConfig::Imap(imap_config) = backend_config {
+    if let BackendConfig::Imap(imap_config) = &config.backend {
         match &imap_config.auth {
             ImapAuthConfig::Passwd(passwd) => {
                 passwd.configure(|| prompt_passwd("Enter your IMAP password:"))
@@ -66,7 +62,7 @@ pub fn configure(
     }
 
     #[cfg(feature = "smtp-sender")]
-    if let EmailSender::Smtp(smtp_config) = &account_config.email_sender {
+    if let SenderConfig::Smtp(smtp_config) = &config.sender {
         match &smtp_config.auth {
             SmtpAuthConfig::Passwd(passwd) => {
                 passwd.configure(|| prompt_passwd("Enter your SMTP password:"))
@@ -296,9 +292,7 @@ mod tests {
     use termcolor::ColorSpec;
 
     use crate::{
-        account::{
-            DeserializedAccountConfig, DeserializedBaseAccountConfig, DeserializedImapAccountConfig,
-        },
+        account::DeserializedAccountConfig,
         printer::{Print, PrintTable, WriteColor},
     };
 
@@ -370,13 +364,11 @@ mod tests {
         let deserialized_config = DeserializedConfig {
             accounts: HashMap::from_iter([(
                 "account-1".into(),
-                DeserializedAccountConfig::Imap(DeserializedImapAccountConfig {
-                    base: DeserializedBaseAccountConfig {
-                        default: Some(true),
-                        ..DeserializedBaseAccountConfig::default()
-                    },
-                    backend: ImapConfig::default(),
-                }),
+                DeserializedAccountConfig {
+                    default: Some(true),
+                    backend: BackendConfig::Imap(ImapConfig::default()),
+                    ..DeserializedAccountConfig::default()
+                },
             )]),
             ..DeserializedConfig::default()
         };

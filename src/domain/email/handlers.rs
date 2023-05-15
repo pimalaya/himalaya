@@ -165,9 +165,9 @@ pub fn list<P: Printer>(
 /// [mailto]: https://en.wikipedia.org/wiki/Mailto
 pub fn mailto<P: Printer>(
     config: &AccountConfig,
-    printer: &mut P,
     backend: &mut dyn Backend,
     sender: &mut dyn Sender,
+    printer: &mut P,
     url: &Url,
 ) -> Result<()> {
     let mut tpl = TplBuilder::default().to(url.path());

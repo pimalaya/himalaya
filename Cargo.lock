@@ -1631,23 +1631,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a60c7ce501c71e03a9c9c0d35b861413ae925bd979cc7a4e30d060069aaac8d"
 
 [[package]]
-name = "mime-msg-builder"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3981dce6db3e7f9faa1124409a6b94436902ecb2670f374d361789d61eb34ac"
-dependencies = [
- "ammonia",
- "chumsky 0.9.0",
- "html-escape",
- "lettre",
- "log",
- "regex",
- "shellexpand",
- "thiserror",
- "tree_magic",
-]
-
-[[package]]
 name = "minimal-lexical"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2068,7 +2051,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-email"
 version = "0.7.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya#715546fabf7246a7f4bff8371aff77f116ae9b9a"
+source = "git+https://git.sr.ht/~soywod/pimalaya#05818504b399a911b88255b7d15592ee834bfbb3"
 dependencies = [
  "advisory-lock",
  "ammonia",
@@ -2084,11 +2067,11 @@ dependencies = [
  "maildir",
  "mailparse",
  "md5",
- "mime-msg-builder",
  "native-tls",
  "notmuch",
  "once_cell",
  "ouroboros",
+ "pimalaya-email-tpl",
  "pimalaya-oauth2",
  "pimalaya-process",
  "pimalaya-secret",
@@ -2108,9 +2091,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "pimalaya-email-tpl"
+version = "0.1.0"
+source = "git+https://git.sr.ht/~soywod/pimalaya#05818504b399a911b88255b7d15592ee834bfbb3"
+dependencies = [
+ "ammonia",
+ "chumsky 0.9.0",
+ "html-escape",
+ "lettre",
+ "log",
+ "pimalaya-process",
+ "regex",
+ "shellexpand",
+ "thiserror",
+ "tree_magic",
+]
+
+[[package]]
 name = "pimalaya-keyring"
 version = "0.0.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya#715546fabf7246a7f4bff8371aff77f116ae9b9a"
+source = "git+https://git.sr.ht/~soywod/pimalaya#05818504b399a911b88255b7d15592ee834bfbb3"
 dependencies = [
  "keyring",
  "log",
@@ -2120,7 +2120,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-oauth2"
 version = "0.0.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya#715546fabf7246a7f4bff8371aff77f116ae9b9a"
+source = "git+https://git.sr.ht/~soywod/pimalaya#05818504b399a911b88255b7d15592ee834bfbb3"
 dependencies = [
  "log",
  "oauth2",
@@ -2132,7 +2132,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-process"
 version = "0.0.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya#715546fabf7246a7f4bff8371aff77f116ae9b9a"
+source = "git+https://git.sr.ht/~soywod/pimalaya#05818504b399a911b88255b7d15592ee834bfbb3"
 dependencies = [
  "log",
  "thiserror",
@@ -2141,7 +2141,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-secret"
 version = "0.0.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya#715546fabf7246a7f4bff8371aff77f116ae9b9a"
+source = "git+https://git.sr.ht/~soywod/pimalaya#05818504b399a911b88255b7d15592ee834bfbb3"
 dependencies = [
  "log",
  "pimalaya-keyring",

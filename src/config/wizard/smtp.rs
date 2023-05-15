@@ -1,14 +1,16 @@
-use super::{SECURITY_PROTOCOLS, THEME};
-use crate::account::DeserializedBaseAccountConfig;
 use anyhow::Result;
 use dialoguer::{Input, Select};
-use pimalaya_email::{EmailSender, SmtpConfig};
+use pimalaya_email::{SenderConfig, SmtpConfig};
 
-pub(crate) fn configure(base: &DeserializedBaseAccountConfig) -> Result<EmailSender> {
+use crate::account::DeserializedAccountConfig;
+
+use super::{SECURITY_PROTOCOLS, THEME};
+
+pub(crate) fn configure(config: &DeserializedAccountConfig) -> Result<SenderConfig> {
     let mut smtp_config = SmtpConfig {
         host: Input::with_theme(&*THEME)
             .with_prompt("Enter the SMTP host: ")
-            .default(format!("smtp.{}", base.email.rsplit_once('@').unwrap().1))
+            .default(format!("smtp.{}", config.email.rsplit_once('@').unwrap().1))
             .interact()?,
         ..Default::default()
     };
@@ -39,7 +41,7 @@ pub(crate) fn configure(base: &DeserializedBaseAccountConfig) -> Result<EmailSen
 
     smtp_config.login = Input::with_theme(&*THEME)
         .with_prompt("Enter your SMTP login:")
-        .default(base.email.clone())
+        .default(config.email.clone())
         .interact()?;
 
     // FIXME: add all variants: password, password command and oauth2
@@ -48,5 +50,5 @@ pub(crate) fn configure(base: &DeserializedBaseAccountConfig) -> Result<EmailSen
     //     .default(format!("pass show {}", &base.email))
     //     .interact()?;
 
-    Ok(EmailSender::Smtp(smtp_config))
+    Ok(SenderConfig::Smtp(smtp_config))
 }

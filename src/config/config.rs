@@ -6,7 +6,8 @@
 use anyhow::{anyhow, Context, Result};
 use dirs::{config_dir, home_dir};
 use log::{debug, trace};
-use pimalaya_email::{AccountConfig, BackendConfig, EmailHooks, EmailTextPlainFormat};
+use pimalaya_email::{AccountConfig, EmailHooks, EmailTextPlainFormat};
+use pimalaya_process::Cmd;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path::PathBuf};
 use toml;
@@ -33,11 +34,32 @@ pub struct DeserializedConfig {
     pub email_reading_headers: Option<Vec<String>>,
     #[serde(default, with = "EmailTextPlainFormatDef")]
     pub email_reading_format: EmailTextPlainFormat,
-    pub email_reading_verify_cmd: Option<String>,
-    pub email_reading_decrypt_cmd: Option<String>,
+    #[serde(
+        default,
+        with = "OptionCmdDef",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub email_reading_verify_cmd: Option<Cmd>,
+    #[serde(
+        default,
+        with = "OptionCmdDef",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub email_reading_decrypt_cmd: Option<Cmd>,
     pub email_writing_headers: Option<Vec<String>>,
-    pub email_writing_sign_cmd: Option<String>,
-    pub email_writing_encrypt_cmd: Option<String>,
+    #[serde(
+        default,
+        with = "OptionCmdDef",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub email_writing_sign_cmd: Option<Cmd>,
+    #[serde(
+        default,
+        with = "OptionCmdDef",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub email_writing_encrypt_cmd: Option<Cmd>,
+    pub email_sending_save_copy: Option<bool>,
     #[serde(
         default,
         with = "EmailHooksDef",
@@ -54,13 +76,15 @@ impl DeserializedConfig {
     pub fn from_opt_path(path: Option<&str>) -> Result<Self> {
         debug!("path: {:?}", path);
 
-        let config: Self = match path.map(|s| s.into()).or_else(Self::path) {
-            Some(path) => {
-                let content = fs::read_to_string(path).context("cannot read config file")?;
-                toml::from_str(&content).context("cannot parse config file")?
-            }
-            None => wizard()?,
-        };
+        // let config: Self = match path.map(|s| s.into()).or_else(Self::path) {
+        //     Some(path) => {
+        //         let content = fs::read_to_string(path).context("cannot read config file")?;
+        //         toml::from_str(&content).context("cannot parse config file")?
+        //     }
+        //     None => wizard()?,
+        // };
+
+        let config = wizard()?;
 
         if config.accounts.is_empty() {
             return Err(anyhow!("config file must contain at least one account"));
@@ -90,17 +114,16 @@ impl DeserializedConfig {
             .filter(|p| p.exists())
     }
 
-    pub fn to_configs(&self, account_name: Option<&str>) -> Result<(AccountConfig, BackendConfig)> {
+    pub fn to_account_config(&self, account_name: Option<&str>) -> Result<AccountConfig> {
         let (account_name, deserialized_account_config) = match account_name {
             Some("default") | Some("") | None => self
                 .accounts
                 .iter()
                 .find_map(|(name, account)| {
-                    if account.is_default() {
-                        Some((name.clone(), account))
-                    } else {
-                        None
-                    }
+                    account
+                        .default
+                        .filter(|default| *default == true)
+                        .map(|_| (name.clone(), account))
                 })
                 .ok_or_else(|| anyhow!("cannot find default account")),
             Some(name) => self
@@ -110,16 +133,15 @@ impl DeserializedConfig {
                 .ok_or_else(|| anyhow!(format!("cannot find account {}", name))),
         }?;
 
-        let (account_config, backend_config) =
-            deserialized_account_config.to_configs(account_name, self);
-
-        Ok((account_config, backend_config))
+        Ok(deserialized_account_config.to_account_config(account_name, self))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use pimalaya_email::{EmailSender, MaildirConfig, PasswdConfig, SendmailConfig};
+    use pimalaya_email::{
+        BackendConfig, MaildirConfig, PasswdConfig, SenderConfig, SendmailConfig,
+    };
     use pimalaya_secret::Secret;
 
     #[cfg(feature = "notmuch-backend")]
@@ -131,14 +153,6 @@ mod tests {
 
     use std::io::Write;
     use tempfile::NamedTempFile;
-
-    use crate::account::DeserializedBaseAccountConfig;
-
-    #[cfg(feature = "imap-backend")]
-    use crate::account::DeserializedImapAccountConfig;
-    use crate::account::DeserializedMaildirAccountConfig;
-    #[cfg(feature = "notmuch-backend")]
-    use crate::account::DeserializedNotmuchAccountConfig;
 
     use super::*;
 
@@ -159,8 +173,22 @@ mod tests {
     }
 
     #[test]
-    fn account_missing_backend_field() {
+    fn account_missing_email_field() {
         let config = make_config("[account]");
+
+        assert!(config
+            .unwrap_err()
+            .root_cause()
+            .to_string()
+            .contains("missing field `email`"));
+    }
+
+    #[test]
+    fn account_missing_backend_field() {
+        let config = make_config(
+            "[account]
+            email = \"test@localhost\"",
+        );
 
         assert!(config
             .unwrap_err()
@@ -173,6 +201,7 @@ mod tests {
     fn account_invalid_backend_field() {
         let config = make_config(
             "[account]
+            email = \"test@localhost\"
             backend = \"bad\"",
         );
 
@@ -181,20 +210,6 @@ mod tests {
             .root_cause()
             .to_string()
             .contains("unknown variant `bad`"));
-    }
-
-    #[test]
-    fn account_missing_email_field() {
-        let config = make_config(
-            "[account]
-            backend = \"none\"",
-        );
-
-        assert!(config
-            .unwrap_err()
-            .root_cause()
-            .to_string()
-            .contains("missing field `email`"));
     }
 
     #[test]
@@ -420,6 +435,8 @@ mod tests {
     #[cfg(feature = "smtp-sender")]
     #[test]
     fn account_smtp_sender_minimum_config() {
+        use pimalaya_email::SenderConfig;
+
         let config = make_config(
             "[account]
             email = \"test@localhost\"
@@ -437,9 +454,9 @@ mod tests {
             DeserializedConfig {
                 accounts: HashMap::from_iter([(
                     "account".into(),
-                    DeserializedAccountConfig::None(DeserializedBaseAccountConfig {
+                    DeserializedAccountConfig {
                         email: "test@localhost".into(),
-                        email_sender: EmailSender::Smtp(SmtpConfig {
+                        sender: SenderConfig::Smtp(SmtpConfig {
                             host: "localhost".into(),
                             port: 25,
                             login: "login".into(),
@@ -448,8 +465,8 @@ mod tests {
                             }),
                             ..SmtpConfig::default()
                         }),
-                        ..DeserializedBaseAccountConfig::default()
-                    })
+                        ..DeserializedAccountConfig::default()
+                    }
                 )]),
                 ..DeserializedConfig::default()
             }
@@ -471,13 +488,13 @@ mod tests {
             DeserializedConfig {
                 accounts: HashMap::from_iter([(
                     "account".into(),
-                    DeserializedAccountConfig::None(DeserializedBaseAccountConfig {
+                    DeserializedAccountConfig {
                         email: "test@localhost".into(),
-                        email_sender: EmailSender::Sendmail(SendmailConfig {
-                            cmd: "echo send".into(),
+                        sender: SenderConfig::Sendmail(SendmailConfig {
+                            cmd: Cmd::from("echo send")
                         }),
-                        ..DeserializedBaseAccountConfig::default()
-                    })
+                        ..DeserializedAccountConfig::default()
+                    }
                 )]),
                 ..DeserializedConfig::default()
             }
@@ -503,12 +520,9 @@ mod tests {
             DeserializedConfig {
                 accounts: HashMap::from_iter([(
                     "account".into(),
-                    DeserializedAccountConfig::Imap(DeserializedImapAccountConfig {
-                        base: DeserializedBaseAccountConfig {
-                            email: "test@localhost".into(),
-                            ..DeserializedBaseAccountConfig::default()
-                        },
-                        backend: ImapConfig {
+                    DeserializedAccountConfig {
+                        email: "test@localhost".into(),
+                        backend: BackendConfig::Imap(ImapConfig {
                             host: "localhost".into(),
                             port: 993,
                             login: "login".into(),
@@ -516,8 +530,9 @@ mod tests {
                                 passwd: Secret::new_cmd(String::from("echo password"))
                             }),
                             ..ImapConfig::default()
-                        }
-                    })
+                        }),
+                        ..DeserializedAccountConfig::default()
+                    }
                 )]),
                 ..DeserializedConfig::default()
             }
@@ -538,15 +553,13 @@ mod tests {
             DeserializedConfig {
                 accounts: HashMap::from_iter([(
                     "account".into(),
-                    DeserializedAccountConfig::Maildir(DeserializedMaildirAccountConfig {
-                        base: DeserializedBaseAccountConfig {
-                            email: "test@localhost".into(),
-                            ..DeserializedBaseAccountConfig::default()
-                        },
-                        backend: MaildirConfig {
+                    DeserializedAccountConfig {
+                        email: "test@localhost".into(),
+                        backend: BackendConfig::Maildir(MaildirConfig {
                             root_dir: "/tmp/maildir".into(),
-                        }
-                    })
+                        }),
+                        ..DeserializedAccountConfig::default()
+                    }
                 )]),
                 ..DeserializedConfig::default()
             }
@@ -569,15 +582,13 @@ mod tests {
             DeserializedConfig {
                 accounts: HashMap::from_iter([(
                     "account".into(),
-                    DeserializedAccountConfig::Notmuch(DeserializedNotmuchAccountConfig {
-                        base: DeserializedBaseAccountConfig {
-                            email: "test@localhost".into(),
-                            ..DeserializedBaseAccountConfig::default()
-                        },
-                        backend: NotmuchConfig {
+                    DeserializedAccountConfig {
+                        email: "test@localhost".into(),
+                        backend: BackendConfig::Notmuch(NotmuchConfig {
                             db_path: "/tmp/notmuch.db".into(),
-                        }
-                    })
+                        }),
+                        ..DeserializedAccountConfig::default()
+                    }
                 )]),
                 ..DeserializedConfig::default()
             }

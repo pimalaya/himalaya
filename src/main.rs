@@ -51,17 +51,16 @@ fn main() -> Result<()> {
     if raw_args.len() > 1 && raw_args[1].starts_with("mailto:") {
         let url = Url::parse(&raw_args[1])?;
         let config = DeserializedConfig::from_opt_path(None)?;
-        let (account_config, backend_config) = config.to_configs(None)?;
-        let mut backend =
-            BackendBuilder::new().build(account_config.clone(), backend_config.clone())?;
-        let mut sender = SenderBuilder::build(&account_config)?;
+        let account_config = config.to_account_config(None)?;
+        let mut backend = BackendBuilder::new().build(&account_config)?;
+        let mut sender = SenderBuilder::new().build(&account_config)?;
         let mut printer = StdoutPrinter::default();
 
         return email::handlers::mailto(
             &account_config,
-            &mut printer,
             backend.as_mut(),
             sender.as_mut(),
+            &mut printer,
             &url,
         );
     }
@@ -88,12 +87,12 @@ fn main() -> Result<()> {
 
     // inits config
     let config = DeserializedConfig::from_opt_path(config::args::parse_arg(&m))?;
-    let (account_config, backend_config) = config.to_configs(account::args::parse_arg(&m))?;
+    let account_config = config.to_account_config(account::args::parse_arg(&m))?;
     let folder = folder::args::parse_source_arg(&m);
 
     // checks IMAP commands
     #[cfg(feature = "imap-backend")]
-    if let BackendConfig::Imap(imap_config) = &backend_config {
+    if let BackendConfig::Imap(imap_config) = &account_config.backend {
         let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
 
         // FIXME: find a way to downcast `backend` instead of
@@ -112,7 +111,7 @@ fn main() -> Result<()> {
     }
 
     // inits services
-    let mut sender = SenderBuilder::build(&account_config)?;
+    let mut sender = SenderBuilder::new().build(&account_config)?;
     let mut printer = StdoutPrinter::try_from(&m)?;
     let disable_cache = cache::args::parse_disable_cache_flag(&m);
 
@@ -125,7 +124,7 @@ fn main() -> Result<()> {
             let backend = BackendBuilder::new()
                 .sessions_pool_size(8)
                 .disable_cache(true)
-                .build(account_config.clone(), backend_config.clone())?;
+                .build(&account_config)?;
             account::handlers::sync(
                 &account_config,
                 &mut printer,
@@ -137,7 +136,7 @@ fn main() -> Result<()> {
             return Ok(());
         }
         Some(account::args::Cmd::Configure(reset)) => {
-            return account::handlers::configure(&account_config, &backend_config, reset);
+            return account::handlers::configure(&account_config, reset);
         }
         _ => (),
     }
@@ -151,13 +150,13 @@ fn main() -> Result<()> {
             let folder = account_config.folder_alias(folder)?;
             let mut backend = BackendBuilder::new()
                 .disable_cache(disable_cache)
-                .build(account_config.clone(), backend_config.clone())?;
+                .build(&account_config)?;
             return folder::handlers::create(&mut printer, backend.as_mut(), &folder);
         }
         Some(folder::args::Cmd::List(max_width)) => {
             let mut backend = BackendBuilder::new()
                 .disable_cache(disable_cache)
-                .build(account_config.clone(), backend_config.clone())?;
+                .build(&account_config)?;
             return folder::handlers::list(
                 &account_config,
                 &mut printer,
@@ -169,7 +168,7 @@ fn main() -> Result<()> {
             let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
             let mut backend = BackendBuilder::new()
                 .disable_cache(disable_cache)
-                .build(account_config.clone(), backend_config.clone())?;
+                .build(&account_config)?;
             return folder::handlers::expunge(&mut printer, backend.as_mut(), &folder);
         }
         Some(folder::args::Cmd::Delete) => {
@@ -179,7 +178,7 @@ fn main() -> Result<()> {
             let folder = account_config.folder_alias(folder)?;
             let mut backend = BackendBuilder::new()
                 .disable_cache(disable_cache)
-                .build(account_config.clone(), backend_config.clone())?;
+                .build(&account_config)?;
             return folder::handlers::delete(&mut printer, backend.as_mut(), &folder);
         }
         _ => (),
@@ -191,7 +190,7 @@ fn main() -> Result<()> {
             let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
             let mut backend = BackendBuilder::new()
                 .disable_cache(disable_cache)
-                .build(account_config.clone(), backend_config.clone())?;
+                .build(&account_config)?;
             let id_mapper = IdMapper::new(backend.as_ref(), &account_config.name, &folder)?;
             return email::handlers::attachments(
                 &account_config,
@@ -206,7 +205,7 @@ fn main() -> Result<()> {
             let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
             let mut backend = BackendBuilder::new()
                 .disable_cache(disable_cache)
-                .build(account_config.clone(), backend_config.clone())?;
+                .build(&account_config)?;
             let id_mapper = IdMapper::new(backend.as_ref(), &account_config.name, &folder)?;
             return email::handlers::copy(
                 &account_config,
@@ -222,7 +221,7 @@ fn main() -> Result<()> {
             let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
             let mut backend = BackendBuilder::new()
                 .disable_cache(disable_cache)
-                .build(account_config.clone(), backend_config.clone())?;
+                .build(&account_config)?;
             let id_mapper = IdMapper::new(backend.as_ref(), &account_config.name, &folder)?;
             return email::handlers::delete(
                 &account_config,
@@ -237,7 +236,7 @@ fn main() -> Result<()> {
             let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
             let mut backend = BackendBuilder::new()
                 .disable_cache(disable_cache)
-                .build(account_config.clone(), backend_config.clone())?;
+                .build(&account_config)?;
             let id_mapper = IdMapper::new(backend.as_ref(), &account_config.name, &folder)?;
             return email::handlers::forward(
                 &account_config,
@@ -255,7 +254,7 @@ fn main() -> Result<()> {
             let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
             let mut backend = BackendBuilder::new()
                 .disable_cache(disable_cache)
-                .build(account_config.clone(), backend_config.clone())?;
+                .build(&account_config)?;
             let id_mapper = IdMapper::new(backend.as_ref(), &account_config.name, &folder)?;
             return email::handlers::list(
                 &account_config,
@@ -272,7 +271,7 @@ fn main() -> Result<()> {
             let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
             let mut backend = BackendBuilder::new()
                 .disable_cache(disable_cache)
-                .build(account_config.clone(), backend_config.clone())?;
+                .build(&account_config)?;
             let id_mapper = IdMapper::new(backend.as_ref(), &account_config.name, &folder)?;
             return email::handlers::move_(
                 &account_config,
@@ -288,7 +287,7 @@ fn main() -> Result<()> {
             let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
             let mut backend = BackendBuilder::new()
                 .disable_cache(disable_cache)
-                .build(account_config.clone(), backend_config.clone())?;
+                .build(&account_config)?;
             let id_mapper = IdMapper::new(backend.as_ref(), &account_config.name, &folder)?;
             return email::handlers::read(
                 &account_config,
@@ -307,7 +306,7 @@ fn main() -> Result<()> {
             let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
             let mut backend = BackendBuilder::new()
                 .disable_cache(disable_cache)
-                .build(account_config.clone(), backend_config.clone())?;
+                .build(&account_config)?;
             let id_mapper = IdMapper::new(backend.as_ref(), &account_config.name, &folder)?;
             return email::handlers::reply(
                 &account_config,
@@ -326,7 +325,7 @@ fn main() -> Result<()> {
             let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
             let mut backend = BackendBuilder::new()
                 .disable_cache(disable_cache)
-                .build(account_config.clone(), backend_config.clone())?;
+                .build(&account_config)?;
             let id_mapper = IdMapper::new(backend.as_ref(), &account_config.name, &folder)?;
             return email::handlers::save(
                 &account_config,
@@ -341,7 +340,7 @@ fn main() -> Result<()> {
             let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
             let mut backend = BackendBuilder::new()
                 .disable_cache(disable_cache)
-                .build(account_config.clone(), backend_config.clone())?;
+                .build(&account_config)?;
             let id_mapper = IdMapper::new(backend.as_ref(), &account_config.name, &folder)?;
             return email::handlers::search(
                 &account_config,
@@ -359,7 +358,7 @@ fn main() -> Result<()> {
             let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
             let mut backend = BackendBuilder::new()
                 .disable_cache(disable_cache)
-                .build(account_config.clone(), backend_config.clone())?;
+                .build(&account_config)?;
             let id_mapper = IdMapper::new(backend.as_ref(), &account_config.name, &folder)?;
             return email::handlers::sort(
                 &account_config,
@@ -377,7 +376,7 @@ fn main() -> Result<()> {
         Some(email::args::Cmd::Send(raw_email)) => {
             let mut backend = BackendBuilder::new()
                 .disable_cache(disable_cache)
-                .build(account_config.clone(), backend_config.clone())?;
+                .build(&account_config)?;
             return email::handlers::send(
                 &account_config,
                 &mut printer,
@@ -391,7 +390,7 @@ fn main() -> Result<()> {
                 let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
                 let mut backend = BackendBuilder::new()
                     .disable_cache(disable_cache)
-                    .build(account_config.clone(), backend_config.clone())?;
+                    .build(&account_config)?;
                 let id_mapper = IdMapper::new(backend.as_ref(), &account_config.name, &folder)?;
                 return flag::handlers::set(
                     &mut printer,
@@ -406,7 +405,7 @@ fn main() -> Result<()> {
                 let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
                 let mut backend = BackendBuilder::new()
                     .disable_cache(disable_cache)
-                    .build(account_config.clone(), backend_config.clone())?;
+                    .build(&account_config)?;
                 let id_mapper = IdMapper::new(backend.as_ref(), &account_config.name, &folder)?;
                 return flag::handlers::add(
                     &mut printer,
@@ -421,7 +420,7 @@ fn main() -> Result<()> {
                 let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
                 let mut backend = BackendBuilder::new()
                     .disable_cache(disable_cache)
-                    .build(account_config.clone(), backend_config.clone())?;
+                    .build(&account_config)?;
                 let id_mapper = IdMapper::new(backend.as_ref(), &account_config.name, &folder)?;
                 return flag::handlers::remove(
                     &mut printer,
@@ -439,7 +438,7 @@ fn main() -> Result<()> {
                 let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
                 let mut backend = BackendBuilder::new()
                     .disable_cache(disable_cache)
-                    .build(account_config.clone(), backend_config.clone())?;
+                    .build(&account_config)?;
                 let id_mapper = IdMapper::new(backend.as_ref(), &account_config.name, &folder)?;
                 return tpl::handlers::forward(
                     &account_config,
@@ -459,7 +458,7 @@ fn main() -> Result<()> {
                 let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
                 let mut backend = BackendBuilder::new()
                     .disable_cache(disable_cache)
-                    .build(account_config.clone(), backend_config.clone())?;
+                    .build(&account_config)?;
                 let id_mapper = IdMapper::new(backend.as_ref(), &account_config.name, &folder)?;
                 return tpl::handlers::reply(
                     &account_config,
@@ -477,7 +476,7 @@ fn main() -> Result<()> {
                 let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
                 let mut backend = BackendBuilder::new()
                     .disable_cache(disable_cache)
-                    .build(account_config.clone(), backend_config.clone())?;
+                    .build(&account_config)?;
                 let id_mapper = IdMapper::new(backend.as_ref(), &account_config.name, &folder)?;
                 return tpl::handlers::save(
                     &account_config,
@@ -492,7 +491,7 @@ fn main() -> Result<()> {
                 let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
                 let mut backend = BackendBuilder::new()
                     .disable_cache(disable_cache)
-                    .build(account_config.clone(), backend_config.clone())?;
+                    .build(&account_config)?;
                 return tpl::handlers::send(
                     &account_config,
                     &mut printer,
@@ -507,7 +506,7 @@ fn main() -> Result<()> {
         Some(email::args::Cmd::Write(headers, body)) => {
             let mut backend = BackendBuilder::new()
                 .disable_cache(disable_cache)
-                .build(account_config.clone(), backend_config.clone())?;
+                .build(&account_config)?;
             return email::handlers::write(
                 &account_config,
                 &mut printer,

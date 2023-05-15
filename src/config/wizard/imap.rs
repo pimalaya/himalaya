@@ -1,23 +1,27 @@
 use anyhow::Result;
 use dialoguer::{Input, Select};
-use pimalaya_email::ImapConfig;
+use pimalaya_email::{BackendConfig, ImapConfig};
 
-use crate::account::{
-    DeserializedAccountConfig, DeserializedBaseAccountConfig, DeserializedImapAccountConfig,
-};
+use crate::account::DeserializedAccountConfig;
 
-use super::{SECURITY_PROTOCOLS, THEME};
+use super::{AUTH_MECHANISMS, CMD, KEYRING, RAW, SECRET, SECURITY_PROTOCOLS, THEME};
 
 #[cfg(feature = "imap-backend")]
-pub(crate) fn configure(base: DeserializedBaseAccountConfig) -> Result<DeserializedAccountConfig> {
+pub(crate) fn configure(base: &DeserializedAccountConfig) -> Result<BackendConfig> {
     // TODO: Validate by checking as valid URI
-    let mut backend = ImapConfig {
-        host: Input::with_theme(&*THEME)
-            .with_prompt("Enter the IMAP host:")
-            .default(format!("imap.{}", base.email.rsplit_once('@').unwrap().1))
-            .interact()?,
-        ..Default::default()
-    };
+
+    use dialoguer::Password;
+    use pimalaya_email::{ImapAuthConfig, PasswdConfig};
+    use pimalaya_secret::Secret;
+
+    use super::PASSWD;
+
+    let mut imap_config = ImapConfig::default();
+
+    imap_config.host = Input::with_theme(&*THEME)
+        .with_prompt("What is your IMAP host:")
+        .default(format!("imap.{}", base.email.rsplit_once('@').unwrap().1))
+        .interact()?;
 
     let default_port = match Select::with_theme(&*THEME)
         .with_prompt("Which security protocol do you want to use?")
@@ -26,27 +30,54 @@ pub(crate) fn configure(base: DeserializedBaseAccountConfig) -> Result<Deseriali
         .interact_opt()?
     {
         Some(idx) if SECURITY_PROTOCOLS[idx] == "SSL/TLS" => {
-            backend.ssl = Some(true);
+            imap_config.ssl = Some(true);
             993
         }
         Some(idx) if SECURITY_PROTOCOLS[idx] == "STARTTLS" => {
-            backend.starttls = Some(true);
+            imap_config.starttls = Some(true);
             143
         }
         _ => 143,
     };
 
-    backend.port = Input::with_theme(&*THEME)
-        .with_prompt("Enter the IMAP port:")
+    imap_config.port = Input::with_theme(&*THEME)
+        .with_prompt("Which IMAP port would you like to use?")
         .validate_with(|input: &String| input.parse::<u16>().map(|_| ()))
         .default(default_port.to_string())
         .interact()
         .map(|input| input.parse::<u16>().unwrap())?;
 
-    backend.login = Input::with_theme(&*THEME)
-        .with_prompt("Enter your IMAP login:")
+    imap_config.login = Input::with_theme(&*THEME)
+        .with_prompt("What is your IMAP login?")
         .default(base.email.clone())
         .interact()?;
+
+    let auth = Select::with_theme(&*THEME)
+        .with_prompt("Which IMAP authentication mechanism would you like to use?")
+        .items(AUTH_MECHANISMS)
+        .default(0)
+        .interact_opt()?;
+
+    imap_config.auth = match auth {
+        Some(idx) if AUTH_MECHANISMS[idx] == PASSWD => {
+            let secret = Select::with_theme(&*THEME)
+                .with_prompt("How would you like to store your password?")
+                .items(SECRET)
+                .default(0)
+                .interact_opt()?;
+            match secret {
+                Some(idx) if SECRET[idx] == RAW => ImapAuthConfig::Passwd(PasswdConfig {
+                    passwd: Secret::new_raw(
+                        Password::with_theme(&*THEME)
+                            .with_prompt("What is your IMAP password?")
+                            .interact()?,
+                    ),
+                }),
+                _ => ImapAuthConfig::default(),
+            }
+        }
+        _ => ImapAuthConfig::default(),
+    };
 
     // FIXME: add all variants: password, password command and oauth2
     // backend.passwd_cmd = Input::with_theme(&*THEME)
@@ -54,7 +85,5 @@ pub(crate) fn configure(base: DeserializedBaseAccountConfig) -> Result<Deseriali
     //     .default(format!("pass show {}", &base.email))
     //     .interact()?;
 
-    Ok(DeserializedAccountConfig::Imap(
-        DeserializedImapAccountConfig { base, backend },
-    ))
+    Ok(BackendConfig::Imap(imap_config))
 }

@@ -74,8 +74,8 @@ pub fn save<P: Printer>(
     })
     .compile(
         CompilerBuilder::default()
-            .some_pgp_sign_cmd(config.email_writing_sign_cmd.as_ref())
-            .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.as_ref()),
+            .some_pgp_sign_cmd(config.email_writing_sign_cmd.clone())
+            .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.clone()),
     )?;
 
     let id = backend.add_email(folder, &email, &Flags::default())?;
@@ -104,8 +104,8 @@ pub fn send<P: Printer>(
     })
     .compile(
         CompilerBuilder::default()
-            .some_pgp_sign_cmd(config.email_writing_sign_cmd.as_ref())
-            .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.as_ref()),
+            .some_pgp_sign_cmd(config.email_writing_sign_cmd.clone())
+            .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.clone()),
     )?;
     sender.send(&email)?;
     backend.add_email(folder, &email, &Flags::default())?;

@@ -5,93 +5,18 @@
 
 use pimalaya_email::{
     folder::sync::Strategy as SyncFoldersStrategy, AccountConfig, BackendConfig, EmailHooks,
-    EmailSender, EmailTextPlainFormat, ImapAuthConfig, MaildirConfig,
+    EmailTextPlainFormat, SenderConfig,
 };
+use pimalaya_process::Cmd;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
-
-#[cfg(feature = "imap-backend")]
-use pimalaya_email::ImapConfig;
-
-#[cfg(feature = "notmuch-backend")]
-use pimalaya_email::NotmuchConfig;
 
 use crate::config::{prelude::*, DeserializedConfig};
 
 /// Represents all existing kind of account config.
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(tag = "backend", rename_all = "kebab-case")]
-pub enum DeserializedAccountConfig {
-    None(DeserializedBaseAccountConfig),
-    Maildir(DeserializedMaildirAccountConfig),
-    #[cfg(feature = "imap-backend")]
-    Imap(DeserializedImapAccountConfig),
-    #[cfg(feature = "notmuch-backend")]
-    Notmuch(DeserializedNotmuchAccountConfig),
-}
-
-impl DeserializedAccountConfig {
-    pub fn to_configs(
-        &self,
-        name: String,
-        global_config: &DeserializedConfig,
-    ) -> (AccountConfig, BackendConfig) {
-        match self {
-            DeserializedAccountConfig::None(config) => (
-                config.to_account_config(name, global_config),
-                BackendConfig::None,
-            ),
-            DeserializedAccountConfig::Maildir(config) => (
-                config.base.to_account_config(name, global_config),
-                BackendConfig::Maildir(config.backend.clone()),
-            ),
-            #[cfg(feature = "imap-backend")]
-            DeserializedAccountConfig::Imap(config) => {
-                let mut imap_config = config.backend.clone();
-
-                match &mut imap_config.auth {
-                    ImapAuthConfig::Passwd(secret) => {
-                        secret.replace_undefined_entry_with(format!("{name}-imap-passwd"));
-                    }
-                    ImapAuthConfig::OAuth2(config) => {
-                        config.client_secret.replace_undefined_entry_with(format!(
-                            "{name}-imap-oauth2-client-secret"
-                        ));
-                        config.access_token.replace_undefined_entry_with(format!(
-                            "{name}-imap-oauth2-access-token"
-                        ));
-                        config.refresh_token.replace_undefined_entry_with(format!(
-                            "{name}-imap-oauth2-refresh-token"
-                        ));
-                    }
-                };
-
-                let account_config = config.base.to_account_config(name, global_config);
-                (account_config, BackendConfig::Imap(imap_config))
-            }
-            #[cfg(feature = "notmuch-backend")]
-            DeserializedAccountConfig::Notmuch(config) => (
-                config.base.to_account_config(name, global_config),
-                BackendConfig::Notmuch(config.backend.clone()),
-            ),
-        }
-    }
-
-    pub fn is_default(&self) -> bool {
-        match self {
-            DeserializedAccountConfig::None(config) => config.default.unwrap_or_default(),
-            DeserializedAccountConfig::Maildir(config) => config.base.default.unwrap_or_default(),
-            #[cfg(feature = "imap-backend")]
-            DeserializedAccountConfig::Imap(config) => config.base.default.unwrap_or_default(),
-            #[cfg(feature = "notmuch-backend")]
-            DeserializedAccountConfig::Notmuch(config) => config.base.default.unwrap_or_default(),
-        }
-    }
-}
-
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub struct DeserializedBaseAccountConfig {
+#[serde(tag = "backend", rename_all = "kebab-case")]
+pub struct DeserializedAccountConfig {
     pub email: String,
     pub default: Option<bool>,
     pub display_name: Option<String>,
@@ -106,13 +31,32 @@ pub struct DeserializedBaseAccountConfig {
     pub email_reading_headers: Option<Vec<String>>,
     #[serde(default, with = "EmailTextPlainFormatDef")]
     pub email_reading_format: EmailTextPlainFormat,
-    pub email_reading_verify_cmd: Option<String>,
-    pub email_reading_decrypt_cmd: Option<String>,
+    #[serde(
+        default,
+        with = "OptionCmdDef",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub email_reading_verify_cmd: Option<Cmd>,
+    #[serde(
+        default,
+        with = "OptionCmdDef",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub email_reading_decrypt_cmd: Option<Cmd>,
     pub email_writing_headers: Option<Vec<String>>,
-    pub email_writing_sign_cmd: Option<String>,
-    pub email_writing_encrypt_cmd: Option<String>,
-    #[serde(flatten, with = "EmailSenderDef")]
-    pub email_sender: EmailSender,
+    #[serde(
+        default,
+        with = "OptionCmdDef",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub email_writing_sign_cmd: Option<Cmd>,
+    #[serde(
+        default,
+        with = "OptionCmdDef",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub email_writing_encrypt_cmd: Option<Cmd>,
+    pub email_sending_save_copy: Option<bool>,
     #[serde(
         default,
         with = "EmailHooksDef",
@@ -125,9 +69,14 @@ pub struct DeserializedBaseAccountConfig {
     pub sync_dir: Option<PathBuf>,
     #[serde(default, with = "SyncFoldersStrategyDef")]
     pub sync_folders_strategy: SyncFoldersStrategy,
+
+    #[serde(flatten, with = "BackendConfigDef")]
+    pub backend: BackendConfig,
+    #[serde(flatten, with = "SenderConfigDef")]
+    pub sender: SenderConfig,
 }
 
-impl DeserializedBaseAccountConfig {
+impl DeserializedAccountConfig {
     pub fn to_account_config(&self, name: String, config: &DeserializedConfig) -> AccountConfig {
         let mut folder_aliases = config
             .folder_aliases
@@ -222,39 +171,16 @@ impl DeserializedBaseAccountConfig {
                 .as_ref()
                 .map(ToOwned::to_owned)
                 .or_else(|| config.email_writing_headers.as_ref().map(ToOwned::to_owned)),
-            email_sender: self.email_sender.to_owned(),
+            email_sending_save_copy: self.email_sending_save_copy.unwrap_or(true),
             email_hooks: EmailHooks {
                 pre_send: self.email_hooks.pre_send.clone(),
             },
             sync: self.sync,
             sync_dir: self.sync_dir.clone(),
             sync_folders_strategy: self.sync_folders_strategy.clone(),
+
+            backend: self.backend.clone(),
+            sender: self.sender.clone(),
         }
     }
-}
-
-#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
-#[cfg(feature = "imap-backend")]
-pub struct DeserializedImapAccountConfig {
-    #[serde(flatten)]
-    pub base: DeserializedBaseAccountConfig,
-    #[serde(flatten, with = "ImapConfigDef")]
-    pub backend: ImapConfig,
-}
-
-#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
-pub struct DeserializedMaildirAccountConfig {
-    #[serde(flatten)]
-    pub base: DeserializedBaseAccountConfig,
-    #[serde(flatten, with = "MaildirConfigDef")]
-    pub backend: MaildirConfig,
-}
-
-#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
-#[cfg(feature = "notmuch-backend")]
-pub struct DeserializedNotmuchAccountConfig {
-    #[serde(flatten)]
-    pub base: DeserializedBaseAccountConfig,
-    #[serde(flatten, with = "NotmuchConfigDef")]
-    pub backend: NotmuchConfig,
 }

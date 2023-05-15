@@ -1,13 +1,13 @@
-use super::THEME;
-use crate::account::{
-    DeserializedAccountConfig, DeserializedBaseAccountConfig, DeserializedNotmuchAccountConfig,
-};
 use anyhow::Result;
 use dialoguer::Input;
-use pimalaya_email::{NotmuchBackend, NotmuchConfig};
+use pimalaya_email::{BackendConfig, NotmuchBackend, NotmuchConfig};
 
-pub(crate) fn configure(base: DeserializedBaseAccountConfig) -> Result<DeserializedAccountConfig> {
-    let db_path = match NotmuchBackend::get_default_db_path() {
+use super::THEME;
+
+pub(crate) fn configure() -> Result<BackendConfig> {
+    let mut notmuch_config = NotmuchConfig::default();
+
+    notmuch_config.db_path = match NotmuchBackend::get_default_db_path() {
         Ok(db) => db,
         _ => {
             let input: String = Input::with_theme(&*THEME)
@@ -17,9 +17,5 @@ pub(crate) fn configure(base: DeserializedBaseAccountConfig) -> Result<Deseriali
         }
     };
 
-    let backend = NotmuchConfig { db_path };
-
-    Ok(DeserializedAccountConfig::Notmuch(
-        DeserializedNotmuchAccountConfig { base, backend },
-    ))
+    Ok(BackendConfig::Notmuch(notmuch_config))
 }

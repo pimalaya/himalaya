@@ -1,13 +1,17 @@
-use super::THEME;
 use anyhow::Result;
 use dialoguer::Input;
-use pimalaya_email::{EmailSender, SendmailConfig};
+use pimalaya_email::{SenderConfig, SendmailConfig};
 
-pub(crate) fn configure() -> Result<EmailSender> {
-    Ok(EmailSender::Sendmail(SendmailConfig {
-        cmd: Input::with_theme(&*THEME)
-            .with_prompt("Enter an external command to send a mail: ")
-            .default("/usr/bin/msmtp".to_owned())
-            .interact()?,
-    }))
+use super::THEME;
+
+pub(crate) fn configure() -> Result<SenderConfig> {
+    let mut sendmail_config = SendmailConfig::default();
+
+    sendmail_config.cmd = Input::with_theme(&*THEME)
+        .with_prompt("Enter an external command to send an email: ")
+        .default("/usr/bin/msmtp".to_owned())
+        .interact()?
+        .into();
+
+    Ok(SenderConfig::Sendmail(sendmail_config))
 }

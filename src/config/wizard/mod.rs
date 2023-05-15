@@ -8,25 +8,36 @@ mod smtp;
 mod validators;
 
 use super::DeserializedConfig;
-use crate::account::{DeserializedAccountConfig, DeserializedBaseAccountConfig};
+use crate::account::DeserializedAccountConfig;
 use anyhow::{anyhow, Result};
 use console::style;
 use dialoguer::{theme::ColorfulTheme, Confirm, Input, Password, Select};
 use log::trace;
 use once_cell::sync::Lazy;
+use pimalaya_email::{BackendConfig, SenderConfig};
 use std::{fs, io, process};
 
 const BACKENDS: &[&str] = &[
-    "Maildir",
     #[cfg(feature = "imap-backend")]
     "IMAP",
+    "Maildir",
     #[cfg(feature = "notmuch-backend")]
     "Notmuch",
+    "None",
 ];
 
 const SENDERS: &[&str] = &["SMTP", "Sendmail"];
 
 const SECURITY_PROTOCOLS: &[&str] = &["SSL/TLS", "STARTTLS", "None"];
+
+const AUTH_MECHANISMS: &[&str] = &[PASSWD, OAUTH2];
+const PASSWD: &str = "Password";
+const OAUTH2: &str = "OAuth 2.0";
+
+const SECRET: &[&str] = &[RAW, CMD, KEYRING];
+const RAW: &str = "In clear, in your configuration (not recommanded)";
+const CMD: &str = "From a shell command";
+const KEYRING: &str = "From your system's global keyring";
 
 // A wizard should have pretty colors 💅
 static THEME: Lazy<ColorfulTheme> = Lazy::new(ColorfulTheme::default);
@@ -45,9 +56,10 @@ pub(crate) fn wizard() -> Result<DeserializedConfig> {
     }
 
     // Determine path to save to
-    let path = dirs::config_dir()
-        .map(|p| p.join("himalaya").join("config.toml"))
-        .ok_or_else(|| anyhow!("The wizard could not determine the config directory. Aborting"))?;
+    // let path = dirs::config_dir()
+    //     .map(|p| p.join("himalaya").join("config.toml"))
+    //     .ok_or_else(|| anyhow!("The wizard could not determine the config directory. Aborting"))?;
+    let path = std::path::PathBuf::from("/home/soywod/config.wizard.toml");
 
     let mut config = DeserializedConfig::default();
 
@@ -74,7 +86,7 @@ pub(crate) fn wizard() -> Result<DeserializedConfig> {
 
     // If one acounts is setup, make it the default. If multiple accounts are setup, decide which
     // will be the default. If no accounts are setup, exit the process
-    let default = match config.accounts.len() {
+    let default_account = match config.accounts.len() {
         1 => Some(config.accounts.values_mut().next().unwrap()),
         i if i > 1 => {
             let accounts = config.accounts.clone();
@@ -97,14 +109,8 @@ pub(crate) fn wizard() -> Result<DeserializedConfig> {
         _ => process::exit(0),
     };
 
-    match default {
-        Some(DeserializedAccountConfig::None(default)) => default.default = Some(true),
-        Some(DeserializedAccountConfig::Maildir(default)) => default.base.default = Some(true),
-        #[cfg(feature = "imap-backend")]
-        Some(DeserializedAccountConfig::Imap(default)) => default.base.default = Some(true),
-        #[cfg(feature = "notmuch-backend")]
-        Some(DeserializedAccountConfig::Notmuch(default)) => default.base.default = Some(true),
-        _ => {}
+    if let Some(account) = default_account {
+        account.default = Some(true);
     }
 
     // Serialize config to file
@@ -117,18 +123,18 @@ pub(crate) fn wizard() -> Result<DeserializedConfig> {
 }
 
 fn configure_account() -> Result<Option<DeserializedAccountConfig>> {
-    let mut base = configure_base()?;
-    let sender = Select::with_theme(&*THEME)
-        .with_prompt("Which sender would you like use with your account?")
-        .items(SENDERS)
-        .default(0)
-        .interact_opt()?;
+    let mut config = DeserializedAccountConfig::default();
 
-    base.email_sender = match sender {
-        Some(idx) if SENDERS[idx] == "SMTP" => smtp::configure(&base),
-        Some(idx) if SENDERS[idx] == "Sendmail" => sendmail::configure(),
-        _ => return Ok(None),
-    }?;
+    config.email = Input::with_theme(&*THEME)
+        .with_prompt("What is your email address?")
+        .validate_with(validators::EmailValidator)
+        .interact()?;
+
+    config.display_name = Some(
+        Input::with_theme(&*THEME)
+            .with_prompt("Which name would you like to display with your email?")
+            .interact()?,
+    );
 
     let backend = Select::with_theme(&*THEME)
         .with_prompt("Which backend would you like to configure your account for?")
@@ -136,32 +142,28 @@ fn configure_account() -> Result<Option<DeserializedAccountConfig>> {
         .default(0)
         .interact_opt()?;
 
-    match backend {
-        Some(idx) if BACKENDS[idx] == "Maildir" => Ok(Some(maildir::configure(base)?)),
-        #[cfg(feature = "imap-backend")]
-        Some(idx) if BACKENDS[idx] == "IMAP" => Ok(Some(imap::configure(base)?)),
-        #[cfg(feature = "notmuch-backend")]
-        Some(idx) if BACKENDS[idx] == "Notmuch" => Ok(Some(notmuch::configure(base)?)),
-        _ => Ok(None),
-    }
-}
+    config.backend = match backend {
+        Some(idx) if BACKENDS[idx] == "IMAP" => imap::configure(&config),
+        Some(idx) if BACKENDS[idx] == "Maildir" => maildir::configure(),
+        Some(idx) if BACKENDS[idx] == "Notmuch" => notmuch::configure(),
+        Some(idx) if BACKENDS[idx] == "None" => Ok(BackendConfig::None),
+        _ => return Ok(None),
+    }?;
 
-fn configure_base() -> Result<DeserializedBaseAccountConfig> {
-    let mut base_account_config = DeserializedBaseAccountConfig {
-        email: Input::with_theme(&*THEME)
-            .with_prompt("Enter your email:")
-            .validate_with(validators::EmailValidator)
-            .interact()?,
-        ..Default::default()
-    };
+    let sender = Select::with_theme(&*THEME)
+        .with_prompt("Which sender would you like use with your account?")
+        .items(SENDERS)
+        .default(0)
+        .interact_opt()?;
 
-    base_account_config.display_name = Some(
-        Input::with_theme(&*THEME)
-            .with_prompt("Enter display name:")
-            .interact()?,
-    );
+    config.sender = match sender {
+        Some(idx) if SENDERS[idx] == "SMTP" => smtp::configure(&config),
+        Some(idx) if SENDERS[idx] == "Sendmail" => sendmail::configure(),
+        Some(idx) if SENDERS[idx] == "None" => Ok(SenderConfig::None),
+        _ => return Ok(None),
+    }?;
 
-    Ok(base_account_config)
+    Ok(Some(config))
 }
 
 pub(crate) fn prompt_passwd(prompt: &str) -> io::Result<String> {

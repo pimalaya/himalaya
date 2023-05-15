@@ -5,6 +5,7 @@
 //! accounts from the config file.
 
 use anyhow::Result;
+use pimalaya_email::BackendConfig;
 use serde::Serialize;
 use std::{collections::hash_map::Iter, ops::Deref};
 
@@ -39,19 +40,19 @@ impl PrintTable for Accounts {
 impl From<Iter<'_, String, DeserializedAccountConfig>> for Accounts {
     fn from(map: Iter<'_, String, DeserializedAccountConfig>) -> Self {
         let mut accounts: Vec<_> = map
-            .map(|(name, account)| match account {
-                DeserializedAccountConfig::Maildir(config) => {
-                    Account::new(name, "maildir", config.base.default.unwrap_or_default())
+            .map(|(name, account)| match &account.backend {
+                BackendConfig::None => Account::new(name, "none", false),
+                BackendConfig::Maildir(_) => {
+                    Account::new(name, "maildir", account.default.unwrap_or_default())
                 }
                 #[cfg(feature = "imap-backend")]
-                DeserializedAccountConfig::Imap(config) => {
-                    Account::new(name, "imap", config.base.default.unwrap_or_default())
+                BackendConfig::Imap(_) => {
+                    Account::new(name, "imap", account.default.unwrap_or_default())
                 }
                 #[cfg(feature = "notmuch-backend")]
-                DeserializedAccountConfig::Notmuch(config) => {
-                    Account::new(name, "notmuch", config.base.default.unwrap_or_default())
+                BackendConfig::Notmuch(_) => {
+                    Account::new(name, "notmuch", account.default.unwrap_or_default())
                 }
-                DeserializedAccountConfig::None(..) => Account::new(name, "none", false),
             })
             .collect();
         accounts.sort_by(|a, b| b.name.partial_cmp(&a.name).unwrap());

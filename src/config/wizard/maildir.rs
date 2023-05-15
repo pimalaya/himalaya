@@ -1,13 +1,13 @@
-use super::THEME;
-use crate::account::{
-    DeserializedAccountConfig, DeserializedBaseAccountConfig, DeserializedMaildirAccountConfig,
-};
 use anyhow::Result;
 use dialoguer::Input;
 use dirs::home_dir;
-use pimalaya_email::MaildirConfig;
+use pimalaya_email::{BackendConfig, MaildirConfig};
 
-pub(crate) fn configure(base: DeserializedBaseAccountConfig) -> Result<DeserializedAccountConfig> {
+use super::THEME;
+
+pub(crate) fn configure() -> Result<BackendConfig> {
+    let mut maildir_config = MaildirConfig::default();
+
     let input = if let Some(home) = home_dir() {
         Input::with_theme(&*THEME)
             .default(home.join("Mail").display().to_string())
@@ -19,12 +19,7 @@ pub(crate) fn configure(base: DeserializedBaseAccountConfig) -> Result<Deseriali
             .interact_text()?
     };
 
-    Ok(DeserializedAccountConfig::Maildir(
-        DeserializedMaildirAccountConfig {
-            base,
-            backend: MaildirConfig {
-                root_dir: input.into(),
-            },
-        },
-    ))
+    maildir_config.root_dir = input.into();
+
+    Ok(BackendConfig::Maildir(maildir_config))
 }

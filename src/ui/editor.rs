@@ -75,8 +75,8 @@ pub fn edit_tpl_with_editor<P: Printer>(
                 printer.print_log("Sending email…")?;
                 let email = tpl.compile(
                     CompilerBuilder::default()
-                        .some_pgp_sign_cmd(config.email_writing_sign_cmd.as_ref())
-                        .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.as_ref()),
+                        .some_pgp_sign_cmd(config.email_writing_sign_cmd.clone())
+                        .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.clone()),
                 )?;
                 sender.send(&email)?;
                 let sent_folder = config.sent_folder_alias()?;
@@ -98,8 +98,8 @@ pub fn edit_tpl_with_editor<P: Printer>(
                 let draft_folder = config.folder_alias("drafts")?;
                 let email = tpl.compile(
                     CompilerBuilder::default()
-                        .some_pgp_sign_cmd(config.email_writing_sign_cmd.as_ref())
-                        .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.as_ref()),
+                        .some_pgp_sign_cmd(config.email_writing_sign_cmd.clone())
+                        .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.clone()),
                 )?;
                 backend.add_email(
                     &draft_folder,
