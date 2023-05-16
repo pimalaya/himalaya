@@ -3,6 +3,10 @@
 //! This module contains the raw deserialized representation of an
 //! account in the accounts section of the user configuration file.
 
+#[cfg(feature = "imap-backend")]
+use pimalaya_email::ImapAuthConfig;
+#[cfg(feature = "smtp-sender")]
+use pimalaya_email::SmtpAuthConfig;
 use pimalaya_email::{
     folder::sync::Strategy as SyncFoldersStrategy, AccountConfig, BackendConfig, EmailHooks,
     EmailTextPlainFormat, SenderConfig,
@@ -29,7 +33,11 @@ pub struct DeserializedAccountConfig {
 
     pub email_listing_page_size: Option<usize>,
     pub email_reading_headers: Option<Vec<String>>,
-    #[serde(default, with = "EmailTextPlainFormatDef")]
+    #[serde(
+        default,
+        with = "EmailTextPlainFormatDef",
+        skip_serializing_if = "EmailTextPlainFormat::is_default"
+    )]
     pub email_reading_format: EmailTextPlainFormat,
     #[serde(
         default,
@@ -64,10 +72,13 @@ pub struct DeserializedAccountConfig {
     )]
     pub email_hooks: EmailHooks,
 
-    #[serde(default)]
-    pub sync: bool,
+    pub sync: Option<bool>,
     pub sync_dir: Option<PathBuf>,
-    #[serde(default, with = "SyncFoldersStrategyDef")]
+    #[serde(
+        default,
+        with = "SyncFoldersStrategyDef",
+        skip_serializing_if = "SyncFoldersStrategy::is_default"
+    )]
     pub sync_folders_strategy: SyncFoldersStrategy,
 
     #[serde(flatten, with = "BackendConfigDef")]
@@ -91,7 +102,7 @@ impl DeserializedAccountConfig {
         );
 
         AccountConfig {
-            name,
+            name: name.clone(),
             email: self.email.to_owned(),
             display_name: self
                 .display_name
@@ -175,12 +186,60 @@ impl DeserializedAccountConfig {
             email_hooks: EmailHooks {
                 pre_send: self.email_hooks.pre_send.clone(),
             },
-            sync: self.sync,
+            sync: self.sync.unwrap_or_default(),
             sync_dir: self.sync_dir.clone(),
             sync_folders_strategy: self.sync_folders_strategy.clone(),
 
-            backend: self.backend.clone(),
-            sender: self.sender.clone(),
+            backend: {
+                let mut backend = self.backend.clone();
+
+                #[cfg(feature = "imap-backend")]
+                if let BackendConfig::Imap(config) = &mut backend {
+                    match &mut config.auth {
+                        ImapAuthConfig::Passwd(secret) => {
+                            secret.replace_undefined_entry_with(format!("{name}-imap-passwd"));
+                        }
+                        ImapAuthConfig::OAuth2(config) => {
+                            config.client_secret.replace_undefined_entry_with(format!(
+                                "{name}-imap-oauth2-client-secret"
+                            ));
+                            config.access_token.replace_undefined_entry_with(format!(
+                                "{name}-imap-oauth2-access-token"
+                            ));
+                            config.refresh_token.replace_undefined_entry_with(format!(
+                                "{name}-imap-oauth2-refresh-token"
+                            ));
+                        }
+                    };
+                }
+
+                backend
+            },
+            sender: {
+                let mut sender = self.sender.clone();
+
+                #[cfg(feature = "smtp-sender")]
+                if let SenderConfig::Smtp(config) = &mut sender {
+                    match &mut config.auth {
+                        SmtpAuthConfig::Passwd(secret) => {
+                            secret.replace_undefined_entry_with(format!("{name}-smtp-passwd"));
+                        }
+                        SmtpAuthConfig::OAuth2(config) => {
+                            config.client_secret.replace_undefined_entry_with(format!(
+                                "{name}-smtp-oauth2-client-secret"
+                            ));
+                            config.access_token.replace_undefined_entry_with(format!(
+                                "{name}-smtp-oauth2-access-token"
+                            ));
+                            config.refresh_token.replace_undefined_entry_with(format!(
+                                "{name}-smtp-oauth2-refresh-token"
+                            ));
+                        }
+                    };
+                }
+
+                sender
+            },
         }
     }
 }

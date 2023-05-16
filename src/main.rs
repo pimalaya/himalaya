@@ -111,9 +111,8 @@ fn main() -> Result<()> {
     }
 
     // inits services
-    let mut sender = SenderBuilder::new().build(&account_config)?;
-    let mut printer = StdoutPrinter::try_from(&m)?;
     let disable_cache = cache::args::parse_disable_cache_flag(&m);
+    let mut printer = StdoutPrinter::try_from(&m)?;
 
     // checks account commands
     match account::args::matches(&m)? {
@@ -237,6 +236,7 @@ fn main() -> Result<()> {
             let mut backend = BackendBuilder::new()
                 .disable_cache(disable_cache)
                 .build(&account_config)?;
+            let mut sender = SenderBuilder::new().build(&account_config)?;
             let id_mapper = IdMapper::new(backend.as_ref(), &account_config.name, &folder)?;
             return email::handlers::forward(
                 &account_config,
@@ -307,6 +307,7 @@ fn main() -> Result<()> {
             let mut backend = BackendBuilder::new()
                 .disable_cache(disable_cache)
                 .build(&account_config)?;
+            let mut sender = SenderBuilder::new().build(&account_config)?;
             let id_mapper = IdMapper::new(backend.as_ref(), &account_config.name, &folder)?;
             return email::handlers::reply(
                 &account_config,
@@ -377,6 +378,7 @@ fn main() -> Result<()> {
             let mut backend = BackendBuilder::new()
                 .disable_cache(disable_cache)
                 .build(&account_config)?;
+            let mut sender = SenderBuilder::new().build(&account_config)?;
             return email::handlers::send(
                 &account_config,
                 &mut printer,
@@ -492,6 +494,7 @@ fn main() -> Result<()> {
                 let mut backend = BackendBuilder::new()
                     .disable_cache(disable_cache)
                     .build(&account_config)?;
+                let mut sender = SenderBuilder::new().build(&account_config)?;
                 return tpl::handlers::send(
                     &account_config,
                     &mut printer,
@@ -507,6 +510,7 @@ fn main() -> Result<()> {
             let mut backend = BackendBuilder::new()
                 .disable_cache(disable_cache)
                 .build(&account_config)?;
+            let mut sender = SenderBuilder::new().build(&account_config)?;
             return email::handlers::write(
                 &account_config,
                 &mut printer,

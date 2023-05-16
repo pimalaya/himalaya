@@ -4,17 +4,19 @@
 //! user configuration file.
 
 use anyhow::{anyhow, Context, Result};
+use dialoguer::Confirm;
 use dirs::{config_dir, home_dir};
 use log::{debug, trace};
 use pimalaya_email::{AccountConfig, EmailHooks, EmailTextPlainFormat};
 use pimalaya_process::Cmd;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{collections::HashMap, fs, path::PathBuf, process};
 use toml;
 
 use crate::{
     account::DeserializedAccountConfig,
-    config::{prelude::*, wizard::wizard},
+    config::{prelude::*, wizard},
+    wizard_prompt, wizard_warn,
 };
 
 /// Represents the user config file.
@@ -32,7 +34,11 @@ pub struct DeserializedConfig {
 
     pub email_listing_page_size: Option<usize>,
     pub email_reading_headers: Option<Vec<String>>,
-    #[serde(default, with = "EmailTextPlainFormatDef")]
+    #[serde(
+        default,
+        with = "EmailTextPlainFormatDef",
+        skip_serializing_if = "EmailTextPlainFormat::is_default"
+    )]
     pub email_reading_format: EmailTextPlainFormat,
     #[serde(
         default,
@@ -76,15 +82,25 @@ impl DeserializedConfig {
     pub fn from_opt_path(path: Option<&str>) -> Result<Self> {
         debug!("path: {:?}", path);
 
-        // let config: Self = match path.map(|s| s.into()).or_else(Self::path) {
-        //     Some(path) => {
-        //         let content = fs::read_to_string(path).context("cannot read config file")?;
-        //         toml::from_str(&content).context("cannot parse config file")?
-        //     }
-        //     None => wizard()?,
-        // };
+        let config = if let Some(path) = path.map(PathBuf::from).or_else(Self::path) {
+            let content = fs::read_to_string(path).context("cannot read config file")?;
+            toml::from_str(&content).context("cannot parse config file")?
+        } else {
+            wizard_warn!("Himalaya could not find an already existing configuration file.");
 
-        let config = wizard()?;
+            if !Confirm::new()
+                .with_prompt(wizard_prompt!(
+                    "Would you like to create one with the wizard?"
+                ))
+                .default(true)
+                .interact_opt()?
+                .unwrap_or_default()
+            {
+                process::exit(0);
+            }
+
+            wizard::configure()?
+        };
 
         if config.accounts.is_empty() {
             return Err(anyhow!("config file must contain at least one account"));

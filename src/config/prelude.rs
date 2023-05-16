@@ -1,80 +1,80 @@
+#[cfg(feature = "imap-backend")]
+use pimalaya_email::ImapConfig;
+#[cfg(feature = "notmuch-backend")]
+use pimalaya_email::NotmuchConfig;
 use pimalaya_email::{
     folder::sync::Strategy as SyncFoldersStrategy, BackendConfig, EmailHooks, EmailTextPlainFormat,
     ImapAuthConfig, MaildirConfig, OAuth2Config, OAuth2Method, OAuth2Scopes, PasswdConfig,
     SenderConfig, SendmailConfig, SmtpAuthConfig, SmtpConfig,
 };
 use pimalaya_keyring::Entry;
-use pimalaya_process::Cmd;
+use pimalaya_process::{Cmd, Pipeline, SingleCmd};
 use pimalaya_secret::Secret;
-use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, path::PathBuf};
+use serde::{ser::SerializeSeq, Deserialize, Serialize, Serializer};
+use std::{collections::HashSet, ops::Deref, path::PathBuf};
 
-#[cfg(feature = "imap-backend")]
-use pimalaya_email::ImapConfig;
-
-#[cfg(feature = "notmuch-backend")]
-use pimalaya_email::NotmuchConfig;
-
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "Entry", from = "String")]
-pub struct EntryDef;
+pub struct EntryDef(#[serde(getter = "Deref::deref")] String);
 
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(remote = "Cmd", from = "String")]
-pub struct SingleCmdDef;
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(remote = "SingleCmd", from = "String")]
+pub struct SingleCmdDef(#[serde(getter = "Deref::deref")] String);
 
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(remote = "Cmd", from = "Vec<String>")]
-pub struct PipelineDef;
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(remote = "Pipeline", from = "Vec<String>")]
+pub struct PipelineDef(
+    #[serde(getter = "Deref::deref", serialize_with = "pipeline")] Vec<SingleCmd>,
+);
 
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(remote = "Cmd", from = "SingleCmdOrPipeline")]
-pub struct CmdDef;
-
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(untagged)]
-pub enum SingleCmdOrPipeline {
-    #[serde(with = "SingleCmdDef")]
-    SingleCmd(Cmd),
-    #[serde(with = "PipelineDef")]
-    Pipeline(Cmd),
-}
-
-impl From<SingleCmdOrPipeline> for Cmd {
-    fn from(cmd: SingleCmdOrPipeline) -> Cmd {
-        match cmd {
-            SingleCmdOrPipeline::SingleCmd(cmd) => cmd,
-            SingleCmdOrPipeline::Pipeline(cmd) => cmd,
-        }
+// NOTE: did not find the way to only do with macros…
+pub fn pipeline<S>(cmds: &Vec<SingleCmd>, s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut seq = s.serialize_seq(Some(cmds.len()))?;
+    for cmd in cmds {
+        seq.serialize_element(&cmd.to_string())?;
     }
+    seq.end()
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(remote = "Option<Cmd>", from = "OptionSingleCmdOrPipeline")]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(remote = "Cmd", untagged)]
+pub enum CmdDef {
+    #[serde(with = "SingleCmdDef")]
+    SingleCmd(SingleCmd),
+    #[serde(with = "PipelineDef")]
+    Pipeline(Pipeline),
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(remote = "Option<Cmd>", from = "OptionCmd")]
 pub struct OptionCmdDef;
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum OptionSingleCmdOrPipeline {
+pub enum OptionCmd {
     #[default]
+    #[serde(skip_serializing)]
     None,
     #[serde(with = "SingleCmdDef")]
-    SingleCmd(Cmd),
+    SingleCmd(SingleCmd),
     #[serde(with = "PipelineDef")]
-    Pipeline(Cmd),
+    Pipeline(Pipeline),
 }
 
-impl From<OptionSingleCmdOrPipeline> for Option<Cmd> {
-    fn from(cmd: OptionSingleCmdOrPipeline) -> Option<Cmd> {
+impl From<OptionCmd> for Option<Cmd> {
+    fn from(cmd: OptionCmd) -> Option<Cmd> {
         match cmd {
-            OptionSingleCmdOrPipeline::None => None,
-            OptionSingleCmdOrPipeline::SingleCmd(cmd) => Some(cmd),
-            OptionSingleCmdOrPipeline::Pipeline(cmd) => Some(cmd),
+            OptionCmd::None => None,
+            OptionCmd::SingleCmd(cmd) => Some(Cmd::SingleCmd(cmd)),
+            OptionCmd::Pipeline(pipeline) => Some(Cmd::Pipeline(pipeline)),
         }
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "Secret", rename_all = "kebab-case")]
 pub enum SecretDef {
     Raw(String),
@@ -84,7 +84,7 @@ pub enum SecretDef {
     Keyring(Entry),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "OAuth2Method")]
 pub enum OAuth2MethodDef {
     #[serde(rename = "xoauth2", alias = "XOAUTH2")]
@@ -93,7 +93,7 @@ pub enum OAuth2MethodDef {
     OAuthBearer,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "BackendConfig", tag = "backend", rename_all = "kebab-case")]
 pub enum BackendConfigDef {
     #[default]
@@ -109,7 +109,7 @@ pub enum BackendConfigDef {
 }
 
 #[cfg(feature = "imap-backend")]
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "ImapConfig")]
 pub struct ImapConfigDef {
     #[serde(rename = "imap-host")]
@@ -134,7 +134,7 @@ pub struct ImapConfigDef {
     pub watch_cmds: Option<Vec<String>>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "ImapAuthConfig", tag = "imap-auth")]
 pub enum ImapAuthConfigDef {
     #[serde(rename = "passwd", alias = "password", with = "ImapPasswdConfigDef")]
@@ -143,7 +143,7 @@ pub enum ImapAuthConfigDef {
     OAuth2(OAuth2Config),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "PasswdConfig")]
 pub struct ImapPasswdConfigDef {
     #[serde(
@@ -155,7 +155,7 @@ pub struct ImapPasswdConfigDef {
     pub passwd: Secret,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "OAuth2Config")]
 pub struct ImapOAuth2ConfigDef {
     #[serde(rename = "imap-oauth2-method", with = "OAuth2MethodDef", default)]
@@ -193,7 +193,7 @@ pub struct ImapOAuth2ConfigDef {
     pub pkce: bool,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "OAuth2Scopes")]
 pub enum ImapOAuth2ScopesDef {
     #[serde(rename = "imap-oauth2-scope")]
@@ -202,7 +202,7 @@ pub enum ImapOAuth2ScopesDef {
     Scopes(Vec<String>),
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "MaildirConfig", rename_all = "kebab-case")]
 pub struct MaildirConfigDef {
     #[serde(rename = "maildir-root-dir")]
@@ -210,14 +210,14 @@ pub struct MaildirConfigDef {
 }
 
 #[cfg(feature = "notmuch-backend")]
-#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "NotmuchConfig", rename_all = "kebab-case")]
 pub struct NotmuchConfigDef {
     #[serde(rename = "notmuch-db-path")]
     pub db_path: PathBuf,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(
     remote = "EmailTextPlainFormat",
     tag = "type",
@@ -231,7 +231,7 @@ pub enum EmailTextPlainFormatDef {
     Fixed(usize),
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "SenderConfig", tag = "sender", rename_all = "kebab-case")]
 pub enum SenderConfigDef {
     #[default]
@@ -242,7 +242,7 @@ pub enum SenderConfigDef {
     Sendmail(SendmailConfig),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "SmtpConfig")]
 struct SmtpConfigDef {
     #[serde(rename = "smtp-host")]
@@ -261,7 +261,7 @@ struct SmtpConfigDef {
     pub auth: SmtpAuthConfig,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "SmtpAuthConfig", tag = "smtp-auth")]
 pub enum SmtpAuthConfigDef {
     #[serde(rename = "passwd", alias = "password", with = "SmtpPasswdConfigDef")]
@@ -270,7 +270,7 @@ pub enum SmtpAuthConfigDef {
     OAuth2(OAuth2Config),
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "PasswdConfig", default)]
 pub struct SmtpPasswdConfigDef {
     #[serde(
@@ -282,7 +282,7 @@ pub struct SmtpPasswdConfigDef {
     pub passwd: Secret,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "OAuth2Config")]
 pub struct SmtpOAuth2ConfigDef {
     #[serde(rename = "smtp-oauth2-method", with = "OAuth2MethodDef", default)]
@@ -320,7 +320,7 @@ pub struct SmtpOAuth2ConfigDef {
     pub pkce: bool,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "OAuth2Scopes")]
 pub enum SmtpOAuth2ScopesDef {
     #[serde(rename = "smtp-oauth2-scope")]
@@ -329,7 +329,7 @@ pub enum SmtpOAuth2ScopesDef {
     Scopes(Vec<String>),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "SendmailConfig", rename_all = "kebab-case")]
 pub struct SendmailConfigDef {
     #[serde(rename = "sendmail-cmd", with = "CmdDef")]
@@ -338,19 +338,15 @@ pub struct SendmailConfigDef {
 
 /// Represents the email hooks. Useful for doing extra email
 /// processing before or after sending it.
-#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "EmailHooks", rename_all = "kebab-case")]
 pub struct EmailHooksDef {
     /// Represents the hook called just before sending an email.
-    #[serde(
-        default,
-        with = "OptionCmdDef",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, with = "OptionCmdDef")]
     pub pre_send: Option<Cmd>,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "SyncFoldersStrategy", rename_all = "kebab-case")]
 pub enum SyncFoldersStrategyDef {
     #[default]

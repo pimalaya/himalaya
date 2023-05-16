@@ -1114,6 +1114,7 @@ dependencies = [
  "once_cell",
  "pimalaya-email",
  "pimalaya-keyring",
+ "pimalaya-oauth2",
  "pimalaya-process",
  "pimalaya-secret",
  "rusqlite",
@@ -1124,6 +1125,7 @@ dependencies = [
  "termcolor",
  "terminal_size",
  "toml",
+ "toml_edit",
  "unicode-width",
  "url",
  "uuid",
@@ -1300,11 +1302,11 @@ dependencies = [
 
 [[package]]
 name = "imap"
-version = "3.0.0-alpha.9"
+version = "3.0.0-alpha.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1c2ff52273d9cd791687b4510d8a0047277e985a348e411c94fe84e193e7a76"
+checksum = "9cceec1222cd3c9b196695fe296dc6ddaa617e06b0c49742140ff9bbc87af628"
 dependencies = [
- "base64 0.13.1",
+ "base64 0.21.0",
  "bufstream",
  "chrono",
  "imap-proto",
@@ -1705,15 +1707,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nom8"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae01545c9c7fc4486ab7debaf2aad7003ac19431791868fb2e8066df97fad2f8"
-dependencies = [
- "memchr 2.5.0",
-]
-
-[[package]]
 name = "notmuch"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2050,8 +2043,9 @@ dependencies = [
 
 [[package]]
 name = "pimalaya-email"
-version = "0.7.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya#05818504b399a911b88255b7d15592ee834bfbb3"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ffcfdf5fbbca7539e3d762a5c5b3b2b6fd58fc3d996b2295f094c7f394553ad"
 dependencies = [
  "advisory-lock",
  "ammonia",
@@ -2092,8 +2086,9 @@ dependencies = [
 
 [[package]]
 name = "pimalaya-email-tpl"
-version = "0.1.0"
-source = "git+https://git.sr.ht/~soywod/pimalaya#05818504b399a911b88255b7d15592ee834bfbb3"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd0a03c25c249b598bddd24a0fe1c06d044c9bb8362644792e902146c8b5b613"
 dependencies = [
  "ammonia",
  "chumsky 0.9.0",
@@ -2110,7 +2105,8 @@ dependencies = [
 [[package]]
 name = "pimalaya-keyring"
 version = "0.0.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya#05818504b399a911b88255b7d15592ee834bfbb3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae5fed5fff1897b4964a5e8efbcd5e41e4492fe7947f827745fe9a14a555fe94"
 dependencies = [
  "keyring",
  "log",
@@ -2119,8 +2115,9 @@ dependencies = [
 
 [[package]]
 name = "pimalaya-oauth2"
-version = "0.0.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya#05818504b399a911b88255b7d15592ee834bfbb3"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9bec4262b62b6b14ffa244727e3d86d69e608e664e162e2c73332bed3b3f8a1"
 dependencies = [
  "log",
  "oauth2",
@@ -2131,8 +2128,9 @@ dependencies = [
 
 [[package]]
 name = "pimalaya-process"
-version = "0.0.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya#05818504b399a911b88255b7d15592ee834bfbb3"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d8d2853bf2f0efbe397ce22bb4e6d53a7464f6dcc0abe7e2936f6f4e8e2726a"
 dependencies = [
  "log",
  "thiserror",
@@ -2141,7 +2139,8 @@ dependencies = [
 [[package]]
 name = "pimalaya-secret"
 version = "0.0.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya#05818504b399a911b88255b7d15592ee834bfbb3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b585f585653ac7f957a608d8cdffd81be6561c2ad92fa82a1e72ed62a1bb31e0"
 dependencies = [
  "log",
  "pimalaya-keyring",
@@ -2673,9 +2672,9 @@ dependencies = [
 
 [[package]]
 name = "serde_spanned"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0efd8caf556a6cebd3b285caf480045fcc1ac04f6bd786b09a6f11af30c4fcf4"
+checksum = "93107647184f6027e3b7dcb2e11034cf95ffa1e3a682c67951963ac69c1c007d"
 dependencies = [
  "serde",
 ]
@@ -2988,9 +2987,9 @@ dependencies = [
 
 [[package]]
 name = "toml"
-version = "0.7.2"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7afcae9e3f0fe2c370fd4657108972cbb2fa9db1b9f84849cefd80741b01cb6"
+checksum = "d6135d499e69981f9ff0ef2167955a5333c35e36f6937d382974566b3d5b94ec"
 dependencies = [
  "serde",
  "serde_spanned",
@@ -3000,24 +2999,24 @@ dependencies = [
 
 [[package]]
 name = "toml_datetime"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ab8ed2edee10b50132aed5f331333428b011c99402b5a534154ed15746f9622"
+checksum = "5a76a9312f5ba4c2dec6b9161fdf25d87ad8a09256ccea5a556fef03c706a10f"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "toml_edit"
-version = "0.19.3"
+version = "0.19.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e6a7712b49e1775fb9a7b998de6635b299237f48b404dde71704f2e0e7f37e5"
+checksum = "92d964908cec0d030b812013af25a0e57fddfadb1e066ecc6681d86253129d4f"
 dependencies = [
  "indexmap",
- "nom8",
  "serde",
  "serde_spanned",
  "toml_datetime",
+ "winnow",
 ]
 
 [[package]]
@@ -3531,6 +3530,15 @@ name = "windows_x86_64_msvc"
 version = "0.48.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1a515f5799fe4961cb532f983ce2b23082366b898e52ffbce459c86f67c8378a"
+
+[[package]]
+name = "winnow"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61de7bac303dc551fe038e2b3cef0f571087a47571ea6e79a87692ac99b99699"
+dependencies = [
+ "memchr 2.5.0",
+]
 
 [[package]]
 name = "winreg"

@@ -52,11 +52,9 @@ pub fn configure(config: &AccountConfig, reset: bool) -> Result<()> {
     #[cfg(feature = "imap-backend")]
     if let BackendConfig::Imap(imap_config) = &config.backend {
         match &imap_config.auth {
-            ImapAuthConfig::Passwd(passwd) => {
-                passwd.configure(|| prompt_passwd("Enter your IMAP password:"))
-            }
+            ImapAuthConfig::Passwd(passwd) => passwd.configure(|| prompt_passwd("IMAP password")),
             ImapAuthConfig::OAuth2(oauth2) => {
-                oauth2.configure(|| prompt_secret("Enter your IMAP OAuth 2.0 client secret:"))
+                oauth2.configure(|| prompt_secret("IMAP OAuth 2.0 client secret"))
             }
         }?;
     }
@@ -64,16 +62,18 @@ pub fn configure(config: &AccountConfig, reset: bool) -> Result<()> {
     #[cfg(feature = "smtp-sender")]
     if let SenderConfig::Smtp(smtp_config) = &config.sender {
         match &smtp_config.auth {
-            SmtpAuthConfig::Passwd(passwd) => {
-                passwd.configure(|| prompt_passwd("Enter your SMTP password:"))
-            }
+            SmtpAuthConfig::Passwd(passwd) => passwd.configure(|| prompt_passwd("SMTP password")),
             SmtpAuthConfig::OAuth2(oauth2) => {
-                oauth2.configure(|| prompt_secret("Enter your SMTP OAuth 2.0 client secret:"))
+                oauth2.configure(|| prompt_secret("SMTP OAuth 2.0 client secret"))
             }
         }?;
     }
 
-    println!("Account successfully configured!");
+    println!(
+        "Account successfully {}configured!",
+        if reset { "re" } else { "" }
+    );
+
     Ok(())
 }
 

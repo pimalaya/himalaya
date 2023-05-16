@@ -9,42 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added keyring support, which means Himalaya can now use your
-  system's global keyring to get/set sensitive data like passwords or
-  tokens.
-- Added required IMAP option `imap-auth` and SMTP option
-  `smtp-auth`. Possible values: `passwd`, `oauth2`.
-- Added OAuth 2.0 support for IMAP and SMTP. To use it, set `imap-auth
-  = "oauth2"`. You also need these options:
-
-  - `imap-oauth2-method`
-  - `imap-oauth2-client-id`
-  - `imap-oauth2-client-secret` or `imap-oauth2-client-secret-cmd` or
-    `imap-oauth2-client-secret-keyring`
-  - `imap-oauth2-auth-url`
-  - `imap-oauth2-token-url`
-  - `imap-oauth2-access-token` or `imap-oauth2-access-token-cmd` or
-    `imap-oauth2-access-token-keyring`
-  - `imap-oauth2-refresh-token` or `imap-oauth2-refresh-token-cmd` or
-    `imap-oauth2-refresh-token-keyring`
-  - `imap-oauth2-scope` or `imap-oauth2-scopes`
-  - `imap-oauth2-pkce`
+- Added keyring support, which means Himalaya can now use your system's global keyring to get/set sensitive data like passwords or tokens.
+- Added required IMAP option `imap-auth` and SMTP option `smtp-auth`. Possible values: `passwd`, `oauth2`.
+- Added OAuth 2.0 support for IMAP and SMTP.
+- Added passwords and OAuth 2.0 configuration via the wizard.
 
 ### Changed
 
-- Changed the way secrets are managed. A secret is a sensitive data
-  like passwords or tokens. There is 3 possible ways to declare a
-  secret in the config file:
-
-  - `<key> = "secret-value"` for the raw secret (unsafe, not
-    recommanded),
-  - `<key>-cmd = "echo 'secret-value'"` for command that retrieve the
-    secret,
-  - `<key>-keyring = "keyring-entry"` for entry in your system's
-    global keyring that contains the secret.
+- Changed the default TLS provider to `rustls`. You can still use `native-tls` with the cargo feature `native-tls`.
+- Changed the way secrets are managed. A secret is a sensitive data like passwords or tokens. There is 3 possible ways to declare a secret in the config file:
+  - `{ raw = <secret> }` for the raw secret (unsafe, not recommanded),
+  - `{ cmd = <secret-cmd> }` for command that exposes the secret,
+  - `{ keyring = <secret-entry> }` for entry in your system's global keyring that contains the secret.
 
   This applies for:
-
     - `imap-passwd`
 	- `imap-oauth2-client-secret`
 	- `imap-oauth2-access-token`
