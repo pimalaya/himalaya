@@ -79,9 +79,11 @@ pub fn edit_tpl_with_editor<P: Printer>(
                         .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.clone()),
                 )?;
                 sender.send(&email)?;
-                let sent_folder = config.sent_folder_alias()?;
-                printer.print_log(format!("Adding email to the {} folder…", sent_folder))?;
-                backend.add_email(&sent_folder, &email, &Flags::from_iter([Flag::Seen]))?;
+                if config.email_sending_save_copy {
+                    let sent_folder = config.sent_folder_alias()?;
+                    printer.print_log(format!("Adding email to the {} folder…", sent_folder))?;
+                    backend.add_email(&sent_folder, &email, &Flags::from_iter([Flag::Seen]))?;
+                }
                 remove_local_draft()?;
                 printer.print("Done!")?;
                 break;

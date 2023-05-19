@@ -382,11 +382,13 @@ pub fn send<P: Printer>(
     };
     trace!("raw email: {:?}", raw_email);
     sender.send(raw_email.as_bytes())?;
-    backend.add_email(
-        &folder,
-        raw_email.as_bytes(),
-        &Flags::from_iter([Flag::Seen]),
-    )?;
+    if config.email_sending_save_copy {
+        backend.add_email(
+            &folder,
+            raw_email.as_bytes(),
+            &Flags::from_iter([Flag::Seen]),
+        )?;
+    }
     Ok(())
 }
 

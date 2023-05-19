@@ -108,7 +108,9 @@ pub fn send<P: Printer>(
             .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.clone()),
     )?;
     sender.send(&email)?;
-    backend.add_email(folder, &email, &Flags::default())?;
+    if config.email_sending_save_copy {
+        backend.add_email(folder, &email, &Flags::default())?;
+    }
     printer.print("Template successfully sent!")?;
     Ok(())
 }
