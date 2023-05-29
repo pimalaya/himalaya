@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use log::debug;
 use pimalaya_email::{
     email::{local_draft_path, remove_local_draft},
-    AccountConfig, Backend, CompilerBuilder, Flag, Flags, Sender, Tpl,
+    AccountConfig, Backend, Flag, Flags, Sender, Tpl,
 };
 use std::{env, fs, process::Command};
 
@@ -73,11 +73,11 @@ pub fn edit_tpl_with_editor<P: Printer>(
         match choice::post_edit() {
             Ok(PostEditChoice::Send) => {
                 printer.print_log("Sending email…")?;
-                let email = tpl.compile(
-                    CompilerBuilder::default()
-                        .some_pgp_sign_cmd(config.email_writing_sign_cmd.clone())
-                        .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.clone()),
-                )?;
+                let email = tpl
+                    .some_pgp_sign_cmd(config.email_writing_sign_cmd.clone())
+                    .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.clone())
+                    .compile()?
+                    .write_to_vec()?;
                 sender.send(&email)?;
                 if config.email_sending_save_copy {
                     let sent_folder = config.sent_folder_alias()?;
@@ -98,11 +98,11 @@ pub fn edit_tpl_with_editor<P: Printer>(
             }
             Ok(PostEditChoice::RemoteDraft) => {
                 let draft_folder = config.folder_alias("drafts")?;
-                let email = tpl.compile(
-                    CompilerBuilder::default()
-                        .some_pgp_sign_cmd(config.email_writing_sign_cmd.clone())
-                        .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.clone()),
-                )?;
+                let email = tpl
+                    .some_pgp_sign_cmd(config.email_writing_sign_cmd.clone())
+                    .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.clone())
+                    .compile()?
+                    .write_to_vec()?;
                 backend.add_email(
                     &draft_folder,
                     &email,

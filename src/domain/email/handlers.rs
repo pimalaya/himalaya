@@ -1,9 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use atty::Stream;
 use log::{debug, trace};
-use pimalaya_email::{
-    AccountConfig, Backend, Email, Flag, Flags, Sender, ShowTextPartsStrategy, Tpl, TplBuilder,
-};
+use pimalaya_email::{AccountConfig, Backend, Email, EmailBuilder, Flag, Flags, Sender};
 use std::{
     fs,
     io::{self, BufRead},
@@ -114,20 +112,22 @@ pub fn forward<P: Printer>(
     sender: &mut dyn Sender,
     folder: &str,
     id: &str,
-    headers: Option<Vec<&str>>,
+    headers: Option<Vec<(&str, &str)>>,
     body: Option<&str>,
 ) -> Result<()> {
     let folder = config.folder_alias(folder)?;
+
     let ids = id_mapper.get_ids([id])?;
     let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
+
     let tpl = backend
         .get_emails(&folder, ids)?
         .first()
         .ok_or_else(|| anyhow!("cannot find email {}", id))?
-        .to_forward_tpl_builder(config)?
-        .set_some_raw_headers(headers)
-        .some_text_plain_part(body)
-        .build();
+        .to_forward_tpl_builder(config)
+        .some_headers(headers)
+        .some_body(body)
+        .build()?;
     trace!("initial template: {}", *tpl);
     editor::edit_tpl_with_editor(config, printer, backend, sender, tpl)?;
     Ok(())
@@ -170,19 +170,24 @@ pub fn mailto<P: Printer>(
     printer: &mut P,
     url: &Url,
 ) -> Result<()> {
-    let mut tpl = TplBuilder::default().to(url.path());
+    let mut builder = EmailBuilder::new().to(url.path());
 
     for (key, val) in url.query_pairs() {
         match key.to_lowercase().as_bytes() {
-            b"cc" => tpl = tpl.cc(val),
-            b"bcc" => tpl = tpl.bcc(val),
-            b"subject" => tpl = tpl.subject(val),
-            b"body" => tpl = tpl.text_plain_part(val.as_bytes()),
+            b"cc" => builder = builder.cc(val.to_string()),
+            b"bcc" => builder = builder.bcc(val.to_string()),
+            b"subject" => builder = builder.subject(val),
+            b"body" => builder = builder.text_body(val),
             _ => (),
         }
     }
 
-    editor::edit_tpl_with_editor(config, printer, backend, sender, tpl.build())
+    let tpl = config
+        .generate_tpl_interpreter()
+        .show_only_headers(config.email_writing_headers())
+        .interpret_msg_builder(builder)?;
+
+    editor::edit_tpl_with_editor(config, printer, backend, sender, tpl)
 }
 
 pub fn move_<P: Printer>(
@@ -209,8 +214,9 @@ pub fn read<P: Printer>(
     backend: &mut dyn Backend,
     folder: &str,
     ids: Vec<&str>,
-    text_mime: &str,
-    sanitize: bool,
+    // TODO: map this to ShowTextsStrategy
+    _text_mime: &str,
+    _sanitize: bool,
     raw: bool,
     headers: Vec<&str>,
 ) -> Result<()> {
@@ -230,20 +236,10 @@ pub fn read<P: Printer>(
             // display what can be displayed
             bodies.push_str(&String::from_utf8_lossy(email.raw()?).into_owned());
         } else {
-            let tpl = email
-                .to_read_tpl_builder(config)?
-                .show_headers(config.email_reading_headers())
-                .show_headers(&headers)
-                .show_text_parts_only(true)
-                .use_show_text_parts_strategy(if text_mime == "plain" {
-                    ShowTextPartsStrategy::PlainOtherwiseHtml
-                } else {
-                    ShowTextPartsStrategy::HtmlOtherwisePlain
-                })
-                .sanitize_text_parts(sanitize)
-                .build();
-
-            bodies.push_str(&<Tpl as Into<String>>::into(tpl));
+            let tpl: String = email
+                .to_read_tpl(&config, |i| i.show_additional_headers(&headers))?
+                .into();
+            bodies.push_str(&tpl);
         }
 
         glue = "\n\n";
@@ -261,20 +257,23 @@ pub fn reply<P: Printer>(
     folder: &str,
     id: &str,
     all: bool,
-    headers: Option<Vec<&str>>,
+    headers: Option<Vec<(&str, &str)>>,
     body: Option<&str>,
 ) -> Result<()> {
     let folder = config.folder_alias(folder)?;
+
     let ids = id_mapper.get_ids([id])?;
     let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
+
     let tpl = backend
         .get_emails(&folder, ids)?
         .first()
         .ok_or_else(|| anyhow!("cannot find email {}", id))?
-        .to_reply_tpl_builder(config, all)?
-        .set_some_raw_headers(headers)
-        .some_text_plain_part(body)
-        .build();
+        .to_reply_tpl_builder(config)
+        .some_headers(headers)
+        .some_body(body)
+        .reply_all(all)
+        .build()?;
     trace!("initial template: {}", *tpl);
     editor::edit_tpl_with_editor(config, printer, backend, sender, tpl)?;
     backend.add_flags(&folder, vec![id], &Flags::from_iter([Flag::Answered]))?;
@@ -397,13 +396,13 @@ pub fn write<P: Printer>(
     printer: &mut P,
     backend: &mut dyn Backend,
     sender: &mut dyn Sender,
-    headers: Option<Vec<&str>>,
+    headers: Option<Vec<(&str, &str)>>,
     body: Option<&str>,
 ) -> Result<()> {
-    let tpl = Email::new_tpl_builder(config)?
-        .set_some_raw_headers(headers)
-        .some_text_plain_part(body)
-        .build();
+    let tpl = Email::new_tpl_builder(config)
+        .some_headers(headers)
+        .some_body(body)
+        .build()?;
     trace!("initial template: {}", *tpl);
     editor::edit_tpl_with_editor(config, printer, backend, sender, tpl)?;
     Ok(())

@@ -1019,6 +1019,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "gethostname"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a329e22866dd78b35d2c639a4a23d7b950aeae300dfd79f4fb19f74055c2404"
+dependencies = [
+ "libc",
+ "windows",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1255,7 +1265,7 @@ checksum = "1788965e61b367cd03a62950836d5cd41560c3577d90e40e0819373194d1661c"
 dependencies = [
  "http",
  "hyper",
- "rustls",
+ "rustls 0.20.8",
  "tokio",
  "tokio-rustls",
 ]
@@ -1440,7 +1450,7 @@ dependencies = [
  "nom 7.1.1",
  "once_cell",
  "quoted_printable",
- "rustls",
+ "rustls 0.20.8",
  "rustls-pemfile",
  "serde",
  "socket2",
@@ -1531,10 +1541,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c41e0c4fef86961ac6d6f8a82609f55f31b05e4fce149ac5710e439df7619ba4"
 
 [[package]]
+name = "mail-builder"
+version = "0.3.0"
+source = "git+https://github.com/stalwartlabs/mail-builder.git#7986275cd89340eef2cb18daea25ced53f51db07"
+dependencies = [
+ "gethostname 0.4.1",
+]
+
+[[package]]
 name = "mail-parser"
-version = "0.8.1"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a2e03aa1d18528b45d0e79e46790f38cfeece6cce3af17a85912677272f36cd"
+checksum = "e4158a1c18963244e083888b21465846dfb68d6170850ed1ab4742edd57c9d47"
 dependencies = [
  "encoding_rs",
 ]
@@ -1545,7 +1563,7 @@ version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d2d08d52a925272eda99f8fe9e91237b1cb958804ee0628cc398ebd1bbc426f"
 dependencies = [
- "gethostname",
+ "gethostname 0.2.3",
  "mailparse",
  "memmap2",
 ]
@@ -2044,8 +2062,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-email"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ffcfdf5fbbca7539e3d762a5c5b3b2b6fd58fc3d996b2295f094c7f394553ad"
+source = "git+https://git.sr.ht/~soywod/pimalaya#f62efe4f4f3fe4d1493056cef50d8ebdc28f681b"
 dependencies = [
  "advisory-lock",
  "ammonia",
@@ -2057,6 +2074,7 @@ dependencies = [
  "imap-proto",
  "lettre",
  "log",
+ "mail-builder",
  "mail-parser",
  "maildir",
  "mailparse",
@@ -2073,7 +2091,7 @@ dependencies = [
  "regex",
  "rfc2047-decoder",
  "rusqlite",
- "rustls",
+ "rustls 0.21.1",
  "rustls-native-certs",
  "shellexpand",
  "thiserror",
@@ -2086,17 +2104,14 @@ dependencies = [
 
 [[package]]
 name = "pimalaya-email-tpl"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd0a03c25c249b598bddd24a0fe1c06d044c9bb8362644792e902146c8b5b613"
+version = "0.2.0"
+source = "git+https://git.sr.ht/~soywod/pimalaya#f62efe4f4f3fe4d1493056cef50d8ebdc28f681b"
 dependencies = [
- "ammonia",
  "chumsky 0.9.0",
- "html-escape",
- "lettre",
  "log",
+ "mail-builder",
+ "mail-parser",
  "pimalaya-process",
- "regex",
  "shellexpand",
  "thiserror",
  "tree_magic",
@@ -2401,7 +2416,7 @@ dependencies = [
  "once_cell",
  "percent-encoding",
  "pin-project-lite",
- "rustls",
+ "rustls 0.20.8",
  "rustls-pemfile",
  "serde",
  "serde_json",
@@ -2507,13 +2522,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustls"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c911ba11bc8433e811ce56fde130ccf32f5127cab0e0194e9c68c5a5b671791e"
+dependencies = [
+ "log",
+ "ring",
+ "rustls-webpki",
+ "sct",
+]
+
+[[package]]
 name = "rustls-connector"
 version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c6a18f8d10f71bce9bca6eaeb80429460e652f3bcf0381f0c5f8954abf7b3b8"
 dependencies = [
  "log",
- "rustls",
+ "rustls 0.20.8",
  "rustls-native-certs",
  "webpki",
 ]
@@ -2537,6 +2564,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d194b56d58803a43635bdc398cd17e383d6f71f9182b9a192c127ca42494a59b"
 dependencies = [
  "base64 0.21.0",
+]
+
+[[package]]
+name = "rustls-webpki"
+version = "0.100.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6207cd5ed3d8dca7816f8f3725513a34609c0c765bf652b8c3cb4cfd87db46b"
+dependencies = [
+ "ring",
+ "untrusted",
 ]
 
 [[package]]
@@ -2966,7 +3003,7 @@ version = "0.23.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c43ee83903113e03984cb9e5cebe6c04a5116269e900e3ddba8f068a62adda59"
 dependencies = [
- "rustls",
+ "rustls 0.20.8",
  "tokio",
  "webpki",
 ]
@@ -3340,6 +3377,21 @@ name = "winapi-x86_64-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
+
+[[package]]
+name = "windows"
+version = "0.43.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "04662ed0e3e5630dfa9b26e4cb823b817f1a9addda855d973a9458c236556244"
+dependencies = [
+ "windows_aarch64_gnullvm 0.42.2",
+ "windows_aarch64_msvc 0.42.2",
+ "windows_i686_gnu 0.42.2",
+ "windows_i686_msvc 0.42.2",
+ "windows_x86_64_gnu 0.42.2",
+ "windows_x86_64_gnullvm 0.42.2",
+ "windows_x86_64_msvc 0.42.2",
+]
 
 [[package]]
 name = "windows-sys"

@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use clap::{Arg, ArgAction, ArgMatches, Command};
+use log::warn;
 
 use crate::email;
 
@@ -20,7 +21,7 @@ const CMD_WRITE: &str = "write";
 pub const CMD_TPL: &str = "template";
 
 pub type RawTpl = String;
-pub type Headers<'a> = Option<Vec<&'a str>>;
+pub type Headers<'a> = Option<Vec<(&'a str, &'a str)>>;
 pub type Body<'a> = Option<&'a str>;
 
 /// Represents the template commands.
@@ -121,8 +122,16 @@ pub fn args() -> Vec<Arg> {
 
 /// Represents the template headers argument parser.
 pub fn parse_headers_arg(m: &ArgMatches) -> Headers<'_> {
-    m.get_many(ARG_HEADERS)
-        .map(|h| h.map(String::as_str).collect::<Vec<_>>())
+    m.get_many::<String>(ARG_HEADERS).map(|h| {
+        h.filter_map(|h| match h.split_once(':') {
+            Some((key, val)) => Some((key, val.trim())),
+            None => {
+                warn!("invalid raw header {h:?}, skipping it");
+                None
+            }
+        })
+        .collect()
+    })
 }
 
 /// Represents the template body argument parser.

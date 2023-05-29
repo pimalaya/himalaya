@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use log::trace;
 use pimalaya_email::EmailTextPlainFormat;
 use termcolor::{Color, ColorSpec};
-use terminal_size;
+use terminal_size::terminal_size;
 use unicode_width::UnicodeWidthStr;
 
 use crate::printer::{Print, PrintTableOpts, WriteColor};
@@ -175,7 +175,7 @@ where
             EmailTextPlainFormat::Flowed => 0,
             EmailTextPlainFormat::Auto => opts
                 .max_width
-                .or_else(|| terminal_size::terminal_size().map(|(w, _)| w.0 as usize))
+                .or_else(|| terminal_size().map(|(w, _)| w.0 as usize))
                 .unwrap_or(DEFAULT_TERM_WIDTH),
         };
         let mut table = vec![Self::head()];

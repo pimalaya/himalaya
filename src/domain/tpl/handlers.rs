@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use atty::Stream;
-use pimalaya_email::{AccountConfig, Backend, CompilerBuilder, Email, Flags, Sender, Tpl};
+use pimalaya_email::{AccountConfig, Backend, Email, Flags, Sender, Tpl};
 use std::io::{stdin, BufRead};
 
 use crate::{printer::Printer, IdMapper};
@@ -12,21 +12,23 @@ pub fn forward<P: Printer>(
     backend: &mut dyn Backend,
     folder: &str,
     id: &str,
-    headers: Option<Vec<&str>>,
+    headers: Option<Vec<(&str, &str)>>,
     body: Option<&str>,
 ) -> Result<()> {
     let ids = id_mapper.get_ids([id])?;
     let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
-    let tpl = backend
+
+    let tpl: String = backend
         .get_emails(folder, ids)?
         .first()
         .ok_or_else(|| anyhow!("cannot find email {}", id))?
-        .to_forward_tpl_builder(config)?
-        .set_some_raw_headers(headers)
-        .some_text_plain_part(body)
-        .build();
+        .to_forward_tpl_builder(config)
+        .some_headers(headers)
+        .some_body(body)
+        .build()?
+        .into();
 
-    printer.print(<Tpl as Into<String>>::into(tpl))
+    printer.print(tpl)
 }
 
 pub fn reply<P: Printer>(
@@ -37,21 +39,24 @@ pub fn reply<P: Printer>(
     folder: &str,
     id: &str,
     all: bool,
-    headers: Option<Vec<&str>>,
+    headers: Option<Vec<(&str, &str)>>,
     body: Option<&str>,
 ) -> Result<()> {
     let ids = id_mapper.get_ids([id])?;
     let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
-    let tpl = backend
+
+    let tpl: String = backend
         .get_emails(folder, ids)?
         .first()
         .ok_or_else(|| anyhow!("cannot find email {}", id))?
-        .to_reply_tpl_builder(config, all)?
-        .set_some_raw_headers(headers)
-        .some_text_plain_part(body)
-        .build();
+        .to_reply_tpl_builder(config)
+        .some_headers(headers)
+        .some_body(body)
+        .reply_all(all)
+        .build()?
+        .into();
 
-    printer.print(<Tpl as Into<String>>::into(tpl))
+    printer.print(tpl)
 }
 
 pub fn save<P: Printer>(
@@ -72,11 +77,10 @@ pub fn save<P: Printer>(
             .collect::<Vec<String>>()
             .join("\n")
     })
-    .compile(
-        CompilerBuilder::default()
-            .some_pgp_sign_cmd(config.email_writing_sign_cmd.clone())
-            .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.clone()),
-    )?;
+    .some_pgp_sign_cmd(config.email_writing_sign_cmd.clone())
+    .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.clone())
+    .compile()?
+    .write_to_vec()?;
 
     let id = backend.add_email(folder, &email, &Flags::default())?;
     id_mapper.create_alias(id)?;
@@ -102,11 +106,10 @@ pub fn send<P: Printer>(
             .collect::<Vec<String>>()
             .join("\n")
     })
-    .compile(
-        CompilerBuilder::default()
-            .some_pgp_sign_cmd(config.email_writing_sign_cmd.clone())
-            .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.clone()),
-    )?;
+    .some_pgp_sign_cmd(config.email_writing_sign_cmd.clone())
+    .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.clone())
+    .compile()?
+    .write_to_vec()?;
     sender.send(&email)?;
     if config.email_sending_save_copy {
         backend.add_email(folder, &email, &Flags::default())?;
@@ -115,15 +118,17 @@ pub fn send<P: Printer>(
     Ok(())
 }
 
-pub fn write<'a, P: Printer>(
-    config: &'a AccountConfig,
-    printer: &'a mut P,
-    headers: Option<Vec<&str>>,
+pub fn write<P: Printer>(
+    config: &AccountConfig,
+    printer: &mut P,
+    headers: Option<Vec<(&str, &str)>>,
     body: Option<&str>,
 ) -> Result<()> {
-    let tpl = Email::new_tpl_builder(config)?
-        .set_some_raw_headers(headers)
-        .some_text_plain_part(body)
-        .build();
-    printer.print(<Tpl as Into<String>>::into(tpl))
+    let tpl: String = Email::new_tpl_builder(config)
+        .some_headers(headers)
+        .some_body(body)
+        .build()?
+        .into();
+
+    printer.print(tpl)
 }
