@@ -52,9 +52,9 @@ dependencies = [
 
 [[package]]
 name = "aho-corasick"
-version = "0.7.20"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc936419f96fa211c1b9166887b38e5e40b19958e5b895be7c1f93adec7071ac"
+checksum = "67fc08ce920c31afb70f013dcce1bfc3a3195de6a228474e45e1f145b36f8d04"
 dependencies = [
  "memchr 2.5.0",
 ]
@@ -1669,6 +1669,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "nanohtml2text"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "999681fe3c0524336e98ece1c25ee4278607f25cc1e361ad0f9201c8bf56dc2c"
+
+[[package]]
 name = "native-tls"
 version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2062,7 +2068,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-email"
 version = "0.8.0"
-source = "git+https://git.sr.ht/~soywod/pimalaya#f62efe4f4f3fe4d1493056cef50d8ebdc28f681b"
+source = "git+https://git.sr.ht/~soywod/pimalaya#6767853528d75d8d0e6ff5e424dafea7351c3c94"
 dependencies = [
  "advisory-lock",
  "ammonia",
@@ -2105,12 +2111,13 @@ dependencies = [
 [[package]]
 name = "pimalaya-email-tpl"
 version = "0.2.0"
-source = "git+https://git.sr.ht/~soywod/pimalaya#f62efe4f4f3fe4d1493056cef50d8ebdc28f681b"
+source = "git+https://git.sr.ht/~soywod/pimalaya#6767853528d75d8d0e6ff5e424dafea7351c3c94"
 dependencies = [
  "chumsky 0.9.0",
  "log",
  "mail-builder",
  "mail-parser",
+ "nanohtml2text",
  "pimalaya-process",
  "shellexpand",
  "thiserror",
@@ -2369,9 +2376,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.7.0"
+version = "1.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e076559ef8e241f2ae3479e36f97bd5741c0330689e217ad51ce2c76808b868a"
+checksum = "81ca098a9821bd52d6b24fd8b10bd081f47d39c22778cafaa75a2857a62c6390"
 dependencies = [
  "aho-corasick",
  "memchr 2.5.0",
@@ -2380,9 +2387,9 @@ dependencies = [
 
 [[package]]
 name = "regex-syntax"
-version = "0.6.28"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "456c603be3e8d448b072f410900c09faf164fbce2d480456f50eea6e25f9c848"
+checksum = "436b050e76ed2903236f032a59761c1eb99e1b0aead2c257922771dab1fc8c78"
 
 [[package]]
 name = "remove_dir_all"

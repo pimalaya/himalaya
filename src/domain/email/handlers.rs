@@ -1,7 +1,9 @@
 use anyhow::{anyhow, Context, Result};
 use atty::Stream;
 use log::{debug, trace};
-use pimalaya_email::{AccountConfig, Backend, Email, EmailBuilder, Flag, Flags, Sender};
+use pimalaya_email::{
+    AccountConfig, Backend, Email, EmailBuilder, FilterParts, Flag, Flags, Sender,
+};
 use std::{
     fs,
     io::{self, BufRead},
@@ -215,7 +217,7 @@ pub fn read<P: Printer>(
     folder: &str,
     ids: Vec<&str>,
     // TODO: map this to ShowTextsStrategy
-    _text_mime: &str,
+    text_mime: &str,
     _sanitize: bool,
     raw: bool,
     headers: Vec<&str>,
@@ -237,7 +239,12 @@ pub fn read<P: Printer>(
             bodies.push_str(&String::from_utf8_lossy(email.raw()?).into_owned());
         } else {
             let tpl: String = email
-                .to_read_tpl(&config, |i| i.show_additional_headers(&headers))?
+                .to_read_tpl(&config, |tpl| match text_mime {
+                    "html" => tpl
+                        .hide_all_headers()
+                        .filter_parts(FilterParts::Only("text/html".into())),
+                    _ => tpl.show_additional_headers(&headers),
+                })?
                 .into();
             bodies.push_str(&tpl);
         }
