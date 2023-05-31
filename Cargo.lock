@@ -1104,7 +1104,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "himalaya"
-version = "0.7.3"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "atty",
@@ -2067,8 +2067,8 @@ dependencies = [
 
 [[package]]
 name = "pimalaya-email"
-version = "0.8.0"
-source = "git+https://git.sr.ht/~soywod/pimalaya#6767853528d75d8d0e6ff5e424dafea7351c3c94"
+version = "0.9.0"
+source = "git+https://git.sr.ht/~soywod/pimalaya#5f5815a1544a49e24ef73cd7f37f763d1c98f70e"
 dependencies = [
  "advisory-lock",
  "ammonia",
@@ -2111,7 +2111,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-email-tpl"
 version = "0.2.0"
-source = "git+https://git.sr.ht/~soywod/pimalaya#6767853528d75d8d0e6ff5e424dafea7351c3c94"
+source = "git+https://git.sr.ht/~soywod/pimalaya#5f5815a1544a49e24ef73cd7f37f763d1c98f70e"
 dependencies = [
  "chumsky 0.9.0",
  "log",

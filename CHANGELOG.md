@@ -14,12 +14,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added OAuth 2.0 support for IMAP and SMTP.
 - Added passwords and OAuth 2.0 configuration via the wizard.
 - Added `email-sending-save-copy` option to control whenever a copy of any sent email should be saved in the `sent` folder defined in `folder-aliases`.
+- Imported id mapper from the lib, which means that the id mapping is now done by the CLI.
+- Added `BackendConfig` to `AccountConfig::backend` to match sender implementation.
+- Added support for pipeline commands, which means commands can be either a single command (string) or piped commands (list of strings). It applies for:
+  - `email-writing-verify-cmd`
+  - `email-writing-decrypt-cmd`
+  - `email-writing-sign-cmd`
+  - `email-writing-encrypt-cmd`
 
 ### Changed
 
-- Changed the default TLS provider to `rustls`. You can still use `native-tls` with the cargo feature `native-tls`.
-- Changed the way secrets are managed. A secret is a sensitive data like passwords or tokens. There is 3 possible ways to declare a secret in the config file:
-  - `{ raw = <secret> }` for the raw secret (unsafe, not recommanded),
+- [**BREAKING**] Changed the default TLS provider to `rustls-tls`. You can still use `native-tls` with the cargo feature `native-tls`.
+- Changed release archive extensions from `.tar.gz` to `.tgz`.
+- Moved `wizard` module into domains (config, account, backend…).
+- [**BREAKING**] Changed the way secrets are managed. A secret is a sensitive data like passwords or tokens. There is 3 possible ways to declare a secret in the config file:
+  - `{ raw = <secret> }` for the raw secret as string (unsafe, not recommanded),
   - `{ cmd = <secret-cmd> }` for command that exposes the secret,
   - `{ keyring = <secret-entry> }` for entry in your system's global keyring that contains the secret.
 
@@ -33,6 +42,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 	- `smtp-oauth2-access-token`
 	- `smtp-oauth2-refresh-token`
 
+### Fixed
+
+- Fixed Windows releases corrupted archives.
+
+### Removed
+
+- [**BREAKING**] Removed cargo feature `rustls-native-certs` (it has been merged with the `rustls-tls` feature).
+- [**BREAKING**] Removed `-s|--sanitize` option. It is done by default now, except if the `-t|--mime-type html` is set.
+
 ## [0.7.3] - 2023-05-01
 
 ### Fixed
@@ -45,62 +63,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added `create` and `delete` folder commands [sourcehut#54].
-- Added generated completions and man pages to releases
-  [sourcehut#43].
-- Added new account config option `sync-folders-strategy` which allows
-  to choose a folders synchronization strategy [sourcehut#59]:
+- Added generated completions and man pages to releases [sourcehut#43].
+- Added new account config option `sync-folders-strategy` which allows to choose a folders synchronization strategy [sourcehut#59]:
   
-  - `sync-folders-strategy = "all"`: synchronize all existing folders
-    for the current account
-  - `sync-folders-strategy.include = ["folder1", "folder2", …]`:
-    synchronize only the given folders for the current account
-  - `sync-folders-strategy.exclude = ["folder1", "folder2", …]`:
-    synchronizes all folders except the given ones for the current
-    account
+  - `sync-folders-strategy = "all"`: synchronize all existing folders for the current account
+  - `sync-folders-strategy.include = ["folder1", "folder2", …]`: synchronize only the given folders for the current account
+  - `sync-folders-strategy.exclude = ["folder1", "folder2", …]`: synchronizes all folders except the given ones for the current account
 
-  Also added new `account sync` arguments that override the account
-  config option:
+  Also added new `account sync` arguments that override the account config option:
   
   - `-A|--all-folders`: include all folders to the synchronization.
-  - `-F|--include-folder`: include given folders to the
-    synchronization. They can be repeated `-F folder1 folder2` or `-F
-    folder1 -F folder2`.
-  - `-x|--exclude-folder`: exclude given folders from the
-    synchronization. They can be repeated `-x folder1 folder2` or `-x
-    folder1 -F folder2`.
+  - `-F|--include-folder`: include given folders to the synchronization. They can be repeated `-F folder1 folder2` or `-F folder1 -F folder2`.
+  - `-x|--exclude-folder`: exclude given folders from the synchronization. They can be repeated `-x folder1 folder2` or `-x folder1 -F folder2`.
 
-- Added cargo features `native-tls` (default), `rustls-tls` and
-  `rustls-native-certs`.
+- Added cargo features `native-tls` (default), `rustls-tls` and `rustls-native-certs`.
 
 ### Changed
 
-- Made global options truly global, which means they can be used
-  everywhere (not only *before* commands but also *after*)
-  [sourcehut#60].
-- Replaced reply all `-a` argument with `-A` because it conflicted
-  with the global option `-a|--account`.
+- Made global options truly global, which means they can be used everywhere (not only *before* commands but also *after*) [sourcehut#60].
+- Replaced reply all `-a` argument with `-A` because it conflicted with the global option `-a|--account`.
 - Replaced `himalaya-lib` by `pimalaya-email`.
 - Renamed feature `vendored` to `native-tls-vendored`.
-- Removed the `develop` branch, all the development is now done on the
-  `master` branch.
+- Removed the `develop` branch, all the development is now done on the `master` branch.
 
 ### Fixed
 
-- Fixed config deserialization issue with `email-hooks` and
-  `email-reading-format`.
+- Fixed config deserialization issue with `email-hooks` and `email-reading-format`.
 - Fixed flags case sensitivity.
 
 ## [0.7.1] - 2023-02-14
 
 ### Added
 
-- Added command `folders expunge` that deletes all emails marked for
-  deletion.
+- Added command `folders expunge` that deletes all emails marked for deletion.
   
 ### Changed
 
-- Changed the location of the
-  [documentation](https://pimalaya.org/himalaya/).
+- Changed the location of the [documentation](https://pimalaya.org/himalaya/).
 
 ### Fixed
 
@@ -108,31 +107,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- Removed the `maildir-backend` cargo feature, it is now included by
-  default.
-- Removed issues section on GitHub, now issues need to be opened by
-  sending an email at
-  [~soywod/pimalaya@todo.sr.ht](mailto:~soywod/pimalaya@todo.sr.ht).
+- Removed the `maildir-backend` cargo feature, it is now included by default.
+- Removed issues section on GitHub, now issues need to be opened by sending an email at [~soywod/pimalaya@todo.sr.ht](mailto:~soywod/pimalaya@todo.sr.ht).
 
 ## [0.7.0] - 2023-02-08
 
 ### Added
 
-- Added offline support with the `account sync` command to synchronize
-  a backend to a local Maildir backend [#342].
-- Added the flag `--disable-cache` to not use the local Maildir
-  backend.
-- Added the email composer (from its own
-  [repository](https://git.sr.ht/~soywod/mime-msg-builder)) [#341].
+- Added offline support with the `account sync` command to synchronize a backend to a local Maildir backend [#342].
+- Added the flag `--disable-cache` to not use the local Maildir backend.
+- Added the email composer (from its own [repository](https://git.sr.ht/~soywod/mime-msg-builder)) [#341].
 - Added Musl builds to releases [#356].
 - Added `himalaya man` command to generate man page [#419].
 
 ### Changed
 
-- Made commands `read`, `attachments`, `flags`, `copy`, `move`,
-  `delete` accept multiple ids.
-- Flipped arguments `ids` and `folder` for commands `copy` and `move`
-  in order the folder not to be considered as an id.
+- Made commands `read`, `attachments`, `flags`, `copy`, `move`, `delete` accept multiple ids.
+- Flipped arguments `ids` and `folder` for commands `copy` and `move` in order the folder not to be considered as an id.
 
 ### Fixed
 
@@ -140,17 +131,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- Removed the `-a|--attachment` argument from `write`, `reply` and
-  `forward` commands. Instead you can attach documents directly from
-  the template using the syntax `<#part
-  filename=/path/to/you/document.ext>`.
-- Removed the `-e|--encrypt` flag from `write`, `reply` and `forward`
-  commands. Instead you can encrypt and sign parts directly from the
-  template using the syntax `<#part type=text/plain encrypt=command
-  sign=command>Hello!<#/part>`.
-- Removed the `-l|--log-level` option, use instead the `RUST_LOG`
-  environment variable (see the
-  [wiki](https://github.com/soywod/himalaya/wiki/Tips:debug-and-logs))
+- Removed the `-a|--attachment` argument from `write`, `reply` and `forward` commands. Instead you can attach documents directly from the template using the syntax `<#part filename=/path/to/you/document.ext>`.
+- Removed the `-e|--encrypt` flag from `write`, `reply` and `forward` commands. Instead you can encrypt and sign parts directly from the template using the syntax `<#part type=text/plain encrypt=command sign=command>Hello!<#/part>`.
+- Removed the `-l|--log-level` option, use instead the `RUST_LOG` environment variable (see the [wiki](https://github.com/soywod/himalaya/wiki/Tips:debug-and-logs))
 
 ## [0.6.1] - 2022-10-12
 
@@ -160,19 +143,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   
 ### Changed
 
-- Changed the behaviour of the `-t|--mime-type` argument of the `read`
-  command. It is less strict now: if no part is found for the given
-  MIME type, it will fallback to the other one. For example, giving
-  `-t html` will show in priority HTML parts, but if none of them are
-  found it will show plain parts instead (and vice versa).
-
-- Sanitization is not done by default when using the `read` command,
-  the flag `-s|--sanitize` needs to be explicitly provided.
+- Changed the behaviour of the `-t|--mime-type` argument of the `read` command. It is less strict now: if no part is found for the given MIME type, it will fallback to the other one. For example, giving `-t html` will show in priority HTML parts, but if none of them are found it will show plain parts instead (and vice versa).
+- Sanitization is not done by default when using the `read` command, the flag `-s|--sanitize` needs to be explicitly provided.
 
 ### Fixed
 
-- Fixed empty text bodies when reading html part on plain text email
-  [#352].
+- Fixed empty text bodies when reading html part on plain text email [#352].
 
 ## [0.6.0] - 2022-10-10
 
@@ -182,34 +158,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   The source code has been splitted into subrepositories:
 
-  - The email logic has been extracted from the CLI and placed in a
-	lib on [sourcehut](https://git.sr.ht/~soywod/himalaya-lib)	
-  - The vim plugin is now in a dedicated repository on
-    [sourcehut](https://git.sr.ht/~soywod/himalaya-vim) as well
-  - This repository only contains the CLI source code (it was not
-	possible to move it to sourcehut because of cross platform builds)
+  - The email logic has been extracted from the CLI and placed in a lib on [sourcehut](https://git.sr.ht/~soywod/himalaya-lib)	
+  - The vim plugin is now in a dedicated repository on [sourcehut](https://git.sr.ht/~soywod/himalaya-vim) as well
+  - This repository only contains the CLI source code (it was not possible to move it to sourcehut because of cross platform builds)
 
 - [**BREAKING**] Renamed `-m|--mailbox` to `-f|--folder`
 
 - [**BREAKING**] Refactored config system [#344].
 
-  The configuration has been rethought in order to be more intuitive
-  and structured. Here are the breaking changes for the global config:
+  The configuration has been rethought in order to be more intuitive and structured. Here are the breaking changes for the global config:
 
   - `name` becomes `display-name` and is not mandatory anymore
   - `signature-delimiter` becomes `signature-delim`
-  - `default-page-size` has been moved to `folder-listing-page-size`
-    and `email-listing-page-size`
-  - `notify-cmd`, `notify-query` and `watch-cmds` have been removed
-    from the global config (available in account config only)
-  - `folder-aliases` has been added to the global config (previously
-    known as `mailboxes` from the account config)
+  - `default-page-size` has been moved to `folder-listing-page-size` and `email-listing-page-size`
+  - `notify-cmd`, `notify-query` and `watch-cmds` have been removed from the global config (available in account config only)
+  - `folder-aliases` has been added to the global config (previously known as `mailboxes` from the account config)
   - `email-reading-headers`, `email-reading-format`,
     `email-reading-decrypt-cmd`, `email-writing-encrypt-cmd` and
     `email-hooks` have been added
   
-  The account config inherits the same breaking changes from the
-  global config, plus:
+  The account config inherits the same breaking changes from the global config, plus:
 
   - `imap-*` requires `backend = "imap"`
   - `maildir-*` requires `backend = "maildir"`
@@ -227,8 +195,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Flag commands [#334]
-- Windows build [#346]
+- Fixed flag commands [#334].
+- Fixed Windows build [#346].
 
 ## [0.5.9] - 2022-03-12
 

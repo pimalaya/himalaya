@@ -283,7 +283,7 @@ fn main() -> Result<()> {
                 ids,
             );
         }
-        Some(email::args::Cmd::Read(ids, text_mime, sanitize, raw, headers)) => {
+        Some(email::args::Cmd::Read(ids, text_mime, raw, headers)) => {
             let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
             let mut backend = BackendBuilder::new()
                 .disable_cache(disable_cache)
@@ -297,7 +297,6 @@ fn main() -> Result<()> {
                 &folder,
                 ids,
                 text_mime,
-                sanitize,
                 raw,
                 headers,
             );

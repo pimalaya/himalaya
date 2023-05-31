@@ -18,7 +18,6 @@ const ARG_PAGE_SIZE: &str = "page-size";
 const ARG_QUERY: &str = "query";
 const ARG_RAW: &str = "raw";
 const ARG_REPLY_ALL: &str = "reply-all";
-const ARG_SANITIZE: &str = "sanitize";
 const CMD_ATTACHMENTS: &str = "attachments";
 const CMD_COPY: &str = "copy";
 const CMD_DELETE: &str = "delete";
@@ -44,7 +43,6 @@ pub type PageSize = usize;
 pub type Query = String;
 pub type Raw = bool;
 pub type RawEmail = String;
-pub type Sanitize = bool;
 pub type TextMime<'a> = &'a str;
 
 /// Represents the email commands.
@@ -57,7 +55,7 @@ pub enum Cmd<'a> {
     Forward(Id<'a>, tpl::args::Headers<'a>, tpl::args::Body<'a>),
     List(table::args::MaxTableWidth, Option<PageSize>, Page),
     Move(Ids<'a>, Folder<'a>),
-    Read(Ids<'a>, TextMime<'a>, Sanitize, Raw, Headers<'a>),
+    Read(Ids<'a>, TextMime<'a>, Raw, Headers<'a>),
     Reply(Id<'a>, All, tpl::args::Headers<'a>, tpl::args::Body<'a>),
     Save(RawEmail),
     Search(Query, table::args::MaxTableWidth, Option<PageSize>, Page),
@@ -104,10 +102,9 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
     } else if let Some(m) = m.subcommand_matches(CMD_READ) {
         let ids = parse_ids_arg(m);
         let mime = parse_mime_type_arg(m);
-        let sanitize = parse_sanitize_flag(m);
         let raw = parse_raw_flag(m);
         let headers = parse_headers_arg(m);
-        Cmd::Read(ids, mime, sanitize, raw, headers)
+        Cmd::Read(ids, mime, raw, headers)
     } else if let Some(m) = m.subcommand_matches(CMD_REPLY) {
         let id = parse_id_arg(m);
         let all = parse_reply_all_flag(m);
@@ -188,7 +185,6 @@ pub fn subcmds() -> Vec<Command> {
             Command::new(CMD_READ)
                 .about("Read text bodies of emails")
                 .arg(mime_type_arg())
-                .arg(sanitize_flag())
                 .arg(raw_flag())
                 .arg(headers_arg())
                 .arg(ids_arg()),
@@ -364,15 +360,6 @@ pub fn parse_headers_arg(m: &ArgMatches) -> Vec<&str> {
         .collect::<Vec<_>>()
 }
 
-/// Represents the sanitize flag.
-pub fn sanitize_flag() -> Arg {
-    Arg::new(ARG_SANITIZE)
-        .help("Sanitizes text bodies")
-        .long("sanitize")
-        .short('s')
-        .action(ArgAction::SetTrue)
-}
-
 /// Represents the raw flag.
 pub fn raw_flag() -> Arg {
     Arg::new(ARG_RAW)
@@ -380,11 +367,6 @@ pub fn raw_flag() -> Arg {
         .long("raw")
         .short('r')
         .action(ArgAction::SetTrue)
-}
-
-/// Represents the sanitize flag parser.
-pub fn parse_sanitize_flag(m: &ArgMatches) -> bool {
-    m.get_flag(ARG_SANITIZE)
 }
 
 /// Represents the raw flag parser.

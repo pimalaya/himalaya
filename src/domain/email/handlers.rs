@@ -216,9 +216,7 @@ pub fn read<P: Printer>(
     backend: &mut dyn Backend,
     folder: &str,
     ids: Vec<&str>,
-    // TODO: map this to ShowTextsStrategy
     text_mime: &str,
-    _sanitize: bool,
     raw: bool,
     headers: Vec<&str>,
 ) -> Result<()> {

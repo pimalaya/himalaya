@@ -27,7 +27,7 @@ pub struct PipelineDef(
     #[serde(getter = "Deref::deref", serialize_with = "pipeline")] Vec<SingleCmd>,
 );
 
-// NOTE: did not find the way to only do with macros…
+// NOTE: did not find the way to do it with macros…
 pub fn pipeline<S>(cmds: &Vec<SingleCmd>, s: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
