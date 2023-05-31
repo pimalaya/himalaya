@@ -2068,7 +2068,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-email"
 version = "0.9.0"
-source = "git+https://git.sr.ht/~soywod/pimalaya#5f5815a1544a49e24ef73cd7f37f763d1c98f70e"
+source = "git+https://git.sr.ht/~soywod/pimalaya#7d04240d0c4c7b98eeee17d4470a742043fef8d3"
 dependencies = [
  "advisory-lock",
  "ammonia",
@@ -2111,7 +2111,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-email-tpl"
 version = "0.2.0"
-source = "git+https://git.sr.ht/~soywod/pimalaya#5f5815a1544a49e24ef73cd7f37f763d1c98f70e"
+source = "git+https://git.sr.ht/~soywod/pimalaya#7d04240d0c4c7b98eeee17d4470a742043fef8d3"
 dependencies = [
  "chumsky 0.9.0",
  "log",
