@@ -15,14 +15,7 @@ repository = "https://github.com/soywod/himalaya"
 all-features = true
 
 [features]
-default = ["rustls-tls", "imap-backend", "smtp-sender"]
-
-# rustls
-rustls-tls = ["pimalaya-email/rustls-tls"]
-
-# native tls
-native-tls = ["pimalaya-email/native-tls"]
-native-tls-vendored = ["pimalaya-email/native-tls-vendored"]
+default = ["imap-backend", "smtp-sender"]
 
 # backends
 imap-backend = ["pimalaya-email/imap-backend"]
@@ -51,7 +44,7 @@ indicatif = "0.17"
 log = "0.4"
 md5 = "0.7.0"
 once_cell = "1.16.0"
-pimalaya-email = { git = "https://git.sr.ht/~soywod/pimalaya" }
+pimalaya-email = "=0.9.0"
 pimalaya-keyring = "=0.0.1"
 pimalaya-oauth2 = "=0.0.2"
 pimalaya-process = "=0.0.2"
