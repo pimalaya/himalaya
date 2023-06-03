@@ -7,5 +7,5 @@ pub mod output;
 pub mod printer;
 pub mod ui;
 
-pub use cache::*;
+pub use cache::IdMapper;
 pub use domain::*;
