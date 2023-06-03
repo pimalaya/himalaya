@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2023-06-03
+
 ### Added
 
 - Added keyring support, which means Himalaya can now use your system's global keyring to get/set sensitive data like passwords or tokens.
@@ -24,7 +26,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- [**BREAKING**] Changed the default TLS provider to `rustls-tls`. You can still use `native-tls` with the cargo feature `native-tls`.
 - Changed release archive extensions from `.tar.gz` to `.tgz`.
 - Moved `wizard` module into domains (config, account, backend…).
 - [**BREAKING**] Changed the way secrets are managed. A secret is a sensitive data like passwords or tokens. There is 3 possible ways to declare a secret in the config file:
@@ -48,8 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- [**BREAKING**] Removed cargo feature `rustls-native-certs` (it has been merged with the `rustls-tls` feature).
 - [**BREAKING**] Removed `-s|--sanitize` option. It is done by default now, except if the `-t|--mime-type html` is set.
+- [**BREAKING**] Removed `native-tls` support, `rustls-tls` is now the only TLS provider available. Removed in consequence `native-tls`, `rustls-tls` and `rustls-native-certs` cargo features.
 
 ## [0.7.3] - 2023-05-01
 
@@ -549,7 +550,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[Unreleased]: https://github.com/soywod/himalaya/compare/v0.7.3...HEAD
+[Unreleased]: https://github.com/soywod/himalaya/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/soywod/himalaya/compare/v0.7.3...v0.8.0
 [0.7.3]: https://github.com/soywod/himalaya/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/soywod/himalaya/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/soywod/himalaya/compare/v0.7.0...v0.7.1
