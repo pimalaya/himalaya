@@ -18,7 +18,8 @@ email = "display.name@gmail.local"
 backend = "imap"
 imap-host = "imap.gmail.com"
 imap-login = "display.name@gmail.local"
-imap-passwd-cmd = "pass show gmail"
+imap-auth = "passwd"
+imap-passwd.cmd = "pass show gmail"
 imap-port = 993
 imap-ssl = true
 imap-starttls = false
@@ -29,14 +30,15 @@ imap-watch-cmds = ["echo \"received server changes!\""]
 sender = "smtp"
 smtp-host = "smtp.gmail.com"
 smtp-login = "display.name@gmail.local"
-smtp-passwd-cmd = "pass show piana/gmail"
+smtp-auth = "passwd"
+smtp-passwd.cmd = "pass show piana/gmail"
 smtp-port = 465
 smtp-ssl = true
 smtp-starttls = false
 
 sync = true
 sync-dir = "/tmp/sync/gmail"
-sync-folders-strategy.only = ["INBOX"]
+sync-folders-strategy.include = ["INBOX"]
 
 [example.folder-aliases]
 inbox = "INBOX"
