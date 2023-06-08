@@ -16,10 +16,7 @@ pub enum IdMapper {
 }
 
 impl IdMapper {
-    fn find_closest_db_path<D>(dir: D) -> PathBuf
-    where
-        D: AsRef<Path>,
-    {
+    pub fn find_closest_db_path(dir: impl AsRef<Path>) -> PathBuf {
         let mut db_path = dir.as_ref().join(ID_MAPPER_DB_FILE_NAME);
         let mut db_parent_dir = dir.as_ref().parent();
 
@@ -40,20 +37,20 @@ impl IdMapper {
     }
 
     pub fn new(backend: &dyn Backend, account: &str, folder: &str) -> Result<Self> {
-        let mut db_path = PathBuf::default();
-
-        if let Some(backend) = backend.as_any().downcast_ref::<MaildirBackend>() {
-            db_path = Self::find_closest_db_path(&backend.path());
-        }
-
         #[cfg(feature = "imap-backend")]
         if backend.as_any().is::<ImapBackend>() {
-            return Ok(Self::Dummy);
+            return Ok(IdMapper::Dummy);
+        }
+
+        let mut db_path = PathBuf::new();
+
+        if let Some(backend) = backend.as_any().downcast_ref::<MaildirBackend>() {
+            db_path = Self::find_closest_db_path(backend.path())
         }
 
         #[cfg(feature = "notmuch-backend")]
         if let Some(backend) = backend.as_any().downcast_ref::<NotmuchBackend>() {
-            db_path = Self::find_closest_db_path(&backend.path());
+            db_path = Self::find_closest_db_path(backend.path())
         }
 
         let digest = md5::compute(account.to_string() + folder);

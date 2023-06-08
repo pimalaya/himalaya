@@ -1010,12 +1010,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "futures"
+version = "0.3.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38390104763dc37a5145a53c29c63c1290b5d316d6086ec32c293f6736051bb0"
+dependencies = [
+ "futures-channel",
+ "futures-core",
+ "futures-executor",
+ "futures-io",
+ "futures-sink",
+ "futures-task",
+ "futures-util",
+]
+
+[[package]]
 name = "futures-channel"
 version = "0.3.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52ba265a92256105f45b719605a571ffe2d1f0fea3807304b522c1d778f79eed"
 dependencies = [
  "futures-core",
+ "futures-sink",
 ]
 
 [[package]]
@@ -1023,6 +1039,17 @@ name = "futures-core"
 version = "0.3.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04909a7a7e4633ae6c4a9ab280aeb86da1236243a77b694a49eacd659a4bd3ac"
+
+[[package]]
+name = "futures-executor"
+version = "0.3.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7acc85df6714c176ab5edf386123fafe217be88c0840ec11f199441134a074e2"
+dependencies = [
+ "futures-core",
+ "futures-task",
+ "futures-util",
+]
 
 [[package]]
 name = "futures-io"
@@ -1074,6 +1101,7 @@ version = "0.3.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "197676987abd2f9cadff84926f410af1c183608d36641465df73ae8211dc65d6"
 dependencies = [
+ "futures-channel",
  "futures-core",
  "futures-io",
  "futures-macro",
@@ -1187,7 +1215,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "himalaya"
-version = "0.8.1"
+version = "0.8.1-beta"
 dependencies = [
  "anyhow",
  "atty",
@@ -1217,6 +1245,7 @@ dependencies = [
  "tempfile",
  "termcolor",
  "terminal_size",
+ "tokio",
  "toml",
  "toml_edit",
  "unicode-width",
@@ -2170,15 +2199,16 @@ dependencies = [
 
 [[package]]
 name = "pimalaya-email"
-version = "0.9.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e85cdc815af8f35c67941eaac74dc2e6a8d01c3ed498b2d36eaaf9bc8a517e6"
+checksum = "6b881982050e29d8f9141a57f0be3f87471394462a2f1695471d5a81f44b4b3a"
 dependencies = [
  "advisory-lock",
  "ammonia",
  "chrono",
  "convert_case",
  "dirs",
+ "futures",
  "html-escape",
  "imap",
  "imap-proto",
@@ -2214,9 +2244,9 @@ dependencies = [
 
 [[package]]
 name = "pimalaya-email-tpl"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e25da44b70885d9636ddcb89181a2f0155acff3816697ec7af07a5f6f17cdc0e"
+checksum = "f640b701926112e28b025cea9c9d50a2bfe329862eeb4acbf2d62edeb53fb19b"
 dependencies = [
  "chumsky 0.9.0",
  "log",
@@ -2231,9 +2261,9 @@ dependencies = [
 
 [[package]]
 name = "pimalaya-keyring"
-version = "0.0.1"
+version = "0.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae5fed5fff1897b4964a5e8efbcd5e41e4492fe7947f827745fe9a14a555fe94"
+checksum = "cef72189d57c09a3c682769e7c99d44772bb1164173e77e77cef837ba8dda1b4"
 dependencies = [
  "keyring",
  "log",
@@ -2242,9 +2272,9 @@ dependencies = [
 
 [[package]]
 name = "pimalaya-oauth2"
-version = "0.0.2"
+version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9bec4262b62b6b14ffa244727e3d86d69e608e664e162e2c73332bed3b3f8a1"
+checksum = "6a28b3da9e56304f14bd46f769bfae52de32bd3fc2795946079e66838a178ce8"
 dependencies = [
  "log",
  "oauth2",
@@ -2265,13 +2295,12 @@ dependencies = [
 
 [[package]]
 name = "pimalaya-secret"
-version = "0.0.1"
+version = "0.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b585f585653ac7f957a608d8cdffd81be6561c2ad92fa82a1e72ed62a1bb31e0"
+checksum = "9338dc84e5ec9fc25f3a36d82ed68ffe4888ad728ca1aa42228e27648ddff01f"
 dependencies = [
  "log",
  "pimalaya-keyring",
- "pimalaya-oauth2",
  "pimalaya-process",
  "thiserror",
 ]
@@ -3153,7 +3182,19 @@ dependencies = [
  "num_cpus",
  "pin-project-lite",
  "socket2",
+ "tokio-macros",
  "windows-sys 0.42.0",
+]
+
+[[package]]
+name = "tokio-macros"
+version = "1.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d266c00fde287f55d3f1c3e96c500c362a2b8c695076ec180f27918820bc6df8"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.104",
 ]
 
 [[package]]

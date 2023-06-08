@@ -3,7 +3,7 @@
 use anyhow::Result;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use log::info;
-use pimalaya_email::folder::sync::Strategy as SyncFoldersStrategy;
+use pimalaya_email::FolderSyncStrategy;
 use std::collections::HashSet;
 
 use crate::{folder, ui::table};
@@ -25,7 +25,7 @@ pub enum Cmd {
     /// Represents the list accounts command.
     List(table::args::MaxTableWidth),
     /// Represents the sync account command.
-    Sync(Option<SyncFoldersStrategy>, DryRun),
+    Sync(Option<FolderSyncStrategy>, DryRun),
     /// Configure the current selected account.
     Configure(Reset),
 }
@@ -39,15 +39,15 @@ pub fn matches(m: &ArgMatches) -> Result<Option<Cmd>> {
             let include = folder::args::parse_include_arg(m);
             let exclude = folder::args::parse_exclude_arg(m);
             let folders_strategy = if let Some(folder) = folder::args::parse_source_arg(m) {
-                Some(SyncFoldersStrategy::Include(HashSet::from_iter([
+                Some(FolderSyncStrategy::Include(HashSet::from_iter([
                     folder.to_owned()
                 ])))
             } else if !include.is_empty() {
-                Some(SyncFoldersStrategy::Include(include.to_owned()))
+                Some(FolderSyncStrategy::Include(include.to_owned()))
             } else if !exclude.is_empty() {
-                Some(SyncFoldersStrategy::Exclude(exclude))
+                Some(FolderSyncStrategy::Exclude(exclude))
             } else if folder::args::parse_all_arg(m) {
-                Some(SyncFoldersStrategy::All)
+                Some(FolderSyncStrategy::All)
             } else {
                 None
             };

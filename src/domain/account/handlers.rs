@@ -3,12 +3,17 @@
 //! This module gathers all account actions triggered by the CLI.
 
 use anyhow::Result;
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use indicatif::{MultiProgress, ProgressBar, ProgressFinish, ProgressStyle};
 use log::{info, trace, warn};
+use once_cell::sync::Lazy;
+#[cfg(feature = "imap-backend")]
+use pimalaya_email::ImapAuthConfig;
+#[cfg(feature = "smtp-sender")]
+use pimalaya_email::SmtpAuthConfig;
 use pimalaya_email::{
-    folder::sync::Strategy as SyncFoldersStrategy, AccountConfig, Backend, BackendConfig,
-    BackendSyncBuilder, BackendSyncProgressEvent, ImapAuthConfig, SenderConfig, SmtpAuthConfig,
+    AccountConfig, BackendConfig, BackendSyncBuilder, BackendSyncProgressEvent, SenderConfig,
 };
+use std::{collections::HashMap, sync::Mutex};
 
 use crate::{
     config::{
@@ -18,6 +23,21 @@ use crate::{
     printer::{PrintTableOpts, Printer},
     Accounts,
 };
+
+const MAIN_PROGRESS_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
+    ProgressStyle::with_template(" {spinner:.dim} {msg:.dim}\n {wide_bar:.cyan/blue} \n").unwrap()
+});
+
+const SUB_PROGRESS_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
+    ProgressStyle::with_template(
+        "   {prefix:.bold} — {wide_msg:.dim} \n   {wide_bar:.black/black} {percent}% ",
+    )
+    .unwrap()
+});
+
+const SUB_PROGRESS_DONE_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
+    ProgressStyle::with_template("   {prefix:.bold} \n   {wide_bar:.green} {percent}% ").unwrap()
+});
 
 /// Configure the current selected account
 pub fn configure(config: &AccountConfig, reset: bool) -> Result<()> {
@@ -103,25 +123,16 @@ pub fn list<'a, P: Printer>(
 
 /// Synchronizes the account defined using argument `-a|--account`. If
 /// no account given, synchronizes the default one.
-pub fn sync<P: Printer>(
-    account_config: &AccountConfig,
+pub fn sync<'a, P: Printer>(
     printer: &mut P,
-    backend: &dyn Backend,
-    folders_strategy: Option<SyncFoldersStrategy>,
+    sync_builder: BackendSyncBuilder<'a>,
     dry_run: bool,
 ) -> Result<()> {
     info!("entering the sync accounts handler");
     trace!("dry run: {dry_run}");
-    trace!("folders strategy: {folders_strategy:#?}");
-
-    let mut sync_builder = BackendSyncBuilder::new(account_config);
-
-    if let Some(strategy) = folders_strategy {
-        sync_builder = sync_builder.folders_strategy(strategy);
-    }
 
     if dry_run {
-        let report = sync_builder.dry_run(true).sync(backend)?;
+        let report = sync_builder.sync()?;
         let mut hunks_count = report.folders_patch.len();
 
         if !report.folders_patch.is_empty() {
@@ -142,98 +153,77 @@ pub fn sync<P: Printer>(
         }
 
         printer.print(format!(
-            "Estimated patch length for account {} to be synchronized: {hunks_count}",
-            backend.name(),
+            "Estimated patch length for account to be synchronized: {hunks_count}",
         ))?;
     } else if printer.is_json() {
-        sync_builder.sync(backend)?;
-        printer.print(format!(
-            "Account {} successfully synchronized!",
-            backend.name()
-        ))?;
+        sync_builder.sync()?;
+        printer.print("Account successfully synchronized!")?;
     } else {
         let multi = MultiProgress::new();
-        let progress = multi.add(
-            ProgressBar::new(0).with_style(
-                ProgressStyle::with_template(
-                    " {spinner:.dim} {msg:.dim}\n {wide_bar:.cyan/blue} {pos}/{len} ",
-                )
-                .unwrap(),
-            ),
+        let sub_progresses = Mutex::new(HashMap::new());
+        let main_progress = multi.add(
+            ProgressBar::new(100)
+                .with_style(MAIN_PROGRESS_STYLE.clone())
+                .with_message("Synchronizing folders…"),
         );
 
+        // Force the progress bar to show
+        main_progress.set_position(0);
+
         let report = sync_builder
-            .on_progress(|evt| {
+            .with_on_progress(move |evt| {
                 use BackendSyncProgressEvent::*;
                 Ok(match evt {
-                    GetLocalCachedFolders => {
-                        progress.set_length(4);
-                        progress.set_position(0);
-                        progress.set_message("Getting local cached folders…");
+                    ApplyFolderPatches(..) => {
+                        main_progress.inc(3);
                     }
-                    GetLocalFolders => {
-                        progress.inc(1);
-                        progress.set_message("Getting local maildir folders…");
+                    ApplyEnvelopePatches(patches) => {
+                        let mut envelopes_progresses = sub_progresses.lock().unwrap();
+                        let patches_len = patches.values().fold(0, |sum, patch| sum + patch.len());
+                        main_progress.set_length((110 * patches_len / 100) as u64);
+                        main_progress.set_position((5 * patches_len / 100) as u64);
+                        main_progress.set_message("Synchronizing envelopes…");
+
+                        for (folder, patch) in patches {
+                            let progress = ProgressBar::new(patch.len() as u64)
+                                .with_style(SUB_PROGRESS_STYLE.clone())
+                                .with_prefix(folder.clone())
+                                .with_finish(ProgressFinish::AndClear);
+                            let progress = multi.add(progress);
+                            envelopes_progresses.insert(folder, progress.clone());
+                        }
                     }
-                    GetRemoteCachedFolders => {
-                        progress.inc(1);
-                        progress.set_message("Getting remote cached folders…");
+                    ApplyEnvelopeHunk(hunk) => {
+                        main_progress.inc(1);
+                        let mut progresses = sub_progresses.lock().unwrap();
+                        if let Some(progress) = progresses.get_mut(hunk.folder()) {
+                            progress.inc(1);
+                            if progress.position() == (progress.length().unwrap() - 1) {
+                                progress.set_style(SUB_PROGRESS_DONE_STYLE.clone())
+                            } else {
+                                progress.set_message(format!("{hunk}…"));
+                            }
+                        }
                     }
-                    GetRemoteFolders => {
-                        progress.inc(1);
-                        progress.set_message("Getting remote folders…");
+                    ApplyEnvelopeCachePatch(_patch) => {
+                        main_progress.set_length(100);
+                        main_progress.set_position(95);
+                        main_progress.set_message("Saving cache database…");
                     }
-                    BuildFoldersPatch => {
-                        progress.inc(1);
-                        progress.set_message("Building patch…");
+                    ExpungeFolders(folders) => {
+                        let mut progresses = sub_progresses.lock().unwrap();
+                        for progress in progresses.values() {
+                            progress.finish_and_clear()
+                        }
+                        progresses.clear();
+
+                        main_progress.set_position(100);
+                        main_progress.set_message(format!("Expunging {} folders…", folders.len()));
                     }
-                    ProcessFoldersPatch(n) => {
-                        progress.set_length(n as u64);
-                        progress.set_position(0);
-                        progress.set_message("Processing patch…");
-                    }
-                    ProcessFolderHunk(msg) => {
-                        progress.inc(1);
-                        progress.set_message(msg + "…");
-                    }
-                    StartEnvelopesSync(folder, n, len) => {
-                        multi.println(format!("[{n:2}/{len}] {folder}")).unwrap();
-                        progress.reset();
-                    }
-                    GetLocalCachedEnvelopes => {
-                        progress.set_length(4);
-                        progress.set_message("Getting local cached envelopes…");
-                    }
-                    GetLocalEnvelopes => {
-                        progress.inc(1);
-                        progress.set_message("Getting local maildir envelopes…");
-                    }
-                    GetRemoteCachedEnvelopes => {
-                        progress.inc(1);
-                        progress.set_message("Getting remote cached envelopes…");
-                    }
-                    GetRemoteEnvelopes => {
-                        progress.inc(1);
-                        progress.set_message("Getting remote envelopes…");
-                    }
-                    BuildEnvelopesPatch => {
-                        progress.inc(1);
-                        progress.set_message("Building patch…");
-                    }
-                    ProcessEnvelopesPatch(n) => {
-                        progress.set_length(n as u64);
-                        progress.set_position(0);
-                        progress.set_message("Processing patch…");
-                    }
-                    ProcessEnvelopeHunk(msg) => {
-                        progress.inc(1);
-                        progress.set_message(msg + "…");
-                    }
+                    _ => (),
                 })
             })
-            .sync(backend)?;
-
-        progress.finish_and_clear();
+            .sync()?;
 
         let folders_patch_err = report
             .folders_patch
@@ -268,18 +258,14 @@ pub fn sync<P: Printer>(
             }
         }
 
-        if !report.envelopes_cache_patch.1.is_empty() {
+        if let Some(err) = report.envelopes_cache_patch.1 {
             printer.print_log("")?;
-            printer.print_log("Error occured while applying the envelopes cache patch:")?;
-            for err in report.envelopes_cache_patch.1 {
-                printer.print_log(format!(" - {err}"))?;
-            }
+            printer.print_log(format!(
+                "Error occured while applying the envelopes cache patch: {err}"
+            ))?;
         }
 
-        printer.print(format!(
-            "Account {} successfully synchronized!",
-            backend.name()
-        ))?;
+        printer.print("Account successfully synchronized!")?;
     }
 
     Ok(())

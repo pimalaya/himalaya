@@ -8,8 +8,8 @@ use pimalaya_email::ImapAuthConfig;
 #[cfg(feature = "smtp-sender")]
 use pimalaya_email::SmtpAuthConfig;
 use pimalaya_email::{
-    folder::sync::Strategy as SyncFoldersStrategy, AccountConfig, BackendConfig, EmailHooks,
-    EmailTextPlainFormat, SenderConfig,
+    AccountConfig, BackendConfig, EmailHooks, EmailTextPlainFormat, FolderSyncStrategy,
+    SenderConfig,
 };
 use pimalaya_process::Cmd;
 use serde::{Deserialize, Serialize};
@@ -76,10 +76,10 @@ pub struct DeserializedAccountConfig {
     pub sync_dir: Option<PathBuf>,
     #[serde(
         default,
-        with = "SyncFoldersStrategyDef",
-        skip_serializing_if = "SyncFoldersStrategy::is_default"
+        with = "FolderSyncStrategyDef",
+        skip_serializing_if = "FolderSyncStrategy::is_default"
     )]
-    pub sync_folders_strategy: SyncFoldersStrategy,
+    pub sync_folders_strategy: FolderSyncStrategy,
 
     #[serde(flatten, with = "BackendConfigDef")]
     pub backend: BackendConfig,
@@ -197,16 +197,16 @@ impl DeserializedAccountConfig {
                 if let BackendConfig::Imap(config) = &mut backend {
                     match &mut config.auth {
                         ImapAuthConfig::Passwd(secret) => {
-                            secret.replace_undefined_entry_with(format!("{name}-imap-passwd"));
+                            secret.set_keyring_entry_if_undefined(format!("{name}-imap-passwd"));
                         }
                         ImapAuthConfig::OAuth2(config) => {
-                            config.client_secret.replace_undefined_entry_with(format!(
+                            config.client_secret.set_keyring_entry_if_undefined(format!(
                                 "{name}-imap-oauth2-client-secret"
                             ));
-                            config.access_token.replace_undefined_entry_with(format!(
+                            config.access_token.set_keyring_entry_if_undefined(format!(
                                 "{name}-imap-oauth2-access-token"
                             ));
-                            config.refresh_token.replace_undefined_entry_with(format!(
+                            config.refresh_token.set_keyring_entry_if_undefined(format!(
                                 "{name}-imap-oauth2-refresh-token"
                             ));
                         }
@@ -222,16 +222,16 @@ impl DeserializedAccountConfig {
                 if let SenderConfig::Smtp(config) = &mut sender {
                     match &mut config.auth {
                         SmtpAuthConfig::Passwd(secret) => {
-                            secret.replace_undefined_entry_with(format!("{name}-smtp-passwd"));
+                            secret.set_keyring_entry_if_undefined(format!("{name}-smtp-passwd"));
                         }
                         SmtpAuthConfig::OAuth2(config) => {
-                            config.client_secret.replace_undefined_entry_with(format!(
+                            config.client_secret.set_keyring_entry_if_undefined(format!(
                                 "{name}-smtp-oauth2-client-secret"
                             ));
-                            config.access_token.replace_undefined_entry_with(format!(
+                            config.access_token.set_keyring_entry_if_undefined(format!(
                                 "{name}-smtp-oauth2-access-token"
                             ));
-                            config.refresh_token.replace_undefined_entry_with(format!(
+                            config.refresh_token.set_keyring_entry_if_undefined(format!(
                                 "{name}-smtp-oauth2-refresh-token"
                             ));
                         }

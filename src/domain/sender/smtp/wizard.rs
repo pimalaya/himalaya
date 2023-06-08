@@ -4,7 +4,7 @@ use pimalaya_email::{
     OAuth2Config, OAuth2Method, OAuth2Scopes, PasswdConfig, SenderConfig, SmtpAuthConfig,
     SmtpConfig,
 };
-use pimalaya_oauth2::AuthorizationCodeGrant;
+use pimalaya_oauth2::{AuthorizationCodeGrant, Client};
 use pimalaya_secret::Secret;
 
 use crate::{
@@ -84,8 +84,8 @@ pub(crate) fn configure(account_name: &str, email: &str) -> Result<SenderConfig>
 
             let config = match secret {
                 Some(idx) if SECRETS[idx] == KEYRING => {
-                    Secret::new_keyring(format!("{account_name}-smtp-passwd"))
-                        .set(prompt_passwd("SMTP password")?)?;
+                    Secret::new_keyring_entry(format!("{account_name}-smtp-passwd"))
+                        .set_keyring_entry_secret(prompt_passwd("SMTP password")?)?;
                     PasswdConfig::default()
                 }
                 Some(idx) if SECRETS[idx] == RAW => PasswdConfig {
@@ -125,8 +125,8 @@ pub(crate) fn configure(account_name: &str, email: &str) -> Result<SenderConfig>
             let client_secret: String = Input::with_theme(&*THEME)
                 .with_prompt("SMTP OAuth 2.0 client secret")
                 .interact()?;
-            Secret::new_keyring(format!("{account_name}-smtp-oauth2-client-secret"))
-                .set(&client_secret)?;
+            Secret::new_keyring_entry(format!("{account_name}-smtp-oauth2-client-secret"))
+                .set_keyring_entry_secret(&client_secret)?;
 
             config.auth_url = Input::with_theme(&*THEME)
                 .with_prompt("SMTP OAuth 2.0 authorization URL")
@@ -174,35 +174,42 @@ pub(crate) fn configure(account_name: &str, email: &str) -> Result<SenderConfig>
 
             wizard_log!("To complete your OAuth 2.0 setup, click on the following link:");
 
-            let mut builder = AuthorizationCodeGrant::new(
+            let client = Client::new(
                 config.client_id.clone(),
                 client_secret,
                 config.auth_url.clone(),
                 config.token_url.clone(),
-            )?;
+            )?
+            .with_redirect_host(config.redirect_host.clone())
+            .with_redirect_port(config.redirect_port)
+            .build()?;
+
+            let mut auth_code_grant = AuthorizationCodeGrant::new()
+                .with_redirect_host(config.redirect_host.clone())
+                .with_redirect_port(config.redirect_port);
 
             if config.pkce {
-                builder = builder.with_pkce();
+                auth_code_grant = auth_code_grant.with_pkce();
             }
 
             for scope in config.scopes.clone() {
-                builder = builder.with_scope(scope);
+                auth_code_grant = auth_code_grant.with_scope(scope);
             }
 
-            let client = builder.get_client()?;
-            let (redirect_url, csrf_token) = builder.get_redirect_url(&client);
+            let (redirect_url, csrf_token) = auth_code_grant.get_redirect_url(&client);
 
             println!("{}", redirect_url.to_string());
             println!("");
 
-            let (access_token, refresh_token) = builder.wait_for_redirection(client, csrf_token)?;
+            let (access_token, refresh_token) =
+                auth_code_grant.wait_for_redirection(&client, csrf_token)?;
 
-            Secret::new_keyring(format!("{account_name}-smtp-oauth2-access-token"))
-                .set(access_token)?;
+            Secret::new_keyring_entry(format!("{account_name}-smtp-oauth2-access-token"))
+                .set_keyring_entry_secret(access_token)?;
 
             if let Some(refresh_token) = &refresh_token {
-                Secret::new_keyring(format!("{account_name}-smtp-oauth2-refresh-token"))
-                    .set(refresh_token)?;
+                Secret::new_keyring_entry(format!("{account_name}-smtp-oauth2-refresh-token"))
+                    .set_keyring_entry_secret(refresh_token)?;
             }
 
             SmtpAuthConfig::OAuth2(config)

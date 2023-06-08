@@ -135,10 +135,10 @@ mod tests {
             fn name(&self) -> String {
                 unimplemented!();
             }
-            fn add_folder(&self, _: &str) -> backend::Result<()> {
+            fn add_folder(&mut self, _: &str) -> backend::Result<()> {
                 unimplemented!();
             }
-            fn list_folders(&self) -> backend::Result<Folders> {
+            fn list_folders(&mut self) -> backend::Result<Folders> {
                 Ok(Folders::from_iter([
                     Folder {
                         delim: "/".into(),
@@ -152,23 +152,28 @@ mod tests {
                     },
                 ]))
             }
-            fn expunge_folder(&self, _: &str) -> backend::Result<()> {
+            fn expunge_folder(&mut self, _: &str) -> backend::Result<()> {
                 unimplemented!();
             }
-            fn purge_folder(&self, _: &str) -> backend::Result<()> {
+            fn purge_folder(&mut self, _: &str) -> backend::Result<()> {
                 unimplemented!();
             }
-            fn delete_folder(&self, _: &str) -> backend::Result<()> {
+            fn delete_folder(&mut self, _: &str) -> backend::Result<()> {
                 unimplemented!();
             }
-            fn get_envelope(&self, _: &str, _: &str) -> backend::Result<Envelope> {
+            fn get_envelope(&mut self, _: &str, _: &str) -> backend::Result<Envelope> {
                 unimplemented!();
             }
-            fn list_envelopes(&self, _: &str, _: usize, _: usize) -> backend::Result<Envelopes> {
+            fn list_envelopes(
+                &mut self,
+                _: &str,
+                _: usize,
+                _: usize,
+            ) -> backend::Result<Envelopes> {
                 unimplemented!()
             }
             fn search_envelopes(
-                &self,
+                &mut self,
                 _: &str,
                 _: &str,
                 _: &str,
@@ -177,35 +182,38 @@ mod tests {
             ) -> backend::Result<Envelopes> {
                 unimplemented!()
             }
-            fn add_email(&self, _: &str, _: &[u8], _: &Flags) -> backend::Result<String> {
+            fn add_email(&mut self, _: &str, _: &[u8], _: &Flags) -> backend::Result<String> {
                 unimplemented!()
             }
-            fn get_emails(&self, _: &str, _: Vec<&str>) -> backend::Result<Emails> {
+            fn get_emails(&mut self, _: &str, _: Vec<&str>) -> backend::Result<Emails> {
                 unimplemented!()
             }
-            fn preview_emails(&self, _: &str, _: Vec<&str>) -> backend::Result<Emails> {
+            fn preview_emails(&mut self, _: &str, _: Vec<&str>) -> backend::Result<Emails> {
                 unimplemented!()
             }
-            fn copy_emails(&self, _: &str, _: &str, _: Vec<&str>) -> backend::Result<()> {
+            fn copy_emails(&mut self, _: &str, _: &str, _: Vec<&str>) -> backend::Result<()> {
                 unimplemented!()
             }
-            fn move_emails(&self, _: &str, _: &str, _: Vec<&str>) -> backend::Result<()> {
+            fn move_emails(&mut self, _: &str, _: &str, _: Vec<&str>) -> backend::Result<()> {
                 unimplemented!()
             }
-            fn delete_emails(&self, _: &str, _: Vec<&str>) -> backend::Result<()> {
+            fn delete_emails(&mut self, _: &str, _: Vec<&str>) -> backend::Result<()> {
                 unimplemented!()
             }
-            fn add_flags(&self, _: &str, _: Vec<&str>, _: &Flags) -> backend::Result<()> {
+            fn add_flags(&mut self, _: &str, _: Vec<&str>, _: &Flags) -> backend::Result<()> {
                 unimplemented!()
             }
-            fn set_flags(&self, _: &str, _: Vec<&str>, _: &Flags) -> backend::Result<()> {
+            fn set_flags(&mut self, _: &str, _: Vec<&str>, _: &Flags) -> backend::Result<()> {
                 unimplemented!()
             }
-            fn remove_flags(&self, _: &str, _: Vec<&str>, _: &Flags) -> backend::Result<()> {
+            fn remove_flags(&mut self, _: &str, _: Vec<&str>, _: &Flags) -> backend::Result<()> {
                 unimplemented!()
             }
-            fn as_any(&self) -> &(dyn Any) {
-                self
+            fn try_clone(&self) -> backend::Result<Box<dyn Backend>> {
+                unimplemented!()
+            }
+            fn as_any(&self) -> &dyn Any {
+                unimplemented!()
             }
         }
 

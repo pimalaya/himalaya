@@ -1,12 +1,13 @@
-#[cfg(feature = "imap-backend")]
-use pimalaya_email::ImapConfig;
 #[cfg(feature = "notmuch-backend")]
 use pimalaya_email::NotmuchConfig;
 use pimalaya_email::{
-    folder::sync::Strategy as SyncFoldersStrategy, BackendConfig, EmailHooks, EmailTextPlainFormat,
-    ImapAuthConfig, MaildirConfig, OAuth2Config, OAuth2Method, OAuth2Scopes, PasswdConfig,
-    SenderConfig, SendmailConfig, SmtpAuthConfig, SmtpConfig,
+    BackendConfig, EmailHooks, EmailTextPlainFormat, FolderSyncStrategy, MaildirConfig,
+    OAuth2Config, OAuth2Method, OAuth2Scopes, PasswdConfig, SenderConfig, SendmailConfig,
 };
+#[cfg(feature = "imap-backend")]
+use pimalaya_email::{ImapAuthConfig, ImapConfig};
+#[cfg(feature = "smtp-sender")]
+use pimalaya_email::{SmtpAuthConfig, SmtpConfig};
 use pimalaya_keyring::Entry;
 use pimalaya_process::{Cmd, Pipeline, SingleCmd};
 use pimalaya_secret::Secret;
@@ -74,14 +75,16 @@ impl From<OptionCmd> for Option<Cmd> {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "Secret", rename_all = "kebab-case")]
 pub enum SecretDef {
     Raw(String),
     #[serde(with = "CmdDef")]
     Cmd(Cmd),
-    #[serde(with = "EntryDef")]
-    Keyring(Entry),
+    #[serde(with = "EntryDef", rename = "keyring")]
+    KeyringEntry(Entry),
+    #[default]
+    Undefined,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -134,6 +137,7 @@ pub struct ImapConfigDef {
     pub watch_cmds: Option<Vec<String>>,
 }
 
+#[cfg(feature = "imap-backend")]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "ImapAuthConfig", tag = "imap-auth")]
 pub enum ImapAuthConfigDef {
@@ -150,7 +154,7 @@ pub struct ImapPasswdConfigDef {
         rename = "imap-passwd",
         with = "SecretDef",
         default,
-        skip_serializing_if = "Secret::is_undefined_entry"
+        skip_serializing_if = "Secret::is_undefined"
     )]
     pub passwd: Secret,
 }
@@ -166,7 +170,7 @@ pub struct ImapOAuth2ConfigDef {
         rename = "imap-oauth2-client-secret",
         with = "SecretDef",
         default,
-        skip_serializing_if = "Secret::is_undefined_entry"
+        skip_serializing_if = "Secret::is_undefined"
     )]
     pub client_secret: Secret,
     #[serde(rename = "imap-oauth2-auth-url")]
@@ -177,20 +181,30 @@ pub struct ImapOAuth2ConfigDef {
         rename = "imap-oauth2-access-token",
         with = "SecretDef",
         default,
-        skip_serializing_if = "Secret::is_undefined_entry"
+        skip_serializing_if = "Secret::is_undefined"
     )]
     pub access_token: Secret,
     #[serde(
         rename = "imap-oauth2-refresh-token",
         with = "SecretDef",
         default,
-        skip_serializing_if = "Secret::is_undefined_entry"
+        skip_serializing_if = "Secret::is_undefined"
     )]
     pub refresh_token: Secret,
     #[serde(flatten, with = "ImapOAuth2ScopesDef")]
     pub scopes: OAuth2Scopes,
     #[serde(rename = "imap-oauth2-pkce", default)]
     pub pkce: bool,
+    #[serde(
+        rename = "imap-oauth2-redirect-host",
+        default = "OAuth2Config::default_redirect_host"
+    )]
+    pub redirect_host: String,
+    #[serde(
+        rename = "imap-oauth2-redirect-port",
+        default = "OAuth2Config::default_redirect_port"
+    )]
+    pub redirect_port: u16,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -236,12 +250,14 @@ pub enum EmailTextPlainFormatDef {
 pub enum SenderConfigDef {
     #[default]
     None,
+    #[cfg(feature = "smtp-sender")]
     #[serde(with = "SmtpConfigDef")]
     Smtp(SmtpConfig),
     #[serde(with = "SendmailConfigDef")]
     Sendmail(SendmailConfig),
 }
 
+#[cfg(feature = "smtp-sender")]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "SmtpConfig")]
 struct SmtpConfigDef {
@@ -261,6 +277,7 @@ struct SmtpConfigDef {
     pub auth: SmtpAuthConfig,
 }
 
+#[cfg(feature = "smtp-sender")]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "SmtpAuthConfig", tag = "smtp-auth")]
 pub enum SmtpAuthConfigDef {
@@ -277,7 +294,7 @@ pub struct SmtpPasswdConfigDef {
         rename = "smtp-passwd",
         with = "SecretDef",
         default,
-        skip_serializing_if = "Secret::is_undefined_entry"
+        skip_serializing_if = "Secret::is_undefined"
     )]
     pub passwd: Secret,
 }
@@ -293,7 +310,7 @@ pub struct SmtpOAuth2ConfigDef {
         rename = "smtp-oauth2-client-secret",
         with = "SecretDef",
         default,
-        skip_serializing_if = "Secret::is_undefined_entry"
+        skip_serializing_if = "Secret::is_undefined"
     )]
     pub client_secret: Secret,
     #[serde(rename = "smtp-oauth2-auth-url")]
@@ -304,20 +321,30 @@ pub struct SmtpOAuth2ConfigDef {
         rename = "smtp-oauth2-access-token",
         with = "SecretDef",
         default,
-        skip_serializing_if = "Secret::is_undefined_entry"
+        skip_serializing_if = "Secret::is_undefined"
     )]
     pub access_token: Secret,
     #[serde(
         rename = "smtp-oauth2-refresh-token",
         with = "SecretDef",
         default,
-        skip_serializing_if = "Secret::is_undefined_entry"
+        skip_serializing_if = "Secret::is_undefined"
     )]
     pub refresh_token: Secret,
     #[serde(flatten, with = "SmtpOAuth2ScopesDef")]
     pub scopes: OAuth2Scopes,
     #[serde(rename = "smtp-oauth2-pkce", default)]
     pub pkce: bool,
+    #[serde(
+        rename = "imap-oauth2-redirect-host",
+        default = "OAuth2Config::default_redirect_host"
+    )]
+    pub redirect_host: String,
+    #[serde(
+        rename = "imap-oauth2-redirect-port",
+        default = "OAuth2Config::default_redirect_port"
+    )]
+    pub redirect_port: u16,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -347,8 +374,8 @@ pub struct EmailHooksDef {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(remote = "SyncFoldersStrategy", rename_all = "kebab-case")]
-pub enum SyncFoldersStrategyDef {
+#[serde(remote = "FolderSyncStrategy", rename_all = "kebab-case")]
+pub enum FolderSyncStrategyDef {
     #[default]
     All,
     #[serde(alias = "only")]
