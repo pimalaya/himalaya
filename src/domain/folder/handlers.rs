@@ -209,9 +209,6 @@ mod tests {
             fn remove_flags(&mut self, _: &str, _: Vec<&str>, _: &Flags) -> backend::Result<()> {
                 unimplemented!()
             }
-            fn try_clone(&self) -> backend::Result<Box<dyn Backend>> {
-                unimplemented!()
-            }
             fn as_any(&self) -> &dyn Any {
                 unimplemented!()
             }
