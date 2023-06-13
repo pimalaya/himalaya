@@ -52,7 +52,7 @@ pub(crate) fn configure() -> Result<DeserializedConfig> {
         wizard_log!("Configuring another account:");
     }
 
-    // If one acounts is setup, make it the default. If multiple
+    // If one account is setup, make it the default. If multiple
     // accounts are setup, decide which will be the default. If no
     // accounts are setup, exit the process.
     let default_account = match config.accounts.len() {
