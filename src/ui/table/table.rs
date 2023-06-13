@@ -18,7 +18,7 @@ use crate::printer::{Print, PrintTableOpts, WriteColor};
 /// TODO: make this customizable.
 pub const DEFAULT_TERM_WIDTH: usize = 80;
 
-/// Defines the minimum size of a shrinked cell.
+/// Defines the minimum size of a shrunk cell.
 /// TODO: make this customizable.
 pub const MAX_SHRINK_WIDTH: usize = 5;
 
@@ -237,9 +237,9 @@ where
 
                         value.push_str("… ");
                         trace!("chars width: {}", chars_width);
-                        trace!("shrinked value: {}", value);
+                        trace!("shrunk value: {}", value);
                         let spaces_count = cell_width - chars_width - 1;
-                        trace!("number of spaces added to shrinked value: {}", spaces_count);
+                        trace!("number of spaces added to shrunk value: {}", spaces_count);
                         value.push_str(&" ".repeat(spaces_count));
                         cell.value = value;
                     } else {

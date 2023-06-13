@@ -232,7 +232,7 @@ pub fn sync<'a, P: Printer>(
             .collect::<Vec<_>>();
         if !folders_patch_err.is_empty() {
             printer.print_log("")?;
-            printer.print_log("Errors occured while applying the folders patch:")?;
+            printer.print_log("Errors occurred while applying the folders patch:")?;
             folders_patch_err
                 .iter()
                 .try_for_each(|(hunk, err)| printer.print_log(format!(" - {hunk}: {err}")))?;
@@ -241,7 +241,7 @@ pub fn sync<'a, P: Printer>(
         if let Some(err) = report.folders_cache_patch.1 {
             printer.print_log("")?;
             printer.print_log(format!(
-                "Error occured while applying the folder cache patch: {err}"
+                "Error occurred while applying the folder cache patch: {err}"
             ))?;
         }
 
@@ -252,7 +252,7 @@ pub fn sync<'a, P: Printer>(
             .collect::<Vec<_>>();
         if !envelopes_patch_err.is_empty() {
             printer.print_log("")?;
-            printer.print_log("Errors occured while applying the envelopes patch:")?;
+            printer.print_log("Errors occurred while applying the envelopes patch:")?;
             for (hunk, err) in folders_patch_err {
                 printer.print_log(format!(" - {hunk}: {err}"))?;
             }
@@ -261,7 +261,7 @@ pub fn sync<'a, P: Printer>(
         if let Some(err) = report.envelopes_cache_patch.1 {
             printer.print_log("")?;
             printer.print_log(format!(
-                "Error occured while applying the envelopes cache patch: {err}"
+                "Error occurred while applying the envelopes cache patch: {err}"
             ))?;
         }
 

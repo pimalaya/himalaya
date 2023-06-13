@@ -35,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed release archive extensions from `.tar.gz` to `.tgz`.
 - Moved `wizard` module into domains (config, account, backend…).
 - [**BREAKING**] Changed the way secrets are managed. A secret is a sensitive data like passwords or tokens. There is 3 possible ways to declare a secret in the config file:
-  - `{ raw = <secret> }` for the raw secret as string (unsafe, not recommanded),
+  - `{ raw = <secret> }` for the raw secret as string (unsafe, not recommended),
   - `{ cmd = <secret-cmd> }` for command that exposes the secret,
   - `{ keyring = <secret-entry> }` for entry in your system's global keyring that contains the secret.
 
@@ -163,7 +163,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Separated the CLI from the lib module [#340].
 
-  The source code has been splitted into subrepositories:
+  The source code has been split into subrepositories:
 
   - The email logic has been extracted from the CLI and placed in a lib on [sourcehut](https://git.sr.ht/~soywod/himalaya-lib)	
   - The vim plugin is now in a dedicated repository on [sourcehut](https://git.sr.ht/~soywod/himalaya-vim) as well
