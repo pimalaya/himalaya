@@ -7,12 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2023-06-15
+
 ### Added
 
 - Implemented OAuth 2.0 refresh token flow for IMAP and SMTP, which means that access tokens are now automatically refreshed and is transparent for users.
 - Added `imap-oauth2-redirect-host` and `smtp-oauth2-redirect-host` options to customize the redirect server host name (default: `localhost`).
 - Added `imap-oauth2-redirect-port` and `smtp-oauth2-redirect-port` options to customize the redirect server port (default: `9999`).
-- Added `email-listing-datetime-fmt` to customize envelopes datetime format. See format spec at <https://docs.rs/chrono/latest/chrono/format/strftime/index.html>.
+- Added `email-listing-datetime-fmt` to customize envelopes datetime format. See format spec [here](https://docs.rs/chrono/latest/chrono/format/strftime/index.html).
 - Added `email-listing-local-datetime` to transform envelopes datetime's timezone to the user's local one. For example, if the user's local is set to `UTC`, the envelope date `2023-06-15T09:00:00+02:00` becomes `2023-06-15T07:00:00-00:00`.
 
 ### Fixed
@@ -562,7 +564,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[Unreleased]: https://github.com/soywod/himalaya/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/soywod/himalaya/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/soywod/himalaya/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/soywod/himalaya/compare/v0.7.3...v0.8.0
 [0.7.3]: https://github.com/soywod/himalaya/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/soywod/himalaya/compare/v0.7.1...v0.7.2
