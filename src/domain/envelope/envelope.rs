@@ -1,14 +1,9 @@
-use chrono::{DateTime, Local};
-use serde::{Serialize, Serializer};
+use serde::Serialize;
 
 use crate::{
     ui::{Cell, Row, Table},
     Flag, Flags,
 };
-
-fn date<S: Serializer>(date: &DateTime<Local>, s: S) -> Result<S::Ok, S::Error> {
-    s.serialize_str(&date.to_rfc3339())
-}
 
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Mailbox {
@@ -22,23 +17,7 @@ pub struct Envelope {
     pub flags: Flags,
     pub subject: String,
     pub from: Mailbox,
-    #[serde(serialize_with = "date")]
-    pub date: DateTime<Local>,
-}
-
-impl From<&pimalaya_email::Envelope> for Envelope {
-    fn from(envelope: &pimalaya_email::Envelope) -> Self {
-        Envelope {
-            id: envelope.id.clone(),
-            flags: envelope.flags.clone().into(),
-            subject: envelope.subject.clone(),
-            from: Mailbox {
-                name: envelope.from.name.clone(),
-                addr: envelope.from.addr.clone(),
-            },
-            date: envelope.date.clone(),
-        }
-    }
+    pub date: String,
 }
 
 impl Table for Envelope {
@@ -75,7 +54,7 @@ impl Table for Envelope {
         } else {
             &self.from.addr
         };
-        let date = self.date.to_rfc3339();
+        let date = &self.date;
 
         Row::new()
             .cell(Cell::new(id).bold_if(unseen).red())

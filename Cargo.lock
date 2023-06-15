@@ -1215,7 +1215,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "himalaya"
-version = "0.8.1-beta"
+version = "0.8.1"
 dependencies = [
  "anyhow",
  "atty",
@@ -2199,9 +2199,9 @@ dependencies = [
 
 [[package]]
 name = "pimalaya-email"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b881982050e29d8f9141a57f0be3f87471394462a2f1695471d5a81f44b4b3a"
+checksum = "8375dc804686e9e03a8b6f87d80b9038b5a734efb4b77f81b90b07b8ac1d4499"
 dependencies = [
  "advisory-lock",
  "ammonia",
@@ -2244,9 +2244,9 @@ dependencies = [
 
 [[package]]
 name = "pimalaya-email-tpl"
-version = "0.2.1"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f640b701926112e28b025cea9c9d50a2bfe329862eeb4acbf2d62edeb53fb19b"
+checksum = "6a838dd91468bf79997ead555d6a5b93f066e363259925ec931d49591b1ebb79"
 dependencies = [
  "chumsky 0.9.0",
  "log",

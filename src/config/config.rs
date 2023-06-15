@@ -33,6 +33,8 @@ pub struct DeserializedConfig {
     pub folder_aliases: Option<HashMap<String, String>>,
 
     pub email_listing_page_size: Option<usize>,
+    pub email_listing_datetime_fmt: Option<String>,
+    pub email_listing_datetime_local_tz: Option<bool>,
     pub email_reading_headers: Option<Vec<String>>,
     #[serde(
         default,

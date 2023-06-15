@@ -149,8 +149,11 @@ pub fn list<P: Printer>(
     let page_size = page_size.unwrap_or(config.email_listing_page_size());
     debug!("page size: {}", page_size);
 
-    let mut envelopes: Envelopes = backend.list_envelopes(&folder, page_size, page)?.into();
-    envelopes.remap_ids(id_mapper)?;
+    let envelopes = Envelopes::from_backend(
+        config,
+        id_mapper,
+        backend.list_envelopes(&folder, page_size, page)?,
+    )?;
     trace!("envelopes: {:?}", envelopes);
 
     printer.print_table(
@@ -326,10 +329,11 @@ pub fn search<P: Printer>(
 ) -> Result<()> {
     let folder = config.folder_alias(folder)?;
     let page_size = page_size.unwrap_or(config.email_listing_page_size());
-    let mut envelopes: Envelopes = backend
-        .search_envelopes(&folder, &query, "", page_size, page)?
-        .into();
-    envelopes.remap_ids(id_mapper)?;
+    let envelopes = Envelopes::from_backend(
+        config,
+        id_mapper,
+        backend.search_envelopes(&folder, &query, "", page_size, page)?,
+    )?;
     let opts = PrintTableOpts {
         format: &config.email_reading_format,
         max_width,
@@ -352,10 +356,11 @@ pub fn sort<P: Printer>(
 ) -> Result<()> {
     let folder = config.folder_alias(folder)?;
     let page_size = page_size.unwrap_or(config.email_listing_page_size());
-    let mut envelopes: Envelopes = backend
-        .search_envelopes(&folder, &query, &sort, page_size, page)?
-        .into();
-    envelopes.remap_ids(id_mapper)?;
+    let envelopes = Envelopes::from_backend(
+        config,
+        id_mapper,
+        backend.search_envelopes(&folder, &query, &sort, page_size, page)?,
+    )?;
     let opts = PrintTableOpts {
         format: &config.email_reading_format,
         max_width,

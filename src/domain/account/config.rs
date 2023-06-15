@@ -32,6 +32,8 @@ pub struct DeserializedAccountConfig {
     pub folder_aliases: Option<HashMap<String, String>>,
 
     pub email_listing_page_size: Option<usize>,
+    pub email_listing_datetime_fmt: Option<String>,
+    pub email_listing_datetime_local_tz: Option<bool>,
     pub email_reading_headers: Option<Vec<String>>,
     #[serde(
         default,
@@ -131,6 +133,19 @@ impl DeserializedAccountConfig {
             email_listing_page_size: self
                 .email_listing_page_size
                 .or_else(|| config.email_listing_page_size),
+            email_listing_datetime_fmt: self
+                .email_listing_datetime_fmt
+                .as_ref()
+                .map(ToOwned::to_owned)
+                .or_else(|| {
+                    config
+                        .email_listing_datetime_fmt
+                        .as_ref()
+                        .map(ToOwned::to_owned)
+                }),
+            email_listing_datetime_local_tz: self
+                .email_listing_datetime_local_tz
+                .or_else(|| config.email_listing_datetime_local_tz),
             email_reading_headers: self
                 .email_reading_headers
                 .as_ref()

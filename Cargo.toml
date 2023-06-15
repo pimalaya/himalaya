@@ -1,7 +1,7 @@
 [package]
 name = "himalaya"
 description = "CLI to manage your emails."
-version = "0.8.1-beta"
+version = "0.8.1"
 authors = ["soywod <clement.douin@posteo.net>"]
 edition = "2021"
 license = "MIT"
@@ -44,7 +44,7 @@ indicatif = "0.17"
 log = "0.4"
 md5 = "0.7.0"
 once_cell = "1.16.0"
-pimalaya-email = { version = "=0.10.0", default-features = false }
+pimalaya-email = { version = "=0.11.0", default-features = false }
 pimalaya-keyring = "=0.0.4"
 pimalaya-oauth2 = "=0.0.3"
 pimalaya-process = "=0.0.2"
