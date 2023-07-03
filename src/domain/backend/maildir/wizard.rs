@@ -1,7 +1,7 @@
 use anyhow::Result;
 use dialoguer::Input;
 use dirs::home_dir;
-use pimalaya_email::{BackendConfig, MaildirConfig};
+use pimalaya_email::backend::{BackendConfig, MaildirConfig};
 
 use crate::config::wizard::THEME;
 

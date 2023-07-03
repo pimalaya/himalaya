@@ -1,8 +1,8 @@
 use anyhow::Result;
 use dialoguer::{Confirm, Input, Password, Select};
 use pimalaya_email::{
-    BackendConfig, ImapAuthConfig, ImapConfig, OAuth2Config, OAuth2Method, OAuth2Scopes,
-    PasswdConfig,
+    account::{OAuth2Config, OAuth2Method, OAuth2Scopes, PasswdConfig},
+    backend::{BackendConfig, ImapAuthConfig, ImapConfig},
 };
 use pimalaya_oauth2::{AuthorizationCodeGrant, Client};
 use pimalaya_secret::Secret;

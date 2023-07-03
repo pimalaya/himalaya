@@ -6,7 +6,7 @@
 use anyhow::Result;
 use clap::{Arg, ArgMatches, Command};
 use log::{debug, info};
-use pimalaya_email::{Flag, Flags};
+use pimalaya_email::email::{Flag, Flags};
 
 use crate::email;
 

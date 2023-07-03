@@ -4,12 +4,15 @@
 //! account in the accounts section of the user configuration file.
 
 #[cfg(feature = "imap-backend")]
-use pimalaya_email::ImapAuthConfig;
+use pimalaya_email::backend::ImapAuthConfig;
 #[cfg(feature = "smtp-sender")]
-use pimalaya_email::SmtpAuthConfig;
+use pimalaya_email::sender::SmtpAuthConfig;
 use pimalaya_email::{
-    AccountConfig, BackendConfig, EmailHooks, EmailTextPlainFormat, FolderSyncStrategy,
-    SenderConfig,
+    account::AccountConfig,
+    backend::BackendConfig,
+    email::{EmailHooks, EmailTextPlainFormat},
+    folder::sync::FolderSyncStrategy,
+    sender::SenderConfig,
 };
 use pimalaya_process::Cmd;
 use serde::{Deserialize, Serialize};

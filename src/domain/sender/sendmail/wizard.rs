@@ -1,6 +1,6 @@
 use anyhow::Result;
 use dialoguer::Input;
-use pimalaya_email::{SenderConfig, SendmailConfig};
+use pimalaya_email::sender::{SenderConfig, SendmailConfig};
 
 use crate::config::wizard::THEME;
 

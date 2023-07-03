@@ -6,7 +6,7 @@
 
 use anyhow::{Context, Result};
 use log::trace;
-use pimalaya_email::EmailTextPlainFormat;
+use pimalaya_email::email::EmailTextPlainFormat;
 use termcolor::{Color, ColorSpec};
 use terminal_size::terminal_size;
 use unicode_width::UnicodeWidthStr;
@@ -267,6 +267,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use pimalaya_email::email::EmailTextPlainFormat;
     use std::io;
 
     use super::*;

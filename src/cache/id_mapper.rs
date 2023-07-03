@@ -1,10 +1,10 @@
 use anyhow::{anyhow, Context, Result};
 use log::{debug, trace};
 #[cfg(feature = "imap-backend")]
-use pimalaya_email::ImapBackend;
+use pimalaya_email::backend::ImapBackend;
 #[cfg(feature = "notmuch-backend")]
-use pimalaya_email::NotmuchBackend;
-use pimalaya_email::{Backend, MaildirBackend};
+use pimalaya_email::backend::NotmuchBackend;
+use pimalaya_email::backend::{Backend, MaildirBackend};
 use std::path::{Path, PathBuf};
 
 const ID_MAPPER_DB_FILE_NAME: &str = ".id-mapper.sqlite";

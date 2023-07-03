@@ -3,7 +3,7 @@
 use anyhow::Result;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use log::info;
-use pimalaya_email::FolderSyncStrategy;
+use pimalaya_email::folder::sync::FolderSyncStrategy;
 use std::collections::HashSet;
 
 use crate::{folder, ui::table};

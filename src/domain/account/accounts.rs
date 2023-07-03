@@ -5,7 +5,7 @@
 //! accounts from the config file.
 
 use anyhow::Result;
-use pimalaya_email::BackendConfig;
+use pimalaya_email::backend::BackendConfig;
 use serde::Serialize;
 use std::{collections::hash_map::Iter, ops::Deref};
 

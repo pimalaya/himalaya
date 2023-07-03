@@ -1,13 +1,16 @@
+#[cfg(feature = "imap-backend")]
+use pimalaya_email::backend::{ImapAuthConfig, ImapConfig};
+#[cfg(feature = "smtp-sender")]
+use pimalaya_email::sender::{SmtpAuthConfig, SmtpConfig};
 #[cfg(feature = "notmuch-backend")]
 use pimalaya_email::NotmuchConfig;
 use pimalaya_email::{
-    BackendConfig, EmailHooks, EmailTextPlainFormat, FolderSyncStrategy, MaildirConfig,
-    OAuth2Config, OAuth2Method, OAuth2Scopes, PasswdConfig, SenderConfig, SendmailConfig,
+    account::{OAuth2Config, OAuth2Method, OAuth2Scopes, PasswdConfig},
+    backend::{BackendConfig, MaildirConfig},
+    email::{EmailHooks, EmailTextPlainFormat},
+    folder::sync::FolderSyncStrategy,
+    sender::{SenderConfig, SendmailConfig},
 };
-#[cfg(feature = "imap-backend")]
-use pimalaya_email::{ImapAuthConfig, ImapConfig};
-#[cfg(feature = "smtp-sender")]
-use pimalaya_email::{SmtpAuthConfig, SmtpConfig};
 use pimalaya_keyring::Entry;
 use pimalaya_process::{Cmd, Pipeline, SingleCmd};
 use pimalaya_secret::Secret;

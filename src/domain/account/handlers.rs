@@ -7,11 +7,16 @@ use indicatif::{MultiProgress, ProgressBar, ProgressFinish, ProgressStyle};
 use log::{info, trace, warn};
 use once_cell::sync::Lazy;
 #[cfg(feature = "imap-backend")]
-use pimalaya_email::ImapAuthConfig;
+use pimalaya_email::backend::ImapAuthConfig;
 #[cfg(feature = "smtp-sender")]
-use pimalaya_email::SmtpAuthConfig;
+use pimalaya_email::sender::SmtpAuthConfig;
 use pimalaya_email::{
-    AccountConfig, BackendConfig, BackendSyncBuilder, BackendSyncProgressEvent, SenderConfig,
+    account::{
+        sync::{AccountSyncBuilder, AccountSyncProgressEvent},
+        AccountConfig,
+    },
+    backend::BackendConfig,
+    sender::SenderConfig,
 };
 use std::{collections::HashMap, sync::Mutex};
 
@@ -40,7 +45,7 @@ const SUB_PROGRESS_DONE_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
 });
 
 /// Configure the current selected account
-pub fn configure(config: &AccountConfig, reset: bool) -> Result<()> {
+pub async fn configure(config: &AccountConfig, reset: bool) -> Result<()> {
     info!("entering the configure account handler");
 
     if reset {
@@ -72,9 +77,13 @@ pub fn configure(config: &AccountConfig, reset: bool) -> Result<()> {
     #[cfg(feature = "imap-backend")]
     if let BackendConfig::Imap(imap_config) = &config.backend {
         match &imap_config.auth {
-            ImapAuthConfig::Passwd(passwd) => passwd.configure(|| prompt_passwd("IMAP password")),
+            ImapAuthConfig::Passwd(passwd) => {
+                passwd.configure(|| prompt_passwd("IMAP password")).await
+            }
             ImapAuthConfig::OAuth2(oauth2) => {
-                oauth2.configure(|| prompt_secret("IMAP OAuth 2.0 client secret"))
+                oauth2
+                    .configure(|| prompt_secret("IMAP OAuth 2.0 client secret"))
+                    .await
             }
         }?;
     }
@@ -82,9 +91,13 @@ pub fn configure(config: &AccountConfig, reset: bool) -> Result<()> {
     #[cfg(feature = "smtp-sender")]
     if let SenderConfig::Smtp(smtp_config) = &config.sender {
         match &smtp_config.auth {
-            SmtpAuthConfig::Passwd(passwd) => passwd.configure(|| prompt_passwd("SMTP password")),
+            SmtpAuthConfig::Passwd(passwd) => {
+                passwd.configure(|| prompt_passwd("SMTP password")).await
+            }
             SmtpAuthConfig::OAuth2(oauth2) => {
-                oauth2.configure(|| prompt_secret("SMTP OAuth 2.0 client secret"))
+                oauth2
+                    .configure(|| prompt_secret("SMTP OAuth 2.0 client secret"))
+                    .await
             }
         }?;
     }
@@ -123,16 +136,16 @@ pub fn list<'a, P: Printer>(
 
 /// Synchronizes the account defined using argument `-a|--account`. If
 /// no account given, synchronizes the default one.
-pub fn sync<'a, P: Printer>(
+pub async fn sync<P: Printer>(
     printer: &mut P,
-    sync_builder: BackendSyncBuilder<'a>,
+    sync_builder: AccountSyncBuilder,
     dry_run: bool,
 ) -> Result<()> {
     info!("entering the sync accounts handler");
     trace!("dry run: {dry_run}");
 
     if dry_run {
-        let report = sync_builder.sync()?;
+        let report = sync_builder.sync().await?;
         let mut hunks_count = report.folders_patch.len();
 
         if !report.folders_patch.is_empty() {
@@ -143,9 +156,9 @@ pub fn sync<'a, P: Printer>(
             printer.print_log("")?;
         }
 
-        if !report.envelopes_patch.is_empty() {
+        if !report.emails_patch.is_empty() {
             printer.print_log("Envelopes patch:")?;
-            for (hunk, _) in report.envelopes_patch {
+            for (hunk, _) in report.emails_patch {
                 hunks_count += 1;
                 printer.print_log(format!(" - {hunk}"))?;
             }
@@ -156,7 +169,7 @@ pub fn sync<'a, P: Printer>(
             "Estimated patch length for account to be synchronized: {hunks_count}",
         ))?;
     } else if printer.is_json() {
-        sync_builder.sync()?;
+        sync_builder.sync().await?;
         printer.print("Account successfully synchronized!")?;
     } else {
         let multi = MultiProgress::new();
@@ -172,7 +185,7 @@ pub fn sync<'a, P: Printer>(
 
         let report = sync_builder
             .with_on_progress(move |evt| {
-                use BackendSyncProgressEvent::*;
+                use AccountSyncProgressEvent::*;
                 Ok(match evt {
                     ApplyFolderPatches(..) => {
                         main_progress.inc(3);
@@ -223,7 +236,8 @@ pub fn sync<'a, P: Printer>(
                     _ => (),
                 })
             })
-            .sync()?;
+            .sync()
+            .await?;
 
         let folders_patch_err = report
             .folders_patch
@@ -246,7 +260,7 @@ pub fn sync<'a, P: Printer>(
         }
 
         let envelopes_patch_err = report
-            .envelopes_patch
+            .emails_patch
             .iter()
             .filter_map(|(hunk, err)| err.as_ref().map(|err| (hunk, err)))
             .collect::<Vec<_>>();
@@ -258,7 +272,7 @@ pub fn sync<'a, P: Printer>(
             }
         }
 
-        if let Some(err) = report.envelopes_cache_patch.1 {
+        if let Some(err) = report.emails_cache_patch.1 {
             printer.print_log("")?;
             printer.print_log(format!(
                 "Error occurred while applying the envelopes cache patch: {err}"
@@ -273,7 +287,7 @@ pub fn sync<'a, P: Printer>(
 
 #[cfg(test)]
 mod tests {
-    use pimalaya_email::{AccountConfig, ImapConfig};
+    use pimalaya_email::{account::AccountConfig, backend::ImapConfig};
     use std::{collections::HashMap, fmt::Debug, io};
     use termcolor::ColorSpec;
 

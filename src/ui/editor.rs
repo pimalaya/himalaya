@@ -1,8 +1,10 @@
 use anyhow::{Context, Result};
 use log::debug;
 use pimalaya_email::{
-    email::{local_draft_path, remove_local_draft},
-    AccountConfig, Backend, Flag, Flags, Sender, Tpl,
+    account::AccountConfig,
+    backend::Backend,
+    email::{local_draft_path, remove_local_draft, Flag, Flags, Tpl},
+    sender::Sender,
 };
 use std::{env, fs, process::Command};
 
@@ -37,7 +39,7 @@ pub fn open_with_local_draft() -> Result<Tpl> {
     open_with_tpl(Tpl::from(content))
 }
 
-pub fn edit_tpl_with_editor<P: Printer>(
+pub async fn edit_tpl_with_editor<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
     backend: &mut dyn Backend,
@@ -76,13 +78,16 @@ pub fn edit_tpl_with_editor<P: Printer>(
                 let email = tpl
                     .some_pgp_sign_cmd(config.email_writing_sign_cmd.clone())
                     .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.clone())
-                    .compile()?
+                    .compile()
+                    .await?
                     .write_to_vec()?;
-                sender.send(&email)?;
+                sender.send(&email).await?;
                 if config.email_sending_save_copy {
                     let sent_folder = config.sent_folder_alias()?;
                     printer.print_log(format!("Adding email to the {} folder…", sent_folder))?;
-                    backend.add_email(&sent_folder, &email, &Flags::from_iter([Flag::Seen]))?;
+                    backend
+                        .add_email(&sent_folder, &email, &Flags::from_iter([Flag::Seen]))
+                        .await?;
                 }
                 remove_local_draft()?;
                 printer.print("Done!")?;
@@ -101,13 +106,16 @@ pub fn edit_tpl_with_editor<P: Printer>(
                 let email = tpl
                     .some_pgp_sign_cmd(config.email_writing_sign_cmd.clone())
                     .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.clone())
-                    .compile()?
+                    .compile()
+                    .await?
                     .write_to_vec()?;
-                backend.add_email(
-                    &draft_folder,
-                    &email,
-                    &Flags::from_iter([Flag::Seen, Flag::Draft]),
-                )?;
+                backend
+                    .add_email(
+                        &draft_folder,
+                        &email,
+                        &Flags::from_iter([Flag::Seen, Flag::Draft]),
+                    )
+                    .await?;
                 remove_local_draft()?;
                 printer.print(format!("Email successfully saved to {}", draft_folder))?;
                 break;

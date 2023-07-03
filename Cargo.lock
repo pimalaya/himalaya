@@ -1218,6 +1218,7 @@ name = "himalaya"
 version = "0.8.1"
 dependencies = [
  "anyhow",
+ "async-trait",
  "atty",
  "chrono",
  "clap",
@@ -2199,12 +2200,12 @@ dependencies = [
 
 [[package]]
 name = "pimalaya-email"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8375dc804686e9e03a8b6f87d80b9038b5a734efb4b77f81b90b07b8ac1d4499"
+version = "0.13.0"
+source = "git+https://git.sr.ht/~soywod/pimalaya#5250a4c906228da7f2d1ca1d58468a760c69c720"
 dependencies = [
  "advisory-lock",
  "ammonia",
+ "async-trait",
  "chrono",
  "convert_case",
  "dirs",
@@ -2244,10 +2245,11 @@ dependencies = [
 
 [[package]]
 name = "pimalaya-email-tpl"
-version = "0.2.3"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a838dd91468bf79997ead555d6a5b93f066e363259925ec931d49591b1ebb79"
+checksum = "c536455f778ed7aa0948b755281e8e6a61650a857a3f610ff7e60b097a681838"
 dependencies = [
+ "async-recursion",
  "chumsky 0.9.0",
  "log",
  "mail-builder",
@@ -2285,19 +2287,20 @@ dependencies = [
 
 [[package]]
 name = "pimalaya-process"
-version = "0.0.2"
+version = "0.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d8d2853bf2f0efbe397ce22bb4e6d53a7464f6dcc0abe7e2936f6f4e8e2726a"
+checksum = "1a9d1e1ab6334d4e4d06613cd65f3fed34e5d2d7b1488f3d1a0d2fdffdba5d1c"
 dependencies = [
  "log",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]
 name = "pimalaya-secret"
-version = "0.0.2"
+version = "0.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9338dc84e5ec9fc25f3a36d82ed68ffe4888ad728ca1aa42228e27648ddff01f"
+checksum = "0f975cafe977327bb215cf71e953dd1f1bfa45d3cf4ab5e806493d917e0a0cd1"
 dependencies = [
  "log",
  "pimalaya-keyring",
@@ -2926,6 +2929,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "signal-hook-registry"
+version = "1.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8229b473baa5980ac72ef434c4415e70c4b5e71b423043adb4ba059f89c99a1"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "siphasher"
 version = "0.3.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3181,6 +3193,7 @@ dependencies = [
  "mio",
  "num_cpus",
  "pin-project-lite",
+ "signal-hook-registry",
  "socket2",
  "tokio-macros",
  "windows-sys 0.42.0",

@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use dialoguer::Confirm;
-use pimalaya_email::{AccountConfig, Backend};
+use pimalaya_email::{account::AccountConfig, backend::Backend};
 use std::process;
 
 use crate::{
@@ -12,18 +12,22 @@ use crate::{
     Folders,
 };
 
-pub fn expunge<P: Printer>(printer: &mut P, backend: &mut dyn Backend, folder: &str) -> Result<()> {
-    backend.expunge_folder(folder)?;
+pub async fn expunge<P: Printer>(
+    printer: &mut P,
+    backend: &mut dyn Backend,
+    folder: &str,
+) -> Result<()> {
+    backend.expunge_folder(folder).await?;
     printer.print(format!("Folder {folder} successfully expunged!"))
 }
 
-pub fn list<P: Printer>(
+pub async fn list<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
     backend: &mut dyn Backend,
     max_width: Option<usize>,
 ) -> Result<()> {
-    let folders: Folders = backend.list_folders()?.into();
+    let folders: Folders = backend.list_folders().await?.into();
     printer.print_table(
         // TODO: remove Box
         Box::new(folders),
@@ -34,12 +38,20 @@ pub fn list<P: Printer>(
     )
 }
 
-pub fn create<P: Printer>(printer: &mut P, backend: &mut dyn Backend, folder: &str) -> Result<()> {
-    backend.add_folder(folder)?;
+pub async fn create<P: Printer>(
+    printer: &mut P,
+    backend: &mut dyn Backend,
+    folder: &str,
+) -> Result<()> {
+    backend.add_folder(folder).await?;
     printer.print("Folder successfully created!")
 }
 
-pub fn delete<P: Printer>(printer: &mut P, backend: &mut dyn Backend, folder: &str) -> Result<()> {
+pub async fn delete<P: Printer>(
+    printer: &mut P,
+    backend: &mut dyn Backend,
+    folder: &str,
+) -> Result<()> {
     if let Some(false) | None = Confirm::new()
         .with_prompt(format!("Confirm deletion of folder {folder}?"))
         .default(false)
@@ -49,14 +61,18 @@ pub fn delete<P: Printer>(printer: &mut P, backend: &mut dyn Backend, folder: &s
         process::exit(0);
     };
 
-    backend.delete_folder(folder)?;
+    backend.delete_folder(folder).await?;
     printer.print("Folder successfully deleted!")
 }
 
 #[cfg(test)]
 mod tests {
+    use async_trait::async_trait;
     use pimalaya_email::{
-        backend, AccountConfig, Backend, Emails, Envelope, Envelopes, Flags, Folder, Folders,
+        account::AccountConfig,
+        backend::Backend,
+        email::{Envelope, Envelopes, Flags, Messages},
+        folder::{Folder, Folders},
     };
     use std::{any::Any, fmt::Debug, io};
     use termcolor::ColorSpec;
@@ -65,8 +81,8 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn it_should_list_mboxes() {
+    #[tokio::test]
+    async fn it_should_list_mboxes() {
         #[derive(Debug, Default, Clone)]
         struct StringWriter {
             content: String,
@@ -131,82 +147,119 @@ mod tests {
 
         struct TestBackend;
 
+        #[async_trait]
         impl Backend for TestBackend {
             fn name(&self) -> String {
                 unimplemented!();
             }
-            fn add_folder(&mut self, _: &str) -> backend::Result<()> {
+            async fn add_folder(&mut self, _: &str) -> pimalaya_email::Result<()> {
                 unimplemented!();
             }
-            fn list_folders(&mut self) -> backend::Result<Folders> {
+            async fn list_folders(&mut self) -> pimalaya_email::Result<Folders> {
                 Ok(Folders::from_iter([
                     Folder {
-                        delim: "/".into(),
                         name: "INBOX".into(),
                         desc: "desc".into(),
                     },
                     Folder {
-                        delim: "/".into(),
                         name: "Sent".into(),
                         desc: "desc".into(),
                     },
                 ]))
             }
-            fn expunge_folder(&mut self, _: &str) -> backend::Result<()> {
+            async fn expunge_folder(&mut self, _: &str) -> pimalaya_email::Result<()> {
                 unimplemented!();
             }
-            fn purge_folder(&mut self, _: &str) -> backend::Result<()> {
+            async fn purge_folder(&mut self, _: &str) -> pimalaya_email::Result<()> {
                 unimplemented!();
             }
-            fn delete_folder(&mut self, _: &str) -> backend::Result<()> {
+            async fn delete_folder(&mut self, _: &str) -> pimalaya_email::Result<()> {
                 unimplemented!();
             }
-            fn get_envelope(&mut self, _: &str, _: &str) -> backend::Result<Envelope> {
+            async fn get_envelope(&mut self, _: &str, _: &str) -> pimalaya_email::Result<Envelope> {
                 unimplemented!();
             }
-            fn list_envelopes(
+            async fn list_envelopes(
                 &mut self,
                 _: &str,
                 _: usize,
                 _: usize,
-            ) -> backend::Result<Envelopes> {
+            ) -> pimalaya_email::Result<Envelopes> {
                 unimplemented!()
             }
-            fn search_envelopes(
+            async fn search_envelopes(
                 &mut self,
                 _: &str,
                 _: &str,
                 _: &str,
                 _: usize,
                 _: usize,
-            ) -> backend::Result<Envelopes> {
+            ) -> pimalaya_email::Result<Envelopes> {
                 unimplemented!()
             }
-            fn add_email(&mut self, _: &str, _: &[u8], _: &Flags) -> backend::Result<String> {
+            async fn add_email(
+                &mut self,
+                _: &str,
+                _: &[u8],
+                _: &Flags,
+            ) -> pimalaya_email::Result<String> {
                 unimplemented!()
             }
-            fn get_emails(&mut self, _: &str, _: Vec<&str>) -> backend::Result<Emails> {
+            async fn get_emails(
+                &mut self,
+                _: &str,
+                _: Vec<&str>,
+            ) -> pimalaya_email::Result<Messages> {
                 unimplemented!()
             }
-            fn preview_emails(&mut self, _: &str, _: Vec<&str>) -> backend::Result<Emails> {
+            async fn preview_emails(
+                &mut self,
+                _: &str,
+                _: Vec<&str>,
+            ) -> pimalaya_email::Result<Messages> {
                 unimplemented!()
             }
-            fn copy_emails(&mut self, _: &str, _: &str, _: Vec<&str>) -> backend::Result<()> {
+            async fn copy_emails(
+                &mut self,
+                _: &str,
+                _: &str,
+                _: Vec<&str>,
+            ) -> pimalaya_email::Result<()> {
                 unimplemented!()
             }
-            fn move_emails(&mut self, _: &str, _: &str, _: Vec<&str>) -> backend::Result<()> {
+            async fn move_emails(
+                &mut self,
+                _: &str,
+                _: &str,
+                _: Vec<&str>,
+            ) -> pimalaya_email::Result<()> {
                 unimplemented!()
             }
-            fn delete_emails(&mut self, _: &str, _: Vec<&str>) -> backend::Result<()> {
+            async fn delete_emails(&mut self, _: &str, _: Vec<&str>) -> pimalaya_email::Result<()> {
                 unimplemented!()
             }
-            fn add_flags(&mut self, _: &str, _: Vec<&str>, _: &Flags) -> backend::Result<()> {
+            async fn add_flags(
+                &mut self,
+                _: &str,
+                _: Vec<&str>,
+                _: &Flags,
+            ) -> pimalaya_email::Result<()> {
                 unimplemented!()
             }
-            fn set_flags(&mut self, _: &str, _: Vec<&str>, _: &Flags) -> backend::Result<()> {
+            async fn set_flags(
+                &mut self,
+                _: &str,
+                _: Vec<&str>,
+                _: &Flags,
+            ) -> pimalaya_email::Result<()> {
                 unimplemented!()
             }
-            fn remove_flags(&mut self, _: &str, _: Vec<&str>, _: &Flags) -> backend::Result<()> {
+            async fn remove_flags(
+                &mut self,
+                _: &str,
+                _: Vec<&str>,
+                _: &Flags,
+            ) -> pimalaya_email::Result<()> {
                 unimplemented!()
             }
             fn as_any(&self) -> &dyn Any {
@@ -218,13 +271,15 @@ mod tests {
         let mut printer = PrinterServiceTest::default();
         let mut backend = TestBackend {};
 
-        assert!(list(&account_config, &mut printer, &mut backend, None).is_ok());
+        assert!(list(&account_config, &mut printer, &mut backend, None)
+            .await
+            .is_ok());
         assert_eq!(
             concat![
                 "\n",
-                "DELIM │NAME  │DESC \n",
-                "/     │INBOX │desc \n",
-                "/     │Sent  │desc \n",
+                "NAME  │DESC \n",
+                "INBOX │desc \n",
+                "Sent  │desc \n",
                 "\n"
             ],
             printer.writer.content

@@ -2,7 +2,10 @@ use anyhow::{anyhow, Context, Result};
 use atty::Stream;
 use log::{debug, trace};
 use pimalaya_email::{
-    AccountConfig, Backend, Email, EmailBuilder, FilterParts, Flag, Flags, Sender,
+    account::AccountConfig,
+    backend::Backend,
+    email::{template::FilterParts, Flag, Flags, Message, MessageBuilder},
+    sender::Sender,
 };
 use std::{
     fs,
@@ -17,7 +20,7 @@ use crate::{
     Envelopes, IdMapper,
 };
 
-pub fn attachments<P: Printer>(
+pub async fn attachments<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
     id_mapper: &IdMapper,
@@ -28,7 +31,7 @@ pub fn attachments<P: Printer>(
     let folder = config.folder_alias(folder)?;
     let ids = id_mapper.get_ids(ids)?;
     let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
-    let emails = backend.get_emails(&folder, ids.clone())?;
+    let emails = backend.get_emails(&folder, ids.clone()).await?;
     let mut index = 0;
 
     let mut emails_count = 0;
@@ -57,7 +60,7 @@ pub fn attachments<P: Printer>(
             let filename = attachment
                 .filename
                 .unwrap_or_else(|| Uuid::new_v4().to_string());
-            let filepath = config.get_download_file_path(&filename)?;
+            let filepath = config.download_fpath(&filename)?;
             printer.print_log(format!("Downloading {:?}…", filepath))?;
             fs::write(&filepath, &attachment.body).context("cannot download attachment")?;
             attachments_count = attachments_count + 1;
@@ -74,7 +77,7 @@ pub fn attachments<P: Printer>(
     }
 }
 
-pub fn copy<P: Printer>(
+pub async fn copy<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
     id_mapper: &IdMapper,
@@ -87,11 +90,11 @@ pub fn copy<P: Printer>(
     let to_folder = config.folder_alias(to_folder)?;
     let ids = id_mapper.get_ids(ids)?;
     let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
-    backend.copy_emails(&from_folder, &to_folder, ids)?;
+    backend.copy_emails(&from_folder, &to_folder, ids).await?;
     printer.print("Email(s) successfully copied!")
 }
 
-pub fn delete<P: Printer>(
+pub async fn delete<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
     id_mapper: &IdMapper,
@@ -102,11 +105,11 @@ pub fn delete<P: Printer>(
     let folder = config.folder_alias(folder)?;
     let ids = id_mapper.get_ids(ids)?;
     let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
-    backend.delete_emails(&folder, ids)?;
+    backend.delete_emails(&folder, ids).await?;
     printer.print("Email(s) successfully deleted!")
 }
 
-pub fn forward<P: Printer>(
+pub async fn forward<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
     id_mapper: &IdMapper,
@@ -123,19 +126,21 @@ pub fn forward<P: Printer>(
     let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
 
     let tpl = backend
-        .get_emails(&folder, ids)?
+        .get_emails(&folder, ids)
+        .await?
         .first()
         .ok_or_else(|| anyhow!("cannot find email {}", id))?
         .to_forward_tpl_builder(config)
-        .some_headers(headers)
-        .some_body(body)
-        .build()?;
+        .with_some_headers(headers)
+        .with_some_body(body)
+        .build()
+        .await?;
     trace!("initial template: {}", *tpl);
-    editor::edit_tpl_with_editor(config, printer, backend, sender, tpl)?;
+    editor::edit_tpl_with_editor(config, printer, backend, sender, tpl).await?;
     Ok(())
 }
 
-pub fn list<P: Printer>(
+pub async fn list<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
     id_mapper: &IdMapper,
@@ -152,7 +157,7 @@ pub fn list<P: Printer>(
     let envelopes = Envelopes::from_backend(
         config,
         id_mapper,
-        backend.list_envelopes(&folder, page_size, page)?,
+        backend.list_envelopes(&folder, page_size, page).await?,
     )?;
     trace!("envelopes: {:?}", envelopes);
 
@@ -168,14 +173,14 @@ pub fn list<P: Printer>(
 /// Parses and edits a message from a [mailto] URL string.
 ///
 /// [mailto]: https://en.wikipedia.org/wiki/Mailto
-pub fn mailto<P: Printer>(
+pub async fn mailto<P: Printer>(
     config: &AccountConfig,
     backend: &mut dyn Backend,
     sender: &mut dyn Sender,
     printer: &mut P,
     url: &Url,
 ) -> Result<()> {
-    let mut builder = EmailBuilder::new().to(url.path());
+    let mut builder = MessageBuilder::new().to(url.path());
 
     for (key, val) in url.query_pairs() {
         match key.to_lowercase().as_bytes() {
@@ -190,12 +195,13 @@ pub fn mailto<P: Printer>(
     let tpl = config
         .generate_tpl_interpreter()
         .show_only_headers(config.email_writing_headers())
-        .interpret_msg_builder(builder)?;
+        .interpret_msg_builder(builder)
+        .await?;
 
-    editor::edit_tpl_with_editor(config, printer, backend, sender, tpl)
+    editor::edit_tpl_with_editor(config, printer, backend, sender, tpl).await
 }
 
-pub fn move_<P: Printer>(
+pub async fn move_<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
     id_mapper: &IdMapper,
@@ -208,11 +214,11 @@ pub fn move_<P: Printer>(
     let to_folder = config.folder_alias(to_folder)?;
     let ids = id_mapper.get_ids(ids)?;
     let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
-    backend.move_emails(&from_folder, &to_folder, ids)?;
+    backend.move_emails(&from_folder, &to_folder, ids).await?;
     printer.print("Email(s) successfully moved!")
 }
 
-pub fn read<P: Printer>(
+pub async fn read<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
     id_mapper: &IdMapper,
@@ -226,7 +232,7 @@ pub fn read<P: Printer>(
     let folder = config.folder_alias(folder)?;
     let ids = id_mapper.get_ids(ids)?;
     let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
-    let emails = backend.get_emails(&folder, ids)?;
+    let emails = backend.get_emails(&folder, ids).await?;
 
     let mut glue = "";
     let mut bodies = String::default();
@@ -245,7 +251,8 @@ pub fn read<P: Printer>(
                         .hide_all_headers()
                         .filter_parts(FilterParts::Only("text/html".into())),
                     _ => tpl.show_additional_headers(&headers),
-                })?
+                })
+                .await?
                 .into();
             bodies.push_str(&tpl);
         }
@@ -256,7 +263,7 @@ pub fn read<P: Printer>(
     printer.print(bodies)
 }
 
-pub fn reply<P: Printer>(
+pub async fn reply<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
     id_mapper: &IdMapper,
@@ -274,21 +281,25 @@ pub fn reply<P: Printer>(
     let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
 
     let tpl = backend
-        .get_emails(&folder, ids)?
+        .get_emails(&folder, ids)
+        .await?
         .first()
         .ok_or_else(|| anyhow!("cannot find email {}", id))?
         .to_reply_tpl_builder(config)
-        .some_headers(headers)
-        .some_body(body)
-        .reply_all(all)
-        .build()?;
+        .with_some_headers(headers)
+        .with_some_body(body)
+        .with_reply_all(all)
+        .build()
+        .await?;
     trace!("initial template: {}", *tpl);
-    editor::edit_tpl_with_editor(config, printer, backend, sender, tpl)?;
-    backend.add_flags(&folder, vec![id], &Flags::from_iter([Flag::Answered]))?;
+    editor::edit_tpl_with_editor(config, printer, backend, sender, tpl).await?;
+    backend
+        .add_flags(&folder, vec![id], &Flags::from_iter([Flag::Answered]))
+        .await?;
     Ok(())
 }
 
-pub fn save<P: Printer>(
+pub async fn save<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
     id_mapper: &IdMapper,
@@ -310,13 +321,15 @@ pub fn save<P: Printer>(
             .join("\r\n")
     };
 
-    let id = backend.add_email(&folder, raw_email.as_bytes(), &Flags::default())?;
+    let id = backend
+        .add_email(&folder, raw_email.as_bytes(), &Flags::default())
+        .await?;
     id_mapper.create_alias(id)?;
 
     Ok(())
 }
 
-pub fn search<P: Printer>(
+pub async fn search<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
     id_mapper: &IdMapper,
@@ -332,7 +345,9 @@ pub fn search<P: Printer>(
     let envelopes = Envelopes::from_backend(
         config,
         id_mapper,
-        backend.search_envelopes(&folder, &query, "", page_size, page)?,
+        backend
+            .search_envelopes(&folder, &query, "", page_size, page)
+            .await?,
     )?;
     let opts = PrintTableOpts {
         format: &config.email_reading_format,
@@ -342,7 +357,7 @@ pub fn search<P: Printer>(
     printer.print_table(Box::new(envelopes), opts)
 }
 
-pub fn sort<P: Printer>(
+pub async fn sort<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
     id_mapper: &IdMapper,
@@ -359,7 +374,9 @@ pub fn sort<P: Printer>(
     let envelopes = Envelopes::from_backend(
         config,
         id_mapper,
-        backend.search_envelopes(&folder, &query, &sort, page_size, page)?,
+        backend
+            .search_envelopes(&folder, &query, &sort, page_size, page)
+            .await?,
     )?;
     let opts = PrintTableOpts {
         format: &config.email_reading_format,
@@ -369,7 +386,7 @@ pub fn sort<P: Printer>(
     printer.print_table(Box::new(envelopes), opts)
 }
 
-pub fn send<P: Printer>(
+pub async fn send<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
     backend: &mut dyn Backend,
@@ -390,18 +407,20 @@ pub fn send<P: Printer>(
             .join("\r\n")
     };
     trace!("raw email: {:?}", raw_email);
-    sender.send(raw_email.as_bytes())?;
+    sender.send(raw_email.as_bytes()).await?;
     if config.email_sending_save_copy {
-        backend.add_email(
-            &folder,
-            raw_email.as_bytes(),
-            &Flags::from_iter([Flag::Seen]),
-        )?;
+        backend
+            .add_email(
+                &folder,
+                raw_email.as_bytes(),
+                &Flags::from_iter([Flag::Seen]),
+            )
+            .await?;
     }
     Ok(())
 }
 
-pub fn write<P: Printer>(
+pub async fn write<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
     backend: &mut dyn Backend,
@@ -409,11 +428,12 @@ pub fn write<P: Printer>(
     headers: Option<Vec<(&str, &str)>>,
     body: Option<&str>,
 ) -> Result<()> {
-    let tpl = Email::new_tpl_builder(config)
-        .some_headers(headers)
-        .some_body(body)
-        .build()?;
+    let tpl = Message::new_tpl_builder(config)
+        .with_some_headers(headers)
+        .with_some_body(body)
+        .build()
+        .await?;
     trace!("initial template: {}", *tpl);
-    editor::edit_tpl_with_editor(config, printer, backend, sender, tpl)?;
+    editor::edit_tpl_with_editor(config, printer, backend, sender, tpl).await?;
     Ok(())
 }

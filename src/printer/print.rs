@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use pimalaya_email::Tpl;
+use pimalaya_email::email::Tpl;
 
 use crate::printer::WriteColor;
 

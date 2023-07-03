@@ -1,9 +1,9 @@
 use anyhow::Result;
-use pimalaya_email::{Backend, Flags};
+use pimalaya_email::{backend::Backend, email::Flags};
 
 use crate::{printer::Printer, IdMapper};
 
-pub fn add<P: Printer>(
+pub async fn add<P: Printer>(
     printer: &mut P,
     id_mapper: &IdMapper,
     backend: &mut dyn Backend,
@@ -13,11 +13,11 @@ pub fn add<P: Printer>(
 ) -> Result<()> {
     let ids = id_mapper.get_ids(ids)?;
     let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
-    backend.add_flags(folder, ids, flags)?;
+    backend.add_flags(folder, ids, flags).await?;
     printer.print("Flag(s) successfully added!")
 }
 
-pub fn set<P: Printer>(
+pub async fn set<P: Printer>(
     printer: &mut P,
     id_mapper: &IdMapper,
     backend: &mut dyn Backend,
@@ -27,11 +27,11 @@ pub fn set<P: Printer>(
 ) -> Result<()> {
     let ids = id_mapper.get_ids(ids)?;
     let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
-    backend.set_flags(folder, ids, flags)?;
+    backend.set_flags(folder, ids, flags).await?;
     printer.print("Flag(s) successfully set!")
 }
 
-pub fn remove<P: Printer>(
+pub async fn remove<P: Printer>(
     printer: &mut P,
     id_mapper: &IdMapper,
     backend: &mut dyn Backend,
@@ -41,6 +41,6 @@ pub fn remove<P: Printer>(
 ) -> Result<()> {
     let ids = id_mapper.get_ids(ids)?;
     let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
-    backend.remove_flags(folder, ids, flags)?;
+    backend.remove_flags(folder, ids, flags).await?;
     printer.print("Flag(s) successfully removed!")
 }

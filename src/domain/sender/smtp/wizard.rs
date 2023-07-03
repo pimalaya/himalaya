@@ -1,8 +1,8 @@
 use anyhow::Result;
 use dialoguer::{Confirm, Input, Select};
 use pimalaya_email::{
-    OAuth2Config, OAuth2Method, OAuth2Scopes, PasswdConfig, SenderConfig, SmtpAuthConfig,
-    SmtpConfig,
+    account::{OAuth2Config, OAuth2Method, OAuth2Scopes, PasswdConfig},
+    sender::{SenderConfig, SmtpAuthConfig, SmtpConfig},
 };
 use pimalaya_oauth2::{AuthorizationCodeGrant, Client};
 use pimalaya_secret::Secret;

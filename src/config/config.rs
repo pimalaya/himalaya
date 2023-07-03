@@ -7,7 +7,10 @@ use anyhow::{anyhow, Context, Result};
 use dialoguer::Confirm;
 use dirs::{config_dir, home_dir};
 use log::{debug, trace};
-use pimalaya_email::{AccountConfig, EmailHooks, EmailTextPlainFormat};
+use pimalaya_email::{
+    account::AccountConfig,
+    email::{EmailHooks, EmailTextPlainFormat},
+};
 use pimalaya_process::Cmd;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path::PathBuf, process};
@@ -158,16 +161,18 @@ impl DeserializedConfig {
 #[cfg(test)]
 mod tests {
     use pimalaya_email::{
-        BackendConfig, MaildirConfig, PasswdConfig, SenderConfig, SendmailConfig,
+        account::PasswdConfig,
+        backend::{BackendConfig, MaildirConfig},
+        sender::{SenderConfig, SendmailConfig},
     };
     use pimalaya_secret::Secret;
 
     #[cfg(feature = "notmuch-backend")]
-    use pimalaya_email::NotmuchConfig;
+    use pimalaya_email::backend::NotmuchConfig;
     #[cfg(feature = "imap-backend")]
-    use pimalaya_email::{ImapAuthConfig, ImapConfig};
+    use pimalaya_email::backend::{ImapAuthConfig, ImapConfig};
     #[cfg(feature = "smtp-sender")]
-    use pimalaya_email::{SmtpAuthConfig, SmtpConfig};
+    use pimalaya_email::sender::{SmtpAuthConfig, SmtpConfig};
 
     use std::io::Write;
     use tempfile::NamedTempFile;
@@ -453,7 +458,7 @@ mod tests {
     #[cfg(feature = "smtp-sender")]
     #[test]
     fn account_smtp_sender_minimum_config() {
-        use pimalaya_email::SenderConfig;
+        use pimalaya_email::sender::SenderConfig;
 
         let config = make_config(
             "[account]
