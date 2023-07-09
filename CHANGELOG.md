@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Made the code async using the tokio async runtime.
+- On Linux, made the kernel keyring the default one (the one based on keyutils).
+
 ## [0.8.1] - 2023-06-15
 
 ### Added
