@@ -440,6 +440,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5827cebf4670468b8772dd191856768aedcb1b0278a04f989f7766351917b9dc"
 
 [[package]]
+name = "coredump"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7b12ca865ce2c375a629bc88221bdcdfaf9bdf6d8e966d7a6dbd2f6c4ceb335"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "cpufeatures"
 version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1006,6 +1015,7 @@ dependencies = [
  "clap_complete",
  "clap_mangen",
  "console",
+ "coredump",
  "dialoguer",
  "dirs",
  "email_address",
