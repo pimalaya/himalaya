@@ -1,9 +1,9 @@
+#[cfg(feature = "notmuch-backend")]
+use pimalaya_email::backend::NotmuchConfig;
 #[cfg(feature = "imap-backend")]
 use pimalaya_email::backend::{ImapAuthConfig, ImapConfig};
 #[cfg(feature = "smtp-sender")]
 use pimalaya_email::sender::{SmtpAuthConfig, SmtpConfig};
-#[cfg(feature = "notmuch-backend")]
-use pimalaya_email::NotmuchConfig;
 use pimalaya_email::{
     account::{OAuth2Config, OAuth2Method, OAuth2Scopes, PasswdConfig},
     backend::{BackendConfig, MaildirConfig},
