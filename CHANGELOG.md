@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Made the code async using the tokio async runtime.
 - On Linux, made the kernel keyring the default one (the one based on keyutils).
 
+### Fixed
+
+- Fixed the way folder aliases are resolved. In some case, aliases were resolved CLI side and lib side, which led to alias errors [sourcehut#95].
+
 ## [0.8.1] - 2023-06-15
 
 ### Added
@@ -744,3 +748,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [sourcehut#54]: https://todo.sr.ht/~soywod/pimalaya/54
 [sourcehut#59]: https://todo.sr.ht/~soywod/pimalaya/59
 [sourcehut#60]: https://todo.sr.ht/~soywod/pimalaya/60
+[sourcehut#95]: https://todo.sr.ht/~soywod/pimalaya/95

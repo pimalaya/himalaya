@@ -28,7 +28,6 @@ pub async fn attachments<P: Printer>(
     folder: &str,
     ids: Vec<&str>,
 ) -> Result<()> {
-    let folder = config.folder_alias(folder)?;
     let ids = id_mapper.get_ids(ids)?;
     let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
     let emails = backend.get_emails(&folder, ids.clone()).await?;
@@ -78,7 +77,6 @@ pub async fn attachments<P: Printer>(
 }
 
 pub async fn copy<P: Printer>(
-    config: &AccountConfig,
     printer: &mut P,
     id_mapper: &IdMapper,
     backend: &mut dyn Backend,
@@ -86,8 +84,6 @@ pub async fn copy<P: Printer>(
     to_folder: &str,
     ids: Vec<&str>,
 ) -> Result<()> {
-    let from_folder = config.folder_alias(from_folder)?;
-    let to_folder = config.folder_alias(to_folder)?;
     let ids = id_mapper.get_ids(ids)?;
     let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
     backend.copy_emails(&from_folder, &to_folder, ids).await?;
@@ -95,14 +91,12 @@ pub async fn copy<P: Printer>(
 }
 
 pub async fn delete<P: Printer>(
-    config: &AccountConfig,
     printer: &mut P,
     id_mapper: &IdMapper,
     backend: &mut dyn Backend,
     folder: &str,
     ids: Vec<&str>,
 ) -> Result<()> {
-    let folder = config.folder_alias(folder)?;
     let ids = id_mapper.get_ids(ids)?;
     let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
     backend.delete_emails(&folder, ids).await?;
@@ -120,8 +114,6 @@ pub async fn forward<P: Printer>(
     headers: Option<Vec<(&str, &str)>>,
     body: Option<&str>,
 ) -> Result<()> {
-    let folder = config.folder_alias(folder)?;
-
     let ids = id_mapper.get_ids([id])?;
     let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
 
@@ -150,7 +142,6 @@ pub async fn list<P: Printer>(
     page_size: Option<usize>,
     page: usize,
 ) -> Result<()> {
-    let folder = config.folder_alias(folder)?;
     let page_size = page_size.unwrap_or(config.email_listing_page_size());
     debug!("page size: {}", page_size);
 
@@ -202,7 +193,6 @@ pub async fn mailto<P: Printer>(
 }
 
 pub async fn move_<P: Printer>(
-    config: &AccountConfig,
     printer: &mut P,
     id_mapper: &IdMapper,
     backend: &mut dyn Backend,
@@ -210,8 +200,6 @@ pub async fn move_<P: Printer>(
     to_folder: &str,
     ids: Vec<&str>,
 ) -> Result<()> {
-    let from_folder = config.folder_alias(from_folder)?;
-    let to_folder = config.folder_alias(to_folder)?;
     let ids = id_mapper.get_ids(ids)?;
     let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
     backend.move_emails(&from_folder, &to_folder, ids).await?;
@@ -229,7 +217,6 @@ pub async fn read<P: Printer>(
     raw: bool,
     headers: Vec<&str>,
 ) -> Result<()> {
-    let folder = config.folder_alias(folder)?;
     let ids = id_mapper.get_ids(ids)?;
     let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
     let emails = backend.get_emails(&folder, ids).await?;
@@ -275,8 +262,6 @@ pub async fn reply<P: Printer>(
     headers: Option<Vec<(&str, &str)>>,
     body: Option<&str>,
 ) -> Result<()> {
-    let folder = config.folder_alias(folder)?;
-
     let ids = id_mapper.get_ids([id])?;
     let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
 
@@ -300,14 +285,12 @@ pub async fn reply<P: Printer>(
 }
 
 pub async fn save<P: Printer>(
-    config: &AccountConfig,
     printer: &mut P,
     id_mapper: &IdMapper,
     backend: &mut dyn Backend,
     folder: &str,
     raw_email: String,
 ) -> Result<()> {
-    let folder = config.folder_alias(folder)?;
     let is_tty = atty::is(Stream::Stdin);
     let is_json = printer.is_json();
     let raw_email = if is_tty || is_json {
@@ -340,7 +323,6 @@ pub async fn search<P: Printer>(
     page_size: Option<usize>,
     page: usize,
 ) -> Result<()> {
-    let folder = config.folder_alias(folder)?;
     let page_size = page_size.unwrap_or(config.email_listing_page_size());
     let envelopes = Envelopes::from_backend(
         config,
@@ -369,7 +351,6 @@ pub async fn sort<P: Printer>(
     page_size: Option<usize>,
     page: usize,
 ) -> Result<()> {
-    let folder = config.folder_alias(folder)?;
     let page_size = page_size.unwrap_or(config.email_listing_page_size());
     let envelopes = Envelopes::from_backend(
         config,

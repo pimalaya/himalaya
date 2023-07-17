@@ -1883,9 +1883,8 @@ dependencies = [
 
 [[package]]
 name = "pimalaya-email"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2070e988ba8e4a38a18efaaf14cc1cc2b95029c645419811ea35ebc0dfe32b62"
+version = "0.13.1-beta"
+source = "git+https://git.sr.ht/~soywod/pimalaya#866279f6cc9e14a565d8ea7d6722a08f5b9293e2"
 dependencies = [
  "advisory-lock",
  "ammonia",

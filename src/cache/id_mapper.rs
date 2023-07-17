@@ -4,7 +4,10 @@ use log::{debug, trace};
 use pimalaya_email::backend::ImapBackend;
 #[cfg(feature = "notmuch-backend")]
 use pimalaya_email::backend::NotmuchBackend;
-use pimalaya_email::backend::{Backend, MaildirBackend};
+use pimalaya_email::{
+    account::AccountConfig,
+    backend::{Backend, MaildirBackend},
+};
 use std::path::{Path, PathBuf};
 
 const ID_MAPPER_DB_FILE_NAME: &str = ".id-mapper.sqlite";
@@ -36,7 +39,11 @@ impl IdMapper {
         db_path
     }
 
-    pub fn new(backend: &dyn Backend, account: &str, folder: &str) -> Result<Self> {
+    pub fn new(
+        backend: &dyn Backend,
+        account_config: &AccountConfig,
+        folder: &str,
+    ) -> Result<Self> {
         #[cfg(feature = "imap-backend")]
         if backend.as_any().is::<ImapBackend>() {
             return Ok(IdMapper::Dummy);
@@ -53,7 +60,8 @@ impl IdMapper {
             db_path = Self::find_closest_db_path(backend.path())
         }
 
-        let digest = md5::compute(account.to_string() + folder);
+        let folder = account_config.get_folder_alias(folder)?;
+        let digest = md5::compute(account_config.name.clone() + &folder);
         let table = format!("id_mapper_{digest:x}");
         debug!("creating id mapper table {table} at {db_path:?}…");
 

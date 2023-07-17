@@ -101,7 +101,6 @@ async fn main() -> Result<()> {
 
     let config = DeserializedConfig::from_opt_path(config::args::parse_arg(&m))?;
     let account_config = config.to_account_config(account::args::parse_arg(&m))?;
-    let account_name = account_config.name.clone();
     let folder = folder::args::parse_source_arg(&m);
     let disable_cache = cache::args::parse_disable_cache_flag(&m);
 
@@ -115,7 +114,7 @@ async fn main() -> Result<()> {
 
     #[cfg(feature = "imap-backend")]
     if let BackendConfig::Imap(imap_config) = &account_config.backend {
-        let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
+        let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
         match imap::args::matches(&m)? {
             Some(imap::args::Cmd::Notify(keepalive)) => {
                 let mut backend =
@@ -159,7 +158,6 @@ async fn main() -> Result<()> {
             let folder = folder
                 .ok_or_else(|| anyhow!("the folder argument is missing"))
                 .context("cannot create folder")?;
-            let folder = account_config.folder_alias(folder)?;
             let mut backend = backend_builder.build().await?;
             folder::handlers::create(&mut printer, backend.as_mut(), &folder).await?;
             return Ok(());
@@ -171,16 +169,13 @@ async fn main() -> Result<()> {
             return Ok(());
         }
         Some(folder::args::Cmd::Expunge) => {
-            let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
+            let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
             let mut backend = backend_builder.build().await?;
             folder::handlers::expunge(&mut printer, backend.as_mut(), &folder).await?;
             return Ok(());
         }
         Some(folder::args::Cmd::Delete) => {
-            let folder = folder
-                .ok_or_else(|| anyhow!("the folder argument is missing"))
-                .context("cannot delete folder")?;
-            let folder = account_config.folder_alias(folder)?;
+            let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
             let mut backend = backend_builder.build().await?;
             folder::handlers::delete(&mut printer, backend.as_mut(), &folder).await?;
             return Ok(());
@@ -191,9 +186,9 @@ async fn main() -> Result<()> {
     // checks email commands
     match email::args::matches(&m)? {
         Some(email::args::Cmd::Attachments(ids)) => {
-            let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
+            let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
             let mut backend = backend_builder.clone().into_build().await?;
-            let id_mapper = IdMapper::new(backend.as_ref(), &account_name, &folder)?;
+            let id_mapper = IdMapper::new(backend.as_ref(), &account_config, &folder)?;
             email::handlers::attachments(
                 &account_config,
                 &mut printer,
@@ -206,12 +201,11 @@ async fn main() -> Result<()> {
             return Ok(());
         }
         Some(email::args::Cmd::Copy(ids, to_folder)) => {
-            let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
+            let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
             let mut backend = backend_builder.clone().into_build().await?;
-            let id_mapper = IdMapper::new(backend.as_ref(), &account_name, &folder)?;
+            let id_mapper = IdMapper::new(backend.as_ref(), &account_config, &folder)?;
 
             email::handlers::copy(
-                &account_config,
                 &mut printer,
                 &id_mapper,
                 backend.as_mut(),
@@ -224,27 +218,20 @@ async fn main() -> Result<()> {
             return Ok(());
         }
         Some(email::args::Cmd::Delete(ids)) => {
-            let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
+            let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
             let mut backend = backend_builder.clone().into_build().await?;
-            let id_mapper = IdMapper::new(backend.as_ref(), &account_name, &folder)?;
+            let id_mapper = IdMapper::new(backend.as_ref(), &account_config, &folder)?;
 
-            email::handlers::delete(
-                &account_config,
-                &mut printer,
-                &id_mapper,
-                backend.as_mut(),
-                &folder,
-                ids,
-            )
-            .await?;
+            email::handlers::delete(&mut printer, &id_mapper, backend.as_mut(), &folder, ids)
+                .await?;
 
             return Ok(());
         }
         Some(email::args::Cmd::Forward(id, headers, body)) => {
-            let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
+            let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
             let mut backend = backend_builder.clone().into_build().await?;
             let mut sender = sender_builder.build().await?;
-            let id_mapper = IdMapper::new(backend.as_ref(), &account_name, &folder)?;
+            let id_mapper = IdMapper::new(backend.as_ref(), &account_config, &folder)?;
 
             email::handlers::forward(
                 &account_config,
@@ -262,9 +249,9 @@ async fn main() -> Result<()> {
             return Ok(());
         }
         Some(email::args::Cmd::List(max_width, page_size, page)) => {
-            let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
+            let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
             let mut backend = backend_builder.clone().into_build().await?;
-            let id_mapper = IdMapper::new(backend.as_ref(), &account_name, &folder)?;
+            let id_mapper = IdMapper::new(backend.as_ref(), &account_config, &folder)?;
 
             email::handlers::list(
                 &account_config,
@@ -281,12 +268,11 @@ async fn main() -> Result<()> {
             return Ok(());
         }
         Some(email::args::Cmd::Move(ids, to_folder)) => {
-            let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
+            let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
             let mut backend = backend_builder.clone().into_build().await?;
-            let id_mapper = IdMapper::new(backend.as_ref(), &account_name, &folder)?;
+            let id_mapper = IdMapper::new(backend.as_ref(), &account_config, &folder)?;
 
             email::handlers::move_(
-                &account_config,
                 &mut printer,
                 &id_mapper,
                 backend.as_mut(),
@@ -299,9 +285,9 @@ async fn main() -> Result<()> {
             return Ok(());
         }
         Some(email::args::Cmd::Read(ids, text_mime, raw, headers)) => {
-            let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
+            let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
             let mut backend = backend_builder.clone().into_build().await?;
-            let id_mapper = IdMapper::new(backend.as_ref(), &account_name, &folder)?;
+            let id_mapper = IdMapper::new(backend.as_ref(), &account_config, &folder)?;
 
             email::handlers::read(
                 &account_config,
@@ -319,10 +305,10 @@ async fn main() -> Result<()> {
             return Ok(());
         }
         Some(email::args::Cmd::Reply(id, all, headers, body)) => {
-            let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
+            let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
             let mut backend = backend_builder.clone().into_build().await?;
             let mut sender = sender_builder.build().await?;
-            let id_mapper = IdMapper::new(backend.as_ref(), &account_name, &folder)?;
+            let id_mapper = IdMapper::new(backend.as_ref(), &account_config, &folder)?;
 
             email::handlers::reply(
                 &account_config,
@@ -341,12 +327,11 @@ async fn main() -> Result<()> {
             return Ok(());
         }
         Some(email::args::Cmd::Save(raw_email)) => {
-            let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
+            let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
             let mut backend = backend_builder.clone().into_build().await?;
-            let id_mapper = IdMapper::new(backend.as_ref(), &account_name, &folder)?;
+            let id_mapper = IdMapper::new(backend.as_ref(), &account_config, &folder)?;
 
             email::handlers::save(
-                &account_config,
                 &mut printer,
                 &id_mapper,
                 backend.as_mut(),
@@ -358,9 +343,9 @@ async fn main() -> Result<()> {
             return Ok(());
         }
         Some(email::args::Cmd::Search(query, max_width, page_size, page)) => {
-            let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
+            let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
             let mut backend = backend_builder.clone().into_build().await?;
-            let id_mapper = IdMapper::new(backend.as_ref(), &account_name, &folder)?;
+            let id_mapper = IdMapper::new(backend.as_ref(), &account_config, &folder)?;
 
             email::handlers::search(
                 &account_config,
@@ -378,9 +363,9 @@ async fn main() -> Result<()> {
             return Ok(());
         }
         Some(email::args::Cmd::Sort(criteria, query, max_width, page_size, page)) => {
-            let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
+            let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
             let mut backend = backend_builder.clone().into_build().await?;
-            let id_mapper = IdMapper::new(backend.as_ref(), &account_name, &folder)?;
+            let id_mapper = IdMapper::new(backend.as_ref(), &account_config, &folder)?;
 
             email::handlers::sort(
                 &account_config,
@@ -414,9 +399,9 @@ async fn main() -> Result<()> {
         }
         Some(email::args::Cmd::Flag(m)) => match m {
             Some(flag::args::Cmd::Set(ids, ref flags)) => {
-                let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
+                let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
                 let mut backend = backend_builder.clone().into_build().await?;
-                let id_mapper = IdMapper::new(backend.as_ref(), &account_name, &folder)?;
+                let id_mapper = IdMapper::new(backend.as_ref(), &account_config, &folder)?;
 
                 flag::handlers::set(
                     &mut printer,
@@ -431,9 +416,9 @@ async fn main() -> Result<()> {
                 return Ok(());
             }
             Some(flag::args::Cmd::Add(ids, ref flags)) => {
-                let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
+                let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
                 let mut backend = backend_builder.clone().into_build().await?;
-                let id_mapper = IdMapper::new(backend.as_ref(), &account_name, &folder)?;
+                let id_mapper = IdMapper::new(backend.as_ref(), &account_config, &folder)?;
 
                 flag::handlers::add(
                     &mut printer,
@@ -448,9 +433,9 @@ async fn main() -> Result<()> {
                 return Ok(());
             }
             Some(flag::args::Cmd::Remove(ids, ref flags)) => {
-                let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
+                let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
                 let mut backend = backend_builder.clone().into_build().await?;
-                let id_mapper = IdMapper::new(backend.as_ref(), &account_name, &folder)?;
+                let id_mapper = IdMapper::new(backend.as_ref(), &account_config, &folder)?;
 
                 flag::handlers::remove(
                     &mut printer,
@@ -468,9 +453,9 @@ async fn main() -> Result<()> {
         },
         Some(email::args::Cmd::Tpl(m)) => match m {
             Some(tpl::args::Cmd::Forward(id, headers, body)) => {
-                let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
+                let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
                 let mut backend = backend_builder.clone().into_build().await?;
-                let id_mapper = IdMapper::new(backend.as_ref(), &account_name, &folder)?;
+                let id_mapper = IdMapper::new(backend.as_ref(), &account_config, &folder)?;
 
                 tpl::handlers::forward(
                     &account_config,
@@ -491,9 +476,9 @@ async fn main() -> Result<()> {
                 return Ok(());
             }
             Some(tpl::args::Cmd::Reply(id, all, headers, body)) => {
-                let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
+                let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
                 let mut backend = backend_builder.clone().into_build().await?;
-                let id_mapper = IdMapper::new(backend.as_ref(), &account_name, &folder)?;
+                let id_mapper = IdMapper::new(backend.as_ref(), &account_config, &folder)?;
 
                 tpl::handlers::reply(
                     &account_config,
@@ -511,9 +496,9 @@ async fn main() -> Result<()> {
                 return Ok(());
             }
             Some(tpl::args::Cmd::Save(tpl)) => {
-                let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
+                let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
                 let mut backend = backend_builder.clone().into_build().await?;
-                let id_mapper = IdMapper::new(backend.as_ref(), &account_name, &folder)?;
+                let id_mapper = IdMapper::new(backend.as_ref(), &account_config, &folder)?;
 
                 tpl::handlers::save(
                     &account_config,
@@ -528,7 +513,7 @@ async fn main() -> Result<()> {
                 return Ok(());
             }
             Some(tpl::args::Cmd::Send(tpl)) => {
-                let folder = account_config.folder_alias(folder.unwrap_or(DEFAULT_INBOX_FOLDER))?;
+                let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
                 let mut backend = backend_builder.clone().into_build().await?;
                 let mut sender = sender_builder.build().await?;
                 tpl::handlers::send(

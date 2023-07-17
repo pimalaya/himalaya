@@ -102,7 +102,6 @@ pub async fn edit_tpl_with_editor<P: Printer>(
                 break;
             }
             Ok(PostEditChoice::RemoteDraft) => {
-                let draft_folder = config.folder_alias("drafts")?;
                 let email = tpl
                     .some_pgp_sign_cmd(config.email_writing_sign_cmd.clone())
                     .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.clone())
@@ -111,13 +110,13 @@ pub async fn edit_tpl_with_editor<P: Printer>(
                     .write_to_vec()?;
                 backend
                     .add_email(
-                        &draft_folder,
+                        "drafts",
                         &email,
                         &Flags::from_iter([Flag::Seen, Flag::Draft]),
                     )
                     .await?;
                 remove_local_draft()?;
-                printer.print(format!("Email successfully saved to {}", draft_folder))?;
+                printer.print("Email successfully saved to drafts")?;
                 break;
             }
             Ok(PostEditChoice::Discard) => {
