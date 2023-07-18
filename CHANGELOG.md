@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed windows releases due to `coredump` crate compilation error.
+- Fixed macos releases due to macos 12 System Integrity Protection.
+
 ## [0.8.2] - 2023-07-18
 
 ### Changed

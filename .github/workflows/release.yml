@@ -42,7 +42,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2        
       - name: Install Nix
-        uses: cachix/install-nix-action@v20
+        uses: cachix/install-nix-action@v22
         with:
           nix_path: nixpkgs=channel:nixos-22.11
           extra_nix_config: |
@@ -139,7 +139,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2        
       - name: Install Nix
-        uses: cachix/install-nix-action@v20
+        uses: cachix/install-nix-action@v22
         with:
           nix_path: nixpkgs=channel:nixos-22.11
           extra_nix_config: |

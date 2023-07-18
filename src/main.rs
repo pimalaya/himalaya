@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Context, Result};
 use clap::Command;
-use coredump::register_panic_handler;
 use log::{debug, warn};
 #[cfg(feature = "imap-backend")]
 use pimalaya_email::backend::ImapBackend;
@@ -49,7 +48,8 @@ fn create_app() -> Command {
 #[allow(clippy::single_match)]
 #[tokio::main]
 async fn main() -> Result<()> {
-    if let Err((_, err)) = register_panic_handler() {
+    #[cfg(not(target_os = "windows"))]
+    if let Err((_, err)) = coredump::register_panic_handler() {
         warn!("cannot register custom panic handler: {err}");
         debug!("cannot register custom panic handler: {err:?}");
     }

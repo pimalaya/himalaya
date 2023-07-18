@@ -36,7 +36,6 @@ clap = "4.0"
 clap_complete = "4.0"
 clap_mangen = "0.2"
 console = "0.15.2"
-coredump = "=0.1.2"
 dialoguer = "0.10.2"
 dirs = "4.0.0"
 email_address = "0.2.4"
@@ -67,3 +66,6 @@ uuid = { version = "0.8", features = ["v4"] }
 rusqlite = { version = "0.29", features = [] }
 [target.'cfg(not(target_env = "musl"))'.dependencies]
 rusqlite = { version = "0.29", features = ["bundled"] }
+
+[target.'cfg(not(target_env = "windows"))'.dependencies]
+coredump = "=0.1.2"
