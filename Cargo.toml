@@ -1,7 +1,7 @@
 [package]
 name = "himalaya"
 description = "CLI to manage your emails."
-version = "0.8.3"
+version = "0.8.4"
 authors = ["soywod <clement.douin@posteo.net>"]
 edition = "2021"
 license = "MIT"
@@ -67,5 +67,5 @@ rusqlite = { version = "0.29", features = [] }
 [target.'cfg(not(target_env = "musl"))'.dependencies]
 rusqlite = { version = "0.29", features = ["bundled"] }
 
-[target.'cfg(not(target_env = "windows"))'.dependencies]
+[target.'cfg(not(windows))'.dependencies]
 coredump = "=0.1.2"
