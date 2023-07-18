@@ -1005,7 +1005,7 @@ dependencies = [
 
 [[package]]
 name = "himalaya"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1883,8 +1883,9 @@ dependencies = [
 
 [[package]]
 name = "pimalaya-email"
-version = "0.13.1-beta"
-source = "git+https://git.sr.ht/~soywod/pimalaya#866279f6cc9e14a565d8ea7d6722a08f5b9293e2"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac81fe94f90d335e4806a58c23eae2973996a666382deeced57215c0590e30c2"
 dependencies = [
  "advisory-lock",
  "ammonia",
@@ -1928,9 +1929,9 @@ dependencies = [
 
 [[package]]
 name = "pimalaya-email-tpl"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c536455f778ed7aa0948b755281e8e6a61650a857a3f610ff7e60b097a681838"
+checksum = "b2a8b37bec4947fb310d807e92e2970d088da3416bc2c7d897814187c639f50a"
 dependencies = [
  "async-recursion",
  "chumsky 0.9.0",
