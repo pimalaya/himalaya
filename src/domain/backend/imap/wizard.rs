@@ -30,7 +30,7 @@ const KEYRING: &str = "Ask my password, then save it in my system's global keyri
 const RAW: &str = "Ask my password, then save it in the configuration file (not safe)";
 const CMD: &str = "Ask me a shell command that exposes my password";
 
-pub(crate) fn configure(account_name: &str, email: &str) -> Result<BackendConfig> {
+pub(crate) async fn configure(account_name: &str, email: &str) -> Result<BackendConfig> {
     let mut config = ImapConfig::default();
 
     config.host = Input::with_theme(&*THEME)
@@ -201,8 +201,9 @@ pub(crate) fn configure(account_name: &str, email: &str) -> Result<BackendConfig
             println!("{}", redirect_url.to_string());
             println!("");
 
-            let (access_token, refresh_token) =
-                auth_code_grant.wait_for_redirection(&client, csrf_token)?;
+            let (access_token, refresh_token) = auth_code_grant
+                .wait_for_redirection(&client, csrf_token)
+                .await?;
 
             Secret::new_keyring_entry(format!("{account_name}-imap-oauth2-access-token"))
                 .set_keyring_entry_secret(access_token)?;

@@ -258,6 +258,7 @@ impl DeserializedAccountConfig {
 
                 sender
             },
+            pgp: Default::default(),
         }
     }
 }

@@ -6,7 +6,7 @@ use crate::{backend, config::wizard::THEME, sender};
 
 use super::DeserializedAccountConfig;
 
-pub(crate) fn configure() -> Result<Option<(String, DeserializedAccountConfig)>> {
+pub(crate) async fn configure() -> Result<Option<(String, DeserializedAccountConfig)>> {
     let mut config = DeserializedAccountConfig::default();
 
     let account_name = Input::with_theme(&*THEME)
@@ -31,9 +31,9 @@ pub(crate) fn configure() -> Result<Option<(String, DeserializedAccountConfig)>>
             .interact()?,
     );
 
-    config.backend = backend::wizard::configure(&account_name, &config.email)?;
+    config.backend = backend::wizard::configure(&account_name, &config.email).await?;
 
-    config.sender = sender::wizard::configure(&account_name, &config.email)?;
+    config.sender = sender::wizard::configure(&account_name, &config.email).await?;
 
     Ok(Some((account_name, config)))
 }

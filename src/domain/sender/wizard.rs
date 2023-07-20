@@ -20,7 +20,7 @@ const SENDERS: &[&str] = &[
     NONE,
 ];
 
-pub(crate) fn configure(account_name: &str, email: &str) -> Result<SenderConfig> {
+pub(crate) async fn configure(account_name: &str, email: &str) -> Result<SenderConfig> {
     let sender = Select::with_theme(&*THEME)
         .with_prompt("Email sender")
         .items(SENDERS)
@@ -29,7 +29,7 @@ pub(crate) fn configure(account_name: &str, email: &str) -> Result<SenderConfig>
 
     match sender {
         #[cfg(feature = "smtp-sender")]
-        Some(n) if SENDERS[n] == SMTP => smtp::wizard::configure(account_name, email),
+        Some(n) if SENDERS[n] == SMTP => smtp::wizard::configure(account_name, email).await,
         Some(n) if SENDERS[n] == SENDMAIL => sendmail::wizard::configure(),
         _ => Ok(SenderConfig::None),
     }

@@ -84,7 +84,7 @@ pub struct DeserializedConfig {
 
 impl DeserializedConfig {
     /// Tries to create a config from an optional path.
-    pub fn from_opt_path(path: Option<&str>) -> Result<Self> {
+    pub async fn from_opt_path(path: Option<&str>) -> Result<Self> {
         debug!("path: {:?}", path);
 
         let config = if let Some(path) = path.map(PathBuf::from).or_else(Self::path) {
@@ -104,7 +104,7 @@ impl DeserializedConfig {
                 process::exit(0);
             }
 
-            wizard::configure()?
+            wizard::configure().await?
         };
 
         if config.accounts.is_empty() {
@@ -179,15 +179,15 @@ mod tests {
 
     use super::*;
 
-    fn make_config(config: &str) -> Result<DeserializedConfig> {
+    async fn make_config(config: &str) -> Result<DeserializedConfig> {
         let mut file = NamedTempFile::new().unwrap();
         write!(file, "{}", config).unwrap();
-        DeserializedConfig::from_opt_path(file.into_temp_path().to_str())
+        DeserializedConfig::from_opt_path(file.into_temp_path().to_str()).await
     }
 
-    #[test]
-    fn empty_config() {
-        let config = make_config("");
+    #[tokio::test]
+    async fn empty_config() {
+        let config = make_config("").await;
 
         assert_eq!(
             config.unwrap_err().root_cause().to_string(),
@@ -195,9 +195,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn account_missing_email_field() {
-        let config = make_config("[account]");
+    #[tokio::test]
+    async fn account_missing_email_field() {
+        let config = make_config("[account]").await;
 
         assert!(config
             .unwrap_err()
@@ -206,12 +206,13 @@ mod tests {
             .contains("missing field `email`"));
     }
 
-    #[test]
-    fn account_missing_backend_field() {
+    #[tokio::test]
+    async fn account_missing_backend_field() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"",
-        );
+        )
+        .await;
 
         assert!(config
             .unwrap_err()
@@ -220,13 +221,14 @@ mod tests {
             .contains("missing field `backend`"));
     }
 
-    #[test]
-    fn account_invalid_backend_field() {
+    #[tokio::test]
+    async fn account_invalid_backend_field() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
             backend = \"bad\"",
-        );
+        )
+        .await;
 
         assert!(config
             .unwrap_err()
@@ -235,14 +237,15 @@ mod tests {
             .contains("unknown variant `bad`"));
     }
 
-    #[test]
-    fn imap_account_missing_host_field() {
+    #[tokio::test]
+    async fn imap_account_missing_host_field() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
             sender = \"none\"
             backend = \"imap\"",
-        );
+        )
+        .await;
 
         assert!(config
             .unwrap_err()
@@ -251,15 +254,16 @@ mod tests {
             .contains("missing field `imap-host`"));
     }
 
-    #[test]
-    fn account_backend_imap_missing_port_field() {
+    #[tokio::test]
+    async fn account_backend_imap_missing_port_field() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
             sender = \"none\"
             backend = \"imap\"
             imap-host = \"localhost\"",
-        );
+        )
+        .await;
 
         assert!(config
             .unwrap_err()
@@ -268,8 +272,8 @@ mod tests {
             .contains("missing field `imap-port`"));
     }
 
-    #[test]
-    fn account_backend_imap_missing_login_field() {
+    #[tokio::test]
+    async fn account_backend_imap_missing_login_field() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
@@ -277,7 +281,8 @@ mod tests {
             backend = \"imap\"
             imap-host = \"localhost\"
             imap-port = 993",
-        );
+        )
+        .await;
 
         assert!(config
             .unwrap_err()
@@ -286,8 +291,8 @@ mod tests {
             .contains("missing field `imap-login`"));
     }
 
-    #[test]
-    fn account_backend_imap_missing_passwd_cmd_field() {
+    #[tokio::test]
+    async fn account_backend_imap_missing_passwd_cmd_field() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
@@ -296,7 +301,8 @@ mod tests {
             imap-host = \"localhost\"
             imap-port = 993
             imap-login = \"login\"",
-        );
+        )
+        .await;
 
         assert!(config
             .unwrap_err()
@@ -305,14 +311,15 @@ mod tests {
             .contains("missing field `imap-auth`"));
     }
 
-    #[test]
-    fn account_backend_maildir_missing_root_dir_field() {
+    #[tokio::test]
+    async fn account_backend_maildir_missing_root_dir_field() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
             sender = \"none\"
             backend = \"maildir\"",
-        );
+        )
+        .await;
 
         assert!(config
             .unwrap_err()
@@ -322,14 +329,15 @@ mod tests {
     }
 
     #[cfg(feature = "notmuch-backend")]
-    #[test]
-    fn account_backend_notmuch_missing_db_path_field() {
+    #[tokio::test]
+    async fn account_backend_notmuch_missing_db_path_field() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
             sender = \"none\"
             backend = \"notmuch\"",
-        );
+        )
+        .await;
 
         assert!(config
             .unwrap_err()
@@ -338,13 +346,14 @@ mod tests {
             .contains("missing field `notmuch-db-path`"));
     }
 
-    #[test]
-    fn account_missing_sender_field() {
+    #[tokio::test]
+    async fn account_missing_sender_field() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
             backend = \"none\"",
-        );
+        )
+        .await;
 
         assert!(config
             .unwrap_err()
@@ -353,14 +362,15 @@ mod tests {
             .contains("missing field `sender`"));
     }
 
-    #[test]
-    fn account_invalid_sender_field() {
+    #[tokio::test]
+    async fn account_invalid_sender_field() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
             backend = \"none\"
             sender = \"bad\"",
-        );
+        )
+        .await;
 
         assert!(config
             .unwrap_err()
@@ -369,14 +379,15 @@ mod tests {
             .contains("unknown variant `bad`, expected one of `none`, `smtp`, `sendmail`"),);
     }
 
-    #[test]
-    fn account_smtp_sender_missing_host_field() {
+    #[tokio::test]
+    async fn account_smtp_sender_missing_host_field() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
             backend = \"none\"
             sender = \"smtp\"",
-        );
+        )
+        .await;
 
         assert!(config
             .unwrap_err()
@@ -385,15 +396,16 @@ mod tests {
             .contains("missing field `smtp-host`"));
     }
 
-    #[test]
-    fn account_smtp_sender_missing_port_field() {
+    #[tokio::test]
+    async fn account_smtp_sender_missing_port_field() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
             backend = \"none\"
             sender = \"smtp\"
             smtp-host = \"localhost\"",
-        );
+        )
+        .await;
 
         assert!(config
             .unwrap_err()
@@ -402,8 +414,8 @@ mod tests {
             .contains("missing field `smtp-port`"));
     }
 
-    #[test]
-    fn account_smtp_sender_missing_login_field() {
+    #[tokio::test]
+    async fn account_smtp_sender_missing_login_field() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
@@ -411,7 +423,8 @@ mod tests {
             sender = \"smtp\"
             smtp-host = \"localhost\"
             smtp-port = 25",
-        );
+        )
+        .await;
 
         assert!(config
             .unwrap_err()
@@ -420,8 +433,8 @@ mod tests {
             .contains("missing field `smtp-login`"));
     }
 
-    #[test]
-    fn account_smtp_sender_missing_auth_field() {
+    #[tokio::test]
+    async fn account_smtp_sender_missing_auth_field() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
@@ -430,7 +443,8 @@ mod tests {
             smtp-host = \"localhost\"
             smtp-port = 25
             smtp-login = \"login\"",
-        );
+        )
+        .await;
 
         assert!(config
             .unwrap_err()
@@ -439,14 +453,15 @@ mod tests {
             .contains("missing field `smtp-auth`"));
     }
 
-    #[test]
-    fn account_sendmail_sender_missing_cmd_field() {
+    #[tokio::test]
+    async fn account_sendmail_sender_missing_cmd_field() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
             backend = \"none\"
             sender = \"sendmail\"",
-        );
+        )
+        .await;
 
         assert!(config
             .unwrap_err()
@@ -456,8 +471,8 @@ mod tests {
     }
 
     #[cfg(feature = "smtp-sender")]
-    #[test]
-    fn account_smtp_sender_minimum_config() {
+    #[tokio::test]
+    async fn account_smtp_sender_minimum_config() {
         use pimalaya_email::sender::SenderConfig;
 
         let config = make_config(
@@ -470,7 +485,8 @@ mod tests {
             smtp-login = \"login\"
             smtp-auth = \"passwd\"
             smtp-passwd = { cmd  = \"echo password\" }",
-        );
+        )
+        .await;
 
         assert_eq!(
             config.unwrap(),
@@ -493,18 +509,19 @@ mod tests {
                 )]),
                 ..DeserializedConfig::default()
             }
-        );
+        )
     }
 
-    #[test]
-    fn account_sendmail_sender_minimum_config() {
+    #[tokio::test]
+    async fn account_sendmail_sender_minimum_config() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
             backend = \"none\"
             sender = \"sendmail\"
             sendmail-cmd = \"echo send\"",
-        );
+        )
+        .await;
 
         assert_eq!(
             config.unwrap(),
@@ -521,11 +538,11 @@ mod tests {
                 )]),
                 ..DeserializedConfig::default()
             }
-        );
+        )
     }
 
-    #[test]
-    fn account_backend_imap_minimum_config() {
+    #[tokio::test]
+    async fn account_backend_imap_minimum_config() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
@@ -536,7 +553,8 @@ mod tests {
             imap-login = \"login\"
             imap-auth = \"passwd\"
             imap-passwd = { cmd = \"echo password\" }",
-        );
+        )
+        .await;
 
         assert_eq!(
             config.unwrap(),
@@ -559,17 +577,19 @@ mod tests {
                 )]),
                 ..DeserializedConfig::default()
             }
-        );
+        )
     }
-    #[test]
-    fn account_backend_maildir_minimum_config() {
+
+    #[tokio::test]
+    async fn account_backend_maildir_minimum_config() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
             sender = \"none\"
             backend = \"maildir\"
             maildir-root-dir = \"/tmp/maildir\"",
-        );
+        )
+        .await;
 
         assert_eq!(
             config.unwrap(),
@@ -586,19 +606,20 @@ mod tests {
                 )]),
                 ..DeserializedConfig::default()
             }
-        );
+        )
     }
 
     #[cfg(feature = "notmuch-backend")]
-    #[test]
-    fn account_backend_notmuch_minimum_config() {
+    #[tokio::test]
+    async fn account_backend_notmuch_minimum_config() {
         let config = make_config(
             "[account]
             email = \"test@localhost\"
             sender = \"none\"
             backend = \"notmuch\"
             notmuch-db-path = \"/tmp/notmuch.db\"",
-        );
+        )
+        .await;
 
         assert_eq!(
             config.unwrap(),

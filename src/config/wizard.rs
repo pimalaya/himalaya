@@ -30,12 +30,12 @@ macro_rules! wizard_log {
 
 pub(crate) static THEME: Lazy<ColorfulTheme> = Lazy::new(ColorfulTheme::default);
 
-pub(crate) fn configure() -> Result<DeserializedConfig> {
+pub(crate) async fn configure() -> Result<DeserializedConfig> {
     wizard_log!("Configuring your first account:");
 
     let mut config = DeserializedConfig::default();
 
-    while let Some((name, account_config)) = account::wizard::configure()? {
+    while let Some((name, account_config)) = account::wizard::configure().await? {
         config.accounts.insert(name, account_config);
 
         if !Confirm::new()

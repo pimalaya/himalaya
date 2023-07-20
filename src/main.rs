@@ -61,7 +61,7 @@ async fn main() -> Result<()> {
     let raw_args: Vec<String> = env::args().collect();
     if raw_args.len() > 1 && raw_args[1].starts_with("mailto:") {
         let url = Url::parse(&raw_args[1])?;
-        let config = DeserializedConfig::from_opt_path(None)?;
+        let config = DeserializedConfig::from_opt_path(None).await?;
         let account_config = config.to_account_config(None)?;
         let mut backend = BackendBuilder::new(account_config.clone()).build().await?;
         let mut sender = SenderBuilder::new(account_config.clone()).build().await?;
@@ -99,7 +99,7 @@ async fn main() -> Result<()> {
         _ => (),
     }
 
-    let config = DeserializedConfig::from_opt_path(config::args::parse_arg(&m))?;
+    let config = DeserializedConfig::from_opt_path(config::args::parse_arg(&m)).await?;
     let account_config = config.to_account_config(account::args::parse_arg(&m))?;
     let folder = folder::args::parse_source_arg(&m);
     let disable_cache = cache::args::parse_disable_cache_flag(&m);

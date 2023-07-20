@@ -26,7 +26,7 @@ const BACKENDS: &[&str] = &[
     NONE,
 ];
 
-pub(crate) fn configure(account_name: &str, email: &str) -> Result<BackendConfig> {
+pub(crate) async fn configure(account_name: &str, email: &str) -> Result<BackendConfig> {
     let backend = Select::with_theme(&*THEME)
         .with_prompt("Email backend")
         .items(BACKENDS)
@@ -35,7 +35,7 @@ pub(crate) fn configure(account_name: &str, email: &str) -> Result<BackendConfig
 
     match backend {
         #[cfg(feature = "imap-backend")]
-        Some(idx) if BACKENDS[idx] == IMAP => imap::wizard::configure(account_name, email),
+        Some(idx) if BACKENDS[idx] == IMAP => imap::wizard::configure(account_name, email).await,
         Some(idx) if BACKENDS[idx] == MAILDIR => maildir::wizard::configure(),
         #[cfg(feature = "notmuch-backend")]
         Some(idx) if BACKENDS[idx] == NOTMUCH => notmuch::wizard::configure(),
