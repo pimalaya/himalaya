@@ -2397,7 +2397,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-email"
 version = "0.14.1-beta"
-source = "git+https://git.sr.ht/~soywod/pimalaya#6c63d026a879276b9c525d78cad9415c7e089b32"
+source = "git+https://git.sr.ht/~soywod/pimalaya#a912fa5d3babfdaa8d240581f9a831d7118cb729"
 dependencies = [
  "advisory-lock",
  "ammonia",
