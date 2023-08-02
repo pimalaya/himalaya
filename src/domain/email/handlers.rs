@@ -185,7 +185,7 @@ pub async fn mailto<P: Printer>(
 
     let tpl = config
         .generate_tpl_interpreter()
-        .show_only_headers(config.email_writing_headers())
+        .with_show_only_headers(config.email_writing_headers())
         .interpret_msg_builder(builder)
         .await?;
 
@@ -235,9 +235,9 @@ pub async fn read<P: Printer>(
             let tpl: String = email
                 .to_read_tpl(&config, |tpl| match text_mime {
                     "html" => tpl
-                        .hide_all_headers()
-                        .filter_parts(FilterParts::Only("text/html".into())),
-                    _ => tpl.show_additional_headers(&headers),
+                        .with_hide_all_headers()
+                        .with_filter_parts(FilterParts::Only("text/html".into())),
+                    _ => tpl.with_show_additional_headers(&headers),
                 })
                 .await?
                 .into();

@@ -8,7 +8,7 @@ use pimalaya_email::backend::ImapAuthConfig;
 #[cfg(feature = "smtp-sender")]
 use pimalaya_email::sender::SmtpAuthConfig;
 use pimalaya_email::{
-    account::AccountConfig,
+    account::{AccountConfig, PgpConfig},
     backend::BackendConfig,
     email::{EmailHooks, EmailTextPlainFormat},
     folder::sync::FolderSyncStrategy,
@@ -90,6 +90,9 @@ pub struct DeserializedAccountConfig {
     pub backend: BackendConfig,
     #[serde(flatten, with = "SenderConfigDef")]
     pub sender: SenderConfig,
+
+    #[serde(default, with = "PgpConfigDef")]
+    pub pgp: PgpConfig,
 }
 
 impl DeserializedAccountConfig {
@@ -155,46 +158,6 @@ impl DeserializedAccountConfig {
                 .map(ToOwned::to_owned)
                 .or_else(|| config.email_reading_headers.as_ref().map(ToOwned::to_owned)),
             email_reading_format: self.email_reading_format.clone(),
-            email_reading_verify_cmd: self
-                .email_reading_verify_cmd
-                .as_ref()
-                .map(ToOwned::to_owned)
-                .or_else(|| {
-                    config
-                        .email_reading_verify_cmd
-                        .as_ref()
-                        .map(ToOwned::to_owned)
-                }),
-            email_reading_decrypt_cmd: self
-                .email_reading_decrypt_cmd
-                .as_ref()
-                .map(ToOwned::to_owned)
-                .or_else(|| {
-                    config
-                        .email_reading_decrypt_cmd
-                        .as_ref()
-                        .map(ToOwned::to_owned)
-                }),
-            email_writing_sign_cmd: self
-                .email_writing_sign_cmd
-                .as_ref()
-                .map(ToOwned::to_owned)
-                .or_else(|| {
-                    config
-                        .email_writing_sign_cmd
-                        .as_ref()
-                        .map(ToOwned::to_owned)
-                }),
-            email_writing_encrypt_cmd: self
-                .email_writing_encrypt_cmd
-                .as_ref()
-                .map(ToOwned::to_owned)
-                .or_else(|| {
-                    config
-                        .email_writing_encrypt_cmd
-                        .as_ref()
-                        .map(ToOwned::to_owned)
-                }),
             email_writing_headers: self
                 .email_writing_headers
                 .as_ref()
@@ -258,7 +221,7 @@ impl DeserializedAccountConfig {
 
                 sender
             },
-            pgp: Default::default(),
+            pgp: self.pgp.clone(),
         }
     }
 }

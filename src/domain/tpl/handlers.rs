@@ -3,7 +3,7 @@ use atty::Stream;
 use pimalaya_email::{
     account::AccountConfig,
     backend::Backend,
-    email::{Flags, Message, Tpl},
+    email::{Flag, Flags, Message, Tpl},
     sender::Sender,
 };
 use std::io::{stdin, BufRead};
@@ -86,8 +86,8 @@ pub async fn save<P: Printer>(
             .collect::<Vec<String>>()
             .join("\n")
     })
-    .some_pgp_sign_cmd(config.email_writing_sign_cmd.clone())
-    .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.clone())
+    .with_pgp_encrypt(config.pgp.clone())
+    .with_pgp_sign(config.pgp.clone())
     .compile()
     .await?
     .write_to_vec()?;
@@ -103,9 +103,9 @@ pub async fn send<P: Printer>(
     printer: &mut P,
     backend: &mut dyn Backend,
     sender: &mut dyn Sender,
-    folder: &str,
     tpl: String,
 ) -> Result<()> {
+    let folder = config.sent_folder_alias()?;
     let email = Tpl::from(if atty::is(Stream::Stdin) || printer.is_json() {
         tpl.replace("\r", "")
     } else {
@@ -116,8 +116,8 @@ pub async fn send<P: Printer>(
             .collect::<Vec<String>>()
             .join("\n")
     })
-    .some_pgp_sign_cmd(config.email_writing_sign_cmd.clone())
-    .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.clone())
+    .with_pgp_encrypt(config.pgp.clone())
+    .with_pgp_sign(config.pgp.clone())
     .compile()
     .await?
     .write_to_vec()?;
@@ -125,7 +125,9 @@ pub async fn send<P: Printer>(
     sender.send(&email).await?;
 
     if config.email_sending_save_copy {
-        backend.add_email(folder, &email, &Flags::default()).await?;
+        backend
+            .add_email(&folder, &email, &Flags::from_iter([Flag::Seen]))
+            .await?;
     }
 
     printer.print("Template successfully sent!")?;

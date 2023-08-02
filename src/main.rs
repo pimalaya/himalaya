@@ -513,7 +513,6 @@ async fn main() -> Result<()> {
                 return Ok(());
             }
             Some(tpl::args::Cmd::Send(tpl)) => {
-                let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
                 let mut backend = backend_builder.clone().into_build().await?;
                 let mut sender = sender_builder.build().await?;
                 tpl::handlers::send(
@@ -521,7 +520,6 @@ async fn main() -> Result<()> {
                     &mut printer,
                     backend.as_mut(),
                     sender.as_mut(),
-                    &folder,
                     tpl,
                 )
                 .await?;

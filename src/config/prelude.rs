@@ -5,7 +5,9 @@ use pimalaya_email::backend::{ImapAuthConfig, ImapConfig};
 #[cfg(feature = "smtp-sender")]
 use pimalaya_email::sender::{SmtpAuthConfig, SmtpConfig};
 use pimalaya_email::{
-    account::{OAuth2Config, OAuth2Method, OAuth2Scopes, PasswdConfig},
+    account::{
+        OAuth2Config, OAuth2Method, OAuth2Scopes, PasswdConfig, PgpConfig, PgpKey, PgpNativeConfig,
+    },
     backend::{BackendConfig, MaildirConfig},
     email::{EmailHooks, EmailTextPlainFormat},
     folder::sync::FolderSyncStrategy,
@@ -386,4 +388,38 @@ pub enum FolderSyncStrategyDef {
     #[serde(alias = "except")]
     #[serde(alias = "ignore")]
     Exclude(HashSet<String>),
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(remote = "PgpConfig", tag = "backend", rename_all = "kebab-case")]
+pub enum PgpConfigDef {
+    #[default]
+    None,
+    #[serde(with = "PgpNativeConfigDef")]
+    Native(PgpNativeConfig),
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(remote = "PgpNativeConfig", rename_all = "kebab-case")]
+pub struct PgpNativeConfigDef {
+    #[serde(default, with = "PgpKeyDef")]
+    secret_key: PgpKey,
+    #[serde(default, with = "SecretDef")]
+    secret_key_passwd: Secret,
+    #[serde(default, with = "PgpKeyDef")]
+    public_key: PgpKey,
+    #[serde(default = "PgpNativeConfig::default_wkd")]
+    wkd: bool,
+    #[serde(default = "PgpNativeConfig::default_key_servers")]
+    key_servers: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(remote = "PgpKey", rename_all = "kebab-case")]
+pub enum PgpKeyDef {
+    #[default]
+    None,
+    Path(PathBuf),
+    #[serde(with = "EntryDef")]
+    Keyring(Entry),
 }

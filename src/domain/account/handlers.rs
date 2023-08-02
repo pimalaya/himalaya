@@ -72,6 +72,8 @@ pub async fn configure(config: &AccountConfig, reset: bool) -> Result<()> {
                 warn!("{err}");
             }
         }
+
+        config.pgp.reset().await?;
     }
 
     #[cfg(feature = "imap-backend")]
@@ -101,6 +103,11 @@ pub async fn configure(config: &AccountConfig, reset: bool) -> Result<()> {
             }
         }?;
     }
+
+    config
+        .pgp
+        .configure(&config.email, || prompt_passwd("PGP secret key password"))
+        .await?;
 
     println!(
         "Account successfully {}configured!",

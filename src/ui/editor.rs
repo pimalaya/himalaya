@@ -76,8 +76,8 @@ pub async fn edit_tpl_with_editor<P: Printer>(
             Ok(PostEditChoice::Send) => {
                 printer.print_log("Sending email…")?;
                 let email = tpl
-                    .some_pgp_sign_cmd(config.email_writing_sign_cmd.clone())
-                    .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.clone())
+                    .with_pgp_encrypt(config.pgp.clone())
+                    .with_pgp_sign(config.pgp.clone())
                     .compile()
                     .await?
                     .write_to_vec()?;
@@ -103,8 +103,8 @@ pub async fn edit_tpl_with_editor<P: Printer>(
             }
             Ok(PostEditChoice::RemoteDraft) => {
                 let email = tpl
-                    .some_pgp_sign_cmd(config.email_writing_sign_cmd.clone())
-                    .some_pgp_encrypt_cmd(config.email_writing_encrypt_cmd.clone())
+                    .with_pgp_encrypt(config.pgp.clone())
+                    .with_pgp_sign(config.pgp.clone())
                     .compile()
                     .await?
                     .write_to_vec()?;
