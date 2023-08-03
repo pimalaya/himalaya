@@ -2413,7 +2413,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-email"
 version = "0.14.1-beta"
-source = "git+https://git.sr.ht/~soywod/pimalaya#da0eb6f289cf16971b62347ac00a799c2fa05a99"
+source = "git+https://git.sr.ht/~soywod/pimalaya#77a2a822e973de2c95d523495ee9ec7709039a41"
 dependencies = [
  "advisory-lock",
  "ammonia",
@@ -2460,7 +2460,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-email-tpl"
 version = "0.3.2-beta"
-source = "git+https://git.sr.ht/~soywod/pimalaya#da0eb6f289cf16971b62347ac00a799c2fa05a99"
+source = "git+https://git.sr.ht/~soywod/pimalaya#77a2a822e973de2c95d523495ee9ec7709039a41"
 dependencies = [
  "async-recursion",
  "chumsky 0.9.0",
@@ -2479,7 +2479,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-keyring"
 version = "0.0.6-beta"
-source = "git+https://git.sr.ht/~soywod/pimalaya#da0eb6f289cf16971b62347ac00a799c2fa05a99"
+source = "git+https://git.sr.ht/~soywod/pimalaya#77a2a822e973de2c95d523495ee9ec7709039a41"
 dependencies = [
  "keyring",
  "log",
@@ -2489,7 +2489,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-oauth2"
 version = "0.0.5-beta"
-source = "git+https://git.sr.ht/~soywod/pimalaya#da0eb6f289cf16971b62347ac00a799c2fa05a99"
+source = "git+https://git.sr.ht/~soywod/pimalaya#77a2a822e973de2c95d523495ee9ec7709039a41"
 dependencies = [
  "log",
  "oauth2",
@@ -2502,7 +2502,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-pgp"
 version = "0.0.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya#da0eb6f289cf16971b62347ac00a799c2fa05a99"
+source = "git+https://git.sr.ht/~soywod/pimalaya#77a2a822e973de2c95d523495ee9ec7709039a41"
 dependencies = [
  "async-recursion",
  "futures",
@@ -2522,7 +2522,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-process"
 version = "0.0.6-beta"
-source = "git+https://git.sr.ht/~soywod/pimalaya#da0eb6f289cf16971b62347ac00a799c2fa05a99"
+source = "git+https://git.sr.ht/~soywod/pimalaya#77a2a822e973de2c95d523495ee9ec7709039a41"
 dependencies = [
  "log",
  "thiserror",
@@ -2532,7 +2532,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-secret"
 version = "0.0.6-beta"
-source = "git+https://git.sr.ht/~soywod/pimalaya#da0eb6f289cf16971b62347ac00a799c2fa05a99"
+source = "git+https://git.sr.ht/~soywod/pimalaya#77a2a822e973de2c95d523495ee9ec7709039a41"
 dependencies = [
  "log",
  "pimalaya-keyring",
