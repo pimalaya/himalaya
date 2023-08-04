@@ -86,8 +86,7 @@ pub async fn save<P: Printer>(
             .collect::<Vec<String>>()
             .join("\n")
     })
-    .with_pgp_encrypt(config.pgp.clone())
-    .with_pgp_sign(config.pgp.clone())
+    .with_pgp(config.pgp.clone())
     .compile()
     .await?
     .write_to_vec()?;
@@ -116,8 +115,7 @@ pub async fn send<P: Printer>(
             .collect::<Vec<String>>()
             .join("\n")
     })
-    .with_pgp_encrypt(config.pgp.clone())
-    .with_pgp_sign(config.pgp.clone())
+    .with_pgp(config.pgp.clone())
     .compile()
     .await?
     .write_to_vec()?;

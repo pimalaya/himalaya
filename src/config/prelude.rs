@@ -6,7 +6,8 @@ use pimalaya_email::backend::{ImapAuthConfig, ImapConfig};
 use pimalaya_email::sender::{SmtpAuthConfig, SmtpConfig};
 use pimalaya_email::{
     account::{
-        OAuth2Config, OAuth2Method, OAuth2Scopes, PasswdConfig, PgpConfig, PgpKey, PgpNativeConfig,
+        OAuth2Config, OAuth2Method, OAuth2Scopes, PasswdConfig, PgpConfig, PgpNativeConfig,
+        PgpNativeSecretKey, SignedSecretKey,
     },
     backend::{BackendConfig, MaildirConfig},
     email::{EmailHooks, EmailTextPlainFormat},
@@ -402,12 +403,10 @@ pub enum PgpConfigDef {
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "PgpNativeConfig", rename_all = "kebab-case")]
 pub struct PgpNativeConfigDef {
-    #[serde(default, with = "PgpKeyDef")]
-    secret_key: PgpKey,
+    #[serde(default, with = "PgpNativeSecretKeyDef")]
+    secret_key: PgpNativeSecretKey,
     #[serde(default, with = "SecretDef")]
-    secret_key_passwd: Secret,
-    #[serde(default, with = "PgpKeyDef")]
-    public_key: PgpKey,
+    secret_key_passphrase: Secret,
     #[serde(default = "PgpNativeConfig::default_wkd")]
     wkd: bool,
     #[serde(default = "PgpNativeConfig::default_key_servers")]
@@ -415,10 +414,12 @@ pub struct PgpNativeConfigDef {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(remote = "PgpKey", rename_all = "kebab-case")]
-pub enum PgpKeyDef {
+#[serde(remote = "PgpNativeSecretKey", rename_all = "kebab-case")]
+pub enum PgpNativeSecretKeyDef {
     #[default]
     None,
+    #[serde(skip)]
+    Raw(SignedSecretKey),
     Path(PathBuf),
     #[serde(with = "EntryDef")]
     Keyring(Entry),
