@@ -15,12 +15,14 @@ repository = "https://github.com/soywod/himalaya"
 all-features = true
 
 [features]
-default = ["imap-backend", "smtp-sender"]
+default = ["imap-backend", "smtp-sender", "cmds-pgp"]
 
 # backends
 imap-backend = ["pimalaya-email/imap-backend"]
 notmuch-backend = ["pimalaya-email/notmuch-backend"]
+cmds-pgp = ["pimalaya-email/cmds-pgp"]
 gpg = ["pimalaya-email/gpg"]
+native-pgp = ["pimalaya-email/native-pgp"]
 
 # senders
 smtp-sender = ["pimalaya-email/smtp-sender"]
