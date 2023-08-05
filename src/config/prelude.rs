@@ -1,3 +1,5 @@
+#[cfg(feature = "gpg")]
+use pimalaya_email::account::GpgConfig;
 #[cfg(feature = "notmuch-backend")]
 use pimalaya_email::backend::NotmuchConfig;
 #[cfg(feature = "imap-backend")]
@@ -398,6 +400,9 @@ pub enum PgpConfigDef {
     None,
     #[serde(with = "PgpNativeConfigDef")]
     Native(PgpNativeConfig),
+    #[cfg(feature = "gpg")]
+    #[serde(with = "GpgConfigDef")]
+    Gpg(GpgConfig),
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -424,3 +429,8 @@ pub enum PgpNativeSecretKeyDef {
     #[serde(with = "EntryDef")]
     Keyring(Entry),
 }
+
+#[cfg(feature = "gpg")]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(remote = "GpgConfig", rename_all = "kebab-case")]
+pub struct GpgConfigDef;

@@ -20,6 +20,7 @@ default = ["imap-backend", "smtp-sender"]
 # backends
 imap-backend = ["pimalaya-email/imap-backend"]
 notmuch-backend = ["pimalaya-email/notmuch-backend"]
+gpg = ["pimalaya-email/gpg"]
 
 # senders
 smtp-sender = ["pimalaya-email/smtp-sender"]

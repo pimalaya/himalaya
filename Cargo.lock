@@ -252,6 +252,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40e38929add23cdf8a366df9b0e088953150724bcbe5fc330b0d8eb3b328eec8"
 
 [[package]]
+name = "build-rs"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b00b8763668c99f8d9101b8a0dd82106f58265464531a79b2cef0d9a30c17dd2"
+
+[[package]]
 name = "bumpalo"
 version = "3.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -325,6 +331,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "738b8d467867f80a71351933f70461f5b56f24d5c93e0cf216e59229c968d330"
 dependencies = [
  "cipher",
+]
+
+[[package]]
+name = "cfg-expr"
+version = "0.15.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b40ccee03b5175c18cde8f37e7d2a33bcef6f8ec8f7cc0d81090d1bb380949c9"
+dependencies = [
+ "smallvec",
+ "target-lexicon",
 ]
 
 [[package]]
@@ -503,6 +519,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "245097e9a4535ee1e3e3931fcfcd55a796a44c643e8596ff6566d68f09b87bbc"
 
 [[package]]
+name = "conv"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "78ff10625fd0ac447827aa30ea8b861fead473bb60aeb73af6c1c58caf0d1299"
+dependencies = [
+ "custom_derive",
+]
+
+[[package]]
 name = "convert_case"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -629,6 +654,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cstr-argument"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6bd9c8e659a473bce955ae5c35b116af38af11a7acb0b480e01f3ed348aeb40"
+dependencies = [
+ "cfg-if 1.0.0",
+ "memchr 2.5.0",
+]
+
+[[package]]
 name = "curve25519-dalek"
 version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -668,6 +703,12 @@ dependencies = [
  "quote",
  "syn 2.0.15",
 ]
+
+[[package]]
+name = "custom_derive"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef8ae57c4978a2acd8b869ce6b9ca1dfe817bff704c220209fdef2c0b75a01b9"
 
 [[package]]
 name = "cxx"
@@ -1269,6 +1310,47 @@ dependencies = [
 ]
 
 [[package]]
+name = "gpg-error"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d89aaeddbfb92313378c58e98abadaaa34082b3855f1d455576eeeda08bd592c"
+dependencies = [
+ "libgpg-error-sys",
+]
+
+[[package]]
+name = "gpgme"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57539732fbe58eacdb984734b72b470ed0bca3ab7a49813271878567025ac44f"
+dependencies = [
+ "bitflags 1.3.2",
+ "cfg-if 1.0.0",
+ "conv",
+ "cstr-argument",
+ "gpg-error",
+ "gpgme-sys",
+ "libc",
+ "memoffset",
+ "once_cell",
+ "smallvec",
+ "static_assertions",
+]
+
+[[package]]
+name = "gpgme-sys"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "509223d659c06e4a26229437d6ac917723f02d31917c86c6ecd50e8369741cf7"
+dependencies = [
+ "build-rs",
+ "libc",
+ "libgpg-error-sys",
+ "system-deps",
+ "winreg",
+]
+
+[[package]]
 name = "group"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1759,6 +1841,17 @@ name = "libc"
 version = "0.2.137"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc7fcc620a3bff7cdd7a365be3376c97191aeaccc2a603e600951e452615bf89"
+
+[[package]]
+name = "libgpg-error-sys"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c97079310f39c835d3bd73578379d040f779614bb331c7ffbb6630fee6420290"
+dependencies = [
+ "build-rs",
+ "system-deps",
+ "winreg",
+]
 
 [[package]]
 name = "libm"
@@ -2413,7 +2506,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-email"
 version = "0.14.1-beta"
-source = "git+https://git.sr.ht/~soywod/pimalaya#86ed502bba59fa70e3f3352b40c0552a5a870c01"
+source = "git+https://git.sr.ht/~soywod/pimalaya#5241ece85e1ed8837bec4076664604c566d45bff"
 dependencies = [
  "advisory-lock",
  "ammonia",
@@ -2460,10 +2553,11 @@ dependencies = [
 [[package]]
 name = "pimalaya-email-tpl"
 version = "0.3.2-beta"
-source = "git+https://git.sr.ht/~soywod/pimalaya#86ed502bba59fa70e3f3352b40c0552a5a870c01"
+source = "git+https://git.sr.ht/~soywod/pimalaya#5241ece85e1ed8837bec4076664604c566d45bff"
 dependencies = [
  "async-recursion",
  "chumsky 0.9.0",
+ "gpgme",
  "log",
  "mail-builder",
  "mail-parser",
@@ -2479,7 +2573,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-keyring"
 version = "0.0.6-beta"
-source = "git+https://git.sr.ht/~soywod/pimalaya#86ed502bba59fa70e3f3352b40c0552a5a870c01"
+source = "git+https://git.sr.ht/~soywod/pimalaya#5241ece85e1ed8837bec4076664604c566d45bff"
 dependencies = [
  "keyring",
  "log",
@@ -2489,7 +2583,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-oauth2"
 version = "0.0.5-beta"
-source = "git+https://git.sr.ht/~soywod/pimalaya#86ed502bba59fa70e3f3352b40c0552a5a870c01"
+source = "git+https://git.sr.ht/~soywod/pimalaya#5241ece85e1ed8837bec4076664604c566d45bff"
 dependencies = [
  "log",
  "oauth2",
@@ -2502,7 +2596,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-pgp"
 version = "0.0.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya#86ed502bba59fa70e3f3352b40c0552a5a870c01"
+source = "git+https://git.sr.ht/~soywod/pimalaya#5241ece85e1ed8837bec4076664604c566d45bff"
 dependencies = [
  "async-recursion",
  "futures",
@@ -2522,7 +2616,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-process"
 version = "0.0.6-beta"
-source = "git+https://git.sr.ht/~soywod/pimalaya#86ed502bba59fa70e3f3352b40c0552a5a870c01"
+source = "git+https://git.sr.ht/~soywod/pimalaya#5241ece85e1ed8837bec4076664604c566d45bff"
 dependencies = [
  "log",
  "thiserror",
@@ -2532,7 +2626,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-secret"
 version = "0.0.6-beta"
-source = "git+https://git.sr.ht/~soywod/pimalaya#86ed502bba59fa70e3f3352b40c0552a5a870c01"
+source = "git+https://git.sr.ht/~soywod/pimalaya#5241ece85e1ed8837bec4076664604c566d45bff"
 dependencies = [
  "log",
  "pimalaya-keyring",
@@ -3306,6 +3400,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "static_assertions"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
 name = "string_cache"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3370,6 +3470,25 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
+
+[[package]]
+name = "system-deps"
+version = "6.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "30c2de8a4d8f4b823d634affc9cd2a74ec98c53a756f317e529a48046cbf71f3"
+dependencies = [
+ "cfg-expr",
+ "heck",
+ "pkg-config",
+ "toml",
+ "version-compare",
+]
+
+[[package]]
+name = "target-lexicon"
+version = "0.12.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d0e916b1148c8e263850e1ebcbd046f333e0683c724876bb0da63ea4373dc8a"
 
 [[package]]
 name = "tempfile"
@@ -3798,6 +3917,12 @@ name = "vcpkg"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
+
+[[package]]
+name = "version-compare"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "579a42fc0b8e0c63b76519a339be31bed574929511fa53c1a3acae26eb258f29"
 
 [[package]]
 name = "version_check"
