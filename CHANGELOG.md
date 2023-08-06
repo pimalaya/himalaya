@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added 3 new cargo features:
+  - `cmds-pgp`: enables the commands PGP backend (enabled by default, same behaviour as before)
+  - `gpg`: enables the GPG backend (requires the `gpgme` lib on the system)
+  - `native-pgp`: enables the native PGP backend
+- Added account configuration `pgp` to configure the way PGP operations are performed.
+
+### Removed
+
+- Removed account configuration `email-writing-encrypt-cmd`.
+- Removed account configuration `email-reading-decrypt-cmd`.
+- Removed account configuration `email-writing-sign-cmd`.
+- Removed account configuration `email-reading-verify-cmd`.
+
 ## [0.8.4] - 2023-07-18
 
 ### Fixed
