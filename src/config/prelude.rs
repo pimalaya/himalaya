@@ -368,8 +368,16 @@ pub enum SmtpOAuth2ScopesDef {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "SendmailConfig", rename_all = "kebab-case")]
 pub struct SendmailConfigDef {
-    #[serde(rename = "sendmail-cmd", with = "CmdDef")]
+    #[serde(
+        rename = "sendmail-cmd",
+        with = "CmdDef",
+        default = "sendmail_default_cmd"
+    )]
     cmd: Cmd,
+}
+
+fn sendmail_default_cmd() -> Cmd {
+    Cmd::from("/usr/sbin/sendmail")
 }
 
 /// Represents the email hooks. Useful for doing extra email
