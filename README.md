@@ -67,6 +67,10 @@ $ cargo install himalaya
 
 # Nix
 $ nix-env -i himalaya
+
+# Fedora/CentOS
+$ dnf copr enable atim/himalaya
+$ dnf install himalaya
 ```
 
 *See the [documentation](https://pimalaya.org/himalaya/cli/installation/index.html) for other installation methods.*
