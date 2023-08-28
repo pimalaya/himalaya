@@ -3,14 +3,11 @@
 //! This module gathers all account actions triggered by the CLI.
 
 use anyhow::Result;
-use indicatif::{MultiProgress, ProgressBar, ProgressFinish, ProgressStyle};
-use log::{info, trace, warn};
-use once_cell::sync::Lazy;
 #[cfg(feature = "imap-backend")]
-use pimalaya_email::backend::ImapAuthConfig;
+use email::backend::ImapAuthConfig;
 #[cfg(feature = "smtp-sender")]
-use pimalaya_email::sender::SmtpAuthConfig;
-use pimalaya_email::{
+use email::sender::SmtpAuthConfig;
+use email::{
     account::{
         sync::{AccountSyncBuilder, AccountSyncProgressEvent},
         AccountConfig,
@@ -18,6 +15,9 @@ use pimalaya_email::{
     backend::BackendConfig,
     sender::SenderConfig,
 };
+use indicatif::{MultiProgress, ProgressBar, ProgressFinish, ProgressStyle};
+use log::{info, trace, warn};
+use once_cell::sync::Lazy;
 use std::{collections::HashMap, sync::Mutex};
 
 use crate::{
@@ -294,7 +294,7 @@ pub async fn sync<P: Printer>(
 
 #[cfg(test)]
 mod tests {
-    use pimalaya_email::{account::AccountConfig, backend::ImapConfig};
+    use email::{account::AccountConfig, backend::ImapConfig};
     use std::{collections::HashMap, fmt::Debug, io};
     use termcolor::ColorSpec;
 

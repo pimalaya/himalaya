@@ -1,11 +1,11 @@
 use anyhow::Result;
 use dialoguer::{Confirm, Input, Select};
-use pimalaya_email::{
+use email::{
     account::{OAuth2Config, OAuth2Method, OAuth2Scopes, PasswdConfig},
     sender::{SenderConfig, SmtpAuthConfig, SmtpConfig},
 };
-use pimalaya_oauth2::{AuthorizationCodeGrant, Client};
-use pimalaya_secret::Secret;
+use oauth::v2_0::{AuthorizationCodeGrant, Client};
+use secret::Secret;
 
 use crate::{
     config::wizard::{prompt_passwd, THEME},

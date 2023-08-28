@@ -11,9 +11,9 @@ pub enum Flag {
     Custom(String),
 }
 
-impl From<&pimalaya_email::email::Flag> for Flag {
-    fn from(flag: &pimalaya_email::email::Flag) -> Self {
-        use pimalaya_email::email::Flag::*;
+impl From<&email::email::Flag> for Flag {
+    fn from(flag: &email::email::Flag) -> Self {
+        use email::email::Flag::*;
         match flag {
             Seen => Flag::Seen,
             Answered => Flag::Answered,

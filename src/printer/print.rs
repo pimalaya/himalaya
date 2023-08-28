@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use pimalaya_email::email::Tpl;
 
 use crate::printer::WriteColor;
 
@@ -15,13 +14,6 @@ impl Print for &str {
 }
 
 impl Print for String {
-    fn print(&self, writer: &mut dyn WriteColor) -> Result<()> {
-        self.as_str().print(writer)?;
-        Ok(writer.reset()?)
-    }
-}
-
-impl Print for Tpl {
     fn print(&self, writer: &mut dyn WriteColor) -> Result<()> {
         self.as_str().print(writer)?;
         Ok(writer.reset()?)

@@ -1,11 +1,12 @@
 use anyhow::{anyhow, Result};
 use atty::Stream;
-use pimalaya_email::{
+use email::{
     account::AccountConfig,
     backend::Backend,
-    email::{Flag, Flags, Message, Tpl},
+    email::{Flag, Flags, Message},
     sender::Sender,
 };
+use mml::MmlCompiler;
 use std::io::{stdin, BufRead};
 
 use crate::{printer::Printer, IdMapper};
@@ -76,7 +77,7 @@ pub async fn save<P: Printer>(
     folder: &str,
     tpl: String,
 ) -> Result<()> {
-    let email = Tpl::from(if atty::is(Stream::Stdin) || printer.is_json() {
+    let mml = if atty::is(Stream::Stdin) || printer.is_json() {
         tpl.replace("\r", "")
     } else {
         stdin()
@@ -85,11 +86,13 @@ pub async fn save<P: Printer>(
             .filter_map(Result::ok)
             .collect::<Vec<String>>()
             .join("\n")
-    })
-    .with_pgp(config.pgp.clone())
-    .compile()
-    .await?
-    .write_to_vec()?;
+    };
+
+    let email = MmlCompiler::new()
+        .with_pgp(config.pgp.clone())
+        .compile(mml)
+        .await?
+        .write_to_vec()?;
 
     let id = backend.add_email(folder, &email, &Flags::default()).await?;
     id_mapper.create_alias(id)?;
@@ -105,7 +108,8 @@ pub async fn send<P: Printer>(
     tpl: String,
 ) -> Result<()> {
     let folder = config.sent_folder_alias()?;
-    let email = Tpl::from(if atty::is(Stream::Stdin) || printer.is_json() {
+
+    let mml = if atty::is(Stream::Stdin) || printer.is_json() {
         tpl.replace("\r", "")
     } else {
         stdin()
@@ -114,11 +118,13 @@ pub async fn send<P: Printer>(
             .filter_map(Result::ok)
             .collect::<Vec<String>>()
             .join("\n")
-    })
-    .with_pgp(config.pgp.clone())
-    .compile()
-    .await?
-    .write_to_vec()?;
+    };
+
+    let email = MmlCompiler::new()
+        .with_pgp(config.pgp.clone())
+        .compile(mml)
+        .await?
+        .write_to_vec()?;
 
     sender.send(&email).await?;
 

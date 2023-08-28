@@ -1,5 +1,5 @@
 use anyhow::Result;
-use pimalaya_email::{backend::Backend, email::Flags};
+use email::{backend::Backend, email::Flags};
 
 use crate::{printer::Printer, IdMapper};
 

@@ -5,8 +5,8 @@
 //! [builder design pattern]: https://refactoring.guru/design-patterns/builder
 
 use anyhow::{Context, Result};
+use email::email::EmailTextPlainFormat;
 use log::trace;
-use pimalaya_email::email::EmailTextPlainFormat;
 use termcolor::{Color, ColorSpec};
 use terminal_size::terminal_size;
 use unicode_width::UnicodeWidthStr;
@@ -267,7 +267,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use pimalaya_email::email::EmailTextPlainFormat;
+    use email::email::EmailTextPlainFormat;
     use std::io;
 
     use super::*;

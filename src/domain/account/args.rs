@@ -2,8 +2,8 @@
 
 use anyhow::Result;
 use clap::{Arg, ArgAction, ArgMatches, Command};
+use email::folder::sync::FolderSyncStrategy;
 use log::info;
-use pimalaya_email::folder::sync::FolderSyncStrategy;
 use std::collections::HashSet;
 
 use crate::{folder, ui::table};

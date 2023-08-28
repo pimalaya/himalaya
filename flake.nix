@@ -1,8 +1,8 @@
 {
-  description = "CLI to manage your emails.";
+  description = "CLI to manage emails.";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-22.11";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-23.05";
     flake-utils.url = "github:numtide/flake-utils";
     gitignore = {
       url = "github:hercules-ci/gitignore.nix";
@@ -48,6 +48,7 @@
               notmuch
 
               # gpg
+              gnupg
               gpgme
             ];
           };
@@ -95,8 +96,8 @@
             SQLITE3_LIB_DIR = "${sqlite.out}/lib";
             hardeningDisable = [ "all" ];
           });
-          # FIXME: package does not build, assembler messages: unknown
-          # pseudo-op…
+          # FIXME: bzlip: fatal error: windows.h: No such file or directory
+          # May be related to SQLite.
           windows = mkPackageWithTarget "x86_64-pc-windows-gnu" {
             strictDeps = true;
             depsBuildBuild = with pkgs.pkgsCross.mingwW64; [

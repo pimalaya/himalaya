@@ -1,5 +1,5 @@
 use anyhow::Result;
-use pimalaya_email::account::AccountConfig;
+use email::account::AccountConfig;
 use serde::Serialize;
 use std::ops;
 
@@ -17,7 +17,7 @@ impl Envelopes {
     pub fn from_backend(
         config: &AccountConfig,
         id_mapper: &IdMapper,
-        envelopes: pimalaya_email::email::Envelopes,
+        envelopes: email::email::Envelopes,
     ) -> Result<Envelopes> {
         let envelopes = envelopes
             .iter()
@@ -59,7 +59,7 @@ impl PrintTable for Envelopes {
 #[cfg(test)]
 mod tests {
     use chrono::DateTime;
-    use pimalaya_email::account::AccountConfig;
+    use email::account::AccountConfig;
     use std::env;
 
     use crate::{Envelopes, IdMapper};
@@ -69,11 +69,10 @@ mod tests {
         let config = AccountConfig::default();
         let id_mapper = IdMapper::Dummy;
 
-        let envelopes =
-            pimalaya_email::email::Envelopes::from_iter([pimalaya_email::email::Envelope {
-                date: DateTime::parse_from_rfc3339("2023-06-15T09:42:00+04:00").unwrap(),
-                ..Default::default()
-            }]);
+        let envelopes = email::email::Envelopes::from_iter([email::email::Envelope {
+            date: DateTime::parse_from_rfc3339("2023-06-15T09:42:00+04:00").unwrap(),
+            ..Default::default()
+        }]);
         let envelopes = Envelopes::from_backend(&config, &id_mapper, envelopes).unwrap();
 
         let expected_date = "2023-06-15 09:42+04:00";
@@ -90,11 +89,10 @@ mod tests {
             ..AccountConfig::default()
         };
 
-        let envelopes =
-            pimalaya_email::email::Envelopes::from_iter([pimalaya_email::email::Envelope {
-                date: DateTime::parse_from_rfc3339("2023-06-15T09:42:00+04:00").unwrap(),
-                ..Default::default()
-            }]);
+        let envelopes = email::email::Envelopes::from_iter([email::email::Envelope {
+            date: DateTime::parse_from_rfc3339("2023-06-15T09:42:00+04:00").unwrap(),
+            ..Default::default()
+        }]);
         let envelopes = Envelopes::from_backend(&config, &id_mapper, envelopes).unwrap();
 
         let expected_date = "15/06/2023 09h42";
@@ -114,11 +112,10 @@ mod tests {
             ..AccountConfig::default()
         };
 
-        let envelopes =
-            pimalaya_email::email::Envelopes::from_iter([pimalaya_email::email::Envelope {
-                date: DateTime::parse_from_rfc3339("2023-06-15T09:42:00+04:00").unwrap(),
-                ..Default::default()
-            }]);
+        let envelopes = email::email::Envelopes::from_iter([email::email::Envelope {
+            date: DateTime::parse_from_rfc3339("2023-06-15T09:42:00+04:00").unwrap(),
+            ..Default::default()
+        }]);
         let envelopes = Envelopes::from_backend(&config, &id_mapper, envelopes).unwrap();
 
         let expected_date = "15/06/2023 05h42";

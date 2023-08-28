@@ -6,14 +6,14 @@
 use anyhow::{anyhow, Context, Result};
 use dialoguer::Confirm;
 use dirs::{config_dir, home_dir};
-use log::{debug, trace};
-use pimalaya_email::{
+use email::{
     account::AccountConfig,
     email::{EmailHooks, EmailTextPlainFormat},
 };
-use pimalaya_process::Cmd;
+use log::{debug, trace};
+use process::Cmd;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, path::PathBuf, process};
+use std::{collections::HashMap, fs, path::PathBuf, process::exit};
 use toml;
 
 use crate::{
@@ -101,7 +101,7 @@ impl DeserializedConfig {
                 .interact_opt()?
                 .unwrap_or_default()
             {
-                process::exit(0);
+                exit(0);
             }
 
             wizard::configure().await?
@@ -160,19 +160,19 @@ impl DeserializedConfig {
 
 #[cfg(test)]
 mod tests {
-    use pimalaya_email::{
+    use email::{
         account::PasswdConfig,
         backend::{BackendConfig, MaildirConfig},
         sender::{SenderConfig, SendmailConfig},
     };
-    use pimalaya_secret::Secret;
+    use secret::Secret;
 
     #[cfg(feature = "notmuch-backend")]
-    use pimalaya_email::backend::NotmuchConfig;
+    use email::backend::NotmuchConfig;
     #[cfg(feature = "imap-backend")]
-    use pimalaya_email::backend::{ImapAuthConfig, ImapConfig};
+    use email::backend::{ImapAuthConfig, ImapConfig};
     #[cfg(feature = "smtp-sender")]
-    use pimalaya_email::sender::{SmtpAuthConfig, SmtpConfig};
+    use email::sender::{SmtpAuthConfig, SmtpConfig};
 
     use std::io::Write;
     use tempfile::NamedTempFile;
@@ -463,17 +463,28 @@ mod tests {
         )
         .await;
 
-        assert!(config
-            .unwrap_err()
-            .root_cause()
-            .to_string()
-            .contains("missing field `sendmail-cmd`"));
+        assert_eq!(
+            config.unwrap(),
+            DeserializedConfig {
+                accounts: HashMap::from_iter([(
+                    "account".into(),
+                    DeserializedAccountConfig {
+                        email: "test@localhost".into(),
+                        sender: SenderConfig::Sendmail(SendmailConfig {
+                            cmd: "/usr/sbin/sendmail".into()
+                        }),
+                        ..DeserializedAccountConfig::default()
+                    }
+                )]),
+                ..DeserializedConfig::default()
+            }
+        )
     }
 
     #[cfg(feature = "smtp-sender")]
     #[tokio::test]
     async fn account_smtp_sender_minimum_config() {
-        use pimalaya_email::sender::SenderConfig;
+        use email::sender::SenderConfig;
 
         let config = make_config(
             "[account]

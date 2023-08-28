@@ -2,7 +2,7 @@
 
 https://pimalaya.org/himalaya/
 
-CLI to manage your emails, based on the [pimalaya-email](https://sr.ht/~soywod/pimalaya/) library.
+CLI to manage emails, based on [email-lib](https://sr.ht/~soywod/pimalaya/).
 
 ![image](https://user-images.githubusercontent.com/10437171/138774902-7b9de5a3-93eb-44b0-8cfb-6d2e11e3b1aa.png)
 
@@ -99,16 +99,15 @@ If you want to **discuss** about the project, feel free to join the [Matrix](htt
 
 Special thanks to the [nlnet](https://nlnet.nl/project/Himalaya/index.html) foundation that helped Himalaya to receive financial support from the [NGI Assure](https://www.ngi.eu/ngi-projects/ngi-assure/) program of the European Commission in September, 2022.
 
-* [himalaya-lib](https://git.sr.ht/~soywod/himalaya-lib)
-* [IMAP RFC3501](https://tools.ietf.org/html/rfc3501)
-* [Iris](https://github.com/soywod/iris.vim), the himalaya predecessor
-* [isync](https://isync.sourceforge.io/), an email synchronizer for offline usage
-* [NeoMutt](https://neomutt.org/), an email terminal user interface
-* [Alpine](http://alpine.x10host.com/alpine/alpine-info/), an other email terminal user interface
-* [mutt-wizard](https://github.com/LukeSmithxyz/mutt-wizard), a tool over NeoMutt and isync
-* [rust-imap](https://github.com/jonhoo/rust-imap), a Rust IMAP library
-* [lettre](https://github.com/lettre/lettre), a Rust mailer library
-* [mailparse](https://github.com/staktrace/mailparse), a Rust MIME email parser.
+- [IMAP RFC3501](https://tools.ietf.org/html/rfc3501)
+- [Iris](https://github.com/soywod/iris.vim), the himalaya predecessor
+- [isync](https://isync.sourceforge.io/), an email synchronizer for offline usage
+- [NeoMutt](https://neomutt.org/), an email terminal user interface
+- [Alpine](http://alpine.x10host.com/alpine/alpine-info/), an other email terminal user interface
+- [mutt-wizard](https://github.com/LukeSmithxyz/mutt-wizard), a tool over NeoMutt and isync
+- [rust-imap](https://github.com/jonhoo/rust-imap), a Rust IMAP library
+- [lettre](https://github.com/lettre/lettre), a Rust mailer library
+- [mailparse](https://github.com/staktrace/mailparse), a Rust MIME email parser.
 
 ## Sponsoring
 

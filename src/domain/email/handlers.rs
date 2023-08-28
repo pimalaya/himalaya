@@ -1,12 +1,12 @@
 use anyhow::{anyhow, Context, Result};
 use atty::Stream;
-use log::{debug, trace};
-use pimalaya_email::{
+use email::{
     account::AccountConfig,
     backend::Backend,
     email::{template::FilterParts, Flag, Flags, Message, MessageBuilder},
     sender::Sender,
 };
+use log::{debug, trace};
 use std::{
     fs,
     io::{self, BufRead},
@@ -127,7 +127,7 @@ pub async fn forward<P: Printer>(
         .with_some_body(body)
         .build()
         .await?;
-    trace!("initial template: {}", *tpl);
+    trace!("initial template: {tpl}");
     editor::edit_tpl_with_editor(config, printer, backend, sender, tpl).await?;
     Ok(())
 }
@@ -276,7 +276,7 @@ pub async fn reply<P: Printer>(
         .with_reply_all(all)
         .build()
         .await?;
-    trace!("initial template: {}", *tpl);
+    trace!("initial template: {tpl}");
     editor::edit_tpl_with_editor(config, printer, backend, sender, tpl).await?;
     backend
         .add_flags(&folder, vec![id], &Flags::from_iter([Flag::Answered]))
@@ -414,7 +414,7 @@ pub async fn write<P: Printer>(
         .with_some_body(body)
         .build()
         .await?;
-    trace!("initial template: {}", *tpl);
+    trace!("initial template: {tpl}");
     editor::edit_tpl_with_editor(config, printer, backend, sender, tpl).await?;
     Ok(())
 }

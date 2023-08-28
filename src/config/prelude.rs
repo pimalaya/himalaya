@@ -1,25 +1,25 @@
-#[cfg(feature = "cmds-pgp")]
-use pimalaya_email::account::CmdsPgpConfig;
-#[cfg(feature = "gpg")]
-use pimalaya_email::account::GpgConfig;
-#[cfg(feature = "native-pgp")]
-use pimalaya_email::account::{NativePgpConfig, NativePgpSecretKey, SignedSecretKey};
+#[cfg(feature = "pgp-commands")]
+use email::account::CmdsPgpConfig;
+#[cfg(feature = "pgp-gpg")]
+use email::account::GpgConfig;
+#[cfg(feature = "pgp-native")]
+use email::account::{NativePgpConfig, NativePgpSecretKey, SignedSecretKey};
 #[cfg(feature = "notmuch-backend")]
-use pimalaya_email::backend::NotmuchConfig;
+use email::backend::NotmuchConfig;
 #[cfg(feature = "imap-backend")]
-use pimalaya_email::backend::{ImapAuthConfig, ImapConfig};
+use email::backend::{ImapAuthConfig, ImapConfig};
 #[cfg(feature = "smtp-sender")]
-use pimalaya_email::sender::{SmtpAuthConfig, SmtpConfig};
-use pimalaya_email::{
+use email::sender::{SmtpAuthConfig, SmtpConfig};
+use email::{
     account::{OAuth2Config, OAuth2Method, OAuth2Scopes, PasswdConfig, PgpConfig},
     backend::{BackendConfig, MaildirConfig},
     email::{EmailHooks, EmailTextPlainFormat},
     folder::sync::FolderSyncStrategy,
     sender::{SenderConfig, SendmailConfig},
 };
-use pimalaya_keyring::Entry;
-use pimalaya_process::{Cmd, Pipeline, SingleCmd};
-use pimalaya_secret::Secret;
+use keyring::Entry;
+use process::{Cmd, Pipeline, SingleCmd};
+use secret::Secret;
 use serde::{ser::SerializeSeq, Deserialize, Serialize, Serializer};
 use std::{collections::HashSet, ops::Deref, path::PathBuf};
 
@@ -407,23 +407,23 @@ pub enum FolderSyncStrategyDef {
 pub enum PgpConfigDef {
     #[default]
     None,
-    #[cfg(feature = "cmds-pgp")]
+    #[cfg(feature = "pgp-commands")]
     #[serde(with = "CmdsPgpConfigDef", alias = "commands")]
     Cmds(CmdsPgpConfig),
-    #[cfg(feature = "gpg")]
+    #[cfg(feature = "pgp-gpg")]
     #[serde(with = "GpgConfigDef")]
     Gpg(GpgConfig),
-    #[cfg(feature = "native-pgp")]
+    #[cfg(feature = "pgp-native")]
     #[serde(with = "NativePgpConfigDef")]
     Native(NativePgpConfig),
 }
 
-#[cfg(feature = "gpg")]
+#[cfg(feature = "pgp-gpg")]
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "GpgConfig", rename_all = "kebab-case")]
 pub struct GpgConfigDef;
 
-#[cfg(feature = "cmds-pgp")]
+#[cfg(feature = "pgp-commands")]
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "CmdsPgpConfig", rename_all = "kebab-case")]
 pub struct CmdsPgpConfigDef {
@@ -441,7 +441,7 @@ pub struct CmdsPgpConfigDef {
     verify_cmd: Option<Cmd>,
 }
 
-#[cfg(feature = "native-pgp")]
+#[cfg(feature = "pgp-native")]
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "NativePgpConfig", rename_all = "kebab-case")]
 pub struct NativePgpConfigDef {
@@ -455,7 +455,7 @@ pub struct NativePgpConfigDef {
     key_servers: Vec<String>,
 }
 
-#[cfg(feature = "native-pgp")]
+#[cfg(feature = "pgp-native")]
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "NativePgpSecretKey", rename_all = "kebab-case")]
 pub enum NativePgpSecretKeyDef {

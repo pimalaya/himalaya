@@ -7,20 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2023-08-28
+
 ### Added
 
 - Added 3 new cargo features:
-  - `cmds-pgp`: enables the commands PGP backend (enabled by default, same behaviour as before)
-  - `gpg`: enables the GPG backend (requires the `gpgme` lib on the system)
-  - `native-pgp`: enables the native PGP backend
+  - `pgp-commands`: enables the commands PGP backend (enabled by default, same behaviour as before)
+  - `pgp-gpg`: enables the GPG backend (requires the `gpgme` lib on the system)
+  - `pgp-native`: enables the native PGP backend
 - Added account configuration `pgp` to configure the way PGP operations are performed.
 
-### Removed
+### Changed
 
-- Removed account configuration `email-writing-encrypt-cmd`.
-- Removed account configuration `email-reading-decrypt-cmd`.
-- Removed account configuration `email-writing-sign-cmd`.
-- Removed account configuration `email-reading-verify-cmd`.
+- Moved `email-writing-encrypt-cmd`to `pgp.encrypt-cmd`.
+- Moved `email-reading-decrypt-cmd` to `pgp-decrypt-cmd`.
+- Moved `email-writing-sign-cmd` to `pgp.sign-cmd`.
+- Moved `email-reading-verify-cmd` to `pgp.verify-cmd`.
 
 ## [0.8.4] - 2023-07-18
 
@@ -603,7 +605,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password from command [#22]
 - Set up README [#20]
 
-[Unreleased]: https://github.com/soywod/himalaya/compare/v0.8.4...HEAD
+[Unreleased]: https://github.com/soywod/himalaya/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/soywod/himalaya/compare/v0.8.4...v0.9.0
 [0.8.4]: https://github.com/soywod/himalaya/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/soywod/himalaya/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/soywod/himalaya/compare/v0.8.1...v0.8.2

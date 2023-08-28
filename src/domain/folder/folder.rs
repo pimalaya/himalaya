@@ -8,8 +8,8 @@ pub struct Folder {
     pub desc: String,
 }
 
-impl From<&pimalaya_email::folder::Folder> for Folder {
-    fn from(folder: &pimalaya_email::folder::Folder) -> Self {
+impl From<&email::folder::Folder> for Folder {
+    fn from(folder: &email::folder::Folder) -> Self {
         Folder {
             name: folder.name.clone(),
             desc: folder.desc.clone(),

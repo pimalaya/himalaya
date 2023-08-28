@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use dialoguer::Confirm;
-use pimalaya_email::{account::AccountConfig, backend::Backend};
+use email::{account::AccountConfig, backend::Backend};
 use std::process;
 
 use crate::{
@@ -68,7 +68,7 @@ pub async fn delete<P: Printer>(
 #[cfg(test)]
 mod tests {
     use async_trait::async_trait;
-    use pimalaya_email::{
+    use email::{
         account::AccountConfig,
         backend::Backend,
         email::{Envelope, Envelopes, Flags, Messages},
@@ -152,10 +152,10 @@ mod tests {
             fn name(&self) -> String {
                 unimplemented!();
             }
-            async fn add_folder(&mut self, _: &str) -> pimalaya_email::Result<()> {
+            async fn add_folder(&mut self, _: &str) -> email::Result<()> {
                 unimplemented!();
             }
-            async fn list_folders(&mut self) -> pimalaya_email::Result<Folders> {
+            async fn list_folders(&mut self) -> email::Result<Folders> {
                 Ok(Folders::from_iter([
                     Folder {
                         name: "INBOX".into(),
@@ -167,16 +167,16 @@ mod tests {
                     },
                 ]))
             }
-            async fn expunge_folder(&mut self, _: &str) -> pimalaya_email::Result<()> {
+            async fn expunge_folder(&mut self, _: &str) -> email::Result<()> {
                 unimplemented!();
             }
-            async fn purge_folder(&mut self, _: &str) -> pimalaya_email::Result<()> {
+            async fn purge_folder(&mut self, _: &str) -> email::Result<()> {
                 unimplemented!();
             }
-            async fn delete_folder(&mut self, _: &str) -> pimalaya_email::Result<()> {
+            async fn delete_folder(&mut self, _: &str) -> email::Result<()> {
                 unimplemented!();
             }
-            async fn get_envelope(&mut self, _: &str, _: &str) -> pimalaya_email::Result<Envelope> {
+            async fn get_envelope(&mut self, _: &str, _: &str) -> email::Result<Envelope> {
                 unimplemented!();
             }
             async fn list_envelopes(
@@ -184,7 +184,7 @@ mod tests {
                 _: &str,
                 _: usize,
                 _: usize,
-            ) -> pimalaya_email::Result<Envelopes> {
+            ) -> email::Result<Envelopes> {
                 unimplemented!()
             }
             async fn search_envelopes(
@@ -194,64 +194,31 @@ mod tests {
                 _: &str,
                 _: usize,
                 _: usize,
-            ) -> pimalaya_email::Result<Envelopes> {
+            ) -> email::Result<Envelopes> {
                 unimplemented!()
             }
-            async fn add_email(
-                &mut self,
-                _: &str,
-                _: &[u8],
-                _: &Flags,
-            ) -> pimalaya_email::Result<String> {
+            async fn add_email(&mut self, _: &str, _: &[u8], _: &Flags) -> email::Result<String> {
                 unimplemented!()
             }
-            async fn get_emails(
-                &mut self,
-                _: &str,
-                _: Vec<&str>,
-            ) -> pimalaya_email::Result<Messages> {
+            async fn get_emails(&mut self, _: &str, _: Vec<&str>) -> email::Result<Messages> {
                 unimplemented!()
             }
-            async fn preview_emails(
-                &mut self,
-                _: &str,
-                _: Vec<&str>,
-            ) -> pimalaya_email::Result<Messages> {
+            async fn preview_emails(&mut self, _: &str, _: Vec<&str>) -> email::Result<Messages> {
                 unimplemented!()
             }
-            async fn copy_emails(
-                &mut self,
-                _: &str,
-                _: &str,
-                _: Vec<&str>,
-            ) -> pimalaya_email::Result<()> {
+            async fn copy_emails(&mut self, _: &str, _: &str, _: Vec<&str>) -> email::Result<()> {
                 unimplemented!()
             }
-            async fn move_emails(
-                &mut self,
-                _: &str,
-                _: &str,
-                _: Vec<&str>,
-            ) -> pimalaya_email::Result<()> {
+            async fn move_emails(&mut self, _: &str, _: &str, _: Vec<&str>) -> email::Result<()> {
                 unimplemented!()
             }
-            async fn delete_emails(&mut self, _: &str, _: Vec<&str>) -> pimalaya_email::Result<()> {
+            async fn delete_emails(&mut self, _: &str, _: Vec<&str>) -> email::Result<()> {
                 unimplemented!()
             }
-            async fn add_flags(
-                &mut self,
-                _: &str,
-                _: Vec<&str>,
-                _: &Flags,
-            ) -> pimalaya_email::Result<()> {
+            async fn add_flags(&mut self, _: &str, _: Vec<&str>, _: &Flags) -> email::Result<()> {
                 unimplemented!()
             }
-            async fn set_flags(
-                &mut self,
-                _: &str,
-                _: Vec<&str>,
-                _: &Flags,
-            ) -> pimalaya_email::Result<()> {
+            async fn set_flags(&mut self, _: &str, _: Vec<&str>, _: &Flags) -> email::Result<()> {
                 unimplemented!()
             }
             async fn remove_flags(
@@ -259,7 +226,7 @@ mod tests {
                 _: &str,
                 _: Vec<&str>,
                 _: &Flags,
-            ) -> pimalaya_email::Result<()> {
+            ) -> email::Result<()> {
                 unimplemented!()
             }
             fn as_any(&self) -> &dyn Any {

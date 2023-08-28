@@ -1,42 +1,45 @@
 use anyhow::{Context, Result};
-use log::debug;
-use pimalaya_email::{
+use email::{
     account::AccountConfig,
     backend::Backend,
-    email::{local_draft_path, remove_local_draft, Flag, Flags, Tpl},
+    email::{local_draft_path, remove_local_draft, Flag, Flags},
     sender::Sender,
 };
-use std::{env, fs, process::Command};
+use log::debug;
+use mml::MmlCompiler;
+use process::Cmd;
+use std::{env, fs};
 
 use crate::{
     printer::Printer,
     ui::choice::{self, PostEditChoice, PreEditChoice},
 };
 
-pub fn open_with_tpl(tpl: Tpl) -> Result<Tpl> {
+pub async fn open_with_tpl(tpl: String) -> Result<String> {
     let path = local_draft_path();
 
     debug!("create draft");
     fs::write(&path, tpl.as_bytes()).context(format!("cannot write local draft at {:?}", path))?;
 
     debug!("open editor");
-    Command::new(env::var("EDITOR").context(r#"cannot find "$EDITOR" env var"#)?)
-        .arg(&path)
-        .status()
+    let editor = env::var("EDITOR").context("cannot get editor from env var")?;
+    Cmd::from(format!("{editor} {}", &path.to_string_lossy()))
+        .run()
+        .await
         .context("cannot launch editor")?;
 
     debug!("read draft");
     let content =
         fs::read_to_string(&path).context(format!("cannot read local draft at {:?}", path))?;
 
-    Ok(Tpl::from(content))
+    Ok(content)
 }
 
-pub fn open_with_local_draft() -> Result<Tpl> {
+pub async fn open_with_local_draft() -> Result<String> {
     let path = local_draft_path();
     let content =
         fs::read_to_string(&path).context(format!("cannot read local draft at {:?}", path))?;
-    open_with_tpl(Tpl::from(content))
+    open_with_tpl(content).await
 }
 
 pub async fn edit_tpl_with_editor<P: Printer>(
@@ -44,7 +47,7 @@ pub async fn edit_tpl_with_editor<P: Printer>(
     printer: &mut P,
     backend: &mut dyn Backend,
     sender: &mut dyn Sender,
-    mut tpl: Tpl,
+    mut tpl: String,
 ) -> Result<()> {
     let draft = local_draft_path();
     if draft.exists() {
@@ -52,11 +55,11 @@ pub async fn edit_tpl_with_editor<P: Printer>(
             match choice::pre_edit() {
                 Ok(choice) => match choice {
                     PreEditChoice::Edit => {
-                        tpl = open_with_local_draft()?;
+                        tpl = open_with_local_draft().await?;
                         break;
                     }
                     PreEditChoice::Discard => {
-                        tpl = open_with_tpl(tpl)?;
+                        tpl = open_with_tpl(tpl).await?;
                         break;
                     }
                     PreEditChoice::Quit => return Ok(()),
@@ -68,16 +71,16 @@ pub async fn edit_tpl_with_editor<P: Printer>(
             }
         }
     } else {
-        tpl = open_with_tpl(tpl)?;
+        tpl = open_with_tpl(tpl).await?;
     }
 
     loop {
         match choice::post_edit() {
             Ok(PostEditChoice::Send) => {
                 printer.print_log("Sending email…")?;
-                let email = tpl
+                let email = MmlCompiler::new()
                     .with_pgp(config.pgp.clone())
-                    .compile()
+                    .compile(tpl)
                     .await?
                     .write_to_vec()?;
                 sender.send(&email).await?;
@@ -93,7 +96,7 @@ pub async fn edit_tpl_with_editor<P: Printer>(
                 break;
             }
             Ok(PostEditChoice::Edit) => {
-                tpl = open_with_tpl(tpl)?;
+                tpl = open_with_tpl(tpl).await?;
                 continue;
             }
             Ok(PostEditChoice::LocalDraft) => {
@@ -101,9 +104,9 @@ pub async fn edit_tpl_with_editor<P: Printer>(
                 break;
             }
             Ok(PostEditChoice::RemoteDraft) => {
-                let email = tpl
+                let email = MmlCompiler::new()
                     .with_pgp(config.pgp.clone())
-                    .compile()
+                    .compile(tpl)
                     .await?
                     .write_to_vec()?;
                 backend

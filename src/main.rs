@@ -1,13 +1,13 @@
-use anyhow::{anyhow, Context, Result};
-use clap::Command;
-use log::{debug, warn};
 #[cfg(feature = "imap-backend")]
-use pimalaya_email::backend::ImapBackend;
-use pimalaya_email::{
+use ::email::backend::ImapBackend;
+use ::email::{
     account::{sync::AccountSyncBuilder, DEFAULT_INBOX_FOLDER},
     backend::{BackendBuilder, BackendConfig},
     sender::SenderBuilder,
 };
+use anyhow::{anyhow, Context, Result};
+use clap::Command;
+use log::{debug, warn};
 use std::env;
 use url::Url;
 

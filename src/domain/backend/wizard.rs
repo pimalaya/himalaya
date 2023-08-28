@@ -1,6 +1,6 @@
 use anyhow::Result;
 use dialoguer::Select;
-use pimalaya_email::backend::BackendConfig;
+use email::backend::BackendConfig;
 
 use crate::config::wizard::THEME;
 

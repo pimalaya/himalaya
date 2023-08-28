@@ -998,6 +998,54 @@ dependencies = [
 ]
 
 [[package]]
+name = "email-lib"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b24c6a2ef2ffbfe518b531ee5cc252ed6014e3cbfe1734e7cece299dbd12eb1b"
+dependencies = [
+ "advisory-lock",
+ "ammonia",
+ "async-trait",
+ "chrono",
+ "convert_case",
+ "dirs",
+ "futures",
+ "html-escape",
+ "imap",
+ "imap-proto",
+ "keyring-lib",
+ "log",
+ "mail-builder",
+ "mail-parser",
+ "mail-send",
+ "maildirpp",
+ "md5",
+ "mml-lib",
+ "notmuch",
+ "oauth-lib",
+ "once_cell",
+ "ouroboros",
+ "pgp-lib",
+ "process-lib",
+ "rayon",
+ "regex",
+ "rfc2047-decoder",
+ "rusqlite",
+ "rustls 0.21.1",
+ "rustls-native-certs",
+ "secret-lib",
+ "shellexpand",
+ "thiserror",
+ "tokio",
+ "tokio-rustls 0.24.0",
+ "tree_magic",
+ "urlencoding",
+ "utf7-imap",
+ "uuid",
+ "webpki-roots 0.22.6",
+]
+
+[[package]]
 name = "email_address"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1430,7 +1478,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "himalaya"
-version = "0.9.0-beta"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1443,19 +1491,20 @@ dependencies = [
  "coredump",
  "dialoguer",
  "dirs",
+ "email-lib",
  "email_address",
  "env_logger",
  "erased-serde",
  "indicatif",
+ "keyring-lib",
  "log",
  "md5",
+ "mml-lib",
+ "oauth-lib",
  "once_cell",
- "pimalaya-email",
- "pimalaya-keyring",
- "pimalaya-oauth2",
- "pimalaya-process",
- "pimalaya-secret",
+ "process-lib",
  "rusqlite",
+ "secret-lib",
  "serde",
  "serde_json",
  "shellexpand",
@@ -1828,6 +1877,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "keyring-lib"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8dcc9433b6eaf33f2f6a8d3a53b598a5d0b8be224c41bd98d1ec936ef4d02d69"
+dependencies = [
+ "keyring",
+ "log",
+ "thiserror",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2118,6 +2178,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "mml-lib"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f87247d31f8b76ac7e5d2e23395a83f54978a8716318db6e66a026f50f9288e3"
+dependencies = [
+ "async-recursion",
+ "chumsky 0.9.0",
+ "gpgme",
+ "keyring-lib",
+ "log",
+ "mail-builder",
+ "mail-parser",
+ "nanohtml2text",
+ "pgp-lib",
+ "process-lib",
+ "secret-lib",
+ "shellexpand",
+ "thiserror",
+ "tree_magic",
+]
+
+[[package]]
 name = "nanohtml2text"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2233,6 +2315,20 @@ name = "number_prefix"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "830b246a0e5f20af87141b25c173cd1b609bd7779a4617d6ec582abaf90870f3"
+
+[[package]]
+name = "oauth-lib"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1484d9864dbf6b55b3785380631a253fa0ff7f8e1bbb078bfd7effd11283d61"
+dependencies = [
+ "log",
+ "oauth2",
+ "reqwest",
+ "thiserror",
+ "tokio",
+ "url",
+]
 
 [[package]]
 name = "oauth2"
@@ -2466,6 +2562,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "pgp-lib"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d61233a437ba3de6396593cb27fda4e48ba7c7415756caffe9f9d5d0d07378c"
+dependencies = [
+ "async-recursion",
+ "futures",
+ "hyper",
+ "hyper-rustls 0.24.1",
+ "log",
+ "pgp",
+ "rand",
+ "sha1",
+ "smallvec",
+ "thiserror",
+ "tokio",
+ "url",
+ "z-base-32",
+]
+
+[[package]]
 name = "phf"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2501,138 +2618,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6796ad771acdc0123d2a88dc428b5e38ef24456743ddb1744ed628f9815c096"
 dependencies = [
  "siphasher",
-]
-
-[[package]]
-name = "pimalaya-email"
-version = "0.14.1-beta"
-source = "git+https://git.sr.ht/~soywod/pimalaya#b75297ae474a231eb13c9bd7c04b5dc877026948"
-dependencies = [
- "advisory-lock",
- "ammonia",
- "async-trait",
- "chrono",
- "convert_case",
- "dirs",
- "futures",
- "html-escape",
- "imap",
- "imap-proto",
- "log",
- "mail-builder",
- "mail-parser",
- "mail-send",
- "maildirpp",
- "md5",
- "notmuch",
- "once_cell",
- "ouroboros",
- "pimalaya-email-tpl",
- "pimalaya-keyring",
- "pimalaya-oauth2",
- "pimalaya-pgp",
- "pimalaya-process",
- "pimalaya-secret",
- "rayon",
- "regex",
- "rfc2047-decoder",
- "rusqlite",
- "rustls 0.21.1",
- "rustls-native-certs",
- "shellexpand",
- "thiserror",
- "tokio",
- "tokio-rustls 0.24.0",
- "tree_magic",
- "urlencoding",
- "utf7-imap",
- "uuid",
- "webpki-roots 0.22.6",
-]
-
-[[package]]
-name = "pimalaya-email-tpl"
-version = "0.3.2-beta"
-source = "git+https://git.sr.ht/~soywod/pimalaya#b75297ae474a231eb13c9bd7c04b5dc877026948"
-dependencies = [
- "async-recursion",
- "chumsky 0.9.0",
- "gpgme",
- "log",
- "mail-builder",
- "mail-parser",
- "nanohtml2text",
- "pimalaya-keyring",
- "pimalaya-pgp",
- "pimalaya-process",
- "pimalaya-secret",
- "shellexpand",
- "thiserror",
- "tree_magic",
-]
-
-[[package]]
-name = "pimalaya-keyring"
-version = "0.0.6-beta"
-source = "git+https://git.sr.ht/~soywod/pimalaya#b75297ae474a231eb13c9bd7c04b5dc877026948"
-dependencies = [
- "keyring",
- "log",
- "thiserror",
-]
-
-[[package]]
-name = "pimalaya-oauth2"
-version = "0.0.5-beta"
-source = "git+https://git.sr.ht/~soywod/pimalaya#b75297ae474a231eb13c9bd7c04b5dc877026948"
-dependencies = [
- "log",
- "oauth2",
- "reqwest",
- "thiserror",
- "tokio",
- "url",
-]
-
-[[package]]
-name = "pimalaya-pgp"
-version = "0.0.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya#b75297ae474a231eb13c9bd7c04b5dc877026948"
-dependencies = [
- "async-recursion",
- "futures",
- "hyper",
- "hyper-rustls 0.24.1",
- "log",
- "pgp",
- "rand",
- "sha1",
- "smallvec",
- "thiserror",
- "tokio",
- "url",
- "z-base-32",
-]
-
-[[package]]
-name = "pimalaya-process"
-version = "0.0.6-beta"
-source = "git+https://git.sr.ht/~soywod/pimalaya#b75297ae474a231eb13c9bd7c04b5dc877026948"
-dependencies = [
- "log",
- "thiserror",
- "tokio",
-]
-
-[[package]]
-name = "pimalaya-secret"
-version = "0.0.6-beta"
-source = "git+https://git.sr.ht/~soywod/pimalaya#b75297ae474a231eb13c9bd7c04b5dc877026948"
-dependencies = [
- "log",
- "pimalaya-keyring",
- "pimalaya-process",
- "thiserror",
 ]
 
 [[package]]
@@ -2744,6 +2729,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b63bdb0cd06f1f4dedf69b254734f9b45af66e4a031e42a7480257d9898b435"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "process-lib"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe824234b824573ff3a80ddf3a6b19e6ffba966798d071f280723ee02a7273ce"
+dependencies = [
+ "log",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -3182,6 +3178,18 @@ dependencies = [
  "pkcs8",
  "subtle",
  "zeroize",
+]
+
+[[package]]
+name = "secret-lib"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d46e99ae858a1978ec3e6e887966514900229fc0df99935a2c61102854f9195e"
+dependencies = [
+ "keyring-lib",
+ "log",
+ "process-lib",
+ "thiserror",
 ]
 
 [[package]]
