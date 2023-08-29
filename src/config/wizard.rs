@@ -3,7 +3,8 @@ use crate::account;
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Confirm, Input, Password, Select};
 use once_cell::sync::Lazy;
-use std::{env, fs, io, path::PathBuf, process};
+use shellexpand_utils::{shellexpand_path, try_shellexpand_path};
+use std::{env, fs, io, process};
 
 #[macro_export]
 macro_rules! wizard_warn {
@@ -92,9 +93,9 @@ pub(crate) async fn configure() -> Result<DeserializedConfig> {
                 .to_string_lossy()
                 .to_string(),
         )
-        .validate_with(|path: &String| shellexpand::full(path).map(|_| ()))
+        .validate_with(|path: &String| try_shellexpand_path(path).map(|_| ()))
         .interact()?;
-    let path: PathBuf = shellexpand::full(&path).unwrap().to_string().into();
+    let path = shellexpand_path(&path);
 
     println!("Writing the configuration to {path:?}…");
 

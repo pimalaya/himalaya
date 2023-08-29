@@ -232,6 +232,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6798148dccfbff0fae41c7574d2fa8f1ef3492fba0face179de5d8d447d67b05"
 dependencies = [
  "memchr 2.5.0",
+ "regex-automata",
  "serde",
 ]
 
@@ -999,9 +1000,9 @@ dependencies = [
 
 [[package]]
 name = "email-lib"
-version = "0.15.0"
+version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b24c6a2ef2ffbfe518b531ee5cc252ed6014e3cbfe1734e7cece299dbd12eb1b"
+checksum = "466e49f407767ae105ac1821997b272bf63f8d06e67892582ff71a991dfc8852"
 dependencies = [
  "advisory-lock",
  "ammonia",
@@ -1034,7 +1035,7 @@ dependencies = [
  "rustls 0.21.1",
  "rustls-native-certs",
  "secret-lib",
- "shellexpand",
+ "shellexpand-utils",
  "thiserror",
  "tokio",
  "tokio-rustls 0.24.0",
@@ -1507,7 +1508,7 @@ dependencies = [
  "secret-lib",
  "serde",
  "serde_json",
- "shellexpand",
+ "shellexpand-utils",
  "tempfile",
  "termcolor",
  "terminal_size",
@@ -2179,9 +2180,9 @@ dependencies = [
 
 [[package]]
 name = "mml-lib"
-version = "0.2.1"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f87247d31f8b76ac7e5d2e23395a83f54978a8716318db6e66a026f50f9288e3"
+checksum = "d9ebec291020a02ef208ca54491b44a929c93c93dcd47be594fc3843ece0104b"
 dependencies = [
  "async-recursion",
  "chumsky 0.9.0",
@@ -2194,7 +2195,7 @@ dependencies = [
  "pgp-lib",
  "process-lib",
  "secret-lib",
- "shellexpand",
+ "shellexpand-utils",
  "thiserror",
  "tree_magic",
 ]
@@ -2367,6 +2368,9 @@ name = "os_str_bytes"
 version = "6.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b7820b9daea5457c9f21c69448905d723fbd21136ccf521748f23fd49e723ee"
+dependencies = [
+ "memchr 2.5.0",
+]
 
 [[package]]
 name = "ouroboros"
@@ -2880,6 +2884,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "regex-automata"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "49530408a136e16e5b486e883fbb6ba058e8e4e8ae6621a77b048b314336e629"
+
+[[package]]
 name = "regex-syntax"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3316,11 +3326,24 @@ dependencies = [
 
 [[package]]
 name = "shellexpand"
-version = "2.1.2"
+version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ccc8076840c4da029af4f87e4e8daeb0fca6b87bbb02e10cb60b791450e11e4"
+checksum = "da03fa3b94cc19e3ebfc88c4229c49d8f08cdbd1228870a45f0ffdf84988e14b"
 dependencies = [
+ "bstr",
  "dirs",
+ "os_str_bytes",
+]
+
+[[package]]
+name = "shellexpand-utils"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b44114d15a72740d3049e739929d0f4af335ba2eb855ea0f1fa2bfb4d7066215"
+dependencies = [
+ "log",
+ "shellexpand",
+ "thiserror",
 ]
 
 [[package]]
