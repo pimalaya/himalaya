@@ -186,7 +186,8 @@ pub async fn mailto<P: Printer>(
     let tpl = config
         .generate_tpl_interpreter()
         .with_show_only_headers(config.email_writing_headers())
-        .interpret_msg_builder(builder)
+        .build()
+        .from_msg_builder(builder)
         .await?;
 
     editor::edit_tpl_with_editor(config, printer, backend, sender, tpl).await

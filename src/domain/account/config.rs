@@ -3,17 +3,20 @@
 //! This module contains the raw deserialized representation of an
 //! account in the accounts section of the user configuration file.
 
+#[cfg(feature = "pgp")]
+use email::account::PgpConfig;
 #[cfg(feature = "imap-backend")]
 use email::backend::ImapAuthConfig;
 #[cfg(feature = "smtp-sender")]
 use email::sender::SmtpAuthConfig;
 use email::{
-    account::{AccountConfig, PgpConfig},
+    account::AccountConfig,
     backend::BackendConfig,
     email::{EmailHooks, EmailTextPlainFormat},
     folder::sync::FolderSyncStrategy,
     sender::SenderConfig,
 };
+
 use process::Cmd;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
@@ -91,6 +94,7 @@ pub struct DeserializedAccountConfig {
     #[serde(flatten, with = "SenderConfigDef")]
     pub sender: SenderConfig,
 
+    #[cfg(feature = "pgp")]
     #[serde(default, with = "PgpConfigDef")]
     pub pgp: PgpConfig,
 }
@@ -221,6 +225,7 @@ impl DeserializedAccountConfig {
 
                 sender
             },
+            #[cfg(feature = "pgp")]
             pgp: self.pgp.clone(),
         }
     }

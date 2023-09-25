@@ -6,7 +6,7 @@ use email::{
     email::{Flag, Flags, Message},
     sender::Sender,
 };
-use mml::MmlCompiler;
+use mml::MmlCompilerBuilder;
 use std::io::{stdin, BufRead};
 
 use crate::{printer::Printer, IdMapper};
@@ -70,14 +70,14 @@ pub async fn reply<P: Printer>(
 }
 
 pub async fn save<P: Printer>(
-    config: &AccountConfig,
+    #[allow(unused_variables)] config: &AccountConfig,
     printer: &mut P,
     id_mapper: &IdMapper,
     backend: &mut dyn Backend,
     folder: &str,
     tpl: String,
 ) -> Result<()> {
-    let mml = if atty::is(Stream::Stdin) || printer.is_json() {
+    let tpl = if atty::is(Stream::Stdin) || printer.is_json() {
         tpl.replace("\r", "")
     } else {
         stdin()
@@ -88,11 +88,12 @@ pub async fn save<P: Printer>(
             .join("\n")
     };
 
-    let email = MmlCompiler::new()
-        .with_pgp(config.pgp.clone())
-        .compile(mml)
-        .await?
-        .write_to_vec()?;
+    let compiler = MmlCompilerBuilder::new();
+
+    #[cfg(feature = "pgp")]
+    let compiler = compiler.with_pgp(config.pgp.clone());
+
+    let email = compiler.build(tpl.as_str())?.compile().await?.into_vec()?;
 
     let id = backend.add_email(folder, &email, &Flags::default()).await?;
     id_mapper.create_alias(id)?;
@@ -109,7 +110,7 @@ pub async fn send<P: Printer>(
 ) -> Result<()> {
     let folder = config.sent_folder_alias()?;
 
-    let mml = if atty::is(Stream::Stdin) || printer.is_json() {
+    let tpl = if atty::is(Stream::Stdin) || printer.is_json() {
         tpl.replace("\r", "")
     } else {
         stdin()
@@ -120,11 +121,12 @@ pub async fn send<P: Printer>(
             .join("\n")
     };
 
-    let email = MmlCompiler::new()
-        .with_pgp(config.pgp.clone())
-        .compile(mml)
-        .await?
-        .write_to_vec()?;
+    let compiler = MmlCompilerBuilder::new();
+
+    #[cfg(feature = "pgp")]
+    let compiler = compiler.with_pgp(config.pgp.clone());
+
+    let email = compiler.build(tpl.as_str())?.compile().await?.into_vec()?;
 
     sender.send(&email).await?;
 

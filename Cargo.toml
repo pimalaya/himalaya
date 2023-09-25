@@ -7,31 +7,37 @@ edition = "2021"
 license = "MIT"
 categories = ["command-line-interface", "command-line-utilities", "email"]
 keywords = ["cli", "mail", "email", "client", "imap"]
-homepage = "https://pimalaya.org/"
+homepage = "https://pimalaya.org/himalaya"
 documentation = "https://pimalaya.org/himalaya/"
 repository = "https://github.com/soywod/himalaya/"
 metadata.docs.rs.all-features = true
 
 [features]
-default = ["imap-backend", "smtp-sender", "pgp-commands"]
-
-# backends
+default = [
+  "imap-backend",
+  # "notmuch-backend",
+  "smtp-sender",
+  # "pgp-commands",
+  # "pgp-gpg",
+  # "pgp-native",
+]
 imap-backend = ["email-lib/imap-backend"]
 notmuch-backend = ["email-lib/notmuch-backend"]
-
-# senders
 smtp-sender = ["email-lib/smtp-sender"]
+pgp = []
+pgp-commands = ["pgp", "email-lib/pgp-commands"]
+pgp-gpg = ["pgp", "email-lib/pgp-gpg"]
+pgp-native = ["pgp", "email-lib/pgp-native"]
 
-# pgp
-pgp-commands = ["email-lib/pgp-commands"]
-pgp-gpg = ["email-lib/pgp-gpg"]
-pgp-native = ["email-lib/pgp-native"]
+# dev dependencies
 
 [dev-dependencies.async-trait]
 version = "0.1"
 
 [dev-dependencies.tempfile]
 version = "3.3"
+
+# dependencies
 
 [dependencies.anyhow]
 version = "1.0"
@@ -82,7 +88,7 @@ version = "0.7.0"
 version = "1.16.0"
 
 [dependencies.email-lib]
-version = "=0.15.2"
+version = "=0.15.3"
 default-features = false
 
 [dependencies.keyring-lib]
@@ -95,7 +101,8 @@ version = "=0.1.0"
 version = "=0.1.0"
 
 [dependencies.mml-lib]
-version = "=0.2.3"
+version = "=0.5.0"
+default-features = false
 
 [dependencies.secret-lib]
 version = "=0.1.0"

@@ -2,6 +2,8 @@
 use email::account::CmdsPgpConfig;
 #[cfg(feature = "pgp-gpg")]
 use email::account::GpgConfig;
+#[cfg(feature = "pgp")]
+use email::account::PgpConfig;
 #[cfg(feature = "pgp-native")]
 use email::account::{NativePgpConfig, NativePgpSecretKey, SignedSecretKey};
 #[cfg(feature = "notmuch-backend")]
@@ -11,7 +13,7 @@ use email::backend::{ImapAuthConfig, ImapConfig};
 #[cfg(feature = "smtp-sender")]
 use email::sender::{SmtpAuthConfig, SmtpConfig};
 use email::{
-    account::{OAuth2Config, OAuth2Method, OAuth2Scopes, PasswdConfig, PgpConfig},
+    account::{OAuth2Config, OAuth2Method, OAuth2Scopes, PasswdConfig},
     backend::{BackendConfig, MaildirConfig},
     email::{EmailHooks, EmailTextPlainFormat},
     folder::sync::FolderSyncStrategy,
@@ -402,6 +404,7 @@ pub enum FolderSyncStrategyDef {
     Exclude(HashSet<String>),
 }
 
+#[cfg(feature = "pgp")]
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "PgpConfig", tag = "backend", rename_all = "kebab-case")]
 pub enum PgpConfigDef {

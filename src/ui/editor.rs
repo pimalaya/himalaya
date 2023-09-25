@@ -6,7 +6,7 @@ use email::{
     sender::Sender,
 };
 use log::debug;
-use mml::MmlCompiler;
+use mml::MmlCompilerBuilder;
 use process::Cmd;
 use std::{env, fs};
 
@@ -78,12 +78,16 @@ pub async fn edit_tpl_with_editor<P: Printer>(
         match choice::post_edit() {
             Ok(PostEditChoice::Send) => {
                 printer.print_log("Sending email…")?;
-                let email = MmlCompiler::new()
-                    .with_pgp(config.pgp.clone())
-                    .compile(tpl)
-                    .await?
-                    .write_to_vec()?;
+
+                let compiler = MmlCompilerBuilder::new();
+
+                #[cfg(feature = "pgp")]
+                let compiler = compiler.with_pgp(config.pgp.clone());
+
+                let email = compiler.build(tpl.as_str())?.compile().await?.into_vec()?;
+
                 sender.send(&email).await?;
+
                 if config.email_sending_save_copy {
                     let sent_folder = config.sent_folder_alias()?;
                     printer.print_log(format!("Adding email to the {} folder…", sent_folder))?;
@@ -91,6 +95,7 @@ pub async fn edit_tpl_with_editor<P: Printer>(
                         .add_email(&sent_folder, &email, &Flags::from_iter([Flag::Seen]))
                         .await?;
                 }
+
                 remove_local_draft()?;
                 printer.print("Done!")?;
                 break;
@@ -104,11 +109,13 @@ pub async fn edit_tpl_with_editor<P: Printer>(
                 break;
             }
             Ok(PostEditChoice::RemoteDraft) => {
-                let email = MmlCompiler::new()
-                    .with_pgp(config.pgp.clone())
-                    .compile(tpl)
-                    .await?
-                    .write_to_vec()?;
+                let compiler = MmlCompilerBuilder::new();
+
+                #[cfg(feature = "pgp")]
+                let compiler = compiler.with_pgp(config.pgp.clone());
+
+                let email = compiler.build(tpl.as_str())?.compile().await?.into_vec()?;
+
                 backend
                     .add_email(
                         "drafts",

@@ -73,6 +73,7 @@ pub async fn configure(config: &AccountConfig, reset: bool) -> Result<()> {
             }
         }
 
+        #[cfg(feature = "pgp")]
         config.pgp.reset().await?;
     }
 
@@ -104,6 +105,7 @@ pub async fn configure(config: &AccountConfig, reset: bool) -> Result<()> {
         }?;
     }
 
+    #[cfg(feature = "pgp")]
     config
         .pgp
         .configure(&config.email, || prompt_passwd("PGP secret key password"))
