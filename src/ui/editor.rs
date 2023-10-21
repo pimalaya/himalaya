@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{ensure, Context, Result};
 use email::{
     account::AccountConfig,
     backend::Backend,
@@ -7,8 +7,8 @@ use email::{
 };
 use log::debug;
 use mml::MmlCompilerBuilder;
-use process::Cmd;
-use std::{env, fs};
+use std::{env, fs, process::Stdio};
+use tokio::process::Command;
 
 use crate::{
     printer::Printer,
@@ -23,10 +23,19 @@ pub async fn open_with_tpl(tpl: String) -> Result<String> {
 
     debug!("open editor");
     let editor = env::var("EDITOR").context("cannot get editor from env var")?;
-    Cmd::from(format!("{editor} {}", &path.to_string_lossy()))
-        .run()
+    let edit_status = Command::new(&editor)
+        .arg(&path)
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .output()
         .await
-        .context("cannot launch editor")?;
+        .context("unable to launch editor")?
+        .status;
+    ensure!(
+        edit_status.success(),
+        format!("editor exited with code {:?}", &edit_status.code())
+    );
 
     debug!("read draft");
     let content =
