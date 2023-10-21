@@ -6,8 +6,8 @@ use email::{
     sender::Sender,
 };
 use log::debug;
+use std::process::Command;
 use mml::MmlCompilerBuilder;
-use process::Cmd;
 use std::{env, fs};
 
 use crate::{
@@ -23,10 +23,12 @@ pub async fn open_with_tpl(tpl: String) -> Result<String> {
 
     debug!("open editor");
     let editor = env::var("EDITOR").context("cannot get editor from env var")?;
-    Cmd::from(format!("{editor} {}", &path.to_string_lossy()))
-        .run()
-        .await
-        .context("cannot launch editor")?;
+    let child = Command::new(&editor)
+        .arg(&path)
+        .spawn()
+        .context(format!("cannot launch editor {}", &editor))?;
+
+    child.wait().context("Error waiting for editor to close")?;
 
     debug!("read draft");
     let content =
