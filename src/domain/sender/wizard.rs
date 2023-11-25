@@ -1,6 +1,5 @@
 use anyhow::Result;
 use dialoguer::Select;
-use email::sender::SenderConfig;
 
 use crate::config::wizard::THEME;
 

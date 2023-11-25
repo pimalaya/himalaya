@@ -9,15 +9,15 @@ use email::account::{NativePgpConfig, NativePgpSecretKey, SignedSecretKey};
 #[cfg(feature = "notmuch-backend")]
 use email::backend::NotmuchConfig;
 #[cfg(feature = "imap-backend")]
-use email::backend::{ImapAuthConfig, ImapConfig};
+use email::imap::{ImapAuthConfig, ImapConfig};
 #[cfg(feature = "smtp-sender")]
-use email::sender::{SmtpAuthConfig, SmtpConfig};
+use email::smtp::{SmtpAuthConfig, SmtpConfig};
 use email::{
     account::{OAuth2Config, OAuth2Method, OAuth2Scopes, PasswdConfig},
-    backend::{BackendConfig, MaildirConfig},
     email::{EmailHooks, EmailTextPlainFormat},
     folder::sync::FolderSyncStrategy,
-    sender::{SenderConfig, SendmailConfig},
+    maildir::MaildirConfig,
+    sendmail::SendmailConfig,
 };
 use keyring::Entry;
 use process::{Cmd, Pipeline, SingleCmd};
@@ -108,49 +108,47 @@ pub enum OAuth2MethodDef {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(remote = "BackendConfig", tag = "backend", rename_all = "kebab-case")]
-pub enum BackendConfigDef {
-    #[default]
-    None,
-    #[cfg(feature = "imap-backend")]
-    #[serde(with = "ImapConfigDef")]
-    Imap(ImapConfig),
-    #[serde(with = "MaildirConfigDef")]
-    Maildir(MaildirConfig),
-    #[cfg(feature = "notmuch-backend")]
-    #[serde(with = "NotmuchConfigDef")]
-    Notmuch(NotmuchConfig),
+#[serde(remote = "Option<ImapConfig>", from = "OptionImapConfig")]
+pub struct OptionImapConfigDef;
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct OptionImapConfig {
+    #[serde(default, skip)]
+    is_none: bool,
+    #[serde(flatten, with = "ImapConfigDef")]
+    inner: ImapConfig,
+}
+
+impl From<OptionImapConfig> for Option<ImapConfig> {
+    fn from(config: OptionImapConfig) -> Option<ImapConfig> {
+        if config.is_none {
+            None
+        } else {
+            Some(config.inner)
+        }
+    }
 }
 
 #[cfg(feature = "imap-backend")]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(remote = "ImapConfig")]
+#[serde(remote = "ImapConfig", rename_all = "kebab-case")]
 pub struct ImapConfigDef {
-    #[serde(rename = "imap-host")]
     pub host: String,
-    #[serde(rename = "imap-port")]
     pub port: u16,
-    #[serde(rename = "imap-ssl")]
     pub ssl: Option<bool>,
-    #[serde(rename = "imap-starttls")]
     pub starttls: Option<bool>,
-    #[serde(rename = "imap-insecure")]
     pub insecure: Option<bool>,
-    #[serde(rename = "imap-login")]
     pub login: String,
     #[serde(flatten, with = "ImapAuthConfigDef")]
     pub auth: ImapAuthConfig,
-    #[serde(rename = "imap-notify-cmd")]
     pub notify_cmd: Option<String>,
-    #[serde(rename = "imap-notify-query")]
     pub notify_query: Option<String>,
-    #[serde(rename = "imap-watch-cmds")]
     pub watch_cmds: Option<Vec<String>>,
 }
 
 #[cfg(feature = "imap-backend")]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(remote = "ImapAuthConfig", tag = "imap-auth")]
+#[serde(remote = "ImapAuthConfig", tag = "auth")]
 pub enum ImapAuthConfigDef {
     #[serde(rename = "passwd", alias = "password", with = "ImapPasswdConfigDef")]
     Passwd(#[serde(default)] PasswdConfig),
@@ -228,6 +226,28 @@ pub enum ImapOAuth2ScopesDef {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(remote = "Option<MaildirConfig>", from = "OptionMaildirConfig")]
+pub struct OptionMaildirConfigDef;
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum OptionMaildirConfig {
+    #[default]
+    #[serde(skip_serializing)]
+    None,
+    Some(#[serde(with = "MaildirConfigDef")] MaildirConfig),
+}
+
+impl From<OptionMaildirConfig> for Option<MaildirConfig> {
+    fn from(config: OptionMaildirConfig) -> Option<MaildirConfig> {
+        match config {
+            OptionMaildirConfig::None => None,
+            OptionMaildirConfig::Some(config) => Some(config),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "MaildirConfig", rename_all = "kebab-case")]
 pub struct MaildirConfigDef {
     #[serde(rename = "maildir-root-dir")]
@@ -236,10 +256,64 @@ pub struct MaildirConfigDef {
 
 #[cfg(feature = "notmuch-backend")]
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(remote = "Option<NotmuchConfig>", from = "OptionNotmuchConfig")]
+pub struct OptionNotmuchConfigDef;
+
+#[cfg(feature = "notmuch-backend")]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum OptionNotmuchConfig {
+    #[default]
+    #[serde(skip_serializing)]
+    None,
+    Some(#[serde(with = "NotmuchConfigDef")] NotmuchConfig),
+}
+
+#[cfg(feature = "notmuch-backend")]
+impl From<OptionNotmuchConfig> for Option<NotmuchConfig> {
+    fn from(config: OptionNotmuchConfig) -> Option<NotmuchConfig> {
+        match config {
+            OptionNotmuchConfig::None => None,
+            OptionNotmuchConfig::Some(config) => Some(config),
+        }
+    }
+}
+
+#[cfg(feature = "notmuch-backend")]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "NotmuchConfig", rename_all = "kebab-case")]
 pub struct NotmuchConfigDef {
     #[serde(rename = "notmuch-db-path")]
     pub db_path: PathBuf,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(
+    remote = "Option<EmailTextPlainFormat>",
+    from = "OptionEmailTextPlainFormat"
+)]
+pub struct OptionEmailTextPlainFormatDef;
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum OptionEmailTextPlainFormat {
+    #[serde(skip_serializing)]
+    None,
+    #[default]
+    Auto,
+    Flowed,
+    Fixed(usize),
+}
+
+impl From<OptionEmailTextPlainFormat> for Option<EmailTextPlainFormat> {
+    fn from(fmt: OptionEmailTextPlainFormat) -> Option<EmailTextPlainFormat> {
+        match fmt {
+            OptionEmailTextPlainFormat::None => None,
+            OptionEmailTextPlainFormat::Auto => Some(EmailTextPlainFormat::Auto),
+            OptionEmailTextPlainFormat::Flowed => Some(EmailTextPlainFormat::Flowed),
+            OptionEmailTextPlainFormat::Fixed(size) => Some(EmailTextPlainFormat::Fixed(size)),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -257,15 +331,25 @@ pub enum EmailTextPlainFormatDef {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(remote = "SenderConfig", tag = "sender", rename_all = "kebab-case")]
-pub enum SenderConfigDef {
+#[serde(remote = "Option<SmtpConfig>", from = "OptionSmtpConfig")]
+pub struct OptionSmtpConfigDef;
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum OptionSmtpConfig {
     #[default]
+    #[serde(skip_serializing)]
     None,
-    #[cfg(feature = "smtp-sender")]
-    #[serde(with = "SmtpConfigDef")]
-    Smtp(SmtpConfig),
-    #[serde(with = "SendmailConfigDef")]
-    Sendmail(SendmailConfig),
+    Some(#[serde(with = "SmtpConfigDef")] SmtpConfig),
+}
+
+impl From<OptionSmtpConfig> for Option<SmtpConfig> {
+    fn from(config: OptionSmtpConfig) -> Option<SmtpConfig> {
+        match config {
+            OptionSmtpConfig::None => None,
+            OptionSmtpConfig::Some(config) => Some(config),
+        }
+    }
 }
 
 #[cfg(feature = "smtp-sender")]
@@ -367,6 +451,28 @@ pub enum SmtpOAuth2ScopesDef {
     Scopes(Vec<String>),
 }
 
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(remote = "Option<SendmailConfig>", from = "OptionSendmailConfig")]
+pub struct OptionSendmailConfigDef;
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum OptionSendmailConfig {
+    #[default]
+    #[serde(skip_serializing)]
+    None,
+    Some(#[serde(with = "SendmailConfigDef")] SendmailConfig),
+}
+
+impl From<OptionSendmailConfig> for Option<SendmailConfig> {
+    fn from(config: OptionSendmailConfig) -> Option<SendmailConfig> {
+        match config {
+            OptionSendmailConfig::None => None,
+            OptionSendmailConfig::Some(config) => Some(config),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "SendmailConfig", rename_all = "kebab-case")]
 pub struct SendmailConfigDef {
@@ -382,6 +488,28 @@ fn sendmail_default_cmd() -> Cmd {
     Cmd::from("/usr/sbin/sendmail")
 }
 
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(remote = "Option<EmailHooks>", from = "OptionEmailHooks")]
+pub struct OptionEmailHooksDef;
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum OptionEmailHooks {
+    #[default]
+    #[serde(skip_serializing)]
+    None,
+    Some(#[serde(with = "EmailHooksDef")] EmailHooks),
+}
+
+impl From<OptionEmailHooks> for Option<EmailHooks> {
+    fn from(fmt: OptionEmailHooks) -> Option<EmailHooks> {
+        match fmt {
+            OptionEmailHooks::None => None,
+            OptionEmailHooks::Some(hooks) => Some(hooks),
+        }
+    }
+}
+
 /// Represents the email hooks. Useful for doing extra email
 /// processing before or after sending it.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -390,6 +518,31 @@ pub struct EmailHooksDef {
     /// Represents the hook called just before sending an email.
     #[serde(default, with = "OptionCmdDef")]
     pub pre_send: Option<Cmd>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(
+    remote = "Option<FolderSyncStrategy>",
+    from = "OptionFolderSyncStrategy"
+)]
+pub struct OptionFolderSyncStrategyDef;
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum OptionFolderSyncStrategy {
+    #[default]
+    #[serde(skip_serializing)]
+    None,
+    Some(#[serde(with = "FolderSyncStrategyDef")] FolderSyncStrategy),
+}
+
+impl From<OptionFolderSyncStrategy> for Option<FolderSyncStrategy> {
+    fn from(config: OptionFolderSyncStrategy) -> Option<FolderSyncStrategy> {
+        match config {
+            OptionFolderSyncStrategy::None => None,
+            OptionFolderSyncStrategy::Some(config) => Some(config),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]

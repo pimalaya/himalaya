@@ -1,9 +1,7 @@
 use anyhow::{Context, Result};
 use email::{
     account::AccountConfig,
-    backend::Backend,
     email::{local_draft_path, remove_local_draft, Flag, Flags},
-    sender::Sender,
 };
 use log::debug;
 use mml::MmlCompilerBuilder;
@@ -11,6 +9,7 @@ use process::Cmd;
 use std::{env, fs};
 
 use crate::{
+    backend::Backend,
     printer::Printer,
     ui::choice::{self, PostEditChoice, PreEditChoice},
 };
@@ -45,8 +44,7 @@ pub async fn open_with_local_draft() -> Result<String> {
 pub async fn edit_tpl_with_editor<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    backend: &mut dyn Backend,
-    sender: &mut dyn Sender,
+    backend: &Backend,
     mut tpl: String,
 ) -> Result<()> {
     let draft = local_draft_path();
@@ -86,13 +84,13 @@ pub async fn edit_tpl_with_editor<P: Printer>(
 
                 let email = compiler.build(tpl.as_str())?.compile().await?.into_vec()?;
 
-                sender.send(&email).await?;
+                backend.send_raw_message(&email).await?;
 
-                if config.email_sending_save_copy {
+                if config.email_sending_save_copy.unwrap_or_default() {
                     let sent_folder = config.sent_folder_alias()?;
                     printer.print_log(format!("Adding email to the {} folder…", sent_folder))?;
                     backend
-                        .add_email(&sent_folder, &email, &Flags::from_iter([Flag::Seen]))
+                        .add_raw_message_with_flag(&sent_folder, &email, Flag::Seen)
                         .await?;
                 }
 
@@ -117,7 +115,7 @@ pub async fn edit_tpl_with_editor<P: Printer>(
                 let email = compiler.build(tpl.as_str())?.compile().await?.into_vec()?;
 
                 backend
-                    .add_email(
+                    .add_raw_message_with_flags(
                         "drafts",
                         &email,
                         &Flags::from_iter([Flag::Seen, Flag::Draft]),

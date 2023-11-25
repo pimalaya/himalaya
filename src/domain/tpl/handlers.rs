@@ -2,30 +2,27 @@ use anyhow::{anyhow, Result};
 use atty::Stream;
 use email::{
     account::AccountConfig,
-    backend::Backend,
-    email::{Flag, Flags, Message},
-    sender::Sender,
+    email::{envelope::Id, Flag, Message},
 };
 use mml::MmlCompilerBuilder;
 use std::io::{stdin, BufRead};
 
-use crate::{printer::Printer, IdMapper};
+use crate::{backend::Backend, printer::Printer, IdMapper};
 
 pub async fn forward<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
     id_mapper: &IdMapper,
-    backend: &mut dyn Backend,
+    backend: &Backend,
     folder: &str,
     id: &str,
     headers: Option<Vec<(&str, &str)>>,
     body: Option<&str>,
 ) -> Result<()> {
-    let ids = id_mapper.get_ids([id])?;
-    let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
+    let ids = Id::multiple(id_mapper.get_ids([id])?);
 
     let tpl: String = backend
-        .get_emails(folder, ids)
+        .get_messages(folder, &ids)
         .await?
         .first()
         .ok_or_else(|| anyhow!("cannot find email {}", id))?
@@ -43,18 +40,17 @@ pub async fn reply<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
     id_mapper: &IdMapper,
-    backend: &mut dyn Backend,
+    backend: &Backend,
     folder: &str,
     id: &str,
     all: bool,
     headers: Option<Vec<(&str, &str)>>,
     body: Option<&str>,
 ) -> Result<()> {
-    let ids = id_mapper.get_ids([id])?;
-    let ids = ids.iter().map(String::as_str).collect::<Vec<_>>();
+    let ids = Id::multiple(id_mapper.get_ids([id])?);
 
     let tpl: String = backend
-        .get_emails(folder, ids)
+        .get_messages(folder, &ids)
         .await?
         .first()
         .ok_or_else(|| anyhow!("cannot find email {}", id))?
@@ -73,7 +69,7 @@ pub async fn save<P: Printer>(
     #[allow(unused_variables)] config: &AccountConfig,
     printer: &mut P,
     id_mapper: &IdMapper,
-    backend: &mut dyn Backend,
+    backend: &Backend,
     folder: &str,
     tpl: String,
 ) -> Result<()> {
@@ -95,8 +91,8 @@ pub async fn save<P: Printer>(
 
     let email = compiler.build(tpl.as_str())?.compile().await?.into_vec()?;
 
-    let id = backend.add_email(folder, &email, &Flags::default()).await?;
-    id_mapper.create_alias(id)?;
+    let id = backend.add_raw_message(folder, &email).await?;
+    id_mapper.create_alias(&*id)?;
 
     printer.print("Template successfully saved!")
 }
@@ -104,8 +100,7 @@ pub async fn save<P: Printer>(
 pub async fn send<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    backend: &mut dyn Backend,
-    sender: &mut dyn Sender,
+    backend: &Backend,
     tpl: String,
 ) -> Result<()> {
     let folder = config.sent_folder_alias()?;
@@ -128,11 +123,11 @@ pub async fn send<P: Printer>(
 
     let email = compiler.build(tpl.as_str())?.compile().await?.into_vec()?;
 
-    sender.send(&email).await?;
+    backend.send_raw_message(&email).await?;
 
-    if config.email_sending_save_copy {
+    if config.email_sending_save_copy.unwrap_or_default() {
         backend
-            .add_email(&folder, &email, &Flags::from_iter([Flag::Seen]))
+            .add_raw_message_with_flag(&folder, &email, Flag::Seen)
             .await?;
     }
 

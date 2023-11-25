@@ -6,12 +6,8 @@
 use anyhow::{anyhow, Context, Result};
 use dialoguer::Confirm;
 use dirs::{config_dir, home_dir};
-use email::{
-    account::AccountConfig,
-    email::{EmailHooks, EmailTextPlainFormat},
-};
+use email::email::{EmailHooks, EmailTextPlainFormat};
 use log::{debug, trace};
-use process::Cmd;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path::PathBuf, process::exit};
 use toml;
@@ -39,44 +35,12 @@ pub struct DeserializedConfig {
     pub email_listing_datetime_fmt: Option<String>,
     pub email_listing_datetime_local_tz: Option<bool>,
     pub email_reading_headers: Option<Vec<String>>,
-    #[serde(
-        default,
-        with = "EmailTextPlainFormatDef",
-        skip_serializing_if = "EmailTextPlainFormat::is_default"
-    )]
-    pub email_reading_format: EmailTextPlainFormat,
-    #[serde(
-        default,
-        with = "OptionCmdDef",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub email_reading_verify_cmd: Option<Cmd>,
-    #[serde(
-        default,
-        with = "OptionCmdDef",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub email_reading_decrypt_cmd: Option<Cmd>,
+    #[serde(default, with = "OptionEmailTextPlainFormatDef")]
+    pub email_reading_format: Option<EmailTextPlainFormat>,
     pub email_writing_headers: Option<Vec<String>>,
-    #[serde(
-        default,
-        with = "OptionCmdDef",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub email_writing_sign_cmd: Option<Cmd>,
-    #[serde(
-        default,
-        with = "OptionCmdDef",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub email_writing_encrypt_cmd: Option<Cmd>,
     pub email_sending_save_copy: Option<bool>,
-    #[serde(
-        default,
-        with = "EmailHooksDef",
-        skip_serializing_if = "EmailHooks::is_empty"
-    )]
-    pub email_hooks: EmailHooks,
+    #[serde(default, with = "OptionEmailHooksDef")]
+    pub email_hooks: Option<EmailHooks>,
 
     #[serde(flatten)]
     pub accounts: HashMap<String, DeserializedAccountConfig>,
@@ -133,28 +97,6 @@ impl DeserializedConfig {
             .filter(|p| p.exists())
             .or_else(|| home_dir().map(|p| p.join(".himalayarc")))
             .filter(|p| p.exists())
-    }
-
-    pub fn to_account_config(&self, account_name: Option<&str>) -> Result<AccountConfig> {
-        let (account_name, deserialized_account_config) = match account_name {
-            Some("default") | Some("") | None => self
-                .accounts
-                .iter()
-                .find_map(|(name, account)| {
-                    account
-                        .default
-                        .filter(|default| *default == true)
-                        .map(|_| (name.clone(), account))
-                })
-                .ok_or_else(|| anyhow!("cannot find default account")),
-            Some(name) => self
-                .accounts
-                .get(name)
-                .map(|account| (name.to_string(), account))
-                .ok_or_else(|| anyhow!(format!("cannot find account {}", name))),
-        }?;
-
-        Ok(deserialized_account_config.to_account_config(account_name, self))
     }
 }
 

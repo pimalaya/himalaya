@@ -5,7 +5,6 @@
 //! accounts from the config file.
 
 use anyhow::Result;
-use email::backend::BackendConfig;
 use serde::Serialize;
 use std::{collections::hash_map::Iter, ops::Deref};
 
@@ -40,19 +39,45 @@ impl PrintTable for Accounts {
 impl From<Iter<'_, String, DeserializedAccountConfig>> for Accounts {
     fn from(map: Iter<'_, String, DeserializedAccountConfig>) -> Self {
         let mut accounts: Vec<_> = map
-            .map(|(name, account)| match &account.backend {
-                BackendConfig::None => Account::new(name, "none", false),
-                BackendConfig::Maildir(_) => {
-                    Account::new(name, "maildir", account.default.unwrap_or_default())
-                }
+            .map(|(name, account)| {
+                let mut backends = String::new();
+
                 #[cfg(feature = "imap-backend")]
-                BackendConfig::Imap(_) => {
-                    Account::new(name, "imap", account.default.unwrap_or_default())
+                if account.imap.is_some() {
+                    backends.push_str("imap");
                 }
+
+                if account.maildir.is_some() {
+                    if !backends.is_empty() {
+                        backends.push_str(", ")
+                    }
+                    backends.push_str("maildir");
+                }
+
                 #[cfg(feature = "notmuch-backend")]
-                BackendConfig::Notmuch(_) => {
-                    Account::new(name, "notmuch", account.default.unwrap_or_default())
+                if account.imap.is_some() {
+                    if !backends.is_empty() {
+                        backends.push_str(", ")
+                    }
+                    backends.push_str("notmuch");
                 }
+
+                #[cfg(feature = "smtp-sender")]
+                if account.smtp.is_some() {
+                    if !backends.is_empty() {
+                        backends.push_str(", ")
+                    }
+                    backends.push_str("smtp");
+                }
+
+                if account.sendmail.is_some() {
+                    if !backends.is_empty() {
+                        backends.push_str(", ")
+                    }
+                    backends.push_str("sendmail");
+                }
+
+                Account::new(name, &backends, account.default.unwrap_or_default())
             })
             .collect();
         accounts.sort_by(|a, b| b.name.partial_cmp(&a.name).unwrap());

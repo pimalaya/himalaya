@@ -4,19 +4,16 @@
 
 use anyhow::Result;
 use dialoguer::Confirm;
-use email::{account::AccountConfig, backend::Backend};
+use email::account::AccountConfig;
 use std::process;
 
 use crate::{
+    backend::Backend,
     printer::{PrintTableOpts, Printer},
     Folders,
 };
 
-pub async fn expunge<P: Printer>(
-    printer: &mut P,
-    backend: &mut dyn Backend,
-    folder: &str,
-) -> Result<()> {
+pub async fn expunge<P: Printer>(printer: &mut P, backend: &Backend, folder: &str) -> Result<()> {
     backend.expunge_folder(folder).await?;
     printer.print(format!("Folder {folder} successfully expunged!"))
 }
@@ -24,7 +21,7 @@ pub async fn expunge<P: Printer>(
 pub async fn list<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    backend: &mut dyn Backend,
+    backend: &Backend,
     max_width: Option<usize>,
 ) -> Result<()> {
     let folders: Folders = backend.list_folders().await?.into();
@@ -38,20 +35,12 @@ pub async fn list<P: Printer>(
     )
 }
 
-pub async fn create<P: Printer>(
-    printer: &mut P,
-    backend: &mut dyn Backend,
-    folder: &str,
-) -> Result<()> {
+pub async fn create<P: Printer>(printer: &mut P, backend: &Backend, folder: &str) -> Result<()> {
     backend.add_folder(folder).await?;
     printer.print("Folder successfully created!")
 }
 
-pub async fn delete<P: Printer>(
-    printer: &mut P,
-    backend: &mut dyn Backend,
-    folder: &str,
-) -> Result<()> {
+pub async fn delete<P: Printer>(printer: &mut P, backend: &Backend, folder: &str) -> Result<()> {
     if let Some(false) | None = Confirm::new()
         .with_prompt(format!("Confirm deletion of folder {folder}?"))
         .default(false)
