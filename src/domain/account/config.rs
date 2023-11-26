@@ -19,8 +19,8 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
 
 use crate::{
-    backend::BackendKind, config::prelude::*, email::envelope::config::EnvelopeConfig,
-    message::config::MessageConfig,
+    backend::BackendKind, config::prelude::*, domain::config::FolderConfig,
+    email::envelope::config::EnvelopeConfig, message::config::MessageConfig,
 };
 
 /// Represents all existing kind of account config.
@@ -56,6 +56,7 @@ pub struct DeserializedAccountConfig {
 
     pub backend: Option<BackendKind>,
 
+    pub folder: Option<FolderConfig>,
     pub envelope: Option<EnvelopeConfig>,
     pub message: Option<MessageConfig>,
 
