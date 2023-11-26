@@ -10,7 +10,10 @@ use email::smtp::{SmtpClientBuilder, SmtpClientSync};
 use email::{
     account::AccountConfig,
     config::Config,
-    folder::list::{imap::ListFoldersImap, maildir::ListFoldersMaildir},
+    email::{
+        envelope::list::{imap::ListEnvelopesImap, maildir::ListEnvelopesMaildir},
+        message::send_raw::{sendmail::SendRawMessageSendmail, smtp::SendRawMessageSmtp},
+    },
     maildir::{MaildirSessionBuilder, MaildirSessionSync},
     sendmail::SendmailContext,
 };
@@ -18,11 +21,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::DeserializedConfig;
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum BackendKind {
-    #[default]
-    None,
     Maildir,
     #[cfg(feature = "imap-backend")]
     Imap,
@@ -35,8 +36,6 @@ pub enum BackendKind {
 
 #[derive(Clone, Default)]
 pub struct BackendContextBuilder {
-    account_config: AccountConfig,
-
     #[cfg(feature = "imap-backend")]
     imap: Option<ImapSessionBuilder>,
     maildir: Option<MaildirSessionBuilder>,
@@ -93,7 +92,7 @@ pub struct BackendBuilder(pub email::backend::BackendBuilder<BackendContextBuild
 
 impl BackendBuilder {
     pub async fn new(config: DeserializedConfig, account_name: Option<&str>) -> Result<Self> {
-        let (account_name, deserialized_account_config) = match account_name {
+        let (account_name, mut deserialized_account_config) = match account_name {
             Some("default") | Some("") | None => config
                 .accounts
                 .iter()
@@ -110,6 +109,25 @@ impl BackendBuilder {
                 .map(|account| (name.to_owned(), account.clone()))
                 .ok_or_else(|| anyhow!("cannot find account {name}")),
         }?;
+
+        println!(
+            "deserialized_account_config: {:#?}",
+            deserialized_account_config
+        );
+
+        #[cfg(feature = "imap-backend")]
+        if let Some(imap_config) = deserialized_account_config.imap.as_mut() {
+            imap_config
+                .auth
+                .replace_undefined_keyring_entries(&account_name);
+        }
+
+        #[cfg(feature = "smtp-sender")]
+        if let Some(smtp_config) = deserialized_account_config.smtp.as_mut() {
+            smtp_config
+                .auth
+                .replace_undefined_keyring_entries(&account_name);
+        }
 
         let config = Config {
             display_name: config.display_name,
@@ -166,10 +184,9 @@ impl BackendBuilder {
             )),
         };
 
-        let account_config = config.account(account_name)?;
+        let account_config = config.account(&account_name)?;
 
         let backend_ctx_builder = BackendContextBuilder {
-            account_config: account_config.clone(),
             maildir: deserialized_account_config
                 .maildir
                 .as_ref()
@@ -199,28 +216,57 @@ impl BackendBuilder {
             ..Default::default()
         };
 
-        let backend_builder =
-            email::backend::BackendBuilder::new(account_config.clone(), backend_ctx_builder)
-                .with_list_folders(move |ctx| {
-                    println!(
-                        "deserialized_account_config: {:#?}",
-                        deserialized_account_config
-                    );
-                    match deserialized_account_config.backend {
-                        BackendKind::Maildir if ctx.maildir.is_some() => {
-                            ListFoldersMaildir::new(ctx.maildir.as_ref().unwrap())
-                        }
-                        #[cfg(feature = "imap-backend")]
-                        BackendKind::Imap if ctx.imap.is_some() => {
-                            ListFoldersImap::new(ctx.imap.as_ref().unwrap())
-                        }
-                        #[cfg(feature = "notmuch-backend")]
-                        BackendKind::Notmuch if ctx.notmuch.is_some() => {
-                            ListFoldersNotmuch::new(ctx.notmuch.as_ref().unwrap())
-                        }
-                        _ => None,
-                    }
+        let mut backend_builder =
+            email::backend::BackendBuilder::new(account_config.clone(), backend_ctx_builder);
+
+        let list_envelopes = deserialized_account_config
+            .envelope
+            .as_ref()
+            .and_then(|envelope| envelope.list.as_ref())
+            .and_then(|send| send.backend.as_ref())
+            .or_else(|| deserialized_account_config.backend.as_ref());
+
+        match list_envelopes {
+            Some(BackendKind::Maildir) => {
+                backend_builder = backend_builder.with_list_envelopes(|ctx| {
+                    ctx.maildir.as_ref().and_then(ListEnvelopesMaildir::new)
                 });
+            }
+            #[cfg(feature = "imap-backend")]
+            Some(BackendKind::Imap) => {
+                backend_builder = backend_builder
+                    .with_list_envelopes(|ctx| ctx.imap.as_ref().and_then(ListEnvelopesImap::new));
+            }
+            #[cfg(feature = "notmuch-backend")]
+            Some(BackendKind::Notmuch) => {
+                backend_builder = backend_builder.with_list_envelopes(|ctx| {
+                    ctx.notmuch.as_ref().and_then(ListEnvelopesNotmuch::new)
+                });
+            }
+            _ => (),
+        }
+
+        let send_msg = deserialized_account_config
+            .message
+            .as_ref()
+            .and_then(|msg| msg.send.as_ref())
+            .and_then(|send| send.backend.as_ref())
+            .or_else(|| deserialized_account_config.backend.as_ref());
+
+        match send_msg {
+            #[cfg(feature = "smtp-sender")]
+            Some(BackendKind::Smtp) => {
+                backend_builder = backend_builder.with_send_raw_message(|ctx| {
+                    ctx.smtp.as_ref().and_then(SendRawMessageSmtp::new)
+                });
+            }
+            Some(BackendKind::Sendmail) => {
+                backend_builder = backend_builder.with_send_raw_message(|ctx| {
+                    ctx.sendmail.as_ref().and_then(SendRawMessageSendmail::new)
+                });
+            }
+            _ => (),
+        }
 
         Ok(Self(backend_builder))
     }

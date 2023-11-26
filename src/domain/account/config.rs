@@ -18,7 +18,10 @@ use email::{
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
 
-use crate::{backend::BackendKind, config::prelude::*};
+use crate::{
+    backend::BackendKind, config::prelude::*, email::envelope::config::EnvelopeConfig,
+    message::config::MessageConfig,
+};
 
 /// Represents all existing kind of account config.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
@@ -51,7 +54,10 @@ pub struct DeserializedAccountConfig {
     #[serde(default, with = "OptionFolderSyncStrategyDef")]
     pub sync_folders_strategy: Option<FolderSyncStrategy>,
 
-    pub backend: BackendKind,
+    pub backend: Option<BackendKind>,
+
+    pub envelope: Option<EnvelopeConfig>,
+    pub message: Option<MessageConfig>,
 
     #[cfg(feature = "imap-backend")]
     #[serde(default, with = "OptionImapConfigDef")]

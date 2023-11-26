@@ -160,7 +160,7 @@ pub enum ImapAuthConfigDef {
 #[serde(remote = "PasswdConfig")]
 pub struct ImapPasswdConfigDef {
     #[serde(
-        rename = "imap-passwd",
+        rename = "passwd",
         with = "SecretDef",
         default,
         skip_serializing_if = "Secret::is_undefined"
@@ -335,19 +335,19 @@ pub enum EmailTextPlainFormatDef {
 pub struct OptionSmtpConfigDef;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum OptionSmtpConfig {
-    #[default]
-    #[serde(skip_serializing)]
-    None,
-    Some(#[serde(with = "SmtpConfigDef")] SmtpConfig),
+pub struct OptionSmtpConfig {
+    #[serde(default, skip)]
+    is_none: bool,
+    #[serde(flatten, with = "SmtpConfigDef")]
+    inner: SmtpConfig,
 }
 
 impl From<OptionSmtpConfig> for Option<SmtpConfig> {
     fn from(config: OptionSmtpConfig) -> Option<SmtpConfig> {
-        match config {
-            OptionSmtpConfig::None => None,
-            OptionSmtpConfig::Some(config) => Some(config),
+        if config.is_none {
+            None
+        } else {
+            Some(config.inner)
         }
     }
 }
@@ -356,17 +356,11 @@ impl From<OptionSmtpConfig> for Option<SmtpConfig> {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "SmtpConfig")]
 struct SmtpConfigDef {
-    #[serde(rename = "smtp-host")]
     pub host: String,
-    #[serde(rename = "smtp-port")]
     pub port: u16,
-    #[serde(rename = "smtp-ssl")]
     pub ssl: Option<bool>,
-    #[serde(rename = "smtp-starttls")]
     pub starttls: Option<bool>,
-    #[serde(rename = "smtp-insecure")]
     pub insecure: Option<bool>,
-    #[serde(rename = "smtp-login")]
     pub login: String,
     #[serde(flatten, with = "SmtpAuthConfigDef")]
     pub auth: SmtpAuthConfig,
@@ -374,7 +368,7 @@ struct SmtpConfigDef {
 
 #[cfg(feature = "smtp-sender")]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(remote = "SmtpAuthConfig", tag = "smtp-auth")]
+#[serde(remote = "SmtpAuthConfig", tag = "auth")]
 pub enum SmtpAuthConfigDef {
     #[serde(rename = "passwd", alias = "password", with = "SmtpPasswdConfigDef")]
     Passwd(#[serde(default)] PasswdConfig),
@@ -386,7 +380,7 @@ pub enum SmtpAuthConfigDef {
 #[serde(remote = "PasswdConfig", default)]
 pub struct SmtpPasswdConfigDef {
     #[serde(
-        rename = "smtp-passwd",
+        rename = "passwd",
         with = "SecretDef",
         default,
         skip_serializing_if = "Secret::is_undefined"
@@ -395,32 +389,26 @@ pub struct SmtpPasswdConfigDef {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(remote = "OAuth2Config")]
+#[serde(remote = "OAuth2Config", rename_all = "kebab-case")]
 pub struct SmtpOAuth2ConfigDef {
-    #[serde(rename = "smtp-oauth2-method", with = "OAuth2MethodDef", default)]
+    #[serde(with = "OAuth2MethodDef", default)]
     pub method: OAuth2Method,
-    #[serde(rename = "smtp-oauth2-client-id")]
     pub client_id: String,
     #[serde(
-        rename = "smtp-oauth2-client-secret",
         with = "SecretDef",
         default,
         skip_serializing_if = "Secret::is_undefined"
     )]
     pub client_secret: Secret,
-    #[serde(rename = "smtp-oauth2-auth-url")]
     pub auth_url: String,
-    #[serde(rename = "smtp-oauth2-token-url")]
     pub token_url: String,
     #[serde(
-        rename = "smtp-oauth2-access-token",
         with = "SecretDef",
         default,
         skip_serializing_if = "Secret::is_undefined"
     )]
     pub access_token: Secret,
     #[serde(
-        rename = "smtp-oauth2-refresh-token",
         with = "SecretDef",
         default,
         skip_serializing_if = "Secret::is_undefined"
@@ -428,17 +416,11 @@ pub struct SmtpOAuth2ConfigDef {
     pub refresh_token: Secret,
     #[serde(flatten, with = "SmtpOAuth2ScopesDef")]
     pub scopes: OAuth2Scopes,
-    #[serde(rename = "smtp-oauth2-pkce", default)]
+    #[serde(default)]
     pub pkce: bool,
-    #[serde(
-        rename = "imap-oauth2-redirect-host",
-        default = "OAuth2Config::default_redirect_host"
-    )]
+    #[serde(default = "OAuth2Config::default_redirect_host")]
     pub redirect_host: String,
-    #[serde(
-        rename = "imap-oauth2-redirect-port",
-        default = "OAuth2Config::default_redirect_port"
-    )]
+    #[serde(default = "OAuth2Config::default_redirect_port")]
     pub redirect_port: u16,
 }
 
@@ -476,11 +458,7 @@ impl From<OptionSendmailConfig> for Option<SendmailConfig> {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "SendmailConfig", rename_all = "kebab-case")]
 pub struct SendmailConfigDef {
-    #[serde(
-        rename = "sendmail-cmd",
-        with = "CmdDef",
-        default = "sendmail_default_cmd"
-    )]
+    #[serde(with = "CmdDef", default = "sendmail_default_cmd")]
     cmd: Cmd,
 }
 
