@@ -11,8 +11,26 @@ use email::{
     account::AccountConfig,
     config::Config,
     email::{
-        envelope::list::{imap::ListEnvelopesImap, maildir::ListEnvelopesMaildir},
-        message::send_raw::{sendmail::SendRawMessageSendmail, smtp::SendRawMessageSmtp},
+        envelope::{
+            get::{imap::GetEnvelopeImap, maildir::GetEnvelopeMaildir},
+            list::{imap::ListEnvelopesImap, maildir::ListEnvelopesMaildir},
+        },
+        flag::{
+            add::{imap::AddFlagsImap, maildir::AddFlagsMaildir},
+            remove::{imap::RemoveFlagsImap, maildir::RemoveFlagsMaildir},
+            set::{imap::SetFlagsImap, maildir::SetFlagsMaildir},
+        },
+        message::{
+            add_raw::imap::AddRawMessageImap,
+            add_raw_with_flags::{
+                imap::AddRawMessageWithFlagsImap, maildir::AddRawMessageWithFlagsMaildir,
+            },
+            copy::{imap::CopyMessagesImap, maildir::CopyMessagesMaildir},
+            get::imap::GetMessagesImap,
+            move_::{imap::MoveMessagesImap, maildir::MoveMessagesMaildir},
+            peek::{imap::PeekMessagesImap, maildir::PeekMessagesMaildir},
+            send_raw::{sendmail::SendRawMessageSendmail, smtp::SendRawMessageSmtp},
+        },
     },
     folder::{
         add::{imap::AddFolderImap, maildir::AddFolderMaildir},
@@ -360,6 +378,33 @@ impl BackendBuilder {
             _ => (),
         }
 
+        let get_envelope = deserialized_account_config
+            .envelope
+            .as_ref()
+            .and_then(|envelope| envelope.get.as_ref())
+            .and_then(|get| get.backend.as_ref())
+            .or_else(|| deserialized_account_config.backend.as_ref());
+
+        match get_envelope {
+            Some(BackendKind::Maildir) => {
+                backend_builder = backend_builder.with_get_envelope(|ctx| {
+                    ctx.maildir.as_ref().and_then(GetEnvelopeMaildir::new)
+                });
+            }
+            #[cfg(feature = "imap-backend")]
+            Some(BackendKind::Imap) => {
+                backend_builder = backend_builder
+                    .with_get_envelope(|ctx| ctx.imap.as_ref().and_then(GetEnvelopeImap::new));
+            }
+            #[cfg(feature = "notmuch-backend")]
+            Some(BackendKind::Notmuch) => {
+                backend_builder = backend_builder.with_get_envelope(|ctx| {
+                    ctx.notmuch.as_ref().and_then(GetEnvelopeNotmuch::new)
+                });
+            }
+            _ => (),
+        }
+
         let list_envelopes = deserialized_account_config
             .envelope
             .as_ref()
@@ -387,6 +432,83 @@ impl BackendBuilder {
             _ => (),
         }
 
+        let add_flags = deserialized_account_config
+            .flag
+            .as_ref()
+            .and_then(|flag| flag.add.as_ref())
+            .and_then(|add| add.backend.as_ref())
+            .or_else(|| deserialized_account_config.backend.as_ref());
+
+        match add_flags {
+            Some(BackendKind::Maildir) => {
+                backend_builder = backend_builder
+                    .with_add_flags(|ctx| ctx.maildir.as_ref().and_then(AddFlagsMaildir::new));
+            }
+            #[cfg(feature = "imap-backend")]
+            Some(BackendKind::Imap) => {
+                backend_builder = backend_builder
+                    .with_add_flags(|ctx| ctx.imap.as_ref().and_then(AddFlagsImap::new));
+            }
+            #[cfg(feature = "notmuch-backend")]
+            Some(BackendKind::Notmuch) => {
+                backend_builder = backend_builder
+                    .with_add_flags(|ctx| ctx.notmuch.as_ref().and_then(AddFlagsNotmuch::new));
+            }
+            _ => (),
+        }
+
+        let set_flags = deserialized_account_config
+            .flag
+            .as_ref()
+            .and_then(|flag| flag.set.as_ref())
+            .and_then(|set| set.backend.as_ref())
+            .or_else(|| deserialized_account_config.backend.as_ref());
+
+        match set_flags {
+            Some(BackendKind::Maildir) => {
+                backend_builder = backend_builder
+                    .with_set_flags(|ctx| ctx.maildir.as_ref().and_then(SetFlagsMaildir::new));
+            }
+            #[cfg(feature = "imap-backend")]
+            Some(BackendKind::Imap) => {
+                backend_builder = backend_builder
+                    .with_set_flags(|ctx| ctx.imap.as_ref().and_then(SetFlagsImap::new));
+            }
+            #[cfg(feature = "notmuch-backend")]
+            Some(BackendKind::Notmuch) => {
+                backend_builder = backend_builder
+                    .with_set_flags(|ctx| ctx.notmuch.as_ref().and_then(SetFlagsNotmuch::new));
+            }
+            _ => (),
+        }
+
+        let remove_flags = deserialized_account_config
+            .flag
+            .as_ref()
+            .and_then(|flag| flag.remove.as_ref())
+            .and_then(|remove| remove.backend.as_ref())
+            .or_else(|| deserialized_account_config.backend.as_ref());
+
+        match remove_flags {
+            Some(BackendKind::Maildir) => {
+                backend_builder = backend_builder.with_remove_flags(|ctx| {
+                    ctx.maildir.as_ref().and_then(RemoveFlagsMaildir::new)
+                });
+            }
+            #[cfg(feature = "imap-backend")]
+            Some(BackendKind::Imap) => {
+                backend_builder = backend_builder
+                    .with_remove_flags(|ctx| ctx.imap.as_ref().and_then(RemoveFlagsImap::new));
+            }
+            #[cfg(feature = "notmuch-backend")]
+            Some(BackendKind::Notmuch) => {
+                backend_builder = backend_builder.with_remove_flags(|ctx| {
+                    ctx.notmuch.as_ref().and_then(RemoveFlagsNotmuch::new)
+                });
+            }
+            _ => (),
+        }
+
         let send_msg = deserialized_account_config
             .message
             .as_ref()
@@ -404,6 +526,141 @@ impl BackendBuilder {
             Some(BackendKind::Sendmail) => {
                 backend_builder = backend_builder.with_send_raw_message(|ctx| {
                     ctx.sendmail.as_ref().and_then(SendRawMessageSendmail::new)
+                });
+            }
+            _ => (),
+        }
+
+        let add_msg = deserialized_account_config
+            .message
+            .as_ref()
+            .and_then(|msg| msg.add.as_ref())
+            .and_then(|add| add.backend.as_ref())
+            .or_else(|| deserialized_account_config.backend.as_ref());
+
+        match add_msg {
+            Some(BackendKind::Maildir) => {
+                backend_builder = backend_builder.with_add_raw_message_with_flags(|ctx| {
+                    ctx.maildir
+                        .as_ref()
+                        .and_then(AddRawMessageWithFlagsMaildir::new)
+                });
+            }
+            #[cfg(feature = "imap-backend")]
+            Some(BackendKind::Imap) => {
+                backend_builder = backend_builder
+                    .with_add_raw_message(|ctx| ctx.imap.as_ref().and_then(AddRawMessageImap::new))
+                    .with_add_raw_message_with_flags(|ctx| {
+                        ctx.imap.as_ref().and_then(AddRawMessageWithFlagsImap::new)
+                    });
+            }
+            #[cfg(feature = "notmuch-backend")]
+            Some(BackendKind::Notmuch) => {
+                backend_builder = backend_builder.with_add_raw_message(|ctx| {
+                    ctx.notmuch.as_ref().and_then(AddRawMessageNotmuch::new)
+                });
+            }
+            _ => (),
+        }
+
+        let peek_msgs = deserialized_account_config
+            .message
+            .as_ref()
+            .and_then(|msg| msg.peek.as_ref())
+            .and_then(|peek| peek.backend.as_ref())
+            .or_else(|| deserialized_account_config.backend.as_ref());
+
+        match peek_msgs {
+            Some(BackendKind::Maildir) => {
+                backend_builder = backend_builder.with_peek_messages(|ctx| {
+                    ctx.maildir.as_ref().and_then(PeekMessagesMaildir::new)
+                });
+            }
+            #[cfg(feature = "imap-backend")]
+            Some(BackendKind::Imap) => {
+                backend_builder = backend_builder
+                    .with_peek_messages(|ctx| ctx.imap.as_ref().and_then(PeekMessagesImap::new));
+            }
+            #[cfg(feature = "notmuch-backend")]
+            Some(BackendKind::Notmuch) => {
+                backend_builder = backend_builder.with_peek_messages(|ctx| {
+                    ctx.notmuch.as_ref().and_then(PeekMessagesNotmuch::new)
+                });
+            }
+            _ => (),
+        }
+
+        let get_msgs = deserialized_account_config
+            .message
+            .as_ref()
+            .and_then(|msg| msg.get.as_ref())
+            .and_then(|get| get.backend.as_ref())
+            .or_else(|| deserialized_account_config.backend.as_ref());
+
+        match get_msgs {
+            #[cfg(feature = "imap-backend")]
+            Some(BackendKind::Imap) => {
+                backend_builder = backend_builder
+                    .with_get_messages(|ctx| ctx.imap.as_ref().and_then(GetMessagesImap::new));
+            }
+            #[cfg(feature = "notmuch-backend")]
+            Some(BackendKind::Notmuch) => {
+                backend_builder = backend_builder.with_get_messages(|ctx| {
+                    ctx.notmuch.as_ref().and_then(GetMessagesNotmuch::new)
+                });
+            }
+            _ => (),
+        }
+
+        let copy_msgs = deserialized_account_config
+            .message
+            .as_ref()
+            .and_then(|msg| msg.copy.as_ref())
+            .and_then(|copy| copy.backend.as_ref())
+            .or_else(|| deserialized_account_config.backend.as_ref());
+
+        match copy_msgs {
+            Some(BackendKind::Maildir) => {
+                backend_builder = backend_builder.with_copy_messages(|ctx| {
+                    ctx.maildir.as_ref().and_then(CopyMessagesMaildir::new)
+                });
+            }
+            #[cfg(feature = "imap-backend")]
+            Some(BackendKind::Imap) => {
+                backend_builder = backend_builder
+                    .with_copy_messages(|ctx| ctx.imap.as_ref().and_then(CopyMessagesImap::new));
+            }
+            #[cfg(feature = "notmuch-backend")]
+            Some(BackendKind::Notmuch) => {
+                backend_builder = backend_builder.with_copy_messages(|ctx| {
+                    ctx.notmuch.as_ref().and_then(CopyMessagesNotmuch::new)
+                });
+            }
+            _ => (),
+        }
+
+        let move_msgs = deserialized_account_config
+            .message
+            .as_ref()
+            .and_then(|msg| msg.move_.as_ref())
+            .and_then(|move_| move_.backend.as_ref())
+            .or_else(|| deserialized_account_config.backend.as_ref());
+
+        match move_msgs {
+            Some(BackendKind::Maildir) => {
+                backend_builder = backend_builder.with_move_messages(|ctx| {
+                    ctx.maildir.as_ref().and_then(MoveMessagesMaildir::new)
+                });
+            }
+            #[cfg(feature = "imap-backend")]
+            Some(BackendKind::Imap) => {
+                backend_builder = backend_builder
+                    .with_move_messages(|ctx| ctx.imap.as_ref().and_then(MoveMessagesImap::new));
+            }
+            #[cfg(feature = "notmuch-backend")]
+            Some(BackendKind::Notmuch) => {
+                backend_builder = backend_builder.with_move_messages(|ctx| {
+                    ctx.notmuch.as_ref().and_then(MoveMessagesNotmuch::new)
                 });
             }
             _ => (),
