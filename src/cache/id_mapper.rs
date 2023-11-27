@@ -36,6 +36,7 @@ impl IdMapper {
         db_path
     }
 
+    // FIXME
     pub fn new(backend: &Backend, account_config: &AccountConfig, folder: &str) -> Result<Self> {
         Ok(IdMapper::Dummy)
 

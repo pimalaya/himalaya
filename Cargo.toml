@@ -93,21 +93,21 @@ version = "1.16.0"
 [dependencies.email-lib]
 # version = "=0.15.3"
 default-features = false
-path = "/home/soywod/sourcehut/pimalaya/email"
+git = "https://git.sr.ht/~soywod/pimalaya"
 
 [dependencies.keyring-lib]
 version = "=0.1.0"
 
 [dependencies.oauth-lib]
 # version = "=0.1.0"
-path = "/home/soywod/sourcehut/pimalaya/oauth"
+git = "https://git.sr.ht/~soywod/pimalaya"
 
 [dependencies.process-lib]
 version = "=0.1.0"
 
 [dependencies.mml-lib]
 # version = "=1.0.1"
-path = "/home/soywod/sourcehut/pimalaya/mml"
+git = "https://git.sr.ht/~soywod/pimalaya"
 
 [dependencies.secret-lib]
 version = "=0.1.0"
@@ -121,7 +121,7 @@ version = "1.0"
 
 [dependencies.shellexpand-utils]
 # version = "=0.1.0"
-path = "/home/soywod/sourcehut/pimalaya/shellexpand-utils"
+git = "https://git.sr.ht/~soywod/pimalaya"
 
 [dependencies.termcolor]
 version = "1.1"
