@@ -16,18 +16,15 @@ use crate::{
     backend::Backend,
     printer::{PrintTableOpts, Printer},
     ui::editor,
-    Envelopes, IdMapper,
 };
 
 pub async fn attachments<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    id_mapper: &IdMapper,
     backend: &Backend,
     folder: &str,
     ids: Vec<&str>,
 ) -> Result<()> {
-    let ids = Id::multiple(id_mapper.get_ids(ids)?);
     let emails = backend.get_messages(&folder, &ids).await?;
     let mut index = 0;
 
@@ -77,13 +74,11 @@ pub async fn attachments<P: Printer>(
 
 pub async fn copy<P: Printer>(
     printer: &mut P,
-    id_mapper: &IdMapper,
     backend: &Backend,
     from_folder: &str,
     to_folder: &str,
     ids: Vec<&str>,
 ) -> Result<()> {
-    let ids = Id::multiple(id_mapper.get_ids(ids)?);
     backend
         .copy_messages(&from_folder, &to_folder, &ids)
         .await?;
@@ -92,12 +87,10 @@ pub async fn copy<P: Printer>(
 
 pub async fn delete<P: Printer>(
     printer: &mut P,
-    id_mapper: &IdMapper,
     backend: &Backend,
     folder: &str,
     ids: Vec<&str>,
 ) -> Result<()> {
-    let ids = Id::multiple(id_mapper.get_ids(ids)?);
     backend.delete_messages(&folder, &ids).await?;
     printer.print("Email(s) successfully deleted!")
 }
@@ -105,16 +98,14 @@ pub async fn delete<P: Printer>(
 pub async fn forward<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    id_mapper: &IdMapper,
     backend: &Backend,
     folder: &str,
     id: &str,
     headers: Option<Vec<(&str, &str)>>,
     body: Option<&str>,
 ) -> Result<()> {
-    let id = Id::single(id_mapper.get_id(id)?);
     let tpl = backend
-        .get_messages(&folder, &id)
+        .get_messages(&folder, &[id])
         .await?
         .first()
         .ok_or_else(|| anyhow!("cannot find email {}", id))?
@@ -131,7 +122,6 @@ pub async fn forward<P: Printer>(
 pub async fn list<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    id_mapper: &IdMapper,
     backend: &Backend,
     folder: &str,
     max_width: Option<usize>,
@@ -141,11 +131,7 @@ pub async fn list<P: Printer>(
     let page_size = page_size.unwrap_or(config.email_listing_page_size());
     debug!("page size: {}", page_size);
 
-    let envelopes = Envelopes::from_backend(
-        config,
-        id_mapper,
-        backend.list_envelopes(&folder, page_size, page).await?,
-    )?;
+    let envelopes = backend.list_envelopes(&folder, page_size, page).await?;
     trace!("envelopes: {:?}", envelopes);
 
     printer.print_table(
@@ -190,13 +176,11 @@ pub async fn mailto<P: Printer>(
 
 pub async fn move_<P: Printer>(
     printer: &mut P,
-    id_mapper: &IdMapper,
     backend: &Backend,
     from_folder: &str,
     to_folder: &str,
     ids: Vec<&str>,
 ) -> Result<()> {
-    let ids = Id::multiple(id_mapper.get_ids(ids)?);
     backend
         .move_messages(&from_folder, &to_folder, &ids)
         .await?;
@@ -206,7 +190,6 @@ pub async fn move_<P: Printer>(
 pub async fn read<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    id_mapper: &IdMapper,
     backend: &Backend,
     folder: &str,
     ids: Vec<&str>,
@@ -214,7 +197,6 @@ pub async fn read<P: Printer>(
     raw: bool,
     headers: Vec<&str>,
 ) -> Result<()> {
-    let ids = Id::multiple(id_mapper.get_ids(ids)?);
     let emails = backend.get_messages(&folder, &ids).await?;
 
     let mut glue = "";
@@ -249,7 +231,6 @@ pub async fn read<P: Printer>(
 pub async fn reply<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    id_mapper: &IdMapper,
     backend: &Backend,
     folder: &str,
     id: &str,
@@ -257,9 +238,8 @@ pub async fn reply<P: Printer>(
     headers: Option<Vec<(&str, &str)>>,
     body: Option<&str>,
 ) -> Result<()> {
-    let id = Id::single(id_mapper.get_id(id)?);
     let tpl = backend
-        .get_messages(folder, &id)
+        .get_messages(folder, &[id])
         .await?
         .first()
         .ok_or_else(|| anyhow!("cannot find email {}", id))?
@@ -271,13 +251,14 @@ pub async fn reply<P: Printer>(
         .await?;
     trace!("initial template: {tpl}");
     editor::edit_tpl_with_editor(config, printer, backend, tpl).await?;
-    backend.add_flag(&folder, &id, Flag::Answered).await?;
+    backend
+        .add_flag(&folder, &Id::single(id), Flag::Answered)
+        .await?;
     Ok(())
 }
 
 pub async fn save<P: Printer>(
     printer: &mut P,
-    id_mapper: &IdMapper,
     backend: &Backend,
     folder: &str,
     raw_email: String,
@@ -295,10 +276,9 @@ pub async fn save<P: Printer>(
             .join("\r\n")
     };
 
-    let id = backend
+    backend
         .add_raw_message(&folder, raw_email.as_bytes())
         .await?;
-    id_mapper.create_alias(&*id)?;
 
     Ok(())
 }
@@ -306,7 +286,6 @@ pub async fn save<P: Printer>(
 pub async fn search<P: Printer>(
     _config: &AccountConfig,
     _printer: &mut P,
-    _id_mapper: &IdMapper,
     _backend: &Backend,
     _folder: &str,
     _query: String,
@@ -334,7 +313,6 @@ pub async fn search<P: Printer>(
 pub async fn sort<P: Printer>(
     _config: &AccountConfig,
     _printer: &mut P,
-    _id_mapper: &IdMapper,
     _backend: &Backend,
     _folder: &str,
     _sort: String,

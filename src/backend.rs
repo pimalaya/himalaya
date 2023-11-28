@@ -1,7 +1,6 @@
-use std::{collections::HashMap, ops::Deref};
-
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use async_trait::async_trait;
+use std::ops::Deref;
 
 #[cfg(feature = "imap-backend")]
 use email::imap::{ImapSessionBuilder, ImapSessionSync};
@@ -9,7 +8,6 @@ use email::imap::{ImapSessionBuilder, ImapSessionSync};
 use email::smtp::{SmtpClientBuilder, SmtpClientSync};
 use email::{
     account::AccountConfig,
-    config::Config,
     email::{
         envelope::{
             get::{imap::GetEnvelopeImap, maildir::GetEnvelopeMaildir},
@@ -32,6 +30,8 @@ use email::{
             send_raw::{sendmail::SendRawMessageSendmail, smtp::SendRawMessageSmtp},
         },
     },
+    envelope::{Id, SingleId},
+    flag::Flags,
     folder::{
         add::{imap::AddFolderImap, maildir::AddFolderMaildir},
         delete::{imap::DeleteFolderImap, maildir::DeleteFolderMaildir},
@@ -40,16 +40,19 @@ use email::{
         purge::imap::PurgeFolderImap,
     },
     maildir::{MaildirConfig, MaildirSessionBuilder, MaildirSessionSync},
+    message::Messages,
     sendmail::SendmailContext,
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{account::DeserializedAccountConfig, config::DeserializedConfig};
+use crate::{account::DeserializedAccountConfig, Envelopes, IdMapper};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum BackendKind {
     Maildir,
+    #[serde(skip_deserializing)]
+    MaildirForSync,
     #[cfg(feature = "imap-backend")]
     Imap,
     #[cfg(feature = "notmuch-backend")]
@@ -61,8 +64,8 @@ pub enum BackendKind {
 
 #[derive(Clone, Default)]
 pub struct BackendContextBuilder {
-    sync_cache: Option<MaildirSessionBuilder>,
     maildir: Option<MaildirSessionBuilder>,
+    maildir_for_sync: Option<MaildirSessionBuilder>,
     #[cfg(feature = "imap-backend")]
     imap: Option<ImapSessionBuilder>,
     #[cfg(feature = "smtp-sender")]
@@ -81,8 +84,8 @@ impl email::backend::BackendContextBuilder for BackendContextBuilder {
             ctx.maildir = Some(maildir.build().await?);
         }
 
-        if let Some(maildir) = self.sync_cache {
-            ctx.sync_cache = Some(maildir.build().await?);
+        if let Some(maildir) = self.maildir_for_sync {
+            ctx.maildir_for_sync = Some(maildir.build().await?);
         }
 
         #[cfg(feature = "imap-backend")]
@@ -110,8 +113,8 @@ impl email::backend::BackendContextBuilder for BackendContextBuilder {
 
 #[derive(Default)]
 pub struct BackendContext {
-    pub sync_cache: Option<MaildirSessionSync>,
     pub maildir: Option<MaildirSessionSync>,
+    pub maildir_for_sync: Option<MaildirSessionSync>,
     #[cfg(feature = "imap-backend")]
     pub imap: Option<ImapSessionSync>,
     #[cfg(feature = "smtp-sender")]
@@ -119,55 +122,178 @@ pub struct BackendContext {
     pub sendmail: Option<SendmailContext>,
 }
 
-pub struct BackendBuilder(pub email::backend::BackendBuilder<BackendContextBuilder>);
+pub struct Backend {
+    toml_account_config: DeserializedAccountConfig,
+    backend: email::backend::Backend<BackendContext>,
+}
 
-pub type Backend = email::backend::Backend<BackendContext>;
+impl Backend {
+    fn build_id_mapper(
+        &self,
+        folder: &str,
+        backend_kind: Option<&BackendKind>,
+    ) -> Result<IdMapper> {
+        let mut id_mapper = IdMapper::Dummy;
+
+        match backend_kind {
+            Some(BackendKind::Maildir) => {
+                if let Some(mdir_config) = &self.toml_account_config.maildir {
+                    id_mapper = IdMapper::new(
+                        &self.backend.account_config,
+                        folder,
+                        mdir_config.root_dir.clone(),
+                    )?;
+                }
+            }
+            Some(BackendKind::MaildirForSync) => {
+                id_mapper = IdMapper::new(
+                    &self.backend.account_config,
+                    folder,
+                    self.backend.account_config.sync_dir()?,
+                )?;
+            }
+            #[cfg(feature = "notmuch-backend")]
+            Some(BackendKind::Notmuch) => {
+                if let Some(notmuch_config) = &self.toml_account_config.notmuch {
+                    id_mapper = IdMapper::new(
+                        &self.backend.account_config,
+                        folder,
+                        mdir_config.root_dir.clone(),
+                    )?;
+                }
+            }
+            _ => (),
+        };
+
+        Ok(id_mapper)
+    }
+
+    pub async fn list_envelopes(
+        &self,
+        folder: &str,
+        page_size: usize,
+        page: usize,
+    ) -> Result<Envelopes> {
+        let backend_kind = self.toml_account_config.list_envelopes_kind();
+        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
+        let envelopes = self.backend.list_envelopes(folder, page_size, page).await?;
+        let envelopes = Envelopes::from_backend(&self.account_config, &id_mapper, envelopes)?;
+        Ok(envelopes)
+    }
+
+    pub async fn add_flags(&self, folder: &str, ids: &[&str], flags: &Flags) -> Result<()> {
+        let backend_kind = self.toml_account_config.add_flags_kind();
+        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
+        let ids = Id::multiple(id_mapper.get_ids(ids)?);
+        self.backend.add_flags(folder, &ids, flags).await
+    }
+
+    pub async fn set_flags(&self, folder: &str, ids: &[&str], flags: &Flags) -> Result<()> {
+        let backend_kind = self.toml_account_config.set_flags_kind();
+        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
+        let ids = Id::multiple(id_mapper.get_ids(ids)?);
+        self.backend.set_flags(folder, &ids, flags).await
+    }
+
+    pub async fn remove_flags(&self, folder: &str, ids: &[&str], flags: &Flags) -> Result<()> {
+        let backend_kind = self.toml_account_config.remove_flags_kind();
+        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
+        let ids = Id::multiple(id_mapper.get_ids(ids)?);
+        self.backend.remove_flags(folder, &ids, flags).await
+    }
+
+    pub async fn get_messages(&self, folder: &str, ids: &[&str]) -> Result<Messages> {
+        let backend_kind = self.toml_account_config.get_messages_kind();
+        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
+        let ids = Id::multiple(id_mapper.get_ids(ids)?);
+        self.backend.get_messages(folder, &ids).await
+    }
+
+    pub async fn copy_messages(
+        &self,
+        from_folder: &str,
+        to_folder: &str,
+        ids: &[&str],
+    ) -> Result<()> {
+        let backend_kind = self.toml_account_config.move_messages_kind();
+        let id_mapper = self.build_id_mapper(from_folder, backend_kind)?;
+        let ids = Id::multiple(id_mapper.get_ids(ids)?);
+        self.backend
+            .copy_messages(from_folder, to_folder, &ids)
+            .await
+    }
+
+    pub async fn move_messages(
+        &self,
+        from_folder: &str,
+        to_folder: &str,
+        ids: &[&str],
+    ) -> Result<()> {
+        let backend_kind = self.toml_account_config.move_messages_kind();
+        let id_mapper = self.build_id_mapper(from_folder, backend_kind)?;
+        let ids = Id::multiple(id_mapper.get_ids(ids)?);
+        self.backend
+            .move_messages(from_folder, to_folder, &ids)
+            .await
+    }
+
+    pub async fn delete_messages(&self, folder: &str, ids: &[&str]) -> Result<()> {
+        let backend_kind = self.toml_account_config.delete_messages_kind();
+        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
+        let ids = Id::multiple(id_mapper.get_ids(ids)?);
+        self.backend.delete_messages(folder, &ids).await
+    }
+
+    pub async fn add_raw_message(&self, folder: &str, email: &[u8]) -> Result<SingleId> {
+        let backend_kind = self.toml_account_config.add_raw_message_kind();
+        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
+        let id = self.backend.add_raw_message(folder, email).await?;
+        id_mapper.create_alias(&*id)?;
+        Ok(id)
+    }
+}
+
+impl Deref for Backend {
+    type Target = email::backend::Backend<BackendContext>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.backend
+    }
+}
+
+pub struct BackendBuilder {
+    toml_account_config: DeserializedAccountConfig,
+    builder: email::backend::BackendBuilder<BackendContextBuilder>,
+}
 
 impl BackendBuilder {
     pub async fn new(
-        deserialized_account_config: DeserializedAccountConfig,
+        toml_account_config: DeserializedAccountConfig,
         account_config: AccountConfig,
-        disable_cache: bool,
     ) -> Result<Self> {
         let backend_ctx_builder = BackendContextBuilder {
-            maildir: deserialized_account_config
-                .maildir
-                .as_ref()
-                .map(|mdir_config| {
-                    MaildirSessionBuilder::new(account_config.clone(), mdir_config.clone())
-                }),
-            sync_cache: if account_config.sync && !disable_cache {
-                Some(MaildirSessionBuilder::new(
-                    account_config.clone(),
-                    MaildirConfig {
-                        root_dir: account_config.sync_dir()?,
-                    },
-                ))
-            } else {
-                None
-            },
+            maildir: toml_account_config.maildir.as_ref().map(|mdir_config| {
+                MaildirSessionBuilder::new(account_config.clone(), mdir_config.clone())
+            }),
+            maildir_for_sync: Some(MaildirSessionBuilder::new(
+                account_config.clone(),
+                MaildirConfig {
+                    root_dir: account_config.sync_dir()?,
+                },
+            )),
             #[cfg(feature = "imap-backend")]
-            imap: deserialized_account_config
-                .imap
-                .as_ref()
-                .map(|imap_config| {
-                    ImapSessionBuilder::new(account_config.clone(), imap_config.clone())
-                }),
+            imap: toml_account_config.imap.as_ref().map(|imap_config| {
+                ImapSessionBuilder::new(account_config.clone(), imap_config.clone())
+            }),
             #[cfg(feature = "notmuch-backend")]
-            notmuch: deserialized_account_config
-                .notmuch
-                .as_ref()
-                .map(|notmuch_config| {
-                    NotmuchSessionBuilder::new(account_config.clone(), notmuch_config.clone())
-                }),
+            notmuch: toml_account_config.notmuch.as_ref().map(|notmuch_config| {
+                NotmuchSessionBuilder::new(account_config.clone(), notmuch_config.clone())
+            }),
             #[cfg(feature = "smtp-sender")]
-            smtp: deserialized_account_config
-                .smtp
-                .as_ref()
-                .map(|smtp_config| {
-                    SmtpClientBuilder::new(account_config.clone(), smtp_config.clone())
-                }),
-            sendmail: deserialized_account_config
+            smtp: toml_account_config.smtp.as_ref().map(|smtp_config| {
+                SmtpClientBuilder::new(account_config.clone(), smtp_config.clone())
+            }),
+            sendmail: toml_account_config
                 .sendmail
                 .as_ref()
                 .map(|sendmail_config| {
@@ -178,21 +304,17 @@ impl BackendBuilder {
         let mut backend_builder =
             email::backend::BackendBuilder::new(account_config.clone(), backend_ctx_builder);
 
-        let add_folder = deserialized_account_config
-            .folder
-            .as_ref()
-            .and_then(|folder| folder.add.as_ref())
-            .and_then(|add| add.backend.as_ref())
-            .or_else(|| deserialized_account_config.backend.as_ref());
-
-        match add_folder {
-            Some(_) if account_config.sync && !disable_cache => {
-                backend_builder = backend_builder
-                    .with_add_folder(|ctx| ctx.sync_cache.as_ref().and_then(AddFolderMaildir::new));
-            }
+        match toml_account_config.add_folder_kind() {
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder
                     .with_add_folder(|ctx| ctx.maildir.as_ref().and_then(AddFolderMaildir::new));
+            }
+            Some(BackendKind::MaildirForSync) => {
+                backend_builder = backend_builder.with_add_folder(|ctx| {
+                    ctx.maildir_for_sync
+                        .as_ref()
+                        .and_then(AddFolderMaildir::new)
+                });
             }
             #[cfg(feature = "imap-backend")]
             Some(BackendKind::Imap) => {
@@ -207,22 +329,17 @@ impl BackendBuilder {
             _ => (),
         }
 
-        let list_folders = deserialized_account_config
-            .folder
-            .as_ref()
-            .and_then(|folder| folder.list.as_ref())
-            .and_then(|list| list.backend.as_ref())
-            .or_else(|| deserialized_account_config.backend.as_ref());
-
-        match list_folders {
-            Some(_) if account_config.sync && !disable_cache => {
-                backend_builder = backend_builder.with_list_folders(|ctx| {
-                    ctx.sync_cache.as_ref().and_then(ListFoldersMaildir::new)
-                });
-            }
+        match toml_account_config.list_folders_kind() {
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder.with_list_folders(|ctx| {
                     ctx.maildir.as_ref().and_then(ListFoldersMaildir::new)
+                });
+            }
+            Some(BackendKind::MaildirForSync) => {
+                backend_builder = backend_builder.with_list_folders(|ctx| {
+                    ctx.maildir_for_sync
+                        .as_ref()
+                        .and_then(ListFoldersMaildir::new)
                 });
             }
             #[cfg(feature = "imap-backend")]
@@ -239,22 +356,17 @@ impl BackendBuilder {
             _ => (),
         }
 
-        let expunge_folder = deserialized_account_config
-            .folder
-            .as_ref()
-            .and_then(|folder| folder.expunge.as_ref())
-            .and_then(|expunge| expunge.backend.as_ref())
-            .or_else(|| deserialized_account_config.backend.as_ref());
-
-        match expunge_folder {
-            Some(_) if account_config.sync && !disable_cache => {
-                backend_builder = backend_builder.with_expunge_folder(|ctx| {
-                    ctx.sync_cache.as_ref().and_then(ExpungeFolderMaildir::new)
-                });
-            }
+        match toml_account_config.expunge_folder_kind() {
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder.with_expunge_folder(|ctx| {
                     ctx.maildir.as_ref().and_then(ExpungeFolderMaildir::new)
+                });
+            }
+            Some(BackendKind::MaildirForSync) => {
+                backend_builder = backend_builder.with_expunge_folder(|ctx| {
+                    ctx.maildir_for_sync
+                        .as_ref()
+                        .and_then(ExpungeFolderMaildir::new)
                 });
             }
             #[cfg(feature = "imap-backend")]
@@ -271,24 +383,16 @@ impl BackendBuilder {
             _ => (),
         }
 
-        let purge_folder = deserialized_account_config
-            .folder
-            .as_ref()
-            .and_then(|folder| folder.purge.as_ref())
-            .and_then(|purge| purge.backend.as_ref())
-            .or_else(|| deserialized_account_config.backend.as_ref());
-
-        match purge_folder {
-            // TODO
-            // Some(_) if account_config.sync && !disable_cache => {
-            //     backend_builder = backend_builder.with_purge_folder(|ctx| {
-            //         ctx.sync_cache.as_ref().and_then(PurgeFolderMaildir::new)
-            //     });
-            // }
+        match toml_account_config.purge_folder_kind() {
             // TODO
             // Some(BackendKind::Maildir) => {
             //     backend_builder = backend_builder
             //         .with_purge_folder(|ctx| ctx.maildir.as_ref().and_then(PurgeFolderMaildir::new));
+            // }
+            // TODO
+            // Some(BackendKind::MaildirForSync) => {
+            //     backend_builder = backend_builder
+            //         .with_purge_folder(|ctx| ctx.maildir_for_sync.as_ref().and_then(PurgeFolderMaildir::new));
             // }
             #[cfg(feature = "imap-backend")]
             Some(BackendKind::Imap) => {
@@ -304,22 +408,17 @@ impl BackendBuilder {
             _ => (),
         }
 
-        let delete_folder = deserialized_account_config
-            .folder
-            .as_ref()
-            .and_then(|folder| folder.delete.as_ref())
-            .and_then(|delete| delete.backend.as_ref())
-            .or_else(|| deserialized_account_config.backend.as_ref());
-
-        match delete_folder {
-            Some(_) if account_config.sync && !disable_cache => {
-                backend_builder = backend_builder.with_delete_folder(|ctx| {
-                    ctx.sync_cache.as_ref().and_then(DeleteFolderMaildir::new)
-                });
-            }
+        match toml_account_config.delete_folder_kind() {
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder.with_delete_folder(|ctx| {
                     ctx.maildir.as_ref().and_then(DeleteFolderMaildir::new)
+                });
+            }
+            Some(BackendKind::MaildirForSync) => {
+                backend_builder = backend_builder.with_delete_folder(|ctx| {
+                    ctx.maildir_for_sync
+                        .as_ref()
+                        .and_then(DeleteFolderMaildir::new)
                 });
             }
             #[cfg(feature = "imap-backend")]
@@ -336,22 +435,17 @@ impl BackendBuilder {
             _ => (),
         }
 
-        let get_envelope = deserialized_account_config
-            .envelope
-            .as_ref()
-            .and_then(|envelope| envelope.get.as_ref())
-            .and_then(|get| get.backend.as_ref())
-            .or_else(|| deserialized_account_config.backend.as_ref());
-
-        match get_envelope {
-            Some(_) if account_config.sync && !disable_cache => {
-                backend_builder = backend_builder.with_get_envelope(|ctx| {
-                    ctx.sync_cache.as_ref().and_then(GetEnvelopeMaildir::new)
-                });
-            }
+        match toml_account_config.get_envelope_kind() {
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder.with_get_envelope(|ctx| {
                     ctx.maildir.as_ref().and_then(GetEnvelopeMaildir::new)
+                });
+            }
+            Some(BackendKind::MaildirForSync) => {
+                backend_builder = backend_builder.with_get_envelope(|ctx| {
+                    ctx.maildir_for_sync
+                        .as_ref()
+                        .and_then(GetEnvelopeMaildir::new)
                 });
             }
             #[cfg(feature = "imap-backend")]
@@ -368,22 +462,17 @@ impl BackendBuilder {
             _ => (),
         }
 
-        let list_envelopes = deserialized_account_config
-            .envelope
-            .as_ref()
-            .and_then(|envelope| envelope.list.as_ref())
-            .and_then(|send| send.backend.as_ref())
-            .or_else(|| deserialized_account_config.backend.as_ref());
-
-        match list_envelopes {
-            Some(_) if account_config.sync && !disable_cache => {
-                backend_builder = backend_builder.with_list_envelopes(|ctx| {
-                    ctx.sync_cache.as_ref().and_then(ListEnvelopesMaildir::new)
-                });
-            }
+        match toml_account_config.list_envelopes_kind() {
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder.with_list_envelopes(|ctx| {
                     ctx.maildir.as_ref().and_then(ListEnvelopesMaildir::new)
+                });
+            }
+            Some(BackendKind::MaildirForSync) => {
+                backend_builder = backend_builder.with_list_envelopes(|ctx| {
+                    ctx.maildir_for_sync
+                        .as_ref()
+                        .and_then(ListEnvelopesMaildir::new)
                 });
             }
             #[cfg(feature = "imap-backend")]
@@ -400,21 +489,15 @@ impl BackendBuilder {
             _ => (),
         }
 
-        let add_flags = deserialized_account_config
-            .flag
-            .as_ref()
-            .and_then(|flag| flag.add.as_ref())
-            .and_then(|add| add.backend.as_ref())
-            .or_else(|| deserialized_account_config.backend.as_ref());
-
-        match add_flags {
-            Some(_) if account_config.sync && !disable_cache => {
-                backend_builder = backend_builder
-                    .with_add_flags(|ctx| ctx.sync_cache.as_ref().and_then(AddFlagsMaildir::new));
-            }
+        match toml_account_config.add_flags_kind() {
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder
                     .with_add_flags(|ctx| ctx.maildir.as_ref().and_then(AddFlagsMaildir::new));
+            }
+            Some(BackendKind::MaildirForSync) => {
+                backend_builder = backend_builder.with_add_flags(|ctx| {
+                    ctx.maildir_for_sync.as_ref().and_then(AddFlagsMaildir::new)
+                });
             }
             #[cfg(feature = "imap-backend")]
             Some(BackendKind::Imap) => {
@@ -429,21 +512,15 @@ impl BackendBuilder {
             _ => (),
         }
 
-        let set_flags = deserialized_account_config
-            .flag
-            .as_ref()
-            .and_then(|flag| flag.set.as_ref())
-            .and_then(|set| set.backend.as_ref())
-            .or_else(|| deserialized_account_config.backend.as_ref());
-
-        match set_flags {
-            Some(_) if account_config.sync && !disable_cache => {
-                backend_builder = backend_builder
-                    .with_set_flags(|ctx| ctx.sync_cache.as_ref().and_then(SetFlagsMaildir::new));
-            }
+        match toml_account_config.set_flags_kind() {
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder
                     .with_set_flags(|ctx| ctx.maildir.as_ref().and_then(SetFlagsMaildir::new));
+            }
+            Some(BackendKind::MaildirForSync) => {
+                backend_builder = backend_builder.with_set_flags(|ctx| {
+                    ctx.maildir_for_sync.as_ref().and_then(SetFlagsMaildir::new)
+                });
             }
             #[cfg(feature = "imap-backend")]
             Some(BackendKind::Imap) => {
@@ -458,22 +535,17 @@ impl BackendBuilder {
             _ => (),
         }
 
-        let remove_flags = deserialized_account_config
-            .flag
-            .as_ref()
-            .and_then(|flag| flag.remove.as_ref())
-            .and_then(|remove| remove.backend.as_ref())
-            .or_else(|| deserialized_account_config.backend.as_ref());
-
-        match remove_flags {
-            Some(_) if account_config.sync && !disable_cache => {
-                backend_builder = backend_builder.with_remove_flags(|ctx| {
-                    ctx.sync_cache.as_ref().and_then(RemoveFlagsMaildir::new)
-                });
-            }
+        match toml_account_config.remove_flags_kind() {
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder.with_remove_flags(|ctx| {
                     ctx.maildir.as_ref().and_then(RemoveFlagsMaildir::new)
+                });
+            }
+            Some(BackendKind::MaildirForSync) => {
+                backend_builder = backend_builder.with_remove_flags(|ctx| {
+                    ctx.maildir_for_sync
+                        .as_ref()
+                        .and_then(RemoveFlagsMaildir::new)
                 });
             }
             #[cfg(feature = "imap-backend")]
@@ -490,14 +562,7 @@ impl BackendBuilder {
             _ => (),
         }
 
-        let send_msg = deserialized_account_config
-            .message
-            .as_ref()
-            .and_then(|msg| msg.send.as_ref())
-            .and_then(|send| send.backend.as_ref())
-            .or_else(|| deserialized_account_config.backend.as_ref());
-
-        match send_msg {
+        match toml_account_config.send_raw_message_kind() {
             #[cfg(feature = "smtp-sender")]
             Some(BackendKind::Smtp) => {
                 backend_builder = backend_builder.with_send_raw_message(|ctx| {
@@ -512,24 +577,17 @@ impl BackendBuilder {
             _ => (),
         }
 
-        let add_msg = deserialized_account_config
-            .message
-            .as_ref()
-            .and_then(|msg| msg.add.as_ref())
-            .and_then(|add| add.backend.as_ref())
-            .or_else(|| deserialized_account_config.backend.as_ref());
-
-        match add_msg {
-            Some(_) if account_config.sync && !disable_cache => {
+        match toml_account_config.add_raw_message_kind() {
+            Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder.with_add_raw_message_with_flags(|ctx| {
-                    ctx.sync_cache
+                    ctx.maildir
                         .as_ref()
                         .and_then(AddRawMessageWithFlagsMaildir::new)
                 });
             }
-            Some(BackendKind::Maildir) => {
+            Some(BackendKind::MaildirForSync) => {
                 backend_builder = backend_builder.with_add_raw_message_with_flags(|ctx| {
-                    ctx.maildir
+                    ctx.maildir_for_sync
                         .as_ref()
                         .and_then(AddRawMessageWithFlagsMaildir::new)
                 });
@@ -551,22 +609,17 @@ impl BackendBuilder {
             _ => (),
         }
 
-        let peek_msgs = deserialized_account_config
-            .message
-            .as_ref()
-            .and_then(|msg| msg.peek.as_ref())
-            .and_then(|peek| peek.backend.as_ref())
-            .or_else(|| deserialized_account_config.backend.as_ref());
-
-        match peek_msgs {
-            Some(_) if account_config.sync && !disable_cache => {
-                backend_builder = backend_builder.with_peek_messages(|ctx| {
-                    ctx.sync_cache.as_ref().and_then(PeekMessagesMaildir::new)
-                });
-            }
+        match toml_account_config.peek_messages_kind() {
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder.with_peek_messages(|ctx| {
                     ctx.maildir.as_ref().and_then(PeekMessagesMaildir::new)
+                });
+            }
+            Some(BackendKind::MaildirForSync) => {
+                backend_builder = backend_builder.with_peek_messages(|ctx| {
+                    ctx.maildir_for_sync
+                        .as_ref()
+                        .and_then(PeekMessagesMaildir::new)
                 });
             }
             #[cfg(feature = "imap-backend")]
@@ -583,14 +636,7 @@ impl BackendBuilder {
             _ => (),
         }
 
-        let get_msgs = deserialized_account_config
-            .message
-            .as_ref()
-            .and_then(|msg| msg.get.as_ref())
-            .and_then(|get| get.backend.as_ref())
-            .or_else(|| deserialized_account_config.backend.as_ref());
-
-        match get_msgs {
+        match toml_account_config.get_messages_kind() {
             #[cfg(feature = "imap-backend")]
             Some(BackendKind::Imap) => {
                 backend_builder = backend_builder
@@ -605,22 +651,17 @@ impl BackendBuilder {
             _ => (),
         }
 
-        let copy_msgs = deserialized_account_config
-            .message
-            .as_ref()
-            .and_then(|msg| msg.copy.as_ref())
-            .and_then(|copy| copy.backend.as_ref())
-            .or_else(|| deserialized_account_config.backend.as_ref());
-
-        match copy_msgs {
-            Some(_) if account_config.sync && !disable_cache => {
-                backend_builder = backend_builder.with_copy_messages(|ctx| {
-                    ctx.sync_cache.as_ref().and_then(CopyMessagesMaildir::new)
-                });
-            }
+        match toml_account_config.copy_messages_kind() {
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder.with_copy_messages(|ctx| {
                     ctx.maildir.as_ref().and_then(CopyMessagesMaildir::new)
+                });
+            }
+            Some(BackendKind::MaildirForSync) => {
+                backend_builder = backend_builder.with_copy_messages(|ctx| {
+                    ctx.maildir_for_sync
+                        .as_ref()
+                        .and_then(CopyMessagesMaildir::new)
                 });
             }
             #[cfg(feature = "imap-backend")]
@@ -637,22 +678,17 @@ impl BackendBuilder {
             _ => (),
         }
 
-        let move_msgs = deserialized_account_config
-            .message
-            .as_ref()
-            .and_then(|msg| msg.move_.as_ref())
-            .and_then(|move_| move_.backend.as_ref())
-            .or_else(|| deserialized_account_config.backend.as_ref());
-
-        match move_msgs {
-            Some(_) if account_config.sync && !disable_cache => {
-                backend_builder = backend_builder.with_move_messages(|ctx| {
-                    ctx.sync_cache.as_ref().and_then(MoveMessagesMaildir::new)
-                });
-            }
+        match toml_account_config.move_messages_kind() {
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder.with_move_messages(|ctx| {
                     ctx.maildir.as_ref().and_then(MoveMessagesMaildir::new)
+                });
+            }
+            Some(BackendKind::MaildirForSync) => {
+                backend_builder = backend_builder.with_move_messages(|ctx| {
+                    ctx.maildir_for_sync
+                        .as_ref()
+                        .and_then(MoveMessagesMaildir::new)
                 });
             }
             #[cfg(feature = "imap-backend")]
@@ -669,10 +705,30 @@ impl BackendBuilder {
             _ => (),
         }
 
-        Ok(Self(backend_builder))
+        Ok(Self {
+            toml_account_config,
+            builder: backend_builder,
+        })
     }
 
     pub async fn build(self) -> Result<Backend> {
-        self.0.build().await
+        Ok(Backend {
+            toml_account_config: self.toml_account_config,
+            backend: self.builder.build().await?,
+        })
+    }
+}
+
+impl Deref for BackendBuilder {
+    type Target = email::backend::BackendBuilder<BackendContextBuilder>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.builder
+    }
+}
+
+impl Into<email::backend::BackendBuilder<BackendContextBuilder>> for BackendBuilder {
+    fn into(self) -> email::backend::BackendBuilder<BackendContextBuilder> {
+        self.builder
     }
 }

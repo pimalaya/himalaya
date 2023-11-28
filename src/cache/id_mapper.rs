@@ -1,11 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use email::account::AccountConfig;
-#[cfg(feature = "notmuch-backend")]
-use email::backend::NotmuchBackend;
 use log::{debug, trace};
 use std::path::{Path, PathBuf};
-
-use crate::backend::Backend;
 
 const ID_MAPPER_DB_FILE_NAME: &str = ".id-mapper.sqlite";
 
@@ -36,46 +32,28 @@ impl IdMapper {
         db_path
     }
 
-    // FIXME
-    pub fn new(backend: &Backend, account_config: &AccountConfig, folder: &str) -> Result<Self> {
-        Ok(IdMapper::Dummy)
+    pub fn new(account_config: &AccountConfig, folder: &str, db_path: PathBuf) -> Result<Self> {
+        let folder = account_config.get_folder_alias(folder)?;
+        let digest = md5::compute(account_config.name.clone() + &folder);
+        let table = format!("id_mapper_{digest:x}");
+        debug!("creating id mapper table {table} at {db_path:?}…");
 
-        // #[cfg(feature = "imap-backend")]
-        // if backend.as_any().is::<ImapBackend>() {
-        //     return Ok(IdMapper::Dummy);
-        // }
+        let db_path = Self::find_closest_db_path(db_path);
+        let conn = rusqlite::Connection::open(&db_path)
+            .with_context(|| format!("cannot open id mapper database at {db_path:?}"))?;
 
-        // let mut db_path = PathBuf::new();
+        let query = format!(
+            "CREATE TABLE IF NOT EXISTS {table} (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                internal_id TEXT UNIQUE
+            )",
+        );
+        trace!("create table query: {query:#?}");
 
-        // if let Some(backend) = backend.as_any().downcast_ref::<MaildirBackend>() {
-        //     db_path = Self::find_closest_db_path(backend.path())
-        // }
+        conn.execute(&query, [])
+            .context("cannot create id mapper table")?;
 
-        // #[cfg(feature = "notmuch-backend")]
-        // if let Some(backend) = backend.as_any().downcast_ref::<NotmuchBackend>() {
-        //     db_path = Self::find_closest_db_path(backend.path())
-        // }
-
-        // let folder = account_config.get_folder_alias(folder)?;
-        // let digest = md5::compute(account_config.name.clone() + &folder);
-        // let table = format!("id_mapper_{digest:x}");
-        // debug!("creating id mapper table {table} at {db_path:?}…");
-
-        // let conn = rusqlite::Connection::open(&db_path)
-        //     .with_context(|| format!("cannot open id mapper database at {db_path:?}"))?;
-
-        // let query = format!(
-        //     "CREATE TABLE IF NOT EXISTS {table} (
-        //         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        //         internal_id TEXT UNIQUE
-        //     )",
-        // );
-        // trace!("create table query: {query:#?}");
-
-        // conn.execute(&query, [])
-        //     .context("cannot create id mapper table")?;
-
-        // Ok(Self::Mapper(table, conn))
+        Ok(Self::Mapper(table, conn))
     }
 
     pub fn create_alias<I>(&self, id: I) -> Result<String>

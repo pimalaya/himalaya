@@ -2,27 +2,24 @@ use anyhow::{anyhow, Result};
 use atty::Stream;
 use email::{
     account::AccountConfig,
-    email::{envelope::Id, Flag, Message},
+    email::{Flag, Message},
 };
 use mml::MmlCompilerBuilder;
 use std::io::{stdin, BufRead};
 
-use crate::{backend::Backend, printer::Printer, IdMapper};
+use crate::{backend::Backend, printer::Printer};
 
 pub async fn forward<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    id_mapper: &IdMapper,
     backend: &Backend,
     folder: &str,
     id: &str,
     headers: Option<Vec<(&str, &str)>>,
     body: Option<&str>,
 ) -> Result<()> {
-    let ids = Id::multiple(id_mapper.get_ids([id])?);
-
     let tpl: String = backend
-        .get_messages(folder, &ids)
+        .get_messages(folder, &[id])
         .await?
         .first()
         .ok_or_else(|| anyhow!("cannot find email {}", id))?
@@ -39,7 +36,6 @@ pub async fn forward<P: Printer>(
 pub async fn reply<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    id_mapper: &IdMapper,
     backend: &Backend,
     folder: &str,
     id: &str,
@@ -47,10 +43,8 @@ pub async fn reply<P: Printer>(
     headers: Option<Vec<(&str, &str)>>,
     body: Option<&str>,
 ) -> Result<()> {
-    let ids = Id::multiple(id_mapper.get_ids([id])?);
-
     let tpl: String = backend
-        .get_messages(folder, &ids)
+        .get_messages(folder, &[id])
         .await?
         .first()
         .ok_or_else(|| anyhow!("cannot find email {}", id))?
@@ -68,7 +62,6 @@ pub async fn reply<P: Printer>(
 pub async fn save<P: Printer>(
     #[allow(unused_variables)] config: &AccountConfig,
     printer: &mut P,
-    id_mapper: &IdMapper,
     backend: &Backend,
     folder: &str,
     tpl: String,
@@ -91,8 +84,7 @@ pub async fn save<P: Printer>(
 
     let email = compiler.build(tpl.as_str())?.compile().await?.into_vec()?;
 
-    let id = backend.add_raw_message(folder, &email).await?;
-    id_mapper.create_alias(&*id)?;
+    backend.add_raw_message(folder, &email).await?;
 
     printer.print("Template successfully saved!")
 }

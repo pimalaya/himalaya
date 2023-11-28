@@ -86,3 +86,141 @@ pub struct DeserializedAccountConfig {
     #[serde(default, with = "OptionPgpConfigDef")]
     pub pgp: Option<PgpConfig>,
 }
+
+impl DeserializedAccountConfig {
+    pub fn add_folder_kind(&self) -> Option<&BackendKind> {
+        self.folder
+            .as_ref()
+            .and_then(|folder| folder.add.as_ref())
+            .and_then(|add| add.backend.as_ref())
+            .or_else(|| self.backend.as_ref())
+    }
+
+    pub fn list_folders_kind(&self) -> Option<&BackendKind> {
+        self.folder
+            .as_ref()
+            .and_then(|folder| folder.list.as_ref())
+            .and_then(|list| list.backend.as_ref())
+            .or_else(|| self.backend.as_ref())
+    }
+
+    pub fn expunge_folder_kind(&self) -> Option<&BackendKind> {
+        self.folder
+            .as_ref()
+            .and_then(|folder| folder.expunge.as_ref())
+            .and_then(|expunge| expunge.backend.as_ref())
+            .or_else(|| self.backend.as_ref())
+    }
+
+    pub fn purge_folder_kind(&self) -> Option<&BackendKind> {
+        self.folder
+            .as_ref()
+            .and_then(|folder| folder.purge.as_ref())
+            .and_then(|purge| purge.backend.as_ref())
+            .or_else(|| self.backend.as_ref())
+    }
+
+    pub fn delete_folder_kind(&self) -> Option<&BackendKind> {
+        self.folder
+            .as_ref()
+            .and_then(|folder| folder.delete.as_ref())
+            .and_then(|delete| delete.backend.as_ref())
+            .or_else(|| self.backend.as_ref())
+    }
+
+    pub fn get_envelope_kind(&self) -> Option<&BackendKind> {
+        self.envelope
+            .as_ref()
+            .and_then(|envelope| envelope.get.as_ref())
+            .and_then(|get| get.backend.as_ref())
+            .or_else(|| self.backend.as_ref())
+    }
+
+    pub fn list_envelopes_kind(&self) -> Option<&BackendKind> {
+        self.envelope
+            .as_ref()
+            .and_then(|envelope| envelope.list.as_ref())
+            .and_then(|list| list.backend.as_ref())
+            .or_else(|| self.backend.as_ref())
+    }
+
+    pub fn add_flags_kind(&self) -> Option<&BackendKind> {
+        self.flag
+            .as_ref()
+            .and_then(|flag| flag.add.as_ref())
+            .and_then(|add| add.backend.as_ref())
+            .or_else(|| self.backend.as_ref())
+    }
+
+    pub fn set_flags_kind(&self) -> Option<&BackendKind> {
+        self.flag
+            .as_ref()
+            .and_then(|flag| flag.set.as_ref())
+            .and_then(|set| set.backend.as_ref())
+            .or_else(|| self.backend.as_ref())
+    }
+
+    pub fn remove_flags_kind(&self) -> Option<&BackendKind> {
+        self.flag
+            .as_ref()
+            .and_then(|flag| flag.remove.as_ref())
+            .and_then(|remove| remove.backend.as_ref())
+            .or_else(|| self.backend.as_ref())
+    }
+
+    pub fn add_raw_message_kind(&self) -> Option<&BackendKind> {
+        self.message
+            .as_ref()
+            .and_then(|msg| msg.add.as_ref())
+            .and_then(|add| add.backend.as_ref())
+            .or_else(|| self.backend.as_ref())
+    }
+
+    pub fn peek_messages_kind(&self) -> Option<&BackendKind> {
+        self.message
+            .as_ref()
+            .and_then(|message| message.peek.as_ref())
+            .and_then(|peek| peek.backend.as_ref())
+            .or_else(|| self.backend.as_ref())
+    }
+
+    pub fn get_messages_kind(&self) -> Option<&BackendKind> {
+        self.message
+            .as_ref()
+            .and_then(|message| message.get.as_ref())
+            .and_then(|get| get.backend.as_ref())
+            .or_else(|| self.backend.as_ref())
+    }
+
+    pub fn copy_messages_kind(&self) -> Option<&BackendKind> {
+        self.message
+            .as_ref()
+            .and_then(|message| message.copy.as_ref())
+            .and_then(|copy| copy.backend.as_ref())
+            .or_else(|| self.backend.as_ref())
+    }
+
+    pub fn move_messages_kind(&self) -> Option<&BackendKind> {
+        self.message
+            .as_ref()
+            .and_then(|message| message.move_.as_ref())
+            .and_then(|move_| move_.backend.as_ref())
+            .or_else(|| self.backend.as_ref())
+    }
+
+    pub fn delete_messages_kind(&self) -> Option<&BackendKind> {
+        self.flag
+            .as_ref()
+            .and_then(|flag| flag.remove.as_ref())
+            .and_then(|remove| remove.backend.as_ref())
+            .or_else(|| self.backend.as_ref())
+    }
+
+    pub fn send_raw_message_kind(&self) -> Option<&BackendKind> {
+        self.message
+            .as_ref()
+            .and_then(|msg| msg.send.as_ref())
+            .and_then(|send| send.backend.as_ref())
+            .or_else(|| self.backend.as_ref())
+    }
+}

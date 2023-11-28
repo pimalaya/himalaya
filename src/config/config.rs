@@ -18,6 +18,7 @@ use toml;
 
 use crate::{
     account::DeserializedAccountConfig,
+    backend::BackendKind,
     config::{prelude::*, wizard},
     wizard_prompt, wizard_warn,
 };
@@ -106,6 +107,7 @@ impl DeserializedConfig {
     pub fn into_account_configs(
         self,
         account_name: Option<&str>,
+        disable_cache: bool,
     ) -> Result<(DeserializedAccountConfig, AccountConfig)> {
         let (account_name, mut toml_account_config) = match account_name {
             Some("default") | Some("") | None => self
@@ -137,6 +139,12 @@ impl DeserializedConfig {
             smtp_config
                 .auth
                 .replace_undefined_keyring_entries(&account_name);
+        }
+
+        if let Some(true) = toml_account_config.sync {
+            if !disable_cache {
+                toml_account_config.backend = Some(BackendKind::MaildirForSync);
+            }
         }
 
         let config = Config {
