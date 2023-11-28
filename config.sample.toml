@@ -6,12 +6,12 @@ default = true
 display-name = "My example account"
 email = "example@localhost"
 
+sync = true
+sync-dir = "./.sync"
+
 # The default backend used for all the features like adding folders,
 # listing envelopes or copying messages.
 backend = "imap"
-
-# Override the backend used for sending messages.
-message.send.backend = "smtp"
 
 # IMAP config
 imap.host = "localhost"
@@ -23,6 +23,9 @@ imap.insecure = true
 imap.auth = "passwd"
 imap.passwd.raw = "example"
 
+# Override the backend used for sending messages.
+message.send.backend = "smtp"
+
 # SMTP config
 smtp.host = "localhost"
 smtp.port = 3025
@@ -32,4 +35,3 @@ smtp.starttls = false
 smtp.insecure = true
 smtp.auth = "passwd"
 smtp.passwd.raw = "example"
-

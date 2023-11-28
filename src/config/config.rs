@@ -6,7 +6,11 @@
 use anyhow::{anyhow, Context, Result};
 use dialoguer::Confirm;
 use dirs::{config_dir, home_dir};
-use email::email::{EmailHooks, EmailTextPlainFormat};
+use email::{
+    account::AccountConfig,
+    config::Config,
+    email::{EmailHooks, EmailTextPlainFormat},
+};
 use log::{debug, trace};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path::PathBuf, process::exit};
@@ -97,6 +101,102 @@ impl DeserializedConfig {
             .filter(|p| p.exists())
             .or_else(|| home_dir().map(|p| p.join(".himalayarc")))
             .filter(|p| p.exists())
+    }
+
+    pub fn into_account_configs(
+        self,
+        account_name: Option<&str>,
+    ) -> Result<(DeserializedAccountConfig, AccountConfig)> {
+        let (account_name, mut toml_account_config) = match account_name {
+            Some("default") | Some("") | None => self
+                .accounts
+                .iter()
+                .find_map(|(name, account)| {
+                    account
+                        .default
+                        .filter(|default| *default == true)
+                        .map(|_| (name.to_owned(), account.clone()))
+                })
+                .ok_or_else(|| anyhow!("cannot find default account")),
+            Some(name) => self
+                .accounts
+                .get(name)
+                .map(|account| (name.to_owned(), account.clone()))
+                .ok_or_else(|| anyhow!("cannot find account {name}")),
+        }?;
+
+        #[cfg(feature = "imap-backend")]
+        if let Some(imap_config) = toml_account_config.imap.as_mut() {
+            imap_config
+                .auth
+                .replace_undefined_keyring_entries(&account_name);
+        }
+
+        #[cfg(feature = "smtp-sender")]
+        if let Some(smtp_config) = toml_account_config.smtp.as_mut() {
+            smtp_config
+                .auth
+                .replace_undefined_keyring_entries(&account_name);
+        }
+
+        let config = Config {
+            display_name: self.display_name,
+            signature_delim: self.signature_delim,
+            signature: self.signature,
+            downloads_dir: self.downloads_dir,
+
+            folder_listing_page_size: self.folder_listing_page_size,
+            folder_aliases: self.folder_aliases,
+
+            email_listing_page_size: self.email_listing_page_size,
+            email_listing_datetime_fmt: self.email_listing_datetime_fmt,
+            email_listing_datetime_local_tz: self.email_listing_datetime_local_tz,
+            email_reading_headers: self.email_reading_headers,
+            email_reading_format: self.email_reading_format,
+            email_writing_headers: self.email_writing_headers,
+            email_sending_save_copy: self.email_sending_save_copy,
+            email_hooks: self.email_hooks,
+
+            accounts: HashMap::from_iter(self.accounts.clone().into_iter().map(
+                |(name, config)| {
+                    (
+                        name.clone(),
+                        AccountConfig {
+                            name,
+                            email: config.email,
+                            display_name: config.display_name,
+                            signature_delim: config.signature_delim,
+                            signature: config.signature,
+                            downloads_dir: config.downloads_dir,
+
+                            folder_listing_page_size: config.folder_listing_page_size,
+                            folder_aliases: config.folder_aliases.unwrap_or_default(),
+
+                            email_listing_page_size: config.email_listing_page_size,
+                            email_listing_datetime_fmt: config.email_listing_datetime_fmt,
+                            email_listing_datetime_local_tz: config.email_listing_datetime_local_tz,
+
+                            email_reading_headers: config.email_reading_headers,
+                            email_reading_format: config.email_reading_format.unwrap_or_default(),
+                            email_writing_headers: config.email_writing_headers,
+                            email_sending_save_copy: config.email_sending_save_copy,
+                            email_hooks: config.email_hooks.unwrap_or_default(),
+
+                            sync: config.sync.unwrap_or_default(),
+                            sync_dir: config.sync_dir,
+                            sync_folders_strategy: config.sync_folders_strategy.unwrap_or_default(),
+
+                            #[cfg(feature = "pgp")]
+                            pgp: config.pgp,
+                        },
+                    )
+                },
+            )),
+        };
+
+        let account_config = config.account(&account_name)?;
+
+        Ok((toml_account_config, account_config))
     }
 }
 

@@ -39,12 +39,12 @@ use email::{
         list::{imap::ListFoldersImap, maildir::ListFoldersMaildir},
         purge::imap::PurgeFolderImap,
     },
-    maildir::{MaildirSessionBuilder, MaildirSessionSync},
+    maildir::{MaildirConfig, MaildirSessionBuilder, MaildirSessionSync},
     sendmail::SendmailContext,
 };
 use serde::{Deserialize, Serialize};
 
-use crate::config::DeserializedConfig;
+use crate::{account::DeserializedAccountConfig, config::DeserializedConfig};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -61,9 +61,10 @@ pub enum BackendKind {
 
 #[derive(Clone, Default)]
 pub struct BackendContextBuilder {
+    sync_cache: Option<MaildirSessionBuilder>,
+    maildir: Option<MaildirSessionBuilder>,
     #[cfg(feature = "imap-backend")]
     imap: Option<ImapSessionBuilder>,
-    maildir: Option<MaildirSessionBuilder>,
     #[cfg(feature = "smtp-sender")]
     smtp: Option<SmtpClientBuilder>,
     sendmail: Option<SendmailContext>,
@@ -78,6 +79,10 @@ impl email::backend::BackendContextBuilder for BackendContextBuilder {
 
         if let Some(maildir) = self.maildir {
             ctx.maildir = Some(maildir.build().await?);
+        }
+
+        if let Some(maildir) = self.sync_cache {
+            ctx.sync_cache = Some(maildir.build().await?);
         }
 
         #[cfg(feature = "imap-backend")]
@@ -105,9 +110,10 @@ impl email::backend::BackendContextBuilder for BackendContextBuilder {
 
 #[derive(Default)]
 pub struct BackendContext {
+    pub sync_cache: Option<MaildirSessionSync>,
+    pub maildir: Option<MaildirSessionSync>,
     #[cfg(feature = "imap-backend")]
     pub imap: Option<ImapSessionSync>,
-    pub maildir: Option<MaildirSessionSync>,
     #[cfg(feature = "smtp-sender")]
     pub smtp: Option<SmtpClientSync>,
     pub sendmail: Option<SendmailContext>,
@@ -115,97 +121,14 @@ pub struct BackendContext {
 
 pub struct BackendBuilder(pub email::backend::BackendBuilder<BackendContextBuilder>);
 
+pub type Backend = email::backend::Backend<BackendContext>;
+
 impl BackendBuilder {
-    pub async fn new(config: DeserializedConfig, account_name: Option<&str>) -> Result<Self> {
-        let (account_name, mut deserialized_account_config) = match account_name {
-            Some("default") | Some("") | None => config
-                .accounts
-                .iter()
-                .find_map(|(name, account)| {
-                    account
-                        .default
-                        .filter(|default| *default == true)
-                        .map(|_| (name.to_owned(), account.clone()))
-                })
-                .ok_or_else(|| anyhow!("cannot find default account")),
-            Some(name) => config
-                .accounts
-                .get(name)
-                .map(|account| (name.to_owned(), account.clone()))
-                .ok_or_else(|| anyhow!("cannot find account {name}")),
-        }?;
-
-        #[cfg(feature = "imap-backend")]
-        if let Some(imap_config) = deserialized_account_config.imap.as_mut() {
-            imap_config
-                .auth
-                .replace_undefined_keyring_entries(&account_name);
-        }
-
-        #[cfg(feature = "smtp-sender")]
-        if let Some(smtp_config) = deserialized_account_config.smtp.as_mut() {
-            smtp_config
-                .auth
-                .replace_undefined_keyring_entries(&account_name);
-        }
-
-        let config = Config {
-            display_name: config.display_name,
-            signature_delim: config.signature_delim,
-            signature: config.signature,
-            downloads_dir: config.downloads_dir,
-
-            folder_listing_page_size: config.folder_listing_page_size,
-            folder_aliases: config.folder_aliases,
-
-            email_listing_page_size: config.email_listing_page_size,
-            email_listing_datetime_fmt: config.email_listing_datetime_fmt,
-            email_listing_datetime_local_tz: config.email_listing_datetime_local_tz,
-            email_reading_headers: config.email_reading_headers,
-            email_reading_format: config.email_reading_format,
-            email_writing_headers: config.email_writing_headers,
-            email_sending_save_copy: config.email_sending_save_copy,
-            email_hooks: config.email_hooks,
-
-            accounts: HashMap::from_iter(config.accounts.clone().into_iter().map(
-                |(name, config)| {
-                    (
-                        name.clone(),
-                        AccountConfig {
-                            name,
-                            email: config.email,
-                            display_name: config.display_name,
-                            signature_delim: config.signature_delim,
-                            signature: config.signature,
-                            downloads_dir: config.downloads_dir,
-
-                            folder_listing_page_size: config.folder_listing_page_size,
-                            folder_aliases: config.folder_aliases.unwrap_or_default(),
-
-                            email_listing_page_size: config.email_listing_page_size,
-                            email_listing_datetime_fmt: config.email_listing_datetime_fmt,
-                            email_listing_datetime_local_tz: config.email_listing_datetime_local_tz,
-
-                            email_reading_headers: config.email_reading_headers,
-                            email_reading_format: config.email_reading_format.unwrap_or_default(),
-                            email_writing_headers: config.email_writing_headers,
-                            email_sending_save_copy: config.email_sending_save_copy,
-                            email_hooks: config.email_hooks.unwrap_or_default(),
-
-                            sync: config.sync,
-                            sync_dir: config.sync_dir,
-                            sync_folders_strategy: config.sync_folders_strategy.unwrap_or_default(),
-
-                            #[cfg(feature = "pgp")]
-                            pgp: config.pgp,
-                        },
-                    )
-                },
-            )),
-        };
-
-        let account_config = config.account(&account_name)?;
-
+    pub async fn new(
+        deserialized_account_config: DeserializedAccountConfig,
+        account_config: AccountConfig,
+        disable_cache: bool,
+    ) -> Result<Self> {
         let backend_ctx_builder = BackendContextBuilder {
             maildir: deserialized_account_config
                 .maildir
@@ -213,6 +136,16 @@ impl BackendBuilder {
                 .map(|mdir_config| {
                     MaildirSessionBuilder::new(account_config.clone(), mdir_config.clone())
                 }),
+            sync_cache: if account_config.sync && !disable_cache {
+                Some(MaildirSessionBuilder::new(
+                    account_config.clone(),
+                    MaildirConfig {
+                        root_dir: account_config.sync_dir()?,
+                    },
+                ))
+            } else {
+                None
+            },
             #[cfg(feature = "imap-backend")]
             imap: deserialized_account_config
                 .imap
@@ -253,6 +186,10 @@ impl BackendBuilder {
             .or_else(|| deserialized_account_config.backend.as_ref());
 
         match add_folder {
+            Some(_) if account_config.sync && !disable_cache => {
+                backend_builder = backend_builder
+                    .with_add_folder(|ctx| ctx.sync_cache.as_ref().and_then(AddFolderMaildir::new));
+            }
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder
                     .with_add_folder(|ctx| ctx.maildir.as_ref().and_then(AddFolderMaildir::new));
@@ -278,6 +215,11 @@ impl BackendBuilder {
             .or_else(|| deserialized_account_config.backend.as_ref());
 
         match list_folders {
+            Some(_) if account_config.sync && !disable_cache => {
+                backend_builder = backend_builder.with_list_folders(|ctx| {
+                    ctx.sync_cache.as_ref().and_then(ListFoldersMaildir::new)
+                });
+            }
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder.with_list_folders(|ctx| {
                     ctx.maildir.as_ref().and_then(ListFoldersMaildir::new)
@@ -305,6 +247,11 @@ impl BackendBuilder {
             .or_else(|| deserialized_account_config.backend.as_ref());
 
         match expunge_folder {
+            Some(_) if account_config.sync && !disable_cache => {
+                backend_builder = backend_builder.with_expunge_folder(|ctx| {
+                    ctx.sync_cache.as_ref().and_then(ExpungeFolderMaildir::new)
+                });
+            }
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder.with_expunge_folder(|ctx| {
                     ctx.maildir.as_ref().and_then(ExpungeFolderMaildir::new)
@@ -333,6 +280,12 @@ impl BackendBuilder {
 
         match purge_folder {
             // TODO
+            // Some(_) if account_config.sync && !disable_cache => {
+            //     backend_builder = backend_builder.with_purge_folder(|ctx| {
+            //         ctx.sync_cache.as_ref().and_then(PurgeFolderMaildir::new)
+            //     });
+            // }
+            // TODO
             // Some(BackendKind::Maildir) => {
             //     backend_builder = backend_builder
             //         .with_purge_folder(|ctx| ctx.maildir.as_ref().and_then(PurgeFolderMaildir::new));
@@ -359,6 +312,11 @@ impl BackendBuilder {
             .or_else(|| deserialized_account_config.backend.as_ref());
 
         match delete_folder {
+            Some(_) if account_config.sync && !disable_cache => {
+                backend_builder = backend_builder.with_delete_folder(|ctx| {
+                    ctx.sync_cache.as_ref().and_then(DeleteFolderMaildir::new)
+                });
+            }
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder.with_delete_folder(|ctx| {
                     ctx.maildir.as_ref().and_then(DeleteFolderMaildir::new)
@@ -386,6 +344,11 @@ impl BackendBuilder {
             .or_else(|| deserialized_account_config.backend.as_ref());
 
         match get_envelope {
+            Some(_) if account_config.sync && !disable_cache => {
+                backend_builder = backend_builder.with_get_envelope(|ctx| {
+                    ctx.sync_cache.as_ref().and_then(GetEnvelopeMaildir::new)
+                });
+            }
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder.with_get_envelope(|ctx| {
                     ctx.maildir.as_ref().and_then(GetEnvelopeMaildir::new)
@@ -413,6 +376,11 @@ impl BackendBuilder {
             .or_else(|| deserialized_account_config.backend.as_ref());
 
         match list_envelopes {
+            Some(_) if account_config.sync && !disable_cache => {
+                backend_builder = backend_builder.with_list_envelopes(|ctx| {
+                    ctx.sync_cache.as_ref().and_then(ListEnvelopesMaildir::new)
+                });
+            }
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder.with_list_envelopes(|ctx| {
                     ctx.maildir.as_ref().and_then(ListEnvelopesMaildir::new)
@@ -440,6 +408,10 @@ impl BackendBuilder {
             .or_else(|| deserialized_account_config.backend.as_ref());
 
         match add_flags {
+            Some(_) if account_config.sync && !disable_cache => {
+                backend_builder = backend_builder
+                    .with_add_flags(|ctx| ctx.sync_cache.as_ref().and_then(AddFlagsMaildir::new));
+            }
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder
                     .with_add_flags(|ctx| ctx.maildir.as_ref().and_then(AddFlagsMaildir::new));
@@ -465,6 +437,10 @@ impl BackendBuilder {
             .or_else(|| deserialized_account_config.backend.as_ref());
 
         match set_flags {
+            Some(_) if account_config.sync && !disable_cache => {
+                backend_builder = backend_builder
+                    .with_set_flags(|ctx| ctx.sync_cache.as_ref().and_then(SetFlagsMaildir::new));
+            }
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder
                     .with_set_flags(|ctx| ctx.maildir.as_ref().and_then(SetFlagsMaildir::new));
@@ -490,6 +466,11 @@ impl BackendBuilder {
             .or_else(|| deserialized_account_config.backend.as_ref());
 
         match remove_flags {
+            Some(_) if account_config.sync && !disable_cache => {
+                backend_builder = backend_builder.with_remove_flags(|ctx| {
+                    ctx.sync_cache.as_ref().and_then(RemoveFlagsMaildir::new)
+                });
+            }
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder.with_remove_flags(|ctx| {
                     ctx.maildir.as_ref().and_then(RemoveFlagsMaildir::new)
@@ -539,6 +520,13 @@ impl BackendBuilder {
             .or_else(|| deserialized_account_config.backend.as_ref());
 
         match add_msg {
+            Some(_) if account_config.sync && !disable_cache => {
+                backend_builder = backend_builder.with_add_raw_message_with_flags(|ctx| {
+                    ctx.sync_cache
+                        .as_ref()
+                        .and_then(AddRawMessageWithFlagsMaildir::new)
+                });
+            }
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder.with_add_raw_message_with_flags(|ctx| {
                     ctx.maildir
@@ -571,6 +559,11 @@ impl BackendBuilder {
             .or_else(|| deserialized_account_config.backend.as_ref());
 
         match peek_msgs {
+            Some(_) if account_config.sync && !disable_cache => {
+                backend_builder = backend_builder.with_peek_messages(|ctx| {
+                    ctx.sync_cache.as_ref().and_then(PeekMessagesMaildir::new)
+                });
+            }
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder.with_peek_messages(|ctx| {
                     ctx.maildir.as_ref().and_then(PeekMessagesMaildir::new)
@@ -620,6 +613,11 @@ impl BackendBuilder {
             .or_else(|| deserialized_account_config.backend.as_ref());
 
         match copy_msgs {
+            Some(_) if account_config.sync && !disable_cache => {
+                backend_builder = backend_builder.with_copy_messages(|ctx| {
+                    ctx.sync_cache.as_ref().and_then(CopyMessagesMaildir::new)
+                });
+            }
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder.with_copy_messages(|ctx| {
                     ctx.maildir.as_ref().and_then(CopyMessagesMaildir::new)
@@ -647,6 +645,11 @@ impl BackendBuilder {
             .or_else(|| deserialized_account_config.backend.as_ref());
 
         match move_msgs {
+            Some(_) if account_config.sync && !disable_cache => {
+                backend_builder = backend_builder.with_move_messages(|ctx| {
+                    ctx.sync_cache.as_ref().and_then(MoveMessagesMaildir::new)
+                });
+            }
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder.with_move_messages(|ctx| {
                     ctx.maildir.as_ref().and_then(MoveMessagesMaildir::new)
@@ -668,14 +671,8 @@ impl BackendBuilder {
 
         Ok(Self(backend_builder))
     }
-}
 
-impl Deref for BackendBuilder {
-    type Target = email::backend::BackendBuilder<BackendContextBuilder>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    pub async fn build(self) -> Result<Backend> {
+        self.0.build().await
     }
 }
-
-pub type Backend = email::backend::Backend<BackendContext>;

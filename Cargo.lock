@@ -984,7 +984,6 @@ dependencies = [
 [[package]]
 name = "email-lib"
 version = "0.15.3"
-source = "git+https://git.sr.ht/~soywod/pimalaya#012d31179908063affe3eec77365e5ac86c436fe"
 dependencies = [
  "advisory-lock",
  "anyhow",
@@ -2070,15 +2069,15 @@ dependencies = [
  "keyring-lib",
  "log",
  "md5",
- "mml-lib 1.0.1 (git+https://git.sr.ht/~soywod/pimalaya)",
- "oauth-lib 0.1.0 (git+https://git.sr.ht/~soywod/pimalaya)",
+ "mml-lib 1.0.1",
+ "oauth-lib 0.1.0",
  "once_cell",
  "process-lib",
  "rusqlite",
  "secret-lib",
  "serde",
  "serde_json",
- "shellexpand-utils 0.1.0 (git+https://git.sr.ht/~soywod/pimalaya)",
+ "shellexpand-utils 0.1.0",
  "tempfile",
  "termcolor",
  "terminal_size",
@@ -2688,6 +2687,21 @@ dependencies = [
 [[package]]
 name = "mml-lib"
 version = "1.0.1"
+dependencies = [
+ "async-recursion",
+ "chumsky",
+ "log",
+ "mail-builder",
+ "mail-parser",
+ "nanohtml2text",
+ "shellexpand-utils 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "thiserror",
+ "tree_magic_mini",
+]
+
+[[package]]
+name = "mml-lib"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "915efb96feb76c123001341d1631dc06c9bbe14c1a249ef709cf84b341eb8295"
 dependencies = [
@@ -2702,22 +2716,6 @@ dependencies = [
  "pgp-lib",
  "process-lib",
  "secret-lib",
- "shellexpand-utils 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "thiserror",
- "tree_magic_mini",
-]
-
-[[package]]
-name = "mml-lib"
-version = "1.0.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya#012d31179908063affe3eec77365e5ac86c436fe"
-dependencies = [
- "async-recursion",
- "chumsky",
- "log",
- "mail-builder",
- "mail-parser",
- "nanohtml2text",
  "shellexpand-utils 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "thiserror",
  "tree_magic_mini",
@@ -2848,8 +2846,6 @@ checksum = "830b246a0e5f20af87141b25c173cd1b609bd7779a4617d6ec582abaf90870f3"
 [[package]]
 name = "oauth-lib"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1484d9864dbf6b55b3785380631a253fa0ff7f8e1bbb078bfd7effd11283d61"
 dependencies = [
  "log",
  "oauth2",
@@ -2862,7 +2858,8 @@ dependencies = [
 [[package]]
 name = "oauth-lib"
 version = "0.1.0"
-source = "git+https://git.sr.ht/~soywod/pimalaya#012d31179908063affe3eec77365e5ac86c436fe"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1484d9864dbf6b55b3785380631a253fa0ff7f8e1bbb078bfd7effd11283d61"
 dependencies = [
  "log",
  "oauth2",
@@ -3859,8 +3856,6 @@ dependencies = [
 [[package]]
 name = "shellexpand-utils"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b44114d15a72740d3049e739929d0f4af335ba2eb855ea0f1fa2bfb4d7066215"
 dependencies = [
  "log",
  "shellexpand",
@@ -3870,7 +3865,8 @@ dependencies = [
 [[package]]
 name = "shellexpand-utils"
 version = "0.1.0"
-source = "git+https://git.sr.ht/~soywod/pimalaya#012d31179908063affe3eec77365e5ac86c436fe"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b44114d15a72740d3049e739929d0f4af335ba2eb855ea0f1fa2bfb4d7066215"
 dependencies = [
  "log",
  "shellexpand",
