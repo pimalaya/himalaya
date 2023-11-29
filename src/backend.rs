@@ -45,11 +45,13 @@ use email::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{account::DeserializedAccountConfig, Envelopes, IdMapper};
+use crate::{account::TomlAccountConfig, Envelopes, IdMapper};
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum BackendKind {
+    #[default]
+    None,
     Maildir,
     #[serde(skip_deserializing)]
     MaildirForSync,
@@ -123,7 +125,7 @@ pub struct BackendContext {
 }
 
 pub struct Backend {
-    toml_account_config: DeserializedAccountConfig,
+    toml_account_config: TomlAccountConfig,
     backend: email::backend::Backend<BackendContext>,
 }
 
@@ -262,13 +264,13 @@ impl Deref for Backend {
 }
 
 pub struct BackendBuilder {
-    toml_account_config: DeserializedAccountConfig,
+    toml_account_config: TomlAccountConfig,
     builder: email::backend::BackendBuilder<BackendContextBuilder>,
 }
 
 impl BackendBuilder {
     pub async fn new(
-        toml_account_config: DeserializedAccountConfig,
+        toml_account_config: TomlAccountConfig,
         account_config: AccountConfig,
     ) -> Result<Self> {
         let backend_ctx_builder = BackendContextBuilder {

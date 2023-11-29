@@ -13,7 +13,7 @@ use crate::{
     ui::Table,
 };
 
-use super::{Account, DeserializedAccountConfig};
+use super::{Account, TomlAccountConfig};
 
 /// Represents the list of printable accounts.
 #[derive(Debug, Default, Serialize)]
@@ -36,8 +36,8 @@ impl PrintTable for Accounts {
     }
 }
 
-impl From<Iter<'_, String, DeserializedAccountConfig>> for Accounts {
-    fn from(map: Iter<'_, String, DeserializedAccountConfig>) -> Self {
+impl From<Iter<'_, String, TomlAccountConfig>> for Accounts {
+    fn from(map: Iter<'_, String, TomlAccountConfig>) -> Self {
         let mut accounts: Vec<_> = map
             .map(|(name, account)| {
                 let mut backends = String::new();

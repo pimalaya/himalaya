@@ -4,10 +4,10 @@ use email_address::EmailAddress;
 
 use crate::config::wizard::THEME;
 
-use super::DeserializedAccountConfig;
+use super::TomlAccountConfig;
 
-pub(crate) async fn configure() -> Result<Option<(String, DeserializedAccountConfig)>> {
-    let mut config = DeserializedAccountConfig::default();
+pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
+    let mut config = TomlAccountConfig::default();
 
     let account_name = Input::with_theme(&*THEME)
         .with_prompt("Account name")

@@ -20,7 +20,7 @@ use crate::{
     backend::BackendContextBuilder,
     config::{
         wizard::{prompt_passwd, prompt_secret},
-        DeserializedConfig,
+        TomlConfig,
     },
     printer::{PrintTableOpts, Printer},
     Accounts,
@@ -120,7 +120,7 @@ pub async fn configure(config: &AccountConfig, reset: bool) -> Result<()> {
 pub fn list<'a, P: Printer>(
     max_width: Option<usize>,
     config: &AccountConfig,
-    deserialized_config: &DeserializedConfig,
+    deserialized_config: &TomlConfig,
     printer: &mut P,
 ) -> Result<()> {
     info!("entering the list accounts handler");
@@ -298,7 +298,7 @@ mod tests {
     use termcolor::ColorSpec;
 
     use crate::{
-        account::DeserializedAccountConfig,
+        account::TomlAccountConfig,
         printer::{Print, PrintTable, WriteColor},
     };
 
@@ -367,16 +367,16 @@ mod tests {
 
         let mut printer = PrinterServiceTest::default();
         let config = AccountConfig::default();
-        let deserialized_config = DeserializedConfig {
+        let deserialized_config = TomlConfig {
             accounts: HashMap::from_iter([(
                 "account-1".into(),
-                DeserializedAccountConfig {
+                TomlAccountConfig {
                     default: Some(true),
                     backend: BackendConfig::Imap(ImapConfig::default()),
-                    ..DeserializedAccountConfig::default()
+                    ..TomlAccountConfig::default()
                 },
             )]),
-            ..DeserializedConfig::default()
+            ..TomlConfig::default()
         };
 
         assert!(list(None, &config, &deserialized_config, &mut printer).is_ok());

@@ -29,7 +29,7 @@ use crate::{
 /// Represents all existing kind of account config.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(tag = "backend", rename_all = "kebab-case")]
-pub struct DeserializedAccountConfig {
+pub struct TomlAccountConfig {
     pub default: Option<bool>,
 
     pub email: String,
@@ -87,7 +87,7 @@ pub struct DeserializedAccountConfig {
     pub pgp: Option<PgpConfig>,
 }
 
-impl DeserializedAccountConfig {
+impl TomlAccountConfig {
     pub fn add_folder_kind(&self) -> Option<&BackendKind> {
         self.folder
             .as_ref()

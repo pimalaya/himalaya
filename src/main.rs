@@ -11,7 +11,7 @@ use himalaya::{
     account,
     backend::BackendBuilder,
     cache, compl,
-    config::{self, DeserializedConfig},
+    config::{self, TomlConfig},
     email, flag, folder, man, output,
     printer::StdoutPrinter,
     tpl,
@@ -53,11 +53,11 @@ async fn main() -> Result<()> {
     let default_env_filter = env_logger::DEFAULT_FILTER_ENV;
     env_logger::init_from_env(env_logger::Env::default().filter_or(default_env_filter, "off"));
 
-    // checks mailto command before app initialization
+    // check mailto command before app initialization
     let raw_args: Vec<String> = env::args().collect();
     if raw_args.len() > 1 && raw_args[1].starts_with("mailto:") {
         let url = Url::parse(&raw_args[1])?;
-        let (toml_account_config, account_config) = DeserializedConfig::from_opt_path(None)
+        let (toml_account_config, account_config) = TomlConfig::from_maybe_path(None)
             .await?
             .into_account_configs(None, false)?;
         let backend_builder =
@@ -88,11 +88,12 @@ async fn main() -> Result<()> {
         _ => (),
     }
 
-    let folder = folder::args::parse_source_arg(&m);
-    let disable_cache = cache::args::parse_disable_cache_flag(&m);
+    let maybe_config_path = config::args::parse_arg(&m);
     let maybe_account_name = account::args::parse_arg(&m);
+    let disable_cache = cache::args::parse_disable_cache_flag(&m);
+    let folder = folder::args::parse_source_arg(&m);
 
-    let toml_config = DeserializedConfig::from_opt_path(config::args::parse_arg(&m)).await?;
+    let toml_config = TomlConfig::from_maybe_path(maybe_config_path).await?;
 
     let mut printer = StdoutPrinter::try_from(&m)?;
 

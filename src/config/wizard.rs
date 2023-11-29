@@ -1,4 +1,4 @@
-use super::DeserializedConfig;
+use super::TomlConfig;
 use crate::account;
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Confirm, Input, Password, Select};
@@ -31,10 +31,10 @@ macro_rules! wizard_log {
 
 pub(crate) static THEME: Lazy<ColorfulTheme> = Lazy::new(ColorfulTheme::default);
 
-pub(crate) async fn configure() -> Result<DeserializedConfig> {
+pub(crate) async fn configure() -> Result<TomlConfig> {
     wizard_log!("Configuring your first account:");
 
-    let mut config = DeserializedConfig::default();
+    let mut config = TomlConfig::default();
 
     while let Some((name, account_config)) = account::wizard::configure().await? {
         config.accounts.insert(name, account_config);

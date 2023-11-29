@@ -17,7 +17,7 @@ use std::{collections::HashMap, fs, path::PathBuf, process::exit};
 use toml;
 
 use crate::{
-    account::DeserializedAccountConfig,
+    account::TomlAccountConfig,
     backend::BackendKind,
     config::{prelude::*, wizard},
     wizard_prompt, wizard_warn,
@@ -26,7 +26,7 @@ use crate::{
 /// Represents the user config file.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub struct DeserializedConfig {
+pub struct TomlConfig {
     #[serde(alias = "name")]
     pub display_name: Option<String>,
     pub signature_delim: Option<String>,
@@ -48,12 +48,12 @@ pub struct DeserializedConfig {
     pub email_hooks: Option<EmailHooks>,
 
     #[serde(flatten)]
-    pub accounts: HashMap<String, DeserializedAccountConfig>,
+    pub accounts: HashMap<String, TomlAccountConfig>,
 }
 
-impl DeserializedConfig {
+impl TomlConfig {
     /// Tries to create a config from an optional path.
-    pub async fn from_opt_path(path: Option<&str>) -> Result<Self> {
+    pub async fn from_maybe_path(path: Option<&str>) -> Result<Self> {
         debug!("path: {:?}", path);
 
         let config = if let Some(path) = path.map(PathBuf::from).or_else(Self::path) {
@@ -108,7 +108,7 @@ impl DeserializedConfig {
         self,
         account_name: Option<&str>,
         disable_cache: bool,
-    ) -> Result<(DeserializedAccountConfig, AccountConfig)> {
+    ) -> Result<(TomlAccountConfig, AccountConfig)> {
         let (account_name, mut toml_account_config) = match account_name {
             Some("default") | Some("") | None => self
                 .accounts
@@ -229,10 +229,10 @@ mod tests {
 
     use super::*;
 
-    async fn make_config(config: &str) -> Result<DeserializedConfig> {
+    async fn make_config(config: &str) -> Result<TomlConfig> {
         let mut file = NamedTempFile::new().unwrap();
         write!(file, "{}", config).unwrap();
-        DeserializedConfig::from_opt_path(file.into_temp_path().to_str()).await
+        TomlConfig::from_maybe_path(file.into_temp_path().to_str()).await
     }
 
     #[tokio::test]
@@ -515,18 +515,18 @@ mod tests {
 
         assert_eq!(
             config.unwrap(),
-            DeserializedConfig {
+            TomlConfig {
                 accounts: HashMap::from_iter([(
                     "account".into(),
-                    DeserializedAccountConfig {
+                    TomlAccountConfig {
                         email: "test@localhost".into(),
                         sender: SenderConfig::Sendmail(SendmailConfig {
                             cmd: "/usr/sbin/sendmail".into()
                         }),
-                        ..DeserializedAccountConfig::default()
+                        ..TomlAccountConfig::default()
                     }
                 )]),
-                ..DeserializedConfig::default()
+                ..TomlConfig::default()
             }
         )
     }
@@ -551,10 +551,10 @@ mod tests {
 
         assert_eq!(
             config.unwrap(),
-            DeserializedConfig {
+            TomlConfig {
                 accounts: HashMap::from_iter([(
                     "account".into(),
-                    DeserializedAccountConfig {
+                    TomlAccountConfig {
                         email: "test@localhost".into(),
                         sender: SenderConfig::Smtp(SmtpConfig {
                             host: "localhost".into(),
@@ -565,10 +565,10 @@ mod tests {
                             }),
                             ..SmtpConfig::default()
                         }),
-                        ..DeserializedAccountConfig::default()
+                        ..TomlAccountConfig::default()
                     }
                 )]),
-                ..DeserializedConfig::default()
+                ..TomlConfig::default()
             }
         )
     }
@@ -586,18 +586,18 @@ mod tests {
 
         assert_eq!(
             config.unwrap(),
-            DeserializedConfig {
+            TomlConfig {
                 accounts: HashMap::from_iter([(
                     "account".into(),
-                    DeserializedAccountConfig {
+                    TomlAccountConfig {
                         email: "test@localhost".into(),
                         sender: SenderConfig::Sendmail(SendmailConfig {
                             cmd: Cmd::from("echo send")
                         }),
-                        ..DeserializedAccountConfig::default()
+                        ..TomlAccountConfig::default()
                     }
                 )]),
-                ..DeserializedConfig::default()
+                ..TomlConfig::default()
             }
         )
     }
@@ -619,10 +619,10 @@ mod tests {
 
         assert_eq!(
             config.unwrap(),
-            DeserializedConfig {
+            TomlConfig {
                 accounts: HashMap::from_iter([(
                     "account".into(),
-                    DeserializedAccountConfig {
+                    TomlAccountConfig {
                         email: "test@localhost".into(),
                         backend: BackendConfig::Imap(ImapConfig {
                             host: "localhost".into(),
@@ -633,10 +633,10 @@ mod tests {
                             }),
                             ..ImapConfig::default()
                         }),
-                        ..DeserializedAccountConfig::default()
+                        ..TomlAccountConfig::default()
                     }
                 )]),
-                ..DeserializedConfig::default()
+                ..TomlConfig::default()
             }
         )
     }
@@ -654,18 +654,18 @@ mod tests {
 
         assert_eq!(
             config.unwrap(),
-            DeserializedConfig {
+            TomlConfig {
                 accounts: HashMap::from_iter([(
                     "account".into(),
-                    DeserializedAccountConfig {
+                    TomlAccountConfig {
                         email: "test@localhost".into(),
                         backend: BackendConfig::Maildir(MaildirConfig {
                             root_dir: "/tmp/maildir".into(),
                         }),
-                        ..DeserializedAccountConfig::default()
+                        ..TomlAccountConfig::default()
                     }
                 )]),
-                ..DeserializedConfig::default()
+                ..TomlConfig::default()
             }
         )
     }
@@ -684,18 +684,18 @@ mod tests {
 
         assert_eq!(
             config.unwrap(),
-            DeserializedConfig {
+            TomlConfig {
                 accounts: HashMap::from_iter([(
                     "account".into(),
-                    DeserializedAccountConfig {
+                    TomlAccountConfig {
                         email: "test@localhost".into(),
                         backend: BackendConfig::Notmuch(NotmuchConfig {
                             db_path: "/tmp/notmuch.db".into(),
                         }),
-                        ..DeserializedAccountConfig::default()
+                        ..TomlAccountConfig::default()
                     }
                 )]),
-                ..DeserializedConfig::default()
+                ..TomlConfig::default()
             }
         );
     }
