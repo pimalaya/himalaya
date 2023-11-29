@@ -16,7 +16,10 @@ use email::{
     sendmail::SendmailConfig,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 
 use crate::{
     backend::BackendKind,
@@ -222,5 +225,31 @@ impl TomlAccountConfig {
             .and_then(|msg| msg.send.as_ref())
             .and_then(|send| send.backend.as_ref())
             .or_else(|| self.backend.as_ref())
+    }
+
+    pub fn get_used_backends(&self) -> HashSet<&BackendKind> {
+        let mut used_backends = HashSet::default();
+
+        if let Some(ref kind) = self.backend {
+            used_backends.insert(kind);
+        }
+
+        if let Some(ref folder) = self.folder {
+            used_backends.extend(folder.get_used_backends());
+        }
+
+        if let Some(ref envelope) = self.envelope {
+            used_backends.extend(envelope.get_used_backends());
+        }
+
+        if let Some(ref flag) = self.flag {
+            used_backends.extend(flag.get_used_backends());
+        }
+
+        if let Some(ref msg) = self.message {
+            used_backends.extend(msg.get_used_backends());
+        }
+
+        used_backends
     }
 }

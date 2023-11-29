@@ -9,7 +9,7 @@ use url::Url;
 use himalaya::imap;
 use himalaya::{
     account,
-    backend::BackendBuilder,
+    backend::{Backend, BackendBuilder},
     cache, compl,
     config::{self, TomlConfig},
     email, flag, folder, man, output,
@@ -61,7 +61,7 @@ async fn main() -> Result<()> {
             .await?
             .into_account_configs(None, false)?;
         let backend_builder =
-            BackendBuilder::new(toml_account_config, account_config.clone()).await?;
+            BackendBuilder::new(toml_account_config, account_config.clone(), true).await?;
         let backend = backend_builder.build().await?;
         let mut printer = StdoutPrinter::default();
 
@@ -130,7 +130,7 @@ async fn main() -> Result<()> {
                 .clone()
                 .into_account_configs(maybe_account_name, true)?;
             let backend_builder =
-                BackendBuilder::new(toml_account_config, account_config.clone()).await?;
+                BackendBuilder::new(toml_account_config, account_config.clone(), false).await?;
             let sync_builder = AccountSyncBuilder::new(backend_builder.into())
                 .await?
                 .with_some_folders_strategy(strategy)
@@ -149,28 +149,29 @@ async fn main() -> Result<()> {
     let (toml_account_config, account_config) = toml_config
         .clone()
         .into_account_configs(maybe_account_name, disable_cache)?;
-    println!("toml_account_config: {:#?}", toml_account_config);
-    let backend_builder = BackendBuilder::new(toml_account_config, account_config.clone()).await?;
-    let backend = backend_builder.build().await?;
 
     // checks folder commands
     match folder::args::matches(&m)? {
         Some(folder::args::Cmd::Create) => {
+            let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
             let folder = folder
                 .ok_or_else(|| anyhow!("the folder argument is missing"))
                 .context("cannot create folder")?;
             return folder::handlers::create(&mut printer, &backend, &folder).await;
         }
         Some(folder::args::Cmd::List(max_width)) => {
+            let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
             return folder::handlers::list(&account_config, &mut printer, &backend, max_width)
                 .await;
         }
         Some(folder::args::Cmd::Expunge) => {
             let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
+            let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
             return folder::handlers::expunge(&mut printer, &backend, &folder).await;
         }
         Some(folder::args::Cmd::Delete) => {
             let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
+            let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
             return folder::handlers::delete(&mut printer, &backend, &folder).await;
         }
         _ => (),
@@ -180,6 +181,7 @@ async fn main() -> Result<()> {
     match email::args::matches(&m)? {
         Some(email::args::Cmd::Attachments(ids)) => {
             let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
+            let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
             return email::handlers::attachments(
                 &account_config,
                 &mut printer,
@@ -191,14 +193,17 @@ async fn main() -> Result<()> {
         }
         Some(email::args::Cmd::Copy(ids, to_folder)) => {
             let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
+            let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
             return email::handlers::copy(&mut printer, &backend, &folder, to_folder, ids).await;
         }
         Some(email::args::Cmd::Delete(ids)) => {
             let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
+            let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
             return email::handlers::delete(&mut printer, &backend, &folder, ids).await;
         }
         Some(email::args::Cmd::Forward(id, headers, body)) => {
             let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
+            let backend = Backend::new(toml_account_config, account_config.clone(), true).await?;
             return email::handlers::forward(
                 &account_config,
                 &mut printer,
@@ -212,6 +217,7 @@ async fn main() -> Result<()> {
         }
         Some(email::args::Cmd::List(max_width, page_size, page)) => {
             let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
+            let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
             return email::handlers::list(
                 &account_config,
                 &mut printer,
@@ -225,10 +231,12 @@ async fn main() -> Result<()> {
         }
         Some(email::args::Cmd::Move(ids, to_folder)) => {
             let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
+            let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
             return email::handlers::move_(&mut printer, &backend, &folder, to_folder, ids).await;
         }
         Some(email::args::Cmd::Read(ids, text_mime, raw, headers)) => {
             let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
+            let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
             return email::handlers::read(
                 &account_config,
                 &mut printer,
@@ -243,6 +251,7 @@ async fn main() -> Result<()> {
         }
         Some(email::args::Cmd::Reply(id, all, headers, body)) => {
             let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
+            let backend = Backend::new(toml_account_config, account_config.clone(), true).await?;
             return email::handlers::reply(
                 &account_config,
                 &mut printer,
@@ -257,10 +266,12 @@ async fn main() -> Result<()> {
         }
         Some(email::args::Cmd::Save(raw_email)) => {
             let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
+            let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
             return email::handlers::save(&mut printer, &backend, &folder, raw_email).await;
         }
         Some(email::args::Cmd::Search(query, max_width, page_size, page)) => {
             let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
+            let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
             return email::handlers::search(
                 &account_config,
                 &mut printer,
@@ -275,6 +286,7 @@ async fn main() -> Result<()> {
         }
         Some(email::args::Cmd::Sort(criteria, query, max_width, page_size, page)) => {
             let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
+            let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
             return email::handlers::sort(
                 &account_config,
                 &mut printer,
@@ -289,19 +301,26 @@ async fn main() -> Result<()> {
             .await;
         }
         Some(email::args::Cmd::Send(raw_email)) => {
+            let backend = Backend::new(toml_account_config, account_config.clone(), true).await?;
             return email::handlers::send(&account_config, &mut printer, &backend, raw_email).await;
         }
         Some(email::args::Cmd::Flag(m)) => match m {
             Some(flag::args::Cmd::Set(ids, ref flags)) => {
                 let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
+                let backend =
+                    Backend::new(toml_account_config, account_config.clone(), false).await?;
                 return flag::handlers::set(&mut printer, &backend, &folder, ids, flags).await;
             }
             Some(flag::args::Cmd::Add(ids, ref flags)) => {
                 let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
+                let backend =
+                    Backend::new(toml_account_config, account_config.clone(), false).await?;
                 return flag::handlers::add(&mut printer, &backend, &folder, ids, flags).await;
             }
             Some(flag::args::Cmd::Remove(ids, ref flags)) => {
                 let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
+                let backend =
+                    Backend::new(toml_account_config, account_config.clone(), false).await?;
                 return flag::handlers::remove(&mut printer, &backend, &folder, ids, flags).await;
             }
             _ => (),
@@ -309,6 +328,8 @@ async fn main() -> Result<()> {
         Some(email::args::Cmd::Tpl(m)) => match m {
             Some(tpl::args::Cmd::Forward(id, headers, body)) => {
                 let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
+                let backend =
+                    Backend::new(toml_account_config, account_config.clone(), false).await?;
                 return tpl::handlers::forward(
                     &account_config,
                     &mut printer,
@@ -321,11 +342,12 @@ async fn main() -> Result<()> {
                 .await;
             }
             Some(tpl::args::Cmd::Write(headers, body)) => {
-                tpl::handlers::write(&account_config, &mut printer, headers, body).await?;
-                return Ok(());
+                return tpl::handlers::write(&account_config, &mut printer, headers, body).await;
             }
             Some(tpl::args::Cmd::Reply(id, all, headers, body)) => {
                 let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
+                let backend =
+                    Backend::new(toml_account_config, account_config.clone(), false).await?;
                 return tpl::handlers::reply(
                     &account_config,
                     &mut printer,
@@ -340,15 +362,20 @@ async fn main() -> Result<()> {
             }
             Some(tpl::args::Cmd::Save(tpl)) => {
                 let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
+                let backend =
+                    Backend::new(toml_account_config, account_config.clone(), false).await?;
                 return tpl::handlers::save(&account_config, &mut printer, &backend, &folder, tpl)
                     .await;
             }
             Some(tpl::args::Cmd::Send(tpl)) => {
+                let backend =
+                    Backend::new(toml_account_config, account_config.clone(), true).await?;
                 return tpl::handlers::send(&account_config, &mut printer, &backend, tpl).await;
             }
             _ => (),
         },
         Some(email::args::Cmd::Write(headers, body)) => {
+            let backend = Backend::new(toml_account_config, account_config.clone(), true).await?;
             return email::handlers::write(&account_config, &mut printer, &backend, headers, body)
                 .await;
         }

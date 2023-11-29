@@ -47,7 +47,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{account::TomlAccountConfig, Envelopes, IdMapper};
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum BackendKind {
     #[default]
@@ -124,145 +124,6 @@ pub struct BackendContext {
     pub sendmail: Option<SendmailContext>,
 }
 
-pub struct Backend {
-    toml_account_config: TomlAccountConfig,
-    backend: email::backend::Backend<BackendContext>,
-}
-
-impl Backend {
-    fn build_id_mapper(
-        &self,
-        folder: &str,
-        backend_kind: Option<&BackendKind>,
-    ) -> Result<IdMapper> {
-        let mut id_mapper = IdMapper::Dummy;
-
-        match backend_kind {
-            Some(BackendKind::Maildir) => {
-                if let Some(mdir_config) = &self.toml_account_config.maildir {
-                    id_mapper = IdMapper::new(
-                        &self.backend.account_config,
-                        folder,
-                        mdir_config.root_dir.clone(),
-                    )?;
-                }
-            }
-            Some(BackendKind::MaildirForSync) => {
-                id_mapper = IdMapper::new(
-                    &self.backend.account_config,
-                    folder,
-                    self.backend.account_config.sync_dir()?,
-                )?;
-            }
-            #[cfg(feature = "notmuch-backend")]
-            Some(BackendKind::Notmuch) => {
-                if let Some(notmuch_config) = &self.toml_account_config.notmuch {
-                    id_mapper = IdMapper::new(
-                        &self.backend.account_config,
-                        folder,
-                        mdir_config.root_dir.clone(),
-                    )?;
-                }
-            }
-            _ => (),
-        };
-
-        Ok(id_mapper)
-    }
-
-    pub async fn list_envelopes(
-        &self,
-        folder: &str,
-        page_size: usize,
-        page: usize,
-    ) -> Result<Envelopes> {
-        let backend_kind = self.toml_account_config.list_envelopes_kind();
-        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
-        let envelopes = self.backend.list_envelopes(folder, page_size, page).await?;
-        let envelopes = Envelopes::from_backend(&self.account_config, &id_mapper, envelopes)?;
-        Ok(envelopes)
-    }
-
-    pub async fn add_flags(&self, folder: &str, ids: &[&str], flags: &Flags) -> Result<()> {
-        let backend_kind = self.toml_account_config.add_flags_kind();
-        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
-        let ids = Id::multiple(id_mapper.get_ids(ids)?);
-        self.backend.add_flags(folder, &ids, flags).await
-    }
-
-    pub async fn set_flags(&self, folder: &str, ids: &[&str], flags: &Flags) -> Result<()> {
-        let backend_kind = self.toml_account_config.set_flags_kind();
-        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
-        let ids = Id::multiple(id_mapper.get_ids(ids)?);
-        self.backend.set_flags(folder, &ids, flags).await
-    }
-
-    pub async fn remove_flags(&self, folder: &str, ids: &[&str], flags: &Flags) -> Result<()> {
-        let backend_kind = self.toml_account_config.remove_flags_kind();
-        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
-        let ids = Id::multiple(id_mapper.get_ids(ids)?);
-        self.backend.remove_flags(folder, &ids, flags).await
-    }
-
-    pub async fn get_messages(&self, folder: &str, ids: &[&str]) -> Result<Messages> {
-        let backend_kind = self.toml_account_config.get_messages_kind();
-        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
-        let ids = Id::multiple(id_mapper.get_ids(ids)?);
-        self.backend.get_messages(folder, &ids).await
-    }
-
-    pub async fn copy_messages(
-        &self,
-        from_folder: &str,
-        to_folder: &str,
-        ids: &[&str],
-    ) -> Result<()> {
-        let backend_kind = self.toml_account_config.move_messages_kind();
-        let id_mapper = self.build_id_mapper(from_folder, backend_kind)?;
-        let ids = Id::multiple(id_mapper.get_ids(ids)?);
-        self.backend
-            .copy_messages(from_folder, to_folder, &ids)
-            .await
-    }
-
-    pub async fn move_messages(
-        &self,
-        from_folder: &str,
-        to_folder: &str,
-        ids: &[&str],
-    ) -> Result<()> {
-        let backend_kind = self.toml_account_config.move_messages_kind();
-        let id_mapper = self.build_id_mapper(from_folder, backend_kind)?;
-        let ids = Id::multiple(id_mapper.get_ids(ids)?);
-        self.backend
-            .move_messages(from_folder, to_folder, &ids)
-            .await
-    }
-
-    pub async fn delete_messages(&self, folder: &str, ids: &[&str]) -> Result<()> {
-        let backend_kind = self.toml_account_config.delete_messages_kind();
-        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
-        let ids = Id::multiple(id_mapper.get_ids(ids)?);
-        self.backend.delete_messages(folder, &ids).await
-    }
-
-    pub async fn add_raw_message(&self, folder: &str, email: &[u8]) -> Result<SingleId> {
-        let backend_kind = self.toml_account_config.add_raw_message_kind();
-        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
-        let id = self.backend.add_raw_message(folder, email).await?;
-        id_mapper.create_alias(&*id)?;
-        Ok(id)
-    }
-}
-
-impl Deref for Backend {
-    type Target = email::backend::Backend<BackendContext>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.backend
-    }
-}
-
 pub struct BackendBuilder {
     toml_account_config: TomlAccountConfig,
     builder: email::backend::BackendBuilder<BackendContextBuilder>,
@@ -272,32 +133,64 @@ impl BackendBuilder {
     pub async fn new(
         toml_account_config: TomlAccountConfig,
         account_config: AccountConfig,
+        with_sending: bool,
     ) -> Result<Self> {
+        let used_backends = toml_account_config.get_used_backends();
+
+        let is_maildir_used = used_backends.contains(&BackendKind::Maildir);
+        let is_maildir_for_sync_used = used_backends.contains(&BackendKind::MaildirForSync);
+        #[cfg(feature = "imap-backend")]
+        let is_imap_used = used_backends.contains(&BackendKind::Imap);
+        #[cfg(feature = "notmuch-backend")]
+        let is_notmuch_used = used_backends.contains(&BackendKind::Notmuch);
+        #[cfg(feature = "smtp-sender")]
+        let is_smtp_used = used_backends.contains(&BackendKind::Smtp);
+        let is_sendmail_used = used_backends.contains(&BackendKind::Sendmail);
+
         let backend_ctx_builder = BackendContextBuilder {
-            maildir: toml_account_config.maildir.as_ref().map(|mdir_config| {
-                MaildirSessionBuilder::new(account_config.clone(), mdir_config.clone())
-            }),
-            maildir_for_sync: Some(MaildirSessionBuilder::new(
-                account_config.clone(),
-                MaildirConfig {
-                    root_dir: account_config.sync_dir()?,
-                },
-            )),
+            maildir: toml_account_config
+                .maildir
+                .as_ref()
+                .filter(|_| is_maildir_used)
+                .map(|mdir_config| {
+                    MaildirSessionBuilder::new(account_config.clone(), mdir_config.clone())
+                }),
+            maildir_for_sync: Some(MaildirConfig {
+                root_dir: account_config.sync_dir()?,
+            })
+            .filter(|_| is_maildir_for_sync_used)
+            .map(|mdir_config| MaildirSessionBuilder::new(account_config.clone(), mdir_config)),
+
             #[cfg(feature = "imap-backend")]
-            imap: toml_account_config.imap.as_ref().map(|imap_config| {
-                ImapSessionBuilder::new(account_config.clone(), imap_config.clone())
-            }),
+            imap: toml_account_config
+                .imap
+                .as_ref()
+                .filter(|_| is_imap_used)
+                .map(|imap_config| {
+                    ImapSessionBuilder::new(account_config.clone(), imap_config.clone())
+                }),
             #[cfg(feature = "notmuch-backend")]
-            notmuch: toml_account_config.notmuch.as_ref().map(|notmuch_config| {
-                NotmuchSessionBuilder::new(account_config.clone(), notmuch_config.clone())
-            }),
+            notmuch: toml_account_config
+                .notmuch
+                .as_ref()
+                .filter(|_| is_notmuch_used)
+                .map(|notmuch_config| {
+                    NotmuchSessionBuilder::new(account_config.clone(), notmuch_config.clone())
+                }),
             #[cfg(feature = "smtp-sender")]
-            smtp: toml_account_config.smtp.as_ref().map(|smtp_config| {
-                SmtpClientBuilder::new(account_config.clone(), smtp_config.clone())
-            }),
+            smtp: toml_account_config
+                .smtp
+                .as_ref()
+                .filter(|_| with_sending)
+                .filter(|_| is_smtp_used)
+                .map(|smtp_config| {
+                    SmtpClientBuilder::new(account_config.clone(), smtp_config.clone())
+                }),
             sendmail: toml_account_config
                 .sendmail
                 .as_ref()
+                .filter(|_| with_sending)
+                .filter(|_| is_sendmail_used)
                 .map(|sendmail_config| {
                     SendmailContext::new(account_config.clone(), sendmail_config.clone())
                 }),
@@ -732,5 +625,155 @@ impl Deref for BackendBuilder {
 impl Into<email::backend::BackendBuilder<BackendContextBuilder>> for BackendBuilder {
     fn into(self) -> email::backend::BackendBuilder<BackendContextBuilder> {
         self.builder
+    }
+}
+
+pub struct Backend {
+    toml_account_config: TomlAccountConfig,
+    backend: email::backend::Backend<BackendContext>,
+}
+
+impl Backend {
+    pub async fn new(
+        toml_account_config: TomlAccountConfig,
+        account_config: AccountConfig,
+        with_sending: bool,
+    ) -> Result<Self> {
+        BackendBuilder::new(toml_account_config, account_config, with_sending)
+            .await?
+            .build()
+            .await
+    }
+
+    fn build_id_mapper(
+        &self,
+        folder: &str,
+        backend_kind: Option<&BackendKind>,
+    ) -> Result<IdMapper> {
+        let mut id_mapper = IdMapper::Dummy;
+
+        match backend_kind {
+            Some(BackendKind::Maildir) => {
+                if let Some(mdir_config) = &self.toml_account_config.maildir {
+                    id_mapper = IdMapper::new(
+                        &self.backend.account_config,
+                        folder,
+                        mdir_config.root_dir.clone(),
+                    )?;
+                }
+            }
+            Some(BackendKind::MaildirForSync) => {
+                id_mapper = IdMapper::new(
+                    &self.backend.account_config,
+                    folder,
+                    self.backend.account_config.sync_dir()?,
+                )?;
+            }
+            #[cfg(feature = "notmuch-backend")]
+            Some(BackendKind::Notmuch) => {
+                if let Some(notmuch_config) = &self.toml_account_config.notmuch {
+                    id_mapper = IdMapper::new(
+                        &self.backend.account_config,
+                        folder,
+                        mdir_config.root_dir.clone(),
+                    )?;
+                }
+            }
+            _ => (),
+        };
+
+        Ok(id_mapper)
+    }
+
+    pub async fn list_envelopes(
+        &self,
+        folder: &str,
+        page_size: usize,
+        page: usize,
+    ) -> Result<Envelopes> {
+        let backend_kind = self.toml_account_config.list_envelopes_kind();
+        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
+        let envelopes = self.backend.list_envelopes(folder, page_size, page).await?;
+        let envelopes = Envelopes::from_backend(&self.account_config, &id_mapper, envelopes)?;
+        Ok(envelopes)
+    }
+
+    pub async fn add_flags(&self, folder: &str, ids: &[&str], flags: &Flags) -> Result<()> {
+        let backend_kind = self.toml_account_config.add_flags_kind();
+        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
+        let ids = Id::multiple(id_mapper.get_ids(ids)?);
+        self.backend.add_flags(folder, &ids, flags).await
+    }
+
+    pub async fn set_flags(&self, folder: &str, ids: &[&str], flags: &Flags) -> Result<()> {
+        let backend_kind = self.toml_account_config.set_flags_kind();
+        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
+        let ids = Id::multiple(id_mapper.get_ids(ids)?);
+        self.backend.set_flags(folder, &ids, flags).await
+    }
+
+    pub async fn remove_flags(&self, folder: &str, ids: &[&str], flags: &Flags) -> Result<()> {
+        let backend_kind = self.toml_account_config.remove_flags_kind();
+        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
+        let ids = Id::multiple(id_mapper.get_ids(ids)?);
+        self.backend.remove_flags(folder, &ids, flags).await
+    }
+
+    pub async fn get_messages(&self, folder: &str, ids: &[&str]) -> Result<Messages> {
+        let backend_kind = self.toml_account_config.get_messages_kind();
+        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
+        let ids = Id::multiple(id_mapper.get_ids(ids)?);
+        self.backend.get_messages(folder, &ids).await
+    }
+
+    pub async fn copy_messages(
+        &self,
+        from_folder: &str,
+        to_folder: &str,
+        ids: &[&str],
+    ) -> Result<()> {
+        let backend_kind = self.toml_account_config.move_messages_kind();
+        let id_mapper = self.build_id_mapper(from_folder, backend_kind)?;
+        let ids = Id::multiple(id_mapper.get_ids(ids)?);
+        self.backend
+            .copy_messages(from_folder, to_folder, &ids)
+            .await
+    }
+
+    pub async fn move_messages(
+        &self,
+        from_folder: &str,
+        to_folder: &str,
+        ids: &[&str],
+    ) -> Result<()> {
+        let backend_kind = self.toml_account_config.move_messages_kind();
+        let id_mapper = self.build_id_mapper(from_folder, backend_kind)?;
+        let ids = Id::multiple(id_mapper.get_ids(ids)?);
+        self.backend
+            .move_messages(from_folder, to_folder, &ids)
+            .await
+    }
+
+    pub async fn delete_messages(&self, folder: &str, ids: &[&str]) -> Result<()> {
+        let backend_kind = self.toml_account_config.delete_messages_kind();
+        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
+        let ids = Id::multiple(id_mapper.get_ids(ids)?);
+        self.backend.delete_messages(folder, &ids).await
+    }
+
+    pub async fn add_raw_message(&self, folder: &str, email: &[u8]) -> Result<SingleId> {
+        let backend_kind = self.toml_account_config.add_raw_message_kind();
+        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
+        let id = self.backend.add_raw_message(folder, email).await?;
+        id_mapper.create_alias(&*id)?;
+        Ok(id)
+    }
+}
+
+impl Deref for Backend {
+    type Target = email::backend::Backend<BackendContext>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.backend
     }
 }
