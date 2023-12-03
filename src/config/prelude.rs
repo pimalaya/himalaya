@@ -537,10 +537,33 @@ pub enum FolderSyncStrategyDef {
 
 #[cfg(feature = "pgp")]
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(remote = "Option<PgpConfig>", from = "OptionPgpConfig")]
+pub struct OptionPgpConfigDef;
+
+#[cfg(feature = "pgp")]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct OptionPgpConfig {
+    #[serde(default, skip)]
+    is_none: bool,
+    #[serde(flatten, with = "PgpConfigDef")]
+    inner: PgpConfig,
+}
+
+#[cfg(feature = "pgp")]
+impl From<OptionPgpConfig> for Option<PgpConfig> {
+    fn from(config: OptionPgpConfig) -> Option<PgpConfig> {
+        if config.is_none {
+            None
+        } else {
+            Some(config.inner)
+        }
+    }
+}
+
+#[cfg(feature = "pgp")]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "PgpConfig", tag = "backend", rename_all = "kebab-case")]
 pub enum PgpConfigDef {
-    #[default]
-    None,
     #[cfg(feature = "pgp-commands")]
     #[serde(with = "CmdsPgpConfigDef", alias = "commands")]
     Cmds(CmdsPgpConfig),

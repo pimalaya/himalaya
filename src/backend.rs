@@ -162,13 +162,21 @@ impl BackendBuilder {
             .map(|mdir_config| MaildirSessionBuilder::new(account_config.clone(), mdir_config)),
 
             #[cfg(feature = "imap-backend")]
-            imap: toml_account_config
-                .imap
-                .as_ref()
-                .filter(|_| is_imap_used)
-                .map(|imap_config| {
-                    ImapSessionBuilder::new(account_config.clone(), imap_config.clone())
-                }),
+            imap: {
+                let ctx_builder = toml_account_config
+                    .imap
+                    .as_ref()
+                    .filter(|_| is_imap_used)
+                    .map(|imap_config| {
+                        ImapSessionBuilder::new(account_config.clone(), imap_config.clone())
+                            .with_prebuilt_credentials()
+                    });
+
+                match ctx_builder {
+                    Some(ctx_builder) => Some(ctx_builder.await?),
+                    None => None,
+                }
+            },
             #[cfg(feature = "notmuch-backend")]
             notmuch: toml_account_config
                 .notmuch

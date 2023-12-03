@@ -77,10 +77,11 @@ pub async fn edit_tpl_with_editor<P: Printer>(
             Ok(PostEditChoice::Send) => {
                 printer.print_log("Sending email…")?;
 
-                let compiler = MmlCompilerBuilder::new();
+                #[allow(unused_mut)]
+                let mut compiler = MmlCompilerBuilder::new();
 
                 #[cfg(feature = "pgp")]
-                let compiler = compiler.with_pgp(config.pgp.clone());
+                compiler.set_some_pgp(config.pgp.clone());
 
                 let email = compiler.build(tpl.as_str())?.compile().await?.into_vec()?;
 
@@ -107,10 +108,11 @@ pub async fn edit_tpl_with_editor<P: Printer>(
                 break;
             }
             Ok(PostEditChoice::RemoteDraft) => {
-                let compiler = MmlCompilerBuilder::new();
+                #[allow(unused_mut)]
+                let mut compiler = MmlCompilerBuilder::new();
 
                 #[cfg(feature = "pgp")]
-                let compiler = compiler.with_pgp(config.pgp.clone());
+                compiler.set_some_pgp(config.pgp.clone());
 
                 let email = compiler.build(tpl.as_str())?.compile().await?.into_vec()?;
 

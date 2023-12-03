@@ -77,10 +77,11 @@ pub async fn save<P: Printer>(
             .join("\n")
     };
 
-    let compiler = MmlCompilerBuilder::new();
+    #[allow(unused_mut)]
+    let mut compiler = MmlCompilerBuilder::new();
 
     #[cfg(feature = "pgp")]
-    let compiler = compiler.with_pgp(config.pgp.clone());
+    compiler.set_some_pgp(config.pgp.clone());
 
     let email = compiler.build(tpl.as_str())?.compile().await?.into_vec()?;
 
@@ -108,10 +109,11 @@ pub async fn send<P: Printer>(
             .join("\n")
     };
 
-    let compiler = MmlCompilerBuilder::new();
+    #[allow(unused_mut)]
+    let mut compiler = MmlCompilerBuilder::new();
 
     #[cfg(feature = "pgp")]
-    let compiler = compiler.with_pgp(config.pgp.clone());
+    compiler.set_some_pgp(config.pgp.clone());
 
     let email = compiler.build(tpl.as_str())?.compile().await?.into_vec()?;
 

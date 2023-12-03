@@ -25,9 +25,9 @@ imap-backend = ["email-lib/imap-backend"]
 notmuch-backend = ["email-lib/notmuch-backend"]
 smtp-sender = ["email-lib/smtp-sender"]
 pgp = []
-pgp-commands = ["pgp", "email-lib/pgp-commands"]
-pgp-gpg = ["pgp", "email-lib/pgp-gpg"]
-pgp-native = ["pgp", "email-lib/pgp-native"]
+pgp-commands = ["pgp", "mml-lib/pgp-commands", "email-lib/pgp-commands"]
+pgp-gpg = ["pgp", "mml-lib/pgp-gpg", "email-lib/pgp-gpg"]
+pgp-native = ["pgp", "mml-lib/pgp-native", "email-lib/pgp-native"]
 
 # dev dependencies
 
@@ -107,6 +107,8 @@ version = "=0.1.0"
 
 [dependencies.mml-lib]
 # version = "=1.0.1"
+default-features = false
+features = ["compiler", "interpreter"]
 path = "/home/soywod/sourcehut/pimalaya/mml"
 
 [dependencies.secret-lib]

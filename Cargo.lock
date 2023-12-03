@@ -1001,7 +1001,7 @@ dependencies = [
  "mail-send",
  "maildirpp",
  "md5",
- "mml-lib 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mml-lib",
  "notmuch",
  "oauth-lib 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "once_cell",
@@ -2069,7 +2069,7 @@ dependencies = [
  "keyring-lib",
  "log",
  "md5",
- "mml-lib 1.0.1",
+ "mml-lib",
  "oauth-lib 0.1.0",
  "once_cell",
  "process-lib",
@@ -2687,23 +2687,6 @@ dependencies = [
 [[package]]
 name = "mml-lib"
 version = "1.0.1"
-dependencies = [
- "async-recursion",
- "chumsky",
- "log",
- "mail-builder",
- "mail-parser",
- "nanohtml2text",
- "shellexpand-utils 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "thiserror",
- "tree_magic_mini",
-]
-
-[[package]]
-name = "mml-lib"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "915efb96feb76c123001341d1631dc06c9bbe14c1a249ef709cf84b341eb8295"
 dependencies = [
  "async-recursion",
  "chumsky",
