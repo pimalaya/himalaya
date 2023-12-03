@@ -57,7 +57,10 @@ pub(crate) async fn configure() -> Result<TomlConfig> {
     // accounts are setup, decide which will be the default. If no
     // accounts are setup, exit the process.
     let default_account = match config.accounts.len() {
-        0 => process::exit(0),
+        0 => {
+            wizard_warn!("No account configured, exiting.");
+            process::exit(0);
+        }
         1 => Some(config.accounts.values_mut().next().unwrap()),
         _ => {
             let accounts = config.accounts.clone();

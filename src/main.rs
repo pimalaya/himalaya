@@ -5,8 +5,6 @@ use log::{debug, warn};
 use std::env;
 use url::Url;
 
-#[cfg(feature = "imap-backend")]
-use himalaya::imap;
 use himalaya::{
     account,
     backend::{Backend, BackendBuilder},
@@ -18,7 +16,7 @@ use himalaya::{
 };
 
 fn create_app() -> Command {
-    let app = Command::new(env!("CARGO_PKG_NAME"))
+    Command::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .author(env!("CARGO_PKG_AUTHORS"))
@@ -33,12 +31,7 @@ fn create_app() -> Command {
         .subcommand(man::args::subcmd())
         .subcommand(account::args::subcmd())
         .subcommand(folder::args::subcmd())
-        .subcommands(email::args::subcmds());
-
-    #[cfg(feature = "imap-backend")]
-    let app = app.subcommands(imap::args::subcmds());
-
-    app
+        .subcommands(email::args::subcmds())
 }
 
 #[allow(clippy::single_match)]
@@ -57,7 +50,7 @@ async fn main() -> Result<()> {
     let raw_args: Vec<String> = env::args().collect();
     if raw_args.len() > 1 && raw_args[1].starts_with("mailto:") {
         let url = Url::parse(&raw_args[1])?;
-        let (toml_account_config, account_config) = TomlConfig::from_maybe_path(None)
+        let (toml_account_config, account_config) = TomlConfig::from_default_paths()
             .await?
             .into_account_configs(None, false)?;
         let backend_builder =
@@ -88,12 +81,12 @@ async fn main() -> Result<()> {
         _ => (),
     }
 
-    let maybe_config_path = config::args::parse_arg(&m);
-    let maybe_account_name = account::args::parse_arg(&m);
+    let some_config_path = config::args::parse_arg(&m);
+    let some_account_name = account::args::parse_arg(&m);
     let disable_cache = cache::args::parse_disable_cache_flag(&m);
     let folder = folder::args::parse_source_arg(&m);
 
-    let toml_config = TomlConfig::from_maybe_path(maybe_config_path).await?;
+    let toml_config = TomlConfig::from_some_path_or_default(some_config_path).await?;
 
     let mut printer = StdoutPrinter::try_from(&m)?;
 
@@ -122,13 +115,13 @@ async fn main() -> Result<()> {
         Some(account::args::Cmd::List(max_width)) => {
             let (_, account_config) = toml_config
                 .clone()
-                .into_account_configs(maybe_account_name, disable_cache)?;
+                .into_account_configs(some_account_name, disable_cache)?;
             return account::handlers::list(max_width, &account_config, &toml_config, &mut printer);
         }
         Some(account::args::Cmd::Sync(strategy, dry_run)) => {
             let (toml_account_config, account_config) = toml_config
                 .clone()
-                .into_account_configs(maybe_account_name, true)?;
+                .into_account_configs(some_account_name, true)?;
             let backend_builder =
                 BackendBuilder::new(toml_account_config, account_config.clone(), false).await?;
             let sync_builder = AccountSyncBuilder::new(backend_builder.into())
@@ -140,7 +133,7 @@ async fn main() -> Result<()> {
         Some(account::args::Cmd::Configure(reset)) => {
             let (_, account_config) = toml_config
                 .clone()
-                .into_account_configs(maybe_account_name, disable_cache)?;
+                .into_account_configs(some_account_name, disable_cache)?;
             return account::handlers::configure(&account_config, reset).await;
         }
         _ => (),
@@ -148,7 +141,7 @@ async fn main() -> Result<()> {
 
     let (toml_account_config, account_config) = toml_config
         .clone()
-        .into_account_configs(maybe_account_name, disable_cache)?;
+        .into_account_configs(some_account_name, disable_cache)?;
 
     // checks folder commands
     match folder::args::matches(&m)? {

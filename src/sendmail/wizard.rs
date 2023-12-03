@@ -1,10 +1,10 @@
 use anyhow::Result;
 use dialoguer::Input;
-use email::sender::{SenderConfig, SendmailConfig};
+use email::sendmail::SendmailConfig;
 
-use crate::config::wizard::THEME;
+use crate::{backend::config::BackendConfig, config::wizard::THEME};
 
-pub(crate) fn configure() -> Result<SenderConfig> {
+pub(crate) fn configure() -> Result<BackendConfig> {
     let mut config = SendmailConfig::default();
 
     config.cmd = Input::with_theme(&*THEME)
@@ -13,5 +13,5 @@ pub(crate) fn configure() -> Result<SenderConfig> {
         .interact()?
         .into();
 
-    Ok(SenderConfig::Sendmail(config))
+    Ok(BackendConfig::Sendmail(config))
 }

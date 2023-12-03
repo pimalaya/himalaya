@@ -1,3 +1,6 @@
+pub mod config;
+pub(crate) mod wizard;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use std::ops::Deref;
@@ -47,11 +50,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{account::TomlAccountConfig, Envelopes, IdMapper};
 
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum BackendKind {
-    #[default]
-    None,
     Maildir,
     #[serde(skip_deserializing)]
     MaildirForSync,
@@ -62,6 +63,24 @@ pub enum BackendKind {
     #[cfg(feature = "smtp-sender")]
     Smtp,
     Sendmail,
+}
+
+impl ToString for BackendKind {
+    fn to_string(&self) -> String {
+        let kind = match self {
+            Self::Maildir => "Maildir",
+            Self::MaildirForSync => "Maildir",
+            #[cfg(feature = "imap-backend")]
+            Self::Imap => "IMAP",
+            #[cfg(feature = "notmuch-backend")]
+            Self::Notmuch => "Notmuch",
+            #[cfg(feature = "smtp-sender")]
+            Self::Smtp => "SMTP",
+            Self::Sendmail => "Sendmail",
+        };
+
+        kind.to_string()
+    }
 }
 
 #[derive(Clone, Default)]

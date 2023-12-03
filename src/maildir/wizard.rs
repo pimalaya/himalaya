@@ -1,9 +1,9 @@
 use anyhow::Result;
 use dialoguer::Input;
 use dirs::home_dir;
-use email::backend::{BackendConfig, MaildirConfig};
+use email::maildir::MaildirConfig;
 
-use crate::config::wizard::THEME;
+use crate::{backend::config::BackendConfig, config::wizard::THEME};
 
 pub(crate) fn configure() -> Result<BackendConfig> {
     let mut config = MaildirConfig::default();

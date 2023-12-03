@@ -11,9 +11,13 @@ use email::{
     config::Config,
     email::{EmailHooks, EmailTextPlainFormat},
 };
-use log::{debug, trace};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, path::PathBuf, process::exit};
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
+    process,
+};
 use toml;
 
 use crate::{
@@ -52,51 +56,95 @@ pub struct TomlConfig {
 }
 
 impl TomlConfig {
-    /// Tries to create a config from an optional path.
-    pub async fn from_maybe_path(path: Option<&str>) -> Result<Self> {
-        debug!("path: {:?}", path);
-
-        let config = if let Some(path) = path.map(PathBuf::from).or_else(Self::path) {
-            let content = fs::read_to_string(path).context("cannot read config file")?;
-            toml::from_str(&content).context("cannot parse config file")?
-        } else {
-            wizard_warn!("Himalaya could not find an already existing configuration file.");
-
-            if !Confirm::new()
-                .with_prompt(wizard_prompt!(
-                    "Would you like to create one with the wizard?"
-                ))
-                .default(true)
-                .interact_opt()?
-                .unwrap_or_default()
-            {
-                exit(0);
-            }
-
-            wizard::configure().await?
-        };
-
-        if config.accounts.is_empty() {
-            return Err(anyhow!("config file must contain at least one account"));
-        }
-
-        trace!("config: {:#?}", config);
-        Ok(config)
+    /// Read and parse the TOML configuration at the given path.
+    ///
+    /// Returns an error if the configuration file cannot be read or
+    /// if its content cannot be parsed.
+    fn from_path(path: &Path) -> Result<Self> {
+        let content =
+            fs::read_to_string(path).context(format!("cannot read config file at {path:?}"))?;
+        toml::from_str(&content).context(format!("cannot parse config file at {path:?}"))
     }
 
-    /// Tries to return a config path from a few default settings.
+    /// Create and save a TOML configuration using the wizard.
+    ///
+    /// If the user accepts the confirmation, the wizard starts and
+    /// help him to create his configuration file. Otherwise the
+    /// program stops.
+    ///
+    /// NOTE: the wizard can only be used with interactive shells.
+    async fn from_wizard(path: PathBuf) -> Result<Self> {
+        wizard_warn!("Cannot find existing configuration at {path:?}.");
+
+        let confirm = Confirm::new()
+            .with_prompt(wizard_prompt!(
+                "Would you like to create it with the wizard?"
+            ))
+            .default(true)
+            .interact_opt()?
+            .unwrap_or_default();
+
+        if !confirm {
+            process::exit(0);
+        }
+
+        wizard::configure().await
+    }
+
+    /// Read and parse the TOML configuration from default paths.
+    pub async fn from_default_paths() -> Result<Self> {
+        match Self::first_valid_default_path() {
+            Some(path) => Self::from_path(&path),
+            None => Self::from_wizard(Self::default_path()?).await,
+        }
+    }
+
+    /// Read and parse the TOML configuration at the optional given
+    /// path.
+    ///
+    /// If the given path exists, then read and parse the TOML
+    /// configuration from it.
+    ///
+    /// If the given path does not exist, then create it using the
+    /// wizard.
+    ///
+    /// If no path is given, then either read and parse the TOML
+    /// configuration at the first valid default path, otherwise
+    /// create it using the wizard.  wizard.
+    pub async fn from_some_path_or_default(path: Option<impl Into<PathBuf>>) -> Result<Self> {
+        match path.map(Into::into) {
+            Some(ref path) if path.exists() => Self::from_path(path),
+            Some(path) => Self::from_wizard(path).await,
+            None => match Self::first_valid_default_path() {
+                Some(path) => Self::from_path(&path),
+                None => Self::from_wizard(Self::default_path()?).await,
+            },
+        }
+    }
+
+    /// Get the default configuration path.
+    ///
+    /// Returns an error if the XDG configuration directory cannot be
+    /// found.
+    pub fn default_path() -> Result<PathBuf> {
+        Ok(config_dir()
+            .ok_or(anyhow!("cannot get XDG config directory"))?
+            .join("himalaya")
+            .join("config.toml"))
+    }
+
+    /// Get the first default configuration path that points to a
+    /// valid file.
     ///
     /// Tries paths in this order:
     ///
-    /// - `"$XDG_CONFIG_DIR/himalaya/config.toml"` (or equivalent to `$XDG_CONFIG_DIR` in  other
-    ///   OSes.)
-    /// - `"$HOME/.config/himalaya/config.toml"`
-    /// - `"$HOME/.himalayarc"`
-    ///
-    /// Returns `Some(path)` if the path exists, otherwise `None`.
-    pub fn path() -> Option<PathBuf> {
-        config_dir()
-            .map(|p| p.join("himalaya").join("config.toml"))
+    /// - `$XDG_CONFIG_DIR/himalaya/config.toml` (or equivalent to
+    ///   `$XDG_CONFIG_DIR` in other OSes.)
+    /// - `$HOME/.config/himalaya/config.toml`
+    /// - `$HOME/.himalayarc`
+    pub fn first_valid_default_path() -> Option<PathBuf> {
+        Self::default_path()
+            .ok()
             .filter(|p| p.exists())
             .or_else(|| home_dir().map(|p| p.join(".config").join("himalaya").join("config.toml")))
             .filter(|p| p.exists())
@@ -104,6 +152,7 @@ impl TomlConfig {
             .filter(|p| p.exists())
     }
 
+    /// Build account configurations from a given account name.
     pub fn into_account_configs(
         self,
         account_name: Option<&str>,
@@ -232,7 +281,7 @@ mod tests {
     async fn make_config(config: &str) -> Result<TomlConfig> {
         let mut file = NamedTempFile::new().unwrap();
         write!(file, "{}", config).unwrap();
-        TomlConfig::from_maybe_path(file.into_temp_path().to_str()).await
+        TomlConfig::from_some_path_or_default(file.into_temp_path().to_str()).await
     }
 
     #[tokio::test]
