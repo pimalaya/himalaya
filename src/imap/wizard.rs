@@ -1,8 +1,11 @@
 use anyhow::Result;
 use dialoguer::{Confirm, Input, Password, Select};
 use email::{
-    account::{OAuth2Config, OAuth2Method, OAuth2Scopes, PasswdConfig},
-    imap::{ImapAuthConfig, ImapConfig},
+    account::config::{
+        oauth2::{OAuth2Config, OAuth2Method, OAuth2Scopes},
+        passwd::PasswdConfig,
+    },
+    imap::config::{ImapAuthConfig, ImapConfig},
 };
 use oauth::v2_0::{AuthorizationCodeGrant, Client};
 use secret::Secret;

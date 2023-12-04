@@ -1,10 +1,11 @@
 use anyhow::{anyhow, Context, Result};
 use atty::Stream;
 use email::{
-    account::AccountConfig,
-    email::{envelope::Id, template::FilterParts, Flag, Message, MessageBuilder},
+    account::config::AccountConfig, envelope::Id, flag::Flag, message::Message,
+    template::FilterParts,
 };
 use log::{debug, trace};
+use mail_builder::MessageBuilder;
 use std::{
     fs,
     io::{self, BufRead},

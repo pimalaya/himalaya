@@ -1,7 +1,7 @@
 use anyhow::Result;
 use dialoguer::Input;
 use dirs::home_dir;
-use email::maildir::MaildirConfig;
+use email::maildir::config::MaildirConfig;
 
 use crate::{backend::config::BackendConfig, config::wizard::THEME};
 

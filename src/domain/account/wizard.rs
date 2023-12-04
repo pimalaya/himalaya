@@ -40,12 +40,12 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
             config.maildir = Some(mdir_config);
             config.backend = Some(BackendKind::Maildir);
         }
-        #[cfg(feature = "imap-backend")]
+        #[cfg(feature = "imap")]
         Some(BackendConfig::Imap(imap_config)) => {
             config.imap = Some(imap_config);
             config.backend = Some(BackendKind::Imap);
         }
-        #[cfg(feature = "notmuch-backend")]
+        #[cfg(feature = "notmuch")]
         Some(BackendConfig::Notmuch(notmuch_config)) => {
             config.notmuch = Some(notmuch_config);
             config.backend = Some(BackendKind::Notmuch);
@@ -64,7 +64,7 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
                 ..Default::default()
             });
         }
-        #[cfg(feature = "smtp-sender")]
+        #[cfg(feature = "smtp")]
         Some(BackendConfig::Smtp(smtp_config)) => {
             config.smtp = Some(smtp_config);
             config.message = Some(MessageConfig {

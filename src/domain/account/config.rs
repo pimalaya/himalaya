@@ -5,15 +5,15 @@
 
 #[cfg(feature = "pgp")]
 use email::account::PgpConfig;
-#[cfg(feature = "imap-backend")]
-use email::imap::ImapConfig;
-#[cfg(feature = "smtp-sender")]
-use email::smtp::SmtpConfig;
+#[cfg(feature = "imap")]
+use email::imap::config::ImapConfig;
+#[cfg(feature = "smtp")]
+use email::smtp::config::SmtpConfig;
 use email::{
-    email::{EmailHooks, EmailTextPlainFormat},
+    email::config::{EmailHooks, EmailTextPlainFormat},
     folder::sync::FolderSyncStrategy,
-    maildir::MaildirConfig,
-    sendmail::SendmailConfig,
+    maildir::config::MaildirConfig,
+    sendmail::config::SendmailConfig,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -79,7 +79,7 @@ pub struct TomlAccountConfig {
     pub flag: Option<FlagConfig>,
     pub message: Option<MessageConfig>,
 
-    #[cfg(feature = "imap-backend")]
+    #[cfg(feature = "imap")]
     #[serde(
         default,
         with = "OptionImapConfigDef",
@@ -94,7 +94,7 @@ pub struct TomlAccountConfig {
     )]
     pub maildir: Option<MaildirConfig>,
 
-    #[cfg(feature = "notmuch-backend")]
+    #[cfg(feature = "notmuch")]
     #[serde(
         default,
         with = "OptionNotmuchConfigDef",
@@ -102,7 +102,7 @@ pub struct TomlAccountConfig {
     )]
     pub notmuch: Option<NotmuchConfig>,
 
-    #[cfg(feature = "smtp-sender")]
+    #[cfg(feature = "smtp")]
     #[serde(
         default,
         with = "OptionSmtpConfigDef",

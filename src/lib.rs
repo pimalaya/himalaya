@@ -3,16 +3,16 @@ pub mod cache;
 pub mod compl;
 pub mod config;
 pub mod domain;
-#[cfg(feature = "imap-backend")]
+#[cfg(feature = "imap")]
 pub mod imap;
 pub mod maildir;
 pub mod man;
-#[cfg(feature = "notmuch-backend")]
+#[cfg(feature = "notmuch")]
 pub mod notmuch;
 pub mod output;
 pub mod printer;
 pub mod sendmail;
-#[cfg(feature = "smtp-sender")]
+#[cfg(feature = "smtp")]
 pub mod smtp;
 pub mod ui;
 

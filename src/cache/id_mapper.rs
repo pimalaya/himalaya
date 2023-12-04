@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Context, Result};
-use email::account::AccountConfig;
+use email::account::config::AccountConfig;
 use log::{debug, trace};
 use std::path::{Path, PathBuf};
 

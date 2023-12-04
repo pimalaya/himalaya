@@ -1,26 +1,26 @@
 use anyhow::Result;
 use dialoguer::Select;
 
-#[cfg(feature = "imap-backend")]
+#[cfg(feature = "imap")]
 use crate::imap;
-#[cfg(feature = "notmuch-backend")]
+#[cfg(feature = "notmuch")]
 use crate::notmuch;
-#[cfg(feature = "smtp-sender")]
+#[cfg(feature = "smtp")]
 use crate::smtp;
 use crate::{config::wizard::THEME, maildir, sendmail};
 
 use super::{config::BackendConfig, BackendKind};
 
 const DEFAULT_BACKEND_KINDS: &[BackendKind] = &[
-    #[cfg(feature = "imap-backend")]
+    #[cfg(feature = "imap")]
     BackendKind::Imap,
     BackendKind::Maildir,
-    #[cfg(feature = "notmuch-backend")]
+    #[cfg(feature = "notmuch")]
     BackendKind::Notmuch,
 ];
 
 const SEND_MESSAGE_BACKEND_KINDS: &[BackendKind] = &[
-    #[cfg(feature = "smtp-sender")]
+    #[cfg(feature = "smtp")]
     BackendKind::Smtp,
     BackendKind::Sendmail,
 ];
@@ -35,11 +35,11 @@ pub(crate) async fn configure(account_name: &str, email: &str) -> Result<Option<
 
     let config = match kind {
         Some(kind) if kind == BackendKind::Maildir => Some(maildir::wizard::configure()?),
-        #[cfg(feature = "imap-backend")]
+        #[cfg(feature = "imap")]
         Some(kind) if kind == BackendKind::Imap => {
             Some(imap::wizard::configure(account_name, email).await?)
         }
-        #[cfg(feature = "notmuch-backend")]
+        #[cfg(feature = "notmuch")]
         Some(kind) if kind == BackendKind::Notmuch => Some(notmuch::wizard::configure()?),
         _ => None,
     };
@@ -60,7 +60,7 @@ pub(crate) async fn configure_sender(
 
     let config = match kind {
         Some(kind) if kind == BackendKind::Sendmail => Some(sendmail::wizard::configure()?),
-        #[cfg(feature = "smtp-sender")]
+        #[cfg(feature = "smtp")]
         Some(kind) if kind == BackendKind::Smtp => {
             Some(smtp::wizard::configure(account_name, email).await?)
         }

@@ -1,9 +1,6 @@
 use anyhow::{anyhow, Result};
 use atty::Stream;
-use email::{
-    account::AccountConfig,
-    email::{Flag, Message},
-};
+use email::{account::config::AccountConfig, flag::Flag, message::Message};
 use mml::MmlCompilerBuilder;
 use std::io::{stdin, BufRead};
 

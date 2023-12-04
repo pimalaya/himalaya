@@ -1,6 +1,6 @@
 use anyhow::Result;
 use dialoguer::Input;
-use email::sendmail::SendmailConfig;
+use email::sendmail::config::SendmailConfig;
 
 use crate::{backend::config::BackendConfig, config::wizard::THEME};
 

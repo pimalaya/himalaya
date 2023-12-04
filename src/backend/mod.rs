@@ -5,36 +5,23 @@ use anyhow::Result;
 use async_trait::async_trait;
 use std::ops::Deref;
 
-#[cfg(feature = "imap-backend")]
+#[cfg(feature = "imap")]
 use email::imap::{ImapSessionBuilder, ImapSessionSync};
-#[cfg(feature = "smtp-sender")]
+#[cfg(feature = "smtp")]
 use email::smtp::{SmtpClientBuilder, SmtpClientSync};
 use email::{
-    account::AccountConfig,
-    email::{
-        envelope::{
-            get::{imap::GetEnvelopeImap, maildir::GetEnvelopeMaildir},
-            list::{imap::ListEnvelopesImap, maildir::ListEnvelopesMaildir},
-        },
-        flag::{
-            add::{imap::AddFlagsImap, maildir::AddFlagsMaildir},
-            remove::{imap::RemoveFlagsImap, maildir::RemoveFlagsMaildir},
-            set::{imap::SetFlagsImap, maildir::SetFlagsMaildir},
-        },
-        message::{
-            add_raw::imap::AddRawMessageImap,
-            add_raw_with_flags::{
-                imap::AddRawMessageWithFlagsImap, maildir::AddRawMessageWithFlagsMaildir,
-            },
-            copy::{imap::CopyMessagesImap, maildir::CopyMessagesMaildir},
-            get::imap::GetMessagesImap,
-            move_::{imap::MoveMessagesImap, maildir::MoveMessagesMaildir},
-            peek::{imap::PeekMessagesImap, maildir::PeekMessagesMaildir},
-            send_raw::{sendmail::SendRawMessageSendmail, smtp::SendRawMessageSmtp},
-        },
+    account::config::AccountConfig,
+    envelope::{
+        get::{imap::GetEnvelopeImap, maildir::GetEnvelopeMaildir},
+        list::{imap::ListEnvelopesImap, maildir::ListEnvelopesMaildir},
+        Id, SingleId,
     },
-    envelope::{Id, SingleId},
-    flag::Flags,
+    flag::{
+        add::{imap::AddFlagsImap, maildir::AddFlagsMaildir},
+        remove::{imap::RemoveFlagsImap, maildir::RemoveFlagsMaildir},
+        set::{imap::SetFlagsImap, maildir::SetFlagsMaildir},
+        Flags,
+    },
     folder::{
         add::{imap::AddFolderImap, maildir::AddFolderMaildir},
         delete::{imap::DeleteFolderImap, maildir::DeleteFolderMaildir},
@@ -42,8 +29,19 @@ use email::{
         list::{imap::ListFoldersImap, maildir::ListFoldersMaildir},
         purge::imap::PurgeFolderImap,
     },
-    maildir::{MaildirConfig, MaildirSessionBuilder, MaildirSessionSync},
-    message::Messages,
+    maildir::{config::MaildirConfig, MaildirSessionBuilder, MaildirSessionSync},
+    message::{
+        add_raw::imap::AddRawMessageImap,
+        add_raw_with_flags::{
+            imap::AddRawMessageWithFlagsImap, maildir::AddRawMessageWithFlagsMaildir,
+        },
+        copy::{imap::CopyMessagesImap, maildir::CopyMessagesMaildir},
+        get::imap::GetMessagesImap,
+        move_::{imap::MoveMessagesImap, maildir::MoveMessagesMaildir},
+        peek::{imap::PeekMessagesImap, maildir::PeekMessagesMaildir},
+        send_raw::{sendmail::SendRawMessageSendmail, smtp::SendRawMessageSmtp},
+        Messages,
+    },
     sendmail::SendmailContext,
 };
 use serde::{Deserialize, Serialize};
@@ -56,11 +54,11 @@ pub enum BackendKind {
     Maildir,
     #[serde(skip_deserializing)]
     MaildirForSync,
-    #[cfg(feature = "imap-backend")]
+    #[cfg(feature = "imap")]
     Imap,
-    #[cfg(feature = "notmuch-backend")]
+    #[cfg(feature = "notmuch")]
     Notmuch,
-    #[cfg(feature = "smtp-sender")]
+    #[cfg(feature = "smtp")]
     Smtp,
     Sendmail,
 }
@@ -70,11 +68,11 @@ impl ToString for BackendKind {
         let kind = match self {
             Self::Maildir => "Maildir",
             Self::MaildirForSync => "Maildir",
-            #[cfg(feature = "imap-backend")]
+            #[cfg(feature = "imap")]
             Self::Imap => "IMAP",
-            #[cfg(feature = "notmuch-backend")]
+            #[cfg(feature = "notmuch")]
             Self::Notmuch => "Notmuch",
-            #[cfg(feature = "smtp-sender")]
+            #[cfg(feature = "smtp")]
             Self::Smtp => "SMTP",
             Self::Sendmail => "Sendmail",
         };
@@ -87,9 +85,9 @@ impl ToString for BackendKind {
 pub struct BackendContextBuilder {
     maildir: Option<MaildirSessionBuilder>,
     maildir_for_sync: Option<MaildirSessionBuilder>,
-    #[cfg(feature = "imap-backend")]
+    #[cfg(feature = "imap")]
     imap: Option<ImapSessionBuilder>,
-    #[cfg(feature = "smtp-sender")]
+    #[cfg(feature = "smtp")]
     smtp: Option<SmtpClientBuilder>,
     sendmail: Option<SendmailContext>,
 }
@@ -109,17 +107,17 @@ impl email::backend::BackendContextBuilder for BackendContextBuilder {
             ctx.maildir_for_sync = Some(maildir.build().await?);
         }
 
-        #[cfg(feature = "imap-backend")]
+        #[cfg(feature = "imap")]
         if let Some(imap) = self.imap {
             ctx.imap = Some(imap.build().await?);
         }
 
-        #[cfg(feature = "notmuch-backend")]
+        #[cfg(feature = "notmuch")]
         if let Some(notmuch) = self.notmuch {
             ctx.notmuch = Some(notmuch.build().await?);
         }
 
-        #[cfg(feature = "smtp-sender")]
+        #[cfg(feature = "smtp")]
         if let Some(smtp) = self.smtp {
             ctx.smtp = Some(smtp.build().await?);
         }
@@ -136,9 +134,9 @@ impl email::backend::BackendContextBuilder for BackendContextBuilder {
 pub struct BackendContext {
     pub maildir: Option<MaildirSessionSync>,
     pub maildir_for_sync: Option<MaildirSessionSync>,
-    #[cfg(feature = "imap-backend")]
+    #[cfg(feature = "imap")]
     pub imap: Option<ImapSessionSync>,
-    #[cfg(feature = "smtp-sender")]
+    #[cfg(feature = "smtp")]
     pub smtp: Option<SmtpClientSync>,
     pub sendmail: Option<SendmailContext>,
 }
@@ -158,11 +156,11 @@ impl BackendBuilder {
 
         let is_maildir_used = used_backends.contains(&BackendKind::Maildir);
         let is_maildir_for_sync_used = used_backends.contains(&BackendKind::MaildirForSync);
-        #[cfg(feature = "imap-backend")]
+        #[cfg(feature = "imap")]
         let is_imap_used = used_backends.contains(&BackendKind::Imap);
-        #[cfg(feature = "notmuch-backend")]
+        #[cfg(feature = "notmuch")]
         let is_notmuch_used = used_backends.contains(&BackendKind::Notmuch);
-        #[cfg(feature = "smtp-sender")]
+        #[cfg(feature = "smtp")]
         let is_smtp_used = used_backends.contains(&BackendKind::Smtp);
         let is_sendmail_used = used_backends.contains(&BackendKind::Sendmail);
 
@@ -180,7 +178,7 @@ impl BackendBuilder {
             .filter(|_| is_maildir_for_sync_used)
             .map(|mdir_config| MaildirSessionBuilder::new(account_config.clone(), mdir_config)),
 
-            #[cfg(feature = "imap-backend")]
+            #[cfg(feature = "imap")]
             imap: {
                 let ctx_builder = toml_account_config
                     .imap
@@ -196,7 +194,7 @@ impl BackendBuilder {
                     None => None,
                 }
             },
-            #[cfg(feature = "notmuch-backend")]
+            #[cfg(feature = "notmuch")]
             notmuch: toml_account_config
                 .notmuch
                 .as_ref()
@@ -204,7 +202,7 @@ impl BackendBuilder {
                 .map(|notmuch_config| {
                     NotmuchSessionBuilder::new(account_config.clone(), notmuch_config.clone())
                 }),
-            #[cfg(feature = "smtp-sender")]
+            #[cfg(feature = "smtp")]
             smtp: toml_account_config
                 .smtp
                 .as_ref()
@@ -238,12 +236,12 @@ impl BackendBuilder {
                         .and_then(AddFolderMaildir::new)
                 });
             }
-            #[cfg(feature = "imap-backend")]
+            #[cfg(feature = "imap")]
             Some(BackendKind::Imap) => {
                 backend_builder = backend_builder
                     .with_add_folder(|ctx| ctx.imap.as_ref().and_then(AddFolderImap::new));
             }
-            #[cfg(feature = "notmuch-backend")]
+            #[cfg(feature = "notmuch")]
             Some(BackendKind::Notmuch) => {
                 backend_builder = backend_builder
                     .with_add_folder(|ctx| ctx.notmuch.as_ref().and_then(AddFolderNotmuch::new));
@@ -264,12 +262,12 @@ impl BackendBuilder {
                         .and_then(ListFoldersMaildir::new)
                 });
             }
-            #[cfg(feature = "imap-backend")]
+            #[cfg(feature = "imap")]
             Some(BackendKind::Imap) => {
                 backend_builder = backend_builder
                     .with_list_folders(|ctx| ctx.imap.as_ref().and_then(ListFoldersImap::new));
             }
-            #[cfg(feature = "notmuch-backend")]
+            #[cfg(feature = "notmuch")]
             Some(BackendKind::Notmuch) => {
                 backend_builder = backend_builder.with_list_folders(|ctx| {
                     ctx.notmuch.as_ref().and_then(ListFoldersNotmuch::new)
@@ -291,12 +289,12 @@ impl BackendBuilder {
                         .and_then(ExpungeFolderMaildir::new)
                 });
             }
-            #[cfg(feature = "imap-backend")]
+            #[cfg(feature = "imap")]
             Some(BackendKind::Imap) => {
                 backend_builder = backend_builder
                     .with_expunge_folder(|ctx| ctx.imap.as_ref().and_then(ExpungeFolderImap::new));
             }
-            #[cfg(feature = "notmuch-backend")]
+            #[cfg(feature = "notmuch")]
             Some(BackendKind::Notmuch) => {
                 backend_builder = backend_builder.with_expunge_folder(|ctx| {
                     ctx.notmuch.as_ref().and_then(ExpungeFolderNotmuch::new)
@@ -316,12 +314,12 @@ impl BackendBuilder {
             //     backend_builder = backend_builder
             //         .with_purge_folder(|ctx| ctx.maildir_for_sync.as_ref().and_then(PurgeFolderMaildir::new));
             // }
-            #[cfg(feature = "imap-backend")]
+            #[cfg(feature = "imap")]
             Some(BackendKind::Imap) => {
                 backend_builder = backend_builder
                     .with_purge_folder(|ctx| ctx.imap.as_ref().and_then(PurgeFolderImap::new));
             }
-            #[cfg(feature = "notmuch-backend")]
+            #[cfg(feature = "notmuch")]
             Some(BackendKind::Notmuch) => {
                 backend_builder = backend_builder.with_purge_folder(|ctx| {
                     ctx.notmuch.as_ref().and_then(PurgeFolderNotmuch::new)
@@ -343,12 +341,12 @@ impl BackendBuilder {
                         .and_then(DeleteFolderMaildir::new)
                 });
             }
-            #[cfg(feature = "imap-backend")]
+            #[cfg(feature = "imap")]
             Some(BackendKind::Imap) => {
                 backend_builder = backend_builder
                     .with_delete_folder(|ctx| ctx.imap.as_ref().and_then(DeleteFolderImap::new));
             }
-            #[cfg(feature = "notmuch-backend")]
+            #[cfg(feature = "notmuch")]
             Some(BackendKind::Notmuch) => {
                 backend_builder = backend_builder.with_delete_folder(|ctx| {
                     ctx.notmuch.as_ref().and_then(DeleteFolderNotmuch::new)
@@ -370,12 +368,12 @@ impl BackendBuilder {
                         .and_then(GetEnvelopeMaildir::new)
                 });
             }
-            #[cfg(feature = "imap-backend")]
+            #[cfg(feature = "imap")]
             Some(BackendKind::Imap) => {
                 backend_builder = backend_builder
                     .with_get_envelope(|ctx| ctx.imap.as_ref().and_then(GetEnvelopeImap::new));
             }
-            #[cfg(feature = "notmuch-backend")]
+            #[cfg(feature = "notmuch")]
             Some(BackendKind::Notmuch) => {
                 backend_builder = backend_builder.with_get_envelope(|ctx| {
                     ctx.notmuch.as_ref().and_then(GetEnvelopeNotmuch::new)
@@ -397,12 +395,12 @@ impl BackendBuilder {
                         .and_then(ListEnvelopesMaildir::new)
                 });
             }
-            #[cfg(feature = "imap-backend")]
+            #[cfg(feature = "imap")]
             Some(BackendKind::Imap) => {
                 backend_builder = backend_builder
                     .with_list_envelopes(|ctx| ctx.imap.as_ref().and_then(ListEnvelopesImap::new));
             }
-            #[cfg(feature = "notmuch-backend")]
+            #[cfg(feature = "notmuch")]
             Some(BackendKind::Notmuch) => {
                 backend_builder = backend_builder.with_list_envelopes(|ctx| {
                     ctx.notmuch.as_ref().and_then(ListEnvelopesNotmuch::new)
@@ -421,12 +419,12 @@ impl BackendBuilder {
                     ctx.maildir_for_sync.as_ref().and_then(AddFlagsMaildir::new)
                 });
             }
-            #[cfg(feature = "imap-backend")]
+            #[cfg(feature = "imap")]
             Some(BackendKind::Imap) => {
                 backend_builder = backend_builder
                     .with_add_flags(|ctx| ctx.imap.as_ref().and_then(AddFlagsImap::new));
             }
-            #[cfg(feature = "notmuch-backend")]
+            #[cfg(feature = "notmuch")]
             Some(BackendKind::Notmuch) => {
                 backend_builder = backend_builder
                     .with_add_flags(|ctx| ctx.notmuch.as_ref().and_then(AddFlagsNotmuch::new));
@@ -444,12 +442,12 @@ impl BackendBuilder {
                     ctx.maildir_for_sync.as_ref().and_then(SetFlagsMaildir::new)
                 });
             }
-            #[cfg(feature = "imap-backend")]
+            #[cfg(feature = "imap")]
             Some(BackendKind::Imap) => {
                 backend_builder = backend_builder
                     .with_set_flags(|ctx| ctx.imap.as_ref().and_then(SetFlagsImap::new));
             }
-            #[cfg(feature = "notmuch-backend")]
+            #[cfg(feature = "notmuch")]
             Some(BackendKind::Notmuch) => {
                 backend_builder = backend_builder
                     .with_set_flags(|ctx| ctx.notmuch.as_ref().and_then(SetFlagsNotmuch::new));
@@ -470,12 +468,12 @@ impl BackendBuilder {
                         .and_then(RemoveFlagsMaildir::new)
                 });
             }
-            #[cfg(feature = "imap-backend")]
+            #[cfg(feature = "imap")]
             Some(BackendKind::Imap) => {
                 backend_builder = backend_builder
                     .with_remove_flags(|ctx| ctx.imap.as_ref().and_then(RemoveFlagsImap::new));
             }
-            #[cfg(feature = "notmuch-backend")]
+            #[cfg(feature = "notmuch")]
             Some(BackendKind::Notmuch) => {
                 backend_builder = backend_builder.with_remove_flags(|ctx| {
                     ctx.notmuch.as_ref().and_then(RemoveFlagsNotmuch::new)
@@ -485,7 +483,7 @@ impl BackendBuilder {
         }
 
         match toml_account_config.send_raw_message_kind() {
-            #[cfg(feature = "smtp-sender")]
+            #[cfg(feature = "smtp")]
             Some(BackendKind::Smtp) => {
                 backend_builder = backend_builder.with_send_raw_message(|ctx| {
                     ctx.smtp.as_ref().and_then(SendRawMessageSmtp::new)
@@ -514,7 +512,7 @@ impl BackendBuilder {
                         .and_then(AddRawMessageWithFlagsMaildir::new)
                 });
             }
-            #[cfg(feature = "imap-backend")]
+            #[cfg(feature = "imap")]
             Some(BackendKind::Imap) => {
                 backend_builder = backend_builder
                     .with_add_raw_message(|ctx| ctx.imap.as_ref().and_then(AddRawMessageImap::new))
@@ -522,7 +520,7 @@ impl BackendBuilder {
                         ctx.imap.as_ref().and_then(AddRawMessageWithFlagsImap::new)
                     });
             }
-            #[cfg(feature = "notmuch-backend")]
+            #[cfg(feature = "notmuch")]
             Some(BackendKind::Notmuch) => {
                 backend_builder = backend_builder.with_add_raw_message(|ctx| {
                     ctx.notmuch.as_ref().and_then(AddRawMessageNotmuch::new)
@@ -544,12 +542,12 @@ impl BackendBuilder {
                         .and_then(PeekMessagesMaildir::new)
                 });
             }
-            #[cfg(feature = "imap-backend")]
+            #[cfg(feature = "imap")]
             Some(BackendKind::Imap) => {
                 backend_builder = backend_builder
                     .with_peek_messages(|ctx| ctx.imap.as_ref().and_then(PeekMessagesImap::new));
             }
-            #[cfg(feature = "notmuch-backend")]
+            #[cfg(feature = "notmuch")]
             Some(BackendKind::Notmuch) => {
                 backend_builder = backend_builder.with_peek_messages(|ctx| {
                     ctx.notmuch.as_ref().and_then(PeekMessagesNotmuch::new)
@@ -559,12 +557,12 @@ impl BackendBuilder {
         }
 
         match toml_account_config.get_messages_kind() {
-            #[cfg(feature = "imap-backend")]
+            #[cfg(feature = "imap")]
             Some(BackendKind::Imap) => {
                 backend_builder = backend_builder
                     .with_get_messages(|ctx| ctx.imap.as_ref().and_then(GetMessagesImap::new));
             }
-            #[cfg(feature = "notmuch-backend")]
+            #[cfg(feature = "notmuch")]
             Some(BackendKind::Notmuch) => {
                 backend_builder = backend_builder.with_get_messages(|ctx| {
                     ctx.notmuch.as_ref().and_then(GetMessagesNotmuch::new)
@@ -586,12 +584,12 @@ impl BackendBuilder {
                         .and_then(CopyMessagesMaildir::new)
                 });
             }
-            #[cfg(feature = "imap-backend")]
+            #[cfg(feature = "imap")]
             Some(BackendKind::Imap) => {
                 backend_builder = backend_builder
                     .with_copy_messages(|ctx| ctx.imap.as_ref().and_then(CopyMessagesImap::new));
             }
-            #[cfg(feature = "notmuch-backend")]
+            #[cfg(feature = "notmuch")]
             Some(BackendKind::Notmuch) => {
                 backend_builder = backend_builder.with_copy_messages(|ctx| {
                     ctx.notmuch.as_ref().and_then(CopyMessagesNotmuch::new)
@@ -613,12 +611,12 @@ impl BackendBuilder {
                         .and_then(MoveMessagesMaildir::new)
                 });
             }
-            #[cfg(feature = "imap-backend")]
+            #[cfg(feature = "imap")]
             Some(BackendKind::Imap) => {
                 backend_builder = backend_builder
                     .with_move_messages(|ctx| ctx.imap.as_ref().and_then(MoveMessagesImap::new));
             }
-            #[cfg(feature = "notmuch-backend")]
+            #[cfg(feature = "notmuch")]
             Some(BackendKind::Notmuch) => {
                 backend_builder = backend_builder.with_move_messages(|ctx| {
                     ctx.notmuch.as_ref().and_then(MoveMessagesNotmuch::new)
@@ -696,7 +694,7 @@ impl Backend {
                     self.backend.account_config.sync_dir()?,
                 )?;
             }
-            #[cfg(feature = "notmuch-backend")]
+            #[cfg(feature = "notmuch")]
             Some(BackendKind::Notmuch) => {
                 if let Some(notmuch_config) = &self.toml_account_config.notmuch {
                     id_mapper = IdMapper::new(

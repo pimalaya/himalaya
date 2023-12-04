@@ -128,17 +128,17 @@ pub(crate) async fn configure(path: PathBuf) -> Result<TomlConfig> {
         });
 
         set_table_dotted(item, "maildir");
-        #[cfg(feature = "imap-backend")]
+        #[cfg(feature = "imap")]
         {
             set_table_dotted(item, "imap");
             get_table_mut(item, "imap").map(|item| {
                 set_tables_dotted(item, ["passwd", "oauth2"]);
             });
         }
-        #[cfg(feature = "notmuch-backend")]
+        #[cfg(feature = "notmuch")]
         set_table_dotted(item, "notmuch");
         set_table_dotted(item, "sendmail");
-        #[cfg(feature = "smtp-sender")]
+        #[cfg(feature = "smtp")]
         {
             set_table_dotted(item, "smtp");
             get_table_mut(item, "smtp").map(|item| {

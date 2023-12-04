@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use dialoguer::Confirm;
-use email::account::AccountConfig;
+use email::account::config::AccountConfig;
 use std::process;
 
 use crate::{

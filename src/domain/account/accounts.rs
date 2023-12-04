@@ -42,7 +42,7 @@ impl From<Iter<'_, String, TomlAccountConfig>> for Accounts {
             .map(|(name, account)| {
                 let mut backends = String::new();
 
-                #[cfg(feature = "imap-backend")]
+                #[cfg(feature = "imap")]
                 if account.imap.is_some() {
                     backends.push_str("imap");
                 }
@@ -54,7 +54,7 @@ impl From<Iter<'_, String, TomlAccountConfig>> for Accounts {
                     backends.push_str("maildir");
                 }
 
-                #[cfg(feature = "notmuch-backend")]
+                #[cfg(feature = "notmuch")]
                 if account.imap.is_some() {
                     if !backends.is_empty() {
                         backends.push_str(", ")
@@ -62,7 +62,7 @@ impl From<Iter<'_, String, TomlAccountConfig>> for Accounts {
                     backends.push_str("notmuch");
                 }
 
-                #[cfg(feature = "smtp-sender")]
+                #[cfg(feature = "smtp")]
                 if account.smtp.is_some() {
                     if !backends.is_empty() {
                         backends.push_str(", ")

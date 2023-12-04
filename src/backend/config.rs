@@ -1,19 +1,19 @@
-#[cfg(feature = "imap-backend")]
-use email::imap::ImapConfig;
-#[cfg(feature = "notmuch-backend")]
-use email::notmuch::NotmuchConfig;
-#[cfg(feature = "smtp-sender")]
-use email::smtp::SmtpConfig;
-use email::{maildir::MaildirConfig, sendmail::SendmailConfig};
+#[cfg(feature = "imap")]
+use email::imap::config::ImapConfig;
+#[cfg(feature = "notmuch")]
+use email::notmuch::config::NotmuchConfig;
+#[cfg(feature = "smtp")]
+use email::smtp::config::SmtpConfig;
+use email::{maildir::config::MaildirConfig, sendmail::config::SendmailConfig};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BackendConfig {
     Maildir(MaildirConfig),
-    #[cfg(feature = "imap-backend")]
+    #[cfg(feature = "imap")]
     Imap(ImapConfig),
-    #[cfg(feature = "notmuch-backend")]
+    #[cfg(feature = "notmuch")]
     Notmuch(NotmuchConfig),
-    #[cfg(feature = "smtp-sender")]
+    #[cfg(feature = "smtp")]
     Smtp(SmtpConfig),
     Sendmail(SendmailConfig),
 }

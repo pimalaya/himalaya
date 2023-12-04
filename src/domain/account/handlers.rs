@@ -4,13 +4,13 @@
 
 use anyhow::Result;
 use email::account::{
+    config::AccountConfig,
     sync::{AccountSyncBuilder, AccountSyncProgressEvent},
-    AccountConfig,
 };
-#[cfg(feature = "imap-backend")]
-use email::imap::ImapAuthConfig;
-#[cfg(feature = "smtp-sender")]
-use email::smtp::SmtpAuthConfig;
+#[cfg(feature = "imap")]
+use email::imap::config::ImapAuthConfig;
+#[cfg(feature = "smtp")]
+use email::smtp::config::SmtpAuthConfig;
 use indicatif::{MultiProgress, ProgressBar, ProgressFinish, ProgressStyle};
 use log::{debug, info, trace, warn};
 use once_cell::sync::Lazy;
@@ -48,7 +48,7 @@ pub async fn configure(config: &TomlAccountConfig, reset: bool) -> Result<()> {
     info!("entering the configure account handler");
 
     if reset {
-        #[cfg(feature = "imap-backend")]
+        #[cfg(feature = "imap")]
         if let Some(ref config) = config.imap {
             let reset = match &config.auth {
                 ImapAuthConfig::Passwd(config) => config.reset(),
@@ -60,7 +60,7 @@ pub async fn configure(config: &TomlAccountConfig, reset: bool) -> Result<()> {
             }
         }
 
-        #[cfg(feature = "smtp-sender")]
+        #[cfg(feature = "smtp")]
         if let Some(ref config) = config.smtp {
             let reset = match &config.auth {
                 SmtpAuthConfig::Passwd(config) => config.reset(),
@@ -78,7 +78,7 @@ pub async fn configure(config: &TomlAccountConfig, reset: bool) -> Result<()> {
         }
     }
 
-    #[cfg(feature = "imap-backend")]
+    #[cfg(feature = "imap")]
     if let Some(ref config) = config.imap {
         match &config.auth {
             ImapAuthConfig::Passwd(config) => {
@@ -92,7 +92,7 @@ pub async fn configure(config: &TomlAccountConfig, reset: bool) -> Result<()> {
         }?;
     }
 
-    #[cfg(feature = "smtp-sender")]
+    #[cfg(feature = "smtp")]
     if let Some(ref config) = config.smtp {
         match &config.auth {
             SmtpAuthConfig::Passwd(config) => {
@@ -299,12 +299,13 @@ pub async fn sync<P: Printer>(
 
 #[cfg(test)]
 mod tests {
-    use email::{account::AccountConfig, backend::ImapConfig};
+    use email::{account::config::AccountConfig, imap::config::ImapConfig};
     use std::{collections::HashMap, fmt::Debug, io};
     use termcolor::ColorSpec;
 
     use crate::{
         account::TomlAccountConfig,
+        backend::BackendKind,
         printer::{Print, PrintTable, WriteColor},
     };
 
@@ -378,8 +379,9 @@ mod tests {
                 "account-1".into(),
                 TomlAccountConfig {
                     default: Some(true),
-                    backend: BackendConfig::Imap(ImapConfig::default()),
-                    ..TomlAccountConfig::default()
+                    backend: Some(BackendKind::Imap),
+                    imap: Some(ImapConfig::default()),
+                    ..Default::default()
                 },
             )]),
             ..TomlConfig::default()

@@ -6,18 +6,21 @@ use email::account::GpgConfig;
 use email::account::PgpConfig;
 #[cfg(feature = "pgp-native")]
 use email::account::{NativePgpConfig, NativePgpSecretKey, SignedSecretKey};
-#[cfg(feature = "notmuch-backend")]
+#[cfg(feature = "notmuch")]
 use email::backend::NotmuchConfig;
-#[cfg(feature = "imap-backend")]
-use email::imap::{ImapAuthConfig, ImapConfig};
-#[cfg(feature = "smtp-sender")]
-use email::smtp::{SmtpAuthConfig, SmtpConfig};
+#[cfg(feature = "imap")]
+use email::imap::config::{ImapAuthConfig, ImapConfig};
+#[cfg(feature = "smtp")]
+use email::smtp::config::{SmtpAuthConfig, SmtpConfig};
 use email::{
-    account::{OAuth2Config, OAuth2Method, OAuth2Scopes, PasswdConfig},
-    email::{EmailHooks, EmailTextPlainFormat},
+    account::config::{
+        oauth2::{OAuth2Config, OAuth2Method, OAuth2Scopes},
+        passwd::PasswdConfig,
+    },
+    email::config::{EmailHooks, EmailTextPlainFormat},
     folder::sync::FolderSyncStrategy,
-    maildir::MaildirConfig,
-    sendmail::SendmailConfig,
+    maildir::config::MaildirConfig,
+    sendmail::config::SendmailConfig,
 };
 use keyring::Entry;
 use process::{Cmd, Pipeline, SingleCmd};
@@ -159,7 +162,7 @@ impl Into<OptionImapConfig> for Option<ImapConfig> {
     }
 }
 
-#[cfg(feature = "imap-backend")]
+#[cfg(feature = "imap")]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "ImapConfig", rename_all = "kebab-case")]
 pub struct ImapConfigDef {
@@ -176,7 +179,7 @@ pub struct ImapConfigDef {
     pub watch_cmds: Option<Vec<String>>,
 }
 
-#[cfg(feature = "imap-backend")]
+#[cfg(feature = "imap")]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "ImapAuthConfig", tag = "auth")]
 pub enum ImapAuthConfigDef {
@@ -303,7 +306,7 @@ pub struct MaildirConfigDef {
     pub root_dir: PathBuf,
 }
 
-#[cfg(feature = "notmuch-backend")]
+#[cfg(feature = "notmuch")]
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(
     remote = "Option<NotmuchConfig>",
@@ -312,7 +315,7 @@ pub struct MaildirConfigDef {
 )]
 pub struct OptionNotmuchConfigDef;
 
-#[cfg(feature = "notmuch-backend")]
+#[cfg(feature = "notmuch")]
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct OptionNotmuchConfig {
     #[serde(default, skip)]
@@ -321,7 +324,7 @@ pub struct OptionNotmuchConfig {
     inner: NotmuchConfig,
 }
 
-#[cfg(feature = "notmuch-backend")]
+#[cfg(feature = "notmuch")]
 impl From<OptionNotmuchConfig> for Option<NotmuchConfig> {
     fn from(config: OptionNotmuchConfig) -> Option<NotmuchConfig> {
         if config.is_none {
@@ -332,7 +335,7 @@ impl From<OptionNotmuchConfig> for Option<NotmuchConfig> {
     }
 }
 
-#[cfg(feature = "notmuch-backend")]
+#[cfg(feature = "notmuch")]
 impl Into<OptionNotmuchConfig> for Option<NotmuchConfig> {
     fn into(self) -> OptionNotmuchConfig {
         match self {
@@ -348,7 +351,7 @@ impl Into<OptionNotmuchConfig> for Option<NotmuchConfig> {
     }
 }
 
-#[cfg(feature = "notmuch-backend")]
+#[cfg(feature = "notmuch")]
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "NotmuchConfig", rename_all = "kebab-case")]
 pub struct NotmuchConfigDef {
@@ -452,7 +455,7 @@ impl Into<OptionSmtpConfig> for Option<SmtpConfig> {
     }
 }
 
-#[cfg(feature = "smtp-sender")]
+#[cfg(feature = "smtp")]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "SmtpConfig")]
 struct SmtpConfigDef {
@@ -466,7 +469,7 @@ struct SmtpConfigDef {
     pub auth: SmtpAuthConfig,
 }
 
-#[cfg(feature = "smtp-sender")]
+#[cfg(feature = "smtp")]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(remote = "SmtpAuthConfig", tag = "auth")]
 pub enum SmtpAuthConfigDef {

@@ -1,7 +1,8 @@
 use anyhow::{Context, Result};
 use email::{
-    account::AccountConfig,
-    email::{local_draft_path, remove_local_draft, Flag, Flags},
+    account::config::AccountConfig,
+    email::utils::{local_draft_path, remove_local_draft},
+    flag::{Flag, Flags},
 };
 use log::debug;
 use mml::MmlCompilerBuilder;

@@ -1,5 +1,5 @@
 use anyhow::Result;
-use email::email::Flags;
+use email::flag::Flags;
 
 use crate::{backend::Backend, printer::Printer};
 

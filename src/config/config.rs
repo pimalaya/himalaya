@@ -7,9 +7,9 @@ use anyhow::{anyhow, Context, Result};
 use dialoguer::Confirm;
 use dirs::{config_dir, home_dir};
 use email::{
-    account::AccountConfig,
+    account::config::AccountConfig,
     config::Config,
-    email::{EmailHooks, EmailTextPlainFormat},
+    email::config::{EmailHooks, EmailTextPlainFormat},
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -184,14 +184,14 @@ impl TomlConfig {
                 .ok_or_else(|| anyhow!("cannot find account {name}")),
         }?;
 
-        #[cfg(feature = "imap-backend")]
+        #[cfg(feature = "imap")]
         if let Some(imap_config) = toml_account_config.imap.as_mut() {
             imap_config
                 .auth
                 .replace_undefined_keyring_entries(&account_name);
         }
 
-        #[cfg(feature = "smtp-sender")]
+        #[cfg(feature = "smtp")]
         if let Some(smtp_config) = toml_account_config.smtp.as_mut() {
             smtp_config
                 .auth
@@ -268,18 +268,17 @@ impl TomlConfig {
 #[cfg(test)]
 mod tests {
     use email::{
-        account::PasswdConfig,
-        backend::{BackendConfig, MaildirConfig},
-        sender::{SenderConfig, SendmailConfig},
+        account::config::passwd::PasswdConfig, maildir::config::MaildirConfig,
+        sendmail::config::SendmailConfig,
     };
     use secret::Secret;
 
-    #[cfg(feature = "notmuch-backend")]
+    #[cfg(feature = "notmuch")]
     use email::backend::NotmuchConfig;
-    #[cfg(feature = "imap-backend")]
-    use email::backend::{ImapAuthConfig, ImapConfig};
-    #[cfg(feature = "smtp-sender")]
-    use email::sender::{SmtpAuthConfig, SmtpConfig};
+    #[cfg(feature = "imap")]
+    use email::imap::config::{ImapAuthConfig, ImapConfig};
+    #[cfg(feature = "smtp")]
+    use email::smtp::config::{SmtpAuthConfig, SmtpConfig};
 
     use std::io::Write;
     use tempfile::NamedTempFile;
@@ -435,7 +434,7 @@ mod tests {
             .contains("missing field `maildir-root-dir`"));
     }
 
-    #[cfg(feature = "notmuch-backend")]
+    #[cfg(feature = "notmuch")]
     #[tokio::test]
     async fn account_backend_notmuch_missing_db_path_field() {
         let config = make_config(
@@ -588,7 +587,7 @@ mod tests {
         )
     }
 
-    #[cfg(feature = "smtp-sender")]
+    #[cfg(feature = "smtp")]
     #[tokio::test]
     async fn account_smtp_sender_minimum_config() {
         use email::sender::SenderConfig;
@@ -727,7 +726,7 @@ mod tests {
         )
     }
 
-    #[cfg(feature = "notmuch-backend")]
+    #[cfg(feature = "notmuch")]
     #[tokio::test]
     async fn account_backend_notmuch_minimum_config() {
         let config = make_config(

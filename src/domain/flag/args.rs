@@ -3,7 +3,7 @@
 //! This module contains the command matcher, the subcommands and the
 //! arguments related to the email flag domain.
 
-use ::email::email::{Flag, Flags};
+use ::email::flag::{Flag, Flags};
 use anyhow::Result;
 use clap::{Arg, ArgMatches, Command};
 use log::{debug, info};

@@ -1,5 +1,5 @@
 use anyhow::Result;
-use email::account::AccountConfig;
+use email::account::config::AccountConfig;
 use serde::Serialize;
 use std::ops;
 
@@ -17,7 +17,7 @@ impl Envelopes {
     pub fn from_backend(
         config: &AccountConfig,
         id_mapper: &IdMapper,
-        envelopes: email::email::Envelopes,
+        envelopes: email::envelope::Envelopes,
     ) -> Result<Envelopes> {
         let envelopes = envelopes
             .iter()
@@ -59,7 +59,7 @@ impl PrintTable for Envelopes {
 #[cfg(test)]
 mod tests {
     use chrono::DateTime;
-    use email::account::AccountConfig;
+    use email::account::config::AccountConfig;
     use std::env;
 
     use crate::{Envelopes, IdMapper};
@@ -69,7 +69,7 @@ mod tests {
         let config = AccountConfig::default();
         let id_mapper = IdMapper::Dummy;
 
-        let envelopes = email::email::Envelopes::from_iter([email::email::Envelope {
+        let envelopes = email::envelope::Envelopes::from_iter([email::envelope::Envelope {
             date: DateTime::parse_from_rfc3339("2023-06-15T09:42:00+04:00").unwrap(),
             ..Default::default()
         }]);
@@ -89,7 +89,7 @@ mod tests {
             ..AccountConfig::default()
         };
 
-        let envelopes = email::email::Envelopes::from_iter([email::email::Envelope {
+        let envelopes = email::envelope::Envelopes::from_iter([email::envelope::Envelope {
             date: DateTime::parse_from_rfc3339("2023-06-15T09:42:00+04:00").unwrap(),
             ..Default::default()
         }]);
@@ -112,7 +112,7 @@ mod tests {
             ..AccountConfig::default()
         };
 
-        let envelopes = email::email::Envelopes::from_iter([email::email::Envelope {
+        let envelopes = email::envelope::Envelopes::from_iter([email::envelope::Envelope {
             date: DateTime::parse_from_rfc3339("2023-06-15T09:42:00+04:00").unwrap(),
             ..Default::default()
         }]);

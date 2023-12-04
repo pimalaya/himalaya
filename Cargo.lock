@@ -2068,6 +2068,7 @@ dependencies = [
  "indicatif",
  "keyring-lib",
  "log",
+ "mail-builder",
  "md5",
  "mml-lib",
  "oauth-lib 0.1.0",

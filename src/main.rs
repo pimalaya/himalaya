@@ -1,4 +1,4 @@
-use ::email::account::{sync::AccountSyncBuilder, DEFAULT_INBOX_FOLDER};
+use ::email::account::{config::DEFAULT_INBOX_FOLDER, sync::AccountSyncBuilder};
 use anyhow::{anyhow, Context, Result};
 use clap::Command;
 use log::{debug, warn};
@@ -91,7 +91,7 @@ async fn main() -> Result<()> {
     let mut printer = StdoutPrinter::try_from(&m)?;
 
     // FIXME
-    // #[cfg(feature = "imap-backend")]
+    // #[cfg(feature = "imap")]
     // if let BackendConfig::Imap(imap_config) = &account_config.backend {
     //     let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
     //     match imap::args::matches(&m)? {
