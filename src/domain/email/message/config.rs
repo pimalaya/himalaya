@@ -10,7 +10,7 @@ pub struct MessageConfig {
     pub peek: Option<MessagePeekConfig>,
     pub get: Option<MessageGetConfig>,
     pub copy: Option<MessageCopyConfig>,
-    #[serde(rename = "move")]
+    #[serde(default, rename = "move", skip_serializing_if = "Option::is_none")]
     pub move_: Option<MessageMoveConfig>,
 }
 

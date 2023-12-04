@@ -44,11 +44,19 @@ pub struct TomlConfig {
     pub email_listing_datetime_fmt: Option<String>,
     pub email_listing_datetime_local_tz: Option<bool>,
     pub email_reading_headers: Option<Vec<String>>,
-    #[serde(default, with = "OptionEmailTextPlainFormatDef")]
+    #[serde(
+        default,
+        with = "OptionEmailTextPlainFormatDef",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub email_reading_format: Option<EmailTextPlainFormat>,
     pub email_writing_headers: Option<Vec<String>>,
     pub email_sending_save_copy: Option<bool>,
-    #[serde(default, with = "OptionEmailHooksDef")]
+    #[serde(
+        default,
+        with = "OptionEmailHooksDef",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub email_hooks: Option<EmailHooks>,
 
     #[serde(flatten)]
@@ -78,7 +86,7 @@ impl TomlConfig {
 
         let confirm = Confirm::new()
             .with_prompt(wizard_prompt!(
-                "Would you like to create it with the wizard?"
+                "Would you like to create one with the wizard?"
             ))
             .default(true)
             .interact_opt()?
@@ -88,7 +96,7 @@ impl TomlConfig {
             process::exit(0);
         }
 
-        wizard::configure().await
+        wizard::configure(path).await
     }
 
     /// Read and parse the TOML configuration from default paths.

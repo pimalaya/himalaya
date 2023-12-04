@@ -12,17 +12,17 @@ use crate::{config::wizard::THEME, maildir, sendmail};
 use super::{config::BackendConfig, BackendKind};
 
 const DEFAULT_BACKEND_KINDS: &[BackendKind] = &[
-    BackendKind::Maildir,
     #[cfg(feature = "imap-backend")]
     BackendKind::Imap,
+    BackendKind::Maildir,
     #[cfg(feature = "notmuch-backend")]
     BackendKind::Notmuch,
 ];
 
 const SEND_MESSAGE_BACKEND_KINDS: &[BackendKind] = &[
-    BackendKind::Sendmail,
     #[cfg(feature = "smtp-sender")]
     BackendKind::Smtp,
+    BackendKind::Sendmail,
 ];
 
 pub(crate) async fn configure(account_name: &str, email: &str) -> Result<Option<BackendConfig>> {
@@ -52,7 +52,7 @@ pub(crate) async fn configure_sender(
     email: &str,
 ) -> Result<Option<BackendConfig>> {
     let kind = Select::with_theme(&*THEME)
-        .with_prompt("Default email backend")
+        .with_prompt("Backend for sending messages")
         .items(SEND_MESSAGE_BACKEND_KINDS)
         .default(0)
         .interact_opt()?

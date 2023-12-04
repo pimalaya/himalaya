@@ -131,10 +131,10 @@ async fn main() -> Result<()> {
             return account::handlers::sync(&mut printer, sync_builder, dry_run).await;
         }
         Some(account::args::Cmd::Configure(reset)) => {
-            let (_, account_config) = toml_config
+            let (toml_account_config, _) = toml_config
                 .clone()
                 .into_account_configs(some_account_name, disable_cache)?;
-            return account::handlers::configure(&account_config, reset).await;
+            return account::handlers::configure(&toml_account_config, reset).await;
         }
         _ => (),
     }

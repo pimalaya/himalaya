@@ -2,7 +2,7 @@
 //!
 //! This module gathers all account actions triggered by the CLI.
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use email::account::{
     sync::{AccountSyncBuilder, AccountSyncProgressEvent},
     AccountConfig,
@@ -12,7 +12,7 @@ use email::imap::ImapAuthConfig;
 #[cfg(feature = "smtp-sender")]
 use email::smtp::SmtpAuthConfig;
 use indicatif::{MultiProgress, ProgressBar, ProgressFinish, ProgressStyle};
-use log::{info, trace, warn};
+use log::{debug, info, trace, warn};
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, sync::Mutex};
 
@@ -25,6 +25,8 @@ use crate::{
     printer::{PrintTableOpts, Printer},
     Accounts,
 };
+
+use super::TomlAccountConfig;
 
 const MAIN_PROGRESS_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
     ProgressStyle::with_template(" {spinner:.dim} {msg:.dim}\n {wide_bar:.cyan/blue} \n").unwrap()
@@ -42,71 +44,75 @@ const SUB_PROGRESS_DONE_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
 });
 
 /// Configure the current selected account
-pub async fn configure(config: &AccountConfig, reset: bool) -> Result<()> {
+pub async fn configure(config: &TomlAccountConfig, reset: bool) -> Result<()> {
     info!("entering the configure account handler");
 
-    // if reset {
-    //     #[cfg(feature = "imap-backend")]
-    //     if let BackendConfig::Imap(imap_config) = &config.backend {
-    //         let reset = match &imap_config.auth {
-    //             ImapAuthConfig::Passwd(passwd) => passwd.reset(),
-    //             ImapAuthConfig::OAuth2(oauth2) => oauth2.reset(),
-    //         };
-    //         if let Err(err) = reset {
-    //             warn!("error while resetting imap secrets, skipping it");
-    //             warn!("{err}");
-    //         }
-    //     }
+    if reset {
+        #[cfg(feature = "imap-backend")]
+        if let Some(ref config) = config.imap {
+            let reset = match &config.auth {
+                ImapAuthConfig::Passwd(config) => config.reset(),
+                ImapAuthConfig::OAuth2(config) => config.reset(),
+            };
+            if let Err(err) = reset {
+                warn!("error while resetting imap secrets: {err}");
+                debug!("error while resetting imap secrets: {err:?}");
+            }
+        }
 
-    //     #[cfg(feature = "smtp-sender")]
-    //     if let SenderConfig::Smtp(smtp_config) = &config.sender {
-    //         let reset = match &smtp_config.auth {
-    //             SmtpAuthConfig::Passwd(passwd) => passwd.reset(),
-    //             SmtpAuthConfig::OAuth2(oauth2) => oauth2.reset(),
-    //         };
-    //         if let Err(err) = reset {
-    //             warn!("error while resetting smtp secrets, skipping it");
-    //             warn!("{err}");
-    //         }
-    //     }
+        #[cfg(feature = "smtp-sender")]
+        if let Some(ref config) = config.smtp {
+            let reset = match &config.auth {
+                SmtpAuthConfig::Passwd(config) => config.reset(),
+                SmtpAuthConfig::OAuth2(config) => config.reset(),
+            };
+            if let Err(err) = reset {
+                warn!("error while resetting smtp secrets: {err}");
+                debug!("error while resetting smtp secrets: {err:?}");
+            }
+        }
 
-    //     #[cfg(feature = "pgp")]
-    //     config.pgp.reset().await?;
-    // }
+        #[cfg(feature = "pgp")]
+        if let Some(ref config) = config.pgp {
+            config.pgp.reset().await?;
+        }
+    }
 
-    // #[cfg(feature = "imap-backend")]
-    // if let BackendConfig::Imap(imap_config) = &config.backend {
-    //     match &imap_config.auth {
-    //         ImapAuthConfig::Passwd(passwd) => {
-    //             passwd.configure(|| prompt_passwd("IMAP password")).await
-    //         }
-    //         ImapAuthConfig::OAuth2(oauth2) => {
-    //             oauth2
-    //                 .configure(|| prompt_secret("IMAP OAuth 2.0 client secret"))
-    //                 .await
-    //         }
-    //     }?;
-    // }
+    #[cfg(feature = "imap-backend")]
+    if let Some(ref config) = config.imap {
+        match &config.auth {
+            ImapAuthConfig::Passwd(config) => {
+                config.configure(|| prompt_passwd("IMAP password")).await
+            }
+            ImapAuthConfig::OAuth2(config) => {
+                config
+                    .configure(|| prompt_secret("IMAP OAuth 2.0 client secret"))
+                    .await
+            }
+        }?;
+    }
 
-    // #[cfg(feature = "smtp-sender")]
-    // if let SenderConfig::Smtp(smtp_config) = &config.sender {
-    //     match &smtp_config.auth {
-    //         SmtpAuthConfig::Passwd(passwd) => {
-    //             passwd.configure(|| prompt_passwd("SMTP password")).await
-    //         }
-    //         SmtpAuthConfig::OAuth2(oauth2) => {
-    //             oauth2
-    //                 .configure(|| prompt_secret("SMTP OAuth 2.0 client secret"))
-    //                 .await
-    //         }
-    //     }?;
-    // }
+    #[cfg(feature = "smtp-sender")]
+    if let Some(ref config) = config.smtp {
+        match &config.auth {
+            SmtpAuthConfig::Passwd(config) => {
+                config.configure(|| prompt_passwd("SMTP password")).await
+            }
+            SmtpAuthConfig::OAuth2(config) => {
+                config
+                    .configure(|| prompt_secret("SMTP OAuth 2.0 client secret"))
+                    .await
+            }
+        }?;
+    }
 
-    // #[cfg(feature = "pgp")]
-    // config
-    //     .pgp
-    //     .configure(&config.email, || prompt_passwd("PGP secret key password"))
-    //     .await?;
+    #[cfg(feature = "pgp")]
+    if let Some(ref config) = config.pgp {
+        config
+            .pgp
+            .configure(&config.email, || prompt_passwd("PGP secret key password"))
+            .await?;
+    }
 
     println!(
         "Account successfully {}configured!",

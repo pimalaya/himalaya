@@ -105,7 +105,7 @@ pub(crate) async fn configure(account_name: &str, email: &str) -> Result<Backend
             ImapAuthConfig::Passwd(config)
         }
         Some(idx) if AUTH_MECHANISMS[idx] == OAUTH2 => {
-            let mut config = OAuth2Config::default();
+            let mut config = OAuth2Config::new()?;
 
             let method = Select::with_theme(&*THEME)
                 .with_prompt("IMAP OAuth 2.0 mechanism")

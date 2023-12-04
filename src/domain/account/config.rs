@@ -31,7 +31,7 @@ use crate::{
 
 /// Represents all existing kind of account config.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(tag = "backend", rename_all = "kebab-case")]
+#[serde(rename_all = "kebab-case")]
 pub struct TomlAccountConfig {
     pub default: Option<bool>,
 
@@ -48,16 +48,28 @@ pub struct TomlAccountConfig {
     pub email_listing_datetime_fmt: Option<String>,
     pub email_listing_datetime_local_tz: Option<bool>,
     pub email_reading_headers: Option<Vec<String>>,
-    #[serde(default, with = "OptionEmailTextPlainFormatDef")]
+    #[serde(
+        default,
+        with = "OptionEmailTextPlainFormatDef",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub email_reading_format: Option<EmailTextPlainFormat>,
     pub email_writing_headers: Option<Vec<String>>,
     pub email_sending_save_copy: Option<bool>,
-    #[serde(default, with = "OptionEmailHooksDef")]
+    #[serde(
+        default,
+        with = "OptionEmailHooksDef",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub email_hooks: Option<EmailHooks>,
 
     pub sync: Option<bool>,
     pub sync_dir: Option<PathBuf>,
-    #[serde(default, with = "OptionFolderSyncStrategyDef")]
+    #[serde(
+        default,
+        with = "OptionFolderSyncStrategyDef",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub sync_folders_strategy: Option<FolderSyncStrategy>,
 
     pub backend: Option<BackendKind>,
@@ -68,25 +80,49 @@ pub struct TomlAccountConfig {
     pub message: Option<MessageConfig>,
 
     #[cfg(feature = "imap-backend")]
-    #[serde(default, with = "OptionImapConfigDef")]
+    #[serde(
+        default,
+        with = "OptionImapConfigDef",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub imap: Option<ImapConfig>,
 
-    #[serde(default, with = "OptionMaildirConfigDef")]
+    #[serde(
+        default,
+        with = "OptionMaildirConfigDef",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub maildir: Option<MaildirConfig>,
 
     #[cfg(feature = "notmuch-backend")]
-    #[serde(default, with = "OptionNotmuchConfigDef")]
+    #[serde(
+        default,
+        with = "OptionNotmuchConfigDef",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub notmuch: Option<NotmuchConfig>,
 
     #[cfg(feature = "smtp-sender")]
-    #[serde(default, with = "OptionSmtpConfigDef")]
+    #[serde(
+        default,
+        with = "OptionSmtpConfigDef",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub smtp: Option<SmtpConfig>,
 
-    #[serde(default, with = "OptionSendmailConfigDef")]
+    #[serde(
+        default,
+        with = "OptionSendmailConfigDef",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub sendmail: Option<SendmailConfig>,
 
     #[cfg(feature = "pgp")]
-    #[serde(default, with = "OptionPgpConfigDef")]
+    #[serde(
+        default,
+        with = "OptionPgpConfigDef",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub pgp: Option<PgpConfig>,
 }
 

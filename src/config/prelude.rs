@@ -61,27 +61,38 @@ pub enum CmdDef {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(remote = "Option<Cmd>", from = "OptionCmd")]
+#[serde(remote = "Option<Cmd>", from = "OptionCmd", into = "OptionCmd")]
 pub struct OptionCmdDef;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum OptionCmd {
-    #[default]
-    #[serde(skip_serializing)]
-    None,
-    #[serde(with = "SingleCmdDef")]
-    SingleCmd(SingleCmd),
-    #[serde(with = "PipelineDef")]
-    Pipeline(Pipeline),
+pub struct OptionCmd {
+    #[serde(default, skip)]
+    is_some: bool,
+    #[serde(flatten, with = "CmdDef")]
+    inner: Cmd,
 }
 
 impl From<OptionCmd> for Option<Cmd> {
     fn from(cmd: OptionCmd) -> Option<Cmd> {
-        match cmd {
-            OptionCmd::None => None,
-            OptionCmd::SingleCmd(cmd) => Some(Cmd::SingleCmd(cmd)),
-            OptionCmd::Pipeline(pipeline) => Some(Cmd::Pipeline(pipeline)),
+        if cmd.is_some {
+            Some(cmd.inner)
+        } else {
+            None
+        }
+    }
+}
+
+impl Into<OptionCmd> for Option<Cmd> {
+    fn into(self) -> OptionCmd {
+        match self {
+            Some(cmd) => OptionCmd {
+                is_some: true,
+                inner: cmd,
+            },
+            None => OptionCmd {
+                is_some: false,
+                inner: Default::default(),
+            },
         }
     }
 }
@@ -108,7 +119,11 @@ pub enum OAuth2MethodDef {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(remote = "Option<ImapConfig>", from = "OptionImapConfig")]
+#[serde(
+    remote = "Option<ImapConfig>",
+    from = "OptionImapConfig",
+    into = "OptionImapConfig"
+)]
 pub struct OptionImapConfigDef;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -125,6 +140,21 @@ impl From<OptionImapConfig> for Option<ImapConfig> {
             None
         } else {
             Some(config.inner)
+        }
+    }
+}
+
+impl Into<OptionImapConfig> for Option<ImapConfig> {
+    fn into(self) -> OptionImapConfig {
+        match self {
+            Some(config) => OptionImapConfig {
+                is_none: false,
+                inner: config,
+            },
+            None => OptionImapConfig {
+                is_none: true,
+                inner: Default::default(),
+            },
         }
     }
 }
@@ -226,23 +256,42 @@ pub enum ImapOAuth2ScopesDef {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(remote = "Option<MaildirConfig>", from = "OptionMaildirConfig")]
+#[serde(
+    remote = "Option<MaildirConfig>",
+    from = "OptionMaildirConfig",
+    into = "OptionMaildirConfig"
+)]
 pub struct OptionMaildirConfigDef;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum OptionMaildirConfig {
-    #[default]
-    #[serde(skip_serializing)]
-    None,
-    Some(#[serde(with = "MaildirConfigDef")] MaildirConfig),
+pub struct OptionMaildirConfig {
+    #[serde(default, skip)]
+    is_none: bool,
+    #[serde(flatten, with = "MaildirConfigDef")]
+    inner: MaildirConfig,
 }
 
 impl From<OptionMaildirConfig> for Option<MaildirConfig> {
     fn from(config: OptionMaildirConfig) -> Option<MaildirConfig> {
-        match config {
-            OptionMaildirConfig::None => None,
-            OptionMaildirConfig::Some(config) => Some(config),
+        if config.is_none {
+            None
+        } else {
+            Some(config.inner)
+        }
+    }
+}
+
+impl Into<OptionMaildirConfig> for Option<MaildirConfig> {
+    fn into(self) -> OptionMaildirConfig {
+        match self {
+            Some(config) => OptionMaildirConfig {
+                is_none: false,
+                inner: config,
+            },
+            None => OptionMaildirConfig {
+                is_none: true,
+                inner: Default::default(),
+            },
         }
     }
 }
@@ -256,25 +305,45 @@ pub struct MaildirConfigDef {
 
 #[cfg(feature = "notmuch-backend")]
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(remote = "Option<NotmuchConfig>", from = "OptionNotmuchConfig")]
+#[serde(
+    remote = "Option<NotmuchConfig>",
+    from = "OptionNotmuchConfig",
+    into = "OptionNotmuchConfig"
+)]
 pub struct OptionNotmuchConfigDef;
 
 #[cfg(feature = "notmuch-backend")]
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum OptionNotmuchConfig {
-    #[default]
-    #[serde(skip_serializing)]
-    None,
-    Some(#[serde(with = "NotmuchConfigDef")] NotmuchConfig),
+pub struct OptionNotmuchConfig {
+    #[serde(default, skip)]
+    is_none: bool,
+    #[serde(flatten, with = "NotmuchConfigDef")]
+    inner: NotmuchConfig,
 }
 
 #[cfg(feature = "notmuch-backend")]
 impl From<OptionNotmuchConfig> for Option<NotmuchConfig> {
     fn from(config: OptionNotmuchConfig) -> Option<NotmuchConfig> {
-        match config {
-            OptionNotmuchConfig::None => None,
-            OptionNotmuchConfig::Some(config) => Some(config),
+        if config.is_none {
+            None
+        } else {
+            Some(config.inner)
+        }
+    }
+}
+
+#[cfg(feature = "notmuch-backend")]
+impl Into<OptionNotmuchConfig> for Option<NotmuchConfig> {
+    fn into(self) -> OptionNotmuchConfig {
+        match self {
+            Some(config) => OptionNotmuchConfig {
+                is_none: false,
+                inner: config,
+            },
+            None => OptionNotmuchConfig {
+                is_none: true,
+                inner: Default::default(),
+            },
         }
     }
 }
@@ -290,28 +359,40 @@ pub struct NotmuchConfigDef {
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(
     remote = "Option<EmailTextPlainFormat>",
-    from = "OptionEmailTextPlainFormat"
+    from = "OptionEmailTextPlainFormat",
+    into = "OptionEmailTextPlainFormat"
 )]
 pub struct OptionEmailTextPlainFormatDef;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum OptionEmailTextPlainFormat {
-    #[serde(skip_serializing)]
-    None,
-    #[default]
-    Auto,
-    Flowed,
-    Fixed(usize),
+pub struct OptionEmailTextPlainFormat {
+    #[serde(default, skip)]
+    is_none: bool,
+    #[serde(flatten, with = "EmailTextPlainFormatDef")]
+    inner: EmailTextPlainFormat,
 }
 
 impl From<OptionEmailTextPlainFormat> for Option<EmailTextPlainFormat> {
     fn from(fmt: OptionEmailTextPlainFormat) -> Option<EmailTextPlainFormat> {
-        match fmt {
-            OptionEmailTextPlainFormat::None => None,
-            OptionEmailTextPlainFormat::Auto => Some(EmailTextPlainFormat::Auto),
-            OptionEmailTextPlainFormat::Flowed => Some(EmailTextPlainFormat::Flowed),
-            OptionEmailTextPlainFormat::Fixed(size) => Some(EmailTextPlainFormat::Fixed(size)),
+        if fmt.is_none {
+            None
+        } else {
+            Some(fmt.inner)
+        }
+    }
+}
+
+impl Into<OptionEmailTextPlainFormat> for Option<EmailTextPlainFormat> {
+    fn into(self) -> OptionEmailTextPlainFormat {
+        match self {
+            Some(config) => OptionEmailTextPlainFormat {
+                is_none: false,
+                inner: config,
+            },
+            None => OptionEmailTextPlainFormat {
+                is_none: true,
+                inner: Default::default(),
+            },
         }
     }
 }
@@ -331,7 +412,11 @@ pub enum EmailTextPlainFormatDef {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(remote = "Option<SmtpConfig>", from = "OptionSmtpConfig")]
+#[serde(
+    remote = "Option<SmtpConfig>",
+    from = "OptionSmtpConfig",
+    into = "OptionSmtpConfig"
+)]
 pub struct OptionSmtpConfigDef;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -348,6 +433,21 @@ impl From<OptionSmtpConfig> for Option<SmtpConfig> {
             None
         } else {
             Some(config.inner)
+        }
+    }
+}
+
+impl Into<OptionSmtpConfig> for Option<SmtpConfig> {
+    fn into(self) -> OptionSmtpConfig {
+        match self {
+            Some(config) => OptionSmtpConfig {
+                is_none: false,
+                inner: config,
+            },
+            None => OptionSmtpConfig {
+                is_none: true,
+                inner: Default::default(),
+            },
         }
     }
 }
@@ -434,23 +534,42 @@ pub enum SmtpOAuth2ScopesDef {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(remote = "Option<SendmailConfig>", from = "OptionSendmailConfig")]
+#[serde(
+    remote = "Option<SendmailConfig>",
+    from = "OptionSendmailConfig",
+    into = "OptionSendmailConfig"
+)]
 pub struct OptionSendmailConfigDef;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum OptionSendmailConfig {
-    #[default]
-    #[serde(skip_serializing)]
-    None,
-    Some(#[serde(with = "SendmailConfigDef")] SendmailConfig),
+pub struct OptionSendmailConfig {
+    #[serde(default, skip)]
+    is_none: bool,
+    #[serde(flatten, with = "SendmailConfigDef")]
+    inner: SendmailConfig,
 }
 
 impl From<OptionSendmailConfig> for Option<SendmailConfig> {
     fn from(config: OptionSendmailConfig) -> Option<SendmailConfig> {
-        match config {
-            OptionSendmailConfig::None => None,
-            OptionSendmailConfig::Some(config) => Some(config),
+        if config.is_none {
+            None
+        } else {
+            Some(config.inner)
+        }
+    }
+}
+
+impl Into<OptionSendmailConfig> for Option<SendmailConfig> {
+    fn into(self) -> OptionSendmailConfig {
+        match self {
+            Some(config) => OptionSendmailConfig {
+                is_none: false,
+                inner: config,
+            },
+            None => OptionSendmailConfig {
+                is_none: true,
+                inner: Default::default(),
+            },
         }
     }
 }
@@ -467,23 +586,46 @@ fn sendmail_default_cmd() -> Cmd {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(remote = "Option<EmailHooks>", from = "OptionEmailHooks")]
+#[serde(
+    remote = "Option<EmailHooks>",
+    from = "OptionEmailHooks",
+    into = "OptionEmailHooks"
+)]
 pub struct OptionEmailHooksDef;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum OptionEmailHooks {
-    #[default]
-    #[serde(skip_serializing)]
-    None,
-    Some(#[serde(with = "EmailHooksDef")] EmailHooks),
+pub struct OptionEmailHooks {
+    #[serde(default, skip)]
+    is_none: bool,
+    #[serde(
+        flatten,
+        skip_serializing_if = "EmailHooks::is_empty",
+        with = "EmailHooksDef"
+    )]
+    inner: EmailHooks,
 }
 
 impl From<OptionEmailHooks> for Option<EmailHooks> {
-    fn from(fmt: OptionEmailHooks) -> Option<EmailHooks> {
-        match fmt {
-            OptionEmailHooks::None => None,
-            OptionEmailHooks::Some(hooks) => Some(hooks),
+    fn from(hooks: OptionEmailHooks) -> Option<EmailHooks> {
+        if hooks.is_none {
+            None
+        } else {
+            Some(hooks.inner)
+        }
+    }
+}
+
+impl Into<OptionEmailHooks> for Option<EmailHooks> {
+    fn into(self) -> OptionEmailHooks {
+        match self {
+            Some(hooks) => OptionEmailHooks {
+                is_none: false,
+                inner: hooks,
+            },
+            None => OptionEmailHooks {
+                is_none: true,
+                inner: Default::default(),
+            },
         }
     }
 }
@@ -501,24 +643,44 @@ pub struct EmailHooksDef {
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(
     remote = "Option<FolderSyncStrategy>",
-    from = "OptionFolderSyncStrategy"
+    from = "OptionFolderSyncStrategy",
+    into = "OptionFolderSyncStrategy"
 )]
 pub struct OptionFolderSyncStrategyDef;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum OptionFolderSyncStrategy {
-    #[default]
-    #[serde(skip_serializing)]
-    None,
-    Some(#[serde(with = "FolderSyncStrategyDef")] FolderSyncStrategy),
+pub struct OptionFolderSyncStrategy {
+    #[serde(default, skip)]
+    is_some: bool,
+    #[serde(
+        flatten,
+        skip_serializing_if = "FolderSyncStrategy::is_default",
+        with = "FolderSyncStrategyDef"
+    )]
+    inner: FolderSyncStrategy,
 }
 
 impl From<OptionFolderSyncStrategy> for Option<FolderSyncStrategy> {
-    fn from(config: OptionFolderSyncStrategy) -> Option<FolderSyncStrategy> {
-        match config {
-            OptionFolderSyncStrategy::None => None,
-            OptionFolderSyncStrategy::Some(config) => Some(config),
+    fn from(option: OptionFolderSyncStrategy) -> Option<FolderSyncStrategy> {
+        if option.is_some {
+            Some(option.inner)
+        } else {
+            None
+        }
+    }
+}
+
+impl Into<OptionFolderSyncStrategy> for Option<FolderSyncStrategy> {
+    fn into(self) -> OptionFolderSyncStrategy {
+        match self {
+            Some(strategy) => OptionFolderSyncStrategy {
+                is_some: true,
+                inner: strategy,
+            },
+            None => OptionFolderSyncStrategy {
+                is_some: false,
+                inner: Default::default(),
+            },
         }
     }
 }
