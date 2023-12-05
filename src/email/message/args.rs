@@ -120,7 +120,8 @@ pub fn matches(m: &ArgMatches) -> Result<Option<Cmd>> {
 /// Represents the email subcommands.
 pub fn subcmd() -> Command {
     Command::new(CMD_MESSAGE)
-        .about("Manage messages")
+        .about("Subcommand to manage messages")
+        .long_about("Subcommand to manage messages like read, write, reply or send")
         .aliases(["msg"])
         .subcommand_required(true)
         .arg_required_else_help(true)

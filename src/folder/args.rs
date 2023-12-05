@@ -14,6 +14,7 @@ use crate::ui::table;
 const ARG_ALL: &str = "all";
 const ARG_EXCLUDE: &str = "exclude";
 const ARG_INCLUDE: &str = "include";
+const ARG_GLOBAL_SOURCE: &str = "global-source";
 const ARG_SOURCE: &str = "source";
 const ARG_TARGET: &str = "target";
 const CMD_CREATE: &str = "create";
@@ -61,7 +62,8 @@ pub fn matches(m: &ArgMatches) -> Result<Option<Cmd>> {
 /// Represents the folder subcommand.
 pub fn subcmd() -> Command {
     Command::new(CMD_FOLDER)
-        .about("Manage folders")
+        .about("Subcommand to manage folders")
+        .long_about("Subcommand to manage folders like list, expunge or delete")
         .subcommands([
             Command::new(CMD_EXPUNGE).about("Delete emails marked for deletion"),
             Command::new(CMD_CREATE)
@@ -77,16 +79,31 @@ pub fn subcmd() -> Command {
 }
 
 /// Represents the source folder argument.
-pub fn source_arg() -> Arg {
-    Arg::new(ARG_SOURCE)
-        .help("Set the source folder")
+pub fn global_args() -> impl IntoIterator<Item = Arg> {
+    [Arg::new(ARG_GLOBAL_SOURCE)
+        .help("Override the default INBOX folder")
+        .long_help(
+            "Override the default INBOX folder.
+
+The given folder will be used by default for all other commands (when
+applicable).",
+        )
         .long("folder")
         .short('f')
         .global(true)
-        .value_name("SOURCE")
+        .value_name("name")]
 }
 
-/// Represents the source folder argument parser.
+pub fn parse_global_source_arg(matches: &ArgMatches) -> Option<&str> {
+    matches
+        .get_one::<String>(ARG_GLOBAL_SOURCE)
+        .map(String::as_str)
+}
+
+pub fn source_arg(help: &'static str) -> Arg {
+    Arg::new(ARG_SOURCE).help(help).value_name("name")
+}
+
 pub fn parse_source_arg(matches: &ArgMatches) -> Option<&str> {
     matches.get_one::<String>(ARG_SOURCE).map(String::as_str)
 }

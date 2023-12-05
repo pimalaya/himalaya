@@ -1,6 +1,7 @@
 use ::email::account::{config::DEFAULT_INBOX_FOLDER, sync::AccountSyncBuilder};
 use anyhow::{anyhow, Context, Result};
-use clap::Command;
+use clap::{Command, CommandFactory, Parser, Subcommand};
+use env_logger::{Builder as LoggerBuilder, Env, DEFAULT_FILTER_ENV};
 use log::{debug, warn};
 use std::env;
 use url::Url;
@@ -15,20 +16,18 @@ use himalaya::{
     template,
 };
 
-fn create_app() -> Command {
+fn _create_app() -> Command {
     Command::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .author(env!("CARGO_PKG_AUTHORS"))
         .propagate_version(true)
         .infer_subcommands(true)
-        .arg(config::args::arg())
-        .arg(account::args::arg())
-        .arg(cache::args::arg())
-        .args(output::args::args())
-        .arg(folder::args::source_arg())
-        .subcommand(completion::args::subcmd())
-        .subcommand(man::args::subcmd())
+        .args(config::args::global_args())
+        .args(account::args::global_args())
+        .args(folder::args::global_args())
+        .args(cache::args::global_args())
+        .args(output::args::global_args())
         .subcommand(account::args::subcmd())
         .subcommand(folder::args::subcmd())
         .subcommand(envelope::args::subcmd())
@@ -38,7 +37,7 @@ fn create_app() -> Command {
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn _old_main() -> Result<()> {
     #[cfg(not(target_os = "windows"))]
     if let Err((_, err)) = coredump::register_panic_handler() {
         warn!("cannot register custom panic handler: {err}");
@@ -63,32 +62,13 @@ async fn main() -> Result<()> {
         return message::handlers::mailto(&account_config, &backend, &mut printer, &url).await;
     }
 
-    let app = create_app();
+    let app = _create_app();
     let m = app.get_matches();
 
-    // check completionetion command before configs
-    // https://github.com/soywod/himalaya/issues/115
-    #[allow(clippy::single_match)]
-    match completion::args::matches(&m)? {
-        Some(completion::args::Cmd::Generate(shell)) => {
-            return completion::handlers::generate(create_app(), shell);
-        }
-        _ => (),
-    }
-
-    // check also man command before configs
-    #[allow(clippy::single_match)]
-    match man::args::matches(&m)? {
-        Some(man::args::Cmd::GenerateAll(dir)) => {
-            return man::handlers::generate(dir, create_app());
-        }
-        _ => (),
-    }
-
-    let some_config_path = config::args::parse_arg(&m);
-    let some_account_name = account::args::parse_arg(&m);
-    let disable_cache = cache::args::parse_disable_cache_flag(&m);
-    let folder = folder::args::parse_source_arg(&m);
+    let some_config_path = config::args::parse_global_arg(&m);
+    let some_account_name = account::args::parse_global_arg(&m);
+    let disable_cache = cache::args::parse_disable_cache_arg(&m);
+    let folder = folder::args::parse_global_source_arg(&m);
 
     let toml_config = TomlConfig::from_some_path_or_default(some_config_path).await?;
 
@@ -361,4 +341,35 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[derive(Parser, Debug)]
+#[command(name= "himalaya", author, version, about, long_about = None, propagate_version = true)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+    Man(man::command::Generate),
+    #[command(aliases = ["completions", "compl", "comp"])]
+    Completion(completion::command::Generate),
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    LoggerBuilder::new()
+        .parse_env(Env::new().filter_or(DEFAULT_FILTER_ENV, "warn"))
+        .format_timestamp(None)
+        .init();
+
+    let mut printer = StdoutPrinter::default();
+
+    match Cli::parse().command {
+        Commands::Man(cmd) => man::handler::generate(&mut printer, Cli::command(), cmd.dir),
+        Commands::Completion(cmd) => {
+            completion::handler::generate(&mut printer, Cli::command(), cmd.shell)
+        }
+    }
 }

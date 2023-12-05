@@ -43,7 +43,8 @@ pub fn matches(m: &ArgMatches) -> Result<Option<Cmd>> {
 /// Represents the envelope subcommand.
 pub fn subcmd() -> Command {
     Command::new(CMD_ENVELOPE)
-        .about("Manage envelopes")
+        .about("Subcommand to manage envelopes")
+        .long_about("Subcommand to manage envelopes like list")
         .subcommands([Command::new(CMD_LIST)
             .alias("lst")
             .about("List envelopes")

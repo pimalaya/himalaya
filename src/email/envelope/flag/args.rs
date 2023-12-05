@@ -57,7 +57,8 @@ pub fn matches(m: &ArgMatches) -> Result<Option<Cmd>> {
 /// Represents the flag subcommand.
 pub fn subcmd() -> Command {
     Command::new(CMD_FLAG)
-        .about("Manage flags")
+        .about("Subcommand to manage flags")
+        .long_about("Subcommand to manage flags like add, set or remove")
         .subcommand_required(true)
         .arg_required_else_help(true)
         .subcommand(

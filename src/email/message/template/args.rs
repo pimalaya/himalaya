@@ -73,7 +73,8 @@ pub fn matches<'a>(m: &'a ArgMatches) -> Result<Option<Cmd<'a>>> {
 pub fn subcmd() -> Command {
     Command::new(CMD_TPL)
         .alias("tpl")
-        .about("Manage templates")
+        .about("Subcommand to manage templates")
+        .long_about("Subcommand to manage templates like write, reply, send or save")
         .subcommand_required(true)
         .arg_required_else_help(true)
         .subcommand(

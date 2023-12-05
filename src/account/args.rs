@@ -33,12 +33,20 @@ pub enum Cmd {
 /// Represents the account command matcher.
 pub fn matches(m: &ArgMatches) -> Result<Option<Cmd>> {
     let cmd = if let Some(m) = m.subcommand_matches(CMD_ACCOUNT) {
-        if let Some(m) = m.subcommand_matches(CMD_SYNC) {
+        if let Some(m) = m.subcommand_matches(CMD_CONFIGURE) {
+            info!("configure account subcommand matched");
+            let reset = parse_reset_flag(m);
+            Some(Cmd::Configure(reset))
+        } else if let Some(m) = m.subcommand_matches(CMD_LIST) {
+            info!("list accounts subcommand matched");
+            let max_table_width = table::args::parse_max_width(m);
+            Some(Cmd::List(max_table_width))
+        } else if let Some(m) = m.subcommand_matches(CMD_SYNC) {
             info!("sync account subcommand matched");
             let dry_run = parse_dry_run_arg(m);
             let include = folder::args::parse_include_arg(m);
             let exclude = folder::args::parse_exclude_arg(m);
-            let folders_strategy = if let Some(folder) = folder::args::parse_source_arg(m) {
+            let folders_strategy = if let Some(folder) = folder::args::parse_global_source_arg(m) {
                 Some(FolderSyncStrategy::Include(HashSet::from_iter([
                     folder.to_owned()
                 ])))
@@ -52,17 +60,8 @@ pub fn matches(m: &ArgMatches) -> Result<Option<Cmd>> {
                 None
             };
             Some(Cmd::Sync(folders_strategy, dry_run))
-        } else if let Some(m) = m.subcommand_matches(CMD_LIST) {
-            info!("list accounts subcommand matched");
-            let max_table_width = table::args::parse_max_width(m);
-            Some(Cmd::List(max_table_width))
-        } else if let Some(m) = m.subcommand_matches(CMD_CONFIGURE) {
-            info!("configure account subcommand matched");
-            let reset = parse_reset_flag(m);
-            Some(Cmd::Configure(reset))
         } else {
-            info!("no account subcommand matched, falling back to subcommand list");
-            Some(Cmd::List(None))
+            None
         }
     } else {
         None
@@ -75,10 +74,26 @@ pub fn matches(m: &ArgMatches) -> Result<Option<Cmd>> {
 pub fn subcmd() -> Command {
     Command::new(CMD_ACCOUNT)
         .about("Subcommand to manage accounts")
-        .subcommands([
+        .long_about("Subcommand to manage accounts like configure, list or sync")
+        .aliases(["accounts", "acc"])
+        .subcommand_required(true)
+        .arg_required_else_help(true)
+        .subcommand(
+            Command::new(CMD_CONFIGURE)
+                .about("Configure the given account")
+                .aliases(["config", "conf", "cfg"])
+                .arg(reset_flag())
+                .arg(folder::args::source_arg(
+                    "Define the account to be configured",
+                )),
+        )
+        .subcommand(
             Command::new(CMD_LIST)
-                .about("List all accounts from the config file")
+                .about("List all accounts")
+                .long_about("List all accounts that are set up in the configuration file")
                 .arg(table::args::max_width()),
+        )
+        .subcommand(
             Command::new(CMD_SYNC)
                 .about("Synchronize the given account locally")
                 .arg(folder::args::all_arg("Synchronize all folders"))
@@ -89,26 +104,27 @@ pub fn subcmd() -> Command {
                     "Synchronize all folders except the given ones",
                 ))
                 .arg(dry_run()),
-            Command::new(CMD_CONFIGURE)
-                .about("Configure the current selected account")
-                .aliases(["config", "conf", "cfg"])
-                .arg(reset_flag()),
-        ])
+        )
 }
 
 /// Represents the user account name argument. This argument allows
 /// the user to select a different account than the default one.
-pub fn arg() -> Arg {
-    Arg::new(ARG_ACCOUNT)
-        .help("Set the account")
+pub fn global_args() -> impl IntoIterator<Item = Arg> {
+    [Arg::new(ARG_ACCOUNT)
+        .help("Override the default account")
+        .long_help(
+            "Override the default account
+
+The given account will be used by default for all other commands (when applicable).",
+        )
         .long("account")
         .short('a')
         .global(true)
-        .value_name("STRING")
+        .value_name("name")]
 }
 
 /// Represents the user account name argument parser.
-pub fn parse_arg(matches: &ArgMatches) -> Option<&str> {
+pub fn parse_global_arg(matches: &ArgMatches) -> Option<&str> {
     matches.get_one::<String>(ARG_ACCOUNT).map(String::as_str)
 }
 
