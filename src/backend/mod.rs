@@ -46,7 +46,7 @@ use email::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{account::TomlAccountConfig, Envelopes, IdMapper};
+use crate::{account::config::TomlAccountConfig, cache::IdMapper, envelope::Envelopes};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
