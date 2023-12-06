@@ -6,15 +6,15 @@ use std::io;
 
 use crate::{cli::Cli, printer::Printer};
 
-/// Print completion script for the given shell to stdout
+/// Print completion script for a shell to stdout
 #[derive(Debug, Parser)]
-pub struct Command {
-    /// Shell that completion script should be generated for
+pub struct CompletionGenerateCommand {
+    /// Shell for which completion script should be generated for
     #[arg(value_parser = value_parser!(Shell))]
     pub shell: Shell,
 }
 
-impl Command {
+impl CompletionGenerateCommand {
     pub async fn execute(self, printer: &mut impl Printer) -> Result<()> {
         info!("executing completion generate command");
 

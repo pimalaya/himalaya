@@ -10,7 +10,7 @@ pub mod folder;
 pub mod imap;
 #[cfg(feature = "maildir")]
 pub mod maildir;
-pub mod man;
+pub mod manual;
 #[cfg(feature = "notmuch")]
 pub mod notmuch;
 pub mod output;

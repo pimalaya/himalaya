@@ -7,6 +7,7 @@ use email::smtp::config::SmtpAuthConfig;
 use log::{debug, info, warn};
 
 use crate::{
+    account::arg::name::AccountNameArg,
     config::{
         wizard::{prompt_passwd, prompt_secret},
         TomlConfig,
@@ -16,26 +17,22 @@ use crate::{
 
 /// Configure the given account
 #[derive(Debug, Parser)]
-pub struct Command {
-    /// The name of the account that needs to be configured
-    ///
-    /// The account names are taken from the table at the root level
-    /// of your TOML configuration file.
-    #[arg(value_name = "NAME")]
-    pub account_name: String,
+pub struct AccountConfigureCommand {
+    #[command(flatten)]
+    pub account: AccountNameArg,
 
-    /// Force the account to reconfigure, even if it is already
+    /// Force the account to reconfigure, even if it has already been
     /// configured
     #[arg(long, short)]
     pub force: bool,
 }
 
-impl Command {
+impl AccountConfigureCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing account configure command");
 
         let (_, account_config) =
-            config.into_toml_account_config(Some(self.account_name.as_str()))?;
+            config.into_toml_account_config(Some(self.account.name.as_str()))?;
 
         if self.force {
             #[cfg(feature = "imap")]
@@ -106,7 +103,7 @@ impl Command {
 
         printer.print(format!(
             "Account {} successfully {}configured!",
-            self.account_name,
+            self.account.name,
             if self.force { "re" } else { "" }
         ))?;
 

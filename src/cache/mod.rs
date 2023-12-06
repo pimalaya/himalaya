@@ -1,3 +1,4 @@
+pub mod arg;
 pub mod args;
 
 use anyhow::{anyhow, Context, Result};

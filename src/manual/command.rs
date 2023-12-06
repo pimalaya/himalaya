@@ -7,17 +7,17 @@ use std::{fs, path::PathBuf};
 
 use crate::{cli::Cli, printer::Printer};
 
-/// Generate all man pages to the given directory
+/// Generate manual pages to a directory
 #[derive(Debug, Parser)]
-pub struct Command {
+pub struct ManualGenerateCommand {
     /// Directory where man files should be generated in
     #[arg(value_parser = dir_parser)]
     pub dir: PathBuf,
 }
 
-impl Command {
+impl ManualGenerateCommand {
     pub async fn execute(self, printer: &mut impl Printer) -> Result<()> {
-        info!("executing man generate command");
+        info!("executing manual generate command");
 
         let cmd = Cli::command();
         let cmd_name = cmd.get_name().to_string();

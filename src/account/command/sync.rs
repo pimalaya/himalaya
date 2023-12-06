@@ -12,7 +12,10 @@ use std::{
     sync::Mutex,
 };
 
-use crate::{backend::BackendBuilder, config::TomlConfig, printer::Printer};
+use crate::{
+    account::arg::name::AccountNameArg, backend::BackendBuilder, config::TomlConfig,
+    printer::Printer,
+};
 
 const MAIN_PROGRESS_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
     ProgressStyle::with_template(" {spinner:.dim} {msg:.dim}\n {wide_bar:.cyan/blue} \n").unwrap()
@@ -30,13 +33,9 @@ const SUB_PROGRESS_DONE_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
 });
 
 #[derive(Debug, Parser)]
-pub struct Command {
-    /// The name of the account that needs to be synchronized
-    ///
-    /// The account names are taken from the table at the root level
-    /// of your TOML configuration file.
-    #[arg(value_name = "ACCOUNT")]
-    pub account_name: String,
+pub struct AccountSyncCommand {
+    #[command(flatten)]
+    pub account: AccountNameArg,
 
     /// Run the synchronization without applying changes
     ///
@@ -60,7 +59,7 @@ pub struct Command {
     pub all_folders: bool,
 }
 
-impl Command {
+impl AccountSyncCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing account sync command");
 
@@ -79,7 +78,7 @@ impl Command {
 
         let (toml_account_config, account_config) = config
             .clone()
-            .into_account_configs(Some(self.account_name.as_str()), true)?;
+            .into_account_configs(Some(self.account.name.as_str()), true)?;
 
         let backend_builder =
             BackendBuilder::new(toml_account_config, account_config.clone(), false).await?;
@@ -110,11 +109,15 @@ impl Command {
             }
 
             printer.print(format!(
-                "Estimated patch length for account to be synchronized: {hunks_count}",
+                "Estimated patch length for account {} to be synchronized: {hunks_count}",
+                self.account.name
             ))?;
         } else if printer.is_json() {
             sync_builder.sync().await?;
-            printer.print("Account successfully synchronized!")?;
+            printer.print(format!(
+                "Account {} successfully synchronized!",
+                self.account.name
+            ))?;
         } else {
             let multi = MultiProgress::new();
             let sub_progresses = Mutex::new(HashMap::new());
@@ -225,7 +228,10 @@ impl Command {
                 ))?;
             }
 
-            printer.print("Account successfully synchronized!")?;
+            printer.print(format!(
+                "Account {} successfully synchronized!",
+                self.account.name
+            ))?;
         }
 
         Ok(())

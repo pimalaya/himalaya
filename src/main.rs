@@ -25,10 +25,8 @@ async fn main() -> Result<()> {
 //         .author(env!("CARGO_PKG_AUTHORS"))
 //         .propagate_version(true)
 //         .infer_subcommands(true)
-//         .args(folder::args::global_args())
 //         .args(cache::args::global_args())
 //         .args(output::args::global_args())
-//         .subcommand(folder::args::subcmd())
 //         .subcommand(envelope::args::subcmd())
 //         .subcommand(flag::args::subcmd())
 //         .subcommand(message::args::subcmd())
@@ -67,62 +65,14 @@ async fn main() -> Result<()> {
 //     let some_config_path = config::args::parse_global_arg(&m);
 //     let some_account_name = account::command::parse_global_arg(&m);
 //     let disable_cache = cache::args::parse_disable_cache_arg(&m);
-//     let folder = folder::args::parse_global_source_arg(&m);
 
 //     let toml_config = TomlConfig::from_some_path_or_default(some_config_path).await?;
 
 //     let mut printer = StdoutPrinter::try_from(&m)?;
 
-//     #[cfg(feature = "imap")]
-//     if let BackendConfig::Imap(imap_config) = &account_config.backend {
-//         let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
-//         match imap::args::matches(&m)? {
-//             Some(imap::args::Cmd::Notify(keepalive)) => {
-//                 let backend =
-//                     ImapBackend::new(account_config.clone(), imap_config.clone(), None).await?;
-//                 imap::handlers::notify(&mut backend, &folder, keepalive).await?;
-//                 return Ok(());
-//             }
-//             Some(imap::args::Cmd::Watch(keepalive)) => {
-//                 let backend =
-//                     ImapBackend::new(account_config.clone(), imap_config.clone(), None).await?;
-//                 imap::handlers::watch(&mut backend, &folder, keepalive).await?;
-//                 return Ok(());
-//             }
-//             _ => (),
-//         }
-//     }
-
 //     let (toml_account_config, account_config) = toml_config
 //         .clone()
 //         .into_account_configs(some_account_name, disable_cache)?;
-
-//     // checks folder commands
-//     match folder::args::matches(&m)? {
-//         Some(folder::args::Cmd::Create) => {
-//             let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
-//             let folder = folder
-//                 .ok_or_else(|| anyhow!("the folder argument is missing"))
-//                 .context("cannot create folder")?;
-//             return folder::handlers::create(&mut printer, &backend, &folder).await;
-//         }
-//         Some(folder::args::Cmd::List(max_width)) => {
-//             let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
-//             return folder::handlers::list(&account_config, &mut printer, &backend, max_width)
-//                 .await;
-//         }
-//         Some(folder::args::Cmd::Expunge) => {
-//             let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
-//             let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
-//             return folder::handlers::expunge(&mut printer, &backend, &folder).await;
-//         }
-//         Some(folder::args::Cmd::Delete) => {
-//             let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
-//             let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
-//             return folder::handlers::delete(&mut printer, &backend, &folder).await;
-//         }
-//         _ => (),
-//     }
 
 //     match envelope::args::matches(&m)? {
 //         Some(envelope::args::Cmd::List(max_width, page_size, page)) => {

@@ -7,23 +7,27 @@ use clap::Subcommand;
 
 use crate::{config::TomlConfig, printer::Printer};
 
+use self::{
+    configure::AccountConfigureCommand, list::AccountListCommand, sync::AccountSyncCommand,
+};
+
 /// Subcommand to manage accounts
 #[derive(Debug, Subcommand)]
-pub enum Command {
-    /// Configure the given account
+pub enum AccountSubcommand {
+    /// Configure an account
     #[command(alias = "cfg")]
-    Configure(configure::Command),
+    Configure(AccountConfigureCommand),
 
-    /// List all exsting accounts
+    /// List all accounts
     #[command(alias = "lst")]
-    List(list::Command),
+    List(AccountListCommand),
 
-    /// Synchronize the given account locally
+    /// Synchronize an account locally
     #[command()]
-    Sync(sync::Command),
+    Sync(AccountSyncCommand),
 }
 
-impl Command {
+impl AccountSubcommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         match self {
             Self::Configure(cmd) => cmd.execute(printer, config).await,

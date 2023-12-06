@@ -6,17 +6,17 @@ use crate::{
     account::Accounts,
     config::TomlConfig,
     printer::{PrintTableOpts, Printer},
+    ui::arg::max_width::MaxTableWidthFlag,
 };
 
 /// List all accounts
 #[derive(Debug, Parser)]
-pub struct Command {
-    /// Define a maximum width for the table
-    #[arg(long, short = 'w', name = "PIXELS")]
-    pub max_width: Option<usize>,
+pub struct AccountListCommand {
+    #[command(flatten)]
+    pub table: MaxTableWidthFlag,
 }
 
-impl Command {
+impl AccountListCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing account list command");
 
@@ -29,7 +29,7 @@ impl Command {
                     .email_reading_format
                     .as_ref()
                     .unwrap_or(&Default::default()),
-                max_width: self.max_width,
+                max_width: self.table.max_width,
             },
         )?;
 

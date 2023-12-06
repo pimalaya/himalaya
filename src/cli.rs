@@ -1,13 +1,13 @@
-use std::path::PathBuf;
-
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use std::path::PathBuf;
 
 use crate::{
-    account::command as account,
-    completion::command as completion,
+    account::command::AccountSubcommand,
+    completion::command::CompletionGenerateCommand,
     config::{self, TomlConfig},
-    man::command as man,
+    folder::command::FolderSubcommand,
+    manual::command::ManualGenerateCommand,
     output::{ColorFmt, OutputFmt},
     printer::Printer,
 };
@@ -23,7 +23,7 @@ use crate::{
 )]
 pub struct Cli {
     #[command(subcommand)]
-    pub command: Command,
+    pub command: HimalayaCommand,
 
     /// Override the default configuration file path
     ///
@@ -86,27 +86,31 @@ pub struct Cli {
     pub color: ColorFmt,
 }
 
-/// Top-level CLI commands.
 #[derive(Subcommand, Debug)]
-pub enum Command {
+pub enum HimalayaCommand {
     /// Subcommand to manage accounts
     #[command(subcommand)]
-    Account(account::Command),
+    Account(AccountSubcommand),
 
-    /// Generate all man pages to the given directory
-    #[command(arg_required_else_help = true, alias = "mans")]
-    Man(man::Command),
+    /// Subcommand to manage folders
+    #[command(subcommand)]
+    Folder(FolderSubcommand),
 
-    /// Print completion script for the given shell to stdout
-    #[command(arg_required_else_help = true, aliases = ["completions", "compl", "comp"])]
-    Completion(completion::Command),
+    /// Generate manual pages to a directory
+    #[command(arg_required_else_help = true)]
+    Manual(ManualGenerateCommand),
+
+    /// Print completion script for a shell to stdout
+    #[command(arg_required_else_help = true)]
+    Completion(CompletionGenerateCommand),
 }
 
-impl Command {
+impl HimalayaCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         match self {
             Self::Account(cmd) => cmd.execute(printer, config).await,
-            Self::Man(cmd) => cmd.execute(printer).await,
+            Self::Folder(cmd) => cmd.execute(printer, config).await,
+            Self::Manual(cmd) => cmd.execute(printer).await,
             Self::Completion(cmd) => cmd.execute(printer).await,
         }
     }
