@@ -1,8 +1,6 @@
 pub mod arg;
-pub mod args;
 pub mod command;
 pub mod config;
-pub mod handlers;
 
 use anyhow::Result;
 use serde::Serialize;

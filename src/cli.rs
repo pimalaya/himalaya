@@ -6,6 +6,7 @@ use crate::{
     account::command::AccountSubcommand,
     completion::command::CompletionGenerateCommand,
     config::{self, TomlConfig},
+    envelope::command::EnvelopeSubcommand,
     folder::command::FolderSubcommand,
     manual::command::ManualGenerateCommand,
     output::{ColorFmt, OutputFmt},
@@ -96,6 +97,10 @@ pub enum HimalayaCommand {
     #[command(subcommand)]
     Folder(FolderSubcommand),
 
+    /// Subcommand to manage envelopes
+    #[command(subcommand)]
+    Envelope(EnvelopeSubcommand),
+
     /// Generate manual pages to a directory
     #[command(arg_required_else_help = true)]
     Manual(ManualGenerateCommand),
@@ -110,6 +115,7 @@ impl HimalayaCommand {
         match self {
             Self::Account(cmd) => cmd.execute(printer, config).await,
             Self::Folder(cmd) => cmd.execute(printer, config).await,
+            Self::Envelope(cmd) => cmd.execute(printer, config).await,
             Self::Manual(cmd) => cmd.execute(printer).await,
             Self::Completion(cmd) => cmd.execute(printer).await,
         }

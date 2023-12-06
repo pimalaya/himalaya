@@ -1,7 +1,6 @@
-pub mod args;
+pub mod command;
 pub mod config;
 pub mod flag;
-pub mod handlers;
 
 use anyhow::Result;
 use email::account::config::AccountConfig;

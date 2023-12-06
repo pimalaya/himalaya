@@ -6,7 +6,7 @@
 use anyhow::Result;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 
-use crate::{folder, template};
+use crate::template;
 
 const ARG_CRITERIA: &str = "criterion";
 const ARG_HEADERS: &str = "headers";
@@ -71,7 +71,7 @@ pub fn matches(m: &ArgMatches) -> Result<Option<Cmd>> {
             Some(Cmd::Attachments(ids))
         } else if let Some(m) = m.subcommand_matches(CMD_COPY) {
             let ids = parse_ids_arg(m);
-            let folder = folder::args::parse_target_arg(m);
+            let folder = "INBOX";
             Some(Cmd::Copy(ids, folder))
         } else if let Some(m) = m.subcommand_matches(CMD_DELETE) {
             let ids = parse_ids_arg(m);
@@ -83,7 +83,7 @@ pub fn matches(m: &ArgMatches) -> Result<Option<Cmd>> {
             Some(Cmd::Forward(id, headers, body))
         } else if let Some(m) = m.subcommand_matches(CMD_MOVE) {
             let ids = parse_ids_arg(m);
-            let folder = folder::args::parse_target_arg(m);
+            let folder = "INBOX";
             Some(Cmd::Move(ids, folder))
         } else if let Some(m) = m.subcommand_matches(CMD_READ) {
             let ids = parse_ids_arg(m);
@@ -158,12 +158,12 @@ pub fn subcmd() -> Command {
             Command::new(CMD_COPY)
                 .alias("cp")
                 .about("Copy emails to the given folder")
-                .arg(folder::args::target_arg())
+                // .arg(folder::args::target_arg())
                 .arg(ids_arg()),
             Command::new(CMD_MOVE)
                 .alias("mv")
                 .about("Move emails to the given folder")
-                .arg(folder::args::target_arg())
+                // .arg(folder::args::target_arg())
                 .arg(ids_arg()),
             Command::new(CMD_DELETE)
                 .aliases(["remove", "rm"])
