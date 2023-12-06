@@ -1,6 +1,5 @@
-pub mod args;
+pub mod command;
 pub mod config;
-pub mod handlers;
 pub(crate) mod wizard;
 
 use anyhow::Result;
@@ -45,7 +44,7 @@ impl Table for Account {
     fn head() -> Row {
         Row::new()
             .cell(Cell::new("NAME").shrinkable().bold().underline().white())
-            .cell(Cell::new("BACKEND").bold().underline().white())
+            .cell(Cell::new("BACKENDS").bold().underline().white())
             .cell(Cell::new("DEFAULT").bold().underline().white())
     }
 

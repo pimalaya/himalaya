@@ -1,6 +1,7 @@
 pub mod account;
 pub mod backend;
 pub mod cache;
+pub mod cli;
 pub mod completion;
 pub mod config;
 pub mod email;

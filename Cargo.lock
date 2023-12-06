@@ -483,6 +483,7 @@ dependencies = [
  "anstyle",
  "clap_lex",
  "strsim 0.10.0",
+ "terminal_size 0.3.0",
 ]
 
 [[package]]
@@ -2094,7 +2095,7 @@ dependencies = [
  "shellexpand-utils 0.1.0",
  "tempfile",
  "termcolor",
- "terminal_size",
+ "terminal_size 0.1.17",
  "tokio",
  "toml 0.7.8",
  "toml_edit 0.19.15",
@@ -4102,6 +4103,16 @@ checksum = "633c1a546cee861a1a6d0dc69ebeca693bf4296661ba7852b9d21d159e0506df"
 dependencies = [
  "libc",
  "winapi",
+]
+
+[[package]]
+name = "terminal_size"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21bebf2b7c9e0a515f6e0f8c51dc0f8e4696391e6f1ff30379559f8365fb0df7"
+dependencies = [
+ "rustix",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

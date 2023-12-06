@@ -121,11 +121,6 @@ pub fn all_arg(help: &'static str) -> Arg {
         .conflicts_with(ARG_EXCLUDE)
 }
 
-/// Represents the all folders argument parser.
-pub fn parse_all_arg(m: &ArgMatches) -> bool {
-    m.get_flag(ARG_ALL)
-}
-
 /// Represents the folders to include argument.
 pub fn include_arg(help: &'static str) -> Arg {
     Arg::new(ARG_INCLUDE)
@@ -139,14 +134,6 @@ pub fn include_arg(help: &'static str) -> Arg {
         .conflicts_with(ARG_SOURCE)
         .conflicts_with(ARG_ALL)
         .conflicts_with(ARG_EXCLUDE)
-}
-
-/// Represents the folders to include argument parser.
-pub fn parse_include_arg(m: &ArgMatches) -> HashSet<String> {
-    m.get_many::<String>(ARG_INCLUDE)
-        .unwrap_or_default()
-        .map(ToOwned::to_owned)
-        .collect()
 }
 
 /// Represents the folders to exclude argument.

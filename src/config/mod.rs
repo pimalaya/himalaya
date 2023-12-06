@@ -1,8 +1,3 @@
-//! Deserialized config module.
-//!
-//! This module contains the raw deserialized representation of the
-//! user configuration file.
-
 pub mod args;
 pub mod prelude;
 pub mod wizard;
@@ -16,6 +11,7 @@ use email::{
     email::config::{EmailHooks, EmailTextPlainFormat},
 };
 use serde::{Deserialize, Serialize};
+use shellexpand_utils::{canonicalize, expand};
 use std::{
     collections::HashMap,
     fs,
@@ -162,12 +158,10 @@ impl TomlConfig {
             .filter(|p| p.exists())
     }
 
-    /// Build account configurations from a given account name.
-    pub fn into_account_configs(
-        self,
+    pub fn into_toml_account_config(
+        &self,
         account_name: Option<&str>,
-        disable_cache: bool,
-    ) -> Result<(TomlAccountConfig, AccountConfig)> {
+    ) -> Result<(String, TomlAccountConfig)> {
         let (account_name, mut toml_account_config) = match account_name {
             Some("default") | Some("") | None => self
                 .accounts
@@ -199,6 +193,18 @@ impl TomlConfig {
                 .auth
                 .replace_undefined_keyring_entries(&account_name);
         }
+
+        Ok((account_name, toml_account_config))
+    }
+
+    /// Build account configurations from a given account name.
+    pub fn into_account_configs(
+        self,
+        account_name: Option<&str>,
+        disable_cache: bool,
+    ) -> Result<(TomlAccountConfig, AccountConfig)> {
+        let (account_name, mut toml_account_config) =
+            self.into_toml_account_config(account_name)?;
 
         if let Some(true) = toml_account_config.sync {
             if !disable_cache {
@@ -265,6 +271,15 @@ impl TomlConfig {
 
         Ok((toml_account_config, account_config))
     }
+}
+
+/// Parse a configuration file path as [`PathBuf`].
+///
+/// The path is shell-expanded then canonicalized (if applicable).
+pub fn path_parser(path: &str) -> Result<PathBuf, String> {
+    expand::try_path(path)
+        .map(canonicalize::path)
+        .map_err(|err| err.to_string())
 }
 
 #[cfg(test)]

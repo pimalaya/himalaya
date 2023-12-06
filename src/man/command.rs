@@ -1,14 +1,56 @@
 use anyhow::Result;
-use clap::Parser;
+use clap::{CommandFactory, Parser};
+use clap_mangen::Man;
+use log::info;
 use shellexpand_utils::{canonicalize, expand};
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
+
+use crate::{cli::Cli, printer::Printer};
 
 /// Generate all man pages to the given directory
 #[derive(Debug, Parser)]
-pub struct Generate {
+pub struct Command {
     /// Directory where man files should be generated in
     #[arg(value_parser = dir_parser)]
     pub dir: PathBuf,
+}
+
+impl Command {
+    pub async fn execute(self, printer: &mut impl Printer) -> Result<()> {
+        info!("executing man generate command");
+
+        let cmd = Cli::command();
+        let cmd_name = cmd.get_name().to_string();
+        let subcmds = cmd.get_subcommands().cloned().collect::<Vec<_>>();
+        let subcmds_len = subcmds.len() + 1;
+
+        let mut buffer = Vec::new();
+        Man::new(cmd).render(&mut buffer)?;
+
+        fs::create_dir_all(&self.dir)?;
+        printer.print_log(format!("Generating man page for command {cmd_name}…"))?;
+        fs::write(self.dir.join(format!("{}.1", cmd_name)), buffer)?;
+
+        for subcmd in subcmds {
+            let subcmd_name = subcmd.get_name().to_string();
+
+            let mut buffer = Vec::new();
+            Man::new(subcmd).render(&mut buffer)?;
+
+            printer.print_log(format!("Generating man page for subcommand {subcmd_name}…"))?;
+            fs::write(
+                self.dir.join(format!("{}-{}.1", cmd_name, subcmd_name)),
+                buffer,
+            )?;
+        }
+
+        printer.print(format!(
+            "{subcmds_len} man page(s) successfully generated in {:?}!",
+            self.dir
+        ))?;
+
+        Ok(())
+    }
 }
 
 /// Parse the given [`str`] as [`PathBuf`].
