@@ -7,6 +7,7 @@ use crate::{
     completion::command::CompletionGenerateCommand,
     config::{self, TomlConfig},
     envelope::command::EnvelopeSubcommand,
+    flag::command::FlagSubcommand,
     folder::command::FolderSubcommand,
     manual::command::ManualGenerateCommand,
     output::{ColorFmt, OutputFmt},
@@ -90,16 +91,20 @@ pub struct Cli {
 #[derive(Subcommand, Debug)]
 pub enum HimalayaCommand {
     /// Subcommand to manage accounts
-    #[command(subcommand)]
+    #[command(subcommand, alias = "accounts")]
     Account(AccountSubcommand),
 
     /// Subcommand to manage folders
-    #[command(subcommand)]
+    #[command(subcommand, alias = "folders")]
     Folder(FolderSubcommand),
 
     /// Subcommand to manage envelopes
-    #[command(subcommand)]
+    #[command(subcommand, alias = "envelopes")]
     Envelope(EnvelopeSubcommand),
+
+    /// Subcommand to manage flags
+    #[command(subcommand, alias = "flags")]
+    Flag(FlagSubcommand),
 
     /// Generate manual pages to a directory
     #[command(arg_required_else_help = true)]
@@ -116,6 +121,7 @@ impl HimalayaCommand {
             Self::Account(cmd) => cmd.execute(printer, config).await,
             Self::Folder(cmd) => cmd.execute(printer, config).await,
             Self::Envelope(cmd) => cmd.execute(printer, config).await,
+            Self::Flag(cmd) => cmd.execute(printer, config).await,
             Self::Manual(cmd) => cmd.execute(printer).await,
             Self::Completion(cmd) => cmd.execute(printer).await,
         }
