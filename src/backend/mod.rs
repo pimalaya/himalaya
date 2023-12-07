@@ -723,28 +723,35 @@ impl Backend {
         Ok(envelopes)
     }
 
-    pub async fn add_flags(&self, folder: &str, ids: &[&str], flags: &Flags) -> Result<()> {
+    pub async fn add_flags(&self, folder: &str, ids: &[usize], flags: &Flags) -> Result<()> {
         let backend_kind = self.toml_account_config.add_flags_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
         let ids = Id::multiple(id_mapper.get_ids(ids)?);
         self.backend.add_flags(folder, &ids, flags).await
     }
 
-    pub async fn set_flags(&self, folder: &str, ids: &[&str], flags: &Flags) -> Result<()> {
+    pub async fn set_flags(&self, folder: &str, ids: &[usize], flags: &Flags) -> Result<()> {
         let backend_kind = self.toml_account_config.set_flags_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
         let ids = Id::multiple(id_mapper.get_ids(ids)?);
         self.backend.set_flags(folder, &ids, flags).await
     }
 
-    pub async fn remove_flags(&self, folder: &str, ids: &[&str], flags: &Flags) -> Result<()> {
+    pub async fn remove_flags(&self, folder: &str, ids: &[usize], flags: &Flags) -> Result<()> {
         let backend_kind = self.toml_account_config.remove_flags_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
         let ids = Id::multiple(id_mapper.get_ids(ids)?);
         self.backend.remove_flags(folder, &ids, flags).await
     }
 
-    pub async fn get_messages(&self, folder: &str, ids: &[&str]) -> Result<Messages> {
+    pub async fn peek_messages(&self, folder: &str, ids: &[usize]) -> Result<Messages> {
+        let backend_kind = self.toml_account_config.get_messages_kind();
+        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
+        let ids = Id::multiple(id_mapper.get_ids(ids)?);
+        self.backend.peek_messages(folder, &ids).await
+    }
+
+    pub async fn get_messages(&self, folder: &str, ids: &[usize]) -> Result<Messages> {
         let backend_kind = self.toml_account_config.get_messages_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
         let ids = Id::multiple(id_mapper.get_ids(ids)?);
@@ -755,7 +762,7 @@ impl Backend {
         &self,
         from_folder: &str,
         to_folder: &str,
-        ids: &[&str],
+        ids: &[usize],
     ) -> Result<()> {
         let backend_kind = self.toml_account_config.move_messages_kind();
         let id_mapper = self.build_id_mapper(from_folder, backend_kind)?;
@@ -769,7 +776,7 @@ impl Backend {
         &self,
         from_folder: &str,
         to_folder: &str,
-        ids: &[&str],
+        ids: &[usize],
     ) -> Result<()> {
         let backend_kind = self.toml_account_config.move_messages_kind();
         let id_mapper = self.build_id_mapper(from_folder, backend_kind)?;
@@ -779,7 +786,7 @@ impl Backend {
             .await
     }
 
-    pub async fn delete_messages(&self, folder: &str, ids: &[&str]) -> Result<()> {
+    pub async fn delete_messages(&self, folder: &str, ids: &[usize]) -> Result<()> {
         let backend_kind = self.toml_account_config.delete_messages_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
         let ids = Id::multiple(id_mapper.get_ids(ids)?);

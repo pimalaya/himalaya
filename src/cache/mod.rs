@@ -122,9 +122,9 @@ impl IdMapper {
 
     pub fn get_id<A>(&self, alias: A) -> Result<String>
     where
-        A: AsRef<str>,
+        A: ToString,
     {
-        let alias = alias.as_ref();
+        let alias = alias.to_string();
         let alias = alias
             .parse::<i64>()
             .context(format!("cannot parse id mapper alias {alias}"))?;
@@ -158,7 +158,7 @@ impl IdMapper {
 
     pub fn get_ids<A, I>(&self, aliases: I) -> Result<Vec<String>>
     where
-        A: AsRef<str>,
+        A: ToString,
         I: IntoIterator<Item = A>,
     {
         aliases

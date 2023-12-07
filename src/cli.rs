@@ -10,6 +10,7 @@ use crate::{
     flag::command::FlagSubcommand,
     folder::command::FolderSubcommand,
     manual::command::ManualGenerateCommand,
+    message::command::MessageSubcommand,
     output::{ColorFmt, OutputFmt},
     printer::Printer,
 };
@@ -33,7 +34,8 @@ pub struct Cli {
     /// applicable). If the path does not point to a valid file, the
     /// wizard will propose to assist you in the creation of the
     /// configuration file.
-    #[arg(long, short, value_name = "PATH", global = true, value_parser = config::path_parser)]
+    #[arg(long, short, global = true)]
+    #[arg(value_name = "PATH", value_parser = config::path_parser)]
     pub config: Option<PathBuf>,
 
     /// Customize the output format
@@ -47,14 +49,8 @@ pub struct Cli {
     ///
     ///  - plain: output will be in a form of either a plain text or
     ///    table, depending on the command
-    #[arg(
-	long,
-	short,
-        value_name = "FORMAT",
-        global = true,
-        value_enum,
-	default_value_t = Default::default(),
-    )]
+    #[arg(long, short, global = true)]
+    #[arg(value_name = "FORMAT", value_enum, default_value_t = Default::default())]
     pub output: OutputFmt,
 
     /// Control when to use colors
@@ -77,41 +73,46 @@ pub struct Cli {
     ///  - ansi: like 'always', but emits ANSI escapes (even in a Windows console)
     ///
     ///  - auto: himalaya tries to be smart
-    #[arg(
-	long,
-        short = 'C',
-        value_name = "MODE",
-        global = true,
-        value_enum,
-	default_value_t = Default::default(),
-    )]
+    #[arg(long, short = 'C', global = true)]
+    #[arg(value_name = "MODE", value_enum, default_value_t = Default::default())]
     pub color: ColorFmt,
 }
 
 #[derive(Subcommand, Debug)]
 pub enum HimalayaCommand {
     /// Subcommand to manage accounts
-    #[command(subcommand, alias = "accounts")]
+    #[command(subcommand)]
+    #[command(alias = "accounts")]
     Account(AccountSubcommand),
 
     /// Subcommand to manage folders
-    #[command(subcommand, alias = "folders")]
+    #[command(subcommand)]
+    #[command(alias = "folders")]
     Folder(FolderSubcommand),
 
     /// Subcommand to manage envelopes
-    #[command(subcommand, alias = "envelopes")]
+    #[command(subcommand)]
+    #[command(alias = "envelopes")]
     Envelope(EnvelopeSubcommand),
 
     /// Subcommand to manage flags
-    #[command(subcommand, alias = "flags")]
+    #[command(subcommand)]
+    #[command(alias = "flags")]
     Flag(FlagSubcommand),
+
+    /// Subcommand to manage messages
+    #[command(subcommand)]
+    #[command(alias = "messages", alias = "msgs", alias = "msg")]
+    Message(MessageSubcommand),
 
     /// Generate manual pages to a directory
     #[command(arg_required_else_help = true)]
+    #[command(alias = "manuals", alias = "mans")]
     Manual(ManualGenerateCommand),
 
     /// Print completion script for a shell to stdout
     #[command(arg_required_else_help = true)]
+    #[command(alias = "completions")]
     Completion(CompletionGenerateCommand),
 }
 
@@ -122,6 +123,7 @@ impl HimalayaCommand {
             Self::Folder(cmd) => cmd.execute(printer, config).await,
             Self::Envelope(cmd) => cmd.execute(printer, config).await,
             Self::Flag(cmd) => cmd.execute(printer, config).await,
+            Self::Message(cmd) => cmd.execute(printer, config).await,
             Self::Manual(cmd) => cmd.execute(printer).await,
             Self::Completion(cmd) => cmd.execute(printer).await,
         }

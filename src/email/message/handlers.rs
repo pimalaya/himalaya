@@ -69,29 +69,6 @@ pub async fn attachments<P: Printer>(
     }
 }
 
-pub async fn copy<P: Printer>(
-    printer: &mut P,
-    backend: &Backend,
-    from_folder: &str,
-    to_folder: &str,
-    ids: Vec<&str>,
-) -> Result<()> {
-    backend
-        .copy_messages(&from_folder, &to_folder, &ids)
-        .await?;
-    printer.print("Email(s) successfully copied!")
-}
-
-pub async fn delete<P: Printer>(
-    printer: &mut P,
-    backend: &Backend,
-    folder: &str,
-    ids: Vec<&str>,
-) -> Result<()> {
-    backend.delete_messages(&folder, &ids).await?;
-    printer.print("Email(s) successfully deleted!")
-}
-
 pub async fn forward<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
@@ -147,60 +124,6 @@ pub async fn mailto<P: Printer>(
     editor::edit_tpl_with_editor(config, printer, backend, tpl).await
 }
 
-pub async fn move_<P: Printer>(
-    printer: &mut P,
-    backend: &Backend,
-    from_folder: &str,
-    to_folder: &str,
-    ids: Vec<&str>,
-) -> Result<()> {
-    backend
-        .move_messages(&from_folder, &to_folder, &ids)
-        .await?;
-    printer.print("Email(s) successfully moved!")
-}
-
-pub async fn read<P: Printer>(
-    config: &AccountConfig,
-    printer: &mut P,
-    backend: &Backend,
-    folder: &str,
-    ids: Vec<&str>,
-    text_mime: &str,
-    raw: bool,
-    headers: Vec<&str>,
-) -> Result<()> {
-    let emails = backend.get_messages(&folder, &ids).await?;
-
-    let mut glue = "";
-    let mut bodies = String::default();
-
-    for email in emails.to_vec() {
-        bodies.push_str(glue);
-
-        if raw {
-            // emails do not always have valid utf8, uses "lossy" to
-            // display what can be displayed
-            bodies.push_str(&String::from_utf8_lossy(email.raw()?).into_owned());
-        } else {
-            let tpl: String = email
-                .to_read_tpl(&config, |tpl| match text_mime {
-                    "html" => tpl
-                        .with_hide_all_headers()
-                        .with_filter_parts(FilterParts::Only("text/html".into())),
-                    _ => tpl.with_show_additional_headers(&headers),
-                })
-                .await?
-                .into();
-            bodies.push_str(&tpl);
-        }
-
-        glue = "\n\n";
-    }
-
-    printer.print(bodies)
-}
-
 pub async fn reply<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
@@ -227,61 +150,6 @@ pub async fn reply<P: Printer>(
     backend
         .add_flag(&folder, &Id::single(id), Flag::Answered)
         .await?;
-    Ok(())
-}
-
-pub async fn save<P: Printer>(
-    printer: &mut P,
-    backend: &Backend,
-    folder: &str,
-    raw_email: String,
-) -> Result<()> {
-    let is_tty = atty::is(Stream::Stdin);
-    let is_json = printer.is_json();
-    let raw_email = if is_tty || is_json {
-        raw_email.replace("\r", "").replace("\n", "\r\n")
-    } else {
-        io::stdin()
-            .lock()
-            .lines()
-            .filter_map(Result::ok)
-            .collect::<Vec<String>>()
-            .join("\r\n")
-    };
-
-    backend
-        .add_raw_message(&folder, raw_email.as_bytes())
-        .await?;
-
-    Ok(())
-}
-
-pub async fn send<P: Printer>(
-    config: &AccountConfig,
-    printer: &mut P,
-    backend: &Backend,
-    raw_email: String,
-) -> Result<()> {
-    let folder = config.sent_folder_alias()?;
-    let is_tty = atty::is(Stream::Stdin);
-    let is_json = printer.is_json();
-    let raw_email = if is_tty || is_json {
-        raw_email.replace("\r", "").replace("\n", "\r\n")
-    } else {
-        io::stdin()
-            .lock()
-            .lines()
-            .filter_map(Result::ok)
-            .collect::<Vec<String>>()
-            .join("\r\n")
-    };
-    trace!("raw email: {:?}", raw_email);
-    backend.send_raw_message(raw_email.as_bytes()).await?;
-    if config.email_sending_save_copy.unwrap_or_default() {
-        backend
-            .add_raw_message_with_flag(&folder, raw_email.as_bytes(), Flag::Seen)
-            .await?;
-    }
     Ok(())
 }
 

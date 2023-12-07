@@ -7,32 +7,36 @@ use crate::{
     backend::Backend,
     cache::arg::disable::DisableCacheFlag,
     config::TomlConfig,
-    flag::arg::ids_and_flags::{into_tuple, IdsAndFlagsArgs},
-    folder::arg::name::FolderNameArg,
+    envelope::arg::ids::EnvelopeIdsArgs,
+    folder::arg::name::{SourceFolderNameArg, TargetFolderNameArg},
     printer::Printer,
 };
 
-/// Remove flag(s) from an envelope
+/// Copy a message from a source folder to a target folder
 #[derive(Debug, Parser)]
-pub struct FlagRemoveCommand {
+pub struct MessageCopyCommand {
     #[command(flatten)]
-    pub folder: FolderNameArg,
+    pub source_folder: SourceFolderNameArg,
 
     #[command(flatten)]
-    pub args: IdsAndFlagsArgs,
+    pub target_folder: TargetFolderNameArg,
 
     #[command(flatten)]
-    pub account: AccountNameFlag,
+    pub envelopes: EnvelopeIdsArgs,
 
     #[command(flatten)]
     pub cache: DisableCacheFlag,
+
+    #[command(flatten)]
+    pub account: AccountNameFlag,
 }
 
-impl FlagRemoveCommand {
+impl MessageCopyCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
-        info!("executing flag remove command");
+        info!("executing message copy command");
 
-        let folder = &self.folder.name;
+        let from_folder = &self.source_folder.name;
+        let to_folder = &self.target_folder.name;
         let account = self.account.name.as_ref().map(String::as_str);
         let cache = self.cache.disable;
 
@@ -40,9 +44,9 @@ impl FlagRemoveCommand {
             config.clone().into_account_configs(account, cache)?;
         let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
 
-        let (ids, flags) = into_tuple(&self.args.ids_and_flags);
-        backend.remove_flags(folder, &ids, &flags).await?;
+        let ids = &self.envelopes.ids;
+        backend.copy_messages(from_folder, to_folder, ids).await?;
 
-        printer.print(format!("Flag(s) {flags} successfully removed!"))
+        printer.print("Message(s) successfully copied from {from_folder} to {to_folder}!")
     }
 }

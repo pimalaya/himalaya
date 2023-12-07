@@ -61,16 +61,6 @@ async fn main() -> Result<()> {
 //             )
 //             .await;
 //         }
-//         Some(message::args::Cmd::Copy(ids, to_folder)) => {
-//             let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
-//             let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
-//             return message::handlers::copy(&mut printer, &backend, &folder, to_folder, ids).await;
-//         }
-//         Some(message::args::Cmd::Delete(ids)) => {
-//             let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
-//             let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
-//             return message::handlers::delete(&mut printer, &backend, &folder, ids).await;
-//         }
 //         Some(message::args::Cmd::Forward(id, headers, body)) => {
 //             let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
 //             let backend = Backend::new(toml_account_config, account_config.clone(), true).await?;
@@ -82,26 +72,6 @@ async fn main() -> Result<()> {
 //                 id,
 //                 headers,
 //                 body,
-//             )
-//             .await;
-//         }
-//         Some(message::args::Cmd::Move(ids, to_folder)) => {
-//             let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
-//             let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
-//             return message::handlers::move_(&mut printer, &backend, &folder, to_folder, ids).await;
-//         }
-//         Some(message::args::Cmd::Read(ids, text_mime, raw, headers)) => {
-//             let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
-//             let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
-//             return message::handlers::read(
-//                 &account_config,
-//                 &mut printer,
-//                 &backend,
-//                 &folder,
-//                 ids,
-//                 text_mime,
-//                 raw,
-//                 headers,
 //             )
 //             .await;
 //         }

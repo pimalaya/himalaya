@@ -7,7 +7,7 @@ use crate::{
     backend::Backend,
     cache::arg::disable::DisableCacheFlag,
     config::TomlConfig,
-    flag::arg::ids_and_flags::{to_tuple, IdsAndFlagsArgs},
+    flag::arg::ids_and_flags::{into_tuple, IdsAndFlagsArgs},
     folder::arg::name::FolderNameArg,
     printer::Printer,
 };
@@ -40,7 +40,7 @@ impl FlagAddCommand {
             config.clone().into_account_configs(account, cache)?;
         let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
 
-        let (ids, flags) = to_tuple(&self.args.ids_and_flags);
+        let (ids, flags) = into_tuple(&self.args.ids_and_flags);
         backend.add_flags(folder, &ids, &flags).await?;
 
         printer.print(format!("Flag(s) {flags} successfully added!"))

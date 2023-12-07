@@ -1,3 +1,4 @@
+pub mod arg;
 pub mod command;
 pub mod config;
 pub mod flag;
