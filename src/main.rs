@@ -3,6 +3,7 @@ use clap::Parser;
 use env_logger::{Builder as LoggerBuilder, Env, DEFAULT_FILTER_ENV};
 use himalaya::{cli::Cli, config::TomlConfig, printer::StdoutPrinter};
 use log::{debug, warn};
+use std::env;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -16,6 +17,17 @@ async fn main() -> Result<()> {
         .parse_env(Env::new().filter_or(DEFAULT_FILTER_ENV, "warn"))
         .format_timestamp(None)
         .init();
+
+    let raw_args: Vec<String> = env::args().collect();
+    if raw_args.len() > 1 && raw_args[1].starts_with("mailto:") {
+        // TODO
+        // let cmd = MessageMailtoCommand::command()
+        //     .no_binary_name(true)
+        //     .try_get_matches_from([&raw_args[1]]);
+        // match cmd {
+        //     Ok(m) => m.exec
+        // }
+    }
 
     let cli = Cli::parse();
 
@@ -58,56 +70,6 @@ async fn main() -> Result<()> {
 //                 &backend,
 //                 &folder,
 //                 ids,
-//             )
-//             .await;
-//         }
-//         Some(message::args::Cmd::Forward(id, headers, body)) => {
-//             let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
-//             let backend = Backend::new(toml_account_config, account_config.clone(), true).await?;
-//             return message::handlers::forward(
-//                 &account_config,
-//                 &mut printer,
-//                 &backend,
-//                 &folder,
-//                 id,
-//                 headers,
-//                 body,
-//             )
-//             .await;
-//         }
-//         Some(message::args::Cmd::Reply(id, all, headers, body)) => {
-//             let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
-//             let backend = Backend::new(toml_account_config, account_config.clone(), true).await?;
-//             return message::handlers::reply(
-//                 &account_config,
-//                 &mut printer,
-//                 &backend,
-//                 &folder,
-//                 id,
-//                 all,
-//                 headers,
-//                 body,
-//             )
-//             .await;
-//         }
-//         Some(message::args::Cmd::Save(raw_email)) => {
-//             let folder = folder.unwrap_or(DEFAULT_INBOX_FOLDER);
-//             let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
-//             return message::handlers::save(&mut printer, &backend, &folder, raw_email).await;
-//         }
-//         Some(message::args::Cmd::Send(raw_email)) => {
-//             let backend = Backend::new(toml_account_config, account_config.clone(), true).await?;
-//             return message::handlers::send(&account_config, &mut printer, &backend, raw_email)
-//                 .await;
-//         }
-//         Some(message::args::Cmd::Write(headers, body)) => {
-//             let backend = Backend::new(toml_account_config, account_config.clone(), true).await?;
-//             return message::handlers::write(
-//                 &account_config,
-//                 &mut printer,
-//                 &backend,
-//                 headers,
-//                 body,
 //             )
 //             .await;
 //         }

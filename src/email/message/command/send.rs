@@ -57,7 +57,7 @@ impl MessageSendCommand {
                 .add_raw_message_with_flag(&folder, raw_email.as_bytes(), Flag::Seen)
                 .await?;
 
-            printer.print("Message successfully sent and saved to {folder}!")
+            printer.print(format!("Message successfully sent and saved to {folder}!"))
         } else {
             printer.print("Message successfully sent!")
         }

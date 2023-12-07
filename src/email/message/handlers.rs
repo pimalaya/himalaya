@@ -69,30 +69,6 @@ pub async fn attachments<P: Printer>(
     }
 }
 
-pub async fn forward<P: Printer>(
-    config: &AccountConfig,
-    printer: &mut P,
-    backend: &Backend,
-    folder: &str,
-    id: &str,
-    headers: Option<Vec<(&str, &str)>>,
-    body: Option<&str>,
-) -> Result<()> {
-    let tpl = backend
-        .get_messages(&folder, &[id])
-        .await?
-        .first()
-        .ok_or_else(|| anyhow!("cannot find email {}", id))?
-        .to_forward_tpl_builder(config)
-        .with_some_headers(headers)
-        .with_some_body(body)
-        .build()
-        .await?;
-    trace!("initial template: {tpl}");
-    editor::edit_tpl_with_editor(config, printer, backend, tpl).await?;
-    Ok(())
-}
-
 /// Parses and edits a message from a [mailto] URL string.
 ///
 /// [mailto]: https://en.wikipedia.org/wiki/Mailto
@@ -122,50 +98,4 @@ pub async fn mailto<P: Printer>(
         .await?;
 
     editor::edit_tpl_with_editor(config, printer, backend, tpl).await
-}
-
-pub async fn reply<P: Printer>(
-    config: &AccountConfig,
-    printer: &mut P,
-    backend: &Backend,
-    folder: &str,
-    id: &str,
-    all: bool,
-    headers: Option<Vec<(&str, &str)>>,
-    body: Option<&str>,
-) -> Result<()> {
-    let tpl = backend
-        .get_messages(folder, &[id])
-        .await?
-        .first()
-        .ok_or_else(|| anyhow!("cannot find email {}", id))?
-        .to_reply_tpl_builder(config)
-        .with_some_headers(headers)
-        .with_some_body(body)
-        .with_reply_all(all)
-        .build()
-        .await?;
-    trace!("initial template: {tpl}");
-    editor::edit_tpl_with_editor(config, printer, backend, tpl).await?;
-    backend
-        .add_flag(&folder, &Id::single(id), Flag::Answered)
-        .await?;
-    Ok(())
-}
-
-pub async fn write<P: Printer>(
-    config: &AccountConfig,
-    printer: &mut P,
-    backend: &Backend,
-    headers: Option<Vec<(&str, &str)>>,
-    body: Option<&str>,
-) -> Result<()> {
-    let tpl = Message::new_tpl_builder(config)
-        .with_some_headers(headers)
-        .with_some_body(body)
-        .build()
-        .await?;
-    trace!("initial template: {tpl}");
-    editor::edit_tpl_with_editor(config, printer, backend, tpl).await?;
-    Ok(())
 }

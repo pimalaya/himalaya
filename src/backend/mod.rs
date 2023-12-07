@@ -20,7 +20,7 @@ use email::{
         add::{imap::AddFlagsImap, maildir::AddFlagsMaildir},
         remove::{imap::RemoveFlagsImap, maildir::RemoveFlagsMaildir},
         set::{imap::SetFlagsImap, maildir::SetFlagsMaildir},
-        Flags,
+        Flag, Flags,
     },
     folder::{
         add::{imap::AddFolderImap, maildir::AddFolderMaildir},
@@ -799,6 +799,27 @@ impl Backend {
         let id = self.backend.add_raw_message(folder, email).await?;
         id_mapper.create_alias(&*id)?;
         Ok(id)
+    }
+
+    pub async fn add_flag(&self, folder: &str, ids: &[usize], flag: Flag) -> Result<()> {
+        let backend_kind = self.toml_account_config.add_flags_kind();
+        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
+        let ids = Id::multiple(id_mapper.get_ids(ids)?);
+        self.backend.add_flag(folder, &ids, flag).await
+    }
+
+    pub async fn set_flag(&self, folder: &str, ids: &[usize], flag: Flag) -> Result<()> {
+        let backend_kind = self.toml_account_config.set_flags_kind();
+        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
+        let ids = Id::multiple(id_mapper.get_ids(ids)?);
+        self.backend.set_flag(folder, &ids, flag).await
+    }
+
+    pub async fn remove_flag(&self, folder: &str, ids: &[usize], flag: Flag) -> Result<()> {
+        let backend_kind = self.toml_account_config.remove_flags_kind();
+        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
+        let ids = Id::multiple(id_mapper.get_ids(ids)?);
+        self.backend.remove_flag(folder, &ids, flag).await
     }
 }
 

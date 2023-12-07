@@ -1,23 +1,28 @@
 use anyhow::Result;
 use atty::Stream;
 use clap::Parser;
+use email::message::Message;
 use log::info;
 use std::io::{self, BufRead};
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::DisableCacheFlag,
-    config::TomlConfig, folder::arg::name::FolderNameArg, printer::Printer,
+    account::arg::name::AccountNameFlag,
+    backend::Backend,
+    cache::arg::disable::DisableCacheFlag,
+    config::TomlConfig,
+    message::arg::{body::BodyRawArg, header::HeaderRawArgs},
+    printer::Printer,
+    ui::editor,
 };
 
-/// Save a message to a folder
+/// Write a new message
 #[derive(Debug, Parser)]
-pub struct MessageSaveCommand {
+pub struct MessageWriteCommand {
     #[command(flatten)]
-    pub folder: FolderNameArg,
+    pub headers: HeaderRawArgs,
 
-    /// The raw message to save
-    #[arg(value_name = "MESSAGE", raw = true)]
-    pub raw: String,
+    #[command(flatten)]
+    pub body: BodyRawArg,
 
     #[command(flatten)]
     pub cache: DisableCacheFlag,
@@ -26,14 +31,12 @@ pub struct MessageSaveCommand {
     pub account: AccountNameFlag,
 }
 
-impl MessageSaveCommand {
+impl MessageWriteCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
-        info!("executing message save command");
+        info!("executing message write command");
 
-        let folder = &self.folder.name;
         let account = self.account.name.as_ref().map(String::as_str);
         let cache = self.cache.disable;
-        let raw_msg = &self.raw;
 
         let (toml_account_config, account_config) =
             config.clone().into_account_configs(account, cache)?;
@@ -41,8 +44,8 @@ impl MessageSaveCommand {
 
         let is_tty = atty::is(Stream::Stdin);
         let is_json = printer.is_json();
-        let raw_email = if is_tty || is_json {
-            raw_msg.replace("\r", "").replace("\n", "\r\n")
+        let body = if !self.body.is_empty() && (is_tty || is_json) {
+            self.body.raw()
         } else {
             io::stdin()
                 .lock()
@@ -52,10 +55,12 @@ impl MessageSaveCommand {
                 .join("\r\n")
         };
 
-        backend
-            .add_raw_message(folder, raw_email.as_bytes())
+        let tpl = Message::new_tpl_builder(&account_config)
+            .with_headers(self.headers.raw)
+            .with_body(body)
+            .build()
             .await?;
 
-        printer.print(format!("Message successfully saved to {folder}!"))
+        editor::edit_tpl_with_editor(&account_config, printer, &backend, tpl).await
     }
 }

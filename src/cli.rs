@@ -80,27 +80,27 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum HimalayaCommand {
-    /// Subcommand to manage accounts
+    /// Manage accounts
     #[command(subcommand)]
     #[command(alias = "accounts")]
     Account(AccountSubcommand),
 
-    /// Subcommand to manage folders
+    /// Manage folders
     #[command(subcommand)]
     #[command(alias = "folders")]
     Folder(FolderSubcommand),
 
-    /// Subcommand to manage envelopes
+    /// Manage envelopes
     #[command(subcommand)]
     #[command(alias = "envelopes")]
     Envelope(EnvelopeSubcommand),
 
-    /// Subcommand to manage flags
+    /// Manage flags
     #[command(subcommand)]
     #[command(alias = "flags")]
     Flag(FlagSubcommand),
 
-    /// Subcommand to manage messages
+    /// Manage messages
     #[command(subcommand)]
     #[command(alias = "messages", alias = "msgs", alias = "msg")]
     Message(MessageSubcommand),

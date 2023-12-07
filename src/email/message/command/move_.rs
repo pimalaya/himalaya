@@ -47,6 +47,8 @@ impl MessageMoveCommand {
         let ids = &self.envelopes.ids;
         backend.move_messages(from_folder, to_folder, ids).await?;
 
-        printer.print("Message(s) successfully moved from {from_folder} to {to_folder}!")
+        printer.print(format!(
+            "Message(s) successfully moved from {from_folder} to {to_folder}!"
+        ))
     }
 }

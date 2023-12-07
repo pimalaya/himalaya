@@ -47,6 +47,8 @@ impl MessageCopyCommand {
         let ids = &self.envelopes.ids;
         backend.copy_messages(from_folder, to_folder, ids).await?;
 
-        printer.print("Message(s) successfully copied from {from_folder} to {to_folder}!")
+        printer.print(format!(
+            "Message(s) successfully copied from {from_folder} to {to_folder}!"
+        ))
     }
 }
