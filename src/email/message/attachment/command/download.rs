@@ -36,7 +36,7 @@ impl AttachmentDownloadCommand {
 
         let (toml_account_config, account_config) =
             config.clone().into_account_configs(account, cache)?;
-        let backend = Backend::new(toml_account_config, account_config.clone(), true).await?;
+        let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
 
         let ids = &self.envelopes.ids;
         let emails = backend.get_messages(&folder, ids).await?;

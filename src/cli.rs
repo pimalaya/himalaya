@@ -10,7 +10,10 @@ use crate::{
     flag::command::FlagSubcommand,
     folder::command::FolderSubcommand,
     manual::command::ManualGenerateCommand,
-    message::{attachment::command::AttachmentSubcommand, command::MessageSubcommand},
+    message::{
+        attachment::command::AttachmentSubcommand, command::MessageSubcommand,
+        template::command::TemplateSubcommand,
+    },
     output::{ColorFmt, OutputFmt},
     printer::Printer,
 };
@@ -105,6 +108,11 @@ pub enum HimalayaCommand {
     #[command(alias = "messages", alias = "msgs", alias = "msg")]
     Message(MessageSubcommand),
 
+    /// Manage templates
+    #[command(subcommand)]
+    #[command(alias = "templates", alias = "tpls", alias = "tpl")]
+    Template(TemplateSubcommand),
+
     /// Manage attachments
     #[command(subcommand)]
     Attachment(AttachmentSubcommand),
@@ -128,6 +136,7 @@ impl HimalayaCommand {
             Self::Envelope(cmd) => cmd.execute(printer, config).await,
             Self::Flag(cmd) => cmd.execute(printer, config).await,
             Self::Message(cmd) => cmd.execute(printer, config).await,
+            Self::Template(cmd) => cmd.execute(printer, config).await,
             Self::Attachment(cmd) => cmd.execute(printer, config).await,
             Self::Manual(cmd) => cmd.execute(printer).await,
             Self::Completion(cmd) => cmd.execute(printer).await,

@@ -1,6 +1,5 @@
-use std::ops::Deref;
-
 use clap::Parser;
+use std::ops::Deref;
 
 /// The raw message body argument parser
 #[derive(Debug, Parser)]
