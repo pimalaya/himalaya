@@ -1470,7 +1470,6 @@ version = "0.9.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "atty",
  "chrono",
  "clap",
  "clap_complete",

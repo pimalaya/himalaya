@@ -1,5 +1,4 @@
 use anyhow::{anyhow, Result};
-use atty::Stream;
 use email::{
     account::AccountConfig,
     backend::Backend,
@@ -7,7 +6,7 @@ use email::{
     sender::Sender,
 };
 use mml::MmlCompilerBuilder;
-use std::io::{stdin, BufRead};
+use std::io::{stdin, BufRead, IsTerminal};
 
 use crate::{printer::Printer, IdMapper};
 
@@ -77,7 +76,7 @@ pub async fn save<P: Printer>(
     folder: &str,
     tpl: String,
 ) -> Result<()> {
-    let tpl = if atty::is(Stream::Stdin) || printer.is_json() {
+    let tpl = if stdin().is_terminal() || printer.is_json() {
         tpl.replace("\r", "")
     } else {
         stdin()
@@ -110,7 +109,7 @@ pub async fn send<P: Printer>(
 ) -> Result<()> {
     let folder = config.sent_folder_alias()?;
 
-    let tpl = if atty::is(Stream::Stdin) || printer.is_json() {
+    let tpl = if stdin().is_terminal() || printer.is_json() {
         tpl.replace("\r", "")
     } else {
         stdin()

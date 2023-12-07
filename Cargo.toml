@@ -38,7 +38,6 @@ tempfile = { version = "3.3" }
 [dependencies]
 
 anyhow = { version = "1.0" }
-atty = { version = "0.2" }
 chrono = { version = "0.4.24" }
 clap = { version = "4.0" }
 clap_complete = { version = "4.0" }

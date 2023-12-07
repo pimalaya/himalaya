@@ -1,5 +1,4 @@
 use anyhow::{anyhow, Context, Result};
-use atty::Stream;
 use email::{
     account::AccountConfig,
     backend::Backend,
@@ -9,7 +8,7 @@ use email::{
 use log::{debug, trace};
 use std::{
     fs,
-    io::{self, BufRead},
+    io::{self, stdin, BufRead, IsTerminal},
 };
 use url::Url;
 use uuid::Uuid;
@@ -292,7 +291,7 @@ pub async fn save<P: Printer>(
     folder: &str,
     raw_email: String,
 ) -> Result<()> {
-    let is_tty = atty::is(Stream::Stdin);
+    let is_tty = stdin().is_terminal();
     let is_json = printer.is_json();
     let raw_email = if is_tty || is_json {
         raw_email.replace("\r", "").replace("\n", "\r\n")
@@ -376,7 +375,7 @@ pub async fn send<P: Printer>(
     raw_email: String,
 ) -> Result<()> {
     let folder = config.sent_folder_alias()?;
-    let is_tty = atty::is(Stream::Stdin);
+    let is_tty = stdin().is_terminal();
     let is_json = printer.is_json();
     let raw_email = if is_tty || is_json {
         raw_email.replace("\r", "").replace("\n", "\r\n")
