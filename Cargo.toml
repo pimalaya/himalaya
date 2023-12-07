@@ -30,119 +30,49 @@ pgp-gpg = ["pgp", "email-lib/pgp-gpg"]
 pgp-native = ["pgp", "email-lib/pgp-native"]
 
 # dev dependencies
+[dev-dependencies]
+async-trait = { version = "0.1" }
 
-[dev-dependencies.async-trait]
-version = "0.1"
+tempfile = { version = "3.3" }
 
-[dev-dependencies.tempfile]
-version = "3.3"
+[dependencies]
 
-# dependencies
-
-[dependencies.anyhow]
-version = "1.0"
-
-[dependencies.atty]
-version = "0.2"
-
-[dependencies.chrono]
-version = "0.4.24"
-
-[dependencies.clap]
-version = "4.0"
-
-[dependencies.clap_complete]
-version = "4.0"
-
-[dependencies.clap_mangen]
-version = "0.2"
-
-[dependencies.console]
-version = "0.15.2"
-
-[dependencies.dialoguer]
-version = "0.10.2"
-
-[dependencies.dirs]
-version = "4.0.0"
-
-[dependencies.email_address]
-version = "0.2.4"
-
-[dependencies.env_logger]
-version = "0.8"
-
-[dependencies.erased-serde]
-version = "0.3"
-
-[dependencies.indicatif]
-version = "0.17"
-
-[dependencies.log]
-version = "0.4"
-
-[dependencies.md5]
-version = "0.7.0"
-
-[dependencies.once_cell]
-version = "1.16.0"
-
-[dependencies.email-lib]
-version = "=0.15.3"
-default-features = false
-
-[dependencies.keyring-lib]
-version = "=0.1.0"
-
-[dependencies.oauth-lib]
-version = "=0.1.0"
-
-[dependencies.process-lib]
-version = "=0.1.0"
-
-[dependencies.mml-lib]
-version = "=0.5.0"
-default-features = false
-
-[dependencies.secret-lib]
-version = "=0.1.0"
-
-[dependencies.serde]
-version = "1.0"
-features = ["derive"]
-
-[dependencies.serde_json]
-version = "1.0"
-
-[dependencies.shellexpand-utils]
-version = "=0.1.0"
-
-[dependencies.termcolor]
-version = "1.1"
-
-[dependencies.terminal_size]
-version = "0.1"
-
-[dependencies.tokio]
-version = "1.23"
-default-features = false
-features = ["macros", "rt-multi-thread"]
-
-[dependencies.toml]
-version = "0.7.4"
-
-[dependencies.toml_edit]
-version = "0.19.8"
-
-[dependencies.unicode-width]
-version = "0.1"
-
-[dependencies.url]
-version = "2.2"
-
-[dependencies.uuid]
-version = "0.8"
-features = ["v4"]
+anyhow = { version = "1.0" }
+atty = { version = "0.2" }
+chrono = { version = "0.4.24" }
+clap = { version = "4.0" }
+clap_complete = { version = "4.0" }
+clap_mangen = { version = "0.2" }
+console = { version = "0.15.2" }
+dialoguer = { version = "0.10.2" }
+dirs = { version = "4.0.0" }
+email_address = { version = "0.2.4" }
+env_logger = { version = "0.8" }
+erased-serde = { version = "0.3" }
+indicatif = { version = "0.17" }
+log = { version = "0.4" }
+md5 = { version = "0.7.0" }
+mml-lib = { version = "=0.5.0", default-features = false }
+once_cell = { version = "1.16.0" }
+email-lib = { version = "=0.15.3", default-features = false }
+keyring-lib = { version = "=0.1.0" }
+oauth-lib = { version = "=0.1.0" }
+process-lib = { version = "=0.1.0" }
+secret-lib = { version = "=0.1.0" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0" }
+shellexpand-utils = { version = "=0.1.0" }
+termcolor = { version = "1.1" }
+terminal_size = { version = "0.1" }
+tokio = { version = "1.23", default-features = false, features = [
+  "macros",
+  "rt-multi-thread",
+] }
+toml = { version = "0.7.4" }
+toml_edit = { version = "0.19.8" }
+unicode-width = { version = "0.1" }
+url = { version = "2.2" }
+uuid = { version = "0.8", features = ["v4"] }
 
 [target.'cfg(target_env = "musl")'.dependencies.rusqlite]
 version = "0.29"
