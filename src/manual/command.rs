@@ -7,10 +7,15 @@ use std::{fs, path::PathBuf};
 
 use crate::{cli::Cli, printer::Printer};
 
-/// Generate manual pages to a directory
+/// Generate manual pages to a directory.
+///
+/// This command allows you to generate manual pages (following the
+/// man page format) to the given directory. If the directory does not
+/// exist, it will be created. Any existing man pages will be
+/// overriden.
 #[derive(Debug, Parser)]
 pub struct ManualGenerateCommand {
-    /// Directory where man files should be generated in
+    /// Directory where man files should be generated in.
     #[arg(value_parser = dir_parser)]
     pub dir: PathBuf,
 }

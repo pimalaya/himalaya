@@ -3,12 +3,17 @@ use clap::Parser;
 use log::info;
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::DisableCacheFlag,
+    account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::CacheDisableFlag,
     config::TomlConfig, envelope::arg::ids::EnvelopeIdsArgs, folder::arg::name::FolderNameArg,
     printer::Printer,
 };
 
-/// Delete a message from a folder
+/// Mark as deleted a message from a folder.
+///
+/// This command does not really delete the message: if the given
+/// folder points to the trash folder, it adds the "deleted" flag to
+/// its envelope, otherwise it moves it to the trash folder. Only the
+/// expunge folder command truly deletes messages.
 #[derive(Debug, Parser)]
 pub struct MessageDeleteCommand {
     #[command(flatten)]
@@ -18,7 +23,7 @@ pub struct MessageDeleteCommand {
     pub envelopes: EnvelopeIdsArgs,
 
     #[command(flatten)]
-    pub cache: DisableCacheFlag,
+    pub cache: CacheDisableFlag,
 
     #[command(flatten)]
     pub account: AccountNameFlag,

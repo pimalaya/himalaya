@@ -7,10 +7,14 @@ use crate::{config::TomlConfig, printer::Printer};
 
 use self::list::EnvelopeListCommand;
 
-/// Subcommand to manage envelopes
+/// Manage envelopes.
+///
+/// An envelope is a small representation of a message. It contains an
+/// identifier (given by the backend), some flags as well as few
+/// headers from the message itself. This subcommand allows you to
+/// manage them.
 #[derive(Debug, Subcommand)]
 pub enum EnvelopeSubcommand {
-    /// List all envelopes from a folder
     #[command(alias = "lst")]
     List(EnvelopeListCommand),
 }

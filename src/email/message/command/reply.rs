@@ -8,16 +8,21 @@ use std::io::{self, BufRead};
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::Backend,
-    cache::arg::disable::DisableCacheFlag,
+    cache::arg::disable::CacheDisableFlag,
     config::TomlConfig,
     envelope::arg::ids::EnvelopeIdArg,
     folder::arg::name::FolderNameArg,
-    message::arg::{body::BodyRawArg, header::HeaderRawArgs, reply::MessageReplyAllArg},
+    message::arg::{body::MessageRawBodyArg, header::HeaderRawArgs, reply::MessageReplyAllArg},
     printer::Printer,
     ui::editor,
 };
 
-/// Reply a new message
+/// Reply to a message.
+///
+/// This command allows you to reply to the given message using the
+/// editor defined in your environment variable $EDITOR. When the
+/// edition process finishes, you can choose between saving or sending
+/// the final message.
 #[derive(Debug, Parser)]
 pub struct MessageReplyCommand {
     #[command(flatten)]
@@ -33,10 +38,10 @@ pub struct MessageReplyCommand {
     pub headers: HeaderRawArgs,
 
     #[command(flatten)]
-    pub body: BodyRawArg,
+    pub body: MessageRawBodyArg,
 
     #[command(flatten)]
-    pub cache: DisableCacheFlag,
+    pub cache: CacheDisableFlag,
 
     #[command(flatten)]
     pub account: AccountNameFlag,

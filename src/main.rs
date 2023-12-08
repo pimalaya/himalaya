@@ -1,7 +1,10 @@
 use anyhow::Result;
 use clap::Parser;
 use env_logger::{Builder as LoggerBuilder, Env, DEFAULT_FILTER_ENV};
-use himalaya::{cli::Cli, config::TomlConfig, printer::StdoutPrinter};
+use himalaya::{
+    cli::Cli, config::TomlConfig, message::command::mailto::MessageMailtoCommand,
+    printer::StdoutPrinter,
+};
 use log::{debug, warn};
 use std::env;
 
@@ -9,7 +12,7 @@ use std::env;
 async fn main() -> Result<()> {
     #[cfg(not(target_os = "windows"))]
     if let Err((_, err)) = coredump::register_panic_handler() {
-        warn!("cannot register custom panic handler: {err}");
+        warn!("cannot register coredump panic handler: {err}");
         debug!("{err:?}");
     }
 
@@ -18,15 +21,15 @@ async fn main() -> Result<()> {
         .format_timestamp(None)
         .init();
 
-    let raw_args: Vec<String> = env::args().collect();
-    if raw_args.len() > 1 && raw_args[1].starts_with("mailto:") {
-        // TODO
-        // let cmd = MessageMailtoCommand::command()
-        //     .no_binary_name(true)
-        //     .try_get_matches_from([&raw_args[1]]);
-        // match cmd {
-        //     Ok(m) => m.exec
-        // }
+    // if the first argument starts by "mailto:", execute straight the
+    // mailto message command
+    if let Some(ref url) = env::args().nth(1).filter(|arg| arg.starts_with("mailto:")) {
+        let mut printer = StdoutPrinter::default();
+        let config = TomlConfig::from_default_paths().await?;
+
+        return MessageMailtoCommand::new(url)?
+            .execute(&mut printer, &config)
+            .await;
     }
 
     let cli = Cli::parse();

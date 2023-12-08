@@ -15,26 +15,32 @@ use crate::{
     printer::Printer,
 };
 
-/// Configure the given account
+/// Configure an account.
+///
+/// This command is mostly used to define or reset passwords managed
+/// by your global keyring. If you do not use the keyring system, you
+/// can skip this command.
 #[derive(Debug, Parser)]
 pub struct AccountConfigureCommand {
     #[command(flatten)]
     pub account: AccountNameArg,
 
-    /// Force the account to reconfigure, even if it has already been
-    /// configured
+    /// Reset keyring passwords.
+    ///
+    /// This argument will force passwords to be prompted again, then
+    /// saved to your global keyring.
     #[arg(long, short)]
-    pub force: bool,
+    pub reset: bool,
 }
 
 impl AccountConfigureCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing account configure command");
 
-        let (_, account_config) =
-            config.into_toml_account_config(Some(self.account.name.as_str()))?;
+        let account = &self.account.name;
+        let (_, account_config) = config.into_toml_account_config(Some(account))?;
 
-        if self.force {
+        if self.reset {
             #[cfg(feature = "imap")]
             if let Some(ref config) = account_config.imap {
                 let reset = match &config.auth {
@@ -102,11 +108,8 @@ impl AccountConfigureCommand {
         }
 
         printer.print(format!(
-            "Account {} successfully {}configured!",
-            self.account.name,
-            if self.force { "re" } else { "" }
-        ))?;
-
-        Ok(())
+            "Account {account} successfully {}configured!",
+            if self.reset { "re" } else { "" }
+        ))
     }
 }

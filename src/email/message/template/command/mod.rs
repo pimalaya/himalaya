@@ -14,28 +14,31 @@ use self::{
     send::TemplateSendCommand, write::TemplateWriteCommand,
 };
 
-/// Subcommand to manage templates
+/// Manage templates.
+///
+/// A template is an editable version of a message (headers +
+/// body). It uses a specific language called MML that allows you to
+/// attach file or encrypt content. This subcommand allows you manage
+/// them.
+///
+/// You can learn more about MML at
+/// <https://crates.io/crates/mml-lib>.
 #[derive(Debug, Subcommand)]
 pub enum TemplateSubcommand {
-    /// Write a new template
-    #[command(alias = "new", alias = "compose")]
+    #[command(alias = "create", alias = "new", alias = "compose")]
     Write(TemplateWriteCommand),
 
-    /// Reply to a template
-    #[command()]
+    #[command(arg_required_else_help = true)]
     Reply(TemplateReplyCommand),
 
-    /// Generate a template for forwarding an email
+    #[command(arg_required_else_help = true)]
     #[command(alias = "fwd")]
     Forward(TemplateForwardCommand),
 
-    /// Save a template to a folder
-    #[command(arg_required_else_help = true)]
-    #[command(alias = "add", alias = "create")]
+    #[command(alias = "add")]
     Save(TemplateSaveCommand),
 
-    /// Send a template
-    #[command(arg_required_else_help = true)]
+    #[command()]
     Send(TemplateSendCommand),
 }
 

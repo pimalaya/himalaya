@@ -6,10 +6,14 @@ use std::io;
 
 use crate::{cli::Cli, printer::Printer};
 
-/// Print completion script for a shell to stdout
+/// Print completion script for a shell to stdout.
+///
+/// This command allows you to generate completion script for a given
+/// shell. The script is printed to the standard output. If you want
+/// to write it to a file, just use unix redirection.
 #[derive(Debug, Parser)]
 pub struct CompletionGenerateCommand {
-    /// Shell for which completion script should be generated for
+    /// Shell for which completion script should be generated for.
     #[arg(value_parser = value_parser!(Shell))]
     pub shell: Shell,
 }

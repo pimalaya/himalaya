@@ -4,12 +4,14 @@ use log::info;
 use mml::message::FilterParts;
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::DisableCacheFlag,
+    account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::CacheDisableFlag,
     config::TomlConfig, envelope::arg::ids::EnvelopeIdsArgs, folder::arg::name::FolderNameArg,
     printer::Printer,
 };
 
-/// Read a message from a folder
+/// Read a message.
+///
+/// This command allows you to read a message.
 #[derive(Debug, Parser)]
 pub struct MessageReadCommand {
     #[command(flatten)]
@@ -18,18 +20,18 @@ pub struct MessageReadCommand {
     #[command(flatten)]
     pub envelopes: EnvelopeIdsArgs,
 
-    /// Read the raw version of the message
+    /// Read the raw version of the given message.
     ///
-    /// The raw message represents the message as it is on the
-    /// backend, unedited: not decoded nor decrypted. This is useful
-    /// for debugging faulty messages, but also for
+    /// The raw message represents the headers and the body as it is
+    /// on the backend, unedited: not decoded nor decrypted. This is
+    /// useful for debugging faulty messages, but also for
     /// saving/sending/transfering messages.
     #[arg(long, short)]
     #[arg(conflicts_with = "no_headers")]
     #[arg(conflicts_with = "headers")]
     pub raw: bool,
 
-    /// Read only body of text/html parts
+    /// Read only body of text/html parts.
     ///
     /// This argument is useful when you need to read the HTML version
     /// of a message. Combined with --no-headers, you can write it to
@@ -38,7 +40,7 @@ pub struct MessageReadCommand {
     #[arg(conflicts_with = "raw")]
     pub html: bool,
 
-    /// Read only the body of the message
+    /// Read only the body of the message.
     ///
     /// All headers will be removed from the message.
     #[arg(long)]
@@ -47,7 +49,7 @@ pub struct MessageReadCommand {
     pub no_headers: bool,
 
     /// List of headers that should be visible at the top of the
-    /// message
+    /// message.
     ///
     /// If a given header is not found in the message, it will not be
     /// visible. If no header is given, defaults to the one set up in
@@ -58,7 +60,7 @@ pub struct MessageReadCommand {
     pub headers: Vec<String>,
 
     #[command(flatten)]
-    pub cache: DisableCacheFlag,
+    pub cache: CacheDisableFlag,
 
     #[command(flatten)]
     pub account: AccountNameFlag,

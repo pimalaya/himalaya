@@ -7,19 +7,23 @@ use mml::MmlCompilerBuilder;
 use std::io::{self, BufRead};
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::DisableCacheFlag,
-    config::TomlConfig, printer::Printer,
+    account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::CacheDisableFlag,
+    config::TomlConfig, email::template::arg::body::TemplateRawBodyArg, printer::Printer,
 };
 
-/// Send a template
+/// Send a template.
+///
+/// This command allows you to send a template and save a copy to the
+/// sent folder. The template is compiled into a MIME message before
+/// being sent. If you want to send a raw message, use the message
+/// send command instead.
 #[derive(Debug, Parser)]
 pub struct TemplateSendCommand {
-    /// The raw template to save
-    #[arg(raw = true, value_delimiter = ' ')]
-    pub raw: Vec<String>,
+    #[command(flatten)]
+    pub body: TemplateRawBodyArg,
 
     #[command(flatten)]
-    pub cache: DisableCacheFlag,
+    pub cache: CacheDisableFlag,
 
     #[command(flatten)]
     pub account: AccountNameFlag,
@@ -40,7 +44,7 @@ impl TemplateSendCommand {
         let is_tty = atty::is(Stream::Stdin);
         let is_json = printer.is_json();
         let tpl = if is_tty || is_json {
-            self.raw.join(" ").replace("\r", "")
+            self.body.raw()
         } else {
             io::stdin()
                 .lock()

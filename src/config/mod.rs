@@ -121,10 +121,7 @@ impl TomlConfig {
         match path.map(Into::into) {
             Some(ref path) if path.exists() => Self::from_path(path),
             Some(path) => Self::from_wizard(path).await,
-            None => match Self::first_valid_default_path() {
-                Some(path) => Self::from_path(&path),
-                None => Self::from_wizard(Self::default_path()?).await,
-            },
+            None => Self::from_default_paths().await,
         }
     }
 

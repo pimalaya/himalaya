@@ -3,21 +3,24 @@ use clap::Parser;
 use log::info;
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::DisableCacheFlag,
+    account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::CacheDisableFlag,
     config::TomlConfig, folder::arg::name::FolderNameArg, printer::Printer,
 };
 
-/// Create a new folder
+/// Create a new folder.
+///
+/// This command allows you to create a new folder using the given
+/// name.
 #[derive(Debug, Parser)]
 pub struct FolderCreateCommand {
     #[command(flatten)]
     pub folder: FolderNameArg,
 
     #[command(flatten)]
-    pub account: AccountNameFlag,
+    pub cache: CacheDisableFlag,
 
     #[command(flatten)]
-    pub cache: DisableCacheFlag,
+    pub account: AccountNameFlag,
 }
 
 impl FolderCreateCommand {

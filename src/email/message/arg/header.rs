@@ -1,9 +1,9 @@
 use clap::Parser;
 
-/// The envelope id argument parser
+/// The envelope id argument parser.
 #[derive(Debug, Parser)]
 pub struct HeaderRawArgs {
-    /// Prefill the template with custom headers
+    /// Prefill the template with custom headers.
     ///
     /// A raw header should follow the pattern KEY:VAL.
     #[arg(long = "header", short = 'H', required = false)]

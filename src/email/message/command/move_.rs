@@ -5,14 +5,14 @@ use log::info;
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::Backend,
-    cache::arg::disable::DisableCacheFlag,
+    cache::arg::disable::CacheDisableFlag,
     config::TomlConfig,
     envelope::arg::ids::EnvelopeIdsArgs,
     folder::arg::name::{SourceFolderNameArg, TargetFolderNameArg},
     printer::Printer,
 };
 
-/// Move a message from a source folder to a target folder
+/// Move a message from a source folder to a target folder.
 #[derive(Debug, Parser)]
 pub struct MessageMoveCommand {
     #[command(flatten)]
@@ -25,7 +25,7 @@ pub struct MessageMoveCommand {
     pub envelopes: EnvelopeIdsArgs,
 
     #[command(flatten)]
-    pub cache: DisableCacheFlag,
+    pub cache: CacheDisableFlag,
 
     #[command(flatten)]
     pub account: AccountNameFlag,

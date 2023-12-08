@@ -5,24 +5,24 @@ use log::info;
 use std::process;
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::DisableCacheFlag,
+    account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::CacheDisableFlag,
     config::TomlConfig, folder::arg::name::FolderNameArg, printer::Printer,
 };
 
-/// Purge a folder
+/// Purge a folder.
 ///
-/// All emails from a given folder are definitely deleted. The purged
-/// folder will remain empty after executing of the command.
+/// All emails from the given folder are definitely deleted. The
+/// purged folder will remain empty after execution of the command.
 #[derive(Debug, Parser)]
 pub struct FolderPurgeCommand {
     #[command(flatten)]
     pub folder: FolderNameArg,
 
     #[command(flatten)]
-    pub account: AccountNameFlag,
+    pub cache: CacheDisableFlag,
 
     #[command(flatten)]
-    pub cache: DisableCacheFlag,
+    pub account: AccountNameFlag,
 }
 
 impl FolderPurgeCommand {

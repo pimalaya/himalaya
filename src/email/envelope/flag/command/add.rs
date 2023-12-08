@@ -5,14 +5,17 @@ use log::info;
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::Backend,
-    cache::arg::disable::DisableCacheFlag,
+    cache::arg::disable::CacheDisableFlag,
     config::TomlConfig,
     flag::arg::ids_and_flags::{into_tuple, IdsAndFlagsArgs},
     folder::arg::name::FolderNameArg,
     printer::Printer,
 };
 
-/// Add flag(s) to an envelope
+/// Add flag(s) to an envelope.
+///
+/// This command allows you to attach the given flag(s) to the given
+/// envelope(s).
 #[derive(Debug, Parser)]
 pub struct FlagAddCommand {
     #[command(flatten)]
@@ -22,10 +25,10 @@ pub struct FlagAddCommand {
     pub args: IdsAndFlagsArgs,
 
     #[command(flatten)]
-    pub account: AccountNameFlag,
+    pub cache: CacheDisableFlag,
 
     #[command(flatten)]
-    pub cache: DisableCacheFlag,
+    pub account: AccountNameFlag,
 }
 
 impl FlagAddCommand {

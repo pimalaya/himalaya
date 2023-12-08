@@ -19,14 +19,8 @@ use crate::{
 };
 
 #[derive(Parser, Debug)]
-#[command(
-    name = "himalaya",
-    author,
-    version,
-    about,
-    propagate_version = true,
-    infer_subcommands = true
-)]
+#[command(name = "himalaya", author, version, about)]
+#[command(propagate_version = true, infer_subcommands = true)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: HimalayaCommand,
@@ -83,46 +77,38 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum HimalayaCommand {
-    /// Manage accounts
     #[command(subcommand)]
     #[command(alias = "accounts")]
     Account(AccountSubcommand),
 
-    /// Manage folders
     #[command(subcommand)]
     #[command(alias = "folders")]
     Folder(FolderSubcommand),
 
-    /// Manage envelopes
     #[command(subcommand)]
     #[command(alias = "envelopes")]
     Envelope(EnvelopeSubcommand),
 
-    /// Manage flags
     #[command(subcommand)]
     #[command(alias = "flags")]
     Flag(FlagSubcommand),
 
-    /// Manage messages
     #[command(subcommand)]
     #[command(alias = "messages", alias = "msgs", alias = "msg")]
     Message(MessageSubcommand),
 
-    /// Manage templates
+    #[command(subcommand)]
+    #[command(alias = "attachments")]
+    Attachment(AttachmentSubcommand),
+
     #[command(subcommand)]
     #[command(alias = "templates", alias = "tpls", alias = "tpl")]
     Template(TemplateSubcommand),
 
-    /// Manage attachments
-    #[command(subcommand)]
-    Attachment(AttachmentSubcommand),
-
-    /// Generate manual pages to a directory
     #[command(arg_required_else_help = true)]
     #[command(alias = "manuals", alias = "mans")]
     Manual(ManualGenerateCommand),
 
-    /// Print completion script for a shell to stdout
     #[command(arg_required_else_help = true)]
     #[command(alias = "completions")]
     Completion(CompletionGenerateCommand),
@@ -136,8 +122,8 @@ impl HimalayaCommand {
             Self::Envelope(cmd) => cmd.execute(printer, config).await,
             Self::Flag(cmd) => cmd.execute(printer, config).await,
             Self::Message(cmd) => cmd.execute(printer, config).await,
-            Self::Template(cmd) => cmd.execute(printer, config).await,
             Self::Attachment(cmd) => cmd.execute(printer, config).await,
+            Self::Template(cmd) => cmd.execute(printer, config).await,
             Self::Manual(cmd) => cmd.execute(printer).await,
             Self::Completion(cmd) => cmd.execute(printer).await,
         }

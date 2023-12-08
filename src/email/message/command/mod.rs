@@ -21,47 +21,42 @@ use self::{
     write::MessageWriteCommand,
 };
 
-/// Subcommand to manage messages
+/// Manage messages.
+///
+/// A message is the content of an email. It is composed of headers
+/// (located at the top of the message) and a body (located at the
+/// bottom of the message). Both are separated by two new lines. This
+/// subcommand allows you to manage them.
 #[derive(Debug, Subcommand)]
 pub enum MessageSubcommand {
-    /// Read a message
     #[command(arg_required_else_help = true)]
     Read(MessageReadCommand),
 
-    /// Write a new message
-    #[command(alias = "new", alias = "compose")]
+    #[command(alias = "add", alias = "create", alias = "new", alias = "compose")]
     Write(MessageWriteCommand),
 
-    /// Reply to a message
     #[command()]
     Reply(MessageReplyCommand),
 
-    /// Forward a message
     #[command(alias = "fwd")]
     Forward(MessageForwardCommand),
 
-    /// Parse and edit a message from a mailto URL string
     #[command()]
     Mailto(MessageMailtoCommand),
 
-    /// Save a message to a folder
     #[command(arg_required_else_help = true)]
     #[command(alias = "add", alias = "create")]
     Save(MessageSaveCommand),
 
-    /// Send a message
     #[command(arg_required_else_help = true)]
     Send(MessageSendCommand),
 
-    /// Copy a message from a source folder to a target folder
     #[command(arg_required_else_help = true)]
     Copy(MessageCopyCommand),
 
-    /// Move a message from a source folder to a target folder
     #[command(arg_required_else_help = true)]
     Move(MessageMoveCommand),
 
-    /// Delete a message from a folder
     #[command(arg_required_else_help = true)]
     Delete(MessageDeleteCommand),
 }

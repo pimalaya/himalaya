@@ -6,14 +6,17 @@ use crate::{
     account::Accounts,
     config::TomlConfig,
     printer::{PrintTableOpts, Printer},
-    ui::arg::max_width::MaxTableWidthFlag,
+    ui::arg::max_width::TableMaxWidthFlag,
 };
 
-/// List all accounts
+/// List all accounts.
+///
+/// This command lists all accounts defined in your TOML configuration
+/// file.
 #[derive(Debug, Parser)]
 pub struct AccountListCommand {
     #[command(flatten)]
-    pub table: MaxTableWidthFlag,
+    pub table: TableMaxWidthFlag,
 }
 
 impl AccountListCommand {
@@ -31,9 +34,7 @@ impl AccountListCommand {
                     .unwrap_or(&Default::default()),
                 max_width: self.table.max_width,
             },
-        )?;
-
-        Ok(())
+        )
     }
 }
 

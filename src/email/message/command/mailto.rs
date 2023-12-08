@@ -1,20 +1,30 @@
 use anyhow::Result;
 use clap::Parser;
-use log::info;
+use log::{debug, info};
 use mail_builder::MessageBuilder;
 use url::Url;
 
 use crate::{backend::Backend, config::TomlConfig, printer::Printer, ui::editor};
 
-/// Parse and edit a message from a mailto URL string
+/// Parse and edit a message from a mailto URL string.
+///
+/// This command allows you to edit a message from the mailto format
+/// using the editor defined in your environment variable
+/// $EDITOR. When the edition process finishes, you can choose between
+/// saving or sending the final message.
 #[derive(Debug, Parser)]
 pub struct MessageMailtoCommand {
-    /// The mailto url
+    /// The mailto url.
     #[arg()]
     pub url: Url,
 }
 
 impl MessageMailtoCommand {
+    pub fn new(url: &str) -> Result<Self> {
+        let url = Url::parse(url)?;
+        Ok(Self { url })
+    }
+
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing message mailto command");
 
@@ -23,14 +33,24 @@ impl MessageMailtoCommand {
         let backend = Backend::new(toml_account_config, account_config.clone(), true).await?;
 
         let mut builder = MessageBuilder::new().to(self.url.path());
+        let mut body = String::new();
 
         for (key, val) in self.url.query_pairs() {
             match key.to_lowercase().as_bytes() {
                 b"cc" => builder = builder.cc(val.to_string()),
                 b"bcc" => builder = builder.bcc(val.to_string()),
                 b"subject" => builder = builder.subject(val),
-                b"body" => builder = builder.text_body(val),
+                b"body" => body += &val,
                 _ => (),
+            }
+        }
+
+        match account_config.signature() {
+            Ok(Some(ref signature)) => builder = builder.text_body(body + "\n\n" + signature),
+            Ok(None) => builder = builder.text_body(body),
+            Err(err) => {
+                debug!("cannot add signature to mailto message, skipping it: {err}");
+                debug!("{err:?}");
             }
         }
 

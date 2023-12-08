@@ -5,35 +5,43 @@ use log::info;
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::Backend,
-    cache::arg::disable::DisableCacheFlag,
+    cache::arg::disable::CacheDisableFlag,
     config::TomlConfig,
     folder::arg::name::FolderNameOptionalArg,
     printer::{PrintTableOpts, Printer},
-    ui::arg::max_width::MaxTableWidthFlag,
+    ui::arg::max_width::TableMaxWidthFlag,
 };
 
-/// List all envelopes from a folder
+/// List all envelopes.
+///
+/// This command allows you to list all envelopes included in the
+/// given folder.
 #[derive(Debug, Parser)]
 pub struct EnvelopeListCommand {
     #[command(flatten)]
     pub folder: FolderNameOptionalArg,
 
-    /// The page number
+    /// The page number.
+    ///
+    /// The page number starts from 1 (which is the default). Giving a
+    /// page number to big will result in a out of bound error.
     #[arg(long, short, value_name = "NUMBER", default_value = "1")]
     pub page: usize,
 
-    /// The page size
+    /// The page size.
+    ///
+    /// Determine the amount of envelopes a page should contain.
     #[arg(long, short = 's', value_name = "NUMBER")]
     pub page_size: Option<usize>,
 
     #[command(flatten)]
-    pub table: MaxTableWidthFlag,
+    pub table: TableMaxWidthFlag,
+
+    #[command(flatten)]
+    pub cache: CacheDisableFlag,
 
     #[command(flatten)]
     pub account: AccountNameFlag,
-
-    #[command(flatten)]
-    pub cache: DisableCacheFlag,
 }
 
 impl EnvelopeListCommand {

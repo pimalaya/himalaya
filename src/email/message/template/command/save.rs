@@ -6,22 +6,27 @@ use mml::MmlCompilerBuilder;
 use std::io::{self, BufRead};
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::DisableCacheFlag,
-    config::TomlConfig, folder::arg::name::FolderNameArg, printer::Printer,
+    account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::CacheDisableFlag,
+    config::TomlConfig, email::template::arg::body::TemplateRawBodyArg,
+    folder::arg::name::FolderNameArg, printer::Printer,
 };
 
-/// Save a template to a folder
+/// Save a template to a folder.
+///
+/// This command allows you to save a template to the given
+/// folder. The template is compiled into a MIME message before being
+/// saved to the folder. If you want to save a raw message, use the
+/// message save command instead.
 #[derive(Debug, Parser)]
 pub struct TemplateSaveCommand {
     #[command(flatten)]
     pub folder: FolderNameArg,
 
-    /// The raw template to save
-    #[arg(raw = true, value_delimiter = ' ')]
-    pub raw: Vec<String>,
+    #[command(flatten)]
+    pub body: TemplateRawBodyArg,
 
     #[command(flatten)]
-    pub cache: DisableCacheFlag,
+    pub cache: CacheDisableFlag,
 
     #[command(flatten)]
     pub account: AccountNameFlag,
@@ -42,7 +47,7 @@ impl TemplateSaveCommand {
         let is_tty = atty::is(Stream::Stdin);
         let is_json = printer.is_json();
         let tpl = if is_tty || is_json {
-            self.raw.join(" ").replace("\r", "")
+            self.body.raw()
         } else {
             io::stdin()
                 .lock()

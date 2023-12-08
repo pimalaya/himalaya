@@ -11,18 +11,19 @@ use self::{
     configure::AccountConfigureCommand, list::AccountListCommand, sync::AccountSyncCommand,
 };
 
-/// Subcommand to manage accounts
+/// Manage accounts.
+///
+/// An account is a set of settings, identified by an account
+/// name. Settings are directly taken from your TOML configuration
+/// file.
 #[derive(Debug, Subcommand)]
 pub enum AccountSubcommand {
-    /// Configure an account
     #[command(alias = "cfg")]
     Configure(AccountConfigureCommand),
 
-    /// List all accounts
     #[command(alias = "lst")]
     List(AccountListCommand),
 
-    /// Synchronize an account locally
     #[command()]
     Sync(AccountSyncCommand),
 }

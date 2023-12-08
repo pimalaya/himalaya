@@ -3,14 +3,14 @@ use clap::Parser;
 use log::info;
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::DisableCacheFlag,
+    account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::CacheDisableFlag,
     config::TomlConfig, folder::arg::name::FolderNameArg, printer::Printer,
 };
 
-/// Expunge a folder
+/// Expunge a folder.
 ///
 /// The concept of expunging is similar to the IMAP one: it definitely
-/// deletes emails from a given folder that contain the "deleted"
+/// deletes emails from the given folder that contain the "deleted"
 /// flag.
 #[derive(Debug, Parser)]
 pub struct FolderExpungeCommand {
@@ -18,10 +18,10 @@ pub struct FolderExpungeCommand {
     pub folder: FolderNameArg,
 
     #[command(flatten)]
-    pub account: AccountNameFlag,
+    pub cache: CacheDisableFlag,
 
     #[command(flatten)]
-    pub cache: DisableCacheFlag,
+    pub account: AccountNameFlag,
 }
 
 impl FolderExpungeCommand {

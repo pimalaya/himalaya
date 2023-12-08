@@ -8,24 +8,29 @@ use std::io::{self, BufRead};
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::Backend,
-    cache::arg::disable::DisableCacheFlag,
+    cache::arg::disable::CacheDisableFlag,
     config::TomlConfig,
-    message::arg::{body::BodyRawArg, header::HeaderRawArgs},
+    message::arg::{body::MessageRawBodyArg, header::HeaderRawArgs},
     printer::Printer,
     ui::editor,
 };
 
-/// Write a new message
+/// Write a new message.
+///
+/// This command allows you to write a new message using the editor
+/// defined in your environment variable $EDITOR. When the edition
+/// process finishes, you can choose between saving or sending the
+/// final message.
 #[derive(Debug, Parser)]
 pub struct MessageWriteCommand {
     #[command(flatten)]
     pub headers: HeaderRawArgs,
 
     #[command(flatten)]
-    pub body: BodyRawArg,
+    pub body: MessageRawBodyArg,
 
     #[command(flatten)]
-    pub cache: DisableCacheFlag,
+    pub cache: CacheDisableFlag,
 
     #[command(flatten)]
     pub account: AccountNameFlag,

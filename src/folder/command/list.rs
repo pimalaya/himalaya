@@ -5,24 +5,26 @@ use log::info;
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::Backend,
-    cache::arg::disable::DisableCacheFlag,
+    cache::arg::disable::CacheDisableFlag,
     config::TomlConfig,
     folder::Folders,
     printer::{PrintTableOpts, Printer},
-    ui::arg::max_width::MaxTableWidthFlag,
+    ui::arg::max_width::TableMaxWidthFlag,
 };
 
-/// List all folders
+/// List all folders.
+///
+/// This command allows you to list all exsting folders.
 #[derive(Debug, Parser)]
 pub struct FolderListCommand {
     #[command(flatten)]
-    pub table: MaxTableWidthFlag,
+    pub table: TableMaxWidthFlag,
+
+    #[command(flatten)]
+    pub cache: CacheDisableFlag,
 
     #[command(flatten)]
     pub account: AccountNameFlag,
-
-    #[command(flatten)]
-    pub cache: DisableCacheFlag,
 }
 
 impl FolderListCommand {

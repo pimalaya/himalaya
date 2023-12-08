@@ -7,16 +7,21 @@ use std::io::{self, BufRead};
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::Backend,
-    cache::arg::disable::DisableCacheFlag,
+    cache::arg::disable::CacheDisableFlag,
     config::TomlConfig,
     envelope::arg::ids::EnvelopeIdArg,
     folder::arg::name::FolderNameArg,
-    message::arg::{body::BodyRawArg, header::HeaderRawArgs},
+    message::arg::{body::MessageRawBodyArg, header::HeaderRawArgs},
     printer::Printer,
     ui::editor,
 };
 
-/// Forward a new message
+/// Forward a message.
+///
+/// This command allows you to forward the given message using the
+/// editor defined in your environment variable $EDITOR. When the
+/// edition process finishes, you can choose between saving or sending
+/// the final message.
 #[derive(Debug, Parser)]
 pub struct MessageForwardCommand {
     #[command(flatten)]
@@ -25,18 +30,14 @@ pub struct MessageForwardCommand {
     #[command(flatten)]
     pub envelope: EnvelopeIdArg,
 
-    /// Forward to all recipients
-    #[arg(long, short = 'A')]
-    pub all: bool,
-
     #[command(flatten)]
     pub headers: HeaderRawArgs,
 
     #[command(flatten)]
-    pub body: BodyRawArg,
+    pub body: MessageRawBodyArg,
 
     #[command(flatten)]
-    pub cache: DisableCacheFlag,
+    pub cache: CacheDisableFlag,
 
     #[command(flatten)]
     pub account: AccountNameFlag,

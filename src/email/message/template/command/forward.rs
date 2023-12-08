@@ -5,15 +5,19 @@ use log::info;
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::Backend,
-    cache::arg::disable::DisableCacheFlag,
+    cache::arg::disable::CacheDisableFlag,
     config::TomlConfig,
     envelope::arg::ids::EnvelopeIdArg,
     folder::arg::name::FolderNameArg,
-    message::arg::{body::BodyRawArg, header::HeaderRawArgs},
+    message::arg::{body::MessageRawBodyArg, header::HeaderRawArgs},
     printer::Printer,
 };
 
-/// Generate a forward message template
+/// Generate a template for forwarding a message.
+///
+/// The generated template is prefilled with your email in a From
+/// header as well as your signature. The forwarded message is also
+/// prefilled in the body of the template, prefixed by a separator.
 #[derive(Debug, Parser)]
 pub struct TemplateForwardCommand {
     #[command(flatten)]
@@ -26,10 +30,10 @@ pub struct TemplateForwardCommand {
     pub headers: HeaderRawArgs,
 
     #[command(flatten)]
-    pub body: BodyRawArg,
+    pub body: MessageRawBodyArg,
 
     #[command(flatten)]
-    pub cache: DisableCacheFlag,
+    pub cache: CacheDisableFlag,
 
     #[command(flatten)]
     pub account: AccountNameFlag,

@@ -2,10 +2,10 @@ use clap::Parser;
 use email::flag::{Flag, Flags};
 use log::debug;
 
-/// The ids and/or flags arguments parser
+/// The ids and/or flags arguments parser.
 #[derive(Debug, Parser)]
 pub struct IdsAndFlagsArgs {
-    /// The list of ids and/or flags
+    /// The list of ids and/or flags.
     ///
     /// Every argument that can be parsed as an integer is considered
     /// an id, otherwise it is considered as a flag.

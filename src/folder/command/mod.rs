@@ -14,26 +14,24 @@ use self::{
     list::FolderListCommand, purge::FolderPurgeCommand,
 };
 
-/// Subcommand to manage accounts
+/// Manage folders.
+///
+/// A folder (AKA mailbox, or directory) contains envelopes and
+/// messages. This subcommand allows you to manage them.
 #[derive(Debug, Subcommand)]
 pub enum FolderSubcommand {
-    /// Create a new folder
-    #[command(alias = "add")]
+    #[command(alias = "add", alias = "new")]
     Create(FolderCreateCommand),
 
-    /// List all folders
     #[command(alias = "lst")]
     List(FolderListCommand),
 
-    /// Expunge a folder
     #[command()]
     Expunge(FolderExpungeCommand),
 
-    /// Purge a folder
     #[command()]
     Purge(FolderPurgeCommand),
 
-    /// Delete a folder
     #[command(alias = "remove", alias = "rm")]
     Delete(FolderDeleteCommand),
 }

@@ -5,22 +5,24 @@ use log::info;
 use std::io::{self, BufRead};
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::DisableCacheFlag,
-    config::TomlConfig, folder::arg::name::FolderNameArg, printer::Printer,
+    account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::CacheDisableFlag,
+    config::TomlConfig, folder::arg::name::FolderNameArg, message::arg::body::MessageRawBodyArg,
+    printer::Printer,
 };
 
-/// Save a message to a folder
+/// Save a message to a folder.
+///
+/// This command allows you to add a raw message to the given folder.
 #[derive(Debug, Parser)]
 pub struct MessageSaveCommand {
     #[command(flatten)]
     pub folder: FolderNameArg,
 
-    /// The raw message to save
-    #[arg(value_name = "MESSAGE", raw = true)]
-    pub raw: String,
+    #[command(flatten)]
+    pub body: MessageRawBodyArg,
 
     #[command(flatten)]
-    pub cache: DisableCacheFlag,
+    pub cache: CacheDisableFlag,
 
     #[command(flatten)]
     pub account: AccountNameFlag,
@@ -33,7 +35,6 @@ impl MessageSaveCommand {
         let folder = &self.folder.name;
         let account = self.account.name.as_ref().map(String::as_str);
         let cache = self.cache.disable;
-        let raw_msg = &self.raw;
 
         let (toml_account_config, account_config) =
             config.clone().into_account_configs(account, cache)?;
@@ -41,8 +42,8 @@ impl MessageSaveCommand {
 
         let is_tty = atty::is(Stream::Stdin);
         let is_json = printer.is_json();
-        let raw_email = if is_tty || is_json {
-            raw_msg.replace("\r", "").replace("\n", "\r\n")
+        let msg = if is_tty || is_json {
+            self.body.raw()
         } else {
             io::stdin()
                 .lock()
@@ -52,9 +53,7 @@ impl MessageSaveCommand {
                 .join("\r\n")
         };
 
-        backend
-            .add_raw_message(folder, raw_email.as_bytes())
-            .await?;
+        backend.add_raw_message(folder, msg.as_bytes()).await?;
 
         printer.print(format!("Message successfully saved to {folder}!"))
     }

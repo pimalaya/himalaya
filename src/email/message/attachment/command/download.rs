@@ -5,12 +5,15 @@ use std::fs;
 use uuid::Uuid;
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::DisableCacheFlag,
+    account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::CacheDisableFlag,
     config::TomlConfig, envelope::arg::ids::EnvelopeIdsArgs, folder::arg::name::FolderNameArg,
     printer::Printer,
 };
 
-/// Download attachments of a message
+/// Download all attachments for the given message.
+///
+/// This command allows you to download all attachments found for the
+/// given message to your downloads directory.
 #[derive(Debug, Parser)]
 pub struct AttachmentDownloadCommand {
     #[command(flatten)]
@@ -20,7 +23,7 @@ pub struct AttachmentDownloadCommand {
     pub envelopes: EnvelopeIdsArgs,
 
     #[command(flatten)]
-    pub cache: DisableCacheFlag,
+    pub cache: CacheDisableFlag,
 
     #[command(flatten)]
     pub account: AccountNameFlag,

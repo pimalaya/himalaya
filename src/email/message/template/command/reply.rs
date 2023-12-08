@@ -5,15 +5,20 @@ use log::info;
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::Backend,
-    cache::arg::disable::DisableCacheFlag,
+    cache::arg::disable::CacheDisableFlag,
     config::TomlConfig,
     envelope::arg::ids::EnvelopeIdArg,
     folder::arg::name::FolderNameArg,
-    message::arg::{body::BodyRawArg, header::HeaderRawArgs, reply::MessageReplyAllArg},
+    message::arg::{body::MessageRawBodyArg, header::HeaderRawArgs, reply::MessageReplyAllArg},
     printer::Printer,
 };
 
-/// Generate a reply message template
+/// Generate a template for replying to a message.
+///
+/// The generated template is prefilled with your email in a From
+/// header as well as your signature. The replied message is also
+/// prefilled in the body of the template, with all lines prefixed by
+/// the symbol greater than ">".
 #[derive(Debug, Parser)]
 pub struct TemplateReplyCommand {
     #[command(flatten)]
@@ -29,10 +34,10 @@ pub struct TemplateReplyCommand {
     pub headers: HeaderRawArgs,
 
     #[command(flatten)]
-    pub body: BodyRawArg,
+    pub body: MessageRawBodyArg,
 
     #[command(flatten)]
-    pub cache: DisableCacheFlag,
+    pub cache: CacheDisableFlag,
 
     #[command(flatten)]
     pub account: AccountNameFlag,

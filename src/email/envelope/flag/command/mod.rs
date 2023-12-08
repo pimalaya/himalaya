@@ -9,20 +9,22 @@ use crate::{config::TomlConfig, printer::Printer};
 
 use self::{add::FlagAddCommand, remove::FlagRemoveCommand, set::FlagSetCommand};
 
-/// Subcommand to manage flags
+/// Manage flags.
+///
+/// A flag is a tag associated to an envelope. Existing flags are
+/// seen, answered, flagged, deleted, draft. Other flags are
+/// considered custom, which are not always supported (the
+/// synchronization does not take care of them yet).
 #[derive(Debug, Subcommand)]
 pub enum FlagSubcommand {
-    /// Add flag(s) to an envelope
     #[command(arg_required_else_help = true)]
     #[command(alias = "create")]
     Add(FlagAddCommand),
 
-    /// Replace flag(s) of an envelope
     #[command(arg_required_else_help = true)]
     #[command(aliases = ["update", "change", "replace"])]
     Set(FlagSetCommand),
 
-    /// Remove flag(s) from an envelope
     #[command(arg_required_else_help = true)]
     #[command(aliases = ["rm", "delete", "del"])]
     Remove(FlagRemoveCommand),

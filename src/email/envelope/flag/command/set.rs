@@ -5,14 +5,17 @@ use log::info;
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::Backend,
-    cache::arg::disable::DisableCacheFlag,
+    cache::arg::disable::CacheDisableFlag,
     config::TomlConfig,
     flag::arg::ids_and_flags::{into_tuple, IdsAndFlagsArgs},
     folder::arg::name::FolderNameArg,
     printer::Printer,
 };
 
-/// Replace flag(s) of an envelope
+/// Replace flag(s) of an envelope.
+///
+/// This command allows you to replace existing flags of the given
+/// envelope(s) with the given flag(s).
 #[derive(Debug, Parser)]
 pub struct FlagSetCommand {
     #[command(flatten)]
@@ -22,10 +25,10 @@ pub struct FlagSetCommand {
     pub args: IdsAndFlagsArgs,
 
     #[command(flatten)]
-    pub account: AccountNameFlag,
+    pub cache: CacheDisableFlag,
 
     #[command(flatten)]
-    pub cache: DisableCacheFlag,
+    pub account: AccountNameFlag,
 }
 
 impl FlagSetCommand {

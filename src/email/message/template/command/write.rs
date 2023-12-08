@@ -4,24 +4,25 @@ use email::message::Message;
 use log::info;
 
 use crate::{
-    account::arg::name::AccountNameFlag,
-    cache::arg::disable::DisableCacheFlag,
-    config::TomlConfig,
-    message::arg::{body::BodyRawArg, header::HeaderRawArgs},
+    account::arg::name::AccountNameFlag, cache::arg::disable::CacheDisableFlag, config::TomlConfig,
+    email::template::arg::body::TemplateRawBodyArg, message::arg::header::HeaderRawArgs,
     printer::Printer,
 };
 
-/// Write a new template
+/// Generate a template for writing a new message from scratch.
+///
+/// The generated template is prefilled with your email in a From
+/// header as well as your signature.
 #[derive(Debug, Parser)]
 pub struct TemplateWriteCommand {
     #[command(flatten)]
     pub headers: HeaderRawArgs,
 
     #[command(flatten)]
-    pub body: BodyRawArg,
+    pub body: TemplateRawBodyArg,
 
     #[command(flatten)]
-    pub cache: DisableCacheFlag,
+    pub cache: CacheDisableFlag,
 
     #[command(flatten)]
     pub account: AccountNameFlag,

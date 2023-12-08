@@ -5,14 +5,17 @@ use log::info;
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::Backend,
-    cache::arg::disable::DisableCacheFlag,
+    cache::arg::disable::CacheDisableFlag,
     config::TomlConfig,
     flag::arg::ids_and_flags::{into_tuple, IdsAndFlagsArgs},
     folder::arg::name::FolderNameArg,
     printer::Printer,
 };
 
-/// Remove flag(s) from an envelope
+/// Remove flag(s) from an envelope.
+///
+/// This command allows you to remove the given flag(s) from the given
+/// envelope(s).
 #[derive(Debug, Parser)]
 pub struct FlagRemoveCommand {
     #[command(flatten)]
@@ -22,10 +25,10 @@ pub struct FlagRemoveCommand {
     pub args: IdsAndFlagsArgs,
 
     #[command(flatten)]
-    pub account: AccountNameFlag,
+    pub cache: CacheDisableFlag,
 
     #[command(flatten)]
-    pub cache: DisableCacheFlag,
+    pub account: AccountNameFlag,
 }
 
 impl FlagRemoveCommand {

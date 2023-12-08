@@ -32,30 +32,49 @@ const SUB_PROGRESS_DONE_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
     ProgressStyle::with_template("   {prefix:.bold} \n   {wide_bar:.green} {percent}% ").unwrap()
 });
 
+/// Synchronize an account.
+///
+/// This command allows you to synchronize all folders and emails
+/// (including envelopes and messages) of an account into a local
+/// Maildir folder.
 #[derive(Debug, Parser)]
 pub struct AccountSyncCommand {
     #[command(flatten)]
     pub account: AccountNameArg,
 
-    /// Run the synchronization without applying changes
+    /// Run the synchronization without applying any changes.
     ///
     /// Instead, a report will be printed to stdout containing all the
     /// changes the synchronization plan to do.
     #[arg(long, short)]
     pub dry_run: bool,
 
-    #[arg(long, short = 'f', value_name = "FOLDER", action = ArgAction::Append, conflicts_with = "exclude_folder", conflicts_with = "all_folders")]
+    /// Synchronize only specific folders.
+    ///
+    /// Only the given folders will be synchronized (including
+    /// associated envelopes and messages). Useful when you need to
+    /// speed up the synchronization process. A good usecase is to
+    /// synchronize only the INBOX in order to quickly check for new
+    /// messages.
+    #[arg(long, short = 'f')]
+    #[arg(value_name = "FOLDER", action = ArgAction::Append)]
+    #[arg(conflicts_with = "exclude_folder", conflicts_with = "all_folders")]
     pub include_folder: Vec<String>,
 
-    #[arg(long, short = 'x', value_name = "FOLDER", action = ArgAction::Append, conflicts_with = "include_folder", conflicts_with = "all_folders")]
+    /// Omit specific folders from the synchronization.
+    ///
+    /// The given folders will be excluded from the synchronization
+    /// (including associated envelopes and messages). Useful when you
+    /// have heavy folders that you do not want to take care of, or to
+    /// speed up the synchronization process.
+    #[arg(long, short = 'x')]
+    #[arg(value_name = "FOLDER", action = ArgAction::Append)]
+    #[arg(conflicts_with = "include_folder", conflicts_with = "all_folders")]
     pub exclude_folder: Vec<String>,
 
-    #[arg(
-        long,
-        short = 'A',
-        conflicts_with = "include_folder",
-        conflicts_with = "exclude_folder"
-    )]
+    /// Synchronize all exsting folders.
+    #[arg(long, short = 'A')]
+    #[arg(conflicts_with = "include_folder", conflicts_with = "exclude_folder")]
     pub all_folders: bool,
 }
 
