@@ -8,7 +8,7 @@ use crate::{
     cache::arg::disable::CacheDisableFlag,
     config::TomlConfig,
     flag::arg::ids_and_flags::{into_tuple, IdsAndFlagsArgs},
-    folder::arg::name::FolderNameArg,
+    folder::arg::name::FolderNameOptionalFlag,
     printer::Printer,
 };
 
@@ -19,7 +19,7 @@ use crate::{
 #[derive(Debug, Parser)]
 pub struct FlagRemoveCommand {
     #[command(flatten)]
-    pub folder: FolderNameArg,
+    pub folder: FolderNameOptionalFlag,
 
     #[command(flatten)]
     pub args: IdsAndFlagsArgs,

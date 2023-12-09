@@ -7,8 +7,8 @@ use std::io::{self, BufRead};
 
 use crate::{
     account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::CacheDisableFlag,
-    config::TomlConfig, email::template::arg::body::TemplateRawBodyArg,
-    folder::arg::name::FolderNameArg, printer::Printer,
+    config::TomlConfig, email::template::arg::TemplateRawArg,
+    folder::arg::name::FolderNameOptionalFlag, printer::Printer,
 };
 
 /// Save a template to a folder.
@@ -20,10 +20,10 @@ use crate::{
 #[derive(Debug, Parser)]
 pub struct TemplateSaveCommand {
     #[command(flatten)]
-    pub folder: FolderNameArg,
+    pub folder: FolderNameOptionalFlag,
 
     #[command(flatten)]
-    pub body: TemplateRawBodyArg,
+    pub template: TemplateRawArg,
 
     #[command(flatten)]
     pub cache: CacheDisableFlag,
@@ -47,7 +47,7 @@ impl TemplateSaveCommand {
         let is_tty = atty::is(Stream::Stdin);
         let is_json = printer.is_json();
         let tpl = if is_tty || is_json {
-            self.body.raw()
+            self.template.raw()
         } else {
             io::stdin()
                 .lock()

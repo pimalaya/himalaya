@@ -5,8 +5,8 @@ use mml::message::FilterParts;
 
 use crate::{
     account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::CacheDisableFlag,
-    config::TomlConfig, envelope::arg::ids::EnvelopeIdsArgs, folder::arg::name::FolderNameArg,
-    printer::Printer,
+    config::TomlConfig, envelope::arg::ids::EnvelopeIdsArgs,
+    folder::arg::name::FolderNameOptionalFlag, printer::Printer,
 };
 
 /// Read a message.
@@ -15,7 +15,7 @@ use crate::{
 #[derive(Debug, Parser)]
 pub struct MessageReadCommand {
     #[command(flatten)]
-    pub folder: FolderNameArg,
+    pub folder: FolderNameOptionalFlag,
 
     #[command(flatten)]
     pub envelopes: EnvelopeIdsArgs,

@@ -1,7 +1,7 @@
 use clap::Parser;
 
 /// The disable cache flag parser.
-#[derive(Debug, Parser)]
+#[derive(Debug, Default, Parser)]
 pub struct CacheDisableFlag {
     /// Disable any sort of cache.
     ///

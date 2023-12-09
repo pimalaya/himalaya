@@ -7,7 +7,7 @@ use std::io::{self, BufRead};
 
 use crate::{
     account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::CacheDisableFlag,
-    config::TomlConfig, message::arg::body::MessageRawBodyArg, printer::Printer,
+    config::TomlConfig, message::arg::MessageRawArg, printer::Printer,
 };
 
 /// Send a message.
@@ -17,7 +17,7 @@ use crate::{
 #[derive(Debug, Parser)]
 pub struct MessageSendCommand {
     #[command(flatten)]
-    pub body: MessageRawBodyArg,
+    pub message: MessageRawArg,
 
     #[command(flatten)]
     pub cache: CacheDisableFlag,
@@ -41,7 +41,7 @@ impl MessageSendCommand {
         let is_tty = atty::is(Stream::Stdin);
         let is_json = printer.is_json();
         let msg = if is_tty || is_json {
-            self.body.raw()
+            self.message.raw()
         } else {
             io::stdin()
                 .lock()

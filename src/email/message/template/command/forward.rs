@@ -8,7 +8,7 @@ use crate::{
     cache::arg::disable::CacheDisableFlag,
     config::TomlConfig,
     envelope::arg::ids::EnvelopeIdArg,
-    folder::arg::name::FolderNameArg,
+    folder::arg::name::FolderNameOptionalFlag,
     message::arg::{body::MessageRawBodyArg, header::HeaderRawArgs},
     printer::Printer,
 };
@@ -21,7 +21,7 @@ use crate::{
 #[derive(Debug, Parser)]
 pub struct TemplateForwardCommand {
     #[command(flatten)]
-    pub folder: FolderNameArg,
+    pub folder: FolderNameOptionalFlag,
 
     #[command(flatten)]
     pub envelope: EnvelopeIdArg,

@@ -6,7 +6,7 @@ use std::io::{self, BufRead};
 
 use crate::{
     account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::CacheDisableFlag,
-    config::TomlConfig, folder::arg::name::FolderNameArg, message::arg::body::MessageRawBodyArg,
+    config::TomlConfig, folder::arg::name::FolderNameOptionalFlag, message::arg::MessageRawArg,
     printer::Printer,
 };
 
@@ -16,10 +16,10 @@ use crate::{
 #[derive(Debug, Parser)]
 pub struct MessageSaveCommand {
     #[command(flatten)]
-    pub folder: FolderNameArg,
+    pub folder: FolderNameOptionalFlag,
 
     #[command(flatten)]
-    pub body: MessageRawBodyArg,
+    pub message: MessageRawArg,
 
     #[command(flatten)]
     pub cache: CacheDisableFlag,
@@ -43,7 +43,7 @@ impl MessageSaveCommand {
         let is_tty = atty::is(Stream::Stdin);
         let is_json = printer.is_json();
         let msg = if is_tty || is_json {
-            self.body.raw()
+            self.message.raw()
         } else {
             io::stdin()
                 .lock()

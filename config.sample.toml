@@ -7,7 +7,7 @@ display-name = "My example account"
 email = "example@localhost"
 
 sync = true
-sync-dir = "./.sync"
+sync-dir = "/tmp/himalaya-sync-example"
 
 # The default backend used for all the features like adding folders,
 # listing envelopes or copying messages.
@@ -21,7 +21,7 @@ imap.ssl = false
 imap.starttls = false
 imap.insecure = true
 imap.auth = "passwd"
-imap.passwd.raw = "example"
+imap.passwd.keyring = "example-passwd"
 
 # Override the backend used for sending messages.
 message.send.backend = "smtp"
@@ -35,3 +35,22 @@ smtp.starttls = false
 smtp.insecure = true
 smtp.auth = "passwd"
 smtp.passwd.raw = "example"
+
+[example-2]
+display-name = "My example account 2"
+email = "example2@localhost"
+
+backend = "imap"
+
+imap.host = "localhost"
+imap.port = 3143
+imap.login = "example2@localhost"
+imap.ssl = false
+imap.starttls = false
+imap.insecure = true
+imap.auth = "passwd"
+imap.passwd.raw = "example"
+
+message.send.backend = "sendmail"
+
+sendmail.cmd = "sendmail"

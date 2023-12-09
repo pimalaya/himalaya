@@ -6,8 +6,8 @@ use uuid::Uuid;
 
 use crate::{
     account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::CacheDisableFlag,
-    config::TomlConfig, envelope::arg::ids::EnvelopeIdsArgs, folder::arg::name::FolderNameArg,
-    printer::Printer,
+    config::TomlConfig, envelope::arg::ids::EnvelopeIdsArgs,
+    folder::arg::name::FolderNameOptionalFlag, printer::Printer,
 };
 
 /// Download all attachments for the given message.
@@ -17,7 +17,7 @@ use crate::{
 #[derive(Debug, Parser)]
 pub struct AttachmentDownloadCommand {
     #[command(flatten)]
-    pub folder: FolderNameArg,
+    pub folder: FolderNameOptionalFlag,
 
     #[command(flatten)]
     pub envelopes: EnvelopeIdsArgs,

@@ -15,7 +15,7 @@ use self::{
 ///
 /// An account is a set of settings, identified by an account
 /// name. Settings are directly taken from your TOML configuration
-/// file.
+/// file. This subcommand allows you to manage them.
 #[derive(Debug, Subcommand)]
 pub enum AccountSubcommand {
     #[command(alias = "cfg")]
@@ -24,7 +24,7 @@ pub enum AccountSubcommand {
     #[command(alias = "lst")]
     List(AccountListCommand),
 
-    #[command()]
+    #[command(alias = "synchronize", alias = "synchronise")]
     Sync(AccountSyncCommand),
 }
 

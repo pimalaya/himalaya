@@ -4,8 +4,8 @@ use log::info;
 
 use crate::{
     account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::CacheDisableFlag,
-    config::TomlConfig, envelope::arg::ids::EnvelopeIdsArgs, folder::arg::name::FolderNameArg,
-    printer::Printer,
+    config::TomlConfig, envelope::arg::ids::EnvelopeIdsArgs,
+    folder::arg::name::FolderNameOptionalFlag, printer::Printer,
 };
 
 /// Mark as deleted a message from a folder.
@@ -17,7 +17,7 @@ use crate::{
 #[derive(Debug, Parser)]
 pub struct MessageDeleteCommand {
     #[command(flatten)]
-    pub folder: FolderNameArg,
+    pub folder: FolderNameOptionalFlag,
 
     #[command(flatten)]
     pub envelopes: EnvelopeIdsArgs,

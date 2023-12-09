@@ -32,32 +32,34 @@ pub enum MessageSubcommand {
     #[command(arg_required_else_help = true)]
     Read(MessageReadCommand),
 
-    #[command(alias = "add", alias = "create", alias = "new", alias = "compose")]
+    #[command(aliases = ["add", "create", "new", "compose"])]
     Write(MessageWriteCommand),
 
     #[command()]
     Reply(MessageReplyCommand),
 
-    #[command(alias = "fwd")]
+    #[command(aliases = ["fwd", "fd"])]
     Forward(MessageForwardCommand),
 
     #[command()]
     Mailto(MessageMailtoCommand),
 
     #[command(arg_required_else_help = true)]
-    #[command(alias = "add", alias = "create")]
     Save(MessageSaveCommand),
 
     #[command(arg_required_else_help = true)]
     Send(MessageSendCommand),
 
     #[command(arg_required_else_help = true)]
+    #[command(aliases = ["cpy", "cp"])]
     Copy(MessageCopyCommand),
 
     #[command(arg_required_else_help = true)]
+    #[command(alias = "mv")]
     Move(MessageMoveCommand),
 
     #[command(arg_required_else_help = true)]
+    #[command(aliases = ["remove", "rm"])]
     Delete(MessageDeleteCommand),
 }
 

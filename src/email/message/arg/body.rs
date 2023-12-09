@@ -6,7 +6,7 @@ use std::ops::Deref;
 pub struct MessageRawBodyArg {
     /// Prefill the template with a custom body.
     #[arg(trailing_var_arg = true)]
-    #[arg(name = "body-raw")]
+    #[arg(name = "body_raw", value_name = "BODY")]
     pub raw: Vec<String>,
 }
 

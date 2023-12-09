@@ -123,7 +123,10 @@ impl From<Iter<'_, String, TomlAccountConfig>> for Accounts {
                 Account::new(name, &backends, account.default.unwrap_or_default())
             })
             .collect();
-        accounts.sort_by(|a, b| b.name.partial_cmp(&a.name).unwrap());
+
+        // sort accounts by name
+        accounts.sort_by(|a, b| a.name.partial_cmp(&b.name).unwrap());
+
         Self(accounts)
     }
 }

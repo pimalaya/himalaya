@@ -4,7 +4,10 @@ use log::{debug, info};
 use mail_builder::MessageBuilder;
 use url::Url;
 
-use crate::{backend::Backend, config::TomlConfig, printer::Printer, ui::editor};
+use crate::{
+    account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::CacheDisableFlag,
+    config::TomlConfig, printer::Printer, ui::editor,
+};
 
 /// Parse and edit a message from a mailto URL string.
 ///
@@ -17,19 +20,31 @@ pub struct MessageMailtoCommand {
     /// The mailto url.
     #[arg()]
     pub url: Url,
+
+    #[command(flatten)]
+    pub cache: CacheDisableFlag,
+
+    #[command(flatten)]
+    pub account: AccountNameFlag,
 }
 
 impl MessageMailtoCommand {
     pub fn new(url: &str) -> Result<Self> {
-        let url = Url::parse(url)?;
-        Ok(Self { url })
+        Ok(Self {
+            url: Url::parse(url)?,
+            cache: Default::default(),
+            account: Default::default(),
+        })
     }
 
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing message mailto command");
 
+        let account = self.account.name.as_ref().map(String::as_str);
+        let cache = self.cache.disable;
+
         let (toml_account_config, account_config) =
-            config.clone().into_account_configs(None, false)?;
+            config.clone().into_account_configs(account, cache)?;
         let backend = Backend::new(toml_account_config, account_config.clone(), true).await?;
 
         let mut builder = MessageBuilder::new().to(self.url.path());

@@ -1,11 +1,12 @@
 use clap::Parser;
 use email::account::config::DEFAULT_INBOX_FOLDER;
 
-/// The folder name argument parser.
+/// The optional folder name flag parser.
 #[derive(Debug, Parser)]
-pub struct FolderNameArg {
+pub struct FolderNameOptionalFlag {
     /// The name of the folder.
-    #[arg(name = "folder_name", value_name = "FOLDER")]
+    #[arg(long = "folder", short = 'f')]
+    #[arg(name = "folder_name", value_name = "NAME", default_value = DEFAULT_INBOX_FOLDER)]
     pub name: String,
 }
 
@@ -14,6 +15,14 @@ pub struct FolderNameArg {
 pub struct FolderNameOptionalArg {
     /// The name of the folder.
     #[arg(name = "folder_name", value_name = "FOLDER", default_value = DEFAULT_INBOX_FOLDER)]
+    pub name: String,
+}
+
+/// The required folder name argument parser.
+#[derive(Debug, Parser)]
+pub struct FolderNameArg {
+    /// The name of the folder.
+    #[arg(name = "folder_name", value_name = "FOLDER")]
     pub name: String,
 }
 

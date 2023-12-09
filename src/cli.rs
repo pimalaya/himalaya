@@ -82,6 +82,7 @@ pub enum HimalayaCommand {
     Account(AccountSubcommand),
 
     #[command(subcommand)]
+    #[command(visible_alias = "mailbox", aliases = ["mailboxes", "mboxes", "mbox"])]
     #[command(alias = "folders")]
     Folder(FolderSubcommand),
 

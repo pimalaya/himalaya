@@ -8,7 +8,7 @@ use std::io::{self, BufRead};
 
 use crate::{
     account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::CacheDisableFlag,
-    config::TomlConfig, email::template::arg::body::TemplateRawBodyArg, printer::Printer,
+    config::TomlConfig, email::template::arg::TemplateRawArg, printer::Printer,
 };
 
 /// Send a template.
@@ -20,7 +20,7 @@ use crate::{
 #[derive(Debug, Parser)]
 pub struct TemplateSendCommand {
     #[command(flatten)]
-    pub body: TemplateRawBodyArg,
+    pub template: TemplateRawArg,
 
     #[command(flatten)]
     pub cache: CacheDisableFlag,
@@ -44,7 +44,7 @@ impl TemplateSendCommand {
         let is_tty = atty::is(Stream::Stdin);
         let is_json = printer.is_json();
         let tpl = if is_tty || is_json {
-            self.body.raw()
+            self.template.raw()
         } else {
             io::stdin()
                 .lock()

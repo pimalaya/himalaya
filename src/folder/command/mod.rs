@@ -16,8 +16,8 @@ use self::{
 
 /// Manage folders.
 ///
-/// A folder (AKA mailbox, or directory) contains envelopes and
-/// messages. This subcommand allows you to manage them.
+/// A folder (as known as mailbox, or directory) contains one or more
+/// emails. This subcommand allows you to manage them.
 #[derive(Debug, Subcommand)]
 pub enum FolderSubcommand {
     #[command(alias = "add", alias = "new")]

@@ -1,8 +1,6 @@
 use anyhow::{anyhow, Result};
-use atty::Stream;
 use clap::Parser;
 use log::info;
-use std::io::{self, BufRead};
 
 use crate::{
     account::arg::name::AccountNameFlag,
@@ -10,7 +8,7 @@ use crate::{
     cache::arg::disable::CacheDisableFlag,
     config::TomlConfig,
     envelope::arg::ids::EnvelopeIdArg,
-    folder::arg::name::FolderNameArg,
+    folder::arg::name::FolderNameOptionalFlag,
     message::arg::{body::MessageRawBodyArg, header::HeaderRawArgs},
     printer::Printer,
     ui::editor,
@@ -25,7 +23,7 @@ use crate::{
 #[derive(Debug, Parser)]
 pub struct MessageForwardCommand {
     #[command(flatten)]
-    pub folder: FolderNameArg,
+    pub folder: FolderNameOptionalFlag,
 
     #[command(flatten)]
     pub envelope: EnvelopeIdArg,
@@ -55,19 +53,6 @@ impl MessageForwardCommand {
             config.clone().into_account_configs(account, cache)?;
         let backend = Backend::new(toml_account_config, account_config.clone(), true).await?;
 
-        let is_tty = atty::is(Stream::Stdin);
-        let is_json = printer.is_json();
-        let body = if !self.body.is_empty() && (is_tty || is_json) {
-            self.body.raw()
-        } else {
-            io::stdin()
-                .lock()
-                .lines()
-                .filter_map(Result::ok)
-                .collect::<Vec<String>>()
-                .join("\r\n")
-        };
-
         let id = self.envelope.id;
         let tpl = backend
             .get_messages(folder, &[id])
@@ -76,7 +61,7 @@ impl MessageForwardCommand {
             .ok_or(anyhow!("cannot find message"))?
             .to_forward_tpl_builder(&account_config)
             .with_headers(self.headers.raw)
-            .with_body(body)
+            .with_body(self.body.raw())
             .build()
             .await?;
         editor::edit_tpl_with_editor(&account_config, printer, &backend, tpl).await

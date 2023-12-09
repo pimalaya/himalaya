@@ -35,7 +35,7 @@ const SUB_PROGRESS_DONE_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
 /// Synchronize an account.
 ///
 /// This command allows you to synchronize all folders and emails
-/// (including envelopes and messages) of an account into a local
+/// (including envelopes and messages) of a given account into a local
 /// Maildir folder.
 #[derive(Debug, Parser)]
 pub struct AccountSyncCommand {

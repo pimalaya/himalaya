@@ -25,7 +25,7 @@ use self::{
 /// <https://crates.io/crates/mml-lib>.
 #[derive(Debug, Subcommand)]
 pub enum TemplateSubcommand {
-    #[command(alias = "create", alias = "new", alias = "compose")]
+    #[command(aliases = ["add", "create", "new", "compose"])]
     Write(TemplateWriteCommand),
 
     #[command(arg_required_else_help = true)]
@@ -35,7 +35,7 @@ pub enum TemplateSubcommand {
     #[command(alias = "fwd")]
     Forward(TemplateForwardCommand),
 
-    #[command(alias = "add")]
+    #[command()]
     Save(TemplateSaveCommand),
 
     #[command()]
