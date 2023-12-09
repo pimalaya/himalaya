@@ -104,7 +104,8 @@ default-features = false
 path = "/home/soywod/sourcehut/pimalaya/email"
 
 [dependencies.keyring-lib]
-version = "=0.1.0"
+# version = "=0.1.0"
+path = "/home/soywod/sourcehut/pimalaya/keyring"
 
 [dependencies.mail-builder]
 version = "0.3"
@@ -114,7 +115,8 @@ version = "0.3"
 path = "/home/soywod/sourcehut/pimalaya/oauth"
 
 [dependencies.process-lib]
-version = "=0.1.0"
+# version = "=0.1.0"
+path = "/home/soywod/sourcehut/pimalaya/process"
 
 [dependencies.mml-lib]
 # version = "=1.0.1"
@@ -123,7 +125,8 @@ features = ["compiler", "interpreter"]
 path = "/home/soywod/sourcehut/pimalaya/mml"
 
 [dependencies.secret-lib]
-version = "=0.1.0"
+# version = "=0.1.0"
+path = "/home/soywod/sourcehut/pimalaya/secret"
 
 [dependencies.serde]
 version = "1.0"

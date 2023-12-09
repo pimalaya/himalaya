@@ -6,7 +6,7 @@ use email::{
 };
 use log::debug;
 use mml::MmlCompilerBuilder;
-use process::Cmd;
+use process::SingleCmd;
 use std::{env, fs};
 
 use crate::{
@@ -23,7 +23,8 @@ pub async fn open_with_tpl(tpl: String) -> Result<String> {
 
     debug!("open editor");
     let editor = env::var("EDITOR").context("cannot get editor from env var")?;
-    Cmd::from(format!("{editor} {}", &path.to_string_lossy()))
+    SingleCmd::from(format!("{editor} {}", &path.to_string_lossy()))
+        .with_output_piped(false)
         .run()
         .await
         .context("cannot launch editor")?;

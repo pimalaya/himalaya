@@ -11,7 +11,9 @@ use crate::{
 
 /// Read a message.
 ///
-/// This command allows you to read a message.
+/// This command allows you to read a message. When reading a message,
+/// the "seen" flag is automatically applied to the corresponding
+/// envelope. To prevent this behaviour, use the --preview flag.
 #[derive(Debug, Parser)]
 pub struct MessageReadCommand {
     #[command(flatten)]
@@ -19,6 +21,11 @@ pub struct MessageReadCommand {
 
     #[command(flatten)]
     pub envelopes: EnvelopeIdsArgs,
+
+    /// Read the message without applying the "seen" flag to its
+    /// corresponding envelope.
+    #[arg(long, short)]
+    pub preview: bool,
 
     /// Read the raw version of the given message.
     ///
@@ -79,7 +86,11 @@ impl MessageReadCommand {
         let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
 
         let ids = &self.envelopes.ids;
-        let emails = backend.get_messages(&folder, &ids).await?;
+        let emails = if self.preview {
+            backend.peek_messages(&folder, &ids).await
+        } else {
+            backend.get_messages(&folder, &ids).await
+        }?;
 
         let mut glue = "";
         let mut bodies = String::default();

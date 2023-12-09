@@ -2445,8 +2445,6 @@ dependencies = [
 [[package]]
 name = "keyring-lib"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8dcc9433b6eaf33f2f6a8d3a53b598a5d0b8be224c41bd98d1ec936ef4d02d69"
 dependencies = [
  "keyring",
  "log",
@@ -3233,10 +3231,10 @@ dependencies = [
 [[package]]
 name = "process-lib"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe824234b824573ff3a80ddf3a6b19e6ffba966798d071f280723ee02a7273ce"
 dependencies = [
+ "anyhow",
  "log",
+ "once_cell",
  "thiserror",
  "tokio",
 ]
@@ -3707,9 +3705,8 @@ dependencies = [
 [[package]]
 name = "secret-lib"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d46e99ae858a1978ec3e6e887966514900229fc0df99935a2c61102854f9195e"
 dependencies = [
+ "anyhow",
  "keyring-lib",
  "log",
  "process-lib",
