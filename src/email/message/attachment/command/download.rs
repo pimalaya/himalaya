@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use log::info;
-use std::fs;
+use std::{fs, path::PathBuf};
 use uuid::Uuid;
 
 use crate::{
@@ -67,6 +67,8 @@ impl AttachmentDownloadCommand {
             for attachment in attachments {
                 let filename = attachment
                     .filename
+                    .map(PathBuf::from)
+                    .and_then(|f| f.file_name().map(|f| f.to_string_lossy().to_string()))
                     .unwrap_or_else(|| Uuid::new_v4().to_string());
                 let filepath = account_config.download_fpath(&filename)?;
                 printer.print_log(format!("Downloading {:?}…", filepath))?;

@@ -1,9 +1,8 @@
 use anyhow::Result;
-use atty::Stream;
 use clap::Parser;
 use log::info;
 use mml::MmlCompilerBuilder;
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, IsTerminal};
 
 use crate::{
     account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::CacheDisableFlag,
@@ -44,7 +43,7 @@ impl TemplateSaveCommand {
             config.clone().into_account_configs(account, cache)?;
         let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
 
-        let is_tty = atty::is(Stream::Stdin);
+        let is_tty = io::stdin().is_terminal();
         let is_json = printer.is_json();
         let tpl = if is_tty || is_json {
             self.template.raw()

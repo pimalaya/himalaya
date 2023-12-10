@@ -1,7 +1,7 @@
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Confirm, Input, Password, Select};
 use once_cell::sync::Lazy;
-use shellexpand_utils::shellexpand_path;
+use shellexpand_utils::expand;
 use std::{fs, io, path::PathBuf, process};
 use toml_edit::{Document, Item};
 
@@ -94,7 +94,7 @@ pub(crate) async fn configure(path: PathBuf) -> Result<TomlConfig> {
         ))
         .default(path.to_string_lossy().to_string())
         .interact()?;
-    let path = shellexpand_path(&path);
+    let path = expand::path(&path);
 
     println!("Writing the configuration to {path:?}…");
 

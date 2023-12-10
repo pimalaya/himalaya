@@ -1,11 +1,12 @@
 use anyhow::{bail, Result};
-use dialoguer::Input;
+use dialoguer::{Confirm, Input};
 use email_address::EmailAddress;
 
 use crate::{
     backend::{self, config::BackendConfig, BackendKind},
     config::wizard::THEME,
     message::config::{MessageConfig, MessageSendConfig},
+    wizard_prompt,
 };
 
 use super::TomlAccountConfig;
@@ -33,6 +34,14 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
         Input::with_theme(&*THEME)
             .with_prompt("Full display name")
             .interact()?,
+    );
+
+    config.downloads_dir = Some(
+        Input::with_theme(&*THEME)
+            .with_prompt("Downloads directory")
+            .default(String::from("~/Downloads"))
+            .interact()?
+            .into(),
     );
 
     match backend::wizard::configure(&account_name, &config.email).await? {
@@ -77,6 +86,16 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
         }
         _ => (),
     };
+
+    config.sync = Some(
+        Confirm::new()
+            .with_prompt(wizard_prompt!(
+                "Do you need an offline access to your account?"
+            ))
+            .default(false)
+            .interact_opt()?
+            .unwrap_or_default(),
+    );
 
     Ok(Some((account_name, config)))
 }

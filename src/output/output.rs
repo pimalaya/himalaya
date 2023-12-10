@@ -1,8 +1,11 @@
 use anyhow::{anyhow, Error, Result};
-use atty::Stream;
 use clap::ValueEnum;
 use serde::Serialize;
-use std::{fmt, str::FromStr};
+use std::{
+    fmt,
+    io::{self, IsTerminal},
+    str::FromStr,
+};
 use termcolor::ColorChoice;
 
 /// Represents the available output formats.
@@ -78,7 +81,7 @@ impl From<ColorFmt> for ColorChoice {
             ColorFmt::Always => Self::Always,
             ColorFmt::Ansi => Self::AlwaysAnsi,
             ColorFmt::Auto => {
-                if atty::is(Stream::Stdout) {
+                if io::stdout().is_terminal() {
                     // Otherwise let's `termcolor` decide by
                     // inspecting the environment. From the [doc]:
                     //

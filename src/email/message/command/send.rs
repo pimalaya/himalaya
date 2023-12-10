@@ -1,9 +1,8 @@
 use anyhow::Result;
-use atty::Stream;
 use clap::Parser;
 use email::flag::Flag;
 use log::info;
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, IsTerminal};
 
 use crate::{
     account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::CacheDisableFlag,
@@ -38,7 +37,7 @@ impl MessageSendCommand {
         let backend = Backend::new(toml_account_config, account_config.clone(), true).await?;
         let folder = account_config.sent_folder_alias()?;
 
-        let is_tty = atty::is(Stream::Stdin);
+        let is_tty = io::stdin().is_terminal();
         let is_json = printer.is_json();
         let msg = if is_tty || is_json {
             self.message.raw()
