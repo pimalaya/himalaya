@@ -20,6 +20,15 @@ sync.enable = true
 # Override the default Maildir path for synchronization.
 sync.dir = "/tmp/himalaya-sync-example"
 
+# Define main folder aliases
+folder.alias.inbox = "INBOX"
+folder.alias.sent = "Sent"
+folder.alias.drafts = "Drafts"
+folder.alias.trash = "Trash"
+
+# Also define custom folder aliases
+folder.alias.prev-year = "Archives/2023"
+
 # Default backend used for all the features like adding folders,
 # listing envelopes or copying messages.
 backend = "imap"

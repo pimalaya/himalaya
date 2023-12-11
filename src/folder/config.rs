@@ -1,18 +1,18 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::backend::BackendKind;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 pub struct FolderConfig {
+    #[serde(alias = "aliases")]
+    pub alias: Option<HashMap<String, String>>,
+
     pub add: Option<FolderAddConfig>,
     pub list: Option<FolderListConfig>,
     pub expunge: Option<FolderExpungeConfig>,
     pub purge: Option<FolderPurgeConfig>,
     pub delete: Option<FolderDeleteConfig>,
-
-    #[serde(flatten)]
-    pub remote: email::folder::config::FolderConfig,
 }
 
 impl FolderConfig {

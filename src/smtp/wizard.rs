@@ -51,13 +51,19 @@ pub(crate) async fn configure(account_name: &str, email: &str) -> Result<Backend
     let default_port = match protocol {
         Some(idx) if PROTOCOLS[idx] == SSL_TLS => {
             config.ssl = Some(true);
+            config.starttls = Some(false);
             465
         }
         Some(idx) if PROTOCOLS[idx] == STARTTLS => {
+            config.ssl = Some(false);
             config.starttls = Some(true);
             587
         }
-        _ => 25,
+        _ => {
+            config.ssl = Some(false);
+            config.starttls = Some(false);
+            25
+        }
     };
 
     config.port = Input::with_theme(&*THEME)

@@ -201,7 +201,7 @@ impl TomlConfig {
                             downloads_dir: config.downloads_dir,
 
                             folder: config.folder.map(|c| FolderConfig {
-                                aliases: c.remote.aliases,
+                                aliases: c.alias,
                                 list: c.list.map(|c| c.remote),
                             }),
                             envelope: config.envelope.map(|c| EnvelopeConfig {
