@@ -58,7 +58,7 @@ impl EnvelopeListCommand {
 
         let page_size = self
             .page_size
-            .unwrap_or(account_config.email_listing_page_size());
+            .unwrap_or(account_config.get_envelope_list_page_size());
         let page = 1.max(self.page) - 1;
 
         let envelopes = backend.list_envelopes(folder, page_size, page).await?;
@@ -66,7 +66,7 @@ impl EnvelopeListCommand {
         printer.print_table(
             Box::new(envelopes),
             PrintTableOpts {
-                format: &account_config.email_reading_format,
+                format: &account_config.get_message_read_format(),
                 max_width: self.table.max_width,
             },
         )?;

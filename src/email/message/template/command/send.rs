@@ -38,7 +38,7 @@ impl TemplateSendCommand {
         let (toml_account_config, account_config) =
             config.clone().into_account_configs(account, cache)?;
         let backend = Backend::new(toml_account_config, account_config.clone(), true).await?;
-        let folder = account_config.sent_folder_alias()?;
+        let folder = account_config.get_sent_folder_alias()?;
 
         let is_tty = io::stdin().is_terminal();
         let is_json = printer.is_json();
@@ -57,13 +57,13 @@ impl TemplateSendCommand {
         let mut compiler = MmlCompilerBuilder::new();
 
         #[cfg(feature = "pgp")]
-        compiler.set_some_pgp(config.pgp.clone());
+        compiler.set_some_pgp(account_config.pgp.clone());
 
         let msg = compiler.build(tpl.as_str())?.compile().await?.into_vec()?;
 
         backend.send_raw_message(&msg).await?;
 
-        if account_config.email_sending_save_copy.unwrap_or_default() {
+        if account_config.should_save_copy_sent_message() {
             backend
                 .add_raw_message_with_flag(&folder, &msg, Flag::Seen)
                 .await?;

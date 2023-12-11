@@ -1,17 +1,40 @@
 [example]
+# Make this account the default one to use when no account is given to
+# commands.
 default = true
 
-# The display-name and email are used to build the full email address:
-# "My example account" <example@localhost>
+# The display-name and the email are used to build the full email
+# address: "My example account" <example@localhost>
 display-name = "My example account"
 email = "example@localhost"
 
-sync = true
-sync-dir = "/tmp/himalaya-sync-example"
+# The signature can be a string or a path to a file.
+signature = "Regards,"
+signature-delim = "-- \n"
 
-# The default backend used for all the features like adding folders,
+# Enable the synchronization for this account. Running the command
+# `account sync example` will synchronize all folders and all emails
+# to a local Maildir at `$XDG_DATA_HOME/himalaya/example`.
+sync.enable = true
+
+# Override the default Maildir path for synchronization.
+sync.dir = "/tmp/himalaya-sync-example"
+
+# Default backend used for all the features like adding folders,
 # listing envelopes or copying messages.
 backend = "imap"
+
+envelope.list.page-size = 10
+envelope.list.datetime-fmt = "%F %R%:z"
+
+# Date are converted to the user's local timezone.
+envelope.list.datetime-local-tz = true
+
+# Override the backend used for listing envelopes.
+envelope.list.backend = "imap"
+
+# Override the backend used for sending messages.
+message.send.backend = "smtp"
 
 # IMAP config
 imap.host = "localhost"
@@ -19,12 +42,17 @@ imap.port = 3143
 imap.login = "example@localhost"
 imap.ssl = false
 imap.starttls = false
-imap.insecure = true
-imap.auth = "passwd"
-imap.passwd.keyring = "example-passwd"
+imap.auth = "passwd" # or oauth2
 
-# Override the backend used for sending messages.
-message.send.backend = "smtp"
+# Get password from the raw string (not safe)
+# imap.passwd.raw = "password"
+
+# Get password from a shell command
+imap.passwd.cmd = ["echo example-imap-password", "cat"]
+
+# Get password from your system keyring using secret service
+# Keyring secrets can be (re)set with the command `account configure example`
+# imap.passwd.keyring = "example-imap-password"
 
 # SMTP config
 smtp.host = "localhost"
@@ -32,25 +60,9 @@ smtp.port = 3025
 smtp.login = "example@localhost"
 smtp.ssl = false
 smtp.starttls = false
-smtp.insecure = true
 smtp.auth = "passwd"
-smtp.passwd.raw = "example"
+smtp.passwd.raw = "password"
 
-[example-2]
-display-name = "My example account 2"
-email = "example2@localhost"
-
-backend = "imap"
-
-imap.host = "localhost"
-imap.port = 3143
-imap.login = "example2@localhost"
-imap.ssl = false
-imap.starttls = false
-imap.insecure = true
-imap.auth = "passwd"
-imap.passwd.raw = "example"
-
-message.send.backend = "sendmail"
-
-sendmail.cmd = "sendmail"
+# PGP needs to be enabled with one of those cargo feature:
+# pgp-commands, pgp-gpg or pgp-native
+# pgp.backend = "gpg"

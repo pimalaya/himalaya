@@ -10,6 +10,9 @@ pub struct FolderConfig {
     pub expunge: Option<FolderExpungeConfig>,
     pub purge: Option<FolderPurgeConfig>,
     pub delete: Option<FolderDeleteConfig>,
+
+    #[serde(flatten)]
+    pub remote: email::folder::config::FolderConfig,
 }
 
 impl FolderConfig {
@@ -60,6 +63,9 @@ impl FolderAddConfig {
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 pub struct FolderListConfig {
     pub backend: Option<BackendKind>,
+
+    #[serde(flatten)]
+    pub remote: email::folder::list::config::FolderListConfig,
 }
 
 impl FolderListConfig {

@@ -1,5 +1,6 @@
 use anyhow::{bail, Result};
 use dialoguer::{Confirm, Input};
+use email::account::sync::config::SyncConfig;
 use email_address::EmailAddress;
 
 use crate::{
@@ -87,15 +88,20 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
         _ => (),
     };
 
-    config.sync = Some(
-        Confirm::new()
-            .with_prompt(wizard_prompt!(
-                "Do you need an offline access to your account?"
-            ))
-            .default(false)
-            .interact_opt()?
-            .unwrap_or_default(),
-    );
+    let should_configure_sync = Confirm::new()
+        .with_prompt(wizard_prompt!(
+            "Do you need an offline access to your account?"
+        ))
+        .default(false)
+        .interact_opt()?
+        .unwrap_or_default();
+
+    if should_configure_sync {
+        config.sync = Some(SyncConfig {
+            enable: Some(true),
+            ..Default::default()
+        });
+    }
 
     Ok(Some((account_name, config)))
 }

@@ -60,7 +60,7 @@ impl MessageMailtoCommand {
             }
         }
 
-        match account_config.signature() {
+        match account_config.find_full_signature() {
             Ok(Some(ref signature)) => builder = builder.text_body(body + "\n\n" + signature),
             Ok(None) => builder = builder.text_body(body),
             Err(err) => {
@@ -71,7 +71,7 @@ impl MessageMailtoCommand {
 
         let tpl = account_config
             .generate_tpl_interpreter()
-            .with_show_only_headers(account_config.email_writing_headers())
+            .with_show_only_headers(account_config.get_message_write_headers())
             .build()
             .from_msg_builder(builder)
             .await?;

@@ -4,26 +4,21 @@
 //! account in the accounts section of the user configuration file.
 
 #[cfg(feature = "pgp")]
-use email::account::PgpConfig;
+use email::account::config::pgp::PgpConfig;
 #[cfg(feature = "imap")]
 use email::imap::config::ImapConfig;
 #[cfg(feature = "smtp")]
 use email::smtp::config::SmtpConfig;
 use email::{
-    email::config::{EmailHooks, EmailTextPlainFormat},
-    folder::sync::FolderSyncStrategy,
-    maildir::config::MaildirConfig,
+    account::sync::config::SyncConfig, maildir::config::MaildirConfig,
     sendmail::config::SendmailConfig,
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{HashMap, HashSet},
-    path::PathBuf,
-};
+use std::{collections::HashSet, path::PathBuf};
 
 use crate::{
-    backend::BackendKind, config::prelude::*, envelope::config::EnvelopeConfig,
-    flag::config::FlagConfig, folder::config::FolderConfig, message::config::MessageConfig,
+    backend::BackendKind, envelope::config::EnvelopeConfig, flag::config::FlagConfig,
+    folder::config::FolderConfig, message::config::MessageConfig,
 };
 
 /// Represents all existing kind of account config.
@@ -34,93 +29,29 @@ pub struct TomlAccountConfig {
 
     pub email: String,
     pub display_name: Option<String>,
-    pub signature_delim: Option<String>,
     pub signature: Option<String>,
+    pub signature_delim: Option<String>,
     pub downloads_dir: Option<PathBuf>,
 
-    pub folder_listing_page_size: Option<usize>,
-    pub folder_aliases: Option<HashMap<String, String>>,
-
-    pub email_listing_page_size: Option<usize>,
-    pub email_listing_datetime_fmt: Option<String>,
-    pub email_listing_datetime_local_tz: Option<bool>,
-    pub email_reading_headers: Option<Vec<String>>,
-    #[serde(
-        default,
-        with = "OptionEmailTextPlainFormatDef",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub email_reading_format: Option<EmailTextPlainFormat>,
-    pub email_writing_headers: Option<Vec<String>>,
-    pub email_sending_save_copy: Option<bool>,
-    #[serde(
-        default,
-        with = "OptionEmailHooksDef",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub email_hooks: Option<EmailHooks>,
-
-    pub sync: Option<bool>,
-    pub sync_dir: Option<PathBuf>,
-    #[serde(
-        default,
-        with = "OptionFolderSyncStrategyDef",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub sync_folders_strategy: Option<FolderSyncStrategy>,
-
-    pub backend: Option<BackendKind>,
-
+    pub sync: Option<SyncConfig>,
     pub folder: Option<FolderConfig>,
     pub envelope: Option<EnvelopeConfig>,
     pub flag: Option<FlagConfig>,
     pub message: Option<MessageConfig>,
-
-    #[cfg(feature = "imap")]
-    #[serde(
-        default,
-        with = "OptionImapConfigDef",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub imap: Option<ImapConfig>,
-
-    #[serde(
-        default,
-        with = "OptionMaildirConfigDef",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub maildir: Option<MaildirConfig>,
-
-    #[cfg(feature = "notmuch")]
-    #[serde(
-        default,
-        with = "OptionNotmuchConfigDef",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub notmuch: Option<NotmuchConfig>,
-
-    #[cfg(feature = "smtp")]
-    #[serde(
-        default,
-        with = "OptionSmtpConfigDef",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub smtp: Option<SmtpConfig>,
-
-    #[serde(
-        default,
-        with = "OptionSendmailConfigDef",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub sendmail: Option<SendmailConfig>,
-
     #[cfg(feature = "pgp")]
-    #[serde(
-        default,
-        with = "OptionPgpConfigDef",
-        skip_serializing_if = "Option::is_none"
-    )]
     pub pgp: Option<PgpConfig>,
+
+    pub backend: Option<BackendKind>,
+    #[cfg(feature = "maildir")]
+    pub maildir: Option<MaildirConfig>,
+    #[cfg(feature = "imap")]
+    pub imap: Option<ImapConfig>,
+    #[cfg(feature = "notmuch")]
+    pub notmuch: Option<NotmuchConfig>,
+    #[cfg(feature = "smtp")]
+    pub smtp: Option<SmtpConfig>,
+    #[cfg(feature = "sendmail")]
+    pub sendmail: Option<SendmailConfig>,
 }
 
 impl TomlAccountConfig {
@@ -207,7 +138,7 @@ impl TomlAccountConfig {
     pub fn add_raw_message_kind(&self) -> Option<&BackendKind> {
         self.message
             .as_ref()
-            .and_then(|msg| msg.add.as_ref())
+            .and_then(|msg| msg.write.as_ref())
             .and_then(|add| add.backend.as_ref())
             .or_else(|| self.backend.as_ref())
     }
@@ -223,7 +154,7 @@ impl TomlAccountConfig {
     pub fn get_messages_kind(&self) -> Option<&BackendKind> {
         self.message
             .as_ref()
-            .and_then(|message| message.get.as_ref())
+            .and_then(|message| message.read.as_ref())
             .and_then(|get| get.backend.as_ref())
             .or_else(|| self.backend.as_ref())
     }

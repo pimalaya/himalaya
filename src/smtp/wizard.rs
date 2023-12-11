@@ -89,7 +89,8 @@ pub(crate) async fn configure(account_name: &str, email: &str) -> Result<Backend
             let config = match secret {
                 Some(idx) if SECRETS[idx] == KEYRING => {
                     Secret::new_keyring_entry(format!("{account_name}-smtp-passwd"))
-                        .set_keyring_entry_secret(prompt_passwd("SMTP password")?)?;
+                        .set_keyring_entry_secret(prompt_passwd("SMTP password")?)
+                        .await?;
                     PasswdConfig::default()
                 }
                 Some(idx) if SECRETS[idx] == RAW => PasswdConfig {
@@ -130,7 +131,8 @@ pub(crate) async fn configure(account_name: &str, email: &str) -> Result<Backend
                 .with_prompt("SMTP OAuth 2.0 client secret")
                 .interact()?;
             Secret::new_keyring_entry(format!("{account_name}-smtp-oauth2-client-secret"))
-                .set_keyring_entry_secret(&client_secret)?;
+                .set_keyring_entry_secret(&client_secret)
+                .await?;
 
             config.auth_url = Input::with_theme(&*THEME)
                 .with_prompt("SMTP OAuth 2.0 authorization URL")
@@ -210,11 +212,13 @@ pub(crate) async fn configure(account_name: &str, email: &str) -> Result<Backend
                 .await?;
 
             Secret::new_keyring_entry(format!("{account_name}-smtp-oauth2-access-token"))
-                .set_keyring_entry_secret(access_token)?;
+                .set_keyring_entry_secret(access_token)
+                .await?;
 
             if let Some(refresh_token) = &refresh_token {
                 Secret::new_keyring_entry(format!("{account_name}-smtp-oauth2-refresh-token"))
-                    .set_keyring_entry_secret(refresh_token)?;
+                    .set_keyring_entry_secret(refresh_token)
+                    .await?;
             }
 
             SmtpAuthConfig::OAuth2(config)

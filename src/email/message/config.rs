@@ -5,12 +5,12 @@ use crate::backend::BackendKind;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 pub struct MessageConfig {
-    pub add: Option<MessageAddConfig>,
+    pub write: Option<MessageAddConfig>,
     pub send: Option<MessageSendConfig>,
     pub peek: Option<MessagePeekConfig>,
-    pub get: Option<MessageGetConfig>,
+    pub read: Option<MessageGetConfig>,
     pub copy: Option<MessageCopyConfig>,
-    #[serde(default, rename = "move", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "move")]
     pub move_: Option<MessageMoveConfig>,
 }
 
@@ -18,7 +18,7 @@ impl MessageConfig {
     pub fn get_used_backends(&self) -> HashSet<&BackendKind> {
         let mut kinds = HashSet::default();
 
-        if let Some(add) = &self.add {
+        if let Some(add) = &self.write {
             kinds.extend(add.get_used_backends());
         }
 
@@ -30,7 +30,7 @@ impl MessageConfig {
             kinds.extend(peek.get_used_backends());
         }
 
-        if let Some(get) = &self.get {
+        if let Some(get) = &self.read {
             kinds.extend(get.get_used_backends());
         }
 
@@ -49,6 +49,9 @@ impl MessageConfig {
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 pub struct MessageAddConfig {
     pub backend: Option<BackendKind>,
+
+    #[serde(flatten)]
+    pub remote: email::message::add_raw::config::MessageWriteConfig,
 }
 
 impl MessageAddConfig {
@@ -66,6 +69,9 @@ impl MessageAddConfig {
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 pub struct MessageSendConfig {
     pub backend: Option<BackendKind>,
+
+    #[serde(flatten)]
+    pub remote: email::message::send_raw::config::MessageSendConfig,
 }
 
 impl MessageSendConfig {
@@ -100,6 +106,9 @@ impl MessagePeekConfig {
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 pub struct MessageGetConfig {
     pub backend: Option<BackendKind>,
+
+    #[serde(flatten)]
+    pub remote: email::message::get::config::MessageReadConfig,
 }
 
 impl MessageGetConfig {

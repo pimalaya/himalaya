@@ -28,10 +28,7 @@ impl AccountListCommand {
         printer.print_table(
             Box::new(accounts),
             PrintTableOpts {
-                format: config
-                    .email_reading_format
-                    .as_ref()
-                    .unwrap_or(&Default::default()),
+                format: &Default::default(),
                 max_width: self.table.max_width,
             },
         )

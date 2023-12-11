@@ -42,7 +42,7 @@ impl FolderListCommand {
         printer.print_table(
             Box::new(folders),
             PrintTableOpts {
-                format: &account_config.email_reading_format,
+                format: &account_config.get_message_read_format(),
                 max_width: self.table.max_width,
             },
         )?;

@@ -65,12 +65,11 @@ impl AttachmentDownloadCommand {
             ))?;
 
             for attachment in attachments {
-                let filename = attachment
+                let filename: PathBuf = attachment
                     .filename
-                    .map(PathBuf::from)
-                    .and_then(|f| f.file_name().map(|f| f.to_string_lossy().to_string()))
-                    .unwrap_or_else(|| Uuid::new_v4().to_string());
-                let filepath = account_config.download_fpath(&filename)?;
+                    .unwrap_or_else(|| Uuid::new_v4().to_string())
+                    .into();
+                let filepath = account_config.get_download_file_path(&filename)?;
                 printer.print_log(format!("Downloading {:?}…", filepath))?;
                 fs::write(&filepath, &attachment.body)
                     .with_context(|| format!("cannot save attachment at {filepath:?}"))?;

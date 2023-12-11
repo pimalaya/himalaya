@@ -28,6 +28,9 @@ impl EnvelopeConfig {
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 pub struct EnvelopeListConfig {
     pub backend: Option<BackendKind>,
+
+    #[serde(flatten)]
+    pub remote: email::envelope::list::config::EnvelopeListConfig,
 }
 
 impl EnvelopeListConfig {

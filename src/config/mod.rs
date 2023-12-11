@@ -1,14 +1,12 @@
 pub mod args;
-pub mod prelude;
 pub mod wizard;
 
 use anyhow::{anyhow, Context, Result};
 use dialoguer::Confirm;
 use dirs::{config_dir, home_dir};
 use email::{
-    account::config::AccountConfig,
-    config::Config,
-    email::config::{EmailHooks, EmailTextPlainFormat},
+    account::config::AccountConfig, config::Config, envelope::config::EnvelopeConfig,
+    folder::config::FolderConfig, message::config::MessageConfig,
 };
 use serde::{Deserialize, Serialize};
 use shellexpand_utils::{canonicalize, expand};
@@ -20,10 +18,7 @@ use std::{
 };
 use toml;
 
-use crate::{
-    account::config::TomlAccountConfig, backend::BackendKind, config::prelude::*, wizard_prompt,
-    wizard_warn,
-};
+use crate::{account::config::TomlAccountConfig, backend::BackendKind, wizard_prompt, wizard_warn};
 
 /// Represents the user config file.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
@@ -31,31 +26,9 @@ use crate::{
 pub struct TomlConfig {
     #[serde(alias = "name")]
     pub display_name: Option<String>,
-    pub signature_delim: Option<String>,
     pub signature: Option<String>,
+    pub signature_delim: Option<String>,
     pub downloads_dir: Option<PathBuf>,
-
-    pub folder_listing_page_size: Option<usize>,
-    pub folder_aliases: Option<HashMap<String, String>>,
-
-    pub email_listing_page_size: Option<usize>,
-    pub email_listing_datetime_fmt: Option<String>,
-    pub email_listing_datetime_local_tz: Option<bool>,
-    pub email_reading_headers: Option<Vec<String>>,
-    #[serde(
-        default,
-        with = "OptionEmailTextPlainFormatDef",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub email_reading_format: Option<EmailTextPlainFormat>,
-    pub email_writing_headers: Option<Vec<String>>,
-    pub email_sending_save_copy: Option<bool>,
-    #[serde(
-        default,
-        with = "OptionEmailHooksDef",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub email_hooks: Option<EmailHooks>,
 
     #[serde(flatten)]
     pub accounts: HashMap<String, TomlAccountConfig>,
@@ -203,7 +176,7 @@ impl TomlConfig {
         let (account_name, mut toml_account_config) =
             self.into_toml_account_config(account_name)?;
 
-        if let Some(true) = toml_account_config.sync {
+        if let Some(true) = toml_account_config.sync.as_ref().and_then(|c| c.enable) {
             if !disable_cache {
                 toml_account_config.backend = Some(BackendKind::MaildirForSync);
             }
@@ -211,21 +184,9 @@ impl TomlConfig {
 
         let config = Config {
             display_name: self.display_name,
-            signature_delim: self.signature_delim,
             signature: self.signature,
+            signature_delim: self.signature_delim,
             downloads_dir: self.downloads_dir,
-
-            folder_listing_page_size: self.folder_listing_page_size,
-            folder_aliases: self.folder_aliases,
-
-            email_listing_page_size: self.email_listing_page_size,
-            email_listing_datetime_fmt: self.email_listing_datetime_fmt,
-            email_listing_datetime_local_tz: self.email_listing_datetime_local_tz,
-            email_reading_headers: self.email_reading_headers,
-            email_reading_format: self.email_reading_format,
-            email_writing_headers: self.email_writing_headers,
-            email_sending_save_copy: self.email_sending_save_copy,
-            email_hooks: self.email_hooks,
 
             accounts: HashMap::from_iter(self.accounts.clone().into_iter().map(
                 |(name, config)| {
@@ -235,27 +196,23 @@ impl TomlConfig {
                             name,
                             email: config.email,
                             display_name: config.display_name,
-                            signature_delim: config.signature_delim,
                             signature: config.signature,
+                            signature_delim: config.signature_delim,
                             downloads_dir: config.downloads_dir,
 
-                            folder_listing_page_size: config.folder_listing_page_size,
-                            folder_aliases: config.folder_aliases.unwrap_or_default(),
-
-                            email_listing_page_size: config.email_listing_page_size,
-                            email_listing_datetime_fmt: config.email_listing_datetime_fmt,
-                            email_listing_datetime_local_tz: config.email_listing_datetime_local_tz,
-
-                            email_reading_headers: config.email_reading_headers,
-                            email_reading_format: config.email_reading_format.unwrap_or_default(),
-                            email_writing_headers: config.email_writing_headers,
-                            email_sending_save_copy: config.email_sending_save_copy,
-                            email_hooks: config.email_hooks.unwrap_or_default(),
-
-                            sync: config.sync.unwrap_or_default(),
-                            sync_dir: config.sync_dir,
-                            sync_folders_strategy: config.sync_folders_strategy.unwrap_or_default(),
-
+                            folder: config.folder.map(|c| FolderConfig {
+                                aliases: c.remote.aliases,
+                                list: c.list.map(|c| c.remote),
+                            }),
+                            envelope: config.envelope.map(|c| EnvelopeConfig {
+                                list: c.list.map(|c| c.remote),
+                            }),
+                            message: config.message.map(|c| MessageConfig {
+                                read: c.read.map(|c| c.remote),
+                                write: c.write.map(|c| c.remote),
+                                send: c.send.map(|c| c.remote),
+                            }),
+                            sync: config.sync,
                             #[cfg(feature = "pgp")]
                             pgp: config.pgp,
                         },

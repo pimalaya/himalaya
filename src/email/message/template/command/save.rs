@@ -60,7 +60,7 @@ impl TemplateSaveCommand {
         let mut compiler = MmlCompilerBuilder::new();
 
         #[cfg(feature = "pgp")]
-        compiler.set_some_pgp(config.pgp.clone());
+        compiler.set_some_pgp(account_config.pgp.clone());
 
         let msg = compiler.build(tpl.as_str())?.compile().await?.into_vec()?;
         backend.add_raw_message(folder, &msg).await?;

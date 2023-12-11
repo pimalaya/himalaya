@@ -44,8 +44,8 @@ impl AccountConfigureCommand {
             #[cfg(feature = "imap")]
             if let Some(ref config) = account_config.imap {
                 let reset = match &config.auth {
-                    ImapAuthConfig::Passwd(config) => config.reset(),
-                    ImapAuthConfig::OAuth2(config) => config.reset(),
+                    ImapAuthConfig::Passwd(config) => config.reset().await,
+                    ImapAuthConfig::OAuth2(config) => config.reset().await,
                 };
                 if let Err(err) = reset {
                     warn!("error while resetting imap secrets: {err}");
@@ -56,8 +56,8 @@ impl AccountConfigureCommand {
             #[cfg(feature = "smtp")]
             if let Some(ref config) = account_config.smtp {
                 let reset = match &config.auth {
-                    SmtpAuthConfig::Passwd(config) => config.reset(),
-                    SmtpAuthConfig::OAuth2(config) => config.reset(),
+                    SmtpAuthConfig::Passwd(config) => config.reset().await,
+                    SmtpAuthConfig::OAuth2(config) => config.reset().await,
                 };
                 if let Err(err) = reset {
                     warn!("error while resetting smtp secrets: {err}");
@@ -67,7 +67,7 @@ impl AccountConfigureCommand {
 
             #[cfg(feature = "pgp")]
             if let Some(ref config) = account_config.pgp {
-                account_config.pgp.reset().await?;
+                config.reset().await?;
             }
         }
 
@@ -100,10 +100,11 @@ impl AccountConfigureCommand {
         }
 
         #[cfg(feature = "pgp")]
-        if let Some(ref config) = config.pgp {
+        if let Some(ref config) = account_config.pgp {
             config
-                .pgp
-                .configure(&config.email, || prompt_passwd("PGP secret key password"))
+                .configure(&account_config.email, || {
+                    prompt_passwd("PGP secret key password")
+                })
                 .await?;
         }
 

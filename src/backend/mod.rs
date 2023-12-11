@@ -173,7 +173,7 @@ impl BackendBuilder {
                     MaildirSessionBuilder::new(account_config.clone(), mdir_config.clone())
                 }),
             maildir_for_sync: Some(MaildirConfig {
-                root_dir: account_config.sync_dir()?,
+                root_dir: account_config.get_sync_dir()?,
             })
             .filter(|_| is_maildir_for_sync_used)
             .map(|mdir_config| MaildirSessionBuilder::new(account_config.clone(), mdir_config)),
@@ -691,7 +691,7 @@ impl Backend {
                 id_mapper = IdMapper::new(
                     &self.backend.account_config,
                     folder,
-                    self.backend.account_config.sync_dir()?,
+                    self.backend.account_config.get_sync_dir()?,
                 )?;
             }
             #[cfg(feature = "notmuch")]

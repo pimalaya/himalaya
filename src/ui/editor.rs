@@ -89,8 +89,8 @@ pub async fn edit_tpl_with_editor<P: Printer>(
 
                 backend.send_raw_message(&email).await?;
 
-                if config.email_sending_save_copy.unwrap_or_default() {
-                    let sent_folder = config.sent_folder_alias()?;
+                if config.should_save_copy_sent_message() {
+                    let sent_folder = config.get_sent_folder_alias()?;
                     printer.print_log(format!("Adding email to the {} folder…", sent_folder))?;
                     backend
                         .add_raw_message_with_flag(&sent_folder, &email, Flag::Seen)
