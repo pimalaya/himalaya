@@ -1,5 +1,5 @@
 use anyhow::Result;
-use email::email::EmailTextPlainFormat;
+use email::email::config::EmailTextPlainFormat;
 use std::io;
 use termcolor::{self, StandardStream};
 

@@ -1,20 +1,19 @@
 use anyhow::{anyhow, Error, Result};
-use atty::Stream;
+use clap::ValueEnum;
 use serde::Serialize;
-use std::{fmt, str::FromStr};
+use std::{
+    fmt,
+    io::{self, IsTerminal},
+    str::FromStr,
+};
 use termcolor::ColorChoice;
 
 /// Represents the available output formats.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd, ValueEnum)]
 pub enum OutputFmt {
+    #[default]
     Plain,
     Json,
-}
-
-impl Default for OutputFmt {
-    fn default() -> Self {
-        Self::Plain
-    }
 }
 
 impl FromStr for OutputFmt {
@@ -52,18 +51,13 @@ impl<T: Serialize> OutputJson<T> {
 }
 
 /// Represent the available color configs.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, PartialOrd, Ord, ValueEnum)]
 pub enum ColorFmt {
     Never,
     Always,
     Ansi,
+    #[default]
     Auto,
-}
-
-impl Default for ColorFmt {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 impl FromStr for ColorFmt {
@@ -87,7 +81,7 @@ impl From<ColorFmt> for ColorChoice {
             ColorFmt::Always => Self::Always,
             ColorFmt::Ansi => Self::AlwaysAnsi,
             ColorFmt::Auto => {
-                if atty::is(Stream::Stdout) {
+                if io::stdout().is_terminal() {
                     // Otherwise let's `termcolor` decide by
                     // inspecting the environment. From the [doc]:
                     //

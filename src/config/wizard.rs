@@ -1,10 +1,13 @@
-use super::DeserializedConfig;
-use crate::account;
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Confirm, Input, Password, Select};
 use once_cell::sync::Lazy;
-use shellexpand_utils::{shellexpand_path, try_shellexpand_path};
-use std::{env, fs, io, process};
+use shellexpand_utils::expand;
+use std::{fs, io, path::PathBuf, process};
+use toml_edit::{Document, Item};
+
+use crate::account;
+
+use super::TomlConfig;
 
 #[macro_export]
 macro_rules! wizard_warn {
@@ -31,10 +34,10 @@ macro_rules! wizard_log {
 
 pub(crate) static THEME: Lazy<ColorfulTheme> = Lazy::new(ColorfulTheme::default);
 
-pub(crate) async fn configure() -> Result<DeserializedConfig> {
+pub(crate) async fn configure(path: PathBuf) -> Result<TomlConfig> {
     wizard_log!("Configuring your first account:");
 
-    let mut config = DeserializedConfig::default();
+    let mut config = TomlConfig::default();
 
     while let Some((name, account_config)) = account::wizard::configure().await? {
         config.accounts.insert(name, account_config);
@@ -57,7 +60,10 @@ pub(crate) async fn configure() -> Result<DeserializedConfig> {
     // accounts are setup, decide which will be the default. If no
     // accounts are setup, exit the process.
     let default_account = match config.accounts.len() {
-        0 => process::exit(0),
+        0 => {
+            wizard_warn!("No account configured, exiting.");
+            process::exit(0);
+        }
         1 => Some(config.accounts.values_mut().next().unwrap()),
         _ => {
             let accounts = config.accounts.clone();
@@ -86,23 +92,84 @@ pub(crate) async fn configure() -> Result<DeserializedConfig> {
         .with_prompt(wizard_prompt!(
             "Where would you like to save your configuration?"
         ))
-        .default(
-            dirs::config_dir()
-                .map(|p| p.join("himalaya").join("config.toml"))
-                .unwrap_or_else(|| env::temp_dir().join("himalaya").join("config.toml"))
-                .to_string_lossy()
-                .to_string(),
-        )
-        .validate_with(|path: &String| try_shellexpand_path(path).map(|_| ()))
+        .default(path.to_string_lossy().to_string())
         .interact()?;
-    let path = shellexpand_path(&path);
+    let path = expand::path(&path);
 
     println!("Writing the configuration to {path:?}…");
 
+    let mut doc = toml::to_string(&config)?.parse::<Document>()?;
+
+    doc.iter_mut().for_each(|(_, item)| {
+        set_table_dotted(item, "folder-aliases");
+        set_table_dotted(item, "sync-folders-strategy");
+
+        set_table_dotted(item, "folder");
+        get_table_mut(item, "folder").map(|item| {
+            set_tables_dotted(item, ["add", "list", "expunge", "purge", "delete"]);
+        });
+
+        set_table_dotted(item, "envelope");
+        get_table_mut(item, "envelope").map(|item| {
+            set_tables_dotted(item, ["list", "get"]);
+        });
+
+        set_table_dotted(item, "flag");
+        get_table_mut(item, "flag").map(|item| {
+            set_tables_dotted(item, ["add", "set", "remove"]);
+        });
+
+        set_table_dotted(item, "message");
+        get_table_mut(item, "message").map(|item| {
+            set_tables_dotted(
+                item,
+                ["add", "send", "peek", "get", "copy", "move", "delete"],
+            );
+        });
+
+        set_table_dotted(item, "maildir");
+        #[cfg(feature = "imap")]
+        {
+            set_table_dotted(item, "imap");
+            get_table_mut(item, "imap").map(|item| {
+                set_tables_dotted(item, ["passwd", "oauth2"]);
+            });
+        }
+        #[cfg(feature = "notmuch")]
+        set_table_dotted(item, "notmuch");
+        set_table_dotted(item, "sendmail");
+        #[cfg(feature = "smtp")]
+        {
+            set_table_dotted(item, "smtp");
+            get_table_mut(item, "smtp").map(|item| {
+                set_tables_dotted(item, ["passwd", "oauth2"]);
+            });
+        }
+
+        #[cfg(feature = "pgp")]
+        set_table_dotted(item, "pgp");
+    });
+
     fs::create_dir_all(path.parent().unwrap_or(&path))?;
-    fs::write(path, toml::to_string(&config)?)?;
+    fs::write(path, doc.to_string())?;
 
     Ok(config)
+}
+
+fn get_table_mut<'a>(item: &'a mut Item, key: &'a str) -> Option<&'a mut Item> {
+    item.get_mut(key).filter(|item| item.is_table())
+}
+
+fn set_table_dotted(item: &mut Item, key: &str) {
+    get_table_mut(item, key)
+        .and_then(|item| item.as_table_mut())
+        .map(|table| table.set_dotted(true));
+}
+
+fn set_tables_dotted<'a>(item: &'a mut Item, keys: impl IntoIterator<Item = &'a str>) {
+    for key in keys {
+        set_table_dotted(item, key)
+    }
 }
 
 pub(crate) fn prompt_passwd(prompt: &str) -> io::Result<String> {

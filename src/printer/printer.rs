@@ -9,10 +9,14 @@ use crate::{
 };
 
 pub trait Printer {
+    // TODO: rename end
     fn print<T: Debug + Print + serde::Serialize>(&mut self, data: T) -> Result<()>;
+    // TODO: rename log
     fn print_log<T: Debug + Print>(&mut self, data: T) -> Result<()>;
+    // TODO: rename table
     fn print_table<T: Debug + erased_serde::Serialize + PrintTable + ?Sized>(
         &mut self,
+        // TODO: remove Box
         data: Box<T>,
         opts: PrintTableOpts,
     ) -> Result<()>;

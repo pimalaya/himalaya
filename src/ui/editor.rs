@@ -1,16 +1,16 @@
 use anyhow::{Context, Result};
 use email::{
-    account::AccountConfig,
-    backend::Backend,
-    email::{local_draft_path, remove_local_draft, Flag, Flags},
-    sender::Sender,
+    account::config::AccountConfig,
+    email::utils::{local_draft_path, remove_local_draft},
+    flag::{Flag, Flags},
 };
 use log::debug;
 use mml::MmlCompilerBuilder;
-use process::Cmd;
+use process::SingleCmd;
 use std::{env, fs};
 
 use crate::{
+    backend::Backend,
     printer::Printer,
     ui::choice::{self, PostEditChoice, PreEditChoice},
 };
@@ -23,7 +23,8 @@ pub async fn open_with_tpl(tpl: String) -> Result<String> {
 
     debug!("open editor");
     let editor = env::var("EDITOR").context("cannot get editor from env var")?;
-    Cmd::from(format!("{editor} {}", &path.to_string_lossy()))
+    SingleCmd::from(format!("{editor} {}", &path.to_string_lossy()))
+        .with_output_piped(false)
         .run()
         .await
         .context("cannot launch editor")?;
@@ -45,8 +46,7 @@ pub async fn open_with_local_draft() -> Result<String> {
 pub async fn edit_tpl_with_editor<P: Printer>(
     config: &AccountConfig,
     printer: &mut P,
-    backend: &mut dyn Backend,
-    sender: &mut dyn Sender,
+    backend: &Backend,
     mut tpl: String,
 ) -> Result<()> {
     let draft = local_draft_path();
@@ -79,20 +79,21 @@ pub async fn edit_tpl_with_editor<P: Printer>(
             Ok(PostEditChoice::Send) => {
                 printer.print_log("Sending email…")?;
 
-                let compiler = MmlCompilerBuilder::new();
+                #[allow(unused_mut)]
+                let mut compiler = MmlCompilerBuilder::new();
 
                 #[cfg(feature = "pgp")]
-                let compiler = compiler.with_pgp(config.pgp.clone());
+                compiler.set_some_pgp(config.pgp.clone());
 
                 let email = compiler.build(tpl.as_str())?.compile().await?.into_vec()?;
 
-                sender.send(&email).await?;
+                backend.send_raw_message(&email).await?;
 
-                if config.email_sending_save_copy {
-                    let sent_folder = config.sent_folder_alias()?;
+                if config.should_save_copy_sent_message() {
+                    let sent_folder = config.get_sent_folder_alias()?;
                     printer.print_log(format!("Adding email to the {} folder…", sent_folder))?;
                     backend
-                        .add_email(&sent_folder, &email, &Flags::from_iter([Flag::Seen]))
+                        .add_raw_message_with_flag(&sent_folder, &email, Flag::Seen)
                         .await?;
                 }
 
@@ -109,15 +110,16 @@ pub async fn edit_tpl_with_editor<P: Printer>(
                 break;
             }
             Ok(PostEditChoice::RemoteDraft) => {
-                let compiler = MmlCompilerBuilder::new();
+                #[allow(unused_mut)]
+                let mut compiler = MmlCompilerBuilder::new();
 
                 #[cfg(feature = "pgp")]
-                let compiler = compiler.with_pgp(config.pgp.clone());
+                compiler.set_some_pgp(config.pgp.clone());
 
                 let email = compiler.build(tpl.as_str())?.compile().await?.into_vec()?;
 
                 backend
-                    .add_email(
+                    .add_raw_message_with_flags(
                         "drafts",
                         &email,
                         &Flags::from_iter([Flag::Seen, Flag::Draft]),

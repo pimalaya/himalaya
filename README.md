@@ -85,35 +85,22 @@ Please read the [documentation](https://pimalaya.org/himalaya/cli/configuration/
 
 ## Contributing
 
-If you find a **bug** that [does not exist yet](https://todo.sr.ht/~soywod/pimalaya), please send an email at [~soywod/pimalaya@todo.sr.ht](mailto:~soywod/pimalaya@todo.sr.ht).
+If you want to **report a bug** that [does not exist yet](https://todo.sr.ht/~soywod/pimalaya), please send an email at [~soywod/pimalaya@todo.sr.ht](mailto:~soywod/pimalaya@todo.sr.ht).
 
-If you have a **question**, please send an email at [~soywod/pimalaya@lists.sr.ht](mailto:~soywod/pimalaya@lists.sr.ht).
+If you want to **propose a feature** or **fix a bug**, please send a patch at [~soywod/pimalaya@lists.sr.ht](mailto:~soywod/pimalaya@lists.sr.ht) using [git send-email](https://git-scm.com/docs/git-send-email). Follow [this guide](https://git-send-email.io/) to configure git properly.
 
-If you want to **propose a feature** or **fix a bug**, please send a patch at [~soywod/pimalaya@lists.sr.ht](mailto:~soywod/pimalaya@lists.sr.ht) using [git send-email](https://git-scm.com/docs/git-send-email) (see [this guide](https://git-send-email.io/) on how to configure it).
+If you just want to **discuss** about the project, feel free to join the [Matrix](https://matrix.org/) workspace [#pimalaya.general](https://matrix.to/#/#pimalaya.general:matrix.org) or contact me directly [@soywod](https://matrix.to/#/@soywod:matrix.org). You can also use the mailing list [[send an email](mailto:~soywod/pimalaya@lists.sr.ht)|[subscribe](mailto:~soywod/pimalaya+subscribe@lists.sr.ht)|[unsubscribe](mailto:~soywod/pimalaya+unsubscribe@lists.sr.ht)].
 
-If you want to **subscribe** to the mailing list, please send an email at [~soywod/pimalaya+subscribe@lists.sr.ht](mailto:~soywod/pimalaya+subscribe@lists.sr.ht).
-
-If you want to **unsubscribe** to the mailing list, please send an email at [~soywod/pimalaya+unsubscribe@lists.sr.ht](mailto:~soywod/pimalaya+unsubscribe@lists.sr.ht).
-
-If you want to **discuss** about the project, feel free to join the [Matrix](https://matrix.org/) workspace [#pimalaya.himalaya](https://matrix.to/#/#pimalaya.himalaya:matrix.org) or contact me directly [@soywod](https://matrix.to/#/@soywod:matrix.org).
-
-## Credits
+## Sponsoring
 
 [![nlnet](https://nlnet.nl/logo/banner-160x60.png)](https://nlnet.nl/project/Himalaya/index.html)
 
-Special thanks to the [nlnet](https://nlnet.nl/project/Himalaya/index.html) foundation that helped Himalaya to receive financial support from the [NGI Assure](https://www.ngi.eu/ngi-projects/ngi-assure/) program of the European Commission in September, 2022.
+Special thanks to the [NLnet foundation](https://nlnet.nl/project/Himalaya/index.html) and the [European Commission](https://www.ngi.eu/) that helped the project to receive financial support from:
 
-- [IMAP RFC3501](https://tools.ietf.org/html/rfc3501)
-- [Iris](https://github.com/soywod/iris.vim), the himalaya predecessor
-- [isync](https://isync.sourceforge.io/), an email synchronizer for offline usage
-- [NeoMutt](https://neomutt.org/), an email terminal user interface
-- [Alpine](http://alpine.x10host.com/alpine/alpine-info/), an other email terminal user interface
-- [mutt-wizard](https://github.com/LukeSmithxyz/mutt-wizard), a tool over NeoMutt and isync
-- [rust-imap](https://github.com/jonhoo/rust-imap), a Rust IMAP library
-- [lettre](https://github.com/lettre/lettre), a Rust mailer library
-- [mailparse](https://github.com/staktrace/mailparse), a Rust MIME email parser.
+- [NGI Assure](https://nlnet.nl/assure/) in 2022
+- [NGI Zero Untrust](https://nlnet.nl/entrust/) in 2023
 
-## Sponsoring
+If you appreciate the project, feel free to donate using one of the following providers:
 
 [![GitHub](https://img.shields.io/badge/-GitHub%20Sponsors-fafbfc?logo=GitHub%20Sponsors)](https://github.com/sponsors/soywod)
 [![PayPal](https://img.shields.io/badge/-PayPal-0079c1?logo=PayPal&logoColor=ffffff)](https://www.paypal.com/paypalme/soywod)
