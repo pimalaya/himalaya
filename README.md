@@ -15,7 +15,7 @@ CLI to manage emails, based on [email-lib](https://crates.io/crates/email-lib).
 - [Message composition](https://pimalaya.org/himalaya/cli/latest/usage/message/write.md) based on `$EDITOR`
 - Message manipulation ([copy](https://pimalaya.org/himalaya/cli/latest/usage/message/copy.md)/[move](https://pimalaya.org/himalaya/cli/latest/usage/message/move.md)/[delete](https://pimalaya.org/himalaya/cli/latest/usage/message/delete.md))
 - [Multi-accounting](https://pimalaya.org/himalaya/cli/latest/configuration/)
-- [Account synchronization](https://pimalaya.org/himalaya/cli/latest/usage/account/sync.md) for offline https://pimalaya.org/himalaya/cli/latest/usage
+- [Account synchronization](https://pimalaya.org/himalaya/cli/latest/usage/account/sync.md) for offline usage
 - Support for [IMAP](https://pimalaya.org/himalaya/cli/latest/configuration/imap.md), [Maildir](https://pimalaya.org/himalaya/cli/latest/configuration/maildir.md), [notmuch](https://pimalaya.org/himalaya/cli/latest/configuration/notmuch.md)
 - Sending via [SMTP](https://pimalaya.org/himalaya/cli/latest/configuration/smtp.md) or [sendmail](https://pimalaya.org/himalaya/cli/latest/configuration/sendmail.md)
 - [PGP](https://pimalaya.org/himalaya/cli/latest/configuration/pgp/) end-to-end encryption
