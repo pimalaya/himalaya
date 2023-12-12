@@ -1,42 +1,28 @@
 # 📫 Himalaya [![GitHub release](https://img.shields.io/github/v/release/soywod/himalaya?color=success)](https://github.com/soywod/himalaya/releases/latest) [![Matrix](https://img.shields.io/matrix/pimalaya.himalaya:matrix.org?color=success&label=chat)](https://matrix.to/#/#pimalaya.himalaya:matrix.org)
 
-https://pimalaya.org/himalaya/
+https://pimalaya.org/himalaya/cli/latest/
 
-CLI to manage emails, based on [email-lib](https://sr.ht/~soywod/pimalaya/).
+CLI to manage emails, based on [email-lib](https://crates.io/crates/email-lib).
 
-![image](https://user-images.githubusercontent.com/10437171/138774902-7b9de5a3-93eb-44b0-8cfb-6d2e11e3b1aa.png)
+![screenshot](https://user-images.githubusercontent.com/10437171/138774902-7b9de5a3-93eb-44b0-8cfb-6d2e11e3b1aa.png)
 
 *Disclaimer: the project is under active development, do not use in production before the `v1.0.0`.*
 
 ## Features
 
-- [Folder listing]
-- [Envelopes listing], [searching] and [sorting]
-- [Email composition] based on `$EDITOR`
-- Email manipulation ([copy]/[move]/[delete])
-- [Multi-accounting]
-- [Account listing]
-- [Account synchronization] for offline usage
-- IMAP, Maildir and Notmuch support
-- IMAP IDLE mode for [real-time notifications]
-- PGP end-to-end encryption
-- [Completions] for various shells
+- [Mailbox management](https://pimalaya.org/himalaya/cli/latest/usage/folder/)
+- [Envelopes listing](https://pimalaya.org/himalaya/cli/latest/usage/envelope/list.md)
+- [Message composition](https://pimalaya.org/himalaya/cli/latest/usage/message/write.md) based on `$EDITOR`
+- Message manipulation ([copy](https://pimalaya.org/himalaya/cli/latest/usage/message/copy.md)/[move](https://pimalaya.org/himalaya/cli/latest/usage/message/move.md)/[delete](https://pimalaya.org/himalaya/cli/latest/usage/message/delete.md))
+- [Multi-accounting](https://pimalaya.org/himalaya/cli/latest/configuration/)
+- [Account synchronization](https://pimalaya.org/himalaya/cli/latest/usage/account/sync.md) for offline https://pimalaya.org/himalaya/cli/latest/usage
+- Support for [IMAP](https://pimalaya.org/himalaya/cli/latest/configuration/imap.md), [Maildir](https://pimalaya.org/himalaya/cli/latest/configuration/maildir.md), [notmuch](https://pimalaya.org/himalaya/cli/latest/configuration/notmuch.md)
+- Sending via [SMTP](https://pimalaya.org/himalaya/cli/latest/configuration/smtp.md) or [sendmail](https://pimalaya.org/himalaya/cli/latest/configuration/sendmail.md)
+- [PGP](https://pimalaya.org/himalaya/cli/latest/configuration/pgp/) end-to-end encryption
+- Generate [completion scripts](https://pimalaya.org/himalaya/cli/latest/tips/completion.md) for various shells
+- Generate [man pages](https://pimalaya.org/himalaya/cli/latest/tips/man.md)
 - JSON output
-- …
-
-[Folder listing]: https://pimalaya.org/himalaya/cli/usage/folders/list.html
-[Envelopes listing]: https://pimalaya.org/himalaya/cli/usage/envelopes/list.html
-[searching]: https://pimalaya.org/himalaya/cli/usage/envelopes/search.html
-[sorting]: https://pimalaya.org/himalaya/cli/usage/envelopes/sort.html
-[Email composition]: https://pimalaya.org/himalaya/cli/usage/emails/write.html
-[copy]: https://pimalaya.org/himalaya/cli/usage/emails/copy.html
-[move]: https://pimalaya.org/himalaya/cli/usage/emails/move.html
-[delete]: https://pimalaya.org/himalaya/cli/usage/emails/delete.html
-[Multi-accounting]: https://pimalaya.org/himalaya/cli/configuration/index.html
-[Account listing]: https://pimalaya.org/himalaya/cli/usage/accounts/list.html
-[Account synchronization]: https://pimalaya.org/himalaya/cli/usage/accounts/synchronize.html
-[real-time notifications]: https://pimalaya.org/himalaya/cli/usage/notifications.html
-[Completions]: https://pimalaya.org/himalaya/cli/tips/completion.html
+- …and more!
 
 ## Installation
 
@@ -73,7 +59,7 @@ $ dnf copr enable atim/himalaya
 $ dnf install himalaya
 ```
 
-*See the [documentation](https://pimalaya.org/himalaya/cli/installation/index.html) for other installation methods.*
+*See the [documentation](https://pimalaya.org/himalaya/cli/latest/installation/) for other installation methods.*
 
 </td>
 </tr>
@@ -81,7 +67,7 @@ $ dnf install himalaya
 
 ## Configuration
 
-Please read the [documentation](https://pimalaya.org/himalaya/cli/configuration/index.html).
+Please read the [documentation](https://pimalaya.org/himalaya/cli/latest/configuration/).
 
 ## Contributing
 

@@ -1,6 +1,5 @@
 [example]
-# Make this account the default one to use when no account is given to
-# commands.
+# The current account will be used by default for all other commands.
 default = true
 
 # The display-name and the email are used to build the full email

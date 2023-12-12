@@ -26,22 +26,22 @@ use crate::{
 #[serde(rename_all = "kebab-case")]
 pub struct TomlAccountConfig {
     pub default: Option<bool>,
-
     pub email: String,
     pub display_name: Option<String>,
     pub signature: Option<String>,
     pub signature_delim: Option<String>,
     pub downloads_dir: Option<PathBuf>,
+    pub backend: Option<BackendKind>,
 
     pub sync: Option<SyncConfig>,
+    #[cfg(feature = "pgp")]
+    pub pgp: Option<PgpConfig>,
+
     pub folder: Option<FolderConfig>,
     pub envelope: Option<EnvelopeConfig>,
     pub flag: Option<FlagConfig>,
     pub message: Option<MessageConfig>,
-    #[cfg(feature = "pgp")]
-    pub pgp: Option<PgpConfig>,
 
-    pub backend: Option<BackendKind>,
     #[cfg(feature = "maildir")]
     pub maildir: Option<MaildirConfig>,
     #[cfg(feature = "imap")]
