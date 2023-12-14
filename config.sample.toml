@@ -41,15 +41,18 @@ envelope.list.datetime-local-tz = true
 # Override the backend used for listing envelopes.
 envelope.list.backend = "imap"
 
+# Send notification on receiving new envelopes
+envelope.watch.received.notify.summary = "📬 New message from {sender}"
+
+# Available placeholders: id, subject, sender, sender.name,
+# sender.address, recipient, recipient.name, recipient.address.
+envelope.watch.received.notify.body = "{subject}"
+
+# Shell commands can also be executed when envelopes change
+# envelope.watch.any.cmd = "mbsync -a"
+
 # Override the backend used for sending messages.
 message.send.backend = "smtp"
-
-# Send notification when receiving new messages
-message.watch.received.notify.summary = "📬 New message from {sender}"
-message.watch.received.notify.body = "{subject}"
-
-# Shell commands can also be executed
-# message.watch.received.cmd = "mbsync -a"
 
 # IMAP config
 imap.host = "localhost"

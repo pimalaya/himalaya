@@ -192,9 +192,9 @@ impl TomlAccountConfig {
     }
 
     pub fn get_watch_message_kind(&self) -> Option<&BackendKind> {
-        self.message
+        self.envelope
             .as_ref()
-            .and_then(|msg| msg.watch.as_ref())
+            .and_then(|envelope| envelope.watch.as_ref())
             .and_then(|watch| watch.backend.as_ref())
             .or_else(|| self.backend.as_ref())
     }

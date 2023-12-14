@@ -11,10 +11,10 @@ use email::imap::{ImapSessionBuilder, ImapSessionSync};
 use email::smtp::{SmtpClientBuilder, SmtpClientSync};
 use email::{
     account::config::AccountConfig,
-    email::watch::{imap::WatchImapEmails, maildir::WatchMaildirEmails},
     envelope::{
         get::{imap::GetEnvelopeImap, maildir::GetEnvelopeMaildir},
         list::{imap::ListEnvelopesImap, maildir::ListEnvelopesMaildir},
+        watch::{imap::WatchImapEnvelopes, maildir::WatchMaildirEnvelopes},
         Id, SingleId,
     },
     flag::{
@@ -358,26 +358,27 @@ impl BackendBuilder {
 
         match toml_account_config.backend {
             Some(BackendKind::Maildir) => {
-                backend_builder = backend_builder.with_watch_emails(|ctx| {
-                    ctx.maildir.as_ref().and_then(WatchMaildirEmails::new)
+                backend_builder = backend_builder.with_watch_envelopes(|ctx| {
+                    ctx.maildir.as_ref().and_then(WatchMaildirEnvelopes::new)
                 });
             }
             Some(BackendKind::MaildirForSync) => {
-                backend_builder = backend_builder.with_watch_emails(|ctx| {
+                backend_builder = backend_builder.with_watch_envelopes(|ctx| {
                     ctx.maildir_for_sync
                         .as_ref()
-                        .and_then(WatchMaildirEmails::new)
+                        .and_then(WatchMaildirEnvelopes::new)
                 });
             }
             #[cfg(feature = "imap")]
             Some(BackendKind::Imap) => {
-                backend_builder = backend_builder
-                    .with_watch_emails(|ctx| ctx.imap.as_ref().and_then(WatchImapEmails::new));
+                backend_builder = backend_builder.with_watch_envelopes(|ctx| {
+                    ctx.imap.as_ref().and_then(WatchImapEnvelopes::new)
+                });
             }
             #[cfg(feature = "notmuch")]
             Some(BackendKind::Notmuch) => {
-                backend_builder = backend_builder.with_watch_emails(|ctx| {
-                    ctx.notmuch.as_ref().and_then(WatchNotmuchEmails::new)
+                backend_builder = backend_builder.with_watch_envelopes(|ctx| {
+                    ctx.notmuch.as_ref().and_then(WatchNotmuchEnvelopes::new)
                 });
             }
             _ => (),

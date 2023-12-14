@@ -4,17 +4,17 @@ use log::info;
 
 use crate::{
     account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::CacheDisableFlag,
-    config::TomlConfig, folder::arg::name::FolderNameArg, printer::Printer,
+    config::TomlConfig, folder::arg::name::FolderNameOptionalArg, printer::Printer,
 };
 
-/// Watch a folder for changes.
+/// Watch envelopes for changes.
 ///
-/// This command allows you to watch a new folder using the given
-/// name.
+/// This command allows you to watch a folder and execute hooks when
+/// changes occur on envelopes.
 #[derive(Debug, Parser)]
-pub struct FolderWatchCommand {
+pub struct WatchEnvelopesCommand {
     #[command(flatten)]
-    pub folder: FolderNameArg,
+    pub folder: FolderNameOptionalArg,
 
     #[command(flatten)]
     pub cache: CacheDisableFlag,
@@ -23,9 +23,9 @@ pub struct FolderWatchCommand {
     pub account: AccountNameFlag,
 }
 
-impl FolderWatchCommand {
+impl WatchEnvelopesCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
-        info!("executing folder watch command");
+        info!("executing envelopes watch command");
 
         let folder = &self.folder.name;
 
@@ -35,8 +35,10 @@ impl FolderWatchCommand {
             .into_account_configs(some_account_name, self.cache.disable)?;
         let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
 
-        printer.print_log(format!("Start watching folder {folder} for changes…"))?;
+        printer.print_log(format!(
+            "Start watching folder {folder} for envelopes changes…"
+        ))?;
 
-        backend.watch_emails(&folder).await
+        backend.watch_envelopes(&folder).await
     }
 }

@@ -5,8 +5,9 @@ use crate::backend::BackendKind;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 pub struct EnvelopeConfig {
-    pub list: Option<EnvelopeListConfig>,
-    pub get: Option<EnvelopeGetConfig>,
+    pub list: Option<ListEnvelopesConfig>,
+    pub watch: Option<WatchEnvelopesConfig>,
+    pub get: Option<GetEnvelopeConfig>,
 }
 
 impl EnvelopeConfig {
@@ -21,19 +22,23 @@ impl EnvelopeConfig {
             kinds.extend(get.get_used_backends());
         }
 
+        if let Some(watch) = &self.watch {
+            kinds.extend(watch.get_used_backends());
+        }
+
         kinds
     }
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
-pub struct EnvelopeListConfig {
+pub struct ListEnvelopesConfig {
     pub backend: Option<BackendKind>,
 
     #[serde(flatten)]
     pub remote: email::envelope::list::config::EnvelopeListConfig,
 }
 
-impl EnvelopeListConfig {
+impl ListEnvelopesConfig {
     pub fn get_used_backends(&self) -> HashSet<&BackendKind> {
         let mut kinds = HashSet::default();
 
@@ -46,11 +51,31 @@ impl EnvelopeListConfig {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
-pub struct EnvelopeGetConfig {
+pub struct WatchEnvelopesConfig {
+    pub backend: Option<BackendKind>,
+
+    #[serde(flatten)]
+    pub remote: email::envelope::watch::config::WatchEnvelopeConfig,
+}
+
+impl WatchEnvelopesConfig {
+    pub fn get_used_backends(&self) -> HashSet<&BackendKind> {
+        let mut kinds = HashSet::default();
+
+        if let Some(kind) = &self.backend {
+            kinds.insert(kind);
+        }
+
+        kinds
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+pub struct GetEnvelopeConfig {
     pub backend: Option<BackendKind>,
 }
 
-impl EnvelopeGetConfig {
+impl GetEnvelopeConfig {
     pub fn get_used_backends(&self) -> HashSet<&BackendKind> {
         let mut kinds = HashSet::default();
 

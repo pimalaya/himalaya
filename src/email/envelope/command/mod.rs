@@ -1,11 +1,12 @@
 pub mod list;
+pub mod watch;
 
 use anyhow::Result;
 use clap::Subcommand;
 
 use crate::{config::TomlConfig, printer::Printer};
 
-use self::list::EnvelopeListCommand;
+use self::{list::ListEnvelopesCommand, watch::WatchEnvelopesCommand};
 
 /// Manage envelopes.
 ///
@@ -16,13 +17,17 @@ use self::list::EnvelopeListCommand;
 #[derive(Debug, Subcommand)]
 pub enum EnvelopeSubcommand {
     #[command(alias = "lst")]
-    List(EnvelopeListCommand),
+    List(ListEnvelopesCommand),
+
+    #[command()]
+    Watch(WatchEnvelopesCommand),
 }
 
 impl EnvelopeSubcommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         match self {
             Self::List(cmd) => cmd.execute(printer, config).await,
+            Self::Watch(cmd) => cmd.execute(printer, config).await,
         }
     }
 }

@@ -17,7 +17,7 @@ use crate::{
 /// This command allows you to list all envelopes included in the
 /// given folder.
 #[derive(Debug, Parser)]
-pub struct EnvelopeListCommand {
+pub struct ListEnvelopesCommand {
     #[command(flatten)]
     pub folder: FolderNameOptionalArg,
 
@@ -44,7 +44,7 @@ pub struct EnvelopeListCommand {
     pub account: AccountNameFlag,
 }
 
-impl EnvelopeListCommand {
+impl ListEnvelopesCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing envelope list command");
 

@@ -12,8 +12,6 @@ pub struct MessageConfig {
     pub copy: Option<MessageCopyConfig>,
     #[serde(rename = "move")]
     pub move_: Option<MessageMoveConfig>,
-
-    pub watch: Option<WatchMessageConfig>,
 }
 
 impl MessageConfig {
@@ -42,10 +40,6 @@ impl MessageConfig {
 
         if let Some(move_) = &self.move_ {
             kinds.extend(move_.get_used_backends());
-        }
-
-        if let Some(watch) = &self.watch {
-            kinds.extend(watch.get_used_backends());
         }
 
         kinds
@@ -152,26 +146,6 @@ pub struct MessageMoveConfig {
 }
 
 impl MessageMoveConfig {
-    pub fn get_used_backends(&self) -> HashSet<&BackendKind> {
-        let mut kinds = HashSet::default();
-
-        if let Some(kind) = &self.backend {
-            kinds.insert(kind);
-        }
-
-        kinds
-    }
-}
-
-#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
-pub struct WatchMessageConfig {
-    pub backend: Option<BackendKind>,
-
-    #[serde(flatten)]
-    pub remote: email::message::watch::config::WatchMessageConfig,
-}
-
-impl WatchMessageConfig {
     pub fn get_used_backends(&self) -> HashSet<&BackendKind> {
         let mut kinds = HashSet::default();
 
