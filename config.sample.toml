@@ -63,10 +63,10 @@ imap.starttls = false
 imap.auth = "passwd" # or oauth2
 
 # Get password from the raw string (not safe)
-# imap.passwd.raw = "password"
+imap.passwd.raw = "password"
 
 # Get password from a shell command
-imap.passwd.cmd = ["echo example-imap-password", "cat"]
+# imap.passwd.cmd = "echo password"
 
 # Get password from your system keyring using secret service
 # Keyring secrets can be (re)set with the command `account configure example`
