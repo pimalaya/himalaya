@@ -191,6 +191,14 @@ impl TomlAccountConfig {
             .or_else(|| self.backend.as_ref())
     }
 
+    pub fn get_watch_message_kind(&self) -> Option<&BackendKind> {
+        self.message
+            .as_ref()
+            .and_then(|msg| msg.watch.as_ref())
+            .and_then(|watch| watch.backend.as_ref())
+            .or_else(|| self.backend.as_ref())
+    }
+
     pub fn get_used_backends(&self) -> HashSet<&BackendKind> {
         let mut used_backends = HashSet::default();
 

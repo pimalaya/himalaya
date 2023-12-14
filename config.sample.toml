@@ -44,6 +44,13 @@ envelope.list.backend = "imap"
 # Override the backend used for sending messages.
 message.send.backend = "smtp"
 
+# Send notification when receiving new messages
+message.watch.received.notify.summary = "📬 New message from {sender}"
+message.watch.received.notify.body = "{subject}"
+
+# Shell commands can also be executed
+# message.watch.received.cmd = "mbsync -a"
+
 # IMAP config
 imap.host = "localhost"
 imap.port = 3143

@@ -211,6 +211,7 @@ impl TomlConfig {
                                 read: c.read.map(|c| c.remote),
                                 write: c.write.map(|c| c.remote),
                                 send: c.send.map(|c| c.remote),
+                                watch: c.watch.map(|c| c.remote),
                             }),
                             sync: config.sync,
                             #[cfg(feature = "pgp")]

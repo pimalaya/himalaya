@@ -11,6 +11,7 @@ use email::imap::{ImapSessionBuilder, ImapSessionSync};
 use email::smtp::{SmtpClientBuilder, SmtpClientSync};
 use email::{
     account::config::AccountConfig,
+    email::watch::{imap::WatchImapEmails, maildir::WatchMaildirEmails},
     envelope::{
         get::{imap::GetEnvelopeImap, maildir::GetEnvelopeMaildir},
         list::{imap::ListEnvelopesImap, maildir::ListEnvelopesMaildir},
@@ -350,6 +351,33 @@ impl BackendBuilder {
             Some(BackendKind::Notmuch) => {
                 backend_builder = backend_builder.with_delete_folder(|ctx| {
                     ctx.notmuch.as_ref().and_then(DeleteFolderNotmuch::new)
+                });
+            }
+            _ => (),
+        }
+
+        match toml_account_config.backend {
+            Some(BackendKind::Maildir) => {
+                backend_builder = backend_builder.with_watch_emails(|ctx| {
+                    ctx.maildir.as_ref().and_then(WatchMaildirEmails::new)
+                });
+            }
+            Some(BackendKind::MaildirForSync) => {
+                backend_builder = backend_builder.with_watch_emails(|ctx| {
+                    ctx.maildir_for_sync
+                        .as_ref()
+                        .and_then(WatchMaildirEmails::new)
+                });
+            }
+            #[cfg(feature = "imap")]
+            Some(BackendKind::Imap) => {
+                backend_builder = backend_builder
+                    .with_watch_emails(|ctx| ctx.imap.as_ref().and_then(WatchImapEmails::new));
+            }
+            #[cfg(feature = "notmuch")]
+            Some(BackendKind::Notmuch) => {
+                backend_builder = backend_builder.with_watch_emails(|ctx| {
+                    ctx.notmuch.as_ref().and_then(WatchNotmuchEmails::new)
                 });
             }
             _ => (),

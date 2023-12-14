@@ -3,6 +3,7 @@ mod delete;
 mod expunge;
 mod list;
 mod purge;
+mod watch;
 
 use anyhow::Result;
 use clap::Subcommand;
@@ -11,7 +12,7 @@ use crate::{config::TomlConfig, printer::Printer};
 
 use self::{
     create::FolderCreateCommand, delete::FolderDeleteCommand, expunge::FolderExpungeCommand,
-    list::FolderListCommand, purge::FolderPurgeCommand,
+    list::FolderListCommand, purge::FolderPurgeCommand, watch::FolderWatchCommand,
 };
 
 /// Manage folders.
@@ -25,6 +26,9 @@ pub enum FolderSubcommand {
 
     #[command(alias = "lst")]
     List(FolderListCommand),
+
+    #[command()]
+    Watch(FolderWatchCommand),
 
     #[command()]
     Expunge(FolderExpungeCommand),
@@ -41,6 +45,7 @@ impl FolderSubcommand {
         match self {
             Self::Create(cmd) => cmd.execute(printer, config).await,
             Self::List(cmd) => cmd.execute(printer, config).await,
+            Self::Watch(cmd) => cmd.execute(printer, config).await,
             Self::Expunge(cmd) => cmd.execute(printer, config).await,
             Self::Purge(cmd) => cmd.execute(printer, config).await,
             Self::Delete(cmd) => cmd.execute(printer, config).await,
