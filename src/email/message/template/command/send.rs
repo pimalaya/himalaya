@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use email::flag::Flag;
+use email::{flag::Flag, folder::SENT};
 use log::info;
 use mml::MmlCompilerBuilder;
 use std::io::{self, BufRead, IsTerminal};
@@ -38,7 +38,6 @@ impl TemplateSendCommand {
         let (toml_account_config, account_config) =
             config.clone().into_account_configs(account, cache)?;
         let backend = Backend::new(toml_account_config, account_config.clone(), true).await?;
-        let folder = account_config.get_sent_folder_alias()?;
 
         let is_tty = io::stdin().is_terminal();
         let is_json = printer.is_json();
@@ -65,10 +64,10 @@ impl TemplateSendCommand {
 
         if account_config.should_save_copy_sent_message() {
             backend
-                .add_raw_message_with_flag(&folder, &msg, Flag::Seen)
+                .add_raw_message_with_flag(SENT, &msg, Flag::Seen)
                 .await?;
 
-            printer.print(format!("Template successfully sent and saved to {folder}!"))
+            printer.print("Template successfully sent and saved to the Sent folder!")
         } else {
             printer.print("Template successfully sent!")
         }

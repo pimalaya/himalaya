@@ -3,6 +3,7 @@ use email::{
     account::config::AccountConfig,
     email::utils::{local_draft_path, remove_local_draft},
     flag::{Flag, Flags},
+    folder::{DRAFTS, SENT},
 };
 use log::debug;
 use mml::MmlCompilerBuilder;
@@ -90,10 +91,9 @@ pub async fn edit_tpl_with_editor<P: Printer>(
                 backend.send_raw_message(&email).await?;
 
                 if config.should_save_copy_sent_message() {
-                    let sent_folder = config.get_sent_folder_alias()?;
-                    printer.print_log(format!("Adding email to the {} folder…", sent_folder))?;
+                    printer.print_log("Adding email to the Sent folder…")?;
                     backend
-                        .add_raw_message_with_flag(&sent_folder, &email, Flag::Seen)
+                        .add_raw_message_with_flag(SENT, &email, Flag::Seen)
                         .await?;
                 }
 
@@ -120,7 +120,7 @@ pub async fn edit_tpl_with_editor<P: Printer>(
 
                 backend
                     .add_raw_message_with_flags(
-                        "drafts",
+                        DRAFTS,
                         &email,
                         &Flags::from_iter([Flag::Seen, Flag::Draft]),
                     )

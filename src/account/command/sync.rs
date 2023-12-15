@@ -13,7 +13,7 @@ use std::{
 };
 
 use crate::{
-    account::arg::name::AccountNameArg, backend::BackendBuilder, config::TomlConfig,
+    account::arg::name::OptionalAccountNameArg, backend::BackendBuilder, config::TomlConfig,
     printer::Printer,
 };
 
@@ -40,7 +40,7 @@ const SUB_PROGRESS_DONE_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
 #[derive(Debug, Parser)]
 pub struct AccountSyncCommand {
     #[command(flatten)]
-    pub account: AccountNameArg,
+    pub account: OptionalAccountNameArg,
 
     /// Run the synchronization without applying any changes.
     ///
@@ -95,9 +95,10 @@ impl AccountSyncCommand {
             None
         };
 
-        let (toml_account_config, account_config) = config
-            .clone()
-            .into_account_configs(Some(self.account.name.as_str()), true)?;
+        let account = self.account.name.as_ref().map(String::as_str);
+        let (toml_account_config, account_config) =
+            config.clone().into_account_configs(account, true)?;
+        let account_name = account_config.name.as_str();
 
         let backend_builder =
             BackendBuilder::new(toml_account_config, account_config.clone(), false).await?;
@@ -128,15 +129,11 @@ impl AccountSyncCommand {
             }
 
             printer.print(format!(
-                "Estimated patch length for account {} to be synchronized: {hunks_count}",
-                self.account.name
+                "Estimated patch length for account {account_name} to be synchronized: {hunks_count}"
             ))?;
         } else if printer.is_json() {
             sync_builder.sync().await?;
-            printer.print(format!(
-                "Account {} successfully synchronized!",
-                self.account.name
-            ))?;
+            printer.print(format!("Account {account_name} successfully synchronized!"))?;
         } else {
             let multi = MultiProgress::new();
             let sub_progresses = Mutex::new(HashMap::new());
@@ -247,10 +244,7 @@ impl AccountSyncCommand {
                 ))?;
             }
 
-            printer.print(format!(
-                "Account {} successfully synchronized!",
-                self.account.name
-            ))?;
+            printer.print(format!("Account {account_name} successfully synchronized!"))?;
         }
 
         Ok(())

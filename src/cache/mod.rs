@@ -36,7 +36,7 @@ impl IdMapper {
     }
 
     pub fn new(account_config: &AccountConfig, folder: &str, db_path: PathBuf) -> Result<Self> {
-        let folder = account_config.get_folder_alias(folder)?;
+        let folder = account_config.get_folder_alias(folder);
         let digest = md5::compute(account_config.name.clone() + &folder);
         let table = format!("id_mapper_{digest:x}");
         debug!("creating id mapper table {table} at {db_path:?}…");

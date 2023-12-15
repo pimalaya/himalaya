@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use email::flag::Flag;
+use email::{flag::Flag, folder::SENT};
 use log::info;
 use std::io::{self, BufRead, IsTerminal};
 
@@ -35,7 +35,6 @@ impl MessageSendCommand {
         let (toml_account_config, account_config) =
             config.clone().into_account_configs(account, cache)?;
         let backend = Backend::new(toml_account_config, account_config.clone(), true).await?;
-        let folder = account_config.get_sent_folder_alias()?;
 
         let is_tty = io::stdin().is_terminal();
         let is_json = printer.is_json();
@@ -54,10 +53,9 @@ impl MessageSendCommand {
 
         if account_config.should_save_copy_sent_message() {
             backend
-                .add_raw_message_with_flag(&folder, msg.as_bytes(), Flag::Seen)
+                .add_raw_message_with_flag(SENT, msg.as_bytes(), Flag::Seen)
                 .await?;
-
-            printer.print(format!("Message successfully sent and saved to {folder}!"))
+            printer.print("Message successfully sent and saved to the Sent folder!")
         } else {
             printer.print("Message successfully sent!")
         }
