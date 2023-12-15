@@ -4,7 +4,7 @@ use log::info;
 
 use crate::{
     account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::CacheDisableFlag,
-    config::TomlConfig, folder::arg::name::FolderNameOptionalArg, printer::Printer,
+    config::TomlConfig, folder::arg::name::FolderNameOptionalFlag, printer::Printer,
 };
 
 /// Watch envelopes for changes.
@@ -14,7 +14,7 @@ use crate::{
 #[derive(Debug, Parser)]
 pub struct WatchEnvelopesCommand {
     #[command(flatten)]
-    pub folder: FolderNameOptionalArg,
+    pub folder: FolderNameOptionalFlag,
 
     #[command(flatten)]
     pub cache: CacheDisableFlag,
