@@ -39,7 +39,7 @@ envelope.list.datetime-fmt = "%F %R%:z"
 envelope.list.datetime-local-tz = true
 
 # Override the backend used for listing envelopes.
-envelope.list.backend = "imap"
+# envelope.list.backend = "imap"
 
 # Send notification on receiving new envelopes
 envelope.watch.received.notify.summary = "📬 New message from {sender}"
