@@ -39,17 +39,15 @@ impl TemplateSendCommand {
             config.clone().into_account_configs(account, cache)?;
         let backend = Backend::new(toml_account_config, account_config.clone(), true).await?;
 
-        let is_tty = io::stdin().is_terminal();
-        let is_json = printer.is_json();
-        let tpl = if is_tty || is_json {
+        let tpl = if io::stdin().is_terminal() {
             self.template.raw()
         } else {
             io::stdin()
                 .lock()
                 .lines()
                 .filter_map(Result::ok)
-                .collect::<Vec<String>>()
-                .join("\r\n")
+                .collect::<Vec<_>>()
+                .join("\n")
         };
 
         #[allow(unused_mut)]

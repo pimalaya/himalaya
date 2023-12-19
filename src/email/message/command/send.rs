@@ -36,16 +36,14 @@ impl MessageSendCommand {
             config.clone().into_account_configs(account, cache)?;
         let backend = Backend::new(toml_account_config, account_config.clone(), true).await?;
 
-        let is_tty = io::stdin().is_terminal();
-        let is_json = printer.is_json();
-        let msg = if is_tty || is_json {
+        let msg = if io::stdin().is_terminal() {
             self.message.raw()
         } else {
             io::stdin()
                 .lock()
                 .lines()
                 .filter_map(Result::ok)
-                .collect::<Vec<String>>()
+                .collect::<Vec<_>>()
                 .join("\r\n")
         };
 
