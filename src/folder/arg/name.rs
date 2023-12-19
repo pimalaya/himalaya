@@ -26,11 +26,12 @@ pub struct FolderNameArg {
     pub name: String,
 }
 
-/// The source folder name argument parser.
+/// The optional source folder name flag parser.
 #[derive(Debug, Parser)]
-pub struct SourceFolderNameArg {
+pub struct SourceFolderNameOptionalFlag {
     /// The name of the source folder.
-    #[arg(name = "from-folder-name", value_name = "FROM")]
+    #[arg(long = "folder", short = 'f')]
+    #[arg(name = "source_folder_name", value_name = "SOURCE", default_value = INBOX)]
     pub name: String,
 }
 
@@ -38,6 +39,6 @@ pub struct SourceFolderNameArg {
 #[derive(Debug, Parser)]
 pub struct TargetFolderNameArg {
     /// The name of the target folder.
-    #[arg(name = "to-folder-name", value_name = "TO")]
+    #[arg(name = "target_folder_name", value_name = "TARGET")]
     pub name: String,
 }

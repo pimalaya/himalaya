@@ -44,6 +44,6 @@ impl MessageDeleteCommand {
         let ids = &self.envelopes.ids;
         backend.delete_messages(folder, ids).await?;
 
-        printer.print("Message(s) successfully deleted from {from_folder} to {to_folder}!")
+        printer.print(format!("Message(s) successfully removed from {folder}!"))
     }
 }

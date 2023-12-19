@@ -8,7 +8,7 @@ use crate::{
     cache::arg::disable::CacheDisableFlag,
     config::TomlConfig,
     envelope::arg::ids::EnvelopeIdsArgs,
-    folder::arg::name::{SourceFolderNameArg, TargetFolderNameArg},
+    folder::arg::name::{SourceFolderNameOptionalFlag, TargetFolderNameArg},
     printer::Printer,
 };
 
@@ -16,7 +16,7 @@ use crate::{
 #[derive(Debug, Parser)]
 pub struct MessageCopyCommand {
     #[command(flatten)]
-    pub source_folder: SourceFolderNameArg,
+    pub source_folder: SourceFolderNameOptionalFlag,
 
     #[command(flatten)]
     pub target_folder: TargetFolderNameArg,
