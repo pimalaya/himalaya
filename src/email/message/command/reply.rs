@@ -70,6 +70,8 @@ impl MessageReplyCommand {
             .build()
             .await?;
         editor::edit_tpl_with_editor(&account_config, printer, &backend, tpl).await?;
+
+        // TODO: let backend.send_reply_raw_message adding the flag
         backend.add_flag(&folder, &[id], Flag::Answered).await
     }
 }
