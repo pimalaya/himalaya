@@ -1,6 +1,5 @@
 use anyhow::Result;
 use clap::Parser;
-use email::{flag::Flag, folder::SENT};
 use log::info;
 use mml::MmlCompilerBuilder;
 use std::io::{self, BufRead, IsTerminal};
@@ -60,14 +59,6 @@ impl TemplateSendCommand {
 
         backend.send_raw_message(&msg).await?;
 
-        if account_config.should_save_copy_sent_message() {
-            backend
-                .add_raw_message_with_flag(SENT, &msg, Flag::Seen)
-                .await?;
-
-            printer.print("Template successfully sent and saved to the Sent folder!")
-        } else {
-            printer.print("Template successfully sent!")
-        }
+        printer.print("Template successfully sent!")
     }
 }

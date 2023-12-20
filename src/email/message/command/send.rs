@@ -1,6 +1,5 @@
 use anyhow::Result;
 use clap::Parser;
-use email::{flag::Flag, folder::SENT};
 use log::info;
 use std::io::{self, BufRead, IsTerminal};
 
@@ -49,13 +48,6 @@ impl MessageSendCommand {
 
         backend.send_raw_message(msg.as_bytes()).await?;
 
-        if account_config.should_save_copy_sent_message() {
-            backend
-                .add_raw_message_with_flag(SENT, msg.as_bytes(), Flag::Seen)
-                .await?;
-            printer.print("Message successfully sent and saved to the Sent folder!")
-        } else {
-            printer.print("Message successfully sent!")
-        }
+        printer.print("Message successfully sent!")
     }
 }

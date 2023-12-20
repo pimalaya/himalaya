@@ -54,6 +54,9 @@ envelope.watch.received.notify.body = "{subject}"
 # Override the backend used for sending messages.
 message.send.backend = "smtp"
 
+# Save a copy of sent messages to the sent folder.
+message.send.save-copy = true
+
 # IMAP config
 imap.host = "localhost"
 imap.port = 3143
