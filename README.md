@@ -4,6 +4,8 @@ https://pimalaya.org/himalaya/cli/latest/
 
 CLI to manage emails, based on [email-lib](https://crates.io/crates/email-lib).
 
+*⚠️ The `v1.0.0-beta` is available on `master`, which introduces breaking changes (see [CHANGELOG](https://github.com/soywod/himalaya/blob/master/CHANGELOG.md#unreleased)). The documentation differs too much from the latest release `v0.9.0`. Knowing that pimalaya.org only points to `master` (till the final `v1.0.0`), it is highly recommended to migrate to the beta. You can install it using [cargo](https://pimalaya.org/himalaya/cli/latest/installation/cargo.html) or [from sources](https://pimalaya.org/himalaya/cli/latest/installation/sources.html).*
+
 ![screenshot](https://user-images.githubusercontent.com/10437171/138774902-7b9de5a3-93eb-44b0-8cfb-6d2e11e3b1aa.png)
 
 *Disclaimer: the project is under active development, do not use in production before the `v1.0.0`.*
