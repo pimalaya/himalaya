@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Few major concepts changed:
 
-- The concept of backend and sender changed. The sender does not exist anymore (it is now a backend). A backend is now a set of features like add folders, list envelopes or send raw message. The backend of every single feature can be customized in the configuration file, which gives users more flexibility. Here the list of features that can be customized:
-  - `backend` *(required)*: the backend used by default by all backend features (`maildir`, `imap` or `notmuch`)
+- The concept of *Backend* and *Sender* changed. The Sender does not exist anymore (it is now a backend feature). A Backend is now a set of features like add folders, list envelopes or send raw message. The backend of every single feature can be customized in the configuration file, which gives users more flexibility. Here the list of backend features that can be customized:
+  - `backend` ***(required)***: the backend used by default by all backend features (`maildir`, `imap` or `notmuch`)
   - `folder.add.backend`: override the backend used for creating folders (`maildir`, `imap` or `notmuch`)
   - `folder.list.backend`: override the backend used for listing folders (`maildir`, `imap` or `notmuch`)
   - `folder.expunge.backend`: override the backend used for expunging folders (`maildir`, `imap` or `notmuch`)
@@ -22,23 +22,24 @@ Few major concepts changed:
   - `flag.add.backend`: override the backend used for adding flags (`maildir`, `imap` or `notmuch`)
   - `flag.set.backend`: override the backend used for setting flags (`maildir`, `imap` or `notmuch`)
   - `flag.remove.backend`: override the backend used for removing flags (`maildir`, `imap` or `notmuch`)
-  - `message.send.backend` *(required)*: override the backend used for sending messages (`sendmail` or `smtp`)
+  - `message.send.backend` ***(required)***: override the backend used for sending messages (`sendmail` or `smtp`)
   - `message.read.backend`: override the backend used for reading messages (`maildir`, `imap` or `notmuch`)
   - `message.write.backend`: override the backend used for adding flags (`maildir`, `imap` or `notmuch`)
   - `message.copy.backend`: override the backend used for copying messages (`maildir`, `imap` or `notmuch`)
   - `message.move.backend`: override the backend used for moving messages (`maildir`, `imap` or `notmuch`)
 - The CLI API changed: every command is now prefixed by its domain following the format `himalaya <domain> <action>`. List of domain available by running `himalaya -h` and list of actions for a domain by running `himalaya <domain> -h`.
-- Configuration file options use now the dot notation rather than the dash notation. For example, `folder-listing-page-size` became `folder.list.page-size`. See the changed section below for more details.
+- TOML configuration file options use now the dot notation rather than the dash notation. For example, `folder-listing-page-size` became `folder.list.page-size`. See the [changed](#changed) section below for more details.
 
 ### Added
 
-- Added cargo feature `maildir` (not working yet).
-- Added cargo feature `sendmail` (not working yet).
+- Added cargo feature `maildir` (not plugged yet).
+- Added cargo feature `sendmail` (not plugged yet).
 - Added watch hooks `envelope.watch.received` (when a new envelope is received) and `envelope.watch.any` (for any other event related to envelopes). A watch hook can be:
   - A shell command: `envelope.watch.any.cmd = "mbsync -a"`
   - A system notification: 
-    - `envelope.watch.any.notify.summary = "📬 New message from {sender}"`: customize the notification summary (title)
-    - `envelope.watch.any.notify.body = "{subject}"`: customize the notification body (content)
+    - `envelope.watch.received.notify.summary = "📬 New message from {sender}"`: customize the notification summary (title)
+    - `envelope.watch.received.notify.body = "{subject}"`: customize the notification body (content)
+
 	*Available placeholders: id, subject, sender, sender.name, sender.address, recipient, recipient.name, recipient.address.*
 - Added watch support for Maildir backend features.
 
@@ -47,7 +48,6 @@ Few major concepts changed:
 - Renamed cargo feature `imap-backend` → `imap`.
 - Renamed cargo feature `notmuch-backend` → `notmuch`.
 - Renamed cargo feature `smtp-sender` → `smtp`.
-- Disabled temporarily the `notmuch` backend because it needs to be refactored using the backend features system (it should be reimplemented soon).
 - Changed the goal of the config option `backend`: it is now the default backend used for all backend features. Valid backends: `imap`, `maildir`, `notmuch`.
 - Moved `folder-aliases` config option to `folder.alias(es)`.
 - Moved `folder-listing-page-size` config option to `folder.list.page-size`.
@@ -62,11 +62,18 @@ Few major concepts changed:
 - Moved `sync` config option to `sync.enable`.
 - Moved `sync-dir` config option to `sync.dir`.
 - Moved `sync-folders-strategy` config option to `sync.strategy`.
+- Moved `maildir-*` config option to `maildir.*`.
+- Moved `imap-*` config option to `imap.*`.
+- Moved `notmuch-*` config option to `notmuch.*`.
+- Moved `sendmail-*` config option to `sendmail.*`.
+- Moved `smtp-*` config option to `smtp.*`.
 
 ### Removed
 
-- Removed all global options except for `display-name`, `signature`, `signature-delim` and `downloads-dir`.
+- Disabled temporarily the `notmuch` backend because it needs to be refactored using the backend features system (it should be reimplemented soon).
+- Disabled temporarily the `search` and `sort` command because they need to be refactored, see [#39](https://todo.sr.ht/~soywod/pimalaya/39).
 - Removed the `notify` command (replaced by the new `watch` command).
+- Removed all global options except for `display-name`, `signature`, `signature-delim` and `downloads-dir`.
 
 ## [0.9.0] - 2023-08-28
 
