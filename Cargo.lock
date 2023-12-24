@@ -1216,9 +1216,9 @@ dependencies = [
 
 [[package]]
 name = "email-lib"
-version = "0.18.4"
+version = "0.18.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3866f59bba6a9bf58a3ee573c0dd111401b9012f3438c912e1fb2563bbc2eae9"
+checksum = "cf17353426518e810ebf0f3513cf1069e3c9b91f0b2746f89389966357753138"
 dependencies = [
  "advisory-lock",
  "anyhow",
@@ -1242,7 +1242,7 @@ dependencies = [
  "notmuch",
  "oauth-lib",
  "once_cell",
- "ouroboros",
+ "ouroboros 0.15.6",
  "pgp-lib",
  "process-lib",
  "rayon",
@@ -2040,9 +2040,9 @@ dependencies = [
 
 [[package]]
 name = "imap"
-version = "3.0.0-alpha.10"
+version = "3.0.0-alpha.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9cceec1222cd3c9b196695fe296dc6ddaa617e06b0c49742140ff9bbc87af628"
+checksum = "c088f9992a0cd2ac0208dd3b1e0bb106a2f54e262f09756d554aa71219510056"
 dependencies = [
  "base64 0.21.5",
  "bufstream",
@@ -2050,16 +2050,16 @@ dependencies = [
  "imap-proto",
  "lazy_static",
  "nom",
- "ouroboros",
+ "ouroboros 0.16.0",
  "regex",
  "rustls-connector",
 ]
 
 [[package]]
 name = "imap-proto"
-version = "0.16.2"
+version = "0.16.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f73b1b63179418b20aa81002d616c5f21b4ba257da9bca6989ea64dc573933e0"
+checksum = "305c25c6e69416059e3396c4a062b84dc7b0a782cd4c84d82bab268eb0421ec7"
 dependencies = [
  "nom",
 ]
@@ -2849,7 +2849,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e1358bd1558bd2a083fed428ffeda486fbfb323e698cdda7794259d592ca72db"
 dependencies = [
  "aliasable",
- "ouroboros_macro",
+ "ouroboros_macro 0.15.6",
+]
+
+[[package]]
+name = "ouroboros"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6a6d0919a92ba28d8109a103e0de08f89706be0eeaad1130fd1a34030dee84a"
+dependencies = [
+ "aliasable",
+ "ouroboros_macro 0.16.0",
+ "static_assertions",
 ]
 
 [[package]]
@@ -2863,6 +2874,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "ouroboros_macro"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46bc2307dc3420554ae349230dac4969c66d7c2feead3a8cab05ea0c604daca6"
+dependencies = [
+ "heck",
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.41",
 ]
 
 [[package]]
@@ -3539,18 +3563,6 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.20.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b80e3dec595989ea8510028f30c408a4630db12c9cbb8de34203b89d6577e99"
-dependencies = [
- "log",
- "ring 0.16.20",
- "sct",
- "webpki",
-]
-
-[[package]]
-name = "rustls"
 version = "0.21.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9d5a6813c0759e4609cd494e8e725babae6a2ca7b62a5536a13daaec6fcb7ba"
@@ -3577,14 +3589,14 @@ dependencies = [
 
 [[package]]
 name = "rustls-connector"
-version = "0.16.1"
+version = "0.18.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c6a18f8d10f71bce9bca6eaeb80429460e652f3bcf0381f0c5f8954abf7b3b8"
+checksum = "25da151615461c7347114b1ad1a7458b4cdebc69cb220cd140cd5cb324b1dd37"
 dependencies = [
  "log",
- "rustls 0.20.9",
+ "rustls 0.21.10",
  "rustls-native-certs",
- "webpki",
+ "rustls-webpki 0.101.7",
 ]
 
 [[package]]
@@ -4577,16 +4589,6 @@ checksum = "50c24a44ec86bb68fbecd1b3efed7e85ea5621b39b35ef2766b66cd984f8010f"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "webpki"
-version = "0.22.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed63aea5ce73d0ff405984102c42de94fc55a6b75765d621c65262469b3c9b53"
-dependencies = [
- "ring 0.17.7",
- "untrusted 0.9.0",
 ]
 
 [[package]]
