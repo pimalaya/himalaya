@@ -63,6 +63,7 @@ imap.port = 3143
 imap.login = "example@localhost"
 imap.ssl = false
 imap.starttls = false
+imap.insecure = true
 imap.auth = "passwd" # or oauth2
 
 # Get password from the raw string (not safe)
@@ -81,6 +82,7 @@ smtp.port = 3025
 smtp.login = "example@localhost"
 smtp.ssl = false
 smtp.starttls = false
+smtp.insecure = true
 smtp.auth = "passwd"
 smtp.passwd.raw = "password"
 
