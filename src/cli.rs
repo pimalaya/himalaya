@@ -151,7 +151,7 @@ impl HimalayaCommand {
                 cmd.execute(printer, &config).await
             }
             Self::Manual(cmd) => cmd.execute(printer).await,
-            Self::Completion(cmd) => cmd.execute(printer).await,
+            Self::Completion(cmd) => cmd.execute().await,
         }
     }
 }

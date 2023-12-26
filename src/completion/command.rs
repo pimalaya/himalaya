@@ -4,7 +4,7 @@ use clap_complete::Shell;
 use log::info;
 use std::io;
 
-use crate::{cli::Cli, printer::Printer};
+use crate::cli::Cli;
 
 /// Print completion script for a shell to stdout.
 ///
@@ -19,17 +19,17 @@ pub struct CompletionGenerateCommand {
 }
 
 impl CompletionGenerateCommand {
-    pub async fn execute(self, printer: &mut impl Printer) -> Result<()> {
+    pub async fn execute(self) -> Result<()> {
         info!("executing completion generate command");
 
         let mut cmd = Cli::command();
         let name = cmd.get_name().to_string();
         clap_complete::generate(self.shell, &mut cmd, name, &mut io::stdout());
 
-        printer.print(format!(
+        info!(
             "Shell script successfully generated for shell {}!",
             self.shell
-        ))?;
+        );
 
         Ok(())
     }
