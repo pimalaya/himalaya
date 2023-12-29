@@ -76,6 +76,10 @@ imap.passwd.raw = "password"
 # Keyring secrets can be (re)set with the command `account configure example`
 # imap.passwd.keyring = "example-imap-password"
 
+# Customize at which period, in seconds, the IMAP IDLE mode should refresh.
+# Defaults to 1740 (29 min), as defined in the RFC.
+# imap.watch.timeout = 25
+
 # SMTP config
 smtp.host = "localhost"
 smtp.port = 3025
