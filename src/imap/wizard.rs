@@ -5,7 +5,7 @@ use email::{
         oauth2::{OAuth2Config, OAuth2Method, OAuth2Scopes},
         passwd::PasswdConfig,
     },
-    imap::config::{ImapAuthConfig, ImapConfig},
+    imap::config::{ImapAuthConfig, ImapConfig, ImapEncryptionKind},
 };
 use oauth::v2_0::{AuthorizationCodeGrant, Client};
 use secret::Secret;
@@ -16,10 +16,11 @@ use crate::{
     wizard_log, wizard_prompt,
 };
 
-const SSL_TLS: &str = "SSL/TLS";
-const STARTTLS: &str = "STARTTLS";
-const NONE: &str = "None";
-const PROTOCOLS: &[&str] = &[SSL_TLS, STARTTLS, NONE];
+const PROTOCOLS: &[ImapEncryptionKind] = &[
+    ImapEncryptionKind::Tls,
+    ImapEncryptionKind::StartTls,
+    ImapEncryptionKind::None,
+];
 
 const PASSWD: &str = "Password";
 const OAUTH2: &str = "OAuth 2.0";
@@ -49,19 +50,16 @@ pub(crate) async fn configure(account_name: &str, email: &str) -> Result<Backend
         .interact_opt()?;
 
     let default_port = match protocol {
-        Some(idx) if PROTOCOLS[idx] == SSL_TLS => {
-            config.ssl = Some(true);
-            config.starttls = Some(false);
+        Some(idx) if PROTOCOLS[idx] == ImapEncryptionKind::Tls => {
+            config.encryption = Some(ImapEncryptionKind::Tls);
             993
         }
-        Some(idx) if PROTOCOLS[idx] == STARTTLS => {
-            config.ssl = Some(false);
-            config.starttls = Some(true);
+        Some(idx) if PROTOCOLS[idx] == ImapEncryptionKind::StartTls => {
+            config.encryption = Some(ImapEncryptionKind::StartTls);
             143
         }
         _ => {
-            config.ssl = Some(false);
-            config.starttls = Some(false);
+            config.encryption = Some(ImapEncryptionKind::None);
             143
         }
     };

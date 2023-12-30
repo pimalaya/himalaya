@@ -61,18 +61,20 @@ message.send.save-copy = true
 imap.host = "localhost"
 imap.port = 3143
 imap.login = "example@localhost"
-imap.ssl = false
-imap.starttls = false
-imap.insecure = true
-imap.auth = "passwd" # or oauth2
 
-# Get password from the raw string (not safe)
+# Encryption can be either "tls" (or true), "start-tls" or "none" (or false).
+imap.encryption = "none"
+
+# Authentication can be either "passwd" or "oauth2"
+imap.auth = "passwd"
+
+# Get password from a raw string (not safe)
 imap.passwd.raw = "password"
 
 # Get password from a shell command
 # imap.passwd.cmd = "echo password"
 
-# Get password from your system keyring using secret service
+# Get password from your global system keyring using secret service
 # Keyring secrets can be (re)set with the command `account configure example`
 # imap.passwd.keyring = "example-imap-password"
 
@@ -84,9 +86,7 @@ imap.passwd.raw = "password"
 smtp.host = "localhost"
 smtp.port = 3025
 smtp.login = "example@localhost"
-smtp.ssl = false
-smtp.starttls = false
-smtp.insecure = true
+smtp.encryption = false
 smtp.auth = "passwd"
 smtp.passwd.raw = "password"
 

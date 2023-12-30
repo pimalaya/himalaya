@@ -62,11 +62,19 @@ Few major concepts changed:
 - Moved `sync` config option to `sync.enable`.
 - Moved `sync-dir` config option to `sync.dir`.
 - Moved `sync-folders-strategy` config option to `sync.strategy`.
-- Moved `maildir-*` config option to `maildir.*`.
-- Moved `imap-*` config option to `imap.*`.
-- Moved `notmuch-*` config option to `notmuch.*`.
-- Moved `sendmail-*` config option to `sendmail.*`.
-- Moved `smtp-*` config option to `smtp.*`.
+- Moved `maildir-*` config options to `maildir.*`.
+- Moved `imap-*` config options to `imap.*`.
+- Moved `notmuch-*` config options to `notmuch.*`.
+- Moved `sendmail-*` config options to `sendmail.*`.
+- Moved `smtp-*` config options to `smtp.*`.
+- Replaced options `imap-ssl`, `imap-starttls` and `imap-insecure` by `imap.encryption`:
+  - `imap.encryption = "tls" | true`: use required encryption (SSL/TLS)
+  - `imap.encryption = "start-tls"`: use opportunistic encryption (StartTLS)
+  - `imap.encryption = "none" | false`: do not use any encryption
+- Replaced options `smtp-ssl`, `smtp-starttls` and `smtp-insecure` by `smtp.encryption`:
+  - `smtp.encryption = "tls" | true`: use required encryption (SSL/TLS)
+  - `smtp.encryption = "start-tls"`: use opportunistic encryption (StartTLS)
+  - `smtp.encryption = "none" | false`: do not use any encryption
 
 ### Removed
 
