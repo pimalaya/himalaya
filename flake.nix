@@ -1,5 +1,5 @@
 {
-  description = "CLI to manage emails.";
+  description = "CLI to manage emails";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-23.05";
@@ -37,17 +37,17 @@
           default = pkgs.mkShell {
             nativeBuildInputs = with pkgs; [ pkg-config ];
             buildInputs = with pkgs; [
-              # Nix env
+              # Nix
               rnix-lsp
               nixpkgs-fmt
 
-              # Rust env
+              # Rust
               rust-toolchain
 
-              # notmuch
+              # Notmuch
               notmuch
 
-              # gpg
+              # GPG
               gnupg
               gpgme
             ];

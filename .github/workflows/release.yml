@@ -53,6 +53,10 @@ jobs:
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       - name: Build release
         run: nix build .#${{ matrix.target }}
+      - name: Fix interpreter path on Linux
+        if: ${{ matrix.target == 'linux' }}
+        run: |
+          nix-shell -p patchelf --command "patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 target/release/himalaya"
       - name: Compress executable
         run: |
           mkdir -p {man,completions}
