@@ -33,9 +33,9 @@ async fn main() -> Result<()> {
     }
 
     let cli = Cli::parse();
-
     let mut printer = StdoutPrinter::new(cli.output, cli.color);
-    let config = TomlConfig::from_some_path_or_default(cli.config.as_ref()).await?;
 
-    cli.command.execute(&mut printer, &config).await
+    cli.command
+        .execute(&mut printer, cli.config_path.as_ref())
+        .await
 }

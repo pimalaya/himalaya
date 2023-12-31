@@ -31,9 +31,9 @@ pub struct Cli {
     /// applicable). If the path does not point to a valid file, the
     /// wizard will propose to assist you in the creation of the
     /// configuration file.
-    #[arg(long, short, global = true)]
+    #[arg(short, long = "config", global = true)]
     #[arg(value_name = "PATH", value_parser = config::path_parser)]
-    pub config: Option<PathBuf>,
+    pub config_path: Option<PathBuf>,
 
     /// Customize the output format
     ///
@@ -116,15 +116,40 @@ pub enum HimalayaCommand {
 }
 
 impl HimalayaCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
+    pub async fn execute(
+        self,
+        printer: &mut impl Printer,
+        config_path: Option<&PathBuf>,
+    ) -> Result<()> {
         match self {
-            Self::Account(cmd) => cmd.execute(printer, config).await,
-            Self::Folder(cmd) => cmd.execute(printer, config).await,
-            Self::Envelope(cmd) => cmd.execute(printer, config).await,
-            Self::Flag(cmd) => cmd.execute(printer, config).await,
-            Self::Message(cmd) => cmd.execute(printer, config).await,
-            Self::Attachment(cmd) => cmd.execute(printer, config).await,
-            Self::Template(cmd) => cmd.execute(printer, config).await,
+            Self::Account(cmd) => {
+                let config = TomlConfig::from_some_path_or_default(config_path).await?;
+                cmd.execute(printer, &config).await
+            }
+            Self::Folder(cmd) => {
+                let config = TomlConfig::from_some_path_or_default(config_path).await?;
+                cmd.execute(printer, &config).await
+            }
+            Self::Envelope(cmd) => {
+                let config = TomlConfig::from_some_path_or_default(config_path).await?;
+                cmd.execute(printer, &config).await
+            }
+            Self::Flag(cmd) => {
+                let config = TomlConfig::from_some_path_or_default(config_path).await?;
+                cmd.execute(printer, &config).await
+            }
+            Self::Message(cmd) => {
+                let config = TomlConfig::from_some_path_or_default(config_path).await?;
+                cmd.execute(printer, &config).await
+            }
+            Self::Attachment(cmd) => {
+                let config = TomlConfig::from_some_path_or_default(config_path).await?;
+                cmd.execute(printer, &config).await
+            }
+            Self::Template(cmd) => {
+                let config = TomlConfig::from_some_path_or_default(config_path).await?;
+                cmd.execute(printer, &config).await
+            }
             Self::Manual(cmd) => cmd.execute(printer).await,
             Self::Completion(cmd) => cmd.execute(printer).await,
         }

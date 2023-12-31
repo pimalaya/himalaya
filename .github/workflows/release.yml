@@ -42,9 +42,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2        
       - name: Install Nix
-        uses: cachix/install-nix-action@v22
+        uses: cachix/install-nix-action@v24
         with:
-          nix_path: nixpkgs=channel:nixos-22.11
+          nix_path: nixpkgs=channel:nixos-23.05
           extra_nix_config: |
             experimental-features = nix-command flakes
       - uses: cachix/cachix-action@v12
@@ -52,15 +52,17 @@ jobs:
           name: soywod
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       - name: Build release
-        run: nix build .#${{ matrix.target }}
-      - name: Fix interpreter path on Linux
-        if: ${{ matrix.target == 'linux' }}
-        run: |
-          nix-shell -p patchelf --command "patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 target/release/himalaya"
-      - name: Compress executable
+        run: nix build -L .#${{ matrix.target }}
+      - name: Copy executable and prepare folders
         run: |
           mkdir -p {man,completions}
           cp result/bin/himalaya* .
+      - name: Patch interpreter
+        if: ${{ matrix.target == 'linux' }}
+        run: |
+          nix-shell -p patchelf --command "sudo patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 himalaya"
+      - name: Build release archive
+        run: |
           nix run .#${{ matrix.target }} man ./man
           nix run .#${{ matrix.target }} completion bash > ./completions/himalaya.bash
           nix run .#${{ matrix.target }} completion elvish > ./completions/himalaya.elvish
@@ -141,14 +143,15 @@ jobs:
     needs: create_release
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2        
+        uses: actions/checkout@v2
       - name: Install Nix
-        uses: cachix/install-nix-action@v22
+        uses: cachix/install-nix-action@v24
         with:
-          nix_path: nixpkgs=channel:nixos-22.11
+          nix_path: nixpkgs=channel:nixos-23.05
           extra_nix_config: |
             experimental-features = nix-command flakes
       - name: Publish library to crates.io
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: nix develop -c cargo publish --no-verify --token ${CARGO_REGISTRY_TOKEN}
+        run: |
+          nix develop -c cargo publish --no-verify --token ${CARGO_REGISTRY_TOKEN}
