@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-beta] - 2023-12-31
+
 Few major concepts changed:
 
 - The concept of *Backend* and *Sender* changed. The Sender does not exist anymore (it is now a backend feature). A Backend is now a set of features like add folders, list envelopes or send raw message. The backend of every single feature can be customized in the configuration file, which gives users more flexibility. Here the list of backend features that can be customized:
@@ -681,7 +683,8 @@ Few major concepts changed:
 - Password from command [#22]
 - Set up README [#20]
 
-[Unreleased]: https://github.com/soywod/himalaya/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/soywod/himalaya/compare/v1.0.0-beta...HEAD
+[1.0.0-beta]: https://github.com/soywod/himalaya/compare/v0.9.0...v1.0.0-beta
 [0.9.0]: https://github.com/soywod/himalaya/compare/v0.8.4...v0.9.0
 [0.8.4]: https://github.com/soywod/himalaya/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/soywod/himalaya/compare/v0.8.2...v0.8.3
