@@ -22,5 +22,4 @@ pub mod smtp;
 pub mod ui;
 
 #[doc(inline)]
-// pub use email::{envelope, flag, message, template};
-pub use email::{envelope, flag, message};
+pub use crate::email::{envelope, flag, message};
