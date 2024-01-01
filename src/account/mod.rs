@@ -113,6 +113,7 @@ impl From<Iter<'_, String, TomlAccountConfig>> for Accounts {
                     backends.push_str("smtp");
                 }
 
+                #[cfg(feature = "sendmail")]
                 if account.sendmail.is_some() {
                     if !backends.is_empty() {
                         backends.push_str(", ")
