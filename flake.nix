@@ -2,7 +2,7 @@
   description = "CLI to manage emails";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-23.05";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-23.11";
     flake-utils.url = "github:numtide/flake-utils";
     gitignore = {
       url = "github:hercules-ci/gitignore.nix";
@@ -35,7 +35,9 @@
         in
         {
           default = pkgs.mkShell {
-            nativeBuildInputs = with pkgs; [ pkg-config ];
+            nativeBuildInputs = with pkgs; [
+              pkg-config
+            ];
             buildInputs = with pkgs; [
               # Nix
               rnix-lsp
@@ -83,22 +85,27 @@
       mkPackages = buildPlatform:
         let
           pkgs = import nixpkgs { system = buildPlatform; };
-          mkPackageWithTarget = mkPackage pkgs buildPlatform;
-          defaultPackage = mkPackage pkgs buildPlatform null { };
+          mkPackage' = mkPackage pkgs buildPlatform;
         in
-        {
-          default = defaultPackage;
-          linux = defaultPackage;
-          macos = defaultPackage;
-          musl = mkPackageWithTarget "x86_64-unknown-linux-musl" (with pkgs.pkgsStatic; {
+        rec {
+          default = if pkgs.stdenv.isDarwin then macos else linux;
+          linux = mkPackage' null { };
+          linux-musl = mkPackage' "x86_64-unknown-linux-musl" (with pkgs.pkgsStatic; {
             CARGO_BUILD_RUSTFLAGS = "-C target-feature=+crt-static";
             SQLITE3_STATIC = 1;
             SQLITE3_LIB_DIR = "${sqlite.out}/lib";
             hardeningDisable = [ "all" ];
           });
+          macos = mkPackage' null (with pkgs.darwin.apple_sdk.frameworks; {
+            # NOTE: needed to prevent error Undefined symbols
+            # "_OBJC_CLASS_$_NSImage" and
+            # "_LSCopyApplicationURLsForBundleIdentifier"
+            NIX_LDFLAGS = "-F${AppKit}/Library/Frameworks -framework AppKit";
+            buildInputs = [ Cocoa ];
+          });
           # FIXME: bzlip: fatal error: windows.h: No such file or directory
           # May be related to SQLite.
-          windows = mkPackageWithTarget "x86_64-pc-windows-gnu" {
+          windows = mkPackage' "x86_64-pc-windows-gnu" {
             strictDeps = true;
             depsBuildBuild = with pkgs.pkgsCross.mingwW64; [
               stdenv.cc
@@ -112,23 +119,26 @@
         name = "himalaya";
       };
 
-      mkApps = buildPlatform: {
-        default = mkApp self.packages.${buildPlatform}.default;
-        linux = mkApp self.packages.${buildPlatform}.linux;
-        macos = mkApp self.packages.${buildPlatform}.macos;
-        musl = mkApp self.packages.${buildPlatform}.musl;
-        windows =
-          let
-            pkgs = import nixpkgs { system = buildPlatform; };
-            wine = pkgs.wine.override { wineBuild = "wine64"; };
-            himalaya = self.packages.${buildPlatform}.windows;
-            app = pkgs.writeShellScriptBin "himalaya" ''
-              export WINEPREFIX="$(mktemp -d)"
-              ${wine}/bin/wine64 ${himalaya}/bin/himalaya.exe $@
-            '';
-          in
-          mkApp app;
-      };
+      mkApps = buildPlatform:
+        let
+          pkgs = import nixpkgs { system = buildPlatform; };
+        in
+        rec {
+          default = if pkgs.stdenv.isDarwin then macos else linux;
+          linux = mkApp self.packages.${buildPlatform}.linux;
+          linux-musl = mkApp self.packages.${buildPlatform}.linux-musl;
+          macos = mkApp self.packages.${buildPlatform}.macos;
+          windows =
+            let
+              wine = pkgs.wine.override { wineBuild = "wine64"; };
+              himalaya = self.packages.${buildPlatform}.windows;
+              app = pkgs.writeShellScriptBin "himalaya" ''
+                export WINEPREFIX="$(mktemp -d)"
+                ${wine}/bin/wine64 ${himalaya}/bin/himalaya.exe $@
+              '';
+            in
+            mkApp app;
+        };
 
     in
     flake-utils.lib.eachDefaultSystem (system: {

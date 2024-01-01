@@ -6,13 +6,13 @@ on:
       - v*
 
 jobs:
-  create_release:
+  create-release:
     runs-on: ubuntu-latest
     outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      upload_url: ${{ steps.create-release.outputs.upload_url }}
     steps:
       - name: Create release
-        id: create_release
+        id: create-release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -22,20 +22,20 @@ jobs:
           draft: false
           prerelease: false
 
-  deploy_github:
+  deploy-unix-releases:
     runs-on: ${{ matrix.os }}
-    needs: create_release
+    needs: create-release
     strategy:
       fail-fast: false
       matrix:
         include:
           - target: linux
             os: ubuntu-latest
+          - target: linux-musl
+            os: ubuntu-latest
           - target: macos
             os: macos-latest
-          - target: musl
-            os: ubuntu-latest
-          # TODO: put back when nix package .#windows is fixed
+          # TODO: uncomment once nix build .#windows works
           # - target: windows
           #   os: ubuntu-latest
     steps:
@@ -44,7 +44,7 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@v24
         with:
-          nix_path: nixpkgs=channel:nixos-23.05
+          nix_path: nixpkgs=channel:nixos-23.11
           extra_nix_config: |
             experimental-features = nix-command flakes
       - uses: cachix/cachix-action@v12
@@ -53,16 +53,16 @@ jobs:
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       - name: Build release
         run: nix build -L .#${{ matrix.target }}
-      - name: Copy executable and prepare folders
+      - name: Copy binary
         run: |
-          mkdir -p {man,completions}
           cp result/bin/himalaya* .
-      - name: Patch interpreter
+      - name: Patch binary interpreter
         if: ${{ matrix.target == 'linux' }}
         run: |
           nix-shell -p patchelf --command "sudo patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 himalaya"
-      - name: Build release archive
+      - name: Prepare release archives
         run: |
+          mkdir -p {man,completions}
           nix run .#${{ matrix.target }} man ./man
           nix run .#${{ matrix.target }} completion bash > ./completions/himalaya.bash
           nix run .#${{ matrix.target }} completion elvish > ./completions/himalaya.elvish
@@ -71,29 +71,29 @@ jobs:
           nix run .#${{ matrix.target }} completion zsh > ./completions/himalaya.zsh
           tar -czf himalaya.tgz himalaya* man completions
           zip -r himalaya.zip himalaya* man completions
-      - name: Upload tar.gz release asset
+      - name: Upload tarball release archive
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: himalaya.tgz
           asset_name: himalaya-${{ matrix.target }}.tgz
           asset_content_type: application/gzip
-      - name: Upload zip release asset
+      - name: Upload zip release archive
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: himalaya.zip
           asset_name: himalaya-${{ matrix.target }}.zip
           asset_content_type: application/zip
 
-  # TODO: remove me when nix package .#windows is fixed
-  deploy_windows_github:
+  # TODO: remove me once nix build .#windows works
+  deploy-windows-release:
     runs-on: windows-latest
-    needs: create_release
+    needs: create-release
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -101,16 +101,19 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-      - name: Builds release
+          profile: minimal
+      - name: Build release
         uses: actions-rs/cargo@v1
         with:
           command: build
           args: --release
-      - name: Compress executable
+      - name: Copy binary
+        run: |
+          copy target/release/himalaya.exe .
+      - name: Prepare release archives
         run: |
           mkdir man
           mkdir completions
-          copy target/release/himalaya.exe .
           ./himalaya.exe man ./man
           ./himalaya.exe completion bash > ./completions/himalaya.bash
           ./himalaya.exe completion elvish > ./completions/himalaya.elvish
@@ -119,35 +122,35 @@ jobs:
           ./himalaya.exe completion zsh > ./completions/himalaya.zsh
           tar -czf himalaya.tgz himalaya.exe man completions
           Compress-Archive -Path himalaya.exe,man,completions -DestinationPath himalaya.zip
-      - name: Upload tar.gz release asset
+      - name: Upload tarball release archive
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: himalaya.tgz
           asset_name: himalaya-windows.tgz
           asset_content_type: application/gzip
-      - name: Upload zip release asset
+      - name: Upload zip release archive
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: himalaya.zip
           asset_name: himalaya-windows.zip
           asset_content_type: application/zip
 
-  deploy_crates:
+  publish-crates-io:
     runs-on: ubuntu-latest
-    needs: create_release
+    needs: create-release
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v2        
       - name: Install Nix
         uses: cachix/install-nix-action@v24
         with:
-          nix_path: nixpkgs=channel:nixos-23.05
+          nix_path: nixpkgs=channel:nixos-23.11
           extra_nix_config: |
             experimental-features = nix-command flakes
       - name: Publish library to crates.io
