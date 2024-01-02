@@ -84,13 +84,13 @@ impl ToString for BackendKind {
 
 #[derive(Clone, Default)]
 pub struct BackendContextBuilder {
-    maildir: Option<MaildirSessionBuilder>,
-    maildir_for_sync: Option<MaildirSessionBuilder>,
+    pub maildir: Option<MaildirSessionBuilder>,
+    pub maildir_for_sync: Option<MaildirSessionBuilder>,
     #[cfg(feature = "imap")]
-    imap: Option<ImapSessionBuilder>,
+    pub imap: Option<ImapSessionBuilder>,
     #[cfg(feature = "smtp")]
-    smtp: Option<SmtpClientBuilder>,
-    sendmail: Option<SendmailContext>,
+    pub smtp: Option<SmtpClientBuilder>,
+    pub sendmail: Option<SendmailContext>,
 }
 
 #[async_trait]
@@ -697,6 +697,16 @@ impl Backend {
             .await?
             .build()
             .await
+    }
+
+    pub async fn new_v2(
+        toml_account_config: TomlAccountConfig,
+        builder: email::backend::BackendBuilder<BackendContextBuilder>,
+    ) -> Result<Self> {
+        Ok(Self {
+            toml_account_config,
+            backend: builder.build().await?,
+        })
     }
 
     fn build_id_mapper(
