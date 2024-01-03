@@ -18,6 +18,14 @@ pub struct FolderNameOptionalArg {
     pub name: String,
 }
 
+impl Default for FolderNameOptionalArg {
+    fn default() -> Self {
+        Self {
+            name: INBOX.to_owned(),
+        }
+    }
+}
+
 /// The required folder name argument parser.
 #[derive(Debug, Parser)]
 pub struct FolderNameArg {

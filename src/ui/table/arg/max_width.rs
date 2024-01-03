@@ -1,7 +1,7 @@
 use clap::Parser;
 
 /// The table max width argument parser.
-#[derive(Debug, Parser)]
+#[derive(Debug, Default, Parser)]
 pub struct TableMaxWidthFlag {
     /// The maximum width the table should not exceed.
     ///

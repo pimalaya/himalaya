@@ -50,6 +50,19 @@ pub struct ListEnvelopesCommand {
     pub account: AccountNameFlag,
 }
 
+impl Default for ListEnvelopesCommand {
+    fn default() -> Self {
+        Self {
+            folder: Default::default(),
+            page: 1,
+            page_size: Default::default(),
+            table: Default::default(),
+            cache: Default::default(),
+            account: Default::default(),
+        }
+    }
+}
+
 impl ListEnvelopesCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing list envelopes command");

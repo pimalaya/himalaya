@@ -2,8 +2,8 @@ use anyhow::Result;
 use clap::Parser;
 use env_logger::{Builder as LoggerBuilder, Env, DEFAULT_FILTER_ENV};
 use himalaya::{
-    cli::Cli, config::TomlConfig, message::command::mailto::MessageMailtoCommand,
-    printer::StdoutPrinter,
+    cli::Cli, config::TomlConfig, envelope::command::list::ListEnvelopesCommand,
+    message::command::mailto::MessageMailtoCommand, printer::StdoutPrinter,
 };
 use log::{debug, warn};
 use std::env;
@@ -35,7 +35,13 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     let mut printer = StdoutPrinter::new(cli.output, cli.color);
 
-    cli.command
-        .execute(&mut printer, cli.config_path.as_ref())
-        .await
+    match cli.command {
+        Some(cmd) => cmd.execute(&mut printer, cli.config_path.as_ref()).await,
+        None => {
+            let config = TomlConfig::from_some_path_or_default(cli.config_path.as_ref()).await?;
+            ListEnvelopesCommand::default()
+                .execute(&mut printer, &config)
+                .await
+        }
+    }
 }
