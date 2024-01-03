@@ -1,10 +1,14 @@
 use anyhow::Result;
 use clap::Parser;
+#[cfg(feature = "imap")]
+use email::folder::list::imap::ListFoldersImap;
+#[cfg(feature = "maildir")]
+use email::folder::list::maildir::ListFoldersMaildir;
 use log::info;
 
 use crate::{
     account::arg::name::AccountNameFlag,
-    backend::Backend,
+    backend::{Backend, BackendKind},
     cache::arg::disable::CacheDisableFlag,
     config::TomlConfig,
     folder::Folders,
@@ -29,13 +33,41 @@ pub struct FolderListCommand {
 
 impl FolderListCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
-        info!("executing folder list command");
+        info!("executing list folders command");
 
-        let some_account_name = self.account.name.as_ref().map(String::as_str);
-        let (toml_account_config, account_config) = config
-            .clone()
-            .into_account_configs(some_account_name, self.cache.disable)?;
-        let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
+        let (toml_account_config, account_config) = config.clone().into_account_configs(
+            self.account.name.as_ref().map(String::as_str),
+            self.cache.disable,
+        )?;
+
+        let list_folders_kind = toml_account_config.list_folders_kind();
+
+        let backend = Backend::new(
+            &toml_account_config,
+            &account_config,
+            list_folders_kind,
+            |builder| match list_folders_kind {
+                Some(BackendKind::Maildir) => {
+                    builder.set_list_folders(|ctx| {
+                        ctx.maildir.as_ref().and_then(ListFoldersMaildir::new)
+                    });
+                }
+                Some(BackendKind::MaildirForSync) => {
+                    builder.set_list_folders(|ctx| {
+                        ctx.maildir_for_sync
+                            .as_ref()
+                            .and_then(ListFoldersMaildir::new)
+                    });
+                }
+                #[cfg(feature = "imap")]
+                Some(BackendKind::Imap) => {
+                    builder
+                        .set_list_folders(|ctx| ctx.imap.as_ref().and_then(ListFoldersImap::new));
+                }
+                _ => (),
+            },
+        )
+        .await?;
 
         let folders: Folders = backend.list_folders().await?.into();
 
@@ -45,8 +77,6 @@ impl FolderListCommand {
                 format: &account_config.get_message_read_format(),
                 max_width: self.table.max_width,
             },
-        )?;
-
-        Ok(())
+        )
     }
 }

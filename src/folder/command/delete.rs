@@ -1,12 +1,20 @@
 use anyhow::Result;
 use clap::Parser;
 use dialoguer::Confirm;
+#[cfg(feature = "imap")]
+use email::folder::delete::imap::DeleteFolderImap;
+#[cfg(feature = "maildir")]
+use email::folder::delete::maildir::DeleteFolderMaildir;
 use log::info;
 use std::process;
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::CacheDisableFlag,
-    config::TomlConfig, folder::arg::name::FolderNameArg, printer::Printer,
+    account::arg::name::AccountNameFlag,
+    backend::{Backend, BackendKind},
+    cache::arg::disable::CacheDisableFlag,
+    config::TomlConfig,
+    folder::arg::name::FolderNameArg,
+    printer::Printer,
 };
 
 /// Delete a folder.
@@ -41,15 +49,42 @@ impl FolderDeleteCommand {
             process::exit(0);
         };
 
-        let some_account_name = self.account.name.as_ref().map(String::as_str);
-        let (toml_account_config, account_config) = config
-            .clone()
-            .into_account_configs(some_account_name, self.cache.disable)?;
-        let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
+        let (toml_account_config, account_config) = config.clone().into_account_configs(
+            self.account.name.as_ref().map(String::as_str),
+            self.cache.disable,
+        )?;
+
+        let delete_folder_kind = toml_account_config.delete_folder_kind();
+
+        let backend = Backend::new(
+            &toml_account_config,
+            &account_config,
+            delete_folder_kind,
+            |builder| match delete_folder_kind {
+                Some(BackendKind::Maildir) => {
+                    builder.set_delete_folder(|ctx| {
+                        ctx.maildir.as_ref().and_then(DeleteFolderMaildir::new)
+                    });
+                }
+                Some(BackendKind::MaildirForSync) => {
+                    builder.set_delete_folder(|ctx| {
+                        ctx.maildir_for_sync
+                            .as_ref()
+                            .and_then(DeleteFolderMaildir::new)
+                    });
+                }
+                #[cfg(feature = "imap")]
+                Some(BackendKind::Imap) => {
+                    builder
+                        .set_delete_folder(|ctx| ctx.imap.as_ref().and_then(DeleteFolderImap::new));
+                }
+                _ => (),
+            },
+        )
+        .await?;
 
         backend.delete_folder(&folder).await?;
-        printer.print(format!("Folder {folder} successfully deleted!"))?;
 
-        Ok(())
+        printer.print(format!("Folder {folder} successfully deleted!"))
     }
 }

@@ -101,7 +101,7 @@ impl AccountSyncCommand {
         let account_name = account_config.name.as_str();
 
         let backend_builder =
-            BackendBuilder::new(toml_account_config, account_config.clone(), false).await?;
+            BackendBuilder::new(toml_account_config, account_config.clone()).await?;
         let sync_builder = AccountSyncBuilder::new(backend_builder.into())
             .await?
             .with_some_folders_strategy(strategy)

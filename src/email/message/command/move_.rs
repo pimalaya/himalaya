@@ -1,10 +1,14 @@
 use anyhow::Result;
 use clap::Parser;
+#[cfg(feature = "imap")]
+use email::message::move_::imap::MoveMessagesImap;
+#[cfg(feature = "maildir")]
+use email::message::move_::maildir::MoveMessagesMaildir;
 use log::info;
 
 use crate::{
     account::arg::name::AccountNameFlag,
-    backend::Backend,
+    backend::{Backend, BackendKind},
     cache::arg::disable::CacheDisableFlag,
     config::TomlConfig,
     envelope::arg::ids::EnvelopeIdsArgs,
@@ -33,22 +37,50 @@ pub struct MessageMoveCommand {
 
 impl MessageMoveCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
-        info!("executing message move command");
+        info!("executing move message(s) command");
 
-        let from_folder = &self.source_folder.name;
-        let to_folder = &self.target_folder.name;
-        let account = self.account.name.as_ref().map(String::as_str);
-        let cache = self.cache.disable;
-
-        let (toml_account_config, account_config) =
-            config.clone().into_account_configs(account, cache)?;
-        let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
-
+        let source = &self.source_folder.name;
+        let target = &self.target_folder.name;
         let ids = &self.envelopes.ids;
-        backend.move_messages(from_folder, to_folder, ids).await?;
+
+        let (toml_account_config, account_config) = config.clone().into_account_configs(
+            self.account.name.as_ref().map(String::as_str),
+            self.cache.disable,
+        )?;
+
+        let move_messages_kind = toml_account_config.move_messages_kind();
+
+        let backend = Backend::new(
+            &toml_account_config,
+            &account_config,
+            move_messages_kind,
+            |builder| match move_messages_kind {
+                Some(BackendKind::Maildir) => {
+                    builder.set_move_messages(|ctx| {
+                        ctx.maildir.as_ref().and_then(MoveMessagesMaildir::new)
+                    });
+                }
+                Some(BackendKind::MaildirForSync) => {
+                    builder.set_move_messages(|ctx| {
+                        ctx.maildir_for_sync
+                            .as_ref()
+                            .and_then(MoveMessagesMaildir::new)
+                    });
+                }
+                #[cfg(feature = "imap")]
+                Some(BackendKind::Imap) => {
+                    builder
+                        .set_move_messages(|ctx| ctx.imap.as_ref().and_then(MoveMessagesImap::new));
+                }
+                _ => (),
+            },
+        )
+        .await?;
+
+        backend.move_messages(source, target, ids).await?;
 
         printer.print(format!(
-            "Message(s) successfully moved from {from_folder} to {to_folder}!"
+            "Message(s) successfully moved from {source} to {target}!"
         ))
     }
 }

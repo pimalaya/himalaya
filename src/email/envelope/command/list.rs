@@ -1,18 +1,16 @@
 use anyhow::Result;
 use clap::Parser;
-use email::backend::BackendBuilder;
 #[cfg(feature = "imap")]
-use email::{envelope::list::imap::ListEnvelopesImap, imap::ImapSessionBuilder};
+use email::envelope::list::imap::ListEnvelopesImap;
 #[cfg(feature = "maildir")]
-use email::{
-    envelope::list::maildir::ListEnvelopesMaildir,
-    maildir::{config::MaildirConfig, MaildirSessionBuilder},
-};
+use email::envelope::list::maildir::ListEnvelopesMaildir;
+#[cfg(feature = "notmuch")]
+use email::envelope::list::notmuch::ListEnvelopesNotmuch;
 use log::info;
 
 use crate::{
     account::arg::name::AccountNameFlag,
-    backend::{Backend, BackendContextBuilder, BackendKind},
+    backend::{Backend, BackendKind},
     cache::arg::disable::CacheDisableFlag,
     config::TomlConfig,
     folder::arg::name::FolderNameOptionalArg,
@@ -54,90 +52,48 @@ pub struct ListEnvelopesCommand {
 
 impl ListEnvelopesCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
-        info!("executing envelope list command");
+        info!("executing list envelopes command");
+
+        let (toml_account_config, account_config) = config.clone().into_account_configs(
+            self.account.name.as_ref().map(String::as_str),
+            self.cache.disable,
+        )?;
 
         let folder = &self.folder.name;
-
-        let some_account_name = self.account.name.as_ref().map(String::as_str);
-        let (toml_account_config, account_config) = config
-            .clone()
-            .into_account_configs(some_account_name, self.cache.disable)?;
-
-        let backend_kind = toml_account_config.list_envelopes_kind();
-        let backend_ctx_builder = BackendContextBuilder {
-            maildir: toml_account_config
-                .maildir
-                .as_ref()
-                .filter(|_| matches!(backend_kind, Some(BackendKind::Maildir)))
-                .map(|mdir_config| {
-                    MaildirSessionBuilder::new(account_config.clone(), mdir_config.clone())
-                }),
-            maildir_for_sync: Some(MaildirConfig {
-                root_dir: account_config.get_sync_dir()?,
-            })
-            .filter(|_| matches!(backend_kind, Some(BackendKind::MaildirForSync)))
-            .map(|mdir_config| MaildirSessionBuilder::new(account_config.clone(), mdir_config)),
-            #[cfg(feature = "imap")]
-            imap: {
-                let ctx_builder = toml_account_config
-                    .imap
-                    .as_ref()
-                    .filter(|_| matches!(backend_kind, Some(BackendKind::Imap)))
-                    .map(|imap_config| {
-                        ImapSessionBuilder::new(account_config.clone(), imap_config.clone())
-                            .with_prebuilt_credentials()
-                    });
-                match ctx_builder {
-                    Some(ctx_builder) => Some(ctx_builder.await?),
-                    None => None,
-                }
-            },
-            #[cfg(feature = "notmuch")]
-            notmuch: toml_account_config
-                .notmuch
-                .as_ref()
-                .filter(|_| matches!(backend_kind, Some(BackendKind::Notmuch)))
-                .map(|notmuch_config| {
-                    NotmuchSessionBuilder::new(account_config.clone(), notmuch_config.clone())
-                }),
-            ..Default::default()
-        };
-
-        let mut backend_builder = BackendBuilder::new(account_config.clone(), backend_ctx_builder);
-
-        match toml_account_config.list_envelopes_kind() {
-            Some(BackendKind::Maildir) => {
-                backend_builder = backend_builder.with_list_envelopes(|ctx| {
-                    ctx.maildir.as_ref().and_then(ListEnvelopesMaildir::new)
-                });
-            }
-            Some(BackendKind::MaildirForSync) => {
-                backend_builder = backend_builder.with_list_envelopes(|ctx| {
-                    ctx.maildir_for_sync
-                        .as_ref()
-                        .and_then(ListEnvelopesMaildir::new)
-                });
-            }
-            #[cfg(feature = "imap")]
-            Some(BackendKind::Imap) => {
-                backend_builder = backend_builder
-                    .with_list_envelopes(|ctx| ctx.imap.as_ref().and_then(ListEnvelopesImap::new));
-            }
-            #[cfg(feature = "notmuch")]
-            Some(BackendKind::Notmuch) => {
-                backend_builder = backend_builder.with_list_envelopes(|ctx| {
-                    ctx.notmuch.as_ref().and_then(ListEnvelopesNotmuch::new)
-                });
-            }
-            _ => (),
-        }
-
-        let backend = Backend::new_v2(toml_account_config.clone(), backend_builder).await?;
-
+        let page = 1.max(self.page) - 1;
         let page_size = self
             .page_size
-            .unwrap_or(account_config.get_envelope_list_page_size());
-        let page = 1.max(self.page) - 1;
+            .unwrap_or_else(|| account_config.get_envelope_list_page_size());
+
+        let list_envelopes_kind = toml_account_config.list_envelopes_kind();
+
+        let backend = Backend::new(
+            &toml_account_config,
+            &account_config,
+            list_envelopes_kind,
+            |builder| match list_envelopes_kind {
+                Some(BackendKind::Maildir) => {
+                    builder.set_list_envelopes(|ctx| {
+                        ctx.maildir.as_ref().and_then(ListEnvelopesMaildir::new)
+                    });
+                }
+                Some(BackendKind::MaildirForSync) => {
+                    builder.set_list_envelopes(|ctx| {
+                        ctx.maildir_for_sync
+                            .as_ref()
+                            .and_then(ListEnvelopesMaildir::new)
+                    });
+                }
+                #[cfg(feature = "imap")]
+                Some(BackendKind::Imap) => {
+                    builder.set_list_envelopes(|ctx| {
+                        ctx.imap.as_ref().and_then(ListEnvelopesImap::new)
+                    });
+                }
+                _ => (),
+            },
+        )
+        .await?;
 
         let envelopes = backend.list_envelopes(folder, page_size, page).await?;
 

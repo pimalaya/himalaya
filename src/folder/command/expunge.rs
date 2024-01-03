@@ -1,10 +1,18 @@
 use anyhow::Result;
 use clap::Parser;
+#[cfg(feature = "imap")]
+use email::folder::expunge::imap::ExpungeFolderImap;
+#[cfg(feature = "maildir")]
+use email::folder::expunge::maildir::ExpungeFolderMaildir;
 use log::info;
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, cache::arg::disable::CacheDisableFlag,
-    config::TomlConfig, folder::arg::name::FolderNameArg, printer::Printer,
+    account::arg::name::AccountNameFlag,
+    backend::{Backend, BackendKind},
+    cache::arg::disable::CacheDisableFlag,
+    config::TomlConfig,
+    folder::arg::name::FolderNameArg,
+    printer::Printer,
 };
 
 /// Expunge a folder.
@@ -26,19 +34,46 @@ pub struct FolderExpungeCommand {
 
 impl FolderExpungeCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
-        info!("executing folder expunge command");
+        info!("executing expunge folder command");
 
         let folder = &self.folder.name;
+        let (toml_account_config, account_config) = config.clone().into_account_configs(
+            self.account.name.as_ref().map(String::as_str),
+            self.cache.disable,
+        )?;
 
-        let some_account_name = self.account.name.as_ref().map(String::as_str);
-        let (toml_account_config, account_config) = config
-            .clone()
-            .into_account_configs(some_account_name, self.cache.disable)?;
-        let backend = Backend::new(toml_account_config, account_config.clone(), false).await?;
+        let expunge_folder_kind = toml_account_config.expunge_folder_kind();
+
+        let backend = Backend::new(
+            &toml_account_config,
+            &account_config,
+            expunge_folder_kind,
+            |builder| match expunge_folder_kind {
+                Some(BackendKind::Maildir) => {
+                    builder.set_expunge_folder(|ctx| {
+                        ctx.maildir.as_ref().and_then(ExpungeFolderMaildir::new)
+                    });
+                }
+                Some(BackendKind::MaildirForSync) => {
+                    builder.set_expunge_folder(|ctx| {
+                        ctx.maildir_for_sync
+                            .as_ref()
+                            .and_then(ExpungeFolderMaildir::new)
+                    });
+                }
+                #[cfg(feature = "imap")]
+                Some(BackendKind::Imap) => {
+                    builder.set_expunge_folder(|ctx| {
+                        ctx.imap.as_ref().and_then(ExpungeFolderImap::new)
+                    });
+                }
+                _ => (),
+            },
+        )
+        .await?;
 
         backend.expunge_folder(&folder).await?;
-        printer.print(format!("Folder {folder} successfully expunged!"))?;
 
-        Ok(())
+        printer.print(format!("Folder {folder} successfully expunged!"))
     }
 }

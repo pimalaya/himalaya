@@ -111,6 +111,14 @@ impl TomlAccountConfig {
             .or_else(|| self.backend.as_ref())
     }
 
+    pub fn watch_envelopes_kind(&self) -> Option<&BackendKind> {
+        self.envelope
+            .as_ref()
+            .and_then(|envelope| envelope.watch.as_ref())
+            .and_then(|watch| watch.backend.as_ref())
+            .or_else(|| self.backend.as_ref())
+    }
+
     pub fn add_flags_kind(&self) -> Option<&BackendKind> {
         self.flag
             .as_ref()

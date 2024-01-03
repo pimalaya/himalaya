@@ -30,12 +30,12 @@ pub struct TemplateWriteCommand {
 
 impl TemplateWriteCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
-        info!("executing template write command");
+        info!("executing write template command");
 
-        let account = self.account.name.as_ref().map(String::as_str);
-        let cache = self.cache.disable;
-
-        let (_, account_config) = config.clone().into_account_configs(account, cache)?;
+        let (_, account_config) = config.clone().into_account_configs(
+            self.account.name.as_ref().map(String::as_str),
+            self.cache.disable,
+        )?;
 
         let tpl: String = Message::new_tpl_builder(&account_config)
             .with_headers(self.headers.raw)

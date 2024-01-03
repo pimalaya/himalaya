@@ -40,7 +40,6 @@ use email::{
         get::imap::GetMessagesImap,
         move_::{imap::MoveMessagesImap, maildir::MoveMessagesMaildir},
         peek::{imap::PeekMessagesImap, maildir::PeekMessagesMaildir},
-        send_raw::{sendmail::SendRawMessageSendmail, smtp::SendRawMessageSmtp},
         Messages,
     },
     sendmail::SendmailContext,
@@ -91,6 +90,68 @@ pub struct BackendContextBuilder {
     #[cfg(feature = "smtp")]
     pub smtp: Option<SmtpClientBuilder>,
     pub sendmail: Option<SendmailContext>,
+}
+
+impl BackendContextBuilder {
+    pub async fn new(
+        toml_account_config: &TomlAccountConfig,
+        account_config: &AccountConfig,
+        kinds: Vec<&BackendKind>,
+    ) -> Result<Self> {
+        Ok(Self {
+            maildir: toml_account_config
+                .maildir
+                .as_ref()
+                .filter(|_| kinds.contains(&&BackendKind::Maildir))
+                .map(|mdir_config| {
+                    MaildirSessionBuilder::new(account_config.clone(), mdir_config.clone())
+                }),
+            maildir_for_sync: Some(MaildirConfig {
+                root_dir: account_config.get_sync_dir()?,
+            })
+            .filter(|_| kinds.contains(&&BackendKind::MaildirForSync))
+            .map(|mdir_config| MaildirSessionBuilder::new(account_config.clone(), mdir_config)),
+            #[cfg(feature = "imap")]
+            imap: {
+                let ctx_builder = toml_account_config
+                    .imap
+                    .as_ref()
+                    .filter(|_| kinds.contains(&&BackendKind::Imap))
+                    .map(|imap_config| {
+                        ImapSessionBuilder::new(account_config.clone(), imap_config.clone())
+                            .with_prebuilt_credentials()
+                    });
+                match ctx_builder {
+                    Some(ctx_builder) => Some(ctx_builder.await?),
+                    None => None,
+                }
+            },
+            #[cfg(feature = "notmuch")]
+            notmuch: toml_account_config
+                .notmuch
+                .as_ref()
+                .filter(|_| kinds.contains(&&BackendKind::Notmuch))
+                .map(|notmuch_config| {
+                    NotmuchSessionBuilder::new(account_config.clone(), notmuch_config.clone())
+                }),
+            #[cfg(feature = "smtp")]
+            smtp: toml_account_config
+                .smtp
+                .as_ref()
+                .filter(|_| kinds.contains(&&BackendKind::Smtp))
+                .map(|smtp_config| {
+                    SmtpClientBuilder::new(account_config.clone(), smtp_config.clone())
+                }),
+            #[cfg(feature = "sendmail")]
+            sendmail: toml_account_config
+                .sendmail
+                .as_ref()
+                .filter(|_| kinds.contains(&&BackendKind::Sendmail))
+                .map(|sendmail_config| {
+                    SendmailContext::new(account_config.clone(), sendmail_config.clone())
+                }),
+        })
+    }
 }
 
 #[async_trait]
@@ -151,7 +212,6 @@ impl BackendBuilder {
     pub async fn new(
         toml_account_config: TomlAccountConfig,
         account_config: AccountConfig,
-        with_sending: bool,
     ) -> Result<Self> {
         let used_backends = toml_account_config.get_used_backends();
 
@@ -159,11 +219,6 @@ impl BackendBuilder {
         let is_maildir_for_sync_used = used_backends.contains(&BackendKind::MaildirForSync);
         #[cfg(feature = "imap")]
         let is_imap_used = used_backends.contains(&BackendKind::Imap);
-        #[cfg(feature = "notmuch")]
-        let is_notmuch_used = used_backends.contains(&BackendKind::Notmuch);
-        #[cfg(feature = "smtp")]
-        let is_smtp_used = used_backends.contains(&BackendKind::Smtp);
-        let is_sendmail_used = used_backends.contains(&BackendKind::Sendmail);
 
         let backend_ctx_builder = BackendContextBuilder {
             maildir: toml_account_config
@@ -195,31 +250,7 @@ impl BackendBuilder {
                     None => None,
                 }
             },
-            #[cfg(feature = "notmuch")]
-            notmuch: toml_account_config
-                .notmuch
-                .as_ref()
-                .filter(|_| is_notmuch_used)
-                .map(|notmuch_config| {
-                    NotmuchSessionBuilder::new(account_config.clone(), notmuch_config.clone())
-                }),
-            #[cfg(feature = "smtp")]
-            smtp: toml_account_config
-                .smtp
-                .as_ref()
-                .filter(|_| with_sending)
-                .filter(|_| is_smtp_used)
-                .map(|smtp_config| {
-                    SmtpClientBuilder::new(account_config.clone(), smtp_config.clone())
-                }),
-            sendmail: toml_account_config
-                .sendmail
-                .as_ref()
-                .filter(|_| with_sending)
-                .filter(|_| is_sendmail_used)
-                .map(|sendmail_config| {
-                    SendmailContext::new(account_config.clone(), sendmail_config.clone())
-                }),
+            ..Default::default()
         };
 
         let mut backend_builder =
@@ -511,21 +542,6 @@ impl BackendBuilder {
             _ => (),
         }
 
-        match toml_account_config.send_raw_message_kind() {
-            #[cfg(feature = "smtp")]
-            Some(BackendKind::Smtp) => {
-                backend_builder = backend_builder.with_send_raw_message(|ctx| {
-                    ctx.smtp.as_ref().and_then(SendRawMessageSmtp::new)
-                });
-            }
-            Some(BackendKind::Sendmail) => {
-                backend_builder = backend_builder.with_send_raw_message(|ctx| {
-                    ctx.sendmail.as_ref().and_then(SendRawMessageSendmail::new)
-                });
-            }
-            _ => (),
-        }
-
         match toml_account_config.add_raw_message_kind() {
             Some(BackendKind::Maildir) => {
                 backend_builder = backend_builder.with_add_raw_message_with_flags(|ctx| {
@@ -689,23 +705,22 @@ pub struct Backend {
 
 impl Backend {
     pub async fn new(
-        toml_account_config: TomlAccountConfig,
-        account_config: AccountConfig,
-        with_sending: bool,
+        toml_account_config: &TomlAccountConfig,
+        account_config: &AccountConfig,
+        backend_kinds: impl IntoIterator<Item = &BackendKind>,
+        with_features: impl Fn(&mut email::backend::BackendBuilder<BackendContextBuilder>),
     ) -> Result<Self> {
-        BackendBuilder::new(toml_account_config, account_config, with_sending)
-            .await?
-            .build()
-            .await
-    }
+        let backend_kinds = backend_kinds.into_iter().collect();
+        let backend_ctx_builder =
+            BackendContextBuilder::new(toml_account_config, account_config, backend_kinds).await?;
+        let mut backend_builder =
+            email::backend::BackendBuilder::new(account_config.clone(), backend_ctx_builder);
 
-    pub async fn new_v2(
-        toml_account_config: TomlAccountConfig,
-        builder: email::backend::BackendBuilder<BackendContextBuilder>,
-    ) -> Result<Self> {
+        with_features(&mut backend_builder);
+
         Ok(Self {
-            toml_account_config,
-            backend: builder.build().await?,
+            toml_account_config: toml_account_config.clone(),
+            backend: backend_builder.build().await?,
         })
     }
 
