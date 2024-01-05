@@ -80,7 +80,7 @@ pub struct AccountSyncCommand {
 
 impl AccountSyncCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
-        info!("executing account sync command");
+        info!("executing sync account command");
 
         let included_folders = HashSet::from_iter(self.include_folder);
         let excluded_folders = HashSet::from_iter(self.exclude_folder);

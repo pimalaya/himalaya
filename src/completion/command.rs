@@ -20,16 +20,11 @@ pub struct CompletionGenerateCommand {
 
 impl CompletionGenerateCommand {
     pub async fn execute(self) -> Result<()> {
-        info!("executing completion generate command");
+        info!("executing generate completion command");
 
         let mut cmd = Cli::command();
         let name = cmd.get_name().to_string();
         clap_complete::generate(self.shell, &mut cmd, name, &mut io::stdout());
-
-        info!(
-            "Shell script successfully generated for shell {}!",
-            self.shell
-        );
 
         Ok(())
     }

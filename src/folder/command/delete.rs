@@ -35,7 +35,7 @@ pub struct FolderDeleteCommand {
 
 impl FolderDeleteCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
-        info!("executing folder delete command");
+        info!("executing delete folder command");
 
         let folder = &self.folder.name;
 

@@ -41,7 +41,7 @@ pub struct TemplateSaveCommand {
 
 impl TemplateSaveCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
-        info!("executing template save command");
+        info!("executing save template command");
 
         let folder = &self.folder.name;
 

@@ -37,7 +37,7 @@ pub struct TemplateSendCommand {
 
 impl TemplateSendCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
-        info!("executing template send command");
+        info!("executing send template command");
 
         let (toml_account_config, account_config) = config.clone().into_account_configs(
             self.account.name.as_ref().map(String::as_str),

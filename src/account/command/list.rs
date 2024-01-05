@@ -21,7 +21,7 @@ pub struct AccountListCommand {
 
 impl AccountListCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
-        info!("executing account list command");
+        info!("executing list accounts command");
 
         let accounts: Accounts = config.accounts.iter().into();
 

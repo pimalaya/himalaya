@@ -22,7 +22,7 @@ pub struct ManualGenerateCommand {
 
 impl ManualGenerateCommand {
     pub async fn execute(self, printer: &mut impl Printer) -> Result<()> {
-        info!("executing manual generate command");
+        info!("executing generate manuals command");
 
         let cmd = Cli::command();
         let cmd_name = cmd.get_name().to_string();

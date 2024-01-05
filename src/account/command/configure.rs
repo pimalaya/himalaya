@@ -35,7 +35,7 @@ pub struct AccountConfigureCommand {
 
 impl AccountConfigureCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
-        info!("executing account configure command");
+        info!("executing configure account command");
 
         let account = &self.account.name;
         let (_, account_config) = config.into_toml_account_config(Some(account))?;

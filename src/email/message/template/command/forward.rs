@@ -45,7 +45,7 @@ pub struct TemplateForwardCommand {
 
 impl TemplateForwardCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
-        info!("executing template forward command");
+        info!("executing forward template command");
 
         let folder = &self.folder.name;
 
