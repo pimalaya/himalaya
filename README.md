@@ -4,7 +4,7 @@ https://pimalaya.org/himalaya/cli/latest/
 
 CLI to manage emails, based on [email-lib](https://crates.io/crates/email-lib).
 
-![screenshot](https://user-images.githubusercontent.com/10437171/138774902-7b9de5a3-93eb-44b0-8cfb-6d2e11e3b1aa.png)
+![screenshot](https://github.com/soywod/himalaya/assets/10437171/8a62cf1d-920e-4110-9849-170db6dc51ce)
 
 *Disclaimer: the project is under active development, do not use in production before the final `v1.0.0`.*
 
