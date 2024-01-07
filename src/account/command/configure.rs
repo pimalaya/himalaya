@@ -4,16 +4,13 @@ use clap::Parser;
 use email::imap::config::ImapAuthConfig;
 #[cfg(feature = "smtp")]
 use email::smtp::config::SmtpAuthConfig;
-use log::{debug, info, warn};
+use log::info;
+#[cfg(any(feature = "imap", feature = "smtp"))]
+use log::{debug, warn};
 
-use crate::{
-    account::arg::name::AccountNameArg,
-    config::{
-        wizard::{prompt_passwd, prompt_secret},
-        TomlConfig,
-    },
-    printer::Printer,
-};
+#[cfg(any(feature = "imap", feature = "smtp"))]
+use crate::config::wizard::{prompt_passwd, prompt_secret};
+use crate::{account::arg::name::AccountNameArg, config::TomlConfig, printer::Printer};
 
 /// Configure an account.
 ///

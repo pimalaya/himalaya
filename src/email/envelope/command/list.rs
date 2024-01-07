@@ -8,10 +8,11 @@ use email::envelope::list::maildir::ListEnvelopesMaildir;
 use email::envelope::list::notmuch::ListEnvelopesNotmuch;
 use log::info;
 
+#[cfg(feature = "sync")]
+use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::{Backend, BackendKind},
-    cache::arg::disable::CacheDisableFlag,
     config::TomlConfig,
     folder::arg::name::FolderNameOptionalArg,
     printer::{PrintTableOpts, Printer},
@@ -43,6 +44,7 @@ pub struct ListEnvelopesCommand {
     #[command(flatten)]
     pub table: TableMaxWidthFlag,
 
+    #[cfg(feature = "sync")]
     #[command(flatten)]
     pub cache: CacheDisableFlag,
 
@@ -57,6 +59,7 @@ impl Default for ListEnvelopesCommand {
             page: 1,
             page_size: Default::default(),
             table: Default::default(),
+            #[cfg(feature = "sync")]
             cache: Default::default(),
             account: Default::default(),
         }
@@ -69,6 +72,7 @@ impl ListEnvelopesCommand {
 
         let (toml_account_config, account_config) = config.clone().into_account_configs(
             self.account.name.as_ref().map(String::as_str),
+            #[cfg(feature = "sync")]
             self.cache.disable,
         )?;
 
@@ -85,22 +89,24 @@ impl ListEnvelopesCommand {
             &account_config,
             list_envelopes_kind,
             |builder| match list_envelopes_kind {
+                #[cfg(feature = "imap")]
+                Some(BackendKind::Imap) => {
+                    builder.set_list_envelopes(|ctx| {
+                        ctx.imap.as_ref().and_then(ListEnvelopesImap::new)
+                    });
+                }
+                #[cfg(feature = "maildir")]
                 Some(BackendKind::Maildir) => {
                     builder.set_list_envelopes(|ctx| {
                         ctx.maildir.as_ref().and_then(ListEnvelopesMaildir::new)
                     });
                 }
+                #[cfg(feature = "sync")]
                 Some(BackendKind::MaildirForSync) => {
                     builder.set_list_envelopes(|ctx| {
                         ctx.maildir_for_sync
                             .as_ref()
                             .and_then(ListEnvelopesMaildir::new)
-                    });
-                }
-                #[cfg(feature = "imap")]
-                Some(BackendKind::Imap) => {
-                    builder.set_list_envelopes(|ctx| {
-                        ctx.imap.as_ref().and_then(ListEnvelopesImap::new)
                     });
                 }
                 _ => (),

@@ -6,10 +6,11 @@ use email::{flag::add::imap::AddFlagsImap, message::move_::imap::MoveMessagesIma
 use email::{flag::add::maildir::AddFlagsMaildir, message::move_::maildir::MoveMessagesMaildir};
 use log::info;
 
+#[cfg(feature = "sync")]
+use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::{Backend, BackendKind},
-    cache::arg::disable::CacheDisableFlag,
     config::TomlConfig,
     envelope::arg::ids::EnvelopeIdsArgs,
     folder::arg::name::FolderNameOptionalFlag,
@@ -30,6 +31,7 @@ pub struct MessageDeleteCommand {
     #[command(flatten)]
     pub envelopes: EnvelopeIdsArgs,
 
+    #[cfg(feature = "sync")]
     #[command(flatten)]
     pub cache: CacheDisableFlag,
 
@@ -46,6 +48,7 @@ impl MessageDeleteCommand {
 
         let (toml_account_config, account_config) = config.clone().into_account_configs(
             self.account.name.as_ref().map(String::as_str),
+            #[cfg(feature = "sync")]
             self.cache.disable,
         )?;
 
@@ -56,6 +59,13 @@ impl MessageDeleteCommand {
             &account_config,
             delete_messages_kind,
             |builder| match delete_messages_kind {
+                #[cfg(feature = "imap")]
+                Some(BackendKind::Imap) => {
+                    builder
+                        .set_move_messages(|ctx| ctx.imap.as_ref().and_then(MoveMessagesImap::new));
+                    builder.set_add_flags(|ctx| ctx.imap.as_ref().and_then(AddFlagsImap::new));
+                }
+                #[cfg(feature = "maildir")]
                 Some(BackendKind::Maildir) => {
                     builder.set_move_messages(|ctx| {
                         ctx.maildir.as_ref().and_then(MoveMessagesMaildir::new)
@@ -63,6 +73,7 @@ impl MessageDeleteCommand {
                     builder
                         .set_add_flags(|ctx| ctx.maildir.as_ref().and_then(AddFlagsMaildir::new));
                 }
+                #[cfg(feature = "sync")]
                 Some(BackendKind::MaildirForSync) => {
                     builder.set_move_messages(|ctx| {
                         ctx.maildir_for_sync
@@ -72,12 +83,6 @@ impl MessageDeleteCommand {
                     builder.set_add_flags(|ctx| {
                         ctx.maildir_for_sync.as_ref().and_then(AddFlagsMaildir::new)
                     });
-                }
-                #[cfg(feature = "imap")]
-                Some(BackendKind::Imap) => {
-                    builder
-                        .set_move_messages(|ctx| ctx.imap.as_ref().and_then(MoveMessagesImap::new));
-                    builder.set_add_flags(|ctx| ctx.imap.as_ref().and_then(AddFlagsImap::new));
                 }
                 _ => (),
             },

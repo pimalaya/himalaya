@@ -6,10 +6,13 @@ use email::folder::list::imap::ListFoldersImap;
 use email::folder::list::maildir::ListFoldersMaildir;
 use log::info;
 
+#[cfg(any(feature = "imap", feature = "maildir", feature = "sync"))]
+use crate::backend::BackendKind;
+#[cfg(feature = "sync")]
+use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
     account::arg::name::AccountNameFlag,
-    backend::{Backend, BackendKind},
-    cache::arg::disable::CacheDisableFlag,
+    backend::Backend,
     config::TomlConfig,
     folder::Folders,
     printer::{PrintTableOpts, Printer},
@@ -24,6 +27,7 @@ pub struct FolderListCommand {
     #[command(flatten)]
     pub table: TableMaxWidthFlag,
 
+    #[cfg(feature = "sync")]
     #[command(flatten)]
     pub cache: CacheDisableFlag,
 
@@ -37,6 +41,7 @@ impl FolderListCommand {
 
         let (toml_account_config, account_config) = config.clone().into_account_configs(
             self.account.name.as_ref().map(String::as_str),
+            #[cfg(feature = "sync")]
             self.cache.disable,
         )?;
 
@@ -47,22 +52,24 @@ impl FolderListCommand {
             &account_config,
             list_folders_kind,
             |builder| match list_folders_kind {
+                #[cfg(feature = "imap")]
+                Some(BackendKind::Imap) => {
+                    builder
+                        .set_list_folders(|ctx| ctx.imap.as_ref().and_then(ListFoldersImap::new));
+                }
+                #[cfg(feature = "maildir")]
                 Some(BackendKind::Maildir) => {
                     builder.set_list_folders(|ctx| {
                         ctx.maildir.as_ref().and_then(ListFoldersMaildir::new)
                     });
                 }
+                #[cfg(feature = "sync")]
                 Some(BackendKind::MaildirForSync) => {
                     builder.set_list_folders(|ctx| {
                         ctx.maildir_for_sync
                             .as_ref()
                             .and_then(ListFoldersMaildir::new)
                     });
-                }
-                #[cfg(feature = "imap")]
-                Some(BackendKind::Imap) => {
-                    builder
-                        .set_list_folders(|ctx| ctx.imap.as_ref().and_then(ListFoldersImap::new));
                 }
                 _ => (),
             },

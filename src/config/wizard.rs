@@ -172,6 +172,7 @@ fn set_tables_dotted<'a>(item: &'a mut Item, keys: impl IntoIterator<Item = &'a 
     }
 }
 
+#[allow(unused)]
 pub(crate) fn prompt_passwd(prompt: &str) -> io::Result<String> {
     Password::with_theme(&*THEME)
         .with_prompt(prompt)
@@ -182,6 +183,7 @@ pub(crate) fn prompt_passwd(prompt: &str) -> io::Result<String> {
         .interact()
 }
 
+#[allow(unused)]
 pub(crate) fn prompt_secret(prompt: &str) -> io::Result<String> {
     Password::with_theme(&*THEME)
         .with_prompt(prompt)

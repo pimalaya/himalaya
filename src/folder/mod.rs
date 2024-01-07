@@ -1,22 +1,30 @@
+#[cfg(feature = "folder-command")]
 pub mod arg;
+#[cfg(feature = "folder-command")]
 pub mod command;
 pub mod config;
 
+#[cfg(feature = "folder-command")]
 use anyhow::Result;
+#[cfg(feature = "folder-command")]
 use serde::Serialize;
+#[cfg(feature = "folder-command")]
 use std::ops;
 
+#[cfg(feature = "folder-command")]
 use crate::{
     printer::{PrintTable, PrintTableOpts, WriteColor},
     ui::{Cell, Row, Table},
 };
 
+#[cfg(feature = "folder-command")]
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Folder {
     pub name: String,
     pub desc: String,
 }
 
+#[cfg(feature = "folder-command")]
 impl From<&email::folder::Folder> for Folder {
     fn from(folder: &email::folder::Folder) -> Self {
         Folder {
@@ -26,6 +34,7 @@ impl From<&email::folder::Folder> for Folder {
     }
 }
 
+#[cfg(feature = "folder-command")]
 impl Table for Folder {
     fn head() -> Row {
         Row::new()
@@ -40,9 +49,11 @@ impl Table for Folder {
     }
 }
 
+#[cfg(feature = "folder-command")]
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Folders(Vec<Folder>);
 
+#[cfg(feature = "folder-command")]
 impl ops::Deref for Folders {
     type Target = Vec<Folder>;
 
@@ -51,12 +62,14 @@ impl ops::Deref for Folders {
     }
 }
 
+#[cfg(feature = "folder-command")]
 impl From<email::folder::Folders> for Folders {
     fn from(folders: email::folder::Folders) -> Self {
         Folders(folders.iter().map(Folder::from).collect())
     }
 }
 
+#[cfg(feature = "folder-command")]
 impl PrintTable for Folders {
     fn print_table(&self, writer: &mut dyn WriteColor, opts: PrintTableOpts) -> Result<()> {
         writeln!(writer)?;

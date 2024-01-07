@@ -8,10 +8,11 @@ use email::flag::set::maildir::SetFlagsMaildir;
 use email::flag::set::notmuch::SetFlagsNotmuch;
 use log::info;
 
+#[cfg(feature = "sync")]
+use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::{Backend, BackendKind},
-    cache::arg::disable::CacheDisableFlag,
     config::TomlConfig,
     flag::arg::ids_and_flags::{into_tuple, IdsAndFlagsArgs},
     folder::arg::name::FolderNameOptionalFlag,
@@ -30,6 +31,7 @@ pub struct FlagSetCommand {
     #[command(flatten)]
     pub args: IdsAndFlagsArgs,
 
+    #[cfg(feature = "sync")]
     #[command(flatten)]
     pub cache: CacheDisableFlag,
 
@@ -45,6 +47,7 @@ impl FlagSetCommand {
         let (ids, flags) = into_tuple(&self.args.ids_and_flags);
         let (toml_account_config, account_config) = config.clone().into_account_configs(
             self.account.name.as_ref().map(String::as_str),
+            #[cfg(feature = "sync")]
             self.cache.disable,
         )?;
 
@@ -55,18 +58,20 @@ impl FlagSetCommand {
             &account_config,
             set_flags_kind,
             |builder| match set_flags_kind {
+                #[cfg(feature = "imap")]
+                Some(BackendKind::Imap) => {
+                    builder.set_set_flags(|ctx| ctx.imap.as_ref().and_then(SetFlagsImap::new));
+                }
+                #[cfg(feature = "maildir")]
                 Some(BackendKind::Maildir) => {
                     builder
                         .set_set_flags(|ctx| ctx.maildir.as_ref().and_then(SetFlagsMaildir::new));
                 }
+                #[cfg(feature = "sync")]
                 Some(BackendKind::MaildirForSync) => {
                     builder.set_set_flags(|ctx| {
                         ctx.maildir_for_sync.as_ref().and_then(SetFlagsMaildir::new)
                     });
-                }
-                #[cfg(feature = "imap")]
-                Some(BackendKind::Imap) => {
-                    builder.set_set_flags(|ctx| ctx.imap.as_ref().and_then(SetFlagsImap::new));
                 }
                 _ => (),
             },

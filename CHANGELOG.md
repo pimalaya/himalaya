@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added one cargo feature per backend feature:
+  - TODO
+
+### Changed
+
+- Renamed `folder create` to `folder add` in order to better match types. An alias has been set up, so both `create` and `add` still work.
+
 ### Fixed
 
 - Fixed default command: running `himalaya` without argument lists envelopes, as it used to be in previous versions.

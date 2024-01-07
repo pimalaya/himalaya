@@ -5,14 +5,16 @@
 
 #[cfg(feature = "pgp")]
 use email::account::config::pgp::PgpConfig;
+#[cfg(feature = "sync")]
+use email::account::sync::config::SyncConfig;
 #[cfg(feature = "imap")]
 use email::imap::config::ImapConfig;
+#[cfg(feature = "maildir")]
+use email::maildir::config::MaildirConfig;
+#[cfg(feature = "sendmail")]
+use email::sendmail::config::SendmailConfig;
 #[cfg(feature = "smtp")]
 use email::smtp::config::SmtpConfig;
-use email::{
-    account::sync::config::SyncConfig, maildir::config::MaildirConfig,
-    sendmail::config::SendmailConfig,
-};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, path::PathBuf};
 
@@ -33,6 +35,7 @@ pub struct TomlAccountConfig {
     pub downloads_dir: Option<PathBuf>,
     pub backend: Option<BackendKind>,
 
+    #[cfg(feature = "sync")]
     pub sync: Option<SyncConfig>,
     #[cfg(feature = "pgp")]
     pub pgp: Option<PgpConfig>,
@@ -55,6 +58,7 @@ pub struct TomlAccountConfig {
 }
 
 impl TomlAccountConfig {
+    #[cfg(feature = "folder-add")]
     pub fn add_folder_kind(&self) -> Option<&BackendKind> {
         self.folder
             .as_ref()
@@ -63,6 +67,7 @@ impl TomlAccountConfig {
             .or_else(|| self.backend.as_ref())
     }
 
+    #[cfg(feature = "folder-list")]
     pub fn list_folders_kind(&self) -> Option<&BackendKind> {
         self.folder
             .as_ref()
@@ -71,6 +76,7 @@ impl TomlAccountConfig {
             .or_else(|| self.backend.as_ref())
     }
 
+    #[cfg(feature = "folder-expunge")]
     pub fn expunge_folder_kind(&self) -> Option<&BackendKind> {
         self.folder
             .as_ref()
@@ -79,6 +85,7 @@ impl TomlAccountConfig {
             .or_else(|| self.backend.as_ref())
     }
 
+    #[cfg(feature = "folder-purge")]
     pub fn purge_folder_kind(&self) -> Option<&BackendKind> {
         self.folder
             .as_ref()
@@ -87,6 +94,7 @@ impl TomlAccountConfig {
             .or_else(|| self.backend.as_ref())
     }
 
+    #[cfg(feature = "folder-delete")]
     pub fn delete_folder_kind(&self) -> Option<&BackendKind> {
         self.folder
             .as_ref()
@@ -95,6 +103,7 @@ impl TomlAccountConfig {
             .or_else(|| self.backend.as_ref())
     }
 
+    #[cfg(feature = "envelope-get")]
     pub fn get_envelope_kind(&self) -> Option<&BackendKind> {
         self.envelope
             .as_ref()
@@ -103,6 +112,7 @@ impl TomlAccountConfig {
             .or_else(|| self.backend.as_ref())
     }
 
+    #[cfg(feature = "envelope-list")]
     pub fn list_envelopes_kind(&self) -> Option<&BackendKind> {
         self.envelope
             .as_ref()
@@ -111,6 +121,7 @@ impl TomlAccountConfig {
             .or_else(|| self.backend.as_ref())
     }
 
+    #[cfg(feature = "envelope-watch")]
     pub fn watch_envelopes_kind(&self) -> Option<&BackendKind> {
         self.envelope
             .as_ref()
@@ -119,6 +130,7 @@ impl TomlAccountConfig {
             .or_else(|| self.backend.as_ref())
     }
 
+    #[cfg(feature = "flag-add")]
     pub fn add_flags_kind(&self) -> Option<&BackendKind> {
         self.flag
             .as_ref()
@@ -127,6 +139,7 @@ impl TomlAccountConfig {
             .or_else(|| self.backend.as_ref())
     }
 
+    #[cfg(feature = "flag-set")]
     pub fn set_flags_kind(&self) -> Option<&BackendKind> {
         self.flag
             .as_ref()
@@ -135,6 +148,7 @@ impl TomlAccountConfig {
             .or_else(|| self.backend.as_ref())
     }
 
+    #[cfg(feature = "flag-remove")]
     pub fn remove_flags_kind(&self) -> Option<&BackendKind> {
         self.flag
             .as_ref()
@@ -143,7 +157,8 @@ impl TomlAccountConfig {
             .or_else(|| self.backend.as_ref())
     }
 
-    pub fn add_raw_message_kind(&self) -> Option<&BackendKind> {
+    #[cfg(feature = "message-add")]
+    pub fn add_message_kind(&self) -> Option<&BackendKind> {
         self.message
             .as_ref()
             .and_then(|msg| msg.write.as_ref())
@@ -151,6 +166,7 @@ impl TomlAccountConfig {
             .or_else(|| self.backend.as_ref())
     }
 
+    #[cfg(feature = "message-peek")]
     pub fn peek_messages_kind(&self) -> Option<&BackendKind> {
         self.message
             .as_ref()
@@ -159,6 +175,7 @@ impl TomlAccountConfig {
             .or_else(|| self.backend.as_ref())
     }
 
+    #[cfg(feature = "message-get")]
     pub fn get_messages_kind(&self) -> Option<&BackendKind> {
         self.message
             .as_ref()
@@ -167,6 +184,7 @@ impl TomlAccountConfig {
             .or_else(|| self.backend.as_ref())
     }
 
+    #[cfg(feature = "message-copy")]
     pub fn copy_messages_kind(&self) -> Option<&BackendKind> {
         self.message
             .as_ref()
@@ -175,6 +193,7 @@ impl TomlAccountConfig {
             .or_else(|| self.backend.as_ref())
     }
 
+    #[cfg(feature = "message-move")]
     pub fn move_messages_kind(&self) -> Option<&BackendKind> {
         self.message
             .as_ref()
@@ -183,6 +202,7 @@ impl TomlAccountConfig {
             .or_else(|| self.backend.as_ref())
     }
 
+    #[cfg(feature = "message-delete")]
     pub fn delete_messages_kind(&self) -> Option<&BackendKind> {
         self.flag
             .as_ref()
@@ -191,19 +211,12 @@ impl TomlAccountConfig {
             .or_else(|| self.backend.as_ref())
     }
 
-    pub fn send_raw_message_kind(&self) -> Option<&BackendKind> {
+    #[cfg(any(feature = "message-send", feature = "template-send"))]
+    pub fn send_message_kind(&self) -> Option<&BackendKind> {
         self.message
             .as_ref()
             .and_then(|msg| msg.send.as_ref())
             .and_then(|send| send.backend.as_ref())
-            .or_else(|| self.backend.as_ref())
-    }
-
-    pub fn get_watch_message_kind(&self) -> Option<&BackendKind> {
-        self.envelope
-            .as_ref()
-            .and_then(|envelope| envelope.watch.as_ref())
-            .and_then(|watch| watch.backend.as_ref())
             .or_else(|| self.backend.as_ref())
     }
 
@@ -218,14 +231,17 @@ impl TomlAccountConfig {
             used_backends.extend(folder.get_used_backends());
         }
 
+        #[cfg(feature = "envelope-command")]
         if let Some(ref envelope) = self.envelope {
             used_backends.extend(envelope.get_used_backends());
         }
 
+        #[cfg(feature = "flag-command")]
         if let Some(ref flag) = self.flag {
             used_backends.extend(flag.get_used_backends());
         }
 
+        #[cfg(feature = "message-command")]
         if let Some(ref msg) = self.message {
             used_backends.extend(msg.get_used_backends());
         }

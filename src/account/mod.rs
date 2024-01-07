@@ -83,6 +83,7 @@ impl From<Iter<'_, String, TomlAccountConfig>> for Accounts {
     fn from(map: Iter<'_, String, TomlAccountConfig>) -> Self {
         let mut accounts: Vec<_> = map
             .map(|(name, account)| {
+                #[allow(unused_mut)]
                 let mut backends = String::new();
 
                 #[cfg(feature = "imap")]
@@ -90,6 +91,7 @@ impl From<Iter<'_, String, TomlAccountConfig>> for Accounts {
                     backends.push_str("imap");
                 }
 
+                #[cfg(feature = "maildir")]
                 if account.maildir.is_some() {
                     if !backends.is_empty() {
                         backends.push_str(", ")

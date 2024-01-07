@@ -8,6 +8,7 @@ use email::{
     account::config::AccountConfig, config::Config, envelope::config::EnvelopeConfig,
     folder::config::FolderConfig, message::config::MessageConfig,
 };
+
 use serde::{Deserialize, Serialize};
 use shellexpand_utils::{canonicalize, expand};
 use std::{
@@ -18,7 +19,9 @@ use std::{
 };
 use toml;
 
-use crate::{account::config::TomlAccountConfig, backend::BackendKind, wizard_prompt, wizard_warn};
+#[cfg(feature = "sync")]
+use crate::backend::BackendKind;
+use crate::{account::config::TomlAccountConfig, wizard_prompt, wizard_warn};
 
 /// Represents the user config file.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
@@ -132,6 +135,7 @@ impl TomlConfig {
         &self,
         account_name: Option<&str>,
     ) -> Result<(String, TomlAccountConfig)> {
+        #[allow(unused_mut)]
         let (account_name, mut toml_account_config) = match account_name {
             Some("default") | Some("") | None => self
                 .accounts
@@ -171,11 +175,13 @@ impl TomlConfig {
     pub fn into_account_configs(
         self,
         account_name: Option<&str>,
-        disable_cache: bool,
+        #[cfg(feature = "sync")] disable_cache: bool,
     ) -> Result<(TomlAccountConfig, AccountConfig)> {
+        #[cfg_attr(not(feature = "sync"), allow(unused_mut))]
         let (account_name, mut toml_account_config) =
             self.into_toml_account_config(account_name)?;
 
+        #[cfg(feature = "sync")]
         if let Some(true) = toml_account_config.sync.as_ref().and_then(|c| c.enable) {
             if !disable_cache {
                 toml_account_config.backend = Some(BackendKind::MaildirForSync);
@@ -200,19 +206,29 @@ impl TomlConfig {
                             signature_delim: config.signature_delim,
                             downloads_dir: config.downloads_dir,
 
-                            folder: config.folder.map(|c| FolderConfig {
+                            folder: config.folder.map(|#[allow(unused)] c| FolderConfig {
                                 aliases: c.alias,
+                                #[cfg(feature = "folder-list")]
                                 list: c.list.map(|c| c.remote),
+                                ..Default::default()
                             }),
-                            envelope: config.envelope.map(|c| EnvelopeConfig {
+                            envelope: config.envelope.map(|#[allow(unused)] c| EnvelopeConfig {
+                                #[cfg(feature = "envelope-list")]
                                 list: c.list.map(|c| c.remote),
+                                #[cfg(feature = "envelope-watch")]
                                 watch: c.watch.map(|c| c.remote),
+                                ..Default::default()
                             }),
-                            message: config.message.map(|c| MessageConfig {
+                            message: config.message.map(|#[allow(unused)] c| MessageConfig {
+                                #[cfg(feature = "message-read")]
                                 read: c.read.map(|c| c.remote),
+                                #[cfg(feature = "message-write")]
                                 write: c.write.map(|c| c.remote),
+                                #[cfg(feature = "message-send")]
                                 send: c.send.map(|c| c.remote),
+                                ..Default::default()
                             }),
+                            #[cfg(feature = "sync")]
                             sync: config.sync,
                             #[cfg(feature = "pgp")]
                             pgp: config.pgp,

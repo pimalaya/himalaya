@@ -3,8 +3,10 @@ use clap::Parser;
 use email::message::Message;
 use log::info;
 
+#[cfg(feature = "sync")]
+use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
-    account::arg::name::AccountNameFlag, cache::arg::disable::CacheDisableFlag, config::TomlConfig,
+    account::arg::name::AccountNameFlag, config::TomlConfig,
     email::template::arg::body::TemplateRawBodyArg, message::arg::header::HeaderRawArgs,
     printer::Printer,
 };
@@ -21,6 +23,7 @@ pub struct TemplateWriteCommand {
     #[command(flatten)]
     pub body: TemplateRawBodyArg,
 
+    #[cfg(feature = "sync")]
     #[command(flatten)]
     pub cache: CacheDisableFlag,
 
@@ -34,6 +37,7 @@ impl TemplateWriteCommand {
 
         let (_, account_config) = config.clone().into_account_configs(
             self.account.name.as_ref().map(String::as_str),
+            #[cfg(feature = "sync")]
             self.cache.disable,
         )?;
 

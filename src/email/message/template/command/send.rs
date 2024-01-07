@@ -1,17 +1,18 @@
 use anyhow::Result;
 use clap::Parser;
 #[cfg(feature = "sendmail")]
-use email::message::send_raw::sendmail::SendRawMessageSendmail;
+use email::message::send::sendmail::SendMessageSendmail;
 #[cfg(feature = "smtp")]
-use email::message::send_raw::smtp::SendRawMessageSmtp;
+use email::message::send::smtp::SendMessageSmtp;
 use log::info;
 use mml::MmlCompilerBuilder;
 use std::io::{self, BufRead, IsTerminal};
 
+#[cfg(feature = "sync")]
+use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::{Backend, BackendKind},
-    cache::arg::disable::CacheDisableFlag,
     config::TomlConfig,
     email::template::arg::TemplateRawArg,
     printer::Printer,
@@ -28,6 +29,7 @@ pub struct TemplateSendCommand {
     #[command(flatten)]
     pub template: TemplateRawArg,
 
+    #[cfg(feature = "sync")]
     #[command(flatten)]
     pub cache: CacheDisableFlag,
 
@@ -41,10 +43,11 @@ impl TemplateSendCommand {
 
         let (toml_account_config, account_config) = config.clone().into_account_configs(
             self.account.name.as_ref().map(String::as_str),
+            #[cfg(feature = "sync")]
             self.cache.disable,
         )?;
 
-        let send_message_kind = toml_account_config.send_raw_message_kind();
+        let send_message_kind = toml_account_config.send_message_kind();
 
         let backend = Backend::new(
             &toml_account_config,
@@ -54,14 +57,14 @@ impl TemplateSendCommand {
                 match send_message_kind {
                     #[cfg(feature = "smtp")]
                     Some(BackendKind::Smtp) => {
-                        builder.set_send_raw_message(|ctx| {
-                            ctx.smtp.as_ref().and_then(SendRawMessageSmtp::new)
+                        builder.set_send_message(|ctx| {
+                            ctx.smtp.as_ref().and_then(SendMessageSmtp::new)
                         });
                     }
                     #[cfg(feature = "sendmail")]
                     Some(BackendKind::Sendmail) => {
-                        builder.set_send_raw_message(|ctx| {
-                            ctx.sendmail.as_ref().and_then(SendRawMessageSendmail::new)
+                        builder.set_send_message(|ctx| {
+                            ctx.sendmail.as_ref().and_then(SendMessageSendmail::new)
                         });
                     }
                     _ => (),
@@ -89,8 +92,8 @@ impl TemplateSendCommand {
 
         let msg = compiler.build(tpl.as_str())?.compile().await?.into_vec()?;
 
-        backend.send_raw_message(&msg).await?;
+        backend.send_message(&msg).await?;
 
-        printer.print("Template successfully sent!")
+        printer.print("Message successfully sent!")
     }
 }

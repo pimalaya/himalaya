@@ -17,24 +17,79 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 default = [
-  "maildir",
   "imap",
+  "maildir",
   # "notmuch",
   "smtp",
   "sendmail",
+  "account",
+  "folder",
+  "envelope",
+  "flag",
+  "message",
+  "attachment",
+  "template",
+  "sync",
   # "pgp-commands",
   # "pgp-gpg",
   # "pgp-native",
 ]
-maildir = ["email-lib/maildir"]
 imap = ["email-lib/imap"]
+maildir = ["email-lib/maildir"]
 notmuch = ["email-lib/notmuch"]
 smtp = ["email-lib/smtp"]
 sendmail = ["email-lib/sendmail"]
+account = ["account-configure", "account-list"]
+account-command = []
+account-configure = ["account-command"]
+account-list = ["account-command"]
+folder = ["folder-add", "folder-list", "folder-expunge", "folder-purge", "folder-delete"]
+folder-command = []
+folder-add = ["folder-command", "email-lib/folder-add"]
+folder-list = ["folder-command", "email-lib/folder-list"]
+folder-expunge = ["folder-command", "email-lib/folder-expunge"]
+folder-purge = ["folder-command", "email-lib/folder-purge"]
+folder-delete = ["folder-command", "email-lib/folder-delete"]
+envelope = ["envelope-list", "envelope-watch", "envelope-get"]
+envelope-command = []
+envelope-list = ["envelope-command", "email-lib/envelope-list"]
+envelope-watch = ["envelope-command", "email-lib/envelope-watch"]
+envelope-get = ["envelope-command", "email-lib/envelope-get"]
+flag = ["flag-add", "flag-set", "flag-remove"]
+flag-command = []
+flag-add = ["flag-command", "email-lib/flag-add"]
+flag-set = ["flag-command", "email-lib/flag-set"]
+flag-remove = ["flag-command", "email-lib/flag-remove"]
+message = ["message-read", "message-write", "message-mailto", "message-reply", "message-forward", "message-save", "message-send", "message-copy", "message-move", "message-delete"]
+message-command = []
+message-add = ["email-lib/message-add"]
+message-peek = ["email-lib/message-peek"]
+message-get = ["email-lib/message-get"]
+message-copy = ["message-command", "email-lib/message-copy"]
+message-move = ["message-command", "email-lib/message-move"]
+message-delete = ["message-command", "email-lib/message-delete"]
+message-send = ["message-command", "email-lib/message-send"]
+message-read = ["message-add", "message-peek", "message-get"]
+message-write = ["message-add", "message-send"]
+message-mailto = ["message-add", "message-send"]
+message-reply = ["message-get", "message-add", "message-send"]
+message-forward = ["message-get", "message-add", "message-send"]
+message-save = ["message-add"]
+attachment = ["attachment-download"]
+attachment-command = []
+attachment-download = ["attachment-command", "message-read"]
+template = ["template-write", "template-reply", "template-forward", "template-save", "template-send"]
+template-command = []
+template-write = ["template-command"]
+template-reply = ["template-command", "email-lib/message-get"]
+template-forward = ["template-command", "email-lib/message-get"]
+template-save = ["template-command", "email-lib/message-add"]
+template-send = ["template-command", "email-lib/message-send"]
+sync = ["account-command", "email-lib/sync"]
 pgp = []
-pgp-commands = ["pgp", "mml-lib/pgp-commands", "email-lib/pgp-commands"]
-pgp-gpg = ["pgp", "mml-lib/pgp-gpg", "email-lib/pgp-gpg"]
-pgp-native = ["pgp", "mml-lib/pgp-native", "email-lib/pgp-native"]
+pgp-commands = ["email-lib/pgp-commands", "mml-lib/pgp-commands", "pgp"]
+pgp-gpg = ["email-lib/pgp-gpg", "mml-lib/pgp-gpg", "pgp"]
+pgp-native = ["email-lib/pgp-native", "mml-lib/pgp-native", "pgp"]
 
 [dev-dependencies]
 async-trait = "0.1"
@@ -50,7 +105,8 @@ clap_mangen = "0.2"
 console = "0.15.2"
 dialoguer = "0.10.2"
 dirs = "4.0"
-email-lib = { version = "=0.19.5", default-features = false }
+# email-lib = { version = "=0.19.6", default-features = false }
+email-lib = { git = "https://git.sr.ht/~soywod/pimalaya", default-features = false }
 email_address = "0.2.4"
 env_logger = "0.8"
 erased-serde = "0.3"

@@ -1,13 +1,19 @@
 use anyhow::{bail, Result};
-use dialoguer::{Confirm, Input};
+#[cfg(feature = "sync")]
+use dialoguer::Confirm;
+use dialoguer::Input;
+#[cfg(feature = "sync")]
 use email::account::sync::config::SyncConfig;
 use email_address::EmailAddress;
 
+#[cfg(feature = "message-send")]
+use crate::message::config::{MessageConfig, MessageSendConfig};
+#[cfg(feature = "sync")]
+use crate::wizard_prompt;
+#[allow(unused)]
 use crate::{
     backend::{self, config::BackendConfig, BackendKind},
     config::wizard::THEME,
-    message::config::{MessageConfig, MessageSendConfig},
-    wizard_prompt,
 };
 
 use super::TomlAccountConfig;
@@ -46,14 +52,15 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
     );
 
     match backend::wizard::configure(&account_name, &config.email).await? {
-        Some(BackendConfig::Maildir(mdir_config)) => {
-            config.maildir = Some(mdir_config);
-            config.backend = Some(BackendKind::Maildir);
-        }
         #[cfg(feature = "imap")]
         Some(BackendConfig::Imap(imap_config)) => {
             config.imap = Some(imap_config);
             config.backend = Some(BackendKind::Imap);
+        }
+        #[cfg(feature = "maildir")]
+        Some(BackendConfig::Maildir(mdir_config)) => {
+            config.maildir = Some(mdir_config);
+            config.backend = Some(BackendKind::Maildir);
         }
         #[cfg(feature = "notmuch")]
         Some(BackendConfig::Notmuch(notmuch_config)) => {
@@ -64,43 +71,55 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
     };
 
     match backend::wizard::configure_sender(&account_name, &config.email).await? {
-        Some(BackendConfig::Sendmail(sendmail_config)) => {
-            config.sendmail = Some(sendmail_config);
-            config.message = Some(MessageConfig {
-                send: Some(MessageSendConfig {
-                    backend: Some(BackendKind::Sendmail),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            });
-        }
         #[cfg(feature = "smtp")]
         Some(BackendConfig::Smtp(smtp_config)) => {
             config.smtp = Some(smtp_config);
-            config.message = Some(MessageConfig {
-                send: Some(MessageSendConfig {
-                    backend: Some(BackendKind::Smtp),
+
+            #[cfg(feature = "message-send")]
+            {
+                config.message = Some(MessageConfig {
+                    send: Some(MessageSendConfig {
+                        backend: Some(BackendKind::Smtp),
+                        ..Default::default()
+                    }),
                     ..Default::default()
-                }),
-                ..Default::default()
-            });
+                });
+            }
+        }
+        #[cfg(feature = "sendmail")]
+        Some(BackendConfig::Sendmail(sendmail_config)) => {
+            config.sendmail = Some(sendmail_config);
+
+            #[cfg(feature = "message-send")]
+            {
+                config.message = Some(MessageConfig {
+                    send: Some(MessageSendConfig {
+                        backend: Some(BackendKind::Sendmail),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                });
+            }
         }
         _ => (),
     };
 
-    let should_configure_sync = Confirm::new()
-        .with_prompt(wizard_prompt!(
-            "Do you need an offline access to your account?"
-        ))
-        .default(false)
-        .interact_opt()?
-        .unwrap_or_default();
+    #[cfg(feature = "sync")]
+    {
+        let should_configure_sync = Confirm::new()
+            .with_prompt(wizard_prompt!(
+                "Do you need an offline access to your account?"
+            ))
+            .default(false)
+            .interact_opt()?
+            .unwrap_or_default();
 
-    if should_configure_sync {
-        config.sync = Some(SyncConfig {
-            enable: Some(true),
-            ..Default::default()
-        });
+        if should_configure_sync {
+            config.sync = Some(SyncConfig {
+                enable: Some(true),
+                ..Default::default()
+            });
+        }
     }
 
     Ok(Some((account_name, config)))

@@ -1216,9 +1216,8 @@ dependencies = [
 
 [[package]]
 name = "email-lib"
-version = "0.19.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e4c31e26febefc822561fe388677cec106bbf0a7fe16608e7638daa3d1da9d9"
+version = "0.19.6"
+source = "git+https://git.sr.ht/~soywod/pimalaya#2933075a179bfff3349987e9620185799eeba907"
 dependencies = [
  "advisory-lock",
  "anyhow",
@@ -1235,7 +1234,6 @@ dependencies = [
  "mail-parser",
  "mail-send",
  "maildirpp",
- "md5",
  "mml-lib",
  "notify",
  "notify-rust",
@@ -1248,8 +1246,6 @@ dependencies = [
  "rayon",
  "regex",
  "rusqlite",
- "rustls 0.22.1",
- "rustls-native-certs",
  "secret-lib",
  "serde",
  "shellexpand-utils",
@@ -1259,8 +1255,6 @@ dependencies = [
  "tree_magic_mini",
  "urlencoding",
  "utf7-imap",
- "uuid",
- "webpki-roots 0.25.3",
 ]
 
 [[package]]

@@ -7,10 +7,11 @@ use email::{flag::add::maildir::AddFlagsMaildir, message::peek::maildir::PeekMes
 use log::info;
 use mml::message::FilterParts;
 
+#[cfg(feature = "sync")]
+use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::{Backend, BackendKind},
-    cache::arg::disable::CacheDisableFlag,
     config::TomlConfig,
     envelope::arg::ids::EnvelopeIdsArgs,
     folder::arg::name::FolderNameOptionalFlag,
@@ -74,6 +75,7 @@ pub struct MessageReadCommand {
     #[arg(conflicts_with = "no_headers")]
     pub headers: Vec<String>,
 
+    #[cfg(feature = "sync")]
     #[command(flatten)]
     pub cache: CacheDisableFlag,
 
@@ -90,6 +92,7 @@ impl MessageReadCommand {
 
         let (toml_account_config, account_config) = config.clone().into_account_configs(
             self.account.name.as_ref().map(String::as_str),
+            #[cfg(feature = "sync")]
             self.cache.disable,
         )?;
 
@@ -100,6 +103,14 @@ impl MessageReadCommand {
             &account_config,
             get_messages_kind,
             |builder| match get_messages_kind {
+                #[cfg(feature = "imap")]
+                Some(BackendKind::Imap) => {
+                    builder
+                        .set_peek_messages(|ctx| ctx.imap.as_ref().and_then(PeekMessagesImap::new));
+                    builder
+                        .set_get_messages(|ctx| ctx.imap.as_ref().and_then(GetMessagesImap::new));
+                }
+                #[cfg(feature = "maildir")]
                 Some(BackendKind::Maildir) => {
                     builder.set_peek_messages(|ctx| {
                         ctx.maildir.as_ref().and_then(PeekMessagesMaildir::new)
@@ -107,6 +118,7 @@ impl MessageReadCommand {
                     builder
                         .set_add_flags(|ctx| ctx.maildir.as_ref().and_then(AddFlagsMaildir::new));
                 }
+                #[cfg(feature = "sync")]
                 Some(BackendKind::MaildirForSync) => {
                     builder.set_peek_messages(|ctx| {
                         ctx.maildir_for_sync
@@ -116,13 +128,6 @@ impl MessageReadCommand {
                     builder.set_add_flags(|ctx| {
                         ctx.maildir_for_sync.as_ref().and_then(AddFlagsMaildir::new)
                     });
-                }
-                #[cfg(feature = "imap")]
-                Some(BackendKind::Imap) => {
-                    builder
-                        .set_peek_messages(|ctx| ctx.imap.as_ref().and_then(PeekMessagesImap::new));
-                    builder
-                        .set_get_messages(|ctx| ctx.imap.as_ref().and_then(GetMessagesImap::new));
                 }
                 _ => (),
             },

@@ -1,12 +1,14 @@
 use anyhow::Result;
 use clap::Parser;
 use env_logger::{Builder as LoggerBuilder, Env, DEFAULT_FILTER_ENV};
-use himalaya::{
-    cli::Cli, config::TomlConfig, envelope::command::list::ListEnvelopesCommand,
-    message::command::mailto::MessageMailtoCommand, printer::StdoutPrinter,
-};
+#[cfg(any(feature = "envelope-list", feature = "message-mailto"))]
+use himalaya::config::TomlConfig;
+#[cfg(feature = "envelope-list")]
+use himalaya::envelope::command::list::ListEnvelopesCommand;
+#[cfg(feature = "message-mailto")]
+use himalaya::message::command::mailto::MessageMailtoCommand;
+use himalaya::{cli::Cli, printer::StdoutPrinter};
 use log::{debug, warn};
-use std::env;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -21,9 +23,13 @@ async fn main() -> Result<()> {
         .format_timestamp(None)
         .init();
 
+    #[cfg(feature = "message-mailto")]
     // if the first argument starts by "mailto:", execute straight the
     // mailto message command
-    if let Some(ref url) = env::args().nth(1).filter(|arg| arg.starts_with("mailto:")) {
+    if let Some(ref url) = std::env::args()
+        .nth(1)
+        .filter(|arg| arg.starts_with("mailto:"))
+    {
         let mut printer = StdoutPrinter::default();
         let config = TomlConfig::from_default_paths().await?;
 
@@ -35,13 +41,20 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     let mut printer = StdoutPrinter::new(cli.output, cli.color);
 
+    #[cfg(feature = "envelope-list")]
     match cli.command {
-        Some(cmd) => cmd.execute(&mut printer, cli.config_path.as_ref()).await,
+        Some(cmd) => return cmd.execute(&mut printer, cli.config_path.as_ref()).await,
         None => {
             let config = TomlConfig::from_some_path_or_default(cli.config_path.as_ref()).await?;
-            ListEnvelopesCommand::default()
+            return ListEnvelopesCommand::default()
                 .execute(&mut printer, &config)
-                .await
+                .await;
         }
     }
+
+    #[cfg(not(feature = "envelope-list"))]
+    return cli
+        .command
+        .execute(&mut printer, cli.config_path.as_ref())
+        .await;
 }

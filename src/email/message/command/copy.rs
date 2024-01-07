@@ -6,10 +6,11 @@ use email::message::copy::imap::CopyMessagesImap;
 use email::message::copy::maildir::CopyMessagesMaildir;
 use log::info;
 
+#[cfg(feature = "sync")]
+use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::{Backend, BackendKind},
-    cache::arg::disable::CacheDisableFlag,
     config::TomlConfig,
     envelope::arg::ids::EnvelopeIdsArgs,
     folder::arg::name::{SourceFolderNameOptionalFlag, TargetFolderNameArg},
@@ -28,6 +29,7 @@ pub struct MessageCopyCommand {
     #[command(flatten)]
     pub envelopes: EnvelopeIdsArgs,
 
+    #[cfg(feature = "sync")]
     #[command(flatten)]
     pub cache: CacheDisableFlag,
 
@@ -45,6 +47,7 @@ impl MessageCopyCommand {
 
         let (toml_account_config, account_config) = config.clone().into_account_configs(
             self.account.name.as_ref().map(String::as_str),
+            #[cfg(feature = "sync")]
             self.cache.disable,
         )?;
 
@@ -55,22 +58,24 @@ impl MessageCopyCommand {
             &account_config,
             copy_messages_kind,
             |builder| match copy_messages_kind {
+                #[cfg(feature = "imap")]
+                Some(BackendKind::Imap) => {
+                    builder
+                        .set_copy_messages(|ctx| ctx.imap.as_ref().and_then(CopyMessagesImap::new));
+                }
+                #[cfg(feature = "maildir")]
                 Some(BackendKind::Maildir) => {
                     builder.set_copy_messages(|ctx| {
                         ctx.maildir.as_ref().and_then(CopyMessagesMaildir::new)
                     });
                 }
+                #[cfg(feature = "sync")]
                 Some(BackendKind::MaildirForSync) => {
                     builder.set_copy_messages(|ctx| {
                         ctx.maildir_for_sync
                             .as_ref()
                             .and_then(CopyMessagesMaildir::new)
                     });
-                }
-                #[cfg(feature = "imap")]
-                Some(BackendKind::Imap) => {
-                    builder
-                        .set_copy_messages(|ctx| ctx.imap.as_ref().and_then(CopyMessagesImap::new));
                 }
                 _ => (),
             },

@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use log::{debug, error};
 use std::io::{self, Write};
 
@@ -43,9 +43,11 @@ pub fn pre_edit() -> Result<PreEditChoice> {
 }
 
 pub enum PostEditChoice {
+    #[cfg(feature = "message-send")]
     Send,
     Edit,
     LocalDraft,
+    #[cfg(feature = "message-add")]
     RemoteDraft,
     Discard,
 }
@@ -60,6 +62,7 @@ pub fn post_edit() -> Result<PostEditChoice> {
         .context("cannot read stdin")?;
 
     match buf.bytes().next().map(|bytes| bytes as char) {
+        #[cfg(feature = "message-send")]
         Some('s') => {
             debug!("send choice matched");
             Ok(PostEditChoice::Send)
@@ -68,6 +71,7 @@ pub fn post_edit() -> Result<PostEditChoice> {
             debug!("save local draft choice matched");
             Ok(PostEditChoice::LocalDraft)
         }
+        #[cfg(feature = "message-add")]
         Some('r') => {
             debug!("save remote draft matched");
             Ok(PostEditChoice::RemoteDraft)
@@ -82,11 +86,11 @@ pub fn post_edit() -> Result<PostEditChoice> {
         }
         Some(choice) => {
             error!(r#"invalid choice "{}""#, choice);
-            Err(anyhow!(r#"invalid choice "{}""#, choice))
+            bail!("invalid choice {choice}");
         }
         None => {
             error!("empty choice");
-            Err(anyhow!("empty choice"))
+            bail!("empty choice");
         }
     }
 }

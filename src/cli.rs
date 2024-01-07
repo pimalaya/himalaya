@@ -2,18 +2,25 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+#[cfg(feature = "account-command")]
+use crate::account::command::AccountSubcommand;
+#[cfg(feature = "envelope-command")]
+use crate::envelope::command::EnvelopeSubcommand;
+#[cfg(feature = "flag-command")]
+use crate::flag::command::FlagSubcommand;
+#[cfg(feature = "folder-command")]
+use crate::folder::command::FolderSubcommand;
+#[cfg(feature = "attachment-command")]
+use crate::message::attachment::command::AttachmentSubcommand;
+#[cfg(feature = "message-command")]
+use crate::message::command::MessageSubcommand;
+#[cfg(feature = "template-command")]
+use crate::message::template::command::TemplateSubcommand;
+#[allow(unused)]
 use crate::{
-    account::command::AccountSubcommand,
     completion::command::CompletionGenerateCommand,
     config::{self, TomlConfig},
-    envelope::command::EnvelopeSubcommand,
-    flag::command::FlagSubcommand,
-    folder::command::FolderSubcommand,
     manual::command::ManualGenerateCommand,
-    message::{
-        attachment::command::AttachmentSubcommand, command::MessageSubcommand,
-        template::command::TemplateSubcommand,
-    },
     output::{ColorFmt, OutputFmt},
     printer::Printer,
 };
@@ -22,8 +29,12 @@ use crate::{
 #[command(name = "himalaya", author, version, about)]
 #[command(propagate_version = true, infer_subcommands = true)]
 pub struct Cli {
+    #[cfg(feature = "envelope-list")]
     #[command(subcommand)]
     pub command: Option<HimalayaCommand>,
+    #[cfg(not(feature = "envelope-list"))]
+    #[command(subcommand)]
+    pub command: HimalayaCommand,
 
     /// Override the default configuration file path
     ///
@@ -77,31 +88,38 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum HimalayaCommand {
+    #[cfg(feature = "account-command")]
     #[command(subcommand)]
     #[command(alias = "accounts")]
     Account(AccountSubcommand),
 
+    #[cfg(feature = "folder-command")]
     #[command(subcommand)]
     #[command(visible_alias = "mailbox", aliases = ["mailboxes", "mboxes", "mbox"])]
     #[command(alias = "folders")]
     Folder(FolderSubcommand),
 
+    #[cfg(feature = "envelope-command")]
     #[command(subcommand)]
     #[command(alias = "envelopes")]
     Envelope(EnvelopeSubcommand),
 
+    #[cfg(feature = "flag-command")]
     #[command(subcommand)]
     #[command(alias = "flags")]
     Flag(FlagSubcommand),
 
+    #[cfg(feature = "message-command")]
     #[command(subcommand)]
     #[command(alias = "messages", alias = "msgs", alias = "msg")]
     Message(MessageSubcommand),
 
+    #[cfg(feature = "attachment-command")]
     #[command(subcommand)]
     #[command(alias = "attachments")]
     Attachment(AttachmentSubcommand),
 
+    #[cfg(feature = "template-command")]
     #[command(subcommand)]
     #[command(alias = "templates", alias = "tpls", alias = "tpl")]
     Template(TemplateSubcommand),
@@ -116,36 +134,44 @@ pub enum HimalayaCommand {
 }
 
 impl HimalayaCommand {
+    #[allow(unused)]
     pub async fn execute(
         self,
         printer: &mut impl Printer,
         config_path: Option<&PathBuf>,
     ) -> Result<()> {
         match self {
+            #[cfg(feature = "account-command")]
             Self::Account(cmd) => {
                 let config = TomlConfig::from_some_path_or_default(config_path).await?;
                 cmd.execute(printer, &config).await
             }
+            #[cfg(feature = "folder-command")]
             Self::Folder(cmd) => {
                 let config = TomlConfig::from_some_path_or_default(config_path).await?;
                 cmd.execute(printer, &config).await
             }
+            #[cfg(feature = "envelope-command")]
             Self::Envelope(cmd) => {
                 let config = TomlConfig::from_some_path_or_default(config_path).await?;
                 cmd.execute(printer, &config).await
             }
+            #[cfg(feature = "flag-command")]
             Self::Flag(cmd) => {
                 let config = TomlConfig::from_some_path_or_default(config_path).await?;
                 cmd.execute(printer, &config).await
             }
+            #[cfg(feature = "message-command")]
             Self::Message(cmd) => {
                 let config = TomlConfig::from_some_path_or_default(config_path).await?;
                 cmd.execute(printer, &config).await
             }
+            #[cfg(feature = "attachment-command")]
             Self::Attachment(cmd) => {
                 let config = TomlConfig::from_some_path_or_default(config_path).await?;
                 cmd.execute(printer, &config).await
             }
+            #[cfg(feature = "template-command")]
             Self::Template(cmd) => {
                 let config = TomlConfig::from_some_path_or_default(config_path).await?;
                 cmd.execute(printer, &config).await
