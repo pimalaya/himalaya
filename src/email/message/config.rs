@@ -18,6 +18,8 @@ pub struct MessageConfig {
     #[cfg(feature = "message-move")]
     #[serde(rename = "move")]
     pub move_: Option<MessageMoveConfig>,
+    #[cfg(feature = "message-delete")]
+    pub delete: Option<MessageDeleteConfig>,
 }
 
 impl MessageConfig {
@@ -171,6 +173,25 @@ pub struct MessageMoveConfig {
 
 #[cfg(feature = "message-move")]
 impl MessageMoveConfig {
+    pub fn get_used_backends(&self) -> HashSet<&BackendKind> {
+        let mut kinds = HashSet::default();
+
+        if let Some(kind) = &self.backend {
+            kinds.insert(kind);
+        }
+
+        kinds
+    }
+}
+
+#[cfg(feature = "message-delete")]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+pub struct MessageDeleteConfig {
+    pub backend: Option<BackendKind>,
+}
+
+#[cfg(feature = "message-delete")]
+impl MessageDeleteConfig {
     pub fn get_used_backends(&self) -> HashSet<&BackendKind> {
         let mut kinds = HashSet::default();
 

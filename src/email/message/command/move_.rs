@@ -8,6 +8,7 @@ use log::info;
 
 #[cfg(feature = "sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
+#[allow(unused)]
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::{Backend, BackendKind},
@@ -57,7 +58,7 @@ impl MessageMoveCommand {
             &toml_account_config,
             &account_config,
             move_messages_kind,
-            |builder| match move_messages_kind {
+            |#[allow(unused)] builder| match move_messages_kind {
                 #[cfg(feature = "imap")]
                 Some(BackendKind::Imap) => {
                     builder

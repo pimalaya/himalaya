@@ -204,10 +204,10 @@ impl TomlAccountConfig {
 
     #[cfg(feature = "message-delete")]
     pub fn delete_messages_kind(&self) -> Option<&BackendKind> {
-        self.flag
+        self.message
             .as_ref()
-            .and_then(|flag| flag.remove.as_ref())
-            .and_then(|remove| remove.backend.as_ref())
+            .and_then(|message| message.delete.as_ref())
+            .and_then(|delete| delete.backend.as_ref())
             .or_else(|| self.backend.as_ref())
     }
 

@@ -81,7 +81,7 @@ use email::sendmail::SendmailContext;
 #[cfg(feature = "smtp")]
 use email::smtp::{SmtpClientBuilder, SmtpClientSync};
 
-#[cfg(any(feature = "flag-command"))]
+#[allow(unused)]
 use email::{
     envelope::Id,
     flag::{Flag, Flags},

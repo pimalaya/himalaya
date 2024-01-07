@@ -8,6 +8,7 @@ use log::info;
 
 #[cfg(feature = "sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
+#[allow(unused)]
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::{Backend, BackendKind},
@@ -58,7 +59,7 @@ impl MessageDeleteCommand {
             &toml_account_config,
             &account_config,
             delete_messages_kind,
-            |builder| match delete_messages_kind {
+            |#[allow(unused)] builder| match delete_messages_kind {
                 #[cfg(feature = "imap")]
                 Some(BackendKind::Imap) => {
                     builder

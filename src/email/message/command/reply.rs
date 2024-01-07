@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Result};
 use clap::Parser;
-use email::flag::Flag;
 #[cfg(feature = "imap")]
 use email::message::add::imap::AddMessageImap;
 #[cfg(feature = "maildir")]
@@ -13,6 +12,7 @@ use log::info;
 
 #[cfg(feature = "sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
+#[allow(unused)]
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::{Backend, BackendKind},
@@ -73,7 +73,7 @@ impl MessageReplyCommand {
             &toml_account_config,
             &account_config,
             add_message_kind.into_iter().chain(send_message_kind),
-            |builder| {
+            |#[allow(unused)] builder| {
                 match add_message_kind {
                     #[cfg(feature = "imap")]
                     Some(BackendKind::Imap) => {
@@ -130,9 +130,6 @@ impl MessageReplyCommand {
             .with_reply_all(self.reply.all)
             .build()
             .await?;
-        editor::edit_tpl_with_editor(&account_config, printer, &backend, tpl).await?;
-
-        // TODO: let backend.send_reply_message adding the flag
-        backend.add_flag(&folder, &[id], Flag::Answered).await
+        editor::edit_tpl_with_editor(&account_config, printer, &backend, tpl).await
     }
 }

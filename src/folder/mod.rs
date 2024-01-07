@@ -1,4 +1,3 @@
-#[cfg(feature = "folder-command")]
 pub mod arg;
 #[cfg(feature = "folder-command")]
 pub mod command;

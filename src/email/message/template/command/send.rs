@@ -1,5 +1,9 @@
 use anyhow::Result;
 use clap::Parser;
+#[cfg(feature = "imap")]
+use email::message::add_with_flags::imap::AddMessageWithFlagsImap;
+#[cfg(feature = "maildir")]
+use email::message::add_with_flags::maildir::AddMessageWithFlagsMaildir;
 #[cfg(feature = "sendmail")]
 use email::message::send::sendmail::SendMessageSendmail;
 #[cfg(feature = "smtp")]
@@ -10,6 +14,7 @@ use std::io::{self, BufRead, IsTerminal};
 
 #[cfg(feature = "sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
+#[allow(unused)]
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::{Backend, BackendKind},
@@ -49,11 +54,43 @@ impl TemplateSendCommand {
 
         let send_message_kind = toml_account_config.send_message_kind();
 
+        #[cfg(feature = "message-add")]
+        let add_message_kind = toml_account_config
+            .add_message_kind()
+            .filter(|_| account_config.should_save_copy_sent_message());
+        #[cfg(not(feature = "message-add"))]
+        let add_message_kind = None;
+
         let backend = Backend::new(
             &toml_account_config,
             &account_config,
-            send_message_kind,
-            |builder| {
+            send_message_kind.into_iter().chain(add_message_kind),
+            |#[allow(unused)] builder| {
+                match add_message_kind {
+                    #[cfg(feature = "imap")]
+                    Some(BackendKind::Imap) => {
+                        builder.set_add_message_with_flags(|ctx| {
+                            ctx.imap.as_ref().and_then(AddMessageWithFlagsImap::new)
+                        });
+                    }
+                    #[cfg(feature = "maildir")]
+                    Some(BackendKind::Maildir) => {
+                        builder.set_add_message_with_flags(|ctx| {
+                            ctx.maildir
+                                .as_ref()
+                                .and_then(AddMessageWithFlagsMaildir::new)
+                        });
+                    }
+                    #[cfg(feature = "sync")]
+                    Some(BackendKind::MaildirForSync) => {
+                        builder.set_add_message_with_flags(|ctx| {
+                            ctx.maildir_for_sync
+                                .as_ref()
+                                .and_then(AddMessageWithFlagsMaildir::new)
+                        });
+                    }
+                    _ => (),
+                };
                 match send_message_kind {
                     #[cfg(feature = "smtp")]
                     Some(BackendKind::Smtp) => {

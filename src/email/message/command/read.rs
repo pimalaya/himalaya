@@ -9,6 +9,7 @@ use mml::message::FilterParts;
 
 #[cfg(feature = "sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
+#[allow(unused)]
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::{Backend, BackendKind},
@@ -102,7 +103,7 @@ impl MessageReadCommand {
             &toml_account_config,
             &account_config,
             get_messages_kind,
-            |builder| match get_messages_kind {
+            |#[allow(unused)] builder| match get_messages_kind {
                 #[cfg(feature = "imap")]
                 Some(BackendKind::Imap) => {
                     builder

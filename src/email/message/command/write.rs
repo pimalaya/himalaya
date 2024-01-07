@@ -13,6 +13,7 @@ use log::info;
 
 #[cfg(feature = "sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
+#[allow(unused)]
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::{Backend, BackendKind},
@@ -61,7 +62,7 @@ impl MessageWriteCommand {
             &toml_account_config,
             &account_config,
             add_message_kind.into_iter().chain(send_message_kind),
-            |builder| {
+            |#[allow(unused)] builder| {
                 match add_message_kind {
                     #[cfg(feature = "imap")]
                     Some(BackendKind::Imap) => {

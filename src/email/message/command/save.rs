@@ -9,6 +9,7 @@ use std::io::{self, BufRead, IsTerminal};
 
 #[cfg(feature = "sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
+#[allow(unused)]
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::{Backend, BackendKind},
@@ -55,7 +56,7 @@ impl MessageSaveCommand {
             &toml_account_config,
             &account_config,
             add_message_kind,
-            |builder| match add_message_kind {
+            |#[allow(unused)] builder| match add_message_kind {
                 #[cfg(feature = "imap")]
                 Some(BackendKind::Imap) => {
                     builder.set_add_message(|ctx| ctx.imap.as_ref().and_then(AddMessageImap::new));
