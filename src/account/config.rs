@@ -231,17 +231,17 @@ impl TomlAccountConfig {
             used_backends.extend(folder.get_used_backends());
         }
 
-        #[cfg(feature = "envelope-command")]
+        #[cfg(feature = "envelope-subcmd")]
         if let Some(ref envelope) = self.envelope {
             used_backends.extend(envelope.get_used_backends());
         }
 
-        #[cfg(feature = "flag-command")]
+        #[cfg(feature = "flag-subcmd")]
         if let Some(ref flag) = self.flag {
             used_backends.extend(flag.get_used_backends());
         }
 
-        #[cfg(feature = "message-command")]
+        #[cfg(feature = "message-subcmd")]
         if let Some(ref msg) = self.message {
             used_backends.extend(msg.get_used_backends());
         }

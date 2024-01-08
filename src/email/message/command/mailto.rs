@@ -1,9 +1,9 @@
 use anyhow::Result;
 use clap::Parser;
 #[cfg(feature = "imap")]
-use email::message::add::imap::AddMessageImap;
+use email::message::add::imap::AddImapMessage;
 #[cfg(feature = "maildir")]
-use email::message::add_with_flags::maildir::AddMessageWithFlagsMaildir;
+use email::message::add::maildir::AddMaildirMessage;
 #[cfg(feature = "sendmail")]
 use email::message::send::sendmail::SendMessageSendmail;
 #[cfg(feature = "smtp")]
@@ -73,22 +73,20 @@ impl MessageMailtoCommand {
                     #[cfg(feature = "imap")]
                     Some(BackendKind::Imap) => {
                         builder
-                            .set_add_message(|ctx| ctx.imap.as_ref().and_then(AddMessageImap::new));
+                            .set_add_message(|ctx| ctx.imap.as_ref().and_then(AddImapMessage::new));
                     }
                     #[cfg(feature = "maildir")]
                     Some(BackendKind::Maildir) => {
-                        builder.set_add_message_with_flags(|ctx| {
-                            ctx.maildir
-                                .as_ref()
-                                .and_then(AddMessageWithFlagsMaildir::new)
+                        builder.set_add_message(|ctx| {
+                            ctx.maildir.as_ref().and_then(AddMaildirMessage::new)
                         });
                     }
                     #[cfg(feature = "sync")]
                     Some(BackendKind::MaildirForSync) => {
-                        builder.set_add_message_with_flags(|ctx| {
+                        builder.set_add_message(|ctx| {
                             ctx.maildir_for_sync
                                 .as_ref()
-                                .and_then(AddMessageWithFlagsMaildir::new)
+                                .and_then(AddMaildirMessage::new)
                         });
                     }
                     _ => (),

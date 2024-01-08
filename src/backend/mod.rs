@@ -56,8 +56,10 @@ use email::imap::{ImapSessionBuilder, ImapSessionSync};
 use email::maildir::config::MaildirConfig;
 #[cfg(feature = "maildir")]
 use email::maildir::{MaildirSessionBuilder, MaildirSessionSync};
+#[cfg(all(feature = "message-add", feature = "imap"))]
+use email::message::add::imap::AddImapMessage;
 #[cfg(all(feature = "message-add", feature = "maildir"))]
-use email::message::add_with_flags::maildir::AddMessageWithFlagsMaildir;
+use email::message::add::maildir::AddMaildirMessage;
 #[cfg(all(feature = "message-copy", feature = "imap"))]
 use email::message::copy::imap::CopyMessagesImap;
 #[cfg(all(feature = "message-copy", feature = "maildir"))]
@@ -74,8 +76,6 @@ use email::message::peek::imap::PeekMessagesImap;
 use email::message::peek::maildir::PeekMessagesMaildir;
 #[cfg(any(feature = "message-peek", feature = "message-get"))]
 use email::message::Messages;
-#[cfg(all(feature = "message-add", feature = "imap"))]
-use email::message::{add::imap::AddMessageImap, add_with_flags::imap::AddMessageWithFlagsImap};
 #[cfg(feature = "sendmail")]
 use email::sendmail::SendmailContext;
 #[cfg(feature = "smtp")]
@@ -650,25 +650,20 @@ impl BackendBuilder {
             #[cfg(feature = "imap")]
             Some(BackendKind::Imap) => {
                 backend_builder = backend_builder
-                    .with_add_message(|ctx| ctx.imap.as_ref().and_then(AddMessageImap::new))
-                    .with_add_message_with_flags(|ctx| {
-                        ctx.imap.as_ref().and_then(AddMessageWithFlagsImap::new)
-                    });
+                    .with_add_message(|ctx| ctx.imap.as_ref().and_then(AddImapMessage::new))
+                    .with_add_message(|ctx| ctx.imap.as_ref().and_then(AddImapMessage::new));
             }
             #[cfg(feature = "maildir")]
             Some(BackendKind::Maildir) => {
-                backend_builder = backend_builder.with_add_message_with_flags(|ctx| {
-                    ctx.maildir
-                        .as_ref()
-                        .and_then(AddMessageWithFlagsMaildir::new)
-                });
+                backend_builder = backend_builder
+                    .with_add_message(|ctx| ctx.maildir.as_ref().and_then(AddMaildirMessage::new));
             }
             #[cfg(feature = "sync")]
             Some(BackendKind::MaildirForSync) => {
-                backend_builder = backend_builder.with_add_message_with_flags(|ctx| {
+                backend_builder = backend_builder.with_add_message(|ctx| {
                     ctx.maildir_for_sync
                         .as_ref()
-                        .and_then(AddMessageWithFlagsMaildir::new)
+                        .and_then(AddMaildirMessage::new)
                 });
             }
             #[cfg(feature = "notmuch")]

@@ -9,8 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added cargo feature `sync`.
 - Added one cargo feature per backend feature:
-  - TODO
+  - `account` including `account-configure`, `account-list`, `sync` and the `account` subcommand
+  - `folder` including `folder-add`, `folder-list`, `folder-expunge`, `folder-purge`, `folder-delete` and the `folder` subcommand
+  - `envelope` including `envelope-list`, `envelope-watch`, `envelope-get` and the `envelope` subcommand
+  - `flag` including `flag-add`, `flag-set`, `flag-remove` and the `flag` subcommand
+  - `message` including `message-read`, `message-write`, `message-mailto`, `message-reply`, `message-forward`, `message-copy`, `message-move`, `message-delete`, `message-save`, `message-send` and the `message` subcommand
+  - `attachment` including `attachment-download` and the `attachment` subcommand
+  - `template` including `template-write`, `template-reply`, `template-forward`, `template-save`, `template-send` and the `template` subcommand
 
 ### Changed
 
@@ -20,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed default command: running `himalaya` without argument lists envelopes, as it used to be in previous versions.
 - Fixed bug when listing envelopes with `backend = "imap"`, `sync.enable = true` and `envelope.watch.backend = "imap"` led to unwanted IMAP connection creation (which slowed down the listing).
+- Fixed builds related to enabled cargo features.
 
 ## [1.0.0-beta] - 2024-01-01
 

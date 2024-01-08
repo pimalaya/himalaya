@@ -1216,8 +1216,9 @@ dependencies = [
 
 [[package]]
 name = "email-lib"
-version = "0.19.6"
-source = "git+https://git.sr.ht/~soywod/pimalaya#2933075a179bfff3349987e9620185799eeba907"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3b77f4c2aee25fe234194b651bfadc3b5a3e3c817ca8ba1cd0044f1dd462723"
 dependencies = [
  "advisory-lock",
  "anyhow",
