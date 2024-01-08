@@ -149,7 +149,7 @@ impl AccountSyncCommand {
             let report = sync_builder
                 .with_on_progress(move |evt| {
                     use AccountSyncProgressEvent::*;
-                    Ok(match evt {
+                    match evt {
                         ApplyFolderPatches(..) => {
                             main_progress.inc(3);
                         }
@@ -199,7 +199,8 @@ impl AccountSyncCommand {
                                 .set_message(format!("Expunging {} folders…", folders.len()));
                         }
                         _ => (),
-                    })
+                    };
+                    Ok(())
                 })
                 .sync()
                 .await?;
