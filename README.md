@@ -71,19 +71,15 @@ Please read the [documentation](https://pimalaya.org/himalaya/cli/latest/configu
 
 ## Contributing
 
-The [bug tracker](https://todo.sr.ht/~soywod/pimalaya) and the [mailing list](https://lists.sr.ht/~soywod/pimalaya) are both on [sourcehut](https://sourcehut.org/).
+A **bug tracker** is available at <https://todo.sr.ht/~soywod/pimalaya>.
 
-### Report a bug
+A **mailing list** is available at <https://lists.sr.ht/~soywod/pimalaya>.
 
-Send an email to the bug tracker at [~soywod/pimalaya@todo.sr.ht](mailto:~soywod/pimalaya@todo.sr.ht).
+If you want to **report a bug**, please send an email at [~soywod/pimalaya@todo.sr.ht](mailto:~soywod/pimalaya@todo.sr.ht).
 
-### Propose a feature or fix a bug
+If you want to **propose a feature** or **fix a bug**, please send a patch at [~soywod/pimalaya@lists.sr.ht](mailto:~soywod/pimalaya@lists.sr.ht). The simplest way to send a patch is to use [git send-email](https://git-scm.com/docs/git-send-email), follow [this guide](https://git-send-email.io/) to configure git properly.
 
-Send a patch to the mailing list at [~soywod/pimalaya@lists.sr.ht](mailto:~soywod/pimalaya@lists.sr.ht) using [git send-email](https://git-scm.com/docs/git-send-email). Follow [this guide](https://git-send-email.io/) to configure git properly.
-
-### Discuss
-
-Join the [Matrix](https://matrix.org/) workspace [#pimalaya.himalaya](https://matrix.to/#/#pimalaya.himalaya:matrix.org) or contact me directly [@soywod](https://matrix.to/#/@soywod:matrix.org). You can also use the mailing list [[send an email](mailto:~soywod/pimalaya@lists.sr.ht)|[subscribe](mailto:~soywod/pimalaya+subscribe@lists.sr.ht)|[unsubscribe](mailto:~soywod/pimalaya+unsubscribe@lists.sr.ht)].
+If you just want to **discuss** about the project, feel free to join the [Matrix](https://matrix.org/) workspace [#pimalaya.himalaya](https://matrix.to/#/#pimalaya.himalaya:matrix.org) or contact me directly [@soywod](https://matrix.to/#/@soywod:matrix.org). You can also use the mailing list [[send an email](mailto:~soywod/pimalaya@lists.sr.ht)|[subscribe](mailto:~soywod/pimalaya+subscribe@lists.sr.ht)|[unsubscribe](mailto:~soywod/pimalaya+unsubscribe@lists.sr.ht)].
 
 ## Sponsoring
 
