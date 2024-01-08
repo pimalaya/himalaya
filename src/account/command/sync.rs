@@ -17,18 +17,18 @@ use crate::{
     printer::Printer,
 };
 
-const MAIN_PROGRESS_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
+static MAIN_PROGRESS_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
     ProgressStyle::with_template(" {spinner:.dim} {msg:.dim}\n {wide_bar:.cyan/blue} \n").unwrap()
 });
 
-const SUB_PROGRESS_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
+static SUB_PROGRESS_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
     ProgressStyle::with_template(
         "   {prefix:.bold} — {wide_msg:.dim} \n   {wide_bar:.black/black} {percent}% ",
     )
     .unwrap()
 });
 
-const SUB_PROGRESS_DONE_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
+static SUB_PROGRESS_DONE_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
     ProgressStyle::with_template("   {prefix:.bold} \n   {wide_bar:.green} {percent}% ").unwrap()
 });
 
