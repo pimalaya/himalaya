@@ -95,7 +95,7 @@ impl AccountSyncCommand {
             None
         };
 
-        let account = self.account.name.as_ref().map(String::as_str);
+        let account = self.account.name.as_deref();
         let (toml_account_config, account_config) =
             config.clone().into_account_configs(account, true)?;
         let account_name = account_config.name.as_str();
