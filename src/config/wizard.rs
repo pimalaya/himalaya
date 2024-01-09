@@ -102,35 +102,35 @@ pub(crate) async fn configure(path: PathBuf) -> Result<TomlConfig> {
         set_table_dotted(item, "sync-folders-strategy");
 
         set_table_dotted(item, "folder");
-        get_table_mut(item, "folder").map(|item| {
+        if let Some(item) = get_table_mut(item, "folder") {
             set_tables_dotted(item, ["add", "list", "expunge", "purge", "delete"]);
-        });
+        }
 
         set_table_dotted(item, "envelope");
-        get_table_mut(item, "envelope").map(|item| {
+        if let Some(item) = get_table_mut(item, "envelope") {
             set_tables_dotted(item, ["list", "get"]);
-        });
+        }
 
         set_table_dotted(item, "flag");
-        get_table_mut(item, "flag").map(|item| {
+        if let Some(item) = get_table_mut(item, "flag") {
             set_tables_dotted(item, ["add", "set", "remove"]);
-        });
+        }
 
         set_table_dotted(item, "message");
-        get_table_mut(item, "message").map(|item| {
+        if let Some(item) = get_table_mut(item, "message") {
             set_tables_dotted(
                 item,
                 ["add", "send", "peek", "get", "copy", "move", "delete"],
             );
-        });
+        }
 
         set_table_dotted(item, "maildir");
         #[cfg(feature = "imap")]
         {
             set_table_dotted(item, "imap");
-            get_table_mut(item, "imap").map(|item| {
+            if let Some(item) = get_table_mut(item, "imap") {
                 set_tables_dotted(item, ["passwd", "oauth2"]);
-            });
+            }
         }
         #[cfg(feature = "notmuch")]
         set_table_dotted(item, "notmuch");
@@ -138,9 +138,9 @@ pub(crate) async fn configure(path: PathBuf) -> Result<TomlConfig> {
         #[cfg(feature = "smtp")]
         {
             set_table_dotted(item, "smtp");
-            get_table_mut(item, "smtp").map(|item| {
+            if let Some(item) = get_table_mut(item, "smtp") {
                 set_tables_dotted(item, ["passwd", "oauth2"]);
-            });
+            }
         }
 
         #[cfg(feature = "pgp")]
@@ -158,9 +158,9 @@ fn get_table_mut<'a>(item: &'a mut Item, key: &'a str) -> Option<&'a mut Item> {
 }
 
 fn set_table_dotted(item: &mut Item, key: &str) {
-    get_table_mut(item, key)
-        .and_then(|item| item.as_table_mut())
-        .map(|table| table.set_dotted(true));
+    if let Some(table) = get_table_mut(item, key).and_then(|item| item.as_table_mut()) {
+        table.set_dotted(true)
+    }
 }
 
 fn set_tables_dotted<'a>(item: &'a mut Item, keys: impl IntoIterator<Item = &'a str>) {
