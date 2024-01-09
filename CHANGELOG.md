@@ -9,9 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added cargo feature `sync`.
+- Added cargo feature `wizard`, enabled by default.
 - Added one cargo feature per backend feature:
-  - `account` including `account-configure`, `account-list`, `sync` and the `account` subcommand
+  - `account` including `account-configure`, `account-list`, `account-sync` and the `account` subcommand
   - `folder` including `folder-add`, `folder-list`, `folder-expunge`, `folder-purge`, `folder-delete` and the `folder` subcommand
   - `envelope` including `envelope-list`, `envelope-watch`, `envelope-get` and the `envelope` subcommand
   - `flag` including `flag-add`, `flag-set`, `flag-remove` and the `flag` subcommand

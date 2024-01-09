@@ -8,7 +8,7 @@ use email::envelope::list::maildir::ListEnvelopesMaildir;
 use email::envelope::list::notmuch::ListEnvelopesNotmuch;
 use log::info;
 
-#[cfg(feature = "sync")]
+#[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
     account::arg::name::AccountNameFlag,
@@ -44,7 +44,7 @@ pub struct ListEnvelopesCommand {
     #[command(flatten)]
     pub table: TableMaxWidthFlag,
 
-    #[cfg(feature = "sync")]
+    #[cfg(feature = "account-sync")]
     #[command(flatten)]
     pub cache: CacheDisableFlag,
 
@@ -59,7 +59,7 @@ impl Default for ListEnvelopesCommand {
             page: 1,
             page_size: Default::default(),
             table: Default::default(),
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             cache: Default::default(),
             account: Default::default(),
         }
@@ -72,7 +72,7 @@ impl ListEnvelopesCommand {
 
         let (toml_account_config, account_config) = config.clone().into_account_configs(
             self.account.name.as_ref().map(String::as_str),
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             self.cache.disable,
         )?;
 
@@ -101,7 +101,7 @@ impl ListEnvelopesCommand {
                         ctx.maildir.as_ref().and_then(ListEnvelopesMaildir::new)
                     });
                 }
-                #[cfg(feature = "sync")]
+                #[cfg(feature = "account-sync")]
                 Some(BackendKind::MaildirForSync) => {
                     builder.set_list_envelopes(|ctx| {
                         ctx.maildir_for_sync

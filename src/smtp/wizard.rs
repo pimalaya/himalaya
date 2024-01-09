@@ -12,7 +12,7 @@ use secret::Secret;
 
 use crate::{
     backend::config::BackendConfig,
-    config::wizard::{prompt_passwd, THEME},
+    ui::{prompt, THEME},
     wizard_log, wizard_prompt,
 };
 
@@ -93,12 +93,12 @@ pub(crate) async fn configure(account_name: &str, email: &str) -> Result<Backend
             let config = match secret {
                 Some(idx) if SECRETS[idx] == KEYRING => {
                     Secret::new_keyring_entry(format!("{account_name}-smtp-passwd"))
-                        .set_keyring_entry_secret(prompt_passwd("SMTP password")?)
+                        .set_keyring_entry_secret(prompt::passwd("SMTP password")?)
                         .await?;
                     PasswdConfig::default()
                 }
                 Some(idx) if SECRETS[idx] == RAW => PasswdConfig {
-                    passwd: Secret::Raw(prompt_passwd("SMTP password")?),
+                    passwd: Secret::Raw(prompt::passwd("SMTP password")?),
                 },
                 Some(idx) if SECRETS[idx] == CMD => PasswdConfig {
                     passwd: Secret::new_cmd(

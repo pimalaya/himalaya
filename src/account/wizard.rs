@@ -1,20 +1,18 @@
 use anyhow::{bail, Result};
-#[cfg(feature = "sync")]
+#[cfg(feature = "account-sync")]
 use dialoguer::Confirm;
 use dialoguer::Input;
-#[cfg(feature = "sync")]
+#[cfg(feature = "account-sync")]
 use email::account::sync::config::SyncConfig;
 use email_address::EmailAddress;
 
+#[allow(unused)]
+use crate::backend::{self, config::BackendConfig, BackendKind};
 #[cfg(feature = "message-send")]
 use crate::message::config::{MessageConfig, MessageSendConfig};
-#[cfg(feature = "sync")]
+use crate::ui::THEME;
+#[cfg(feature = "account-sync")]
 use crate::wizard_prompt;
-#[allow(unused)]
-use crate::{
-    backend::{self, config::BackendConfig, BackendKind},
-    config::wizard::THEME,
-};
 
 use super::TomlAccountConfig;
 
@@ -104,7 +102,7 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
         _ => (),
     };
 
-    #[cfg(feature = "sync")]
+    #[cfg(feature = "account-sync")]
     {
         let should_configure_sync = Confirm::new()
             .with_prompt(wizard_prompt!(

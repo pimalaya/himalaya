@@ -6,7 +6,7 @@ use email::message::get::imap::GetMessagesImap;
 use email::{flag::add::maildir::AddFlagsMaildir, message::peek::maildir::PeekMessagesMaildir};
 use log::info;
 
-#[cfg(feature = "sync")]
+#[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
 #[allow(unused)]
 use crate::{
@@ -38,7 +38,7 @@ pub struct TemplateForwardCommand {
     #[command(flatten)]
     pub body: MessageRawBodyArg,
 
-    #[cfg(feature = "sync")]
+    #[cfg(feature = "account-sync")]
     #[command(flatten)]
     pub cache: CacheDisableFlag,
 
@@ -54,7 +54,7 @@ impl TemplateForwardCommand {
 
         let (toml_account_config, account_config) = config.clone().into_account_configs(
             self.account.name.as_ref().map(String::as_str),
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             self.cache.disable,
         )?;
 
@@ -78,7 +78,7 @@ impl TemplateForwardCommand {
                     builder
                         .set_add_flags(|ctx| ctx.maildir.as_ref().and_then(AddFlagsMaildir::new));
                 }
-                #[cfg(feature = "sync")]
+                #[cfg(feature = "account-sync")]
                 Some(BackendKind::MaildirForSync) => {
                     builder.set_peek_messages(|ctx| {
                         ctx.maildir_for_sync

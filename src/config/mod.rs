@@ -1,8 +1,8 @@
 pub mod args;
+#[cfg(feature = "wizard")]
 pub mod wizard;
 
 use anyhow::{anyhow, Context, Result};
-use dialoguer::Confirm;
 use dirs::{config_dir, home_dir};
 use email::{
     account::config::AccountConfig, config::Config, envelope::config::EnvelopeConfig,
@@ -15,13 +15,14 @@ use std::{
     collections::HashMap,
     fs,
     path::{Path, PathBuf},
-    process,
 };
 use toml;
 
-#[cfg(feature = "sync")]
+use crate::account::config::TomlAccountConfig;
+#[cfg(feature = "account-sync")]
 use crate::backend::BackendKind;
-use crate::{account::config::TomlAccountConfig, wizard_prompt, wizard_warn};
+#[cfg(feature = "wizard")]
+use crate::{wizard_prompt, wizard_warn};
 
 /// Represents the user config file.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
@@ -48,6 +49,7 @@ impl TomlConfig {
         toml::from_str(&content).context(format!("cannot parse config file at {path:?}"))
     }
 
+    #[cfg(feature = "wizard")]
     /// Create and save a TOML configuration using the wizard.
     ///
     /// If the user accepts the confirmation, the wizard starts and
@@ -56,6 +58,9 @@ impl TomlConfig {
     ///
     /// NOTE: the wizard can only be used with interactive shells.
     async fn from_wizard(path: PathBuf) -> Result<Self> {
+        use dialoguer::Confirm;
+        use std::process;
+
         wizard_warn!("Cannot find existing configuration at {path:?}.");
 
         let confirm = Confirm::new()
@@ -77,7 +82,10 @@ impl TomlConfig {
     pub async fn from_default_paths() -> Result<Self> {
         match Self::first_valid_default_path() {
             Some(path) => Self::from_path(&path),
+            #[cfg(feature = "wizard")]
             None => Self::from_wizard(Self::default_path()?).await,
+            #[cfg(not(feature = "wizard"))]
+            None => anyhow::bail!("cannot find configuration file from default locations"),
         }
     }
 
@@ -96,8 +104,9 @@ impl TomlConfig {
     pub async fn from_some_path_or_default(path: Option<impl Into<PathBuf>>) -> Result<Self> {
         match path.map(Into::into) {
             Some(ref path) if path.exists() => Self::from_path(path),
+            #[cfg(feature = "wizard")]
             Some(path) => Self::from_wizard(path).await,
-            None => Self::from_default_paths().await,
+            _ => Self::from_default_paths().await,
         }
     }
 
@@ -175,13 +184,13 @@ impl TomlConfig {
     pub fn into_account_configs(
         self,
         account_name: Option<&str>,
-        #[cfg(feature = "sync")] disable_cache: bool,
+        #[cfg(feature = "account-sync")] disable_cache: bool,
     ) -> Result<(TomlAccountConfig, AccountConfig)> {
-        #[cfg_attr(not(feature = "sync"), allow(unused_mut))]
+        #[cfg_attr(not(feature = "account-sync"), allow(unused_mut))]
         let (account_name, mut toml_account_config) =
             self.into_toml_account_config(account_name)?;
 
-        #[cfg(feature = "sync")]
+        #[cfg(feature = "account-sync")]
         if let Some(true) = toml_account_config.sync.as_ref().and_then(|c| c.enable) {
             if !disable_cache {
                 toml_account_config.backend = Some(BackendKind::MaildirForSync);
@@ -228,7 +237,7 @@ impl TomlConfig {
                                 send: c.send.map(|c| c.remote),
                                 ..Default::default()
                             }),
-                            #[cfg(feature = "sync")]
+                            #[cfg(feature = "account-sync")]
                             sync: config.sync,
                             #[cfg(feature = "pgp")]
                             pgp: config.pgp,

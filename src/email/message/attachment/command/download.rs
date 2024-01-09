@@ -8,7 +8,7 @@ use log::info;
 use std::{fs, path::PathBuf};
 use uuid::Uuid;
 
-#[cfg(feature = "sync")]
+#[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
     account::arg::name::AccountNameFlag,
@@ -31,7 +31,7 @@ pub struct AttachmentDownloadCommand {
     #[command(flatten)]
     pub envelopes: EnvelopeIdsArgs,
 
-    #[cfg(feature = "sync")]
+    #[cfg(feature = "account-sync")]
     #[command(flatten)]
     pub cache: CacheDisableFlag,
 
@@ -48,7 +48,7 @@ impl AttachmentDownloadCommand {
 
         let (toml_account_config, account_config) = config.clone().into_account_configs(
             self.account.name.as_ref().map(String::as_str),
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             self.cache.disable,
         )?;
 
@@ -72,7 +72,7 @@ impl AttachmentDownloadCommand {
                     builder
                         .set_add_flags(|ctx| ctx.maildir.as_ref().and_then(AddFlagsMaildir::new));
                 }
-                #[cfg(feature = "sync")]
+                #[cfg(feature = "account-sync")]
                 Some(BackendKind::MaildirForSync) => {
                     builder.set_peek_messages(|ctx| {
                         ctx.maildir_for_sync

@@ -6,7 +6,7 @@ use email::{flag::add::imap::AddFlagsImap, message::move_::imap::MoveMessagesIma
 use email::{flag::add::maildir::AddFlagsMaildir, message::move_::maildir::MoveMessagesMaildir};
 use log::info;
 
-#[cfg(feature = "sync")]
+#[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
 #[allow(unused)]
 use crate::{
@@ -32,7 +32,7 @@ pub struct MessageDeleteCommand {
     #[command(flatten)]
     pub envelopes: EnvelopeIdsArgs,
 
-    #[cfg(feature = "sync")]
+    #[cfg(feature = "account-sync")]
     #[command(flatten)]
     pub cache: CacheDisableFlag,
 
@@ -49,7 +49,7 @@ impl MessageDeleteCommand {
 
         let (toml_account_config, account_config) = config.clone().into_account_configs(
             self.account.name.as_ref().map(String::as_str),
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             self.cache.disable,
         )?;
 
@@ -74,7 +74,7 @@ impl MessageDeleteCommand {
                     builder
                         .set_add_flags(|ctx| ctx.maildir.as_ref().and_then(AddFlagsMaildir::new));
                 }
-                #[cfg(feature = "sync")]
+                #[cfg(feature = "account-sync")]
                 Some(BackendKind::MaildirForSync) => {
                     builder.set_move_messages(|ctx| {
                         ctx.maildir_for_sync

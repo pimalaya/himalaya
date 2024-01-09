@@ -5,7 +5,7 @@
 
 #[cfg(feature = "pgp")]
 use email::account::config::pgp::PgpConfig;
-#[cfg(feature = "sync")]
+#[cfg(feature = "account-sync")]
 use email::account::sync::config::SyncConfig;
 #[cfg(feature = "imap")]
 use email::imap::config::ImapConfig;
@@ -35,7 +35,7 @@ pub struct TomlAccountConfig {
     pub downloads_dir: Option<PathBuf>,
     pub backend: Option<BackendKind>,
 
-    #[cfg(feature = "sync")]
+    #[cfg(feature = "account-sync")]
     pub sync: Option<SyncConfig>,
     #[cfg(feature = "pgp")]
     pub pgp: Option<PgpConfig>,

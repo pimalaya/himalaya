@@ -6,9 +6,9 @@ use email::folder::purge::imap::PurgeFolderImap;
 use log::info;
 use std::process;
 
-#[cfg(any(feature = "imap", feature = "maildir", feature = "sync"))]
+#[cfg(any(feature = "imap", feature = "maildir", feature = "account-sync"))]
 use crate::backend::BackendKind;
-#[cfg(feature = "sync")]
+#[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
     account::arg::name::AccountNameFlag, backend::Backend, config::TomlConfig,
@@ -24,7 +24,7 @@ pub struct FolderPurgeCommand {
     #[command(flatten)]
     pub folder: FolderNameArg,
 
-    #[cfg(feature = "sync")]
+    #[cfg(feature = "account-sync")]
     #[command(flatten)]
     pub cache: CacheDisableFlag,
 
@@ -50,7 +50,7 @@ impl FolderPurgeCommand {
 
         let (toml_account_config, account_config) = config.clone().into_account_configs(
             self.account.name.as_ref().map(String::as_str),
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             self.cache.disable,
         )?;
 
@@ -73,7 +73,7 @@ impl FolderPurgeCommand {
                 //         ctx.maildir.as_ref().and_then(PurgeFolderMaildir::new)
                 //     });
                 // }
-                // #[cfg(feature = "sync")]
+                // #[cfg(feature = "account-sync")]
                 // Some(BackendKind::MaildirForSync) => {
                 //     builder.set_purge_folder(|ctx| {
                 //         ctx.maildir_for_sync

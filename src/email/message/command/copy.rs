@@ -6,7 +6,7 @@ use email::message::copy::imap::CopyMessagesImap;
 use email::message::copy::maildir::CopyMessagesMaildir;
 use log::info;
 
-#[cfg(feature = "sync")]
+#[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
 #[allow(unused)]
 use crate::{
@@ -30,7 +30,7 @@ pub struct MessageCopyCommand {
     #[command(flatten)]
     pub envelopes: EnvelopeIdsArgs,
 
-    #[cfg(feature = "sync")]
+    #[cfg(feature = "account-sync")]
     #[command(flatten)]
     pub cache: CacheDisableFlag,
 
@@ -48,7 +48,7 @@ impl MessageCopyCommand {
 
         let (toml_account_config, account_config) = config.clone().into_account_configs(
             self.account.name.as_ref().map(String::as_str),
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             self.cache.disable,
         )?;
 
@@ -70,7 +70,7 @@ impl MessageCopyCommand {
                         ctx.maildir.as_ref().and_then(CopyMessagesMaildir::new)
                     });
                 }
-                #[cfg(feature = "sync")]
+                #[cfg(feature = "account-sync")]
                 Some(BackendKind::MaildirForSync) => {
                     builder.set_copy_messages(|ctx| {
                         ctx.maildir_for_sync

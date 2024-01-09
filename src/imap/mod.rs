@@ -1,3 +1,2 @@
-// pub mod args;
-// pub mod handlers;
+#[cfg(feature = "wizard")]
 pub(crate) mod wizard;

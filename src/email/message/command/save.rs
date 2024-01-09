@@ -7,7 +7,7 @@ use email::message::add::maildir::AddMaildirMessage;
 use log::info;
 use std::io::{self, BufRead, IsTerminal};
 
-#[cfg(feature = "sync")]
+#[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
 #[allow(unused)]
 use crate::{
@@ -30,7 +30,7 @@ pub struct MessageSaveCommand {
     #[command(flatten)]
     pub message: MessageRawArg,
 
-    #[cfg(feature = "sync")]
+    #[cfg(feature = "account-sync")]
     #[command(flatten)]
     pub cache: CacheDisableFlag,
 
@@ -46,7 +46,7 @@ impl MessageSaveCommand {
 
         let (toml_account_config, account_config) = config.clone().into_account_configs(
             self.account.name.as_ref().map(String::as_str),
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             self.cache.disable,
         )?;
 
@@ -67,7 +67,7 @@ impl MessageSaveCommand {
                         ctx.maildir.as_ref().and_then(AddMaildirMessage::new)
                     });
                 }
-                #[cfg(feature = "sync")]
+                #[cfg(feature = "account-sync")]
                 Some(BackendKind::MaildirForSync) => {
                     builder.set_add_message(|ctx| {
                         ctx.maildir_for_sync

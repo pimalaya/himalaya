@@ -1,4 +1,5 @@
 pub mod config;
+#[cfg(feature = "wizard")]
 pub(crate) mod wizard;
 
 use anyhow::Result;
@@ -52,7 +53,7 @@ use email::folder::list::maildir::ListFoldersMaildir;
 use email::folder::purge::imap::PurgeFolderImap;
 #[cfg(feature = "imap")]
 use email::imap::{ImapSessionBuilder, ImapSessionSync};
-#[cfg(feature = "sync")]
+#[cfg(feature = "account-sync")]
 use email::maildir::config::MaildirConfig;
 #[cfg(feature = "maildir")]
 use email::maildir::{MaildirSessionBuilder, MaildirSessionSync};
@@ -99,7 +100,7 @@ pub enum BackendKind {
     Imap,
     #[cfg(feature = "maildir")]
     Maildir,
-    #[cfg(feature = "sync")]
+    #[cfg(feature = "account-sync")]
     #[serde(skip_deserializing)]
     MaildirForSync,
     #[cfg(feature = "notmuch")]
@@ -118,7 +119,7 @@ impl ToString for BackendKind {
             Self::Imap => "IMAP",
             #[cfg(feature = "maildir")]
             Self::Maildir => "Maildir",
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             Self::MaildirForSync => "Maildir",
             #[cfg(feature = "notmuch")]
             Self::Notmuch => "Notmuch",
@@ -139,7 +140,7 @@ pub struct BackendContextBuilder {
     pub imap: Option<ImapSessionBuilder>,
     #[cfg(feature = "maildir")]
     pub maildir: Option<MaildirSessionBuilder>,
-    #[cfg(feature = "sync")]
+    #[cfg(feature = "account-sync")]
     pub maildir_for_sync: Option<MaildirSessionBuilder>,
     #[cfg(feature = "smtp")]
     pub smtp: Option<SmtpClientBuilder>,
@@ -178,7 +179,7 @@ impl BackendContextBuilder {
                 .map(|mdir_config| {
                     MaildirSessionBuilder::new(account_config.clone(), mdir_config.clone())
                 }),
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             maildir_for_sync: Some(MaildirConfig {
                 root_dir: account_config.get_sync_dir()?,
             })
@@ -230,7 +231,7 @@ impl email::backend::BackendContextBuilder for BackendContextBuilder {
             ctx.maildir = Some(maildir.build().await?);
         }
 
-        #[cfg(feature = "sync")]
+        #[cfg(feature = "account-sync")]
         if let Some(maildir) = self.maildir_for_sync {
             ctx.maildir_for_sync = Some(maildir.build().await?);
         }
@@ -260,7 +261,7 @@ pub struct BackendContext {
     pub imap: Option<ImapSessionSync>,
     #[cfg(feature = "maildir")]
     pub maildir: Option<MaildirSessionSync>,
-    #[cfg(feature = "sync")]
+    #[cfg(feature = "account-sync")]
     pub maildir_for_sync: Option<MaildirSessionSync>,
     #[cfg(feature = "smtp")]
     pub smtp: Option<SmtpClientSync>,
@@ -285,7 +286,7 @@ impl BackendBuilder {
         let is_imap_used = used_backends.contains(&BackendKind::Imap);
         #[cfg(feature = "maildir")]
         let is_maildir_used = used_backends.contains(&BackendKind::Maildir);
-        #[cfg(feature = "sync")]
+        #[cfg(feature = "account-sync")]
         let is_maildir_for_sync_used = used_backends.contains(&BackendKind::MaildirForSync);
 
         let backend_ctx_builder = BackendContextBuilder {
@@ -313,7 +314,7 @@ impl BackendBuilder {
                 .map(|mdir_config| {
                     MaildirSessionBuilder::new(account_config.clone(), mdir_config.clone())
                 }),
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             maildir_for_sync: Some(MaildirConfig {
                 root_dir: account_config.get_sync_dir()?,
             })
@@ -333,7 +334,7 @@ impl BackendBuilder {
                 backend_builder = backend_builder
                     .with_add_folder(|ctx| ctx.maildir.as_ref().and_then(AddFolderMaildir::new));
             }
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             Some(BackendKind::MaildirForSync) => {
                 backend_builder = backend_builder.with_add_folder(|ctx| {
                     ctx.maildir_for_sync
@@ -362,7 +363,7 @@ impl BackendBuilder {
                     ctx.maildir.as_ref().and_then(ListFoldersMaildir::new)
                 });
             }
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             Some(BackendKind::MaildirForSync) => {
                 backend_builder = backend_builder.with_list_folders(|ctx| {
                     ctx.maildir_for_sync
@@ -392,7 +393,7 @@ impl BackendBuilder {
                     ctx.maildir.as_ref().and_then(ExpungeFolderMaildir::new)
                 });
             }
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             Some(BackendKind::MaildirForSync) => {
                 backend_builder = backend_builder.with_expunge_folder(|ctx| {
                     ctx.maildir_for_sync
@@ -423,7 +424,7 @@ impl BackendBuilder {
             //         .with_purge_folder(|ctx| ctx.maildir.as_ref().and_then(PurgeFolderMaildir::new));
             // }
             // TODO
-            // #[cfg(feature = "sync")]
+            // #[cfg(feature = "account-sync")]
             // Some(BackendKind::MaildirForSync) => {
             //     backend_builder = backend_builder
             //         .with_purge_folder(|ctx| ctx.maildir_for_sync.as_ref().and_then(PurgeFolderMaildir::new));
@@ -450,7 +451,7 @@ impl BackendBuilder {
                     ctx.maildir.as_ref().and_then(DeleteFolderMaildir::new)
                 });
             }
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             Some(BackendKind::MaildirForSync) => {
                 backend_builder = backend_builder.with_delete_folder(|ctx| {
                     ctx.maildir_for_sync
@@ -480,7 +481,7 @@ impl BackendBuilder {
                     ctx.maildir.as_ref().and_then(ListEnvelopesMaildir::new)
                 });
             }
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             Some(BackendKind::MaildirForSync) => {
                 backend_builder = backend_builder.with_list_envelopes(|ctx| {
                     ctx.maildir_for_sync
@@ -510,7 +511,7 @@ impl BackendBuilder {
                     ctx.maildir.as_ref().and_then(WatchMaildirEnvelopes::new)
                 });
             }
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             Some(BackendKind::MaildirForSync) => {
                 backend_builder = backend_builder.with_watch_envelopes(|ctx| {
                     ctx.maildir_for_sync
@@ -541,7 +542,7 @@ impl BackendBuilder {
                     ctx.maildir.as_ref().and_then(GetEnvelopeMaildir::new)
                 });
             }
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             Some(BackendKind::MaildirForSync) => {
                 backend_builder = backend_builder.with_get_envelope(|ctx| {
                     ctx.maildir_for_sync
@@ -570,7 +571,7 @@ impl BackendBuilder {
                 backend_builder = backend_builder
                     .with_add_flags(|ctx| ctx.maildir.as_ref().and_then(AddFlagsMaildir::new));
             }
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             Some(BackendKind::MaildirForSync) => {
                 backend_builder = backend_builder.with_add_flags(|ctx| {
                     ctx.maildir_for_sync.as_ref().and_then(AddFlagsMaildir::new)
@@ -596,7 +597,7 @@ impl BackendBuilder {
                 backend_builder = backend_builder
                     .with_set_flags(|ctx| ctx.maildir.as_ref().and_then(SetFlagsMaildir::new));
             }
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             Some(BackendKind::MaildirForSync) => {
                 backend_builder = backend_builder.with_set_flags(|ctx| {
                     ctx.maildir_for_sync.as_ref().and_then(SetFlagsMaildir::new)
@@ -623,7 +624,7 @@ impl BackendBuilder {
                     ctx.maildir.as_ref().and_then(RemoveFlagsMaildir::new)
                 });
             }
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             Some(BackendKind::MaildirForSync) => {
                 backend_builder = backend_builder.with_remove_flags(|ctx| {
                     ctx.maildir_for_sync
@@ -658,7 +659,7 @@ impl BackendBuilder {
                 backend_builder = backend_builder
                     .with_add_message(|ctx| ctx.maildir.as_ref().and_then(AddMaildirMessage::new));
             }
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             Some(BackendKind::MaildirForSync) => {
                 backend_builder = backend_builder.with_add_message(|ctx| {
                     ctx.maildir_for_sync
@@ -683,7 +684,7 @@ impl BackendBuilder {
                     ctx.maildir.as_ref().and_then(PeekMessagesMaildir::new)
                 });
             }
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             Some(BackendKind::MaildirForSync) => {
                 backend_builder = backend_builder.with_peek_messages(|ctx| {
                     ctx.maildir_for_sync
@@ -729,7 +730,7 @@ impl BackendBuilder {
                     ctx.maildir.as_ref().and_then(CopyMessagesMaildir::new)
                 });
             }
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             Some(BackendKind::MaildirForSync) => {
                 backend_builder = backend_builder.with_copy_messages(|ctx| {
                     ctx.maildir_for_sync
@@ -759,7 +760,7 @@ impl BackendBuilder {
                     ctx.maildir.as_ref().and_then(MoveMessagesMaildir::new)
                 });
             }
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             Some(BackendKind::MaildirForSync) => {
                 backend_builder = backend_builder.with_move_messages(|ctx| {
                     ctx.maildir_for_sync
@@ -856,7 +857,7 @@ impl Backend {
                     )?;
                 }
             }
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             Some(BackendKind::MaildirForSync) => {
                 id_mapper = IdMapper::new(
                     &self.backend.account_config,

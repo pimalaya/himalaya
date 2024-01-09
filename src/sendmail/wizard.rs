@@ -2,7 +2,7 @@ use anyhow::Result;
 use dialoguer::Input;
 use email::sendmail::config::SendmailConfig;
 
-use crate::{backend::config::BackendConfig, config::wizard::THEME};
+use crate::{backend::config::BackendConfig, ui::THEME};
 
 pub(crate) fn configure() -> Result<BackendConfig> {
     let mut config = SendmailConfig::default();

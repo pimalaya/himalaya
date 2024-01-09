@@ -1,7 +1,6 @@
 use anyhow::Result;
 use dialoguer::Select;
 
-use crate::config::wizard::THEME;
 #[cfg(feature = "imap")]
 use crate::imap;
 #[cfg(feature = "maildir")]
@@ -12,6 +11,7 @@ use crate::notmuch;
 use crate::sendmail;
 #[cfg(feature = "smtp")]
 use crate::smtp;
+use crate::ui::THEME;
 
 use super::{config::BackendConfig, BackendKind};
 

@@ -2,7 +2,7 @@
 mod configure;
 #[cfg(feature = "account-list")]
 mod list;
-#[cfg(feature = "sync")]
+#[cfg(feature = "account-sync")]
 mod sync;
 
 use anyhow::Result;
@@ -14,7 +14,7 @@ use crate::{config::TomlConfig, printer::Printer};
 use self::configure::AccountConfigureCommand;
 #[cfg(feature = "account-list")]
 use self::list::AccountListCommand;
-#[cfg(feature = "sync")]
+#[cfg(feature = "account-sync")]
 use self::sync::AccountSyncCommand;
 
 /// Manage accounts.
@@ -32,7 +32,7 @@ pub enum AccountSubcommand {
     #[command(alias = "lst")]
     List(AccountListCommand),
 
-    #[cfg(feature = "sync")]
+    #[cfg(feature = "account-sync")]
     #[command(alias = "synchronize", alias = "synchronise")]
     Sync(AccountSyncCommand),
 }
@@ -45,7 +45,7 @@ impl AccountSubcommand {
             Self::Configure(cmd) => cmd.execute(printer, config).await,
             #[cfg(feature = "account-list")]
             Self::List(cmd) => cmd.execute(printer, config).await,
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             Self::Sync(cmd) => cmd.execute(printer, config).await,
         }
     }

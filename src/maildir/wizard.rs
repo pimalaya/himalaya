@@ -3,7 +3,7 @@ use dialoguer::Input;
 use dirs::home_dir;
 use email::maildir::config::MaildirConfig;
 
-use crate::{backend::config::BackendConfig, config::wizard::THEME};
+use crate::{backend::config::BackendConfig, ui::THEME};
 
 pub(crate) fn configure() -> Result<BackendConfig> {
     let mut config = MaildirConfig::default();

@@ -6,9 +6,9 @@ use email::folder::list::imap::ListFoldersImap;
 use email::folder::list::maildir::ListFoldersMaildir;
 use log::info;
 
-#[cfg(any(feature = "imap", feature = "maildir", feature = "sync"))]
+#[cfg(any(feature = "imap", feature = "maildir", feature = "account-sync"))]
 use crate::backend::BackendKind;
-#[cfg(feature = "sync")]
+#[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
     account::arg::name::AccountNameFlag,
@@ -27,7 +27,7 @@ pub struct FolderListCommand {
     #[command(flatten)]
     pub table: TableMaxWidthFlag,
 
-    #[cfg(feature = "sync")]
+    #[cfg(feature = "account-sync")]
     #[command(flatten)]
     pub cache: CacheDisableFlag,
 
@@ -41,7 +41,7 @@ impl FolderListCommand {
 
         let (toml_account_config, account_config) = config.clone().into_account_configs(
             self.account.name.as_ref().map(String::as_str),
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             self.cache.disable,
         )?;
 
@@ -63,7 +63,7 @@ impl FolderListCommand {
                         ctx.maildir.as_ref().and_then(ListFoldersMaildir::new)
                     });
                 }
-                #[cfg(feature = "sync")]
+                #[cfg(feature = "account-sync")]
                 Some(BackendKind::MaildirForSync) => {
                     builder.set_list_folders(|ctx| {
                         ctx.maildir_for_sync

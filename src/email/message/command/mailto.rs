@@ -12,7 +12,7 @@ use log::{debug, info};
 use mail_builder::MessageBuilder;
 use url::Url;
 
-#[cfg(feature = "sync")]
+#[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
     account::arg::name::AccountNameFlag,
@@ -34,7 +34,7 @@ pub struct MessageMailtoCommand {
     #[arg()]
     pub url: Url,
 
-    #[cfg(feature = "sync")]
+    #[cfg(feature = "account-sync")]
     #[command(flatten)]
     pub cache: CacheDisableFlag,
 
@@ -46,7 +46,7 @@ impl MessageMailtoCommand {
     pub fn new(url: &str) -> Result<Self> {
         Ok(Self {
             url: Url::parse(url)?,
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             cache: Default::default(),
             account: Default::default(),
         })
@@ -57,7 +57,7 @@ impl MessageMailtoCommand {
 
         let (toml_account_config, account_config) = config.clone().into_account_configs(
             self.account.name.as_ref().map(String::as_str),
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             self.cache.disable,
         )?;
 
@@ -81,7 +81,7 @@ impl MessageMailtoCommand {
                             ctx.maildir.as_ref().and_then(AddMaildirMessage::new)
                         });
                     }
-                    #[cfg(feature = "sync")]
+                    #[cfg(feature = "account-sync")]
                     Some(BackendKind::MaildirForSync) => {
                         builder.set_add_message(|ctx| {
                             ctx.maildir_for_sync

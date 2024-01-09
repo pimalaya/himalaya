@@ -1,11 +1,10 @@
 use anyhow::Result;
-use dialoguer::{theme::ColorfulTheme, Confirm, Input, Password, Select};
-use once_cell::sync::Lazy;
+use dialoguer::{Confirm, Input, Select};
 use shellexpand_utils::expand;
-use std::{fs, io, path::PathBuf, process};
+use std::{fs, path::PathBuf, process};
 use toml_edit::{Document, Item};
 
-use crate::account;
+use crate::{account, ui::THEME};
 
 use super::TomlConfig;
 
@@ -31,8 +30,6 @@ macro_rules! wizard_log {
 	println!("");
     };
 }
-
-pub(crate) static THEME: Lazy<ColorfulTheme> = Lazy::new(ColorfulTheme::default);
 
 pub(crate) async fn configure(path: PathBuf) -> Result<TomlConfig> {
     wizard_log!("Configuring your first account:");
@@ -170,23 +167,4 @@ fn set_tables_dotted<'a>(item: &'a mut Item, keys: impl IntoIterator<Item = &'a 
     for key in keys {
         set_table_dotted(item, key)
     }
-}
-
-#[allow(unused)]
-pub(crate) fn prompt_passwd(prompt: &str) -> io::Result<String> {
-    Password::with_theme(&*THEME)
-        .with_prompt(prompt)
-        .with_confirmation(
-            "Confirm password",
-            "Passwords do not match, please try again.",
-        )
-        .interact()
-}
-
-#[allow(unused)]
-pub(crate) fn prompt_secret(prompt: &str) -> io::Result<String> {
-    Password::with_theme(&*THEME)
-        .with_prompt(prompt)
-        .report(false)
-        .interact()
 }

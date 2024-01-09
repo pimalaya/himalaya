@@ -6,8 +6,8 @@ authors = ["soywod <clement.douin@posteo.net>"]
 edition = "2021"
 license = "MIT"
 categories = ["command-line-interface", "command-line-utilities", "email"]
-keywords = ["cli", "mail", "email", "client", "imap"]
-homepage = "https://pimalaya.org/himalaya/cli/latest/"
+keywords = ["cli", "email", "imap", "smtp", "sync"]
+homepage = "https://pimalaya.org/"
 documentation = "https://pimalaya.org/himalaya/cli/latest/"
 repository = "https://github.com/soywod/himalaya/"
 
@@ -16,12 +16,17 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
+# features documentation:
+# https://pimalaya.org/himalaya/cli/latest/installation.html#cargo
 default = [
+  "wizard",
+
   "imap",
   "maildir",
   # "notmuch",
   "smtp",
   "sendmail",
+
   "account",
   "folder",
   "envelope",
@@ -29,21 +34,25 @@ default = [
   "message",
   "attachment",
   "template",
-  "sync",
-  # "pgp-commands",
-  # "pgp-gpg",
+
+  # "pgp-commands", # enable PGP based on shell commands
+  # "pgp-gpg", # enable
   # "pgp-native",
 ]
+
+wizard = ["autoconfig"]
+
 imap = ["email-lib/imap"]
 maildir = ["email-lib/maildir"]
 notmuch = ["email-lib/notmuch"]
 smtp = ["email-lib/smtp"]
 sendmail = ["email-lib/sendmail"]
-account = ["account-configure", "account-list", "sync"]
+
+account = ["account-configure", "account-list", "account-sync"]
 account-subcmd = []
 account-configure = ["account-subcmd"]
 account-list = ["account-subcmd"]
-sync = ["account-subcmd", "email-lib/sync"]
+account-sync = ["account-subcmd", "email-lib/sync"]
 folder = ["folder-add", "folder-list", "folder-expunge", "folder-purge", "folder-delete"]
 folder-subcmd = []
 folder-add = ["folder-subcmd", "email-lib/folder-add"]
@@ -86,6 +95,7 @@ template-reply = ["template-subcmd", "email-lib/message-get"]
 template-forward = ["template-subcmd", "email-lib/message-get"]
 template-save = ["template-subcmd", "email-lib/message-add"]
 template-send = ["template-subcmd", "email-lib/message-send"]
+
 pgp = []
 pgp-commands = ["email-lib/pgp-commands", "mml-lib/pgp-commands", "pgp"]
 pgp-gpg = ["email-lib/pgp-gpg", "mml-lib/pgp-gpg", "pgp"]
@@ -98,6 +108,7 @@ tempfile = "3.3"
 [dependencies]
 anyhow = "1"
 async-trait = "0.1"
+autoconfig = { version = "0.4", optional = true }
 chrono = "0.4.24"
 clap = { version = "4.4", features = ["derive"] }
 clap_complete = "4.4"

@@ -8,7 +8,7 @@ use email::envelope::watch::maildir::WatchMaildirEnvelopes;
 use email::envelope::watch::notmuch::WatchNotmuchEnvelopes;
 use log::info;
 
-#[cfg(feature = "sync")]
+#[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
     account::arg::name::AccountNameFlag,
@@ -27,7 +27,7 @@ pub struct WatchEnvelopesCommand {
     #[command(flatten)]
     pub folder: FolderNameOptionalFlag,
 
-    #[cfg(feature = "sync")]
+    #[cfg(feature = "account-sync")]
     #[command(flatten)]
     pub cache: CacheDisableFlag,
 
@@ -42,7 +42,7 @@ impl WatchEnvelopesCommand {
         let folder = &self.folder.name;
         let (toml_account_config, account_config) = config.clone().into_account_configs(
             self.account.name.as_ref().map(String::as_str),
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             self.cache.disable,
         )?;
 
@@ -65,7 +65,7 @@ impl WatchEnvelopesCommand {
                         ctx.maildir.as_ref().and_then(WatchMaildirEnvelopes::new)
                     });
                 }
-                #[cfg(feature = "sync")]
+                #[cfg(feature = "account-sync")]
                 Some(BackendKind::MaildirForSync) => {
                     builder.set_watch_envelopes(|ctx| {
                         ctx.maildir_for_sync

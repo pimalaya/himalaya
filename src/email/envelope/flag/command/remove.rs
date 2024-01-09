@@ -8,7 +8,7 @@ use email::flag::remove::maildir::RemoveFlagsMaildir;
 use email::flag::remove::notmuch::RemoveFlagsNotmuch;
 use log::info;
 
-#[cfg(feature = "sync")]
+#[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
     account::arg::name::AccountNameFlag,
@@ -31,7 +31,7 @@ pub struct FlagRemoveCommand {
     #[command(flatten)]
     pub args: IdsAndFlagsArgs,
 
-    #[cfg(feature = "sync")]
+    #[cfg(feature = "account-sync")]
     #[command(flatten)]
     pub cache: CacheDisableFlag,
 
@@ -47,7 +47,7 @@ impl FlagRemoveCommand {
         let (ids, flags) = into_tuple(&self.args.ids_and_flags);
         let (toml_account_config, account_config) = config.clone().into_account_configs(
             self.account.name.as_ref().map(String::as_str),
-            #[cfg(feature = "sync")]
+            #[cfg(feature = "account-sync")]
             self.cache.disable,
         )?;
 
@@ -69,7 +69,7 @@ impl FlagRemoveCommand {
                         ctx.maildir.as_ref().and_then(RemoveFlagsMaildir::new)
                     });
                 }
-                #[cfg(feature = "sync")]
+                #[cfg(feature = "account-sync")]
                 Some(BackendKind::MaildirForSync) => {
                     builder.set_remove_flags(|ctx| {
                         ctx.maildir_for_sync

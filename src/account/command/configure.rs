@@ -9,7 +9,7 @@ use log::info;
 use log::{debug, warn};
 
 #[cfg(any(feature = "imap", feature = "smtp"))]
-use crate::config::wizard::{prompt_passwd, prompt_secret};
+use crate::ui::prompt;
 use crate::{account::arg::name::AccountNameArg, config::TomlConfig, printer::Printer};
 
 /// Configure an account.
@@ -72,11 +72,11 @@ impl AccountConfigureCommand {
         if let Some(ref config) = account_config.imap {
             match &config.auth {
                 ImapAuthConfig::Passwd(config) => {
-                    config.configure(|| prompt_passwd("IMAP password")).await
+                    config.configure(|| prompt::passwd("IMAP password")).await
                 }
                 ImapAuthConfig::OAuth2(config) => {
                     config
-                        .configure(|| prompt_secret("IMAP OAuth 2.0 client secret"))
+                        .configure(|| prompt::secret("IMAP OAuth 2.0 client secret"))
                         .await
                 }
             }?;
@@ -86,11 +86,11 @@ impl AccountConfigureCommand {
         if let Some(ref config) = account_config.smtp {
             match &config.auth {
                 SmtpAuthConfig::Passwd(config) => {
-                    config.configure(|| prompt_passwd("SMTP password")).await
+                    config.configure(|| prompt::passwd("SMTP password")).await
                 }
                 SmtpAuthConfig::OAuth2(config) => {
                     config
-                        .configure(|| prompt_secret("SMTP OAuth 2.0 client secret"))
+                        .configure(|| prompt::secret("SMTP OAuth 2.0 client secret"))
                         .await
                 }
             }?;

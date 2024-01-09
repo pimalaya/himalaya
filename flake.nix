@@ -46,6 +46,9 @@
               # Rust
               rust-toolchain
 
+              # OpenSSL
+              openssl.dev
+
               # Notmuch
               notmuch
 
