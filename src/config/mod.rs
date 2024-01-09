@@ -219,14 +219,12 @@ impl TomlConfig {
                                 aliases: c.alias,
                                 #[cfg(feature = "folder-list")]
                                 list: c.list.map(|c| c.remote),
-                                ..Default::default()
                             }),
                             envelope: config.envelope.map(|#[allow(unused)] c| EnvelopeConfig {
                                 #[cfg(feature = "envelope-list")]
                                 list: c.list.map(|c| c.remote),
                                 #[cfg(feature = "envelope-watch")]
                                 watch: c.watch.map(|c| c.remote),
-                                ..Default::default()
                             }),
                             message: config.message.map(|#[allow(unused)] c| MessageConfig {
                                 #[cfg(feature = "message-read")]
@@ -235,7 +233,6 @@ impl TomlConfig {
                                 write: c.write.map(|c| c.remote),
                                 #[cfg(feature = "message-send")]
                                 send: c.send.map(|c| c.remote),
-                                ..Default::default()
                             }),
                             #[cfg(feature = "account-sync")]
                             sync: config.sync,
