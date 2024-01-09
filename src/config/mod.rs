@@ -152,7 +152,7 @@ impl TomlConfig {
                 .find_map(|(name, account)| {
                     account
                         .default
-                        .filter(|default| *default == true)
+                        .filter(|default| *default)
                         .map(|_| (name.to_owned(), account.clone()))
                 })
                 .ok_or_else(|| anyhow!("cannot find default account")),
