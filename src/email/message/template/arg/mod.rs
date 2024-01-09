@@ -13,6 +13,6 @@ pub struct TemplateRawArg {
 
 impl TemplateRawArg {
     pub fn raw(self) -> String {
-        self.raw.join(" ").replace("\r", "")
+        self.raw.join(" ").replace('\r', "")
     }
 }

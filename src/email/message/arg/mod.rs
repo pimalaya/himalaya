@@ -15,6 +15,6 @@ pub struct MessageRawArg {
 
 impl MessageRawArg {
     pub fn raw(self) -> String {
-        self.raw.join(" ").replace("\r", "").replace("\n", "\r\n")
+        self.raw.join(" ").replace('\r', "").replace('\n', "\r\n")
     }
 }

@@ -12,7 +12,7 @@ pub struct HeaderRawArgs {
 }
 
 pub fn raw_header_parser(raw_header: &str) -> Result<(String, String), String> {
-    if let Some((key, val)) = raw_header.split_once(":") {
+    if let Some((key, val)) = raw_header.split_once(':') {
         Ok((key.trim().to_owned(), val.trim().to_owned()))
     } else {
         Err(format!("cannot parse raw header {raw_header:?}"))
