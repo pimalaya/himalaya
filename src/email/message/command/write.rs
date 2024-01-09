@@ -50,7 +50,7 @@ impl MessageWriteCommand {
         info!("executing write message command");
 
         let (toml_account_config, account_config) = config.clone().into_account_configs(
-            self.account.name.as_ref().map(String::as_str),
+            self.account.name.as_deref(),
             #[cfg(feature = "account-sync")]
             self.cache.disable,
         )?;

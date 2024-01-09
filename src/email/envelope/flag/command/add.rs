@@ -46,7 +46,7 @@ impl FlagAddCommand {
         let folder = &self.folder.name;
         let (ids, flags) = into_tuple(&self.args.ids_and_flags);
         let (toml_account_config, account_config) = config.clone().into_account_configs(
-            self.account.name.as_ref().map(String::as_str),
+            self.account.name.as_deref(),
             #[cfg(feature = "account-sync")]
             self.cache.disable,
         )?;

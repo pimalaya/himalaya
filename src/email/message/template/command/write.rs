@@ -36,7 +36,7 @@ impl TemplateWriteCommand {
         info!("executing write template command");
 
         let (_, account_config) = config.clone().into_account_configs(
-            self.account.name.as_ref().map(String::as_str),
+            self.account.name.as_deref(),
             #[cfg(feature = "account-sync")]
             self.cache.disable,
         )?;
