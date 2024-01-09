@@ -244,7 +244,7 @@ impl TomlConfig {
             )),
         };
 
-        let account_config = config.account(&account_name)?;
+        let account_config = config.account(account_name)?;
 
         Ok((toml_account_config, account_config))
     }

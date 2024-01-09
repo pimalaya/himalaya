@@ -91,7 +91,7 @@ pub(crate) async fn configure(path: PathBuf) -> Result<TomlConfig> {
         ))
         .default(path.to_string_lossy().to_string())
         .interact()?;
-    let path = expand::path(&path);
+    let path = expand::path(path);
 
     println!("Writing the configuration to {path:?}…");
 
