@@ -41,12 +41,11 @@ impl TemplateWriteCommand {
             self.cache.disable,
         )?;
 
-        let tpl: String = Message::new_tpl_builder(&account_config)
+        let tpl = Message::new_tpl_builder(&account_config)
             .with_headers(self.headers.raw)
             .with_body(self.body.raw())
             .build()
-            .await?
-            .into();
+            .await?;
 
         printer.print(tpl)
     }
