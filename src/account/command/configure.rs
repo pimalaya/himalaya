@@ -8,7 +8,7 @@ use log::info;
 #[cfg(any(feature = "imap", feature = "smtp"))]
 use log::{debug, warn};
 
-#[cfg(any(feature = "imap", feature = "smtp"))]
+#[cfg(any(feature = "imap", feature = "smtp", feature = "pgp"))]
 use crate::ui::prompt;
 use crate::{account::arg::name::AccountNameArg, config::TomlConfig, printer::Printer};
 
@@ -100,7 +100,7 @@ impl AccountConfigureCommand {
         if let Some(ref config) = account_config.pgp {
             config
                 .configure(&account_config.email, || {
-                    prompt_passwd("PGP secret key password")
+                    prompt::passwd("PGP secret key password")
                 })
                 .await?;
         }
