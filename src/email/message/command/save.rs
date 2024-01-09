@@ -88,7 +88,7 @@ impl MessageSaveCommand {
             io::stdin()
                 .lock()
                 .lines()
-                .filter_map(Result::ok)
+                .map_while(Result::ok)
                 .collect::<Vec<String>>()
                 .join("\r\n")
         };

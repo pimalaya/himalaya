@@ -110,7 +110,7 @@ impl MessageSendCommand {
             io::stdin()
                 .lock()
                 .lines()
-                .filter_map(Result::ok)
+                .map_while(Result::ok)
                 .collect::<Vec<_>>()
                 .join("\r\n")
         };
