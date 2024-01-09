@@ -64,7 +64,7 @@ impl TomlAccountConfig {
             .as_ref()
             .and_then(|folder| folder.add.as_ref())
             .and_then(|add| add.backend.as_ref())
-            .or_else(|| self.backend.as_ref())
+            .or(self.backend.as_ref())
     }
 
     #[cfg(feature = "folder-list")]
@@ -73,7 +73,7 @@ impl TomlAccountConfig {
             .as_ref()
             .and_then(|folder| folder.list.as_ref())
             .and_then(|list| list.backend.as_ref())
-            .or_else(|| self.backend.as_ref())
+            .or(self.backend.as_ref())
     }
 
     #[cfg(feature = "folder-expunge")]
@@ -82,7 +82,7 @@ impl TomlAccountConfig {
             .as_ref()
             .and_then(|folder| folder.expunge.as_ref())
             .and_then(|expunge| expunge.backend.as_ref())
-            .or_else(|| self.backend.as_ref())
+            .or(self.backend.as_ref())
     }
 
     #[cfg(feature = "folder-purge")]
@@ -91,7 +91,7 @@ impl TomlAccountConfig {
             .as_ref()
             .and_then(|folder| folder.purge.as_ref())
             .and_then(|purge| purge.backend.as_ref())
-            .or_else(|| self.backend.as_ref())
+            .or(self.backend.as_ref())
     }
 
     #[cfg(feature = "folder-delete")]
@@ -100,7 +100,7 @@ impl TomlAccountConfig {
             .as_ref()
             .and_then(|folder| folder.delete.as_ref())
             .and_then(|delete| delete.backend.as_ref())
-            .or_else(|| self.backend.as_ref())
+            .or(self.backend.as_ref())
     }
 
     #[cfg(feature = "envelope-get")]
@@ -109,7 +109,7 @@ impl TomlAccountConfig {
             .as_ref()
             .and_then(|envelope| envelope.get.as_ref())
             .and_then(|get| get.backend.as_ref())
-            .or_else(|| self.backend.as_ref())
+            .or(self.backend.as_ref())
     }
 
     #[cfg(feature = "envelope-list")]
@@ -118,7 +118,7 @@ impl TomlAccountConfig {
             .as_ref()
             .and_then(|envelope| envelope.list.as_ref())
             .and_then(|list| list.backend.as_ref())
-            .or_else(|| self.backend.as_ref())
+            .or(self.backend.as_ref())
     }
 
     #[cfg(feature = "envelope-watch")]
@@ -127,7 +127,7 @@ impl TomlAccountConfig {
             .as_ref()
             .and_then(|envelope| envelope.watch.as_ref())
             .and_then(|watch| watch.backend.as_ref())
-            .or_else(|| self.backend.as_ref())
+            .or(self.backend.as_ref())
     }
 
     #[cfg(feature = "flag-add")]
@@ -136,7 +136,7 @@ impl TomlAccountConfig {
             .as_ref()
             .and_then(|flag| flag.add.as_ref())
             .and_then(|add| add.backend.as_ref())
-            .or_else(|| self.backend.as_ref())
+            .or(self.backend.as_ref())
     }
 
     #[cfg(feature = "flag-set")]
@@ -145,7 +145,7 @@ impl TomlAccountConfig {
             .as_ref()
             .and_then(|flag| flag.set.as_ref())
             .and_then(|set| set.backend.as_ref())
-            .or_else(|| self.backend.as_ref())
+            .or(self.backend.as_ref())
     }
 
     #[cfg(feature = "flag-remove")]
@@ -154,7 +154,7 @@ impl TomlAccountConfig {
             .as_ref()
             .and_then(|flag| flag.remove.as_ref())
             .and_then(|remove| remove.backend.as_ref())
-            .or_else(|| self.backend.as_ref())
+            .or(self.backend.as_ref())
     }
 
     #[cfg(feature = "message-add")]
@@ -163,7 +163,7 @@ impl TomlAccountConfig {
             .as_ref()
             .and_then(|msg| msg.write.as_ref())
             .and_then(|add| add.backend.as_ref())
-            .or_else(|| self.backend.as_ref())
+            .or(self.backend.as_ref())
     }
 
     #[cfg(feature = "message-peek")]
@@ -172,7 +172,7 @@ impl TomlAccountConfig {
             .as_ref()
             .and_then(|message| message.peek.as_ref())
             .and_then(|peek| peek.backend.as_ref())
-            .or_else(|| self.backend.as_ref())
+            .or(self.backend.as_ref())
     }
 
     #[cfg(feature = "message-get")]
@@ -181,7 +181,7 @@ impl TomlAccountConfig {
             .as_ref()
             .and_then(|message| message.read.as_ref())
             .and_then(|get| get.backend.as_ref())
-            .or_else(|| self.backend.as_ref())
+            .or(self.backend.as_ref())
     }
 
     #[cfg(feature = "message-copy")]
@@ -190,7 +190,7 @@ impl TomlAccountConfig {
             .as_ref()
             .and_then(|message| message.copy.as_ref())
             .and_then(|copy| copy.backend.as_ref())
-            .or_else(|| self.backend.as_ref())
+            .or(self.backend.as_ref())
     }
 
     #[cfg(feature = "message-move")]
@@ -199,7 +199,7 @@ impl TomlAccountConfig {
             .as_ref()
             .and_then(|message| message.move_.as_ref())
             .and_then(|move_| move_.backend.as_ref())
-            .or_else(|| self.backend.as_ref())
+            .or(self.backend.as_ref())
     }
 
     #[cfg(feature = "message-delete")]
@@ -208,7 +208,7 @@ impl TomlAccountConfig {
             .as_ref()
             .and_then(|message| message.delete.as_ref())
             .and_then(|delete| delete.backend.as_ref())
-            .or_else(|| self.backend.as_ref())
+            .or(self.backend.as_ref())
     }
 
     #[cfg(any(feature = "message-send", feature = "template-send"))]
@@ -217,7 +217,7 @@ impl TomlAccountConfig {
             .as_ref()
             .and_then(|msg| msg.send.as_ref())
             .and_then(|send| send.backend.as_ref())
-            .or_else(|| self.backend.as_ref())
+            .or(self.backend.as_ref())
     }
 
     pub fn get_used_backends(&self) -> HashSet<&BackendKind> {
