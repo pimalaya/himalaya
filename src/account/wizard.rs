@@ -21,7 +21,7 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
 
     let account_name = Input::with_theme(&*THEME)
         .with_prompt("Account name")
-        .default(String::from("Personal"))
+        .default(String::from("personal"))
         .interact()?;
 
     config.email = Input::with_theme(&*THEME)

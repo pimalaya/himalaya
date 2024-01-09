@@ -1,5 +1,8 @@
 use anyhow::Result;
+use autoconfig::config::Config as AutoConfig;
 use dialoguer::Select;
+use log::{debug, warn};
+use std::sync::OnceLock;
 
 #[cfg(feature = "imap")]
 use crate::imap;
@@ -30,6 +33,23 @@ const SEND_MESSAGE_BACKEND_KINDS: &[BackendKind] = &[
     #[cfg(feature = "sendmail")]
     BackendKind::Sendmail,
 ];
+
+static AUTOCONFIG: OnceLock<AutoConfig> = OnceLock::new();
+
+#[cfg(any(feature = "imap", feature = "smtp"))]
+pub(crate) async fn get_or_init_autoconfig(email: &str) -> Option<&AutoConfig> {
+    match AUTOCONFIG.get() {
+        Some(autoconfig) => Some(autoconfig),
+        None => match autoconfig::from_addr(email).await {
+            Ok(autoconfig) => Some(AUTOCONFIG.get_or_init(|| autoconfig)),
+            Err(err) => {
+                warn!("cannot discover SMTP configuration from {email}: {err}");
+                debug!("{err:?}");
+                None
+            }
+        },
+    }
+}
 
 pub(crate) async fn configure(
     #[allow(unused)] account_name: &str,

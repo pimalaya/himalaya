@@ -1,5 +1,6 @@
 use anyhow::Result;
-use dialoguer::{Confirm, Input, Select};
+use autoconfig::config::{AuthenticationType, SecurityType, ServerType};
+use dialoguer::{Confirm, Input, Password, Select};
 use email::{
     account::config::{
         oauth2::{OAuth2Config, OAuth2Method, OAuth2Scopes},
@@ -11,223 +12,315 @@ use oauth::v2_0::{AuthorizationCodeGrant, Client};
 use secret::Secret;
 
 use crate::{
-    backend::config::BackendConfig,
+    backend::{config::BackendConfig, wizard::get_or_init_autoconfig},
     ui::{prompt, THEME},
     wizard_log, wizard_prompt,
 };
 
-const PROTOCOLS: &[SmtpEncryptionKind] = &[
+const ENCRYPTIONS: &[SmtpEncryptionKind] = &[
     SmtpEncryptionKind::Tls,
     SmtpEncryptionKind::StartTls,
     SmtpEncryptionKind::None,
 ];
-
-const PASSWD: &str = "Password";
-const OAUTH2: &str = "OAuth 2.0";
-const AUTH_MECHANISMS: &[&str] = &[PASSWD, OAUTH2];
 
 const XOAUTH2: &str = "XOAUTH2";
 const OAUTHBEARER: &str = "OAUTHBEARER";
 const OAUTH2_MECHANISMS: &[&str] = &[XOAUTH2, OAUTHBEARER];
 
 const SECRETS: &[&str] = &[KEYRING, RAW, CMD];
-const KEYRING: &str = "Ask the password, then save it in my system's global keyring";
-const RAW: &str = "Ask the password, then save it in the configuration file (not safe)";
-const CMD: &str = "Use a shell command that exposes the password";
+const KEYRING: &str = "Ask my password, then save it in my system's global keyring";
+const RAW: &str = "Ask my password, then save it in the configuration file (not safe)";
+const CMD: &str = "Ask me a shell command that exposes my password";
 
 pub(crate) async fn configure(account_name: &str, email: &str) -> Result<BackendConfig> {
-    let mut config = SmtpConfig::default();
+    let autoconfig = get_or_init_autoconfig(email).await;
+    let autoconfig_oauth2 = autoconfig.and_then(|c| c.oauth2());
+    let autoconfig_server = autoconfig.and_then(|c| {
+        c.email_provider()
+            .incoming_servers()
+            .into_iter()
+            .find(|server| matches!(server.server_type(), ServerType::Smtp))
+    });
 
-    config.host = Input::with_theme(&*THEME)
-        .with_prompt("SMTP host")
-        .default(format!("smtp.{}", email.rsplit_once('@').unwrap().1))
+    let autoconfig_host = autoconfig_server
+        .and_then(|s| s.hostname())
+        .map(ToOwned::to_owned);
+
+    let default_host =
+        autoconfig_host.unwrap_or_else(|| format!("smtp.{}", email.rsplit_once('@').unwrap().1));
+
+    let host = Input::with_theme(&*THEME)
+        .with_prompt("SMTP hostname")
+        .default(default_host)
         .interact()?;
 
-    let protocol = Select::with_theme(&*THEME)
-        .with_prompt("SMTP security protocol")
-        .items(PROTOCOLS)
-        .default(0)
-        .interact_opt()?;
+    let autoconfig_encryption = autoconfig_server
+        .and_then(|smtp| {
+            smtp.security_type().map(|encryption| match encryption {
+                SecurityType::Plain => SmtpEncryptionKind::None,
+                SecurityType::Starttls => SmtpEncryptionKind::StartTls,
+                SecurityType::Tls => SmtpEncryptionKind::Tls,
+            })
+        })
+        .unwrap_or_default();
 
-    let default_port = match protocol {
-        Some(idx) if PROTOCOLS[idx] == SmtpEncryptionKind::Tls => {
-            config.encryption = Some(SmtpEncryptionKind::Tls);
-            465
-        }
-        Some(idx) if PROTOCOLS[idx] == SmtpEncryptionKind::StartTls => {
-            config.encryption = Some(SmtpEncryptionKind::StartTls);
-            587
-        }
-        _ => {
-            config.encryption = Some(SmtpEncryptionKind::None);
-            25
-        }
+    let default_encryption_idx = match &autoconfig_encryption {
+        SmtpEncryptionKind::Tls => 0,
+        SmtpEncryptionKind::StartTls => 1,
+        SmtpEncryptionKind::None => 2,
     };
 
-    config.port = Input::with_theme(&*THEME)
+    let encryption_idx = Select::with_theme(&*THEME)
+        .with_prompt("SMTP encryption")
+        .items(ENCRYPTIONS)
+        .default(default_encryption_idx)
+        .interact_opt()?;
+
+    let autoconfig_port = autoconfig_server
+        .and_then(|s| s.port())
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| match &autoconfig_encryption {
+            SmtpEncryptionKind::Tls => 993,
+            SmtpEncryptionKind::StartTls => 143,
+            SmtpEncryptionKind::None => 143,
+        });
+
+    let (encryption, default_port) = match encryption_idx {
+        Some(idx) if idx == default_encryption_idx => {
+            (Some(autoconfig_encryption), autoconfig_port)
+        }
+        Some(idx) if ENCRYPTIONS[idx] == SmtpEncryptionKind::Tls => {
+            (Some(SmtpEncryptionKind::Tls), 465)
+        }
+        Some(idx) if ENCRYPTIONS[idx] == SmtpEncryptionKind::StartTls => {
+            (Some(SmtpEncryptionKind::StartTls), 587)
+        }
+        _ => (Some(SmtpEncryptionKind::None), 25),
+    };
+
+    let port = Input::with_theme(&*THEME)
         .with_prompt("SMTP port")
         .validate_with(|input: &String| input.parse::<u16>().map(|_| ()))
         .default(default_port.to_string())
         .interact()
         .map(|input| input.parse::<u16>().unwrap())?;
 
-    config.login = Input::with_theme(&*THEME)
+    let autoconfig_login = autoconfig_server.map(|smtp| match smtp.username() {
+        Some("%EMAILLOCALPART%") => email.rsplit_once('@').unwrap().0.to_owned(),
+        Some("%EMAILADDRESS%") => email.to_owned(),
+        _ => email.to_owned(),
+    });
+
+    let default_login = autoconfig_login.unwrap_or_else(|| email.to_owned());
+
+    let login = Input::with_theme(&*THEME)
         .with_prompt("SMTP login")
-        .default(email.to_owned())
+        .default(default_login)
         .interact()?;
 
-    let auth = Select::with_theme(&*THEME)
-        .with_prompt("SMTP authentication mechanism")
-        .items(AUTH_MECHANISMS)
-        .default(0)
-        .interact_opt()?;
+    let default_oauth2_enabled = autoconfig_server
+        .and_then(|smtp| {
+            smtp.authentication_type()
+                .into_iter()
+                .find_map(|t| Option::from(matches!(t, AuthenticationType::OAuth2)))
+        })
+        .filter(|_| autoconfig_oauth2.is_some())
+        .unwrap_or_default();
 
-    config.auth = match auth {
-        Some(idx) if AUTH_MECHANISMS[idx] == PASSWD => {
-            let secret = Select::with_theme(&*THEME)
-                .with_prompt("SMTP authentication strategy")
-                .items(SECRETS)
-                .default(0)
-                .interact_opt()?;
+    let oauth2_enabled = Confirm::new()
+        .with_prompt(wizard_prompt!("Would you like to enable OAuth 2.0?"))
+        .default(default_oauth2_enabled)
+        .interact_opt()?
+        .unwrap_or_default();
 
-            let config = match secret {
-                Some(idx) if SECRETS[idx] == KEYRING => {
-                    Secret::new_keyring_entry(format!("{account_name}-smtp-passwd"))
-                        .set_keyring_entry_secret(prompt::passwd("SMTP password")?)
-                        .await?;
-                    PasswdConfig::default()
-                }
-                Some(idx) if SECRETS[idx] == RAW => PasswdConfig {
-                    passwd: Secret::Raw(prompt::passwd("SMTP password")?),
-                },
-                Some(idx) if SECRETS[idx] == CMD => PasswdConfig {
-                    passwd: Secret::new_cmd(
-                        Input::with_theme(&*THEME)
-                            .with_prompt("Shell command")
-                            .default(format!("pass show {account_name}-smtp-passwd"))
-                            .interact()?,
-                    ),
-                },
-                _ => PasswdConfig::default(),
-            };
-            SmtpAuthConfig::Passwd(config)
+    let auth = if oauth2_enabled {
+        let mut config = OAuth2Config::default();
+
+        let method_idx = Select::with_theme(&*THEME)
+            .with_prompt("SMTP OAuth 2.0 mechanism")
+            .items(OAUTH2_MECHANISMS)
+            .default(0)
+            .interact_opt()?;
+
+        config.method = match method_idx {
+            Some(idx) if OAUTH2_MECHANISMS[idx] == XOAUTH2 => OAuth2Method::XOAuth2,
+            Some(idx) if OAUTH2_MECHANISMS[idx] == OAUTHBEARER => OAuth2Method::OAuthBearer,
+            _ => OAuth2Method::XOAuth2,
+        };
+
+        config.client_id = Input::with_theme(&*THEME)
+            .with_prompt("SMTP OAuth 2.0 client id")
+            .interact()?;
+
+        let client_secret: String = Password::with_theme(&*THEME)
+            .with_prompt("SMTP OAuth 2.0 client secret")
+            .interact()?;
+        config.client_secret =
+            Secret::new_keyring_entry(format!("{account_name}-smtp-oauth2-client-secret"));
+        config
+            .client_secret
+            .set_keyring_entry_secret(&client_secret)
+            .await?;
+
+        let default_auth_url = autoconfig_oauth2
+            .map(|o| o.auth_url().to_owned())
+            .unwrap_or_default();
+        config.auth_url = Input::with_theme(&*THEME)
+            .with_prompt("SMTP OAuth 2.0 authorization URL")
+            .default(default_auth_url)
+            .interact()?;
+
+        let default_token_url = autoconfig_oauth2
+            .map(|o| o.token_url().to_owned())
+            .unwrap_or_default();
+        config.token_url = Input::with_theme(&*THEME)
+            .with_prompt("SMTP OAuth 2.0 token URL")
+            .default(default_token_url)
+            .interact()?;
+
+        let autoconfig_scopes = autoconfig_oauth2.map(|o| o.scope());
+
+        let prompt_scope = |prompt: &str| -> Result<Option<String>> {
+            Ok(match &autoconfig_scopes {
+                Some(scopes) => Select::with_theme(&*THEME)
+                    .with_prompt(prompt)
+                    .items(scopes)
+                    .default(0)
+                    .interact_opt()?
+                    .and_then(|idx| scopes.get(idx))
+                    .map(|scope| scope.to_string()),
+                None => Some(
+                    Input::with_theme(&*THEME)
+                        .with_prompt(prompt)
+                        .default(String::default())
+                        .interact()?
+                        .to_owned(),
+                )
+                .filter(|scope| !scope.is_empty()),
+            })
+        };
+
+        if let Some(scope) = prompt_scope("SMTP OAuth 2.0 main scope")? {
+            config.scopes = OAuth2Scopes::Scope(scope);
         }
-        Some(idx) if AUTH_MECHANISMS[idx] == OAUTH2 => {
-            let mut config = OAuth2Config::default();
 
-            let method = Select::with_theme(&*THEME)
-                .with_prompt("SMTP OAuth 2.0 mechanism")
-                .items(OAUTH2_MECHANISMS)
-                .default(0)
-                .interact_opt()?;
-
-            config.method = match method {
-                Some(idx) if OAUTH2_MECHANISMS[idx] == XOAUTH2 => OAuth2Method::XOAuth2,
-                Some(idx) if OAUTH2_MECHANISMS[idx] == OAUTHBEARER => OAuth2Method::OAuthBearer,
-                _ => OAuth2Method::XOAuth2,
-            };
-
-            config.client_id = Input::with_theme(&*THEME)
-                .with_prompt("SMTP OAuth 2.0 client id")
-                .interact()?;
-
-            let client_secret: String = Input::with_theme(&*THEME)
-                .with_prompt("SMTP OAuth 2.0 client secret")
-                .interact()?;
-            Secret::new_keyring_entry(format!("{account_name}-smtp-oauth2-client-secret"))
-                .set_keyring_entry_secret(&client_secret)
-                .await?;
-
-            config.auth_url = Input::with_theme(&*THEME)
-                .with_prompt("SMTP OAuth 2.0 authorization URL")
-                .interact()?;
-
-            config.token_url = Input::with_theme(&*THEME)
-                .with_prompt("SMTP OAuth 2.0 token URL")
-                .interact()?;
-
-            config.scopes = OAuth2Scopes::Scope(
-                Input::with_theme(&*THEME)
-                    .with_prompt("SMTP OAuth 2.0 main scope")
-                    .interact()?,
-            );
-
-            while Confirm::new()
+        let confirm_additional_scope = || -> Result<bool> {
+            let confirm = Confirm::new()
                 .with_prompt(wizard_prompt!(
                     "Would you like to add more SMTP OAuth 2.0 scopes?"
                 ))
                 .default(false)
                 .interact_opt()?
-                .unwrap_or_default()
-            {
-                let mut scopes = match config.scopes {
-                    OAuth2Scopes::Scope(scope) => vec![scope],
-                    OAuth2Scopes::Scopes(scopes) => scopes,
-                };
+                .unwrap_or_default();
 
-                scopes.push(
-                    Input::with_theme(&*THEME)
-                        .with_prompt("Additional SMTP OAuth 2.0 scope")
-                        .interact()?,
-                );
+            Ok(confirm)
+        };
 
-                config.scopes = OAuth2Scopes::Scopes(scopes);
+        while confirm_additional_scope()? {
+            let mut scopes = match config.scopes {
+                OAuth2Scopes::Scope(scope) => vec![scope],
+                OAuth2Scopes::Scopes(scopes) => scopes,
+            };
+
+            if let Some(scope) = prompt_scope("Additional SMTP OAuth 2.0 scope")? {
+                scopes.push(scope)
             }
 
-            config.pkce = Confirm::new()
-                .with_prompt(wizard_prompt!(
-                    "Would you like to enable PKCE verification?"
-                ))
-                .default(true)
-                .interact_opt()?
-                .unwrap_or(true);
-
-            wizard_log!("To complete your OAuth 2.0 setup, click on the following link:");
-
-            let client = Client::new(
-                config.client_id.clone(),
-                client_secret,
-                config.auth_url.clone(),
-                config.token_url.clone(),
-            )?
-            .with_redirect_host(config.redirect_host.clone())
-            .with_redirect_port(config.redirect_port)
-            .build()?;
-
-            let mut auth_code_grant = AuthorizationCodeGrant::new()
-                .with_redirect_host(config.redirect_host.clone())
-                .with_redirect_port(config.redirect_port);
-
-            if config.pkce {
-                auth_code_grant = auth_code_grant.with_pkce();
-            }
-
-            for scope in config.scopes.clone() {
-                auth_code_grant = auth_code_grant.with_scope(scope);
-            }
-
-            let (redirect_url, csrf_token) = auth_code_grant.get_redirect_url(&client);
-
-            println!("{}", redirect_url.to_string());
-            println!();
-
-            let (access_token, refresh_token) = auth_code_grant
-                .wait_for_redirection(&client, csrf_token)
-                .await?;
-
-            Secret::new_keyring_entry(format!("{account_name}-smtp-oauth2-access-token"))
-                .set_keyring_entry_secret(access_token)
-                .await?;
-
-            if let Some(refresh_token) = &refresh_token {
-                Secret::new_keyring_entry(format!("{account_name}-smtp-oauth2-refresh-token"))
-                    .set_keyring_entry_secret(refresh_token)
-                    .await?;
-            }
-
-            SmtpAuthConfig::OAuth2(config)
+            config.scopes = OAuth2Scopes::Scopes(scopes);
         }
-        _ => SmtpAuthConfig::default(),
+
+        config.pkce = Confirm::new()
+            .with_prompt(wizard_prompt!(
+                "Would you like to enable PKCE verification?"
+            ))
+            .default(true)
+            .interact_opt()?
+            .unwrap_or(true);
+
+        wizard_log!("To complete your OAuth 2.0 setup, click on the following link:");
+
+        let client = Client::new(
+            config.client_id.clone(),
+            client_secret,
+            config.auth_url.clone(),
+            config.token_url.clone(),
+        )?
+        .with_redirect_host(config.redirect_host.clone())
+        .with_redirect_port(config.redirect_port)
+        .build()?;
+
+        let mut auth_code_grant = AuthorizationCodeGrant::new()
+            .with_redirect_host(config.redirect_host.clone())
+            .with_redirect_port(config.redirect_port);
+
+        if config.pkce {
+            auth_code_grant = auth_code_grant.with_pkce();
+        }
+
+        for scope in config.scopes.clone() {
+            auth_code_grant = auth_code_grant.with_scope(scope);
+        }
+
+        let (redirect_url, csrf_token) = auth_code_grant.get_redirect_url(&client);
+
+        println!("{}", redirect_url.to_string());
+        println!("");
+
+        let (access_token, refresh_token) = auth_code_grant
+            .wait_for_redirection(&client, csrf_token)
+            .await?;
+
+        config.access_token =
+            Secret::new_keyring_entry(format!("{account_name}-smtp-oauth2-access-token"));
+        config
+            .access_token
+            .set_keyring_entry_secret(access_token)
+            .await?;
+
+        if let Some(refresh_token) = &refresh_token {
+            config.refresh_token =
+                Secret::new_keyring_entry(format!("{account_name}-smtp-oauth2-refresh-token"));
+            config
+                .refresh_token
+                .set_keyring_entry_secret(refresh_token)
+                .await?;
+        }
+
+        SmtpAuthConfig::OAuth2(config)
+    } else {
+        let secret_idx = Select::with_theme(&*THEME)
+            .with_prompt("SMTP authentication strategy")
+            .items(SECRETS)
+            .default(0)
+            .interact_opt()?;
+
+        let secret = match secret_idx {
+            Some(idx) if SECRETS[idx] == KEYRING => {
+                let secret = Secret::new_keyring_entry(format!("{account_name}-smtp-passwd"));
+                secret
+                    .set_keyring_entry_secret(prompt::passwd("SMTP password")?)
+                    .await?;
+                secret
+            }
+            Some(idx) if SECRETS[idx] == RAW => Secret::new_raw(prompt::passwd("SMTP password")?),
+            Some(idx) if SECRETS[idx] == CMD => Secret::new_cmd(
+                Input::with_theme(&*THEME)
+                    .with_prompt("Shell command")
+                    .default(format!("pass show {account_name}-smtp-passwd"))
+                    .interact()?,
+            ),
+            _ => Default::default(),
+        };
+
+        SmtpAuthConfig::Passwd(PasswdConfig { passwd: secret })
+    };
+
+    let config = SmtpConfig {
+        host,
+        port,
+        encryption,
+        login,
+        auth,
     };
 
     Ok(BackendConfig::Smtp(config))
