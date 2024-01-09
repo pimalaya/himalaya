@@ -5,13 +5,14 @@ use email::sendmail::config::SendmailConfig;
 use crate::{backend::config::BackendConfig, ui::THEME};
 
 pub(crate) fn configure() -> Result<BackendConfig> {
-    let mut config = SendmailConfig::default();
-
-    config.cmd = Input::with_theme(&*THEME)
-        .with_prompt("Sendmail-compatible shell command to send emails")
-        .default(String::from("/usr/bin/msmtp"))
-        .interact()?
-        .into();
+    let config = SendmailConfig {
+        cmd: Input::with_theme(&*THEME)
+            .with_prompt("Sendmail-compatible shell command to send emails")
+            .default(String::from("/usr/bin/msmtp"))
+            .interact()?
+            .into(),
+        // ..Default::default() // in case any other field was added
+    };
 
     Ok(BackendConfig::Sendmail(config))
 }
