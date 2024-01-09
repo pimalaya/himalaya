@@ -150,7 +150,7 @@ impl MessageReadCommand {
             if self.raw {
                 // emails do not always have valid utf8, uses "lossy" to
                 // display what can be displayed
-                bodies.push_str(&String::from_utf8_lossy(email.raw()?).into_owned());
+                bodies.push_str(&String::from_utf8_lossy(email.raw()?));
             } else {
                 let tpl: String = email
                     .to_read_tpl(&account_config, |mut tpl| {
