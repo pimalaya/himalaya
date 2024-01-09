@@ -99,7 +99,7 @@ impl TemplateReplyCommand {
         )
         .await?;
 
-        let tpl: String = backend
+        let tpl = backend
             .get_messages(folder, &[id])
             .await?
             .first()
@@ -109,8 +109,7 @@ impl TemplateReplyCommand {
             .with_body(self.body.raw())
             .with_reply_all(self.reply.all)
             .build()
-            .await?
-            .into();
+            .await?;
 
         printer.print(tpl)
     }

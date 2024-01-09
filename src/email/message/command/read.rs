@@ -152,7 +152,7 @@ impl MessageReadCommand {
                 // display what can be displayed
                 bodies.push_str(&String::from_utf8_lossy(email.raw()?));
             } else {
-                let tpl: String = email
+                let tpl = email
                     .to_read_tpl(&account_config, |mut tpl| {
                         if self.no_headers {
                             tpl = tpl.with_hide_all_headers();
@@ -166,8 +166,7 @@ impl MessageReadCommand {
 
                         tpl
                     })
-                    .await?
-                    .into();
+                    .await?;
                 bodies.push_str(&tpl);
             }
 

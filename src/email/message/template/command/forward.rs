@@ -95,7 +95,7 @@ impl TemplateForwardCommand {
         .await?;
 
         let id = self.envelope.id;
-        let tpl: String = backend
+        let tpl = backend
             .get_messages(folder, &[id])
             .await?
             .first()
@@ -104,8 +104,7 @@ impl TemplateForwardCommand {
             .with_headers(self.headers.raw)
             .with_body(self.body.raw())
             .build()
-            .await?
-            .into();
+            .await?;
 
         printer.print(tpl)
     }
