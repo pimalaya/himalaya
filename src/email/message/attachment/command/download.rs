@@ -88,7 +88,7 @@ impl AttachmentDownloadCommand {
         )
         .await?;
 
-        let emails = backend.get_messages(&folder, ids).await?;
+        let emails = backend.get_messages(folder, ids).await?;
 
         let mut emails_count = 0;
         let mut attachments_count = 0;

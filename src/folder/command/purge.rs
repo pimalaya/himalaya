@@ -86,7 +86,7 @@ impl FolderPurgeCommand {
         )
         .await?;
 
-        backend.purge_folder(&folder).await?;
+        backend.purge_folder(folder).await?;
 
         printer.print(format!("Folder {folder} successfully purged!"))
     }

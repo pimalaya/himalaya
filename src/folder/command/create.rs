@@ -72,7 +72,7 @@ impl AddFolderCommand {
         )
         .await?;
 
-        backend.add_folder(&folder).await?;
+        backend.add_folder(folder).await?;
 
         printer.print(format!("Folder {folder} successfully created!"))
     }

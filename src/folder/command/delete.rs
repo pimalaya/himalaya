@@ -87,7 +87,7 @@ impl FolderDeleteCommand {
         )
         .await?;
 
-        backend.delete_folder(&folder).await?;
+        backend.delete_folder(folder).await?;
 
         printer.print(format!("Folder {folder} successfully deleted!"))
     }

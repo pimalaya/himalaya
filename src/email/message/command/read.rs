@@ -136,9 +136,9 @@ impl MessageReadCommand {
         .await?;
 
         let emails = if self.preview {
-            backend.peek_messages(&folder, &ids).await
+            backend.peek_messages(folder, ids).await
         } else {
-            backend.get_messages(&folder, &ids).await
+            backend.get_messages(folder, ids).await
         }?;
 
         let mut glue = "";

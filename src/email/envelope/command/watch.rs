@@ -82,6 +82,6 @@ impl WatchEnvelopesCommand {
             "Start watching folder {folder} for envelopes changes…"
         ))?;
 
-        backend.watch_envelopes(&folder).await
+        backend.watch_envelopes(folder).await
     }
 }

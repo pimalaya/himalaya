@@ -76,7 +76,7 @@ impl FolderExpungeCommand {
         )
         .await?;
 
-        backend.expunge_folder(&folder).await?;
+        backend.expunge_folder(folder).await?;
 
         printer.print(format!("Folder {folder} successfully expunged!"))
     }
