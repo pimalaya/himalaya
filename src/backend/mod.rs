@@ -803,10 +803,9 @@ impl Deref for BackendBuilder {
         &self.builder
     }
 }
-
-impl Into<email::backend::BackendBuilder<BackendContextBuilder>> for BackendBuilder {
-    fn into(self) -> email::backend::BackendBuilder<BackendContextBuilder> {
-        self.builder
+impl From<BackendBuilder> for email::backend::BackendBuilder<BackendContextBuilder> {
+    fn from(backend_builder: BackendBuilder) -> Self {
+        backend_builder.builder
     }
 }
 
