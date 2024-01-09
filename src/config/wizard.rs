@@ -25,9 +25,9 @@ macro_rules! wizard_prompt {
 #[macro_export]
 macro_rules! wizard_log {
     ($($arg:tt)*) => {
-	println!("");
+	println!();
 	println!("{}", console::style(format!($($arg)*)).underlined());
-	println!("");
+	println!();
     };
 }
 

@@ -263,8 +263,8 @@ pub(crate) async fn configure(account_name: &str, email: &str) -> Result<Backend
 
         let (redirect_url, csrf_token) = auth_code_grant.get_redirect_url(&client);
 
-        println!("{}", redirect_url.to_string());
-        println!("");
+        println!("{redirect_url}");
+        println!();
 
         let (access_token, refresh_token) = auth_code_grant
             .wait_for_redirection(&client, csrf_token)
