@@ -45,6 +45,7 @@
 
               # Rust
               rust-toolchain
+              cargo-watch
 
               # OpenSSL
               openssl.dev

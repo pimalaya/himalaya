@@ -88,7 +88,7 @@ If you just want to **discuss** about the project, feel free to join the [Matrix
 Special thanks to the [NLnet foundation](https://nlnet.nl/project/Himalaya/index.html) and the [European Commission](https://www.ngi.eu/) that helped the project to receive financial support from:
 
 - [NGI Assure](https://nlnet.nl/assure/) in 2022
-- [NGI Zero Untrust](https://nlnet.nl/entrust/) in 2023
+- [NGI Zero Entrust](https://nlnet.nl/entrust/) in 2023
 
 If you appreciate the project, feel free to donate using one of the following providers:
 

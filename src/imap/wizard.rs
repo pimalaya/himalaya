@@ -135,6 +135,8 @@ pub(crate) async fn configure(account_name: &str, email: &str) -> Result<Backend
 
     let auth = if oauth2_enabled {
         let mut config = OAuth2Config::default();
+        let redirect_host = OAuth2Config::LOCALHOST.to_owned();
+        let redirect_port = OAuth2Config::get_first_available_port()?;
 
         let method_idx = Select::with_theme(&*THEME)
             .with_prompt("IMAP OAuth 2.0 mechanism")
@@ -245,13 +247,13 @@ pub(crate) async fn configure(account_name: &str, email: &str) -> Result<Backend
             config.auth_url.clone(),
             config.token_url.clone(),
         )?
-        .with_redirect_host(config.redirect_host.clone())
-        .with_redirect_port(config.redirect_port)
+        .with_redirect_host(redirect_host.to_owned())
+        .with_redirect_port(redirect_port)
         .build()?;
 
         let mut auth_code_grant = AuthorizationCodeGrant::new()
-            .with_redirect_host(config.redirect_host.clone())
-            .with_redirect_port(config.redirect_port);
+            .with_redirect_host(redirect_host.to_owned())
+            .with_redirect_port(redirect_port);
 
         if config.pkce {
             auth_code_grant = auth_code_grant.with_pkce();
@@ -312,7 +314,7 @@ pub(crate) async fn configure(account_name: &str, email: &str) -> Result<Backend
             _ => Default::default(),
         };
 
-        ImapAuthConfig::Passwd(PasswdConfig { passwd: secret })
+        ImapAuthConfig::Passwd(PasswdConfig(secret))
     };
 
     let config = ImapConfig {

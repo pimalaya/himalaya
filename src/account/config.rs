@@ -45,10 +45,10 @@ pub struct TomlAccountConfig {
     pub flag: Option<FlagConfig>,
     pub message: Option<MessageConfig>,
 
-    #[cfg(feature = "maildir")]
-    pub maildir: Option<MaildirConfig>,
     #[cfg(feature = "imap")]
     pub imap: Option<ImapConfig>,
+    #[cfg(feature = "maildir")]
+    pub maildir: Option<MaildirConfig>,
     #[cfg(feature = "notmuch")]
     pub notmuch: Option<NotmuchConfig>,
     #[cfg(feature = "smtp")]
