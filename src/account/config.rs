@@ -25,7 +25,7 @@ use crate::{
 
 /// Represents all existing kind of account config.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct TomlAccountConfig {
     pub default: Option<bool>,
     pub email: String,
