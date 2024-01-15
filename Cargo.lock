@@ -1462,7 +1462,9 @@ dependencies = [
 
 [[package]]
 name = "email-lib"
-version = "0.20.0"
+version = "0.20.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d79298206bcb8ada88ed67be329711502351ad55bf143025b310139701dd01a0"
 dependencies = [
  "advisory-lock",
  "anyhow",
@@ -2957,7 +2959,9 @@ dependencies = [
 
 [[package]]
 name = "mml-lib"
-version = "1.0.6"
+version = "1.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8ffcc68cd2f48395ee07fe85ec580154c6f8f22ff89972b4a1dd2452890d614"
 dependencies = [
  "async-recursion",
  "chumsky",
@@ -3709,7 +3713,9 @@ dependencies = [
 
 [[package]]
 name = "process-lib"
-version = "0.3.0"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e83db4af201454004f9cdc5fb343031f6d84bddf8a0d41348bc9e82fab1f1ee"
 dependencies = [
  "log",
  "once_cell",
@@ -4245,7 +4251,9 @@ dependencies = [
 
 [[package]]
 name = "secret-lib"
-version = "0.3.2"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af8fa450b77b5d8e0ac1cf7c741e912e54b568e8dcf888d80f5502c23899aeae"
 dependencies = [
  "keyring-lib",
  "process-lib",

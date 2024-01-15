@@ -191,13 +191,15 @@ mod test {
 
     use crate::{account::config::TomlAccountConfig, config::TomlConfig};
 
+    use super::pretty_serialize;
+
     fn assert_eq(config: TomlAccountConfig, expected_toml: &str) {
         let config = TomlConfig {
             accounts: HashMap::from_iter([("test".into(), config)]),
             ..Default::default()
         };
 
-        let toml = super::pretty_serialize(&config).expect("serialize error");
+        let toml = pretty_serialize(&config).expect("serialize error");
         assert_eq!(toml, expected_toml);
 
         let expected_config = toml::from_str(&toml).expect("deserialize error");

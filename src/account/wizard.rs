@@ -5,6 +5,7 @@ use dialoguer::Input;
 #[cfg(feature = "account-sync")]
 use email::account::sync::config::SyncConfig;
 use email_address::EmailAddress;
+use log::{debug, trace, warn};
 
 #[allow(unused)]
 use crate::backend::{self, config::BackendConfig, BackendKind};
@@ -35,6 +36,8 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
         })
         .interact()?;
 
+    let email = &config.email;
+
     config.display_name = Some(
         Input::with_theme(&*THEME)
             .with_prompt("Full display name")
@@ -49,7 +52,22 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
             .into(),
     );
 
-    match backend::wizard::configure(&account_name, &config.email).await? {
+    let autoconfig = match autoconfig::from_addr(email).await {
+        Ok(autoconfig) => {
+            println!("An automatic configuration has been found for {email},");
+            println!("it will be used by default for the rest of the configuration.\n");
+            trace!("{autoconfig:#?}");
+            Some(autoconfig)
+        }
+        Err(err) => {
+            warn!("cannot discover configuration from {email}: {err}");
+            debug!("{err:?}");
+            None
+        }
+    };
+    let autoconfig = autoconfig.as_ref();
+
+    match backend::wizard::configure(&account_name, email, autoconfig).await? {
         #[cfg(feature = "imap")]
         Some(BackendConfig::Imap(imap_config)) => {
             config.imap = Some(imap_config);
@@ -68,7 +86,7 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
         _ => (),
     };
 
-    match backend::wizard::configure_sender(&account_name, &config.email).await? {
+    match backend::wizard::configure_sender(&account_name, email, autoconfig).await? {
         #[cfg(feature = "smtp")]
         Some(BackendConfig::Smtp(smtp_config)) => {
             config.smtp = Some(smtp_config);

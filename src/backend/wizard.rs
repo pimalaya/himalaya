@@ -1,8 +1,6 @@
 use anyhow::Result;
 use autoconfig::config::Config as AutoConfig;
 use dialoguer::Select;
-use log::{debug, warn};
-use std::sync::OnceLock;
 
 #[cfg(feature = "imap")]
 use crate::imap;
@@ -34,26 +32,10 @@ const SEND_MESSAGE_BACKEND_KINDS: &[BackendKind] = &[
     BackendKind::Sendmail,
 ];
 
-static AUTOCONFIG: OnceLock<AutoConfig> = OnceLock::new();
-
-#[cfg(any(feature = "imap", feature = "smtp"))]
-pub(crate) async fn get_or_init_autoconfig(email: &str) -> Option<&AutoConfig> {
-    match AUTOCONFIG.get() {
-        Some(autoconfig) => Some(autoconfig),
-        None => match autoconfig::from_addr(email).await {
-            Ok(autoconfig) => Some(AUTOCONFIG.get_or_init(|| autoconfig)),
-            Err(err) => {
-                warn!("cannot discover SMTP configuration from {email}: {err}");
-                debug!("{err:?}");
-                None
-            }
-        },
-    }
-}
-
 pub(crate) async fn configure(
     #[allow(unused)] account_name: &str,
     #[allow(unused)] email: &str,
+    autoconfig: Option<&AutoConfig>,
 ) -> Result<Option<BackendConfig>> {
     let kind = Select::with_theme(&*THEME)
         .with_prompt("Default email backend")
@@ -65,7 +47,7 @@ pub(crate) async fn configure(
     let config = match kind {
         #[cfg(feature = "imap")]
         Some(kind) if kind == BackendKind::Imap => {
-            Some(imap::wizard::configure(account_name, email).await?)
+            Some(imap::wizard::configure(account_name, email, autoconfig).await?)
         }
         #[cfg(feature = "maildir")]
         Some(kind) if kind == BackendKind::Maildir => Some(maildir::wizard::configure()?),
@@ -80,6 +62,7 @@ pub(crate) async fn configure(
 pub(crate) async fn configure_sender(
     #[allow(unused)] account_name: &str,
     #[allow(unused)] email: &str,
+    autoconfig: Option<&AutoConfig>,
 ) -> Result<Option<BackendConfig>> {
     let kind = Select::with_theme(&*THEME)
         .with_prompt("Backend for sending messages")
@@ -91,7 +74,7 @@ pub(crate) async fn configure_sender(
     let config = match kind {
         #[cfg(feature = "smtp")]
         Some(kind) if kind == BackendKind::Smtp => {
-            Some(smtp::wizard::configure(account_name, email).await?)
+            Some(smtp::wizard::configure(account_name, email, autoconfig).await?)
         }
         #[cfg(feature = "sendmail")]
         Some(kind) if kind == BackendKind::Sendmail => Some(sendmail::wizard::configure()?),

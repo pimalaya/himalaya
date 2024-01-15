@@ -1,5 +1,5 @@
 use anyhow::Result;
-use autoconfig::config::{AuthenticationType, SecurityType, ServerType};
+use autoconfig::config::{AuthenticationType, Config as AutoConfig, SecurityType, ServerType};
 use dialoguer::{Confirm, Input, Password, Select};
 use email::{
     account::config::{
@@ -12,7 +12,7 @@ use oauth::v2_0::{AuthorizationCodeGrant, Client};
 use secret::Secret;
 
 use crate::{
-    backend::{config::BackendConfig, wizard::get_or_init_autoconfig},
+    backend::config::BackendConfig,
     ui::{prompt, THEME},
     wizard_log, wizard_prompt,
 };
@@ -32,8 +32,11 @@ const KEYRING: &str = "Ask my password, then save it in my system's global keyri
 const RAW: &str = "Ask my password, then save it in the configuration file (not safe)";
 const CMD: &str = "Ask me a shell command that exposes my password";
 
-pub(crate) async fn configure(account_name: &str, email: &str) -> Result<BackendConfig> {
-    let autoconfig = get_or_init_autoconfig(email).await;
+pub(crate) async fn configure(
+    account_name: &str,
+    email: &str,
+    autoconfig: Option<&AutoConfig>,
+) -> Result<BackendConfig> {
     let autoconfig_oauth2 = autoconfig.and_then(|c| c.oauth2());
     let autoconfig_server = autoconfig.and_then(|c| {
         c.email_provider()
