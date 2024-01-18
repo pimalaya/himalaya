@@ -1217,12 +1217,11 @@ dependencies = [
 [[package]]
 name = "email-lib"
 version = "0.20.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya#074ba9ef9663f939d624b315eff6d70f37d1e96e"
+source = "git+https://git.sr.ht/~soywod/pimalaya#aadfde30406f97b480ee673ec04f4d79b9e8d8b3"
 dependencies = [
  "advisory-lock",
  "anyhow",
  "async-trait",
- "bytes",
  "chrono",
  "convert_case",
  "dirs 4.0.0",
