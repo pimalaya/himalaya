@@ -1,10 +1,12 @@
 use anyhow::Result;
-use autoconfig::config::{AuthenticationType, Config as AutoConfig, SecurityType, ServerType};
 use dialoguer::{Confirm, Input, Password, Select};
 use email::{
-    account::config::{
-        oauth2::{OAuth2Config, OAuth2Method, OAuth2Scopes},
-        passwd::PasswdConfig,
+    account::{
+        config::{
+            oauth2::{OAuth2Config, OAuth2Method, OAuth2Scopes},
+            passwd::PasswdConfig,
+        },
+        discover::config::{AuthenticationType, AutoConfig, SecurityType, ServerType},
     },
     imap::config::{ImapAuthConfig, ImapConfig, ImapEncryptionKind},
 };

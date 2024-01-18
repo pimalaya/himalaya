@@ -1,6 +1,6 @@
 use anyhow::Result;
-use autoconfig::config::Config as AutoConfig;
 use dialoguer::Select;
+use email::account::discover::config::AutoConfig;
 
 #[cfg(feature = "imap")]
 use crate::imap;

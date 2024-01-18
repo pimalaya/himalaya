@@ -1,11 +1,13 @@
+use std::str::FromStr;
+
 use anyhow::{bail, Result};
 #[cfg(feature = "account-sync")]
 use dialoguer::Confirm;
 use dialoguer::Input;
+use email::account;
 #[cfg(feature = "account-sync")]
 use email::account::sync::config::SyncConfig;
 use email_address::EmailAddress;
-use log::{debug, trace, warn};
 
 #[allow(unused)]
 use crate::backend::{self, config::BackendConfig, BackendKind};
@@ -20,11 +22,6 @@ use super::TomlAccountConfig;
 pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
     let mut config = TomlAccountConfig::default();
 
-    let account_name = Input::with_theme(&*THEME)
-        .with_prompt("Account name")
-        .default(String::from("personal"))
-        .interact()?;
-
     config.email = Input::with_theme(&*THEME)
         .with_prompt("Email address")
         .validate_with(|email: &String| {
@@ -36,11 +33,21 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
         })
         .interact()?;
 
-    let email = &config.email;
+    let addr = EmailAddress::from_str(&config.email).unwrap();
+
+    let autoconfig_email = config.email.to_owned();
+    let autoconfig =
+        tokio::spawn(async move { account::discover::from_addr(&autoconfig_email).await.ok() });
+
+    let account_name = Input::with_theme(&*THEME)
+        .with_prompt("Account name")
+        .default(addr.domain().split_once('.').unwrap().0.to_owned())
+        .interact()?;
 
     config.display_name = Some(
         Input::with_theme(&*THEME)
             .with_prompt("Full display name")
+            .default(addr.local_part().to_owned())
             .interact()?,
     );
 
@@ -52,19 +59,8 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
             .into(),
     );
 
-    let autoconfig = match autoconfig::from_addr(email).await {
-        Ok(autoconfig) => {
-            println!("An automatic configuration has been found for {email},");
-            println!("it will be used by default for the rest of the configuration.\n");
-            trace!("{autoconfig:#?}");
-            Some(autoconfig)
-        }
-        Err(err) => {
-            warn!("cannot discover configuration from {email}: {err}");
-            debug!("{err:?}");
-            None
-        }
-    };
+    let email = &config.email;
+    let autoconfig = autoconfig.await?;
     let autoconfig = autoconfig.as_ref();
 
     match backend::wizard::configure(&account_name, email, autoconfig).await? {
