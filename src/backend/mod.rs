@@ -112,7 +112,7 @@ use email::message::Messages;
 #[cfg(feature = "notmuch")]
 use email::notmuch::{NotmuchContextBuilder, NotmuchContextSync};
 #[cfg(feature = "sendmail")]
-use email::sendmail::SendmailContext;
+use email::sendmail::{SendmailContext, SendmailContextBuilder};
 #[cfg(feature = "smtp")]
 use email::smtp::{SmtpContextBuilder, SmtpContextSync};
 
@@ -181,7 +181,7 @@ pub struct BackendContextBuilder {
     #[cfg(feature = "smtp")]
     pub smtp: Option<SmtpContextBuilder>,
     #[cfg(feature = "sendmail")]
-    pub sendmail: Option<SendmailContext>,
+    pub sendmail: Option<SendmailContextBuilder>,
 }
 
 impl BackendContextBuilder {
@@ -198,9 +198,8 @@ impl BackendContextBuilder {
                     .imap
                     .as_ref()
                     .filter(|_| kinds.contains(&&BackendKind::Imap))
-                    .map(|imap_config| {
-                        ImapContextBuilder::new(account_config.clone(), imap_config.clone())
-                            .with_prebuilt_credentials()
+                    .map(|config| {
+                        ImapContextBuilder::new(config.clone()).with_prebuilt_credentials()
                     });
                 match ctx_builder {
                     Some(ctx_builder) => Some(ctx_builder.await?),
@@ -212,39 +211,31 @@ impl BackendContextBuilder {
                 .maildir
                 .as_ref()
                 .filter(|_| kinds.contains(&&BackendKind::Maildir))
-                .map(|mdir_config| {
-                    MaildirContextBuilder::new(account_config.clone(), mdir_config.clone())
-                }),
+                .map(|config| MaildirContextBuilder::new(config.clone())),
             #[cfg(feature = "account-sync")]
             maildir_for_sync: Some(MaildirConfig {
                 root_dir: account_config.get_sync_dir()?,
             })
             .filter(|_| kinds.contains(&&BackendKind::MaildirForSync))
-            .map(|mdir_config| MaildirContextBuilder::new(account_config.clone(), mdir_config)),
+            .map(|config| MaildirContextBuilder::new(config)),
             #[cfg(feature = "notmuch")]
             notmuch: toml_account_config
                 .notmuch
                 .as_ref()
                 .filter(|_| kinds.contains(&&BackendKind::Notmuch))
-                .map(|notmuch_config| {
-                    NotmuchContextBuilder::new(account_config.clone(), notmuch_config.clone())
-                }),
+                .map(|config| NotmuchContextBuilder::new(config.clone())),
             #[cfg(feature = "smtp")]
             smtp: toml_account_config
                 .smtp
                 .as_ref()
                 .filter(|_| kinds.contains(&&BackendKind::Smtp))
-                .map(|smtp_config| {
-                    SmtpContextBuilder::new(account_config.clone(), smtp_config.clone())
-                }),
+                .map(|config| SmtpContextBuilder::new(config.clone())),
             #[cfg(feature = "sendmail")]
             sendmail: toml_account_config
                 .sendmail
                 .as_ref()
                 .filter(|_| kinds.contains(&&BackendKind::Sendmail))
-                .map(|sendmail_config| {
-                    SendmailContext::new(account_config.clone(), sendmail_config.clone())
-                }),
+                .map(|config| SendmailContextBuilder::new(config.clone())),
         })
     }
 }
@@ -253,38 +244,38 @@ impl BackendContextBuilder {
 impl email::backend::BackendContextBuilder for BackendContextBuilder {
     type Context = BackendContext;
 
-    async fn build(self) -> Result<Self::Context> {
+    async fn build(self, config: &AccountConfig) -> Result<Self::Context> {
         #[allow(unused_mut)]
         let mut ctx = BackendContext::default();
 
         #[cfg(feature = "imap")]
         if let Some(imap) = self.imap {
-            ctx.imap = Some(imap.build().await?);
+            ctx.imap = Some(imap.build(config).await?);
         }
 
         #[cfg(feature = "maildir")]
         if let Some(maildir) = self.maildir {
-            ctx.maildir = Some(maildir.build().await?);
+            ctx.maildir = Some(maildir.build(config).await?);
         }
 
         #[cfg(feature = "account-sync")]
         if let Some(maildir) = self.maildir_for_sync {
-            ctx.maildir_for_sync = Some(maildir.build().await?);
+            ctx.maildir_for_sync = Some(maildir.build(config).await?);
         }
 
         #[cfg(feature = "notmuch")]
         if let Some(notmuch) = self.notmuch {
-            ctx.notmuch = Some(notmuch.build().await?);
+            ctx.notmuch = Some(notmuch.build(config).await?);
         }
 
         #[cfg(feature = "smtp")]
         if let Some(smtp) = self.smtp {
-            ctx.smtp = Some(smtp.build().await?);
+            ctx.smtp = Some(smtp.build(config).await?);
         }
 
         #[cfg(feature = "sendmail")]
         if let Some(sendmail) = self.sendmail {
-            ctx.sendmail = Some(sendmail.build().await?);
+            ctx.sendmail = Some(sendmail.build(config).await?);
         }
 
         Ok(ctx)
@@ -334,9 +325,8 @@ impl BackendBuilder {
                     .imap
                     .as_ref()
                     .filter(|_| is_imap_used)
-                    .map(|imap_config| {
-                        ImapContextBuilder::new(account_config.clone(), imap_config.clone())
-                            .with_prebuilt_credentials()
+                    .map(|config| {
+                        ImapContextBuilder::new(config.clone()).with_prebuilt_credentials()
                     });
 
                 match ctx_builder {
@@ -349,15 +339,13 @@ impl BackendBuilder {
                 .maildir
                 .as_ref()
                 .filter(|_| is_maildir_used)
-                .map(|mdir_config| {
-                    MaildirContextBuilder::new(account_config.clone(), mdir_config.clone())
-                }),
+                .map(|config| MaildirContextBuilder::new(config.clone())),
             #[cfg(feature = "account-sync")]
             maildir_for_sync: Some(MaildirConfig {
                 root_dir: account_config.get_sync_dir()?,
             })
             .filter(|_| is_maildir_for_sync_used)
-            .map(|mdir_config| MaildirContextBuilder::new(account_config.clone(), mdir_config)),
+            .map(|config| MaildirContextBuilder::new(config)),
             ..Default::default()
         };
 
