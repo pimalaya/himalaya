@@ -1,9 +1,9 @@
 use anyhow::Result;
 use clap::Parser;
 #[cfg(feature = "imap")]
-use email::message::move_::imap::MoveMessagesImap;
+use email::message::move_::imap::MoveImapMessages;
 #[cfg(feature = "maildir")]
-use email::message::move_::maildir::MoveMessagesMaildir;
+use email::message::move_::maildir::MoveMaildirMessages;
 use log::info;
 
 #[cfg(feature = "account-sync")]
@@ -61,13 +61,14 @@ impl MessageMoveCommand {
             |#[allow(unused)] builder| match move_messages_kind {
                 #[cfg(feature = "imap")]
                 Some(BackendKind::Imap) => {
-                    builder
-                        .set_move_messages(|ctx| ctx.imap.as_ref().and_then(MoveMessagesImap::new));
+                    builder.set_move_messages(|ctx| {
+                        ctx.imap.as_ref().map(MoveImapMessages::new_boxed)
+                    });
                 }
                 #[cfg(feature = "maildir")]
                 Some(BackendKind::Maildir) => {
                     builder.set_move_messages(|ctx| {
-                        ctx.maildir.as_ref().and_then(MoveMessagesMaildir::new)
+                        ctx.maildir.as_ref().map(MoveMaildirMessages::new_boxed)
                     });
                 }
                 #[cfg(feature = "account-sync")]
@@ -75,7 +76,7 @@ impl MessageMoveCommand {
                     builder.set_move_messages(|ctx| {
                         ctx.maildir_for_sync
                             .as_ref()
-                            .and_then(MoveMessagesMaildir::new)
+                            .map(MoveMaildirMessages::new_boxed)
                     });
                 }
                 _ => (),

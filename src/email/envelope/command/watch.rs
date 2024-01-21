@@ -4,8 +4,8 @@ use clap::Parser;
 use email::envelope::watch::imap::WatchImapEnvelopes;
 #[cfg(feature = "maildir")]
 use email::envelope::watch::maildir::WatchMaildirEnvelopes;
-#[cfg(feature = "notmuch")]
-use email::envelope::watch::notmuch::WatchNotmuchEnvelopes;
+// #[cfg(feature = "notmuch")]
+// use email::envelope::watch::notmuch::WatchNotmuchEnvelopes;
 use log::info;
 
 #[cfg(feature = "account-sync")]
@@ -56,13 +56,13 @@ impl WatchEnvelopesCommand {
                 #[cfg(feature = "imap")]
                 Some(BackendKind::Imap) => {
                     builder.set_watch_envelopes(|ctx| {
-                        ctx.imap.as_ref().and_then(WatchImapEnvelopes::new)
+                        ctx.imap.as_ref().map(WatchImapEnvelopes::new_boxed)
                     });
                 }
                 #[cfg(feature = "maildir")]
                 Some(BackendKind::Maildir) => {
                     builder.set_watch_envelopes(|ctx| {
-                        ctx.maildir.as_ref().and_then(WatchMaildirEnvelopes::new)
+                        ctx.maildir.as_ref().map(WatchMaildirEnvelopes::new_boxed)
                     });
                 }
                 #[cfg(feature = "account-sync")]
@@ -70,8 +70,15 @@ impl WatchEnvelopesCommand {
                     builder.set_watch_envelopes(|ctx| {
                         ctx.maildir_for_sync
                             .as_ref()
-                            .and_then(WatchMaildirEnvelopes::new)
+                            .map(WatchMaildirEnvelopes::new_boxed)
                     });
+                }
+                #[cfg(feature = "notmuch")]
+                Some(BackendKind::Notmuch) => {
+                    // TODO
+                    // builder.set_watch_envelopes(|ctx| {
+                    //     ctx.notmuch.as_ref().map(WatchNotmuchEnvelopes::new_boxed)
+                    // });
                 }
                 _ => (),
             },

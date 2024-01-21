@@ -1,9 +1,11 @@
 use anyhow::Result;
 use clap::Parser;
 #[cfg(feature = "imap")]
-use email::folder::add::imap::AddFolderImap;
+use email::folder::add::imap::AddImapFolder;
 #[cfg(feature = "maildir")]
-use email::folder::add::maildir::AddFolderMaildir;
+use email::folder::add::maildir::AddMaildirFolder;
+#[cfg(feature = "notmuch")]
+use email::folder::add::notmuch::AddNotmuchFolder;
 use log::info;
 
 #[cfg(any(feature = "imap", feature = "maildir", feature = "account-sync"))]
@@ -52,19 +54,26 @@ impl AddFolderCommand {
             |builder| match add_folder_kind {
                 #[cfg(feature = "imap")]
                 Some(BackendKind::Imap) => {
-                    builder.set_add_folder(|ctx| ctx.imap.as_ref().and_then(AddFolderImap::new));
+                    builder.set_add_folder(|ctx| ctx.imap.as_ref().map(AddImapFolder::new_boxed));
                 }
                 #[cfg(feature = "maildir")]
                 Some(BackendKind::Maildir) => {
-                    builder
-                        .set_add_folder(|ctx| ctx.maildir.as_ref().and_then(AddFolderMaildir::new));
+                    builder.set_add_folder(|ctx| {
+                        ctx.maildir.as_ref().map(AddMaildirFolder::new_boxed)
+                    });
                 }
                 #[cfg(feature = "account-sync")]
                 Some(BackendKind::MaildirForSync) => {
                     builder.set_add_folder(|ctx| {
                         ctx.maildir_for_sync
                             .as_ref()
-                            .and_then(AddFolderMaildir::new)
+                            .map(AddMaildirFolder::new_boxed)
+                    });
+                }
+                #[cfg(feature = "notmuch")]
+                Some(BackendKind::Notmuch) => {
+                    builder.set_add_folder(|ctx| {
+                        ctx.notmuch.as_ref().map(AddNotmuchFolder::new_boxed)
                     });
                 }
                 _ => (),

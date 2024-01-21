@@ -1,9 +1,9 @@
 use anyhow::Result;
 use clap::Parser;
 #[cfg(feature = "imap")]
-use email::{flag::add::imap::AddFlagsImap, message::move_::imap::MoveMessagesImap};
+use email::{flag::add::imap::AddImapFlags, message::move_::imap::MoveImapMessages};
 #[cfg(feature = "maildir")]
-use email::{flag::add::maildir::AddFlagsMaildir, message::move_::maildir::MoveMessagesMaildir};
+use email::{flag::add::maildir::AddMaildirFlags, message::move_::maildir::MoveMaildirMessages};
 use log::info;
 
 #[cfg(feature = "account-sync")]
@@ -62,27 +62,30 @@ impl MessageDeleteCommand {
             |#[allow(unused)] builder| match delete_messages_kind {
                 #[cfg(feature = "imap")]
                 Some(BackendKind::Imap) => {
-                    builder
-                        .set_move_messages(|ctx| ctx.imap.as_ref().and_then(MoveMessagesImap::new));
-                    builder.set_add_flags(|ctx| ctx.imap.as_ref().and_then(AddFlagsImap::new));
+                    builder.set_move_messages(|ctx| {
+                        ctx.imap.as_ref().map(MoveImapMessages::new_boxed)
+                    });
+                    builder.set_add_flags(|ctx| ctx.imap.as_ref().map(AddImapFlags::new_boxed));
                 }
                 #[cfg(feature = "maildir")]
                 Some(BackendKind::Maildir) => {
                     builder.set_move_messages(|ctx| {
-                        ctx.maildir.as_ref().and_then(MoveMessagesMaildir::new)
+                        ctx.maildir.as_ref().map(MoveMaildirMessages::new_boxed)
                     });
                     builder
-                        .set_add_flags(|ctx| ctx.maildir.as_ref().and_then(AddFlagsMaildir::new));
+                        .set_add_flags(|ctx| ctx.maildir.as_ref().map(AddMaildirFlags::new_boxed));
                 }
                 #[cfg(feature = "account-sync")]
                 Some(BackendKind::MaildirForSync) => {
                     builder.set_move_messages(|ctx| {
                         ctx.maildir_for_sync
                             .as_ref()
-                            .and_then(MoveMessagesMaildir::new)
+                            .map(MoveMaildirMessages::new_boxed)
                     });
                     builder.set_add_flags(|ctx| {
-                        ctx.maildir_for_sync.as_ref().and_then(AddFlagsMaildir::new)
+                        ctx.maildir_for_sync
+                            .as_ref()
+                            .map(AddMaildirFlags::new_boxed)
                     });
                 }
                 _ => (),

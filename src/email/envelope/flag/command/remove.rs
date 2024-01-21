@@ -1,11 +1,11 @@
 use anyhow::Result;
 use clap::Parser;
 #[cfg(feature = "imap")]
-use email::flag::remove::imap::RemoveFlagsImap;
+use email::flag::remove::imap::RemoveImapFlags;
 #[cfg(feature = "maildir")]
-use email::flag::remove::maildir::RemoveFlagsMaildir;
+use email::flag::remove::maildir::RemoveMaildirFlags;
 #[cfg(feature = "notmuch")]
-use email::flag::remove::notmuch::RemoveFlagsNotmuch;
+use email::flag::remove::notmuch::RemoveNotmuchFlags;
 use log::info;
 
 #[cfg(feature = "account-sync")]
@@ -61,12 +61,12 @@ impl FlagRemoveCommand {
                 #[cfg(feature = "imap")]
                 Some(BackendKind::Imap) => {
                     builder
-                        .set_remove_flags(|ctx| ctx.imap.as_ref().and_then(RemoveFlagsImap::new));
+                        .set_remove_flags(|ctx| ctx.imap.as_ref().map(RemoveImapFlags::new_boxed));
                 }
                 #[cfg(feature = "maildir")]
                 Some(BackendKind::Maildir) => {
                     builder.set_remove_flags(|ctx| {
-                        ctx.maildir.as_ref().and_then(RemoveFlagsMaildir::new)
+                        ctx.maildir.as_ref().map(RemoveMaildirFlags::new_boxed)
                     });
                 }
                 #[cfg(feature = "account-sync")]
@@ -74,7 +74,13 @@ impl FlagRemoveCommand {
                     builder.set_remove_flags(|ctx| {
                         ctx.maildir_for_sync
                             .as_ref()
-                            .and_then(RemoveFlagsMaildir::new)
+                            .map(RemoveMaildirFlags::new_boxed)
+                    });
+                }
+                #[cfg(feature = "notmuch")]
+                Some(BackendKind::Notmuch) => {
+                    builder.set_remove_flags(|ctx| {
+                        ctx.notmuch.as_ref().map(RemoveNotmuchFlags::new_boxed)
                     });
                 }
                 _ => (),

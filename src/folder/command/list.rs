@@ -1,9 +1,11 @@
 use anyhow::Result;
 use clap::Parser;
 #[cfg(feature = "imap")]
-use email::folder::list::imap::ListFoldersImap;
+use email::folder::list::imap::ListImapFolders;
 #[cfg(feature = "maildir")]
-use email::folder::list::maildir::ListFoldersMaildir;
+use email::folder::list::maildir::ListMaildirFolders;
+#[cfg(feature = "notmuch")]
+use email::folder::list::notmuch::ListNotmuchFolders;
 use log::info;
 
 #[cfg(any(feature = "imap", feature = "maildir", feature = "account-sync"))]
@@ -55,12 +57,12 @@ impl FolderListCommand {
                 #[cfg(feature = "imap")]
                 Some(BackendKind::Imap) => {
                     builder
-                        .set_list_folders(|ctx| ctx.imap.as_ref().and_then(ListFoldersImap::new));
+                        .set_list_folders(|ctx| ctx.imap.as_ref().map(ListImapFolders::new_boxed));
                 }
                 #[cfg(feature = "maildir")]
                 Some(BackendKind::Maildir) => {
                     builder.set_list_folders(|ctx| {
-                        ctx.maildir.as_ref().and_then(ListFoldersMaildir::new)
+                        ctx.maildir.as_ref().map(ListMaildirFolders::new_boxed)
                     });
                 }
                 #[cfg(feature = "account-sync")]
@@ -68,9 +70,16 @@ impl FolderListCommand {
                     builder.set_list_folders(|ctx| {
                         ctx.maildir_for_sync
                             .as_ref()
-                            .and_then(ListFoldersMaildir::new)
+                            .map(ListMaildirFolders::new_boxed)
                     });
                 }
+                #[cfg(feature = "notmuch")]
+                Some(BackendKind::Notmuch) => {
+                    builder.set_list_folders(|ctx| {
+                        ctx.notmuch.as_ref().map(ListNotmuchFolders::new_boxed)
+                    });
+                }
+
                 _ => (),
             },
         )

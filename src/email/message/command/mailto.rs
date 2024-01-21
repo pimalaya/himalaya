@@ -5,9 +5,9 @@ use email::message::add::imap::AddImapMessage;
 #[cfg(feature = "maildir")]
 use email::message::add::maildir::AddMaildirMessage;
 #[cfg(feature = "sendmail")]
-use email::message::send::sendmail::SendMessageSendmail;
+use email::message::send::sendmail::SendSendmailMessage;
 #[cfg(feature = "smtp")]
-use email::message::send::smtp::SendMessageSmtp;
+use email::message::send::smtp::SendSmtpMessage;
 use log::{debug, info};
 use mail_builder::MessageBuilder;
 use url::Url;
@@ -72,13 +72,14 @@ impl MessageMailtoCommand {
                 match add_message_kind {
                     #[cfg(feature = "imap")]
                     Some(BackendKind::Imap) => {
-                        builder
-                            .set_add_message(|ctx| ctx.imap.as_ref().and_then(AddImapMessage::new));
+                        builder.set_add_message(|ctx| {
+                            ctx.imap.as_ref().map(AddImapMessage::new_boxed)
+                        });
                     }
                     #[cfg(feature = "maildir")]
                     Some(BackendKind::Maildir) => {
                         builder.set_add_message(|ctx| {
-                            ctx.maildir.as_ref().and_then(AddMaildirMessage::new)
+                            ctx.maildir.as_ref().map(AddMaildirMessage::new_boxed)
                         });
                     }
                     #[cfg(feature = "account-sync")]
@@ -86,7 +87,7 @@ impl MessageMailtoCommand {
                         builder.set_add_message(|ctx| {
                             ctx.maildir_for_sync
                                 .as_ref()
-                                .and_then(AddMaildirMessage::new)
+                                .map(AddMaildirMessage::new_boxed)
                         });
                     }
                     _ => (),
@@ -96,13 +97,13 @@ impl MessageMailtoCommand {
                     #[cfg(feature = "smtp")]
                     Some(BackendKind::Smtp) => {
                         builder.set_send_message(|ctx| {
-                            ctx.smtp.as_ref().and_then(SendMessageSmtp::new)
+                            ctx.smtp.as_ref().map(SendSmtpMessage::new_boxed)
                         });
                     }
                     #[cfg(feature = "sendmail")]
                     Some(BackendKind::Sendmail) => {
                         builder.set_send_message(|ctx| {
-                            ctx.sendmail.as_ref().and_then(SendMessageSendmail::new)
+                            ctx.sendmail.as_ref().map(SendSendmailMessage::new_boxed)
                         });
                     }
                     _ => (),

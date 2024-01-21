@@ -1,9 +1,9 @@
 use anyhow::Result;
 use clap::Parser;
 #[cfg(feature = "imap")]
-use email::message::copy::imap::CopyMessagesImap;
+use email::message::copy::imap::CopyImapMessages;
 #[cfg(feature = "maildir")]
-use email::message::copy::maildir::CopyMessagesMaildir;
+use email::message::copy::maildir::CopyMaildirMessages;
 use log::info;
 
 #[cfg(feature = "account-sync")]
@@ -61,13 +61,14 @@ impl MessageCopyCommand {
             |#[allow(unused)] builder| match copy_messages_kind {
                 #[cfg(feature = "imap")]
                 Some(BackendKind::Imap) => {
-                    builder
-                        .set_copy_messages(|ctx| ctx.imap.as_ref().and_then(CopyMessagesImap::new));
+                    builder.set_copy_messages(|ctx| {
+                        ctx.imap.as_ref().map(CopyImapMessages::new_boxed)
+                    });
                 }
                 #[cfg(feature = "maildir")]
                 Some(BackendKind::Maildir) => {
                     builder.set_copy_messages(|ctx| {
-                        ctx.maildir.as_ref().and_then(CopyMessagesMaildir::new)
+                        ctx.maildir.as_ref().map(CopyMaildirMessages::new_boxed)
                     });
                 }
                 #[cfg(feature = "account-sync")]
@@ -75,7 +76,7 @@ impl MessageCopyCommand {
                     builder.set_copy_messages(|ctx| {
                         ctx.maildir_for_sync
                             .as_ref()
-                            .and_then(CopyMessagesMaildir::new)
+                            .map(CopyMaildirMessages::new_boxed)
                     });
                 }
                 _ => (),

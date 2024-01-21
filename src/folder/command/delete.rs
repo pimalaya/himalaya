@@ -2,9 +2,11 @@ use anyhow::Result;
 use clap::Parser;
 use dialoguer::Confirm;
 #[cfg(feature = "imap")]
-use email::folder::delete::imap::DeleteFolderImap;
+use email::folder::delete::imap::DeleteImapFolder;
 #[cfg(feature = "maildir")]
-use email::folder::delete::maildir::DeleteFolderMaildir;
+use email::folder::delete::maildir::DeleteMaildirFolder;
+// #[cfg(feature = "notmuch")]
+// use email::folder::delete::notmuch::DeleteNotmuchFolder;
 use log::info;
 use std::process;
 
@@ -65,13 +67,14 @@ impl FolderDeleteCommand {
             |builder| match delete_folder_kind {
                 #[cfg(feature = "imap")]
                 Some(BackendKind::Imap) => {
-                    builder
-                        .set_delete_folder(|ctx| ctx.imap.as_ref().and_then(DeleteFolderImap::new));
+                    builder.set_delete_folder(|ctx| {
+                        ctx.imap.as_ref().map(DeleteImapFolder::new_boxed)
+                    });
                 }
                 #[cfg(feature = "maildir")]
                 Some(BackendKind::Maildir) => {
                     builder.set_delete_folder(|ctx| {
-                        ctx.maildir.as_ref().and_then(DeleteFolderMaildir::new)
+                        ctx.maildir.as_ref().map(DeleteMaildirFolder::new_boxed)
                     });
                 }
                 #[cfg(feature = "account-sync")]
@@ -79,8 +82,15 @@ impl FolderDeleteCommand {
                     builder.set_delete_folder(|ctx| {
                         ctx.maildir_for_sync
                             .as_ref()
-                            .and_then(DeleteFolderMaildir::new)
+                            .map(DeleteMaildirFolder::new_boxed)
                     });
+                }
+                #[cfg(feature = "notmuch")]
+                Some(BackendKind::Notmuch) => {
+                    // TODO
+                    // builder.set_delete_folder(|ctx| {
+                    //     ctx.notmuch.as_ref().map(DeleteNotmuchFolder::new_boxed)
+                    // });
                 }
                 _ => (),
             },

@@ -59,12 +59,12 @@ impl MessageSaveCommand {
             |#[allow(unused)] builder| match add_message_kind {
                 #[cfg(feature = "imap")]
                 Some(BackendKind::Imap) => {
-                    builder.set_add_message(|ctx| ctx.imap.as_ref().and_then(AddImapMessage::new));
+                    builder.set_add_message(|ctx| ctx.imap.as_ref().map(AddImapMessage::new_boxed));
                 }
                 #[cfg(feature = "maildir")]
                 Some(BackendKind::Maildir) => {
                     builder.set_add_message(|ctx| {
-                        ctx.maildir.as_ref().and_then(AddMaildirMessage::new)
+                        ctx.maildir.as_ref().map(AddMaildirMessage::new_boxed)
                     });
                 }
                 #[cfg(feature = "account-sync")]
@@ -72,7 +72,7 @@ impl MessageSaveCommand {
                     builder.set_add_message(|ctx| {
                         ctx.maildir_for_sync
                             .as_ref()
-                            .and_then(AddMaildirMessage::new)
+                            .map(AddMaildirMessage::new_boxed)
                     });
                 }
                 _ => (),

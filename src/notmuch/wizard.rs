@@ -1,20 +1,24 @@
 use anyhow::Result;
 use dialoguer::Input;
-use email::backend::{BackendConfig, NotmuchBackend, NotmuchConfig};
+use email::notmuch::config::NotmuchConfig;
 
-use crate::config::wizard::THEME;
+use crate::{backend::config::BackendConfig, ui::THEME};
 
 pub(crate) fn configure() -> Result<BackendConfig> {
     let mut config = NotmuchConfig::default();
 
-    config.db_path = if let Ok(db_path) = NotmuchBackend::get_default_db_path() {
-        db_path
-    } else {
-        let db_path: String = Input::with_theme(&*THEME)
+    let default_database_path = NotmuchConfig::get_default_database_path()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+
+    config.database_path = Some(
+        Input::with_theme(&*THEME)
             .with_prompt("Notmuch database path")
-            .interact_text()?;
-        db_path.into()
-    };
+            .default(default_database_path)
+            .interact_text()?
+            .into(),
+    );
 
     Ok(BackendConfig::Notmuch(config))
 }

@@ -11,6 +11,8 @@ use email::account::sync::config::SyncConfig;
 use email::imap::config::ImapConfig;
 #[cfg(feature = "maildir")]
 use email::maildir::config::MaildirConfig;
+#[cfg(feature = "notmuch")]
+use email::notmuch::config::NotmuchConfig;
 #[cfg(feature = "sendmail")]
 use email::sendmail::config::SendmailConfig;
 #[cfg(feature = "smtp")]

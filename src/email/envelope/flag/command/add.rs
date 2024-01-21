@@ -1,11 +1,11 @@
 use anyhow::Result;
 use clap::Parser;
 #[cfg(feature = "imap")]
-use email::flag::add::imap::AddFlagsImap;
+use email::flag::add::imap::AddImapFlags;
 #[cfg(feature = "maildir")]
-use email::flag::add::maildir::AddFlagsMaildir;
+use email::flag::add::maildir::AddMaildirFlags;
 #[cfg(feature = "notmuch")]
-use email::flag::add::notmuch::AddFlagsNotmuch;
+use email::flag::add::notmuch::AddNotmuchFlags;
 use log::info;
 
 #[cfg(feature = "account-sync")]
@@ -60,18 +60,25 @@ impl FlagAddCommand {
             |builder| match add_flags_kind {
                 #[cfg(feature = "imap")]
                 Some(BackendKind::Imap) => {
-                    builder.set_add_flags(|ctx| ctx.imap.as_ref().and_then(AddFlagsImap::new));
+                    builder.set_add_flags(|ctx| ctx.imap.as_ref().map(AddImapFlags::new_boxed));
                 }
                 #[cfg(feature = "maildir")]
                 Some(BackendKind::Maildir) => {
                     builder
-                        .set_add_flags(|ctx| ctx.maildir.as_ref().and_then(AddFlagsMaildir::new));
+                        .set_add_flags(|ctx| ctx.maildir.as_ref().map(AddMaildirFlags::new_boxed));
                 }
                 #[cfg(feature = "account-sync")]
                 Some(BackendKind::MaildirForSync) => {
                     builder.set_add_flags(|ctx| {
-                        ctx.maildir_for_sync.as_ref().and_then(AddFlagsMaildir::new)
+                        ctx.maildir_for_sync
+                            .as_ref()
+                            .map(AddMaildirFlags::new_boxed)
                     });
+                }
+                #[cfg(feature = "notmuch")]
+                Some(BackendKind::Notmuch) => {
+                    builder
+                        .set_add_flags(|ctx| ctx.notmuch.as_ref().map(AddNotmuchFlags::new_boxed));
                 }
                 _ => (),
             },

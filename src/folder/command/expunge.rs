@@ -1,9 +1,11 @@
 use anyhow::Result;
 use clap::Parser;
 #[cfg(feature = "imap")]
-use email::folder::expunge::imap::ExpungeFolderImap;
+use email::folder::expunge::imap::ExpungeImapFolder;
 #[cfg(feature = "maildir")]
-use email::folder::expunge::maildir::ExpungeFolderMaildir;
+use email::folder::expunge::maildir::ExpungeMaildirFolder;
+// #[cfg(feature = "notmuch")]
+// use email::folder::expunge::notmuch::ExpungeNotmuchFolder;
 use log::info;
 
 #[cfg(any(feature = "imap", feature = "maildir", feature = "account-sync"))]
@@ -54,13 +56,13 @@ impl FolderExpungeCommand {
                 #[cfg(feature = "imap")]
                 Some(BackendKind::Imap) => {
                     builder.set_expunge_folder(|ctx| {
-                        ctx.imap.as_ref().and_then(ExpungeFolderImap::new)
+                        ctx.imap.as_ref().map(ExpungeImapFolder::new_boxed)
                     });
                 }
                 #[cfg(feature = "maildir")]
                 Some(BackendKind::Maildir) => {
                     builder.set_expunge_folder(|ctx| {
-                        ctx.maildir.as_ref().and_then(ExpungeFolderMaildir::new)
+                        ctx.maildir.as_ref().map(ExpungeMaildirFolder::new_boxed)
                     });
                 }
                 #[cfg(feature = "account-sync")]
@@ -68,8 +70,15 @@ impl FolderExpungeCommand {
                     builder.set_expunge_folder(|ctx| {
                         ctx.maildir_for_sync
                             .as_ref()
-                            .and_then(ExpungeFolderMaildir::new)
+                            .map(ExpungeMaildirFolder::new_boxed)
                     });
+                }
+                #[cfg(feature = "notmuch")]
+                Some(BackendKind::Notmuch) => {
+                    // TODO
+                    // builder.set_expunge_folder(|ctx| {
+                    //     ctx.notmuch.as_ref().map(ExpungeNotmuchFolder::new_boxed)
+                    // });
                 }
                 _ => (),
             },

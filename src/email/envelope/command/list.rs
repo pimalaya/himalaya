@@ -1,11 +1,11 @@
 use anyhow::Result;
 use clap::Parser;
 #[cfg(feature = "imap")]
-use email::envelope::list::imap::ListEnvelopesImap;
+use email::envelope::list::imap::ListImapEnvelopes;
 #[cfg(feature = "maildir")]
-use email::envelope::list::maildir::ListEnvelopesMaildir;
+use email::envelope::list::maildir::ListMaildirEnvelopes;
 #[cfg(feature = "notmuch")]
-use email::envelope::list::notmuch::ListEnvelopesNotmuch;
+use email::envelope::list::notmuch::ListNotmuchEnvelopes;
 use log::info;
 
 #[cfg(feature = "account-sync")]
@@ -92,13 +92,13 @@ impl ListEnvelopesCommand {
                 #[cfg(feature = "imap")]
                 Some(BackendKind::Imap) => {
                     builder.set_list_envelopes(|ctx| {
-                        ctx.imap.as_ref().and_then(ListEnvelopesImap::new)
+                        ctx.imap.as_ref().map(ListImapEnvelopes::new_boxed)
                     });
                 }
                 #[cfg(feature = "maildir")]
                 Some(BackendKind::Maildir) => {
                     builder.set_list_envelopes(|ctx| {
-                        ctx.maildir.as_ref().and_then(ListEnvelopesMaildir::new)
+                        ctx.maildir.as_ref().map(ListMaildirEnvelopes::new_boxed)
                     });
                 }
                 #[cfg(feature = "account-sync")]
@@ -106,7 +106,13 @@ impl ListEnvelopesCommand {
                     builder.set_list_envelopes(|ctx| {
                         ctx.maildir_for_sync
                             .as_ref()
-                            .and_then(ListEnvelopesMaildir::new)
+                            .map(ListMaildirEnvelopes::new_boxed)
+                    });
+                }
+                #[cfg(feature = "notmuch")]
+                Some(BackendKind::Notmuch) => {
+                    builder.set_list_envelopes(|ctx| {
+                        ctx.notmuch.as_ref().map(ListNotmuchEnvelopes::new_boxed)
                     });
                 }
                 _ => (),

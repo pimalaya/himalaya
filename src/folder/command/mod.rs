@@ -1,5 +1,5 @@
 #[cfg(feature = "folder-add")]
-mod create;
+mod add;
 #[cfg(feature = "folder-delete")]
 mod delete;
 #[cfg(feature = "folder-expunge")]
@@ -15,7 +15,7 @@ use clap::Subcommand;
 use crate::{config::TomlConfig, printer::Printer};
 
 #[cfg(feature = "folder-add")]
-use self::create::AddFolderCommand;
+use self::add::AddFolderCommand;
 #[cfg(feature = "folder-delete")]
 use self::delete::FolderDeleteCommand;
 #[cfg(feature = "folder-expunge")]

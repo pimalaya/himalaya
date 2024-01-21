@@ -1,9 +1,9 @@
 use anyhow::{anyhow, Result};
 use clap::Parser;
 #[cfg(feature = "imap")]
-use email::message::get::imap::GetMessagesImap;
+use email::message::get::imap::GetImapMessages;
 #[cfg(feature = "maildir")]
-use email::{flag::add::maildir::AddFlagsMaildir, message::peek::maildir::PeekMessagesMaildir};
+use email::{flag::add::maildir::AddMaildirFlags, message::peek::maildir::PeekMaildirMessages};
 use log::info;
 
 #[cfg(feature = "account-sync")]
@@ -68,25 +68,27 @@ impl TemplateForwardCommand {
                 #[cfg(feature = "imap")]
                 Some(BackendKind::Imap) => {
                     builder
-                        .set_get_messages(|ctx| ctx.imap.as_ref().and_then(GetMessagesImap::new));
+                        .set_get_messages(|ctx| ctx.imap.as_ref().map(GetImapMessages::new_boxed));
                 }
                 #[cfg(feature = "maildir")]
                 Some(BackendKind::Maildir) => {
                     builder.set_peek_messages(|ctx| {
-                        ctx.maildir.as_ref().and_then(PeekMessagesMaildir::new)
+                        ctx.maildir.as_ref().map(PeekMaildirMessages::new_boxed)
                     });
                     builder
-                        .set_add_flags(|ctx| ctx.maildir.as_ref().and_then(AddFlagsMaildir::new));
+                        .set_add_flags(|ctx| ctx.maildir.as_ref().map(AddMaildirFlags::new_boxed));
                 }
                 #[cfg(feature = "account-sync")]
                 Some(BackendKind::MaildirForSync) => {
                     builder.set_peek_messages(|ctx| {
                         ctx.maildir_for_sync
                             .as_ref()
-                            .and_then(PeekMessagesMaildir::new)
+                            .map(PeekMaildirMessages::new_boxed)
                     });
                     builder.set_add_flags(|ctx| {
-                        ctx.maildir_for_sync.as_ref().and_then(AddFlagsMaildir::new)
+                        ctx.maildir_for_sync
+                            .as_ref()
+                            .map(AddMaildirFlags::new_boxed)
                     });
                 }
                 _ => (),
