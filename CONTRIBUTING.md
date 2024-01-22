@@ -1,49 +1,31 @@
-# Himalaya contributing guide
+# Contributing guide
 
-Thank you for investing your time in contributing to Himalaya!
+Thank you for investing your time in contributing to Himalaya CLI!
 
 ## Development
 
-The development environment is managed by
-[Nix](https://nixos.org/download.html). Running `nix-shell` will spawn
-a shell with everything you need to get started with the tool:
-`cargo`, `cargo-watch`, `rust-bin`, `rust-analyzer`…
+The development environment is managed by [Nix](https://nixos.org/download.html). Running `nix-shell` will spawn a shell with everything you need to get started with the lib: `cargo`, `cargo-watch`, `rust-bin`, `rust-analyzer`, `notmuch`…
 
 ```sh
-# starts a nix shell (the first launch may take a while)
+# Start a Nix shell
 $ nix-shell
 
-# builds the CLI
+# then build the CLI
 $ cargo build
 
-# runs the CLI
-$ cargo run -- list
+# run the CLI
+$ cargo run --feature pgp-gpg -- envelope list
 ```
 
 ## Contributing
 
-If you find a **bug**, please send an email at
-[~soywod/pimalaya@todo.sr.ht](mailto:~soywod/pimalaya@todo.sr.ht).
+Himalaya CLI supports open-source, hence the choice of using [sourcehut](https://sourcehut.org/) for managing the project. The only reason why the source code is hosted on GitHub is to build releases for all major platforms (using GitHub Actions). Don't worry, contributing on sourcehut is not a big deal: you just need to send emails! You don't need to create any account. Here a small comparison guide with GitHub:
 
-If you have a **question**, please send an email at
-[~soywod/pimalaya@lists.sr.ht](mailto:~soywod/pimalaya@lists.sr.ht).
+The equivalent of **GitHub Discussions** are:
 
-If you want to **propose a feature** or **fix a bug**, please send a
-patch at
-[~soywod/pimalaya@lists.sr.ht](mailto:~soywod/pimalaya@lists.sr.ht)
-using [git send-email](https://git-scm.com/docs/git-send-email) (see
-[this guide](https://git-send-email.io/) on how to configure it).
+- The [Matrix](https://matrix.org/) chat room [#pimalaya.himalaya](https://matrix.to/#/#pimalaya.himalaya:matrix.org)
+- The sourcehut mailing list. You can consult existing messages [here](https://lists.sr.ht/~soywod/pimalaya). You can "open a new discussion" by sending an email at [~soywod/pimalaya@lists.sr.ht](mailto:~soywod/pimalaya@lists.sr.ht). You can also [subscribe](mailto:~soywod/pimalaya+subscribe@lists.sr.ht) and [unsubscribe](mailto:~soywod/pimalaya+unsubscribe@lists.sr.ht) to the mailing list, so you can receive a copy of all discussions.
 
-If you want to **subscribe** to the mailing list, please send an email
-at
-[~soywod/pimalaya+subscribe@lists.sr.ht](mailto:~soywod/pimalaya+subscribe@lists.sr.ht).
+The equivalent of **GitHub Issues** is the sourcehut bug tracker. You can consult existing bugs [here](https://todo.sr.ht/~soywod/pimalaya), and you can "open a new issue" by sending an email at [~soywod/pimalaya@todo.sr.ht](mailto:~soywod/pimalaya@todo.sr.ht).
 
-If you want to **unsubscribe** to the mailing list, please send an
-email at
-[~soywod/pimalaya+unsubscribe@lists.sr.ht](mailto:~soywod/pimalaya+unsubscribe@lists.sr.ht).
-
-If you want to **discuss** about the project, feel free to join the
-[Matrix](https://matrix.org/) workspace
-[#pimalaya.himalaya](https://matrix.to/#/#pimalaya.himalaya:matrix.org)
-or contact me directly
-[@soywod](https://matrix.to/#/@soywod:matrix.org).
+The equivalent of **GitHub Pull requests** is the sourcehut mailing list. You can "open a new pull request" by sending an email containing a git patch at [~soywod/pimalaya@todo.sr.ht](mailto:~soywod/pimalaya@todo.sr.ht). The simplest way to send a patch is to use [git send-email](https://git-scm.com/docs/git-send-email), follow [this guide](https://git-send-email.io/) to configure git properly.

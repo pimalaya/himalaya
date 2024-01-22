@@ -4,6 +4,8 @@ use clap::Parser;
 use email::message::add::imap::AddImapMessage;
 #[cfg(feature = "maildir")]
 use email::message::add::maildir::AddMaildirMessage;
+#[cfg(feature = "notmuch")]
+use email::message::add::notmuch::AddNotmuchMessage;
 use log::info;
 use std::io::{self, BufRead, IsTerminal};
 
@@ -73,6 +75,12 @@ impl MessageSaveCommand {
                         ctx.maildir_for_sync
                             .as_ref()
                             .map(AddMaildirMessage::new_boxed)
+                    });
+                }
+                #[cfg(feature = "notmuch")]
+                Some(BackendKind::Notmuch) => {
+                    builder.set_add_message(|ctx| {
+                        ctx.notmuch.as_ref().map(AddNotmuchMessage::new_boxed)
                     });
                 }
                 _ => (),

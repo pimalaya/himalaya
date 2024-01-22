@@ -4,6 +4,8 @@ use clap::Parser;
 use email::message::{get::imap::GetImapMessages, peek::imap::PeekImapMessages};
 #[cfg(feature = "maildir")]
 use email::{flag::add::maildir::AddMaildirFlags, message::peek::maildir::PeekMaildirMessages};
+#[cfg(feature = "notmuch")]
+use email::{flag::add::notmuch::AddNotmuchFlags, message::peek::notmuch::PeekNotmuchMessages};
 use log::info;
 use mml::message::FilterParts;
 
@@ -132,6 +134,14 @@ impl MessageReadCommand {
                             .as_ref()
                             .map(AddMaildirFlags::new_boxed)
                     });
+                }
+                #[cfg(feature = "notmuch")]
+                Some(BackendKind::Notmuch) => {
+                    builder.set_peek_messages(|ctx| {
+                        ctx.notmuch.as_ref().map(PeekNotmuchMessages::new_boxed)
+                    });
+                    builder
+                        .set_add_flags(|ctx| ctx.notmuch.as_ref().map(AddNotmuchFlags::new_boxed));
                 }
                 _ => (),
             },

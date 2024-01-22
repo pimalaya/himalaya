@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `attachment` including `attachment-download` and the `attachment` subcommand
   - `template` including `template-write`, `template-reply`, `template-forward`, `template-save`, `template-send` and the `template` subcommand
 - Added wizard capability to autodetect IMAP and SMTP configurations, based on the [Thunderbird Autoconfiguration](https://wiki.mozilla.org/Thunderbird:Autoconfiguration) standard.
+- Added back Notmuch backend features.
 
 ### Changed
 

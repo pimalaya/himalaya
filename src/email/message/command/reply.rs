@@ -4,6 +4,8 @@ use clap::Parser;
 use email::message::add::imap::AddImapMessage;
 #[cfg(feature = "maildir")]
 use email::message::add::maildir::AddMaildirMessage;
+#[cfg(feature = "notmuch")]
+use email::message::add::notmuch::AddNotmuchMessage;
 #[cfg(feature = "sendmail")]
 use email::message::send::sendmail::SendSendmailMessage;
 #[cfg(feature = "smtp")]
@@ -93,6 +95,12 @@ impl MessageReplyCommand {
                             ctx.maildir_for_sync
                                 .as_ref()
                                 .map(AddMaildirMessage::new_boxed)
+                        });
+                    }
+                    #[cfg(feature = "notmuch")]
+                    Some(BackendKind::Notmuch) => {
+                        builder.set_add_message(|ctx| {
+                            ctx.notmuch.as_ref().map(AddNotmuchMessage::new_boxed)
                         });
                     }
                     _ => (),

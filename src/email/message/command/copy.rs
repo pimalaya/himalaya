@@ -4,6 +4,8 @@ use clap::Parser;
 use email::message::copy::imap::CopyImapMessages;
 #[cfg(feature = "maildir")]
 use email::message::copy::maildir::CopyMaildirMessages;
+#[cfg(feature = "notmuch")]
+use email::message::copy::notmuch::CopyNotmuchMessages;
 use log::info;
 
 #[cfg(feature = "account-sync")]
@@ -77,6 +79,12 @@ impl MessageCopyCommand {
                         ctx.maildir_for_sync
                             .as_ref()
                             .map(CopyMaildirMessages::new_boxed)
+                    });
+                }
+                #[cfg(feature = "notmuch")]
+                Some(BackendKind::Notmuch) => {
+                    builder.set_copy_messages(|ctx| {
+                        ctx.notmuch.as_ref().map(CopyNotmuchMessages::new_boxed)
                     });
                 }
                 _ => (),

@@ -4,6 +4,8 @@ use clap::Parser;
 use email::{flag::add::imap::AddImapFlags, message::move_::imap::MoveImapMessages};
 #[cfg(feature = "maildir")]
 use email::{flag::add::maildir::AddMaildirFlags, message::move_::maildir::MoveMaildirMessages};
+#[cfg(feature = "notmuch")]
+use email::{flag::add::notmuch::AddNotmuchFlags, message::move_::notmuch::MoveNotmuchMessages};
 use log::info;
 
 #[cfg(feature = "account-sync")]
@@ -87,6 +89,14 @@ impl MessageDeleteCommand {
                             .as_ref()
                             .map(AddMaildirFlags::new_boxed)
                     });
+                }
+                #[cfg(feature = "notmuch")]
+                Some(BackendKind::Notmuch) => {
+                    builder.set_move_messages(|ctx| {
+                        ctx.notmuch.as_ref().map(MoveNotmuchMessages::new_boxed)
+                    });
+                    builder
+                        .set_add_flags(|ctx| ctx.notmuch.as_ref().map(AddNotmuchFlags::new_boxed));
                 }
                 _ => (),
             },
