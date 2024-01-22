@@ -67,11 +67,11 @@ $ dnf install himalaya
 
 ## Configuration
 
-Please read the [documentation](https://pimalaya.org/himalaya/cli/latest/configuration/).
+*Please read the [documentation](https://pimalaya.org/himalaya/cli/latest/configuration/).*
 
 ## Contributing
 
-Pleas read the [contributing guide](https://github.com/soywod/himalaya/blob/master/CONTRIBUTING.md) for more detailed information.
+*Please read the [contributing guide](https://github.com/soywod/himalaya/blob/master/CONTRIBUTING.md) for more detailed information.*
 
 A **bug tracker** is available on [sourcehut](https://todo.sr.ht/~soywod/pimalaya) [[send an email](mailto:~soywod/pimalaya@todo.sr.ht)].
 
