@@ -74,11 +74,9 @@ pub enum MessageSubcommand {
     Mailto(MessageMailtoCommand),
 
     #[cfg(feature = "message-save")]
-    #[command(arg_required_else_help = true)]
     Save(MessageSaveCommand),
 
     #[cfg(feature = "message-send")]
-    #[command(arg_required_else_help = true)]
     Send(MessageSendCommand),
 
     #[cfg(feature = "message-copy")]
