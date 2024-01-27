@@ -1,8 +1,6 @@
 # 📫 Himalaya [![GitHub release](https://img.shields.io/github/v/release/soywod/himalaya?color=success)](https://github.com/soywod/himalaya/releases/latest) [![Matrix](https://img.shields.io/matrix/pimalaya.himalaya:matrix.org?color=success&label=chat)](https://matrix.to/#/#pimalaya.himalaya:matrix.org)
 
-https://pimalaya.org/himalaya/cli/latest/
-
-CLI to manage emails, based on [email-lib](https://crates.io/crates/email-lib).
+Welcome to [**Himalaya CLI**](https://pimalaya.org/himalaya/cli/latest/), the Command-Line Interface to manage emails based on [email-lib](https://crates.io/crates/email-lib).
 
 ![screenshot](https://github.com/soywod/himalaya/assets/10437171/8a62cf1d-920e-4110-9849-170db6dc51ce)
 
@@ -59,7 +57,7 @@ $ dnf copr enable atim/himalaya
 $ dnf install himalaya
 ```
 
-*See the [documentation](https://pimalaya.org/himalaya/cli/latest/installation/) for other installation methods.*
+*See the [documentation](https://pimalaya.org/himalaya/cli/latest/installation.html) for other installation methods.*
 
 </td>
 </tr>

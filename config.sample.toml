@@ -1,4 +1,6 @@
+# The account name.
 [example]
+
 # The current account will be used by default for all other commands.
 default = true
 
@@ -65,9 +67,6 @@ imap.login = "example@localhost"
 # Encryption can be either "tls" (or true), "start-tls" or "none" (or false).
 imap.encryption = "none"
 
-# Authentication can be either "passwd" or "oauth2"
-imap.auth = "passwd"
-
 # Get password from a raw string (not safe)
 imap.passwd.raw = "password"
 
@@ -87,7 +86,6 @@ smtp.host = "localhost"
 smtp.port = 3025
 smtp.login = "example@localhost"
 smtp.encryption = false
-smtp.auth = "passwd"
 smtp.passwd.raw = "password"
 
 # PGP needs to be enabled with one of those cargo feature:
