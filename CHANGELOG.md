@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-beta.2] - 2024-01-27
+
 ### Added
 
 - Added cargo feature `wizard`, enabled by default.
@@ -707,7 +709,8 @@ Few major concepts changed:
 - Password from command [#22]
 - Set up README [#20]
 
-[Unreleased]: https://github.com/soywod/himalaya/compare/v1.0.0-beta...HEAD
+[Unreleased]: https://github.com/soywod/himalaya/compare/v1.0.0-beta.2...HEAD
+[1.0.0-beta.2]: https://github.com/soywod/himalaya/compare/v1.0.0-beta...v1.0.0-beta.2
 [1.0.0-beta]: https://github.com/soywod/himalaya/compare/v0.9.0...v1.0.0-beta
 [0.9.0]: https://github.com/soywod/himalaya/compare/v0.8.4...v0.9.0
 [0.8.4]: https://github.com/soywod/himalaya/compare/v0.8.3...v0.8.4
