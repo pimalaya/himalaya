@@ -11,13 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added cargo feature `wizard`, enabled by default.
 - Added one cargo feature per backend feature:
-  - `account` including `account-configure`, `account-list`, `account-sync` and the `account` subcommand
-  - `folder` including `folder-add`, `folder-list`, `folder-expunge`, `folder-purge`, `folder-delete` and the `folder` subcommand
-  - `envelope` including `envelope-list`, `envelope-watch`, `envelope-get` and the `envelope` subcommand
-  - `flag` including `flag-add`, `flag-set`, `flag-remove` and the `flag` subcommand
-  - `message` including `message-read`, `message-write`, `message-mailto`, `message-reply`, `message-forward`, `message-copy`, `message-move`, `message-delete`, `message-save`, `message-send` and the `message` subcommand
-  - `attachment` including `attachment-download` and the `attachment` subcommand
-  - `template` including `template-write`, `template-reply`, `template-forward`, `template-save`, `template-send` and the `template` subcommand
+  - `account` including `account-configure`, `account-list`, `account-sync` and the `account-subcmd`
+  - `folder` including `folder-add`, `folder-list`, `folder-expunge`, `folder-purge`, `folder-delete` and the `folder-subcmd`
+  - `envelope` including `envelope-list`, `envelope-watch`, `envelope-get` and the `envelope-subcmd`
+  - `flag` including `flag-add`, `flag-set`, `flag-remove` and the `flag-subcmd`
+  - `message` including `message-read`, `message-write`, `message-mailto`, `message-reply`, `message-forward`, `message-copy`, `message-move`, `message-delete`, `message-save`, `message-send` and the `message-subcmd`
+  - `attachment` including `attachment-download` and the `attachment-subcmd`
+  - `template` including `template-write`, `template-reply`, `template-forward`, `template-save`, `template-send` and the `template-subcmd`
 - Added wizard capability to autodetect IMAP and SMTP configurations, based on the [Thunderbird Autoconfiguration](https://wiki.mozilla.org/Thunderbird:Autoconfiguration) standard.
 - Added back Notmuch backend features.
 
@@ -316,9 +316,9 @@ Few major concepts changed:
 
   The source code has been split into subrepositories:
 
-  - The email logic has been extracted from the CLI and placed in a lib on [sourcehut](https://git.sr.ht/~soywod/himalaya-lib)	
-  - The vim plugin is now in a dedicated repository on [sourcehut](https://git.sr.ht/~soywod/himalaya-vim) as well
-  - This repository only contains the CLI source code (it was not possible to move it to sourcehut because of cross platform builds)
+  - The email logic has been extracted from the CLI and placed in a lib on [SourceHut](https://git.sr.ht/~soywod/himalaya-lib)	
+  - The vim plugin is now in a dedicated repository on [SourceHut](https://git.sr.ht/~soywod/himalaya-vim) as well
+  - This repository only contains the CLI source code (it was not possible to move it to SourceHut because of cross platform builds)
 
 - [**BREAKING**] Renamed `-m|--mailbox` to `-f|--folder`
 
