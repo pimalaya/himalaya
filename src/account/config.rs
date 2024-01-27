@@ -60,7 +60,7 @@ pub struct TomlAccountConfig {
 }
 
 impl TomlAccountConfig {
-    #[cfg(feature = "folder-add")]
+    #[cfg(any(feature = "account-sync", feature = "folder-add"))]
     pub fn add_folder_kind(&self) -> Option<&BackendKind> {
         self.folder
             .as_ref()
@@ -69,7 +69,7 @@ impl TomlAccountConfig {
             .or(self.backend.as_ref())
     }
 
-    #[cfg(feature = "folder-list")]
+    #[cfg(any(feature = "account-sync", feature = "folder-list"))]
     pub fn list_folders_kind(&self) -> Option<&BackendKind> {
         self.folder
             .as_ref()
@@ -78,7 +78,7 @@ impl TomlAccountConfig {
             .or(self.backend.as_ref())
     }
 
-    #[cfg(feature = "folder-expunge")]
+    #[cfg(any(feature = "account-sync", feature = "folder-expunge"))]
     pub fn expunge_folder_kind(&self) -> Option<&BackendKind> {
         self.folder
             .as_ref()
@@ -96,7 +96,7 @@ impl TomlAccountConfig {
             .or(self.backend.as_ref())
     }
 
-    #[cfg(feature = "folder-delete")]
+    #[cfg(any(feature = "account-sync", feature = "folder-delete"))]
     pub fn delete_folder_kind(&self) -> Option<&BackendKind> {
         self.folder
             .as_ref()
@@ -105,7 +105,7 @@ impl TomlAccountConfig {
             .or(self.backend.as_ref())
     }
 
-    #[cfg(feature = "envelope-get")]
+    #[cfg(any(feature = "account-sync", feature = "envelope-get"))]
     pub fn get_envelope_kind(&self) -> Option<&BackendKind> {
         self.envelope
             .as_ref()
@@ -114,7 +114,7 @@ impl TomlAccountConfig {
             .or(self.backend.as_ref())
     }
 
-    #[cfg(feature = "envelope-list")]
+    #[cfg(any(feature = "account-sync", feature = "envelope-list"))]
     pub fn list_envelopes_kind(&self) -> Option<&BackendKind> {
         self.envelope
             .as_ref()
@@ -132,7 +132,7 @@ impl TomlAccountConfig {
             .or(self.backend.as_ref())
     }
 
-    #[cfg(feature = "flag-add")]
+    #[cfg(any(feature = "account-sync", feature = "flag-add"))]
     pub fn add_flags_kind(&self) -> Option<&BackendKind> {
         self.flag
             .as_ref()
@@ -141,7 +141,7 @@ impl TomlAccountConfig {
             .or(self.backend.as_ref())
     }
 
-    #[cfg(feature = "flag-set")]
+    #[cfg(any(feature = "account-sync", feature = "flag-set"))]
     pub fn set_flags_kind(&self) -> Option<&BackendKind> {
         self.flag
             .as_ref()
@@ -159,7 +159,7 @@ impl TomlAccountConfig {
             .or(self.backend.as_ref())
     }
 
-    #[cfg(feature = "message-add")]
+    #[cfg(any(feature = "account-sync", feature = "message-add"))]
     pub fn add_message_kind(&self) -> Option<&BackendKind> {
         self.message
             .as_ref()
@@ -168,7 +168,7 @@ impl TomlAccountConfig {
             .or(self.backend.as_ref())
     }
 
-    #[cfg(feature = "message-peek")]
+    #[cfg(any(feature = "account-sync", feature = "message-peek"))]
     pub fn peek_messages_kind(&self) -> Option<&BackendKind> {
         self.message
             .as_ref()
@@ -177,7 +177,7 @@ impl TomlAccountConfig {
             .or(self.backend.as_ref())
     }
 
-    #[cfg(feature = "message-get")]
+    #[cfg(any(feature = "account-sync", feature = "message-get"))]
     pub fn get_messages_kind(&self) -> Option<&BackendKind> {
         self.message
             .as_ref()
@@ -195,11 +195,11 @@ impl TomlAccountConfig {
             .or(self.backend.as_ref())
     }
 
-    #[cfg(feature = "message-move")]
+    #[cfg(any(feature = "account-sync", feature = "message-move"))]
     pub fn move_messages_kind(&self) -> Option<&BackendKind> {
         self.message
             .as_ref()
-            .and_then(|message| message.move_.as_ref())
+            .and_then(|message| message.r#move.as_ref())
             .and_then(|move_| move_.backend.as_ref())
             .or(self.backend.as_ref())
     }

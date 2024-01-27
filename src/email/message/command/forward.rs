@@ -1,23 +1,12 @@
 use anyhow::{anyhow, Result};
 use clap::Parser;
-#[cfg(feature = "imap")]
-use email::message::add::imap::AddImapMessage;
-#[cfg(feature = "maildir")]
-use email::message::add::maildir::AddMaildirMessage;
-#[cfg(feature = "notmuch")]
-use email::message::add::notmuch::AddNotmuchMessage;
-#[cfg(feature = "sendmail")]
-use email::message::send::sendmail::SendSendmailMessage;
-#[cfg(feature = "smtp")]
-use email::message::send::smtp::SendSmtpMessage;
 use log::info;
 
 #[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
-#[allow(unused)]
 use crate::{
     account::arg::name::AccountNameFlag,
-    backend::{Backend, BackendKind},
+    backend::Backend,
     config::TomlConfig,
     envelope::arg::ids::EnvelopeIdArg,
     folder::arg::name::FolderNameOptionalFlag,
@@ -70,55 +59,12 @@ impl MessageForwardCommand {
         let send_message_kind = toml_account_config.send_message_kind();
 
         let backend = Backend::new(
-            &toml_account_config,
-            &account_config,
+            toml_account_config.clone(),
+            account_config.clone(),
             add_message_kind.into_iter().chain(send_message_kind),
-            |#[allow(unused)] builder| {
-                match add_message_kind {
-                    #[cfg(feature = "imap")]
-                    Some(BackendKind::Imap) => {
-                        builder.set_add_message(|ctx| {
-                            ctx.imap.as_ref().map(AddImapMessage::new_boxed)
-                        });
-                    }
-                    #[cfg(feature = "maildir")]
-                    Some(BackendKind::Maildir) => {
-                        builder.set_add_message(|ctx| {
-                            ctx.maildir.as_ref().map(AddMaildirMessage::new_boxed)
-                        });
-                    }
-                    #[cfg(feature = "account-sync")]
-                    Some(BackendKind::MaildirForSync) => {
-                        builder.set_add_message(|ctx| {
-                            ctx.maildir_for_sync
-                                .as_ref()
-                                .map(AddMaildirMessage::new_boxed)
-                        });
-                    }
-                    #[cfg(feature = "notmuch")]
-                    Some(BackendKind::Notmuch) => {
-                        builder.set_add_message(|ctx| {
-                            ctx.notmuch.as_ref().map(AddNotmuchMessage::new_boxed)
-                        });
-                    }
-                    _ => (),
-                };
-
-                match send_message_kind {
-                    #[cfg(feature = "smtp")]
-                    Some(BackendKind::Smtp) => {
-                        builder.set_send_message(|ctx| {
-                            ctx.smtp.as_ref().map(SendSmtpMessage::new_boxed)
-                        });
-                    }
-                    #[cfg(feature = "sendmail")]
-                    Some(BackendKind::Sendmail) => {
-                        builder.set_send_message(|ctx| {
-                            ctx.sendmail.as_ref().map(SendSendmailMessage::new_boxed)
-                        });
-                    }
-                    _ => (),
-                };
+            |builder| {
+                builder.set_add_message(Some(None));
+                builder.set_send_message(Some(None));
             },
         )
         .await?;
@@ -134,6 +80,6 @@ impl MessageForwardCommand {
             .with_body(self.body.raw())
             .build()
             .await?;
-        editor::edit_tpl_with_editor(&account_config, printer, &backend, tpl).await
+        editor::edit_tpl_with_editor(account_config, printer, &backend, tpl).await
     }
 }

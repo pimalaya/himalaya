@@ -1,22 +1,14 @@
 use anyhow::Result;
 use clap::Parser;
-#[cfg(feature = "imap")]
-use email::message::add::imap::AddImapMessage;
-#[cfg(feature = "maildir")]
-use email::message::add::maildir::AddMaildirMessage;
 use log::info;
 use mml::MmlCompilerBuilder;
 use std::io::{self, BufRead, IsTerminal};
 
 #[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
-#[allow(unused)]
 use crate::{
-    account::arg::name::AccountNameFlag,
-    backend::{Backend, BackendKind},
-    config::TomlConfig,
-    email::template::arg::TemplateRawArg,
-    folder::arg::name::FolderNameOptionalFlag,
+    account::arg::name::AccountNameFlag, backend::Backend, config::TomlConfig,
+    email::template::arg::TemplateRawArg, folder::arg::name::FolderNameOptionalFlag,
     printer::Printer,
 };
 
@@ -57,30 +49,10 @@ impl TemplateSaveCommand {
         let add_message_kind = toml_account_config.add_message_kind();
 
         let backend = Backend::new(
-            &toml_account_config,
-            &account_config,
+            toml_account_config.clone(),
+            account_config.clone(),
             add_message_kind,
-            |#[allow(unused)] builder| match add_message_kind {
-                #[cfg(feature = "imap")]
-                Some(BackendKind::Imap) => {
-                    builder.set_add_message(|ctx| ctx.imap.as_ref().map(AddImapMessage::new_boxed));
-                }
-                #[cfg(feature = "maildir")]
-                Some(BackendKind::Maildir) => {
-                    builder.set_add_message(|ctx| {
-                        ctx.maildir.as_ref().map(AddMaildirMessage::new_boxed)
-                    });
-                }
-                #[cfg(feature = "account-sync")]
-                Some(BackendKind::MaildirForSync) => {
-                    builder.set_add_message(|ctx| {
-                        ctx.maildir_for_sync
-                            .as_ref()
-                            .map(AddMaildirMessage::new_boxed)
-                    });
-                }
-                _ => (),
-            },
+            |builder| builder.set_add_message(Some(None)),
         )
         .await?;
 

@@ -40,19 +40,19 @@ default = [
   # "pgp-native",
 ]
 
-wizard = ["email-lib/account-discovery"]
-
 imap = ["email-lib/imap"]
 maildir = ["email-lib/maildir"]
 notmuch = ["email-lib/notmuch"]
 smtp = ["email-lib/smtp"]
 sendmail = ["email-lib/sendmail"]
 
+wizard = ["email-lib/account-discovery"]
 account = ["account-configure", "account-list", "account-sync"]
 account-subcmd = []
 account-configure = ["account-subcmd"]
 account-list = ["account-subcmd"]
-account-sync = ["account-subcmd", "email-lib/sync"]
+account-sync = ["account-subcmd", "email-lib/account-sync"]
+
 folder = ["folder-add", "folder-list", "folder-expunge", "folder-purge", "folder-delete"]
 folder-subcmd = []
 folder-add = ["folder-subcmd", "email-lib/folder-add"]
@@ -60,16 +60,19 @@ folder-list = ["folder-subcmd", "email-lib/folder-list"]
 folder-expunge = ["folder-subcmd", "email-lib/folder-expunge"]
 folder-purge = ["folder-subcmd", "email-lib/folder-purge"]
 folder-delete = ["folder-subcmd", "email-lib/folder-delete"]
+
 envelope = ["envelope-list", "envelope-watch", "envelope-get"]
 envelope-subcmd = []
 envelope-list = ["envelope-subcmd", "email-lib/envelope-list"]
 envelope-watch = ["envelope-subcmd", "email-lib/envelope-watch"]
 envelope-get = ["envelope-subcmd", "email-lib/envelope-get"]
+
 flag = ["flag-add", "flag-set", "flag-remove"]
 flag-subcmd = []
 flag-add = ["flag-subcmd", "email-lib/flag-add"]
 flag-set = ["flag-subcmd", "email-lib/flag-set"]
 flag-remove = ["flag-subcmd", "email-lib/flag-remove"]
+
 message = ["message-read", "message-write", "message-mailto", "message-reply", "message-forward", "message-save", "message-send", "message-copy", "message-move", "message-delete"]
 message-subcmd = []
 message-add = ["email-lib/message-add"]
@@ -85,9 +88,11 @@ message-reply = ["message-get", "message-add", "message-send"]
 message-forward = ["message-get", "message-add", "message-send"]
 message-save = ["message-add"]
 message-send = ["message-subcmd", "email-lib/message-send"]
+
 attachment = ["attachment-download"]
 attachment-subcmd = []
 attachment-download = ["attachment-subcmd", "message-read"]
+
 template = ["template-write", "template-reply", "template-forward", "template-save", "template-send"]
 template-subcmd = []
 template-write = ["template-subcmd"]
@@ -115,8 +120,7 @@ clap_mangen = "0.2"
 console = "0.15.2"
 dialoguer = "0.10.2"
 dirs = "4.0"
-# email-lib = { version = "=0.20.1", default-features = false }
-email-lib = { git = "https://git.sr.ht/~soywod/pimalaya", default-features = false }
+email-lib = { version = "=0.21.0", default-features = false }
 email_address = "0.2.4"
 env_logger = "0.8"
 erased-serde = "0.3"

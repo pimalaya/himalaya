@@ -1,19 +1,12 @@
 use anyhow::Result;
 use clap::Parser;
-#[cfg(feature = "imap")]
-use email::message::copy::imap::CopyImapMessages;
-#[cfg(feature = "maildir")]
-use email::message::copy::maildir::CopyMaildirMessages;
-#[cfg(feature = "notmuch")]
-use email::message::copy::notmuch::CopyNotmuchMessages;
 use log::info;
 
 #[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
-#[allow(unused)]
 use crate::{
     account::arg::name::AccountNameFlag,
-    backend::{Backend, BackendKind},
+    backend::Backend,
     config::TomlConfig,
     envelope::arg::ids::EnvelopeIdsArgs,
     folder::arg::name::{SourceFolderNameOptionalFlag, TargetFolderNameArg},
@@ -57,38 +50,10 @@ impl MessageCopyCommand {
         let copy_messages_kind = toml_account_config.copy_messages_kind();
 
         let backend = Backend::new(
-            &toml_account_config,
-            &account_config,
+            toml_account_config.clone(),
+            account_config,
             copy_messages_kind,
-            |#[allow(unused)] builder| match copy_messages_kind {
-                #[cfg(feature = "imap")]
-                Some(BackendKind::Imap) => {
-                    builder.set_copy_messages(|ctx| {
-                        ctx.imap.as_ref().map(CopyImapMessages::new_boxed)
-                    });
-                }
-                #[cfg(feature = "maildir")]
-                Some(BackendKind::Maildir) => {
-                    builder.set_copy_messages(|ctx| {
-                        ctx.maildir.as_ref().map(CopyMaildirMessages::new_boxed)
-                    });
-                }
-                #[cfg(feature = "account-sync")]
-                Some(BackendKind::MaildirForSync) => {
-                    builder.set_copy_messages(|ctx| {
-                        ctx.maildir_for_sync
-                            .as_ref()
-                            .map(CopyMaildirMessages::new_boxed)
-                    });
-                }
-                #[cfg(feature = "notmuch")]
-                Some(BackendKind::Notmuch) => {
-                    builder.set_copy_messages(|ctx| {
-                        ctx.notmuch.as_ref().map(CopyNotmuchMessages::new_boxed)
-                    });
-                }
-                _ => (),
-            },
+            |builder| builder.set_copy_messages(Some(None)),
         )
         .await?;
 

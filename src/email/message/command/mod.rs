@@ -7,7 +7,7 @@ pub mod forward;
 #[cfg(feature = "message-mailto")]
 pub mod mailto;
 #[cfg(feature = "message-move")]
-pub mod move_;
+pub mod r#move;
 #[cfg(feature = "message-read")]
 pub mod read;
 #[cfg(feature = "message-reply")]
@@ -33,7 +33,7 @@ use self::forward::MessageForwardCommand;
 #[cfg(feature = "message-mailto")]
 use self::mailto::MessageMailtoCommand;
 #[cfg(feature = "message-move")]
-use self::move_::MessageMoveCommand;
+use self::r#move::MessageMoveCommand;
 #[cfg(feature = "message-read")]
 use self::read::MessageReadCommand;
 #[cfg(feature = "message-reply")]

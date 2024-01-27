@@ -1,21 +1,12 @@
 use anyhow::Result;
 use clap::Parser;
-#[cfg(feature = "imap")]
-use email::envelope::watch::imap::WatchImapEnvelopes;
-#[cfg(feature = "maildir")]
-use email::envelope::watch::maildir::WatchMaildirEnvelopes;
-// #[cfg(feature = "notmuch")]
-// use email::envelope::watch::notmuch::WatchNotmuchEnvelopes;
 use log::info;
 
 #[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
-    account::arg::name::AccountNameFlag,
-    backend::{Backend, BackendKind},
-    config::TomlConfig,
-    folder::arg::name::FolderNameOptionalFlag,
-    printer::Printer,
+    account::arg::name::AccountNameFlag, backend::Backend, config::TomlConfig,
+    folder::arg::name::FolderNameOptionalFlag, printer::Printer,
 };
 
 /// Watch envelopes for changes.
@@ -49,39 +40,10 @@ impl WatchEnvelopesCommand {
         let watch_envelopes_kind = toml_account_config.watch_envelopes_kind();
 
         let backend = Backend::new(
-            &toml_account_config,
-            &account_config,
+            toml_account_config.clone(),
+            account_config,
             watch_envelopes_kind,
-            |builder| match watch_envelopes_kind {
-                #[cfg(feature = "imap")]
-                Some(BackendKind::Imap) => {
-                    builder.set_watch_envelopes(|ctx| {
-                        ctx.imap.as_ref().map(WatchImapEnvelopes::new_boxed)
-                    });
-                }
-                #[cfg(feature = "maildir")]
-                Some(BackendKind::Maildir) => {
-                    builder.set_watch_envelopes(|ctx| {
-                        ctx.maildir.as_ref().map(WatchMaildirEnvelopes::new_boxed)
-                    });
-                }
-                #[cfg(feature = "account-sync")]
-                Some(BackendKind::MaildirForSync) => {
-                    builder.set_watch_envelopes(|ctx| {
-                        ctx.maildir_for_sync
-                            .as_ref()
-                            .map(WatchMaildirEnvelopes::new_boxed)
-                    });
-                }
-                #[cfg(feature = "notmuch")]
-                Some(BackendKind::Notmuch) => {
-                    // TODO
-                    // builder.set_watch_envelopes(|ctx| {
-                    //     ctx.notmuch.as_ref().map(WatchNotmuchEnvelopes::new_boxed)
-                    // });
-                }
-                _ => (),
-            },
+            |builder| builder.set_watch_envelopes(Some(None)),
         )
         .await?;
 

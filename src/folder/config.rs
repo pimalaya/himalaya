@@ -8,15 +8,15 @@ pub struct FolderConfig {
     #[serde(alias = "aliases")]
     pub alias: Option<HashMap<String, String>>,
 
-    #[cfg(feature = "folder-add")]
+    #[cfg(any(feature = "account-sync", feature = "folder-add"))]
     pub add: Option<FolderAddConfig>,
-    #[cfg(feature = "folder-list")]
+    #[cfg(any(feature = "account-sync", feature = "folder-list"))]
     pub list: Option<FolderListConfig>,
-    #[cfg(feature = "folder-expunge")]
+    #[cfg(any(feature = "account-sync", feature = "folder-expunge"))]
     pub expunge: Option<FolderExpungeConfig>,
     #[cfg(feature = "folder-purge")]
     pub purge: Option<FolderPurgeConfig>,
-    #[cfg(feature = "folder-delete")]
+    #[cfg(any(feature = "account-sync", feature = "folder-delete"))]
     pub delete: Option<FolderDeleteConfig>,
 }
 
@@ -25,17 +25,17 @@ impl FolderConfig {
         #[allow(unused_mut)]
         let mut kinds = HashSet::default();
 
-        #[cfg(feature = "folder-add")]
+        #[cfg(any(feature = "account-sync", feature = "folder-add"))]
         if let Some(add) = &self.add {
             kinds.extend(add.get_used_backends());
         }
 
-        #[cfg(feature = "folder-list")]
+        #[cfg(any(feature = "account-sync", feature = "folder-list"))]
         if let Some(list) = &self.list {
             kinds.extend(list.get_used_backends());
         }
 
-        #[cfg(feature = "folder-expunge")]
+        #[cfg(any(feature = "account-sync", feature = "folder-expunge"))]
         if let Some(expunge) = &self.expunge {
             kinds.extend(expunge.get_used_backends());
         }
@@ -45,7 +45,7 @@ impl FolderConfig {
             kinds.extend(purge.get_used_backends());
         }
 
-        #[cfg(feature = "folder-delete")]
+        #[cfg(any(feature = "account-sync", feature = "folder-delete"))]
         if let Some(delete) = &self.delete {
             kinds.extend(delete.get_used_backends());
         }
@@ -54,13 +54,13 @@ impl FolderConfig {
     }
 }
 
-#[cfg(feature = "folder-add")]
+#[cfg(any(feature = "account-sync", feature = "folder-add"))]
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 pub struct FolderAddConfig {
     pub backend: Option<BackendKind>,
 }
 
-#[cfg(feature = "folder-add")]
+#[cfg(any(feature = "account-sync", feature = "folder-add"))]
 impl FolderAddConfig {
     pub fn get_used_backends(&self) -> HashSet<&BackendKind> {
         let mut kinds = HashSet::default();
@@ -73,7 +73,7 @@ impl FolderAddConfig {
     }
 }
 
-#[cfg(feature = "folder-list")]
+#[cfg(any(feature = "account-sync", feature = "folder-list"))]
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 pub struct FolderListConfig {
     pub backend: Option<BackendKind>,
@@ -82,7 +82,7 @@ pub struct FolderListConfig {
     pub remote: email::folder::list::config::FolderListConfig,
 }
 
-#[cfg(feature = "folder-list")]
+#[cfg(any(feature = "account-sync", feature = "folder-list"))]
 impl FolderListConfig {
     pub fn get_used_backends(&self) -> HashSet<&BackendKind> {
         let mut kinds = HashSet::default();
@@ -95,13 +95,13 @@ impl FolderListConfig {
     }
 }
 
-#[cfg(feature = "folder-expunge")]
+#[cfg(any(feature = "account-sync", feature = "folder-expunge"))]
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 pub struct FolderExpungeConfig {
     pub backend: Option<BackendKind>,
 }
 
-#[cfg(feature = "folder-expunge")]
+#[cfg(any(feature = "account-sync", feature = "folder-expunge"))]
 impl FolderExpungeConfig {
     pub fn get_used_backends(&self) -> HashSet<&BackendKind> {
         let mut kinds = HashSet::default();
@@ -133,13 +133,13 @@ impl FolderPurgeConfig {
     }
 }
 
-#[cfg(feature = "folder-delete")]
+#[cfg(any(feature = "account-sync", feature = "folder-delete"))]
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 pub struct FolderDeleteConfig {
     pub backend: Option<BackendKind>,
 }
 
-#[cfg(feature = "folder-delete")]
+#[cfg(any(feature = "account-sync", feature = "folder-delete"))]
 impl FolderDeleteConfig {
     pub fn get_used_backends(&self) -> HashSet<&BackendKind> {
         let mut kinds = HashSet::default();

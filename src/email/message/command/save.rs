@@ -1,11 +1,5 @@
 use anyhow::Result;
 use clap::Parser;
-#[cfg(feature = "imap")]
-use email::message::add::imap::AddImapMessage;
-#[cfg(feature = "maildir")]
-use email::message::add::maildir::AddMaildirMessage;
-#[cfg(feature = "notmuch")]
-use email::message::add::notmuch::AddNotmuchMessage;
 use log::info;
 use std::io::{self, BufRead, IsTerminal};
 
@@ -13,12 +7,8 @@ use std::io::{self, BufRead, IsTerminal};
 use crate::cache::arg::disable::CacheDisableFlag;
 #[allow(unused)]
 use crate::{
-    account::arg::name::AccountNameFlag,
-    backend::{Backend, BackendKind},
-    config::TomlConfig,
-    folder::arg::name::FolderNameOptionalFlag,
-    message::arg::MessageRawArg,
-    printer::Printer,
+    account::arg::name::AccountNameFlag, backend::Backend, config::TomlConfig,
+    folder::arg::name::FolderNameOptionalFlag, message::arg::MessageRawArg, printer::Printer,
 };
 
 /// Save a message to a folder.
@@ -55,36 +45,10 @@ impl MessageSaveCommand {
         let add_message_kind = toml_account_config.add_message_kind();
 
         let backend = Backend::new(
-            &toml_account_config,
-            &account_config,
+            toml_account_config.clone(),
+            account_config,
             add_message_kind,
-            |#[allow(unused)] builder| match add_message_kind {
-                #[cfg(feature = "imap")]
-                Some(BackendKind::Imap) => {
-                    builder.set_add_message(|ctx| ctx.imap.as_ref().map(AddImapMessage::new_boxed));
-                }
-                #[cfg(feature = "maildir")]
-                Some(BackendKind::Maildir) => {
-                    builder.set_add_message(|ctx| {
-                        ctx.maildir.as_ref().map(AddMaildirMessage::new_boxed)
-                    });
-                }
-                #[cfg(feature = "account-sync")]
-                Some(BackendKind::MaildirForSync) => {
-                    builder.set_add_message(|ctx| {
-                        ctx.maildir_for_sync
-                            .as_ref()
-                            .map(AddMaildirMessage::new_boxed)
-                    });
-                }
-                #[cfg(feature = "notmuch")]
-                Some(BackendKind::Notmuch) => {
-                    builder.set_add_message(|ctx| {
-                        ctx.notmuch.as_ref().map(AddNotmuchMessage::new_boxed)
-                    });
-                }
-                _ => (),
-            },
+            |builder| builder.set_add_message(Some(None)),
         )
         .await?;
 

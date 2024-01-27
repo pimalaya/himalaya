@@ -12,7 +12,7 @@ use log::debug;
 #[cfg(any(feature = "message-send", feature = "template-send"))]
 use mml::MmlCompilerBuilder;
 use process::SingleCmd;
-use std::{env, fs};
+use std::{env, fs, sync::Arc};
 
 use crate::{
     backend::Backend,
@@ -50,7 +50,7 @@ pub async fn open_with_local_draft() -> Result<String> {
 
 #[allow(unused)]
 pub async fn edit_tpl_with_editor<P: Printer>(
-    config: &AccountConfig,
+    config: Arc<AccountConfig>,
     printer: &mut P,
     backend: &Backend,
     mut tpl: String,

@@ -1,17 +1,9 @@
 use anyhow::Result;
 use clap::Parser;
 use dialoguer::Confirm;
-#[cfg(feature = "imap")]
-use email::folder::purge::imap::PurgeImapFolder;
-// #[cfg(feature = "maildir")]
-// use email::folder::purge::maildir::PurgeMaildirFolder;
-// #[cfg(feature = "notmuch")]
-// use email::folder::purge::notmuch::PurgeNotmuchFolder;
 use log::info;
 use std::process;
 
-#[cfg(any(feature = "imap", feature = "maildir", feature = "account-sync"))]
-use crate::backend::BackendKind;
 #[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
@@ -61,40 +53,10 @@ impl FolderPurgeCommand {
         let purge_folder_kind = toml_account_config.purge_folder_kind();
 
         let backend = Backend::new(
-            &toml_account_config,
-            &account_config,
+            toml_account_config.clone(),
+            account_config,
             purge_folder_kind,
-            |builder| match purge_folder_kind {
-                #[cfg(feature = "imap")]
-                Some(BackendKind::Imap) => {
-                    builder
-                        .set_purge_folder(|ctx| ctx.imap.as_ref().map(PurgeImapFolder::new_boxed));
-                }
-                #[cfg(feature = "maildir")]
-                Some(BackendKind::Maildir) => {
-                    // TODO
-                    // builder.set_purge_folder(|ctx| {
-                    //     ctx.maildir.as_ref().map(PurgeMaildirFolder::new_boxed)
-                    // });
-                }
-                #[cfg(feature = "account-sync")]
-                Some(BackendKind::MaildirForSync) => {
-                    // TODO
-                    // builder.set_purge_folder(|ctx| {
-                    //     ctx.maildir_for_sync
-                    //         .as_ref()
-                    //         .map(PurgeMaildirFolder::new_boxed)
-                    // });
-                }
-                #[cfg(feature = "notmuch")]
-                Some(BackendKind::Notmuch) => {
-                    // TODO
-                    // builder.set_purge_folder(|ctx| {
-                    //     ctx.notmuch.as_ref().map(PurgeNotmuchFolder::new_boxed)
-                    // });
-                }
-                _ => (),
-            },
+            |builder| builder.set_purge_folder(Some(None)),
         )
         .await?;
 

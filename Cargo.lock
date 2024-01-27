@@ -1216,8 +1216,9 @@ dependencies = [
 
 [[package]]
 name = "email-lib"
-version = "0.20.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya#db699eb29b71e22bc74ccbb99003c3ac06816d69"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fe5898733e36f6faf030398be1481b8e80ed041372236a64bf7da0e05eb1223"
 dependencies = [
  "advisory-lock",
  "anyhow",
@@ -1225,6 +1226,7 @@ dependencies = [
  "chrono",
  "convert_case",
  "dirs 4.0.0",
+ "email-macros",
  "email_address",
  "futures",
  "hickory-resolver",
@@ -1260,6 +1262,16 @@ dependencies = [
  "tree_magic_mini",
  "urlencoding",
  "utf7-imap",
+]
+
+[[package]]
+name = "email-macros"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c6354267c9a1db068b10ad982db9b8a82445f73f9bc9a57ed4924ddb913a065"
+dependencies = [
+ "quote",
+ "syn 2.0.41",
 ]
 
 [[package]]

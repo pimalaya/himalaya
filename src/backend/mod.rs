@@ -4,126 +4,68 @@ pub(crate) mod wizard;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use std::ops::Deref;
+use std::{ops::Deref, sync::Arc};
 
-use email::account::config::AccountConfig;
-#[cfg(all(feature = "envelope-get", feature = "imap"))]
-use email::envelope::get::imap::GetImapEnvelope;
-#[cfg(all(feature = "envelope-get", feature = "maildir"))]
-use email::envelope::get::maildir::GetMaildirEnvelope;
-#[cfg(all(feature = "envelope-get", feature = "notmuch"))]
-use email::envelope::get::notmuch::GetNotmuchEnvelope;
-#[cfg(all(feature = "envelope-list", feature = "imap"))]
-use email::envelope::list::imap::ListImapEnvelopes;
-#[cfg(all(feature = "envelope-list", feature = "maildir"))]
-use email::envelope::list::maildir::ListMaildirEnvelopes;
-#[cfg(all(feature = "envelope-list", feature = "notmuch"))]
-use email::envelope::list::notmuch::ListNotmuchEnvelopes;
-#[cfg(all(feature = "envelope-watch", feature = "imap"))]
-use email::envelope::watch::imap::WatchImapEnvelopes;
-#[cfg(all(feature = "envelope-watch", feature = "maildir"))]
-use email::envelope::watch::maildir::WatchMaildirEnvelopes;
-// #[cfg(all(feature = "envelope-watch", feature = "notmuch"))]
-// use email::envelope::watch::notmuch::WatchNotmuchEnvelopes;
-#[cfg(feature = "message-add")]
-use email::envelope::SingleId;
-#[cfg(all(feature = "flag-add", feature = "imap"))]
-use email::flag::add::imap::AddImapFlags;
-#[cfg(all(feature = "flag-add", feature = "maildir"))]
-use email::flag::add::maildir::AddMaildirFlags;
-#[cfg(all(feature = "flag-add", feature = "notmuch"))]
-use email::flag::add::notmuch::AddNotmuchFlags;
-#[cfg(all(feature = "flag-remove", feature = "imap"))]
-use email::flag::remove::imap::RemoveImapFlags;
-#[cfg(all(feature = "flag-remove", feature = "maildir"))]
-use email::flag::remove::maildir::RemoveMaildirFlags;
-#[cfg(all(feature = "flag-remove", feature = "notmuch"))]
-use email::flag::remove::notmuch::RemoveNotmuchFlags;
-#[cfg(all(feature = "flag-set", feature = "imap"))]
-use email::flag::set::imap::SetImapFlags;
-#[cfg(all(feature = "flag-set", feature = "maildir"))]
-use email::flag::set::maildir::SetMaildirFlags;
-#[cfg(all(feature = "flag-set", feature = "notmuch"))]
-use email::flag::set::notmuch::SetNotmuchFlags;
-#[cfg(all(feature = "folder-add", feature = "imap"))]
-use email::folder::add::imap::AddImapFolder;
-#[cfg(all(feature = "folder-add", feature = "maildir"))]
-use email::folder::add::maildir::AddMaildirFolder;
-#[cfg(all(feature = "folder-add", feature = "notmuch"))]
-use email::folder::add::notmuch::AddNotmuchFolder;
-#[cfg(all(feature = "folder-delete", feature = "imap"))]
-use email::folder::delete::imap::DeleteImapFolder;
-#[cfg(all(feature = "folder-delete", feature = "maildir"))]
-use email::folder::delete::maildir::DeleteMaildirFolder;
-// #[cfg(all(feature = "folder-delete", feature = "notmuch"))]
-// use email::folder::delete::notmuch::DeleteNotmuchFolder;
-#[cfg(all(feature = "folder-expunge", feature = "imap"))]
-use email::folder::expunge::imap::ExpungeImapFolder;
-#[cfg(all(feature = "folder-expunge", feature = "maildir"))]
-use email::folder::expunge::maildir::ExpungeMaildirFolder;
-// #[cfg(all(feature = "folder-expunge", feature = "notmuch"))]
-// use email::folder::expunge::notmuch::ExpungeNotmuchFolder;
-#[cfg(all(feature = "folder-list", feature = "imap"))]
-use email::folder::list::imap::ListImapFolders;
-#[cfg(all(feature = "folder-list", feature = "maildir"))]
-use email::folder::list::maildir::ListMaildirFolders;
-#[cfg(all(feature = "folder-list", feature = "notmuch"))]
-use email::folder::list::notmuch::ListNotmuchFolders;
-#[cfg(all(feature = "folder-purge", feature = "imap"))]
-use email::folder::purge::imap::PurgeImapFolder;
-// #[cfg(all(feature = "folder-purge", feature = "maildir"))]
-// use email::folder::purge::maildir::PurgeMaildirFolder;
-// #[cfg(all(feature = "folder-purge", feature = "notmuch"))]
-// use email::folder::purge::notmuch::PurgeNotmuchFolder;
+#[cfg(any(feature = "account-sync", feature = "envelope-get"))]
+use email::envelope::get::GetEnvelope;
+#[cfg(any(feature = "account-sync", feature = "envelope-list"))]
+use email::envelope::list::ListEnvelopes;
+#[cfg(feature = "envelope-watch")]
+use email::envelope::watch::WatchEnvelopes;
+#[cfg(any(feature = "account-sync", feature = "flag-add"))]
+use email::flag::add::AddFlags;
+#[cfg(feature = "flag-remove")]
+use email::flag::remove::RemoveFlags;
+#[cfg(any(feature = "account-sync", feature = "flag-set"))]
+use email::flag::set::SetFlags;
+#[cfg(any(feature = "account-sync", feature = "folder-add"))]
+use email::folder::add::AddFolder;
+#[cfg(any(feature = "account-sync", feature = "folder-delete"))]
+use email::folder::delete::DeleteFolder;
+#[cfg(any(feature = "account-sync", feature = "folder-expunge"))]
+use email::folder::expunge::ExpungeFolder;
+#[cfg(any(feature = "account-sync", feature = "folder-list"))]
+use email::folder::list::ListFolders;
+#[cfg(feature = "folder-purge")]
+use email::folder::purge::PurgeFolder;
 #[cfg(feature = "imap")]
 use email::imap::{ImapContextBuilder, ImapContextSync};
 #[cfg(feature = "account-sync")]
 use email::maildir::config::MaildirConfig;
-#[cfg(feature = "maildir")]
+#[cfg(any(feature = "account-sync", feature = "maildir"))]
 use email::maildir::{MaildirContextBuilder, MaildirContextSync};
-#[cfg(all(feature = "message-add", feature = "imap"))]
-use email::message::add::imap::AddImapMessage;
-#[cfg(all(feature = "message-add", feature = "maildir"))]
-use email::message::add::maildir::AddMaildirMessage;
-#[cfg(all(feature = "message-add", feature = "notmuch"))]
-use email::message::add::notmuch::AddNotmuchMessage;
-#[cfg(all(feature = "message-copy", feature = "imap"))]
-use email::message::copy::imap::CopyImapMessages;
-#[cfg(all(feature = "message-copy", feature = "maildir"))]
-use email::message::copy::maildir::CopyMaildirMessages;
-#[cfg(all(feature = "message-copy", feature = "notmuch"))]
-use email::message::copy::notmuch::CopyNotmuchMessages;
-#[cfg(all(feature = "message-get", feature = "imap"))]
-use email::message::get::imap::GetImapMessages;
-#[cfg(all(feature = "message-move", feature = "imap"))]
-use email::message::move_::imap::MoveImapMessages;
-#[cfg(all(feature = "message-move", feature = "maildir"))]
-use email::message::move_::maildir::MoveMaildirMessages;
-#[cfg(all(feature = "message-move", feature = "notmuch"))]
-use email::message::move_::notmuch::MoveNotmuchMessages;
-#[cfg(all(feature = "message-peek", feature = "imap"))]
-use email::message::peek::imap::PeekImapMessages;
-#[cfg(all(feature = "message-peek", feature = "maildir"))]
-use email::message::peek::maildir::PeekMaildirMessages;
-#[cfg(all(feature = "message-peek", feature = "notmuch"))]
-use email::message::peek::notmuch::PeekNotmuchMessages;
-#[cfg(any(feature = "message-peek", feature = "message-get"))]
-use email::message::Messages;
+#[cfg(any(feature = "account-sync", feature = "message-add"))]
+use email::message::add::AddMessage;
+#[cfg(feature = "message-copy")]
+use email::message::copy::CopyMessages;
+#[cfg(feature = "message-delete")]
+use email::message::delete::DeleteMessages;
+#[cfg(any(feature = "account-sync", feature = "message-get"))]
+use email::message::get::GetMessages;
+#[cfg(any(feature = "account-sync", feature = "message-peek"))]
+use email::message::peek::PeekMessages;
+#[cfg(any(feature = "account-sync", feature = "message-move"))]
+use email::message::r#move::MoveMessages;
+#[cfg(feature = "message-send")]
+use email::message::send::SendMessage;
 #[cfg(feature = "notmuch")]
 use email::notmuch::{NotmuchContextBuilder, NotmuchContextSync};
 #[cfg(feature = "sendmail")]
-use email::sendmail::{SendmailContext, SendmailContextBuilder};
+use email::sendmail::{SendmailContextBuilder, SendmailContextSync};
 #[cfg(feature = "smtp")]
 use email::smtp::{SmtpContextBuilder, SmtpContextSync};
-
-#[allow(unused)]
 use email::{
-    envelope::Id,
+    account::config::AccountConfig,
+    backend::{
+        macros::BackendContext, BackendFeatureBuilder, FindBackendSubcontext, MapBackendFeature,
+    },
+    envelope::{Id, SingleId},
     flag::{Flag, Flags},
+    message::Messages,
 };
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "envelope-list")]
+#[cfg(any(feature = "account-sync", feature = "envelope-list"))]
 use crate::envelope::Envelopes;
 use crate::{account::config::TomlAccountConfig, cache::IdMapper};
 
@@ -170,72 +112,96 @@ impl ToString for BackendKind {
 
 #[derive(Clone, Default)]
 pub struct BackendContextBuilder {
+    pub toml_account_config: Arc<TomlAccountConfig>,
+    pub account_config: Arc<AccountConfig>,
+
     #[cfg(feature = "imap")]
     pub imap: Option<ImapContextBuilder>,
+
     #[cfg(feature = "maildir")]
     pub maildir: Option<MaildirContextBuilder>,
+
     #[cfg(feature = "account-sync")]
     pub maildir_for_sync: Option<MaildirContextBuilder>,
+
     #[cfg(feature = "notmuch")]
     pub notmuch: Option<NotmuchContextBuilder>,
+
     #[cfg(feature = "smtp")]
     pub smtp: Option<SmtpContextBuilder>,
+
     #[cfg(feature = "sendmail")]
     pub sendmail: Option<SendmailContextBuilder>,
 }
 
 impl BackendContextBuilder {
-    #[allow(unused)]
     pub async fn new(
-        toml_account_config: &TomlAccountConfig,
-        account_config: &AccountConfig,
+        toml_account_config: Arc<TomlAccountConfig>,
+        account_config: Arc<AccountConfig>,
         kinds: Vec<&BackendKind>,
     ) -> Result<Self> {
         Ok(Self {
+            toml_account_config: toml_account_config.clone(),
+            account_config: account_config.clone(),
+
             #[cfg(feature = "imap")]
             imap: {
-                let ctx_builder = toml_account_config
+                let builder = toml_account_config
                     .imap
                     .as_ref()
                     .filter(|_| kinds.contains(&&BackendKind::Imap))
-                    .map(|config| {
-                        ImapContextBuilder::new(config.clone()).with_prebuilt_credentials()
-                    });
-                match ctx_builder {
-                    Some(ctx_builder) => Some(ctx_builder.await?),
+                    .map(Clone::clone)
+                    .map(Arc::new)
+                    .map(|config| ImapContextBuilder::new(config).with_prebuilt_credentials());
+                match builder {
+                    Some(builder) => Some(builder.await?),
                     None => None,
                 }
             },
+
             #[cfg(feature = "maildir")]
             maildir: toml_account_config
                 .maildir
                 .as_ref()
                 .filter(|_| kinds.contains(&&BackendKind::Maildir))
-                .map(|config| MaildirContextBuilder::new(config.clone())),
+                .map(Clone::clone)
+                .map(Arc::new)
+                .map(MaildirContextBuilder::new),
+
             #[cfg(feature = "account-sync")]
             maildir_for_sync: Some(MaildirConfig {
                 root_dir: account_config.get_sync_dir()?,
             })
             .filter(|_| kinds.contains(&&BackendKind::MaildirForSync))
-            .map(|config| MaildirContextBuilder::new(config)),
+            .map(Arc::new)
+            .map(MaildirContextBuilder::new),
+
             #[cfg(feature = "notmuch")]
             notmuch: toml_account_config
                 .notmuch
                 .as_ref()
                 .filter(|_| kinds.contains(&&BackendKind::Notmuch))
-                .map(|config| NotmuchContextBuilder::new(config.clone())),
+                .map(Clone::clone)
+                .map(Arc::new)
+                .map(NotmuchContextBuilder::new),
+
             #[cfg(feature = "smtp")]
             smtp: toml_account_config
                 .smtp
                 .as_ref()
                 .filter(|_| kinds.contains(&&BackendKind::Smtp))
-                .map(|config| SmtpContextBuilder::new(config.clone())),
+                .map(Clone::clone)
+                .map(Arc::new)
+                .map(SmtpContextBuilder::new),
+
             #[cfg(feature = "sendmail")]
             sendmail: toml_account_config
                 .sendmail
                 .as_ref()
                 .filter(|_| kinds.contains(&&BackendKind::Sendmail))
-                .map(|config| SendmailContextBuilder::new(config.clone())),
+                .map(Clone::clone)
+                .map(Arc::new)
+                .map(SendmailContextBuilder::new),
         })
     }
 }
@@ -244,616 +210,438 @@ impl BackendContextBuilder {
 impl email::backend::BackendContextBuilder for BackendContextBuilder {
     type Context = BackendContext;
 
-    async fn build(self, config: &AccountConfig) -> Result<Self::Context> {
-        #[allow(unused_mut)]
+    #[cfg(any(feature = "account-sync", feature = "folder-add"))]
+    fn add_folder(&self) -> BackendFeatureBuilder<Self::Context, dyn AddFolder> {
+        match self.toml_account_config.add_folder_kind() {
+            #[cfg(feature = "imap")]
+            Some(BackendKind::Imap) => self.add_folder_from(self.imap.as_ref()),
+            #[cfg(feature = "maildir")]
+            Some(BackendKind::Maildir) => self.add_folder_from(self.maildir.as_ref()),
+            #[cfg(feature = "account-sync")]
+            Some(BackendKind::MaildirForSync) => {
+                let f = self.maildir_for_sync.as_ref()?.add_folder()?;
+                Some(Arc::new(move |ctx| f(ctx.maildir_for_sync.as_ref()?)))
+            }
+            #[cfg(feature = "notmuch")]
+            Some(BackendKind::Notmuch) => self.add_folder_from(self.notmuch.as_ref()),
+            _ => None,
+        }
+    }
+
+    #[cfg(any(feature = "account-sync", feature = "folder-list"))]
+    fn list_folders(&self) -> BackendFeatureBuilder<Self::Context, dyn ListFolders> {
+        match self.toml_account_config.list_folders_kind() {
+            #[cfg(feature = "imap")]
+            Some(BackendKind::Imap) => self.list_folders_from(self.imap.as_ref()),
+            #[cfg(feature = "maildir")]
+            Some(BackendKind::Maildir) => self.list_folders_from(self.maildir.as_ref()),
+            #[cfg(feature = "account-sync")]
+            Some(BackendKind::MaildirForSync) => {
+                let f = self.maildir_for_sync.as_ref()?.list_folders()?;
+                Some(Arc::new(move |ctx| f(ctx.maildir_for_sync.as_ref()?)))
+            }
+            #[cfg(feature = "notmuch")]
+            Some(BackendKind::Notmuch) => self.list_folders_from(self.notmuch.as_ref()),
+            _ => None,
+        }
+    }
+
+    #[cfg(any(feature = "account-sync", feature = "folder-expunge"))]
+    fn expunge_folder(&self) -> BackendFeatureBuilder<Self::Context, dyn ExpungeFolder> {
+        match self.toml_account_config.expunge_folder_kind() {
+            #[cfg(feature = "imap")]
+            Some(BackendKind::Imap) => self.expunge_folder_from(self.imap.as_ref()),
+            #[cfg(feature = "maildir")]
+            Some(BackendKind::Maildir) => self.expunge_folder_from(self.maildir.as_ref()),
+            #[cfg(feature = "account-sync")]
+            Some(BackendKind::MaildirForSync) => {
+                let f = self.maildir_for_sync.as_ref()?.expunge_folder()?;
+                Some(Arc::new(move |ctx| f(ctx.maildir_for_sync.as_ref()?)))
+            }
+            #[cfg(feature = "notmuch")]
+            Some(BackendKind::Notmuch) => self.expunge_folder_from(self.notmuch.as_ref()),
+            _ => None,
+        }
+    }
+
+    #[cfg(feature = "folder-purge")]
+    fn purge_folder(&self) -> BackendFeatureBuilder<Self::Context, dyn PurgeFolder> {
+        match self.toml_account_config.purge_folder_kind() {
+            #[cfg(feature = "imap")]
+            Some(BackendKind::Imap) => self.purge_folder_from(self.imap.as_ref()),
+            #[cfg(feature = "maildir")]
+            Some(BackendKind::Maildir) => self.purge_folder_from(self.maildir.as_ref()),
+            #[cfg(feature = "account-sync")]
+            Some(BackendKind::MaildirForSync) => {
+                let f = self.maildir_for_sync.as_ref()?.purge_folder()?;
+                Some(Arc::new(move |ctx| f(ctx.maildir_for_sync.as_ref()?)))
+            }
+            #[cfg(feature = "notmuch")]
+            Some(BackendKind::Notmuch) => self.purge_folder_from(self.notmuch.as_ref()),
+            _ => None,
+        }
+    }
+
+    #[cfg(any(feature = "account-sync", feature = "folder-delete"))]
+    fn delete_folder(&self) -> BackendFeatureBuilder<Self::Context, dyn DeleteFolder> {
+        match self.toml_account_config.delete_folder_kind() {
+            #[cfg(feature = "imap")]
+            Some(BackendKind::Imap) => self.delete_folder_from(self.imap.as_ref()),
+            #[cfg(feature = "maildir")]
+            Some(BackendKind::Maildir) => self.delete_folder_from(self.maildir.as_ref()),
+            #[cfg(feature = "account-sync")]
+            Some(BackendKind::MaildirForSync) => {
+                let f = self.maildir_for_sync.as_ref()?.delete_folder()?;
+                Some(Arc::new(move |ctx| f(ctx.maildir_for_sync.as_ref()?)))
+            }
+            #[cfg(feature = "notmuch")]
+            Some(BackendKind::Notmuch) => self.delete_folder_from(self.notmuch.as_ref()),
+            _ => None,
+        }
+    }
+
+    #[cfg(any(feature = "account-sync", feature = "envelope-list"))]
+    fn list_envelopes(&self) -> BackendFeatureBuilder<Self::Context, dyn ListEnvelopes> {
+        match self.toml_account_config.list_envelopes_kind() {
+            #[cfg(feature = "imap")]
+            Some(BackendKind::Imap) => self.list_envelopes_from(self.imap.as_ref()),
+            #[cfg(feature = "maildir")]
+            Some(BackendKind::Maildir) => self.list_envelopes_from(self.maildir.as_ref()),
+            #[cfg(feature = "account-sync")]
+            Some(BackendKind::MaildirForSync) => {
+                let f = self.maildir_for_sync.as_ref()?.list_envelopes()?;
+                Some(Arc::new(move |ctx| f(ctx.maildir_for_sync.as_ref()?)))
+            }
+            #[cfg(feature = "notmuch")]
+            Some(BackendKind::Notmuch) => self.list_envelopes_from(self.notmuch.as_ref()),
+            _ => None,
+        }
+    }
+
+    #[cfg(feature = "envelope-watch")]
+    fn watch_envelopes(&self) -> BackendFeatureBuilder<Self::Context, dyn WatchEnvelopes> {
+        match self.toml_account_config.watch_envelopes_kind() {
+            #[cfg(feature = "imap")]
+            Some(BackendKind::Imap) => self.watch_envelopes_from(self.imap.as_ref()),
+            #[cfg(feature = "maildir")]
+            Some(BackendKind::Maildir) => self.watch_envelopes_from(self.maildir.as_ref()),
+            #[cfg(feature = "account-sync")]
+            Some(BackendKind::MaildirForSync) => {
+                let f = self.maildir_for_sync.as_ref()?.watch_envelopes()?;
+                Some(Arc::new(move |ctx| f(ctx.maildir_for_sync.as_ref()?)))
+            }
+            #[cfg(feature = "notmuch")]
+            Some(BackendKind::Notmuch) => self.watch_envelopes_from(self.notmuch.as_ref()),
+            _ => None,
+        }
+    }
+
+    #[cfg(any(feature = "account-sync", feature = "envelope-get"))]
+    fn get_envelope(&self) -> BackendFeatureBuilder<Self::Context, dyn GetEnvelope> {
+        match self.toml_account_config.get_envelope_kind() {
+            #[cfg(feature = "imap")]
+            Some(BackendKind::Imap) => self.get_envelope_from(self.imap.as_ref()),
+            #[cfg(feature = "maildir")]
+            Some(BackendKind::Maildir) => self.get_envelope_from(self.maildir.as_ref()),
+            #[cfg(feature = "account-sync")]
+            Some(BackendKind::MaildirForSync) => {
+                let f = self.maildir_for_sync.as_ref()?.get_envelope()?;
+                Some(Arc::new(move |ctx| f(ctx.maildir_for_sync.as_ref()?)))
+            }
+            #[cfg(feature = "notmuch")]
+            Some(BackendKind::Notmuch) => self.get_envelope_from(self.notmuch.as_ref()),
+            _ => None,
+        }
+    }
+
+    #[cfg(any(feature = "account-sync", feature = "flag-add"))]
+    fn add_flags(&self) -> BackendFeatureBuilder<Self::Context, dyn AddFlags> {
+        match self.toml_account_config.add_flags_kind() {
+            #[cfg(feature = "imap")]
+            Some(BackendKind::Imap) => self.add_flags_from(self.imap.as_ref()),
+            #[cfg(feature = "maildir")]
+            Some(BackendKind::Maildir) => self.add_flags_from(self.maildir.as_ref()),
+            #[cfg(feature = "account-sync")]
+            Some(BackendKind::MaildirForSync) => {
+                let f = self.maildir_for_sync.as_ref()?.add_flags()?;
+                Some(Arc::new(move |ctx| f(ctx.maildir_for_sync.as_ref()?)))
+            }
+            #[cfg(feature = "notmuch")]
+            Some(BackendKind::Notmuch) => self.add_flags_from(self.notmuch.as_ref()),
+            _ => None,
+        }
+    }
+
+    #[cfg(any(feature = "account-sync", feature = "flag-set"))]
+    fn set_flags(&self) -> BackendFeatureBuilder<Self::Context, dyn SetFlags> {
+        match self.toml_account_config.set_flags_kind() {
+            #[cfg(feature = "imap")]
+            Some(BackendKind::Imap) => self.set_flags_from(self.imap.as_ref()),
+            #[cfg(feature = "maildir")]
+            Some(BackendKind::Maildir) => self.set_flags_from(self.maildir.as_ref()),
+            #[cfg(feature = "account-sync")]
+            Some(BackendKind::MaildirForSync) => {
+                let f = self.maildir_for_sync.as_ref()?.set_flags()?;
+                Some(Arc::new(move |ctx| f(ctx.maildir_for_sync.as_ref()?)))
+            }
+            #[cfg(feature = "notmuch")]
+            Some(BackendKind::Notmuch) => self.set_flags_from(self.notmuch.as_ref()),
+            _ => None,
+        }
+    }
+
+    #[cfg(feature = "flag-remove")]
+    fn remove_flags(&self) -> BackendFeatureBuilder<Self::Context, dyn RemoveFlags> {
+        match self.toml_account_config.remove_flags_kind() {
+            #[cfg(feature = "imap")]
+            Some(BackendKind::Imap) => self.remove_flags_from(self.imap.as_ref()),
+            #[cfg(feature = "maildir")]
+            Some(BackendKind::Maildir) => self.remove_flags_from(self.maildir.as_ref()),
+            #[cfg(feature = "account-sync")]
+            Some(BackendKind::MaildirForSync) => {
+                let f = self.maildir_for_sync.as_ref()?.remove_flags()?;
+                Some(Arc::new(move |ctx| f(ctx.maildir_for_sync.as_ref()?)))
+            }
+            #[cfg(feature = "notmuch")]
+            Some(BackendKind::Notmuch) => self.remove_flags_from(self.notmuch.as_ref()),
+            _ => None,
+        }
+    }
+
+    #[cfg(any(feature = "account-sync", feature = "message-add"))]
+    fn add_message(&self) -> BackendFeatureBuilder<Self::Context, dyn AddMessage> {
+        match self.toml_account_config.add_message_kind() {
+            #[cfg(feature = "imap")]
+            Some(BackendKind::Imap) => self.add_message_from(self.imap.as_ref()),
+            #[cfg(feature = "maildir")]
+            Some(BackendKind::Maildir) => self.add_message_from(self.maildir.as_ref()),
+            #[cfg(feature = "account-sync")]
+            Some(BackendKind::MaildirForSync) => {
+                let f = self.maildir_for_sync.as_ref()?.add_message()?;
+                Some(Arc::new(move |ctx| f(ctx.maildir_for_sync.as_ref()?)))
+            }
+            #[cfg(feature = "notmuch")]
+            Some(BackendKind::Notmuch) => self.add_message_from(self.notmuch.as_ref()),
+            _ => None,
+        }
+    }
+
+    #[cfg(feature = "message-send")]
+    fn send_message(&self) -> BackendFeatureBuilder<Self::Context, dyn SendMessage> {
+        match self.toml_account_config.send_message_kind() {
+            #[cfg(feature = "smtp")]
+            Some(BackendKind::Smtp) => self.send_message_from(self.smtp.as_ref()),
+            #[cfg(feature = "sendmail")]
+            Some(BackendKind::Sendmail) => self.send_message_from(self.sendmail.as_ref()),
+            _ => None,
+        }
+    }
+
+    #[cfg(any(feature = "account-sync", feature = "message-peek"))]
+    fn peek_messages(&self) -> BackendFeatureBuilder<Self::Context, dyn PeekMessages> {
+        match self.toml_account_config.peek_messages_kind() {
+            #[cfg(feature = "imap")]
+            Some(BackendKind::Imap) => self.peek_messages_from(self.imap.as_ref()),
+            #[cfg(feature = "maildir")]
+            Some(BackendKind::Maildir) => self.peek_messages_from(self.maildir.as_ref()),
+            #[cfg(feature = "account-sync")]
+            Some(BackendKind::MaildirForSync) => {
+                let f = self.maildir_for_sync.as_ref()?.peek_messages()?;
+                Some(Arc::new(move |ctx| f(ctx.maildir_for_sync.as_ref()?)))
+            }
+            #[cfg(feature = "notmuch")]
+            Some(BackendKind::Notmuch) => self.peek_messages_from(self.notmuch.as_ref()),
+            _ => None,
+        }
+    }
+
+    #[cfg(any(feature = "account-sync", feature = "message-get"))]
+    fn get_messages(&self) -> BackendFeatureBuilder<Self::Context, dyn GetMessages> {
+        match self.toml_account_config.get_messages_kind() {
+            #[cfg(feature = "imap")]
+            Some(BackendKind::Imap) => self.get_messages_from(self.imap.as_ref()),
+            #[cfg(feature = "maildir")]
+            Some(BackendKind::Maildir) => self.get_messages_from(self.maildir.as_ref()),
+            #[cfg(feature = "account-sync")]
+            Some(BackendKind::MaildirForSync) => {
+                let f = self.maildir_for_sync.as_ref()?.get_messages()?;
+                Some(Arc::new(move |ctx| f(ctx.maildir_for_sync.as_ref()?)))
+            }
+            #[cfg(feature = "notmuch")]
+            Some(BackendKind::Notmuch) => self.get_messages_from(self.notmuch.as_ref()),
+            _ => None,
+        }
+    }
+
+    #[cfg(feature = "message-copy")]
+    fn copy_messages(&self) -> BackendFeatureBuilder<Self::Context, dyn CopyMessages> {
+        match self.toml_account_config.copy_messages_kind() {
+            #[cfg(feature = "imap")]
+            Some(BackendKind::Imap) => self.copy_messages_from(self.imap.as_ref()),
+            #[cfg(feature = "maildir")]
+            Some(BackendKind::Maildir) => self.copy_messages_from(self.maildir.as_ref()),
+            #[cfg(feature = "account-sync")]
+            Some(BackendKind::MaildirForSync) => {
+                let f = self.maildir_for_sync.as_ref()?.copy_messages()?;
+                Some(Arc::new(move |ctx| f(ctx.maildir_for_sync.as_ref()?)))
+            }
+            #[cfg(feature = "notmuch")]
+            Some(BackendKind::Notmuch) => self.copy_messages_from(self.notmuch.as_ref()),
+            _ => None,
+        }
+    }
+
+    #[cfg(any(feature = "account-sync", feature = "message-move"))]
+    fn move_messages(&self) -> BackendFeatureBuilder<Self::Context, dyn MoveMessages> {
+        match self.toml_account_config.move_messages_kind() {
+            #[cfg(feature = "imap")]
+            Some(BackendKind::Imap) => self.move_messages_from(self.imap.as_ref()),
+            #[cfg(feature = "maildir")]
+            Some(BackendKind::Maildir) => self.move_messages_from(self.maildir.as_ref()),
+            #[cfg(feature = "account-sync")]
+            Some(BackendKind::MaildirForSync) => {
+                let f = self.maildir_for_sync.as_ref()?.move_messages()?;
+                Some(Arc::new(move |ctx| f(ctx.maildir_for_sync.as_ref()?)))
+            }
+            #[cfg(feature = "notmuch")]
+            Some(BackendKind::Notmuch) => self.move_messages_from(self.notmuch.as_ref()),
+            _ => None,
+        }
+    }
+
+    #[cfg(feature = "message-delete")]
+    fn delete_messages(&self) -> BackendFeatureBuilder<Self::Context, dyn DeleteMessages> {
+        match self.toml_account_config.delete_messages_kind() {
+            #[cfg(feature = "imap")]
+            Some(BackendKind::Imap) => self.delete_messages_from(self.imap.as_ref()),
+            #[cfg(feature = "maildir")]
+            Some(BackendKind::Maildir) => self.delete_messages_from(self.maildir.as_ref()),
+            #[cfg(feature = "account-sync")]
+            Some(BackendKind::MaildirForSync) => {
+                let f = self.maildir_for_sync.as_ref()?.delete_messages()?;
+                Some(Arc::new(move |ctx| f(ctx.maildir_for_sync.as_ref()?)))
+            }
+            #[cfg(feature = "notmuch")]
+            Some(BackendKind::Notmuch) => self.delete_messages_from(self.notmuch.as_ref()),
+            _ => None,
+        }
+    }
+
+    async fn build(self, config: Arc<AccountConfig>) -> Result<Self::Context> {
         let mut ctx = BackendContext::default();
 
         #[cfg(feature = "imap")]
         if let Some(imap) = self.imap {
-            ctx.imap = Some(imap.build(config).await?);
+            ctx.imap = Some(imap.build(config.clone()).await?);
         }
 
         #[cfg(feature = "maildir")]
         if let Some(maildir) = self.maildir {
-            ctx.maildir = Some(maildir.build(config).await?);
+            ctx.maildir = Some(maildir.build(config.clone()).await?);
         }
 
         #[cfg(feature = "account-sync")]
         if let Some(maildir) = self.maildir_for_sync {
-            ctx.maildir_for_sync = Some(maildir.build(config).await?);
+            ctx.maildir_for_sync = Some(maildir.build(config.clone()).await?);
         }
 
         #[cfg(feature = "notmuch")]
         if let Some(notmuch) = self.notmuch {
-            ctx.notmuch = Some(notmuch.build(config).await?);
+            ctx.notmuch = Some(notmuch.build(config.clone()).await?);
         }
 
         #[cfg(feature = "smtp")]
         if let Some(smtp) = self.smtp {
-            ctx.smtp = Some(smtp.build(config).await?);
+            ctx.smtp = Some(smtp.build(config.clone()).await?);
         }
 
         #[cfg(feature = "sendmail")]
         if let Some(sendmail) = self.sendmail {
-            ctx.sendmail = Some(sendmail.build(config).await?);
+            ctx.sendmail = Some(sendmail.build(config.clone()).await?);
         }
 
         Ok(ctx)
     }
 }
 
-#[derive(Default)]
+#[derive(BackendContext, Default)]
 pub struct BackendContext {
     #[cfg(feature = "imap")]
     pub imap: Option<ImapContextSync>,
+
     #[cfg(feature = "maildir")]
     pub maildir: Option<MaildirContextSync>,
+
     #[cfg(feature = "account-sync")]
     pub maildir_for_sync: Option<MaildirContextSync>,
+
     #[cfg(feature = "notmuch")]
     pub notmuch: Option<NotmuchContextSync>,
+
     #[cfg(feature = "smtp")]
     pub smtp: Option<SmtpContextSync>,
+
     #[cfg(feature = "sendmail")]
-    pub sendmail: Option<SendmailContext>,
+    pub sendmail: Option<SendmailContextSync>,
 }
 
-pub struct BackendBuilder {
-    toml_account_config: TomlAccountConfig,
-    builder: email::backend::BackendBuilder<BackendContextBuilder>,
-}
-
-impl BackendBuilder {
-    pub async fn new(
-        toml_account_config: TomlAccountConfig,
-        account_config: AccountConfig,
-    ) -> Result<Self> {
-        #[allow(unused)]
-        let used_backends = toml_account_config.get_used_backends();
-
-        #[cfg(feature = "imap")]
-        let is_imap_used = used_backends.contains(&BackendKind::Imap);
-        #[cfg(feature = "maildir")]
-        let is_maildir_used = used_backends.contains(&BackendKind::Maildir);
-        #[cfg(feature = "account-sync")]
-        let is_maildir_for_sync_used = used_backends.contains(&BackendKind::MaildirForSync);
-
-        let backend_ctx_builder = BackendContextBuilder {
-            #[cfg(feature = "imap")]
-            imap: {
-                let ctx_builder = toml_account_config
-                    .imap
-                    .as_ref()
-                    .filter(|_| is_imap_used)
-                    .map(|config| {
-                        ImapContextBuilder::new(config.clone()).with_prebuilt_credentials()
-                    });
-
-                match ctx_builder {
-                    Some(ctx_builder) => Some(ctx_builder.await?),
-                    None => None,
-                }
-            },
-            #[cfg(feature = "maildir")]
-            maildir: toml_account_config
-                .maildir
-                .as_ref()
-                .filter(|_| is_maildir_used)
-                .map(|config| MaildirContextBuilder::new(config.clone())),
-            #[cfg(feature = "account-sync")]
-            maildir_for_sync: Some(MaildirConfig {
-                root_dir: account_config.get_sync_dir()?,
-            })
-            .filter(|_| is_maildir_for_sync_used)
-            .map(|config| MaildirContextBuilder::new(config)),
-            ..Default::default()
-        };
-
-        #[allow(unused_mut)]
-        let mut backend_builder =
-            email::backend::BackendBuilder::new(account_config.clone(), backend_ctx_builder);
-
-        #[cfg(feature = "folder-add")]
-        match toml_account_config.add_folder_kind() {
-            #[cfg(feature = "maildir")]
-            Some(BackendKind::Maildir) => {
-                backend_builder = backend_builder
-                    .with_add_folder(|ctx| ctx.maildir.as_ref().map(AddMaildirFolder::new_boxed));
-            }
-            #[cfg(feature = "account-sync")]
-            Some(BackendKind::MaildirForSync) => {
-                backend_builder = backend_builder.with_add_folder(|ctx| {
-                    ctx.maildir_for_sync
-                        .as_ref()
-                        .map(AddMaildirFolder::new_boxed)
-                });
-            }
-            #[cfg(feature = "imap")]
-            Some(BackendKind::Imap) => {
-                backend_builder = backend_builder
-                    .with_add_folder(|ctx| ctx.imap.as_ref().map(AddImapFolder::new_boxed));
-            }
-            #[cfg(feature = "notmuch")]
-            Some(BackendKind::Notmuch) => {
-                backend_builder = backend_builder
-                    .with_add_folder(|ctx| ctx.notmuch.as_ref().map(AddNotmuchFolder::new_boxed));
-            }
-            _ => (),
-        }
-
-        #[cfg(feature = "folder-list")]
-        match toml_account_config.list_folders_kind() {
-            #[cfg(feature = "maildir")]
-            Some(BackendKind::Maildir) => {
-                backend_builder = backend_builder.with_list_folders(|ctx| {
-                    ctx.maildir.as_ref().map(ListMaildirFolders::new_boxed)
-                });
-            }
-            #[cfg(feature = "account-sync")]
-            Some(BackendKind::MaildirForSync) => {
-                backend_builder = backend_builder.with_list_folders(|ctx| {
-                    ctx.maildir_for_sync
-                        .as_ref()
-                        .map(ListMaildirFolders::new_boxed)
-                });
-            }
-            #[cfg(feature = "imap")]
-            Some(BackendKind::Imap) => {
-                backend_builder = backend_builder
-                    .with_list_folders(|ctx| ctx.imap.as_ref().map(ListImapFolders::new_boxed));
-            }
-            #[cfg(feature = "notmuch")]
-            Some(BackendKind::Notmuch) => {
-                backend_builder = backend_builder.with_list_folders(|ctx| {
-                    ctx.notmuch.as_ref().map(ListNotmuchFolders::new_boxed)
-                });
-            }
-            _ => (),
-        }
-
-        #[cfg(feature = "folder-expunge")]
-        match toml_account_config.expunge_folder_kind() {
-            #[cfg(feature = "maildir")]
-            Some(BackendKind::Maildir) => {
-                backend_builder = backend_builder.with_expunge_folder(|ctx| {
-                    ctx.maildir.as_ref().map(ExpungeMaildirFolder::new_boxed)
-                });
-            }
-            #[cfg(feature = "account-sync")]
-            Some(BackendKind::MaildirForSync) => {
-                backend_builder = backend_builder.with_expunge_folder(|ctx| {
-                    ctx.maildir_for_sync
-                        .as_ref()
-                        .map(ExpungeMaildirFolder::new_boxed)
-                });
-            }
-            #[cfg(feature = "imap")]
-            Some(BackendKind::Imap) => {
-                backend_builder = backend_builder
-                    .with_expunge_folder(|ctx| ctx.imap.as_ref().map(ExpungeImapFolder::new_boxed));
-            }
-            #[cfg(feature = "notmuch")]
-            Some(BackendKind::Notmuch) => {
-                // TODO
-                // backend_builder = backend_builder.with_expunge_folder(|ctx| {
-                //     ctx.notmuch.as_ref().map(ExpungeNotmuchFolder::new_boxed)
-                // });
-            }
-            _ => (),
-        }
-
-        #[cfg(feature = "folder-purge")]
-        match toml_account_config.purge_folder_kind() {
-            // TODO
-            // #[cfg(feature = "maildir")]
-            // Some(BackendKind::Maildir) => {
-            //     backend_builder = backend_builder
-            //         .with_purge_folder(|ctx| ctx.maildir.as_ref().map(PurgeMaildirFolder::new_boxed));
-            // }
-            // TODO
-            // #[cfg(feature = "account-sync")]
-            // Some(BackendKind::MaildirForSync) => {
-            //     backend_builder = backend_builder
-            //         .with_purge_folder(|ctx| ctx.maildir_for_sync.as_ref().map(PurgeMaildirFolder::new_boxed));
-            // }
-            #[cfg(feature = "imap")]
-            Some(BackendKind::Imap) => {
-                backend_builder = backend_builder
-                    .with_purge_folder(|ctx| ctx.imap.as_ref().map(PurgeImapFolder::new_boxed));
-            }
-            #[cfg(feature = "notmuch")]
-            Some(BackendKind::Notmuch) => {
-                // TODO
-                // backend_builder = backend_builder.with_purge_folder(|ctx| {
-                //     ctx.notmuch.as_ref().map(PurgeNotmuchFolder::new_boxed)
-                // });
-            }
-            _ => (),
-        }
-
-        #[cfg(feature = "folder-delete")]
-        match toml_account_config.delete_folder_kind() {
-            #[cfg(feature = "maildir")]
-            Some(BackendKind::Maildir) => {
-                backend_builder = backend_builder.with_delete_folder(|ctx| {
-                    ctx.maildir.as_ref().map(DeleteMaildirFolder::new_boxed)
-                });
-            }
-            #[cfg(feature = "account-sync")]
-            Some(BackendKind::MaildirForSync) => {
-                backend_builder = backend_builder.with_delete_folder(|ctx| {
-                    ctx.maildir_for_sync
-                        .as_ref()
-                        .map(DeleteMaildirFolder::new_boxed)
-                });
-            }
-            #[cfg(feature = "imap")]
-            Some(BackendKind::Imap) => {
-                backend_builder = backend_builder
-                    .with_delete_folder(|ctx| ctx.imap.as_ref().map(DeleteImapFolder::new_boxed));
-            }
-            #[cfg(feature = "notmuch")]
-            Some(BackendKind::Notmuch) => {
-                // TODO
-                // backend_builder = backend_builder.with_delete_folder(|ctx| {
-                //     ctx.notmuch.as_ref().map(DeleteNotmuchFolder::new_boxed)
-                // });
-            }
-            _ => (),
-        }
-
-        #[cfg(feature = "envelope-list")]
-        match toml_account_config.list_envelopes_kind() {
-            #[cfg(feature = "maildir")]
-            Some(BackendKind::Maildir) => {
-                backend_builder = backend_builder.with_list_envelopes(|ctx| {
-                    ctx.maildir.as_ref().map(ListMaildirEnvelopes::new_boxed)
-                });
-            }
-            #[cfg(feature = "account-sync")]
-            Some(BackendKind::MaildirForSync) => {
-                backend_builder = backend_builder.with_list_envelopes(|ctx| {
-                    ctx.maildir_for_sync
-                        .as_ref()
-                        .map(ListMaildirEnvelopes::new_boxed)
-                });
-            }
-            #[cfg(feature = "imap")]
-            Some(BackendKind::Imap) => {
-                backend_builder = backend_builder
-                    .with_list_envelopes(|ctx| ctx.imap.as_ref().map(ListImapEnvelopes::new_boxed));
-            }
-            #[cfg(feature = "notmuch")]
-            Some(BackendKind::Notmuch) => {
-                backend_builder = backend_builder.with_list_envelopes(|ctx| {
-                    ctx.notmuch.as_ref().map(ListNotmuchEnvelopes::new_boxed)
-                });
-            }
-            _ => (),
-        }
-
-        #[cfg(feature = "envelope-watch")]
-        match toml_account_config.watch_envelopes_kind() {
-            #[cfg(feature = "maildir")]
-            Some(BackendKind::Maildir) => {
-                backend_builder = backend_builder.with_watch_envelopes(|ctx| {
-                    ctx.maildir.as_ref().map(WatchMaildirEnvelopes::new_boxed)
-                });
-            }
-            #[cfg(feature = "account-sync")]
-            Some(BackendKind::MaildirForSync) => {
-                backend_builder = backend_builder.with_watch_envelopes(|ctx| {
-                    ctx.maildir_for_sync
-                        .as_ref()
-                        .map(WatchMaildirEnvelopes::new_boxed)
-                });
-            }
-            #[cfg(feature = "imap")]
-            Some(BackendKind::Imap) => {
-                backend_builder = backend_builder.with_watch_envelopes(|ctx| {
-                    ctx.imap.as_ref().map(WatchImapEnvelopes::new_boxed)
-                });
-            }
-            #[cfg(feature = "notmuch")]
-            Some(BackendKind::Notmuch) => {
-                // TODO
-                // backend_builder = backend_builder.with_watch_envelopes(|ctx| {
-                //     ctx.notmuch.as_ref().map(WatchNotmuchEnvelopes::new_boxed)
-                // });
-            }
-            _ => (),
-        }
-
-        #[cfg(feature = "envelope-get")]
-        match toml_account_config.get_envelope_kind() {
-            #[cfg(feature = "maildir")]
-            Some(BackendKind::Maildir) => {
-                backend_builder = backend_builder.with_get_envelope(|ctx| {
-                    ctx.maildir.as_ref().map(GetMaildirEnvelope::new_boxed)
-                });
-            }
-            #[cfg(feature = "account-sync")]
-            Some(BackendKind::MaildirForSync) => {
-                backend_builder = backend_builder.with_get_envelope(|ctx| {
-                    ctx.maildir_for_sync
-                        .as_ref()
-                        .map(GetMaildirEnvelope::new_boxed)
-                });
-            }
-            #[cfg(feature = "imap")]
-            Some(BackendKind::Imap) => {
-                backend_builder = backend_builder
-                    .with_get_envelope(|ctx| ctx.imap.as_ref().map(GetImapEnvelope::new_boxed));
-            }
-            #[cfg(feature = "notmuch")]
-            Some(BackendKind::Notmuch) => {
-                backend_builder = backend_builder.with_get_envelope(|ctx| {
-                    ctx.notmuch.as_ref().map(GetNotmuchEnvelope::new_boxed)
-                });
-            }
-            _ => (),
-        }
-
-        #[cfg(feature = "flag-add")]
-        match toml_account_config.add_flags_kind() {
-            #[cfg(feature = "maildir")]
-            Some(BackendKind::Maildir) => {
-                backend_builder = backend_builder
-                    .with_add_flags(|ctx| ctx.maildir.as_ref().map(AddMaildirFlags::new_boxed));
-            }
-            #[cfg(feature = "account-sync")]
-            Some(BackendKind::MaildirForSync) => {
-                backend_builder = backend_builder.with_add_flags(|ctx| {
-                    ctx.maildir_for_sync
-                        .as_ref()
-                        .map(AddMaildirFlags::new_boxed)
-                });
-            }
-            #[cfg(feature = "imap")]
-            Some(BackendKind::Imap) => {
-                backend_builder = backend_builder
-                    .with_add_flags(|ctx| ctx.imap.as_ref().map(AddImapFlags::new_boxed));
-            }
-            #[cfg(feature = "notmuch")]
-            Some(BackendKind::Notmuch) => {
-                backend_builder = backend_builder
-                    .with_add_flags(|ctx| ctx.notmuch.as_ref().map(AddNotmuchFlags::new_boxed));
-            }
-            _ => (),
-        }
-
-        #[cfg(feature = "flag-set")]
-        match toml_account_config.set_flags_kind() {
-            #[cfg(feature = "maildir")]
-            Some(BackendKind::Maildir) => {
-                backend_builder = backend_builder
-                    .with_set_flags(|ctx| ctx.maildir.as_ref().map(SetMaildirFlags::new_boxed));
-            }
-            #[cfg(feature = "account-sync")]
-            Some(BackendKind::MaildirForSync) => {
-                backend_builder = backend_builder.with_set_flags(|ctx| {
-                    ctx.maildir_for_sync
-                        .as_ref()
-                        .map(SetMaildirFlags::new_boxed)
-                });
-            }
-            #[cfg(feature = "imap")]
-            Some(BackendKind::Imap) => {
-                backend_builder = backend_builder
-                    .with_set_flags(|ctx| ctx.imap.as_ref().map(SetImapFlags::new_boxed));
-            }
-            #[cfg(feature = "notmuch")]
-            Some(BackendKind::Notmuch) => {
-                backend_builder = backend_builder
-                    .with_set_flags(|ctx| ctx.notmuch.as_ref().map(SetNotmuchFlags::new_boxed));
-            }
-            _ => (),
-        }
-
-        #[cfg(feature = "flag-remove")]
-        match toml_account_config.remove_flags_kind() {
-            #[cfg(feature = "maildir")]
-            Some(BackendKind::Maildir) => {
-                backend_builder = backend_builder.with_remove_flags(|ctx| {
-                    ctx.maildir.as_ref().map(RemoveMaildirFlags::new_boxed)
-                });
-            }
-            #[cfg(feature = "account-sync")]
-            Some(BackendKind::MaildirForSync) => {
-                backend_builder = backend_builder.with_remove_flags(|ctx| {
-                    ctx.maildir_for_sync
-                        .as_ref()
-                        .map(RemoveMaildirFlags::new_boxed)
-                });
-            }
-            #[cfg(feature = "imap")]
-            Some(BackendKind::Imap) => {
-                backend_builder = backend_builder
-                    .with_remove_flags(|ctx| ctx.imap.as_ref().map(RemoveImapFlags::new_boxed));
-            }
-            #[cfg(feature = "notmuch")]
-            Some(BackendKind::Notmuch) => {
-                backend_builder = backend_builder.with_remove_flags(|ctx| {
-                    ctx.notmuch.as_ref().map(RemoveNotmuchFlags::new_boxed)
-                });
-            }
-            _ => (),
-        }
-
-        #[cfg(feature = "message-add")]
-        match toml_account_config.add_message_kind() {
-            #[cfg(feature = "imap")]
-            Some(BackendKind::Imap) => {
-                backend_builder = backend_builder
-                    .with_add_message(|ctx| ctx.imap.as_ref().map(AddImapMessage::new_boxed))
-                    .with_add_message(|ctx| ctx.imap.as_ref().map(AddImapMessage::new_boxed));
-            }
-            #[cfg(feature = "maildir")]
-            Some(BackendKind::Maildir) => {
-                backend_builder = backend_builder
-                    .with_add_message(|ctx| ctx.maildir.as_ref().map(AddMaildirMessage::new_boxed));
-            }
-            #[cfg(feature = "account-sync")]
-            Some(BackendKind::MaildirForSync) => {
-                backend_builder = backend_builder.with_add_message(|ctx| {
-                    ctx.maildir_for_sync
-                        .as_ref()
-                        .map(AddMaildirMessage::new_boxed)
-                });
-            }
-            #[cfg(feature = "notmuch")]
-            Some(BackendKind::Notmuch) => {
-                backend_builder = backend_builder
-                    .with_add_message(|ctx| ctx.notmuch.as_ref().map(AddNotmuchMessage::new_boxed));
-            }
-            _ => (),
-        }
-
-        #[cfg(feature = "message-peek")]
-        match toml_account_config.peek_messages_kind() {
-            #[cfg(feature = "maildir")]
-            Some(BackendKind::Maildir) => {
-                backend_builder = backend_builder.with_peek_messages(|ctx| {
-                    ctx.maildir.as_ref().map(PeekMaildirMessages::new_boxed)
-                });
-            }
-            #[cfg(feature = "account-sync")]
-            Some(BackendKind::MaildirForSync) => {
-                backend_builder = backend_builder.with_peek_messages(|ctx| {
-                    ctx.maildir_for_sync
-                        .as_ref()
-                        .map(PeekMaildirMessages::new_boxed)
-                });
-            }
-            #[cfg(feature = "imap")]
-            Some(BackendKind::Imap) => {
-                backend_builder = backend_builder
-                    .with_peek_messages(|ctx| ctx.imap.as_ref().map(PeekImapMessages::new_boxed));
-            }
-            #[cfg(feature = "notmuch")]
-            Some(BackendKind::Notmuch) => {
-                backend_builder = backend_builder.with_peek_messages(|ctx| {
-                    ctx.notmuch.as_ref().map(PeekNotmuchMessages::new_boxed)
-                });
-            }
-            _ => (),
-        }
-
-        #[cfg(feature = "message-get")]
-        match toml_account_config.get_messages_kind() {
-            #[cfg(feature = "imap")]
-            Some(BackendKind::Imap) => {
-                backend_builder = backend_builder
-                    .with_get_messages(|ctx| ctx.imap.as_ref().map(GetImapMessages::new_boxed));
-            }
-            _ => (),
-        }
-
-        #[cfg(feature = "message-copy")]
-        match toml_account_config.copy_messages_kind() {
-            #[cfg(feature = "maildir")]
-            Some(BackendKind::Maildir) => {
-                backend_builder = backend_builder.with_copy_messages(|ctx| {
-                    ctx.maildir.as_ref().map(CopyMaildirMessages::new_boxed)
-                });
-            }
-            #[cfg(feature = "account-sync")]
-            Some(BackendKind::MaildirForSync) => {
-                backend_builder = backend_builder.with_copy_messages(|ctx| {
-                    ctx.maildir_for_sync
-                        .as_ref()
-                        .map(CopyMaildirMessages::new_boxed)
-                });
-            }
-            #[cfg(feature = "imap")]
-            Some(BackendKind::Imap) => {
-                backend_builder = backend_builder
-                    .with_copy_messages(|ctx| ctx.imap.as_ref().map(CopyImapMessages::new_boxed));
-            }
-            #[cfg(feature = "notmuch")]
-            Some(BackendKind::Notmuch) => {
-                backend_builder = backend_builder.with_copy_messages(|ctx| {
-                    ctx.notmuch.as_ref().map(CopyNotmuchMessages::new_boxed)
-                });
-            }
-            _ => (),
-        }
-
-        #[cfg(feature = "message-move")]
-        match toml_account_config.move_messages_kind() {
-            #[cfg(feature = "maildir")]
-            Some(BackendKind::Maildir) => {
-                backend_builder = backend_builder.with_move_messages(|ctx| {
-                    ctx.maildir.as_ref().map(MoveMaildirMessages::new_boxed)
-                });
-            }
-            #[cfg(feature = "account-sync")]
-            Some(BackendKind::MaildirForSync) => {
-                backend_builder = backend_builder.with_move_messages(|ctx| {
-                    ctx.maildir_for_sync
-                        .as_ref()
-                        .map(MoveMaildirMessages::new_boxed)
-                });
-            }
-            #[cfg(feature = "imap")]
-            Some(BackendKind::Imap) => {
-                backend_builder = backend_builder
-                    .with_move_messages(|ctx| ctx.imap.as_ref().map(MoveImapMessages::new_boxed));
-            }
-            #[cfg(feature = "notmuch")]
-            Some(BackendKind::Notmuch) => {
-                backend_builder = backend_builder.with_move_messages(|ctx| {
-                    ctx.notmuch.as_ref().map(MoveNotmuchMessages::new_boxed)
-                });
-            }
-            _ => (),
-        }
-
-        Ok(Self {
-            toml_account_config,
-            builder: backend_builder,
-        })
-    }
-
-    pub async fn build(self) -> Result<Backend> {
-        Ok(Backend {
-            toml_account_config: self.toml_account_config,
-            backend: self.builder.build().await?,
-        })
+#[cfg(feature = "imap")]
+impl FindBackendSubcontext<ImapContextSync> for BackendContext {
+    fn find_subcontext(&self) -> Option<&ImapContextSync> {
+        self.imap.as_ref()
     }
 }
 
-impl Deref for BackendBuilder {
-    type Target = email::backend::BackendBuilder<BackendContextBuilder>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.builder
+#[cfg(feature = "maildir")]
+impl FindBackendSubcontext<MaildirContextSync> for BackendContext {
+    fn find_subcontext(&self) -> Option<&MaildirContextSync> {
+        self.maildir.as_ref()
     }
 }
-impl From<BackendBuilder> for email::backend::BackendBuilder<BackendContextBuilder> {
-    fn from(backend_builder: BackendBuilder) -> Self {
-        backend_builder.builder
+
+#[cfg(feature = "notmuch")]
+impl FindBackendSubcontext<NotmuchContextSync> for BackendContext {
+    fn find_subcontext(&self) -> Option<&NotmuchContextSync> {
+        self.notmuch.as_ref()
+    }
+}
+
+#[cfg(feature = "smtp")]
+impl FindBackendSubcontext<SmtpContextSync> for BackendContext {
+    fn find_subcontext(&self) -> Option<&SmtpContextSync> {
+        self.smtp.as_ref()
+    }
+}
+
+#[cfg(feature = "sendmail")]
+impl FindBackendSubcontext<SendmailContextSync> for BackendContext {
+    fn find_subcontext(&self) -> Option<&SendmailContextSync> {
+        self.sendmail.as_ref()
     }
 }
 
 pub struct Backend {
-    #[allow(unused)]
-    toml_account_config: TomlAccountConfig,
-    backend: email::backend::Backend<BackendContext>,
+    pub toml_account_config: Arc<TomlAccountConfig>,
+    pub backend: email::backend::Backend<BackendContext>,
 }
 
 impl Backend {
     pub async fn new(
-        toml_account_config: &TomlAccountConfig,
-        account_config: &AccountConfig,
+        toml_account_config: Arc<TomlAccountConfig>,
+        account_config: Arc<AccountConfig>,
         backend_kinds: impl IntoIterator<Item = &BackendKind>,
         with_features: impl Fn(&mut email::backend::BackendBuilder<BackendContextBuilder>),
     ) -> Result<Self> {
         let backend_kinds = backend_kinds.into_iter().collect();
-        let backend_ctx_builder =
-            BackendContextBuilder::new(toml_account_config, account_config, backend_kinds).await?;
+        let backend_ctx_builder = BackendContextBuilder::new(
+            toml_account_config.clone(),
+            account_config.clone(),
+            backend_kinds,
+        )
+        .await?;
         let mut backend_builder =
-            email::backend::BackendBuilder::new(account_config.clone(), backend_ctx_builder);
+            email::backend::BackendBuilder::new(account_config.clone(), backend_ctx_builder)
+                .with_default_features_disabled();
 
         with_features(&mut backend_builder);
 
@@ -883,6 +671,7 @@ impl Backend {
                     )?;
                 }
             }
+
             #[cfg(feature = "account-sync")]
             Some(BackendKind::MaildirForSync) => {
                 id_mapper = IdMapper::new(
@@ -891,6 +680,7 @@ impl Backend {
                     self.backend.account_config.get_sync_dir()?,
                 )?;
             }
+
             #[cfg(feature = "notmuch")]
             Some(BackendKind::Notmuch) => {
                 if let Some(notmuch_config) = &self.toml_account_config.notmuch {
@@ -907,7 +697,7 @@ impl Backend {
         Ok(id_mapper)
     }
 
-    #[cfg(feature = "envelope-list")]
+    #[cfg(any(feature = "account-sync", feature = "envelope-list"))]
     pub async fn list_envelopes(
         &self,
         folder: &str,
@@ -921,7 +711,7 @@ impl Backend {
         Ok(envelopes)
     }
 
-    #[cfg(feature = "flag-add")]
+    #[cfg(any(feature = "account-sync", feature = "flag-add"))]
     pub async fn add_flags(&self, folder: &str, ids: &[usize], flags: &Flags) -> Result<()> {
         let backend_kind = self.toml_account_config.add_flags_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
@@ -929,7 +719,7 @@ impl Backend {
         self.backend.add_flags(folder, &ids, flags).await
     }
 
-    #[cfg(feature = "flag-add")]
+    #[cfg(any(feature = "account-sync", feature = "flag-add"))]
     pub async fn add_flag(&self, folder: &str, ids: &[usize], flag: Flag) -> Result<()> {
         let backend_kind = self.toml_account_config.add_flags_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
@@ -937,7 +727,7 @@ impl Backend {
         self.backend.add_flag(folder, &ids, flag).await
     }
 
-    #[cfg(feature = "flag-set")]
+    #[cfg(any(feature = "account-sync", feature = "flag-set"))]
     pub async fn set_flags(&self, folder: &str, ids: &[usize], flags: &Flags) -> Result<()> {
         let backend_kind = self.toml_account_config.set_flags_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
@@ -945,7 +735,7 @@ impl Backend {
         self.backend.set_flags(folder, &ids, flags).await
     }
 
-    #[cfg(feature = "flag-set")]
+    #[cfg(any(feature = "account-sync", feature = "flag-set"))]
     pub async fn set_flag(&self, folder: &str, ids: &[usize], flag: Flag) -> Result<()> {
         let backend_kind = self.toml_account_config.set_flags_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
@@ -969,7 +759,7 @@ impl Backend {
         self.backend.remove_flag(folder, &ids, flag).await
     }
 
-    #[cfg(feature = "message-add")]
+    #[cfg(any(feature = "account-sync", feature = "message-add"))]
     pub async fn add_message(&self, folder: &str, email: &[u8]) -> Result<SingleId> {
         let backend_kind = self.toml_account_config.add_message_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
@@ -978,7 +768,7 @@ impl Backend {
         Ok(id)
     }
 
-    #[cfg(feature = "message-peek")]
+    #[cfg(any(feature = "account-sync", feature = "message-peek"))]
     pub async fn peek_messages(&self, folder: &str, ids: &[usize]) -> Result<Messages> {
         let backend_kind = self.toml_account_config.get_messages_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
@@ -986,7 +776,7 @@ impl Backend {
         self.backend.peek_messages(folder, &ids).await
     }
 
-    #[cfg(feature = "message-get")]
+    #[cfg(any(feature = "account-sync", feature = "message-get"))]
     pub async fn get_messages(&self, folder: &str, ids: &[usize]) -> Result<Messages> {
         let backend_kind = self.toml_account_config.get_messages_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
@@ -1009,7 +799,7 @@ impl Backend {
             .await
     }
 
-    #[cfg(feature = "message-move")]
+    #[cfg(any(feature = "account-sync", feature = "message-move"))]
     pub async fn move_messages(
         &self,
         from_folder: &str,

@@ -1,18 +1,12 @@
 use anyhow::Result;
 use clap::Parser;
-#[cfg(feature = "imap")]
-use email::flag::add::imap::AddImapFlags;
-#[cfg(feature = "maildir")]
-use email::flag::add::maildir::AddMaildirFlags;
-#[cfg(feature = "notmuch")]
-use email::flag::add::notmuch::AddNotmuchFlags;
 use log::info;
 
 #[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
     account::arg::name::AccountNameFlag,
-    backend::{Backend, BackendKind},
+    backend::Backend,
     config::TomlConfig,
     flag::arg::ids_and_flags::{into_tuple, IdsAndFlagsArgs},
     folder::arg::name::FolderNameOptionalFlag,
@@ -54,34 +48,10 @@ impl FlagAddCommand {
         let add_flags_kind = toml_account_config.add_flags_kind();
 
         let backend = Backend::new(
-            &toml_account_config,
-            &account_config,
+            toml_account_config.clone(),
+            account_config,
             add_flags_kind,
-            |builder| match add_flags_kind {
-                #[cfg(feature = "imap")]
-                Some(BackendKind::Imap) => {
-                    builder.set_add_flags(|ctx| ctx.imap.as_ref().map(AddImapFlags::new_boxed));
-                }
-                #[cfg(feature = "maildir")]
-                Some(BackendKind::Maildir) => {
-                    builder
-                        .set_add_flags(|ctx| ctx.maildir.as_ref().map(AddMaildirFlags::new_boxed));
-                }
-                #[cfg(feature = "account-sync")]
-                Some(BackendKind::MaildirForSync) => {
-                    builder.set_add_flags(|ctx| {
-                        ctx.maildir_for_sync
-                            .as_ref()
-                            .map(AddMaildirFlags::new_boxed)
-                    });
-                }
-                #[cfg(feature = "notmuch")]
-                Some(BackendKind::Notmuch) => {
-                    builder
-                        .set_add_flags(|ctx| ctx.notmuch.as_ref().map(AddNotmuchFlags::new_boxed));
-                }
-                _ => (),
-            },
+            |builder| builder.set_add_flags(Some(None)),
         )
         .await?;
 

@@ -1,11 +1,5 @@
 use anyhow::Result;
 use clap::Parser;
-#[cfg(feature = "imap")]
-use email::message::{get::imap::GetImapMessages, peek::imap::PeekImapMessages};
-#[cfg(feature = "maildir")]
-use email::{flag::add::maildir::AddMaildirFlags, message::peek::maildir::PeekMaildirMessages};
-#[cfg(feature = "notmuch")]
-use email::{flag::add::notmuch::AddNotmuchFlags, message::peek::notmuch::PeekNotmuchMessages};
 use log::info;
 use mml::message::FilterParts;
 
@@ -13,11 +7,8 @@ use mml::message::FilterParts;
 use crate::cache::arg::disable::CacheDisableFlag;
 #[allow(unused)]
 use crate::{
-    account::arg::name::AccountNameFlag,
-    backend::{Backend, BackendKind},
-    config::TomlConfig,
-    envelope::arg::ids::EnvelopeIdsArgs,
-    folder::arg::name::FolderNameOptionalFlag,
+    account::arg::name::AccountNameFlag, backend::Backend, config::TomlConfig,
+    envelope::arg::ids::EnvelopeIdsArgs, folder::arg::name::FolderNameOptionalFlag,
     printer::Printer,
 };
 
@@ -102,49 +93,10 @@ impl MessageReadCommand {
         let get_messages_kind = toml_account_config.get_messages_kind();
 
         let backend = Backend::new(
-            &toml_account_config,
-            &account_config,
+            toml_account_config.clone(),
+            account_config.clone(),
             get_messages_kind,
-            |#[allow(unused)] builder| match get_messages_kind {
-                #[cfg(feature = "imap")]
-                Some(BackendKind::Imap) => {
-                    builder.set_peek_messages(|ctx| {
-                        ctx.imap.as_ref().map(PeekImapMessages::new_boxed)
-                    });
-                    builder
-                        .set_get_messages(|ctx| ctx.imap.as_ref().map(GetImapMessages::new_boxed));
-                }
-                #[cfg(feature = "maildir")]
-                Some(BackendKind::Maildir) => {
-                    builder.set_peek_messages(|ctx| {
-                        ctx.maildir.as_ref().map(PeekMaildirMessages::new_boxed)
-                    });
-                    builder
-                        .set_add_flags(|ctx| ctx.maildir.as_ref().map(AddMaildirFlags::new_boxed));
-                }
-                #[cfg(feature = "account-sync")]
-                Some(BackendKind::MaildirForSync) => {
-                    builder.set_peek_messages(|ctx| {
-                        ctx.maildir_for_sync
-                            .as_ref()
-                            .map(PeekMaildirMessages::new_boxed)
-                    });
-                    builder.set_add_flags(|ctx| {
-                        ctx.maildir_for_sync
-                            .as_ref()
-                            .map(AddMaildirFlags::new_boxed)
-                    });
-                }
-                #[cfg(feature = "notmuch")]
-                Some(BackendKind::Notmuch) => {
-                    builder.set_peek_messages(|ctx| {
-                        ctx.notmuch.as_ref().map(PeekNotmuchMessages::new_boxed)
-                    });
-                    builder
-                        .set_add_flags(|ctx| ctx.notmuch.as_ref().map(AddNotmuchFlags::new_boxed));
-                }
-                _ => (),
-            },
+            |builder| builder.set_get_messages(Some(None)),
         )
         .await?;
 

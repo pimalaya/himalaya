@@ -1,15 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
-#[cfg(feature = "imap")]
-use email::folder::list::imap::ListImapFolders;
-#[cfg(feature = "maildir")]
-use email::folder::list::maildir::ListMaildirFolders;
-#[cfg(feature = "notmuch")]
-use email::folder::list::notmuch::ListNotmuchFolders;
 use log::info;
 
-#[cfg(any(feature = "imap", feature = "maildir", feature = "account-sync"))]
-use crate::backend::BackendKind;
 #[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
@@ -50,38 +42,10 @@ impl FolderListCommand {
         let list_folders_kind = toml_account_config.list_folders_kind();
 
         let backend = Backend::new(
-            &toml_account_config,
-            &account_config,
+            toml_account_config.clone(),
+            account_config.clone(),
             list_folders_kind,
-            |builder| match list_folders_kind {
-                #[cfg(feature = "imap")]
-                Some(BackendKind::Imap) => {
-                    builder
-                        .set_list_folders(|ctx| ctx.imap.as_ref().map(ListImapFolders::new_boxed));
-                }
-                #[cfg(feature = "maildir")]
-                Some(BackendKind::Maildir) => {
-                    builder.set_list_folders(|ctx| {
-                        ctx.maildir.as_ref().map(ListMaildirFolders::new_boxed)
-                    });
-                }
-                #[cfg(feature = "account-sync")]
-                Some(BackendKind::MaildirForSync) => {
-                    builder.set_list_folders(|ctx| {
-                        ctx.maildir_for_sync
-                            .as_ref()
-                            .map(ListMaildirFolders::new_boxed)
-                    });
-                }
-                #[cfg(feature = "notmuch")]
-                Some(BackendKind::Notmuch) => {
-                    builder.set_list_folders(|ctx| {
-                        ctx.notmuch.as_ref().map(ListNotmuchFolders::new_boxed)
-                    });
-                }
-
-                _ => (),
-            },
+            |builder| builder.set_list_folders(Some(None)),
         )
         .await?;
 

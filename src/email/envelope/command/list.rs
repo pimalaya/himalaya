@@ -1,18 +1,12 @@
 use anyhow::Result;
 use clap::Parser;
-#[cfg(feature = "imap")]
-use email::envelope::list::imap::ListImapEnvelopes;
-#[cfg(feature = "maildir")]
-use email::envelope::list::maildir::ListMaildirEnvelopes;
-#[cfg(feature = "notmuch")]
-use email::envelope::list::notmuch::ListNotmuchEnvelopes;
 use log::info;
 
 #[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
     account::arg::name::AccountNameFlag,
-    backend::{Backend, BackendKind},
+    backend::Backend,
     config::TomlConfig,
     folder::arg::name::FolderNameOptionalArg,
     printer::{PrintTableOpts, Printer},
@@ -85,38 +79,10 @@ impl ListEnvelopesCommand {
         let list_envelopes_kind = toml_account_config.list_envelopes_kind();
 
         let backend = Backend::new(
-            &toml_account_config,
-            &account_config,
+            toml_account_config.clone(),
+            account_config.clone(),
             list_envelopes_kind,
-            |builder| match list_envelopes_kind {
-                #[cfg(feature = "imap")]
-                Some(BackendKind::Imap) => {
-                    builder.set_list_envelopes(|ctx| {
-                        ctx.imap.as_ref().map(ListImapEnvelopes::new_boxed)
-                    });
-                }
-                #[cfg(feature = "maildir")]
-                Some(BackendKind::Maildir) => {
-                    builder.set_list_envelopes(|ctx| {
-                        ctx.maildir.as_ref().map(ListMaildirEnvelopes::new_boxed)
-                    });
-                }
-                #[cfg(feature = "account-sync")]
-                Some(BackendKind::MaildirForSync) => {
-                    builder.set_list_envelopes(|ctx| {
-                        ctx.maildir_for_sync
-                            .as_ref()
-                            .map(ListMaildirEnvelopes::new_boxed)
-                    });
-                }
-                #[cfg(feature = "notmuch")]
-                Some(BackendKind::Notmuch) => {
-                    builder.set_list_envelopes(|ctx| {
-                        ctx.notmuch.as_ref().map(ListNotmuchEnvelopes::new_boxed)
-                    });
-                }
-                _ => (),
-            },
+            |builder| builder.set_list_envelopes(Some(None)),
         )
         .await?;
 

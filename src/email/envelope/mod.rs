@@ -3,19 +3,14 @@ pub mod command;
 pub mod config;
 pub mod flag;
 
-#[cfg(feature = "envelope-list")]
 use anyhow::Result;
-#[cfg(feature = "envelope-list")]
 use email::account::config::AccountConfig;
 use serde::Serialize;
-#[cfg(feature = "envelope-list")]
 use std::ops;
 
-use crate::flag::Flags;
-#[cfg(feature = "envelope-list")]
 use crate::{
     cache::IdMapper,
-    flag::Flag,
+    flag::{Flag, Flags},
     printer::{PrintTable, PrintTableOpts, WriteColor},
     ui::{Cell, Row, Table},
 };
@@ -35,7 +30,7 @@ pub struct Envelope {
     pub date: String,
 }
 
-#[cfg(feature = "envelope-list")]
+#[cfg(any(feature = "account-sync", feature = "envelope-list"))]
 impl Table for Envelope {
     fn head() -> Row {
         Row::new()
@@ -81,12 +76,12 @@ impl Table for Envelope {
     }
 }
 
-#[cfg(feature = "envelope-list")]
+#[cfg(any(feature = "account-sync", feature = "envelope-list"))]
 /// Represents the list of envelopes.
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Envelopes(Vec<Envelope>);
 
-#[cfg(feature = "envelope-list")]
+#[cfg(any(feature = "account-sync", feature = "envelope-list"))]
 impl Envelopes {
     pub fn from_backend(
         config: &AccountConfig,
@@ -113,7 +108,7 @@ impl Envelopes {
     }
 }
 
-#[cfg(feature = "envelope-list")]
+#[cfg(any(feature = "account-sync", feature = "envelope-list"))]
 impl ops::Deref for Envelopes {
     type Target = Vec<Envelope>;
 
@@ -122,7 +117,7 @@ impl ops::Deref for Envelopes {
     }
 }
 
-#[cfg(feature = "envelope-list")]
+#[cfg(any(feature = "account-sync", feature = "envelope-list"))]
 impl PrintTable for Envelopes {
     fn print_table(&self, writer: &mut dyn WriteColor, opts: PrintTableOpts) -> Result<()> {
         writeln!(writer)?;

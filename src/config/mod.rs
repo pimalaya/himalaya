@@ -15,6 +15,7 @@ use std::{
     collections::HashMap,
     fs,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 use toml;
 
@@ -185,7 +186,7 @@ impl TomlConfig {
         self,
         account_name: Option<&str>,
         #[cfg(feature = "account-sync")] disable_cache: bool,
-    ) -> Result<(TomlAccountConfig, AccountConfig)> {
+    ) -> Result<(Arc<TomlAccountConfig>, Arc<AccountConfig>)> {
         #[cfg_attr(not(feature = "account-sync"), allow(unused_mut))]
         let (account_name, mut toml_account_config) =
             self.into_toml_account_config(account_name)?;
@@ -217,19 +218,19 @@ impl TomlConfig {
 
                             folder: config.folder.map(|#[allow(unused)] c| FolderConfig {
                                 aliases: c.alias,
-                                #[cfg(feature = "folder-list")]
+                                #[cfg(any(feature = "account-sync", feature = "folder-list"))]
                                 list: c.list.map(|c| c.remote),
                             }),
                             envelope: config.envelope.map(|#[allow(unused)] c| EnvelopeConfig {
-                                #[cfg(feature = "envelope-list")]
+                                #[cfg(any(feature = "account-sync", feature = "envelope-list"))]
                                 list: c.list.map(|c| c.remote),
                                 #[cfg(feature = "envelope-watch")]
                                 watch: c.watch.map(|c| c.remote),
                             }),
                             message: config.message.map(|#[allow(unused)] c| MessageConfig {
-                                #[cfg(feature = "message-read")]
+                                #[cfg(any(feature = "account-sync", feature = "message-read"))]
                                 read: c.read.map(|c| c.remote),
-                                #[cfg(feature = "message-write")]
+                                #[cfg(any(feature = "account-sync", feature = "message-write"))]
                                 write: c.write.map(|c| c.remote),
                                 #[cfg(feature = "message-send")]
                                 send: c.send.map(|c| c.remote),
@@ -246,7 +247,7 @@ impl TomlConfig {
 
         let account_config = config.account(account_name)?;
 
-        Ok((toml_account_config, account_config))
+        Ok((Arc::new(toml_account_config), Arc::new(account_config)))
     }
 }
 
