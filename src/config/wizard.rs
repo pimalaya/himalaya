@@ -501,7 +501,7 @@ smtp.oauth2.scopes = []
         );
     }
 
-    #[cfg(feature = "pgp")]
+    #[cfg(feature = "pgp-cmds")]
     #[test]
     fn pretty_serialize_pgp_cmds() {
         use email::account::config::pgp::PgpConfig;
