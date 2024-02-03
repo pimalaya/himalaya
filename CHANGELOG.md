@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Changed `envelope.watch.{event}.{hook}`: hooks can now be cumulated. For example it is possible to send a system notification and execute a shell command when receiving a new envelope:
+
+  ```toml
+  envelope.watch.received.notify.summary = "New message from {sender}"
+  envelope.watch.received.notify.body = "{subject}"
+  envelope.watch.received.cmd = "echo {id} >> /tmp/new-email-counter"
+  ```
+
+### Fixed
+
+- Fixed bug that was preventing watch placeholders to be replaced when using shell command hook.
+
 ## [1.0.0-beta.2] - 2024-01-27
 
 ### Added
