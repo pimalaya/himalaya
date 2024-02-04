@@ -13,9 +13,9 @@ use email_address::EmailAddress;
 use crate::backend::{self, config::BackendConfig, BackendKind};
 #[cfg(feature = "message-send")]
 use crate::message::config::{MessageConfig, MessageSendConfig};
-use crate::ui::THEME;
 #[cfg(feature = "account-sync")]
 use crate::wizard_prompt;
+use crate::{ui::THEME, wizard_warn};
 
 use super::TomlAccountConfig;
 
@@ -62,6 +62,15 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
     let email = &config.email;
     let autoconfig = autoconfig.await?;
     let autoconfig = autoconfig.as_ref();
+
+    if let Some(config) = autoconfig {
+        if config.is_gmail() {
+            println!();
+            wizard_warn!("Warning: Google passwords cannot be used directly, see:");
+            wizard_warn!("https://pimalaya.org/himalaya/cli/latest/configuration/gmail.html");
+            println!();
+        }
+    }
 
     match backend::wizard::configure(&account_name, email, autoconfig).await? {
         #[cfg(feature = "imap")]
