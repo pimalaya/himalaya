@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Improved pre and post edit choices interaction. [sourcehut#58]
 - Changed `envelope.watch.{event}.{hook}`: hooks can now be cumulated. For example it is possible to send a system notification and execute a shell command when receiving a new envelope:
 
   ```toml
@@ -907,6 +908,7 @@ Few major concepts changed:
 [sourcehut#41]: https://todo.sr.ht/~soywod/pimalaya/41
 [sourcehut#43]: https://todo.sr.ht/~soywod/pimalaya/43
 [sourcehut#54]: https://todo.sr.ht/~soywod/pimalaya/54
+[sourcehut#58]: https://todo.sr.ht/~soywod/pimalaya/58
 [sourcehut#59]: https://todo.sr.ht/~soywod/pimalaya/59
 [sourcehut#60]: https://todo.sr.ht/~soywod/pimalaya/60
 [sourcehut#95]: https://todo.sr.ht/~soywod/pimalaya/95

@@ -1,47 +1,42 @@
-use anyhow::{anyhow, bail, Context, Result};
-use log::{debug, error};
-use std::io::{self, Write};
+use anyhow::Result;
+use dialoguer::Select;
 
+use super::THEME;
+
+#[derive(Clone, Debug)]
 pub enum PreEditChoice {
     Edit,
     Discard,
     Quit,
 }
 
-pub fn pre_edit() -> Result<PreEditChoice> {
-    println!("A draft was found:");
-    print!("(e)dit, (d)iscard or (q)uit? ");
-    io::stdout().flush().context("cannot flush stdout")?;
-
-    let mut buf = String::new();
-    io::stdin()
-        .read_line(&mut buf)
-        .context("cannot read stdin")?;
-
-    match buf.bytes().next().map(|bytes| bytes as char) {
-        Some('e') => {
-            debug!("edit choice matched");
-            Ok(PreEditChoice::Edit)
-        }
-        Some('d') => {
-            debug!("discard choice matched");
-            Ok(PreEditChoice::Discard)
-        }
-        Some('q') => {
-            debug!("quit choice matched");
-            Ok(PreEditChoice::Quit)
-        }
-        Some(choice) => {
-            error!(r#"invalid choice "{}""#, choice);
-            Err(anyhow!(r#"invalid choice "{}""#, choice))
-        }
-        None => {
-            error!("empty choice");
-            Err(anyhow!("empty choice"))
+impl ToString for PreEditChoice {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Edit => "Edit it".into(),
+            Self::Discard => "Discard it".into(),
+            Self::Quit => "Quit".into(),
         }
     }
 }
 
+pub fn pre_edit() -> Result<PreEditChoice> {
+    let choices = [
+        PreEditChoice::Edit,
+        PreEditChoice::Discard,
+        PreEditChoice::Quit,
+    ];
+
+    let choice_idx = Select::with_theme(&*THEME)
+        .with_prompt("A draft was found, what would you like to do with it?")
+        .items(&choices)
+        .default(0)
+        .interact()?;
+
+    Ok(choices[choice_idx].clone())
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PostEditChoice {
     #[cfg(feature = "message-send")]
     Send,
@@ -52,45 +47,36 @@ pub enum PostEditChoice {
     Discard,
 }
 
-pub fn post_edit() -> Result<PostEditChoice> {
-    print!("(s)end, (e)dit, (l)ocal/(r)emote draft or (d)iscard? ");
-    io::stdout().flush().context("cannot flush stdout")?;
-
-    let mut buf = String::new();
-    io::stdin()
-        .read_line(&mut buf)
-        .context("cannot read stdin")?;
-
-    match buf.bytes().next().map(|bytes| bytes as char) {
-        #[cfg(feature = "message-send")]
-        Some('s') => {
-            debug!("send choice matched");
-            Ok(PostEditChoice::Send)
-        }
-        Some('l') => {
-            debug!("save local draft choice matched");
-            Ok(PostEditChoice::LocalDraft)
-        }
-        #[cfg(feature = "message-add")]
-        Some('r') => {
-            debug!("save remote draft matched");
-            Ok(PostEditChoice::RemoteDraft)
-        }
-        Some('e') => {
-            debug!("edit choice matched");
-            Ok(PostEditChoice::Edit)
-        }
-        Some('d') => {
-            debug!("discard choice matched");
-            Ok(PostEditChoice::Discard)
-        }
-        Some(choice) => {
-            error!(r#"invalid choice "{}""#, choice);
-            bail!("invalid choice {choice}");
-        }
-        None => {
-            error!("empty choice");
-            bail!("empty choice");
+impl ToString for PostEditChoice {
+    fn to_string(&self) -> String {
+        match self {
+            #[cfg(feature = "message-send")]
+            Self::Send => "Send it".into(),
+            Self::Edit => "Edit it again".into(),
+            Self::LocalDraft => "Save it as local draft".into(),
+            #[cfg(feature = "message-add")]
+            Self::RemoteDraft => "Save it as remote draft".into(),
+            Self::Discard => "Discard it".into(),
         }
     }
+}
+
+pub fn post_edit() -> Result<PostEditChoice> {
+    let choices = [
+        #[cfg(feature = "message-send")]
+        PostEditChoice::Send,
+        PostEditChoice::Edit,
+        PostEditChoice::LocalDraft,
+        #[cfg(feature = "message-add")]
+        PostEditChoice::RemoteDraft,
+        PostEditChoice::Discard,
+    ];
+
+    let choice_idx = Select::with_theme(&*THEME)
+        .with_prompt("What would you like to do with this message?")
+        .items(&choices)
+        .default(0)
+        .interact()?;
+
+    Ok(choices[choice_idx].clone())
 }
