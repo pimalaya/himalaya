@@ -9,11 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added wizard warning about google passwords. [sourcehut#41]
+- Added wizard warning about google passwords [#41].
 
 ### Changed
 
-- Improved pre and post edit choices interaction. [sourcehut#58]
+- Improved pre and post edit choices interaction [#58].
 - Changed `envelope.watch.{event}.{hook}`: hooks can now be cumulated. For example it is possible to send a system notification and execute a shell command when receiving a new envelope:
 
   ```toml
@@ -126,7 +126,7 @@ Few major concepts changed:
 ### Removed
 
 - Disabled temporarily the `notmuch` backend because it needs to be refactored using the backend features system (it should be reimplemented soon).
-- Disabled temporarily the `search` and `sort` command because they need to be refactored, see [#39](https://todo.sr.ht/~soywod/pimalaya/39).
+- Disabled temporarily the `search` and `sort` command because they need to be refactored, see [#39].
 - Removed the `notify` command (replaced by the new `watch` command).
 - Removed all global options except for `display-name`, `signature`, `signature-delim` and `downloads-dir`.
 
@@ -169,7 +169,7 @@ Few major concepts changed:
 
 ### Fixed
 
-- Fixed the way folder aliases are resolved. In some case, aliases were resolved CLI side and lib side, which led to alias errors [sourcehut#95].
+- Fixed the way folder aliases are resolved. In some case, aliases were resolved CLI side and lib side, which led to alias errors [#95].
 
 ## [0.8.1] - 2023-06-15
 
@@ -241,9 +241,9 @@ Few major concepts changed:
 
 ### Added
 
-- Added `create` and `delete` folder commands [sourcehut#54].
-- Added generated completions and man pages to releases [sourcehut#43].
-- Added new account config option `sync-folders-strategy` which allows to choose a folders synchronization strategy [sourcehut#59]:
+- Added `create` and `delete` folder commands [#54].
+- Added generated completions and man pages to releases [#43].
+- Added new account config option `sync-folders-strategy` which allows to choose a folders synchronization strategy [#59]:
   
   - `sync-folders-strategy = "all"`: synchronize all existing folders for the current account
   - `sync-folders-strategy.include = ["folder1", "folder2", …]`: synchronize only the given folders for the current account
@@ -259,7 +259,7 @@ Few major concepts changed:
 
 ### Changed
 
-- Made global options truly global, which means they can be used everywhere (not only *before* commands but also *after*) [sourcehut#60].
+- Made global options truly global, which means they can be used everywhere (not only *before* commands but also *after*) [#60].
 - Replaced reply all `-a` argument with `-A` because it conflicted with the global option `-a|--account`.
 - Replaced `himalaya-lib` by `pimalaya-email`.
 - Renamed feature `vendored` to `native-tls-vendored`.
@@ -293,11 +293,11 @@ Few major concepts changed:
 
 ### Added
 
-- Added offline support with the `account sync` command to synchronize a backend to a local Maildir backend [#342].
+- Added offline support with the `account sync` command to synchronize a backend to a local Maildir backend.
 - Added the flag `--disable-cache` to not use the local Maildir backend.
-- Added the email composer (from its own [repository](https://git.sr.ht/~soywod/mime-msg-builder)) [#341].
-- Added Musl builds to releases [#356].
-- Added `himalaya man` command to generate man page [#419].
+- Added the email composer (from its own [repository](https://git.sr.ht/~soywod/mime-msg-builder)).
+- Added Musl builds to releases.
+- Added `himalaya man` command to generate man page.
 
 ### Changed
 
@@ -306,7 +306,7 @@ Few major concepts changed:
 
 ### Fixed
 
-- Fixed missing folder aliases [#430].
+- Fixed missing folder aliases.
 
 ### Removed
 
@@ -327,13 +327,13 @@ Few major concepts changed:
 
 ### Fixed
 
-- Fixed empty text bodies when reading html part on plain text email [#352].
+- Fixed empty text bodies when reading html part on plain text email.
 
 ## [0.6.0] - 2022-10-10
 
 ### Changed
 
-- Separated the CLI from the lib module [#340].
+- Separated the CLI from the lib module.
 
   The source code has been split into subrepositories:
 
@@ -343,7 +343,7 @@ Few major concepts changed:
 
 - [**BREAKING**] Renamed `-m|--mailbox` to `-f|--folder`
 
-- [**BREAKING**] Refactored config system [#344].
+- [**BREAKING**] Refactored config system.
 
   The configuration has been rethought in order to be more intuitive and structured. Here are the breaking changes for the global config:
 
@@ -374,92 +374,92 @@ Few major concepts changed:
 
 ### Fixed
 
-- Fixed flag commands [#334].
-- Fixed Windows build [#346].
+- Fixed flag commands.
+- Fixed Windows build.
 
 ## [0.5.9] - 2022-03-12
 
 ### Added
 
-- SMTP pre-send hook [#178]
-- Customize headers to show at the top of a read message [#338]
+- SMTP pre-send hook
+- Customize headers to show at the top of a read message
 
 ### Changed
 
-- Improve `attachments` command [#281]
+- Improve `attachments` command
 
 ### Fixed
 
-- `In-Reply-To` not set properly when replying to a message [#323]
-- `Cc` missing or invalid when replying to a message [#324]
-- Notmuch backend hangs [#329]
-- Maildir e2e tests [#335]
-- JSON API for listings [#331]
+- `In-Reply-To` not set properly when replying to a message
+- `Cc` missing or invalid when replying to a message
+- Notmuch backend hangs
+- Maildir e2e tests
+- JSON API for listings
 
 ## [0.5.8] - 2022-03-04
 
 ### Added
 
-- Flowed format support [#206]
-- List accounts command [#244]
-- One cargo feature per backend [#318]
+- Flowed format support
+- List accounts command
+- One cargo feature per backend
 
 ### Changed
 
-- Vim doc about mailbox pickers [#298]
+- Vim doc about mailbox pickers
 
 ### Fixed
 
-- Some emojis break the table layout [#300]
-- Bad sender and date in reply and forward template [#321]
+- Some emojis break the table layout
+- Bad sender and date in reply and forward template
 
 ## [0.5.7] - 2022-03-01
 
 ### Added
 
-- Notmuch support [#57]
+- Notmuch support
 
 ### Fixed
 
-- Build failure due to `imap` version [#303]
-- No tilde expansion in `maildir-dir` [#305]
-- Unknown command SORT [#308]
+- Build failure due to `imap` version
+- No tilde expansion in `maildir-dir`
+- Unknown command SORT
 
 ### Changed
 
 - [**BREAKING**] Replace `inbox-folder`, `sent-folder` and `draft-folder` by a generic hashmap `mailboxes`
-- Display short envelopes id for `maildir` and `notmuch` backends [#309]
+- Display short envelopes id for `maildir` and `notmuch` backends
 
 ## [0.5.6] - 2022-02-22
 
 ### Added
 
-- Sort command [#34]
-- Maildir support [#43]
+- Sort command
+- Maildir support
 
 ### Fixed
 
-- Suffix to downloaded attachments with same name [#204]
+- Suffix to downloaded attachments with same name
 
 ## [0.5.5] - 2022-02-08
 
 ### Added
 
-- [Contributing guide](https://github.com/soywod/himalaya/blob/master/CONTRIBUTING.md) [#256]
-- Notify query config option [#289]
-- End-to-end encryption [#54]
+- [Contributing guide](https://github.com/soywod/himalaya/blob/master/CONTRIBUTING.md)
+- Notify query config option
+- End-to-end encryption
 
 ### Fixed
 
-- Multiple recipients issue [#288]
-- Cannot parse address [#227]
+- Multiple recipients issue
+- Cannot parse address
 
 ## [0.5.4] - 2022-02-05
 
 ### Fixed
 
-- Add attachments with save and send commands [#47] [#259]
-- Invalid sequence set [#276]
+- Add attachments with save and send commands
+- Invalid sequence set
 
 ## [0.5.3] - 2022-02-03
 
@@ -472,194 +472,194 @@ Few major concepts changed:
 
 ### Fixed
 
-- Blur in list msg screenshot [#181]
-- Make inbox, sent and drafts folders customizable [#172]
-- Vim plugin get focused msg id [#268]
-- Nix run issue [#272]
-- Range not displayed when fetch fails [#276]
-- Blank lines and spaces in `text/plain` parts [#280]
-- Watch command [#271]
-- Mailbox telescope.nvim preview [#249]
+- Blur in list msg screenshot
+- Make inbox, sent and drafts folders customizable
+- Vim plugin get focused msg id
+- Nix run issue
+- Range not displayed when fetch fails
+- Blank lines and spaces in `text/plain` parts
+- Watch command
+- Mailbox telescope.nvim preview
 
 ### Removed
 
-- The wiki git submodule [#273]
+- The wiki git submodule
 
 ## [0.5.1] - 2021-10-24
 
 ### Added
 
-- Disable color feature [#185]
-- `--max-width|-w` argument to restrict listing table width [#220]
+- Disable color feature
+- `--max-width|-w` argument to restrict listing table width
 
 ### Fixed
 
-- Error when receiving notification from `notify` command [#228]
+- Error when receiving notification from `notify` command
 
 ### Changed
 
-- Remove error when empty subject [#229]
-- Vim plugin does not render anymore the msg by itself, it uses the one available from the CLI [#220]
+- Remove error when empty subject
+- Vim plugin does not render anymore the msg by itself, it uses the one available from the CLI
 
 ## [0.5.0] - 2021-10-10
 
 ### Added
 
-- Mailto support [#162]
-- Remove previous signature when replying/forwarding a message [#193]
-- Config option `signature-delimiter` to customize the signature delimiter (default to `-- \n`) [[#114](https://github.com/soywod/himalaya/pull/114)]
-- Expand tilde and env vars for `downloads-dir` and `signature` [#102]
+- Mailto support
+- Remove previous signature when replying/forwarding a message
+- Config option `signature-delimiter` to customize the signature delimiter (default to `-- \n`)
+- Expand tilde and env vars for `downloads-dir` and `signature`
 
 ### Changed
 
-- [**BREAKING**] Folder structure, message management, JSON API and Vim plugin [#199]
-- Pagination for list and search cmd starts from 1 instead of 0 [#186]
-- Errors management with `anyhow` [#152]
+- [**BREAKING**] Folder structure, message management, JSON API and Vim plugin
+- Pagination for list and search cmd starts from 1 instead of 0
+- Errors management with `anyhow`
 
 ### Fixed
 
-- Panic on flags command [#190]
-- Make more use of serde [#153]
-- Write message vim plugin [#196]
-- Invalid encoding when sending message [#205]
-- Pagination reset current account [#215]
-- New/reply/forward from Vim plugin since Tpl refactor [#176]
+- Panic on flags command
+- Make more use of serde
+- Write message vim plugin
+- Invalid encoding when sending message
+- Pagination reset current account
+- New/reply/forward from Vim plugin since Tpl refactor
 
 ## [0.4.0] - 2021-06-03
 
 ### Added
 
-- Add ability to change account in with the Vim plugin [#91]
-- Add possibility to make Himalaya default email app [#160] [[#161](https://github.com/soywod/himalaya/pull/161)]
+- Add ability to change account in with the Vim plugin
+- Add possibility to make Himalaya default email app
 
 ### Changed
 
 - [**BREAKING**] Short version of reply `--all` arg is now `-A` to
   avoid conflicts with `--attachment|-a`
-- Template management [#80]
+- Template management
 
 ### Fixed
 
 - `\Seen` flag when moving a message
-- Attachments arg for reply and forward commands [#109]
-- Vim doc [#117]
+- Attachments arg for reply and forward commands
+- Vim doc
 
 ### Removed
 
-- `Content-Type` from templates [#146]
+- `Content-Type` from templates
 
 ## [0.3.2] - 2021-05-08
 
 ### Added
 
-- Mailbox attributes [#134]
-- Wiki entry about new messages counter [#121]
-- Copy/move/delete a message in vim [#95]
+- Mailbox attributes
+- Wiki entry about new messages counter
+- Copy/move/delete a message in vim
 
 ### Changed
 
-- Get signature from file [#135]
+- Get signature from file
 - [**BREAKING**] Split `idle` command into two commands:
   - `notify`: Runs `notify-cmd` when a new message arrives to the server
   - `watch`: Runs `watch-cmds` when any change occurs on the server
 
 ### Removed
 
-- `.exe` extension from release binaries [#144]
+- `.exe` extension from release binaries
 
 ## [0.3.1] - 2021-05-04
 
 ### Added
 
-- Send message via stdin [#78]
+- Send message via stdin
 
 ### Fixed
 
-- Table with subject containing `\r`, `\n` or `\t` [#141]
-- Overflow panic when shrink column [#138]
-- Vim plugin empty mailbox message [#136]
+- Table with subject containing `\r`, `\n` or `\t`
+- Overflow panic when shrink column
+- Vim plugin empty mailbox message
 
 ## [0.3.0] - 2021-04-28
 
 ### Fixed
 
-- IDLE mode after network interruption [#123]
-- Output redirected to `stderr` [#130]
-- Refactor table system [#132]
-- Editon file format on Linux [#133]
-- Show email address when name not available [#131]
+- IDLE mode after network interruption
+- Output redirected to `stderr`
+- Refactor table system
+- Editon file format on Linux
+- Show email address when name not available
 
 ### Removed
 
-- `--log-level|-l` arg (replaced by default `RUST_LOG` env var from `env_logger`) [#130]
+- `--log-level|-l` arg (replaced by default `RUST_LOG` env var from `env_logger`)
 
 ## [0.2.7] - 2021-04-24
 
 ### Added
 
-- Default page size to config [#96]
-- Custom config path [#86]
+- Default page size to config
+- Custom config path
 - Setting idle-hook-cmds
 
 ### Changed
 
-- Plain logger with `env_logger` [#126]
-- Refresh email list on load buffer [#125]
+- Plain logger with `env_logger`
+- Refresh email list on load buffer
 
 ### Fixed
 
-- Improve config compatibility on Windows [[#111](https://github.com/soywod/himalaya/pull/111)]
-- Vim table containing emoji [#122]
+- Improve config compatibility on Windows
+- Vim table containing emoji
 
 ## [0.2.6] - 2021-04-17
 
 ### Added
 
-- Insecure TLS option [#84] [#103](https://github.com/soywod/himalaya/pull/103) [[#105](https://github.com/soywod/himalaya/pull/105)]
-- Completion subcommands [[#99](https://github.com/soywod/himalaya/pull/99)]
-- Vim flags to enable telescope preview and to choose picker [[#97](https://github.com/soywod/himalaya/pull/97)]
+- Insecure TLS option
+- Completion subcommands
+- Vim flags to enable telescope preview and to choose picker
 
 ### Changed
 
-- Make `install.sh` POSIX compliant [[#53](https://github.com/soywod/himalaya/pull/53)]
+- Make `install.sh` POSIX compliant
 
 ### Fixed
 
-- SMTP port [#87]
-- Save msg upon error [#59]
-- Answered flag not set [#50]
-- Panic when downloads-dir does not exist [#100]
-- Idle mode incorrect new message notification [#48]
+- SMTP port
+- Save msg upon error
+- Answered flag not set
+- Panic when downloads-dir does not exist
+- Idle mode incorrect new message notification
 
 ## [0.2.5] - 2021-04-12
 
 ### Fixed
 
-- Expunge mbox after `move` and `delete` cmd [#83]
-- JSON output [#89]
+- Expunge mbox after `move` and `delete` cmd
+- JSON output
 
 ## [0.2.4] - 2021-04-09
 
 ### Added
 
-- Wiki entry for Gmail users [#58]
-- Info logs for copy/move/delete cmd + silent mode [#74]
-- `--raw` arg for `read` cmd [#79]
+- Wiki entry for Gmail users
+- Info logs for copy/move/delete cmd + silent mode
+- `--raw` arg for `read` cmd
 
 ### Changed
 
-- Refactor output system + log levels [#74]
+- Refactor output system + log levels
 
 ## [0.2.3] - 2021-04-08
 
 ### Added
 
-- Telescope support [#61]
+- Telescope support
 
 ### Fixed
 
-- Unicode chars breaks the view [#71]
-- Copy/move incomplete (missing parts) [#75]
+- Unicode chars breaks the view
+- Copy/move incomplete (missing parts)
 
 ## [0.2.2] - 2021-04-04
 
@@ -676,57 +676,57 @@ Few major concepts changed:
 
 ### Added
 
-- IDLE support [#29]
-- Improve choice after editing msg [#30]
-- Flags management [#41]
-- Copy feature [#35]
-- Move feature [#31]
-- Delete feature [#36]
-- Signature support [#33]
-- Add attachment(s) to a message (CLI) [#37]
+- IDLE support
+- Improve choice after editing msg
+- Flags management
+- Copy feature
+- Move feature
+- Delete feature
+- Signature support
+- Add attachment(s) to a message (CLI)
 
 ### Changed
 
-- Errors management with `error_chain` [#39]
+- Errors management with `error_chain`
 
 ### Fixed
 
-- Missing `FLAGS` column in messages table [#40]
-- Subtract with overflow if next page empty [#38]
+- Missing `FLAGS` column in messages table
+- Subtract with overflow if next page empty
 
 ## [0.2.0] - 2021-03-10
 
 ### Added
 
-- STARTTLS support [#32]
-- Flags [#25]
+- STARTTLS support
+- Flags
 
 ### Changed
 
-- JSON support [#18]
+- JSON support
 
 ## [0.1.0] - 2021-01-17
 
 ### Added
 
-- Parse TOML config [#1]
-- Populate Config struct from TOML [#2]
-- Set up IMAP connection [#3]
-- List new emails [#6]
-- Set up CLI arg parser [#15]
-- List mailboxes command [#5]
-- Text and HTML previews [#12] [#13]
-- Set up SMTP connection [#4]
-- Write new email [#8]
-- Write new email [#8]
-- Reply, reply all and forward [#9] [#10] [#11]
-- Download attachments [#14]
-- Merge `Email` with `Msg` [#21]
-- List command with pagination [#19]
-- Icon in table when attachment is present [#16]
-- Multi-account [#17]
-- Password from command [#22]
-- Set up README [#20]
+- Parse TOML config
+- Populate Config struct from TOML
+- Set up IMAP connection
+- List new emails
+- Set up CLI arg parser
+- List mailboxes command
+- Text and HTML previews
+- Set up SMTP connection
+- Write new email
+- Write new email
+- Reply, reply all and forward
+- Download attachments
+- Merge `Email` with `Msg`
+- List command with pagination
+- Icon in table when attachment is present
+- Multi-account
+- Password from command
+- Set up README
 
 [Unreleased]: https://github.com/soywod/himalaya/compare/v1.0.0-beta.2...HEAD
 [1.0.0-beta.2]: https://github.com/soywod/himalaya/compare/v1.0.0-beta...v1.0.0-beta.2
@@ -768,147 +768,11 @@ Few major concepts changed:
 [0.2.0]: https://github.com/soywod/himalaya/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/soywod/himalaya/releases/tag/v0.1.0
 
-[#1]: https://github.com/soywod/himalaya/issues/1
-[#2]: https://github.com/soywod/himalaya/issues/2
-[#3]: https://github.com/soywod/himalaya/issues/3
-[#4]: https://github.com/soywod/himalaya/issues/4
-[#5]: https://github.com/soywod/himalaya/issues/5
-[#8]: https://github.com/soywod/himalaya/issues/8
-[#9]: https://github.com/soywod/himalaya/issues/9
-[#10]: https://github.com/soywod/himalaya/issues/10
-[#11]: https://github.com/soywod/himalaya/issues/11
-[#12]: https://github.com/soywod/himalaya/issues/12
-[#13]: https://github.com/soywod/himalaya/issues/13
-[#14]: https://github.com/soywod/himalaya/issues/14
-[#15]: https://github.com/soywod/himalaya/issues/15
-[#16]: https://github.com/soywod/himalaya/issues/16
-[#17]: https://github.com/soywod/himalaya/issues/17
-[#18]: https://github.com/soywod/himalaya/issues/18
-[#19]: https://github.com/soywod/himalaya/issues/19
-[#20]: https://github.com/soywod/himalaya/issues/20
-[#21]: https://github.com/soywod/himalaya/issues/21
-[#22]: https://github.com/soywod/himalaya/issues/22
-[#25]: https://github.com/soywod/himalaya/issues/25
-[#29]: https://github.com/soywod/himalaya/issues/29
-[#30]: https://github.com/soywod/himalaya/issues/30
-[#31]: https://github.com/soywod/himalaya/issues/31
-[#32]: https://github.com/soywod/himalaya/issues/32
-[#33]: https://github.com/soywod/himalaya/issues/33
-[#34]: https://github.com/soywod/himalaya/issues/34
-[#35]: https://github.com/soywod/himalaya/issues/35
-[#37]: https://github.com/soywod/himalaya/issues/37
-[#38]: https://github.com/soywod/himalaya/issues/38
-[#39]: https://github.com/soywod/himalaya/issues/39
-[#40]: https://github.com/soywod/himalaya/issues/40
-[#41]: https://github.com/soywod/himalaya/issues/41
-[#43]: https://github.com/soywod/himalaya/issues/43
-[#47]: https://github.com/soywod/himalaya/issues/47
-[#48]: https://github.com/soywod/himalaya/issues/48
-[#50]: https://github.com/soywod/himalaya/issues/50
-[#54]: https://github.com/soywod/himalaya/issues/54
-[#57]: https://github.com/soywod/himalaya/issues/57
-[#58]: https://github.com/soywod/himalaya/issues/58
-[#59]: https://github.com/soywod/himalaya/issues/59
-[#61]: https://github.com/soywod/himalaya/issues/61
-[#71]: https://github.com/soywod/himalaya/issues/71
-[#74]: https://github.com/soywod/himalaya/issues/74
-[#75]: https://github.com/soywod/himalaya/issues/75
-[#78]: https://github.com/soywod/himalaya/issues/78
-[#79]: https://github.com/soywod/himalaya/issues/79
-[#80]: https://github.com/soywod/himalaya/issues/80
-[#83]: https://github.com/soywod/himalaya/issues/83
-[#84]: https://github.com/soywod/himalaya/issues/84
-[#86]: https://github.com/soywod/himalaya/issues/86
-[#87]: https://github.com/soywod/himalaya/issues/87
-[#89]: https://github.com/soywod/himalaya/issues/89
-[#91]: https://github.com/soywod/himalaya/issues/91
-[#95]: https://github.com/soywod/himalaya/issues/95
-[#96]: https://github.com/soywod/himalaya/issues/96
-[#100]: https://github.com/soywod/himalaya/issues/100
-[#102]: https://github.com/soywod/himalaya/issues/102
-[#109]: https://github.com/soywod/himalaya/issues/109
-[#117]: https://github.com/soywod/himalaya/issues/117
-[#121]: https://github.com/soywod/himalaya/issues/121
-[#122]: https://github.com/soywod/himalaya/issues/122
-[#123]: https://github.com/soywod/himalaya/issues/123
-[#125]: https://github.com/soywod/himalaya/issues/125
-[#126]: https://github.com/soywod/himalaya/issues/126
-[#130]: https://github.com/soywod/himalaya/issues/130
-[#131]: https://github.com/soywod/himalaya/issues/131
-[#132]: https://github.com/soywod/himalaya/issues/132
-[#133]: https://github.com/soywod/himalaya/issues/133
-[#134]: https://github.com/soywod/himalaya/issues/134
-[#135]: https://github.com/soywod/himalaya/issues/135
-[#136]: https://github.com/soywod/himalaya/issues/136
-[#138]: https://github.com/soywod/himalaya/issues/138
-[#141]: https://github.com/soywod/himalaya/issues/141
-[#144]: https://github.com/soywod/himalaya/issues/144
-[#146]: https://github.com/soywod/himalaya/issues/146
-[#152]: https://github.com/soywod/himalaya/issues/152
-[#153]: https://github.com/soywod/himalaya/issues/153
-[#160]: https://github.com/soywod/himalaya/issues/160
-[#162]: https://github.com/soywod/himalaya/issues/162
-[#176]: https://github.com/soywod/himalaya/issues/176
-[#172]: https://github.com/soywod/himalaya/issues/172
-[#178]: https://github.com/soywod/himalaya/issues/178
-[#181]: https://github.com/soywod/himalaya/issues/181
-[#185]: https://github.com/soywod/himalaya/issues/185
-[#186]: https://github.com/soywod/himalaya/issues/186
-[#190]: https://github.com/soywod/himalaya/issues/190
-[#193]: https://github.com/soywod/himalaya/issues/193
-[#196]: https://github.com/soywod/himalaya/issues/196
-[#199]: https://github.com/soywod/himalaya/issues/199
-[#204]: https://github.com/soywod/himalaya/issues/204
-[#205]: https://github.com/soywod/himalaya/issues/205
-[#206]: https://github.com/soywod/himalaya/issues/206
-[#215]: https://github.com/soywod/himalaya/issues/215
-[#220]: https://github.com/soywod/himalaya/issues/220
-[#227]: https://github.com/soywod/himalaya/issues/227
-[#228]: https://github.com/soywod/himalaya/issues/228
-[#229]: https://github.com/soywod/himalaya/issues/229
-[#244]: https://github.com/soywod/himalaya/issues/244
-[#249]: https://github.com/soywod/himalaya/issues/249
-[#256]: https://github.com/soywod/himalaya/issues/256
-[#259]: https://github.com/soywod/himalaya/issues/259
-[#268]: https://github.com/soywod/himalaya/issues/268
-[#272]: https://github.com/soywod/himalaya/issues/272
-[#273]: https://github.com/soywod/himalaya/issues/273
-[#276]: https://github.com/soywod/himalaya/issues/276
-[#271]: https://github.com/soywod/himalaya/issues/271
-[#276]: https://github.com/soywod/himalaya/issues/276
-[#280]: https://github.com/soywod/himalaya/issues/280
-[#281]: https://github.com/soywod/himalaya/issues/281
-[#288]: https://github.com/soywod/himalaya/issues/288
-[#289]: https://github.com/soywod/himalaya/issues/289
-[#298]: https://github.com/soywod/himalaya/issues/298
-[#300]: https://github.com/soywod/himalaya/issues/300
-[#303]: https://github.com/soywod/himalaya/issues/303
-[#305]: https://github.com/soywod/himalaya/issues/305
-[#308]: https://github.com/soywod/himalaya/issues/308
-[#309]: https://github.com/soywod/himalaya/issues/309
-[#318]: https://github.com/soywod/himalaya/issues/318
-[#321]: https://github.com/soywod/himalaya/issues/321
-[#323]: https://github.com/soywod/himalaya/issues/323
-[#324]: https://github.com/soywod/himalaya/issues/324
-[#329]: https://github.com/soywod/himalaya/issues/329
-[#331]: https://github.com/soywod/himalaya/issues/331
-[#334]: https://github.com/soywod/himalaya/issues/334
-[#335]: https://github.com/soywod/himalaya/issues/335
-[#338]: https://github.com/soywod/himalaya/issues/338
-[#340]: https://github.com/soywod/himalaya/issues/340
-[#341]: https://github.com/soywod/himalaya/issues/341
-[#342]: https://github.com/soywod/himalaya/issues/342
-[#344]: https://github.com/soywod/himalaya/issues/344
-[#346]: https://github.com/soywod/himalaya/issues/346
-[#352]: https://github.com/soywod/himalaya/issues/352
-[#356]: https://github.com/soywod/himalaya/issues/356
-[#419]: https://github.com/soywod/himalaya/issues/419
-[#430]: https://github.com/soywod/himalaya/issues/430
-
-[sourcehut#41]: https://todo.sr.ht/~soywod/pimalaya/41
-[sourcehut#43]: https://todo.sr.ht/~soywod/pimalaya/43
-[sourcehut#54]: https://todo.sr.ht/~soywod/pimalaya/54
-[sourcehut#58]: https://todo.sr.ht/~soywod/pimalaya/58
-[sourcehut#59]: https://todo.sr.ht/~soywod/pimalaya/59
-[sourcehut#60]: https://todo.sr.ht/~soywod/pimalaya/60
-[sourcehut#95]: https://todo.sr.ht/~soywod/pimalaya/95
+[#39]: https://todo.sr.ht/~soywod/pimalaya/39
+[#41]: https://todo.sr.ht/~soywod/pimalaya/41
+[#43]: https://todo.sr.ht/~soywod/pimalaya/43
+[#54]: https://todo.sr.ht/~soywod/pimalaya/54
+[#58]: https://todo.sr.ht/~soywod/pimalaya/58
+[#59]: https://todo.sr.ht/~soywod/pimalaya/59
+[#60]: https://todo.sr.ht/~soywod/pimalaya/60
+[#95]: https://todo.sr.ht/~soywod/pimalaya/95
