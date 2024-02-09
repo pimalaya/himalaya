@@ -8,19 +8,18 @@ Welcome to [**Himalaya CLI**](https://pimalaya.org/himalaya/cli/latest/), the Co
 
 ## Features
 
-- [Mailbox management](https://pimalaya.org/himalaya/cli/latest/usage/folder/)
-- [Envelopes listing](https://pimalaya.org/himalaya/cli/latest/usage/envelope/list.md)
-- [Message composition](https://pimalaya.org/himalaya/cli/latest/usage/message/write.md) based on `$EDITOR`
-- Message manipulation ([copy](https://pimalaya.org/himalaya/cli/latest/usage/message/copy.md)/[move](https://pimalaya.org/himalaya/cli/latest/usage/message/move.md)/[delete](https://pimalaya.org/himalaya/cli/latest/usage/message/delete.md))
+- [Folder (aka mailbox) management](https://pimalaya.org/himalaya/cli/latest/usage/advanced/folder/)
+- [Envelopes listing](https://pimalaya.org/himalaya/cli/latest/usage/basic/envelope/list.html)
+- [Message composition](https://pimalaya.org/himalaya/cli/latest/usage/basic/message/send.html) based on `$EDITOR`
+- Message manipulation ([copy](https://pimalaya.org/himalaya/cli/latest/usage/advanced/message/copy.html)/[move](https://pimalaya.org/himalaya/cli/latest/usage/advanced/message/move.html)/[delete](https://pimalaya.org/himalaya/cli/latest/usage/advanced/message/delete.html))
 - [Multi-accounting](https://pimalaya.org/himalaya/cli/latest/configuration/)
-- [Account synchronization](https://pimalaya.org/himalaya/cli/latest/usage/account/sync.md) for offline usage
-- Support for [IMAP](https://pimalaya.org/himalaya/cli/latest/configuration/imap.md), [Maildir](https://pimalaya.org/himalaya/cli/latest/configuration/maildir.md), [notmuch](https://pimalaya.org/himalaya/cli/latest/configuration/notmuch.md)
-- Sending via [SMTP](https://pimalaya.org/himalaya/cli/latest/configuration/smtp.md) or [sendmail](https://pimalaya.org/himalaya/cli/latest/configuration/sendmail.md)
-- [PGP](https://pimalaya.org/himalaya/cli/latest/configuration/pgp/) end-to-end encryption
-- Generate [completion scripts](https://pimalaya.org/himalaya/cli/latest/tips/completion.md) for various shells
-- Generate [man pages](https://pimalaya.org/himalaya/cli/latest/tips/man.md)
-- JSON output
-- …and more!
+- [Account synchronization](https://pimalaya.org/himalaya/cli/latest/usage/basic/account/sync.html) for offline usage
+- Support multiple backends: [IMAP](https://pimalaya.org/himalaya/cli/latest/usage/advanced/imap.html), [Maildir](https://pimalaya.org/himalaya/cli/latest/usage/advanced/maildir.html), [Notmuch](https://pimalaya.org/himalaya/cli/latest/usage/advanced/notmuch.html), [SMTP](https://pimalaya.org/himalaya/cli/latest/usage/advanced/smtp.html), [Sendmail](https://pimalaya.org/himalaya/cli/latest/usage/advanced/sendmail.html).
+- [PGP](https://pimalaya.org/himalaya/cli/latest/usage/advanced/pgp/) end-to-end encryption
+- Generate [man pages](https://pimalaya.org/himalaya/cli/latest/usage/advanced/man.html)
+- Generate [completion scripts](https://pimalaya.org/himalaya/cli/latest/usage/advanced/completion.html) for various shells
+- [JSON output](https://pimalaya.org/himalaya/cli/latest/usage/advanced/#-o--output)
+- …and more! [Get started now](https://pimalaya.org/himalaya/cli/latest/quickstart.html)
 
 ## Installation
 
