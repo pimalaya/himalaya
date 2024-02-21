@@ -239,7 +239,7 @@ impl AccountSyncCommand {
             if !envelopes_patch_err.is_empty() {
                 printer.print_log("")?;
                 printer.print_log("Errors occurred while applying the envelopes patch:")?;
-                for (hunk, err) in folders_patch_err {
+                for (hunk, err) in envelopes_patch_err {
                     printer.print_log(format!(" - {hunk}: {err}"))?;
                 }
             }
