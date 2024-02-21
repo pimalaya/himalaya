@@ -1,5 +1,5 @@
 # The account name.
-[example]
+[accounts.example]
 
 # The current account will be used by default for all other commands.
 default = true
