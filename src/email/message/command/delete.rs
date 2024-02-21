@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use email::backend::feature::BackendFeatureSource;
 use log::info;
 
 #[cfg(feature = "account-sync")]
@@ -51,7 +52,7 @@ impl MessageDeleteCommand {
             toml_account_config.clone(),
             account_config,
             delete_messages_kind,
-            |builder| builder.set_delete_messages(Some(None)),
+            |builder| builder.set_delete_messages(BackendFeatureSource::Context),
         )
         .await?;
 

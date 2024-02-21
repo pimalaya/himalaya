@@ -1,7 +1,6 @@
 pub mod arg;
 pub mod command;
 pub mod config;
-#[cfg(feature = "wizard")]
 pub(crate) mod wizard;
 
 use anyhow::Result;

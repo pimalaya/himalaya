@@ -3,7 +3,6 @@ use std::io;
 
 use super::THEME;
 
-#[allow(unused)]
 pub(crate) fn passwd(prompt: &str) -> io::Result<String> {
     Password::with_theme(&*THEME)
         .with_prompt(prompt)
@@ -14,7 +13,6 @@ pub(crate) fn passwd(prompt: &str) -> io::Result<String> {
         .interact()
 }
 
-#[allow(unused)]
 pub(crate) fn secret(prompt: &str) -> io::Result<String> {
     Password::with_theme(&*THEME)
         .with_prompt(prompt)

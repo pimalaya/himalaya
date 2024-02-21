@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use email::{backend::feature::BackendFeatureSource, folder::list::ListFolders};
 use log::info;
 
 #[cfg(feature = "account-sync")]
@@ -45,7 +46,7 @@ impl FolderListCommand {
             toml_account_config.clone(),
             account_config.clone(),
             list_folders_kind,
-            |builder| builder.set_list_folders(Some(None)),
+            |builder| builder.set_list_folders(BackendFeatureSource::Context),
         )
         .await?;
 

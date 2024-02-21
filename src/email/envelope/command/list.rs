@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use email::backend::feature::BackendFeatureSource;
 use log::info;
 
 #[cfg(feature = "account-sync")]
@@ -82,7 +83,7 @@ impl ListEnvelopesCommand {
             toml_account_config.clone(),
             account_config.clone(),
             list_envelopes_kind,
-            |builder| builder.set_list_envelopes(Some(None)),
+            |builder| builder.set_list_envelopes(BackendFeatureSource::Context),
         )
         .await?;
 

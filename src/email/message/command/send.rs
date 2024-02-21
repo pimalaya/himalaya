@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use email::{backend::feature::BackendFeatureSource, message::send::SendMessageThenSaveCopy};
 use log::info;
 use std::io::{self, BufRead, IsTerminal};
 
@@ -37,10 +38,7 @@ impl MessageSendCommand {
             self.cache.disable,
         )?;
 
-        let send_message_kind = toml_account_config.send_message_kind();
-
-        #[cfg(feature = "message-add")]
-        let send_message_kind = send_message_kind.into_iter().chain(
+        let send_message_kind = toml_account_config.send_message_kind().into_iter().chain(
             toml_account_config
                 .add_message_kind()
                 .filter(|_| account_config.should_save_copy_sent_message()),
@@ -51,9 +49,8 @@ impl MessageSendCommand {
             account_config,
             send_message_kind,
             |builder| {
-                builder.set_send_message(Some(None));
-                #[cfg(feature = "message-add")]
-                builder.set_add_message(Some(None));
+                builder.set_send_message(BackendFeatureSource::Context);
+                builder.set_add_message(BackendFeatureSource::Context);
             },
         )
         .await?;
@@ -69,7 +66,7 @@ impl MessageSendCommand {
                 .join("\r\n")
         };
 
-        backend.send_message(msg.as_bytes()).await?;
+        backend.send_message_then_save_copy(msg.as_bytes()).await?;
 
         printer.print("Message successfully sent!")
     }

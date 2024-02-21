@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use email::{backend::feature::BackendFeatureSource, envelope::watch::WatchEnvelopes};
 use log::info;
 
 #[cfg(feature = "account-sync")]
@@ -43,7 +44,7 @@ impl WatchEnvelopesCommand {
             toml_account_config.clone(),
             account_config,
             watch_envelopes_kind,
-            |builder| builder.set_watch_envelopes(Some(None)),
+            |builder| builder.set_watch_envelopes(BackendFeatureSource::Context),
         )
         .await?;
 

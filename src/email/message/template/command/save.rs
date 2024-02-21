@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use email::backend::feature::BackendFeatureSource;
 use log::info;
 use mml::MmlCompilerBuilder;
 use std::io::{self, BufRead, IsTerminal};
@@ -52,7 +53,7 @@ impl TemplateSaveCommand {
             toml_account_config.clone(),
             account_config.clone(),
             add_message_kind,
-            |builder| builder.set_add_message(Some(None)),
+            |builder| builder.set_add_message(BackendFeatureSource::Context),
         )
         .await?;
 

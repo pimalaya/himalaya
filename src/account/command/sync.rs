@@ -8,25 +8,22 @@ use anyhow::Result;
 use clap::{ArgAction, Parser};
 #[cfg(feature = "imap")]
 use email::imap::ImapContextBuilder;
-#[cfg(feature = "account-sync")]
 use email::maildir::config::MaildirConfig;
 #[cfg(feature = "maildir")]
 use email::maildir::MaildirContextBuilder;
 #[cfg(feature = "notmuch")]
 use email::notmuch::NotmuchContextBuilder;
 use email::{
-    account::{
-        config::AccountConfig,
-        sync::{AccountSyncBuilder, AccountSyncProgressEvent},
-    },
+    account::{config::AccountConfig, sync::AccountSyncBuilder},
     backend::BackendBuilder,
-    folder::sync::FolderSyncStrategy,
+    folder::sync::config::FolderSyncStrategy,
+    sync::SyncEvent,
 };
 use indicatif::{MultiProgress, ProgressBar, ProgressFinish, ProgressStyle};
 use log::info;
 use once_cell::sync::Lazy;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeSet, HashMap},
     ops::Deref,
     sync::{Arc, Mutex},
 };
@@ -96,8 +93,8 @@ impl AccountSyncCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing sync account command");
 
-        let included_folders = HashSet::from_iter(self.include_folder);
-        let excluded_folders = HashSet::from_iter(self.exclude_folder);
+        let included_folders = BTreeSet::from_iter(self.include_folder);
+        let excluded_folders = BTreeSet::from_iter(self.exclude_folder);
 
         let strategy = if !included_folders.is_empty() {
             Some(FolderSyncStrategy::Include(included_folders))
@@ -116,26 +113,25 @@ impl AccountSyncCommand {
 
         let backend_builder =
             AccountSyncBackendBuilder::new(toml_account_config, account_config.clone()).await?;
-        let sync_builder = AccountSyncBuilder::new(account_config.clone(), backend_builder.into())
-            .await?
-            .with_some_folders_strategy(strategy)
-            .with_dry_run(self.dry_run);
+        let sync_builder = AccountSyncBuilder::new(backend_builder.into())?
+            .with_dry_run(self.dry_run)
+            .with_some_folders_filter(strategy);
 
         if self.dry_run {
             let report = sync_builder.sync().await?;
-            let mut hunks_count = report.folders_patch.len();
+            let mut hunks_count = report.folder.patch.len();
 
-            if !report.folders_patch.is_empty() {
+            if !report.folder.patch.is_empty() {
                 printer.print_log("Folders patch:")?;
-                for (hunk, _) in report.folders_patch {
+                for (hunk, _) in report.folder.patch {
                     printer.print_log(format!(" - {hunk}"))?;
                 }
                 printer.print_log("")?;
             }
 
-            if !report.emails_patch.is_empty() {
+            if !report.email.patch.is_empty() {
                 printer.print_log("Envelopes patch:")?;
-                for (hunk, _) in report.emails_patch {
+                for (hunk, _) in report.email.patch {
                     hunks_count += 1;
                     printer.print_log(format!(" - {hunk}"))?;
                 }
@@ -154,27 +150,27 @@ impl AccountSyncCommand {
             let main_progress = multi.add(
                 ProgressBar::new(100)
                     .with_style(MAIN_PROGRESS_STYLE.clone())
-                    .with_message("Synchronizing folders…"),
+                    .with_message("Listing folders…"),
             );
 
-            // Force the progress bar to show
-            main_progress.set_position(0);
+            main_progress.tick();
 
             let report = sync_builder
-                .with_on_progress(move |evt| {
-                    use AccountSyncProgressEvent::*;
+                .with_handler(move |evt| {
                     match evt {
-                        ApplyFolderPatches(..) => {
-                            main_progress.inc(3);
+                        SyncEvent::ListedAllFolders => {
+                            main_progress.set_message("Synchronizing folders…");
                         }
-                        ApplyEnvelopePatches(patches) => {
-                            let mut envelopes_progresses = sub_progresses.lock().unwrap();
-                            let patches_len =
-                                patches.values().fold(0, |sum, patch| sum + patch.len());
-                            main_progress.set_length((110 * patches_len / 100) as u64);
-                            main_progress.set_position((5 * patches_len / 100) as u64);
-                            main_progress.set_message("Synchronizing envelopes…");
+                        SyncEvent::ProcessedAllFolderHunks => {
+                            main_progress.set_message("Listing envelopes…");
+                        }
+                        SyncEvent::GeneratedEmailPatch(patches) => {
+                            let patches_len = patches.values().flatten().count();
+                            main_progress.set_length(patches_len as u64);
+                            main_progress.set_position(0);
+                            main_progress.set_message("Synchronizing emails…");
 
+                            let mut envelopes_progresses = sub_progresses.lock().unwrap();
                             for (folder, patch) in patches {
                                 let progress = ProgressBar::new(patch.len() as u64)
                                     .with_style(SUB_PROGRESS_STYLE.clone())
@@ -184,7 +180,7 @@ impl AccountSyncCommand {
                                 envelopes_progresses.insert(folder, progress.clone());
                             }
                         }
-                        ApplyEnvelopeHunk(hunk) => {
+                        SyncEvent::ProcessedEmailHunk(hunk) => {
                             main_progress.inc(1);
                             let mut progresses = sub_progresses.lock().unwrap();
                             if let Some(progress) = progresses.get_mut(hunk.folder()) {
@@ -196,31 +192,33 @@ impl AccountSyncCommand {
                                 }
                             }
                         }
-                        ApplyEnvelopeCachePatch(_patch) => {
-                            main_progress.set_length(100);
-                            main_progress.set_position(95);
-                            main_progress.set_message("Saving cache database…");
-                        }
-                        ExpungeFolders(folders) => {
+                        SyncEvent::ProcessedAllEmailHunks => {
                             let mut progresses = sub_progresses.lock().unwrap();
                             for progress in progresses.values() {
                                 progress.finish_and_clear()
                             }
                             progresses.clear();
 
+                            main_progress.set_length(100);
                             main_progress.set_position(100);
-                            main_progress
-                                .set_message(format!("Expunging {} folders…", folders.len()));
+                            main_progress.set_message("Expunging folders…");
                         }
-                        _ => (),
+                        SyncEvent::ExpungedAllFolders => {
+                            main_progress.finish_and_clear();
+                        }
+                        _ => {
+                            main_progress.tick();
+                        }
                     };
-                    Ok(())
+
+                    async { Ok(()) }
                 })
                 .sync()
                 .await?;
 
             let folders_patch_err = report
-                .folders_patch
+                .folder
+                .patch
                 .iter()
                 .filter_map(|(hunk, err)| err.as_ref().map(|err| (hunk, err)))
                 .collect::<Vec<_>>();
@@ -232,15 +230,9 @@ impl AccountSyncCommand {
                     .try_for_each(|(hunk, err)| printer.print_log(format!(" - {hunk}: {err}")))?;
             }
 
-            if let Some(err) = report.folders_cache_patch.1 {
-                printer.print_log("")?;
-                printer.print_log(format!(
-                    "Error occurred while applying the folder cache patch: {err}"
-                ))?;
-            }
-
             let envelopes_patch_err = report
-                .emails_patch
+                .email
+                .patch
                 .iter()
                 .filter_map(|(hunk, err)| err.as_ref().map(|err| (hunk, err)))
                 .collect::<Vec<_>>();
@@ -250,13 +242,6 @@ impl AccountSyncCommand {
                 for (hunk, err) in folders_patch_err {
                     printer.print_log(format!(" - {hunk}: {err}"))?;
                 }
-            }
-
-            if let Some(err) = report.emails_cache_patch.1 {
-                printer.print_log("")?;
-                printer.print_log(format!(
-                    "Error occurred while applying the envelopes cache patch: {err}"
-                ))?;
             }
 
             printer.print(format!("Account {account_name} successfully synchronized!"))?;
@@ -283,7 +268,6 @@ impl AccountSyncBackendBuilder {
         let is_imap_used = used_backends.contains(&BackendKind::Imap);
         #[cfg(feature = "maildir")]
         let is_maildir_used = used_backends.contains(&BackendKind::Maildir);
-        #[cfg(feature = "account-sync")]
         let is_maildir_for_sync_used = used_backends.contains(&BackendKind::MaildirForSync);
         #[cfg(feature = "notmuch")]
         let is_notmuch_used = used_backends.contains(&BackendKind::Notmuch);
@@ -300,7 +284,10 @@ impl AccountSyncBackendBuilder {
                     .filter(|_| is_imap_used)
                     .map(Clone::clone)
                     .map(Arc::new)
-                    .map(|config| ImapContextBuilder::new(config).with_prebuilt_credentials());
+                    .map(|config| {
+                        ImapContextBuilder::new(account_config.clone(), config)
+                            .with_prebuilt_credentials()
+                    });
                 match builder {
                     Some(builder) => Some(builder.await?),
                     None => None,
@@ -314,15 +301,14 @@ impl AccountSyncBackendBuilder {
                 .filter(|_| is_maildir_used)
                 .map(Clone::clone)
                 .map(Arc::new)
-                .map(MaildirContextBuilder::new),
+                .map(|mdir_config| MaildirContextBuilder::new(account_config.clone(), mdir_config)),
 
-            #[cfg(feature = "account-sync")]
             maildir_for_sync: Some(MaildirConfig {
                 root_dir: account_config.get_sync_dir()?,
             })
             .filter(|_| is_maildir_for_sync_used)
             .map(Arc::new)
-            .map(MaildirContextBuilder::new),
+            .map(|mdir_config| MaildirContextBuilder::new(account_config.clone(), mdir_config)),
 
             #[cfg(feature = "notmuch")]
             notmuch: toml_account_config
@@ -331,7 +317,9 @@ impl AccountSyncBackendBuilder {
                 .filter(|_| is_notmuch_used)
                 .map(Clone::clone)
                 .map(Arc::new)
-                .map(NotmuchContextBuilder::new),
+                .map(|notmuch_config| {
+                    NotmuchContextBuilder::new(account_config.clone(), notmuch_config)
+                }),
 
             #[cfg(feature = "smtp")]
             smtp: None,

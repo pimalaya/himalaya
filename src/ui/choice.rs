@@ -38,11 +38,9 @@ pub fn pre_edit() -> Result<PreEditChoice> {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PostEditChoice {
-    #[cfg(feature = "message-send")]
     Send,
     Edit,
     LocalDraft,
-    #[cfg(feature = "message-add")]
     RemoteDraft,
     Discard,
 }
@@ -50,11 +48,9 @@ pub enum PostEditChoice {
 impl ToString for PostEditChoice {
     fn to_string(&self) -> String {
         match self {
-            #[cfg(feature = "message-send")]
             Self::Send => "Send it".into(),
             Self::Edit => "Edit it again".into(),
             Self::LocalDraft => "Save it as local draft".into(),
-            #[cfg(feature = "message-add")]
             Self::RemoteDraft => "Save it as remote draft".into(),
             Self::Discard => "Discard it".into(),
         }
@@ -63,11 +59,9 @@ impl ToString for PostEditChoice {
 
 pub fn post_edit() -> Result<PostEditChoice> {
     let choices = [
-        #[cfg(feature = "message-send")]
         PostEditChoice::Send,
         PostEditChoice::Edit,
         PostEditChoice::LocalDraft,
-        #[cfg(feature = "message-add")]
         PostEditChoice::RemoteDraft,
         PostEditChoice::Discard,
     ];

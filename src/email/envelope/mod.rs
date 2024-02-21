@@ -30,7 +30,6 @@ pub struct Envelope {
     pub date: String,
 }
 
-#[cfg(any(feature = "account-sync", feature = "envelope-list"))]
 impl Table for Envelope {
     fn head() -> Row {
         Row::new()
@@ -76,12 +75,10 @@ impl Table for Envelope {
     }
 }
 
-#[cfg(any(feature = "account-sync", feature = "envelope-list"))]
 /// Represents the list of envelopes.
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Envelopes(Vec<Envelope>);
 
-#[cfg(any(feature = "account-sync", feature = "envelope-list"))]
 impl Envelopes {
     pub fn from_backend(
         config: &AccountConfig,
@@ -108,7 +105,6 @@ impl Envelopes {
     }
 }
 
-#[cfg(any(feature = "account-sync", feature = "envelope-list"))]
 impl ops::Deref for Envelopes {
     type Target = Vec<Envelope>;
 
@@ -117,7 +113,6 @@ impl ops::Deref for Envelopes {
     }
 }
 
-#[cfg(any(feature = "account-sync", feature = "envelope-list"))]
 impl PrintTable for Envelopes {
     fn print_table(&self, writer: &mut dyn WriteColor, opts: PrintTableOpts) -> Result<()> {
         writeln!(writer)?;

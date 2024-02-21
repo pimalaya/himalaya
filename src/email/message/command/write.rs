@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use email::message::Message;
+use email::{backend::feature::BackendFeatureSource, message::Message};
 use log::info;
 
 #[cfg(feature = "account-sync")]
@@ -54,8 +54,8 @@ impl MessageWriteCommand {
             account_config.clone(),
             add_message_kind.into_iter().chain(send_message_kind),
             |builder| {
-                builder.set_add_message(Some(None));
-                builder.set_send_message(Some(None));
+                builder.set_add_message(BackendFeatureSource::Context);
+                builder.set_send_message(BackendFeatureSource::Context);
             },
         )
         .await?;

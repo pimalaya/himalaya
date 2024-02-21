@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use email::backend::feature::BackendFeatureSource;
 use log::info;
 use std::io::{self, BufRead, IsTerminal};
 
@@ -48,7 +49,7 @@ impl MessageSaveCommand {
             toml_account_config.clone(),
             account_config,
             add_message_kind,
-            |builder| builder.set_add_message(Some(None)),
+            |builder| builder.set_add_message(BackendFeatureSource::Context),
         )
         .await?;
 

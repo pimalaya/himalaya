@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 use dialoguer::Confirm;
+use email::{backend::feature::BackendFeatureSource, folder::purge::PurgeFolder};
 use log::info;
 use std::process;
 
@@ -56,7 +57,7 @@ impl FolderPurgeCommand {
             toml_account_config.clone(),
             account_config,
             purge_folder_kind,
-            |builder| builder.set_purge_folder(Some(None)),
+            |builder| builder.set_purge_folder(BackendFeatureSource::Context),
         )
         .await?;
 

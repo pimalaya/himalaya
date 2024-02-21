@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 use dialoguer::Confirm;
+use email::{backend::feature::BackendFeatureSource, folder::delete::DeleteFolder};
 use log::info;
 use std::process;
 
@@ -56,7 +57,7 @@ impl FolderDeleteCommand {
             toml_account_config.clone(),
             account_config,
             delete_folder_kind,
-            |builder| builder.set_delete_folder(Some(None)),
+            |builder| builder.set_delete_folder(BackendFeatureSource::Context),
         )
         .await?;
 

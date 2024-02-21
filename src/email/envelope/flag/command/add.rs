@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use email::backend::feature::BackendFeatureSource;
 use log::info;
 
 #[cfg(feature = "account-sync")]
@@ -51,7 +52,7 @@ impl FlagAddCommand {
             toml_account_config.clone(),
             account_config,
             add_flags_kind,
-            |builder| builder.set_add_flags(Some(None)),
+            |builder| builder.set_add_flags(BackendFeatureSource::Context),
         )
         .await?;
 

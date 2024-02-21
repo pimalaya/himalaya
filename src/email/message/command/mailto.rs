@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use email::backend::feature::BackendFeatureSource;
 use log::{debug, info};
 use mail_builder::MessageBuilder;
 use url::Url;
@@ -58,8 +59,8 @@ impl MessageMailtoCommand {
             account_config.clone(),
             add_message_kind.into_iter().chain(send_message_kind),
             |builder| {
-                builder.set_add_message(Some(None));
-                builder.set_send_message(Some(None));
+                builder.set_add_message(BackendFeatureSource::Context);
+                builder.set_send_message(BackendFeatureSource::Context);
             },
         )
         .await?;

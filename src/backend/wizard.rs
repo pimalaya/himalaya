@@ -33,8 +33,8 @@ const SEND_MESSAGE_BACKEND_KINDS: &[BackendKind] = &[
 ];
 
 pub(crate) async fn configure(
-    #[allow(unused)] account_name: &str,
-    #[allow(unused)] email: &str,
+    account_name: &str,
+    email: &str,
     autoconfig: Option<&AutoConfig>,
 ) -> Result<Option<BackendConfig>> {
     let kind = Select::with_theme(&*THEME)
@@ -60,8 +60,8 @@ pub(crate) async fn configure(
 }
 
 pub(crate) async fn configure_sender(
-    #[allow(unused)] account_name: &str,
-    #[allow(unused)] email: &str,
+    account_name: &str,
+    email: &str,
     autoconfig: Option<&AutoConfig>,
 ) -> Result<Option<BackendConfig>> {
     let kind = Select::with_theme(&*THEME)

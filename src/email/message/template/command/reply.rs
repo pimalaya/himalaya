@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use clap::Parser;
+use email::backend::feature::BackendFeatureSource;
 use log::info;
 
 #[cfg(feature = "account-sync")]
@@ -64,7 +65,7 @@ impl TemplateReplyCommand {
             toml_account_config.clone(),
             account_config.clone(),
             get_messages_kind,
-            |builder| builder.set_get_messages(Some(None)),
+            |builder| builder.set_get_messages(BackendFeatureSource::Context),
         )
         .await?;
 

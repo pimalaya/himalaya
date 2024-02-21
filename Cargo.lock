@@ -1217,7 +1217,7 @@ dependencies = [
 [[package]]
 name = "email-lib"
 version = "0.21.0"
-source = "git+https://git.sr.ht/~soywod/pimalaya#ca42096c5537cf15becbb12bf0935381a1ea2908"
+source = "git+https://git.sr.ht/~soywod/pimalaya#358717d3579ffacad2bbabd9d116a292473e38ae"
 dependencies = [
  "advisory-lock",
  "anyhow",
@@ -1239,6 +1239,7 @@ dependencies = [
  "mail-parser",
  "mail-send",
  "maildirpp",
+ "md5",
  "mml-lib",
  "notify",
  "notify-rust",
@@ -1246,11 +1247,11 @@ dependencies = [
  "oauth-lib",
  "once_cell",
  "ouroboros 0.15.6",
+ "paste",
  "pgp-lib",
  "process-lib",
  "rayon",
  "regex",
- "rusqlite",
  "secret-lib",
  "serde",
  "serde-xml-rs",
@@ -1265,9 +1266,9 @@ dependencies = [
 
 [[package]]
 name = "email-macros"
-version = "0.0.1"
+version = "0.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c6354267c9a1db068b10ad982db9b8a82445f73f9bc9a57ed4924ddb913a065"
+checksum = "0f24a09fd651027f8764f8a12c12358715cb9bab622ab3125ede3dd6ae047c95"
 dependencies = [
  "quote",
  "syn 2.0.41",
@@ -2961,6 +2962,12 @@ dependencies = [
  "rand_core",
  "subtle",
 ]
+
+[[package]]
+name = "paste"
+version = "1.0.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de3145af08024dea9fa9914f381a17b8fc6034dfb00f3a84013f7ff43f29ed4c"
 
 [[package]]
 name = "pbkdf2"

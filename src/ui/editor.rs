@@ -2,14 +2,11 @@ use anyhow::{Context, Result};
 use email::{
     account::config::AccountConfig,
     email::utils::{local_draft_path, remove_local_draft},
-};
-#[cfg(feature = "message-add")]
-use email::{
     flag::{Flag, Flags},
     folder::DRAFTS,
+    message::{add::AddMessage, send::SendMessageThenSaveCopy},
 };
 use log::debug;
-#[cfg(any(feature = "message-send", feature = "template-send"))]
 use mml::MmlCompilerBuilder;
 use process::SingleCmd;
 use std::{env, fs, sync::Arc};
@@ -82,7 +79,6 @@ pub async fn edit_tpl_with_editor<P: Printer>(
 
     loop {
         match choice::post_edit() {
-            #[cfg(feature = "message-send")]
             Ok(PostEditChoice::Send) => {
                 printer.print_log("Sending email…")?;
 
@@ -94,7 +90,7 @@ pub async fn edit_tpl_with_editor<P: Printer>(
 
                 let email = compiler.build(tpl.as_str())?.compile().await?.into_vec()?;
 
-                backend.send_message(&email).await?;
+                backend.send_message_then_save_copy(&email).await?;
 
                 remove_local_draft()?;
                 printer.print("Done!")?;
@@ -108,7 +104,6 @@ pub async fn edit_tpl_with_editor<P: Printer>(
                 printer.print("Email successfully saved locally")?;
                 break;
             }
-            #[cfg(feature = "message-add")]
             Ok(PostEditChoice::RemoteDraft) => {
                 #[allow(unused_mut)]
                 let mut compiler = MmlCompilerBuilder::new();

@@ -1,12 +1,10 @@
-pub mod args;
-#[cfg(feature = "wizard")]
 pub mod wizard;
 
 use anyhow::{anyhow, Context, Result};
 use dirs::{config_dir, home_dir};
 use email::{
     account::config::AccountConfig, config::Config, envelope::config::EnvelopeConfig,
-    folder::config::FolderConfig, message::config::MessageConfig,
+    flag::config::FlagConfig, folder::config::FolderConfig, message::config::MessageConfig,
 };
 
 use serde::{Deserialize, Serialize};
@@ -19,11 +17,9 @@ use std::{
 };
 use toml;
 
-use crate::account::config::TomlAccountConfig;
 #[cfg(feature = "account-sync")]
 use crate::backend::BackendKind;
-#[cfg(feature = "wizard")]
-use crate::{wizard_prompt, wizard_warn};
+use crate::{account::config::TomlAccountConfig, wizard_prompt, wizard_warn};
 
 /// Represents the user config file.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
@@ -34,8 +30,6 @@ pub struct TomlConfig {
     pub signature: Option<String>,
     pub signature_delim: Option<String>,
     pub downloads_dir: Option<PathBuf>,
-
-    #[serde(flatten)]
     pub accounts: HashMap<String, TomlAccountConfig>,
 }
 
@@ -50,7 +44,6 @@ impl TomlConfig {
         toml::from_str(&content).context(format!("cannot parse config file at {path:?}"))
     }
 
-    #[cfg(feature = "wizard")]
     /// Create and save a TOML configuration using the wizard.
     ///
     /// If the user accepts the confirmation, the wizard starts and
@@ -83,10 +76,7 @@ impl TomlConfig {
     pub async fn from_default_paths() -> Result<Self> {
         match Self::first_valid_default_path() {
             Some(path) => Self::from_path(&path),
-            #[cfg(feature = "wizard")]
             None => Self::from_wizard(Self::default_path()?).await,
-            #[cfg(not(feature = "wizard"))]
-            None => anyhow::bail!("cannot find configuration file from default locations"),
         }
     }
 
@@ -105,7 +95,6 @@ impl TomlConfig {
     pub async fn from_some_path_or_default(path: Option<impl Into<PathBuf>>) -> Result<Self> {
         match path.map(Into::into) {
             Some(ref path) if path.exists() => Self::from_path(path),
-            #[cfg(feature = "wizard")]
             Some(path) => Self::from_wizard(path).await,
             _ => Self::from_default_paths().await,
         }
@@ -215,25 +204,28 @@ impl TomlConfig {
                             signature: config.signature,
                             signature_delim: config.signature_delim,
                             downloads_dir: config.downloads_dir,
-
-                            folder: config.folder.map(|#[allow(unused)] c| FolderConfig {
+                            folder: config.folder.map(|c| FolderConfig {
                                 aliases: c.alias,
-                                #[cfg(any(feature = "account-sync", feature = "folder-list"))]
                                 list: c.list.map(|c| c.remote),
+                                #[cfg(feature = "account-sync")]
+                                sync: c.sync,
                             }),
-                            envelope: config.envelope.map(|#[allow(unused)] c| EnvelopeConfig {
-                                #[cfg(any(feature = "account-sync", feature = "envelope-list"))]
+                            envelope: config.envelope.map(|c| EnvelopeConfig {
                                 list: c.list.map(|c| c.remote),
-                                #[cfg(feature = "envelope-watch")]
                                 watch: c.watch.map(|c| c.remote),
+                                #[cfg(feature = "account-sync")]
+                                sync: c.sync,
                             }),
-                            message: config.message.map(|#[allow(unused)] c| MessageConfig {
-                                #[cfg(any(feature = "account-sync", feature = "message-read"))]
+                            flag: config.flag.map(|c| FlagConfig {
+                                #[cfg(feature = "account-sync")]
+                                sync: c.sync,
+                            }),
+                            message: config.message.map(|c| MessageConfig {
                                 read: c.read.map(|c| c.remote),
-                                #[cfg(any(feature = "account-sync", feature = "message-write"))]
                                 write: c.write.map(|c| c.remote),
-                                #[cfg(feature = "message-send")]
                                 send: c.send.map(|c| c.remote),
+                                #[cfg(feature = "account-sync")]
+                                sync: c.sync,
                             }),
                             #[cfg(feature = "account-sync")]
                             sync: config.sync,

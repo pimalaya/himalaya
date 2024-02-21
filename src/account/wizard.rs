@@ -1,21 +1,20 @@
-use std::str::FromStr;
-
 use anyhow::{bail, Result};
 #[cfg(feature = "account-sync")]
-use dialoguer::Confirm;
-use dialoguer::Input;
+use dialoguer::{Confirm, Input};
 use email::account;
 #[cfg(feature = "account-sync")]
 use email::account::sync::config::SyncConfig;
 use email_address::EmailAddress;
+use std::str::FromStr;
 
-#[allow(unused)]
-use crate::backend::{self, config::BackendConfig, BackendKind};
-#[cfg(feature = "message-send")]
-use crate::message::config::{MessageConfig, MessageSendConfig};
 #[cfg(feature = "account-sync")]
 use crate::wizard_prompt;
-use crate::{ui::THEME, wizard_warn};
+use crate::{
+    backend::{self, config::BackendConfig, BackendKind},
+    message::config::{MessageConfig, MessageSendConfig},
+    ui::THEME,
+    wizard_warn,
+};
 
 use super::TomlAccountConfig;
 
@@ -95,32 +94,24 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
         #[cfg(feature = "smtp")]
         Some(BackendConfig::Smtp(smtp_config)) => {
             config.smtp = Some(smtp_config);
-
-            #[cfg(feature = "message-send")]
-            {
-                config.message = Some(MessageConfig {
-                    send: Some(MessageSendConfig {
-                        backend: Some(BackendKind::Smtp),
-                        ..Default::default()
-                    }),
+            config.message = Some(MessageConfig {
+                send: Some(MessageSendConfig {
+                    backend: Some(BackendKind::Smtp),
                     ..Default::default()
-                });
-            }
+                }),
+                ..Default::default()
+            });
         }
         #[cfg(feature = "sendmail")]
         Some(BackendConfig::Sendmail(sendmail_config)) => {
             config.sendmail = Some(sendmail_config);
-
-            #[cfg(feature = "message-send")]
-            {
-                config.message = Some(MessageConfig {
-                    send: Some(MessageSendConfig {
-                        backend: Some(BackendKind::Sendmail),
-                        ..Default::default()
-                    }),
+            config.message = Some(MessageConfig {
+                send: Some(MessageSendConfig {
+                    backend: Some(BackendKind::Sendmail),
                     ..Default::default()
-                });
-            }
+                }),
+                ..Default::default()
+            });
         }
         _ => (),
     };

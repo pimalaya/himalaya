@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use email::{backend::feature::BackendFeatureSource, folder::add::AddFolder};
 use log::info;
 
 #[cfg(feature = "account-sync")]
@@ -43,7 +44,7 @@ impl AddFolderCommand {
             toml_account_config.clone(),
             account_config,
             add_folder_kind,
-            |builder| builder.set_add_folder(Some(None)),
+            |builder| builder.set_add_folder(BackendFeatureSource::Context),
         )
         .await?;
 

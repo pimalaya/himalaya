@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use email::backend::feature::BackendFeatureSource;
 use log::info;
 
 #[cfg(feature = "account-sync")]
@@ -53,7 +54,7 @@ impl MessageCopyCommand {
             toml_account_config.clone(),
             account_config,
             copy_messages_kind,
-            |builder| builder.set_copy_messages(Some(None)),
+            |builder| builder.set_copy_messages(BackendFeatureSource::Context),
         )
         .await?;
 

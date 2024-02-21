@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use email::{backend::feature::BackendFeatureSource, folder::expunge::ExpungeFolder};
 use log::info;
 
 #[cfg(feature = "account-sync")]
@@ -44,7 +45,7 @@ impl FolderExpungeCommand {
             toml_account_config.clone(),
             account_config,
             expunge_folder_kind,
-            |builder| builder.set_expunge_folder(Some(None)),
+            |builder| builder.set_expunge_folder(BackendFeatureSource::Context),
         )
         .await?;
 
