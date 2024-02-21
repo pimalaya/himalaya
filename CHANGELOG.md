@@ -13,7 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Removed account configurations flatten level in order to improve diagnostic errors, due to a [bug](https://github.com/toml-rs/toml/issues/589#issuecomment-1872345017) in clap. **This means that accounts need to be prefixed by `accounts`: `[my-account]` becomes `[accounts.my-account]`**. It also opens doors for interface-specific configurations.
+- Rolled back cargo feature additions from the previous release. It was a mistake: the amount of features was too big, the code (both CLI and lib) was too hard to maintain. Cargo features kept: `imap`, `maildir`, `notmuch`, `account-sync`, `account-discovery`, `pgp-gpg`, `pgp-commands` and `pgp-native`.
 - Improved pre and post edit choices interaction [#58].
+- Improved account synchronization performances, making it 50% faster than `mbsync` and 370% faster than `OfflineIMAP`.
 - Changed `envelope.watch.{event}.{hook}`: hooks can now be cumulated. For example it is possible to send a system notification and execute a shell command when receiving a new envelope:
 
   ```toml
@@ -25,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed bug that was preventing watch placeholders to be replaced when using shell command hook.
+- Fixed watch IMAP envelopes issue preventing events to be triggered.
+- Fixed DNS account discovery priority issues.
+- Fixed SMTP messages not properly sent to all recipients [#172].
+- Fixed backend feature badly linked, leading to reply and forward message errors [#173].
 
 ## [1.0.0-beta.2] - 2024-01-27
 
@@ -776,3 +783,5 @@ Few major concepts changed:
 [#59]: https://todo.sr.ht/~soywod/pimalaya/59
 [#60]: https://todo.sr.ht/~soywod/pimalaya/60
 [#95]: https://todo.sr.ht/~soywod/pimalaya/95
+[#172]: https://todo.sr.ht/~soywod/pimalaya/172
+[#173]: https://todo.sr.ht/~soywod/pimalaya/173
