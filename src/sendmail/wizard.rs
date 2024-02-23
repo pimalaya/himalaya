@@ -11,7 +11,6 @@ pub(crate) fn configure() -> Result<BackendConfig> {
             .default(String::from("/usr/bin/msmtp"))
             .interact()?
             .into(),
-        // ..Default::default() // in case any other field was added
     };
 
     Ok(BackendConfig::Sendmail(config))

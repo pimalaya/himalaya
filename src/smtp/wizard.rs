@@ -42,7 +42,7 @@ pub(crate) async fn configure(
     let autoconfig_oauth2 = autoconfig.and_then(|c| c.oauth2());
     let autoconfig_server = autoconfig.and_then(|c| {
         c.email_provider()
-            .incoming_servers()
+            .outgoing_servers()
             .into_iter()
             .find(|server| matches!(server.server_type(), ServerType::Smtp))
     });
