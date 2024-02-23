@@ -106,64 +106,66 @@ fn pretty_serialize(config: &TomlConfig) -> Result<String> {
     let mut doc: Document = toml::to_string(&config)?.parse()?;
 
     doc.iter_mut().for_each(|(_, item)| {
-        set_table_dotted(item, "folder");
-        if let Some(item) = get_table_mut(item, "folder") {
-            set_tables_dotted(item, ["alias", "add", "list", "expunge", "purge", "delete"]);
+        if let Some(item) = item.as_table_mut() {
+            item.iter_mut().for_each(|(_, item)| {
+                set_table_dotted(item, "folder");
+                if let Some(item) = get_table_mut(item, "folder") {
+                    let keys = ["alias", "add", "list", "expunge", "purge", "delete", "sync"];
+                    set_tables_dotted(item, keys);
+
+                    if let Some(item) = get_table_mut(item, "sync") {
+                        set_tables_dotted(item, ["filter", "permissions"]);
+                    }
+                }
+
+                set_table_dotted(item, "envelope");
+                if let Some(item) = get_table_mut(item, "envelope") {
+                    set_tables_dotted(item, ["list", "get"]);
+                }
+
+                set_table_dotted(item, "flag");
+                if let Some(item) = get_table_mut(item, "flag") {
+                    set_tables_dotted(item, ["add", "set", "remove"]);
+                }
+
+                set_table_dotted(item, "message");
+                if let Some(item) = get_table_mut(item, "message") {
+                    let keys = ["add", "send", "peek", "get", "copy", "move", "delete"];
+                    set_tables_dotted(item, keys);
+                }
+
+                #[cfg(feature = "maildir")]
+                set_table_dotted(item, "maildir");
+
+                #[cfg(feature = "imap")]
+                {
+                    set_table_dotted(item, "imap");
+                    if let Some(item) = get_table_mut(item, "imap") {
+                        set_tables_dotted(item, ["passwd", "oauth2"]);
+                    }
+                }
+
+                #[cfg(feature = "notmuch")]
+                set_table_dotted(item, "notmuch");
+
+                #[cfg(feature = "smtp")]
+                {
+                    set_table_dotted(item, "smtp");
+                    if let Some(item) = get_table_mut(item, "smtp") {
+                        set_tables_dotted(item, ["passwd", "oauth2"]);
+                    }
+                }
+
+                #[cfg(feature = "sendmail")]
+                set_table_dotted(item, "sendmail");
+
+                #[cfg(feature = "account-sync")]
+                set_table_dotted(item, "sync");
+
+                #[cfg(feature = "pgp")]
+                set_table_dotted(item, "pgp");
+            })
         }
-
-        set_table_dotted(item, "envelope");
-        if let Some(item) = get_table_mut(item, "envelope") {
-            set_tables_dotted(item, ["list", "get"]);
-        }
-
-        set_table_dotted(item, "flag");
-        if let Some(item) = get_table_mut(item, "flag") {
-            set_tables_dotted(item, ["add", "set", "remove"]);
-        }
-
-        set_table_dotted(item, "message");
-        if let Some(item) = get_table_mut(item, "message") {
-            set_tables_dotted(
-                item,
-                ["add", "send", "peek", "get", "copy", "move", "delete"],
-            );
-        }
-
-        #[cfg(feature = "maildir")]
-        set_table_dotted(item, "maildir");
-
-        #[cfg(feature = "imap")]
-        {
-            set_table_dotted(item, "imap");
-            if let Some(item) = get_table_mut(item, "imap") {
-                set_tables_dotted(item, ["passwd", "oauth2"]);
-            }
-        }
-
-        #[cfg(feature = "notmuch")]
-        set_table_dotted(item, "notmuch");
-
-        #[cfg(feature = "smtp")]
-        {
-            set_table_dotted(item, "smtp");
-            if let Some(item) = get_table_mut(item, "smtp") {
-                set_tables_dotted(item, ["passwd", "oauth2"]);
-            }
-        }
-
-        #[cfg(feature = "sendmail")]
-        set_table_dotted(item, "sendmail");
-
-        #[cfg(feature = "account-sync")]
-        {
-            set_table_dotted(item, "sync");
-            if let Some(item) = get_table_mut(item, "sync") {
-                set_tables_dotted(item, ["strategy"]);
-            }
-        }
-
-        #[cfg(feature = "pgp")]
-        set_table_dotted(item, "pgp");
     });
 
     Ok(doc.to_string())
@@ -213,7 +215,7 @@ mod test {
                 email: "test@localhost".into(),
                 ..Default::default()
             },
-            r#"[test]
+            r#"[accounts.test]
 email = "test@localhost"
 "#,
         )
@@ -222,7 +224,7 @@ email = "test@localhost"
     #[cfg(feature = "account-sync")]
     #[test]
     fn pretty_serialize_sync_all() {
-        use email::{account::sync::config::SyncConfig, folder::sync::FolderSyncStrategy};
+        use email::account::sync::config::SyncConfig;
 
         assert_eq(
             TomlAccountConfig {
@@ -230,15 +232,14 @@ email = "test@localhost"
                 sync: Some(SyncConfig {
                     enable: Some(false),
                     dir: Some("/tmp/test".into()),
-                    strategy: Some(FolderSyncStrategy::All),
+                    ..Default::default()
                 }),
                 ..Default::default()
             },
-            r#"[test]
+            r#"[accounts.test]
 email = "test@localhost"
 sync.enable = false
 sync.dir = "/tmp/test"
-sync.strategy = "all"
 "#,
         );
     }
@@ -246,9 +247,13 @@ sync.strategy = "all"
     #[cfg(feature = "account-sync")]
     #[test]
     fn pretty_serialize_sync_include() {
-        use std::collections::HashSet;
+        use email::{
+            account::sync::config::SyncConfig,
+            folder::sync::config::{FolderSyncConfig, FolderSyncStrategy},
+        };
+        use std::collections::BTreeSet;
 
-        use email::{account::sync::config::SyncConfig, folder::sync::FolderSyncStrategy};
+        use crate::folder::config::FolderConfig;
 
         assert_eq(
             TomlAccountConfig {
@@ -256,17 +261,24 @@ sync.strategy = "all"
                 sync: Some(SyncConfig {
                     enable: Some(true),
                     dir: Some("/tmp/test".into()),
-                    strategy: Some(FolderSyncStrategy::Include(HashSet::from_iter([
-                        "test".into()
-                    ]))),
+                    ..Default::default()
+                }),
+                folder: Some(FolderConfig {
+                    sync: Some(FolderSyncConfig {
+                        filter: FolderSyncStrategy::Include(BTreeSet::from_iter(["test".into()])),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
                 }),
                 ..Default::default()
             },
-            r#"[test]
+            r#"[accounts.test]
 email = "test@localhost"
 sync.enable = true
 sync.dir = "/tmp/test"
-sync.strategy.include = ["test"]
+folder.sync.filter.include = ["test"]
+folder.sync.permissions.create = true
+folder.sync.permissions.delete = true
 "#,
         );
     }
@@ -292,7 +304,7 @@ sync.strategy.include = ["test"]
                 }),
                 ..Default::default()
             },
-            r#"[test]
+            r#"[accounts.test]
 email = "test@localhost"
 imap.host = "localhost"
 imap.port = 143
@@ -326,7 +338,7 @@ imap.passwd.cmd = "pass show test"
                 }),
                 ..Default::default()
             },
-            r#"[test]
+            r#"[accounts.test]
 email = "test@localhost"
 imap.host = "localhost"
 imap.port = 143
@@ -361,7 +373,7 @@ imap.passwd.cmd = ["pass show test", "tr -d '[:blank:]'"]
                 }),
                 ..Default::default()
             },
-            r#"[test]
+            r#"[accounts.test]
 email = "test@localhost"
 imap.host = "localhost"
 imap.port = 143
@@ -389,7 +401,7 @@ imap.oauth2.scopes = []
                 }),
                 ..Default::default()
             },
-            r#"[test]
+            r#"[accounts.test]
 email = "test@localhost"
 maildir.root-dir = "/tmp/test"
 "#,
@@ -417,7 +429,7 @@ maildir.root-dir = "/tmp/test"
                 }),
                 ..Default::default()
             },
-            r#"[test]
+            r#"[accounts.test]
 email = "test@localhost"
 smtp.host = "localhost"
 smtp.port = 143
@@ -451,7 +463,7 @@ smtp.passwd.cmd = "pass show test"
                 }),
                 ..Default::default()
             },
-            r#"[test]
+            r#"[accounts.test]
 email = "test@localhost"
 smtp.host = "localhost"
 smtp.port = 143
@@ -486,7 +498,7 @@ smtp.passwd.cmd = ["pass show test", "tr -d '[:blank:]'"]
                 }),
                 ..Default::default()
             },
-            r#"[test]
+            r#"[accounts.test]
 email = "test@localhost"
 smtp.host = "localhost"
 smtp.port = 143
@@ -512,7 +524,7 @@ smtp.oauth2.scopes = []
                 pgp: Some(PgpConfig::Cmds(Default::default())),
                 ..Default::default()
             },
-            r#"[test]
+            r#"[accounts.test]
 email = "test@localhost"
 pgp.backend = "cmds"
 "#,
