@@ -96,8 +96,6 @@
           linux = mkPackage' null { };
           linux-musl = mkPackage' "x86_64-unknown-linux-musl" (with pkgs.pkgsStatic; {
             CARGO_BUILD_RUSTFLAGS = "-C target-feature=+crt-static";
-            SQLITE3_STATIC = 1;
-            SQLITE3_LIB_DIR = "${sqlite.out}/lib";
             hardeningDisable = [ "all" ];
           });
           macos = mkPackage' null (with pkgs.darwin.apple_sdk.frameworks; {

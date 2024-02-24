@@ -9,12 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added account check-up command.
 - Added wizard warning about google passwords [#41].
 
 ### Changed
 
 - Removed account configurations flatten level in order to improve diagnostic errors, due to a [bug](https://github.com/toml-rs/toml/issues/589#issuecomment-1872345017) in clap. **This means that accounts need to be prefixed by `accounts`: `[my-account]` becomes `[accounts.my-account]`**. It also opens doors for interface-specific configurations.
 - Rolled back cargo feature additions from the previous release. It was a mistake: the amount of features was too big, the code (both CLI and lib) was too hard to maintain. Cargo features kept: `imap`, `maildir`, `notmuch`, `smtp`, `sendmail`, `account-sync`, `account-discovery`, `pgp-gpg`, `pgp-commands` and `pgp-native`.
+- Replaced id mapping database `SQLite` by `sled`, a pure key-val store written in Rust to improve portability of the tool. Therefore, id aliases are reset.
 - Improved pre and post edit choices interaction [#58].
 - Improved account synchronization performances, making it 50% faster than `mbsync` and 370% faster than `OfflineIMAP`.
 - Changed `envelope.watch.{event}.{hook}`: hooks can now be cumulated. For example it is possible to send a system notification and execute a shell command when receiving a new envelope:

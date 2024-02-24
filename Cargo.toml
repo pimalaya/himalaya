@@ -78,6 +78,7 @@ secret-lib = "=0.3.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 shellexpand-utils = "=0.2.0"
+sled = "=0.34.7"
 termcolor = "1.1"
 terminal_size = "0.1"
 tokio = { version = "1.23", default-features = false, features = ["macros", "rt-multi-thread"] }
@@ -87,16 +88,8 @@ unicode-width = "0.1"
 url = "2.2"
 uuid = { version = "0.8", features = ["v4"] }
 
-[target.'cfg(target_env = "musl")'.dependencies.rusqlite]
-version = "0.29"
-features = []
-
-[target.'cfg(not(target_env = "musl"))'.dependencies.rusqlite]
-version = "0.29"
-features = ["bundled"]
-
 [target.'cfg(not(windows))'.dependencies.coredump]
 version = "0.1"
 
-# [patch.crates-io]
-# email-lib = { git = "https://git.sr.ht/~soywod/pimalaya" }
+[patch.crates-io]
+email-lib = { git = "https://git.sr.ht/~soywod/pimalaya" }

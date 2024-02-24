@@ -619,32 +619,20 @@ impl Backend {
         match backend_kind {
             #[cfg(feature = "maildir")]
             Some(BackendKind::Maildir) => {
-                if let Some(mdir_config) = &self.toml_account_config.maildir {
-                    id_mapper = IdMapper::new(
-                        &self.backend.account_config,
-                        folder,
-                        mdir_config.root_dir.clone(),
-                    )?;
+                if let Some(_) = &self.toml_account_config.maildir {
+                    id_mapper = IdMapper::new(&self.backend.account_config, folder)?;
                 }
             }
 
             #[cfg(feature = "account-sync")]
             Some(BackendKind::MaildirForSync) => {
-                id_mapper = IdMapper::new(
-                    &self.backend.account_config,
-                    folder,
-                    self.backend.account_config.get_sync_dir()?,
-                )?;
+                id_mapper = IdMapper::new(&self.backend.account_config, folder)?;
             }
 
             #[cfg(feature = "notmuch")]
             Some(BackendKind::Notmuch) => {
-                if let Some(notmuch_config) = &self.toml_account_config.notmuch {
-                    id_mapper = IdMapper::new(
-                        &self.backend.account_config,
-                        folder,
-                        notmuch_config.get_maildir_path()?,
-                    )?;
+                if let Some(_) = &self.toml_account_config.notmuch {
+                    id_mapper = IdMapper::new(&self.backend.account_config, folder)?;
                 }
             }
             _ => (),
