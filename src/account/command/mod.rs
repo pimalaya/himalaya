@@ -1,3 +1,4 @@
+mod check_up;
 mod configure;
 mod list;
 #[cfg(feature = "account-sync")]
@@ -10,7 +11,9 @@ use crate::{config::TomlConfig, printer::Printer};
 
 #[cfg(feature = "account-sync")]
 use self::sync::AccountSyncCommand;
-use self::{configure::AccountConfigureCommand, list::AccountListCommand};
+use self::{
+    check_up::AccountCheckUpCommand, configure::AccountConfigureCommand, list::AccountListCommand,
+};
 
 /// Manage accounts.
 ///
@@ -19,6 +22,9 @@ use self::{configure::AccountConfigureCommand, list::AccountListCommand};
 /// file. This subcommand allows you to manage them.
 #[derive(Debug, Subcommand)]
 pub enum AccountSubcommand {
+    #[command(alias = "checkup")]
+    CheckUp(AccountCheckUpCommand),
+
     #[command(alias = "cfg")]
     Configure(AccountConfigureCommand),
 
@@ -34,6 +40,7 @@ impl AccountSubcommand {
     #[allow(unused)]
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         match self {
+            Self::CheckUp(cmd) => cmd.execute(printer, config).await,
             Self::Configure(cmd) => cmd.execute(printer, config).await,
             Self::List(cmd) => cmd.execute(printer, config).await,
             #[cfg(feature = "account-sync")]
