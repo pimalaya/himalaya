@@ -16,10 +16,15 @@ signature-delim = "-- \n"
 # Enable the synchronization for this account. Running the command
 # `account sync example` will synchronize all folders and all emails
 # to a local Maildir at `$XDG_DATA_HOME/himalaya/example`.
-sync.enable = true
+sync.enable = false
 
 # Override the default Maildir path for synchronization.
 sync.dir = "/tmp/himalaya-sync-example"
+
+# Filter folders to sync
+folder.sync.filter.include = ["INBOX"]
+# folder.sync.filter.exclude = ["All mails"]
+# folder.sync.filter = "all"
 
 # Define main folder aliases
 folder.alias.inbox = "INBOX"
@@ -57,7 +62,7 @@ envelope.watch.received.notify.body = "{subject}"
 message.send.backend = "smtp"
 
 # Save a copy of sent messages to the sent folder.
-message.send.save-copy = true
+message.send.save-copy = false
 
 # IMAP config
 imap.host = "localhost"

@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 #[cfg(feature = "account-sync")]
-use dialoguer::{Confirm, Input};
-use email::account;
+use dialoguer::Confirm;
+use dialoguer::Input;
 #[cfg(feature = "account-sync")]
 use email::account::sync::config::SyncConfig;
 use email_address::EmailAddress;
@@ -9,11 +9,12 @@ use std::str::FromStr;
 
 #[cfg(feature = "account-sync")]
 use crate::wizard_prompt;
+#[cfg(feature = "account-discovery")]
+use crate::wizard_warn;
 use crate::{
     backend::{self, config::BackendConfig, BackendKind},
     message::config::{MessageConfig, MessageSendConfig},
     ui::THEME,
-    wizard_warn,
 };
 
 use super::TomlAccountConfig;
@@ -34,9 +35,14 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
 
     let addr = EmailAddress::from_str(&config.email).unwrap();
 
+    #[cfg(feature = "account-discovery")]
     let autoconfig_email = config.email.to_owned();
-    let autoconfig =
-        tokio::spawn(async move { account::discover::from_addr(&autoconfig_email).await.ok() });
+    #[cfg(feature = "account-discovery")]
+    let autoconfig = tokio::spawn(async move {
+        email::account::discover::from_addr(&autoconfig_email)
+            .await
+            .ok()
+    });
 
     let account_name = Input::with_theme(&*THEME)
         .with_prompt("Account name")
@@ -59,9 +65,12 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
     );
 
     let email = &config.email;
+    #[cfg(feature = "account-discovery")]
     let autoconfig = autoconfig.await?;
+    #[cfg(feature = "account-discovery")]
     let autoconfig = autoconfig.as_ref();
 
+    #[cfg(feature = "account-discovery")]
     if let Some(config) = autoconfig {
         if config.is_gmail() {
             println!();
@@ -71,7 +80,14 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
         }
     }
 
-    match backend::wizard::configure(&account_name, email, autoconfig).await? {
+    match backend::wizard::configure(
+        &account_name,
+        email,
+        #[cfg(feature = "account-discovery")]
+        autoconfig,
+    )
+    .await?
+    {
         #[cfg(feature = "imap")]
         Some(BackendConfig::Imap(imap_config)) => {
             config.imap = Some(imap_config);
@@ -90,7 +106,14 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
         _ => (),
     };
 
-    match backend::wizard::configure_sender(&account_name, email, autoconfig).await? {
+    match backend::wizard::configure_sender(
+        &account_name,
+        email,
+        #[cfg(feature = "account-discovery")]
+        autoconfig,
+    )
+    .await?
+    {
         #[cfg(feature = "smtp")]
         Some(BackendConfig::Smtp(smtp_config)) => {
             config.smtp = Some(smtp_config);

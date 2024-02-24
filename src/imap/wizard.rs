@@ -1,12 +1,11 @@
 use anyhow::Result;
 use dialoguer::{Confirm, Input, Password, Select};
+#[cfg(feature = "account-discovery")]
+use email::account::discover::config::{AuthenticationType, AutoConfig, SecurityType, ServerType};
 use email::{
-    account::{
-        config::{
-            oauth2::{OAuth2Config, OAuth2Method, OAuth2Scopes},
-            passwd::PasswdConfig,
-        },
-        discover::config::{AuthenticationType, AutoConfig, SecurityType, ServerType},
+    account::config::{
+        oauth2::{OAuth2Config, OAuth2Method, OAuth2Scopes},
+        passwd::PasswdConfig,
     },
     imap::config::{ImapAuthConfig, ImapConfig, ImapEncryptionKind},
 };
@@ -34,6 +33,7 @@ const KEYRING: &str = "Ask my password, then save it in my system's global keyri
 const RAW: &str = "Ask my password, then save it in the configuration file (not safe)";
 const CMD: &str = "Ask me a shell command that exposes my password";
 
+#[cfg(feature = "account-discovery")]
 pub(crate) async fn configure(
     account_name: &str,
     email: &str,
@@ -205,6 +205,228 @@ pub(crate) async fn configure(
                 )
                 .filter(|scope| !scope.is_empty()),
             })
+        };
+
+        if let Some(scope) = prompt_scope("IMAP OAuth 2.0 main scope")? {
+            config.scopes = OAuth2Scopes::Scope(scope);
+        }
+
+        let confirm_additional_scope = || -> Result<bool> {
+            let confirm = Confirm::new()
+                .with_prompt(wizard_prompt!(
+                    "Would you like to add more IMAP OAuth 2.0 scopes?"
+                ))
+                .default(false)
+                .interact_opt()?
+                .unwrap_or_default();
+
+            Ok(confirm)
+        };
+
+        while confirm_additional_scope()? {
+            let mut scopes = match config.scopes {
+                OAuth2Scopes::Scope(scope) => vec![scope],
+                OAuth2Scopes::Scopes(scopes) => scopes,
+            };
+
+            if let Some(scope) = prompt_scope("Additional IMAP OAuth 2.0 scope")? {
+                scopes.push(scope)
+            }
+
+            config.scopes = OAuth2Scopes::Scopes(scopes);
+        }
+
+        config.pkce = Confirm::new()
+            .with_prompt(wizard_prompt!(
+                "Would you like to enable PKCE verification?"
+            ))
+            .default(true)
+            .interact_opt()?
+            .unwrap_or(true);
+
+        wizard_log!("To complete your OAuth 2.0 setup, click on the following link:");
+
+        let client = Client::new(
+            config.client_id.clone(),
+            client_secret,
+            config.auth_url.clone(),
+            config.token_url.clone(),
+        )?
+        .with_redirect_host(redirect_host.to_owned())
+        .with_redirect_port(redirect_port)
+        .build()?;
+
+        let mut auth_code_grant = AuthorizationCodeGrant::new()
+            .with_redirect_host(redirect_host.to_owned())
+            .with_redirect_port(redirect_port);
+
+        if config.pkce {
+            auth_code_grant = auth_code_grant.with_pkce();
+        }
+
+        for scope in config.scopes.clone() {
+            auth_code_grant = auth_code_grant.with_scope(scope);
+        }
+
+        let (redirect_url, csrf_token) = auth_code_grant.get_redirect_url(&client);
+
+        println!("{redirect_url}");
+        println!();
+
+        let (access_token, refresh_token) = auth_code_grant
+            .wait_for_redirection(&client, csrf_token)
+            .await?;
+
+        config.access_token =
+            Secret::new_keyring_entry(format!("{account_name}-imap-oauth2-access-token"));
+        config
+            .access_token
+            .set_keyring_entry_secret(access_token)
+            .await?;
+
+        if let Some(refresh_token) = &refresh_token {
+            config.refresh_token =
+                Secret::new_keyring_entry(format!("{account_name}-imap-oauth2-refresh-token"));
+            config
+                .refresh_token
+                .set_keyring_entry_secret(refresh_token)
+                .await?;
+        }
+
+        ImapAuthConfig::OAuth2(config)
+    } else {
+        let secret_idx = Select::with_theme(&*THEME)
+            .with_prompt("IMAP authentication strategy")
+            .items(SECRETS)
+            .default(0)
+            .interact_opt()?;
+
+        let secret = match secret_idx {
+            Some(idx) if SECRETS[idx] == KEYRING => {
+                let secret = Secret::new_keyring_entry(format!("{account_name}-imap-passwd"));
+                secret
+                    .set_keyring_entry_secret(prompt::passwd("IMAP password")?)
+                    .await?;
+                secret
+            }
+            Some(idx) if SECRETS[idx] == RAW => Secret::new_raw(prompt::passwd("IMAP password")?),
+            Some(idx) if SECRETS[idx] == CMD => Secret::new_cmd(
+                Input::with_theme(&*THEME)
+                    .with_prompt("Shell command")
+                    .default(format!("pass show {account_name}-imap-passwd"))
+                    .interact()?,
+            ),
+            _ => Default::default(),
+        };
+
+        ImapAuthConfig::Passwd(PasswdConfig(secret))
+    };
+
+    let config = ImapConfig {
+        host,
+        port,
+        encryption,
+        login,
+        auth,
+        watch: None,
+    };
+
+    Ok(BackendConfig::Imap(config))
+}
+
+#[cfg(not(feature = "account-discovery"))]
+pub(crate) async fn configure(account_name: &str, email: &str) -> Result<BackendConfig> {
+    let default_host = format!("imap.{}", email.rsplit_once('@').unwrap().1);
+
+    let host = Input::with_theme(&*THEME)
+        .with_prompt("IMAP hostname")
+        .default(default_host)
+        .interact()?;
+
+    let encryption_idx = Select::with_theme(&*THEME)
+        .with_prompt("IMAP encryption")
+        .items(ENCRYPTIONS)
+        .default(0)
+        .interact_opt()?;
+
+    let (encryption, default_port) = match encryption_idx {
+        Some(idx) if ENCRYPTIONS[idx] == ImapEncryptionKind::Tls => {
+            (Some(ImapEncryptionKind::Tls), 993)
+        }
+        Some(idx) if ENCRYPTIONS[idx] == ImapEncryptionKind::StartTls => {
+            (Some(ImapEncryptionKind::StartTls), 143)
+        }
+        _ => (Some(ImapEncryptionKind::None), 143),
+    };
+
+    let port = Input::with_theme(&*THEME)
+        .with_prompt("IMAP port")
+        .validate_with(|input: &String| input.parse::<u16>().map(|_| ()))
+        .default(default_port.to_string())
+        .interact()
+        .map(|input| input.parse::<u16>().unwrap())?;
+
+    let default_login = email.to_owned();
+
+    let login = Input::with_theme(&*THEME)
+        .with_prompt("IMAP login")
+        .default(default_login)
+        .interact()?;
+
+    let oauth2_enabled = Confirm::new()
+        .with_prompt(wizard_prompt!("Would you like to enable OAuth 2.0?"))
+        .default(false)
+        .interact_opt()?
+        .unwrap_or_default();
+
+    let auth = if oauth2_enabled {
+        let mut config = OAuth2Config::default();
+        let redirect_host = OAuth2Config::LOCALHOST.to_owned();
+        let redirect_port = OAuth2Config::get_first_available_port()?;
+
+        let method_idx = Select::with_theme(&*THEME)
+            .with_prompt("IMAP OAuth 2.0 mechanism")
+            .items(OAUTH2_MECHANISMS)
+            .default(0)
+            .interact_opt()?;
+
+        config.method = match method_idx {
+            Some(idx) if OAUTH2_MECHANISMS[idx] == XOAUTH2 => OAuth2Method::XOAuth2,
+            Some(idx) if OAUTH2_MECHANISMS[idx] == OAUTHBEARER => OAuth2Method::OAuthBearer,
+            _ => OAuth2Method::XOAuth2,
+        };
+
+        config.client_id = Input::with_theme(&*THEME)
+            .with_prompt("IMAP OAuth 2.0 client id")
+            .interact()?;
+
+        let client_secret: String = Password::with_theme(&*THEME)
+            .with_prompt("IMAP OAuth 2.0 client secret")
+            .interact()?;
+        config.client_secret =
+            Secret::new_keyring_entry(format!("{account_name}-imap-oauth2-client-secret"));
+        config
+            .client_secret
+            .set_keyring_entry_secret(&client_secret)
+            .await?;
+
+        config.auth_url = Input::with_theme(&*THEME)
+            .with_prompt("IMAP OAuth 2.0 authorization URL")
+            .interact()?;
+
+        config.token_url = Input::with_theme(&*THEME)
+            .with_prompt("IMAP OAuth 2.0 token URL")
+            .interact()?;
+
+        let prompt_scope = |prompt: &str| -> Result<Option<String>> {
+            Ok(Some(
+                Input::with_theme(&*THEME)
+                    .with_prompt(prompt)
+                    .default(String::default())
+                    .interact()?
+                    .to_owned(),
+            )
+            .filter(|scope| !scope.is_empty()))
         };
 
         if let Some(scope) = prompt_scope("IMAP OAuth 2.0 main scope")? {

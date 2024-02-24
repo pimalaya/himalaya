@@ -26,8 +26,11 @@ impl AccountCheckUpCommand {
 
         printer.print_log("Checking configuration integrity…")?;
 
-        let (toml_account_config, account_config) =
-            config.clone().into_account_configs(account, true)?;
+        let (toml_account_config, account_config) = config.clone().into_account_configs(
+            account,
+            #[cfg(feature = "account-sync")]
+            true,
+        )?;
         let used_backends = toml_account_config.get_used_backends();
 
         printer.print_log("Checking backend context integrity…")?;

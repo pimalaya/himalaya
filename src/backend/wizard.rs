@@ -1,5 +1,6 @@
 use anyhow::Result;
 use dialoguer::Select;
+#[cfg(feature = "account-discovery")]
 use email::account::discover::config::AutoConfig;
 
 #[cfg(feature = "imap")]
@@ -35,7 +36,7 @@ const SEND_MESSAGE_BACKEND_KINDS: &[BackendKind] = &[
 pub(crate) async fn configure(
     account_name: &str,
     email: &str,
-    autoconfig: Option<&AutoConfig>,
+    #[cfg(feature = "account-discovery")] autoconfig: Option<&AutoConfig>,
 ) -> Result<Option<BackendConfig>> {
     let kind = Select::with_theme(&*THEME)
         .with_prompt("Default email backend")
@@ -46,9 +47,15 @@ pub(crate) async fn configure(
 
     let config = match kind {
         #[cfg(feature = "imap")]
-        Some(kind) if kind == BackendKind::Imap => {
-            Some(imap::wizard::configure(account_name, email, autoconfig).await?)
-        }
+        Some(kind) if kind == BackendKind::Imap => Some(
+            imap::wizard::configure(
+                account_name,
+                email,
+                #[cfg(feature = "account-discovery")]
+                autoconfig,
+            )
+            .await?,
+        ),
         #[cfg(feature = "maildir")]
         Some(kind) if kind == BackendKind::Maildir => Some(maildir::wizard::configure()?),
         #[cfg(feature = "notmuch")]
@@ -62,7 +69,7 @@ pub(crate) async fn configure(
 pub(crate) async fn configure_sender(
     account_name: &str,
     email: &str,
-    autoconfig: Option<&AutoConfig>,
+    #[cfg(feature = "account-discovery")] autoconfig: Option<&AutoConfig>,
 ) -> Result<Option<BackendConfig>> {
     let kind = Select::with_theme(&*THEME)
         .with_prompt("Backend for sending messages")
@@ -73,9 +80,15 @@ pub(crate) async fn configure_sender(
 
     let config = match kind {
         #[cfg(feature = "smtp")]
-        Some(kind) if kind == BackendKind::Smtp => {
-            Some(smtp::wizard::configure(account_name, email, autoconfig).await?)
-        }
+        Some(kind) if kind == BackendKind::Smtp => Some(
+            smtp::wizard::configure(
+                account_name,
+                email,
+                #[cfg(feature = "account-discovery")]
+                autoconfig,
+            )
+            .await?,
+        ),
         #[cfg(feature = "sendmail")]
         Some(kind) if kind == BackendKind::Sendmail => Some(sendmail::wizard::configure()?),
         _ => None,
