@@ -38,7 +38,7 @@ smtp = ["email-lib/smtp"]
 sendmail = ["email-lib/sendmail"]
 
 account-discovery = ["email-lib/account-discovery"]
-account-sync = ["email-lib/account-sync"]
+account-sync = ["email-lib/account-sync", "maildir"]
 
 pgp = []
 pgp-commands = ["email-lib/pgp-commands", "mml-lib/pgp-commands", "pgp"]
