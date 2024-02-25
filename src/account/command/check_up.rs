@@ -11,7 +11,7 @@ use crate::{
 ///
 /// This command performs a checkup of the given account. It checks if
 /// the configuration is valid, if backend can be created and if
-/// sessions work.
+/// sessions work as expected.
 #[derive(Debug, Parser)]
 pub struct AccountCheckUpCommand {
     #[command(flatten)]
