@@ -7,15 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-beta.3] - 2024-02-25
+
 ### Added
 
-- Added account check-up command.
+- Added `account check-up` command.
 - Added wizard warning about google passwords [#41].
 
 ### Changed
 
 - Removed account configurations flatten level in order to improve diagnostic errors, due to a [bug](https://github.com/toml-rs/toml/issues/589#issuecomment-1872345017) in clap. **This means that accounts need to be prefixed by `accounts`: `[my-account]` becomes `[accounts.my-account]`**. It also opens doors for interface-specific configurations.
 - Rolled back cargo feature additions from the previous release. It was a mistake: the amount of features was too big, the code (both CLI and lib) was too hard to maintain. Cargo features kept: `imap`, `maildir`, `notmuch`, `smtp`, `sendmail`, `account-sync`, `account-discovery`, `pgp-gpg`, `pgp-commands` and `pgp-native`.
+- Moved `sync.strategy` to `folder.sync.filter`.
 - Changed location of the synchronization data from `$XDG_DATA_HOME/himalaya/<account-name>` to `$XDG_DATA_HOME/pimalaya/email/sync/<account-name>-cache`.
 - Changed location of the synchronization cache from `sync.dir` to `$XDG_CACHE_HOME/pimalaya/email/sync/<hash>/`.
 - Replaced id mapping database `SQLite` by `sled`, a pure key-val store written in Rust to improve portability of the tool. **Therefore, id aliases are reset**.
