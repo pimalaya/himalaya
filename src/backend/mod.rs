@@ -22,7 +22,12 @@ use email::{
     backend::{
         feature::BackendFeature, macros::BackendContext, mapper::SomeBackendContextBuilderMapper,
     },
-    envelope::{get::GetEnvelope, list::ListEnvelopes, watch::WatchEnvelopes, Id, SingleId},
+    envelope::{
+        get::GetEnvelope,
+        list::{ListEnvelopes, ListEnvelopesOptions},
+        watch::WatchEnvelopes,
+        Id, SingleId,
+    },
     flag::{add::AddFlags, remove::RemoveFlags, set::SetFlags, Flag, Flags},
     folder::{
         add::AddFolder, delete::DeleteFolder, expunge::ExpungeFolder, list::ListFolders,
@@ -644,12 +649,11 @@ impl Backend {
     pub async fn list_envelopes(
         &self,
         folder: &str,
-        page_size: usize,
-        page: usize,
+        opts: ListEnvelopesOptions,
     ) -> Result<Envelopes> {
         let backend_kind = self.toml_account_config.list_envelopes_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
-        let envelopes = self.backend.list_envelopes(folder, page_size, page).await?;
+        let envelopes = self.backend.list_envelopes(folder, opts).await?;
         let envelopes = Envelopes::from_backend(&self.account_config, &id_mapper, envelopes)?;
         Ok(envelopes)
     }

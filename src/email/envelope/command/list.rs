@@ -1,6 +1,7 @@
 use anyhow::Result;
+use ariadne::{Color, Label, Report, ReportKind, Source};
 use clap::Parser;
-use email::backend::feature::BackendFeatureSource;
+use email::{backend::feature::BackendFeatureSource, envelope::list::ListEnvelopesOptions};
 use log::info;
 
 #[cfg(feature = "account-sync")]
@@ -9,7 +10,7 @@ use crate::{
     account::arg::name::AccountNameFlag,
     backend::Backend,
     config::TomlConfig,
-    folder::arg::name::FolderNameOptionalArg,
+    folder::arg::name::FolderNameOptionalFlag,
     printer::{PrintTableOpts, Printer},
     ui::arg::max_width::TableMaxWidthFlag,
 };
@@ -21,7 +22,7 @@ use crate::{
 #[derive(Debug, Parser)]
 pub struct ListEnvelopesCommand {
     #[command(flatten)]
-    pub folder: FolderNameOptionalArg,
+    pub folder: FolderNameOptionalFlag,
 
     /// The page number.
     ///
@@ -45,6 +46,12 @@ pub struct ListEnvelopesCommand {
 
     #[command(flatten)]
     pub account: AccountNameFlag,
+
+    /// The list envelopes filter and sort query.
+    ///
+    /// TODO
+    #[arg(allow_hyphen_values = true, trailing_var_arg = true)]
+    pub query: Option<Vec<String>>,
 }
 
 impl Default for ListEnvelopesCommand {
@@ -57,6 +64,7 @@ impl Default for ListEnvelopesCommand {
             #[cfg(feature = "account-sync")]
             cache: Default::default(),
             account: Default::default(),
+            query: Default::default(),
         }
     }
 }
@@ -87,7 +95,38 @@ impl ListEnvelopesCommand {
         )
         .await?;
 
-        let envelopes = backend.list_envelopes(folder, page_size, page).await?;
+        let filter = match self.query.map(|filter| filter.join(" ").parse()) {
+            Some(Ok(filter)) => Some(filter),
+            Some(Err(err)) => {
+                if let email::envelope::list::Error::ParseFilterError(errs, query) = &err {
+                    errs.into_iter().for_each(|e| {
+                        Report::build(ReportKind::Error, "query", e.span().start)
+                            .with_message(e.to_string())
+                            .with_label(
+                                Label::new(("query", e.span().into_range()))
+                                    .with_message(e.reason().to_string())
+                                    .with_color(Color::Red),
+                            )
+                            .finish()
+                            .eprint(("query", Source::from(&query)))
+                            .unwrap()
+                    });
+                };
+
+                Err(err)?;
+                None
+            }
+            None => None,
+        };
+
+        let opts = ListEnvelopesOptions {
+            page,
+            page_size,
+            filter,
+            sort: Default::default(),
+        };
+
+        let envelopes = backend.list_envelopes(folder, opts).await?;
 
         printer.print_table(
             Box::new(envelopes),

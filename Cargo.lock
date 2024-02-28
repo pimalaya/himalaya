@@ -160,6 +160,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5ad32ce52e4161730f7098c077cd2ed6229b5804ccf99e5366be1ab72a98b4e1"
 
 [[package]]
+name = "ariadne"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "367fd0ad87307588d087544707bc5fbf4805ded96c7db922b70d368fa1cb5702"
+dependencies = [
+ "unicode-width",
+ "yansi",
+]
+
+[[package]]
 name = "async-broadcast"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1209,13 +1219,13 @@ dependencies = [
 [[package]]
 name = "email-lib"
 version = "0.22.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7444aaa4ce80e796febd3def00dd27ec59f4097d65d727cfa5f16dfb07a4fd72"
+source = "git+https://git.sr.ht/~soywod/pimalaya#79af9b0fa5fb30dcb1f8fbd322f7e40b9e05053a"
 dependencies = [
  "advisory-lock",
  "anyhow",
  "async-trait",
  "chrono",
+ "chumsky",
  "convert_case",
  "dirs 4.0.0",
  "email-macros",
@@ -1856,6 +1866,7 @@ name = "himalaya"
 version = "1.0.0-beta.3"
 dependencies = [
  "anyhow",
+ "ariadne",
  "async-trait",
  "chrono",
  "clap",
@@ -4955,6 +4966,12 @@ name = "xml-rs"
 version = "0.8.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fcb9cbac069e033553e8bb871be2fbdffcab578eb25bd0f7c508cedc6dcd75a"
+
+[[package]]
+name = "yansi"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09041cd90cf85f7f8b2df60c646f853b7f535ce68f85244eb6731cf89fa498ec"
 
 [[package]]
 name = "z-base-32"
