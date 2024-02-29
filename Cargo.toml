@@ -92,3 +92,4 @@ version = "0.1"
 
 [patch.crates-io]
 email-lib = { git = "https://git.sr.ht/~soywod/pimalaya" }
+chumsky = { git = "https://github.com/zesterer/chumsky.git", rev = "6837537" }

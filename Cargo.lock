@@ -635,8 +635,7 @@ dependencies = [
 [[package]]
 name = "chumsky"
 version = "1.0.0-alpha.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9c28d4e5dd9a9262a38b231153591da6ce1471b818233f4727985d3dd0ed93c"
+source = "git+https://github.com/zesterer/chumsky.git?rev=6837537#68375371a5fde6ee14f190c14e9a9cee0697f022"
 dependencies = [
  "hashbrown",
  "regex-automata 0.3.9",
@@ -1219,7 +1218,7 @@ dependencies = [
 [[package]]
 name = "email-lib"
 version = "0.22.3"
-source = "git+https://git.sr.ht/~soywod/pimalaya#79af9b0fa5fb30dcb1f8fbd322f7e40b9e05053a"
+source = "git+https://git.sr.ht/~soywod/pimalaya#17838306e588fd1382da4b49ec1ed9ff846f33f0"
 dependencies = [
  "advisory-lock",
  "anyhow",

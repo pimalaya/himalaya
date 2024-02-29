@@ -1,8 +1,12 @@
 use anyhow::Result;
 use ariadne::{Color, Label, Report, ReportKind, Source};
 use clap::Parser;
-use email::{backend::feature::BackendFeatureSource, envelope::list::ListEnvelopesOptions};
+use email::{
+    backend::feature::BackendFeatureSource, envelope::list::ListEnvelopesOptions,
+    search_query::SearchEmailsQuery,
+};
 use log::info;
+use std::process::exit;
 
 #[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
@@ -95,35 +99,37 @@ impl ListEnvelopesCommand {
         )
         .await?;
 
-        let filter = match self.query.map(|filter| filter.join(" ").parse()) {
-            Some(Ok(filter)) => Some(filter),
-            Some(Err(err)) => {
-                if let email::envelope::list::Error::ParseFilterError(errs, query) = &err {
-                    errs.into_iter().for_each(|e| {
-                        Report::build(ReportKind::Error, "query", e.span().start)
-                            .with_message(e.to_string())
-                            .with_label(
-                                Label::new(("query", e.span().into_range()))
-                                    .with_message(e.reason().to_string())
-                                    .with_color(Color::Red),
-                            )
-                            .finish()
-                            .eprint(("query", Source::from(&query)))
-                            .unwrap()
-                    });
-                };
+        let query = self
+            .query
+            .map(|query| query.join(" ").parse::<SearchEmailsQuery>());
 
-                Err(err)?;
-                None
-            }
+        let query = match query {
             None => None,
+            Some(Ok(query)) => Some(query),
+            Some(Err(main_err)) => {
+                let source = "query";
+                let email::search_query::Error::ParseError(errs, query) = &main_err;
+                for err in errs {
+                    Report::build(ReportKind::Error, source, err.span().start)
+                        .with_message(main_err.to_string())
+                        .with_label(
+                            Label::new((source, err.span().into_range()))
+                                .with_message(err.reason().to_string())
+                                .with_color(Color::Red),
+                        )
+                        .finish()
+                        .eprint((source, Source::from(&query)))
+                        .unwrap();
+                }
+
+                exit(0)
+            }
         };
 
         let opts = ListEnvelopesOptions {
             page,
             page_size,
-            filter,
-            sort: Default::default(),
+            query,
         };
 
         let envelopes = backend.list_envelopes(folder, opts).await?;
