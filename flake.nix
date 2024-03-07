@@ -3,7 +3,6 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-23.11";
-    flake-utils.url = "github:numtide/flake-utils";
     gitignore = {
       url = "github:hercules-ci/gitignore.nix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -22,7 +21,7 @@
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, gitignore, fenix, naersk, ... }:
+  outputs = { self, nixpkgs, gitignore, fenix, naersk, ... }:
     let
       inherit (gitignore.lib) gitignoreSource;
 
@@ -116,10 +115,13 @@
           };
         };
 
-      mkApp = drv: flake-utils.lib.mkApp {
-        inherit drv;
-        name = "himalaya";
-      };
+      mkApp = drv:
+        let exePath = drv.passthru.exePath or "/bin/himalaya";
+        in
+        {
+          type = "app";
+          program = "${drv}${exePath}";
+        };
 
       mkApps = buildPlatform:
         let
@@ -141,11 +143,12 @@
             in
             mkApp app;
         };
-
+      supportedSystems = [ "aarch64-linux" "aarch64-darwin" "x86_64-darwin" "x86_64-linux" ];
+      forEachSupportedSystem = f: nixpkgs.lib.genAttrs supportedSystems f;
     in
-    flake-utils.lib.eachDefaultSystem (system: {
-      devShells = mkDevShells system;
-      packages = mkPackages system;
-      apps = mkApps system;
-    });
+    {
+      apps = forEachSupportedSystem mkApps;
+      packages = forEachSupportedSystem mkPackages;
+      devShells = forEachSupportedSystem mkDevShells;
+    };
 }
