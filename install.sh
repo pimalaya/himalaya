@@ -32,4 +32,11 @@ tar -xzf "$tmpdir/himalaya.tar.gz" -C "$tmpdir"
 mkdir -p "$PREFIX/bin"
 cp -f -- "$tmpdir/$binary" "$PREFIX/bin/$binary"
 
+# See User Unit Search Path in `man systemd.unit(5)`
+if [ "$system" = "linux" ] && [ "$PREFIX" = "/usr" ]; then
+  mkdir -p "$PREFIX/lib/systemd/user"
+  sed "s:%install_dir%:$PREFIX/bin:" "$tmpdir/assets/himalaya-watch@.service" \
+       > "$PREFIX/lib/systemd/user/himalaya-watch@.service"
+fi
+
 die "$("$PREFIX/bin/$binary" --version) installed!" 0

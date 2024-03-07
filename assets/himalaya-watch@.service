@@ -1,0 +1,13 @@
+[Unit]
+Description=Email client Himalaya CLI envelopes watcher service
+After=network.target
+
+[Service]
+Type=exec
+ExecStart=%install_dir%/himalaya envelopes watch --account %i
+ExecSearchPath=/bin
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
