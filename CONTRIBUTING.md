@@ -28,4 +28,4 @@ The equivalent of **GitHub Discussions** are:
 
 The equivalent of **GitHub Issues** is the SourceHut bug tracker. You can consult existing bugs [here](https://todo.sr.ht/~soywod/pimalaya), and you can "open a new issue" by sending an email at [~soywod/pimalaya@todo.sr.ht](mailto:~soywod/pimalaya@todo.sr.ht).
 
-The equivalent of **GitHub Pull requests** is the SourceHut mailing list. You can "open a new pull request" by sending an email containing a git patch at [~soywod/pimalaya@todo.sr.ht](mailto:~soywod/pimalaya@todo.sr.ht). The simplest way to send a patch is to use [git send-email](https://git-scm.com/docs/git-send-email), follow [this guide](https://git-send-email.io/) to configure git properly.
+The equivalent of **GitHub Pull requests** is the SourceHut mailing list. You can "open a new pull request" by sending an email containing a git patch at [~soywod/pimalaya@lists.sr.ht](mailto:~soywod/pimalaya@lists.sr.ht). The simplest way to send a patch is to use [git send-email](https://git-scm.com/docs/git-send-email), follow [this guide](https://git-send-email.io/) to configure git properly.
