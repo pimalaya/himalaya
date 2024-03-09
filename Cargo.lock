@@ -1218,7 +1218,7 @@ dependencies = [
 [[package]]
 name = "email-lib"
 version = "0.22.3"
-source = "git+https://git.sr.ht/~soywod/pimalaya#17838306e588fd1382da4b49ec1ed9ff846f33f0"
+source = "git+https://git.sr.ht/~soywod/pimalaya#2ddfe15f9b10e8e53ab9b04db465abc58c68b67e"
 dependencies = [
  "advisory-lock",
  "anyhow",

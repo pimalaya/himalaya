@@ -102,13 +102,12 @@ impl ListEnvelopesCommand {
         let query = self
             .query
             .map(|query| query.join(" ").parse::<SearchEmailsQuery>());
-
         let query = match query {
             None => None,
             Some(Ok(query)) => Some(query),
             Some(Err(main_err)) => {
                 let source = "query";
-                let email::search_query::Error::ParseError(errs, query) = &main_err;
+                let email::search_query::parser::Error::ParseError(errs, query) = &main_err;
                 for err in errs {
                     Report::build(ReportKind::Error, source, err.span().start)
                         .with_message(main_err.to_string())
