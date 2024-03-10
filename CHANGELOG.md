@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Changed the `envelope list` options (see `envelope list --help` for more details):
   - the folder argument became a flag `--folder <name>`
-  - the query argument has been added at the end of the command to filter and sort results (only filter and IMAP for now)
+  - the query argument has been added at the end of the command to filter and sort results [#39]
 
 ### Fixed
 

@@ -9,7 +9,7 @@ Welcome to [**Himalaya CLI**](https://pimalaya.org/himalaya/cli/latest/), the Co
 ## Features
 
 - [Folder (aka mailbox) management](https://pimalaya.org/himalaya/cli/latest/usage/advanced/folder/)
-- [Envelopes listing, filtering and sorting](https://pimalaya.org/himalaya/cli/latest/usage/basic/envelope/list.html)
+- Envelope [listing](https://pimalaya.org/himalaya/cli/latest/usage/basic/envelope/list.html), [filtering and sorting](https://pimalaya.org/himalaya/cli/latest/usage/advanced/envelope/list.html)
 - [Message composition](https://pimalaya.org/himalaya/cli/latest/usage/basic/message/send.html) based on `$EDITOR`
 - Message manipulation ([copy](https://pimalaya.org/himalaya/cli/latest/usage/advanced/message/copy.html)/[move](https://pimalaya.org/himalaya/cli/latest/usage/advanced/message/move.html)/[delete](https://pimalaya.org/himalaya/cli/latest/usage/advanced/message/delete.html))
 - [Multi-accounting](https://pimalaya.org/himalaya/cli/latest/configuration/)
