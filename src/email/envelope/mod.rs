@@ -27,6 +27,7 @@ pub struct Envelope {
     pub flags: Flags,
     pub subject: String,
     pub from: Mailbox,
+    pub to: Mailbox,
     pub date: String,
 }
 
@@ -95,6 +96,10 @@ impl Envelopes {
                     from: Mailbox {
                         name: envelope.from.name.clone(),
                         addr: envelope.from.addr.clone(),
+                    },
+                    to: Mailbox {
+                        name: envelope.to.name.clone(),
+                        addr: envelope.to.addr.clone(),
                     },
                     date: envelope.format_date(config),
                 })
