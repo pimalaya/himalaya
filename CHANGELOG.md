@@ -7,15 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
+### Added
 
-- Fixed watch IMAP envelopes when folder was empty [#179].
+- Added systemd service in `assets/` folder.
 
 ### Changed
 
-- Changed the `envelope list` options:
+- Changed the `envelope list` options (see `envelope list --help` for more details):
   - the folder argument became a flag `--folder <name>`
   - the query argument has been added at the end of the command to filter and sort results (only filter and IMAP for now)
+
+### Fixed
+
+- Fixed watch IMAP envelopes when folder was empty [#179].
 
 ## [1.0.0-beta.3] - 2024-02-25
 
