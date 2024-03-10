@@ -53,7 +53,71 @@ pub struct ListEnvelopesCommand {
 
     /// The list envelopes filter and sort query.
     ///
-    /// TODO
+    /// The query can be a filter query, a sort query or both
+    /// together.
+    ///
+    /// A filter query is composed of operators and conditions. There
+    /// is 3 operators and 8 conditions:
+    ///
+    ///  • not <condition> → filter envelopes that do not match the
+    /// condition
+    ///
+    ///  • <condition> and <condition> → filter envelopes that match
+    /// both conditions
+    ///
+    ///  • <condition> or <condition> → filter envelopes that match
+    /// one of the conditions
+    ///
+    ///  ◦ date <yyyy-mm-dd> → filter envelopes that match the given
+    /// date
+    ///
+    ///  ◦ before <yyyy-mm-dd> → filter envelopes with date strictly
+    /// before the given one
+    ///
+    ///  ◦ after <yyyy-mm-dd> → filter envelopes with date stricly
+    /// after the given one
+    ///
+    ///  ◦ from <pattern> → filter envelopes with senders matching the
+    /// given pattern
+    ///
+    ///  ◦ to <pattern> → filter envelopes with recipients matching
+    /// the given pattern
+    ///
+    ///  ◦ subject <pattern> → filter envelopes with subject matching
+    /// the given pattern
+    ///
+    ///  ◦ body <pattern> → filter envelopes with text bodies matching
+    /// the given pattern
+    ///
+    ///  ◦ flag <flag> → filter envelopes matching the given flag
+    ///
+    /// A sort query starts by "order by", and is composed of kinds
+    /// and orders. There is 4 kinds and 2 orders:
+    ///
+    ///  • date [order] → sort envelopes by date
+    ///
+    ///  • from [order] → sort envelopes by sender
+    ///
+    ///  • to [order] → sort envelopes by recipient
+    ///
+    ///  • subject [order] → sort envelopes by subject
+    ///
+    ///  ◦ <kind> asc → sort envelopes by the given kind in ascending
+    /// order
+    ///
+    ///  ◦ <kind> desc → sort envelopes by the given kind in
+    /// descending order
+    ///
+    /// Examples:
+    ///
+    /// subject foo and body bar → filter envelopes containing "foo"
+    /// in their subject and "bar" in their text bodies
+    ///
+    /// order by date desc subject → sort envelopes by descending date
+    /// (most recent first), then by ascending subject
+    ///
+    /// subject foo and body bar order by date desc subject →
+    /// combination of the 2 previous examples
     #[arg(allow_hyphen_values = true, trailing_var_arg = true)]
     pub query: Option<Vec<String>>,
 }
