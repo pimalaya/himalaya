@@ -23,7 +23,7 @@ use crate::{account::config::TomlAccountConfig, wizard_prompt, wizard_warn};
 
 /// Represents the user config file.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct TomlConfig {
     #[serde(alias = "name")]
     pub display_name: Option<String>,

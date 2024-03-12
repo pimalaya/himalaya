@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed watch IMAP envelopes when folder was empty [#179].
+- Prevent parsing of undefined config options [#188].
 
 ## [1.0.0-beta.3] - 2024-02-25
 
@@ -806,3 +807,4 @@ Few major concepts changed:
 [#95]: https://todo.sr.ht/~soywod/pimalaya/95
 [#172]: https://todo.sr.ht/~soywod/pimalaya/172
 [#173]: https://todo.sr.ht/~soywod/pimalaya/173
+[#188]: https://todo.sr.ht/~soywod/pimalaya/188
