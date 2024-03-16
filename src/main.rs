@@ -22,10 +22,11 @@ async fn main() -> Result<()> {
 
     // if the first argument starts by "mailto:", execute straight the
     // mailto message command
-    if let Some(ref url) = std::env::args()
+    let mailto = std::env::args()
         .nth(1)
-        .filter(|arg| arg.starts_with("mailto:"))
-    {
+        .filter(|arg| arg.starts_with("mailto:"));
+
+    if let Some(ref url) = mailto {
         let mut printer = StdoutPrinter::default();
         let config = TomlConfig::from_default_paths().await?;
 
@@ -38,9 +39,9 @@ async fn main() -> Result<()> {
     let mut printer = StdoutPrinter::new(cli.output, cli.color);
 
     match cli.command {
-        Some(cmd) => cmd.execute(&mut printer, cli.config_path.as_ref()).await,
+        Some(cmd) => cmd.execute(&mut printer, cli.config_paths.as_ref()).await,
         None => {
-            let config = TomlConfig::from_some_path_or_default(cli.config_path.as_ref()).await?;
+            let config = TomlConfig::from_paths_or_default(cli.config_paths.as_ref()).await?;
             ListEnvelopesCommand::default()
                 .execute(&mut printer, &config)
                 .await

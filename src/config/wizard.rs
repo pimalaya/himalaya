@@ -2,7 +2,7 @@ use anyhow::Result;
 use dialoguer::{Confirm, Input, Select};
 use shellexpand_utils::expand;
 use std::{fs, path::PathBuf, process};
-use toml_edit::{Document, Item};
+use toml_edit::{DocumentMut, Item};
 
 use crate::{account, ui::THEME};
 
@@ -31,7 +31,7 @@ macro_rules! wizard_log {
     };
 }
 
-pub(crate) async fn configure(path: PathBuf) -> Result<TomlConfig> {
+pub(crate) async fn configure(path: &PathBuf) -> Result<TomlConfig> {
     wizard_log!("Configuring your first account:");
 
     let mut config = TomlConfig::default();
@@ -103,7 +103,7 @@ pub(crate) async fn configure(path: PathBuf) -> Result<TomlConfig> {
 }
 
 fn pretty_serialize(config: &TomlConfig) -> Result<String> {
-    let mut doc: Document = toml::to_string(&config)?.parse()?;
+    let mut doc: DocumentMut = toml::to_string(&config)?.parse()?;
 
     doc.iter_mut().for_each(|(_, item)| {
         if let Some(item) = item.as_table_mut() {
@@ -299,7 +299,9 @@ folder.sync.permissions.delete = true
                     host: "localhost".into(),
                     port: 143,
                     login: "test@localhost".into(),
-                    auth: ImapAuthConfig::Passwd(PasswdConfig(Secret::new_cmd("pass show test"))),
+                    auth: ImapAuthConfig::Passwd(PasswdConfig(Secret::new_command(
+                        "pass show test",
+                    ))),
                     ..Default::default()
                 }),
                 ..Default::default()
@@ -330,7 +332,7 @@ imap.passwd.cmd = "pass show test"
                     host: "localhost".into(),
                     port: 143,
                     login: "test@localhost".into(),
-                    auth: ImapAuthConfig::Passwd(PasswdConfig(Secret::new_cmd(vec![
+                    auth: ImapAuthConfig::Passwd(PasswdConfig(Secret::new_command(vec![
                         "pass show test",
                         "tr -d '[:blank:]'",
                     ]))),
@@ -424,7 +426,9 @@ maildir.root-dir = "/tmp/test"
                     host: "localhost".into(),
                     port: 143,
                     login: "test@localhost".into(),
-                    auth: SmtpAuthConfig::Passwd(PasswdConfig(Secret::new_cmd("pass show test"))),
+                    auth: SmtpAuthConfig::Passwd(PasswdConfig(Secret::new_command(
+                        "pass show test",
+                    ))),
                     ..Default::default()
                 }),
                 ..Default::default()
@@ -455,7 +459,7 @@ smtp.passwd.cmd = "pass show test"
                     host: "localhost".into(),
                     port: 143,
                     login: "test@localhost".into(),
-                    auth: SmtpAuthConfig::Passwd(PasswdConfig(Secret::new_cmd(vec![
+                    auth: SmtpAuthConfig::Passwd(PasswdConfig(Secret::new_command(vec![
                         "pass show test",
                         "tr -d '[:blank:]'",
                     ]))),

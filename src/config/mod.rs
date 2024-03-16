@@ -1,21 +1,17 @@
 pub mod wizard;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use dirs::{config_dir, home_dir};
 use email::{
     account::config::AccountConfig, config::Config, envelope::config::EnvelopeConfig,
     flag::config::FlagConfig, folder::config::FolderConfig, message::config::MessageConfig,
 };
-
+use log::debug;
 use serde::{Deserialize, Serialize};
+use serde_toml_merge::merge;
 use shellexpand_utils::{canonicalize, expand};
-use std::{
-    collections::HashMap,
-    fs,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
-use toml;
+use std::{collections::HashMap, fs, path::PathBuf, sync::Arc};
+use toml::{self, Value};
 
 #[cfg(feature = "account-sync")]
 use crate::backend::BackendKind;
@@ -34,14 +30,48 @@ pub struct TomlConfig {
 }
 
 impl TomlConfig {
-    /// Read and parse the TOML configuration at the given path.
+    /// Read and parse the TOML configuration at the given paths.
     ///
-    /// Returns an error if the configuration file cannot be read or
-    /// if its content cannot be parsed.
-    fn from_path(path: &Path) -> Result<Self> {
-        let content =
-            fs::read_to_string(path).context(format!("cannot read config file at {path:?}"))?;
-        toml::from_str(&content).context(format!("cannot parse config file at {path:?}"))
+    /// Returns an error if a configuration file cannot be read or if
+    /// a content cannot be parsed.
+    fn from_paths(paths: &[PathBuf]) -> Result<Self> {
+        match paths.len() {
+            0 => {
+                // should never happen
+                bail!("cannot read config file from empty paths");
+            }
+            1 => {
+                let path = &paths[0];
+
+                let ref content = fs::read_to_string(path)
+                    .context(format!("cannot read config file at {path:?}"))?;
+
+                toml::from_str(content).context(format!("cannot parse config file at {path:?}"))
+            }
+            _ => {
+                let path = &paths[0];
+
+                let mut merged_content = fs::read_to_string(path)
+                    .context(format!("cannot read config file at {path:?}"))?
+                    .parse::<Value>()?;
+
+                for path in &paths[1..] {
+                    match fs::read_to_string(path) {
+                        Ok(content) => {
+                            merged_content = merge(merged_content, content.parse()?).unwrap();
+                        }
+                        Err(err) => {
+                            debug!("skipping subconfig file at {path:?}: {err}");
+                            continue;
+                        }
+                    }
+                }
+
+                merged_content
+                    .try_into()
+                    .context(format!("cannot parse merged config file at {path:?}"))
+            }
+        }
     }
 
     /// Create and save a TOML configuration using the wizard.
@@ -51,7 +81,7 @@ impl TomlConfig {
     /// program stops.
     ///
     /// NOTE: the wizard can only be used with interactive shells.
-    async fn from_wizard(path: PathBuf) -> Result<Self> {
+    async fn from_wizard(path: &PathBuf) -> Result<Self> {
         use dialoguer::Confirm;
         use std::process;
 
@@ -75,8 +105,8 @@ impl TomlConfig {
     /// Read and parse the TOML configuration from default paths.
     pub async fn from_default_paths() -> Result<Self> {
         match Self::first_valid_default_path() {
-            Some(path) => Self::from_path(&path),
-            None => Self::from_wizard(Self::default_path()?).await,
+            Some(path) => Self::from_paths(&[path]),
+            None => Self::from_wizard(&Self::default_path()?).await,
         }
     }
 
@@ -92,11 +122,11 @@ impl TomlConfig {
     /// If no path is given, then either read and parse the TOML
     /// configuration at the first valid default path, otherwise
     /// create it using the wizard.  wizard.
-    pub async fn from_some_path_or_default(path: Option<impl Into<PathBuf>>) -> Result<Self> {
-        match path.map(Into::into) {
-            Some(ref path) if path.exists() => Self::from_path(path),
-            Some(path) => Self::from_wizard(path).await,
-            _ => Self::from_default_paths().await,
+    pub async fn from_paths_or_default(paths: &[PathBuf]) -> Result<Self> {
+        match paths.len() {
+            0 => Self::from_default_paths().await,
+            _ if paths[0].exists() => Self::from_paths(paths),
+            _ => Self::from_wizard(&paths[0]).await,
         }
     }
 
@@ -157,14 +187,14 @@ impl TomlConfig {
         if let Some(imap_config) = toml_account_config.imap.as_mut() {
             imap_config
                 .auth
-                .replace_undefined_keyring_entries(&account_name);
+                .replace_undefined_keyring_entries(&account_name)?;
         }
 
         #[cfg(feature = "smtp")]
         if let Some(smtp_config) = toml_account_config.smtp.as_mut() {
             smtp_config
                 .auth
-                .replace_undefined_keyring_entries(&account_name);
+                .replace_undefined_keyring_entries(&account_name)?;
         }
 
         Ok((account_name, toml_account_config))

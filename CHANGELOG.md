@@ -13,9 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Made the global `--config|-c` option repeatable: the first option is considered the path to the main config, and successive options are considered partial overrides [#184].
 - Changed the `envelope list` options (see `envelope list --help` for more details):
-  - the folder argument became a flag `--folder <name>`
-  - the query argument has been added at the end of the command to filter and sort results [#39]
+  - The folder argument became a flag `--folder <name>`.
+  - The query argument has been added at the end of the command to filter and sort results [#39].
 
 ### Fixed
 
@@ -807,4 +808,5 @@ Few major concepts changed:
 [#95]: https://todo.sr.ht/~soywod/pimalaya/95
 [#172]: https://todo.sr.ht/~soywod/pimalaya/172
 [#173]: https://todo.sr.ht/~soywod/pimalaya/173
+[#184]: https://todo.sr.ht/~soywod/pimalaya/184
 [#188]: https://todo.sr.ht/~soywod/pimalaya/188
