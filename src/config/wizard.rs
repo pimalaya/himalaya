@@ -311,7 +311,7 @@ email = "test@localhost"
 imap.host = "localhost"
 imap.port = 143
 imap.login = "test@localhost"
-imap.passwd.cmd = "pass show test"
+imap.passwd.command = "pass show test"
 "#,
         );
     }
@@ -345,7 +345,7 @@ email = "test@localhost"
 imap.host = "localhost"
 imap.port = 143
 imap.login = "test@localhost"
-imap.passwd.cmd = ["pass show test", "tr -d '[:blank:]'"]
+imap.passwd.command = ["pass show test", "tr -d '[:blank:]'"]
 "#,
         );
     }
@@ -438,7 +438,7 @@ email = "test@localhost"
 smtp.host = "localhost"
 smtp.port = 143
 smtp.login = "test@localhost"
-smtp.passwd.cmd = "pass show test"
+smtp.passwd.command = "pass show test"
 "#,
         );
     }
@@ -472,7 +472,7 @@ email = "test@localhost"
 smtp.host = "localhost"
 smtp.port = 143
 smtp.login = "test@localhost"
-smtp.passwd.cmd = ["pass show test", "tr -d '[:blank:]'"]
+smtp.passwd.command = ["pass show test", "tr -d '[:blank:]'"]
 "#,
         );
     }
