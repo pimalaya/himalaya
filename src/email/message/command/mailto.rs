@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 use email::backend::feature::BackendFeatureSource;
-use log::{debug, info};
+use log::info;
 use mail_builder::MessageBuilder;
 use url::Url;
 
@@ -79,12 +79,8 @@ impl MessageMailtoCommand {
         }
 
         match account_config.find_full_signature() {
-            Ok(Some(ref signature)) => builder = builder.text_body(body + "\n\n" + signature),
-            Ok(None) => builder = builder.text_body(body),
-            Err(err) => {
-                debug!("cannot add signature to mailto message, skipping it: {err}");
-                debug!("{err:?}");
-            }
+            Some(ref sig) => builder = builder.text_body(body + "\n\n" + sig),
+            None => builder = builder.text_body(body),
         }
 
         let tpl = account_config
@@ -92,7 +88,8 @@ impl MessageMailtoCommand {
             .with_show_only_headers(account_config.get_message_write_headers())
             .build()
             .from_msg_builder(builder)
-            .await?;
+            .await?
+            .into();
 
         editor::edit_tpl_with_editor(account_config, printer, &backend, tpl).await
     }

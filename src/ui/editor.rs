@@ -5,6 +5,7 @@ use email::{
     flag::{Flag, Flags},
     folder::DRAFTS,
     message::{add::AddMessage, send::SendMessageThenSaveCopy},
+    template::Template,
 };
 use log::debug;
 use mml::MmlCompilerBuilder;
@@ -17,7 +18,7 @@ use crate::{
     ui::choice::{self, PostEditChoice, PreEditChoice},
 };
 
-pub async fn open_with_tpl(tpl: String) -> Result<String> {
+pub async fn open_with_tpl(tpl: Template) -> Result<Template> {
     let path = local_draft_path();
 
     debug!("create draft");
@@ -35,14 +36,14 @@ pub async fn open_with_tpl(tpl: String) -> Result<String> {
     let content =
         fs::read_to_string(&path).context(format!("cannot read local draft at {:?}", path))?;
 
-    Ok(content)
+    Ok(content.into())
 }
 
-pub async fn open_with_local_draft() -> Result<String> {
+pub async fn open_with_local_draft() -> Result<Template> {
     let path = local_draft_path();
     let content =
         fs::read_to_string(&path).context(format!("cannot read local draft at {:?}", path))?;
-    open_with_tpl(content).await
+    open_with_tpl(content.into()).await
 }
 
 #[allow(unused)]
@@ -50,7 +51,7 @@ pub async fn edit_tpl_with_editor<P: Printer>(
     config: Arc<AccountConfig>,
     printer: &mut P,
     backend: &Backend,
-    mut tpl: String,
+    mut tpl: Template,
 ) -> Result<()> {
     let draft = local_draft_path();
     if draft.exists() {

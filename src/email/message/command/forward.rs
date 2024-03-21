@@ -76,7 +76,7 @@ impl MessageForwardCommand {
             .await?
             .first()
             .ok_or(anyhow!("cannot find message"))?
-            .to_forward_tpl_builder(&account_config)
+            .to_forward_tpl_builder(account_config.clone())
             .with_headers(self.headers.raw)
             .with_body(self.body.raw())
             .build()

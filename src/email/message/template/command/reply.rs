@@ -74,7 +74,7 @@ impl TemplateReplyCommand {
             .await?
             .first()
             .ok_or(anyhow!("cannot find message {id}"))?
-            .to_reply_tpl_builder(&account_config)
+            .to_reply_tpl_builder(account_config)
             .with_headers(self.headers.raw)
             .with_body(self.body.raw())
             .with_reply_all(self.reply.all)

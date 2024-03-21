@@ -257,6 +257,7 @@ impl TomlConfig {
                                 #[cfg(feature = "account-sync")]
                                 sync: c.sync,
                             }),
+                            template: config.template,
                             #[cfg(feature = "account-sync")]
                             sync: config.sync,
                             #[cfg(feature = "pgp")]

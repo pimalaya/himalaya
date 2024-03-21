@@ -70,7 +70,7 @@ impl TemplateForwardCommand {
             .await?
             .first()
             .ok_or(anyhow!("cannot find message {id}"))?
-            .to_forward_tpl_builder(&account_config)
+            .to_forward_tpl_builder(account_config)
             .with_headers(self.headers.raw)
             .with_body(self.body.raw())
             .build()

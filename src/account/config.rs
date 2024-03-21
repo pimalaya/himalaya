@@ -17,6 +17,7 @@ use email::notmuch::config::NotmuchConfig;
 use email::sendmail::config::SendmailConfig;
 #[cfg(feature = "smtp")]
 use email::smtp::config::SmtpConfig;
+use email::template::config::TemplateConfig;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, path::PathBuf};
 
@@ -46,6 +47,7 @@ pub struct TomlAccountConfig {
     pub envelope: Option<EnvelopeConfig>,
     pub flag: Option<FlagConfig>,
     pub message: Option<MessageConfig>,
+    pub template: Option<TemplateConfig>,
 
     #[cfg(feature = "imap")]
     pub imap: Option<ImapConfig>,

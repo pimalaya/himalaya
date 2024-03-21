@@ -60,7 +60,7 @@ impl MessageWriteCommand {
         )
         .await?;
 
-        let tpl = Message::new_tpl_builder(&account_config)
+        let tpl = Message::new_tpl_builder(account_config.clone())
             .with_headers(self.headers.raw)
             .with_body(self.body.raw())
             .build()
