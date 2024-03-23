@@ -1,3 +1,4 @@
+use email::message::delete::config::DeleteMessageStyle;
 #[cfg(feature = "account-sync")]
 use email::message::sync::config::MessageSyncConfig;
 use serde::{Deserialize, Serialize};
@@ -13,7 +14,7 @@ pub struct MessageConfig {
     pub read: Option<MessageGetConfig>,
     pub copy: Option<MessageCopyConfig>,
     pub r#move: Option<MessageMoveConfig>,
-    pub delete: Option<MessageDeleteConfig>,
+    pub delete: Option<DeleteMessageConfig>,
     #[cfg(feature = "account-sync")]
     pub sync: Option<MessageSyncConfig>,
 }
@@ -162,11 +163,20 @@ impl MessageMoveConfig {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
-pub struct MessageDeleteConfig {
+pub struct DeleteMessageConfig {
     pub backend: Option<BackendKind>,
+    pub style: Option<DeleteMessageStyle>,
 }
 
-impl MessageDeleteConfig {
+impl From<DeleteMessageConfig> for email::message::delete::config::DeleteMessageConfig {
+    fn from(config: DeleteMessageConfig) -> Self {
+        Self {
+            style: config.style,
+        }
+    }
+}
+
+impl DeleteMessageConfig {
     pub fn get_used_backends(&self) -> HashSet<&BackendKind> {
         let mut kinds = HashSet::default();
 

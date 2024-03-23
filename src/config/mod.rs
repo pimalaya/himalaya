@@ -254,6 +254,7 @@ impl TomlConfig {
                                 read: c.read.map(|c| c.remote),
                                 write: c.write.map(|c| c.remote),
                                 send: c.send.map(|c| c.remote),
+                                delete: c.delete.map(Into::into),
                                 #[cfg(feature = "account-sync")]
                                 sync: c.sync,
                             }),

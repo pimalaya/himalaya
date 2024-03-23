@@ -10,18 +10,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added systemd service in `assets/` folder.
+- Added configuration option `message.delete.style` that can be either `folder` (deleted messages are moved to the Trash folder, default style) or `flag` (deleted messages receive the Deleted flag).
 
 ### Changed
 
+- **Added back the search feature**: you can now give an optional filter and sort query at the end of the `envelope list` command. See `envelope list --help` or [pimalaya.org](https://pimalaya.org/himalaya/cli/master/usage/advanced/envelope/list.html#query) for more detail on the search API.
+- Changed the `envelope list` folder argument due to the search query: it became a flag `--folder|-f`.
 - Made the global `--config|-c` option repeatable: the first option is considered the path to the main config, and successive options are considered partial overrides [#184].
-- Changed the `envelope list` options (see `envelope list --help` for more details):
-  - The folder argument became a flag `--folder <name>`.
-  - The query argument has been added at the end of the command to filter and sort results [#39].
+- Improved `template {new,reply,forward}` command JSON output: they return now a JSON object with 3 properties:
+  - `content`: the content of the template
+  - `cursor.row`: the row at which the cursor should be placed by the interface using the template
+  - `cursor.col`: the column at which the cursor should be placed by the interface using the template
 
 ### Fixed
 
 - Fixed watch IMAP envelopes when folder was empty [#179].
-- Prevent parsing of undefined config options [#188].
+- Prevented parsing of undefined config options [#188].
 
 ## [1.0.0-beta.3] - 2024-02-25
 
