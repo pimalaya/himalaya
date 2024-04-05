@@ -213,7 +213,10 @@ impl TomlConfig {
         #[cfg(feature = "account-sync")]
         if let Some(true) = toml_account_config.sync.as_ref().and_then(|c| c.enable) {
             if !disable_cache {
-                toml_account_config.backend = Some(BackendKind::MaildirForSync);
+                toml_account_config.backend = match toml_account_config.backend {
+                    Some(BackendKind::Imap) => Some(BackendKind::ImapCache),
+                    backend => backend,
+                }
             }
         }
 
@@ -260,7 +263,7 @@ impl TomlConfig {
                             }),
                             template: config.template,
                             #[cfg(feature = "account-sync")]
-                            sync: config.sync,
+                            sync: config.sync.map(Into::into),
                             #[cfg(feature = "pgp")]
                             pgp: config.pgp,
                         },

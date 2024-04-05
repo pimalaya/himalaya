@@ -4,7 +4,6 @@ use email::{
     email::utils::{local_draft_path, remove_local_draft},
     flag::{Flag, Flags},
     folder::DRAFTS,
-    message::{add::AddMessage, send::SendMessageThenSaveCopy},
     template::Template,
 };
 use log::debug;

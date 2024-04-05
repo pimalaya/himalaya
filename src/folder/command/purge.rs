@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use clap::Parser;
 use dialoguer::Confirm;
 use email::{backend::feature::BackendFeatureSource, folder::purge::PurgeFolder};
@@ -61,7 +61,10 @@ impl FolderPurgeCommand {
         )
         .await?;
 
-        backend.purge_folder(folder).await?;
+        backend
+            .purge_folder(folder)
+            .await
+            .map_err(|err| anyhow!(err))?;
 
         printer.print(format!("Folder {folder} successfully purged!"))
     }

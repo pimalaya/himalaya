@@ -2,8 +2,8 @@ use anyhow::Result;
 use ariadne::{Color, Label, Report, ReportKind, Source};
 use clap::Parser;
 use email::{
-    backend::feature::BackendFeatureSource, envelope::list::ListEnvelopesOptions,
-    search_query::SearchEmailsQuery,
+    backend::feature::BackendFeatureSource, email::search_query,
+    envelope::list::ListEnvelopesOptions, search_query::SearchEmailsQuery,
 };
 use log::info;
 use std::process::exit;
@@ -171,7 +171,7 @@ impl ListEnvelopesCommand {
             Some(Ok(query)) => Some(query),
             Some(Err(main_err)) => {
                 let source = "query";
-                let email::search_query::parser::Error::ParseError(errs, query) = &main_err;
+                let search_query::error::Error::ParseError(errs, query) = &main_err;
                 for err in errs {
                     Report::build(ReportKind::Error, source, err.span().start)
                         .with_message(main_err.to_string())

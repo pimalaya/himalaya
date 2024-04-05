@@ -5,8 +5,6 @@
 
 #[cfg(feature = "pgp")]
 use email::account::config::pgp::PgpConfig;
-#[cfg(feature = "account-sync")]
-use email::account::sync::config::SyncConfig;
 #[cfg(feature = "imap")]
 use email::imap::config::ImapConfig;
 #[cfg(feature = "maildir")]
@@ -25,6 +23,25 @@ use crate::{
     backend::BackendKind, envelope::config::EnvelopeConfig, flag::config::FlagConfig,
     folder::config::FolderConfig, message::config::MessageConfig,
 };
+
+#[cfg(feature = "account-sync")]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct SyncConfig {
+    pub backend: Option<BackendKind>,
+    pub enable: Option<bool>,
+    pub dir: Option<PathBuf>,
+}
+
+impl From<SyncConfig> for email::account::sync::config::SyncConfig {
+    fn from(config: SyncConfig) -> Self {
+        Self {
+            enable: config.enable,
+            dir: config.dir,
+            ..Default::default()
+        }
+    }
+}
 
 /// Represents all existing kind of account config.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
@@ -62,6 +79,13 @@ pub struct TomlAccountConfig {
 }
 
 impl TomlAccountConfig {
+    pub fn sync_kind(&self) -> Option<&BackendKind> {
+        self.sync
+            .as_ref()
+            .and_then(|sync| sync.backend.as_ref())
+            .or(self.backend.as_ref())
+    }
+
     pub fn add_folder_kind(&self) -> Option<&BackendKind> {
         self.folder
             .as_ref()

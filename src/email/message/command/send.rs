@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use email::{backend::feature::BackendFeatureSource, message::send::SendMessageThenSaveCopy};
+use email::backend::feature::BackendFeatureSource;
 use log::info;
 use std::io::{self, BufRead, IsTerminal};
 

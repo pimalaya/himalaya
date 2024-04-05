@@ -1,9 +1,9 @@
+#[cfg(feature = "account-sync")]
+use crate::account::config::SyncConfig;
 use anyhow::{bail, Result};
 #[cfg(feature = "account-sync")]
 use dialoguer::Confirm;
 use dialoguer::Input;
-#[cfg(feature = "account-sync")]
-use email::account::sync::config::SyncConfig;
 use email_address::EmailAddress;
 use std::str::FromStr;
 
@@ -143,7 +143,7 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
     {
         let should_configure_sync = Confirm::new()
             .with_prompt(wizard_prompt!(
-                "Do you need an offline access to your account?"
+                "Do you need offline access for your account?"
             ))
             .default(false)
             .interact_opt()?

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use clap::Parser;
 use email::backend::context::BackendContextBuilder;
 use log::info;
@@ -42,7 +42,11 @@ impl AccountCheckUpCommand {
         )
         .await?;
 
-        let ctx = ctx_builder.clone().build().await?;
+        let ctx = ctx_builder
+            .clone()
+            .build()
+            .await
+            .map_err(|err| anyhow!(err))?;
 
         #[cfg(feature = "maildir")]
         {
@@ -55,7 +59,7 @@ impl AccountCheckUpCommand {
                 .and_then(|f| ctx.maildir.as_ref().and_then(|ctx| f(ctx)));
 
             if let Some(maildir) = maildir.as_ref() {
-                maildir.check_up().await?;
+                maildir.check_up().await.map_err(|err| anyhow!(err))?;
             }
         }
 
@@ -70,7 +74,7 @@ impl AccountCheckUpCommand {
                 .and_then(|f| ctx.imap.as_ref().and_then(|ctx| f(ctx)));
 
             if let Some(imap) = imap.as_ref() {
-                imap.check_up().await?;
+                imap.check_up().await.map_err(|err| anyhow!(err))?;
             }
         }
 
@@ -85,7 +89,7 @@ impl AccountCheckUpCommand {
                 .and_then(|f| ctx.notmuch.as_ref().and_then(|ctx| f(ctx)));
 
             if let Some(notmuch) = notmuch.as_ref() {
-                notmuch.check_up().await?;
+                notmuch.check_up().await.map_err(|err| anyhow!(err))?;
             }
         }
 
@@ -100,7 +104,7 @@ impl AccountCheckUpCommand {
                 .and_then(|f| ctx.smtp.as_ref().and_then(|ctx| f(ctx)));
 
             if let Some(smtp) = smtp.as_ref() {
-                smtp.check_up().await?;
+                smtp.check_up().await.map_err(|err| anyhow!(err))?;
             }
         }
 
@@ -115,7 +119,7 @@ impl AccountCheckUpCommand {
                 .and_then(|f| ctx.sendmail.as_ref().and_then(|ctx| f(ctx)));
 
             if let Some(sendmail) = sendmail.as_ref() {
-                sendmail.check_up().await?;
+                sendmail.check_up().await.map_err(|err| anyhow!(err))?;
             }
         }
 

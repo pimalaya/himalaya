@@ -93,12 +93,21 @@ version = "0.1"
 [patch.crates-io]
 # waiting for alpha 7
 chumsky = { git = "https://github.com/zesterer/chumsky.git", rev = "6837537" }
+
 email-lib = { git = "https://git.sr.ht/~soywod/pimalaya" }
 email-macros = { git = "https://git.sr.ht/~soywod/pimalaya" }
 keyring-lib = { git = "https://git.sr.ht/~soywod/pimalaya" }
 mml-lib = { git = "https://git.sr.ht/~soywod/pimalaya" }
 oauth-lib = { git = "https://git.sr.ht/~soywod/pimalaya" }
-pgp-lib = { git = "https://git.sr.ht/~soywod/pimalaya" }
 process-lib = { git = "https://git.sr.ht/~soywod/pimalaya" }
 secret-lib = { git = "https://git.sr.ht/~soywod/pimalaya" }
 shellexpand-utils = { git = "https://git.sr.ht/~soywod/pimalaya" }
+
+# email-lib = { path = "/home/soywod/sourcehut/pimalaya/email" }
+# email-macros = { path = "/home/soywod/sourcehut/pimalaya/email-macros" }
+# keyring-lib = { path = "/home/soywod/sourcehut/pimalaya/keyring" }
+# mml-lib = { path = "/home/soywod/sourcehut/pimalaya/mml" }
+# oauth-lib = { path = "/home/soywod/sourcehut/pimalaya/oauth" }
+# process-lib = { path = "/home/soywod/sourcehut/pimalaya/process" }
+# secret-lib = { path = "/home/soywod/sourcehut/pimalaya/secret" }
+# shellexpand-utils = { path = "/home/soywod/sourcehut/pimalaya/shellexpand-utils" }

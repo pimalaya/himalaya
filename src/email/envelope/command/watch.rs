@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use email::{backend::feature::BackendFeatureSource, envelope::watch::WatchEnvelopes};
+use email::backend::feature::BackendFeatureSource;
 use log::info;
 
 #[cfg(feature = "account-sync")]
