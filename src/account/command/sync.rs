@@ -102,8 +102,7 @@ impl AccountSyncCommand {
                     .ok_or_else(|| anyhow!("imap config not found"))?;
                 let imap_ctx = ImapContextBuilder::new(account_config.clone(), imap_config)
                     .with_prebuilt_credentials()
-                    .await
-                    .map_err(|err| anyhow!(err))?;
+                    .await?;
                 let imap = BackendBuilder::new(account_config.clone(), imap_ctx);
                 self.sync(printer, account_name, imap).await
             }
@@ -135,11 +134,7 @@ impl AccountSyncCommand {
             AccountSyncBuilder::try_new(right)?.with_some_folders_filter(folders_filter);
 
         if self.dry_run {
-            let report = sync_builder
-                .with_dry_run(true)
-                .sync()
-                .await
-                .map_err(|err| anyhow!(err))?;
+            let report = sync_builder.with_dry_run(true).sync().await?;
             let mut hunks_count = report.folder.patch.len();
 
             if !report.folder.patch.is_empty() {
@@ -163,7 +158,7 @@ impl AccountSyncCommand {
                 "Estimated patch length for account {account_name} to be synchronized: {hunks_count}"
             ))?;
         } else if printer.is_json() {
-            sync_builder.sync().await.map_err(|err| anyhow!(err))?;
+            sync_builder.sync().await?;
             printer.print(format!("Account {account_name} successfully synchronized!"))?;
         } else {
             let multi = MultiProgress::new();
@@ -235,8 +230,7 @@ impl AccountSyncCommand {
                     async { Ok(()) }
                 })
                 .sync()
-                .await
-                .map_err(|err| anyhow!(err))?;
+                .await?;
 
             let folders_patch_err = report
                 .folder

@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use clap::Parser;
 use email::{backend::feature::BackendFeatureSource, folder::expunge::ExpungeFolder};
 use log::info;
@@ -49,10 +49,7 @@ impl FolderExpungeCommand {
         )
         .await?;
 
-        backend
-            .expunge_folder(folder)
-            .await
-            .map_err(|err| anyhow!(err))?;
+        backend.expunge_folder(folder).await?;
 
         printer.print(format!("Folder {folder} successfully expunged!"))
     }

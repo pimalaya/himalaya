@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use clap::Parser;
 use email::{backend::feature::BackendFeatureSource, folder::list::ListFolders};
 use log::info;
@@ -50,11 +50,7 @@ impl FolderListCommand {
         )
         .await?;
 
-        let folders: Folders = backend
-            .list_folders()
-            .await
-            .map_err(|err| anyhow!(err))?
-            .into();
+        let folders: Folders = backend.list_folders().await?.into();
 
         printer.print_table(
             Box::new(folders),

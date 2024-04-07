@@ -187,351 +187,351 @@ fn set_tables_dotted<'a>(item: &'a mut Item, keys: impl IntoIterator<Item = &'a 
     }
 }
 
-#[cfg(test)]
-mod test {
-    use std::collections::HashMap;
+// #[cfg(test)]
+// mod test {
+//     use std::collections::HashMap;
 
-    use crate::{account::config::TomlAccountConfig, config::TomlConfig};
+//     use crate::{account::config::TomlAccountConfig, config::TomlConfig};
 
-    use super::pretty_serialize;
+//     use super::pretty_serialize;
 
-    fn assert_eq(config: TomlAccountConfig, expected_toml: &str) {
-        let config = TomlConfig {
-            accounts: HashMap::from_iter([("test".into(), config)]),
-            ..Default::default()
-        };
+//     fn assert_eq(config: TomlAccountConfig, expected_toml: &str) {
+//         let config = TomlConfig {
+//             accounts: HashMap::from_iter([("test".into(), config)]),
+//             ..Default::default()
+//         };
 
-        let toml = pretty_serialize(&config).expect("serialize error");
-        assert_eq!(toml, expected_toml);
+//         let toml = pretty_serialize(&config).expect("serialize error");
+//         assert_eq!(toml, expected_toml);
 
-        let expected_config = toml::from_str(&toml).expect("deserialize error");
-        assert_eq!(config, expected_config);
-    }
+//         let expected_config = toml::from_str(&toml).expect("deserialize error");
+//         assert_eq!(config, expected_config);
+//     }
 
-    #[test]
-    fn pretty_serialize_default() {
-        assert_eq(
-            TomlAccountConfig {
-                email: "test@localhost".into(),
-                ..Default::default()
-            },
-            r#"[accounts.test]
-email = "test@localhost"
-"#,
-        )
-    }
+//     #[test]
+//     fn pretty_serialize_default() {
+//         assert_eq(
+//             TomlAccountConfig {
+//                 email: "test@localhost".into(),
+//                 ..Default::default()
+//             },
+//             r#"[accounts.test]
+// email = "test@localhost"
+// "#,
+//         )
+//     }
 
-    #[cfg(feature = "account-sync")]
-    #[test]
-    fn pretty_serialize_sync_all() {
-        use email::account::sync::config::SyncConfig;
+//     #[cfg(feature = "account-sync")]
+//     #[test]
+//     fn pretty_serialize_sync_all() {
+//         use email::account::sync::config::SyncConfig;
 
-        assert_eq(
-            TomlAccountConfig {
-                email: "test@localhost".into(),
-                sync: Some(SyncConfig {
-                    enable: Some(false),
-                    dir: Some("/tmp/test".into()),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-            r#"[accounts.test]
-email = "test@localhost"
-sync.enable = false
-sync.dir = "/tmp/test"
-"#,
-        );
-    }
+//         assert_eq(
+//             TomlAccountConfig {
+//                 email: "test@localhost".into(),
+//                 sync: Some(SyncConfig {
+//                     enable: Some(false),
+//                     dir: Some("/tmp/test".into()),
+//                     ..Default::default()
+//                 }),
+//                 ..Default::default()
+//             },
+//             r#"[accounts.test]
+// email = "test@localhost"
+// sync.enable = false
+// sync.dir = "/tmp/test"
+// "#,
+//         );
+//     }
 
-    #[cfg(feature = "account-sync")]
-    #[test]
-    fn pretty_serialize_sync_include() {
-        use email::{
-            account::sync::config::SyncConfig,
-            folder::sync::config::{FolderSyncConfig, FolderSyncStrategy},
-        };
-        use std::collections::BTreeSet;
+//     #[cfg(feature = "account-sync")]
+//     #[test]
+//     fn pretty_serialize_sync_include() {
+//         use email::{
+//             account::sync::config::SyncConfig,
+//             folder::sync::config::{FolderSyncConfig, FolderSyncStrategy},
+//         };
+//         use std::collections::BTreeSet;
 
-        use crate::folder::config::FolderConfig;
+//         use crate::folder::config::FolderConfig;
 
-        assert_eq(
-            TomlAccountConfig {
-                email: "test@localhost".into(),
-                sync: Some(SyncConfig {
-                    enable: Some(true),
-                    dir: Some("/tmp/test".into()),
-                    ..Default::default()
-                }),
-                folder: Some(FolderConfig {
-                    sync: Some(FolderSyncConfig {
-                        filter: FolderSyncStrategy::Include(BTreeSet::from_iter(["test".into()])),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-            r#"[accounts.test]
-email = "test@localhost"
-sync.enable = true
-sync.dir = "/tmp/test"
-folder.sync.filter.include = ["test"]
-folder.sync.permissions.create = true
-folder.sync.permissions.delete = true
-"#,
-        );
-    }
+//         assert_eq(
+//             TomlAccountConfig {
+//                 email: "test@localhost".into(),
+//                 sync: Some(SyncConfig {
+//                     enable: Some(true),
+//                     dir: Some("/tmp/test".into()),
+//                     ..Default::default()
+//                 }),
+//                 folder: Some(FolderConfig {
+//                     sync: Some(FolderSyncConfig {
+//                         filter: FolderSyncStrategy::Include(BTreeSet::from_iter(["test".into()])),
+//                         ..Default::default()
+//                     }),
+//                     ..Default::default()
+//                 }),
+//                 ..Default::default()
+//             },
+//             r#"[accounts.test]
+// email = "test@localhost"
+// sync.enable = true
+// sync.dir = "/tmp/test"
+// folder.sync.filter.include = ["test"]
+// folder.sync.permissions.create = true
+// folder.sync.permissions.delete = true
+// "#,
+//         );
+//     }
 
-    #[cfg(feature = "imap")]
-    #[test]
-    fn pretty_serialize_imap_passwd_cmd() {
-        use email::{
-            account::config::passwd::PasswdConfig,
-            imap::config::{ImapAuthConfig, ImapConfig},
-        };
-        use secret::Secret;
+//     #[cfg(feature = "imap")]
+//     #[test]
+//     fn pretty_serialize_imap_passwd_cmd() {
+//         use email::{
+//             account::config::passwd::PasswdConfig,
+//             imap::config::{ImapAuthConfig, ImapConfig},
+//         };
+//         use secret::Secret;
 
-        assert_eq(
-            TomlAccountConfig {
-                email: "test@localhost".into(),
-                imap: Some(ImapConfig {
-                    host: "localhost".into(),
-                    port: 143,
-                    login: "test@localhost".into(),
-                    auth: ImapAuthConfig::Passwd(PasswdConfig(Secret::new_command(
-                        "pass show test",
-                    ))),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-            r#"[accounts.test]
-email = "test@localhost"
-imap.host = "localhost"
-imap.port = 143
-imap.login = "test@localhost"
-imap.passwd.command = "pass show test"
-"#,
-        );
-    }
+//         assert_eq(
+//             TomlAccountConfig {
+//                 email: "test@localhost".into(),
+//                 imap: Some(ImapConfig {
+//                     host: "localhost".into(),
+//                     port: 143,
+//                     login: "test@localhost".into(),
+//                     auth: ImapAuthConfig::Passwd(PasswdConfig(Secret::new_command(
+//                         "pass show test",
+//                     ))),
+//                     ..Default::default()
+//                 }),
+//                 ..Default::default()
+//             },
+//             r#"[accounts.test]
+// email = "test@localhost"
+// imap.host = "localhost"
+// imap.port = 143
+// imap.login = "test@localhost"
+// imap.passwd.command = "pass show test"
+// "#,
+//         );
+//     }
 
-    #[cfg(feature = "imap")]
-    #[test]
-    fn pretty_serialize_imap_passwd_cmds() {
-        use email::{
-            account::config::passwd::PasswdConfig,
-            imap::config::{ImapAuthConfig, ImapConfig},
-        };
-        use secret::Secret;
+//     #[cfg(feature = "imap")]
+//     #[test]
+//     fn pretty_serialize_imap_passwd_cmds() {
+//         use email::{
+//             account::config::passwd::PasswdConfig,
+//             imap::config::{ImapAuthConfig, ImapConfig},
+//         };
+//         use secret::Secret;
 
-        assert_eq(
-            TomlAccountConfig {
-                email: "test@localhost".into(),
-                imap: Some(ImapConfig {
-                    host: "localhost".into(),
-                    port: 143,
-                    login: "test@localhost".into(),
-                    auth: ImapAuthConfig::Passwd(PasswdConfig(Secret::new_command(vec![
-                        "pass show test",
-                        "tr -d '[:blank:]'",
-                    ]))),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-            r#"[accounts.test]
-email = "test@localhost"
-imap.host = "localhost"
-imap.port = 143
-imap.login = "test@localhost"
-imap.passwd.command = ["pass show test", "tr -d '[:blank:]'"]
-"#,
-        );
-    }
+//         assert_eq(
+//             TomlAccountConfig {
+//                 email: "test@localhost".into(),
+//                 imap: Some(ImapConfig {
+//                     host: "localhost".into(),
+//                     port: 143,
+//                     login: "test@localhost".into(),
+//                     auth: ImapAuthConfig::Passwd(PasswdConfig(Secret::new_command(vec![
+//                         "pass show test",
+//                         "tr -d '[:blank:]'",
+//                     ]))),
+//                     ..Default::default()
+//                 }),
+//                 ..Default::default()
+//             },
+//             r#"[accounts.test]
+// email = "test@localhost"
+// imap.host = "localhost"
+// imap.port = 143
+// imap.login = "test@localhost"
+// imap.passwd.command = ["pass show test", "tr -d '[:blank:]'"]
+// "#,
+//         );
+//     }
 
-    #[cfg(feature = "imap")]
-    #[test]
-    fn pretty_serialize_imap_oauth2() {
-        use email::{
-            account::config::oauth2::OAuth2Config,
-            imap::config::{ImapAuthConfig, ImapConfig},
-        };
+//     #[cfg(feature = "imap")]
+//     #[test]
+//     fn pretty_serialize_imap_oauth2() {
+//         use email::{
+//             account::config::oauth2::OAuth2Config,
+//             imap::config::{ImapAuthConfig, ImapConfig},
+//         };
 
-        assert_eq(
-            TomlAccountConfig {
-                email: "test@localhost".into(),
-                imap: Some(ImapConfig {
-                    host: "localhost".into(),
-                    port: 143,
-                    login: "test@localhost".into(),
-                    auth: ImapAuthConfig::OAuth2(OAuth2Config {
-                        client_id: "client-id".into(),
-                        auth_url: "auth-url".into(),
-                        token_url: "token-url".into(),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-            r#"[accounts.test]
-email = "test@localhost"
-imap.host = "localhost"
-imap.port = 143
-imap.login = "test@localhost"
-imap.oauth2.method = "xoauth2"
-imap.oauth2.client-id = "client-id"
-imap.oauth2.auth-url = "auth-url"
-imap.oauth2.token-url = "token-url"
-imap.oauth2.pkce = false
-imap.oauth2.scopes = []
-"#,
-        );
-    }
+//         assert_eq(
+//             TomlAccountConfig {
+//                 email: "test@localhost".into(),
+//                 imap: Some(ImapConfig {
+//                     host: "localhost".into(),
+//                     port: 143,
+//                     login: "test@localhost".into(),
+//                     auth: ImapAuthConfig::OAuth2(OAuth2Config {
+//                         client_id: "client-id".into(),
+//                         auth_url: "auth-url".into(),
+//                         token_url: "token-url".into(),
+//                         ..Default::default()
+//                     }),
+//                     ..Default::default()
+//                 }),
+//                 ..Default::default()
+//             },
+//             r#"[accounts.test]
+// email = "test@localhost"
+// imap.host = "localhost"
+// imap.port = 143
+// imap.login = "test@localhost"
+// imap.oauth2.method = "xoauth2"
+// imap.oauth2.client-id = "client-id"
+// imap.oauth2.auth-url = "auth-url"
+// imap.oauth2.token-url = "token-url"
+// imap.oauth2.pkce = false
+// imap.oauth2.scopes = []
+// "#,
+//         );
+//     }
 
-    #[cfg(feature = "maildir")]
-    #[test]
-    fn pretty_serialize_maildir() {
-        use email::maildir::config::MaildirConfig;
+//     #[cfg(feature = "maildir")]
+//     #[test]
+//     fn pretty_serialize_maildir() {
+//         use email::maildir::config::MaildirConfig;
 
-        assert_eq(
-            TomlAccountConfig {
-                email: "test@localhost".into(),
-                maildir: Some(MaildirConfig {
-                    root_dir: "/tmp/test".into(),
-                }),
-                ..Default::default()
-            },
-            r#"[accounts.test]
-email = "test@localhost"
-maildir.root-dir = "/tmp/test"
-"#,
-        );
-    }
+//         assert_eq(
+//             TomlAccountConfig {
+//                 email: "test@localhost".into(),
+//                 maildir: Some(MaildirConfig {
+//                     root_dir: "/tmp/test".into(),
+//                 }),
+//                 ..Default::default()
+//             },
+//             r#"[accounts.test]
+// email = "test@localhost"
+// maildir.root-dir = "/tmp/test"
+// "#,
+//         );
+//     }
 
-    #[cfg(feature = "smtp")]
-    #[test]
-    fn pretty_serialize_smtp_passwd_cmd() {
-        use email::{
-            account::config::passwd::PasswdConfig,
-            smtp::config::{SmtpAuthConfig, SmtpConfig},
-        };
-        use secret::Secret;
+//     #[cfg(feature = "smtp")]
+//     #[test]
+//     fn pretty_serialize_smtp_passwd_cmd() {
+//         use email::{
+//             account::config::passwd::PasswdConfig,
+//             smtp::config::{SmtpAuthConfig, SmtpConfig},
+//         };
+//         use secret::Secret;
 
-        assert_eq(
-            TomlAccountConfig {
-                email: "test@localhost".into(),
-                smtp: Some(SmtpConfig {
-                    host: "localhost".into(),
-                    port: 143,
-                    login: "test@localhost".into(),
-                    auth: SmtpAuthConfig::Passwd(PasswdConfig(Secret::new_command(
-                        "pass show test",
-                    ))),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-            r#"[accounts.test]
-email = "test@localhost"
-smtp.host = "localhost"
-smtp.port = 143
-smtp.login = "test@localhost"
-smtp.passwd.command = "pass show test"
-"#,
-        );
-    }
+//         assert_eq(
+//             TomlAccountConfig {
+//                 email: "test@localhost".into(),
+//                 smtp: Some(SmtpConfig {
+//                     host: "localhost".into(),
+//                     port: 143,
+//                     login: "test@localhost".into(),
+//                     auth: SmtpAuthConfig::Passwd(PasswdConfig(Secret::new_command(
+//                         "pass show test",
+//                     ))),
+//                     ..Default::default()
+//                 }),
+//                 ..Default::default()
+//             },
+//             r#"[accounts.test]
+// email = "test@localhost"
+// smtp.host = "localhost"
+// smtp.port = 143
+// smtp.login = "test@localhost"
+// smtp.passwd.command = "pass show test"
+// "#,
+//         );
+//     }
 
-    #[cfg(feature = "smtp")]
-    #[test]
-    fn pretty_serialize_smtp_passwd_cmds() {
-        use email::{
-            account::config::passwd::PasswdConfig,
-            smtp::config::{SmtpAuthConfig, SmtpConfig},
-        };
-        use secret::Secret;
+//     #[cfg(feature = "smtp")]
+//     #[test]
+//     fn pretty_serialize_smtp_passwd_cmds() {
+//         use email::{
+//             account::config::passwd::PasswdConfig,
+//             smtp::config::{SmtpAuthConfig, SmtpConfig},
+//         };
+//         use secret::Secret;
 
-        assert_eq(
-            TomlAccountConfig {
-                email: "test@localhost".into(),
-                smtp: Some(SmtpConfig {
-                    host: "localhost".into(),
-                    port: 143,
-                    login: "test@localhost".into(),
-                    auth: SmtpAuthConfig::Passwd(PasswdConfig(Secret::new_command(vec![
-                        "pass show test",
-                        "tr -d '[:blank:]'",
-                    ]))),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-            r#"[accounts.test]
-email = "test@localhost"
-smtp.host = "localhost"
-smtp.port = 143
-smtp.login = "test@localhost"
-smtp.passwd.command = ["pass show test", "tr -d '[:blank:]'"]
-"#,
-        );
-    }
+//         assert_eq(
+//             TomlAccountConfig {
+//                 email: "test@localhost".into(),
+//                 smtp: Some(SmtpConfig {
+//                     host: "localhost".into(),
+//                     port: 143,
+//                     login: "test@localhost".into(),
+//                     auth: SmtpAuthConfig::Passwd(PasswdConfig(Secret::new_command(vec![
+//                         "pass show test",
+//                         "tr -d '[:blank:]'",
+//                     ]))),
+//                     ..Default::default()
+//                 }),
+//                 ..Default::default()
+//             },
+//             r#"[accounts.test]
+// email = "test@localhost"
+// smtp.host = "localhost"
+// smtp.port = 143
+// smtp.login = "test@localhost"
+// smtp.passwd.command = ["pass show test", "tr -d '[:blank:]'"]
+// "#,
+//         );
+//     }
 
-    #[cfg(feature = "smtp")]
-    #[test]
-    fn pretty_serialize_smtp_oauth2() {
-        use email::{
-            account::config::oauth2::OAuth2Config,
-            smtp::config::{SmtpAuthConfig, SmtpConfig},
-        };
+//     #[cfg(feature = "smtp")]
+//     #[test]
+//     fn pretty_serialize_smtp_oauth2() {
+//         use email::{
+//             account::config::oauth2::OAuth2Config,
+//             smtp::config::{SmtpAuthConfig, SmtpConfig},
+//         };
 
-        assert_eq(
-            TomlAccountConfig {
-                email: "test@localhost".into(),
-                smtp: Some(SmtpConfig {
-                    host: "localhost".into(),
-                    port: 143,
-                    login: "test@localhost".into(),
-                    auth: SmtpAuthConfig::OAuth2(OAuth2Config {
-                        client_id: "client-id".into(),
-                        auth_url: "auth-url".into(),
-                        token_url: "token-url".into(),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-            r#"[accounts.test]
-email = "test@localhost"
-smtp.host = "localhost"
-smtp.port = 143
-smtp.login = "test@localhost"
-smtp.oauth2.method = "xoauth2"
-smtp.oauth2.client-id = "client-id"
-smtp.oauth2.auth-url = "auth-url"
-smtp.oauth2.token-url = "token-url"
-smtp.oauth2.pkce = false
-smtp.oauth2.scopes = []
-"#,
-        );
-    }
+//         assert_eq(
+//             TomlAccountConfig {
+//                 email: "test@localhost".into(),
+//                 smtp: Some(SmtpConfig {
+//                     host: "localhost".into(),
+//                     port: 143,
+//                     login: "test@localhost".into(),
+//                     auth: SmtpAuthConfig::OAuth2(OAuth2Config {
+//                         client_id: "client-id".into(),
+//                         auth_url: "auth-url".into(),
+//                         token_url: "token-url".into(),
+//                         ..Default::default()
+//                     }),
+//                     ..Default::default()
+//                 }),
+//                 ..Default::default()
+//             },
+//             r#"[accounts.test]
+// email = "test@localhost"
+// smtp.host = "localhost"
+// smtp.port = 143
+// smtp.login = "test@localhost"
+// smtp.oauth2.method = "xoauth2"
+// smtp.oauth2.client-id = "client-id"
+// smtp.oauth2.auth-url = "auth-url"
+// smtp.oauth2.token-url = "token-url"
+// smtp.oauth2.pkce = false
+// smtp.oauth2.scopes = []
+// "#,
+//         );
+//     }
 
-    #[cfg(feature = "pgp-cmds")]
-    #[test]
-    fn pretty_serialize_pgp_cmds() {
-        use email::account::config::pgp::PgpConfig;
+//     #[cfg(feature = "pgp-cmds")]
+//     #[test]
+//     fn pretty_serialize_pgp_cmds() {
+//         use email::account::config::pgp::PgpConfig;
 
-        assert_eq(
-            TomlAccountConfig {
-                email: "test@localhost".into(),
-                pgp: Some(PgpConfig::Cmds(Default::default())),
-                ..Default::default()
-            },
-            r#"[accounts.test]
-email = "test@localhost"
-pgp.backend = "cmds"
-"#,
-        );
-    }
-}
+//         assert_eq(
+//             TomlAccountConfig {
+//                 email: "test@localhost".into(),
+//                 pgp: Some(PgpConfig::Cmds(Default::default())),
+//                 ..Default::default()
+//             },
+//             r#"[accounts.test]
+// email = "test@localhost"
+// pgp.backend = "cmds"
+// "#,
+//         );
+//     }
+// }

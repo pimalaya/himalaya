@@ -1,7 +1,7 @@
 pub mod config;
 pub(crate) mod wizard;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use async_trait::async_trait;
 use std::{ops::Deref, sync::Arc};
 
@@ -41,6 +41,7 @@ use email::{
         send::{SendMessage, SendMessageThenSaveCopy},
         Messages,
     },
+    AnyResult,
 };
 use serde::{Deserialize, Serialize};
 
@@ -143,7 +144,7 @@ impl BackendContextBuilder {
                             .with_prebuilt_credentials()
                     });
                 match builder {
-                    Some(builder) => Some(builder.await.map_err(|err| anyhow!(err))?),
+                    Some(builder) => Some(builder.await?),
                     None => None,
                 }
             },
@@ -514,7 +515,7 @@ impl email::backend::context::BackendContextBuilder for BackendContextBuilder {
         }
     }
 
-    async fn build(self) -> email::Result<Self::Context> {
+    async fn build(self) -> AnyResult<Self::Context> {
         let mut ctx = BackendContext::default();
 
         #[cfg(feature = "imap")]
@@ -634,7 +635,7 @@ impl Backend {
 
         Ok(Self {
             toml_account_config: toml_account_config.clone(),
-            backend: backend_builder.build().await.map_err(|err| anyhow!(err))?,
+            backend: backend_builder.build().await?,
         })
     }
 
@@ -678,12 +679,9 @@ impl Backend {
     ) -> Result<Envelopes> {
         let backend_kind = self.toml_account_config.list_envelopes_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
-        let envelopes = self
-            .backend
-            .list_envelopes(folder, opts)
-            .await
-            .map_err(|err| anyhow!(err))?;
-        let envelopes = Envelopes::from_backend(&self.account_config, &id_mapper, envelopes)?;
+        let envelopes = self.backend.list_envelopes(folder, opts).await?;
+        let envelopes =
+            Envelopes::from_backend(&self.backend.account_config, &id_mapper, envelopes)?;
         Ok(envelopes)
     }
 
@@ -691,70 +689,54 @@ impl Backend {
         let backend_kind = self.toml_account_config.add_flags_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
         let ids = Id::multiple(id_mapper.get_ids(ids)?);
-        self.backend
-            .add_flags(folder, &ids, flags)
-            .await
-            .map_err(|err| anyhow!(err))
+        self.backend.add_flags(folder, &ids, flags).await?;
+        Ok(())
     }
 
     pub async fn add_flag(&self, folder: &str, ids: &[usize], flag: Flag) -> Result<()> {
         let backend_kind = self.toml_account_config.add_flags_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
         let ids = Id::multiple(id_mapper.get_ids(ids)?);
-        self.backend
-            .add_flag(folder, &ids, flag)
-            .await
-            .map_err(|err| anyhow!(err))
+        self.backend.add_flag(folder, &ids, flag).await?;
+        Ok(())
     }
 
     pub async fn set_flags(&self, folder: &str, ids: &[usize], flags: &Flags) -> Result<()> {
         let backend_kind = self.toml_account_config.set_flags_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
         let ids = Id::multiple(id_mapper.get_ids(ids)?);
-        self.backend
-            .set_flags(folder, &ids, flags)
-            .await
-            .map_err(|err| anyhow!(err))
+        self.backend.set_flags(folder, &ids, flags).await?;
+        Ok(())
     }
 
     pub async fn set_flag(&self, folder: &str, ids: &[usize], flag: Flag) -> Result<()> {
         let backend_kind = self.toml_account_config.set_flags_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
         let ids = Id::multiple(id_mapper.get_ids(ids)?);
-        self.backend
-            .set_flag(folder, &ids, flag)
-            .await
-            .map_err(|err| anyhow!(err))
+        self.backend.set_flag(folder, &ids, flag).await?;
+        Ok(())
     }
 
     pub async fn remove_flags(&self, folder: &str, ids: &[usize], flags: &Flags) -> Result<()> {
         let backend_kind = self.toml_account_config.remove_flags_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
         let ids = Id::multiple(id_mapper.get_ids(ids)?);
-        self.backend
-            .remove_flags(folder, &ids, flags)
-            .await
-            .map_err(|err| anyhow!(err))
+        self.backend.remove_flags(folder, &ids, flags).await?;
+        Ok(())
     }
 
     pub async fn remove_flag(&self, folder: &str, ids: &[usize], flag: Flag) -> Result<()> {
         let backend_kind = self.toml_account_config.remove_flags_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
         let ids = Id::multiple(id_mapper.get_ids(ids)?);
-        self.backend
-            .remove_flag(folder, &ids, flag)
-            .await
-            .map_err(|err| anyhow!(err))
+        self.backend.remove_flag(folder, &ids, flag).await?;
+        Ok(())
     }
 
     pub async fn add_message(&self, folder: &str, email: &[u8]) -> Result<SingleId> {
         let backend_kind = self.toml_account_config.add_message_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
-        let id = self
-            .backend
-            .add_message(folder, email)
-            .await
-            .map_err(|err| anyhow!(err))?;
+        let id = self.backend.add_message(folder, email).await?;
         id_mapper.create_alias(&*id)?;
         Ok(id)
     }
@@ -770,8 +752,7 @@ impl Backend {
         let id = self
             .backend
             .add_message_with_flags(folder, email, flags)
-            .await
-            .map_err(|err| anyhow!(err))?;
+            .await?;
         id_mapper.create_alias(&*id)?;
         Ok(id)
     }
@@ -780,20 +761,16 @@ impl Backend {
         let backend_kind = self.toml_account_config.get_messages_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
         let ids = Id::multiple(id_mapper.get_ids(ids)?);
-        self.backend
-            .peek_messages(folder, &ids)
-            .await
-            .map_err(|err| anyhow!(err))
+        let msgs = self.backend.peek_messages(folder, &ids).await?;
+        Ok(msgs)
     }
 
     pub async fn get_messages(&self, folder: &str, ids: &[usize]) -> Result<Messages> {
         let backend_kind = self.toml_account_config.get_messages_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
         let ids = Id::multiple(id_mapper.get_ids(ids)?);
-        self.backend
-            .get_messages(folder, &ids)
-            .await
-            .map_err(|err| anyhow!(err))
+        let msgs = self.backend.get_messages(folder, &ids).await?;
+        Ok(msgs)
     }
 
     pub async fn copy_messages(
@@ -807,8 +784,8 @@ impl Backend {
         let ids = Id::multiple(id_mapper.get_ids(ids)?);
         self.backend
             .copy_messages(from_folder, to_folder, &ids)
-            .await
-            .map_err(|err| anyhow!(err))
+            .await?;
+        Ok(())
     }
 
     pub async fn move_messages(
@@ -822,32 +799,26 @@ impl Backend {
         let ids = Id::multiple(id_mapper.get_ids(ids)?);
         self.backend
             .move_messages(from_folder, to_folder, &ids)
-            .await
-            .map_err(|err| anyhow!(err))
+            .await?;
+        Ok(())
     }
 
     pub async fn delete_messages(&self, folder: &str, ids: &[usize]) -> Result<()> {
         let backend_kind = self.toml_account_config.delete_messages_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
         let ids = Id::multiple(id_mapper.get_ids(ids)?);
-        self.backend
-            .delete_messages(folder, &ids)
-            .await
-            .map_err(|err| anyhow!(err))
+        self.backend.delete_messages(folder, &ids).await?;
+        Ok(())
     }
 
     pub async fn send_message_then_save_copy(&self, msg: &[u8]) -> Result<()> {
-        self.backend
-            .send_message_then_save_copy(msg)
-            .await
-            .map_err(|err| anyhow!(err))
+        self.backend.send_message_then_save_copy(msg).await?;
+        Ok(())
     }
 
     pub async fn watch_envelopes(&self, folder: &str) -> Result<()> {
-        self.backend
-            .watch_envelopes(folder)
-            .await
-            .map_err(|err| anyhow!(err))
+        self.backend.watch_envelopes(folder).await?;
+        Ok(())
     }
 }
 

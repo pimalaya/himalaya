@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use clap::Parser;
 use dialoguer::Confirm;
 use email::{backend::feature::BackendFeatureSource, folder::delete::DeleteFolder};
@@ -61,10 +61,7 @@ impl FolderDeleteCommand {
         )
         .await?;
 
-        backend
-            .delete_folder(folder)
-            .await
-            .map_err(|err| anyhow!(err))?;
+        backend.delete_folder(folder).await?;
 
         printer.print(format!("Folder {folder} successfully deleted!"))
     }

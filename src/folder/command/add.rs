@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use clap::Parser;
 use email::{backend::feature::BackendFeatureSource, folder::add::AddFolder};
 use log::info;
@@ -48,10 +48,7 @@ impl AddFolderCommand {
         )
         .await?;
 
-        backend
-            .add_folder(folder)
-            .await
-            .map_err(|err| anyhow!(err))?;
+        backend.add_folder(folder).await?;
 
         printer.print(format!("Folder {folder} successfully created!"))
     }
