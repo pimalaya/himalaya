@@ -120,7 +120,7 @@ impl AccountSyncCommand {
         let included_folders = BTreeSet::from_iter(self.include_folder);
         let excluded_folders = BTreeSet::from_iter(self.exclude_folder);
 
-        let folders_filter = if !included_folders.is_empty() {
+        let folder_filters = if !included_folders.is_empty() {
             Some(FolderSyncStrategy::Include(included_folders))
         } else if !excluded_folders.is_empty() {
             Some(FolderSyncStrategy::Exclude(excluded_folders))
@@ -131,7 +131,7 @@ impl AccountSyncCommand {
         };
 
         let sync_builder =
-            AccountSyncBuilder::try_new(right)?.with_some_folders_filter(folders_filter);
+            AccountSyncBuilder::try_new(right)?.with_some_folder_filters(folder_filters);
 
         if self.dry_run {
             let report = sync_builder.with_dry_run(true).sync().await?;
