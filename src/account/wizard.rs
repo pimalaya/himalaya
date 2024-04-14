@@ -1,6 +1,6 @@
 #[cfg(feature = "account-sync")]
 use crate::account::config::SyncConfig;
-use anyhow::{bail, Result};
+use color_eyre::{eyre::bail, Result};
 #[cfg(feature = "account-sync")]
 use dialoguer::Confirm;
 use dialoguer::Input;

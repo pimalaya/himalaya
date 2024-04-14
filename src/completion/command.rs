@@ -1,8 +1,8 @@
-use anyhow::Result;
 use clap::{value_parser, CommandFactory, Parser};
 use clap_complete::Shell;
-use log::info;
+use color_eyre::Result;
 use std::io;
+use tracing::info;
 
 use crate::cli::Cli;
 

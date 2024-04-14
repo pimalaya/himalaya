@@ -1,11 +1,11 @@
 pub mod arg;
 
-use anyhow::{anyhow, Context, Result};
+use color_eyre::{eyre::eyre, eyre::Context, Result};
 use dirs::data_dir;
 use email::account::config::AccountConfig;
-use log::debug;
 use sled::{Config, Db};
 use std::collections::HashSet;
+use tracing::debug;
 
 #[derive(Debug)]
 pub enum IdMapper {
@@ -17,7 +17,7 @@ impl IdMapper {
     pub fn new(account_config: &AccountConfig, folder: &str) -> Result<Self> {
         let digest = md5::compute(account_config.name.clone() + folder);
         let db_path = data_dir()
-            .ok_or(anyhow!("cannot get XDG data directory"))?
+            .ok_or(eyre!("cannot get XDG data directory"))?
             .join("himalaya")
             .join(".id-mappers")
             .join(format!("{digest:x}"));
@@ -108,7 +108,7 @@ impl IdMapper {
                             None
                         }
                     })
-                    .ok_or_else(|| anyhow!("cannot get id from alias {alias}"))?;
+                    .ok_or_else(|| eyre!("cannot get id from alias {alias}"))?;
                 debug!("found id {id} from alias {alias}");
 
                 Ok(id)

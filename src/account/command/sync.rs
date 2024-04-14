@@ -1,5 +1,5 @@
-use anyhow::{anyhow, bail, Result};
 use clap::{ArgAction, Parser};
+use color_eyre::{eyre::bail, eyre::eyre, Result};
 use email::backend::context::BackendContextBuilder;
 #[cfg(feature = "imap")]
 use email::imap::ImapContextBuilder;
@@ -10,12 +10,12 @@ use email::{
     sync::{hash::SyncHash, SyncEvent},
 };
 use indicatif::{MultiProgress, ProgressBar, ProgressFinish, ProgressStyle};
-use log::info;
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeSet, HashMap},
     sync::{Arc, Mutex},
 };
+use tracing::info;
 
 use crate::{
     account::arg::name::OptionalAccountNameArg, backend::BackendKind, config::TomlConfig,
@@ -99,7 +99,7 @@ impl AccountSyncCommand {
                     .as_ref()
                     .map(Clone::clone)
                     .map(Arc::new)
-                    .ok_or_else(|| anyhow!("imap config not found"))?;
+                    .ok_or_else(|| eyre!("imap config not found"))?;
                 let imap_ctx = ImapContextBuilder::new(account_config.clone(), imap_config)
                     .with_prebuilt_credentials()
                     .await?;

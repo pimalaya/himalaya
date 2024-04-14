@@ -1,8 +1,8 @@
-use anyhow::{Context, Result};
 use clap::Parser;
+use color_eyre::{eyre::Context, Result};
 use email::backend::feature::BackendFeatureSource;
-use log::info;
 use std::{fs, path::PathBuf};
+use tracing::info;
 use uuid::Uuid;
 
 #[cfg(feature = "account-sync")]

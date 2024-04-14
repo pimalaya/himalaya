@@ -1,4 +1,4 @@
-use anyhow::Result;
+use color_eyre::Result;
 use dialoguer::{Confirm, Input, Password, Select};
 #[cfg(feature = "account-discovery")]
 use email::account::discover::config::{AuthenticationType, AutoConfig, SecurityType, ServerType};

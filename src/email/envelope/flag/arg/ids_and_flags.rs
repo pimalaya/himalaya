@@ -1,6 +1,6 @@
 use clap::Parser;
 use email::flag::{Flag, Flags};
-use log::debug;
+use tracing::debug;
 
 /// The ids and/or flags arguments parser.
 #[derive(Debug, Parser)]

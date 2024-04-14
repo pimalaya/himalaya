@@ -1,7 +1,7 @@
 pub mod list;
 pub mod watch;
 
-use anyhow::Result;
+use color_eyre::Result;
 use clap::Subcommand;
 
 use crate::{config::TomlConfig, printer::Printer};

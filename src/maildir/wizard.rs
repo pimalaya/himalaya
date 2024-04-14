@@ -1,4 +1,4 @@
-use anyhow::Result;
+use color_eyre::Result;
 use dialoguer::Input;
 use dirs::home_dir;
 use email::maildir::config::MaildirConfig;

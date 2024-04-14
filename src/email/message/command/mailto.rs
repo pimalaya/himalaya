@@ -1,8 +1,8 @@
-use anyhow::Result;
 use clap::Parser;
+use color_eyre::Result;
 use email::backend::feature::BackendFeatureSource;
-use log::info;
 use mail_builder::MessageBuilder;
+use tracing::info;
 use url::Url;
 
 #[cfg(feature = "account-sync")]

@@ -1,6 +1,6 @@
-use anyhow::Result;
 use clap::Parser;
-use log::info;
+use color_eyre::Result;
+use tracing::info;
 
 use crate::{
     account::Accounts,

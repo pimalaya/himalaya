@@ -2,7 +2,7 @@ pub mod arg;
 pub mod command;
 pub mod config;
 
-use anyhow::Result;
+use color_eyre::Result;
 use serde::Serialize;
 use std::ops;
 

@@ -1,9 +1,9 @@
-use anyhow::Result;
 use clap::{CommandFactory, Parser};
 use clap_mangen::Man;
-use log::info;
+use color_eyre::Result;
 use shellexpand_utils::{canonicalize, expand};
 use std::{fs, path::PathBuf};
+use tracing::info;
 
 use crate::{cli::Cli, printer::Printer};
 

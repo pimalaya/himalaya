@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use color_eyre::{eyre::Context, Result};
 use email::{
     account::config::AccountConfig,
     email::utils::{local_draft_path, remove_local_draft},
@@ -6,10 +6,10 @@ use email::{
     folder::DRAFTS,
     template::Template,
 };
-use log::debug;
 use mml::MmlCompilerBuilder;
 use process::SingleCommand;
 use std::{env, fs, sync::Arc};
+use tracing::debug;
 
 use crate::{
     backend::Backend,

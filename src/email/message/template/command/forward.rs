@@ -1,7 +1,7 @@
-use anyhow::{anyhow, Result};
 use clap::Parser;
+use color_eyre::{eyre::eyre, Result};
 use email::backend::feature::BackendFeatureSource;
-use log::info;
+use tracing::info;
 
 #[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
@@ -69,7 +69,7 @@ impl TemplateForwardCommand {
             .get_messages(folder, &[id])
             .await?
             .first()
-            .ok_or(anyhow!("cannot find message {id}"))?
+            .ok_or(eyre!("cannot find message {id}"))?
             .to_forward_tpl_builder(account_config)
             .with_headers(self.headers.raw)
             .with_body(self.body.raw())

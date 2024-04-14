@@ -1,12 +1,12 @@
-use anyhow::Result;
 use ariadne::{Color, Label, Report, ReportKind, Source};
 use clap::Parser;
+use color_eyre::Result;
 use email::{
     backend::feature::BackendFeatureSource, email::search_query,
     envelope::list::ListEnvelopesOptions, search_query::SearchEmailsQuery,
 };
-use log::info;
 use std::process::exit;
+use tracing::info;
 
 #[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;

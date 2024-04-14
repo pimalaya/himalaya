@@ -1,7 +1,7 @@
-use anyhow::Result;
 use clap::Parser;
+use color_eyre::Result;
 use email::{backend::feature::BackendFeatureSource, message::Message};
-use log::info;
+use tracing::info;
 
 #[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;

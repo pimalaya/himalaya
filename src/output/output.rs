@@ -1,5 +1,5 @@
-use anyhow::{anyhow, Error, Result};
 use clap::ValueEnum;
+use color_eyre::{eyre::eyre, eyre::Error, Result};
 use serde::Serialize;
 use std::{
     fmt,
@@ -23,7 +23,7 @@ impl FromStr for OutputFmt {
         match fmt {
             fmt if fmt.eq_ignore_ascii_case("json") => Ok(Self::Json),
             fmt if fmt.eq_ignore_ascii_case("plain") => Ok(Self::Plain),
-            unknown => Err(anyhow!("cannot parse output format {}", unknown)),
+            unknown => Err(eyre!("cannot parse output format {}", unknown)),
         }
     }
 }
@@ -69,7 +69,7 @@ impl FromStr for ColorFmt {
             fmt if fmt.eq_ignore_ascii_case("always") => Ok(Self::Always),
             fmt if fmt.eq_ignore_ascii_case("ansi") => Ok(Self::Ansi),
             fmt if fmt.eq_ignore_ascii_case("auto") => Ok(Self::Auto),
-            unknown => Err(anyhow!("cannot parse color format {}", unknown)),
+            unknown => Err(eyre!("cannot parse color format {}", unknown)),
         }
     }
 }

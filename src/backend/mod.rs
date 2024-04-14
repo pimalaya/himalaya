@@ -1,7 +1,7 @@
 pub mod config;
 pub(crate) mod wizard;
 
-use anyhow::Result;
+use color_eyre::Result;
 use async_trait::async_trait;
 use std::{ops::Deref, sync::Arc};
 

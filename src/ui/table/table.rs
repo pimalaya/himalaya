@@ -4,11 +4,11 @@
 //!
 //! [builder design pattern]: https://refactoring.guru/design-patterns/builder
 
-use anyhow::{Context, Result};
+use color_eyre::{eyre::Context, Result};
 use email::email::config::EmailTextPlainFormat;
-use log::trace;
 use termcolor::{Color, ColorSpec};
 use terminal_size::terminal_size;
+use tracing::trace;
 use unicode_width::UnicodeWidthStr;
 
 use crate::printer::{Print, PrintTableOpts, WriteColor};

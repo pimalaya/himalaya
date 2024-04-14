@@ -1,9 +1,9 @@
-use anyhow::Result;
 use clap::Parser;
+use color_eyre::Result;
 use dialoguer::Confirm;
 use email::{backend::feature::BackendFeatureSource, folder::purge::PurgeFolder};
-use log::info;
 use std::process;
+use tracing::info;
 
 #[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;

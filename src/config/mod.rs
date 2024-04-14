@@ -1,17 +1,20 @@
 pub mod wizard;
 
-use anyhow::{anyhow, bail, Context, Result};
+use color_eyre::{
+    eyre::{bail, eyre, Context},
+    Result,
+};
 use dirs::{config_dir, home_dir};
 use email::{
     account::config::AccountConfig, config::Config, envelope::config::EnvelopeConfig,
     flag::config::FlagConfig, folder::config::FolderConfig, message::config::MessageConfig,
 };
-use log::debug;
 use serde::{Deserialize, Serialize};
 use serde_toml_merge::merge;
 use shellexpand_utils::{canonicalize, expand};
 use std::{collections::HashMap, fs, path::PathBuf, sync::Arc};
 use toml::{self, Value};
+use tracing::debug;
 
 #[cfg(feature = "account-sync")]
 use crate::backend::BackendKind;
@@ -136,7 +139,7 @@ impl TomlConfig {
     /// found.
     pub fn default_path() -> Result<PathBuf> {
         Ok(config_dir()
-            .ok_or(anyhow!("cannot get XDG config directory"))?
+            .ok_or(eyre!("cannot get XDG config directory"))?
             .join("himalaya")
             .join("config.toml"))
     }
@@ -175,12 +178,12 @@ impl TomlConfig {
                         .filter(|default| *default)
                         .map(|_| (name.to_owned(), account.clone()))
                 })
-                .ok_or_else(|| anyhow!("cannot find default account")),
+                .ok_or_else(|| eyre!("cannot find default account")),
             Some(name) => self
                 .accounts
                 .get(name)
                 .map(|account| (name.to_owned(), account.clone()))
-                .ok_or_else(|| anyhow!("cannot find account {name}")),
+                .ok_or_else(|| eyre!("cannot find account {name}")),
         }?;
 
         #[cfg(feature = "imap")]

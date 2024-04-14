@@ -1,4 +1,4 @@
-use anyhow::Result;
+use color_eyre::Result;
 use dialoguer::Input;
 use email::sendmail::config::SendmailConfig;
 

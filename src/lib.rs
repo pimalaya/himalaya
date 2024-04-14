@@ -19,6 +19,7 @@ pub mod printer;
 pub mod sendmail;
 #[cfg(feature = "smtp")]
 pub mod smtp;
+pub mod tracing;
 pub mod ui;
 
 #[doc(inline)]

@@ -1,7 +1,7 @@
 pub mod arg;
 pub mod command;
 
-use anyhow::Result;
+use color_eyre::Result;
 use email::template::Template;
 
 use crate::printer::{Print, WriteColor};

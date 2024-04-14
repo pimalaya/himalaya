@@ -3,7 +3,7 @@ pub mod command;
 pub mod config;
 pub mod flag;
 
-use anyhow::Result;
+use color_eyre::Result;
 use email::account::config::AccountConfig;
 use serde::Serialize;
 use std::ops;

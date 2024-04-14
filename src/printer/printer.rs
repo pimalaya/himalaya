@@ -1,5 +1,5 @@
-use anyhow::{Context, Error, Result};
 use clap::ArgMatches;
+use color_eyre::{eyre::Context, Report, Result};
 use std::fmt::{self, Debug};
 use termcolor::StandardStream;
 
@@ -87,7 +87,7 @@ impl From<OutputFmt> for StdoutPrinter {
 }
 
 impl TryFrom<&ArgMatches> for StdoutPrinter {
-    type Error = Error;
+    type Error = Report;
 
     fn try_from(m: &ArgMatches) -> Result<Self, Self::Error> {
         let fmt: OutputFmt = m

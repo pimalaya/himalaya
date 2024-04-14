@@ -1,12 +1,12 @@
-use anyhow::Result;
 use clap::Parser;
+use color_eyre::Result;
 #[cfg(feature = "imap")]
 use email::imap::config::ImapAuthConfig;
 #[cfg(feature = "smtp")]
 use email::smtp::config::SmtpAuthConfig;
-use log::info;
+use tracing::info;
 #[cfg(any(feature = "imap", feature = "smtp"))]
-use log::{debug, warn};
+use tracing::{debug, warn};
 
 #[cfg(any(feature = "imap", feature = "smtp", feature = "pgp"))]
 use crate::ui::prompt;

@@ -1,7 +1,7 @@
-use anyhow::Result;
 use clap::Parser;
+use color_eyre::Result;
 use email::backend::context::BackendContextBuilder;
-use log::info;
+use tracing::info;
 
 use crate::{
     account::arg::name::OptionalAccountNameArg, backend, config::TomlConfig, printer::Printer,

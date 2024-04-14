@@ -1,5 +1,5 @@
-use anyhow::Result;
 use clap::{Parser, Subcommand};
+use color_eyre::Result;
 use std::path::PathBuf;
 
 use crate::{
@@ -75,6 +75,20 @@ pub struct Cli {
     #[arg(long, short = 'C', global = true)]
     #[arg(value_name = "MODE", value_enum, default_value_t = Default::default())]
     pub color: ColorFmt,
+
+    /// Enable logs with spantrace.
+    ///
+    /// This is the same as running the command with `RUST_LOG=debug`
+    /// environment variable.
+    #[arg(long, global = true, conflicts_with = "trace")]
+    pub debug: bool,
+
+    /// Enable verbose logs with backtrace.
+    ///
+    /// This is the same as running the command with `RUST_LOG=trace`
+    /// and `RUST_BACKTRACE=1` environment variables.
+    #[arg(long, global = true, conflicts_with = "debug")]
+    pub trace: bool,
 }
 
 #[derive(Subcommand, Debug)]

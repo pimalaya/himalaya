@@ -3,7 +3,7 @@ pub mod command;
 pub mod config;
 pub(crate) mod wizard;
 
-use anyhow::Result;
+use color_eyre::Result;
 use serde::Serialize;
 use std::{collections::hash_map::Iter, fmt, ops::Deref};
 

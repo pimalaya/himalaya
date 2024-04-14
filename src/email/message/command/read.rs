@@ -1,8 +1,8 @@
-use anyhow::Result;
 use clap::Parser;
+use color_eyre::Result;
 use email::backend::feature::BackendFeatureSource;
-use log::info;
 use mml::message::FilterParts;
+use tracing::info;
 
 #[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
