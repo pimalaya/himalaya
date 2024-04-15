@@ -1,12 +1,11 @@
-use std::env;
-
 use clap::Parser;
 use color_eyre::{Result, Section};
 use himalaya::{
     cli::Cli, config::TomlConfig, envelope::command::list::ListEnvelopesCommand,
     message::command::mailto::MessageMailtoCommand, printer::StdoutPrinter,
 };
-use tracing::{debug, level_filters::LevelFilter, trace};
+use std::env;
+use tracing::level_filters::LevelFilter;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -23,12 +22,6 @@ async fn main() -> Result<()> {
     let filter = himalaya::tracing::install()?;
 
     let mut printer = StdoutPrinter::new(cli.output, cli.color);
-
-    #[cfg(not(target_os = "windows"))]
-    if let Err((_, err)) = coredump::register_panic_handler() {
-        trace!("cannot register coredump panic handler: {err}");
-        debug!("{err:?}");
-    }
 
     // if the first argument starts by "mailto:", execute straight the
     // mailto message command

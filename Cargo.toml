@@ -83,6 +83,3 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 unicode-width = "0.1"
 url = "2.2"
 uuid = { version = "0.8", features = ["v4"] }
-
-[target.'cfg(not(windows))'.dependencies.coredump]
-version = "0.1"
