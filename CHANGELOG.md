@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed watch IMAP envelopes when folder was empty [#179].
 - Prevented parsing of undefined config options [#188].
+- Fixed `In-Reply-To` header being skipped from mailto URLs [#194].
 
 ## [1.0.0-beta.3] - 2024-02-25
 
@@ -814,3 +815,4 @@ Few major concepts changed:
 [#173]: https://todo.sr.ht/~soywod/pimalaya/173
 [#184]: https://todo.sr.ht/~soywod/pimalaya/184
 [#188]: https://todo.sr.ht/~soywod/pimalaya/188
+[#194]: https://todo.sr.ht/~soywod/pimalaya/194

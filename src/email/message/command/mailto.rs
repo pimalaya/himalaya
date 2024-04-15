@@ -69,11 +69,22 @@ impl MessageMailtoCommand {
         let mut body = String::new();
 
         for (key, val) in self.url.query_pairs() {
-            match key.to_lowercase().as_bytes() {
-                b"cc" => builder = builder.cc(val.to_string()),
-                b"bcc" => builder = builder.bcc(val.to_string()),
-                b"subject" => builder = builder.subject(val),
-                b"body" => body += &val,
+            match key {
+                key if key.eq_ignore_ascii_case("in-reply-to") => {
+                    builder = builder.in_reply_to(val.to_string());
+                }
+                key if key.eq_ignore_ascii_case("cc") => {
+                    builder = builder.cc(val.to_string());
+                }
+                key if key.eq_ignore_ascii_case("bcc") => {
+                    builder = builder.bcc(val.to_string());
+                }
+                key if key.eq_ignore_ascii_case("subject") => {
+                    builder = builder.subject(val.to_string());
+                }
+                key if key.eq_ignore_ascii_case("body") => {
+                    body += &val;
+                }
                 _ => (),
             }
         }
