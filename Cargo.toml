@@ -45,13 +45,10 @@ pgp-commands = ["email-lib/pgp-commands", "mml-lib/pgp-commands", "pgp"]
 pgp-gpg = ["email-lib/pgp-gpg", "mml-lib/pgp-gpg", "pgp"]
 pgp-native = ["email-lib/pgp-native", "mml-lib/pgp-native", "pgp"]
 
-[dev-dependencies]
-tempfile = "3.3"
 
 [dependencies]
 ariadne = "0.2"
 async-trait = "0.1"
-chrono = "0.4.24"
 clap = { version = "4.4", features = ["derive"] }
 clap_complete = "4.4"
 clap_mangen = "0.2"
@@ -63,7 +60,6 @@ email-lib = { version = "=0.24.0", default-features = false, features = ["derive
 email_address = "0.2.4"
 erased-serde = "0.3"
 indicatif = "0.17"
-keyring-lib = { version = "=0.4.2", features = ["derive"] }
 mail-builder = "0.3"
 md5 = "0.7"
 mml-lib = { version = "=1.0.12", default-features = false, features = ["derive"]  }

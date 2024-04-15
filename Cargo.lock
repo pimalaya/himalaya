@@ -1867,7 +1867,6 @@ version = "1.0.0-beta.4"
 dependencies = [
  "ariadne",
  "async-trait",
- "chrono",
  "clap",
  "clap_complete",
  "clap_mangen",
@@ -1880,7 +1879,6 @@ dependencies = [
  "email_address",
  "erased-serde",
  "indicatif",
- "keyring-lib",
  "mail-builder",
  "md5",
  "mml-lib",
@@ -1893,7 +1891,6 @@ dependencies = [
  "serde_json",
  "shellexpand-utils",
  "sled",
- "tempfile",
  "termcolor",
  "terminal_size",
  "tokio",
@@ -2255,7 +2252,8 @@ dependencies = [
 [[package]]
 name = "keyring-lib"
 version = "0.4.2"
-source = "git+https://git.sr.ht/~soywod/pimalaya#7d56cfda13fe13a9aa48d9a117573e3dfbbcf8a2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2e6d01e57f1b382ba5a1c40ef866855e8bab15f7caa4033480db80a5b9b9aff"
 dependencies = [
  "keyring",
  "log",
