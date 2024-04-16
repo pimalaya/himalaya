@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-beta.4] - 2024-04-16
+
 ### Added
 
 - Added systemd service in `assets/` folder.
@@ -32,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed watch IMAP envelopes when folder was empty [#179].
 - Prevented parsing of undefined config options [#188].
 - Fixed `In-Reply-To` header being skipped from mailto URLs [#194].
+- Fixed error page out of bounds when filtering envelopes returned an empty result [#195].
 
 ## [1.0.0-beta.3] - 2024-02-25
 
@@ -821,3 +824,4 @@ Few major concepts changed:
 [#184]: https://todo.sr.ht/~soywod/pimalaya/184
 [#188]: https://todo.sr.ht/~soywod/pimalaya/188
 [#194]: https://todo.sr.ht/~soywod/pimalaya/194
+[#195]: https://todo.sr.ht/~soywod/pimalaya/195

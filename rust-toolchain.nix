@@ -2,26 +2,23 @@ fenix:
 
 let
   file = ./rust-toolchain.toml;
-  sha256 = "e4mlaJehWBymYxJGgnbuCObVlqMlQSilZ8FljG9zPHY=";
+  sha256 = "+syqAd2kX8KVa8/U2gz3blIQTTsYYt3U63xBWaGOSc8=";
 in
 {
   fromFile = { system }: fenix.packages.${system}.fromToolchainFile {
     inherit file sha256;
   };
 
-  fromTarget = { pkgs, buildPlatform, targetPlatform ? null }:
+  fromTarget = { pkgs, buildPlatform, targetPlatform }:
     let
-      inherit ((pkgs.lib.importTOML file).toolchain) channel;
-      toolchain = fenix.packages.${buildPlatform};
+      name = (pkgs.lib.importTOML file).toolchain.channel;
+      fenixPackage = fenix.packages.${buildPlatform};
+      toolchain = fenixPackage.fromToolchainName { inherit name sha256; };
+      targetToolchain = fenixPackage.targets.${targetPlatform}.fromToolchainName { inherit name sha256; };
     in
-    if
-      isNull targetPlatform
-    then
-      fenix.packages.${buildPlatform}.${channel}.toolchain
-    else
-      toolchain.combine [
-        toolchain.${channel}.rustc
-        toolchain.${channel}.cargo
-        toolchain.targets.${targetPlatform}.${channel}.rust-std
-      ];
+    fenixPackage.combine [
+      toolchain.rustc
+      toolchain.cargo
+      targetToolchain.rust-std
+    ];
 }
