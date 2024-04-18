@@ -16,7 +16,7 @@ jobs:
             os: ubuntu-latest
           - target: x86_64-windows
             os: ubuntu-latest
-          - target: x86_64-macos
+          - target: x86_64-darwin
             os: macos-latest
     steps:
       - name: Checkout code

@@ -53,7 +53,7 @@
             rustTarget = "x86_64-pc-windows-gnu";
             runner = { pkgs, himalaya }:
               let wine = pkgs.wine.override { wineBuild = "wine64"; };
-              in "${wine}/bin/wine64 ${himalaya}";
+              in "${wine}/bin/wine64 ${himalaya}.exe";
             mkPackage = { system, pkgs }: package:
               let
                 inherit (pkgs.pkgsCross.mingwW64) stdenv windows;
