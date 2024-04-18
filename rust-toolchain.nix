@@ -5,16 +5,16 @@ let
   sha256 = "+syqAd2kX8KVa8/U2gz3blIQTTsYYt3U63xBWaGOSc8=";
 in
 {
-  fromFile = { system }: fenix.packages.${system}.fromToolchainFile {
+  fromFile = { buildSystem }: fenix.packages.${buildSystem}.fromToolchainFile {
     inherit file sha256;
   };
 
-  fromTarget = { pkgs, buildPlatform, targetPlatform }:
+  fromTarget = { pkgs, buildSystem, targetSystem }:
     let
       name = (pkgs.lib.importTOML file).toolchain.channel;
-      fenixPackage = fenix.packages.${buildPlatform};
+      fenixPackage = fenix.packages.${buildSystem};
       toolchain = fenixPackage.fromToolchainName { inherit name sha256; };
-      targetToolchain = fenixPackage.targets.${targetPlatform}.fromToolchainName { inherit name sha256; };
+      targetToolchain = fenixPackage.targets.${targetSystem}.fromToolchainName { inherit name sha256; };
     in
     fenixPackage.combine [
       toolchain.rustc

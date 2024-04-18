@@ -29,7 +29,7 @@
 
       # Map of map matching supported Nix build systems with Rust
       # cross target systems.
-      crossBuildTargets = {
+      crossSystems = {
         x86_64-linux = {
           x86_64-linux = {
             rustTarget = "x86_64-unknown-linux-musl";
@@ -37,7 +37,7 @@
 
           aarch64-linux = rec {
             rustTarget = "aarch64-unknown-linux-musl";
-            runner = pkgs: "${pkgs.qemu}/bin/qemu-aarch64 ./himalaya";
+            runner = { pkgs, himalaya }: "${pkgs.qemu}/bin/qemu-aarch64 ${himalaya}";
             mkPackage = { system, pkgs }: package:
               let
                 inherit (mkPkgsCross system rustTarget) stdenv;
@@ -51,9 +51,9 @@
 
           x86_64-windows = {
             rustTarget = "x86_64-pc-windows-gnu";
-            runner = pkgs:
+            runner = { pkgs, himalaya }:
               let wine = pkgs.wine.override { wineBuild = "wine64"; };
-              in "${wine}/bin/wine64 ./himalaya.exe";
+              in "${wine}/bin/wine64 ${himalaya}";
             mkPackage = { system, pkgs }: package:
               let
                 inherit (pkgs.pkgsCross.mingwW64) stdenv windows;
@@ -72,15 +72,6 @@
             rustTarget = "aarch64-unknown-linux-musl";
           };
         };
-
-        # FIXME: attribute 'sharedLibrary' missing?
-        # x86_64-windows = {
-        #   x86_64-windows = {
-        #     rustTarget = "x86_64-pc-windows-gnu";
-        #     runner = _: "./himalaya.exe";
-        #     mkPackage = { system, pkgs }: package: package;
-        #   };
-        # };
 
         x86_64-darwin = {
           x86_64-darwin = {
@@ -137,24 +128,10 @@
         crossSystem.config = crossSystem;
       };
 
-      mkPackageArchives = { pkgs, runner ? "./himalaya" }: ''
-        export WINEPREFIX="$(mktemp -d)"
-        cd $out/bin
-        mkdir -p {man,completions}
-        ${runner} man ./man
-        ${runner} completion bash > ./completions/himalaya.bash
-        ${runner} completion elvish > ./completions/himalaya.elvish
-        ${runner} completion fish > ./completions/himalaya.fish
-        ${runner} completion powershell > ./completions/himalaya.powershell
-        ${runner} completion zsh > ./completions/himalaya.zsh
-        tar -czf himalaya.tgz himalaya* man completions
-        ${pkgs.zip}/bin/zip -r himalaya.zip himalaya* man completions
-      '';
-
-      mkDevShells = buildPlatform:
+      mkDevShells = buildSystem:
         let
-          pkgs = import nixpkgs { system = buildPlatform; };
-          rust-toolchain = mkToolchain.fromFile { system = buildPlatform; };
+          pkgs = import nixpkgs { system = buildSystem; };
+          rust-toolchain = mkToolchain.fromFile { inherit buildSystem; };
         in
         {
           default = pkgs.mkShell {
@@ -177,71 +154,90 @@
           };
         };
 
-      mkPackages = buildPlatform:
+      mkPackages = buildSystem:
         let
-          pkgs = import nixpkgs { system = buildPlatform; };
+          pkgs = import nixpkgs { system = buildSystem; };
 
-          mkPackage = targetPlatform: crossBuild:
-            let mkPackage' = crossBuild.mkPackage or (_: p: p);
-            in mkPackage' { inherit pkgs; system = buildPlatform; } {
+          mkPackage = targetSystem: targetConfig:
+            let mkPackage' = targetConfig.mkPackage or (_: p: p);
+            in mkPackage' { inherit pkgs; system = buildSystem; } {
               name = "himalaya";
               src = gitignoreSource ./.;
-              # overrideMain = _: {
-              #   postInstall = ''
-              #     mkdir -p $out/share/applications/
-              #     cp assets/himalaya.desktop $out/share/applications/
-              #   '';
-              # };
+              overrideMain = _: {
+                postInstall = ''
+                  mkdir -p $out/share/applications/
+                  cp assets/himalaya.desktop $out/share/applications/
+                '';
+              };
               doCheck = false;
               auditable = false;
               strictDeps = true;
-              CARGO_BUILD_TARGET = targetPlatform;
+              CARGO_BUILD_TARGET = targetConfig.rustTarget;
               CARGO_BUILD_RUSTFLAGS = staticRustFlags;
+              nativeBuildInputs = with pkgs; [ pkg-config ];
             };
 
-          buildPackage = doPostInstall: targetPlatform: crossBuild:
+          buildPackage = targetSystem: targetConfig:
             let
               toolchain = mkToolchain.fromTarget {
-                inherit pkgs buildPlatform;
-                targetPlatform = crossBuild.rustTarget;
+                inherit pkgs buildSystem;
+                targetSystem = targetConfig.rustTarget;
               };
-              rust = naersk.lib.${buildPlatform}.override {
+              rust = naersk.lib.${buildSystem}.override {
                 cargo = toolchain;
                 rustc = toolchain;
               };
-              package = mkPackage targetPlatform crossBuild;
-              postInstall = pkgs.lib.optionalAttrs doPostInstall {
-                postInstall = mkPackageArchives {
-                  inherit pkgs;
-                  runner = (crossBuild.runner or (_: null)) pkgs;
-                };
-              };
+              package = mkPackage targetSystem targetConfig;
             in
-            rust.buildPackage package // postInstall;
+            rust.buildPackage package;
 
-          defaultPackage = buildPackage false buildPlatform crossBuildTargets.${buildPlatform}.${buildPlatform};
-          packages = builtins.mapAttrs (buildPackage false) crossBuildTargets.${buildPlatform};
-          archives = pkgs.lib.foldlAttrs (p: k: v: p // { "${k}-archives" = buildPackage true k v; }) { } crossBuildTargets.${buildPlatform};
+          buildArchives = targetSystem:
+            let himalaya = pkgs.lib.getExe self.apps.${buildSystem}.${targetSystem};
+            in pkgs.writeShellScriptBin "himalaya-archives" ''
+              export WINEPREFIX="$(mktemp -d)"
+              mkdir -p {man,completions}
+              ${himalaya} man ./man
+              ${himalaya} completion bash > ./completions/himalaya.bash
+              ${himalaya} completion elvish > ./completions/himalaya.elvish
+              ${himalaya} completion fish > ./completions/himalaya.fish
+              ${himalaya} completion powershell > ./completions/himalaya.powershell
+              ${himalaya} completion zsh > ./completions/himalaya.zsh
+              tar -czf himalaya.tgz himalaya* man completions
+              ${pkgs.zip}/bin/zip -r himalaya.zip himalaya* man completions
+            '';
 
-        in
-        { default = defaultPackage; } // packages // archives;
+          defaultPackage = buildPackage buildSystem crossSystems.${buildSystem}.${buildSystem};
+          packages = builtins.mapAttrs buildPackage crossSystems.${buildSystem};
+          archives = pkgs.lib.foldlAttrs (p: k: _: p // { "${k}-archives" = buildArchives k; }) { } crossSystems.${buildSystem};
 
-      mkApp = drv:
-        let exePath = drv.passthru.exePath or "/bin/himalaya";
         in
         {
-          type = "app";
-          program = "${drv}${exePath}";
-        };
+          default = defaultPackage;
+        } // packages // archives;
 
-      mkApps = buildPlatform:
+      mkApps = buildSystem:
         let
-          pkgs = import nixpkgs { system = buildPlatform; };
-          mkApp' = target: package: mkApp self.packages.${buildPlatform}.${target};
+          pkgs = import nixpkgs { system = buildSystem; };
+          mkAppWrapper = { targetSystem }:
+            let
+              targetConfig = crossSystems.${buildSystem}.${targetSystem};
+              drv = self.packages.${buildSystem}.${targetSystem};
+              exePath = drv.passthru.exePath or "/bin/himalaya";
+              himalaya = "${drv}${exePath}";
+              himalayaWrapper = targetConfig.runner or (_: himalaya) { inherit pkgs himalaya; };
+              wrapper = pkgs.writeShellScriptBin "himalaya" "${himalayaWrapper} $@";
+            in
+            {
+              type = "app";
+              program = "${wrapper}/bin/himalaya";
+            };
+          mkApp = targetSystem: _: mkAppWrapper { inherit targetSystem; };
+          defaultApp = mkApp buildSystem null;
+          apps = builtins.mapAttrs mkApp crossSystems.${buildSystem};
         in
-        builtins.mapAttrs mkApp' crossBuildTargets.${buildPlatform};
+        { default = defaultApp; } // apps;
 
-      supportedSystems = builtins.attrNames crossBuildTargets;
+      supportedSystems = builtins.attrNames crossSystems;
       mapSupportedSystem = nixpkgs.lib.genAttrs supportedSystems;
     in
     {
