@@ -12,7 +12,7 @@ jobs:
         include:
           - target: x86_64-linux
             os: ubuntu-latest
-          - target: arm64-linux
+          - target: aarch64-linux
             os: ubuntu-latest
           - target: x86_64-windows
             os: ubuntu-latest
@@ -33,4 +33,4 @@ jobs:
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       - name: Run app
         run: |
-          nix run -L .#${{ matrix.target }}
+          nix run -L .#${{ matrix.target }} -- --version
