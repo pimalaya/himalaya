@@ -33,81 +33,98 @@
         x86_64-linux = {
           x86_64-linux = {
             rustTarget = "x86_64-unknown-linux-musl";
-            override = { ... }: { };
           };
 
-          arm64-linux = rec {
+          aarch64-linux = rec {
             rustTarget = "aarch64-unknown-linux-musl";
-            override = { system, pkgs }:
+            runner = pkgs: "${pkgs.qemu}/bin/qemu-aarch64 ./himalaya";
+            mkPackage = { system, pkgs }: package:
               let
                 inherit (mkPkgsCross system rustTarget) stdenv;
-                cc = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc"; in
-              rec {
+                cc = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc";
+              in
+              package // {
                 TARGET_CC = cc;
-                CARGO_BUILD_RUSTFLAGS = staticRustFlags ++ [ "-Clinker=${cc}" ];
-                postInstall = mkPostInstall {
-                  inherit pkgs;
-                  bin = "${pkgs.qemu}/bin/qemu-aarch64 ./himalaya";
-                };
+                CARGO_BUILD_RUSTFLAGS = package.CARGO_BUILD_RUSTFLAGS ++ [ "-Clinker=${cc}" ];
               };
           };
 
           x86_64-windows = {
             rustTarget = "x86_64-pc-windows-gnu";
-            override = { system, pkgs }:
+            runner = pkgs:
+              let wine = pkgs.wine.override { wineBuild = "wine64"; };
+              in "${wine}/bin/wine64 ./himalaya.exe";
+            mkPackage = { system, pkgs }: package:
               let
-                inherit (pkgs) pkgsCross zip;
-                inherit (pkgsCross.mingwW64) stdenv windows;
+                inherit (pkgs.pkgsCross.mingwW64) stdenv windows;
                 cc = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc";
-                wine = pkgs.wine.override { wineBuild = "wine64"; };
-                postInstall = mkPostInstall {
-                  inherit pkgs;
-                  bin = "${wine}/bin/wine64 ./himalaya.exe";
-                };
               in
-              {
+              package // {
                 depsBuildBuild = [ stdenv.cc windows.pthreads ];
                 TARGET_CC = cc;
-                CARGO_BUILD_RUSTFLAGS = staticRustFlags ++ [ "-Clinker=${cc}" ];
-                postInstall = ''
-                  export WINEPREFIX="$(mktemp -d)"
-                  ${postInstall}
-                '';
+                CARGO_BUILD_RUSTFLAGS = package.CARGO_BUILD_RUSTFLAGS ++ [ "-Clinker=${cc}" ];
               };
           };
         };
 
+        aarch64-linux = {
+          aarch64-linux = {
+            rustTarget = "aarch64-unknown-linux-musl";
+          };
+        };
+
+        # FIXME: attribute 'sharedLibrary' missing?
+        # x86_64-windows = {
+        #   x86_64-windows = {
+        #     rustTarget = "x86_64-pc-windows-gnu";
+        #     runner = _: "./himalaya.exe";
+        #     mkPackage = { system, pkgs }: package: package;
+        #   };
+        # };
+
         x86_64-darwin = {
-          x86_64-macos = {
+          x86_64-darwin = {
             rustTarget = "x86_64-apple-darwin";
-            override = { pkgs, ... }:
-              let inherit (pkgs.darwin.apple_sdk.frameworks) AppKit Cocoa; in
-              {
+            mkPackage = { pkgs, ... }: package:
+              let inherit (pkgs.darwin.apple_sdk.frameworks) AppKit Cocoa;
+              in package // {
                 buildInputs = [ Cocoa ];
                 NIX_LDFLAGS = "-F${AppKit}/Library/Frameworks -framework AppKit";
               };
           };
 
           # FIXME: infinite recursion in stdenv?!
-          arm64-macos = {
+          # aarch64-darwin = {
+          #   rustTarget = "aarch64-apple-darwin";
+          #   override = { system, pkgs }:
+          #     let
+          #       # inherit (mkPkgsCross system "aarch64-darwin") stdenv;
+          #       inherit ((mkPkgsCross system "aarch64-darwin").pkgsStatic) stdenv darwin;
+          #       inherit (darwin.apple_sdk.frameworks) AppKit Cocoa;
+          #       cc = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc";
+          #     in
+          #     {
+          #       buildInputs = [ Cocoa ];
+          #       NIX_LDFLAGS = "-F${AppKit}/Library/Frameworks -framework AppKit -F${Cocoa}/Library/Frameworks -framework Cocoa";
+          #       NIX_CFLAGS_COMPILE = "-F${AppKit}/Library/Frameworks -framework AppKit -F${Cocoa}/Library/Frameworks -framework Cocoa";
+          #       TARGET_CC = cc;
+          #       CARGO_BUILD_RUSTFLAGS = staticRustFlags ++ [ "-Clinker=${cc}" "-lframework=${Cocoa}/Library/Frameworks" ];
+          #       postInstall = mkPostInstall {
+          #         inherit pkgs;
+          #         bin = "${pkgs.qemu}/bin/qemu-aarch64 ./himalaya";
+          #       };
+          #     };
+          # };
+        };
+
+        aarch64-darwin = {
+          aarch64-darwin = {
             rustTarget = "aarch64-apple-darwin";
-            override = { system, pkgs }:
-              let
-                # inherit (mkPkgsCross system "aarch64-darwin") stdenv;
-                inherit ((mkPkgsCross system "aarch64-darwin").pkgsStatic) stdenv darwin;
-                inherit (darwin.apple_sdk.frameworks) AppKit Cocoa;
-                cc = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc";
-              in
-              rec {
+            mkPackage = { pkgs, ... }: package:
+              let inherit (pkgs.darwin.apple_sdk.frameworks) AppKit Cocoa;
+              in package // {
                 buildInputs = [ Cocoa ];
-                NIX_LDFLAGS = "-F${AppKit}/Library/Frameworks -framework AppKit -F${Cocoa}/Library/Frameworks -framework Cocoa";
-                NIX_CFLAGS_COMPILE = "-F${AppKit}/Library/Frameworks -framework AppKit -F${Cocoa}/Library/Frameworks -framework Cocoa";
-                TARGET_CC = cc;
-                CARGO_BUILD_RUSTFLAGS = staticRustFlags ++ [ "-Clinker=${cc}" "-lframework=${Cocoa}/Library/Frameworks" ];
-                postInstall = mkPostInstall {
-                  inherit pkgs;
-                  bin = "${pkgs.qemu}/bin/qemu-aarch64 ./himalaya";
-                };
+                NIX_LDFLAGS = "-F${AppKit}/Library/Frameworks -framework AppKit";
               };
           };
         };
@@ -120,17 +137,18 @@
         crossSystem.config = crossSystem;
       };
 
-      mkPostInstall = { pkgs, bin ? "./himalaya" }: with pkgs; ''
+      mkPackageArchives = { pkgs, runner ? "./himalaya" }: ''
+        export WINEPREFIX="$(mktemp -d)"
         cd $out/bin
         mkdir -p {man,completions}
-        ${bin} man ./man
-        ${bin} completion bash > ./completions/himalaya.bash
-        ${bin} completion elvish > ./completions/himalaya.elvish
-        ${bin} completion fish > ./completions/himalaya.fish
-        ${bin} completion powershell > ./completions/himalaya.powershell
-        ${bin} completion zsh > ./completions/himalaya.zsh
+        ${runner} man ./man
+        ${runner} completion bash > ./completions/himalaya.bash
+        ${runner} completion elvish > ./completions/himalaya.elvish
+        ${runner} completion fish > ./completions/himalaya.fish
+        ${runner} completion powershell > ./completions/himalaya.powershell
+        ${runner} completion zsh > ./completions/himalaya.zsh
         tar -czf himalaya.tgz himalaya* man completions
-        ${zip}/bin/zip -r himalaya.zip himalaya* man completions
+        ${pkgs.zip}/bin/zip -r himalaya.zip himalaya* man completions
       '';
 
       mkDevShells = buildPlatform:
@@ -143,7 +161,7 @@
             nativeBuildInputs = with pkgs; [ pkg-config ];
             buildInputs = with pkgs; [
               # Nix
-              # rnix-lsp
+              nixd
               nixpkgs-fmt
 
               # Rust
@@ -159,43 +177,58 @@
           };
         };
 
-      mkPackage = pkgs: buildPlatform: targetPlatform: package:
+      mkPackages = buildPlatform:
         let
-          toolchain = mkToolchain.fromTarget {
-            inherit pkgs buildPlatform targetPlatform;
-          };
-          naersk' = naersk.lib.${buildPlatform}.override {
-            cargo = toolchain;
-            rustc = toolchain;
-          };
-          package' = {
-            name = "himalaya";
-            src = gitignoreSource ./.;
-            # overrideMain = _: {
-            #   postInstall = ''
-            #     mkdir -p $out/share/applications/
-            #     cp assets/himalaya.desktop $out/share/applications/
-            #   '';
-            # };
-            doCheck = false;
-            auditable = false;
-            strictDeps = true;
-            CARGO_BUILD_TARGET = targetPlatform;
-            CARGO_BUILD_RUSTFLAGS = staticRustFlags;
-            postInstall = mkPostInstall { inherit pkgs; };
-          } // package;
-        in
-        naersk'.buildPackage package';
+          pkgs = import nixpkgs { system = buildPlatform; };
 
-      mkPackages = system:
-        let
-          pkgs = import nixpkgs { inherit system; };
-          mkPackage' = target: package: mkPackage pkgs system package.rustTarget (package.override { inherit system pkgs; });
+          mkPackage = targetPlatform: crossBuild:
+            let mkPackage' = crossBuild.mkPackage or (_: p: p);
+            in mkPackage' { inherit pkgs; system = buildPlatform; } {
+              name = "himalaya";
+              src = gitignoreSource ./.;
+              # overrideMain = _: {
+              #   postInstall = ''
+              #     mkdir -p $out/share/applications/
+              #     cp assets/himalaya.desktop $out/share/applications/
+              #   '';
+              # };
+              doCheck = false;
+              auditable = false;
+              strictDeps = true;
+              CARGO_BUILD_TARGET = targetPlatform;
+              CARGO_BUILD_RUSTFLAGS = staticRustFlags;
+            };
+
+          buildPackage = doPostInstall: targetPlatform: crossBuild:
+            let
+              toolchain = mkToolchain.fromTarget {
+                inherit pkgs buildPlatform;
+                targetPlatform = crossBuild.rustTarget;
+              };
+              rust = naersk.lib.${buildPlatform}.override {
+                cargo = toolchain;
+                rustc = toolchain;
+              };
+              package = mkPackage targetPlatform crossBuild;
+              postInstall = pkgs.lib.optionalAttrs doPostInstall {
+                postInstall = mkPackageArchives {
+                  inherit pkgs;
+                  runner = (crossBuild.runner or (_: null)) pkgs;
+                };
+              };
+            in
+            rust.buildPackage package // postInstall;
+
+          defaultPackage = buildPackage false buildPlatform crossBuildTargets.${buildPlatform}.${buildPlatform};
+          packages = builtins.mapAttrs (buildPackage false) crossBuildTargets.${buildPlatform};
+          archives = pkgs.lib.foldlAttrs (p: k: v: p // { "${k}-archives" = buildPackage true k v; }) { } crossBuildTargets.${buildPlatform};
+
         in
-        builtins.mapAttrs mkPackage' crossBuildTargets.${system};
+        { default = defaultPackage; } // packages // archives;
 
       mkApp = drv:
-        let exePath = drv.passthru.exePath or "/bin/himalaya"; in
+        let exePath = drv.passthru.exePath or "/bin/himalaya";
+        in
         {
           type = "app";
           program = "${drv}${exePath}";
