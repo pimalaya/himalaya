@@ -23,6 +23,7 @@
 
   outputs = { self, nixpkgs, gitignore, fenix, naersk, ... }:
     let
+      inherit (nixpkgs) lib;
       inherit (gitignore.lib) gitignoreSource;
 
       staticRustFlags = [ "-Ctarget-feature=+crt-static" ];
@@ -191,8 +192,9 @@
             in
             rust.buildPackage package;
 
+          # TODO: move this to postInstall
           buildArchives = targetSystem:
-            let himalaya = pkgs.lib.getExe self.apps.${buildSystem}.${targetSystem};
+            let himalaya = self.apps.${buildSystem}.${targetSystem}.program;
             in pkgs.writeShellScriptBin "himalaya-archives" ''
               export WINEPREFIX="$(mktemp -d)"
               mkdir -p {man,completions}
@@ -208,12 +210,10 @@
 
           defaultPackage = buildPackage buildSystem crossSystems.${buildSystem}.${buildSystem};
           packages = builtins.mapAttrs buildPackage crossSystems.${buildSystem};
-          archives = pkgs.lib.foldlAttrs (p: k: _: p // { "${k}-archives" = buildArchives k; }) { } crossSystems.${buildSystem};
+          archives = lib.foldlAttrs (p: k: _: p // { "${k}-archives" = buildArchives k; }) { } crossSystems.${buildSystem};
 
         in
-        {
-          default = defaultPackage;
-        } // packages // archives;
+        { default = defaultPackage; } // packages // archives;
 
       mkApps = buildSystem:
         let
@@ -237,12 +237,12 @@
         in
         { default = defaultApp; } // apps;
 
-      supportedSystems = builtins.attrNames crossSystems;
-      mapSupportedSystem = nixpkgs.lib.genAttrs supportedSystems;
+      eachSystem = lib.genAttrs (builtins.attrNames crossSystems);
+
     in
     {
-      apps = mapSupportedSystem mkApps;
-      packages = mapSupportedSystem mkPackages;
-      devShells = mapSupportedSystem mkDevShells;
+      apps = eachSystem mkApps;
+      packages = eachSystem mkPackages;
+      devShells = eachSystem mkDevShells;
     };
 }
