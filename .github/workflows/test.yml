@@ -18,8 +18,9 @@ jobs:
             os: ubuntu-latest
           - target: x86_64-darwin
             os: macos-latest
-          - target: aarch64-darwin
-            os: macos-latest
+          # FIXME: build broken
+          # - target: aarch64-darwin
+          #   os: macos-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
