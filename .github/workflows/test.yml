@@ -35,5 +35,6 @@ jobs:
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       - name: Run app
         run: |
+          nix build -L .#${{ matrix.target }}
           nix run -L .#${{ matrix.target }} -- --version
-          ls result -al
+          tree result
