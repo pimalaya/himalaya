@@ -125,14 +125,11 @@
       mkApp = { pkgs, buildSystem, targetSystem ? buildSystem }:
         let
           himalaya = lib.getExe self.packages.${buildSystem}.${targetSystem};
-          wrapper = crossSystems.${buildSystem}.${targetSystem}.runner or (_: himalaya) {
-            inherit pkgs himalaya;
-          };
-        in
-        {
-          type = "app";
+          wrapper = crossSystems.${buildSystem}.${targetSystem}.runner or (_: himalaya) { inherit pkgs himalaya; };
           program = lib.getExe (pkgs.writeShellScriptBin "himalaya" "${wrapper} $@");
-        };
+          app = { inherit program; type = "app"; };
+        in
+        app;
 
       mkApps = buildSystem:
         let
@@ -143,64 +140,59 @@
         in
         apps // { default = defaultApp; };
 
+      mkPackage = { pkgs, buildSystem, targetSystem ? buildSystem }:
+        let
+          targetConfig = crossSystems.${buildSystem}.${targetSystem};
+          toolchain = mkToolchain.fromTarget {
+            inherit pkgs buildSystem;
+            targetSystem = targetConfig.rustTarget;
+          };
+          rust = naersk.lib.${buildSystem}.override {
+            cargo = toolchain;
+            rustc = toolchain;
+          };
+          mkPackage' = targetConfig.mkPackage or (_: p: p);
+          himalaya = "./himalaya";
+          runner = targetConfig.runner or (_: himalaya) { inherit pkgs himalaya; };
+          package = mkPackage' { inherit pkgs; system = buildSystem; } {
+            name = "himalaya";
+            src = gitignoreSource ./.;
+            strictDeps = true;
+            doCheck = false;
+            auditable = false;
+            nativeBuildInputs = with pkgs; [ pkg-config ];
+            CARGO_BUILD_TARGET = targetConfig.rustTarget;
+            CARGO_BUILD_RUSTFLAGS = [ "-Ctarget-feature=+crt-static" ];
+            postInstall = ''
+              export WINEPREFIX="$(mktemp -d)"
+
+              mkdir -p $out/bin/share/{applications,completions,man,services}
+              cp assets/himalaya.desktop $out/bin/share/applications/
+              cp assets/himalaya-watch@.service $out/bin/share/services/
+
+              cd $out/bin
+              ${runner} man ./share/man
+              ${runner} completion bash > ./share/completions/himalaya.bash
+              ${runner} completion elvish > ./share/completions/himalaya.elvish
+              ${runner} completion fish > ./share/completions/himalaya.fish
+              ${runner} completion powershell > ./share/completions/himalaya.powershell
+              ${runner} completion zsh > ./share/completions/himalaya.zsh
+              tar -czf himalaya.tgz himalaya* share
+              ${pkgs.zip}/bin/zip -r himalaya.zip himalaya* share
+
+              mv share ../
+              mv himalaya.tgz himalaya.zip ../
+            '';
+          };
+        in
+        rust.buildPackage package;
+
       mkPackages = buildSystem:
         let
           pkgs = import nixpkgs { system = buildSystem; };
-
-          mkPackage = targetSystem: targetConfig:
-            let
-              mkPackage' = targetConfig.mkPackage or (_: p: p);
-              himalaya = "./himalaya";
-              runner = targetConfig.runner or (_: himalaya) { inherit pkgs himalaya; };
-            in
-            mkPackage' { inherit pkgs; system = buildSystem; } {
-              name = "himalaya";
-              src = gitignoreSource ./.;
-              strictDeps = true;
-              doCheck = false;
-              auditable = false;
-              nativeBuildInputs = with pkgs; [ pkg-config ];
-              CARGO_BUILD_TARGET = targetConfig.rustTarget;
-              CARGO_BUILD_RUSTFLAGS = [ "-Ctarget-feature=+crt-static" ];
-              postInstall = ''
-                export WINEPREFIX="$(mktemp -d)"
-
-                mkdir -p $out/bin/share/{applications,completions,man,services}
-                cp assets/himalaya.desktop $out/bin/share/applications/
-                cp assets/himalaya-watch@.service $out/bin/share/services/
-
-                cd $out/bin
-                ${runner} man ./share/man
-                ${runner} completion bash > ./share/completions/himalaya.bash
-                ${runner} completion elvish > ./share/completions/himalaya.elvish
-                ${runner} completion fish > ./share/completions/himalaya.fish
-                ${runner} completion powershell > ./share/completions/himalaya.powershell
-                ${runner} completion zsh > ./share/completions/himalaya.zsh
-                tar -czf himalaya.tgz himalaya* share
-                ${pkgs.zip}/bin/zip -r himalaya.zip himalaya* share
-
-                mv share ../
-                mv himalaya.tgz himalaya.zip ../
-              '';
-            };
-
-          buildPackage = targetSystem: targetConfig:
-            let
-              toolchain = mkToolchain.fromTarget {
-                inherit pkgs buildSystem;
-                targetSystem = targetConfig.rustTarget;
-              };
-              rust = naersk.lib.${buildSystem}.override {
-                cargo = toolchain;
-                rustc = toolchain;
-              };
-              package = mkPackage targetSystem targetConfig;
-            in
-            rust.buildPackage package;
-
-          defaultPackage = buildPackage buildSystem crossSystems.${buildSystem}.${buildSystem};
-          packages = builtins.mapAttrs buildPackage crossSystems.${buildSystem};
-
+          mkPackage' = targetSystem: _: mkPackage { inherit pkgs buildSystem targetSystem; };
+          defaultPackage = mkPackage { inherit pkgs buildSystem; };
+          packages = builtins.mapAttrs mkPackage' crossSystems.${buildSystem};
         in
         packages // { default = defaultPackage; };
 
