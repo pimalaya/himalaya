@@ -37,4 +37,4 @@ jobs:
         run: |
           nix build -L .#${{ matrix.target }}
           nix run -L .#${{ matrix.target }} -- --version
-          tree result
+          ls -R result
