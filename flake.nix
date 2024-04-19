@@ -26,8 +26,6 @@
       inherit (nixpkgs) lib;
       inherit (gitignore.lib) gitignoreSource;
 
-      # Map of map matching supported Nix build systems with Rust
-      # cross target systems.
       crossSystems = {
         x86_64-linux = {
           x86_64-linux = {
@@ -83,7 +81,7 @@
               };
           };
 
-          # FIXME: infinite recursion in stdenv?!
+          # FIXME: https://github.com/NixOS/nixpkgs/issues/273442
           aarch64-darwin = {
             rustTarget = "aarch64-apple-darwin";
             runner = { pkgs, himalaya }: "${pkgs.qemu}/bin/qemu-aarch64 ${himalaya}";
@@ -115,38 +113,35 @@
         };
       };
 
-      mkToolchain = import ./rust-toolchain.nix fenix;
+      eachBuildSystem = lib.genAttrs (builtins.attrNames crossSystems);
 
       mkPkgsCross = buildSystem: crossSystem: import nixpkgs {
         system = buildSystem;
         crossSystem.config = crossSystem;
       };
 
-      mkDevShells = buildSystem:
+      mkToolchain = import ./rust-toolchain.nix fenix;
+
+      mkApp = { pkgs, buildSystem, targetSystem ? buildSystem }:
         let
-          pkgs = import nixpkgs { system = buildSystem; };
-          rust-toolchain = mkToolchain.fromFile { inherit buildSystem; };
+          himalaya = lib.getExec self.packages.${buildSystem}.${targetSystem};
+          wrapper = crossSystems.${buildSystem}.${targetSystem}.runner or (_: himalaya) {
+            inherit pkgs himalaya;
+          };
         in
         {
-          default = pkgs.mkShell {
-            nativeBuildInputs = with pkgs; [ pkg-config ];
-            buildInputs = with pkgs; [
-              # Nix
-              nixd
-              nixpkgs-fmt
-
-              # Rust
-              rust-toolchain
-              cargo-watch
-
-              # Email env
-              gnupg
-              gpgme
-              msmtp
-              notmuch
-            ];
-          };
+          type = "app";
+          program = lib.getExe (pkgs.writeShellScriptBin "himalaya" "${wrapper} $@");
         };
+
+      mkApps = buildSystem:
+        let
+          pkgs = import nixpkgs { system = buildSystem; };
+          mkApp' = targetSystem: _: mkApp { inherit pkgs buildSystem targetSystem; };
+          defaultApp = mkApp { inherit pkgs buildSystem; };
+          apps = builtins.mapAttrs mkApp' crossSystems.${buildSystem};
+        in
+        apps // { default = defaultApp; };
 
       mkPackages = buildSystem:
         let
@@ -207,37 +202,37 @@
           packages = builtins.mapAttrs buildPackage crossSystems.${buildSystem};
 
         in
-        { default = defaultPackage; } // packages;
+        packages // { default = defaultPackage; };
 
-      mkApps = buildSystem:
+      mkDevShells = buildSystem:
         let
           pkgs = import nixpkgs { system = buildSystem; };
-          mkAppWrapper = { targetSystem }:
-            let
-              targetConfig = crossSystems.${buildSystem}.${targetSystem};
-              drv = self.packages.${buildSystem}.${targetSystem};
-              exePath = drv.passthru.exePath or "/bin/himalaya";
-              himalaya = "${drv}${exePath}";
-              himalayaWrapper = targetConfig.runner or (_: himalaya) { inherit pkgs himalaya; };
-              wrapper = pkgs.writeShellScriptBin "himalaya" "${himalayaWrapper} $@";
-            in
-            {
-              type = "app";
-              program = "${wrapper}/bin/himalaya";
-            };
-          mkApp = targetSystem: _: mkAppWrapper { inherit targetSystem; };
+          rust-toolchain = mkToolchain.fromFile { inherit buildSystem; };
+          defaultShell = pkgs.mkShell {
+            nativeBuildInputs = with pkgs; [ pkg-config ];
+            buildInputs = with pkgs; [
+              # Nix
+              nixd
+              nixpkgs-fmt
 
-          defaultApp = mkApp buildSystem null;
-          apps = builtins.mapAttrs mkApp crossSystems.${buildSystem};
+              # Rust
+              rust-toolchain
+              cargo-watch
+
+              # Email env
+              gnupg
+              gpgme
+              msmtp
+              notmuch
+            ];
+          };
         in
-        { default = defaultApp; } // apps;
-
-      eachSystem = lib.genAttrs (builtins.attrNames crossSystems);
+        { default = defaultShell; };
 
     in
     {
-      apps = eachSystem mkApps;
-      packages = eachSystem mkPackages;
-      devShells = eachSystem mkDevShells;
+      apps = eachBuildSystem mkApps;
+      packages = eachBuildSystem mkPackages;
+      devShells = eachBuildSystem mkDevShells;
     };
 }
