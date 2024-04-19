@@ -18,6 +18,8 @@ jobs:
             os: ubuntu-latest
           - target: x86_64-darwin
             os: macos-latest
+          - target: aarch64-darwin
+            os: macos-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -35,4 +37,7 @@ jobs:
         run: |
           nix run -L .#${{ matrix.target }} -- --version
           ls result/bin -al
+          ls result/share -al
           ls result/share/applications -al
+          ls result/share/man -al
+          ls result/share/completions -al

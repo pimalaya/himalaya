@@ -163,29 +163,32 @@
             mkPackage' { inherit pkgs; system = buildSystem; } {
               name = "himalaya";
               src = gitignoreSource ./.;
-              overrideMain = _: {
-                postInstall = ''
-                  export WINEPREFIX="$(mktemp -d)"
-                  mkdir -p $out/share/applications/
-                  cp assets/himalaya.desktop $out/share/applications/
-                  cd $out/bin
-                  mkdir -p {man,completions}
-                  ${runner} man ./man
-                  ${runner} completion bash > ./completions/himalaya.bash
-                  ${runner} completion elvish > ./completions/himalaya.elvish
-                  ${runner} completion fish > ./completions/himalaya.fish
-                  ${runner} completion powershell > ./completions/himalaya.powershell
-                  ${runner} completion zsh > ./completions/himalaya.zsh
-                  tar -czf himalaya.tgz himalaya* man completions
-                  ${pkgs.zip}/bin/zip -r himalaya.zip himalaya* man completions
-                '';
-              };
+              strictDeps = true;
               doCheck = false;
               auditable = false;
-              strictDeps = true;
+              nativeBuildInputs = with pkgs; [ pkg-config ];
               CARGO_BUILD_TARGET = targetConfig.rustTarget;
               CARGO_BUILD_RUSTFLAGS = staticRustFlags;
-              nativeBuildInputs = with pkgs; [ pkg-config ];
+              postInstall = ''
+                export WINEPREFIX="$(mktemp -d)"
+
+                mkdir -p $out/bin/share/{applications,completions,man,services}
+                cp assets/himalaya.desktop $out/bin/share/applications/
+                cp assets/himalaya-watch@.service $out/bin/share/services/
+
+                cd $out/bin
+                ${runner} man ./share/man
+                ${runner} completion bash > ./share/completions/himalaya.bash
+                ${runner} completion elvish > ./share/completions/himalaya.elvish
+                ${runner} completion fish > ./share/completions/himalaya.fish
+                ${runner} completion powershell > ./share/completions/himalaya.powershell
+                ${runner} completion zsh > ./share/completions/himalaya.zsh
+                tar -czf himalaya.tgz himalaya* share
+                ${pkgs.zip}/bin/zip -r himalaya.zip himalaya* share
+
+                mv share ../
+                mv himalaya.tgz himalaya.zip ../
+              '';
             };
 
           buildPackage = targetSystem: targetConfig:
