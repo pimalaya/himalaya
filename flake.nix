@@ -124,7 +124,7 @@
 
       mkApp = { pkgs, buildSystem, targetSystem ? buildSystem }:
         let
-          himalaya = lib.getExec self.packages.${buildSystem}.${targetSystem};
+          himalaya = lib.getExe self.packages.${buildSystem}.${targetSystem};
           wrapper = crossSystems.${buildSystem}.${targetSystem}.runner or (_: himalaya) {
             inherit pkgs himalaya;
           };
