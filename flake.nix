@@ -86,27 +86,22 @@
           };
 
           # FIXME: infinite recursion in stdenv?!
-          # aarch64-darwin = {
-          #   rustTarget = "aarch64-apple-darwin";
-          #   override = { system, pkgs }:
-          #     let
-          #       # inherit (mkPkgsCross system "aarch64-darwin") stdenv;
-          #       inherit ((mkPkgsCross system "aarch64-darwin").pkgsStatic) stdenv darwin;
-          #       inherit (darwin.apple_sdk.frameworks) AppKit Cocoa;
-          #       cc = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc";
-          #     in
-          #     {
-          #       buildInputs = [ Cocoa ];
-          #       NIX_LDFLAGS = "-F${AppKit}/Library/Frameworks -framework AppKit -F${Cocoa}/Library/Frameworks -framework Cocoa";
-          #       NIX_CFLAGS_COMPILE = "-F${AppKit}/Library/Frameworks -framework AppKit -F${Cocoa}/Library/Frameworks -framework Cocoa";
-          #       TARGET_CC = cc;
-          #       CARGO_BUILD_RUSTFLAGS = staticRustFlags ++ [ "-Clinker=${cc}" "-lframework=${Cocoa}/Library/Frameworks" ];
-          #       postInstall = mkPostInstall {
-          #         inherit pkgs;
-          #         bin = "${pkgs.qemu}/bin/qemu-aarch64 ./himalaya";
-          #       };
-          #     };
-          # };
+          aarch64-darwin = {
+            rustTarget = "aarch64-apple-darwin";
+            runner = { pkgs, himalaya }: "${pkgs.qemu}/bin/qemu-aarch64 ${himalaya}";
+            mkPackage = { system, pkgs }: package:
+              let
+                inherit ((mkPkgsCross system "aarch64-darwin").pkgsStatic) stdenv darwin;
+                inherit (darwin.apple_sdk.frameworks) AppKit Cocoa;
+                cc = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc";
+              in
+              package // {
+                buildInputs = [ Cocoa ];
+                NIX_LDFLAGS = "-F${AppKit}/Library/Frameworks -framework AppKit";
+                TARGET_CC = cc;
+                CARGO_BUILD_RUSTFLAGS = package.CARGO_BUILD_RUSTFLAGS ++ [ "-Clinker=${cc}" ];
+              };
+          };
         };
 
         aarch64-darwin = {
@@ -160,14 +155,29 @@
           pkgs = import nixpkgs { system = buildSystem; };
 
           mkPackage = targetSystem: targetConfig:
-            let mkPackage' = targetConfig.mkPackage or (_: p: p);
-            in mkPackage' { inherit pkgs; system = buildSystem; } {
+            let
+              mkPackage' = targetConfig.mkPackage or (_: p: p);
+              himalaya = "./himalaya";
+              runner = targetConfig.runner or (_: himalaya) { inherit pkgs himalaya; };
+            in
+            mkPackage' { inherit pkgs; system = buildSystem; } {
               name = "himalaya";
               src = gitignoreSource ./.;
               overrideMain = _: {
                 postInstall = ''
+                  export WINEPREFIX="$(mktemp -d)"
                   mkdir -p $out/share/applications/
                   cp assets/himalaya.desktop $out/share/applications/
+                  cd $out/bin
+                  mkdir -p {man,completions}
+                  ${runner} man ./man
+                  ${runner} completion bash > ./completions/himalaya.bash
+                  ${runner} completion elvish > ./completions/himalaya.elvish
+                  ${runner} completion fish > ./completions/himalaya.fish
+                  ${runner} completion powershell > ./completions/himalaya.powershell
+                  ${runner} completion zsh > ./completions/himalaya.zsh
+                  tar -czf himalaya.tgz himalaya* man completions
+                  ${pkgs.zip}/bin/zip -r himalaya.zip himalaya* man completions
                 '';
               };
               doCheck = false;
@@ -192,28 +202,11 @@
             in
             rust.buildPackage package;
 
-          # TODO: move this to postInstall
-          buildArchives = targetSystem:
-            let himalaya = self.apps.${buildSystem}.${targetSystem}.program;
-            in pkgs.writeShellScriptBin "himalaya-archives" ''
-              export WINEPREFIX="$(mktemp -d)"
-              mkdir -p {man,completions}
-              ${himalaya} man ./man
-              ${himalaya} completion bash > ./completions/himalaya.bash
-              ${himalaya} completion elvish > ./completions/himalaya.elvish
-              ${himalaya} completion fish > ./completions/himalaya.fish
-              ${himalaya} completion powershell > ./completions/himalaya.powershell
-              ${himalaya} completion zsh > ./completions/himalaya.zsh
-              tar -czf himalaya.tgz himalaya* man completions
-              ${pkgs.zip}/bin/zip -r himalaya.zip himalaya* man completions
-            '';
-
           defaultPackage = buildPackage buildSystem crossSystems.${buildSystem}.${buildSystem};
           packages = builtins.mapAttrs buildPackage crossSystems.${buildSystem};
-          archives = lib.foldlAttrs (p: k: _: p // { "${k}-archives" = buildArchives k; }) { } crossSystems.${buildSystem};
 
         in
-        { default = defaultPackage; } // packages // archives;
+        { default = defaultPackage; } // packages;
 
       mkApps = buildSystem:
         let
@@ -232,6 +225,7 @@
               program = "${wrapper}/bin/himalaya";
             };
           mkApp = targetSystem: _: mkAppWrapper { inherit targetSystem; };
+
           defaultApp = mkApp buildSystem null;
           apps = builtins.mapAttrs mkApp crossSystems.${buildSystem};
         in
