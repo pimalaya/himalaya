@@ -36,8 +36,4 @@ jobs:
       - name: Run app
         run: |
           nix run -L .#${{ matrix.target }} -- --version
-          ls result/bin -al
-          ls result/share -al
-          ls result/share/applications -al
-          ls result/share/man -al
-          ls result/share/completions -al
+          ls result -al

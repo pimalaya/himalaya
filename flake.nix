@@ -26,8 +26,6 @@
       inherit (nixpkgs) lib;
       inherit (gitignore.lib) gitignoreSource;
 
-      staticRustFlags = [ "-Ctarget-feature=+crt-static" ];
-
       # Map of map matching supported Nix build systems with Rust
       # cross target systems.
       crossSystems = {
@@ -168,7 +166,7 @@
               auditable = false;
               nativeBuildInputs = with pkgs; [ pkg-config ];
               CARGO_BUILD_TARGET = targetConfig.rustTarget;
-              CARGO_BUILD_RUSTFLAGS = staticRustFlags;
+              CARGO_BUILD_RUSTFLAGS = [ "-Ctarget-feature=+crt-static" ];
               postInstall = ''
                 export WINEPREFIX="$(mktemp -d)"
 
