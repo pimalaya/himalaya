@@ -31,12 +31,15 @@ jobs:
         include:
           - target: x86_64-linux
             os: ubuntu-latest
-          - target: arm64-linux
+          - target: aarch64-linux
             os: ubuntu-latest
           - target: x86_64-windows
             os: ubuntu-latest
-          - target: x86_64-macos
+          - target: x86_64-darwin
             os: macos-latest
+          # FIXME: build broken
+          # - target: aarch64-darwin
+          #   os: macos-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v2        
@@ -53,7 +56,7 @@ jobs:
       - name: Build release archive
         run: |
           nix build -L .#${{ matrix.target }}
-          cp result/bin/himalaya* .
+          cp result/himalaya* .
       - name: Upload tgz release archive
         uses: actions/upload-release-asset@v1
         env:
