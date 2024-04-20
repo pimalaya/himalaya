@@ -17,11 +17,8 @@ async fn main() -> Result<()> {
             env::set_var("RUST_LOG", "trace");
         }
     }
-    let cli = Cli::parse();
 
     let filter = himalaya::tracing::install()?;
-
-    let mut printer = StdoutPrinter::new(cli.output, cli.color);
 
     // if the first argument starts by "mailto:", execute straight the
     // mailto message command
@@ -38,6 +35,8 @@ async fn main() -> Result<()> {
             .await;
     }
 
+    let cli = Cli::parse();
+    let mut printer = StdoutPrinter::new(cli.output, cli.color);
     let mut res = match cli.command {
         Some(cmd) => cmd.execute(&mut printer, cli.config_paths.as_ref()).await,
         None => {
