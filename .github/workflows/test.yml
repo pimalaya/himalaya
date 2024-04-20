@@ -1,0 +1,41 @@
+name: test
+
+on:
+  push:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-linux
+            os: ubuntu-latest
+          - target: aarch64-linux
+            os: ubuntu-latest
+          - target: x86_64-windows
+            os: ubuntu-latest
+          - target: x86_64-darwin
+            os: macos-latest
+          # FIXME: build broken
+          # - target: aarch64-darwin
+          #   os: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install Nix
+        uses: cachix/install-nix-action@v24
+        with:
+          nix_path: nixpkgs=channel:nixos-23.11
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - uses: cachix/cachix-action@v12
+        with:
+          name: soywod
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+      - name: Run app
+        run: |
+          nix build -L .#${{ matrix.target }}
+          nix run -L .#${{ matrix.target }} -- --version
+          ls -R result
