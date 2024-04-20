@@ -23,14 +23,14 @@ case $system in
     linux|freebsd)
 	case $machine in
 	    x86_64) target=x86_64-linux;;
-	    arm64|aarch64) target=arm64-linux;;
+	    arm64|aarch64) target=aarch64-linux;;
 	    *) die "Unsupported machine $machine for system $system";;
 	esac;;
 
     darwin)
 	case $machine in
 	    x86_64) target=x86_64-macos;;
-	    arm64|aarch64) target=arm64-macos;;
+	    arm64|aarch64) target=aarch64-macos;;
 	    *) die "Unsupported machine $machine for system $system";;
 	esac;;
 
