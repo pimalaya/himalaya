@@ -59,6 +59,7 @@ email-lib = { version = "=0.24.1", default-features = false, features = ["derive
 email_address = "0.2.4"
 erased-serde = "0.3"
 indicatif = "0.17"
+inquire = "0.7.4"
 mail-builder = "0.3"
 md5 = "0.7"
 mml-lib = { version = "=1.0.12", default-features = false, features = ["derive"]  }

@@ -1,11 +1,11 @@
 #[cfg(feature = "account-sync")]
 use crate::account::config::SyncConfig;
-use color_eyre::{eyre::bail, Result};
+use color_eyre::{eyre::OptionExt, Result};
 #[cfg(feature = "account-sync")]
 use dialoguer::Confirm;
-use dialoguer::Input;
 use email_address::EmailAddress;
-use std::str::FromStr;
+use inquire::validator::{ErrorMessage, Validation};
+use std::{path::PathBuf, str::FromStr};
 
 #[cfg(feature = "account-sync")]
 use crate::wizard_prompt;
@@ -14,24 +14,26 @@ use crate::wizard_warn;
 use crate::{
     backend::{self, config::BackendConfig, BackendKind},
     message::config::{MessageConfig, MessageSendConfig},
-    ui::THEME,
 };
 
 use super::TomlAccountConfig;
 
 pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
-    let mut config = TomlAccountConfig::default();
+    let mut config = TomlAccountConfig {
+        email: inquire::Text::new("Email address: ")
+            .with_validator(|email: &_| {
+                if EmailAddress::is_valid(email) {
+                    Ok(Validation::Valid)
+                } else {
+                    Ok(Validation::Invalid(ErrorMessage::Custom(format!(
+                        "Invalid email address: {email}"
+                    ))))
+                }
+            })
+            .prompt()?,
 
-    config.email = Input::with_theme(&*THEME)
-        .with_prompt("Email address")
-        .validate_with(|email: &String| {
-            if EmailAddress::is_valid(email) {
-                Ok(())
-            } else {
-                bail!("Invalid email address: {email}")
-            }
-        })
-        .interact()?;
+        ..Default::default()
+    };
 
     let addr = EmailAddress::from_str(&config.email).unwrap();
 
@@ -44,25 +46,26 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
             .ok()
     });
 
-    let account_name = Input::with_theme(&*THEME)
-        .with_prompt("Account name")
-        .default(addr.domain().split_once('.').unwrap().0.to_owned())
-        .interact()?;
+    let account_name = inquire::Text::new("Account name: ")
+        .with_default(
+            addr.domain()
+                .split_once('.')
+                .ok_or_eyre("not a valid domain, without any .")?
+                .0,
+        )
+        .prompt()?;
 
     config.display_name = Some(
-        Input::with_theme(&*THEME)
-            .with_prompt("Full display name")
-            .default(addr.local_part().to_owned())
-            .interact()?,
+        inquire::Text::new("Full display name: ")
+            .with_default(addr.local_part())
+            .prompt()?,
     );
 
-    config.downloads_dir = Some(
-        Input::with_theme(&*THEME)
-            .with_prompt("Downloads directory")
-            .default(String::from("~/Downloads"))
-            .interact()?
-            .into(),
-    );
+    config.downloads_dir = Some(PathBuf::from(
+        inquire::Text::new("Downloads directory: ")
+            .with_default("~/Downloads")
+            .prompt()?,
+    ));
 
     let email = &config.email;
     #[cfg(feature = "account-discovery")]
