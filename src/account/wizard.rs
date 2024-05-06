@@ -2,13 +2,10 @@
 use crate::account::config::SyncConfig;
 use color_eyre::{eyre::OptionExt, Result};
 #[cfg(feature = "account-sync")]
-use dialoguer::Confirm;
 use email_address::EmailAddress;
 use inquire::validator::{ErrorMessage, Validation};
 use std::{path::PathBuf, str::FromStr};
 
-#[cfg(feature = "account-sync")]
-use crate::wizard_prompt;
 #[cfg(feature = "account-discovery")]
 use crate::wizard_warn;
 use crate::{
@@ -144,13 +141,11 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
 
     #[cfg(feature = "account-sync")]
     {
-        let should_configure_sync = Confirm::new()
-            .with_prompt(wizard_prompt!(
-                "Do you need offline access for your account?"
-            ))
-            .default(false)
-            .interact_opt()?
-            .unwrap_or_default();
+        let should_configure_sync =
+            inquire::Confirm::new("Do you need offline access for your account?")
+                .with_default(false)
+                .prompt_skippable()?
+                .unwrap_or_default();
 
         if should_configure_sync {
             config.sync = Some(SyncConfig {

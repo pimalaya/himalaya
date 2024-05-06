@@ -1,7 +1,7 @@
 use color_eyre::Result;
-use dialoguer::Select;
 #[cfg(feature = "account-discovery")]
 use email::account::discover::config::AutoConfig;
+use inquire::Select;
 
 #[cfg(feature = "imap")]
 use crate::imap;
@@ -13,7 +13,6 @@ use crate::notmuch;
 use crate::sendmail;
 #[cfg(feature = "smtp")]
 use crate::smtp;
-use crate::ui::THEME;
 
 use super::{config::BackendConfig, BackendKind};
 
@@ -38,12 +37,9 @@ pub(crate) async fn configure(
     email: &str,
     #[cfg(feature = "account-discovery")] autoconfig: Option<&AutoConfig>,
 ) -> Result<Option<BackendConfig>> {
-    let kind = Select::with_theme(&*THEME)
-        .with_prompt("Default email backend")
-        .items(DEFAULT_BACKEND_KINDS)
-        .default(0)
-        .interact_opt()?
-        .and_then(|idx| DEFAULT_BACKEND_KINDS.get(idx).map(Clone::clone));
+    let kind = Select::new("Default email backend", DEFAULT_BACKEND_KINDS.to_vec())
+        .with_starting_cursor(0)
+        .prompt_skippable()?;
 
     let config = match kind {
         #[cfg(feature = "imap")]
@@ -71,12 +67,12 @@ pub(crate) async fn configure_sender(
     email: &str,
     #[cfg(feature = "account-discovery")] autoconfig: Option<&AutoConfig>,
 ) -> Result<Option<BackendConfig>> {
-    let kind = Select::with_theme(&*THEME)
-        .with_prompt("Backend for sending messages")
-        .items(SEND_MESSAGE_BACKEND_KINDS)
-        .default(0)
-        .interact_opt()?
-        .and_then(|idx| SEND_MESSAGE_BACKEND_KINDS.get(idx).map(Clone::clone));
+    let kind = Select::new(
+        "Backend for sending messages",
+        SEND_MESSAGE_BACKEND_KINDS.to_vec(),
+    )
+    .with_starting_cursor(0)
+    .prompt_skippable()?;
 
     let config = match kind {
         #[cfg(feature = "smtp")]

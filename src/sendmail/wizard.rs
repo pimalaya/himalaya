@@ -1,15 +1,14 @@
 use color_eyre::Result;
-use dialoguer::Input;
 use email::sendmail::config::SendmailConfig;
+use inquire::Text;
 
-use crate::{backend::config::BackendConfig, ui::THEME};
+use crate::backend::config::BackendConfig;
 
 pub(crate) fn configure() -> Result<BackendConfig> {
     let config = SendmailConfig {
-        cmd: Input::with_theme(&*THEME)
-            .with_prompt("Sendmail-compatible shell command to send emails")
-            .default(String::from("/usr/bin/msmtp"))
-            .interact()?
+        cmd: Text::new("Sendmail-compatible shell command to send emails")
+            .with_default("/usr/bin/msmtp")
+            .prompt()?
             .into(),
     };
 

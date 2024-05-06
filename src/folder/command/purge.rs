@@ -1,6 +1,5 @@
 use clap::Parser;
 use color_eyre::Result;
-use dialoguer::Confirm;
 use email::{backend::feature::BackendFeatureSource, folder::purge::PurgeFolder};
 use std::process;
 use tracing::info;
@@ -35,12 +34,10 @@ impl FolderPurgeCommand {
 
         let folder = &self.folder.name;
 
-        let confirm_msg = format!("Do you really want to purge the folder {folder}? All emails will be definitely deleted.");
-        let confirm = Confirm::new()
-            .with_prompt(confirm_msg)
-            .default(false)
-            .report(false)
-            .interact_opt()?;
+        let confirm = inquire::Confirm::new(&format!("Do you really want to purge the folder {folder}? All emails will be definitely deleted."))
+            .with_default(false)
+            .prompt_skippable()?;
+
         if let Some(false) | None = confirm {
             process::exit(0);
         };

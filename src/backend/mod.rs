@@ -1,9 +1,9 @@
 pub mod config;
 pub(crate) mod wizard;
 
-use color_eyre::Result;
 use async_trait::async_trait;
-use std::{ops::Deref, sync::Arc};
+use color_eyre::Result;
+use std::{fmt::Display, ops::Deref, sync::Arc};
 
 #[cfg(feature = "imap")]
 use email::imap::{ImapContextBuilder, ImapContextSync};
@@ -70,30 +70,32 @@ pub enum BackendKind {
     Sendmail,
 }
 
-impl ToString for BackendKind {
-    fn to_string(&self) -> String {
-        let kind = match self {
-            Self::None => "None",
+impl Display for BackendKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::None => "None",
 
-            #[cfg(feature = "imap")]
-            Self::Imap => "IMAP",
-            #[cfg(all(feature = "imap", feature = "account-sync"))]
-            Self::ImapCache => "IMAP cache",
+                #[cfg(feature = "imap")]
+                Self::Imap => "IMAP",
+                #[cfg(all(feature = "imap", feature = "account-sync"))]
+                Self::ImapCache => "IMAP cache",
 
-            #[cfg(feature = "maildir")]
-            Self::Maildir => "Maildir",
+                #[cfg(feature = "maildir")]
+                Self::Maildir => "Maildir",
 
-            #[cfg(feature = "notmuch")]
-            Self::Notmuch => "Notmuch",
+                #[cfg(feature = "notmuch")]
+                Self::Notmuch => "Notmuch",
 
-            #[cfg(feature = "smtp")]
-            Self::Smtp => "SMTP",
+                #[cfg(feature = "smtp")]
+                Self::Smtp => "SMTP",
 
-            #[cfg(feature = "sendmail")]
-            Self::Sendmail => "Sendmail",
-        };
-
-        kind.to_string()
+                #[cfg(feature = "sendmail")]
+                Self::Sendmail => "Sendmail",
+            }
+        )
     }
 }
 

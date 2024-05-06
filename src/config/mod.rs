@@ -18,7 +18,7 @@ use tracing::debug;
 
 #[cfg(feature = "account-sync")]
 use crate::backend::BackendKind;
-use crate::{account::config::TomlAccountConfig, wizard_prompt, wizard_warn};
+use crate::{account::config::TomlAccountConfig, wizard_warn};
 
 /// Represents the user config file.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
@@ -46,8 +46,8 @@ impl TomlConfig {
             1 => {
                 let path = &paths[0];
 
-                let ref content = fs::read_to_string(path)
-                    .context(format!("cannot read config file at {path:?}"))?;
+                let content = &(fs::read_to_string(path)
+                    .context(format!("cannot read config file at {path:?}"))?);
 
                 toml::from_str(content).context(format!("cannot parse config file at {path:?}"))
             }
@@ -85,17 +85,13 @@ impl TomlConfig {
     ///
     /// NOTE: the wizard can only be used with interactive shells.
     async fn from_wizard(path: &PathBuf) -> Result<Self> {
-        use dialoguer::Confirm;
         use std::process;
 
         wizard_warn!("Cannot find existing configuration at {path:?}.");
 
-        let confirm = Confirm::new()
-            .with_prompt(wizard_prompt!(
-                "Would you like to create one with the wizard?"
-            ))
-            .default(true)
-            .interact_opt()?
+        let confirm = inquire::Confirm::new("Would you like to create one with the wizard? ")
+            .with_default(true)
+            .prompt_skippable()?
             .unwrap_or_default();
 
         if !confirm {

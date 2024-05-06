@@ -1,10 +1,10 @@
 use color_eyre::Result;
-use dialoguer::{Confirm, Input, Select};
+use inquire::{Confirm, Select, Text};
 use shellexpand_utils::expand;
-use std::{fs, path::PathBuf, process};
+use std::{fs, path::Path, process};
 use toml_edit::{DocumentMut, Item};
 
-use crate::{account, ui::THEME};
+use crate::account;
 
 use super::TomlConfig;
 
@@ -31,7 +31,7 @@ macro_rules! wizard_log {
     };
 }
 
-pub(crate) async fn configure(path: &PathBuf) -> Result<TomlConfig> {
+pub(crate) async fn configure(path: &Path) -> Result<TomlConfig> {
     wizard_log!("Configuring your first account:");
 
     let mut config = TomlConfig::default();
@@ -39,12 +39,9 @@ pub(crate) async fn configure(path: &PathBuf) -> Result<TomlConfig> {
     while let Some((name, account_config)) = account::wizard::configure().await? {
         config.accounts.insert(name, account_config);
 
-        if !Confirm::new()
-            .with_prompt(wizard_prompt!(
-                "Would you like to configure another account?"
-            ))
-            .default(false)
-            .interact_opt()?
+        if !Confirm::new("Would you like to configure another account?")
+            .with_default(false)
+            .prompt_skippable()?
             .unwrap_or_default()
         {
             break;
@@ -68,14 +65,13 @@ pub(crate) async fn configure(path: &PathBuf) -> Result<TomlConfig> {
 
             println!("{} accounts have been configured.", accounts.len());
 
-            Select::with_theme(&*THEME)
-                .with_prompt(wizard_prompt!(
-                    "Which account would you like to set as your default?"
-                ))
-                .items(&accounts)
-                .default(0)
-                .interact_opt()?
-                .and_then(|idx| config.accounts.get_mut(accounts[idx]))
+            Select::new(
+                "Which account would you like to set as your default?",
+                accounts,
+            )
+            .with_starting_cursor(0)
+            .prompt_skippable()?
+            .and_then(|input| config.accounts.get_mut(input))
         }
     };
 
@@ -85,12 +81,9 @@ pub(crate) async fn configure(path: &PathBuf) -> Result<TomlConfig> {
         process::exit(0)
     }
 
-    let path = Input::with_theme(&*THEME)
-        .with_prompt(wizard_prompt!(
-            "Where would you like to save your configuration?"
-        ))
-        .default(path.to_string_lossy().to_string())
-        .interact()?;
+    let path = Text::new("Where would you like to save your configuration?")
+        .with_default(&path.to_string_lossy())
+        .prompt()?;
     let path = expand::path(path);
 
     println!("Writing the configuration to {path:?}…");
