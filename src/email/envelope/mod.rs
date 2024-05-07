@@ -4,6 +4,7 @@ pub mod config;
 pub mod flag;
 
 use color_eyre::Result;
+use comfy_table::{presets, Attribute, Cell, Color, ContentArrangement, Row, Table};
 use email::account::config::AccountConfig;
 use serde::Serialize;
 use std::ops;
@@ -11,8 +12,7 @@ use std::ops;
 use crate::{
     cache::IdMapper,
     flag::{Flag, Flags},
-    printer::{PrintTable, PrintTableOpts, WriteColor},
-    ui::{Cell, Row, Table},
+    printer::{PrintTable, WriteColor},
 };
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -30,55 +30,169 @@ pub struct Envelope {
     pub to: Mailbox,
     pub date: String,
 }
+impl From<Envelope> for Row {
+    fn from(envelope: Envelope) -> Self {
+        let mut all_attributes = vec![];
 
-impl Table for Envelope {
-    fn head() -> Row {
-        Row::new()
-            .cell(Cell::new("ID").bold().underline().white())
-            .cell(Cell::new("FLAGS").bold().underline().white())
-            .cell(Cell::new("SUBJECT").shrinkable().bold().underline().white())
-            .cell(Cell::new("FROM").bold().underline().white())
-            .cell(Cell::new("DATE").bold().underline().white())
-    }
+        let unseen = !envelope.flags.contains(&Flag::Seen);
+        if unseen {
+            all_attributes.push(Attribute::Bold)
+        }
 
-    fn row(&self) -> Row {
-        let id = self.id.to_string();
-        let unseen = !self.flags.contains(&Flag::Seen);
         let flags = {
             let mut flags = String::new();
-            flags.push_str(if !unseen { " " } else { "✷" });
-            flags.push_str(if self.flags.contains(&Flag::Answered) {
-                "↵"
+            flags.push(if !unseen { ' ' } else { '✷' });
+            flags.push(if envelope.flags.contains(&Flag::Answered) {
+                '↵'
             } else {
-                " "
+                ' '
             });
-            flags.push_str(if self.flags.contains(&Flag::Flagged) {
-                "⚑"
+            flags.push(if envelope.flags.contains(&Flag::Flagged) {
+                '⚑'
             } else {
-                " "
+                ' '
             });
             flags
         };
-        let subject = &self.subject;
-        let sender = if let Some(name) = &self.from.name {
-            name
-        } else {
-            &self.from.addr
-        };
-        let date = &self.date;
 
-        Row::new()
-            .cell(Cell::new(id).bold_if(unseen).red())
-            .cell(Cell::new(flags).bold_if(unseen).white())
-            .cell(Cell::new(subject).shrinkable().bold_if(unseen).green())
-            .cell(Cell::new(sender).bold_if(unseen).blue())
-            .cell(Cell::new(date).bold_if(unseen).yellow())
+        let mut row = Row::new();
+
+        row.add_cell(
+            Cell::new(envelope.id)
+                .add_attributes(all_attributes.clone())
+                .fg(Color::Red),
+        )
+        .add_cell(
+            Cell::new(flags)
+                .add_attributes(all_attributes.clone())
+                .fg(Color::White),
+        )
+        .add_cell(
+            Cell::new(envelope.subject)
+                .add_attributes(all_attributes.clone())
+                .fg(Color::Green),
+        )
+        .add_cell(
+            Cell::new(if let Some(name) = envelope.from.name {
+                name
+            } else {
+                envelope.from.addr
+            })
+            .add_attributes(all_attributes.clone())
+            .fg(Color::Blue),
+        )
+        .add_cell(
+            Cell::new(envelope.date)
+                .add_attributes(all_attributes)
+                .fg(Color::Yellow),
+        );
+
+        row
+    }
+}
+
+impl From<&Envelope> for Row {
+    fn from(envelope: &Envelope) -> Self {
+        let mut all_attributes = vec![];
+
+        let unseen = !envelope.flags.contains(&Flag::Seen);
+        if unseen {
+            all_attributes.push(Attribute::Bold)
+        }
+
+        let flags = {
+            let mut flags = String::new();
+            flags.push(if !unseen { ' ' } else { '✷' });
+            flags.push(if envelope.flags.contains(&Flag::Answered) {
+                '↵'
+            } else {
+                ' '
+            });
+            flags.push(if envelope.flags.contains(&Flag::Flagged) {
+                '⚑'
+            } else {
+                ' '
+            });
+            flags
+        };
+
+        let mut row = Row::new();
+
+        row.add_cell(
+            Cell::new(&envelope.id)
+                .add_attributes(all_attributes.clone())
+                .fg(Color::Red),
+        )
+        .add_cell(
+            Cell::new(flags)
+                .add_attributes(all_attributes.clone())
+                .fg(Color::White),
+        )
+        .add_cell(
+            Cell::new(&envelope.subject)
+                .add_attributes(all_attributes.clone())
+                .fg(Color::Green),
+        )
+        .add_cell(
+            Cell::new(if let Some(name) = &envelope.from.name {
+                name
+            } else {
+                &envelope.from.addr
+            })
+            .add_attributes(all_attributes.clone())
+            .fg(Color::Blue),
+        )
+        .add_cell(
+            Cell::new(&envelope.date)
+                .add_attributes(all_attributes)
+                .fg(Color::Yellow),
+        );
+
+        row
     }
 }
 
 /// Represents the list of envelopes.
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Envelopes(Vec<Envelope>);
+
+impl From<Envelopes> for Table {
+    fn from(envelopes: Envelopes) -> Self {
+        let mut table = Table::new();
+        table
+            .load_preset(presets::NOTHING)
+            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_header(Row::from([
+                Cell::new("ID").add_attribute(Attribute::Reverse),
+                Cell::new("FLAGS").add_attribute(Attribute::Reverse),
+                Cell::new("SUBJECT").add_attribute(Attribute::Reverse),
+                Cell::new("FROM").add_attribute(Attribute::Reverse),
+                Cell::new("DATE").add_attribute(Attribute::Reverse),
+            ]))
+            .add_rows(envelopes.0.into_iter().map(Row::from));
+
+        table
+    }
+}
+
+impl From<&Envelopes> for Table {
+    fn from(envelopes: &Envelopes) -> Self {
+        let mut table = Table::new();
+        table
+            .load_preset(presets::NOTHING)
+            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_header(Row::from([
+                Cell::new("ID").add_attribute(Attribute::Reverse),
+                Cell::new("FLAGS").add_attribute(Attribute::Reverse),
+                Cell::new("SUBJECT").add_attribute(Attribute::Reverse),
+                Cell::new("FROM").add_attribute(Attribute::Reverse),
+                Cell::new("DATE").add_attribute(Attribute::Reverse),
+            ]))
+            .add_rows(envelopes.0.iter().map(Row::from));
+
+        table
+    }
+}
 
 impl Envelopes {
     pub fn from_backend(
@@ -119,9 +233,13 @@ impl ops::Deref for Envelopes {
 }
 
 impl PrintTable for Envelopes {
-    fn print_table(&self, writer: &mut dyn WriteColor, opts: PrintTableOpts) -> Result<()> {
+    fn print_table(&self, writer: &mut dyn WriteColor, table_max_width: Option<u16>) -> Result<()> {
+        let mut table = Table::from(self);
+        if let Some(width) = table_max_width {
+            table.set_width(width);
+        }
         writeln!(writer)?;
-        Table::print(writer, self, opts)?;
+        write!(writer, "{}", table)?;
         writeln!(writer)?;
         Ok(())
     }

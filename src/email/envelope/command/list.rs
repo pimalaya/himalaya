@@ -11,12 +11,8 @@ use tracing::info;
 #[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
-    account::arg::name::AccountNameFlag,
-    backend::Backend,
-    config::TomlConfig,
-    folder::arg::name::FolderNameOptionalFlag,
-    printer::{PrintTableOpts, Printer},
-    ui::arg::max_width::TableMaxWidthFlag,
+    account::arg::name::AccountNameFlag, backend::Backend, config::TomlConfig,
+    folder::arg::name::FolderNameOptionalFlag, printer::Printer,
 };
 
 /// List all envelopes.
@@ -41,15 +37,20 @@ pub struct ListEnvelopesCommand {
     #[arg(long, short = 's', value_name = "NUMBER")]
     pub page_size: Option<usize>,
 
-    #[command(flatten)]
-    pub table: TableMaxWidthFlag,
-
     #[cfg(feature = "account-sync")]
     #[command(flatten)]
     pub cache: CacheDisableFlag,
 
     #[command(flatten)]
     pub account: AccountNameFlag,
+
+    /// The maximum width the table should not exceed.
+    ///
+    /// This argument will force the table not to exceed the given
+    /// width in pixels. Columns may shrink with ellipsis in order to
+    /// fit the width.
+    #[arg(long, short = 'w', name = "table_max_width", value_name = "PIXELS")]
+    pub table_max_width: Option<u16>,
 
     /// The list envelopes filter and sort query.
     ///
@@ -128,11 +129,11 @@ impl Default for ListEnvelopesCommand {
             folder: Default::default(),
             page: 1,
             page_size: Default::default(),
-            table: Default::default(),
             #[cfg(feature = "account-sync")]
             cache: Default::default(),
             account: Default::default(),
             query: Default::default(),
+            table_max_width: Default::default(),
         }
     }
 }
@@ -197,13 +198,7 @@ impl ListEnvelopesCommand {
 
         let envelopes = backend.list_envelopes(folder, opts).await?;
 
-        printer.print_table(
-            Box::new(envelopes),
-            PrintTableOpts {
-                format: &account_config.get_message_read_format(),
-                max_width: self.table.max_width,
-            },
-        )?;
+        printer.print_table(envelopes, self.table_max_width)?;
 
         Ok(())
     }

@@ -2,12 +2,7 @@ use clap::Parser;
 use color_eyre::Result;
 use tracing::info;
 
-use crate::{
-    account::Accounts,
-    config::TomlConfig,
-    printer::{PrintTableOpts, Printer},
-    ui::arg::max_width::TableMaxWidthFlag,
-};
+use crate::{account::Accounts, config::TomlConfig, printer::Printer};
 
 /// List all accounts.
 ///
@@ -15,8 +10,13 @@ use crate::{
 /// file.
 #[derive(Debug, Parser)]
 pub struct AccountListCommand {
-    #[command(flatten)]
-    pub table: TableMaxWidthFlag,
+    /// The maximum width the table should not exceed.
+    ///
+    /// This argument will force the table not to exceed the given
+    /// width in pixels. Columns may shrink with ellipsis in order to
+    /// fit the width.
+    #[arg(long, short = 'w', name = "table_max_width", value_name = "PIXELS")]
+    pub table_max_width: Option<u16>,
 }
 
 impl AccountListCommand {
@@ -25,12 +25,7 @@ impl AccountListCommand {
 
         let accounts: Accounts = config.accounts.iter().into();
 
-        printer.print_table(
-            Box::new(accounts),
-            PrintTableOpts {
-                format: &Default::default(),
-                max_width: self.table.max_width,
-            },
-        )
+        printer.print_table(accounts, self.table_max_width)?;
+        Ok(())
     }
 }

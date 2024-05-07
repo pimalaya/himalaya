@@ -4,13 +4,11 @@ pub mod config;
 pub(crate) mod wizard;
 
 use color_eyre::Result;
+use comfy_table::{presets, Attribute, Cell, Color, ContentArrangement, Row, Table};
 use serde::Serialize;
 use std::{collections::hash_map::Iter, fmt, ops::Deref};
 
-use crate::{
-    printer::{PrintTable, PrintTableOpts, WriteColor},
-    ui::table::{Cell, Row, Table},
-};
+use crate::printer::{PrintTable, WriteColor};
 
 use self::config::TomlAccountConfig;
 
@@ -41,20 +39,22 @@ impl fmt::Display for Account {
     }
 }
 
-impl Table for Account {
-    fn head() -> Row {
-        Row::new()
-            .cell(Cell::new("NAME").shrinkable().bold().underline().white())
-            .cell(Cell::new("BACKENDS").bold().underline().white())
-            .cell(Cell::new("DEFAULT").bold().underline().white())
+impl From<Account> for Row {
+    fn from(account: Account) -> Self {
+        let mut r = Row::new();
+        r.add_cell(Cell::new(account.name).fg(Color::Green));
+        r.add_cell(Cell::new(account.backend).fg(Color::Blue));
+        r.add_cell(Cell::new(if account.default { "yes" } else { "" }).fg(Color::White));
+        r
     }
-
-    fn row(&self) -> Row {
-        let default = if self.default { "yes" } else { "" };
-        Row::new()
-            .cell(Cell::new(&self.name).shrinkable().green())
-            .cell(Cell::new(&self.backend).blue())
-            .cell(Cell::new(default).white())
+}
+impl From<&Account> for Row {
+    fn from(account: &Account) -> Self {
+        let mut r = Row::new();
+        r.add_cell(Cell::new(&account.name).fg(Color::Green));
+        r.add_cell(Cell::new(&account.backend).fg(Color::Blue));
+        r.add_cell(Cell::new(if account.default { "yes" } else { "" }).fg(Color::White));
+        r
     }
 }
 
@@ -70,10 +70,46 @@ impl Deref for Accounts {
     }
 }
 
+impl From<Accounts> for Table {
+    fn from(accounts: Accounts) -> Self {
+        let mut table = Table::new();
+        table
+            .load_preset(presets::NOTHING)
+            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_header(Row::from([
+                Cell::new("NAME").add_attribute(Attribute::Reverse),
+                Cell::new("BACKENDS").add_attribute(Attribute::Reverse),
+                Cell::new("DEFAULT").add_attribute(Attribute::Reverse),
+            ]))
+            .add_rows(accounts.0.into_iter().map(Row::from));
+        table
+    }
+}
+
+impl From<&Accounts> for Table {
+    fn from(accounts: &Accounts) -> Self {
+        let mut table = Table::new();
+        table
+            .load_preset(presets::NOTHING)
+            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_header(Row::from([
+                Cell::new("NAME").add_attribute(Attribute::Reverse),
+                Cell::new("BACKENDS").add_attribute(Attribute::Reverse),
+                Cell::new("DEFAULT").add_attribute(Attribute::Reverse),
+            ]))
+            .add_rows(accounts.0.iter().map(Row::from));
+        table
+    }
+}
+
 impl PrintTable for Accounts {
-    fn print_table(&self, writer: &mut dyn WriteColor, opts: PrintTableOpts) -> Result<()> {
+    fn print_table(&self, writer: &mut dyn WriteColor, table_max_width: Option<u16>) -> Result<()> {
+        let mut table = Table::from(self);
+        if let Some(width) = table_max_width {
+            table.set_width(width);
+        }
         writeln!(writer)?;
-        Table::print(writer, self, opts)?;
+        write!(writer, "{}", table)?;
         writeln!(writer)?;
         Ok(())
     }

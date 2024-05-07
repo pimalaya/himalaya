@@ -1,8 +1,13 @@
 pub mod print;
-pub mod print_table;
 #[allow(clippy::module_inception)]
 pub mod printer;
 
+use std::io;
+
 pub use print::*;
-pub use print_table::*;
 pub use printer::*;
+use termcolor::StandardStream;
+
+pub trait WriteColor: io::Write + termcolor::WriteColor {}
+
+impl WriteColor for StandardStream {}

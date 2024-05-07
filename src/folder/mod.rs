@@ -3,13 +3,11 @@ pub mod command;
 pub mod config;
 
 use color_eyre::Result;
+use comfy_table::{presets, Attribute, Cell, ContentArrangement, Row, Table};
 use serde::Serialize;
 use std::ops;
 
-use crate::{
-    printer::{PrintTable, PrintTableOpts, WriteColor},
-    ui::{Cell, Row, Table},
-};
+use crate::printer::{PrintTable, WriteColor};
 
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Folder {
@@ -25,23 +23,57 @@ impl From<&email::folder::Folder> for Folder {
         }
     }
 }
+impl From<&Folder> for Row {
+    fn from(folder: &Folder) -> Self {
+        let mut row = Row::new();
+        row.add_cell(Cell::new(&folder.name).fg(comfy_table::Color::Blue));
+        row.add_cell(Cell::new(&folder.desc).fg(comfy_table::Color::Green));
 
-impl Table for Folder {
-    fn head() -> Row {
-        Row::new()
-            .cell(Cell::new("NAME").bold().underline().white())
-            .cell(Cell::new("DESC").bold().underline().white())
+        row
     }
+}
 
-    fn row(&self) -> Row {
-        Row::new()
-            .cell(Cell::new(&self.name).blue())
-            .cell(Cell::new(&self.desc).green())
+impl From<Folder> for Row {
+    fn from(folder: Folder) -> Self {
+        let mut row = Row::new();
+        row.add_cell(Cell::new(folder.name).fg(comfy_table::Color::Blue));
+        row.add_cell(Cell::new(folder.desc).fg(comfy_table::Color::Green));
+
+        row
     }
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Folders(Vec<Folder>);
+
+impl From<Folders> for Table {
+    fn from(folders: Folders) -> Self {
+        let mut table = Table::new();
+        table
+            .load_preset(presets::NOTHING)
+            .set_header(Row::from([
+                Cell::new("NAME").add_attribute(Attribute::Reverse),
+                Cell::new("DESC").add_attribute(Attribute::Reverse),
+            ]))
+            .add_rows(folders.0.into_iter().map(Row::from));
+        table
+    }
+}
+
+impl From<&Folders> for Table {
+    fn from(folders: &Folders) -> Self {
+        let mut table = Table::new();
+        table
+            .load_preset(presets::NOTHING)
+            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_header(Row::from([
+                Cell::new("NAME").add_attribute(Attribute::Reverse),
+                Cell::new("DESC").add_attribute(Attribute::Reverse),
+            ]))
+            .add_rows(folders.0.iter().map(Row::from));
+        table
+    }
+}
 
 impl ops::Deref for Folders {
     type Target = Vec<Folder>;
@@ -58,9 +90,13 @@ impl From<email::folder::Folders> for Folders {
 }
 
 impl PrintTable for Folders {
-    fn print_table(&self, writer: &mut dyn WriteColor, opts: PrintTableOpts) -> Result<()> {
+    fn print_table(&self, writer: &mut dyn WriteColor, table_max_width: Option<u16>) -> Result<()> {
+        let mut table = Table::from(self);
+        if let Some(width) = table_max_width {
+            table.set_width(width);
+        }
         writeln!(writer)?;
-        Table::print(writer, self, opts)?;
+        write!(writer, "{}", table)?;
         writeln!(writer)?;
         Ok(())
     }

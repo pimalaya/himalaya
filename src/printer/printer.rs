@@ -1,12 +1,15 @@
 use clap::ArgMatches;
 use color_eyre::{eyre::Context, Report, Result};
-use std::fmt::{self, Debug};
+use std::fmt::Debug;
 use termcolor::StandardStream;
 
 use crate::{
     output::{args, ColorFmt, OutputFmt},
-    printer::{Print, PrintTable, PrintTableOpts, WriteColor},
+    printer::{Print, WriteColor},
 };
+pub trait PrintTable {
+    fn print_table(&self, writer: &mut dyn WriteColor, table_max_width: Option<u16>) -> Result<()>;
+}
 
 pub trait Printer {
     // TODO: rename end
@@ -14,12 +17,12 @@ pub trait Printer {
     // TODO: rename log
     fn print_log<T: Debug + Print>(&mut self, data: T) -> Result<()>;
     // TODO: rename table
-    fn print_table<T: Debug + erased_serde::Serialize + PrintTable + ?Sized>(
+    fn print_table<T: Debug + PrintTable>(
         &mut self,
-        // TODO: remove Box
-        data: Box<T>,
-        opts: PrintTableOpts,
+        data: T,
+        table_max_width: Option<u16>,
     ) -> Result<()>;
+
     fn is_json(&self) -> bool;
 }
 
@@ -59,24 +62,16 @@ impl Printer for StdoutPrinter {
         }
     }
 
-    fn print_table<T: fmt::Debug + erased_serde::Serialize + PrintTable + ?Sized>(
-        &mut self,
-        data: Box<T>,
-        opts: PrintTableOpts,
-    ) -> Result<()> {
-        match self.fmt {
-            OutputFmt::Plain => data.print_table(self.writer.as_mut(), opts),
-            OutputFmt::Json => {
-                let json = &mut serde_json::Serializer::new(self.writer.as_mut());
-                let ser = &mut <dyn erased_serde::Serializer>::erase(json);
-                data.erased_serialize(ser).unwrap();
-                Ok(())
-            }
-        }
-    }
-
     fn is_json(&self) -> bool {
         self.fmt == OutputFmt::Json
+    }
+
+    fn print_table<T: Debug + PrintTable>(
+        &mut self,
+        data: T,
+        table_max_width: Option<u16>,
+    ) -> Result<()> {
+        data.print_table(self.writer.as_mut(), table_max_width)
     }
 }
 

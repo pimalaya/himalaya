@@ -52,6 +52,7 @@ clap = { version = "4.4", features = ["derive", "wrap_help"] }
 clap_complete = "4.4"
 clap_mangen = "0.2"
 color-eyre = "0.6.3"
+comfy-table = "7.1.1"
 console = "0.15.2"
 dirs = "4"
 email-lib = { version = "=0.24.1", default-features = false, features = ["derive", "tracing"]  }
