@@ -4,10 +4,10 @@ use tracing_error::ErrorLayer;
 use tracing_subscriber::{filter::LevelFilter, fmt, prelude::*, EnvFilter};
 
 pub fn install() -> Result<LevelFilter> {
-    let fmt_layer = fmt::layer().with_target(false);
+    let fmt_layer = fmt::layer();
 
     let (filter_layer, current_filter) = match EnvFilter::try_from_default_env() {
-        Err(_) => (EnvFilter::try_new("warn").unwrap(), LevelFilter::OFF),
+        Err(_) => (EnvFilter::try_new("off").unwrap(), LevelFilter::OFF),
         Ok(layer) => {
             let level = layer.max_level_hint().unwrap_or(LevelFilter::OFF);
             (layer, level)
