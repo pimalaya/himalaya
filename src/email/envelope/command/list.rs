@@ -49,7 +49,8 @@ pub struct ListEnvelopesCommand {
     /// This argument will force the table not to exceed the given
     /// width in pixels. Columns may shrink with ellipsis in order to
     /// fit the width.
-    #[arg(long, short = 'w', name = "table_max_width", value_name = "PIXELS")]
+    #[arg(long = "max-width", short = 'w')]
+    #[arg(name = "table_max_width", value_name = "PIXELS")]
     pub table_max_width: Option<u16>,
 
     /// The list envelopes filter and sort query.
