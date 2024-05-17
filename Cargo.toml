@@ -65,6 +65,7 @@ md5 = "0.7"
 mml-lib = { version = "=1.0.12", default-features = false, features = ["derive"]  }
 oauth-lib = "=0.1.1"
 once_cell = "1.16"
+petgraph = "0.6"
 process-lib = { version = "=0.4.2", features = ["derive"] }
 secret-lib = { version = "=0.4.4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
@@ -86,8 +87,11 @@ uuid = { version = "0.8", features = ["v4"] }
 
 [patch.crates-io]
 # WIP: transition from `imap` to `imap-codec`
-email-lib = { git = "https://git.sr.ht/~soywod/pimalaya" }
-imap-client = { git = "https://github.com/soywod/imap-flow.git", branch = "session" }
-tasks = { git = "https://github.com/soywod/imap-flow.git", branch = "session" }
+email-lib = { path = "/home/soywod/sourcehut/pimalaya/email" }
+imap-client = { path = "/home/soywod/code/imap-flow/client" }
+tasks = { path = "/home/soywod/code/imap-flow/tasks" }
+# email-lib = { git = "https://git.sr.ht/~soywod/pimalaya" }
+# imap-client = { git = "https://github.com/soywod/imap-flow.git", branch = "session" }
+# tasks = { git = "https://github.com/soywod/imap-flow.git", branch = "session" }
 imap-codec = { git = "https://github.com/duesee/imap-codec.git" }
 imap-types = { git = "https://github.com/duesee/imap-codec.git" }

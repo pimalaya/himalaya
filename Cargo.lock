@@ -1396,7 +1396,6 @@ dependencies = [
 [[package]]
 name = "email-lib"
 version = "0.24.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya#033ba2a2e193769e1272c9493aa1d6c975346eb5"
 dependencies = [
  "advisory-lock",
  "async-ctrlc",
@@ -1425,6 +1424,7 @@ dependencies = [
  "once_cell",
  "ouroboros",
  "paste",
+ "petgraph",
  "pgp-lib",
  "process-lib",
  "rayon",
@@ -2074,6 +2074,7 @@ dependencies = [
  "mml-lib",
  "oauth-lib",
  "once_cell",
+ "petgraph",
  "process-lib",
  "secret-lib",
  "serde",
@@ -2267,7 +2268,6 @@ dependencies = [
 [[package]]
 name = "imap-client"
 version = "0.1.0"
-source = "git+https://github.com/soywod/imap-flow.git?branch=session#599cedbf9facd7d04eaacef2ec6710ee7f7f9eff"
 dependencies = [
  "imap-flow",
  "once_cell",
@@ -2297,7 +2297,6 @@ dependencies = [
 [[package]]
 name = "imap-flow"
 version = "0.1.0"
-source = "git+https://github.com/soywod/imap-flow.git?branch=session#599cedbf9facd7d04eaacef2ec6710ee7f7f9eff"
 dependencies = [
  "bounded-static",
  "bytes",
@@ -4577,7 +4576,6 @@ dependencies = [
 [[package]]
 name = "tag-generator"
 version = "0.1.0"
-source = "git+https://github.com/soywod/imap-flow.git?branch=session#599cedbf9facd7d04eaacef2ec6710ee7f7f9eff"
 dependencies = [
  "imap-types",
  "rand",
@@ -4592,7 +4590,6 @@ checksum = "e1fc403891a21bcfb7c37834ba66a547a8f402146eba7265b5a6d88059c9ff2f"
 [[package]]
 name = "tasks"
 version = "0.1.0"
-source = "git+https://github.com/soywod/imap-flow.git?branch=session#599cedbf9facd7d04eaacef2ec6710ee7f7f9eff"
 dependencies = [
  "imap-flow",
  "imap-types",

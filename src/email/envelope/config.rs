@@ -8,6 +8,7 @@ use crate::backend::BackendKind;
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 pub struct EnvelopeConfig {
     pub list: Option<ListEnvelopesConfig>,
+    pub thread: Option<ThreadEnvelopesConfig>,
     pub watch: Option<WatchEnvelopesConfig>,
     pub get: Option<GetEnvelopeConfig>,
     #[cfg(feature = "account-sync")]
@@ -43,6 +44,26 @@ pub struct ListEnvelopesConfig {
 }
 
 impl ListEnvelopesConfig {
+    pub fn get_used_backends(&self) -> HashSet<&BackendKind> {
+        let mut kinds = HashSet::default();
+
+        if let Some(kind) = &self.backend {
+            kinds.insert(kind);
+        }
+
+        kinds
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+pub struct ThreadEnvelopesConfig {
+    pub backend: Option<BackendKind>,
+
+    #[serde(flatten)]
+    pub remote: email::envelope::thread::config::EnvelopeThreadConfig,
+}
+
+impl ThreadEnvelopesConfig {
     pub fn get_used_backends(&self) -> HashSet<&BackendKind> {
         let mut kinds = HashSet::default();
 

@@ -1,12 +1,15 @@
 pub mod list;
+pub mod thread;
 pub mod watch;
 
-use color_eyre::Result;
 use clap::Subcommand;
+use color_eyre::Result;
 
 use crate::{config::TomlConfig, printer::Printer};
 
-use self::{list::ListEnvelopesCommand, watch::WatchEnvelopesCommand};
+use self::{
+    list::ListEnvelopesCommand, thread::ThreadEnvelopesCommand, watch::WatchEnvelopesCommand,
+};
 
 /// Manage envelopes.
 ///
@@ -20,6 +23,9 @@ pub enum EnvelopeSubcommand {
     List(ListEnvelopesCommand),
 
     #[command()]
+    Thread(ThreadEnvelopesCommand),
+
+    #[command()]
     Watch(WatchEnvelopesCommand),
 }
 
@@ -28,6 +34,7 @@ impl EnvelopeSubcommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         match self {
             Self::List(cmd) => cmd.execute(printer, config).await,
+            Self::Thread(cmd) => cmd.execute(printer, config).await,
             Self::Watch(cmd) => cmd.execute(printer, config).await,
         }
     }

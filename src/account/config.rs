@@ -142,6 +142,14 @@ impl TomlAccountConfig {
             .or(self.backend.as_ref())
     }
 
+    pub fn thread_envelopes_kind(&self) -> Option<&BackendKind> {
+        self.envelope
+            .as_ref()
+            .and_then(|envelope| envelope.thread.as_ref())
+            .and_then(|thread| thread.backend.as_ref())
+            .or(self.backend.as_ref())
+    }
+
     pub fn watch_envelopes_kind(&self) -> Option<&BackendKind> {
         self.envelope
             .as_ref()
