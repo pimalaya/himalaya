@@ -26,7 +26,7 @@ use email::{
         list::{ListEnvelopes, ListEnvelopesOptions},
         thread::ThreadEnvelopes,
         watch::WatchEnvelopes,
-        Id, SingleId,
+        Id, SingleId, ThreadedEnvelopes,
     },
     flag::{add::AddFlags, remove::RemoveFlags, set::SetFlags, Flag, Flags},
     folder::{
@@ -710,7 +710,7 @@ impl Backend {
         &self,
         folder: &str,
         opts: ListEnvelopesOptions,
-    ) -> Result<DiGraphMap<u32, u32>> {
+    ) -> Result<ThreadedEnvelopes> {
         let backend_kind = self.toml_account_config.thread_envelopes_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
         let envelopes = self.backend.thread_envelopes(folder, opts).await?;

@@ -204,12 +204,10 @@ impl ThreadEnvelopesCommand {
             query: None,
         };
 
-        let graph = backend.thread_envelopes(folder, opts).await?;
-
-        println!("graph: {graph:#?}");
+        let envelopes = backend.thread_envelopes(folder, opts).await?;
 
         let mut stdout = std::io::stdout();
-        write_tree(&mut stdout, &graph, 0, String::new(), 0)?;
+        write_tree(&mut stdout, envelopes.graph(), "root", String::new(), 0)?;
         stdout.flush()?;
 
         // printer.print_table(envelopes, self.table_max_width)?;
@@ -220,10 +218,10 @@ impl ThreadEnvelopesCommand {
 
 pub fn write_tree(
     w: &mut impl std::io::Write,
-    graph: &DiGraphMap<u32, u32>,
-    parent: u32,
+    graph: &DiGraphMap<&str, u8>,
+    parent: &str,
     pad: String,
-    weight: u32,
+    weight: u8,
 ) -> std::io::Result<()> {
     let edges = graph
         .all_edges()
@@ -264,11 +262,11 @@ mod test {
     fn tree_1() {
         let mut buf = Vec::new();
         let mut graph = DiGraphMap::new();
-        graph.add_edge(0, 1, 0);
-        graph.add_edge(0, 2, 0);
-        graph.add_edge(0, 3, 0);
+        graph.add_edge("0", "1", 0);
+        graph.add_edge("0", "2", 0);
+        graph.add_edge("0", "3", 0);
 
-        write_tree(&mut buf, &graph, 0, String::new(), 0).unwrap();
+        write_tree(&mut buf, &graph, "0", String::new(), 0).unwrap();
         let buf = String::from_utf8_lossy(&buf);
 
         let expected = "
@@ -284,11 +282,11 @@ mod test {
     fn tree_2() {
         let mut buf = Vec::new();
         let mut graph = DiGraphMap::new();
-        graph.add_edge(0, 1, 0);
-        graph.add_edge(1, 2, 1);
-        graph.add_edge(1, 3, 1);
+        graph.add_edge("0", "1", 0);
+        graph.add_edge("1", "2", 1);
+        graph.add_edge("1", "3", 1);
 
-        write_tree(&mut buf, &graph, 0, String::new(), 0).unwrap();
+        write_tree(&mut buf, &graph, "0", String::new(), 0).unwrap();
         let buf = String::from_utf8_lossy(&buf);
 
         let expected = "
@@ -304,15 +302,15 @@ mod test {
     fn tree_3() {
         let mut buf = Vec::new();
         let mut graph = DiGraphMap::new();
-        graph.add_edge(0, 1, 0);
-        graph.add_edge(1, 2, 1);
-        graph.add_edge(2, 22, 2);
-        graph.add_edge(1, 3, 1);
-        graph.add_edge(0, 4, 0);
-        graph.add_edge(4, 5, 1);
-        graph.add_edge(5, 6, 2);
+        graph.add_edge("0", "1", 0);
+        graph.add_edge("1", "2", 1);
+        graph.add_edge("2", "22", 2);
+        graph.add_edge("1", "3", 1);
+        graph.add_edge("0", "4", 0);
+        graph.add_edge("4", "5", 1);
+        graph.add_edge("5", "6", 2);
 
-        write_tree(&mut buf, &graph, 0, String::new(), 0).unwrap();
+        write_tree(&mut buf, &graph, "0", String::new(), 0).unwrap();
         let buf = String::from_utf8_lossy(&buf);
 
         let expected = "
