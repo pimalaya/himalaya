@@ -1006,7 +1006,10 @@ dependencies = [
  "bitflags 2.5.0",
  "crossterm_winapi",
  "libc",
+ "mio",
  "parking_lot 0.12.1",
+ "signal-hook",
+ "signal-hook-mio",
  "winapi",
 ]
 
@@ -2063,6 +2066,7 @@ dependencies = [
  "color-eyre",
  "comfy-table",
  "console",
+ "crossterm 0.27.0",
  "dirs 4.0.0",
  "email-lib",
  "email_address",
