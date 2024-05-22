@@ -48,7 +48,7 @@ pgp-native = ["email-lib/pgp-native", "mml-lib/pgp-native", "pgp"]
 [dependencies]
 ariadne = "0.2"
 async-trait = "0.1"
-clap = { version = "4.4", features = ["derive", "wrap_help"] }
+clap = { version = "4.4", features = ["derive", "wrap_help", "env"] }
 clap_complete = "4.4"
 clap_mangen = "0.2"
 color-eyre = "0.6.3"

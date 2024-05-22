@@ -33,7 +33,7 @@ pub struct Cli {
     /// configuration file. Other paths are merged with the first one,
     /// which allows you to separate your public config from your
     /// private(s) one(s).
-    #[arg(short, long = "config", global = true)]
+    #[arg(short, long = "config", global = true, env = "HIMALAYA_CONFIG")]
     #[arg(value_name = "PATH", value_parser = config::path_parser)]
     pub config_paths: Vec<PathBuf>,
 
