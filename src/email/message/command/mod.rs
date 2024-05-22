@@ -7,10 +7,11 @@ pub mod read;
 pub mod reply;
 pub mod save;
 pub mod send;
+pub mod thread;
 pub mod write;
 
-use color_eyre::Result;
 use clap::Subcommand;
+use color_eyre::Result;
 
 use crate::{config::TomlConfig, printer::Printer};
 
@@ -18,7 +19,7 @@ use self::{
     copy::MessageCopyCommand, delete::MessageDeleteCommand, forward::MessageForwardCommand,
     mailto::MessageMailtoCommand, r#move::MessageMoveCommand, read::MessageReadCommand,
     reply::MessageReplyCommand, save::MessageSaveCommand, send::MessageSendCommand,
-    write::MessageWriteCommand,
+    thread::MessageThreadCommand, write::MessageWriteCommand,
 };
 
 /// Manage messages.
@@ -31,6 +32,9 @@ use self::{
 pub enum MessageSubcommand {
     #[command(arg_required_else_help = true)]
     Read(MessageReadCommand),
+
+    #[command(arg_required_else_help = true)]
+    Thread(MessageThreadCommand),
 
     #[command(aliases = ["add", "create", "new", "compose"])]
     Write(MessageWriteCommand),
@@ -66,6 +70,7 @@ impl MessageSubcommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         match self {
             Self::Read(cmd) => cmd.execute(printer, config).await,
+            Self::Thread(cmd) => cmd.execute(printer, config).await,
             Self::Write(cmd) => cmd.execute(printer, config).await,
             Self::Reply(cmd) => cmd.execute(printer, config).await,
             Self::Forward(cmd) => cmd.execute(printer, config).await,

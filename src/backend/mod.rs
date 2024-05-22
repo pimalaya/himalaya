@@ -3,7 +3,6 @@ pub(crate) mod wizard;
 
 use async_trait::async_trait;
 use color_eyre::Result;
-use petgraph::graphmap::DiGraphMap;
 use std::{fmt::Display, ops::Deref, sync::Arc};
 
 #[cfg(feature = "imap")]
@@ -714,6 +713,23 @@ impl Backend {
         let backend_kind = self.toml_account_config.thread_envelopes_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
         let envelopes = self.backend.thread_envelopes(folder, opts).await?;
+        // let envelopes =
+        //     Envelopes::from_backend(&self.backend.account_config, &id_mapper, envelopes)?;
+        Ok(envelopes)
+    }
+
+    pub async fn thread_envelope(
+        &self,
+        folder: &str,
+        id: usize,
+        opts: ListEnvelopesOptions,
+    ) -> Result<ThreadedEnvelopes> {
+        let backend_kind = self.toml_account_config.thread_envelopes_kind();
+        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
+        let envelopes = self
+            .backend
+            .thread_envelope(folder, SingleId::from(id), opts)
+            .await?;
         // let envelopes =
         //     Envelopes::from_backend(&self.backend.account_config, &id_mapper, envelopes)?;
         Ok(envelopes)

@@ -3,7 +3,7 @@ use clap::Parser;
 use color_eyre::Result;
 use crossterm::{
     cursor::{self, MoveToColumn},
-    style::{Attribute, Color, Print, ResetColor, SetAttribute, SetForegroundColor},
+    style::{Color, Print, ResetColor, SetForegroundColor},
     terminal, ExecutableCommand,
 };
 use email::{
@@ -11,14 +11,10 @@ use email::{
     backend::feature::BackendFeatureSource,
     email::search_query,
     envelope::{list::ListEnvelopesOptions, ThreadedEnvelope},
-    search_query::{filter::SearchEmailsFilterQuery, SearchEmailsQuery},
+    search_query::SearchEmailsQuery,
 };
-use petgraph::{graphmap::DiGraphMap, visit::IntoNodeIdentifiers, Direction};
-use std::{
-    collections::{HashMap, HashSet},
-    io::Write,
-    process::exit,
-};
+use petgraph::graphmap::DiGraphMap;
+use std::{io::Write, process::exit};
 use tracing::info;
 
 #[cfg(feature = "account-sync")]
@@ -37,19 +33,6 @@ pub struct ThreadEnvelopesCommand {
     #[command(flatten)]
     pub folder: FolderNameOptionalFlag,
 
-    /// The page number.
-    ///
-    /// The page number starts from 1 (which is the default). Giving a
-    /// page number to big will result in a out of bound error.
-    #[arg(long, short, value_name = "NUMBER", default_value = "1")]
-    pub page: usize,
-
-    /// The page size.
-    ///
-    /// Determine the amount of envelopes a page should contain.
-    #[arg(long, short = 's', value_name = "NUMBER")]
-    pub page_size: Option<usize>,
-
     #[cfg(feature = "account-sync")]
     #[command(flatten)]
     pub cache: CacheDisableFlag,
@@ -57,103 +40,16 @@ pub struct ThreadEnvelopesCommand {
     #[command(flatten)]
     pub account: AccountNameFlag,
 
-    /// The maximum width the table should not exceed.
-    ///
-    /// This argument will force the table not to exceed the given
-    /// width in pixels. Columns may shrink with ellipsis in order to
-    /// fit the width.
-    #[arg(long = "max-width", short = 'w')]
-    #[arg(name = "table_max_width", value_name = "PIXELS")]
-    pub table_max_width: Option<u16>,
+    /// Show only threads that contain the given envelope identifier.
+    #[arg(long, short)]
+    pub id: Option<usize>,
 
-    /// The thread envelopes filter and sort query.
-    ///
-    /// The query can be a filter query, a sort query or both
-    /// together.
-    ///
-    /// A filter query is composed of operators and conditions. There
-    /// is 3 operators and 8 conditions:
-    ///
-    ///  • not <condition> → filter envelopes that do not match the
-    /// condition
-    ///
-    ///  • <condition> and <condition> → filter envelopes that match
-    /// both conditions
-    ///
-    ///  • <condition> or <condition> → filter envelopes that match
-    /// one of the conditions
-    ///
-    ///  ◦ date <yyyy-mm-dd> → filter envelopes that match the given
-    /// date
-    ///
-    ///  ◦ before <yyyy-mm-dd> → filter envelopes with date strictly
-    /// before the given one
-    ///
-    ///  ◦ after <yyyy-mm-dd> → filter envelopes with date stricly
-    /// after the given one
-    ///
-    ///  ◦ from <pattern> → filter envelopes with senders matching the
-    /// given pattern
-    ///
-    ///  ◦ to <pattern> → filter envelopes with recipients matching
-    /// the given pattern
-    ///
-    ///  ◦ subject <pattern> → filter envelopes with subject matching
-    /// the given pattern
-    ///
-    ///  ◦ body <pattern> → filter envelopes with text bodies matching
-    /// the given pattern
-    ///
-    ///  ◦ flag <flag> → filter envelopes matching the given flag
-    ///
-    /// A sort query starts by "order by", and is composed of kinds
-    /// and orders. There is 4 kinds and 2 orders:
-    ///
-    ///  • date [order] → sort envelopes by date
-    ///
-    ///  • from [order] → sort envelopes by sender
-    ///
-    ///  • to [order] → sort envelopes by recipient
-    ///
-    ///  • subject [order] → sort envelopes by subject
-    ///
-    ///  ◦ <kind> asc → sort envelopes by the given kind in ascending
-    /// order
-    ///
-    ///  ◦ <kind> desc → sort envelopes by the given kind in
-    /// descending order
-    ///
-    /// Examples:
-    ///
-    /// subject foo and body bar → filter envelopes containing "foo"
-    /// in their subject and "bar" in their text bodies
-    ///
-    /// order by date desc subject → sort envelopes by descending date
-    /// (most recent first), then by ascending subject
-    ///
-    /// subject foo and body bar order by date desc subject →
-    /// combination of the 2 previous examples
     #[arg(allow_hyphen_values = true, trailing_var_arg = true)]
     pub query: Option<Vec<String>>,
 }
 
-impl Default for ThreadEnvelopesCommand {
-    fn default() -> Self {
-        Self {
-            folder: Default::default(),
-            page: 1,
-            page_size: Default::default(),
-            #[cfg(feature = "account-sync")]
-            cache: Default::default(),
-            account: Default::default(),
-            query: Default::default(),
-            table_max_width: Default::default(),
-        }
-    }
-}
-
 impl ThreadEnvelopesCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
+    pub async fn execute(self, _printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing thread envelopes command");
 
         let (toml_account_config, account_config) = config.clone().into_account_configs(
@@ -163,11 +59,6 @@ impl ThreadEnvelopesCommand {
         )?;
 
         let folder = &self.folder.name;
-        let page = 1.max(self.page) - 1;
-        let page_size = self
-            .page_size
-            .unwrap_or_else(|| account_config.get_envelope_thread_page_size());
-
         let thread_envelopes_kind = toml_account_config.thread_envelopes_kind();
 
         let backend = Backend::new(
@@ -205,12 +96,15 @@ impl ThreadEnvelopesCommand {
         };
 
         let opts = ListEnvelopesOptions {
-            page,
-            page_size,
+            page: 0,
+            page_size: 0,
             query,
         };
 
-        let envelopes = backend.thread_envelopes(folder, opts).await?;
+        let envelopes = match self.id {
+            Some(id) => backend.thread_envelope(folder, id, opts).await,
+            None => backend.thread_envelopes(folder, opts).await,
+        }?;
 
         let mut stdout = std::io::stdout();
         write_tree(
