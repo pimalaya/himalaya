@@ -79,6 +79,6 @@ impl TemplateSendCommand {
 
         backend.send_message_then_save_copy(&msg).await?;
 
-        printer.print("Message successfully sent!")
+        printer.out("Message successfully sent!")
     }
 }

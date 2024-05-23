@@ -4,15 +4,19 @@ pub mod config;
 pub mod flag;
 
 use color_eyre::Result;
-use comfy_table::{presets, Attribute, Cell, Color, ContentArrangement, Row, Table};
-use email::account::config::AccountConfig;
-use serde::Serialize;
-use std::ops;
+use comfy_table::{presets, Attribute, Cell, ContentArrangement, Row, Table};
+use crossterm::{cursor, style::Stylize, terminal};
+use email::{
+    account::config::AccountConfig,
+    envelope::{ThreadedEnvelope, ThreadedEnvelopes},
+};
+use petgraph::graphmap::DiGraphMap;
+use serde::{Serialize, Serializer};
+use std::{fmt, ops::Deref, sync::Arc};
 
 use crate::{
     cache::IdMapper,
     flag::{Flag, Flags},
-    printer::{PrintTable, WriteColor},
 };
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -60,17 +64,17 @@ impl From<Envelope> for Row {
         row.add_cell(
             Cell::new(envelope.id)
                 .add_attributes(all_attributes.clone())
-                .fg(Color::Red),
+                .fg(comfy_table::Color::Red),
         )
         .add_cell(
             Cell::new(flags)
                 .add_attributes(all_attributes.clone())
-                .fg(Color::White),
+                .fg(comfy_table::Color::White),
         )
         .add_cell(
             Cell::new(envelope.subject)
                 .add_attributes(all_attributes.clone())
-                .fg(Color::Green),
+                .fg(comfy_table::Color::Green),
         )
         .add_cell(
             Cell::new(if let Some(name) = envelope.from.name {
@@ -79,12 +83,12 @@ impl From<Envelope> for Row {
                 envelope.from.addr
             })
             .add_attributes(all_attributes.clone())
-            .fg(Color::Blue),
+            .fg(comfy_table::Color::Blue),
         )
         .add_cell(
             Cell::new(envelope.date)
                 .add_attributes(all_attributes)
-                .fg(Color::Yellow),
+                .fg(comfy_table::Color::Yellow),
         );
 
         row
@@ -121,17 +125,17 @@ impl From<&Envelope> for Row {
         row.add_cell(
             Cell::new(&envelope.id)
                 .add_attributes(all_attributes.clone())
-                .fg(Color::Red),
+                .fg(comfy_table::Color::Red),
         )
         .add_cell(
             Cell::new(flags)
                 .add_attributes(all_attributes.clone())
-                .fg(Color::White),
+                .fg(comfy_table::Color::White),
         )
         .add_cell(
             Cell::new(&envelope.subject)
                 .add_attributes(all_attributes.clone())
-                .fg(Color::Green),
+                .fg(comfy_table::Color::Green),
         )
         .add_cell(
             Cell::new(if let Some(name) = &envelope.from.name {
@@ -140,12 +144,12 @@ impl From<&Envelope> for Row {
                 &envelope.from.addr
             })
             .add_attributes(all_attributes.clone())
-            .fg(Color::Blue),
+            .fg(comfy_table::Color::Blue),
         )
         .add_cell(
             Cell::new(&envelope.date)
                 .add_attributes(all_attributes)
-                .fg(Color::Yellow),
+                .fg(comfy_table::Color::Yellow),
         );
 
         row
@@ -156,46 +160,8 @@ impl From<&Envelope> for Row {
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Envelopes(Vec<Envelope>);
 
-impl From<Envelopes> for Table {
-    fn from(envelopes: Envelopes) -> Self {
-        let mut table = Table::new();
-        table
-            .load_preset(presets::NOTHING)
-            .set_content_arrangement(ContentArrangement::Dynamic)
-            .set_header(Row::from([
-                Cell::new("ID").add_attribute(Attribute::Reverse),
-                Cell::new("FLAGS").add_attribute(Attribute::Reverse),
-                Cell::new("SUBJECT").add_attribute(Attribute::Reverse),
-                Cell::new("FROM").add_attribute(Attribute::Reverse),
-                Cell::new("DATE").add_attribute(Attribute::Reverse),
-            ]))
-            .add_rows(envelopes.0.into_iter().map(Row::from));
-
-        table
-    }
-}
-
-impl From<&Envelopes> for Table {
-    fn from(envelopes: &Envelopes) -> Self {
-        let mut table = Table::new();
-        table
-            .load_preset(presets::NOTHING)
-            .set_content_arrangement(ContentArrangement::Dynamic)
-            .set_header(Row::from([
-                Cell::new("ID").add_attribute(Attribute::Reverse),
-                Cell::new("FLAGS").add_attribute(Attribute::Reverse),
-                Cell::new("SUBJECT").add_attribute(Attribute::Reverse),
-                Cell::new("FROM").add_attribute(Attribute::Reverse),
-                Cell::new("DATE").add_attribute(Attribute::Reverse),
-            ]))
-            .add_rows(envelopes.0.iter().map(Row::from));
-
-        table
-    }
-}
-
 impl Envelopes {
-    pub fn from_backend(
+    pub fn try_from_backend(
         config: &AccountConfig,
         id_mapper: &IdMapper,
         envelopes: email::envelope::Envelopes,
@@ -222,9 +188,27 @@ impl Envelopes {
 
         Ok(Envelopes(envelopes))
     }
+
+    pub fn to_table(&self) -> Table {
+        let mut table = Table::new();
+
+        table
+            .load_preset(presets::NOTHING)
+            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_header(Row::from([
+                Cell::new("ID").add_attribute(Attribute::Reverse),
+                Cell::new("FLAGS").add_attribute(Attribute::Reverse),
+                Cell::new("SUBJECT").add_attribute(Attribute::Reverse),
+                Cell::new("FROM").add_attribute(Attribute::Reverse),
+                Cell::new("DATE").add_attribute(Attribute::Reverse),
+            ]))
+            .add_rows(self.iter().map(Row::from));
+
+        table
+    }
 }
 
-impl ops::Deref for Envelopes {
+impl Deref for Envelopes {
     type Target = Vec<Envelope>;
 
     fn deref(&self) -> &Self::Target {
@@ -232,15 +216,148 @@ impl ops::Deref for Envelopes {
     }
 }
 
-impl PrintTable for Envelopes {
-    fn print_table(&self, writer: &mut dyn WriteColor, table_max_width: Option<u16>) -> Result<()> {
-        let mut table = Table::from(self);
-        if let Some(width) = table_max_width {
+pub struct EnvelopesTable {
+    envelopes: Envelopes,
+    width: Option<u16>,
+}
+
+impl EnvelopesTable {
+    pub fn with_some_width(mut self, width: Option<u16>) -> Self {
+        self.width = width;
+        self
+    }
+}
+
+impl From<Envelopes> for EnvelopesTable {
+    fn from(envelopes: Envelopes) -> Self {
+        Self {
+            envelopes,
+            width: None,
+        }
+    }
+}
+
+impl fmt::Display for EnvelopesTable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut table = self.envelopes.to_table();
+
+        if let Some(width) = self.width {
             table.set_width(width);
         }
-        writeln!(writer)?;
-        write!(writer, "{}", table)?;
-        writeln!(writer)?;
+
+        writeln!(f)?;
+        write!(f, "{table}")?;
+        writeln!(f)?;
         Ok(())
+    }
+}
+
+impl Serialize for EnvelopesTable {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.envelopes.serialize(serializer)
+    }
+}
+
+pub struct EnvelopesTree {
+    config: Arc<AccountConfig>,
+    envelopes: ThreadedEnvelopes,
+}
+
+impl EnvelopesTree {
+    pub fn new(config: Arc<AccountConfig>, envelopes: ThreadedEnvelopes) -> Self {
+        Self { config, envelopes }
+    }
+
+    pub fn fmt(
+        f: &mut fmt::Formatter,
+        config: &AccountConfig,
+        graph: &DiGraphMap<ThreadedEnvelope<'_>, u8>,
+        parent: ThreadedEnvelope<'_>,
+        pad: String,
+        weight: u8,
+    ) -> fmt::Result {
+        let edges = graph
+            .all_edges()
+            .filter_map(|(a, b, w)| {
+                if a == parent && *w == weight {
+                    Some(b)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        if parent.id == "0" {
+            f.write_str("root")?;
+        } else {
+            write!(f, "{}{}", parent.id.red(), ") ".dark_grey())?;
+
+            if !parent.subject.is_empty() {
+                write!(f, "{} ", parent.subject.green())?;
+            }
+
+            if !parent.from.is_empty() {
+                let left = "<".dark_grey();
+                let right = ">".dark_grey();
+                write!(f, "{left}{}{right}", parent.from.blue())?;
+            }
+
+            let date = parent.format_date(config);
+            let cursor_date_begin_col = terminal::size().unwrap().0 - date.len() as u16;
+
+            let dots =
+                "·".repeat((cursor_date_begin_col - cursor::position().unwrap().0 - 2) as usize);
+            write!(f, " {} {}", dots.dark_grey(), date.dark_yellow())?;
+        }
+
+        writeln!(f)?;
+
+        let edges_count = edges.len();
+        for (i, b) in edges.into_iter().enumerate() {
+            let is_last = edges_count == i + 1;
+            let (x, y) = if is_last {
+                (' ', '└')
+            } else {
+                ('│', '├')
+            };
+
+            write!(f, "{pad}{y}─ ")?;
+
+            let pad = format!("{pad}{x}  ");
+            Self::fmt(f, config, graph, b, pad, weight + 1)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl fmt::Display for EnvelopesTree {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        EnvelopesTree::fmt(
+            f,
+            &self.config,
+            self.envelopes.graph(),
+            ThreadedEnvelope {
+                id: "0",
+                message_id: "0",
+                from: "",
+                subject: "",
+                date: Default::default(),
+            },
+            String::new(),
+            0,
+        )
+    }
+}
+
+impl Serialize for EnvelopesTree {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.envelopes.serialize(serializer)
     }
 }

@@ -6,7 +6,10 @@ use tracing::info;
 #[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, config::TomlConfig, folder::Folders,
+    account::arg::name::AccountNameFlag,
+    backend::Backend,
+    config::TomlConfig,
+    folder::{Folders, FoldersTable},
     printer::Printer,
 };
 
@@ -51,9 +54,10 @@ impl FolderListCommand {
         )
         .await?;
 
-        let folders: Folders = backend.list_folders().await?.into();
+        let folders = Folders::from(backend.list_folders().await?);
+        let table = FoldersTable::from(folders).with_some_width(self.table_max_width);
 
-        printer.print_table(folders, self.table_max_width)?;
+        printer.log(table)?;
         Ok(())
     }
 }

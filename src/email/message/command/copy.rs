@@ -60,7 +60,7 @@ impl MessageCopyCommand {
 
         backend.copy_messages(source, target, ids).await?;
 
-        printer.print(format!(
+        printer.out(format!(
             "Message(s) successfully copied from {source} to {target}!"
         ))
     }

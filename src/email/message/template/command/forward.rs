@@ -76,6 +76,6 @@ impl TemplateForwardCommand {
             .build()
             .await?;
 
-        printer.print(tpl)
+        printer.out(tpl)
     }
 }

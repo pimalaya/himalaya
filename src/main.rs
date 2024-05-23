@@ -36,7 +36,7 @@ async fn main() -> Result<()> {
     }
 
     let cli = Cli::parse();
-    let mut printer = StdoutPrinter::new(cli.output, cli.color);
+    let mut printer = StdoutPrinter::new(cli.output);
     let mut res = match cli.command {
         Some(cmd) => cmd.execute(&mut printer, cli.config_paths.as_ref()).await,
         None => {

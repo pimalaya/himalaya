@@ -701,7 +701,7 @@ impl Backend {
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
         let envelopes = self.backend.list_envelopes(folder, opts).await?;
         let envelopes =
-            Envelopes::from_backend(&self.backend.account_config, &id_mapper, envelopes)?;
+            Envelopes::try_from_backend(&self.backend.account_config, &id_mapper, envelopes)?;
         Ok(envelopes)
     }
 

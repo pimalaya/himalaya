@@ -68,6 +68,6 @@ impl MessageSendCommand {
 
         backend.send_message_then_save_copy(msg.as_bytes()).await?;
 
-        printer.print("Message successfully sent!")
+        printer.out("Message successfully sent!")
     }
 }

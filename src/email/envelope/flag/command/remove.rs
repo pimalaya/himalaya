@@ -58,6 +58,6 @@ impl FlagRemoveCommand {
 
         backend.remove_flags(folder, &ids, &flags).await?;
 
-        printer.print(format!("Flag(s) {flags} successfully removed!"))
+        printer.out(format!("Flag(s) {flags} successfully removed!"))
     }
 }

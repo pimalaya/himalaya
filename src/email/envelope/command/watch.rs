@@ -48,7 +48,7 @@ impl WatchEnvelopesCommand {
         )
         .await?;
 
-        printer.print_log(format!(
+        printer.out(format!(
             "Start watching folder {folder} for envelopes changes…"
         ))?;
 

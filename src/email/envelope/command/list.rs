@@ -12,7 +12,7 @@ use tracing::info;
 use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
     account::arg::name::AccountNameFlag, backend::Backend, config::TomlConfig,
-    folder::arg::name::FolderNameOptionalFlag, printer::Printer,
+    envelope::EnvelopesTable, folder::arg::name::FolderNameOptionalFlag, printer::Printer,
 };
 
 /// List all envelopes.
@@ -198,9 +198,9 @@ impl ListEnvelopesCommand {
         };
 
         let envelopes = backend.list_envelopes(folder, opts).await?;
+        let table = EnvelopesTable::from(envelopes).with_some_width(self.table_max_width);
 
-        printer.print_table(envelopes, self.table_max_width)?;
-
+        printer.out(table)?;
         Ok(())
     }
 }

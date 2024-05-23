@@ -81,6 +81,6 @@ impl TemplateReplyCommand {
             .build()
             .await?;
 
-        printer.print(tpl)
+        printer.out(tpl)
     }
 }

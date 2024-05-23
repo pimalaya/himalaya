@@ -80,6 +80,6 @@ impl TemplateSaveCommand {
 
         backend.add_message(folder, &msg).await?;
 
-        printer.print(format!("Template successfully saved to {folder}!"))
+        printer.out(format!("Template successfully saved to {folder}!"))
     }
 }

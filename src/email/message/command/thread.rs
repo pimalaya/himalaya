@@ -154,6 +154,6 @@ impl MessageThreadCommand {
             glue = "\n\n";
         }
 
-        printer.print(bodies)
+        printer.out(bodies)
     }
 }

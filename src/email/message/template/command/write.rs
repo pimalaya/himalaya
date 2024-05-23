@@ -47,6 +47,6 @@ impl TemplateWriteCommand {
             .build()
             .await?;
 
-        printer.print(tpl)
+        printer.out(tpl)
     }
 }

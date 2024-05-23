@@ -1,27 +1,18 @@
 use ariadne::{Label, Report, ReportKind, Source};
 use clap::Parser;
 use color_eyre::Result;
-use crossterm::{
-    cursor::{self, MoveToColumn},
-    style::{Color, Print, ResetColor, SetForegroundColor},
-    terminal, ExecutableCommand,
-};
 use email::{
-    account::config::AccountConfig,
-    backend::feature::BackendFeatureSource,
-    email::search_query,
-    envelope::{list::ListEnvelopesOptions, ThreadedEnvelope},
-    search_query::SearchEmailsQuery,
+    backend::feature::BackendFeatureSource, email::search_query,
+    envelope::list::ListEnvelopesOptions, search_query::SearchEmailsQuery,
 };
-use petgraph::graphmap::DiGraphMap;
-use std::{io::Write, process::exit};
+use std::process::exit;
 use tracing::info;
 
 #[cfg(feature = "account-sync")]
 use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
     account::arg::name::AccountNameFlag, backend::Backend, config::TomlConfig,
-    folder::arg::name::FolderNameOptionalFlag, printer::Printer,
+    envelope::EnvelopesTree, folder::arg::name::FolderNameOptionalFlag, printer::Printer,
 };
 
 /// Thread all envelopes.
@@ -49,7 +40,7 @@ pub struct ThreadEnvelopesCommand {
 }
 
 impl ThreadEnvelopesCommand {
-    pub async fn execute(self, _printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing thread envelopes command");
 
         let (toml_account_config, account_config) = config.clone().into_account_configs(
@@ -106,198 +97,101 @@ impl ThreadEnvelopesCommand {
             None => backend.thread_envelopes(folder, opts).await,
         }?;
 
-        let mut stdout = std::io::stdout();
-        write_tree(
-            &account_config,
-            &mut stdout,
-            envelopes.graph(),
-            ThreadedEnvelope {
-                id: "0",
-                message_id: "0",
-                from: "",
-                subject: "",
-                date: Default::default(),
-            },
-            String::new(),
-            0,
-        )?;
-        stdout.flush()?;
+        let tree = EnvelopesTree::new(account_config, envelopes);
 
-        // printer.print_table(envelopes, self.table_max_width)?;
+        printer.out(tree)?;
 
         Ok(())
     }
 }
 
-pub fn write_tree(
-    config: &AccountConfig,
-    w: &mut impl std::io::Write,
-    graph: &DiGraphMap<ThreadedEnvelope<'_>, u8>,
-    parent: ThreadedEnvelope<'_>,
-    pad: String,
-    weight: u8,
-) -> std::io::Result<()> {
-    let edges = graph
-        .all_edges()
-        .filter_map(|(a, b, w)| {
-            if a == parent && *w == weight {
-                Some(b)
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
+// #[cfg(test)]
+// mod test {
+//     use email::{account::config::AccountConfig, envelope::ThreadedEnvelope};
+//     use petgraph::graphmap::DiGraphMap;
 
-    if parent.id == "0" {
-        w.execute(Print("root"))?;
-    } else {
-        w.execute(SetForegroundColor(Color::Red))?
-            .execute(Print(parent.id))?
-            .execute(SetForegroundColor(Color::DarkGrey))?
-            .execute(Print(") "))?
-            .execute(ResetColor)?;
+//     use super::write_tree;
 
-        if !parent.subject.is_empty() {
-            w.execute(SetForegroundColor(Color::Green))?
-                .execute(Print(parent.subject))?
-                .execute(ResetColor)?
-                .execute(Print(" "))?;
-        }
+//     macro_rules! e {
+//         ($id:literal) => {
+//             ThreadedEnvelope {
+//                 id: $id,
+//                 message_id: $id,
+//                 from: "",
+//                 subject: "",
+//                 date: Default::default(),
+//             }
+//         };
+//     }
 
-        if !parent.from.is_empty() {
-            w.execute(SetForegroundColor(Color::DarkGrey))?
-                .execute(Print("<"))?
-                .execute(SetForegroundColor(Color::Blue))?
-                .execute(Print(parent.from))?
-                .execute(SetForegroundColor(Color::DarkGrey))?
-                .execute(Print(">"))?
-                .execute(ResetColor)?;
-        }
+//     #[test]
+//     fn tree_1() {
+//         let config = AccountConfig::default();
+//         let mut buf = Vec::new();
+//         let mut graph = DiGraphMap::new();
+//         graph.add_edge(e!("0"), e!("1"), 0);
+//         graph.add_edge(e!("0"), e!("2"), 0);
+//         graph.add_edge(e!("0"), e!("3"), 0);
 
-        let date = parent.format_date(config);
-        let cursor_date_begin_col = terminal::size()?.0 - date.len() as u16;
+//         write_tree(&config, &mut buf, &graph, e!("0"), String::new(), 0).unwrap();
+//         let buf = String::from_utf8_lossy(&buf);
 
-        w.execute(Print(" "))?
-            .execute(SetForegroundColor(Color::DarkGrey))?
-            .execute(Print("·".repeat(
-                (cursor_date_begin_col - cursor::position()?.0 - 1) as usize,
-            )))?
-            .execute(ResetColor)?
-            .execute(Print(" "))?;
+//         let expected = "
+// 0
+// ├─ 1
+// ├─ 2
+// └─ 3
+// ";
+//         assert_eq!(expected.trim_start(), buf)
+//     }
 
-        w.execute(MoveToColumn(terminal::size()?.0 - date.len() as u16))?
-            .execute(SetForegroundColor(Color::DarkYellow))?
-            .execute(Print(date))?
-            .execute(ResetColor)?;
-    }
+//     #[test]
+//     fn tree_2() {
+//         let config = AccountConfig::default();
+//         let mut buf = Vec::new();
+//         let mut graph = DiGraphMap::new();
+//         graph.add_edge(e!("0"), e!("1"), 0);
+//         graph.add_edge(e!("1"), e!("2"), 1);
+//         graph.add_edge(e!("1"), e!("3"), 1);
 
-    writeln!(w)?;
+//         write_tree(&config, &mut buf, &graph, e!("0"), String::new(), 0).unwrap();
+//         let buf = String::from_utf8_lossy(&buf);
 
-    let edges_count = edges.len();
-    for (i, b) in edges.into_iter().enumerate() {
-        let is_last = edges_count == i + 1;
-        let (x, y) = if is_last {
-            (' ', '└')
-        } else {
-            ('│', '├')
-        };
+//         let expected = "
+// 0
+// └─ 1
+//    ├─ 2
+//    └─ 3
+// ";
+//         assert_eq!(expected.trim_start(), buf)
+//     }
 
-        write!(w, "{pad}{y}─ ")?;
+//     #[test]
+//     fn tree_3() {
+//         let config = AccountConfig::default();
+//         let mut buf = Vec::new();
+//         let mut graph = DiGraphMap::new();
+//         graph.add_edge(e!("0"), e!("1"), 0);
+//         graph.add_edge(e!("1"), e!("2"), 1);
+//         graph.add_edge(e!("2"), e!("22"), 2);
+//         graph.add_edge(e!("1"), e!("3"), 1);
+//         graph.add_edge(e!("0"), e!("4"), 0);
+//         graph.add_edge(e!("4"), e!("5"), 1);
+//         graph.add_edge(e!("5"), e!("6"), 2);
 
-        let pad = format!("{pad}{x}  ");
-        write_tree(config, w, graph, b, pad, weight + 1)?;
-    }
+//         write_tree(&config, &mut buf, &graph, e!("0"), String::new(), 0).unwrap();
+//         let buf = String::from_utf8_lossy(&buf);
 
-    Ok(())
-}
-
-#[cfg(test)]
-mod test {
-    use email::{account::config::AccountConfig, envelope::ThreadedEnvelope};
-    use petgraph::graphmap::DiGraphMap;
-
-    use super::write_tree;
-
-    macro_rules! e {
-        ($id:literal) => {
-            ThreadedEnvelope {
-                id: $id,
-                message_id: $id,
-                from: "",
-                subject: "",
-                date: Default::default(),
-            }
-        };
-    }
-
-    #[test]
-    fn tree_1() {
-        let config = AccountConfig::default();
-        let mut buf = Vec::new();
-        let mut graph = DiGraphMap::new();
-        graph.add_edge(e!("0"), e!("1"), 0);
-        graph.add_edge(e!("0"), e!("2"), 0);
-        graph.add_edge(e!("0"), e!("3"), 0);
-
-        write_tree(&config, &mut buf, &graph, e!("0"), String::new(), 0).unwrap();
-        let buf = String::from_utf8_lossy(&buf);
-
-        let expected = "
-0
-├─ 1
-├─ 2
-└─ 3
-";
-        assert_eq!(expected.trim_start(), buf)
-    }
-
-    #[test]
-    fn tree_2() {
-        let config = AccountConfig::default();
-        let mut buf = Vec::new();
-        let mut graph = DiGraphMap::new();
-        graph.add_edge(e!("0"), e!("1"), 0);
-        graph.add_edge(e!("1"), e!("2"), 1);
-        graph.add_edge(e!("1"), e!("3"), 1);
-
-        write_tree(&config, &mut buf, &graph, e!("0"), String::new(), 0).unwrap();
-        let buf = String::from_utf8_lossy(&buf);
-
-        let expected = "
-0
-└─ 1
-   ├─ 2
-   └─ 3
-";
-        assert_eq!(expected.trim_start(), buf)
-    }
-
-    #[test]
-    fn tree_3() {
-        let config = AccountConfig::default();
-        let mut buf = Vec::new();
-        let mut graph = DiGraphMap::new();
-        graph.add_edge(e!("0"), e!("1"), 0);
-        graph.add_edge(e!("1"), e!("2"), 1);
-        graph.add_edge(e!("2"), e!("22"), 2);
-        graph.add_edge(e!("1"), e!("3"), 1);
-        graph.add_edge(e!("0"), e!("4"), 0);
-        graph.add_edge(e!("4"), e!("5"), 1);
-        graph.add_edge(e!("5"), e!("6"), 2);
-
-        write_tree(&config, &mut buf, &graph, e!("0"), String::new(), 0).unwrap();
-        let buf = String::from_utf8_lossy(&buf);
-
-        let expected = "
-0
-├─ 1
-│  ├─ 2
-│  │  └─ 22
-│  └─ 3
-└─ 4
-   └─ 5
-      └─ 6
-";
-        assert_eq!(expected.trim_start(), buf)
-    }
-}
+//         let expected = "
+// 0
+// ├─ 1
+// │  ├─ 2
+// │  │  └─ 22
+// │  └─ 3
+// └─ 4
+//    └─ 5
+//       └─ 6
+// ";
+//         assert_eq!(expected.trim_start(), buf)
+//     }
+// }

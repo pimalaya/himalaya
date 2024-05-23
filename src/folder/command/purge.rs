@@ -60,6 +60,6 @@ impl FolderPurgeCommand {
 
         backend.purge_folder(folder).await?;
 
-        printer.print(format!("Folder {folder} successfully purged!"))
+        printer.log(format!("Folder {folder} successfully purged!"))
     }
 }
