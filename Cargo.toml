@@ -87,11 +87,8 @@ uuid = { version = "0.8", features = ["v4"] }
 
 [patch.crates-io]
 # WIP: transition from `imap` to `imap-codec`
-email-lib = { path = "/home/soywod/sourcehut/pimalaya/email" }
-imap-client = { path = "/home/soywod/code/imap-flow/client" }
-tasks = { path = "/home/soywod/code/imap-flow/tasks" }
-# email-lib = { git = "https://git.sr.ht/~soywod/pimalaya" }
-# imap-client = { git = "https://github.com/soywod/imap-flow.git", branch = "session" }
-# tasks = { git = "https://github.com/soywod/imap-flow.git", branch = "session" }
+email-lib = { git = "https://git.sr.ht/~soywod/pimalaya", branch = "thread" }
+imap-client = { git = "https://github.com/soywod/imap-flow.git", branch = "session" }
+tasks = { git = "https://github.com/soywod/imap-flow.git", branch = "session" }
 imap-codec = { git = "https://github.com/duesee/imap-codec.git" }
 imap-types = { git = "https://github.com/duesee/imap-codec.git" }
