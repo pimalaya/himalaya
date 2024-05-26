@@ -6,13 +6,10 @@ pub mod flag;
 use color_eyre::Result;
 use comfy_table::{presets, Attribute, Cell, ContentArrangement, Row, Table};
 use crossterm::{cursor, style::Stylize, terminal};
-use email::{
-    account::config::AccountConfig,
-    envelope::{ThreadedEnvelope, ThreadedEnvelopes},
-};
+use email::{account::config::AccountConfig, envelope::ThreadedEnvelope};
 use petgraph::graphmap::DiGraphMap;
 use serde::{Serialize, Serializer};
-use std::{fmt, ops::Deref, sync::Arc};
+use std::{collections::HashMap, fmt, ops::Deref, sync::Arc};
 
 use crate::{
     cache::IdMapper,
@@ -156,7 +153,6 @@ impl From<&Envelope> for Row {
     }
 }
 
-/// Represents the list of envelopes.
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Envelopes(Vec<Envelope>);
 
@@ -261,6 +257,80 @@ impl Serialize for EnvelopesTable {
     }
 }
 
+pub struct ThreadedEnvelopes(email::envelope::ThreadedEnvelopes);
+
+impl ThreadedEnvelopes {
+    pub fn try_from_backend(
+        id_mapper: &IdMapper,
+        envelopes: email::envelope::ThreadedEnvelopes,
+    ) -> Result<ThreadedEnvelopes> {
+        let prev_edges = envelopes
+            .graph()
+            .all_edges()
+            .map(|(a, b, w)| {
+                let a = id_mapper.get_or_create_alias(&a.id)?;
+                let b = id_mapper.get_or_create_alias(&b.id)?;
+                Ok((a, b, *w))
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        let envelopes = envelopes
+            .map()
+            .iter()
+            .map(|(_, envelope)| {
+                let id = id_mapper.get_or_create_alias(&envelope.id)?;
+                let envelope = email::envelope::Envelope {
+                    id: id.clone(),
+                    message_id: envelope.message_id.clone(),
+                    in_reply_to: envelope.in_reply_to.clone(),
+                    flags: envelope.flags.clone(),
+                    subject: envelope.subject.clone(),
+                    from: envelope.from.clone(),
+                    to: envelope.to.clone(),
+                    date: envelope.date.clone(),
+                };
+
+                Ok((id, envelope))
+            })
+            .collect::<Result<HashMap<_, _>>>()?;
+
+        let envelopes = email::envelope::ThreadedEnvelopes::build(envelopes, move |envelopes| {
+            let mut graph = DiGraphMap::<ThreadedEnvelope, u8>::new();
+
+            for (a, b, w) in prev_edges.clone() {
+                let eb = envelopes.get(&b).unwrap();
+                match envelopes.get(&a) {
+                    Some(ea) => {
+                        graph.add_edge(ea.as_threaded(), eb.as_threaded(), w);
+                    }
+                    None => {
+                        let ea = ThreadedEnvelope {
+                            id: "0",
+                            message_id: "0",
+                            subject: "",
+                            from: "",
+                            date: Default::default(),
+                        };
+                        graph.add_edge(ea, eb.as_threaded(), w);
+                    }
+                }
+            }
+
+            graph
+        });
+
+        Ok(ThreadedEnvelopes(envelopes))
+    }
+}
+
+impl Deref for ThreadedEnvelopes {
+    type Target = email::envelope::ThreadedEnvelopes;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 pub struct EnvelopesTree {
     config: Arc<AccountConfig>,
     envelopes: ThreadedEnvelopes,
@@ -339,7 +409,7 @@ impl fmt::Display for EnvelopesTree {
         EnvelopesTree::fmt(
             f,
             &self.config,
-            self.envelopes.graph(),
+            self.envelopes.0.graph(),
             ThreadedEnvelope {
                 id: "0",
                 message_id: "0",
@@ -358,6 +428,14 @@ impl Serialize for EnvelopesTree {
     where
         S: Serializer,
     {
-        self.envelopes.serialize(serializer)
+        self.envelopes.0.serialize(serializer)
+    }
+}
+
+impl Deref for EnvelopesTree {
+    type Target = ThreadedEnvelopes;
+
+    fn deref(&self) -> &Self::Target {
+        &self.envelopes
     }
 }

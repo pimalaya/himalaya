@@ -25,7 +25,7 @@ use email::{
         list::{ListEnvelopes, ListEnvelopesOptions},
         thread::ThreadEnvelopes,
         watch::WatchEnvelopes,
-        Id, SingleId, ThreadedEnvelopes,
+        Id, SingleId,
     },
     flag::{add::AddFlags, remove::RemoveFlags, set::SetFlags, Flag, Flags},
     folder::{
@@ -46,7 +46,11 @@ use email::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{account::config::TomlAccountConfig, cache::IdMapper, envelope::Envelopes};
+use crate::{
+    account::config::TomlAccountConfig,
+    cache::IdMapper,
+    envelope::{Envelopes, ThreadedEnvelopes},
+};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -713,8 +717,7 @@ impl Backend {
         let backend_kind = self.toml_account_config.thread_envelopes_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
         let envelopes = self.backend.thread_envelopes(folder, opts).await?;
-        // let envelopes =
-        //     Envelopes::from_backend(&self.backend.account_config, &id_mapper, envelopes)?;
+        let envelopes = ThreadedEnvelopes::try_from_backend(&id_mapper, envelopes)?;
         Ok(envelopes)
     }
 
@@ -726,12 +729,12 @@ impl Backend {
     ) -> Result<ThreadedEnvelopes> {
         let backend_kind = self.toml_account_config.thread_envelopes_kind();
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
+        let id = id_mapper.get_id(id)?;
         let envelopes = self
             .backend
             .thread_envelope(folder, SingleId::from(id), opts)
             .await?;
-        // let envelopes =
-        //     Envelopes::from_backend(&self.backend.account_config, &id_mapper, envelopes)?;
+        let envelopes = ThreadedEnvelopes::try_from_backend(&id_mapper, envelopes)?;
         Ok(envelopes)
     }
 
