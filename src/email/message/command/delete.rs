@@ -58,6 +58,6 @@ impl MessageDeleteCommand {
 
         backend.delete_messages(folder, ids).await?;
 
-        printer.print(format!("Message(s) successfully removed from {folder}!"))
+        printer.out(format!("Message(s) successfully removed from {folder}!"))
     }
 }

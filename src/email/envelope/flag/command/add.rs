@@ -58,6 +58,6 @@ impl FlagAddCommand {
 
         backend.add_flags(folder, &ids, &flags).await?;
 
-        printer.print(format!("Flag(s) {flags} successfully added!"))
+        printer.out(format!("Flag(s) {flags} successfully added!"))
     }
 }

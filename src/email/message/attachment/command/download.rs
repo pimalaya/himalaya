@@ -67,13 +67,13 @@ impl AttachmentDownloadCommand {
             let attachments = email.attachments()?;
 
             if attachments.is_empty() {
-                printer.print_log(format!("No attachment found for message {id}!"))?;
+                printer.log(format!("No attachment found for message {id}!"))?;
                 continue;
             } else {
                 emails_count += 1;
             }
 
-            printer.print_log(format!(
+            printer.log(format!(
                 "{} attachment(s) found for message {id}!",
                 attachments.len()
             ))?;
@@ -84,7 +84,7 @@ impl AttachmentDownloadCommand {
                     .unwrap_or_else(|| Uuid::new_v4().to_string())
                     .into();
                 let filepath = account_config.get_download_file_path(&filename)?;
-                printer.print_log(format!("Downloading {:?}…", filepath))?;
+                printer.log(format!("Downloading {:?}…", filepath))?;
                 fs::write(&filepath, &attachment.body)
                     .with_context(|| format!("cannot save attachment at {filepath:?}"))?;
                 attachments_count += 1;
@@ -92,9 +92,9 @@ impl AttachmentDownloadCommand {
         }
 
         match attachments_count {
-            0 => printer.print("No attachment found!"),
-            1 => printer.print("Downloaded 1 attachment!"),
-            n => printer.print(format!(
+            0 => printer.out("No attachment found!"),
+            1 => printer.out("Downloaded 1 attachment!"),
+            n => printer.out(format!(
                 "Downloaded {} attachment(s) from {} messages(s)!",
                 n, emails_count,
             )),

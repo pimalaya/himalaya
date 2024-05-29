@@ -24,7 +24,7 @@ impl AccountCheckUpCommand {
 
         let account = self.account.name.as_ref().map(String::as_str);
 
-        printer.print_log("Checking configuration integrity…")?;
+        printer.log("Checking configuration integrity…")?;
 
         let (toml_account_config, account_config) = config.clone().into_account_configs(
             account,
@@ -33,7 +33,7 @@ impl AccountCheckUpCommand {
         )?;
         let used_backends = toml_account_config.get_used_backends();
 
-        printer.print_log("Checking backend context integrity…")?;
+        printer.log("Checking backend context integrity…")?;
 
         let ctx_builder = backend::BackendContextBuilder::new(
             toml_account_config.clone(),
@@ -46,7 +46,7 @@ impl AccountCheckUpCommand {
 
         #[cfg(feature = "maildir")]
         {
-            printer.print_log("Checking Maildir integrity…")?;
+            printer.log("Checking Maildir integrity…")?;
 
             let maildir = ctx_builder
                 .maildir
@@ -61,7 +61,7 @@ impl AccountCheckUpCommand {
 
         #[cfg(feature = "imap")]
         {
-            printer.print_log("Checking IMAP integrity…")?;
+            printer.log("Checking IMAP integrity…")?;
 
             let imap = ctx_builder
                 .imap
@@ -76,7 +76,7 @@ impl AccountCheckUpCommand {
 
         #[cfg(feature = "notmuch")]
         {
-            printer.print_log("Checking Notmuch integrity…")?;
+            printer.print("Checking Notmuch integrity…")?;
 
             let notmuch = ctx_builder
                 .notmuch
@@ -91,7 +91,7 @@ impl AccountCheckUpCommand {
 
         #[cfg(feature = "smtp")]
         {
-            printer.print_log("Checking SMTP integrity…")?;
+            printer.log("Checking SMTP integrity…")?;
 
             let smtp = ctx_builder
                 .smtp
@@ -106,7 +106,7 @@ impl AccountCheckUpCommand {
 
         #[cfg(feature = "sendmail")]
         {
-            printer.print_log("Checking Sendmail integrity…")?;
+            printer.log("Checking Sendmail integrity…")?;
 
             let sendmail = ctx_builder
                 .sendmail
@@ -119,6 +119,6 @@ impl AccountCheckUpCommand {
             }
         }
 
-        printer.print("Checkup successfully completed!")
+        printer.out("Checkup successfully completed!")
     }
 }

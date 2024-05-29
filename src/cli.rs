@@ -14,7 +14,7 @@ use crate::{
         attachment::command::AttachmentSubcommand, command::MessageSubcommand,
         template::command::TemplateSubcommand,
     },
-    output::{ColorFmt, OutputFmt},
+    output::OutputFmt,
     printer::Printer,
 };
 
@@ -51,30 +51,6 @@ pub struct Cli {
     #[arg(long, short, global = true)]
     #[arg(value_name = "FORMAT", value_enum, default_value_t = Default::default())]
     pub output: OutputFmt,
-
-    /// Control when to use colors
-    ///
-    /// The default setting is 'auto', which means himalaya will try
-    /// to guess when to use colors. For example, if himalaya is
-    /// printing to a terminal, then it will use colors, but if it is
-    /// redirected to a file or a pipe, then it will suppress color
-    /// output. himalaya will suppress color output in some other
-    /// circumstances as well. For example, if the TERM environment
-    /// variable is not set or set to 'dumb', then himalaya will not
-    /// use colors.
-    ///
-    /// The possible values are:
-    ///
-    ///  - never: colors will never be used
-    ///
-    ///  - always: colors will always be used regardless of where output is sent
-    ///
-    ///  - ansi: like 'always', but emits ANSI escapes (even in a Windows console)
-    ///
-    ///  - auto: himalaya tries to be smart
-    #[arg(long, short = 'C', global = true)]
-    #[arg(value_name = "MODE", value_enum, default_value_t = Default::default())]
-    pub color: ColorFmt,
 
     /// Enable logs with spantrace.
     ///

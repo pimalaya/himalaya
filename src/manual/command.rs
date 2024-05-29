@@ -33,7 +33,7 @@ impl ManualGenerateCommand {
         Man::new(cmd).render(&mut buffer)?;
 
         fs::create_dir_all(&self.dir)?;
-        printer.print_log(format!("Generating man page for command {cmd_name}…"))?;
+        printer.log(format!("Generating man page for command {cmd_name}…"))?;
         fs::write(self.dir.join(format!("{}.1", cmd_name)), buffer)?;
 
         for subcmd in subcmds {
@@ -42,14 +42,14 @@ impl ManualGenerateCommand {
             let mut buffer = Vec::new();
             Man::new(subcmd).render(&mut buffer)?;
 
-            printer.print_log(format!("Generating man page for subcommand {subcmd_name}…"))?;
+            printer.log(format!("Generating man page for subcommand {subcmd_name}…"))?;
             fs::write(
                 self.dir.join(format!("{}-{}.1", cmd_name, subcmd_name)),
                 buffer,
             )?;
         }
 
-        printer.print(format!(
+        printer.log(format!(
             "{subcmds_len} man page(s) successfully generated in {:?}!",
             self.dir
         ))?;

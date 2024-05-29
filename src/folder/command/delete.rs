@@ -60,6 +60,6 @@ impl FolderDeleteCommand {
 
         backend.delete_folder(folder).await?;
 
-        printer.print(format!("Folder {folder} successfully deleted!"))
+        printer.log(format!("Folder {folder} successfully deleted!"))
     }
 }

@@ -244,6 +244,7 @@ impl TomlConfig {
                             }),
                             envelope: config.envelope.map(|c| EnvelopeConfig {
                                 list: c.list.map(|c| c.remote),
+                                thread: c.thread.map(|c| c.remote),
                                 watch: c.watch.map(|c| c.remote),
                                 #[cfg(feature = "account-sync")]
                                 sync: c.sync,

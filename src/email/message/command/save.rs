@@ -68,6 +68,6 @@ impl MessageSaveCommand {
 
         backend.add_message(folder, msg.as_bytes()).await?;
 
-        printer.print(format!("Message successfully saved to {folder}!"))
+        printer.out(format!("Message successfully saved to {folder}!"))
     }
 }

@@ -23,6 +23,7 @@ use email::{
     envelope::{
         get::GetEnvelope,
         list::{ListEnvelopes, ListEnvelopesOptions},
+        thread::ThreadEnvelopes,
         watch::WatchEnvelopes,
         Id, SingleId,
     },
@@ -45,7 +46,11 @@ use email::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{account::config::TomlAccountConfig, cache::IdMapper, envelope::Envelopes};
+use crate::{
+    account::config::TomlAccountConfig,
+    cache::IdMapper,
+    envelope::{Envelopes, ThreadedEnvelopes},
+};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -333,6 +338,23 @@ impl email::backend::context::BackendContextBuilder for BackendContextBuilder {
             Some(BackendKind::Maildir) => self.list_envelopes_with_some(&self.maildir),
             #[cfg(feature = "notmuch")]
             Some(BackendKind::Notmuch) => self.list_envelopes_with_some(&self.notmuch),
+            _ => None,
+        }
+    }
+
+    fn thread_envelopes(&self) -> Option<BackendFeature<Self::Context, dyn ThreadEnvelopes>> {
+        match self.toml_account_config.thread_envelopes_kind() {
+            #[cfg(feature = "imap")]
+            Some(BackendKind::Imap) => self.thread_envelopes_with_some(&self.imap),
+            #[cfg(all(feature = "imap", feature = "account-sync"))]
+            Some(BackendKind::ImapCache) => {
+                let f = self.imap_cache.as_ref()?.thread_envelopes()?;
+                Some(Arc::new(move |ctx| f(ctx.imap_cache.as_ref()?)))
+            }
+            #[cfg(feature = "maildir")]
+            Some(BackendKind::Maildir) => self.thread_envelopes_with_some(&self.maildir),
+            #[cfg(feature = "notmuch")]
+            Some(BackendKind::Notmuch) => self.thread_envelopes_with_some(&self.notmuch),
             _ => None,
         }
     }
@@ -683,7 +705,36 @@ impl Backend {
         let id_mapper = self.build_id_mapper(folder, backend_kind)?;
         let envelopes = self.backend.list_envelopes(folder, opts).await?;
         let envelopes =
-            Envelopes::from_backend(&self.backend.account_config, &id_mapper, envelopes)?;
+            Envelopes::try_from_backend(&self.backend.account_config, &id_mapper, envelopes)?;
+        Ok(envelopes)
+    }
+
+    pub async fn thread_envelopes(
+        &self,
+        folder: &str,
+        opts: ListEnvelopesOptions,
+    ) -> Result<ThreadedEnvelopes> {
+        let backend_kind = self.toml_account_config.thread_envelopes_kind();
+        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
+        let envelopes = self.backend.thread_envelopes(folder, opts).await?;
+        let envelopes = ThreadedEnvelopes::try_from_backend(&id_mapper, envelopes)?;
+        Ok(envelopes)
+    }
+
+    pub async fn thread_envelope(
+        &self,
+        folder: &str,
+        id: usize,
+        opts: ListEnvelopesOptions,
+    ) -> Result<ThreadedEnvelopes> {
+        let backend_kind = self.toml_account_config.thread_envelopes_kind();
+        let id_mapper = self.build_id_mapper(folder, backend_kind)?;
+        let id = id_mapper.get_id(id)?;
+        let envelopes = self
+            .backend
+            .thread_envelope(folder, SingleId::from(id), opts)
+            .await?;
+        let envelopes = ThreadedEnvelopes::try_from_backend(&id_mapper, envelopes)?;
         Ok(envelopes)
     }
 

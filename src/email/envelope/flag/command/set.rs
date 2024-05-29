@@ -58,6 +58,6 @@ impl FlagSetCommand {
 
         backend.set_flags(folder, &ids, &flags).await?;
 
-        printer.print(format!("Flag(s) {flags} successfully replaced!"))
+        printer.out(format!("Flag(s) {flags} successfully replaced!"))
     }
 }

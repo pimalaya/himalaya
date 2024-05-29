@@ -61,7 +61,7 @@ impl MessageMoveCommand {
 
         backend.move_messages(source, target, ids).await?;
 
-        printer.print(format!(
+        printer.out(format!(
             "Message(s) successfully moved from {source} to {target}!"
         ))
     }

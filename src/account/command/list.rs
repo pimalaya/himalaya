@@ -2,7 +2,11 @@ use clap::Parser;
 use color_eyre::Result;
 use tracing::info;
 
-use crate::{account::Accounts, config::TomlConfig, printer::Printer};
+use crate::{
+    account::{Accounts, AccountsTable},
+    config::TomlConfig,
+    printer::Printer,
+};
 
 /// List all accounts.
 ///
@@ -23,9 +27,10 @@ impl AccountListCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing list accounts command");
 
-        let accounts: Accounts = config.accounts.iter().into();
+        let accounts = Accounts::from(config.accounts.iter());
+        let table = AccountsTable::from(accounts).with_some_width(self.table_max_width);
 
-        printer.print_table(accounts, self.table_max_width)?;
+        printer.out(table)?;
         Ok(())
     }
 }

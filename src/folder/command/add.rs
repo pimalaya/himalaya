@@ -50,6 +50,6 @@ impl AddFolderCommand {
 
         backend.add_folder(folder).await?;
 
-        printer.print(format!("Folder {folder} successfully created!"))
+        printer.log(format!("Folder {folder} successfully created!"))
     }
 }
