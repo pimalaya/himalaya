@@ -1399,7 +1399,7 @@ dependencies = [
 [[package]]
 name = "email-lib"
 version = "0.24.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya?branch=thread#bbb579312d7f10dd3359cc5068b6eb7d5d7fee50"
+source = "git+https://git.sr.ht/~soywod/pimalaya#a28e746a634c066f4b9b0b15cd6f742fa530164d"
 dependencies = [
  "advisory-lock",
  "async-ctrlc",
@@ -2272,12 +2272,13 @@ dependencies = [
 [[package]]
 name = "imap-client"
 version = "0.1.0"
-source = "git+https://github.com/soywod/imap-flow.git?branch=session#7d60dd27829b82602e7c7f794633aef432f4c191"
+source = "git+https://github.com/soywod/imap-client.git#4533995f3ebe6efdb503128af15a867b60e48645"
 dependencies = [
  "imap-flow",
+ "imap-types",
  "once_cell",
  "rustls-native-certs 0.7.0",
- "tasks",
+ "tag-generator",
  "thiserror",
  "tokio",
  "tokio-rustls 0.26.0",
@@ -2302,7 +2303,7 @@ dependencies = [
 [[package]]
 name = "imap-flow"
 version = "0.1.0"
-source = "git+https://github.com/soywod/imap-flow.git?branch=session#7d60dd27829b82602e7c7f794633aef432f4c191"
+source = "git+https://github.com/soywod/imap-flow?branch=into-inner-stream#b705adbc03976367330f2b24e99a9623e5da3733"
 dependencies = [
  "bounded-static",
  "bytes",
@@ -4582,7 +4583,7 @@ dependencies = [
 [[package]]
 name = "tag-generator"
 version = "0.1.0"
-source = "git+https://github.com/soywod/imap-flow.git?branch=session#7d60dd27829b82602e7c7f794633aef432f4c191"
+source = "git+https://github.com/duesee/imap-flow#9ffda2b321247896b3f452072ccfd38789bb547a"
 dependencies = [
  "imap-types",
  "rand",
@@ -4593,18 +4594,6 @@ name = "target-lexicon"
 version = "0.12.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e1fc403891a21bcfb7c37834ba66a547a8f402146eba7265b5a6d88059c9ff2f"
-
-[[package]]
-name = "tasks"
-version = "0.1.0"
-source = "git+https://github.com/soywod/imap-flow.git?branch=session#7d60dd27829b82602e7c7f794633aef432f4c191"
-dependencies = [
- "imap-flow",
- "imap-types",
- "tag-generator",
- "thiserror",
- "tracing",
-]
 
 [[package]]
 name = "tauri-winrt-notification"
