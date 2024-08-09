@@ -4,8 +4,6 @@ use email::{backend::feature::BackendFeatureSource, folder::purge::PurgeFolder};
 use std::process;
 use tracing::info;
 
-#[cfg(feature = "account-sync")]
-use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
     account::arg::name::AccountNameFlag, backend::Backend, config::TomlConfig,
     folder::arg::name::FolderNameArg, printer::Printer,
@@ -19,10 +17,6 @@ use crate::{
 pub struct FolderPurgeCommand {
     #[command(flatten)]
     pub folder: FolderNameArg,
-
-    #[cfg(feature = "account-sync")]
-    #[command(flatten)]
-    pub cache: CacheDisableFlag,
 
     #[command(flatten)]
     pub account: AccountNameFlag,
@@ -42,11 +36,9 @@ impl FolderPurgeCommand {
             process::exit(0);
         };
 
-        let (toml_account_config, account_config) = config.clone().into_account_configs(
-            self.account.name.as_deref(),
-            #[cfg(feature = "account-sync")]
-            self.cache.disable,
-        )?;
+        let (toml_account_config, account_config) = config
+            .clone()
+            .into_account_configs(self.account.name.as_deref())?;
 
         let purge_folder_kind = toml_account_config.purge_folder_kind();
 

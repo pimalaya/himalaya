@@ -1,16 +1,12 @@
 mod check_up;
 mod configure;
 mod list;
-#[cfg(feature = "account-sync")]
-mod sync;
 
-use color_eyre::Result;
 use clap::Subcommand;
+use color_eyre::Result;
 
 use crate::{config::TomlConfig, printer::Printer};
 
-#[cfg(feature = "account-sync")]
-use self::sync::AccountSyncCommand;
 use self::{
     check_up::AccountCheckUpCommand, configure::AccountConfigureCommand, list::AccountListCommand,
 };
@@ -30,10 +26,6 @@ pub enum AccountSubcommand {
 
     #[command(alias = "lst")]
     List(AccountListCommand),
-
-    #[cfg(feature = "account-sync")]
-    #[command(alias = "synchronize", alias = "synchronise")]
-    Sync(AccountSyncCommand),
 }
 
 impl AccountSubcommand {
@@ -43,8 +35,6 @@ impl AccountSubcommand {
             Self::CheckUp(cmd) => cmd.execute(printer, config).await,
             Self::Configure(cmd) => cmd.execute(printer, config).await,
             Self::List(cmd) => cmd.execute(printer, config).await,
-            #[cfg(feature = "account-sync")]
-            Self::Sync(cmd) => cmd.execute(printer, config).await,
         }
     }
 }

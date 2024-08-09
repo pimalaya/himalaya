@@ -3,8 +3,6 @@ use color_eyre::Result;
 use email::backend::feature::BackendFeatureSource;
 use tracing::info;
 
-#[cfg(feature = "account-sync")]
-use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::Backend,
@@ -26,10 +24,6 @@ pub struct FlagAddCommand {
     #[command(flatten)]
     pub args: IdsAndFlagsArgs,
 
-    #[cfg(feature = "account-sync")]
-    #[command(flatten)]
-    pub cache: CacheDisableFlag,
-
     #[command(flatten)]
     pub account: AccountNameFlag,
 }
@@ -40,11 +34,9 @@ impl FlagAddCommand {
 
         let folder = &self.folder.name;
         let (ids, flags) = into_tuple(&self.args.ids_and_flags);
-        let (toml_account_config, account_config) = config.clone().into_account_configs(
-            self.account.name.as_deref(),
-            #[cfg(feature = "account-sync")]
-            self.cache.disable,
-        )?;
+        let (toml_account_config, account_config) = config
+            .clone()
+            .into_account_configs(self.account.name.as_deref())?;
 
         let add_flags_kind = toml_account_config.add_flags_kind();
 

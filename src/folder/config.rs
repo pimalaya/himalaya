@@ -1,5 +1,3 @@
-#[cfg(feature = "account-sync")]
-use email::folder::sync::config::FolderSyncConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -14,8 +12,6 @@ pub struct FolderConfig {
     pub expunge: Option<FolderExpungeConfig>,
     pub purge: Option<FolderPurgeConfig>,
     pub delete: Option<FolderDeleteConfig>,
-    #[cfg(feature = "account-sync")]
-    pub sync: Option<FolderSyncConfig>,
 }
 
 impl FolderConfig {

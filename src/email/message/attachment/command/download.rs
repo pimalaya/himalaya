@@ -5,8 +5,6 @@ use std::{fs, path::PathBuf};
 use tracing::info;
 use uuid::Uuid;
 
-#[cfg(feature = "account-sync")]
-use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
     account::arg::name::AccountNameFlag, backend::Backend, config::TomlConfig,
     envelope::arg::ids::EnvelopeIdsArgs, folder::arg::name::FolderNameOptionalFlag,
@@ -25,10 +23,6 @@ pub struct AttachmentDownloadCommand {
     #[command(flatten)]
     pub envelopes: EnvelopeIdsArgs,
 
-    #[cfg(feature = "account-sync")]
-    #[command(flatten)]
-    pub cache: CacheDisableFlag,
-
     #[command(flatten)]
     pub account: AccountNameFlag,
 }
@@ -40,11 +34,9 @@ impl AttachmentDownloadCommand {
         let folder = &self.folder.name;
         let ids = &self.envelopes.ids;
 
-        let (toml_account_config, account_config) = config.clone().into_account_configs(
-            self.account.name.as_deref(),
-            #[cfg(feature = "account-sync")]
-            self.cache.disable,
-        )?;
+        let (toml_account_config, account_config) = config
+            .clone()
+            .into_account_configs(self.account.name.as_deref())?;
 
         let get_messages_kind = toml_account_config.get_messages_kind();
 

@@ -4,8 +4,6 @@ use email::backend::feature::BackendFeatureSource;
 use mml::message::FilterParts;
 use tracing::info;
 
-#[cfg(feature = "account-sync")]
-use crate::cache::arg::disable::CacheDisableFlag;
 use crate::envelope::arg::ids::EnvelopeIdArg;
 #[allow(unused)]
 use crate::{
@@ -71,10 +69,6 @@ pub struct MessageThreadCommand {
     #[arg(conflicts_with = "no_headers")]
     pub headers: Vec<String>,
 
-    #[cfg(feature = "account-sync")]
-    #[command(flatten)]
-    pub cache: CacheDisableFlag,
-
     #[command(flatten)]
     pub account: AccountNameFlag,
 }
@@ -86,11 +80,9 @@ impl MessageThreadCommand {
         let folder = &self.folder.name;
         let id = &self.envelope.id;
 
-        let (toml_account_config, account_config) = config.clone().into_account_configs(
-            self.account.name.as_deref(),
-            #[cfg(feature = "account-sync")]
-            self.cache.disable,
-        )?;
+        let (toml_account_config, account_config) = config
+            .clone()
+            .into_account_configs(self.account.name.as_deref())?;
 
         let get_messages_kind = toml_account_config.get_messages_kind();
 

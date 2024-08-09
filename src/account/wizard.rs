@@ -1,12 +1,8 @@
-#[cfg(feature = "account-sync")]
-use crate::account::config::SyncConfig;
 use color_eyre::{eyre::OptionExt, Result};
-#[cfg(feature = "account-sync")]
 use email_address::EmailAddress;
 use inquire::validator::{ErrorMessage, Validation};
 use std::{path::PathBuf, str::FromStr};
 
-#[cfg(feature = "account-discovery")]
 use crate::wizard_warn;
 use crate::{
     backend::{self, config::BackendConfig, BackendKind},
@@ -34,14 +30,11 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
 
     let addr = EmailAddress::from_str(&config.email).unwrap();
 
-    #[cfg(feature = "account-discovery")]
+    #[cfg(feature = "wizard")]
     let autoconfig_email = config.email.to_owned();
-    #[cfg(feature = "account-discovery")]
-    let autoconfig = tokio::spawn(async move {
-        email::account::discover::from_addr(&autoconfig_email)
-            .await
-            .ok()
-    });
+    #[cfg(feature = "wizard")]
+    let autoconfig =
+        tokio::spawn(async move { email::autoconfig::from_addr(&autoconfig_email).await.ok() });
 
     let account_name = inquire::Text::new("Account name: ")
         .with_default(
@@ -65,12 +58,12 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
     ));
 
     let email = &config.email;
-    #[cfg(feature = "account-discovery")]
+    #[cfg(feature = "wizard")]
     let autoconfig = autoconfig.await?;
-    #[cfg(feature = "account-discovery")]
+    #[cfg(feature = "wizard")]
     let autoconfig = autoconfig.as_ref();
 
-    #[cfg(feature = "account-discovery")]
+    #[cfg(feature = "wizard")]
     if let Some(config) = autoconfig {
         if config.is_gmail() {
             println!();
@@ -83,7 +76,7 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
     match backend::wizard::configure(
         &account_name,
         email,
-        #[cfg(feature = "account-discovery")]
+        #[cfg(feature = "wizard")]
         autoconfig,
     )
     .await?
@@ -109,7 +102,7 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
     match backend::wizard::configure_sender(
         &account_name,
         email,
-        #[cfg(feature = "account-discovery")]
+        #[cfg(feature = "wizard")]
         autoconfig,
     )
     .await?
@@ -138,22 +131,6 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
         }
         _ => (),
     };
-
-    #[cfg(feature = "account-sync")]
-    {
-        let should_configure_sync =
-            inquire::Confirm::new("Do you need offline access for your account?")
-                .with_default(false)
-                .prompt_skippable()?
-                .unwrap_or_default();
-
-        if should_configure_sync {
-            config.sync = Some(SyncConfig {
-                enable: Some(true),
-                ..Default::default()
-            });
-        }
-    }
 
     Ok(Some((account_name, config)))
 }

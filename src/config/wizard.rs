@@ -152,9 +152,6 @@ fn pretty_serialize(config: &TomlConfig) -> Result<String> {
                 #[cfg(feature = "sendmail")]
                 set_table_dotted(item, "sendmail");
 
-                #[cfg(feature = "account-sync")]
-                set_table_dotted(item, "sync");
-
                 #[cfg(feature = "pgp")]
                 set_table_dotted(item, "pgp");
             })
@@ -212,68 +209,6 @@ fn set_tables_dotted<'a>(item: &'a mut Item, keys: impl IntoIterator<Item = &'a 
 // email = "test@localhost"
 // "#,
 //         )
-//     }
-
-//     #[cfg(feature = "account-sync")]
-//     #[test]
-//     fn pretty_serialize_sync_all() {
-//         use email::account::sync::config::SyncConfig;
-
-//         assert_eq(
-//             TomlAccountConfig {
-//                 email: "test@localhost".into(),
-//                 sync: Some(SyncConfig {
-//                     enable: Some(false),
-//                     dir: Some("/tmp/test".into()),
-//                     ..Default::default()
-//                 }),
-//                 ..Default::default()
-//             },
-//             r#"[accounts.test]
-// email = "test@localhost"
-// sync.enable = false
-// sync.dir = "/tmp/test"
-// "#,
-//         );
-//     }
-
-//     #[cfg(feature = "account-sync")]
-//     #[test]
-//     fn pretty_serialize_sync_include() {
-//         use email::{
-//             account::sync::config::SyncConfig,
-//             folder::sync::config::{FolderSyncConfig, FolderSyncStrategy},
-//         };
-//         use std::collections::BTreeSet;
-
-//         use crate::folder::config::FolderConfig;
-
-//         assert_eq(
-//             TomlAccountConfig {
-//                 email: "test@localhost".into(),
-//                 sync: Some(SyncConfig {
-//                     enable: Some(true),
-//                     dir: Some("/tmp/test".into()),
-//                     ..Default::default()
-//                 }),
-//                 folder: Some(FolderConfig {
-//                     sync: Some(FolderSyncConfig {
-//                         filter: FolderSyncStrategy::Include(BTreeSet::from_iter(["test".into()])),
-//                         ..Default::default()
-//                     }),
-//                     ..Default::default()
-//                 }),
-//                 ..Default::default()
-//             },
-//             r#"[accounts.test]
-// email = "test@localhost"
-// sync.enable = true
-// sync.dir = "/tmp/test"
-// folder.sync.filter.include = ["test"]
-// folder.sync.permissions.create = true
-// folder.sync.permissions.delete = true
-// "#,
-//         );
 //     }
 
 //     #[cfg(feature = "imap")]

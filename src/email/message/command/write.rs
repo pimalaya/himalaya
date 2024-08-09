@@ -3,8 +3,6 @@ use color_eyre::Result;
 use email::{backend::feature::BackendFeatureSource, message::Message};
 use tracing::info;
 
-#[cfg(feature = "account-sync")]
-use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::Backend,
@@ -28,10 +26,6 @@ pub struct MessageWriteCommand {
     #[command(flatten)]
     pub body: MessageRawBodyArg,
 
-    #[cfg(feature = "account-sync")]
-    #[command(flatten)]
-    pub cache: CacheDisableFlag,
-
     #[command(flatten)]
     pub account: AccountNameFlag,
 }
@@ -40,11 +34,9 @@ impl MessageWriteCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing write message command");
 
-        let (toml_account_config, account_config) = config.clone().into_account_configs(
-            self.account.name.as_deref(),
-            #[cfg(feature = "account-sync")]
-            self.cache.disable,
-        )?;
+        let (toml_account_config, account_config) = config
+            .clone()
+            .into_account_configs(self.account.name.as_deref())?;
 
         let add_message_kind = toml_account_config.add_message_kind();
         let send_message_kind = toml_account_config.send_message_kind();

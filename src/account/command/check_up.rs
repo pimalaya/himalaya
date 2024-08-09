@@ -26,11 +26,7 @@ impl AccountCheckUpCommand {
 
         printer.log("Checking configuration integrity…")?;
 
-        let (toml_account_config, account_config) = config.clone().into_account_configs(
-            account,
-            #[cfg(feature = "account-sync")]
-            true,
-        )?;
+        let (toml_account_config, account_config) = config.clone().into_account_configs(account)?;
         let used_backends = toml_account_config.get_used_backends();
 
         printer.log("Checking backend context integrity…")?;
@@ -76,7 +72,7 @@ impl AccountCheckUpCommand {
 
         #[cfg(feature = "notmuch")]
         {
-            printer.print("Checking Notmuch integrity…")?;
+            printer.log("Checking Notmuch integrity…")?;
 
             let notmuch = ctx_builder
                 .notmuch
