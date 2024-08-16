@@ -3,8 +3,6 @@ use color_eyre::{eyre::eyre, Result};
 use email::backend::feature::BackendFeatureSource;
 use tracing::info;
 
-#[cfg(feature = "account-sync")]
-use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::Backend,
@@ -39,10 +37,6 @@ pub struct MessageReplyCommand {
     #[command(flatten)]
     pub body: MessageRawBodyArg,
 
-    #[cfg(feature = "account-sync")]
-    #[command(flatten)]
-    pub cache: CacheDisableFlag,
-
     #[command(flatten)]
     pub account: AccountNameFlag,
 }
@@ -52,11 +46,9 @@ impl MessageReplyCommand {
         info!("executing reply message command");
 
         let folder = &self.folder.name;
-        let (toml_account_config, account_config) = config.clone().into_account_configs(
-            self.account.name.as_deref(),
-            #[cfg(feature = "account-sync")]
-            self.cache.disable,
-        )?;
+        let (toml_account_config, account_config) = config
+            .clone()
+            .into_account_configs(self.account.name.as_deref())?;
 
         let add_message_kind = toml_account_config.add_message_kind();
         let send_message_kind = toml_account_config.send_message_kind();

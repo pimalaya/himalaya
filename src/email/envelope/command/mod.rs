@@ -1,15 +1,12 @@
 pub mod list;
 pub mod thread;
-pub mod watch;
 
 use clap::Subcommand;
 use color_eyre::Result;
 
 use crate::{config::TomlConfig, printer::Printer};
 
-use self::{
-    list::ListEnvelopesCommand, thread::ThreadEnvelopesCommand, watch::WatchEnvelopesCommand,
-};
+use self::{list::ListEnvelopesCommand, thread::ThreadEnvelopesCommand};
 
 /// Manage envelopes.
 ///
@@ -24,9 +21,6 @@ pub enum EnvelopeSubcommand {
 
     #[command()]
     Thread(ThreadEnvelopesCommand),
-
-    #[command()]
-    Watch(WatchEnvelopesCommand),
 }
 
 impl EnvelopeSubcommand {
@@ -35,7 +29,6 @@ impl EnvelopeSubcommand {
         match self {
             Self::List(cmd) => cmd.execute(printer, config).await,
             Self::Thread(cmd) => cmd.execute(printer, config).await,
-            Self::Watch(cmd) => cmd.execute(printer, config).await,
         }
     }
 }

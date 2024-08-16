@@ -5,8 +5,6 @@ use mml::MmlCompilerBuilder;
 use std::io::{self, BufRead, IsTerminal};
 use tracing::info;
 
-#[cfg(feature = "account-sync")]
-use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
     account::arg::name::AccountNameFlag, backend::Backend, config::TomlConfig,
     email::template::arg::TemplateRawArg, printer::Printer,
@@ -23,10 +21,6 @@ pub struct TemplateSendCommand {
     #[command(flatten)]
     pub template: TemplateRawArg,
 
-    #[cfg(feature = "account-sync")]
-    #[command(flatten)]
-    pub cache: CacheDisableFlag,
-
     #[command(flatten)]
     pub account: AccountNameFlag,
 }
@@ -35,11 +29,9 @@ impl TemplateSendCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing send template command");
 
-        let (toml_account_config, account_config) = config.clone().into_account_configs(
-            self.account.name.as_deref(),
-            #[cfg(feature = "account-sync")]
-            self.cache.disable,
-        )?;
+        let (toml_account_config, account_config) = config
+            .clone()
+            .into_account_configs(self.account.name.as_deref())?;
 
         let send_message_kind = toml_account_config.send_message_kind().into_iter().chain(
             toml_account_config

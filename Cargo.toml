@@ -1,12 +1,12 @@
 [package]
 name = "himalaya"
 description = "CLI to manage emails"
-version = "1.0.0-beta.4"
+version = "1.0.0"
 authors = ["soywod <clement.douin@posteo.net>"]
 edition = "2021"
 license = "MIT"
-categories = ["command-line-interface", "command-line-utilities", "email"]
-keywords = ["cli", "email", "imap", "smtp", "sync"]
+categories = ["command-line-utilities", "email"]
+keywords = ["cli", "email", "imap", "maildir", "smtp"]
 homepage = "https://pimalaya.org/"
 documentation = "https://pimalaya.org/himalaya/cli/latest/"
 repository = "https://github.com/soywod/himalaya/"
@@ -23,8 +23,9 @@ default = [
   "smtp",
   "sendmail",
 
-  "account-discovery",
-  "account-sync",
+  "wizard",
+  # "keyring",
+  # "oauth2",
 
   # "pgp-commands",
   # "pgp-gpg",
@@ -37,8 +38,9 @@ notmuch = ["email-lib/notmuch"]
 smtp = ["email-lib/smtp"]
 sendmail = ["email-lib/sendmail"]
 
-account-discovery = ["email-lib/account-discovery"]
-account-sync = ["email-lib/account-sync", "maildir"]
+keyring = ["email-lib/keyring", "secret-lib?/keyring-tokio"]
+oauth2 = ["dep:oauth-lib", "email-lib/oauth2"]
+wizard = ["dep:secret-lib", "email-lib/autoconfig"]
 
 pgp = []
 pgp-commands = ["email-lib/pgp-commands", "mml-lib/pgp-commands", "pgp"]
@@ -48,7 +50,7 @@ pgp-native = ["email-lib/pgp-native", "mml-lib/pgp-native", "pgp"]
 [dependencies]
 ariadne = "0.2"
 async-trait = "0.1"
-clap = { version = "4.4", features = ["derive", "wrap_help", "env"] }
+clap = { version = "4.4", features = ["derive", "env", "wrap_help"] }
 clap_complete = "4.4"
 clap_mangen = "0.2"
 color-eyre = "0.6.3"
@@ -56,19 +58,19 @@ comfy-table = "7.1.1"
 console = "0.15.2"
 crossterm = "0.27"
 dirs = "4"
-email-lib = { version = "=0.24.1", default-features = false, features = ["derive", "tracing"]  }
+email-lib = { version = "=0.25.0", default-features = false, features = ["derive", "thread", "tracing"] }
 email_address = "0.2.4"
 erased-serde = "0.3"
 indicatif = "0.17"
 inquire = "0.7.4"
 mail-builder = "0.3"
 md5 = "0.7"
-mml-lib = { version = "=1.0.12", default-features = false, features = ["derive"]  }
-oauth-lib = "=0.1.1"
+mml-lib = { version = "=1.0.14", default-features = false, features = ["derive"]  }
+oauth-lib = { version = "=0.1.1", optional = true }
 once_cell = "1.16"
 petgraph = "0.6"
 process-lib = { version = "=0.4.2", features = ["derive"] }
-secret-lib = { version = "=0.4.4", features = ["derive"] }
+secret-lib = { version = "=0.4.6", default-features = false, features = ["command", "derive"], optional = true }
 serde = { version = "1", features = ["derive"] }
 serde-toml-merge = "0.3"
 serde_json = "1"
@@ -86,8 +88,3 @@ url = "2.2"
 uuid = { version = "0.8", features = ["v4"] }
 
 [patch.crates-io]
-# WIP: transition from `imap` to `imap-{types,codec,client}`
-email-lib = { git = "https://git.sr.ht/~soywod/pimalaya" }
-imap-client = { git = "https://github.com/soywod/imap-client.git" }
-imap-codec = { git = "https://github.com/duesee/imap-codec.git" }
-imap-types = { git = "https://github.com/duesee/imap-codec.git" }

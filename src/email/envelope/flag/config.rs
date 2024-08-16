@@ -1,5 +1,3 @@
-#[cfg(feature = "account-sync")]
-use email::flag::sync::config::FlagSyncConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -10,8 +8,6 @@ pub struct FlagConfig {
     pub add: Option<FlagAddConfig>,
     pub set: Option<FlagSetConfig>,
     pub remove: Option<FlagRemoveConfig>,
-    #[cfg(feature = "account-sync")]
-    pub sync: Option<FlagSyncConfig>,
 }
 
 impl FlagConfig {

@@ -1,3 +1,4 @@
+#[cfg(feature = "wizard")]
 pub mod wizard;
 
 use color_eyre::{
@@ -7,7 +8,7 @@ use color_eyre::{
 use dirs::{config_dir, home_dir};
 use email::{
     account::config::AccountConfig, config::Config, envelope::config::EnvelopeConfig,
-    flag::config::FlagConfig, folder::config::FolderConfig, message::config::MessageConfig,
+    folder::config::FolderConfig, message::config::MessageConfig,
 };
 use serde::{Deserialize, Serialize};
 use serde_toml_merge::merge;
@@ -16,9 +17,9 @@ use std::{collections::HashMap, fs, path::PathBuf, sync::Arc};
 use toml::{self, Value};
 use tracing::debug;
 
-#[cfg(feature = "account-sync")]
-use crate::backend::BackendKind;
-use crate::{account::config::TomlAccountConfig, wizard_warn};
+use crate::account::config::TomlAccountConfig;
+#[cfg(feature = "wizard")]
+use crate::wizard_warn;
 
 /// Represents the user config file.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
@@ -84,9 +85,8 @@ impl TomlConfig {
     /// program stops.
     ///
     /// NOTE: the wizard can only be used with interactive shells.
+    #[cfg(feature = "wizard")]
     async fn from_wizard(path: &PathBuf) -> Result<Self> {
-        use std::process;
-
         wizard_warn!("Cannot find existing configuration at {path:?}.");
 
         let confirm = inquire::Confirm::new("Would you like to create one with the wizard? ")
@@ -95,10 +95,15 @@ impl TomlConfig {
             .unwrap_or_default();
 
         if !confirm {
-            process::exit(0);
+            std::process::exit(0);
         }
 
-        wizard::configure(path).await
+        return wizard::configure(path).await;
+    }
+
+    #[cfg(not(feature = "wizard"))]
+    async fn from_wizard(path: &PathBuf) -> Result<Self> {
+        bail!("Cannot find existing configuration at {path:?}.");
     }
 
     /// Read and parse the TOML configuration from default paths.
@@ -182,14 +187,14 @@ impl TomlConfig {
                 .ok_or_else(|| eyre!("cannot find account {name}")),
         }?;
 
-        #[cfg(feature = "imap")]
+        #[cfg(all(feature = "imap", feature = "keyring"))]
         if let Some(imap_config) = toml_account_config.imap.as_mut() {
             imap_config
                 .auth
                 .replace_undefined_keyring_entries(&account_name)?;
         }
 
-        #[cfg(feature = "smtp")]
+        #[cfg(all(feature = "smtp", feature = "keyring"))]
         if let Some(smtp_config) = toml_account_config.smtp.as_mut() {
             smtp_config
                 .auth
@@ -203,21 +208,8 @@ impl TomlConfig {
     pub fn into_account_configs(
         self,
         account_name: Option<&str>,
-        #[cfg(feature = "account-sync")] disable_cache: bool,
     ) -> Result<(Arc<TomlAccountConfig>, Arc<AccountConfig>)> {
-        #[cfg_attr(not(feature = "account-sync"), allow(unused_mut))]
-        let (account_name, mut toml_account_config) =
-            self.into_toml_account_config(account_name)?;
-
-        #[cfg(feature = "account-sync")]
-        if let Some(true) = toml_account_config.sync.as_ref().and_then(|c| c.enable) {
-            if !disable_cache {
-                toml_account_config.backend = match toml_account_config.backend {
-                    Some(BackendKind::Imap) => Some(BackendKind::ImapCache),
-                    backend => backend,
-                }
-            }
-        }
+        let (account_name, toml_account_config) = self.into_toml_account_config(account_name)?;
 
         let config = Config {
             display_name: self.display_name,
@@ -239,31 +231,19 @@ impl TomlConfig {
                             folder: config.folder.map(|c| FolderConfig {
                                 aliases: c.alias,
                                 list: c.list.map(|c| c.remote),
-                                #[cfg(feature = "account-sync")]
-                                sync: c.sync,
                             }),
                             envelope: config.envelope.map(|c| EnvelopeConfig {
                                 list: c.list.map(|c| c.remote),
                                 thread: c.thread.map(|c| c.remote),
-                                watch: c.watch.map(|c| c.remote),
-                                #[cfg(feature = "account-sync")]
-                                sync: c.sync,
                             }),
-                            flag: config.flag.map(|c| FlagConfig {
-                                #[cfg(feature = "account-sync")]
-                                sync: c.sync,
-                            }),
+                            flag: None,
                             message: config.message.map(|c| MessageConfig {
                                 read: c.read.map(|c| c.remote),
                                 write: c.write.map(|c| c.remote),
                                 send: c.send.map(|c| c.remote),
                                 delete: c.delete.map(Into::into),
-                                #[cfg(feature = "account-sync")]
-                                sync: c.sync,
                             }),
                             template: config.template,
-                            #[cfg(feature = "account-sync")]
-                            sync: config.sync.map(Into::into),
                             #[cfg(feature = "pgp")]
                             pgp: config.pgp,
                         },

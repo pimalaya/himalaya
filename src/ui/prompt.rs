@@ -14,6 +14,7 @@ pub(crate) fn passwd(prompt: &str) -> io::Result<String> {
         })
 }
 
+#[cfg(feature = "oauth2")]
 pub(crate) fn secret(prompt: &str) -> io::Result<String> {
     inquire::Password::new(prompt)
         .with_display_mode(inquire::PasswordDisplayMode::Masked)

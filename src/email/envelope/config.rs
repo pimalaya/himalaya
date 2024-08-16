@@ -1,5 +1,3 @@
-#[cfg(feature = "account-sync")]
-use email::envelope::sync::config::EnvelopeSyncConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -9,10 +7,7 @@ use crate::backend::BackendKind;
 pub struct EnvelopeConfig {
     pub list: Option<ListEnvelopesConfig>,
     pub thread: Option<ThreadEnvelopesConfig>,
-    pub watch: Option<WatchEnvelopesConfig>,
     pub get: Option<GetEnvelopeConfig>,
-    #[cfg(feature = "account-sync")]
-    pub sync: Option<EnvelopeSyncConfig>,
 }
 
 impl EnvelopeConfig {
@@ -21,10 +16,6 @@ impl EnvelopeConfig {
 
         if let Some(list) = &self.list {
             kinds.extend(list.get_used_backends());
-        }
-
-        if let Some(watch) = &self.watch {
-            kinds.extend(watch.get_used_backends());
         }
 
         if let Some(get) = &self.get {
@@ -64,26 +55,6 @@ pub struct ThreadEnvelopesConfig {
 }
 
 impl ThreadEnvelopesConfig {
-    pub fn get_used_backends(&self) -> HashSet<&BackendKind> {
-        let mut kinds = HashSet::default();
-
-        if let Some(kind) = &self.backend {
-            kinds.insert(kind);
-        }
-
-        kinds
-    }
-}
-
-#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
-pub struct WatchEnvelopesConfig {
-    pub backend: Option<BackendKind>,
-
-    #[serde(flatten)]
-    pub remote: email::envelope::watch::config::WatchEnvelopeConfig,
-}
-
-impl WatchEnvelopesConfig {
     pub fn get_used_backends(&self) -> HashSet<&BackendKind> {
         let mut kinds = HashSet::default();
 

@@ -1,6 +1,5 @@
 use color_eyre::Result;
-#[cfg(feature = "account-discovery")]
-use email::account::discover::config::AutoConfig;
+use email::autoconfig::config::AutoConfig;
 use inquire::Select;
 
 #[cfg(feature = "imap")]
@@ -35,7 +34,7 @@ const SEND_MESSAGE_BACKEND_KINDS: &[BackendKind] = &[
 pub(crate) async fn configure(
     account_name: &str,
     email: &str,
-    #[cfg(feature = "account-discovery")] autoconfig: Option<&AutoConfig>,
+    autoconfig: Option<&AutoConfig>,
 ) -> Result<Option<BackendConfig>> {
     let kind = Select::new("Default email backend", DEFAULT_BACKEND_KINDS.to_vec())
         .with_starting_cursor(0)
@@ -47,7 +46,7 @@ pub(crate) async fn configure(
             imap::wizard::configure(
                 account_name,
                 email,
-                #[cfg(feature = "account-discovery")]
+                #[cfg(feature = "wizard")]
                 autoconfig,
             )
             .await?,
@@ -65,7 +64,7 @@ pub(crate) async fn configure(
 pub(crate) async fn configure_sender(
     account_name: &str,
     email: &str,
-    #[cfg(feature = "account-discovery")] autoconfig: Option<&AutoConfig>,
+    autoconfig: Option<&AutoConfig>,
 ) -> Result<Option<BackendConfig>> {
     let kind = Select::new(
         "Backend for sending messages",
@@ -80,7 +79,7 @@ pub(crate) async fn configure_sender(
             smtp::wizard::configure(
                 account_name,
                 email,
-                #[cfg(feature = "account-discovery")]
+                #[cfg(feature = "wizard")]
                 autoconfig,
             )
             .await?,

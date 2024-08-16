@@ -42,6 +42,7 @@ impl AccountConfigureCommand {
             if let Some(ref config) = account_config.imap {
                 let reset = match &config.auth {
                     ImapAuthConfig::Passwd(config) => config.reset().await,
+                    #[cfg(feature = "oauth2")]
                     ImapAuthConfig::OAuth2(config) => config.reset().await,
                 };
                 if let Err(err) = reset {
@@ -54,6 +55,7 @@ impl AccountConfigureCommand {
             if let Some(ref config) = account_config.smtp {
                 let reset = match &config.auth {
                     SmtpAuthConfig::Passwd(config) => config.reset().await,
+                    #[cfg(feature = "oauth2")]
                     SmtpAuthConfig::OAuth2(config) => config.reset().await,
                 };
                 if let Err(err) = reset {
@@ -74,6 +76,7 @@ impl AccountConfigureCommand {
                 ImapAuthConfig::Passwd(config) => {
                     config.configure(|| prompt::passwd("IMAP password")).await
                 }
+                #[cfg(feature = "oauth2")]
                 ImapAuthConfig::OAuth2(config) => {
                     config
                         .configure(|| prompt::secret("IMAP OAuth 2.0 client secret"))
@@ -88,6 +91,7 @@ impl AccountConfigureCommand {
                 SmtpAuthConfig::Passwd(config) => {
                     config.configure(|| prompt::passwd("SMTP password")).await
                 }
+                #[cfg(feature = "oauth2")]
                 SmtpAuthConfig::OAuth2(config) => {
                     config
                         .configure(|| prompt::secret("SMTP OAuth 2.0 client secret"))

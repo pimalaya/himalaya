@@ -3,8 +3,6 @@ use color_eyre::Result;
 use email::backend::feature::BackendFeatureSource;
 use tracing::info;
 
-#[cfg(feature = "account-sync")]
-use crate::cache::arg::disable::CacheDisableFlag;
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::Backend,
@@ -26,10 +24,6 @@ pub struct MessageCopyCommand {
     #[command(flatten)]
     pub envelopes: EnvelopeIdsArgs,
 
-    #[cfg(feature = "account-sync")]
-    #[command(flatten)]
-    pub cache: CacheDisableFlag,
-
     #[command(flatten)]
     pub account: AccountNameFlag,
 }
@@ -42,11 +36,9 @@ impl MessageCopyCommand {
         let target = &self.target_folder.name;
         let ids = &self.envelopes.ids;
 
-        let (toml_account_config, account_config) = config.clone().into_account_configs(
-            self.account.name.as_deref(),
-            #[cfg(feature = "account-sync")]
-            self.cache.disable,
-        )?;
+        let (toml_account_config, account_config) = config
+            .clone()
+            .into_account_configs(self.account.name.as_deref())?;
 
         let copy_messages_kind = toml_account_config.copy_messages_kind();
 

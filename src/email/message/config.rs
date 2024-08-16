@@ -1,6 +1,4 @@
 use email::message::delete::config::DeleteMessageStyle;
-#[cfg(feature = "account-sync")]
-use email::message::sync::config::MessageSyncConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -15,8 +13,6 @@ pub struct MessageConfig {
     pub copy: Option<MessageCopyConfig>,
     pub r#move: Option<MessageMoveConfig>,
     pub delete: Option<DeleteMessageConfig>,
-    #[cfg(feature = "account-sync")]
-    pub sync: Option<MessageSyncConfig>,
 }
 
 impl MessageConfig {

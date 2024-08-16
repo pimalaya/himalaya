@@ -24,25 +24,6 @@ use crate::{
     folder::config::FolderConfig, message::config::MessageConfig,
 };
 
-#[cfg(feature = "account-sync")]
-#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct SyncConfig {
-    pub backend: Option<BackendKind>,
-    pub enable: Option<bool>,
-    pub dir: Option<PathBuf>,
-}
-
-impl From<SyncConfig> for email::account::sync::config::SyncConfig {
-    fn from(config: SyncConfig) -> Self {
-        Self {
-            enable: config.enable,
-            dir: config.dir,
-            ..Default::default()
-        }
-    }
-}
-
 /// Represents all existing kind of account config.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
@@ -55,8 +36,6 @@ pub struct TomlAccountConfig {
     pub downloads_dir: Option<PathBuf>,
     pub backend: Option<BackendKind>,
 
-    #[cfg(feature = "account-sync")]
-    pub sync: Option<SyncConfig>,
     #[cfg(feature = "pgp")]
     pub pgp: Option<PgpConfig>,
 
@@ -79,13 +58,6 @@ pub struct TomlAccountConfig {
 }
 
 impl TomlAccountConfig {
-    pub fn sync_kind(&self) -> Option<&BackendKind> {
-        self.sync
-            .as_ref()
-            .and_then(|sync| sync.backend.as_ref())
-            .or(self.backend.as_ref())
-    }
-
     pub fn add_folder_kind(&self) -> Option<&BackendKind> {
         self.folder
             .as_ref()
@@ -147,14 +119,6 @@ impl TomlAccountConfig {
             .as_ref()
             .and_then(|envelope| envelope.thread.as_ref())
             .and_then(|thread| thread.backend.as_ref())
-            .or(self.backend.as_ref())
-    }
-
-    pub fn watch_envelopes_kind(&self) -> Option<&BackendKind> {
-        self.envelope
-            .as_ref()
-            .and_then(|envelope| envelope.watch.as_ref())
-            .and_then(|watch| watch.backend.as_ref())
             .or(self.backend.as_ref())
     }
 
