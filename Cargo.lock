@@ -1235,7 +1235,7 @@ dependencies = [
 [[package]]
 name = "email-lib"
 version = "0.25.0"
-source = "git+https://git.sr.ht/~soywod/pimalaya?rev=5f27b227#5f27b22759513f0bdf4b163262210ff38a4d54da"
+source = "git+https://git.sr.ht/~soywod/pimalaya#0a0921f5e5888ae64951a42b989d3dfad997a68b"
 dependencies = [
  "async-trait",
  "chrono",
@@ -2198,9 +2198,9 @@ dependencies = [
 
 [[package]]
 name = "imap-client"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56aad0480cb885b11bf3bed91df513911a9c084f2199df051f4f9b8251488840"
+checksum = "a7f4daa800d27626983116fb9aa8eb09d4fecbd45676490a3734a3c19b6139cb"
 dependencies = [
  "imap-next",
  "once_cell",

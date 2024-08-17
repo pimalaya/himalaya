@@ -88,4 +88,4 @@ url = "2.2"
 uuid = { version = "0.8", features = ["v4"] }
 
 [patch.crates-io]
-email-lib = { git = "https://git.sr.ht/~soywod/pimalaya", rev = "5f27b227" }
+email-lib = { git = "https://git.sr.ht/~soywod/pimalaya" }
