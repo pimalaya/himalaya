@@ -30,7 +30,9 @@ pub struct Envelope {
     pub from: Mailbox,
     pub to: Mailbox,
     pub date: String,
+    pub has_attachment: bool,
 }
+
 impl From<Envelope> for Row {
     fn from(envelope: Envelope) -> Self {
         let mut all_attributes = vec![];
@@ -103,17 +105,23 @@ impl From<&Envelope> for Row {
 
         let flags = {
             let mut flags = String::new();
+
             flags.push(if !unseen { ' ' } else { '✷' });
+
             flags.push(if envelope.flags.contains(&Flag::Answered) {
                 '↵'
             } else {
                 ' '
             });
+
             flags.push(if envelope.flags.contains(&Flag::Flagged) {
                 '⚑'
             } else {
                 ' '
             });
+
+            flags.push(if envelope.has_attachment { '📎' } else { ' ' });
+
             flags
         };
 
@@ -178,6 +186,7 @@ impl Envelopes {
                         addr: envelope.to.addr.clone(),
                     },
                     date: envelope.format_date(config),
+                    has_attachment: envelope.has_attachment,
                 })
             })
             .collect::<Result<Vec<_>>>()?;
@@ -288,6 +297,7 @@ impl ThreadedEnvelopes {
                     from: envelope.from.clone(),
                     to: envelope.to.clone(),
                     date: envelope.date.clone(),
+                    has_attachment: envelope.has_attachment,
                 };
 
                 Ok((id, envelope))
