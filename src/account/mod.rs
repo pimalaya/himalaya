@@ -57,7 +57,7 @@ impl Accounts {
 
         table
             .load_preset(presets::NOTHING)
-            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_content_arrangement(ContentArrangement::DynamicFullWidth)
             .set_header(Row::from([
                 Cell::new("NAME").add_attribute(Attribute::Reverse),
                 Cell::new("BACKENDS").add_attribute(Attribute::Reverse),

@@ -2,7 +2,7 @@ pub mod arg;
 pub mod command;
 pub mod config;
 
-use comfy_table::{presets, Attribute, Cell, Row, Table};
+use comfy_table::{presets, Attribute, Cell, ContentArrangement, Row, Table};
 use serde::{Serialize, Serializer};
 use std::{fmt, ops::Deref};
 
@@ -41,6 +41,7 @@ impl Folders {
 
         table
             .load_preset(presets::NOTHING)
+            .set_content_arrangement(ContentArrangement::DynamicFullWidth)
             .set_header(Row::from([
                 Cell::new("NAME").add_attribute(Attribute::Reverse),
                 Cell::new("DESC").add_attribute(Attribute::Reverse),

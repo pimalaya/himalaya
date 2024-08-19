@@ -199,7 +199,7 @@ impl Envelopes {
 
         table
             .load_preset(presets::NOTHING)
-            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_content_arrangement(ContentArrangement::DynamicFullWidth)
             .set_header(Row::from([
                 Cell::new("ID").add_attribute(Attribute::Reverse),
                 Cell::new("FLAGS").add_attribute(Attribute::Reverse),
