@@ -47,7 +47,11 @@ impl FolderListCommand {
         .await?;
 
         let folders = Folders::from(backend.list_folders().await?);
-        let table = FoldersTable::from(folders).with_some_width(self.table_max_width);
+        let table = FoldersTable::from(folders)
+            .with_some_width(self.table_max_width)
+            .with_some_preset(toml_account_config.folder_list_table_preset())
+            .with_some_name_color(toml_account_config.folder_list_table_name_color())
+            .with_some_desc_color(toml_account_config.folder_list_table_desc_color());
 
         printer.log(table)?;
         Ok(())

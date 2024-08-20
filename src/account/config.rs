@@ -3,6 +3,8 @@
 //! This module contains the raw deserialized representation of an
 //! account in the accounts section of the user configuration file.
 
+use comfy_table::presets;
+use crossterm::style::Color;
 #[cfg(feature = "pgp")]
 use email::account::config::pgp::PgpConfig;
 #[cfg(feature = "imap")]
@@ -21,7 +23,7 @@ use std::{collections::HashSet, path::PathBuf};
 
 use crate::{
     backend::BackendKind, envelope::config::EnvelopeConfig, flag::config::FlagConfig,
-    folder::config::FolderConfig, message::config::MessageConfig,
+    folder::config::FolderConfig, message::config::MessageConfig, ui::map_color,
 };
 
 /// Represents all existing kind of account config.
@@ -58,6 +60,110 @@ pub struct TomlAccountConfig {
 }
 
 impl TomlAccountConfig {
+    pub fn folder_list_table_preset(&self) -> Option<String> {
+        self.folder
+            .as_ref()
+            .and_then(|folder| folder.list.as_ref())
+            .and_then(|list| list.table.as_ref())
+            .and_then(|table| table.preset.clone())
+    }
+
+    pub fn folder_list_table_name_color(&self) -> Option<Color> {
+        self.folder
+            .as_ref()
+            .and_then(|folder| folder.list.as_ref())
+            .and_then(|list| list.table.as_ref())
+            .and_then(|table| table.name_color)
+    }
+
+    pub fn folder_list_table_desc_color(&self) -> Option<Color> {
+        self.folder
+            .as_ref()
+            .and_then(|folder| folder.list.as_ref())
+            .and_then(|list| list.table.as_ref())
+            .and_then(|table| table.desc_color)
+    }
+
+    pub fn envelope_list_table_preset(&self) -> Option<String> {
+        self.envelope
+            .as_ref()
+            .and_then(|env| env.list.as_ref())
+            .and_then(|list| list.table.as_ref())
+            .and_then(|table| table.preset.clone())
+    }
+
+    pub fn envelope_list_table_unseen_char(&self) -> Option<char> {
+        self.envelope
+            .as_ref()
+            .and_then(|env| env.list.as_ref())
+            .and_then(|list| list.table.as_ref())
+            .and_then(|table| table.unseen_char)
+    }
+
+    pub fn envelope_list_table_replied_char(&self) -> Option<char> {
+        self.envelope
+            .as_ref()
+            .and_then(|env| env.list.as_ref())
+            .and_then(|list| list.table.as_ref())
+            .and_then(|table| table.replied_char)
+    }
+
+    pub fn envelope_list_table_flagged_char(&self) -> Option<char> {
+        self.envelope
+            .as_ref()
+            .and_then(|env| env.list.as_ref())
+            .and_then(|list| list.table.as_ref())
+            .and_then(|table| table.flagged_char)
+    }
+
+    pub fn envelope_list_table_attachment_char(&self) -> Option<char> {
+        self.envelope
+            .as_ref()
+            .and_then(|env| env.list.as_ref())
+            .and_then(|list| list.table.as_ref())
+            .and_then(|table| table.attachment_char)
+    }
+
+    pub fn envelope_list_table_id_color(&self) -> Option<Color> {
+        self.envelope
+            .as_ref()
+            .and_then(|env| env.list.as_ref())
+            .and_then(|list| list.table.as_ref())
+            .and_then(|table| table.id_color)
+    }
+
+    pub fn envelope_list_table_flags_color(&self) -> Option<Color> {
+        self.envelope
+            .as_ref()
+            .and_then(|env| env.list.as_ref())
+            .and_then(|list| list.table.as_ref())
+            .and_then(|table| table.flags_color)
+    }
+
+    pub fn envelope_list_table_subject_color(&self) -> Option<Color> {
+        self.envelope
+            .as_ref()
+            .and_then(|env| env.list.as_ref())
+            .and_then(|list| list.table.as_ref())
+            .and_then(|table| table.subject_color)
+    }
+
+    pub fn envelope_list_table_sender_color(&self) -> Option<Color> {
+        self.envelope
+            .as_ref()
+            .and_then(|env| env.list.as_ref())
+            .and_then(|list| list.table.as_ref())
+            .and_then(|table| table.sender_color)
+    }
+
+    pub fn envelope_list_table_date_color(&self) -> Option<Color> {
+        self.envelope
+            .as_ref()
+            .and_then(|env| env.list.as_ref())
+            .and_then(|list| list.table.as_ref())
+            .and_then(|table| table.date_color)
+    }
+
     pub fn add_folder_kind(&self) -> Option<&BackendKind> {
         self.folder
             .as_ref()
@@ -226,5 +332,32 @@ impl TomlAccountConfig {
         }
 
         used_backends
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ListAccountsTableConfig {
+    pub preset: Option<String>,
+    pub name_color: Option<Color>,
+    pub backends_color: Option<Color>,
+    pub default_color: Option<Color>,
+}
+
+impl ListAccountsTableConfig {
+    pub fn preset(&self) -> &str {
+        self.preset.as_deref().unwrap_or(presets::ASCII_MARKDOWN)
+    }
+
+    pub fn name_color(&self) -> comfy_table::Color {
+        map_color(self.name_color.unwrap_or(Color::Green))
+    }
+
+    pub fn backends_color(&self) -> comfy_table::Color {
+        map_color(self.backends_color.unwrap_or(Color::Blue))
+    }
+
+    pub fn default_color(&self) -> comfy_table::Color {
+        map_color(self.default_color.unwrap_or(Color::Reset))
     }
 }

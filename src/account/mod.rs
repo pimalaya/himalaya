@@ -4,11 +4,12 @@ pub mod config;
 #[cfg(feature = "wizard")]
 pub(crate) mod wizard;
 
-use comfy_table::{presets, Attribute, Cell, Color, ContentArrangement, Row, Table};
+use comfy_table::{Cell, ContentArrangement, Row, Table};
+use crossterm::style::Color;
 use serde::{Serialize, Serializer};
 use std::{collections::hash_map::Iter, fmt, ops::Deref};
 
-use self::config::TomlAccountConfig;
+use self::config::{ListAccountsTableConfig, TomlAccountConfig};
 
 /// Represents the printable account.
 #[derive(Debug, Default, PartialEq, Eq, Serialize)]
@@ -30,12 +31,12 @@ impl Account {
         }
     }
 
-    pub fn to_row(&self) -> Row {
+    pub fn to_row(&self, config: &ListAccountsTableConfig) -> Row {
         let mut row = Row::new();
 
-        row.add_cell(Cell::new(&self.name).fg(Color::Green));
-        row.add_cell(Cell::new(&self.backend).fg(Color::Blue));
-        row.add_cell(Cell::new(if self.default { "yes" } else { "" }).fg(Color::White));
+        row.add_cell(Cell::new(&self.name).fg(config.name_color()));
+        row.add_cell(Cell::new(&self.backend).fg(config.backends_color()));
+        row.add_cell(Cell::new(if self.default { "yes" } else { "" }).fg(config.default_color()));
 
         row
     }
@@ -50,24 +51,6 @@ impl fmt::Display for Account {
 /// Represents the list of printable accounts.
 #[derive(Debug, Default, Serialize)]
 pub struct Accounts(Vec<Account>);
-
-impl Accounts {
-    pub fn to_table(&self) -> Table {
-        let mut table = Table::new();
-
-        table
-            .load_preset(presets::NOTHING)
-            .set_content_arrangement(ContentArrangement::DynamicFullWidth)
-            .set_header(Row::from([
-                Cell::new("NAME").add_attribute(Attribute::Reverse),
-                Cell::new("BACKENDS").add_attribute(Attribute::Reverse),
-                Cell::new("DEFAULT").add_attribute(Attribute::Reverse),
-            ]))
-            .add_rows(self.iter().map(Account::to_row));
-
-        table
-    }
-}
 
 impl Deref for Accounts {
     type Target = Vec<Account>;
@@ -98,7 +81,7 @@ impl From<Iter<'_, String, TomlAccountConfig>> for Accounts {
                 }
 
                 #[cfg(feature = "notmuch")]
-                if account.imap.is_some() {
+                if account.notmuch.is_some() {
                     if !backends.is_empty() {
                         backends.push_str(", ")
                     }
@@ -135,11 +118,32 @@ impl From<Iter<'_, String, TomlAccountConfig>> for Accounts {
 pub struct AccountsTable {
     accounts: Accounts,
     width: Option<u16>,
+    config: ListAccountsTableConfig,
 }
 
 impl AccountsTable {
     pub fn with_some_width(mut self, width: Option<u16>) -> Self {
         self.width = width;
+        self
+    }
+
+    pub fn with_some_preset(mut self, preset: Option<String>) -> Self {
+        self.config.preset = preset;
+        self
+    }
+
+    pub fn with_some_name_color(mut self, color: Option<Color>) -> Self {
+        self.config.name_color = color;
+        self
+    }
+
+    pub fn with_some_backends_color(mut self, color: Option<Color>) -> Self {
+        self.config.backends_color = color;
+        self
+    }
+
+    pub fn with_some_default_color(mut self, color: Option<Color>) -> Self {
+        self.config.default_color = color;
         self
     }
 }
@@ -149,13 +153,28 @@ impl From<Accounts> for AccountsTable {
         Self {
             accounts,
             width: None,
+            config: Default::default(),
         }
     }
 }
 
 impl fmt::Display for AccountsTable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = self.accounts.to_table();
+        let mut table = Table::new();
+
+        table
+            .load_preset(self.config.preset())
+            .set_content_arrangement(ContentArrangement::DynamicFullWidth)
+            .set_header(Row::from([
+                Cell::new("NAME"),
+                Cell::new("BACKENDS"),
+                Cell::new("DEFAULT"),
+            ]))
+            .add_rows(
+                self.accounts
+                    .iter()
+                    .map(|account| account.to_row(&self.config)),
+            );
 
         if let Some(width) = self.width {
             table.set_width(width);

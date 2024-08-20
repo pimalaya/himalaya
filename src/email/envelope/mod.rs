@@ -4,8 +4,12 @@ pub mod config;
 pub mod flag;
 
 use color_eyre::Result;
-use comfy_table::{presets, Attribute, Cell, ContentArrangement, Row, Table};
-use crossterm::{cursor, style::Stylize, terminal};
+use comfy_table::{Attribute, Cell, ContentArrangement, Row, Table};
+use crossterm::{
+    cursor,
+    style::{Color, Stylize},
+    terminal,
+};
 use email::{account::config::AccountConfig, envelope::ThreadedEnvelope};
 use petgraph::graphmap::DiGraphMap;
 use serde::{Serialize, Serializer};
@@ -15,6 +19,8 @@ use crate::{
     cache::IdMapper,
     flag::{Flag, Flags},
 };
+
+use self::config::ListEnvelopesTableConfig;
 
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Mailbox {
@@ -33,72 +39,11 @@ pub struct Envelope {
     pub has_attachment: bool,
 }
 
-impl From<Envelope> for Row {
-    fn from(envelope: Envelope) -> Self {
+impl Envelope {
+    fn to_row(&self, config: &ListEnvelopesTableConfig) -> Row {
         let mut all_attributes = vec![];
 
-        let unseen = !envelope.flags.contains(&Flag::Seen);
-        if unseen {
-            all_attributes.push(Attribute::Bold)
-        }
-
-        let flags = {
-            let mut flags = String::new();
-            flags.push(if !unseen { ' ' } else { '✷' });
-            flags.push(if envelope.flags.contains(&Flag::Answered) {
-                '↵'
-            } else {
-                ' '
-            });
-            flags.push(if envelope.flags.contains(&Flag::Flagged) {
-                '⚑'
-            } else {
-                ' '
-            });
-            flags
-        };
-
-        let mut row = Row::new();
-
-        row.add_cell(
-            Cell::new(envelope.id)
-                .add_attributes(all_attributes.clone())
-                .fg(comfy_table::Color::Red),
-        )
-        .add_cell(
-            Cell::new(flags)
-                .add_attributes(all_attributes.clone())
-                .fg(comfy_table::Color::White),
-        )
-        .add_cell(
-            Cell::new(envelope.subject)
-                .add_attributes(all_attributes.clone())
-                .fg(comfy_table::Color::Green),
-        )
-        .add_cell(
-            Cell::new(if let Some(name) = envelope.from.name {
-                name
-            } else {
-                envelope.from.addr
-            })
-            .add_attributes(all_attributes.clone())
-            .fg(comfy_table::Color::Blue),
-        )
-        .add_cell(
-            Cell::new(envelope.date)
-                .add_attributes(all_attributes)
-                .fg(comfy_table::Color::Yellow),
-        );
-
-        row
-    }
-}
-
-impl From<&Envelope> for Row {
-    fn from(envelope: &Envelope) -> Self {
-        let mut all_attributes = vec![];
-
-        let unseen = !envelope.flags.contains(&Flag::Seen);
+        let unseen = !self.flags.contains(&Flag::Seen);
         if unseen {
             all_attributes.push(Attribute::Bold)
         }
@@ -106,55 +51,45 @@ impl From<&Envelope> for Row {
         let flags = {
             let mut flags = String::new();
 
-            flags.push(if !unseen { ' ' } else { '✷' });
-
-            flags.push(if envelope.flags.contains(&Flag::Answered) {
-                '↵'
-            } else {
-                ' '
-            });
-
-            flags.push(if envelope.flags.contains(&Flag::Flagged) {
-                '⚑'
-            } else {
-                ' '
-            });
-
-            flags.push(if envelope.has_attachment { '📎' } else { ' ' });
+            flags.push(config.unseen_char(unseen));
+            flags.push(config.replied_char(self.flags.contains(&Flag::Answered)));
+            flags.push(config.flagged_char(self.flags.contains(&Flag::Flagged)));
+            flags.push(config.attachment_char(self.has_attachment));
 
             flags
         };
 
         let mut row = Row::new();
+        row.max_height(1);
 
         row.add_cell(
-            Cell::new(&envelope.id)
+            Cell::new(&self.id)
                 .add_attributes(all_attributes.clone())
-                .fg(comfy_table::Color::Red),
+                .fg(config.id_color()),
         )
         .add_cell(
             Cell::new(flags)
                 .add_attributes(all_attributes.clone())
-                .fg(comfy_table::Color::White),
+                .fg(config.flags_color()),
         )
         .add_cell(
-            Cell::new(&envelope.subject)
+            Cell::new(&self.subject)
                 .add_attributes(all_attributes.clone())
-                .fg(comfy_table::Color::Green),
+                .fg(config.subject_color()),
         )
         .add_cell(
-            Cell::new(if let Some(name) = &envelope.from.name {
+            Cell::new(if let Some(name) = &self.from.name {
                 name
             } else {
-                &envelope.from.addr
+                &self.from.addr
             })
             .add_attributes(all_attributes.clone())
-            .fg(comfy_table::Color::Blue),
+            .fg(config.sender_color()),
         )
         .add_cell(
-            Cell::new(&envelope.date)
+            Cell::new(&self.date)
                 .add_attributes(all_attributes)
-                .fg(comfy_table::Color::Yellow),
+                .fg(config.date_color()),
         );
 
         row
@@ -193,24 +128,6 @@ impl Envelopes {
 
         Ok(Envelopes(envelopes))
     }
-
-    pub fn to_table(&self) -> Table {
-        let mut table = Table::new();
-
-        table
-            .load_preset(presets::NOTHING)
-            .set_content_arrangement(ContentArrangement::DynamicFullWidth)
-            .set_header(Row::from([
-                Cell::new("ID").add_attribute(Attribute::Reverse),
-                Cell::new("FLAGS").add_attribute(Attribute::Reverse),
-                Cell::new("SUBJECT").add_attribute(Attribute::Reverse),
-                Cell::new("FROM").add_attribute(Attribute::Reverse),
-                Cell::new("DATE").add_attribute(Attribute::Reverse),
-            ]))
-            .add_rows(self.iter().map(Row::from));
-
-        table
-    }
 }
 
 impl Deref for Envelopes {
@@ -224,11 +141,62 @@ impl Deref for Envelopes {
 pub struct EnvelopesTable {
     envelopes: Envelopes,
     width: Option<u16>,
+    config: ListEnvelopesTableConfig,
 }
 
 impl EnvelopesTable {
     pub fn with_some_width(mut self, width: Option<u16>) -> Self {
         self.width = width;
+        self
+    }
+
+    pub fn with_some_preset(mut self, preset: Option<String>) -> Self {
+        self.config.preset = preset;
+        self
+    }
+
+    pub fn with_some_unseen_char(mut self, char: Option<char>) -> Self {
+        self.config.unseen_char = char;
+        self
+    }
+
+    pub fn with_some_replied_char(mut self, char: Option<char>) -> Self {
+        self.config.replied_char = char;
+        self
+    }
+
+    pub fn with_some_flagged_char(mut self, char: Option<char>) -> Self {
+        self.config.flagged_char = char;
+        self
+    }
+
+    pub fn with_some_attachment_char(mut self, char: Option<char>) -> Self {
+        self.config.attachment_char = char;
+        self
+    }
+
+    pub fn with_some_id_color(mut self, color: Option<Color>) -> Self {
+        self.config.id_color = color;
+        self
+    }
+
+    pub fn with_some_flags_color(mut self, color: Option<Color>) -> Self {
+        self.config.flags_color = color;
+        self
+    }
+
+    pub fn with_some_subject_color(mut self, color: Option<Color>) -> Self {
+        self.config.subject_color = color;
+        self
+    }
+
+    pub fn with_some_sender_color(mut self, color: Option<Color>) -> Self {
+        self.config.sender_color = color;
+        self
+    }
+
+    pub fn with_some_date_color(mut self, color: Option<Color>) -> Self {
+        self.config.date_color = color;
         self
     }
 }
@@ -238,13 +206,26 @@ impl From<Envelopes> for EnvelopesTable {
         Self {
             envelopes,
             width: None,
+            config: Default::default(),
         }
     }
 }
 
 impl fmt::Display for EnvelopesTable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = self.envelopes.to_table();
+        let mut table = Table::new();
+
+        table
+            .load_preset(self.config.preset())
+            .set_content_arrangement(ContentArrangement::DynamicFullWidth)
+            .set_header(Row::from([
+                Cell::new("ID"),
+                Cell::new("FLAGS"),
+                Cell::new("SUBJECT"),
+                Cell::new("FROM"),
+                Cell::new("DATE"),
+            ]))
+            .add_rows(self.envelopes.iter().map(|env| env.to_row(&self.config)));
 
         if let Some(width) = self.width {
             table.set_width(width);

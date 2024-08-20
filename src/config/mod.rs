@@ -5,6 +5,7 @@ use color_eyre::{
     eyre::{bail, eyre, Context},
     Result,
 };
+use crossterm::style::Color;
 use dirs::{config_dir, home_dir};
 use email::{
     account::config::AccountConfig, config::Config, envelope::config::EnvelopeConfig,
@@ -17,7 +18,7 @@ use std::{collections::HashMap, fs, path::PathBuf, sync::Arc};
 use toml::{self, Value};
 use tracing::debug;
 
-use crate::account::config::TomlAccountConfig;
+use crate::account::config::{ListAccountsTableConfig, TomlAccountConfig};
 #[cfg(feature = "wizard")]
 use crate::wizard_warn;
 
@@ -31,9 +32,42 @@ pub struct TomlConfig {
     pub signature_delim: Option<String>,
     pub downloads_dir: Option<PathBuf>,
     pub accounts: HashMap<String, TomlAccountConfig>,
+    pub account: Option<AccountsConfig>,
 }
 
 impl TomlConfig {
+    pub fn account_list_table_preset(&self) -> Option<String> {
+        self.account
+            .as_ref()
+            .and_then(|account| account.list.as_ref())
+            .and_then(|list| list.table.as_ref())
+            .and_then(|table| table.preset.clone())
+    }
+
+    pub fn account_list_table_name_color(&self) -> Option<Color> {
+        self.account
+            .as_ref()
+            .and_then(|account| account.list.as_ref())
+            .and_then(|list| list.table.as_ref())
+            .and_then(|table| table.name_color)
+    }
+
+    pub fn account_list_table_backends_color(&self) -> Option<Color> {
+        self.account
+            .as_ref()
+            .and_then(|account| account.list.as_ref())
+            .and_then(|list| list.table.as_ref())
+            .and_then(|table| table.backends_color)
+    }
+
+    pub fn account_list_table_default_color(&self) -> Option<Color> {
+        self.account
+            .as_ref()
+            .and_then(|account| account.list.as_ref())
+            .and_then(|list| list.table.as_ref())
+            .and_then(|table| table.default_color)
+    }
+
     /// Read and parse the TOML configuration at the given paths.
     ///
     /// Returns an error if a configuration file cannot be read or if
@@ -265,4 +299,16 @@ pub fn path_parser(path: &str) -> Result<PathBuf, String> {
     expand::try_path(path)
         .map(canonicalize::path)
         .map_err(|err| err.to_string())
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct AccountsConfig {
+    pub list: Option<ListAccountsConfig>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ListAccountsConfig {
+    pub table: Option<ListAccountsTableConfig>,
 }

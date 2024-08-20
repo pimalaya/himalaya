@@ -188,7 +188,18 @@ impl ListEnvelopesCommand {
         };
 
         let envelopes = backend.list_envelopes(folder, opts).await?;
-        let table = EnvelopesTable::from(envelopes).with_some_width(self.table_max_width);
+        let table = EnvelopesTable::from(envelopes)
+            .with_some_width(self.table_max_width)
+            .with_some_preset(toml_account_config.envelope_list_table_preset())
+            .with_some_unseen_char(toml_account_config.envelope_list_table_unseen_char())
+            .with_some_replied_char(toml_account_config.envelope_list_table_replied_char())
+            .with_some_flagged_char(toml_account_config.envelope_list_table_flagged_char())
+            .with_some_attachment_char(toml_account_config.envelope_list_table_attachment_char())
+            .with_some_id_color(toml_account_config.envelope_list_table_id_color())
+            .with_some_flags_color(toml_account_config.envelope_list_table_flags_color())
+            .with_some_subject_color(toml_account_config.envelope_list_table_subject_color())
+            .with_some_sender_color(toml_account_config.envelope_list_table_sender_color())
+            .with_some_date_color(toml_account_config.envelope_list_table_date_color());
 
         printer.out(table)?;
         Ok(())

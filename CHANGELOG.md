@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `account.list.table.preset` global config option, `accounts.<name>.folder.list.table.preset` and `accounts.<name>.envelope.list.table.preset` account config options.
+
+  These options customize the shape of tables, see examples at [`comfy_table::presets`](https://docs.rs/comfy-table/latest/comfy_table/presets/index.html). Defaults to `"||  |-|||           "`, which corresponds to [`comfy_table::presets::ASCII_MARKDOWN`](https://docs.rs/comfy-table/latest/comfy_table/presets/constant.ASCII_MARKDOWN.html).
+
+- Added `account.list.table.name-color` config option to customize the color used for the accounts' `NAME` column (defaults to `green`).
+- Added `account.list.table.backends-color` config option to customize the color used for the folders' `BACKENDS` column (defaults to `blue`).
+- Added `account.list.table.default-color` config option to customize the color used for the folders' `DEFAULT` column (defaults to `reset`).
+- Added `accounts.<name>.folder.list.table.name-color` account config option to customize the color used for the folders' `NAME` column (defaults to `blue`).
+- Added `accounts.<name>.folder.list.table.desc-color` account config option to customize the color used for the folders' `DESC` column (defaults to `green`).
+- Added `accounts.<name>.envelope.list.table.id-color` account config option to customize the color used for the envelopes' `ID` column (defaults to `red`).
+- Added `accounts.<name>.envelope.list.table.flags-color` account config option to customize the color used for the envelopes' `FLAGS` column (defaults to `reset`).
+- Added `accounts.<name>.envelope.list.table.subject-color` account config option to customize the color used for the envelopes' `SUBJECT` column (defaults to `green`).
+- Added `accounts.<name>.envelope.list.table.sender-color` account config option to customize the color used for the envelopes' `FROM` column (defaults to `blue`).
+- Added `accounts.<name>.envelope.list.table.date-color` account config option to customize the color used for the envelopes' `DATE` column (defaults to `dark_yellow`).
+- Added `accounts.<name>.envelope.list.table.unseen-char` account config option to customize the char used for unseen envelopes (defaults to `*`).
+- Added `accounts.<name>.envelope.list.table.replied-char` account config option to customize the char used for replied envelopes (defaults to `R`).
+- Added `accounts.<name>.envelope.list.table.flagged-char` account config option to customize the char used for flagged envelopes (defaults to `!`).
+- Added `accounts.<name>.envelope.list.table.attachment-char` account config option to customize the char used for envelopes with at least one attachment (defaults to `@`).
+
 ## [1.0.0-beta.4] - 2024-04-16
 
 ### Added

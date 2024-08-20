@@ -28,7 +28,12 @@ impl AccountListCommand {
         info!("executing list accounts command");
 
         let accounts = Accounts::from(config.accounts.iter());
-        let table = AccountsTable::from(accounts).with_some_width(self.table_max_width);
+        let table = AccountsTable::from(accounts)
+            .with_some_width(self.table_max_width)
+            .with_some_preset(config.account_list_table_preset())
+            .with_some_name_color(config.account_list_table_name_color())
+            .with_some_backends_color(config.account_list_table_backends_color())
+            .with_some_default_color(config.account_list_table_default_color());
 
         printer.out(table)?;
         Ok(())

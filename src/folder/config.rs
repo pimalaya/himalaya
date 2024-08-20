@@ -1,7 +1,9 @@
+use comfy_table::presets;
+use crossterm::style::Color;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
-use crate::backend::BackendKind;
+use crate::{backend::BackendKind, ui::map_color};
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 pub struct FolderConfig {
@@ -60,8 +62,10 @@ impl FolderAddConfig {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct FolderListConfig {
     pub backend: Option<BackendKind>,
+    pub table: Option<ListFoldersTableConfig>,
 
     #[serde(flatten)]
     pub remote: email::folder::list::config::FolderListConfig,
@@ -76,6 +80,28 @@ impl FolderListConfig {
         }
 
         kinds
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ListFoldersTableConfig {
+    pub preset: Option<String>,
+    pub name_color: Option<Color>,
+    pub desc_color: Option<Color>,
+}
+
+impl ListFoldersTableConfig {
+    pub fn preset(&self) -> &str {
+        self.preset.as_deref().unwrap_or(presets::ASCII_MARKDOWN)
+    }
+
+    pub fn name_color(&self) -> comfy_table::Color {
+        map_color(self.name_color.unwrap_or(Color::Blue))
+    }
+
+    pub fn desc_color(&self) -> comfy_table::Color {
+        map_color(self.desc_color.unwrap_or(Color::Green))
     }
 }
 
