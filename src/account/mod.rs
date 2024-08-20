@@ -33,6 +33,7 @@ impl Account {
 
     pub fn to_row(&self, config: &ListAccountsTableConfig) -> Row {
         let mut row = Row::new();
+        row.max_height(1);
 
         row.add_cell(Cell::new(&self.name).fg(config.name_color()));
         row.add_cell(Cell::new(&self.backend).fg(config.backends_color()));
