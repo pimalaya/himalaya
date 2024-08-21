@@ -310,6 +310,7 @@ pub(crate) async fn configure(
         encryption,
         login,
         auth,
+        extensions: None,
         watch: None,
     };
 
