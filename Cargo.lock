@@ -1239,7 +1239,7 @@ dependencies = [
 [[package]]
 name = "email-lib"
 version = "0.25.0"
-source = "git+https://git.sr.ht/~soywod/pimalaya#c9687fb0c30830316525ed33349e4d47617ee1ac"
+source = "git+https://git.sr.ht/~soywod/pimalaya#667aa414db55c7067cbc6592d18bb3b3376049e6"
 dependencies = [
  "async-trait",
  "chrono",
@@ -2203,8 +2203,7 @@ dependencies = [
 [[package]]
 name = "imap-client"
 version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08221b996310a500ceea28104e4d081531dc4be58e427f01393c777c4352fa93"
+source = "git+https://github.com/soywod/imap-client.git#a6eea6f2310ffdc59f27070b0a062604ad9c0f9e"
 dependencies = [
  "imap-next",
  "once_cell",
@@ -2936,8 +2935,7 @@ checksum = "830b246a0e5f20af87141b25c173cd1b609bd7779a4617d6ec582abaf90870f3"
 [[package]]
 name = "oauth-lib"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2fd81f50b3bdf9656f511a776e5a76c249e00d7ce5c0c9071d0b923177d9248d"
+source = "git+https://git.sr.ht/~soywod/pimalaya#667aa414db55c7067cbc6592d18bb3b3376049e6"
 dependencies = [
  "log",
  "oauth2",

@@ -39,7 +39,7 @@ smtp = ["email-lib/smtp"]
 sendmail = ["email-lib/sendmail"]
 
 keyring = ["email-lib/keyring", "secret-lib?/keyring-tokio"]
-oauth2 = ["dep:oauth-lib", "email-lib/oauth2"]
+oauth2 = ["dep:oauth-lib", "email-lib/oauth2", "keyring"]
 wizard = ["dep:secret-lib", "email-lib/autoconfig"]
 
 pgp = []
@@ -89,3 +89,5 @@ uuid = { version = "0.8", features = ["v4"] }
 
 [patch.crates-io]
 email-lib = { git = "https://git.sr.ht/~soywod/pimalaya" }
+oauth-lib = { git = "https://git.sr.ht/~soywod/pimalaya" }
+imap-client = { git = "https://github.com/soywod/imap-client.git" }
