@@ -88,6 +88,8 @@ url = "2.2"
 uuid = { version = "0.8", features = ["v4"] }
 
 [patch.crates-io]
-email-lib = { git = "https://git.sr.ht/~soywod/pimalaya" }
 oauth-lib = { git = "https://git.sr.ht/~soywod/pimalaya" }
-imap-client = { git = "https://github.com/soywod/imap-client.git" }
+imap-codec = { git = "https://github.com/soywod/imap-codec" }
+imap-next = { git = "https://github.com/duesee/imap-next", branch = "jakoschiko_poison-message-with-fragmentizer" }
+imap-client = { git = "https://github.com/soywod/imap-client" }
+email-lib = { git = "https://git.sr.ht/~soywod/pimalaya" }
