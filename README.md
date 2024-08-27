@@ -38,9 +38,7 @@ $ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
 - **OAuth 2.0** authorization (requires `oauth2` feature)
 - **JSON** output via `--output json`
 
-*Himalaya CLI is written in [Rust](https://www.rust-lang.org/), and relies on [cargo features](https://doc.rust-lang.org/cargo/reference/features.html) to enable or disable functionalities.*
-
-*Default features can be found in the `features` section of the [`Cargo.toml`](https://github.com/pimalaya/himalaya/blob/master/Cargo.toml#L18).*
+*Himalaya CLI is written in [Rust](https://www.rust-lang.org/), and relies on [cargo features](https://doc.rust-lang.org/cargo/reference/features.html) to enable or disable functionalities. Default features can be found in the `features` section of the [`Cargo.toml`](https://github.com/pimalaya/himalaya/blob/master/Cargo.toml#L18).*
 
 ## Installation
 
@@ -255,7 +253,7 @@ You can also manually write your own configuration, from scratch:
 
   Google passwords cannot be used directly. There is two ways to authenticate yourself:
 
-  ## Using [App Passwords](https://support.google.com/mail/answer/185833)
+  ### Using [App Passwords](https://support.google.com/mail/answer/185833)
 
   This option is the simplest and the fastest. First, be sure that:
 
@@ -303,7 +301,7 @@ You can also manually write your own configuration, from scratch:
 
     Running `himalaya configure -a gmail` will ask for your IMAP password, just paste the one generated previously.
 
-  ## Using OAuth 2.0
+  ### Using OAuth 2.0
 
   This option is the most secure but the hardest to configure. It requires the `oauth2` and `keyring` cargo features.
 
@@ -358,7 +356,7 @@ You can also manually write your own configuration, from scratch:
 <details>
   <summary>Outlook</summary>
 
-    ```toml
+  ```toml
   [accounts.outlook]
   email = "example@outlook.com"
 
@@ -452,6 +450,123 @@ You can also manually write your own configuration, from scratch:
 </details>
 
 ## FAQ
+
+<details>
+  <summary>How to compose a message?</summary>
+
+  An email message is a list of **headers** (`key: val`) followed by a **body**. They form together a template:
+
+  ```eml
+  Header: value
+  Header: value
+  Header: value
+
+  Body
+  ```
+
+  ***Headers and body must be separated by an empty line.***
+
+  ### Headers
+
+  Here a non-exhaustive list of valid email message template headers:
+
+  - `Message-ID`: represents the message identifier (you usually do not need to set up it manually)
+  - `In-Reply-To`: represents the identifier of the replied message
+  - `Date`: represents the date of the message
+  - `Subject`: represents the subject of the message
+  - `From`: represents the address of the sender
+  - `To`: represents the addresses of the receivers
+  - `Reply-To`: represents the address the receiver should reply to instead of the `From` header
+  - `Cc`: represents the addresses of the other receivers (carbon copy)
+  - `Bcc`: represents the addresses of the other hidden receivers (blind carbon copy)
+    
+  An address can be:
+
+  - a single email address `user@domain`
+  - a named address `Name <user@domain>`
+  - a quoted named address `"Name" <user@domain>`
+
+  Multiple address are separated by a coma `,`: `user@domain, Name <user@domain>, "Name" <user@domain>`.
+
+  ### Body
+
+  Email message template body can be written in plain text. The result will be compiled into a single `text/plain` MIME part:
+
+  ```eml
+  From: alice@localhost
+  To: Bob <bob@localhost>
+  Subject: Hello from Himalaya
+
+  Hello, world!
+  ```
+
+  Email message template body can also be written in MML (MIME Meta Language).
+
+  A raw email message is structured according to the [MIME](https://www.rfc-editor.org/rfc/rfc2045) standard. But it is not so user-friendly to use. Here comes MML: it simplifies the way email message body are structured. Thanks to its simple XML-based syntax, you can easily add multiple parts, attach a binary file, or attach inline image to your body.
+
+  For example, this MML template:
+
+  ```eml
+  From: alice@localhost
+  To: bob@localhost
+  Subject: MML simple
+
+  <#multipart type=alternative>
+  This is a plain text part.
+  <#part type=text/enriched>
+  <center>This is a centered enriched part</center>
+  <#/multipart>
+  ```
+
+  is compiled into this valid (and way more verbose) MIME Message:
+
+  ```eml
+  Subject: MML simple
+  To: bob@localhost
+  From: alice@localhost
+  MIME-Version: 1.0
+  Date: Tue, 29 Nov 2022 13:07:01 +0000
+  Content-Type: multipart/alternative;
+   boundary="4CV1Cnp7mXkDyvb55i77DcNSkKzB8HJzaIT84qZe"
+
+  --4CV1Cnp7mXkDyvb55i77DcNSkKzB8HJzaIT84qZe
+  Content-Type: text/plain; charset=utf-8
+  Content-Transfer-Encoding: 7bit
+
+  This is a plain text part.
+  --4CV1Cnp7mXkDyvb55i77DcNSkKzB8HJzaIT84qZe
+  Content-Type: text/enriched
+  Content-Transfer-Encoding: 7bit
+
+  <center>This is a centered enriched part</center>
+  --4CV1Cnp7mXkDyvb55i77DcNSkKzB8HJzaIT84qZe--
+  ```
+
+  *See more examples at [pimalaya/core/mml](https://github.com/pimalaya/core/tree/master/mml/examples).*
+</details>
+
+<details>
+  <summary>How to add attachments to a message?</summary>
+
+  *Read first about the FAQ: How to compose a message?*.
+
+    ```eml
+  From: alice@localhost
+  To: bob@localhost
+  Subject: How to attach stuff
+
+  Regular binary attachment:
+  <#part filename=/path/to/file.pdf><#/part>
+
+  Custom file name:
+  <#part filename=/path/to/file.pdf name=custom.pdf><#/part>
+
+  Inline image:
+  <#part disposition=inline filename=/path/to/image.png><#/part>
+  ```
+
+  *See more examples at [pimalaya/core/mml](https://github.com/pimalaya/core/tree/master/mml/examples).*
+</details>
 
 <details>
   <summary>How to debug Himalaya CLI?</summary>
