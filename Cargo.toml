@@ -40,7 +40,7 @@ sendmail = ["email-lib/sendmail"]
 
 keyring = ["email-lib/keyring", "secret-lib?/keyring-tokio"]
 oauth2 = ["dep:oauth-lib", "email-lib/oauth2", "keyring"]
-wizard = ["dep:secret-lib", "email-lib/autoconfig"]
+wizard = ["dep:secret-lib", "dep:toml_edit", "email-lib/autoconfig"]
 
 pgp = []
 pgp-commands = ["email-lib/pgp-commands", "mml-lib/pgp-commands", "pgp"]
@@ -79,7 +79,7 @@ sled = "=0.34.7"
 terminal_size = "0.1"
 tokio = { version = "1.23", default-features = false, features = ["macros", "rt-multi-thread"] }
 toml = "0.8"
-toml_edit = "0.22"
+toml_edit = { version = "0.22", optional = true }
 tracing = "0.1.40"
 tracing-error = "0.2.0"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
@@ -88,8 +88,8 @@ url = "2.2"
 uuid = { version = "0.8", features = ["v4"] }
 
 [patch.crates-io]
-oauth-lib = { git = "https://git.sr.ht/~soywod/pimalaya" }
-imap-codec = { git = "https://github.com/soywod/imap-codec" }
+oauth-lib = { git = "https://github.com/pimalaya/core" }
+imap-codec = { git = "https://github.com/duesee/imap-codec" }
 imap-next = { git = "https://github.com/duesee/imap-next", branch = "jakoschiko_poison-message-with-fragmentizer" }
-imap-client = { git = "https://github.com/soywod/imap-client" }
-email-lib = { git = "https://git.sr.ht/~soywod/pimalaya" }
+imap-client = { git = "https://github.com/pimalaya/imap-client" }
+email-lib = { git = "https://github.com/pimalaya/core" }

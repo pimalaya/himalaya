@@ -1,10 +1,20 @@
-# 📫 Himalaya [![GitHub release](https://img.shields.io/github/v/release/soywod/himalaya?color=success)](https://github.com/soywod/himalaya/releases/latest) [![Matrix](https://img.shields.io/matrix/pimalaya.himalaya:matrix.org?color=success&label=chat)](https://matrix.to/#/#pimalaya.himalaya:matrix.org)
+<div align="center">
+  <img src="./logo.svg" alt="Logo" width="128" height="128" />
+  <h1>📫 Himalaya</h1>
+  <p>CLI to manage emails,<br>based on <a href="https://crates.io/crates/email-lib"><code>email-lib</code></a>.</p>
+  <p>
+    <a href="https://github.com/soywod/neverest/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/soywod/neverest?color=success"/></a>
+	<a href="https://repology.org/project/himalaya/versions"><img alt="Repology" src="https://img.shields.io/repology/repositories/himalaya"></a>
+    <a href="https://matrix.to/#/#pimalaya:matrix.org"><img alt="Matrix" src="https://img.shields.io/matrix/pimalaya:matrix.org?color=success&label=chat"/></a>
+  </p>
+  <!-- <p><em>🚧 <strong>Work In Progress</strong>, stay tuned! 🚧</em></p> -->
+</div>
 
-Welcome to [**Himalaya CLI**](https://pimalaya.org/himalaya/cli/latest/), the Command-Line Interface to manage emails based on [email-lib](https://crates.io/crates/email-lib).
+```
+$ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
+```
 
-![screenshot](https://github.com/soywod/himalaya/assets/10437171/8a62cf1d-920e-4110-9849-170db6dc51ce)
-
-*Disclaimer: the project is under active development, do not use in production before the final `v1.0.0`.*
+![screenshot](./screenshot)
 
 ## Features
 
@@ -65,20 +75,6 @@ $ dnf install himalaya
 ## Configuration
 
 *Please read the [documentation](https://pimalaya.org/himalaya/cli/latest/configuration/).*
-
-## Contributing
-
-*Please read the [contributing guide](https://github.com/soywod/himalaya/blob/master/CONTRIBUTING.md) for more detailed information.*
-
-A **bug tracker** is available on [SourceHut](https://todo.sr.ht/~soywod/pimalaya). <sup>[[send an email](mailto:~soywod/pimalaya@todo.sr.ht)]</sup>
-
-A **mailing list** is available on [SourceHut](https://lists.sr.ht/~soywod/pimalaya). <sup>[[send an email](mailto:~soywod/pimalaya@lists.sr.ht)] [[subscribe](mailto:~soywod/pimalaya+subscribe@lists.sr.ht)] [[unsubscribe](mailto:~soywod/pimalaya+unsubscribe@lists.sr.ht)]</sup>
-
-If you want to **report a bug**, please send an email at [~soywod/pimalaya@todo.sr.ht](mailto:~soywod/pimalaya@todo.sr.ht).
-
-If you want to **propose a feature** or **fix a bug**, please send a patch at [~soywod/pimalaya@lists.sr.ht](mailto:~soywod/pimalaya@lists.sr.ht). The simplest way to send a patch is to use [git send-email](https://git-scm.com/docs/git-send-email), follow [this guide](https://git-send-email.io/) to configure git properly.
-
-If you just want to **discuss** about the project, feel free to join the [Matrix](https://matrix.org/) workspace [#pimalaya.himalaya](https://matrix.to/#/#pimalaya.himalaya:matrix.org) or contact me directly [@soywod](https://matrix.to/#/@soywod:matrix.org). You can also use the mailing list.
 
 ## Sponsoring
 

@@ -1245,7 +1245,7 @@ dependencies = [
 [[package]]
 name = "email-lib"
 version = "0.25.0"
-source = "git+https://git.sr.ht/~soywod/pimalaya#f2b429db2839ddef9e4c496def386062339b437b"
+source = "git+https://github.com/pimalaya/core#d61f0e9c6fb26abd0d7f104e6839fcd02ef423bc"
 dependencies = [
  "async-trait",
  "chrono",
@@ -2209,7 +2209,7 @@ dependencies = [
 [[package]]
 name = "imap-client"
 version = "0.1.4"
-source = "git+https://github.com/soywod/imap-client#a6eea6f2310ffdc59f27070b0a062604ad9c0f9e"
+source = "git+https://github.com/pimalaya/imap-client#02d6bce5513c8ec6ac3aff0e7b13ce4ae87dbe1f"
 dependencies = [
  "imap-next",
  "once_cell",
@@ -2223,7 +2223,7 @@ dependencies = [
 [[package]]
 name = "imap-codec"
 version = "2.0.0-alpha.4"
-source = "git+https://github.com/soywod/imap-codec#7f5d0918b96a4198811eb73ea12e1a42f43f955b"
+source = "git+https://github.com/duesee/imap-codec#fff8355ad0f7133be9e58919be5a6f05f684d421"
 dependencies = [
  "abnf-core",
  "base64 0.22.1",
@@ -2250,7 +2250,7 @@ dependencies = [
 [[package]]
 name = "imap-types"
 version = "2.0.0-alpha.3"
-source = "git+https://github.com/soywod/imap-codec#7f5d0918b96a4198811eb73ea12e1a42f43f955b"
+source = "git+https://github.com/duesee/imap-codec#fff8355ad0f7133be9e58919be5a6f05f684d421"
 dependencies = [
  "base64 0.22.1",
  "bounded-static",
@@ -2947,7 +2947,7 @@ checksum = "830b246a0e5f20af87141b25c173cd1b609bd7779a4617d6ec582abaf90870f3"
 [[package]]
 name = "oauth-lib"
 version = "0.1.1"
-source = "git+https://git.sr.ht/~soywod/pimalaya#f2b429db2839ddef9e4c496def386062339b437b"
+source = "git+https://github.com/pimalaya/core#d61f0e9c6fb26abd0d7f104e6839fcd02ef423bc"
 dependencies = [
  "log",
  "oauth2",

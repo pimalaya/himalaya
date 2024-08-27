@@ -51,10 +51,10 @@ impl Envelope {
         let flags = {
             let mut flags = String::new();
 
-            flags.push(config.unseen_char(unseen));
-            flags.push(config.replied_char(self.flags.contains(&Flag::Answered)));
             flags.push(config.flagged_char(self.flags.contains(&Flag::Flagged)));
+            flags.push(config.unseen_char(unseen));
             flags.push(config.attachment_char(self.has_attachment));
+            flags.push(config.replied_char(self.flags.contains(&Flag::Answered)));
 
             flags
         };
