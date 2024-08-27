@@ -1,62 +1,180 @@
-# The account name.
-[accounts.example]
+################################################################################
+#### Global configuration ######################################################
+################################################################################
 
-# The current account will be used by default for all other commands.
-default = true
+# Default display name for all accounts
+#
+# The display-name is used to build the full email address of an
+# account: "Example" <example@localhost>
+#
+display-name = "Example"
 
-# The display-name and the email are used to build the full email
-# address: "My example account" <example@localhost>
-display-name = "My example account"
-email = "example@localhost"
+# Default signature for all accounts
+#
+# The signature is put at the bottom of all messages. It can be a path
+# or a string. Supports TOML multilines.
+#
+# signature = "/path/to/signature/file"
+# signature = """
+#   Thanks you,
+#   Regards
+# """
+signature = "Regards,\n"
 
-# The signature can be a string or a path to a file.
-signature = "Regards,"
+# Default signature delimiter for all accounts
+#
+# The signature delimiter delimits the end of the message body from
+# the signature. Defaults to "-- \n".
+#
 signature-delim = "-- \n"
 
-# Enable the synchronization for this account. Running the command
-# `account sync example` will synchronize all folders and all emails
-# to a local Maildir at `$XDG_DATA_HOME/himalaya/example`.
-sync.enable = false
+# Default downloads directory path for all accounts
+#
+# The downloads directory is mostly used for downloading
+# attachments. Defaults to "/tmp".
+downloads-dir = "~/downloads"
 
-# Override the default Maildir path for synchronization.
-sync.dir = "/tmp/himalaya-sync-example"
+# Account listing table preset
+#
+# Customizes the charset used to build the table. Defaults to markdown
+# table style.
+#
+# See <https://docs.rs/comfy-table/latest/comfy_table/presets/index.html>.
+#
+account.list.table.preset = "||  |-|||           "
 
-# Filter folders to sync
-folder.sync.filter.include = ["INBOX"]
-# folder.sync.filter.exclude = ["All mails"]
-# folder.sync.filter = "all"
+# Account listing table name column
+#
+# Customizes the color of the NAME column of the account listing
+# table.
+#
+account.list.table.name-color = "green"
 
-# Define main folder aliases
+# Account listing table backends column
+#
+# Customizes the color of the BACKENDS column of the account listing
+# table.
+#
+account.list.table.backends-color = "blue"
+
+# Account listing table default column
+#
+# Customizes the color of the DEFAULT column of the account listing
+# table.
+#
+account.list.table.default-color = "reset"
+
+################################################################################
+#### Account configuration #####################################################
+################################################################################
+
+[accounts.example]
+
+# Defaultness of the account
+#
+# The current account will be used by default in all commands.
+#
+default = true
+
+# Email of the account
+#
+# The email address associated to the current account.
+#
+email = "example@localhost"
+
+# Display name
+#
+# The display-name and the email are used to build the full email
+# address: "Example" <example@localhost>
+#
+display-name = "Example"
+
+# Signature
+#
+# The signature is put at the bottom of all messages. It can be a path
+# or a string. Supports TOML multilines.
+#
+# signature = "/path/to/signature/file"
+# signature = """
+#   Thanks you,
+#   Regards
+# """
+signature = "Regards,\n"
+
+# Signature delimiter
+#
+# The signature delimiter delimits the end of the message body from
+# the signature. Defaults to "-- \n".
+#
+signature-delim = "-- \n"
+
+# Downloads directory path
+#
+# The downloads directory is mostly used for downloading
+# attachments. Defaults to "/tmp".
+downloads-dir = "~/downloads"
+
+# Default backend
+#
+# Backend used by default for all the features like adding folders,
+# listing envelopes or copying messages.
+#
+# backend = "notmuch" # requires the notmuch cargo feature and the libnotmuch installed
+# backend = "maildir"
+backend = "imap"
+
+# Folder aliases
+# 
+# Defines aliases for your mailboxes. There are 4 special aliases used
+# by the tool: inbox, sent, drafts and trash. Other aliases can be
+# defined as well.
+#
 folder.alias.inbox = "INBOX"
 folder.alias.sent = "Sent"
 folder.alias.drafts = "Drafts"
 folder.alias.trash = "Trash"
+folder.alias.a23 = "Archives/2023"
 
-# Also define custom folder aliases
-folder.alias.prev-year = "Archives/2023"
+# Folder listing page size
+#
+# Customizes the number of folders to show by page. Defaults to 10.
+#
+folder.list.page-size = 10
 
-# Default backend used for all the features like adding folders,
-# listing envelopes or copying messages.
-backend = "imap"
+# Folder listing table preset
+#
+# Customizes the charset used to build the table. Defaults to markdown
+# table style.
+#
+# See <https://docs.rs/comfy-table/latest/comfy_table/presets/index.html>.
+#
+folder.list.table.preset = "||  |-|||           "
 
+# Folder listing table name column
+#
+# Customizes the color of the NAME column of the folder listing table.
+#
+folder.list.table.name-color = "blue"
+
+# Folder listing table desc column
+#
+# Customizes the color of the DESC column of the folder listing table.
+#
+folder.list.table.desc-color = "green"
+
+
+# TODO: need to improve the following
+
+
+# Envelope listing page size
+#
+# Customizes the number of envelopes to show by page. Defaults to 10.
+#
 envelope.list.page-size = 10
 envelope.list.datetime-fmt = "%F %R%:z"
 
 # Date are converted to the user's local timezone.
 envelope.list.datetime-local-tz = true
-
-# Override the backend used for listing envelopes.
-# envelope.list.backend = "imap"
-
-# Send notification on receiving new envelopes
-envelope.watch.received.notify.summary = "📬 New message from {sender}"
-
-# Available placeholders: id, subject, sender, sender.name,
-# sender.address, recipient, recipient.name, recipient.address.
-envelope.watch.received.notify.body = "{subject}"
-
-# Shell commands can also be executed when envelopes change
-# envelope.watch.any.cmd = "mbsync -a"
 
 # Override the backend used for sending messages.
 message.send.backend = "smtp"
@@ -81,10 +199,6 @@ imap.passwd.raw = "password"
 # Get password from your global system keyring using secret service
 # Keyring secrets can be (re)set with the command `account configure example`
 # imap.passwd.keyring = "example-imap-password"
-
-# Customize at which period, in seconds, the IMAP IDLE mode should refresh.
-# Defaults to 1740 (29 min), as defined in the RFC.
-# imap.watch.timeout = 25
 
 # SMTP config
 smtp.host = "localhost"

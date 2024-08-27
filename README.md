@@ -502,7 +502,7 @@ You can also manually write your own configuration, from scratch:
 
   ### MML boby
 
-  Email message template body can also be written in MML. The MIME Meta Language was introduced by the Emacs [`mml`](https://www.gnu.org/software/emacs/manual/html_node/emacs-mime/Composing.html) ELisp module. Pimalaya [ported it in Rust](https://github.com/pimalaya/core/tree/master/mml).
+  Email message template body can also be written in MML. The MIME Meta Language was introduced by the Emacs [`mml`](https://www.gnu.org/software/emacs/manual/html_node/emacs-mime/Composing.html) ELisp module. Pimalaya [ported it](https://github.com/pimalaya/core/tree/master/mml) in Rust.
 
   A raw email message is structured according to the [MIME](https://www.rfc-editor.org/rfc/rfc2045) standard. This standard produces verbose, non-friendly messages. Here comes MML: it simplifies the way email message body are structured. Thanks to its simple XML-based syntax, it allows you to easily add multiple parts, attach a binary file, or attach inline image to your body without dealing with the MIME standard.
 
