@@ -550,7 +550,7 @@ You can also manually write your own configuration, from scratch:
 
   *Read first about the FAQ: How to compose a message?*.
 
-    ```eml
+  ```eml
   From: alice@localhost
   To: bob@localhost
   Subject: How to attach stuff
