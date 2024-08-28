@@ -23,11 +23,11 @@ $ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
 - Envelope **listing**, **filtering** and **sorting**
 - Message composition based on `$EDITOR`
 - Message manipulation (**copy**, **move**, **delete**)
-- Basic backends:
+- Default backends:
   - **IMAP** (requires `imap` feature)
   - **Maildir** (requires `maildir` feature)
   - **Notmuch** (requires `notmuch` feature)
-- Default backends:
+- Message sending backends:
   - **SMTP** (requires `smtp` feature)
   - **Sendmail** (requires `sendmail` feature)
 - PGP encryption:
