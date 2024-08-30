@@ -1,17 +1,7 @@
 use color_eyre::Result;
 use email::autoconfig::config::AutoConfig;
-use inquire::Select;
-
-#[cfg(feature = "imap")]
-use crate::imap;
-#[cfg(feature = "maildir")]
-use crate::maildir;
-#[cfg(feature = "notmuch")]
-use crate::notmuch;
-#[cfg(feature = "sendmail")]
-use crate::sendmail;
-#[cfg(feature = "smtp")]
-use crate::smtp;
+use email_address::EmailAddress;
+use pimalaya_tui::{prompt, wizard};
 
 use super::{config::BackendConfig, BackendKind};
 
@@ -24,6 +14,34 @@ const DEFAULT_BACKEND_KINDS: &[BackendKind] = &[
     BackendKind::Notmuch,
 ];
 
+pub async fn configure(
+    account_name: &str,
+    email: &EmailAddress,
+    autoconfig: Option<&AutoConfig>,
+) -> Result<BackendConfig> {
+    let backend = prompt::item("Default backend:", &*DEFAULT_BACKEND_KINDS, None)?;
+
+    match backend {
+        #[cfg(feature = "imap")]
+        BackendKind::Imap => {
+            let config = wizard::imap::start(account_name, email, autoconfig).await?;
+            Ok(BackendConfig::Imap(config))
+        }
+        #[cfg(feature = "maildir")]
+        BackendKind::Maildir => {
+            let config = wizard::maildir::start(account_name)?;
+            Ok(BackendConfig::Maildir(config))
+        }
+        // TODO
+        // #[cfg(feature = "notmuch")]
+        // BackendKind::Notmuch => {
+        //     let config = wizard::notmuch::start()?;
+        //     Ok(BackendConfig::Notmuch(config))
+        // }
+        _ => unreachable!(),
+    }
+}
+
 const SEND_MESSAGE_BACKEND_KINDS: &[BackendKind] = &[
     #[cfg(feature = "smtp")]
     BackendKind::Smtp,
@@ -31,63 +49,30 @@ const SEND_MESSAGE_BACKEND_KINDS: &[BackendKind] = &[
     BackendKind::Sendmail,
 ];
 
-pub(crate) async fn configure(
+pub async fn configure_sender(
     account_name: &str,
-    email: &str,
+    email: &EmailAddress,
     autoconfig: Option<&AutoConfig>,
-) -> Result<Option<BackendConfig>> {
-    let kind = Select::new("Default email backend", DEFAULT_BACKEND_KINDS.to_vec())
-        .with_starting_cursor(0)
-        .prompt_skippable()?;
+) -> Result<BackendConfig> {
+    let backend = prompt::item(
+        "Backend for sending messages:",
+        &*SEND_MESSAGE_BACKEND_KINDS,
+        None,
+    )?;
 
-    let config = match kind {
-        #[cfg(feature = "imap")]
-        Some(kind) if kind == BackendKind::Imap => Some(
-            imap::wizard::configure(
-                account_name,
-                email,
-                #[cfg(feature = "wizard")]
-                autoconfig,
-            )
-            .await?,
-        ),
-        #[cfg(feature = "maildir")]
-        Some(kind) if kind == BackendKind::Maildir => Some(maildir::wizard::configure()?),
-        #[cfg(feature = "notmuch")]
-        Some(kind) if kind == BackendKind::Notmuch => Some(notmuch::wizard::configure()?),
-        _ => None,
-    };
-
-    Ok(config)
-}
-
-pub(crate) async fn configure_sender(
-    account_name: &str,
-    email: &str,
-    autoconfig: Option<&AutoConfig>,
-) -> Result<Option<BackendConfig>> {
-    let kind = Select::new(
-        "Backend for sending messages",
-        SEND_MESSAGE_BACKEND_KINDS.to_vec(),
-    )
-    .with_starting_cursor(0)
-    .prompt_skippable()?;
-
-    let config = match kind {
+    match backend {
+        // TODO
         #[cfg(feature = "smtp")]
-        Some(kind) if kind == BackendKind::Smtp => Some(
-            smtp::wizard::configure(
-                account_name,
-                email,
-                #[cfg(feature = "wizard")]
-                autoconfig,
-            )
-            .await?,
-        ),
+        BackendKind::Smtp => {
+            let config = wizard::smtp::start(account_name, email, autoconfig).await?;
+            Ok(BackendConfig::Smtp(config))
+        }
+        // TODO
         #[cfg(feature = "sendmail")]
-        Some(kind) if kind == BackendKind::Sendmail => Some(sendmail::wizard::configure()?),
-        _ => None,
-    };
-
-    Ok(config)
+        BackendKind::Sendmail => {
+            let config = wizard::sendmail::start()?;
+            Ok(BackendConfig::Sendmail(config))
+        }
+        _ => unreachable!(),
+    }
 }

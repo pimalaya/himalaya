@@ -1,97 +1,29 @@
+use std::{fs, path::PathBuf};
+
 use color_eyre::Result;
-use inquire::{Confirm, Select, Text};
-use shellexpand_utils::expand;
-use std::{fs, path::Path, process};
-use toml_edit::{DocumentMut, Item};
+use pimalaya_tui::{print, prompt};
+use toml_edit::{DocumentMut, Table};
 
 use crate::account;
 
 use super::TomlConfig;
 
-#[macro_export]
-macro_rules! wizard_warn {
-    ($($arg:tt)*) => {
-	println!("{}", console::style(format!($($arg)*)).yellow().bold());
-    };
-}
-
-#[macro_export]
-macro_rules! wizard_prompt {
-    ($($arg:tt)*) => {
-	format!("{}", console::style(format!($($arg)*)).italic())
-    };
-}
-
-#[macro_export]
-macro_rules! wizard_log {
-    ($($arg:tt)*) => {
-	println!();
-	println!("{}", console::style(format!($($arg)*)).underlined());
-	println!();
-    };
-}
-
-pub(crate) async fn configure(path: &Path) -> Result<TomlConfig> {
-    wizard_log!("Configuring your first account:");
+pub async fn configure(path: &PathBuf) -> Result<TomlConfig> {
+    print::section("Configuring your default account");
 
     let mut config = TomlConfig::default();
 
-    while let Some((name, account_config)) = account::wizard::configure().await? {
-        config.accounts.insert(name, account_config);
+    let (account_name, account_config) = account::wizard::configure().await?;
+    config.accounts.insert(account_name, account_config);
 
-        if !Confirm::new("Would you like to configure another account?")
-            .with_default(false)
-            .prompt_skippable()?
-            .unwrap_or_default()
-        {
-            break;
-        }
+    let path = prompt::path("Where to save the configuration?", Some(path))?;
+    println!("Writing the configuration to {}…", path.display());
 
-        wizard_log!("Configuring another account:");
-    }
-
-    // If one account is setup, make it the default. If multiple
-    // accounts are setup, decide which will be the default. If no
-    // accounts are setup, exit the process.
-    let default_account = match config.accounts.len() {
-        0 => {
-            wizard_warn!("No account configured, exiting.");
-            process::exit(0);
-        }
-        1 => Some(config.accounts.values_mut().next().unwrap()),
-        _ => {
-            let accounts = config.accounts.clone();
-            let accounts: Vec<&String> = accounts.keys().collect();
-
-            println!("{} accounts have been configured.", accounts.len());
-
-            Select::new(
-                "Which account would you like to set as your default?",
-                accounts,
-            )
-            .with_starting_cursor(0)
-            .prompt_skippable()?
-            .and_then(|input| config.accounts.get_mut(input))
-        }
-    };
-
-    if let Some(account) = default_account {
-        account.default = Some(true);
-    } else {
-        process::exit(0)
-    }
-
-    let path = Text::new("Where would you like to save your configuration?")
-        .with_default(&path.to_string_lossy())
-        .prompt()?;
-    let path = expand::path(path);
-
-    println!("Writing the configuration to {path:?}…");
     let toml = pretty_serialize(&config)?;
     fs::create_dir_all(path.parent().unwrap_or(&path))?;
     fs::write(path, toml)?;
 
-    println!("Exiting the wizard…");
+    println!("Done! Exiting the wizard…");
     Ok(config)
 }
 
@@ -99,61 +31,11 @@ fn pretty_serialize(config: &TomlConfig) -> Result<String> {
     let mut doc: DocumentMut = toml::to_string(&config)?.parse()?;
 
     doc.iter_mut().for_each(|(_, item)| {
-        if let Some(item) = item.as_table_mut() {
-            item.iter_mut().for_each(|(_, item)| {
-                set_table_dotted(item, "folder");
-                if let Some(item) = get_table_mut(item, "folder") {
-                    let keys = ["alias", "add", "list", "expunge", "purge", "delete", "sync"];
-                    set_tables_dotted(item, keys);
-
-                    if let Some(item) = get_table_mut(item, "sync") {
-                        set_tables_dotted(item, ["filter", "permissions"]);
-                    }
+        if let Some(table) = item.as_table_mut() {
+            table.iter_mut().for_each(|(_, item)| {
+                if let Some(table) = item.as_table_mut() {
+                    set_table_dotted(table);
                 }
-
-                set_table_dotted(item, "envelope");
-                if let Some(item) = get_table_mut(item, "envelope") {
-                    set_tables_dotted(item, ["list", "get"]);
-                }
-
-                set_table_dotted(item, "flag");
-                if let Some(item) = get_table_mut(item, "flag") {
-                    set_tables_dotted(item, ["add", "set", "remove"]);
-                }
-
-                set_table_dotted(item, "message");
-                if let Some(item) = get_table_mut(item, "message") {
-                    let keys = ["add", "send", "peek", "get", "copy", "move", "delete"];
-                    set_tables_dotted(item, keys);
-                }
-
-                #[cfg(feature = "maildir")]
-                set_table_dotted(item, "maildir");
-
-                #[cfg(feature = "imap")]
-                {
-                    set_table_dotted(item, "imap");
-                    if let Some(item) = get_table_mut(item, "imap") {
-                        set_tables_dotted(item, ["passwd", "oauth2"]);
-                    }
-                }
-
-                #[cfg(feature = "notmuch")]
-                set_table_dotted(item, "notmuch");
-
-                #[cfg(feature = "smtp")]
-                {
-                    set_table_dotted(item, "smtp");
-                    if let Some(item) = get_table_mut(item, "smtp") {
-                        set_tables_dotted(item, ["passwd", "oauth2"]);
-                    }
-                }
-
-                #[cfg(feature = "sendmail")]
-                set_table_dotted(item, "sendmail");
-
-                #[cfg(feature = "pgp")]
-                set_table_dotted(item, "pgp");
             })
         }
     });
@@ -161,19 +43,13 @@ fn pretty_serialize(config: &TomlConfig) -> Result<String> {
     Ok(doc.to_string())
 }
 
-fn get_table_mut<'a>(item: &'a mut Item, key: &'a str) -> Option<&'a mut Item> {
-    item.get_mut(key).filter(|item| item.is_table())
-}
-
-fn set_table_dotted(item: &mut Item, key: &str) {
-    if let Some(table) = get_table_mut(item, key).and_then(|item| item.as_table_mut()) {
-        table.set_dotted(true)
-    }
-}
-
-fn set_tables_dotted<'a>(item: &'a mut Item, keys: impl IntoIterator<Item = &'a str>) {
-    for key in keys {
-        set_table_dotted(item, key)
+fn set_table_dotted(table: &mut Table) {
+    let keys: Vec<String> = table.iter().map(|(key, _)| key.to_string()).collect();
+    for ref key in keys {
+        if let Some(table) = table.get_mut(key).unwrap().as_table_mut() {
+            table.set_dotted(true);
+            set_table_dotted(table)
+        }
     }
 }
 

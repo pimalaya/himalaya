@@ -1,3 +1,5 @@
+use std::{env, fs, sync::Arc};
+
 use color_eyre::{eyre::Context, Result};
 use email::{
     account::config::AccountConfig,
@@ -8,7 +10,6 @@ use email::{
 };
 use mml::MmlCompilerBuilder;
 use process::SingleCommand;
-use std::{env, fs, sync::Arc};
 use tracing::debug;
 
 use crate::{

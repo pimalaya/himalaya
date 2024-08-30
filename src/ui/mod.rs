@@ -2,7 +2,6 @@ use crossterm::style::Color;
 
 pub mod choice;
 pub mod editor;
-pub(crate) mod prompt;
 
 pub(crate) fn map_color(color: Color) -> comfy_table::Color {
     match color {

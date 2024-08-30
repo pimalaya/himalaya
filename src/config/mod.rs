@@ -1,6 +1,8 @@
 #[cfg(feature = "wizard")]
 pub mod wizard;
 
+use std::{collections::HashMap, fs, path::PathBuf, sync::Arc};
+
 use color_eyre::{
     eyre::{bail, eyre, Context},
     Result,
@@ -11,16 +13,15 @@ use email::{
     account::config::AccountConfig, config::Config, envelope::config::EnvelopeConfig,
     folder::config::FolderConfig, message::config::MessageConfig,
 };
+#[cfg(feature = "wizard")]
+use pimalaya_tui::print;
 use serde::{Deserialize, Serialize};
 use serde_toml_merge::merge;
 use shellexpand_utils::{canonicalize, expand};
-use std::{collections::HashMap, fs, path::PathBuf, sync::Arc};
 use toml::{self, Value};
 use tracing::debug;
 
 use crate::account::config::{ListAccountsTableConfig, TomlAccountConfig};
-#[cfg(feature = "wizard")]
-use crate::wizard_warn;
 
 /// Represents the user config file.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
@@ -121,7 +122,7 @@ impl TomlConfig {
     /// NOTE: the wizard can only be used with interactive shells.
     #[cfg(feature = "wizard")]
     async fn from_wizard(path: &PathBuf) -> Result<Self> {
-        wizard_warn!("Cannot find existing configuration at {path:?}.");
+        print::warn(format!("Cannot find existing configuration at {path:?}."));
 
         let confirm = inquire::Confirm::new("Would you like to create one with the wizard? ")
             .with_default(true)

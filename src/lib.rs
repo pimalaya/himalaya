@@ -6,19 +6,9 @@ pub mod completion;
 pub mod config;
 pub mod email;
 pub mod folder;
-#[cfg(feature = "imap")]
-pub mod imap;
-#[cfg(feature = "maildir")]
-pub mod maildir;
 pub mod manual;
-#[cfg(feature = "notmuch")]
-pub mod notmuch;
 pub mod output;
 pub mod printer;
-#[cfg(feature = "sendmail")]
-pub mod sendmail;
-#[cfg(feature = "smtp")]
-pub mod smtp;
 pub mod tracing;
 pub mod ui;
 

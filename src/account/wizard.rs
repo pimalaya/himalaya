@@ -1,9 +1,6 @@
-use color_eyre::{eyre::OptionExt, Result};
-use email_address::EmailAddress;
-use inquire::validator::{ErrorMessage, Validation};
-use std::{path::PathBuf, str::FromStr};
+use color_eyre::Result;
+use pimalaya_tui::{print, prompt};
 
-use crate::wizard_warn;
 use crate::{
     backend::{self, config::BackendConfig, BackendKind},
     message::config::{MessageConfig, MessageSendConfig},
@@ -11,104 +8,66 @@ use crate::{
 
 use super::TomlAccountConfig;
 
-pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
-    let mut config = TomlAccountConfig {
-        email: inquire::Text::new("Email address: ")
-            .with_validator(|email: &_| {
-                if EmailAddress::is_valid(email) {
-                    Ok(Validation::Valid)
-                } else {
-                    Ok(Validation::Invalid(ErrorMessage::Custom(format!(
-                        "Invalid email address: {email}"
-                    ))))
-                }
-            })
-            .prompt()?,
+pub async fn configure() -> Result<(String, TomlAccountConfig)> {
+    let email = prompt::email("Email address:", None)?;
 
+    let mut config = TomlAccountConfig {
+        email: email.to_string(),
         ..Default::default()
     };
 
-    let addr = EmailAddress::from_str(&config.email).unwrap();
-
-    #[cfg(feature = "wizard")]
     let autoconfig_email = config.email.to_owned();
-    #[cfg(feature = "wizard")]
     let autoconfig =
         tokio::spawn(async move { email::autoconfig::from_addr(&autoconfig_email).await.ok() });
 
-    let account_name = inquire::Text::new("Account name: ")
-        .with_default(
-            addr.domain()
-                .split_once('.')
-                .ok_or_eyre("not a valid domain, without any .")?
-                .0,
-        )
-        .prompt()?;
+    let default_account_name = email
+        .domain()
+        .split_once('.')
+        .map(|domain| domain.0)
+        .unwrap_or(email.domain());
+    let account_name = prompt::text("Account name:", Some(default_account_name))?;
 
-    config.display_name = Some(
-        inquire::Text::new("Full display name: ")
-            .with_default(addr.local_part())
-            .prompt()?,
-    );
+    config.display_name = Some(prompt::text(
+        "Full display name:",
+        Some(email.local_part()),
+    )?);
 
-    config.downloads_dir = Some(PathBuf::from(
-        inquire::Text::new("Downloads directory: ")
-            .with_default("~/Downloads")
-            .prompt()?,
-    ));
+    config.downloads_dir = Some(prompt::path("Downloads directory:", Some("~/Downloads"))?);
 
-    let email = &config.email;
-    #[cfg(feature = "wizard")]
     let autoconfig = autoconfig.await?;
-    #[cfg(feature = "wizard")]
     let autoconfig = autoconfig.as_ref();
 
-    #[cfg(feature = "wizard")]
     if let Some(config) = autoconfig {
         if config.is_gmail() {
             println!();
-            wizard_warn!("Warning: Google passwords cannot be used directly, see:");
-            wizard_warn!("https://pimalaya.org/himalaya/cli/latest/configuration/gmail.html");
+            print::warn("Warning: Google passwords cannot be used directly, see:");
+            print::warn("https://github.com/pimalaya/himalaya?tab=readme-ov-file#configuration");
             println!();
         }
     }
 
-    match backend::wizard::configure(
-        &account_name,
-        email,
-        #[cfg(feature = "wizard")]
-        autoconfig,
-    )
-    .await?
-    {
+    match backend::wizard::configure(&account_name, &email, autoconfig).await? {
         #[cfg(feature = "imap")]
-        Some(BackendConfig::Imap(imap_config)) => {
+        BackendConfig::Imap(imap_config) => {
             config.imap = Some(imap_config);
             config.backend = Some(BackendKind::Imap);
         }
         #[cfg(feature = "maildir")]
-        Some(BackendConfig::Maildir(mdir_config)) => {
+        BackendConfig::Maildir(mdir_config) => {
             config.maildir = Some(mdir_config);
             config.backend = Some(BackendKind::Maildir);
         }
         #[cfg(feature = "notmuch")]
-        Some(BackendConfig::Notmuch(notmuch_config)) => {
+        BackendConfig::Notmuch(notmuch_config) => {
             config.notmuch = Some(notmuch_config);
             config.backend = Some(BackendKind::Notmuch);
         }
-        _ => (),
+        _ => unreachable!(),
     };
 
-    match backend::wizard::configure_sender(
-        &account_name,
-        email,
-        #[cfg(feature = "wizard")]
-        autoconfig,
-    )
-    .await?
-    {
+    match backend::wizard::configure_sender(&account_name, &email, autoconfig).await? {
         #[cfg(feature = "smtp")]
-        Some(BackendConfig::Smtp(smtp_config)) => {
+        BackendConfig::Smtp(smtp_config) => {
             config.smtp = Some(smtp_config);
             config.message = Some(MessageConfig {
                 send: Some(MessageSendConfig {
@@ -119,7 +78,7 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
             });
         }
         #[cfg(feature = "sendmail")]
-        Some(BackendConfig::Sendmail(sendmail_config)) => {
+        BackendConfig::Sendmail(sendmail_config) => {
             config.sendmail = Some(sendmail_config);
             config.message = Some(MessageConfig {
                 send: Some(MessageSendConfig {
@@ -129,8 +88,8 @@ pub(crate) async fn configure() -> Result<Option<(String, TomlAccountConfig)>> {
                 ..Default::default()
             });
         }
-        _ => (),
+        _ => unreachable!(),
     };
 
-    Ok(Some((account_name, config)))
+    Ok((account_name, config))
 }

@@ -1,17 +1,17 @@
-use std::fmt::Display;
+use std::fmt;
 
 use color_eyre::Result;
-use inquire::Select;
+use pimalaya_tui::prompt;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PreEditChoice {
     Edit,
     Discard,
     Quit,
 }
 
-impl Display for PreEditChoice {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for PreEditChoice {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{}",
@@ -24,22 +24,20 @@ impl Display for PreEditChoice {
     }
 }
 
+static PRE_EDIT_CHOICES: [PreEditChoice; 3] = [
+    PreEditChoice::Edit,
+    PreEditChoice::Discard,
+    PreEditChoice::Quit,
+];
+
 pub fn pre_edit() -> Result<PreEditChoice> {
-    let choices = [
-        PreEditChoice::Edit,
-        PreEditChoice::Discard,
-        PreEditChoice::Quit,
-    ];
-
-    let user_choice = Select::new(
+    let user_choice = prompt::item(
         "A draft was found, what would you like to do with it?",
-        choices.to_vec(),
-    )
-    .with_starting_cursor(0)
-    .with_vim_mode(true)
-    .prompt()?;
+        &PRE_EDIT_CHOICES,
+        None,
+    )?;
 
-    Ok(user_choice)
+    Ok(user_choice.clone())
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -51,7 +49,7 @@ pub enum PostEditChoice {
     Discard,
 }
 
-impl Display for PostEditChoice {
+impl fmt::Display for PostEditChoice {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -67,22 +65,20 @@ impl Display for PostEditChoice {
     }
 }
 
+static POST_EDIT_CHOICES: [PostEditChoice; 5] = [
+    PostEditChoice::Send,
+    PostEditChoice::Edit,
+    PostEditChoice::LocalDraft,
+    PostEditChoice::RemoteDraft,
+    PostEditChoice::Discard,
+];
+
 pub fn post_edit() -> Result<PostEditChoice> {
-    let choices = [
-        PostEditChoice::Send,
-        PostEditChoice::Edit,
-        PostEditChoice::LocalDraft,
-        PostEditChoice::RemoteDraft,
-        PostEditChoice::Discard,
-    ];
-
-    let user_choice = inquire::Select::new(
+    let user_choice = prompt::item(
         "What would you like to do with this message?",
-        choices.to_vec(),
-    )
-    .with_starting_cursor(0)
-    .with_vim_mode(true)
-    .prompt()?;
+        &POST_EDIT_CHOICES,
+        None,
+    )?;
 
-    Ok(user_choice)
+    Ok(user_choice.clone())
 }

@@ -4,12 +4,12 @@ use color_eyre::Result;
 use email::imap::config::ImapAuthConfig;
 #[cfg(feature = "smtp")]
 use email::smtp::config::SmtpAuthConfig;
+#[cfg(any(feature = "imap", feature = "smtp", feature = "pgp"))]
+use pimalaya_tui::prompt;
 use tracing::info;
 #[cfg(any(feature = "imap", feature = "smtp"))]
 use tracing::{debug, warn};
 
-#[cfg(any(feature = "imap", feature = "smtp", feature = "pgp"))]
-use crate::ui::prompt;
 use crate::{account::arg::name::AccountNameArg, config::TomlConfig, printer::Printer};
 
 /// Configure an account.
@@ -74,12 +74,14 @@ impl AccountConfigureCommand {
         if let Some(ref config) = account_config.imap {
             match &config.auth {
                 ImapAuthConfig::Passwd(config) => {
-                    config.configure(|| prompt::passwd("IMAP password")).await
+                    config
+                        .configure(|| Ok(prompt::password("IMAP password")?))
+                        .await
                 }
                 #[cfg(feature = "oauth2")]
                 ImapAuthConfig::OAuth2(config) => {
                     config
-                        .configure(|| prompt::secret("IMAP OAuth 2.0 client secret"))
+                        .configure(|| Ok(prompt::secret("IMAP OAuth 2.0 clientsecret")?))
                         .await
                 }
             }?;
@@ -89,12 +91,14 @@ impl AccountConfigureCommand {
         if let Some(ref config) = account_config.smtp {
             match &config.auth {
                 SmtpAuthConfig::Passwd(config) => {
-                    config.configure(|| prompt::passwd("SMTP password")).await
+                    config
+                        .configure(|| Ok(prompt::password("SMTP password")?))
+                        .await
                 }
                 #[cfg(feature = "oauth2")]
                 SmtpAuthConfig::OAuth2(config) => {
                     config
-                        .configure(|| prompt::secret("SMTP OAuth 2.0 client secret"))
+                        .configure(|| Ok(prompt::secret("SMTP OAuth 2.0 client secret")?))
                         .await
                 }
             }?;
@@ -104,7 +108,7 @@ impl AccountConfigureCommand {
         if let Some(ref config) = account_config.pgp {
             config
                 .configure(&account_config.email, || {
-                    prompt::passwd("PGP secret key password")
+                    Ok(prompt::password("PGP secret key password")?)
                 })
                 .await?;
         }
