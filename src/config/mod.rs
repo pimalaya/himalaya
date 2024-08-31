@@ -14,7 +14,7 @@ use email::{
     folder::config::FolderConfig, message::config::MessageConfig,
 };
 #[cfg(feature = "wizard")]
-use pimalaya_tui::print;
+use pimalaya_tui::{print, prompt};
 use serde::{Deserialize, Serialize};
 use serde_toml_merge::merge;
 use shellexpand_utils::{canonicalize, expand};
@@ -124,12 +124,7 @@ impl TomlConfig {
     async fn from_wizard(path: &PathBuf) -> Result<Self> {
         print::warn(format!("Cannot find existing configuration at {path:?}."));
 
-        let confirm = inquire::Confirm::new("Would you like to create one with the wizard? ")
-            .with_default(true)
-            .prompt_skippable()?
-            .unwrap_or_default();
-
-        if !confirm {
+        if !prompt::bool("Would you like to create one with the wizard? ", true)? {
             std::process::exit(0);
         }
 

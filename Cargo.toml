@@ -60,7 +60,6 @@ dirs = "4"
 email-lib = { version = "=0.25.0", default-features = false, features = ["derive", "thread", "tracing"] }
 email_address = { version = "0.2", optional = true }
 erased-serde = "0.3"
-inquire = "0.7.4"
 mail-builder = "0.3"
 md5 = "0.7"
 mml-lib = { version = "=1.0.14", default-features = false, features = ["derive"]  }

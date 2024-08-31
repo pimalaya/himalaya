@@ -1896,7 +1896,6 @@ dependencies = [
  "email-lib",
  "email_address",
  "erased-serde",
- "inquire",
  "mail-builder",
  "md5",
  "mml-lib",

@@ -1,8 +1,9 @@
+use std::process;
+
 use clap::Parser;
 use color_eyre::Result;
 use email::{backend::feature::BackendFeatureSource, folder::delete::DeleteFolder};
-use inquire::Confirm;
-use std::process;
+use pimalaya_tui::prompt;
 use tracing::info;
 
 use crate::{
@@ -29,10 +30,9 @@ impl FolderDeleteCommand {
 
         let folder = &self.folder.name;
 
-        let confirm = Confirm::new(&format!("Do you really want to delete the folder {folder}? All emails will be definitely deleted."))
-        .with_default(false).prompt_skippable()?;
+        let confirm = format!("Do you really want to delete the folder {folder}? All emails will be definitely deleted.");
 
-        if let Some(false) | None = confirm {
+        if !prompt::bool(confirm, false)? {
             process::exit(0);
         };
 
