@@ -4,10 +4,10 @@ mod expunge;
 mod list;
 mod purge;
 
-use color_eyre::Result;
 use clap::Subcommand;
+use color_eyre::Result;
 
-use crate::{config::TomlConfig, printer::Printer};
+use crate::{config::Config, printer::Printer};
 
 use self::{
     add::AddFolderCommand, delete::FolderDeleteCommand, expunge::FolderExpungeCommand,
@@ -38,7 +38,7 @@ pub enum FolderSubcommand {
 
 impl FolderSubcommand {
     #[allow(unused)]
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
         match self {
             Self::Add(cmd) => cmd.execute(printer, config).await,
             Self::List(cmd) => cmd.execute(printer, config).await,

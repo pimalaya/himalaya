@@ -4,7 +4,7 @@ use email::{backend::feature::BackendFeatureSource, folder::add::AddFolder};
 use tracing::info;
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, config::TomlConfig,
+    account::arg::name::AccountNameFlag, backend::Backend, config::Config,
     folder::arg::name::FolderNameArg, printer::Printer,
 };
 
@@ -22,7 +22,7 @@ pub struct AddFolderCommand {
 }
 
 impl AddFolderCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
         info!("executing create folder command");
 
         let folder = &self.folder.name;

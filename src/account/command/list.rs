@@ -4,7 +4,7 @@ use tracing::info;
 
 use crate::{
     account::{Accounts, AccountsTable},
-    config::TomlConfig,
+    config::Config,
     printer::Printer,
 };
 
@@ -24,7 +24,7 @@ pub struct AccountListCommand {
 }
 
 impl AccountListCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
         info!("executing list accounts command");
 
         let accounts = Accounts::from(config.accounts.iter());

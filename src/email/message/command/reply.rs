@@ -6,7 +6,7 @@ use tracing::info;
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::Backend,
-    config::TomlConfig,
+    config::Config,
     envelope::arg::ids::EnvelopeIdArg,
     folder::arg::name::FolderNameOptionalFlag,
     message::arg::{body::MessageRawBodyArg, header::HeaderRawArgs, reply::MessageReplyAllArg},
@@ -42,7 +42,7 @@ pub struct MessageReplyCommand {
 }
 
 impl MessageReplyCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
         info!("executing reply message command");
 
         let folder = &self.folder.name;

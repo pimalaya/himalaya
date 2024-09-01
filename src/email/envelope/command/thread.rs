@@ -9,8 +9,8 @@ use std::process::exit;
 use tracing::info;
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, config::TomlConfig,
-    envelope::EnvelopesTree, folder::arg::name::FolderNameOptionalFlag, printer::Printer,
+    account::arg::name::AccountNameFlag, backend::Backend, config::Config, envelope::EnvelopesTree,
+    folder::arg::name::FolderNameOptionalFlag, printer::Printer,
 };
 
 /// Thread all envelopes.
@@ -34,7 +34,7 @@ pub struct ThreadEnvelopesCommand {
 }
 
 impl ThreadEnvelopesCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
         info!("executing thread envelopes command");
 
         let (toml_account_config, account_config) = config

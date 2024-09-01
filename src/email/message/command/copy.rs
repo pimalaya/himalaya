@@ -6,7 +6,7 @@ use tracing::info;
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::Backend,
-    config::TomlConfig,
+    config::Config,
     envelope::arg::ids::EnvelopeIdsArgs,
     folder::arg::name::{SourceFolderNameOptionalFlag, TargetFolderNameArg},
     printer::Printer,
@@ -29,7 +29,7 @@ pub struct MessageCopyCommand {
 }
 
 impl MessageCopyCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
         info!("executing copy message(s) command");
 
         let source = &self.source_folder.name;

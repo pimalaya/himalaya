@@ -1,9 +1,9 @@
 mod download;
 
-use color_eyre::Result;
 use clap::Subcommand;
+use color_eyre::Result;
 
-use crate::{config::TomlConfig, printer::Printer};
+use crate::{config::Config, printer::Printer};
 
 use self::download::AttachmentDownloadCommand;
 
@@ -19,7 +19,7 @@ pub enum AttachmentSubcommand {
 }
 
 impl AttachmentSubcommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
         match self {
             Self::Download(cmd) => cmd.execute(printer, config).await,
         }

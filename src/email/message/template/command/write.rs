@@ -4,7 +4,7 @@ use email::message::Message;
 use tracing::info;
 
 use crate::{
-    account::arg::name::AccountNameFlag, config::TomlConfig,
+    account::arg::name::AccountNameFlag, config::Config,
     email::template::arg::body::TemplateRawBodyArg, message::arg::header::HeaderRawArgs,
     printer::Printer,
 };
@@ -26,7 +26,7 @@ pub struct TemplateWriteCommand {
 }
 
 impl TemplateWriteCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
         info!("executing write template command");
 
         let (_, account_config) = config

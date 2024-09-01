@@ -32,12 +32,11 @@ pub async fn configure(
             let config = wizard::maildir::start(account_name)?;
             Ok(BackendConfig::Maildir(config))
         }
-        // TODO
-        // #[cfg(feature = "notmuch")]
-        // BackendKind::Notmuch => {
-        //     let config = wizard::notmuch::start()?;
-        //     Ok(BackendConfig::Notmuch(config))
-        // }
+        #[cfg(feature = "notmuch")]
+        BackendKind::Notmuch => {
+            let config = wizard::notmuch::start()?;
+            Ok(BackendConfig::Notmuch(config))
+        }
         _ => unreachable!(),
     }
 }

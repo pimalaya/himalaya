@@ -6,7 +6,7 @@ use tracing::info;
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::Backend,
-    config::TomlConfig,
+    config::Config,
     folder::{Folders, FoldersTable},
     printer::Printer,
 };
@@ -29,7 +29,7 @@ pub struct FolderListCommand {
 }
 
 impl FolderListCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
         info!("executing list folders command");
 
         let (toml_account_config, account_config) = config

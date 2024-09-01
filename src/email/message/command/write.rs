@@ -6,7 +6,7 @@ use tracing::info;
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::Backend,
-    config::TomlConfig,
+    config::Config,
     message::arg::{body::MessageRawBodyArg, header::HeaderRawArgs},
     printer::Printer,
     ui::editor,
@@ -31,7 +31,7 @@ pub struct MessageWriteCommand {
 }
 
 impl MessageWriteCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
         info!("executing write message command");
 
         let (toml_account_config, account_config) = config

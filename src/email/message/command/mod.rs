@@ -13,7 +13,7 @@ pub mod write;
 use clap::Subcommand;
 use color_eyre::Result;
 
-use crate::{config::TomlConfig, printer::Printer};
+use crate::{config::Config, printer::Printer};
 
 use self::{
     copy::MessageCopyCommand, delete::MessageDeleteCommand, forward::MessageForwardCommand,
@@ -67,7 +67,7 @@ pub enum MessageSubcommand {
 
 impl MessageSubcommand {
     #[allow(unused)]
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
         match self {
             Self::Read(cmd) => cmd.execute(printer, config).await,
             Self::Thread(cmd) => cmd.execute(printer, config).await,

@@ -6,7 +6,7 @@ use std::io::{self, BufRead, IsTerminal};
 use tracing::info;
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, config::TomlConfig,
+    account::arg::name::AccountNameFlag, backend::Backend, config::Config,
     email::template::arg::TemplateRawArg, folder::arg::name::FolderNameOptionalFlag,
     printer::Printer,
 };
@@ -30,7 +30,7 @@ pub struct TemplateSaveCommand {
 }
 
 impl TemplateSaveCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
         info!("executing save template command");
 
         let folder = &self.folder.name;

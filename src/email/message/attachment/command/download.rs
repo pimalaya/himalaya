@@ -6,7 +6,7 @@ use tracing::info;
 use uuid::Uuid;
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, config::TomlConfig,
+    account::arg::name::AccountNameFlag, backend::Backend, config::Config,
     envelope::arg::ids::EnvelopeIdsArgs, folder::arg::name::FolderNameOptionalFlag,
     printer::Printer,
 };
@@ -28,7 +28,7 @@ pub struct AttachmentDownloadCommand {
 }
 
 impl AttachmentDownloadCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
         info!("executing download attachment(s) command");
 
         let folder = &self.folder.name;

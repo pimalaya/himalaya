@@ -1,13 +1,14 @@
-use color_eyre::{eyre::Context, Result};
 use std::{
     fmt,
-    io::{self, Write},
+    io::{stderr, stdout, Stderr, Stdout, Write},
 };
+
+use color_eyre::{eyre::Context, Result};
 
 use crate::output::OutputFmt;
 
 pub trait PrintTable {
-    fn print(&self, writer: &mut dyn io::Write, table_max_width: Option<u16>) -> Result<()>;
+    fn print(&self, writer: &mut dyn Write, table_max_width: Option<u16>) -> Result<()>;
 }
 
 pub trait Printer {
@@ -23,16 +24,16 @@ pub trait Printer {
 }
 
 pub struct StdoutPrinter {
-    stdout: io::Stdout,
-    stderr: io::Stderr,
+    stdout: Stdout,
+    stderr: Stderr,
     output: OutputFmt,
 }
 
 impl StdoutPrinter {
     pub fn new(output: OutputFmt) -> Self {
         Self {
-            stdout: io::stdout(),
-            stderr: io::stderr(),
+            stdout: stdout(),
+            stderr: stderr(),
             output,
         }
     }

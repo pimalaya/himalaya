@@ -1,5 +1,8 @@
 use clap::ValueEnum;
-use color_eyre::{eyre::eyre, eyre::Error, Result};
+use color_eyre::{
+    eyre::{bail, Error},
+    Result,
+};
 use serde::Serialize;
 use std::{fmt, str::FromStr};
 
@@ -18,7 +21,7 @@ impl FromStr for OutputFmt {
         match fmt {
             fmt if fmt.eq_ignore_ascii_case("json") => Ok(Self::Json),
             fmt if fmt.eq_ignore_ascii_case("plain") => Ok(Self::Plain),
-            unknown => Err(eyre!("cannot parse output format {}", unknown)),
+            unknown => bail!("cannot parse output format {unknown}"),
         }
     }
 }

@@ -6,12 +6,12 @@ use toml_edit::{DocumentMut, Table};
 
 use crate::account;
 
-use super::TomlConfig;
+use super::Config;
 
-pub async fn configure(path: &PathBuf) -> Result<TomlConfig> {
+pub async fn configure(path: &PathBuf) -> Result<Config> {
     print::section("Configuring your default account");
 
-    let mut config = TomlConfig::default();
+    let mut config = Config::default();
 
     let (account_name, account_config) = account::wizard::configure().await?;
     config.accounts.insert(account_name, account_config);
@@ -27,7 +27,7 @@ pub async fn configure(path: &PathBuf) -> Result<TomlConfig> {
     Ok(config)
 }
 
-fn pretty_serialize(config: &TomlConfig) -> Result<String> {
+fn pretty_serialize(config: &Config) -> Result<String> {
     let mut doc: DocumentMut = toml::to_string(&config)?.parse()?;
 
     doc.iter_mut().for_each(|(_, item)| {

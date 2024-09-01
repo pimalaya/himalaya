@@ -6,7 +6,7 @@ use tracing::info;
 use crate::{
     account::arg::name::AccountNameFlag,
     backend::Backend,
-    config::TomlConfig,
+    config::Config,
     envelope::arg::ids::EnvelopeIdArg,
     folder::arg::name::FolderNameOptionalFlag,
     message::arg::{body::MessageRawBodyArg, header::HeaderRawArgs, reply::MessageReplyAllArg},
@@ -41,7 +41,7 @@ pub struct TemplateReplyCommand {
 }
 
 impl TemplateReplyCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
         info!("executing reply template command");
 
         let folder = &self.folder.name;

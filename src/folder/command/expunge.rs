@@ -4,7 +4,7 @@ use email::{backend::feature::BackendFeatureSource, folder::expunge::ExpungeFold
 use tracing::info;
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, config::TomlConfig,
+    account::arg::name::AccountNameFlag, backend::Backend, config::Config,
     folder::arg::name::FolderNameArg, printer::Printer,
 };
 
@@ -23,7 +23,7 @@ pub struct FolderExpungeCommand {
 }
 
 impl FolderExpungeCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
         info!("executing expunge folder command");
 
         let folder = &self.folder.name;

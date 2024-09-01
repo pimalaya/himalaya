@@ -6,7 +6,7 @@ use tracing::info;
 use url::Url;
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, config::TomlConfig, printer::Printer,
+    account::arg::name::AccountNameFlag, backend::Backend, config::Config, printer::Printer,
     ui::editor,
 };
 
@@ -34,7 +34,7 @@ impl MessageMailtoCommand {
         })
     }
 
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
         info!("executing mailto message command");
 
         let (toml_account_config, account_config) = config

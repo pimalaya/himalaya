@@ -1,32 +1,24 @@
 #[cfg(feature = "wizard")]
 pub mod wizard;
 
-use std::{collections::HashMap, fs, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
-use color_eyre::{
-    eyre::{bail, eyre, Context},
-    Result,
-};
+use color_eyre::{eyre::eyre, Result};
 use crossterm::style::Color;
-use dirs::{config_dir, home_dir};
 use email::{
-    account::config::AccountConfig, config::Config, envelope::config::EnvelopeConfig,
-    folder::config::FolderConfig, message::config::MessageConfig,
+    account::config::AccountConfig, envelope::config::EnvelopeConfig, folder::config::FolderConfig,
+    message::config::MessageConfig,
 };
-#[cfg(feature = "wizard")]
-use pimalaya_tui::{print, prompt};
+use pimalaya_tui::config::TomlConfig;
 use serde::{Deserialize, Serialize};
-use serde_toml_merge::merge;
 use shellexpand_utils::{canonicalize, expand};
-use toml::{self, Value};
-use tracing::debug;
 
 use crate::account::config::{ListAccountsTableConfig, TomlAccountConfig};
 
 /// Represents the user config file.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct TomlConfig {
+pub struct Config {
     #[serde(alias = "name")]
     pub display_name: Option<String>,
     pub signature: Option<String>,
@@ -36,83 +28,9 @@ pub struct TomlConfig {
     pub account: Option<AccountsConfig>,
 }
 
-impl TomlConfig {
-    pub fn account_list_table_preset(&self) -> Option<String> {
-        self.account
-            .as_ref()
-            .and_then(|account| account.list.as_ref())
-            .and_then(|list| list.table.as_ref())
-            .and_then(|table| table.preset.clone())
-    }
+impl TomlConfig<AccountConfig> for Config {}
 
-    pub fn account_list_table_name_color(&self) -> Option<Color> {
-        self.account
-            .as_ref()
-            .and_then(|account| account.list.as_ref())
-            .and_then(|list| list.table.as_ref())
-            .and_then(|table| table.name_color)
-    }
-
-    pub fn account_list_table_backends_color(&self) -> Option<Color> {
-        self.account
-            .as_ref()
-            .and_then(|account| account.list.as_ref())
-            .and_then(|list| list.table.as_ref())
-            .and_then(|table| table.backends_color)
-    }
-
-    pub fn account_list_table_default_color(&self) -> Option<Color> {
-        self.account
-            .as_ref()
-            .and_then(|account| account.list.as_ref())
-            .and_then(|list| list.table.as_ref())
-            .and_then(|table| table.default_color)
-    }
-
-    /// Read and parse the TOML configuration at the given paths.
-    ///
-    /// Returns an error if a configuration file cannot be read or if
-    /// a content cannot be parsed.
-    fn from_paths(paths: &[PathBuf]) -> Result<Self> {
-        match paths.len() {
-            0 => {
-                // should never happen
-                bail!("cannot read config file from empty paths");
-            }
-            1 => {
-                let path = &paths[0];
-
-                let content = &(fs::read_to_string(path)
-                    .context(format!("cannot read config file at {path:?}"))?);
-
-                toml::from_str(content).context(format!("cannot parse config file at {path:?}"))
-            }
-            _ => {
-                let path = &paths[0];
-
-                let mut merged_content = fs::read_to_string(path)
-                    .context(format!("cannot read config file at {path:?}"))?
-                    .parse::<Value>()?;
-
-                for path in &paths[1..] {
-                    match fs::read_to_string(path) {
-                        Ok(content) => {
-                            merged_content = merge(merged_content, content.parse()?).unwrap();
-                        }
-                        Err(err) => {
-                            debug!("skipping subconfig file at {path:?}: {err}");
-                            continue;
-                        }
-                    }
-                }
-
-                merged_content
-                    .try_into()
-                    .context(format!("cannot parse merged config file at {path:?}"))
-            }
-        }
-    }
-
+impl Config {
     /// Create and save a TOML configuration using the wizard.
     ///
     /// If the user accepts the confirmation, the wizard starts and
@@ -122,25 +40,18 @@ impl TomlConfig {
     /// NOTE: the wizard can only be used with interactive shells.
     #[cfg(feature = "wizard")]
     async fn from_wizard(path: &PathBuf) -> Result<Self> {
-        print::warn(format!("Cannot find existing configuration at {path:?}."));
-
-        if !prompt::bool("Would you like to create one with the wizard? ", true)? {
-            std::process::exit(0);
-        }
-
-        return wizard::configure(path).await;
-    }
-
-    #[cfg(not(feature = "wizard"))]
-    async fn from_wizard(path: &PathBuf) -> Result<Self> {
-        bail!("Cannot find existing configuration at {path:?}.");
+        Self::confirm_from_wizard(path)?;
+        wizard::configure(path).await
     }
 
     /// Read and parse the TOML configuration from default paths.
     pub async fn from_default_paths() -> Result<Self> {
         match Self::first_valid_default_path() {
             Some(path) => Self::from_paths(&[path]),
+            #[cfg(feature = "wizard")]
             None => Self::from_wizard(&Self::default_path()?).await,
+            #[cfg(not(feature = "wizard"))]
+            None => color_eyre::eyre::bail!("cannot find config file from default paths"),
         }
     }
 
@@ -162,36 +73,6 @@ impl TomlConfig {
             _ if paths[0].exists() => Self::from_paths(paths),
             _ => Self::from_wizard(&paths[0]).await,
         }
-    }
-
-    /// Get the default configuration path.
-    ///
-    /// Returns an error if the XDG configuration directory cannot be
-    /// found.
-    pub fn default_path() -> Result<PathBuf> {
-        Ok(config_dir()
-            .ok_or(eyre!("cannot get XDG config directory"))?
-            .join("himalaya")
-            .join("config.toml"))
-    }
-
-    /// Get the first default configuration path that points to a
-    /// valid file.
-    ///
-    /// Tries paths in this order:
-    ///
-    /// - `$XDG_CONFIG_DIR/himalaya/config.toml` (or equivalent to
-    ///   `$XDG_CONFIG_DIR` in other OSes.)
-    /// - `$HOME/.config/himalaya/config.toml`
-    /// - `$HOME/.himalayarc`
-    pub fn first_valid_default_path() -> Option<PathBuf> {
-        Self::default_path()
-            .ok()
-            .filter(|p| p.exists())
-            .or_else(|| home_dir().map(|p| p.join(".config").join("himalaya").join("config.toml")))
-            .filter(|p| p.exists())
-            .or_else(|| home_dir().map(|p| p.join(".himalayarc")))
-            .filter(|p| p.exists())
     }
 
     pub fn into_toml_account_config(
@@ -241,7 +122,7 @@ impl TomlConfig {
     ) -> Result<(Arc<TomlAccountConfig>, Arc<AccountConfig>)> {
         let (account_name, toml_account_config) = self.into_toml_account_config(account_name)?;
 
-        let config = Config {
+        let config = email::config::Config {
             display_name: self.display_name,
             signature: self.signature,
             signature_delim: self.signature_delim,
@@ -285,6 +166,38 @@ impl TomlConfig {
         let account_config = config.account(account_name)?;
 
         Ok((Arc::new(toml_account_config), Arc::new(account_config)))
+    }
+
+    pub fn account_list_table_preset(&self) -> Option<String> {
+        self.account
+            .as_ref()
+            .and_then(|account| account.list.as_ref())
+            .and_then(|list| list.table.as_ref())
+            .and_then(|table| table.preset.clone())
+    }
+
+    pub fn account_list_table_name_color(&self) -> Option<Color> {
+        self.account
+            .as_ref()
+            .and_then(|account| account.list.as_ref())
+            .and_then(|list| list.table.as_ref())
+            .and_then(|table| table.name_color)
+    }
+
+    pub fn account_list_table_backends_color(&self) -> Option<Color> {
+        self.account
+            .as_ref()
+            .and_then(|account| account.list.as_ref())
+            .and_then(|list| list.table.as_ref())
+            .and_then(|table| table.backends_color)
+    }
+
+    pub fn account_list_table_default_color(&self) -> Option<Color> {
+        self.account
+            .as_ref()
+            .and_then(|account| account.list.as_ref())
+            .and_then(|list| list.table.as_ref())
+            .and_then(|table| table.default_color)
     }
 }
 

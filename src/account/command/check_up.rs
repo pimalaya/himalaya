@@ -4,7 +4,7 @@ use email::backend::context::BackendContextBuilder;
 use tracing::info;
 
 use crate::{
-    account::arg::name::OptionalAccountNameArg, backend, config::TomlConfig, printer::Printer,
+    account::arg::name::OptionalAccountNameArg, backend, config::Config, printer::Printer,
 };
 
 /// Check up the given account.
@@ -19,7 +19,7 @@ pub struct AccountCheckUpCommand {
 }
 
 impl AccountCheckUpCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
         info!("executing check up account command");
 
         let account = self.account.name.as_ref().map(String::as_str);

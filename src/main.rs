@@ -1,24 +1,14 @@
 use clap::Parser;
-use color_eyre::{Result, Section};
+use color_eyre::Result;
 use himalaya::{
-    cli::Cli, config::TomlConfig, envelope::command::list::ListEnvelopesCommand,
+    cli::Cli, config::Config, envelope::command::list::ListEnvelopesCommand,
     message::command::mailto::MessageMailtoCommand, printer::StdoutPrinter,
 };
-use std::env;
-use tracing::level_filters::LevelFilter;
+use pimalaya_tui::cli::tracing;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    if env::var("RUST_LOG").is_err() {
-        if std::env::args().any(|arg| arg == "--debug") {
-            env::set_var("RUST_LOG", "debug");
-        }
-        if std::env::args().any(|arg| arg == "--trace") {
-            env::set_var("RUST_LOG", "trace");
-        }
-    }
-
-    let filter = himalaya::tracing::install()?;
+    let tracing = tracing::install()?;
 
     // if the first argument starts by "mailto:", execute straight the
     // mailto message command
@@ -28,7 +18,7 @@ async fn main() -> Result<()> {
 
     if let Some(ref url) = mailto {
         let mut printer = StdoutPrinter::default();
-        let config = TomlConfig::from_default_paths().await?;
+        let config = Config::from_default_paths().await?;
 
         return MessageMailtoCommand::new(url)?
             .execute(&mut printer, &config)
@@ -37,23 +27,15 @@ async fn main() -> Result<()> {
 
     let cli = Cli::parse();
     let mut printer = StdoutPrinter::new(cli.output);
-    let mut res = match cli.command {
+    let res = match cli.command {
         Some(cmd) => cmd.execute(&mut printer, cli.config_paths.as_ref()).await,
         None => {
-            let config = TomlConfig::from_paths_or_default(cli.config_paths.as_ref()).await?;
+            let config = Config::from_paths_or_default(cli.config_paths.as_ref()).await?;
             ListEnvelopesCommand::default()
                 .execute(&mut printer, &config)
                 .await
         }
     };
 
-    if filter < LevelFilter::DEBUG {
-        res = res.note("Run with --debug to enable logs with spantrace.");
-    };
-
-    if filter < LevelFilter::TRACE {
-        res = res.note("Run with --trace to enable verbose logs with backtrace.")
-    };
-
-    res
+    tracing.with_debug_and_trace_notes(res)
 }

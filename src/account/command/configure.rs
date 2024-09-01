@@ -10,7 +10,7 @@ use tracing::info;
 #[cfg(any(feature = "imap", feature = "smtp"))]
 use tracing::{debug, warn};
 
-use crate::{account::arg::name::AccountNameArg, config::TomlConfig, printer::Printer};
+use crate::{account::arg::name::AccountNameArg, config::Config, printer::Printer};
 
 /// Configure an account.
 ///
@@ -31,7 +31,7 @@ pub struct AccountConfigureCommand {
 }
 
 impl AccountConfigureCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
         info!("executing configure account command");
 
         let account = &self.account.name;

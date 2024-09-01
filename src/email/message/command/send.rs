@@ -5,7 +5,7 @@ use std::io::{self, BufRead, IsTerminal};
 use tracing::info;
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, config::TomlConfig,
+    account::arg::name::AccountNameFlag, backend::Backend, config::Config,
     message::arg::MessageRawArg, printer::Printer,
 };
 
@@ -23,7 +23,7 @@ pub struct MessageSendCommand {
 }
 
 impl MessageSendCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
         info!("executing send message command");
 
         let (toml_account_config, account_config) = config

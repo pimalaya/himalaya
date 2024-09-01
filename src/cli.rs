@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use crate::{
     account::command::AccountSubcommand,
     completion::command::CompletionGenerateCommand,
-    config::{self, TomlConfig},
+    config::{self, Config},
     envelope::command::EnvelopeSubcommand,
     flag::command::FlagSubcommand,
     folder::command::FolderSubcommand,
@@ -111,31 +111,31 @@ impl HimalayaCommand {
     pub async fn execute(self, printer: &mut impl Printer, config_paths: &[PathBuf]) -> Result<()> {
         match self {
             Self::Account(cmd) => {
-                let config = TomlConfig::from_paths_or_default(config_paths).await?;
+                let config = Config::from_paths_or_default(config_paths).await?;
                 cmd.execute(printer, &config).await
             }
             Self::Folder(cmd) => {
-                let config = TomlConfig::from_paths_or_default(config_paths).await?;
+                let config = Config::from_paths_or_default(config_paths).await?;
                 cmd.execute(printer, &config).await
             }
             Self::Envelope(cmd) => {
-                let config = TomlConfig::from_paths_or_default(config_paths).await?;
+                let config = Config::from_paths_or_default(config_paths).await?;
                 cmd.execute(printer, &config).await
             }
             Self::Flag(cmd) => {
-                let config = TomlConfig::from_paths_or_default(config_paths).await?;
+                let config = Config::from_paths_or_default(config_paths).await?;
                 cmd.execute(printer, &config).await
             }
             Self::Message(cmd) => {
-                let config = TomlConfig::from_paths_or_default(config_paths).await?;
+                let config = Config::from_paths_or_default(config_paths).await?;
                 cmd.execute(printer, &config).await
             }
             Self::Attachment(cmd) => {
-                let config = TomlConfig::from_paths_or_default(config_paths).await?;
+                let config = Config::from_paths_or_default(config_paths).await?;
                 cmd.execute(printer, &config).await
             }
             Self::Template(cmd) => {
-                let config = TomlConfig::from_paths_or_default(config_paths).await?;
+                let config = Config::from_paths_or_default(config_paths).await?;
                 cmd.execute(printer, &config).await
             }
             Self::Manual(cmd) => cmd.execute(printer).await,

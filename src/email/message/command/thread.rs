@@ -7,7 +7,7 @@ use tracing::info;
 use crate::envelope::arg::ids::EnvelopeIdArg;
 #[allow(unused)]
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, config::TomlConfig,
+    account::arg::name::AccountNameFlag, backend::Backend, config::Config,
     envelope::arg::ids::EnvelopeIdsArgs, folder::arg::name::FolderNameOptionalFlag,
     printer::Printer,
 };
@@ -74,7 +74,7 @@ pub struct MessageThreadCommand {
 }
 
 impl MessageThreadCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
         info!("executing thread message(s) command");
 
         let folder = &self.folder.name;
