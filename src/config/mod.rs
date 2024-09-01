@@ -28,7 +28,11 @@ pub struct Config {
     pub account: Option<AccountsConfig>,
 }
 
-impl TomlConfig<AccountConfig> for Config {}
+impl TomlConfig<AccountConfig> for Config {
+    fn project_name() -> &'static str {
+        env!("CARGO_PKG_NAME")
+    }
+}
 
 impl Config {
     /// Create and save a TOML configuration using the wizard.

@@ -3191,7 +3191,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-tui"
 version = "0.1.0"
-source = "git+https://github.com/pimalaya/tui#0b2403886edcc57491e56da86537541e9b126cbc"
+source = "git+https://github.com/pimalaya/tui#fba8c1284dbaaa4433c7cb6b242e68864d8d5b44"
 dependencies = [
  "clap",
  "color-eyre",
