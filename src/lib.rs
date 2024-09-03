@@ -9,7 +9,6 @@ pub mod folder;
 pub mod manual;
 pub mod output;
 pub mod printer;
-pub mod tracing;
 pub mod ui;
 
 #[doc(inline)]

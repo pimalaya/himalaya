@@ -10,6 +10,9 @@ use pimalaya_tui::cli::tracing;
 async fn main() -> Result<()> {
     let tracing = tracing::install()?;
 
+    #[cfg(feature = "keyring")]
+    secret::keyring::set_global_service_name("himalaya-cli");
+
     // if the first argument starts by "mailto:", execute straight the
     // mailto message command
     let mailto = std::env::args()

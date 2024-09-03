@@ -60,13 +60,11 @@ pub async fn configure_sender(
     )?;
 
     match backend {
-        // TODO
         #[cfg(feature = "smtp")]
         BackendKind::Smtp => {
             let config = wizard::smtp::start(account_name, email, autoconfig).await?;
             Ok(BackendConfig::Smtp(config))
         }
-        // TODO
         #[cfg(feature = "sendmail")]
         BackendKind::Sendmail => {
             let config = wizard::sendmail::start()?;
