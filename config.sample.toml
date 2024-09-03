@@ -329,27 +329,31 @@ imap.login = "example@localhost"
 
 # IMAP server password authentication configuration.
 #
+#imap.auth.type = "password"
+#
 # Password can be inlined (not recommended).
 #
-#imap.passwd.raw = "p@assw0rd"
+#imap.auth.raw = "p@assw0rd"
 #
 # Password can be stored inside your system global keyring (requires
 # the keyring cargo feature). You must run at least once `himalaya
 # account configure` to set up the password.
 #
-#imap.passwd.keyring = "example-imap"
+#imap.auth.keyring = "example-imap"
 #
 # Password can be retrieved from a shell command.
 #
-imap.passwd.cmd = "pass show example-imap"
+imap.auth.cmd = "pass show example-imap"
 
 # IMAP server OAuth 2.0 authorization configuration.
+#
+#imap.auth.type = "oauth2"
 #
 # Client identifier issued to the client during the registration
 # process described in RFC6749.
 # See <https://datatracker.ietf.org/doc/html/rfc6749#section-2.2>.
 #
-#imap.oauth2.client-id = "client-id"
+#imap.auth.client-id = "client-id"
 #
 # Client password issued to the client during the registration process
 # described in RFC6749.
@@ -357,23 +361,23 @@ imap.passwd.cmd = "pass show example-imap"
 # Defaults to keyring "<account-name>-imap-client-secret".
 # See <https://datatracker.ietf.org/doc/html/rfc6749#section-2.2>.
 #
-#imap.oauth2.client-secret.raw = "<raw-client-secret>"
-#imap.oauth2.client-secret.keyring = "example-imap-client-secret"
-#imap.oauth2.client-secret.cmd = "pass show example-imap-client-secret"
+#imap.auth.client-secret.raw = "<raw-client-secret>"
+#imap.auth.client-secret.keyring = "example-imap-client-secret"
+#imap.auth.client-secret.cmd = "pass show example-imap-client-secret"
 #
 # Method for presenting an OAuth 2.0 bearer token to a service for
 # authentication.
 #
-#imap.oauth2.method = "oauthbearer"
-#imap.oauth2.method = "xoauth2"
+#imap.auth.method = "oauthbearer"
+#imap.auth.method = "xoauth2"
 #
 # URL of the authorization server's authorization endpoint.
 #
-#imap.oauth2.auth-url = "https://accounts.google.com/o/oauth2/v2/auth"
+#imap.auth.auth-url = "https://accounts.google.com/o/oauth2/v2/auth"
 #
 # URL of the authorization server's token endpoint.
 #
-#imap.oauth2.token-url = "https://www.googleapis.com/oauth2/v3/token"
+#imap.auth.token-url = "https://www.googleapis.com/oauth2/v3/token"
 #
 # Access token returned by the token endpoint and used to access
 # protected resources. It is recommended to use the keyring variant,
@@ -381,9 +385,9 @@ imap.passwd.cmd = "pass show example-imap"
 #
 # Defaults to keyring "<account-name>-imap-access-token".
 #
-#imap.oauth2.access-token.raw = "<raw-access-token>"
-#imap.oauth2.access-token.keyring = "example-imap-access-token"
-#imap.oauth2.access-token.cmd = "pass show example-imap-access-token"
+#imap.auth.access-token.raw = "<raw-access-token>"
+#imap.auth.access-token.keyring = "example-imap-access-token"
+#imap.auth.access-token.cmd = "pass show example-imap-access-token"
 #
 # Refresh token used to obtain a new access token (if supported by the
 # authorization server). It is recommended to use the keyring variant,
@@ -391,30 +395,30 @@ imap.passwd.cmd = "pass show example-imap"
 #
 # Defaults to keyring "<account-name>-imap-refresh-token".
 #
-#imap.oauth2.refresh-token.raw = "<raw-refresh-token>"
-#imap.oauth2.refresh-token.keyring = "example-imap-refresh-token"
-#imap.oauth2.refresh-token.cmd = "pass show example-imap-refresh-token"
+#imap.auth.refresh-token.raw = "<raw-refresh-token>"
+#imap.auth.refresh-token.keyring = "example-imap-refresh-token"
+#imap.auth.refresh-token.cmd = "pass show example-imap-refresh-token"
 #
 # Enable the protection, as defined in RFC7636.
 #
 # See <https://datatracker.ietf.org/doc/html/rfc7636>.
 #
-#imap.oauth2.pkce = true
+#imap.auth.pkce = true
 #
 # Access token scope(s), as defined by the authorization server.
 #
-#imap.oauth2.scope = "unique scope"
-#imap.oauth2.scopes = ["multiple", "scopes"]
+#imap.auth.scope = "unique scope"
+#imap.auth.scopes = ["multiple", "scopes"]
 #
 # Host name of the redirect server.
 # Defaults to localhost.
 #
-#imap.oauth2.redirect-host = "localhost"
+#imap.auth.redirect-host = "localhost"
 #
 # Port of the redirect server.
 # Defaults to the first available one.
 #
-#imap.oauth2.redirect-port = 9999
+#imap.auth.redirect-port = 9999
 
 ########################################
 #### Maildir configuration #############
@@ -491,27 +495,31 @@ smtp.login = "example@localhost"
 
 # SMTP server password authentication configuration.
 #
+#smtp.auth.type = "password"
+#
 # Password can be inlined (not recommended).
 #
-#smtp.passwd.raw = "p@assw0rd"
+#smtp.auth.raw = "p@assw0rd"
 #
 # Password can be stored inside your system global keyring (requires
 # the keyring cargo feature). You must run at least once `himalaya
 # account configure` to set up the password.
 #
-#smtp.passwd.keyring = "example-smtp"
+#smtp.auth.keyring = "example-smtp"
 #
 # Password can be retrieved from a shell command.
 #
-smtp.passwd.cmd = "pass show example-smtp"
+smtp.auth.cmd = "pass show example-smtp"
 
 # SMTP server OAuth 2.0 authorization configuration.
+#
+#smtp.auth.type = "oauth2"
 #
 # Client identifier issued to the client during the registration
 # process described in RFC6749.
 # See <https://datatracker.ietf.org/doc/html/rfc6749#section-2.2>.
 #
-#smtp.oauth2.client-id = "client-id"
+#smtp.auth.client-id = "client-id"
 #
 # Client password issued to the client during the registration process
 # described in RFC6749.
@@ -519,23 +527,23 @@ smtp.passwd.cmd = "pass show example-smtp"
 # Defaults to keyring "<account-name>-smtp-client-secret".
 # See <https://datatracker.ietf.org/doc/html/rfc6749#section-2.2>.
 #
-#smtp.oauth2.client-secret.raw = "<raw-client-secret>"
-#smtp.oauth2.client-secret.keyring = "example-smtp-client-secret"
-#smtp.oauth2.client-secret.cmd = "pass show example-smtp-client-secret"
+#smtp.auth.client-secret.raw = "<raw-client-secret>"
+#smtp.auth.client-secret.keyring = "example-smtp-client-secret"
+#smtp.auth.client-secret.cmd = "pass show example-smtp-client-secret"
 #
 # Method for presenting an OAuth 2.0 bearer token to a service for
 # authentication.
 #
-#smtp.oauth2.method = "oauthbearer"
-#smtp.oauth2.method = "xoauth2"
+#smtp.auth.method = "oauthbearer"
+#smtp.auth.method = "xoauth2"
 #
 # URL of the authorization server's authorization endpoint.
 #
-#smtp.oauth2.auth-url = "https://accounts.google.com/o/oauth2/v2/auth"
+#smtp.auth.auth-url = "https://accounts.google.com/o/oauth2/v2/auth"
 #
 # URL of the authorization server's token endpoint.
 #
-#smtp.oauth2.token-url = "https://www.googleapis.com/oauth2/v3/token"
+#smtp.auth.token-url = "https://www.googleapis.com/oauth2/v3/token"
 #
 # Access token returned by the token endpoint and used to access
 # protected resources. It is recommended to use the keyring variant,
@@ -543,9 +551,9 @@ smtp.passwd.cmd = "pass show example-smtp"
 #
 # Defaults to keyring "<account-name>-smtp-access-token".
 #
-#smtp.oauth2.access-token.raw = "<raw-access-token>"
-#smtp.oauth2.access-token.keyring = "example-smtp-access-token"
-#smtp.oauth2.access-token.cmd = "pass show example-smtp-access-token"
+#smtp.auth.access-token.raw = "<raw-access-token>"
+#smtp.auth.access-token.keyring = "example-smtp-access-token"
+#smtp.auth.access-token.cmd = "pass show example-smtp-access-token"
 #
 # Refresh token used to obtain a new access token (if supported by the
 # authorization server). It is recommended to use the keyring variant,
@@ -553,30 +561,30 @@ smtp.passwd.cmd = "pass show example-smtp"
 #
 # Defaults to keyring "<account-name>-smtp-refresh-token".
 #
-#smtp.oauth2.refresh-token.raw = "<raw-refresh-token>"
-#smtp.oauth2.refresh-token.keyring = "example-smtp-refresh-token"
-#smtp.oauth2.refresh-token.cmd = "pass show example-smtp-refresh-token"
+#smtp.auth.refresh-token.raw = "<raw-refresh-token>"
+#smtp.auth.refresh-token.keyring = "example-smtp-refresh-token"
+#smtp.auth.refresh-token.cmd = "pass show example-smtp-refresh-token"
 #
 # Enable the protection, as defined in RFC7636.
 #
 # See <https://datatracker.ietf.org/doc/html/rfc7636>.
 #
-#smtp.oauth2.pkce = true
+#smtp.auth.pkce = true
 #
 # Access token scope(s), as defined by the authorization server.
 #
-#smtp.oauth2.scope = "unique scope"
-#smtp.oauth2.scopes = ["multiple", "scopes"]
+#smtp.auth.scope = "unique scope"
+#smtp.auth.scopes = ["multiple", "scopes"]
 #
 # Host name of the redirect server.
 # Defaults to localhost.
 #
-#smtp.oauth2.redirect-host = "localhost"
+#smtp.auth.redirect-host = "localhost"
 #
 # Port of the redirect server.
 # Defaults to the first available one.
 #
-#smtp.oauth2.redirect-port = 9999
+#smtp.auth.redirect-port = 9999
 
 ########################################
 #### Sendmail configuration ############

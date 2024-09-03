@@ -1232,7 +1232,7 @@ dependencies = [
 [[package]]
 name = "email-lib"
 version = "0.25.0"
-source = "git+https://github.com/pimalaya/core#45efcdc68797efdbdf7ee23a1e77b84ff32c2925"
+source = "git+https://github.com/pimalaya/core#520796c592c4d52236b597b34819e0f817686378"
 dependencies = [
  "async-trait",
  "chrono",
@@ -2891,7 +2891,7 @@ dependencies = [
 [[package]]
 name = "oauth-lib"
 version = "0.1.1"
-source = "git+https://github.com/pimalaya/core#45efcdc68797efdbdf7ee23a1e77b84ff32c2925"
+source = "git+https://github.com/pimalaya/core#520796c592c4d52236b597b34819e0f817686378"
 dependencies = [
  "log",
  "oauth2",

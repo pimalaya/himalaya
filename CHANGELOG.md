@@ -28,6 +28,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `accounts.<name>.envelope.list.table.flagged-char` account config option to customize the char used for flagged envelopes (defaults to `!`).
 - Added `accounts.<name>.envelope.list.table.attachment-char` account config option to customize the char used for envelopes with at least one attachment (defaults to `@`).
 
+### Changed
+
+- Refactored IMAP and SMTP auth config API
+
+  The IMAP and SMTP auth config option is now explicit, in order to improve error messages:
+
+  ```toml
+  # before
+  imap.password.cmd = "pass show example"
+  smtp.oauth2.method = "xoauth2"
+
+  # after
+  imap.auth.type = "password"
+  imap.auth.cmd = "pass show example"
+  smtp.auth.type = "oauth2"
+  smtp.auth.method = "xoauth2"
+  ```
+
 ## [1.0.0-beta.4] - 2024-04-16
 
 ### Added

@@ -75,7 +75,10 @@ impl Config {
         match paths.len() {
             0 => Self::from_default_paths().await,
             _ if paths[0].exists() => Self::from_paths(paths),
+            #[cfg(feature = "wizard")]
             _ => Self::from_wizard(&paths[0]).await,
+            #[cfg(not(feature = "wizard"))]
+            _ => color_eyre::eyre::bail!("cannot find config file from default paths"),
         }
     }
 
