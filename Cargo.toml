@@ -80,7 +80,7 @@ uuid = { version = "0.8", features = ["v4"] }
 
 [patch.crates-io]
 imap-codec = { git = "https://github.com/duesee/imap-codec" }
-imap-next = { git = "https://github.com/duesee/imap-next", branch = "jakoschiko_poison-message-with-fragmentizer" }
+imap-next = { git = "https://github.com/soywod/imap-next" }
 imap-client = { git = "https://github.com/pimalaya/imap-client" }
 oauth-lib = { git = "https://github.com/pimalaya/core" }
 email-lib = { git = "https://github.com/pimalaya/core" }

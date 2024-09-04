@@ -2,12 +2,14 @@
   description = "CLI to manage emails";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-23.11";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-24.05";
     gitignore = {
       url = "github:hercules-ci/gitignore.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     fenix = {
+      # https://github.com/nix-community/fenix/pull/145
+      # url = "github:nix-community/fenix";
       url = "github:soywod/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
@@ -108,6 +110,23 @@
               in package // {
                 buildInputs = [ Cocoa ];
                 NIX_LDFLAGS = "-F${AppKit}/Library/Frameworks -framework AppKit";
+              };
+          };
+
+          x86_64-darwin = {
+            rustTarget = "x86_64-apple-darwin";
+            runner = { pkgs, himalaya }: "${pkgs.qemu}/bin/qemu-x86_64 ${himalaya}";
+            mkPackage = { system, pkgs }: package:
+              let
+                inherit ((mkPkgsCross system "x86_64-apple-darwin").pkgsStatic) stdenv darwin;
+                inherit (darwin.apple_sdk.frameworks) AppKit Cocoa;
+                cc = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc";
+              in
+              package // {
+                buildInputs = [ Cocoa ];
+                NIX_LDFLAGS = "-F${AppKit}/Library/Frameworks -framework AppKit";
+                TARGET_CC = cc;
+                CARGO_BUILD_RUSTFLAGS = package.CARGO_BUILD_RUSTFLAGS ++ [ "-Clinker=${cc}" ];
               };
           };
         };
