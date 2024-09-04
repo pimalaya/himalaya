@@ -112,23 +112,6 @@
                 NIX_LDFLAGS = "-F${AppKit}/Library/Frameworks -framework AppKit";
               };
           };
-
-          x86_64-darwin = {
-            rustTarget = "x86_64-apple-darwin";
-            runner = { pkgs, himalaya }: "${pkgs.qemu}/bin/qemu-x86_64 ${himalaya}";
-            mkPackage = { system, pkgs }: package:
-              let
-                inherit ((mkPkgsCross system "x86_64-apple-darwin").pkgsStatic) stdenv darwin;
-                inherit (darwin.apple_sdk.frameworks) AppKit Cocoa;
-                cc = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc";
-              in
-              package // {
-                buildInputs = [ Cocoa ];
-                NIX_LDFLAGS = "-F${AppKit}/Library/Frameworks -framework AppKit";
-                TARGET_CC = cc;
-                CARGO_BUILD_RUSTFLAGS = package.CARGO_BUILD_RUSTFLAGS ++ [ "-Clinker=${cc}" ];
-              };
-          };
         };
       };
 

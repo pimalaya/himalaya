@@ -17,23 +17,23 @@ jobs:
           - target: x86_64-windows
             os: ubuntu-latest
           - target: x86_64-darwin
-            os: macos-latest
-          # FIXME: build broken
-          # - target: aarch64-darwin
-          #   os: macos-latest
+            os: macos-13
+          - target: aarch64-darwin
+            os: macos-14
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Install Nix
-        uses: cachix/install-nix-action@v24
+        uses: cachix/install-nix-action@v27
         with:
-          nix_path: nixpkgs=channel:nixos-23.11
-          extra_nix_config: |
-            experimental-features = nix-command flakes
-      - uses: cachix/cachix-action@v12
+          nix_path: nixpkgs=channel:nixos-24.05
+          enable_kvm: true
+          extra_nix_config: "experimental-features = nix-command flakes"
+      - uses: cachix/cachix-action@v15
         with:
           name: soywod
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          extraPullNames: nix-community
       - name: Run app
         run: |
           nix build -L .#${{ matrix.target }}
