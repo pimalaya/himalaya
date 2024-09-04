@@ -3235,8 +3235,7 @@ dependencies = [
 [[package]]
 name = "process-lib"
 version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0600893efc62c84ded38fec2b022ada4d4d80e48a8df5bceb070c865bf8a33a9"
+source = "git+https://github.com/pimalaya/core#9dad2b0b59c11b0ead1932081b61409e9cb018b3"
 dependencies = [
  "log",
  "serde",

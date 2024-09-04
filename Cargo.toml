@@ -83,5 +83,6 @@ imap-codec = { git = "https://github.com/duesee/imap-codec" }
 imap-next = { git = "https://github.com/soywod/imap-next" }
 imap-client = { git = "https://github.com/pimalaya/imap-client" }
 oauth-lib = { git = "https://github.com/pimalaya/core" }
+process-lib = { git = "https://github.com/pimalaya/core" }
 email-lib = { git = "https://github.com/pimalaya/core" }
 pimalaya-tui = { git = "https://github.com/pimalaya/tui" }
