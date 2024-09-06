@@ -53,7 +53,7 @@ impl FolderListCommand {
             .with_some_name_color(toml_account_config.folder_list_table_name_color())
             .with_some_desc_color(toml_account_config.folder_list_table_desc_color());
 
-        printer.log(table)?;
+        printer.out(table)?;
         Ok(())
     }
 }
