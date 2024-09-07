@@ -80,8 +80,8 @@ uuid = { version = "0.8", features = ["v4"] }
 
 [patch.crates-io]
 imap-codec = { git = "https://github.com/duesee/imap-codec" }
-imap-next = { git = "https://github.com/soywod/imap-next" }
-imap-client = { git = "https://github.com/pimalaya/imap-client" }
+imap-next = { git = "https://github.com/soywod/imap-next", branch = "greeting-timeout" }
+imap-client = { git = "https://github.com/pimalaya/imap-client", branch = "greeting-timeout" }
 oauth-lib = { git = "https://github.com/pimalaya/core" }
 process-lib = { git = "https://github.com/pimalaya/core" }
 email-lib = { git = "https://github.com/pimalaya/core" }
