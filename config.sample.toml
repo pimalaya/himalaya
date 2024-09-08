@@ -329,7 +329,7 @@ imap.login = "example@localhost"
 
 # IMAP server password authentication configuration.
 #
-#imap.auth.type = "password"
+imap.auth.type = "password"
 #
 # Password can be inlined (not recommended).
 #
@@ -495,7 +495,7 @@ smtp.login = "example@localhost"
 
 # SMTP server password authentication configuration.
 #
-#smtp.auth.type = "password"
+smtp.auth.type = "password"
 #
 # Password can be inlined (not recommended).
 #
