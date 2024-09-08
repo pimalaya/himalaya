@@ -8,8 +8,8 @@ license = "MIT"
 categories = ["command-line-utilities", "email"]
 keywords = ["cli", "email", "imap", "maildir", "smtp"]
 homepage = "https://pimalaya.org/"
-documentation = "https://pimalaya.org/himalaya/cli/latest/"
-repository = "https://github.com/soywod/himalaya/"
+documentation = "https://github.com/pimalaya/himalaya/"
+repository = "https://github.com/pimalaya/himalaya/"
 
 [package.metadata.docs.rs]
 all-features = true
@@ -53,8 +53,8 @@ async-trait = "0.1"
 clap = { version = "4.4", features = ["derive", "env", "wrap_help"] }
 clap_complete = "4.4"
 clap_mangen = "0.2"
-color-eyre = "0.6.3"
-comfy-table = "7.1.1"
+color-eyre = "0.6"
+comfy-table = "7.1"
 crossterm = { version = "0.27", features = ["serde"] }
 dirs = "4"
 email-lib = { version = "=0.25.0", default-features = false, features = ["derive", "thread", "tracing"] }
@@ -74,14 +74,13 @@ shellexpand-utils = "=0.2.1"
 sled = "=0.34.7"
 tokio = { version = "1.23", default-features = false, features = ["macros", "rt-multi-thread"] }
 toml = "0.8"
-tracing = "0.1.40"
+tracing = "0.1"
 url = "2.2"
 uuid = { version = "0.8", features = ["v4"] }
 
 [patch.crates-io]
-imap-codec = { git = "https://github.com/duesee/imap-codec" }
-imap-next = { git = "https://github.com/soywod/imap-next", branch = "greeting-timeout" }
-imap-client = { git = "https://github.com/pimalaya/imap-client", branch = "greeting-timeout" }
+imap-next = { git = "https://github.com/duesee/imap-next" }
+imap-client = { git = "https://github.com/pimalaya/imap-client" }
 oauth-lib = { git = "https://github.com/pimalaya/core" }
 process-lib = { git = "https://github.com/pimalaya/core" }
 email-lib = { git = "https://github.com/pimalaya/core" }
