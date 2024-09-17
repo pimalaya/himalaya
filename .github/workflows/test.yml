@@ -6,6 +6,8 @@ on:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
+    env:
+      CARGO_HOME: ~/.cargo
     strategy:
       fail-fast: false
       matrix:
@@ -29,11 +31,22 @@ jobs:
           nix_path: nixpkgs=channel:nixos-24.05
           enable_kvm: true
           extra_nix_config: "experimental-features = nix-command flakes"
-      - uses: cachix/cachix-action@v15
+      - name: Restore Nix store
+        uses: cachix/cachix-action@v15
         with:
           name: soywod
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
           extraPullNames: nix-community
+      - name: Restore Cargo home
+        uses: actions/cache/restore@v4
+        id: cache-cargo-home
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
       - name: Build release
         run: |
           nix run -L .#${{ matrix.target }} -- --version
@@ -44,3 +57,13 @@ jobs:
           path: |
             result/himalaya.tgz
             result/himalaya.zip
+    - name: Save Cargo home
+      id: cache-cargo-home
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+        key: ${{ steps.cache-cargo-home.outputs.cache-primary-key }}
