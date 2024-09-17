@@ -50,13 +50,14 @@ jobs:
       - name: Build release
         run: |
           nix run -L .#${{ matrix.target }} -- --version
+          cp result/himalaya* .
       - name: Upload release artifact
         uses: actions/upload-artifact@v4
         with:
           name: release
           path: |
-            result/himalaya.tgz
-            result/himalaya.zip
+            himalaya.tgz
+            himalaya.zip
       - name: Save Cargo home
         uses: actions/cache/save@v4
         id: cache-cargo-save
