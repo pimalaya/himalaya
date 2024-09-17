@@ -39,7 +39,7 @@ jobs:
           extraPullNames: nix-community
       - name: Restore Cargo home
         uses: actions/cache/restore@v4
-        id: cache-cargo-home
+        id: cache-cargo-restore
         with:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           path: |
@@ -59,9 +59,9 @@ jobs:
             result/himalaya.zip
       - name: Save Cargo home
         uses: actions/cache/save@v4
-        id: cache-cargo-home
+        id: cache-cargo-save
         with:
-          key: ${{ steps.cache-cargo-home.outputs.cache-primary-key }}
+          key: ${{ steps.cache-cargo-restore.outputs.cache-primary-key }}
           path: |
             ~/.cargo/bin/
             ~/.cargo/registry/index/
