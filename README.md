@@ -38,19 +38,41 @@ $ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
 
 ## Installation
 
-Himalaya CLI can be installed with a prebuilt binary:
+*The `v1.0.0` is currently being tested on the `master` branch, and is the prefered version to use. Previous versions (including GitHub beta releases and repositories published versions) are not recommended.*
 
-```bash
-# As root:
-$ curl -sSL https://raw.githubusercontent.com/pimalaya/himalaya/master/install.sh | sudo sh
+### `v1.0.0`
 
-# As a regular user:
-$ curl -sSL https://raw.githubusercontent.com/pimalaya/himalaya/master/install.sh | PREFIX=~/.local sh
-```
+Himalaya CLI `v1.0.0` can be installed with a prebuilt binary. Take to the latest [`pre-release`](https://github.com/pimalaya/himalaya/actions/workflows/pre-release.yml) GitHub workflow and look for the `Artifacts` section. You should find a pre-built binary matching your OS.
 
-These commands install the latest binary from the GitHub [releases](https://github.com/pimalaya/himalaya/releases) section.
+<details>
+  <summary>Cargo (git)</summary>
 
-*Binaries are built with [default](https://github.com/pimalaya/himalaya/blob/master/Cargo.toml#L18) cargo features. If you want to enable or disable a feature, please use another installation method.*
+  Himalaya CLI `v1.0.0` can also be installed with [cargo](https://doc.rust-lang.org/cargo/):
+
+  ```bash
+  $ cargo install --git https://github.com/pimalaya/himalaya.git --force himalaya
+  ```
+</details>
+
+### Outdated versions
+
+These installation methods should not be used until the `v1.0.0` is finally released, as they are all outdated at the moment:
+
+<details>
+  <summary>Pre-built binary</summary>
+  Himalaya CLI can be installed with a prebuilt binary:
+
+  ```bash
+  # As root:
+  $ curl -sSL https://raw.githubusercontent.com/pimalaya/himalaya/master/install.sh | sudo sh
+
+  # As a regular user:
+  $ curl -sSL https://raw.githubusercontent.com/pimalaya/himalaya/master/install.sh | PREFIX=~/.local sh
+  ```
+
+  These commands install the latest binary from the GitHub [releases](https://github.com/pimalaya/himalaya/releases) section.
+
+  *Binaries are built with [default](https://github.com/pimalaya/himalaya/blob/master/Cargo.toml#L18) cargo features. If you want to enable or disable a feature, please use another installation method.*
 
 <details>
   <summary>Cargo</summary>
