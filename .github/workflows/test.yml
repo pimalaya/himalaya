@@ -41,4 +41,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release
-          path: result
+          path: |
+            result/*
