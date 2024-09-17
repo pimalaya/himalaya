@@ -52,9 +52,9 @@ Himalaya CLI `v1.0.0` can also be installed with [cargo](https://doc.rust-lang.o
 $ cargo install --git https://github.com/pimalaya/himalaya.git --force himalaya
 ```
 
-### Outdated versions
+### Other outdated versions
 
-These installation methods should not be used until the `v1.0.0` is finally released, as they are all outdated at the moment:
+These installation methods should not be used until the `v1.0.0` is finally released, as they are all (temporarily) outdated:
 
 <details>
   <summary>Pre-built binary</summary>
