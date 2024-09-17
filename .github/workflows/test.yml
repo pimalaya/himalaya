@@ -42,4 +42,5 @@ jobs:
         with:
           name: release
           path: |
-            result/*
+            result/himalaya.tgz
+            result/himalaya.zip
