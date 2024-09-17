@@ -57,13 +57,13 @@ jobs:
           path: |
             result/himalaya.tgz
             result/himalaya.zip
-    - name: Save Cargo home
-      id: cache-cargo-home
-      uses: actions/cache/save@v4
-      with:
-        path: |
-          ~/.cargo/bin/
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
+      - name: Save Cargo home
+        uses: actions/cache/save@v4
+        id: cache-cargo-home
         key: ${{ steps.cache-cargo-home.outputs.cache-primary-key }}
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
