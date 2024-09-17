@@ -37,7 +37,7 @@
           aarch64-linux = rec {
             rustTarget = "aarch64-unknown-linux-musl";
             runner = { pkgs, himalaya }: "${pkgs.qemu}/bin/qemu-aarch64 ${himalaya}";
-            mkPackage = { system }: package:
+            mkPackage = { system, pkgs }: package:
               let
                 inherit (mkPkgsCross system rustTarget) stdenv;
                 cc = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc";
@@ -53,7 +53,7 @@
             runner = { pkgs, himalaya }:
               let wine = pkgs.wine.override { wineBuild = "wine64"; };
               in "${wine}/bin/wine64 ${himalaya}.exe";
-            mkPackage = { pkgs }: package:
+            mkPackage = { system, pkgs }: package:
               let
                 inherit (pkgs.pkgsCross.mingwW64) stdenv windows;
                 cc = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc";
@@ -87,7 +87,7 @@
           aarch64-darwin = {
             rustTarget = "aarch64-apple-darwin";
             runner = { pkgs, himalaya }: "${pkgs.qemu}/bin/qemu-aarch64 ${himalaya}";
-            mkPackage = { system }: package:
+            mkPackage = { system, pkgs }: package:
               let
                 inherit ((mkPkgsCross system "aarch64-darwin").pkgsStatic) stdenv darwin;
                 inherit (darwin.apple_sdk.frameworks) AppKit Cocoa;
