@@ -40,8 +40,8 @@ jobs:
       - name: Restore Cargo home
         uses: actions/cache/restore@v4
         id: cache-cargo-home
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
         with:
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           path: |
             ~/.cargo/bin/
             ~/.cargo/registry/index/
@@ -60,8 +60,8 @@ jobs:
       - name: Save Cargo home
         uses: actions/cache/save@v4
         id: cache-cargo-home
-        key: ${{ steps.cache-cargo-home.outputs.cache-primary-key }}
         with:
+          key: ${{ steps.cache-cargo-home.outputs.cache-primary-key }}
           path: |
             ~/.cargo/bin/
             ~/.cargo/registry/index/
