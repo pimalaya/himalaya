@@ -22,7 +22,7 @@ jobs:
             os: macos-14
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Install Nix
         uses: cachix/install-nix-action@v27
         with:

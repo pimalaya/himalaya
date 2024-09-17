@@ -41,7 +41,7 @@ jobs:
             os: macos-14
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2        
+        uses: actions/checkout@v4
       - name: Install Nix
         uses: cachix/install-nix-action@v27
         with:
@@ -52,6 +52,7 @@ jobs:
         with:
           name: soywod
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          extraPullNames: nix-community
       - name: Build release archive
         run: |
           nix build -L .#${{ matrix.target }}
