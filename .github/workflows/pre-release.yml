@@ -1,10 +1,10 @@
-name: test
+name: pre-release
 
 on:
   push:
 
 jobs:
-  test:
+  pre-release:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
