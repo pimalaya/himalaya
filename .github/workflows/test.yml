@@ -34,8 +34,11 @@ jobs:
           name: soywod
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
           extraPullNames: nix-community
-      - name: Run app
+      - name: Build release
         run: |
-          nix build -L .#${{ matrix.target }}
           nix run -L .#${{ matrix.target }} -- --version
-          ls -R result
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: result
