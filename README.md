@@ -73,6 +73,7 @@ These installation methods should not be used until the `v1.0.0` is finally rele
   These commands install the latest binary from the GitHub [releases](https://github.com/pimalaya/himalaya/releases) section.
 
   *Binaries are built with [default](https://github.com/pimalaya/himalaya/blob/master/Cargo.toml#L18) cargo features. If you want to enable or disable a feature, please use another installation method.*
+</details>
 
 <details>
   <summary>Cargo</summary>
