@@ -58,6 +58,7 @@ These installation methods should not be used until the `v1.0.0` is finally rele
 
 <details>
   <summary>Pre-built binary</summary>
+
   Himalaya CLI can be installed with a prebuilt binary:
 
   ```bash
