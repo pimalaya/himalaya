@@ -2264,8 +2264,7 @@ dependencies = [
 [[package]]
 name = "keyring-lib"
 version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb0a843c3edec50d5f5541e72c4068ab5bc273efa16b4ba51c5825a872ad8a9a"
+source = "git+https://github.com/pimalaya/core#2767c389b4ad3fb738c6d2d6348304f937643cee"
 dependencies = [
  "keyring",
  "log",
@@ -3708,8 +3707,7 @@ dependencies = [
 [[package]]
 name = "secret-lib"
 version = "0.4.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3d34288431a1ca4930e49cca081ce9368dc457eda755289cedf8cf32464a25a"
+source = "git+https://github.com/pimalaya/core#2767c389b4ad3fb738c6d2d6348304f937643cee"
 dependencies = [
  "keyring-lib",
  "log",
@@ -4509,9 +4507,9 @@ checksum = "f6ccf251212114b54433ec949fd6a7841275f9ada20dddd2f29e9ceea4501493"
 
 [[package]]
 name = "unicode-width"
-version = "0.1.13"
+version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0336d538f7abc86d282a4189614dfaa90810dfc2c6f6427eaf88e16311dd225d"
+checksum = "7dd6e30e90baa6f72411720665d41d89b9a3d039dc45b8faea1ddd07f617f6af"
 
 [[package]]
 name = "untrusted"

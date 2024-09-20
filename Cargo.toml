@@ -79,9 +79,16 @@ url = "2.2"
 uuid = { version = "0.8", features = ["v4"] }
 
 [patch.crates-io]
+# IMAP
 imap-next = { git = "https://github.com/duesee/imap-next" }
 imap-client = { git = "https://github.com/pimalaya/imap-client" }
+
+# Pimalaya core
+email-lib = { git = "https://github.com/pimalaya/core" }
+keyring-lib = { git = "https://github.com/pimalaya/core" }
 oauth-lib = { git = "https://github.com/pimalaya/core" }
 process-lib = { git = "https://github.com/pimalaya/core" }
-email-lib = { git = "https://github.com/pimalaya/core" }
+secret-lib = { git = "https://github.com/pimalaya/core" }
+
+# Pimalaya TUI
 pimalaya-tui = { git = "https://github.com/pimalaya/tui" }
