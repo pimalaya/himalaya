@@ -215,10 +215,6 @@ message.read.format = "auto"
 #
 message.write.headers = ["From", "To", "In-Reply-To", "Cc", "Subject"]
 
-# Overrides the backend used for sending messages.
-#
-message.send.backend = "smtp"
-
 # Saves a copy of sent messages to the sent folder. The sent folder is
 # taken from folder.alias, defaults to Sent.
 #
@@ -471,7 +467,7 @@ imap.auth.cmd = "pass show example-imap"
 
 # Defines the SMTP backend for the message sending feature.
 #
-backend = "smtp"
+message.send.backend = "smtp"
 
 # SMTP server host name.
 #
