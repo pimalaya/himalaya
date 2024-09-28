@@ -9,7 +9,7 @@ use std::{fmt::Display, ops::Deref, sync::Arc};
 use tracing::instrument;
 
 #[cfg(feature = "imap")]
-use email::imap::{ImapContextBuilder, ImapContextSync};
+use email::imap::{ImapContext, ImapContextBuilder};
 #[cfg(any(feature = "account-sync", feature = "maildir"))]
 use email::maildir::{MaildirContextBuilder, MaildirContextSync};
 #[cfg(feature = "notmuch")]
@@ -447,7 +447,7 @@ impl email::backend::context::BackendContextBuilder for BackendContextBuilder {
 #[derive(BackendContext, Default)]
 pub struct BackendContext {
     #[cfg(feature = "imap")]
-    pub imap: Option<ImapContextSync>,
+    pub imap: Option<ImapContext>,
 
     #[cfg(feature = "maildir")]
     pub maildir: Option<MaildirContextSync>,
@@ -463,8 +463,8 @@ pub struct BackendContext {
 }
 
 #[cfg(feature = "imap")]
-impl AsRef<Option<ImapContextSync>> for BackendContext {
-    fn as_ref(&self) -> &Option<ImapContextSync> {
+impl AsRef<Option<ImapContext>> for BackendContext {
+    fn as_ref(&self) -> &Option<ImapContext> {
         &self.imap
     }
 }
