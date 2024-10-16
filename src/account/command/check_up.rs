@@ -1,11 +1,22 @@
+use std::sync::Arc;
+
 use clap::Parser;
 use color_eyre::Result;
-use email::backend::context::BackendContextBuilder;
+use email::backend::BackendBuilder;
+#[cfg(feature = "imap")]
+use email::imap::ImapContextBuilder;
+#[cfg(feature = "maildir")]
+use email::maildir::MaildirContextBuilder;
+#[cfg(feature = "notmuch")]
+use email::notmuch::NotmuchContextBuilder;
+#[cfg(feature = "sendmail")]
+use email::sendmail::SendmailContextBuilder;
+#[cfg(feature = "smtp")]
+use email::smtp::SmtpContextBuilder;
+use pimalaya_tui::terminal::{cli::printer::Printer, config::TomlConfig as _};
 use tracing::info;
 
-use crate::{
-    account::arg::name::OptionalAccountNameArg, backend, config::Config, printer::Printer,
-};
+use crate::{account::arg::name::OptionalAccountNameArg, config::TomlConfig};
 
 /// Check up the given account.
 ///
@@ -19,7 +30,7 @@ pub struct AccountCheckUpCommand {
 }
 
 impl AccountCheckUpCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing check up account command");
 
         let account = self.account.name.as_ref().map(String::as_str);
@@ -27,92 +38,60 @@ impl AccountCheckUpCommand {
         printer.log("Checking configuration integrity…")?;
 
         let (toml_account_config, account_config) = config.clone().into_account_configs(account)?;
-        let used_backends = toml_account_config.get_used_backends();
+        let account_config = Arc::new(account_config);
 
         printer.log("Checking backend context integrity…")?;
 
-        let ctx_builder = backend::BackendContextBuilder::new(
-            toml_account_config.clone(),
-            account_config,
-            Vec::from_iter(used_backends),
-        )
-        .await?;
-
-        let ctx = ctx_builder.clone().build().await?;
-
         #[cfg(feature = "maildir")]
-        {
+        if let Some(mdir_config) = toml_account_config.maildir {
             printer.log("Checking Maildir integrity…")?;
 
-            let maildir = ctx_builder
-                .maildir
-                .as_ref()
-                .and_then(|maildir| maildir.check_up())
-                .and_then(|f| ctx.maildir.as_ref().and_then(|ctx| f(ctx)));
-
-            if let Some(maildir) = maildir.as_ref() {
-                maildir.check_up().await?;
-            }
+            let ctx = MaildirContextBuilder::new(account_config.clone(), Arc::new(mdir_config));
+            BackendBuilder::new(account_config.clone(), ctx)
+                .check_up()
+                .await?;
         }
 
         #[cfg(feature = "imap")]
-        {
+        if let Some(imap_config) = toml_account_config.imap {
             printer.log("Checking IMAP integrity…")?;
 
-            let imap = ctx_builder
-                .imap
-                .as_ref()
-                .and_then(|imap| imap.check_up())
-                .and_then(|f| ctx.imap.as_ref().and_then(|ctx| f(ctx)));
-
-            if let Some(imap) = imap.as_ref() {
-                imap.check_up().await?;
-            }
+            let ctx = ImapContextBuilder::new(account_config.clone(), Arc::new(imap_config))
+                .with_pool_size(1);
+            BackendBuilder::new(account_config.clone(), ctx)
+                .check_up()
+                .await?;
         }
 
         #[cfg(feature = "notmuch")]
-        {
+        if let Some(notmuch_config) = toml_account_config.notmuch {
             printer.log("Checking Notmuch integrity…")?;
 
-            let notmuch = ctx_builder
-                .notmuch
-                .as_ref()
-                .and_then(|notmuch| notmuch.check_up())
-                .and_then(|f| ctx.notmuch.as_ref().and_then(|ctx| f(ctx)));
-
-            if let Some(notmuch) = notmuch.as_ref() {
-                notmuch.check_up().await?;
-            }
+            let ctx = NotmuchContextBuilder::new(account_config.clone(), Arc::new(notmuch_config));
+            BackendBuilder::new(account_config.clone(), ctx)
+                .check_up()
+                .await?;
         }
 
         #[cfg(feature = "smtp")]
-        {
+        if let Some(smtp_config) = toml_account_config.smtp {
             printer.log("Checking SMTP integrity…")?;
 
-            let smtp = ctx_builder
-                .smtp
-                .as_ref()
-                .and_then(|smtp| smtp.check_up())
-                .and_then(|f| ctx.smtp.as_ref().and_then(|ctx| f(ctx)));
-
-            if let Some(smtp) = smtp.as_ref() {
-                smtp.check_up().await?;
-            }
+            let ctx = SmtpContextBuilder::new(account_config.clone(), Arc::new(smtp_config));
+            BackendBuilder::new(account_config.clone(), ctx)
+                .check_up()
+                .await?;
         }
 
         #[cfg(feature = "sendmail")]
-        {
+        if let Some(sendmail_config) = toml_account_config.sendmail {
             printer.log("Checking Sendmail integrity…")?;
 
-            let sendmail = ctx_builder
-                .sendmail
-                .as_ref()
-                .and_then(|sendmail| sendmail.check_up())
-                .and_then(|f| ctx.sendmail.as_ref().and_then(|ctx| f(ctx)));
-
-            if let Some(sendmail) = sendmail.as_ref() {
-                sendmail.check_up().await?;
-            }
+            let ctx =
+                SendmailContextBuilder::new(account_config.clone(), Arc::new(sendmail_config));
+            BackendBuilder::new(account_config.clone(), ctx)
+                .check_up()
+                .await?;
         }
 
         printer.out("Checkup successfully completed!")

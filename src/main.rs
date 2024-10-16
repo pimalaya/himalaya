@@ -1,10 +1,13 @@
 use clap::Parser;
 use color_eyre::Result;
 use himalaya::{
-    cli::Cli, config::Config, envelope::command::list::ListEnvelopesCommand,
-    message::command::mailto::MessageMailtoCommand, printer::StdoutPrinter,
+    cli::Cli, config::TomlConfig, envelope::command::list::ListEnvelopesCommand,
+    message::command::mailto::MessageMailtoCommand,
 };
-use pimalaya_tui::cli::tracing;
+use pimalaya_tui::terminal::{
+    cli::{printer::StdoutPrinter, tracing},
+    config::TomlConfig as _,
+};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -21,7 +24,7 @@ async fn main() -> Result<()> {
 
     if let Some(ref url) = mailto {
         let mut printer = StdoutPrinter::default();
-        let config = Config::from_default_paths().await?;
+        let config = TomlConfig::from_default_paths().await?;
 
         return MessageMailtoCommand::new(url)?
             .execute(&mut printer, &config)
@@ -33,7 +36,7 @@ async fn main() -> Result<()> {
     let res = match cli.command {
         Some(cmd) => cmd.execute(&mut printer, cli.config_paths.as_ref()).await,
         None => {
-            let config = Config::from_paths_or_default(cli.config_paths.as_ref()).await?;
+            let config = TomlConfig::from_paths_or_default(cli.config_paths.as_ref()).await?;
             ListEnvelopesCommand::default()
                 .execute(&mut printer, &config)
                 .await

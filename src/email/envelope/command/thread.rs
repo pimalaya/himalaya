@@ -5,12 +5,16 @@ use email::{
     backend::feature::BackendFeatureSource, email::search_query,
     envelope::list::ListEnvelopesOptions, search_query::SearchEmailsQuery,
 };
-use std::process::exit;
+use pimalaya_tui::{
+    himalaya::{backend::BackendBuilder, config::EnvelopesTree},
+    terminal::{cli::printer::Printer, config::TomlConfig as _},
+};
+use std::{process::exit, sync::Arc};
 use tracing::info;
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, config::Config, envelope::EnvelopesTree,
-    folder::arg::name::FolderNameOptionalFlag, printer::Printer,
+    account::arg::name::AccountNameFlag, config::TomlConfig,
+    folder::arg::name::FolderNameOptionalFlag,
 };
 
 /// Thread all envelopes.
@@ -34,22 +38,26 @@ pub struct ThreadEnvelopesCommand {
 }
 
 impl ThreadEnvelopesCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing thread envelopes command");
 
         let (toml_account_config, account_config) = config
             .clone()
             .into_account_configs(self.account.name.as_deref())?;
 
+        let account_config = Arc::new(account_config);
         let folder = &self.folder.name;
-        let thread_envelopes_kind = toml_account_config.thread_envelopes_kind();
 
-        let backend = Backend::new(
-            toml_account_config.clone(),
+        let backend = BackendBuilder::new(
+            Arc::new(toml_account_config),
             account_config.clone(),
-            thread_envelopes_kind,
-            |builder| builder.set_thread_envelopes(BackendFeatureSource::Context),
+            |builder| {
+                builder
+                    .without_features()
+                    .with_thread_envelopes(BackendFeatureSource::Context)
+            },
         )
+        .build()
         .await?;
 
         let query = self

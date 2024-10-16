@@ -2,13 +2,19 @@ use clap::Parser;
 use color_eyre::Result;
 use email::backend::feature::BackendFeatureSource;
 use mml::MmlCompilerBuilder;
-use std::io::{self, BufRead, IsTerminal};
+use pimalaya_tui::{
+    himalaya::backend::BackendBuilder,
+    terminal::{cli::printer::Printer, config::TomlConfig as _},
+};
+use std::{
+    io::{self, BufRead, IsTerminal},
+    sync::Arc,
+};
 use tracing::info;
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, config::Config,
-    email::template::arg::TemplateRawArg, folder::arg::name::FolderNameOptionalFlag,
-    printer::Printer,
+    account::arg::name::AccountNameFlag, config::TomlConfig, email::template::arg::TemplateRawArg,
+    folder::arg::name::FolderNameOptionalFlag,
 };
 
 /// Save a template to a folder.
@@ -30,7 +36,7 @@ pub struct TemplateSaveCommand {
 }
 
 impl TemplateSaveCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing save template command");
 
         let folder = &self.folder.name;
@@ -39,14 +45,16 @@ impl TemplateSaveCommand {
             .clone()
             .into_account_configs(self.account.name.as_deref())?;
 
-        let add_message_kind = toml_account_config.add_message_kind();
-
-        let backend = Backend::new(
-            toml_account_config.clone(),
-            account_config.clone(),
-            add_message_kind,
-            |builder| builder.set_add_message(BackendFeatureSource::Context),
+        let backend = BackendBuilder::new(
+            Arc::new(toml_account_config),
+            Arc::new(account_config),
+            |builder| {
+                builder
+                    .without_features()
+                    .with_add_message(BackendFeatureSource::Context)
+            },
         )
+        .build()
         .await?;
 
         let is_tty = io::stdin().is_terminal();
@@ -72,6 +80,6 @@ impl TemplateSaveCommand {
 
         backend.add_message(folder, &msg).await?;
 
-        printer.out(format!("Template successfully saved to {folder}!"))
+        printer.out(format!("Template successfully saved to {folder}!\n"))
     }
 }

@@ -1,11 +1,16 @@
+use std::sync::Arc;
+
 use clap::Parser;
 use color_eyre::Result;
 use email::{backend::feature::BackendFeatureSource, folder::add::AddFolder};
+use pimalaya_tui::{
+    himalaya::backend::BackendBuilder,
+    terminal::{cli::printer::Printer, config::TomlConfig as _},
+};
 use tracing::info;
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, config::Config,
-    folder::arg::name::FolderNameArg, printer::Printer,
+    account::arg::name::AccountNameFlag, config::TomlConfig, folder::arg::name::FolderNameArg,
 };
 
 /// Create a new folder.
@@ -22,26 +27,29 @@ pub struct AddFolderCommand {
 }
 
 impl AddFolderCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing create folder command");
 
         let folder = &self.folder.name;
+
         let (toml_account_config, account_config) = config
             .clone()
             .into_account_configs(self.account.name.as_deref())?;
 
-        let add_folder_kind = toml_account_config.add_folder_kind();
-
-        let backend = Backend::new(
-            toml_account_config.clone(),
-            account_config,
-            add_folder_kind,
-            |builder| builder.set_add_folder(BackendFeatureSource::Context),
+        let backend = BackendBuilder::new(
+            Arc::new(toml_account_config),
+            Arc::new(account_config),
+            |builder| {
+                builder
+                    .without_features()
+                    .with_add_folder(BackendFeatureSource::Context)
+            },
         )
+        .build()
         .await?;
 
         backend.add_folder(folder).await?;
 
-        printer.log(format!("Folder {folder} successfully created!"))
+        printer.out(format!("Folder {folder} successfully created!\n"))
     }
 }

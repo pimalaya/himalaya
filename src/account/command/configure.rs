@@ -5,12 +5,13 @@ use email::imap::config::ImapAuthConfig;
 #[cfg(feature = "smtp")]
 use email::smtp::config::SmtpAuthConfig;
 #[cfg(any(feature = "imap", feature = "smtp", feature = "pgp"))]
-use pimalaya_tui::prompt;
+use pimalaya_tui::terminal::prompt;
+use pimalaya_tui::terminal::{cli::printer::Printer, config::TomlConfig as _};
 use tracing::info;
 #[cfg(any(feature = "imap", feature = "smtp"))]
 use tracing::{debug, warn};
 
-use crate::{account::arg::name::AccountNameArg, config::Config, printer::Printer};
+use crate::{account::arg::name::AccountNameArg, config::TomlConfig};
 
 /// Configure an account.
 ///
@@ -31,19 +32,20 @@ pub struct AccountConfigureCommand {
 }
 
 impl AccountConfigureCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing configure account command");
 
         let account = &self.account.name;
-        let (_, account_config) = config.into_toml_account_config(Some(account))?;
+        let (_, toml_account_config) = config.to_toml_account_config(Some(account))?;
 
         if self.reset {
             #[cfg(feature = "imap")]
-            if let Some(ref config) = account_config.imap {
+            if let Some(config) = &toml_account_config.imap {
                 let reset = match &config.auth {
                     ImapAuthConfig::Passwd(config) => config.reset().await,
                     #[cfg(feature = "oauth2")]
                     ImapAuthConfig::OAuth2(config) => config.reset().await,
+                    ImapAuthConfig::MissingOAuth2Feature => unreachable!(),
                 };
                 if let Err(err) = reset {
                     warn!("error while resetting imap secrets: {err}");
@@ -52,7 +54,7 @@ impl AccountConfigureCommand {
             }
 
             #[cfg(feature = "smtp")]
-            if let Some(ref config) = account_config.smtp {
+            if let Some(config) = &toml_account_config.smtp {
                 let reset = match &config.auth {
                     SmtpAuthConfig::Passwd(config) => config.reset().await,
                     #[cfg(feature = "oauth2")]
@@ -71,7 +73,7 @@ impl AccountConfigureCommand {
         }
 
         #[cfg(feature = "imap")]
-        if let Some(ref config) = account_config.imap {
+        if let Some(config) = &toml_account_config.imap {
             match &config.auth {
                 ImapAuthConfig::Passwd(config) => {
                     config
@@ -84,11 +86,12 @@ impl AccountConfigureCommand {
                         .configure(|| Ok(prompt::secret("IMAP OAuth 2.0 clientsecret")?))
                         .await
                 }
+                ImapAuthConfig::MissingOAuth2Feature => unreachable!(),
             }?;
         }
 
         #[cfg(feature = "smtp")]
-        if let Some(ref config) = account_config.smtp {
+        if let Some(config) = &toml_account_config.smtp {
             match &config.auth {
                 SmtpAuthConfig::Passwd(config) => {
                     config

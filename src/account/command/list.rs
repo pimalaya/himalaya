@@ -1,12 +1,12 @@
 use clap::Parser;
 use color_eyre::Result;
+use pimalaya_tui::{
+    himalaya::config::{Accounts, AccountsTable},
+    terminal::cli::printer::Printer,
+};
 use tracing::info;
 
-use crate::{
-    account::{Accounts, AccountsTable},
-    config::Config,
-    printer::Printer,
-};
+use crate::config::TomlConfig;
 
 /// List all accounts.
 ///
@@ -24,7 +24,7 @@ pub struct AccountListCommand {
 }
 
 impl AccountListCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing list accounts command");
 
         let accounts = Accounts::from(config.accounts.iter());

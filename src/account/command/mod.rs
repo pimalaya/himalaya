@@ -4,8 +4,9 @@ mod list;
 
 use clap::Subcommand;
 use color_eyre::Result;
+use pimalaya_tui::terminal::cli::printer::Printer;
 
-use crate::{config::Config, printer::Printer};
+use crate::config::TomlConfig;
 
 use self::{
     check_up::AccountCheckUpCommand, configure::AccountConfigureCommand, list::AccountListCommand,
@@ -30,7 +31,7 @@ pub enum AccountSubcommand {
 
 impl AccountSubcommand {
     #[allow(unused)]
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         match self {
             Self::CheckUp(cmd) => cmd.execute(printer, config).await,
             Self::Configure(cmd) => cmd.execute(printer, config).await,

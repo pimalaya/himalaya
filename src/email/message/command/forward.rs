@@ -1,17 +1,20 @@
+use std::sync::Arc;
+
 use clap::Parser;
 use color_eyre::{eyre::eyre, Result};
 use email::backend::feature::BackendFeatureSource;
+use pimalaya_tui::{
+    himalaya::{backend::BackendBuilder, editor},
+    terminal::{cli::printer::Printer, config::TomlConfig as _},
+};
 use tracing::info;
 
 use crate::{
     account::arg::name::AccountNameFlag,
-    backend::Backend,
-    config::Config,
+    config::TomlConfig,
     envelope::arg::ids::EnvelopeIdArg,
     folder::arg::name::FolderNameOptionalFlag,
     message::arg::{body::MessageRawBodyArg, header::HeaderRawArgs},
-    printer::Printer,
-    ui::editor,
 };
 
 /// Forward a message.
@@ -39,7 +42,7 @@ pub struct MessageForwardCommand {
 }
 
 impl MessageForwardCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing forward message command");
 
         let folder = &self.folder.name;
@@ -48,18 +51,19 @@ impl MessageForwardCommand {
             .clone()
             .into_account_configs(self.account.name.as_deref())?;
 
-        let add_message_kind = toml_account_config.add_message_kind();
-        let send_message_kind = toml_account_config.send_message_kind();
+        let account_config = Arc::new(account_config);
 
-        let backend = Backend::new(
-            toml_account_config.clone(),
+        let backend = BackendBuilder::new(
+            Arc::new(toml_account_config),
             account_config.clone(),
-            add_message_kind.into_iter().chain(send_message_kind),
             |builder| {
-                builder.set_add_message(BackendFeatureSource::Context);
-                builder.set_send_message(BackendFeatureSource::Context);
+                builder
+                    .without_features()
+                    .with_add_message(BackendFeatureSource::Context)
+                    .with_send_message(BackendFeatureSource::Context)
             },
         )
+        .build()
         .await?;
 
         let id = self.envelope.id;

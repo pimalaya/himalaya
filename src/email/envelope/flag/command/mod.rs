@@ -4,8 +4,9 @@ mod set;
 
 use clap::Subcommand;
 use color_eyre::Result;
+use pimalaya_tui::terminal::cli::printer::Printer;
 
-use crate::{config::Config, printer::Printer};
+use crate::config::TomlConfig;
 
 use self::{add::FlagAddCommand, remove::FlagRemoveCommand, set::FlagSetCommand};
 
@@ -32,7 +33,7 @@ pub enum FlagSubcommand {
 
 impl FlagSubcommand {
     #[allow(unused)]
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         match self {
             Self::Add(cmd) => cmd.execute(printer, config).await,
             Self::Set(cmd) => cmd.execute(printer, config).await,

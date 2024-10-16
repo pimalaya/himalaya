@@ -1,15 +1,19 @@
+use std::sync::Arc;
+
 use clap::Parser;
 use color_eyre::Result;
 use email::backend::feature::BackendFeatureSource;
+use pimalaya_tui::{
+    himalaya::backend::BackendBuilder,
+    terminal::{cli::printer::Printer, config::TomlConfig as _},
+};
 use tracing::info;
 
 use crate::{
     account::arg::name::AccountNameFlag,
-    backend::Backend,
-    config::Config,
+    config::TomlConfig,
     flag::arg::ids_and_flags::{into_tuple, IdsAndFlagsArgs},
     folder::arg::name::FolderNameOptionalFlag,
-    printer::Printer,
 };
 
 /// Add flag(s) to an envelope.
@@ -29,7 +33,7 @@ pub struct FlagAddCommand {
 }
 
 impl FlagAddCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing add flag(s) command");
 
         let folder = &self.folder.name;
@@ -38,18 +42,20 @@ impl FlagAddCommand {
             .clone()
             .into_account_configs(self.account.name.as_deref())?;
 
-        let add_flags_kind = toml_account_config.add_flags_kind();
-
-        let backend = Backend::new(
-            toml_account_config.clone(),
-            account_config,
-            add_flags_kind,
-            |builder| builder.set_add_flags(BackendFeatureSource::Context),
+        let backend = BackendBuilder::new(
+            Arc::new(toml_account_config),
+            Arc::new(account_config),
+            |builder| {
+                builder
+                    .without_features()
+                    .with_add_flags(BackendFeatureSource::Context)
+            },
         )
+        .build()
         .await?;
 
         backend.add_flags(folder, &ids, &flags).await?;
 
-        printer.out(format!("Flag(s) {flags} successfully added!"))
+        printer.out(format!("Flag(s) {flags} successfully added!\n"))
     }
 }

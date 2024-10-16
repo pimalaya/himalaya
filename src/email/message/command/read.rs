@@ -1,14 +1,19 @@
+use std::sync::Arc;
+
 use clap::Parser;
 use color_eyre::Result;
 use email::backend::feature::BackendFeatureSource;
 use mml::message::FilterParts;
+use pimalaya_tui::{
+    himalaya::backend::BackendBuilder,
+    terminal::{cli::printer::Printer, config::TomlConfig as _},
+};
 use tracing::info;
 
 #[allow(unused)]
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, config::Config,
-    envelope::arg::ids::EnvelopeIdsArgs, folder::arg::name::FolderNameOptionalFlag,
-    printer::Printer,
+    account::arg::name::AccountNameFlag, config::TomlConfig, envelope::arg::ids::EnvelopeIdsArgs,
+    folder::arg::name::FolderNameOptionalFlag,
 };
 
 /// Read a message.
@@ -73,7 +78,7 @@ pub struct MessageReadCommand {
 }
 
 impl MessageReadCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing read message(s) command");
 
         let folder = &self.folder.name;
@@ -83,14 +88,18 @@ impl MessageReadCommand {
             .clone()
             .into_account_configs(self.account.name.as_deref())?;
 
-        let get_messages_kind = toml_account_config.get_messages_kind();
+        let account_config = Arc::new(account_config);
 
-        let backend = Backend::new(
-            toml_account_config.clone(),
+        let backend = BackendBuilder::new(
+            Arc::new(toml_account_config),
             account_config.clone(),
-            get_messages_kind,
-            |builder| builder.set_get_messages(BackendFeatureSource::Context),
+            |builder| {
+                builder
+                    .without_features()
+                    .with_get_messages(BackendFeatureSource::Context)
+            },
         )
+        .build()
         .await?;
 
         let emails = if self.preview {

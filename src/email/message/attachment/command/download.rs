@@ -1,14 +1,17 @@
 use clap::Parser;
 use color_eyre::{eyre::Context, Result};
 use email::backend::feature::BackendFeatureSource;
-use std::{fs, path::PathBuf};
+use pimalaya_tui::{
+    himalaya::backend::BackendBuilder,
+    terminal::{cli::printer::Printer, config::TomlConfig as _},
+};
+use std::{fs, path::PathBuf, sync::Arc};
 use tracing::info;
 use uuid::Uuid;
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, config::Config,
-    envelope::arg::ids::EnvelopeIdsArgs, folder::arg::name::FolderNameOptionalFlag,
-    printer::Printer,
+    account::arg::name::AccountNameFlag, config::TomlConfig, envelope::arg::ids::EnvelopeIdsArgs,
+    folder::arg::name::FolderNameOptionalFlag,
 };
 
 /// Download all attachments for the given message.
@@ -28,7 +31,7 @@ pub struct AttachmentDownloadCommand {
 }
 
 impl AttachmentDownloadCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing download attachment(s) command");
 
         let folder = &self.folder.name;
@@ -38,14 +41,18 @@ impl AttachmentDownloadCommand {
             .clone()
             .into_account_configs(self.account.name.as_deref())?;
 
-        let get_messages_kind = toml_account_config.get_messages_kind();
+        let account_config = Arc::new(account_config);
 
-        let backend = Backend::new(
-            toml_account_config.clone(),
+        let backend = BackendBuilder::new(
+            Arc::new(toml_account_config),
             account_config.clone(),
-            get_messages_kind,
-            |builder| builder.set_get_messages(BackendFeatureSource::Context),
+            |builder| {
+                builder
+                    .without_features()
+                    .with_get_messages(BackendFeatureSource::Context)
+            },
         )
+        .build()
         .await?;
 
         let emails = backend.get_messages(folder, ids).await?;

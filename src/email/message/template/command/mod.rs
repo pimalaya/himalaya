@@ -6,8 +6,9 @@ mod write;
 
 use clap::Subcommand;
 use color_eyre::Result;
+use pimalaya_tui::terminal::cli::printer::Printer;
 
-use crate::{config::Config, printer::Printer};
+use crate::config::TomlConfig;
 
 use self::{
     forward::TemplateForwardCommand, reply::TemplateReplyCommand, save::TemplateSaveCommand,
@@ -43,7 +44,7 @@ pub enum TemplateSubcommand {
 }
 
 impl TemplateSubcommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         match self {
             Self::Write(cmd) => cmd.execute(printer, config).await,
             Self::Reply(cmd) => cmd.execute(printer, config).await,

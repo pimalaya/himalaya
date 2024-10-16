@@ -3,8 +3,9 @@ pub mod thread;
 
 use clap::Subcommand;
 use color_eyre::Result;
+use pimalaya_tui::terminal::cli::printer::Printer;
 
-use crate::{config::Config, printer::Printer};
+use crate::config::TomlConfig;
 
 use self::{list::ListEnvelopesCommand, thread::ThreadEnvelopesCommand};
 
@@ -25,7 +26,7 @@ pub enum EnvelopeSubcommand {
 
 impl EnvelopeSubcommand {
     #[allow(unused)]
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         match self {
             Self::List(cmd) => cmd.execute(printer, config).await,
             Self::Thread(cmd) => cmd.execute(printer, config).await,

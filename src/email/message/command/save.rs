@@ -1,13 +1,19 @@
 use clap::Parser;
 use color_eyre::Result;
 use email::backend::feature::BackendFeatureSource;
-use std::io::{self, BufRead, IsTerminal};
+use pimalaya_tui::{
+    himalaya::backend::BackendBuilder,
+    terminal::{cli::printer::Printer, config::TomlConfig as _},
+};
+use std::{
+    io::{self, BufRead, IsTerminal},
+    sync::Arc,
+};
 use tracing::info;
 
-#[allow(unused)]
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, config::Config,
-    folder::arg::name::FolderNameOptionalFlag, message::arg::MessageRawArg, printer::Printer,
+    account::arg::name::AccountNameFlag, config::TomlConfig,
+    folder::arg::name::FolderNameOptionalFlag, message::arg::MessageRawArg,
 };
 
 /// Save a message to a folder.
@@ -26,7 +32,7 @@ pub struct MessageSaveCommand {
 }
 
 impl MessageSaveCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing save message command");
 
         let folder = &self.folder.name;
@@ -35,14 +41,16 @@ impl MessageSaveCommand {
             .clone()
             .into_account_configs(self.account.name.as_deref())?;
 
-        let add_message_kind = toml_account_config.add_message_kind();
-
-        let backend = Backend::new(
-            toml_account_config.clone(),
-            account_config,
-            add_message_kind,
-            |builder| builder.set_add_message(BackendFeatureSource::Context),
+        let backend = BackendBuilder::new(
+            Arc::new(toml_account_config),
+            Arc::new(account_config),
+            |builder| {
+                builder
+                    .without_features()
+                    .with_add_message(BackendFeatureSource::Context)
+            },
         )
+        .build()
         .await?;
 
         let is_tty = io::stdin().is_terminal();
@@ -60,6 +68,6 @@ impl MessageSaveCommand {
 
         backend.add_message(folder, msg.as_bytes()).await?;
 
-        printer.out(format!("Message successfully saved to {folder}!"))
+        printer.out(format!("Message successfully saved to {folder}!\n"))
     }
 }

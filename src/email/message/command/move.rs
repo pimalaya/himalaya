@@ -1,16 +1,20 @@
+use std::sync::Arc;
+
 use clap::Parser;
 use color_eyre::Result;
 use email::backend::feature::BackendFeatureSource;
+use pimalaya_tui::{
+    himalaya::backend::BackendBuilder,
+    terminal::{cli::printer::Printer, config::TomlConfig as _},
+};
 use tracing::info;
 
 #[allow(unused)]
 use crate::{
     account::arg::name::AccountNameFlag,
-    backend::Backend,
-    config::Config,
+    config::TomlConfig,
     envelope::arg::ids::EnvelopeIdsArgs,
     folder::arg::name::{SourceFolderNameOptionalFlag, TargetFolderNameArg},
-    printer::Printer,
 };
 
 /// Move a message from a source folder to a target folder.
@@ -30,7 +34,7 @@ pub struct MessageMoveCommand {
 }
 
 impl MessageMoveCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing move message(s) command");
 
         let source = &self.source_folder.name;
@@ -41,20 +45,22 @@ impl MessageMoveCommand {
             .clone()
             .into_account_configs(self.account.name.as_deref())?;
 
-        let move_messages_kind = toml_account_config.move_messages_kind();
-
-        let backend = Backend::new(
-            toml_account_config.clone(),
-            account_config,
-            move_messages_kind,
-            |builder| builder.set_move_messages(BackendFeatureSource::Context),
+        let backend = BackendBuilder::new(
+            Arc::new(toml_account_config),
+            Arc::new(account_config),
+            |builder| {
+                builder
+                    .without_features()
+                    .with_move_messages(BackendFeatureSource::Context)
+            },
         )
+        .build()
         .await?;
 
         backend.move_messages(source, target, ids).await?;
 
         printer.out(format!(
-            "Message(s) successfully moved from {source} to {target}!"
+            "Message(s) successfully moved from {source} to {target}!\n"
         ))
     }
 }

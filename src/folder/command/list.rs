@@ -1,15 +1,18 @@
+use std::sync::Arc;
+
 use clap::Parser;
 use color_eyre::Result;
 use email::{backend::feature::BackendFeatureSource, folder::list::ListFolders};
+use pimalaya_tui::{
+    himalaya::{
+        backend::BackendBuilder,
+        config::{Folders, FoldersTable},
+    },
+    terminal::{cli::printer::Printer, config::TomlConfig as _},
+};
 use tracing::info;
 
-use crate::{
-    account::arg::name::AccountNameFlag,
-    backend::Backend,
-    config::Config,
-    folder::{Folders, FoldersTable},
-    printer::Printer,
-};
+use crate::{account::arg::name::AccountNameFlag, config::TomlConfig};
 
 /// List all folders.
 ///
@@ -29,21 +32,25 @@ pub struct FolderListCommand {
 }
 
 impl FolderListCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing list folders command");
 
         let (toml_account_config, account_config) = config
             .clone()
             .into_account_configs(self.account.name.as_deref())?;
 
-        let list_folders_kind = toml_account_config.list_folders_kind();
+        let toml_account_config = Arc::new(toml_account_config);
 
-        let backend = Backend::new(
+        let backend = BackendBuilder::new(
             toml_account_config.clone(),
-            account_config.clone(),
-            list_folders_kind,
-            |builder| builder.set_list_folders(BackendFeatureSource::Context),
+            Arc::new(account_config),
+            |builder| {
+                builder
+                    .without_features()
+                    .with_list_folders(BackendFeatureSource::Context)
+            },
         )
+        .build()
         .await?;
 
         let folders = Folders::from(backend.list_folders().await?);
