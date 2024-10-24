@@ -13,7 +13,10 @@ use email::notmuch::NotmuchContextBuilder;
 use email::sendmail::SendmailContextBuilder;
 #[cfg(feature = "smtp")]
 use email::smtp::SmtpContextBuilder;
-use pimalaya_tui::terminal::{cli::printer::Printer, config::TomlConfig as _};
+use pimalaya_tui::{
+    himalaya::config::{Backend, SendingBackend},
+    terminal::{cli::printer::Printer, config::TomlConfig as _},
+};
 use tracing::info;
 
 use crate::{account::arg::name::OptionalAccountNameArg, config::TomlConfig};
@@ -42,56 +45,65 @@ impl AccountCheckUpCommand {
 
         printer.log("Checking backend context integrity…")?;
 
-        #[cfg(feature = "maildir")]
-        if let Some(mdir_config) = toml_account_config.maildir {
-            printer.log("Checking Maildir integrity…")?;
+        match toml_account_config.backend {
+            #[cfg(feature = "maildir")]
+            Some(Backend::Maildir(mdir_config)) => {
+                printer.log("Checking Maildir integrity…")?;
 
-            let ctx = MaildirContextBuilder::new(account_config.clone(), Arc::new(mdir_config));
-            BackendBuilder::new(account_config.clone(), ctx)
-                .check_up()
-                .await?;
+                let ctx = MaildirContextBuilder::new(account_config.clone(), Arc::new(mdir_config));
+                BackendBuilder::new(account_config.clone(), ctx)
+                    .check_up()
+                    .await?;
+            }
+            #[cfg(feature = "imap")]
+            Some(Backend::Imap(imap_config)) => {
+                printer.log("Checking IMAP integrity…")?;
+
+                let ctx = ImapContextBuilder::new(account_config.clone(), Arc::new(imap_config))
+                    .with_pool_size(1);
+                BackendBuilder::new(account_config.clone(), ctx)
+                    .check_up()
+                    .await?;
+            }
+            #[cfg(feature = "notmuch")]
+            Some(Backend::Notmuch(notmuch_config)) => {
+                printer.log("Checking Notmuch integrity…")?;
+
+                let ctx =
+                    NotmuchContextBuilder::new(account_config.clone(), Arc::new(notmuch_config));
+                BackendBuilder::new(account_config.clone(), ctx)
+                    .check_up()
+                    .await?;
+            }
+            _ => (),
         }
 
-        #[cfg(feature = "imap")]
-        if let Some(imap_config) = toml_account_config.imap {
-            printer.log("Checking IMAP integrity…")?;
+        let sending_backend = toml_account_config
+            .message
+            .and_then(|msg| msg.send)
+            .and_then(|send| send.backend);
 
-            let ctx = ImapContextBuilder::new(account_config.clone(), Arc::new(imap_config))
-                .with_pool_size(1);
-            BackendBuilder::new(account_config.clone(), ctx)
-                .check_up()
-                .await?;
-        }
+        match sending_backend {
+            #[cfg(feature = "smtp")]
+            Some(SendingBackend::Smtp(smtp_config)) => {
+                printer.log("Checking Smtp integrity…")?;
 
-        #[cfg(feature = "notmuch")]
-        if let Some(notmuch_config) = toml_account_config.notmuch {
-            printer.log("Checking Notmuch integrity…")?;
+                let ctx = SmtpContextBuilder::new(account_config.clone(), Arc::new(smtp_config));
+                BackendBuilder::new(account_config.clone(), ctx)
+                    .check_up()
+                    .await?;
+            }
+            #[cfg(feature = "sendmail")]
+            Some(SendingBackend::Sendmail(sendmail_config)) => {
+                printer.log("Checking Sendmail integrity…")?;
 
-            let ctx = NotmuchContextBuilder::new(account_config.clone(), Arc::new(notmuch_config));
-            BackendBuilder::new(account_config.clone(), ctx)
-                .check_up()
-                .await?;
-        }
-
-        #[cfg(feature = "smtp")]
-        if let Some(smtp_config) = toml_account_config.smtp {
-            printer.log("Checking SMTP integrity…")?;
-
-            let ctx = SmtpContextBuilder::new(account_config.clone(), Arc::new(smtp_config));
-            BackendBuilder::new(account_config.clone(), ctx)
-                .check_up()
-                .await?;
-        }
-
-        #[cfg(feature = "sendmail")]
-        if let Some(sendmail_config) = toml_account_config.sendmail {
-            printer.log("Checking Sendmail integrity…")?;
-
-            let ctx =
-                SendmailContextBuilder::new(account_config.clone(), Arc::new(sendmail_config));
-            BackendBuilder::new(account_config.clone(), ctx)
-                .check_up()
-                .await?;
+                let ctx =
+                    SendmailContextBuilder::new(account_config.clone(), Arc::new(sendmail_config));
+                BackendBuilder::new(account_config.clone(), ctx)
+                    .check_up()
+                    .await?;
+            }
+            _ => (),
         }
 
         printer.out("Checkup successfully completed!")

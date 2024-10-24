@@ -39,9 +39,11 @@ impl TemplateSendCommand {
             .clone()
             .into_account_configs(self.account.name.as_deref())?;
 
+        let account_config = Arc::new(account_config);
+
         let backend = BackendBuilder::new(
             Arc::new(toml_account_config),
-            Arc::new(account_config),
+            account_config.clone(),
             |builder| {
                 builder
                     .without_features()

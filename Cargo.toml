@@ -21,12 +21,10 @@ default = [
   "maildir",
   #"notmuch",
   "smtp",
-  "sendmail",
-
+  #"sendmail",
   #"keyring",
   #"oauth2",
   "wizard",
-
   #"pgp-commands",
   #"pgp-gpg",
   #"pgp-native",
@@ -38,14 +36,14 @@ notmuch = ["email-lib/notmuch", "pimalaya-tui/notmuch"]
 smtp = ["email-lib/smtp", "pimalaya-tui/smtp"]
 sendmail = ["email-lib/sendmail", "pimalaya-tui/sendmail"]
 
-keyring = ["email-lib/keyring", "pimalaya-tui/keyring", "secret-lib?/keyring-tokio"]
+keyring = ["email-lib/keyring", "pimalaya-tui/keyring", "secret-lib/keyring"]
 oauth2 = ["dep:oauth-lib", "email-lib/oauth2", "pimalaya-tui/oauth2", "keyring"]
-wizard = ["dep:email_address", "dep:secret-lib", "email-lib/autoconfig", "pimalaya-tui/wizard"]
+wizard = ["dep:email_address", "email-lib/autoconfig", "pimalaya-tui/wizard"]
 
 pgp = []
-pgp-commands = ["email-lib/pgp-commands", "mml-lib/pgp-commands", "pgp"]
-pgp-gpg = ["email-lib/pgp-gpg", "mml-lib/pgp-gpg", "pgp"]
-pgp-native = ["email-lib/pgp-native", "mml-lib/pgp-native", "pgp"]
+pgp-commands = ["email-lib/pgp-commands", "mml-lib/pgp-commands", "pimalaya-tui/pgp-commands", "pgp"]
+pgp-gpg = ["email-lib/pgp-gpg", "mml-lib/pgp-gpg", "pimalaya-tui/pgp-gpg", "pgp"]
+pgp-native = ["email-lib/pgp-native", "mml-lib/pgp-native", "pimalaya-tui/pgp-native", "pgp"]
 
 [dependencies]
 ariadne = "0.2"
@@ -57,17 +55,17 @@ color-eyre = "0.6"
 comfy-table = "7.1"
 crossterm = { version = "0.27", features = ["serde"] }
 dirs = "4"
-email-lib = { version = "=0.25.0", default-features = false, features = ["derive", "thread", "tracing"] }
+email-lib = { version = "1", default-features = false, features = ["tokio-rustls", "derive", "thread"] }
 email_address = { version = "0.2", optional = true }
 mail-builder = "0.3"
 md5 = "0.7"
-mml-lib = { version = "=1.0.14", default-features = false, features = ["derive"]  }
-oauth-lib = { version = "=0.1.1", optional = true }
+mml-lib = { version = "1", default-features = false, features = ["derive"]  }
+oauth-lib = { version = "1", optional = true }
 once_cell = "1.16"
 petgraph = "0.6"
-pimalaya-tui = { version = "=0.1.0", default-features = false, features = ["email", "path", "cli", "himalaya", "tracing", "sled"] }
-process-lib = { version = "=0.4.2", features = ["derive"] }
-secret-lib = { version = "=0.4.6", default-features = false, features = ["command", "derive"], optional = true }
+pimalaya-tui = { version = "1", default-features = false, features = ["email", "path", "cli", "himalaya", "tracing", "sled"] }
+process-lib = { version = "1", features = ["derive"] }
+secret-lib = { version = "1", default-features = false, features = ["tokio", "rustls", "command", "derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 shellexpand-utils = "=0.2.1"
@@ -79,18 +77,16 @@ uuid = { version = "0.8", features = ["v4"] }
 
 [patch.crates-io]
 # IMAP
+imap-codec = { git = "https://github.com/duesee/imap-codec" }
 imap-next = { git = "https://github.com/duesee/imap-next" }
 imap-client = { git = "https://github.com/pimalaya/imap-client" }
 
 # Pimalaya core
-#email-lib = { git = "https://github.com/pimalaya/core" }
-email-lib = { path = "/home/soywod/code/pimalaya/core/email" }
-pgp-lib = { path = "/home/soywod/code/pimalaya/core/pgp" }
-keyring-lib = { git = "https://github.com/pimalaya/core" }
+email-lib = { git = "https://github.com/pimalaya/core" }
+mml-lib = { git = "https://github.com/pimalaya/core" }
 oauth-lib = { git = "https://github.com/pimalaya/core" }
 process-lib = { git = "https://github.com/pimalaya/core" }
 secret-lib = { git = "https://github.com/pimalaya/core" }
 
-# Pimalaya TUI
-#pimalaya-tui = { git = "https://github.com/pimalaya/tui" }
-pimalaya-tui = { path = "/home/soywod/code/pimalaya/tui" }
+# Pimalaya non-core
+pimalaya-tui = { git = "https://github.com/pimalaya/tui" }

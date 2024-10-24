@@ -40,13 +40,14 @@ impl AccountConfigureCommand {
 
         if self.reset {
             #[cfg(feature = "imap")]
-            if let Some(config) = &toml_account_config.imap {
-                let reset = match &config.auth {
-                    ImapAuthConfig::Passwd(config) => config.reset().await,
+            {
+                let reset = match toml_account_config.imap_auth_config() {
+                    Some(ImapAuthConfig::Password(config)) => config.reset().await,
                     #[cfg(feature = "oauth2")]
-                    ImapAuthConfig::OAuth2(config) => config.reset().await,
-                    ImapAuthConfig::MissingOAuth2Feature => unreachable!(),
+                    Some(ImapAuthConfig::OAuth2(config)) => config.reset().await,
+                    _ => Ok(()),
                 };
+
                 if let Err(err) = reset {
                     warn!("error while resetting imap secrets: {err}");
                     debug!("error while resetting imap secrets: {err:?}");
@@ -54,12 +55,14 @@ impl AccountConfigureCommand {
             }
 
             #[cfg(feature = "smtp")]
-            if let Some(config) = &toml_account_config.smtp {
-                let reset = match &config.auth {
-                    SmtpAuthConfig::Passwd(config) => config.reset().await,
+            {
+                let reset = match toml_account_config.smtp_auth_config() {
+                    Some(SmtpAuthConfig::Passwd(config)) => config.reset().await,
                     #[cfg(feature = "oauth2")]
-                    SmtpAuthConfig::OAuth2(config) => config.reset().await,
+                    Some(SmtpAuthConfig::OAuth2(config)) => config.reset().await,
+                    _ => Ok(()),
                 };
+
                 if let Err(err) = reset {
                     warn!("error while resetting smtp secrets: {err}");
                     debug!("error while resetting smtp secrets: {err:?}");
@@ -67,50 +70,47 @@ impl AccountConfigureCommand {
             }
 
             #[cfg(feature = "pgp")]
-            if let Some(ref config) = account_config.pgp {
+            if let Some(config) = &toml_account_config.pgp {
                 config.reset().await?;
             }
         }
 
         #[cfg(feature = "imap")]
-        if let Some(config) = &toml_account_config.imap {
-            match &config.auth {
-                ImapAuthConfig::Passwd(config) => {
-                    config
-                        .configure(|| Ok(prompt::password("IMAP password")?))
-                        .await
-                }
-                #[cfg(feature = "oauth2")]
-                ImapAuthConfig::OAuth2(config) => {
-                    config
-                        .configure(|| Ok(prompt::secret("IMAP OAuth 2.0 clientsecret")?))
-                        .await
-                }
-                ImapAuthConfig::MissingOAuth2Feature => unreachable!(),
-            }?;
-        }
+        match toml_account_config.imap_auth_config() {
+            Some(ImapAuthConfig::Password(config)) => {
+                config
+                    .configure(|| Ok(prompt::password("IMAP password")?))
+                    .await
+            }
+            #[cfg(feature = "oauth2")]
+            Some(ImapAuthConfig::OAuth2(config)) => {
+                config
+                    .configure(|| Ok(prompt::secret("IMAP OAuth 2.0 client secret")?))
+                    .await
+            }
+            _ => Ok(()),
+        }?;
 
         #[cfg(feature = "smtp")]
-        if let Some(config) = &toml_account_config.smtp {
-            match &config.auth {
-                SmtpAuthConfig::Passwd(config) => {
-                    config
-                        .configure(|| Ok(prompt::password("SMTP password")?))
-                        .await
-                }
-                #[cfg(feature = "oauth2")]
-                SmtpAuthConfig::OAuth2(config) => {
-                    config
-                        .configure(|| Ok(prompt::secret("SMTP OAuth 2.0 client secret")?))
-                        .await
-                }
-            }?;
-        }
+        match toml_account_config.smtp_auth_config() {
+            Some(SmtpAuthConfig::Passwd(config)) => {
+                config
+                    .configure(|| Ok(prompt::password("SMTP password")?))
+                    .await
+            }
+            #[cfg(feature = "oauth2")]
+            Some(SmtpAuthConfig::OAuth2(config)) => {
+                config
+                    .configure(|| Ok(prompt::secret("SMTP OAuth 2.0 client secret")?))
+                    .await
+            }
+            _ => Ok(()),
+        }?;
 
         #[cfg(feature = "pgp")]
-        if let Some(ref config) = account_config.pgp {
+        if let Some(config) = &toml_account_config.pgp {
             config
-                .configure(&account_config.email, || {
+                .configure(&toml_account_config.email, || {
                     Ok(prompt::password("PGP secret key password")?)
                 })
                 .await?;
