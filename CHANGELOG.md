@@ -30,21 +30,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Refactored IMAP and SMTP auth config API
+- Improved error messages when missing cargo features. For example, if a TOML configuration uses the IMAP backend without the `imap` cargo features, the error `missing "imap" feature` is displayed. [#20](https://github.com/pimalaya/core/issues/20)
+- Normalized enum-based configurations, using the [internally tagged representation](https://serde.rs/enum-representations.html#internally-tagged) `type =`. It should reduce issues due to misconfiguration, and improve othe error messages. Yet it is not perfect, see [#802](https://github.com/toml-rs/toml/issues/802):
 
-  The IMAP and SMTP auth config option is now explicit, in order to improve error messages:
+  - `imap.*`, `maildir.*` and `notmuch.*` moved to `backend.*`:
 
-  ```toml
-  # before
-  imap.password.cmd = "pass show example"
-  smtp.oauth2.method = "xoauth2"
+	```toml
+	# before
+	imap.host = "localhost"
+	imap.port = 143
 
-  # after
-  imap.auth.type = "password"
-  imap.auth.cmd = "pass show example"
-  smtp.auth.type = "oauth2"
-  smtp.auth.method = "xoauth2"
-  ```
+	# after
+	backend.type = "imap"
+	backend.host = "localhost"
+	backend.port = 143
+	```
+
+  - `smtp.*` and `sendmail.*` moved to `message.send.backend.*`:
+
+	```toml
+	# before
+	smtp.host = "localhost"
+	smtp.port = 25
+
+	# after
+	message.send.backend.type = "smtp"
+	message.send.backend.host = "localhost"
+	message.send.backend.port = 25
+	```
+
+  - `pgp.backend` renamed `pgp.type`:
+
+	```toml
+	# before
+	pgp.backend = "commands"
+	pgp.encrypt-cmd = "gpg --encrypt --quiet --armor <recipients>"
+
+	# after
+	pgp.type = "commands"
+	pgp.encrypt-cmd = "gpg --encrypt --quiet --armor <recipients>"
+	```
+
+  - `{imap,smtp}.auth` moved as well:
+
+    ```toml
+    # before
+    imap.password.cmd = "pass show example"
+    smtp.oauth2.method = "xoauth2"
+
+    # after
+    backend.auth.type = "password"
+    backend.auth.cmd = "pass show example"
+    message.send.backend.auth.type = "oauth2"
+    message.send.backend.auth.method = "xoauth2"
+    ```
 
 ## [1.0.0-beta.4] - 2024-04-16
 
@@ -849,18 +888,3 @@ Few major concepts changed:
 [0.2.1]: https://github.com/soywod/himalaya/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/soywod/himalaya/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/soywod/himalaya/releases/tag/v0.1.0
-
-[#39]: https://todo.sr.ht/~soywod/pimalaya/39
-[#41]: https://todo.sr.ht/~soywod/pimalaya/41
-[#43]: https://todo.sr.ht/~soywod/pimalaya/43
-[#54]: https://todo.sr.ht/~soywod/pimalaya/54
-[#58]: https://todo.sr.ht/~soywod/pimalaya/58
-[#59]: https://todo.sr.ht/~soywod/pimalaya/59
-[#60]: https://todo.sr.ht/~soywod/pimalaya/60
-[#95]: https://todo.sr.ht/~soywod/pimalaya/95
-[#172]: https://todo.sr.ht/~soywod/pimalaya/172
-[#173]: https://todo.sr.ht/~soywod/pimalaya/173
-[#184]: https://todo.sr.ht/~soywod/pimalaya/184
-[#188]: https://todo.sr.ht/~soywod/pimalaya/188
-[#194]: https://todo.sr.ht/~soywod/pimalaya/194
-[#195]: https://todo.sr.ht/~soywod/pimalaya/195

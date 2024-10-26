@@ -161,6 +161,7 @@ impl ListEnvelopesCommand {
                     .with_list_envelopes(BackendFeatureSource::Context)
             },
         )
+        .without_sending_backend()
         .build()
         .await?;
 

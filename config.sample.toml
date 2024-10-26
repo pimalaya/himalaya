@@ -288,13 +288,80 @@ template.forward.signature-style = "inlined"
 template.forward.quote-headline = "-------- Forwarded Message --------\n"
 
 ########################################
-#### PGP configuration #################
+#### GPG-based PGP configuration #######
 ########################################
 
-# TODO
-#pgp.backend = "commands"
-#pgp.backend = "gpg"
-#pgp.backend = "native"
+# Enables PGP using GPG bindings. It requires the GPG lib to be
+# installed on the system, and the `pgp-gpg` cargo feature on.
+#
+#pgp.type = "gpg"
+
+########################################
+#### Command-based PGP configuration ###
+########################################
+
+# Enables PGP using shell commands. A PGP client needs to be installed
+# on the system, like gpg. It also requires the `pgp-commands` cargo
+# feature.
+#
+#pgp.type = "commands"
+
+# Defines the encrypt command. The special placeholder `<recipients>`
+# represents the list of recipients, formatted by
+# `pgp.encrypt-recipient-fmt`.
+#
+#pgp.encrypt-cmd = "gpg --encrypt --quiet --armor <recipients>"
+
+# Formats recipients for `pgp.encrypt-cmd`. The special placeholder
+# `<recipient>` is replaced by an actual recipient at runtime.
+#
+#pgp.encrypt-recipient-fmt = "--recipient <recipient>"
+
+# Defines the separator used between formatted recipients
+# `pgp.encrypt-recipient-fmt`.
+#
+#pgp.encrypt-recipients-sep = " "
+
+# Defines the decrypt command.
+#
+#pgp.decrypt-cmd = "gpg --decrypt --quiet"
+
+# Defines the sign command.
+#
+#pgp.sign-cmd = "gpg --sign --quiet --armor"
+
+# Defines the verify command.
+#
+#pgp.verify-cmd = "gpg --verify --quiet"
+
+########################################
+#### Native PGP configuration ##########
+########################################
+
+# Enables the native Rust implementation of PGP. It requires the
+# `pgp-native` cargo feature.
+#
+#pgp.type = "native"
+
+# Defines where to find the PGP secret key.
+#
+#pgp.secret-key.path = "/path/to/secret.key"
+#pgp.secret-key.keyring = "my-pgp-secret-key"
+
+# Defines how to retrieve the PGP secret key passphrase.
+#
+#pgp.secret-key-passphrase.raw = "p@assw0rd"
+#pgp.secret-key-passphrase.keyring = "my-pgp-passphrase"
+#pgp.secret-key-passphrase.cmd = "pass show pgp-passphrase"
+
+# Enables the Web Key Discovery protocol to discover recipients'
+# public key based on their email address.
+#
+#pgp.wkd = true
+
+# Enables public key servers discovery.
+#
+#pgp.key-servers = ["hkps://keys.openpgp.org", "hkps://keys.mailvelope.com"]
 
 ########################################
 #### IMAP configuration ################
@@ -302,54 +369,54 @@ template.forward.quote-headline = "-------- Forwarded Message --------\n"
 
 # Defines the IMAP backend as the default one for all features.
 #
-backend = "imap"
+backend.type = "imap"
 
 # IMAP server host name.
 #
-imap.host = "localhost"
+backend.host = "localhost"
 
 # IMAP server port.
 #
-#imap.port = 143
-imap.port = 993
+#backend.port = 143
+backend.port = 993
 
 # IMAP server encryption.
 #
-#imap.encryption = "none" # or false
-#imap.encryption = "start-tls"
-imap.encryption = "tls" # or true
+#backend.encryption = "none" # or false
+#backend.encryption = "start-tls"
+backend.encryption = "tls" # or true
 
 # IMAP server login.
 #
-imap.login = "example@localhost"
+backend.login = "example@localhost"
 
 # IMAP server password authentication configuration.
 #
-imap.auth.type = "password"
+backend.auth.type = "password"
 #
 # Password can be inlined (not recommended).
 #
-#imap.auth.raw = "p@assw0rd"
+#backend.auth.raw = "p@assw0rd"
 #
 # Password can be stored inside your system global keyring (requires
 # the keyring cargo feature). You must run at least once `himalaya
 # account configure` to set up the password.
 #
-#imap.auth.keyring = "example-imap"
+#backend.auth.keyring = "example-imap"
 #
 # Password can be retrieved from a shell command.
 #
-imap.auth.cmd = "pass show example-imap"
+backend.auth.cmd = "pass show example-imap"
 
 # IMAP server OAuth 2.0 authorization configuration.
 #
-#imap.auth.type = "oauth2"
+#backend.auth.type = "oauth2"
 #
 # Client identifier issued to the client during the registration
 # process described in RFC6749.
 # See <https://datatracker.ietf.org/doc/html/rfc6749#section-2.2>.
 #
-#imap.auth.client-id = "client-id"
+#backend.auth.client-id = "client-id"
 #
 # Client password issued to the client during the registration process
 # described in RFC6749.
@@ -357,23 +424,23 @@ imap.auth.cmd = "pass show example-imap"
 # Defaults to keyring "<account-name>-imap-client-secret".
 # See <https://datatracker.ietf.org/doc/html/rfc6749#section-2.2>.
 #
-#imap.auth.client-secret.raw = "<raw-client-secret>"
-#imap.auth.client-secret.keyring = "example-imap-client-secret"
-#imap.auth.client-secret.cmd = "pass show example-imap-client-secret"
+#backend.auth.client-secret.raw = "<raw-client-secret>"
+#backend.auth.client-secret.keyring = "example-imap-client-secret"
+#backend.auth.client-secret.cmd = "pass show example-imap-client-secret"
 #
 # Method for presenting an OAuth 2.0 bearer token to a service for
 # authentication.
 #
-#imap.auth.method = "oauthbearer"
-#imap.auth.method = "xoauth2"
+#backend.auth.method = "oauthbearer"
+#backend.auth.method = "xoauth2"
 #
 # URL of the authorization server's authorization endpoint.
 #
-#imap.auth.auth-url = "https://accounts.google.com/o/oauth2/v2/auth"
+#backend.auth.auth-url = "https://accounts.google.com/o/oauth2/v2/auth"
 #
 # URL of the authorization server's token endpoint.
 #
-#imap.auth.token-url = "https://www.googleapis.com/oauth2/v3/token"
+#backend.auth.token-url = "https://www.googleapis.com/oauth2/v3/token"
 #
 # Access token returned by the token endpoint and used to access
 # protected resources. It is recommended to use the keyring variant,
@@ -381,9 +448,9 @@ imap.auth.cmd = "pass show example-imap"
 #
 # Defaults to keyring "<account-name>-imap-access-token".
 #
-#imap.auth.access-token.raw = "<raw-access-token>"
-#imap.auth.access-token.keyring = "example-imap-access-token"
-#imap.auth.access-token.cmd = "pass show example-imap-access-token"
+#backend.auth.access-token.raw = "<raw-access-token>"
+#backend.auth.access-token.keyring = "example-imap-access-token"
+#backend.auth.access-token.cmd = "pass show example-imap-access-token"
 #
 # Refresh token used to obtain a new access token (if supported by the
 # authorization server). It is recommended to use the keyring variant,
@@ -391,30 +458,35 @@ imap.auth.cmd = "pass show example-imap"
 #
 # Defaults to keyring "<account-name>-imap-refresh-token".
 #
-#imap.auth.refresh-token.raw = "<raw-refresh-token>"
-#imap.auth.refresh-token.keyring = "example-imap-refresh-token"
-#imap.auth.refresh-token.cmd = "pass show example-imap-refresh-token"
+#backend.auth.refresh-token.raw = "<raw-refresh-token>"
+#backend.auth.refresh-token.keyring = "example-imap-refresh-token"
+#backend.auth.refresh-token.cmd = "pass show example-imap-refresh-token"
 #
 # Enable the protection, as defined in RFC7636.
 #
 # See <https://datatracker.ietf.org/doc/html/rfc7636>.
 #
-#imap.auth.pkce = true
+#backend.auth.pkce = true
 #
 # Access token scope(s), as defined by the authorization server.
 #
-#imap.auth.scope = "unique scope"
-#imap.auth.scopes = ["multiple", "scopes"]
+#backend.auth.scope = "unique scope"
+#backend.auth.scopes = ["multiple", "scopes"]
+#
+# URL scheme of the redirect server.
+# Defaults to http.
+#
+#backend.auth.redirect-scheme = "http"
 #
 # Host name of the redirect server.
 # Defaults to localhost.
 #
-#imap.auth.redirect-host = "localhost"
+#backend.auth.redirect-host = "localhost"
 #
 # Port of the redirect server.
 # Defaults to the first available one.
 #
-#imap.auth.redirect-port = 9999
+#backend.auth.redirect-port = 9999
 
 ########################################
 #### Maildir configuration #############
@@ -422,18 +494,18 @@ imap.auth.cmd = "pass show example-imap"
 
 # Defines the Maildir backend as the default one for all features.
 #
-#backend = "maildir"
+#backend.type = "maildir"
 
 # The Maildir root directory. The path should point to the root level
 # of the Maildir directory.
 #
-#maildir.root-dir = "~/.Mail/example"
+#backend.root-dir = "~/.Mail/example"
 
 # Does the Maildir folder follows the Maildir++ standard?
 #
 # See <https://en.wikipedia.org/wiki/Maildir#Maildir++>.
 #
-#maildir.maildirpp = false
+#backend.maildirpp = false
 
 ########################################
 #### Notmuch configuration #############
@@ -441,25 +513,25 @@ imap.auth.cmd = "pass show example-imap"
 
 # Defines the Notmuch backend as the default one for all features.
 #
-#backend = "notmuch"
+#backend.type = "notmuch"
 
 # The path to the Notmuch database. The path should point to the root
 # directory containing the Notmuch database (usually the root Maildir
 # directory).
 #
-#notmuch.db-path = "~/.Mail/example"
+#backend.db-path = "~/.Mail/example"
 
 # Overrides the default path to the Maildir folder.
 #
-#notmuch.maildir-path = "~/.Mail/example"
+#backend.maildir-path = "~/.Mail/example"
 
 # Overrides the default Notmuch configuration file path.
 #
-#notmuch.config-path = "~/.notmuchrc"
+#backend.config-path = "~/.notmuchrc"
 
 # Override the default Notmuch profile name.
 #
-#notmuch.profile = "example"
+#backend.profile = "example"
 
 ########################################
 #### SMTP configuration ################
@@ -467,55 +539,55 @@ imap.auth.cmd = "pass show example-imap"
 
 # Defines the SMTP backend for the message sending feature.
 #
-message.send.backend = "smtp"
+message.send.backend.type = "smtp"
 
 # SMTP server host name.
 #
-smtp.host = "localhost"
+message.send.backend.host = "localhost"
 
 # SMTP server port.
 #
-#smtp.port = 25
-#smtp.port = 465
-smtp.port = 587
+#message.send.backend.port = 25
+#message.send.backend.port = 465
+message.send.backend.port = 587
 
 # SMTP server encryption.
 #
-#smtp.encryption = "none" # or false
-#smtp.encryption = "start-tls"
-smtp.encryption = "tls" # or true
+#message.send.backend.encryption = "none" # or false
+#message.send.backend.encryption = "start-tls"
+message.send.backend.encryption = "tls" # or true
 
 # SMTP server login.
 #
-smtp.login = "example@localhost"
+message.send.backend.login = "example@localhost"
 
 # SMTP server password authentication configuration.
 #
-smtp.auth.type = "password"
+message.send.backend.auth.type = "password"
 #
 # Password can be inlined (not recommended).
 #
-#smtp.auth.raw = "p@assw0rd"
+#message.send.backend.auth.raw = "p@assw0rd"
 #
 # Password can be stored inside your system global keyring (requires
 # the keyring cargo feature). You must run at least once `himalaya
 # account configure` to set up the password.
 #
-#smtp.auth.keyring = "example-smtp"
+#message.send.backend.auth.keyring = "example-smtp"
 #
 # Password can be retrieved from a shell command.
 #
-smtp.auth.cmd = "pass show example-smtp"
+message.send.backend.auth.cmd = "pass show example-smtp"
 
 # SMTP server OAuth 2.0 authorization configuration.
 #
-#smtp.auth.type = "oauth2"
+#message.send.backend.auth.type = "oauth2"
 #
 # Client identifier issued to the client during the registration
 # process described in RFC6749.
 # See <https://datatracker.ietf.org/doc/html/rfc6749#section-2.2>.
 #
-#smtp.auth.client-id = "client-id"
+#message.send.backend.auth.client-id = "client-id"
 #
 # Client password issued to the client during the registration process
 # described in RFC6749.
@@ -523,23 +595,23 @@ smtp.auth.cmd = "pass show example-smtp"
 # Defaults to keyring "<account-name>-smtp-client-secret".
 # See <https://datatracker.ietf.org/doc/html/rfc6749#section-2.2>.
 #
-#smtp.auth.client-secret.raw = "<raw-client-secret>"
-#smtp.auth.client-secret.keyring = "example-smtp-client-secret"
-#smtp.auth.client-secret.cmd = "pass show example-smtp-client-secret"
+#message.send.backend.auth.client-secret.raw = "<raw-client-secret>"
+#message.send.backend.auth.client-secret.keyring = "example-smtp-client-secret"
+#message.send.backend.auth.client-secret.cmd = "pass show example-smtp-client-secret"
 #
 # Method for presenting an OAuth 2.0 bearer token to a service for
 # authentication.
 #
-#smtp.auth.method = "oauthbearer"
-#smtp.auth.method = "xoauth2"
+#message.send.backend.auth.method = "oauthbearer"
+#message.send.backend.auth.method = "xoauth2"
 #
 # URL of the authorization server's authorization endpoint.
 #
-#smtp.auth.auth-url = "https://accounts.google.com/o/oauth2/v2/auth"
+#message.send.backend.auth.auth-url = "https://accounts.google.com/o/oauth2/v2/auth"
 #
 # URL of the authorization server's token endpoint.
 #
-#smtp.auth.token-url = "https://www.googleapis.com/oauth2/v3/token"
+#message.send.backend.auth.token-url = "https://www.googleapis.com/oauth2/v3/token"
 #
 # Access token returned by the token endpoint and used to access
 # protected resources. It is recommended to use the keyring variant,
@@ -547,9 +619,9 @@ smtp.auth.cmd = "pass show example-smtp"
 #
 # Defaults to keyring "<account-name>-smtp-access-token".
 #
-#smtp.auth.access-token.raw = "<raw-access-token>"
-#smtp.auth.access-token.keyring = "example-smtp-access-token"
-#smtp.auth.access-token.cmd = "pass show example-smtp-access-token"
+#message.send.backend.auth.access-token.raw = "<raw-access-token>"
+#message.send.backend.auth.access-token.keyring = "example-smtp-access-token"
+#message.send.backend.auth.access-token.cmd = "pass show example-smtp-access-token"
 #
 # Refresh token used to obtain a new access token (if supported by the
 # authorization server). It is recommended to use the keyring variant,
@@ -557,30 +629,35 @@ smtp.auth.cmd = "pass show example-smtp"
 #
 # Defaults to keyring "<account-name>-smtp-refresh-token".
 #
-#smtp.auth.refresh-token.raw = "<raw-refresh-token>"
-#smtp.auth.refresh-token.keyring = "example-smtp-refresh-token"
-#smtp.auth.refresh-token.cmd = "pass show example-smtp-refresh-token"
+#message.send.backend.auth.refresh-token.raw = "<raw-refresh-token>"
+#message.send.backend.auth.refresh-token.keyring = "example-smtp-refresh-token"
+#message.send.backend.auth.refresh-token.cmd = "pass show example-smtp-refresh-token"
 #
 # Enable the protection, as defined in RFC7636.
 #
 # See <https://datatracker.ietf.org/doc/html/rfc7636>.
 #
-#smtp.auth.pkce = true
+#message.send.backend.auth.pkce = true
 #
 # Access token scope(s), as defined by the authorization server.
 #
-#smtp.auth.scope = "unique scope"
-#smtp.auth.scopes = ["multiple", "scopes"]
+#message.send.backend.auth.scope = "unique scope"
+#message.send.backend.auth.scopes = ["multiple", "scopes"]
+#
+# URL scheme of the redirect server.
+# Defaults to http.
+#
+#message.send.backend.auth.redirect-scheme = "http"
 #
 # Host name of the redirect server.
 # Defaults to localhost.
 #
-#smtp.auth.redirect-host = "localhost"
+#message.send.backend.auth.redirect-host = "localhost"
 #
 # Port of the redirect server.
 # Defaults to the first available one.
 #
-#smtp.auth.redirect-port = 9999
+#message.send.backend.auth.redirect-port = 9999
 
 ########################################
 #### Sendmail configuration ############
@@ -588,8 +665,8 @@ smtp.auth.cmd = "pass show example-smtp"
 
 # Defines the Sendmail backend for the message sending feature.
 #
-#message.send.backend = "sendmail"
+#message.send.backend.type = "sendmail"
 
 # Customizes the sendmail shell command.
 #
-#sendmail.cmd = "/usr/bin/sendmail"
+#message.send.backend.cmd = "/usr/bin/sendmail"

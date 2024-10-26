@@ -37,8 +37,8 @@ smtp = ["email-lib/smtp", "pimalaya-tui/smtp"]
 sendmail = ["email-lib/sendmail", "pimalaya-tui/sendmail"]
 
 keyring = ["email-lib/keyring", "pimalaya-tui/keyring", "secret-lib/keyring"]
-oauth2 = ["dep:oauth-lib", "email-lib/oauth2", "pimalaya-tui/oauth2", "keyring"]
-wizard = ["dep:email_address", "email-lib/autoconfig", "pimalaya-tui/wizard"]
+oauth2 = ["email-lib/oauth2", "pimalaya-tui/oauth2", "keyring"]
+wizard = ["email-lib/autoconfig", "pimalaya-tui/wizard"]
 
 pgp = []
 pgp-commands = ["email-lib/pgp-commands", "mml-lib/pgp-commands", "pimalaya-tui/pgp-commands", "pgp"]
@@ -47,24 +47,15 @@ pgp-native = ["email-lib/pgp-native", "mml-lib/pgp-native", "pimalaya-tui/pgp-na
 
 [dependencies]
 ariadne = "0.2"
-async-trait = "0.1"
 clap = { version = "4.4", features = ["derive", "env", "wrap_help"] }
 clap_complete = "4.4"
 clap_mangen = "0.2"
 color-eyre = "0.6"
-comfy-table = "7.1"
-crossterm = { version = "0.27", features = ["serde"] }
-dirs = "4"
 email-lib = { version = "1", default-features = false, features = ["tokio-rustls", "derive", "thread"] }
-email_address = { version = "0.2", optional = true }
 mail-builder = "0.3"
-md5 = "0.7"
 mml-lib = { version = "1", default-features = false, features = ["derive"]  }
-oauth-lib = { version = "1", optional = true }
 once_cell = "1.16"
-petgraph = "0.6"
 pimalaya-tui = { version = "1", default-features = false, features = ["email", "path", "cli", "himalaya", "tracing", "sled"] }
-process-lib = { version = "1", features = ["derive"] }
 secret-lib = { version = "1", default-features = false, features = ["tokio", "rustls", "command", "derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -83,8 +74,11 @@ imap-client = { git = "https://github.com/pimalaya/imap-client" }
 
 # Pimalaya core
 email-lib = { git = "https://github.com/pimalaya/core" }
+http-lib = { git = "https://github.com/pimalaya/core" }
+keyring-lib = { git = "https://github.com/pimalaya/core" }
 mml-lib = { git = "https://github.com/pimalaya/core" }
 oauth-lib = { git = "https://github.com/pimalaya/core" }
+pgp-lib = { git = "https://github.com/pimalaya/core" }
 process-lib = { git = "https://github.com/pimalaya/core" }
 secret-lib = { git = "https://github.com/pimalaya/core" }
 

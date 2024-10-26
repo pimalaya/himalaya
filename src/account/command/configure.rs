@@ -57,7 +57,7 @@ impl AccountConfigureCommand {
             #[cfg(feature = "smtp")]
             {
                 let reset = match toml_account_config.smtp_auth_config() {
-                    Some(SmtpAuthConfig::Passwd(config)) => config.reset().await,
+                    Some(SmtpAuthConfig::Password(config)) => config.reset().await,
                     #[cfg(feature = "oauth2")]
                     Some(SmtpAuthConfig::OAuth2(config)) => config.reset().await,
                     _ => Ok(()),
@@ -93,7 +93,7 @@ impl AccountConfigureCommand {
 
         #[cfg(feature = "smtp")]
         match toml_account_config.smtp_auth_config() {
-            Some(SmtpAuthConfig::Passwd(config)) => {
+            Some(SmtpAuthConfig::Password(config)) => {
                 config
                     .configure(|| Ok(prompt::password("SMTP password")?))
                     .await
