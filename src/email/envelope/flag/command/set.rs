@@ -1,15 +1,19 @@
+use std::sync::Arc;
+
 use clap::Parser;
 use color_eyre::Result;
 use email::backend::feature::BackendFeatureSource;
+use pimalaya_tui::{
+    himalaya::backend::BackendBuilder,
+    terminal::{cli::printer::Printer, config::TomlConfig as _},
+};
 use tracing::info;
 
 use crate::{
     account::arg::name::AccountNameFlag,
-    backend::Backend,
-    config::Config,
+    config::TomlConfig,
     flag::arg::ids_and_flags::{into_tuple, IdsAndFlagsArgs},
     folder::arg::name::FolderNameOptionalFlag,
-    printer::Printer,
 };
 
 /// Replace flag(s) of an envelope.
@@ -29,7 +33,7 @@ pub struct FlagSetCommand {
 }
 
 impl FlagSetCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing set flag(s) command");
 
         let folder = &self.folder.name;
@@ -38,18 +42,21 @@ impl FlagSetCommand {
             .clone()
             .into_account_configs(self.account.name.as_deref())?;
 
-        let set_flags_kind = toml_account_config.set_flags_kind();
-
-        let backend = Backend::new(
-            toml_account_config.clone(),
-            account_config,
-            set_flags_kind,
-            |builder| builder.set_set_flags(BackendFeatureSource::Context),
+        let backend = BackendBuilder::new(
+            Arc::new(toml_account_config),
+            Arc::new(account_config),
+            |builder| {
+                builder
+                    .without_features()
+                    .with_set_flags(BackendFeatureSource::Context)
+            },
         )
+        .without_sending_backend()
+        .build()
         .await?;
 
         backend.set_flags(folder, &ids, &flags).await?;
 
-        printer.out(format!("Flag(s) {flags} successfully replaced!"))
+        printer.out(format!("Flag(s) {flags} successfully replaced!\n"))
     }
 }

@@ -1,14 +1,17 @@
+use std::sync::Arc;
+
 use clap::Parser;
 use color_eyre::Result;
 use email::backend::feature::BackendFeatureSource;
 use mail_builder::MessageBuilder;
+use pimalaya_tui::{
+    himalaya::{backend::BackendBuilder, editor},
+    terminal::{cli::printer::Printer, config::TomlConfig as _},
+};
 use tracing::info;
 use url::Url;
 
-use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, config::Config, printer::Printer,
-    ui::editor,
-};
+use crate::{account::arg::name::AccountNameFlag, config::TomlConfig};
 
 /// Parse and edit a message from a mailto URL string.
 ///
@@ -34,25 +37,27 @@ impl MessageMailtoCommand {
         })
     }
 
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing mailto message command");
 
         let (toml_account_config, account_config) = config
             .clone()
             .into_account_configs(self.account.name.as_deref())?;
 
-        let add_message_kind = toml_account_config.add_message_kind();
-        let send_message_kind = toml_account_config.send_message_kind();
+        let account_config = Arc::new(account_config);
 
-        let backend = Backend::new(
-            toml_account_config.clone(),
+        let backend = BackendBuilder::new(
+            Arc::new(toml_account_config),
             account_config.clone(),
-            add_message_kind.into_iter().chain(send_message_kind),
             |builder| {
-                builder.set_add_message(BackendFeatureSource::Context);
-                builder.set_send_message(BackendFeatureSource::Context);
+                builder
+                    .without_features()
+                    .with_add_message(BackendFeatureSource::Context)
+                    .with_send_message(BackendFeatureSource::Context)
             },
         )
+        .without_sending_backend()
+        .build()
         .await?;
 
         let mut builder = MessageBuilder::new().to(self.url.path());

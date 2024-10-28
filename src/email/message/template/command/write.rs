@@ -1,12 +1,14 @@
+use std::sync::Arc;
+
 use clap::Parser;
 use color_eyre::Result;
 use email::message::Message;
+use pimalaya_tui::terminal::{cli::printer::Printer, config::TomlConfig as _};
 use tracing::info;
 
 use crate::{
-    account::arg::name::AccountNameFlag, config::Config,
+    account::arg::name::AccountNameFlag, config::TomlConfig,
     email::template::arg::body::TemplateRawBodyArg, message::arg::header::HeaderRawArgs,
-    printer::Printer,
 };
 
 /// Generate a template for writing a new message from scratch.
@@ -26,14 +28,14 @@ pub struct TemplateWriteCommand {
 }
 
 impl TemplateWriteCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing write template command");
 
         let (_, account_config) = config
             .clone()
             .into_account_configs(self.account.name.as_deref())?;
 
-        let tpl = Message::new_tpl_builder(account_config)
+        let tpl = Message::new_tpl_builder(Arc::new(account_config))
             .with_headers(self.headers.raw)
             .with_body(self.body.raw())
             .build()

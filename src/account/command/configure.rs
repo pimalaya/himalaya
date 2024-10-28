@@ -5,12 +5,13 @@ use email::imap::config::ImapAuthConfig;
 #[cfg(feature = "smtp")]
 use email::smtp::config::SmtpAuthConfig;
 #[cfg(any(feature = "imap", feature = "smtp", feature = "pgp"))]
-use pimalaya_tui::prompt;
+use pimalaya_tui::terminal::prompt;
+use pimalaya_tui::terminal::{cli::printer::Printer, config::TomlConfig as _};
 use tracing::info;
 #[cfg(any(feature = "imap", feature = "smtp"))]
 use tracing::{debug, warn};
 
-use crate::{account::arg::name::AccountNameArg, config::Config, printer::Printer};
+use crate::{account::arg::name::AccountNameArg, config::TomlConfig};
 
 /// Configure an account.
 ///
@@ -31,20 +32,22 @@ pub struct AccountConfigureCommand {
 }
 
 impl AccountConfigureCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing configure account command");
 
         let account = &self.account.name;
-        let (_, account_config) = config.into_toml_account_config(Some(account))?;
+        let (_, toml_account_config) = config.to_toml_account_config(Some(account))?;
 
         if self.reset {
             #[cfg(feature = "imap")]
-            if let Some(ref config) = account_config.imap {
-                let reset = match &config.auth {
-                    ImapAuthConfig::Passwd(config) => config.reset().await,
+            {
+                let reset = match toml_account_config.imap_auth_config() {
+                    Some(ImapAuthConfig::Password(config)) => config.reset().await,
                     #[cfg(feature = "oauth2")]
-                    ImapAuthConfig::OAuth2(config) => config.reset().await,
+                    Some(ImapAuthConfig::OAuth2(config)) => config.reset().await,
+                    _ => Ok(()),
                 };
+
                 if let Err(err) = reset {
                     warn!("error while resetting imap secrets: {err}");
                     debug!("error while resetting imap secrets: {err:?}");
@@ -52,12 +55,14 @@ impl AccountConfigureCommand {
             }
 
             #[cfg(feature = "smtp")]
-            if let Some(ref config) = account_config.smtp {
-                let reset = match &config.auth {
-                    SmtpAuthConfig::Passwd(config) => config.reset().await,
+            {
+                let reset = match toml_account_config.smtp_auth_config() {
+                    Some(SmtpAuthConfig::Password(config)) => config.reset().await,
                     #[cfg(feature = "oauth2")]
-                    SmtpAuthConfig::OAuth2(config) => config.reset().await,
+                    Some(SmtpAuthConfig::OAuth2(config)) => config.reset().await,
+                    _ => Ok(()),
                 };
+
                 if let Err(err) = reset {
                     warn!("error while resetting smtp secrets: {err}");
                     debug!("error while resetting smtp secrets: {err:?}");
@@ -65,56 +70,54 @@ impl AccountConfigureCommand {
             }
 
             #[cfg(feature = "pgp")]
-            if let Some(ref config) = account_config.pgp {
+            if let Some(config) = &toml_account_config.pgp {
                 config.reset().await?;
             }
         }
 
         #[cfg(feature = "imap")]
-        if let Some(ref config) = account_config.imap {
-            match &config.auth {
-                ImapAuthConfig::Passwd(config) => {
-                    config
-                        .configure(|| Ok(prompt::password("IMAP password")?))
-                        .await
-                }
-                #[cfg(feature = "oauth2")]
-                ImapAuthConfig::OAuth2(config) => {
-                    config
-                        .configure(|| Ok(prompt::secret("IMAP OAuth 2.0 clientsecret")?))
-                        .await
-                }
-            }?;
-        }
+        match toml_account_config.imap_auth_config() {
+            Some(ImapAuthConfig::Password(config)) => {
+                config
+                    .configure(|| Ok(prompt::password("IMAP password")?))
+                    .await
+            }
+            #[cfg(feature = "oauth2")]
+            Some(ImapAuthConfig::OAuth2(config)) => {
+                config
+                    .configure(|| Ok(prompt::secret("IMAP OAuth 2.0 client secret")?))
+                    .await
+            }
+            _ => Ok(()),
+        }?;
 
         #[cfg(feature = "smtp")]
-        if let Some(ref config) = account_config.smtp {
-            match &config.auth {
-                SmtpAuthConfig::Passwd(config) => {
-                    config
-                        .configure(|| Ok(prompt::password("SMTP password")?))
-                        .await
-                }
-                #[cfg(feature = "oauth2")]
-                SmtpAuthConfig::OAuth2(config) => {
-                    config
-                        .configure(|| Ok(prompt::secret("SMTP OAuth 2.0 client secret")?))
-                        .await
-                }
-            }?;
-        }
+        match toml_account_config.smtp_auth_config() {
+            Some(SmtpAuthConfig::Password(config)) => {
+                config
+                    .configure(|| Ok(prompt::password("SMTP password")?))
+                    .await
+            }
+            #[cfg(feature = "oauth2")]
+            Some(SmtpAuthConfig::OAuth2(config)) => {
+                config
+                    .configure(|| Ok(prompt::secret("SMTP OAuth 2.0 client secret")?))
+                    .await
+            }
+            _ => Ok(()),
+        }?;
 
         #[cfg(feature = "pgp")]
-        if let Some(ref config) = account_config.pgp {
+        if let Some(config) = &toml_account_config.pgp {
             config
-                .configure(&account_config.email, || {
+                .configure(&toml_account_config.email, || {
                     Ok(prompt::password("PGP secret key password")?)
                 })
                 .await?;
         }
 
         printer.out(format!(
-            "Account {account} successfully {}configured!",
+            "Account {account} successfully {}configured!\n",
             if self.reset { "re" } else { "" }
         ))
     }

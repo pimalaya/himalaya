@@ -1,14 +1,16 @@
-use std::process;
+use std::{process, sync::Arc};
 
 use clap::Parser;
 use color_eyre::Result;
 use email::{backend::feature::BackendFeatureSource, folder::purge::PurgeFolder};
-use pimalaya_tui::prompt;
+use pimalaya_tui::{
+    himalaya::backend::BackendBuilder,
+    terminal::{cli::printer::Printer, config::TomlConfig as _, prompt},
+};
 use tracing::info;
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, config::Config,
-    folder::arg::name::FolderNameArg, printer::Printer,
+    account::arg::name::AccountNameFlag, config::TomlConfig, folder::arg::name::FolderNameArg,
 };
 
 /// Purge a folder.
@@ -25,12 +27,13 @@ pub struct FolderPurgeCommand {
 }
 
 impl FolderPurgeCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing purge folder command");
 
         let folder = &self.folder.name;
 
-        let confirm = format!("Do you really want to purge the folder {folder}? All emails will be definitely deleted.");
+        let confirm = format!("Do you really want to purge the folder {folder}");
+        let confirm = format!("{confirm}? All emails will be definitely deleted.");
 
         if !prompt::bool(confirm, false)? {
             process::exit(0);
@@ -40,18 +43,21 @@ impl FolderPurgeCommand {
             .clone()
             .into_account_configs(self.account.name.as_deref())?;
 
-        let purge_folder_kind = toml_account_config.purge_folder_kind();
-
-        let backend = Backend::new(
-            toml_account_config.clone(),
-            account_config,
-            purge_folder_kind,
-            |builder| builder.set_purge_folder(BackendFeatureSource::Context),
+        let backend = BackendBuilder::new(
+            Arc::new(toml_account_config),
+            Arc::new(account_config),
+            |builder| {
+                builder
+                    .without_features()
+                    .with_purge_folder(BackendFeatureSource::Context)
+            },
         )
+        .without_sending_backend()
+        .build()
         .await?;
 
         backend.purge_folder(folder).await?;
 
-        printer.log(format!("Folder {folder} successfully purged!"))
+        printer.out(format!("Folder {folder} successfully purged!\n"))
     }
 }

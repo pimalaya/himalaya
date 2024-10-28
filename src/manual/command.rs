@@ -1,11 +1,12 @@
 use clap::{CommandFactory, Parser};
 use clap_mangen::Man;
 use color_eyre::Result;
+use pimalaya_tui::terminal::cli::printer::Printer;
 use shellexpand_utils::{canonicalize, expand};
 use std::{fs, path::PathBuf};
 use tracing::info;
 
-use crate::{cli::Cli, printer::Printer};
+use crate::cli::Cli;
 
 /// Generate manual pages to a directory.
 ///

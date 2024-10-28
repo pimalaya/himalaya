@@ -2,12 +2,18 @@ use clap::Parser;
 use color_eyre::Result;
 use email::backend::feature::BackendFeatureSource;
 use mml::MmlCompilerBuilder;
-use std::io::{self, BufRead, IsTerminal};
+use pimalaya_tui::{
+    himalaya::backend::BackendBuilder,
+    terminal::{cli::printer::Printer, config::TomlConfig as _},
+};
+use std::{
+    io::{self, BufRead, IsTerminal},
+    sync::Arc,
+};
 use tracing::info;
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, config::Config,
-    email::template::arg::TemplateRawArg, printer::Printer,
+    account::arg::name::AccountNameFlag, config::TomlConfig, email::template::arg::TemplateRawArg,
 };
 
 /// Send a template.
@@ -26,28 +32,26 @@ pub struct TemplateSendCommand {
 }
 
 impl TemplateSendCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing send template command");
 
         let (toml_account_config, account_config) = config
             .clone()
             .into_account_configs(self.account.name.as_deref())?;
 
-        let send_message_kind = toml_account_config.send_message_kind().into_iter().chain(
-            toml_account_config
-                .add_message_kind()
-                .filter(|_| account_config.should_save_copy_sent_message()),
-        );
+        let account_config = Arc::new(account_config);
 
-        let backend = Backend::new(
-            toml_account_config.clone(),
+        let backend = BackendBuilder::new(
+            Arc::new(toml_account_config),
             account_config.clone(),
-            send_message_kind,
             |builder| {
-                builder.set_send_message(BackendFeatureSource::Context);
-                builder.set_add_message(BackendFeatureSource::Context);
+                builder
+                    .without_features()
+                    .with_add_message(BackendFeatureSource::Context)
+                    .with_send_message(BackendFeatureSource::Context)
             },
         )
+        .build()
         .await?;
 
         let tpl = if io::stdin().is_terminal() {

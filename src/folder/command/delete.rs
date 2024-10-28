@@ -1,14 +1,16 @@
-use std::process;
+use std::{process, sync::Arc};
 
 use clap::Parser;
 use color_eyre::Result;
 use email::{backend::feature::BackendFeatureSource, folder::delete::DeleteFolder};
-use pimalaya_tui::prompt;
+use pimalaya_tui::{
+    himalaya::backend::BackendBuilder,
+    terminal::{cli::printer::Printer, config::TomlConfig as _, prompt},
+};
 use tracing::info;
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, config::Config,
-    folder::arg::name::FolderNameArg, printer::Printer,
+    account::arg::name::AccountNameFlag, config::TomlConfig, folder::arg::name::FolderNameArg,
 };
 
 /// Delete a folder.
@@ -25,12 +27,13 @@ pub struct FolderDeleteCommand {
 }
 
 impl FolderDeleteCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing delete folder command");
 
         let folder = &self.folder.name;
 
-        let confirm = format!("Do you really want to delete the folder {folder}? All emails will be definitely deleted.");
+        let confirm = format!("Do you really want to delete the folder {folder}");
+        let confirm = format!("{confirm}? All emails will be definitely deleted.");
 
         if !prompt::bool(confirm, false)? {
             process::exit(0);
@@ -40,18 +43,21 @@ impl FolderDeleteCommand {
             .clone()
             .into_account_configs(self.account.name.as_deref())?;
 
-        let delete_folder_kind = toml_account_config.delete_folder_kind();
-
-        let backend = Backend::new(
-            toml_account_config.clone(),
-            account_config,
-            delete_folder_kind,
-            |builder| builder.set_delete_folder(BackendFeatureSource::Context),
+        let backend = BackendBuilder::new(
+            Arc::new(toml_account_config),
+            Arc::new(account_config),
+            |builder| {
+                builder
+                    .without_features()
+                    .with_delete_folder(BackendFeatureSource::Context)
+            },
         )
+        .without_sending_backend()
+        .build()
         .await?;
 
         backend.delete_folder(folder).await?;
 
-        printer.log(format!("Folder {folder} successfully deleted!"))
+        printer.out(format!("Folder {folder} successfully deleted!\n"))
     }
 }

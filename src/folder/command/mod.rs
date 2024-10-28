@@ -6,8 +6,9 @@ mod purge;
 
 use clap::Subcommand;
 use color_eyre::Result;
+use pimalaya_tui::terminal::cli::printer::Printer;
 
-use crate::{config::Config, printer::Printer};
+use crate::config::TomlConfig;
 
 use self::{
     add::AddFolderCommand, delete::FolderDeleteCommand, expunge::FolderExpungeCommand,
@@ -38,7 +39,7 @@ pub enum FolderSubcommand {
 
 impl FolderSubcommand {
     #[allow(unused)]
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         match self {
             Self::Add(cmd) => cmd.execute(printer, config).await,
             Self::List(cmd) => cmd.execute(printer, config).await,

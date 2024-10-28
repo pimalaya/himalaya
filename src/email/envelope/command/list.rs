@@ -1,3 +1,5 @@
+use std::{process::exit, sync::Arc};
+
 use ariadne::{Color, Label, Report, ReportKind, Source};
 use clap::Parser;
 use color_eyre::Result;
@@ -5,12 +7,15 @@ use email::{
     backend::feature::BackendFeatureSource, email::search_query,
     envelope::list::ListEnvelopesOptions, search_query::SearchEmailsQuery,
 };
-use std::process::exit;
+use pimalaya_tui::{
+    himalaya::{backend::BackendBuilder, config::EnvelopesTable},
+    terminal::{cli::printer::Printer, config::TomlConfig as _},
+};
 use tracing::info;
 
 use crate::{
-    account::arg::name::AccountNameFlag, backend::Backend, config::Config,
-    envelope::EnvelopesTable, folder::arg::name::FolderNameOptionalFlag, printer::Printer,
+    account::arg::name::AccountNameFlag, config::TomlConfig,
+    folder::arg::name::FolderNameOptionalFlag,
 };
 
 /// List all envelopes.
@@ -132,12 +137,14 @@ impl Default for ListEnvelopesCommand {
 }
 
 impl ListEnvelopesCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &Config) -> Result<()> {
+    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing list envelopes command");
 
         let (toml_account_config, account_config) = config
             .clone()
             .into_account_configs(self.account.name.as_deref())?;
+
+        let toml_account_config = Arc::new(toml_account_config);
 
         let folder = &self.folder.name;
         let page = 1.max(self.page) - 1;
@@ -145,14 +152,17 @@ impl ListEnvelopesCommand {
             .page_size
             .unwrap_or_else(|| account_config.get_envelope_list_page_size());
 
-        let list_envelopes_kind = toml_account_config.list_envelopes_kind();
-
-        let backend = Backend::new(
+        let backend = BackendBuilder::new(
             toml_account_config.clone(),
-            account_config.clone(),
-            list_envelopes_kind,
-            |builder| builder.set_list_envelopes(BackendFeatureSource::Context),
+            Arc::new(account_config),
+            |builder| {
+                builder
+                    .without_features()
+                    .with_list_envelopes(BackendFeatureSource::Context)
+            },
         )
+        .without_sending_backend()
+        .build()
         .await?;
 
         let query = self
