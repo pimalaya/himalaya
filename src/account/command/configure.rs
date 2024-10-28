@@ -117,7 +117,7 @@ impl AccountConfigureCommand {
         }
 
         printer.out(format!(
-            "Account {account} successfully {}configured!",
+            "Account {account} successfully {}configured!\n",
             if self.reset { "re" } else { "" }
         ))
     }

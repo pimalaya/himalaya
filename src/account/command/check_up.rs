@@ -38,17 +38,15 @@ impl AccountCheckUpCommand {
 
         let account = self.account.name.as_ref().map(String::as_str);
 
-        printer.log("Checking configuration integrity…")?;
+        printer.log("Checking configuration integrity…\n")?;
 
         let (toml_account_config, account_config) = config.clone().into_account_configs(account)?;
         let account_config = Arc::new(account_config);
 
-        printer.log("Checking backend context integrity…")?;
-
         match toml_account_config.backend {
             #[cfg(feature = "maildir")]
             Some(Backend::Maildir(mdir_config)) => {
-                printer.log("Checking Maildir integrity…")?;
+                printer.log("Checking Maildir integrity…\n")?;
 
                 let ctx = MaildirContextBuilder::new(account_config.clone(), Arc::new(mdir_config));
                 BackendBuilder::new(account_config.clone(), ctx)
@@ -57,7 +55,7 @@ impl AccountCheckUpCommand {
             }
             #[cfg(feature = "imap")]
             Some(Backend::Imap(imap_config)) => {
-                printer.log("Checking IMAP integrity…")?;
+                printer.log("Checking IMAP integrity…\n")?;
 
                 let ctx = ImapContextBuilder::new(account_config.clone(), Arc::new(imap_config))
                     .with_pool_size(1);
@@ -67,7 +65,7 @@ impl AccountCheckUpCommand {
             }
             #[cfg(feature = "notmuch")]
             Some(Backend::Notmuch(notmuch_config)) => {
-                printer.log("Checking Notmuch integrity…")?;
+                printer.log("Checking Notmuch integrity…\n")?;
 
                 let ctx =
                     NotmuchContextBuilder::new(account_config.clone(), Arc::new(notmuch_config));
@@ -86,7 +84,7 @@ impl AccountCheckUpCommand {
         match sending_backend {
             #[cfg(feature = "smtp")]
             Some(SendingBackend::Smtp(smtp_config)) => {
-                printer.log("Checking Smtp integrity…")?;
+                printer.log("Checking SMTP integrity…\n")?;
 
                 let ctx = SmtpContextBuilder::new(account_config.clone(), Arc::new(smtp_config));
                 BackendBuilder::new(account_config.clone(), ctx)
@@ -95,7 +93,7 @@ impl AccountCheckUpCommand {
             }
             #[cfg(feature = "sendmail")]
             Some(SendingBackend::Sendmail(sendmail_config)) => {
-                printer.log("Checking Sendmail integrity…")?;
+                printer.log("Checking Sendmail integrity…\n")?;
 
                 let ctx =
                     SendmailContextBuilder::new(account_config.clone(), Arc::new(sendmail_config));
@@ -106,6 +104,6 @@ impl AccountCheckUpCommand {
             _ => (),
         }
 
-        printer.out("Checkup successfully completed!")
+        printer.out("Checkup successfully completed!\n")
     }
 }

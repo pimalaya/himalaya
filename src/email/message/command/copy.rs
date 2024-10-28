@@ -53,6 +53,7 @@ impl MessageCopyCommand {
                     .with_copy_messages(BackendFeatureSource::Context)
             },
         )
+        .without_sending_backend()
         .build()
         .await?;
 

@@ -52,6 +52,7 @@ impl FolderDeleteCommand {
                     .with_delete_folder(BackendFeatureSource::Context)
             },
         )
+        .without_sending_backend()
         .build()
         .await?;
 

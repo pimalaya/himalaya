@@ -51,6 +51,7 @@ impl FlagRemoveCommand {
                     .with_remove_flags(BackendFeatureSource::Context)
             },
         )
+        .without_sending_backend()
         .build()
         .await?;
 

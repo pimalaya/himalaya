@@ -50,6 +50,7 @@ impl MessageSaveCommand {
                     .with_add_message(BackendFeatureSource::Context)
             },
         )
+        .without_sending_backend()
         .build()
         .await?;
 

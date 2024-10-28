@@ -56,6 +56,7 @@ impl MessageMailtoCommand {
                     .with_send_message(BackendFeatureSource::Context)
             },
         )
+        .without_sending_backend()
         .build()
         .await?;
 

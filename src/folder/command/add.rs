@@ -45,6 +45,7 @@ impl AddFolderCommand {
                     .with_add_folder(BackendFeatureSource::Context)
             },
         )
+        .without_sending_backend()
         .build()
         .await?;
 

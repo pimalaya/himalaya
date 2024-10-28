@@ -52,6 +52,7 @@ impl FolderPurgeCommand {
                     .with_purge_folder(BackendFeatureSource::Context)
             },
         )
+        .without_sending_backend()
         .build()
         .await?;
 

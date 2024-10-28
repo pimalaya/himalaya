@@ -66,6 +66,7 @@ impl TemplateReplyCommand {
                     .with_get_messages(BackendFeatureSource::Context)
             },
         )
+        .without_sending_backend()
         .build()
         .await?;
 

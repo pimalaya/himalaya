@@ -45,6 +45,7 @@ impl FolderExpungeCommand {
                     .with_expunge_folder(BackendFeatureSource::Context)
             },
         )
+        .without_sending_backend()
         .build()
         .await?;
 

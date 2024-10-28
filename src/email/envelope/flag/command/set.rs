@@ -51,6 +51,7 @@ impl FlagSetCommand {
                     .with_set_flags(BackendFeatureSource::Context)
             },
         )
+        .without_sending_backend()
         .build()
         .await?;
 

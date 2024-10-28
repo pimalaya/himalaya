@@ -1193,8 +1193,9 @@ dependencies = [
 
 [[package]]
 name = "email-lib"
-version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#79a960a684274537788d1193fe3db5bcf66cfb7e"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "efdb5d972806dac8ab65f659d7c7ec59fc683bd2b9e149bdc77b18ae95a16fd9"
 dependencies = [
  "async-trait",
  "chrono",
@@ -1824,8 +1825,9 @@ dependencies = [
 
 [[package]]
 name = "http-lib"
-version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#79a960a684274537788d1193fe3db5bcf66cfb7e"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "994cbd23c90551cb5821d1c9d9b1e41383f338b31fc122671edc7d1695a61338"
 dependencies = [
  "thiserror",
  "tokio",
@@ -1899,8 +1901,9 @@ dependencies = [
 
 [[package]]
 name = "imap-client"
-version = "0.1.4"
-source = "git+https://github.com/pimalaya/imap-client#c1f0dfcfb3e5f22763324d6d2497e195d44c9ec8"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e667382fe3b5f75c78af4f7028a44435ed5f6da8e91500037115cee1569d8c5"
 dependencies = [
  "imap-next",
  "once_cell",
@@ -1914,7 +1917,8 @@ dependencies = [
 [[package]]
 name = "imap-codec"
 version = "2.0.0-alpha.5"
-source = "git+https://github.com/duesee/imap-codec#086523d64095fd7da35b4fe5ffe27067185c9801"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f584310addd1fb8fe288e4f07c279fec9264ac1ea68b018241ae4dcd4fb28557"
 dependencies = [
  "abnf-core",
  "base64 0.22.1",
@@ -1926,8 +1930,9 @@ dependencies = [
 
 [[package]]
 name = "imap-next"
-version = "0.2.0"
-source = "git+https://github.com/duesee/imap-next#7e120f40cb30cef0f761c0efd44a4846234e9e91"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "793a41b36eb0fbe7eff9d8715717be264c9429d1989a60fd3d7893476b966506"
 dependencies = [
  "bytes",
  "imap-codec",
@@ -1940,7 +1945,8 @@ dependencies = [
 [[package]]
 name = "imap-types"
 version = "2.0.0-alpha.4"
-source = "git+https://github.com/duesee/imap-codec#086523d64095fd7da35b4fe5ffe27067185c9801"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d601d81f11962a649acc2d535ad7311770e30364b4a978a762de291829c9ef53"
 dependencies = [
  "base64 0.22.1",
  "bounded-static",
@@ -2092,8 +2098,9 @@ dependencies = [
 
 [[package]]
 name = "keyring"
-version = "3.5.0"
-source = "git+https://github.com/soywod/keyring-rs.git?branch=secret-service-with-keyutils#f59afd50e4b9be4e333e6c050ac8f97f51fe632d"
+version = "3.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f8fe839464d4e4b37d756d7e910063696af79a7e877282cb1825e4ec5f10833"
 dependencies = [
  "byteorder",
  "dbus-secret-service",
@@ -2108,8 +2115,9 @@ dependencies = [
 
 [[package]]
 name = "keyring-lib"
-version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#79a960a684274537788d1193fe3db5bcf66cfb7e"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56921558c465f33d51c6047b86b76764cd2a86b69b99653b43ba1f9a32965218"
 dependencies = [
  "keyring",
  "once_cell",
@@ -2176,9 +2184,9 @@ dependencies = [
 
 [[package]]
 name = "libm"
-version = "0.2.8"
+version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ec2a862134d2a7d32d7983ddcdd1c4923530833c9f2ea1a44fc5fa473989058"
+checksum = "a00419de735aac21d53b0de5ce2c03bd3627277cf471300f27ebc89f7d828047"
 
 [[package]]
 name = "libredox"
@@ -2389,7 +2397,8 @@ dependencies = [
 [[package]]
 name = "mml-lib"
 version = "1.1.0"
-source = "git+https://github.com/pimalaya/core#79a960a684274537788d1193fe3db5bcf66cfb7e"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4ac497207f2c20c5f29503ad6e04a7d5a15e29583526764a03d46239d5b80fa"
 dependencies = [
  "async-recursion",
  "chumsky",
@@ -2588,7 +2597,8 @@ dependencies = [
 [[package]]
 name = "oauth-lib"
 version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#79a960a684274537788d1193fe3db5bcf66cfb7e"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d936e2859cd8769d97a035df0886e0a8c487d916415b4ad3802ecd5a86664452"
 dependencies = [
  "http-lib",
  "oauth2",
@@ -2861,7 +2871,8 @@ dependencies = [
 [[package]]
 name = "pgp-lib"
 version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#79a960a684274537788d1193fe3db5bcf66cfb7e"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62b1a64cb843daaa31d7109d77871ba6fcaa25be5b488c97eeb28fc378e5fed7"
 dependencies = [
  "async-recursion",
  "futures",
@@ -2878,8 +2889,9 @@ dependencies = [
 
 [[package]]
 name = "pimalaya-tui"
-version = "1.0.0"
-source = "git+https://github.com/pimalaya/tui#d3664c02dce63fe0f91b7e47a49e68bbe86f5bfc"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d72a8bba0e012700dfb3a7611fffaa6b9ec9dc747134b1a1d34d2fd9f8ddce5"
 dependencies = [
  "async-trait",
  "clap",
@@ -3038,7 +3050,8 @@ dependencies = [
 [[package]]
 name = "process-lib"
 version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#79a960a684274537788d1193fe3db5bcf66cfb7e"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3eb47ed33aeaf6b32cecbbde6f56dde6c8740f2dac4a146179cc82f797918c46"
 dependencies = [
  "serde",
  "thiserror",
@@ -3288,9 +3301,9 @@ dependencies = [
 
 [[package]]
 name = "rustix"
-version = "0.38.37"
+version = "0.38.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8acb788b847c24f28525660c4d7758620a7210875711f79e7f663cc152726811"
+checksum = "aa260229e6538e52293eeb577aabd09945a09d6d9cc0fc550ed7529056c2e32a"
 dependencies = [
  "bitflags 2.6.0",
  "errno",
@@ -3487,7 +3500,8 @@ dependencies = [
 [[package]]
 name = "secret-lib"
 version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#79a960a684274537788d1193fe3db5bcf66cfb7e"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba34b385def61154faed219ac86f80ad8c72877a278208bac2ecdd85d68f962f"
 dependencies = [
  "keyring-lib",
  "process-lib",
@@ -4212,6 +4226,7 @@ checksum = "3a139c7262528ca928e9a4368281577453ae93953159d7d7b922165bd083049f"
 dependencies = [
  "base64 0.22.1",
  "cc",
+ "flate2",
  "hoot",
  "http",
  "log",

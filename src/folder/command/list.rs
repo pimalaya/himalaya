@@ -50,6 +50,7 @@ impl FolderListCommand {
                     .with_list_folders(BackendFeatureSource::Context)
             },
         )
+        .without_sending_backend()
         .build()
         .await?;
 

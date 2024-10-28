@@ -101,6 +101,7 @@ impl MessageThreadCommand {
                     .with_thread_envelopes(BackendFeatureSource::Context)
             },
         )
+        .without_sending_backend()
         .build()
         .await?;
 
