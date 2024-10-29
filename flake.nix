@@ -75,10 +75,10 @@
         x86_64-darwin.x86_64-darwin = {
           rustTarget = "x86_64-apple-darwin";
           mkPackage = { pkgs, ... }: package:
-            let inherit (pkgs.darwin.apple_sdk_11_0.frameworks) AppKit Cocoa Security;
+            let inherit (pkgs.darwin.apple_sdk_11_0.frameworks) AppKit Cocoa CoreFoundation;
             in package // {
-              buildInputs = [ AppKit Cocoa Security ];
-              NIX_LDFLAGS = "-F${AppKit}/Library/Frameworks -framework AppKit -F${Cocoa}/Library/Frameworks -framework Cocoa -F${AppKit}/Library/Frameworks -framework Security";
+              buildInputs = [ AppKit Cocoa CoreFoundation ];
+              NIX_LDFLAGS = "-F${AppKit}/Library/Frameworks -framework AppKit -F${Cocoa}/Library/Frameworks -framework Cocoa -F${CoreFoundation}/Library/Frameworks -framework CoreFoundation";
             };
         };
 
