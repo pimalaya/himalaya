@@ -76,7 +76,7 @@
             let inherit (pkgs.darwin.apple_sdk_11_0.frameworks) Security;
             in package // {
               buildInputs = [ Security ];
-              NIX_LDFLAGS = "-F${Security}/Library/Frameworks -framework Security";
+              # NIX_LDFLAGS = "-F${Security}/Library/Frameworks -framework Security";
             };
         };
 
