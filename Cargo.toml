@@ -65,3 +65,9 @@ toml = "0.8"
 tracing = "0.1"
 url = "2.2"
 uuid = { version = "0.8", features = ["v4"] }
+
+[patch.crates-io]
+email-lib = { git = "https://github.com/pimalaya/core" }
+process-lib = { git = "https://github.com/pimalaya/core" }
+secret-lib = { git = "https://github.com/pimalaya/core" }
+mml-lib = { git = "https://github.com/pimalaya/core" }

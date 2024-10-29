@@ -1194,8 +1194,7 @@ dependencies = [
 [[package]]
 name = "email-lib"
 version = "0.26.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efdb5d972806dac8ab65f659d7c7ec59fc683bd2b9e149bdc77b18ae95a16fd9"
+source = "git+https://github.com/pimalaya/core#afa6403c2c596d3d8c90dee26b57d57a8cce635c"
 dependencies = [
  "async-trait",
  "chrono",
@@ -1204,7 +1203,7 @@ dependencies = [
  "email_address",
  "futures",
  "hickory-resolver",
- "http-lib",
+ "http-lib 0.1.0 (git+https://github.com/pimalaya/core)",
  "imap-client",
  "imap-next",
  "keyring-lib",
@@ -1215,7 +1214,7 @@ dependencies = [
  "mml-lib",
  "notify",
  "notmuch",
- "oauth-lib",
+ "oauth-lib 1.0.0 (git+https://github.com/pimalaya/core)",
  "once_cell",
  "ouroboros",
  "paste",
@@ -1836,6 +1835,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "http-lib"
+version = "0.1.0"
+source = "git+https://github.com/pimalaya/core#afa6403c2c596d3d8c90dee26b57d57a8cce635c"
+dependencies = [
+ "thiserror",
+ "tokio",
+ "tracing",
+ "ureq",
+]
+
+[[package]]
 name = "httparse"
 version = "1.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2116,8 +2126,7 @@ dependencies = [
 [[package]]
 name = "keyring-lib"
 version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56921558c465f33d51c6047b86b76764cd2a86b69b99653b43ba1f9a32965218"
+source = "git+https://github.com/pimalaya/core#afa6403c2c596d3d8c90dee26b57d57a8cce635c"
 dependencies = [
  "keyring",
  "once_cell",
@@ -2184,9 +2193,9 @@ dependencies = [
 
 [[package]]
 name = "libm"
-version = "0.2.10"
+version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a00419de735aac21d53b0de5ce2c03bd3627277cf471300f27ebc89f7d828047"
+checksum = "8355be11b20d696c8f18f6cc018c4e372165b1fa8126cef092399c9951984ffa"
 
 [[package]]
 name = "libredox"
@@ -2272,7 +2281,7 @@ checksum = "7a575d25cf00ed68e5790b473b29242a47e991c6187785d47b45e31fc5816554"
 dependencies = [
  "base64 0.22.1",
  "gethostname",
- "rustls 0.23.15",
+ "rustls 0.23.16",
  "rustls-pki-types",
  "smtp-proto",
  "tokio",
@@ -2397,8 +2406,7 @@ dependencies = [
 [[package]]
 name = "mml-lib"
 version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4ac497207f2c20c5f29503ad6e04a7d5a15e29583526764a03d46239d5b80fa"
+source = "git+https://github.com/pimalaya/core#afa6403c2c596d3d8c90dee26b57d57a8cce635c"
 dependencies = [
  "async-recursion",
  "chumsky",
@@ -2600,7 +2608,19 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d936e2859cd8769d97a035df0886e0a8c487d916415b4ad3802ecd5a86664452"
 dependencies = [
- "http-lib",
+ "http-lib 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "oauth2",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "oauth-lib"
+version = "1.0.0"
+source = "git+https://github.com/pimalaya/core#afa6403c2c596d3d8c90dee26b57d57a8cce635c"
+dependencies = [
+ "http-lib 0.1.0 (git+https://github.com/pimalaya/core)",
  "oauth2",
  "thiserror",
  "tokio",
@@ -2871,12 +2891,11 @@ dependencies = [
 [[package]]
 name = "pgp-lib"
 version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62b1a64cb843daaa31d7109d77871ba6fcaa25be5b488c97eeb28fc378e5fed7"
+source = "git+https://github.com/pimalaya/core#afa6403c2c596d3d8c90dee26b57d57a8cce635c"
 dependencies = [
  "async-recursion",
  "futures",
- "http-lib",
+ "http-lib 0.1.0 (git+https://github.com/pimalaya/core)",
  "pgp",
  "rand",
  "sha1",
@@ -2904,7 +2923,7 @@ dependencies = [
  "inquire",
  "md5",
  "mml-lib",
- "oauth-lib",
+ "oauth-lib 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "petgraph",
  "process-lib",
  "secret-lib",
@@ -3050,8 +3069,7 @@ dependencies = [
 [[package]]
 name = "process-lib"
 version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3eb47ed33aeaf6b32cecbbde6f56dde6c8740f2dac4a146179cc82f797918c46"
+source = "git+https://github.com/pimalaya/core#afa6403c2c596d3d8c90dee26b57d57a8cce635c"
 dependencies = [
  "serde",
  "thiserror",
@@ -3326,9 +3344,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.15"
+version = "0.23.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fbb44d7acc4e873d613422379f69f237a1b141928c02f6bc6ccfddddc2d7993"
+checksum = "eee87ff5d9b36712a58574e12e9f0ea80f915a5b0ac518d322b24a465617925e"
 dependencies = [
  "log",
  "once_cell",
@@ -3400,7 +3418,7 @@ dependencies = [
  "jni",
  "log",
  "once_cell",
- "rustls 0.23.15",
+ "rustls 0.23.16",
  "rustls-native-certs 0.7.3",
  "rustls-platform-verifier-android",
  "rustls-webpki 0.102.8",
@@ -3500,8 +3518,7 @@ dependencies = [
 [[package]]
 name = "secret-lib"
 version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba34b385def61154faed219ac86f80ad8c72877a278208bac2ecdd85d68f962f"
+source = "git+https://github.com/pimalaya/core#afa6403c2c596d3d8c90dee26b57d57a8cce635c"
 dependencies = [
  "keyring-lib",
  "process-lib",
@@ -3574,9 +3591,9 @@ checksum = "61697e0a1c7e512e84a621326239844a24d8207b4669b41bc18b32ea5cbf988b"
 
 [[package]]
 name = "serde"
-version = "1.0.213"
+version = "1.0.214"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ea7893ff5e2466df8d720bb615088341b295f849602c6956047f8f80f0e9bc1"
+checksum = "f55c3193aca71c12ad7890f1785d2b73e1b9f63a0bbc353c08ef26fe03fc56b5"
 dependencies = [
  "serde_derive",
 ]
@@ -3604,9 +3621,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.213"
+version = "1.0.214"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e85ad2009c50b58e87caa8cd6dac16bdf511bbfb7af6c33df902396aa480fa5"
+checksum = "de523f781f095e28fa605cdce0f8307e451cc0fd14e2eb4cd2e98a355b147766"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4030,7 +4047,7 @@ version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c7bc40d0e5a97695bb96e27995cd3a08538541b0a846f65bba7a359f36700d4"
 dependencies = [
- "rustls 0.23.15",
+ "rustls 0.23.16",
  "rustls-pki-types",
  "tokio",
 ]
@@ -4232,7 +4249,7 @@ dependencies = [
  "log",
  "once_cell",
  "percent-encoding",
- "rustls 0.23.15",
+ "rustls 0.23.16",
  "rustls-pemfile 2.2.0",
  "rustls-pki-types",
  "rustls-platform-verifier",
