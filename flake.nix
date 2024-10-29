@@ -75,7 +75,7 @@
         x86_64-darwin.x86_64-darwin = {
           rustTarget = "x86_64-apple-darwin";
           mkPackage = { pkgs, ... }: package:
-            let inherit (pkgs.darwin.apple_sdk_11_0.frameworks) AppKit Cocoa;
+            let inherit (pkgs.darwin.apple_sdk.frameworks) AppKit Cocoa;
             in package // {
               buildInputs = [ Cocoa ];
               NIX_LDFLAGS = "-F${AppKit}/Library/Frameworks -framework AppKit";
