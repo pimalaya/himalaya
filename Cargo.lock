@@ -1912,12 +1912,10 @@ dependencies = [
 [[package]]
 name = "imap-client"
 version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e667382fe3b5f75c78af4f7028a44435ed5f6da8e91500037115cee1569d8c5"
+source = "git+https://github.com/pimalaya/imap-client#c7e7dfb4779a2166d09ce18d8575f4e09e55e184"
 dependencies = [
  "imap-next",
- "once_cell",
- "rustls-native-certs 0.8.0",
+ "rustls-platform-verifier",
  "thiserror",
  "tokio",
  "tokio-rustls 0.26.0",
@@ -3371,19 +3369,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustls-native-certs"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcaf18a4f2be7326cd874a5fa579fae794320a0f388d365dca7e480e55f83f8a"
-dependencies = [
- "openssl-probe",
- "rustls-pemfile 2.2.0",
- "rustls-pki-types",
- "schannel",
- "security-framework 2.11.1",
-]
-
-[[package]]
 name = "rustls-pemfile"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3419,7 +3404,7 @@ dependencies = [
  "log",
  "once_cell",
  "rustls 0.23.16",
- "rustls-native-certs 0.7.3",
+ "rustls-native-certs",
  "rustls-platform-verifier-android",
  "rustls-webpki 0.102.8",
  "security-framework 2.11.1",
