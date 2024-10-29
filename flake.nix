@@ -73,7 +73,7 @@
         x86_64-darwin.x86_64-darwin = {
           rustTarget = "x86_64-apple-darwin";
           mkPackage = { pkgs, ... }: package:
-            let inherit (pkgs.darwin.apple_sdk_10_12.frameworks) Security;
+            let inherit (pkgs.darwin.apple_sdk_11_0.frameworks) Security;
             in package // {
               buildInputs = [ Security ];
               NIX_LDFLAGS = "-F${Security}/Library/Frameworks -framework Security";
