@@ -66,19 +66,17 @@
           };
         };
 
-        aarch64-linux = {
-          aarch64-linux = {
-            rustTarget = "aarch64-unknown-linux-musl";
-          };
+        aarch64-linux.aarch64-linux = {
+          rustTarget = "aarch64-unknown-linux-musl";
         };
 
         x86_64-darwin.x86_64-darwin = {
           rustTarget = "x86_64-apple-darwin";
           mkPackage = { pkgs, ... }: package:
-            let inherit (pkgs.darwin.apple_sdk_11_0.frameworks) AppKit Cocoa CoreFoundation;
+            let inherit (pkgs.darwin.apple_sdk.frameworks) AppKit Cocoa Security;
             in package // {
-              buildInputs = [ AppKit Cocoa CoreFoundation ];
-              NIX_LDFLAGS = "-F${AppKit}/Library/Frameworks -framework AppKit -F${Cocoa}/Library/Frameworks -framework Cocoa -F${CoreFoundation}/Library/Frameworks -framework CoreFoundation";
+              buildInputs = [ ];
+              # NIX_LDFLAGS = "-F${AppKit}/Library/Frameworks -framework AppKit -F${Cocoa}/Library/Frameworks -framework Cocoa -F${CoreFoundation}/Library/Frameworks -framework CoreFoundation";
             };
         };
 
@@ -87,8 +85,8 @@
           mkPackage = { pkgs, ... }: package:
             let inherit (pkgs.darwin.apple_sdk.frameworks) AppKit Cocoa;
             in package // {
-              buildInputs = [ Cocoa ];
-              NIX_LDFLAGS = "-F${AppKit}/Library/Frameworks -framework AppKit";
+              # buildInputs = [ Cocoa ];
+              # NIX_LDFLAGS = "-F${AppKit}/Library/Frameworks -framework AppKit";
             };
         };
       };
