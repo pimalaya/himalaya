@@ -39,13 +39,10 @@ jobs:
         run: |
           nix build -L .#${{ matrix.target }}
           nix run -L .#${{ matrix.target }} -- --version
-      - name: Upload release artifact (tarball)
+      - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: "himalaya.${{ matrix.target }}.tgz"
-          path: result/himalaya.tgz
-      - name: Upload release artifact (zip)
-        uses: actions/upload-artifact@v4
-        with:
-          name: "himalaya.${{ matrix.target }}.zip"
-          path: result/himalaya.zip
+          name: "himalaya.${{ matrix.target }}"
+          path: |
+            result/bin/himalaya*
+            result/bin/share

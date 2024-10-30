@@ -37,7 +37,7 @@
           aarch64-linux = rec {
             rustTarget = "aarch64-unknown-linux-musl";
             runner = { pkgs, himalaya }: "${pkgs.qemu}/bin/qemu-aarch64 ${himalaya}";
-            mkPackage = { system, pkgs }: package:
+            mkPackage = { system, ... }: package:
               let
                 inherit (mkPkgsCross system rustTarget) stdenv;
                 cc = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc";
@@ -53,7 +53,7 @@
             runner = { pkgs, himalaya }:
               let wine = pkgs.wine.override { wineBuild = "wine64"; };
               in "${wine}/bin/wine64 ${himalaya}.exe";
-            mkPackage = { system, pkgs }: package:
+            mkPackage = { pkgs, ... }: package:
               let
                 inherit (pkgs.pkgsCross.mingwW64) stdenv windows;
                 cc = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc";
@@ -148,11 +148,12 @@
               ${runner} completion fish > ./share/completions/himalaya.fish
               ${runner} completion powershell > ./share/completions/himalaya.powershell
               ${runner} completion zsh > ./share/completions/himalaya.zsh
-              tar -czf himalaya.tgz himalaya* share
-              ${pkgs.zip}/bin/zip -r himalaya.zip himalaya* share
 
-              mv share ../
-              mv himalaya.tgz himalaya.zip ../
+              tar -czf himalaya.tgz himalaya* share
+              mv himalaya.tgz ../
+
+              ${pkgs.zip}/bin/zip -r himalaya.zip himalaya* share
+              mv himalaya.zip ../
             '';
           };
         in

@@ -85,6 +85,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     message.send.backend.auth.method = "xoauth2"
     ```
 
+### Fixed
+
+- Fixed pre-release archives issue. [#492]
+
 ## [1.0.0-beta.4] - 2024-04-16
 
 ### Added
@@ -888,3 +892,5 @@ Few major concepts changed:
 [0.2.1]: https://github.com/soywod/himalaya/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/soywod/himalaya/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/soywod/himalaya/releases/tag/v0.1.0
+
+[#492]: https://github.com/pimalaya/himalaya/issues/492
