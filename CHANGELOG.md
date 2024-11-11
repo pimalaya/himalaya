@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Improved long version `--version`. [#496]
 - Improved error messages when missing cargo features. For example, if a TOML configuration uses the IMAP backend without the `imap` cargo features, the error `missing "imap" feature` is displayed. [#20](https://github.com/pimalaya/core/issues/20)
 - Normalized enum-based configurations, using the [internally tagged representation](https://serde.rs/enum-representations.html#internally-tagged) `type =`. It should reduce issues due to misconfiguration, and improve othe error messages. Yet it is not perfect, see [#802](https://github.com/toml-rs/toml/issues/802):
 
@@ -894,3 +895,4 @@ Few major concepts changed:
 [0.1.0]: https://github.com/soywod/himalaya/releases/tag/v0.1.0
 
 [#492]: https://github.com/pimalaya/himalaya/issues/492
+[#496]: https://github.com/pimalaya/himalaya/issues/496

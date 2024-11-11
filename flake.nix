@@ -188,6 +188,7 @@
               gpgme
               msmtp
               notmuch
+              openssl.dev
             ];
           };
         in

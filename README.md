@@ -49,7 +49,7 @@ Himalaya CLI `v1.0.0` can be installed with a pre-built binary. Find the latest 
 Himalaya CLI `v1.0.0` can also be installed with [cargo](https://doc.rust-lang.org/cargo/):
 
 ```bash
-$ cargo install --git https://github.com/pimalaya/himalaya.git --force himalaya
+$ cargo install --frozen --force --git https://github.com/pimalaya/himalaya.git
 ```
 
 ### Other outdated methods
