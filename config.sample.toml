@@ -49,7 +49,7 @@ account.list.table.backends-color = "blue"
 # Customizes the color of the DEFAULT column of the account listing
 # table.
 #
-account.list.table.default-color = "reset"
+account.list.table.default-color = "black"
 
 ################################################################################
 #### Account configuration #####################################################
@@ -177,7 +177,7 @@ envelope.list.table.id-color = "red"
 # Customizes the color of the FLAGS column of the envelope listing
 # table.
 #
-envelope.list.table.flags-color = "reset"
+envelope.list.table.flags-color = "black"
 
 # Customizes the color of the SUBJECT column of the envelope listing
 # table.
