@@ -3,36 +3,18 @@ use std::env;
 use git2::Repository;
 
 fn main() {
-    let repo = Repository::open(".").expect("should open git repository");
-    let head = repo.head().expect("should get HEAD");
-    let branch = head.shorthand().expect("should get branch name");
-    let commit = head.peel_to_commit().expect("should get HEAD commit");
-    let rev = commit.id().to_string();
+    if let Ok(repo) = Repository::open(".") {
+        let head = repo.head().expect("should get git HEAD");
+        let commit = head.peel_to_commit().expect("should get git HEAD commit");
+        println!("cargo::rustc-env=GIT_REV={}", commit.id());
+    }
 
-    let version = env!("CARGO_PKG_VERSION");
     let os = env::var("CARGO_CFG_TARGET_OS").expect("should get CARGO_CFG_TARGET_OS");
+    println!("cargo::rustc-env=TARGET_OS={os}");
+
     let env = env::var("CARGO_CFG_TARGET_ENV").expect("should get CARGO_CFG_TARGET_ENV");
+    println!("cargo::rustc-env=TARGET_ENV={env}");
+
     let arch = env::var("CARGO_CFG_TARGET_ARCH").expect("should get CARGO_CFG_TARGET_ARCH");
-
-    let long_version = [
-        version,
-        &os,
-        &env,
-        &arch,
-        "git branch",
-        &branch,
-        "rev",
-        &rev,
-    ]
-    .into_iter()
-    .filter(|s| !s.trim().is_empty())
-    .fold(String::new(), |mut version, section| {
-        if !version.is_empty() {
-            version.push(' ')
-        }
-        version.push_str(section);
-        version
-    });
-
-    println!("cargo::rustc-env=HIMALAYA_LONG_VERSION={long_version}");
+    println!("cargo::rustc-env=TARGET_ARCH={arch}");
 }
