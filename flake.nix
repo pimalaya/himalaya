@@ -134,7 +134,8 @@
             nativeBuildInputs = with pkgs; [ pkg-config ];
             CARGO_BUILD_TARGET = targetConfig.rustTarget;
             CARGO_BUILD_RUSTFLAGS = [ "-Ctarget-feature=+crt-static" ];
-            GIT_REV = self.rev or self.dirtyRev or "dirty";
+            GIT_REV = self.rev or self.dirtyRev or "unknown-rev";
+            GIT_DESCRIBE = "flake-" + self.shortRev or self.dirtyShortRev or "unknown";
             postInstall = ''
               export WINEPREFIX="$(mktemp -d)"
 
