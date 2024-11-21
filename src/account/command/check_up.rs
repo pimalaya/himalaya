@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use clap::Parser;
 use color_eyre::Result;
-use email::backend::BackendBuilder;
 #[cfg(feature = "imap")]
 use email::imap::ImapContextBuilder;
 #[cfg(feature = "maildir")]
@@ -13,6 +12,7 @@ use email::notmuch::NotmuchContextBuilder;
 use email::sendmail::SendmailContextBuilder;
 #[cfg(feature = "smtp")]
 use email::smtp::SmtpContextBuilder;
+use email::{backend::BackendBuilder, config::Config};
 use pimalaya_tui::{
     himalaya::config::{Backend, SendingBackend},
     terminal::{cli::printer::Printer, config::TomlConfig as _},
@@ -36,11 +36,13 @@ impl AccountCheckUpCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing check up account command");
 
-        let account = self.account.name.as_ref().map(String::as_str);
-
         printer.log("Checking configuration integrity…\n")?;
 
-        let (toml_account_config, account_config) = config.clone().into_account_configs(account)?;
+        let (toml_account_config, account_config) = config
+            .clone()
+            .into_account_configs(self.account.name.as_deref(), |c: &Config, name| {
+                c.account(name).ok()
+            })?;
         let account_config = Arc::new(account_config);
 
         match toml_account_config.backend {

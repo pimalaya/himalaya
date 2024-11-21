@@ -4,7 +4,7 @@ use ariadne::{Color, Label, Report, ReportKind, Source};
 use clap::Parser;
 use color_eyre::Result;
 use email::{
-    backend::feature::BackendFeatureSource, email::search_query,
+    backend::feature::BackendFeatureSource, config::Config, email::search_query,
     envelope::list::ListEnvelopesOptions, search_query::SearchEmailsQuery,
 };
 use pimalaya_tui::{
@@ -142,7 +142,9 @@ impl ListEnvelopesCommand {
 
         let (toml_account_config, account_config) = config
             .clone()
-            .into_account_configs(self.account.name.as_deref())?;
+            .into_account_configs(self.account.name.as_deref(), |c: &Config, name| {
+                c.account(name).ok()
+            })?;
 
         let toml_account_config = Arc::new(toml_account_config);
 

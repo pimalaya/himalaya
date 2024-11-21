@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use clap::Parser;
 use color_eyre::Result;
-use email::backend::feature::BackendFeatureSource;
+use email::{backend::feature::BackendFeatureSource, config::Config};
 use mml::message::FilterParts;
 use pimalaya_tui::{
     himalaya::backend::BackendBuilder,
@@ -87,7 +87,9 @@ impl MessageThreadCommand {
 
         let (toml_account_config, account_config) = config
             .clone()
-            .into_account_configs(self.account.name.as_deref())?;
+            .into_account_configs(self.account.name.as_deref(), |c: &Config, name| {
+                c.account(name).ok()
+            })?;
 
         let account_config = Arc::new(account_config);
 

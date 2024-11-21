@@ -2,7 +2,7 @@ use std::{process, sync::Arc};
 
 use clap::Parser;
 use color_eyre::Result;
-use email::{backend::feature::BackendFeatureSource, folder::purge::PurgeFolder};
+use email::{backend::feature::BackendFeatureSource, config::Config, folder::purge::PurgeFolder};
 use pimalaya_tui::{
     himalaya::backend::BackendBuilder,
     terminal::{cli::printer::Printer, config::TomlConfig as _, prompt},
@@ -41,7 +41,9 @@ impl FolderPurgeCommand {
 
         let (toml_account_config, account_config) = config
             .clone()
-            .into_account_configs(self.account.name.as_deref())?;
+            .into_account_configs(self.account.name.as_deref(), |c: &Config, name| {
+                c.account(name).ok()
+            })?;
 
         let backend = BackendBuilder::new(
             Arc::new(toml_account_config),

@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use clap::Parser;
 use color_eyre::Result;
-use email::{backend::feature::BackendFeatureSource, folder::list::ListFolders};
+use email::{
+    config::Config,
+    {backend::feature::BackendFeatureSource, folder::list::ListFolders},
+};
 use pimalaya_tui::{
     himalaya::{
         backend::BackendBuilder,
@@ -37,7 +40,9 @@ impl FolderListCommand {
 
         let (toml_account_config, account_config) = config
             .clone()
-            .into_account_configs(self.account.name.as_deref())?;
+            .into_account_configs(self.account.name.as_deref(), |c: &Config, name| {
+                c.account(name).ok()
+            })?;
 
         let toml_account_config = Arc::new(toml_account_config);
 

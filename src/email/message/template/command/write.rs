@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use clap::Parser;
 use color_eyre::Result;
-use email::message::Message;
+use email::{config::Config, message::Message};
 use pimalaya_tui::terminal::{cli::printer::Printer, config::TomlConfig as _};
 use tracing::info;
 
@@ -33,7 +33,9 @@ impl TemplateWriteCommand {
 
         let (_, account_config) = config
             .clone()
-            .into_account_configs(self.account.name.as_deref())?;
+            .into_account_configs(self.account.name.as_deref(), |c: &Config, name| {
+                c.account(name).ok()
+            })?;
 
         let tpl = Message::new_tpl_builder(Arc::new(account_config))
             .with_headers(self.headers.raw)

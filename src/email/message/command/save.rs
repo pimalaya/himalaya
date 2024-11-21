@@ -1,6 +1,6 @@
 use clap::Parser;
 use color_eyre::Result;
-use email::backend::feature::BackendFeatureSource;
+use email::{backend::feature::BackendFeatureSource, config::Config};
 use pimalaya_tui::{
     himalaya::backend::BackendBuilder,
     terminal::{cli::printer::Printer, config::TomlConfig as _},
@@ -39,7 +39,9 @@ impl MessageSaveCommand {
 
         let (toml_account_config, account_config) = config
             .clone()
-            .into_account_configs(self.account.name.as_deref())?;
+            .into_account_configs(self.account.name.as_deref(), |c: &Config, name| {
+                c.account(name).ok()
+            })?;
 
         let backend = BackendBuilder::new(
             Arc::new(toml_account_config),
