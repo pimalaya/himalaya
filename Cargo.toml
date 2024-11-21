@@ -71,7 +71,6 @@ uuid = { version = "0.8", features = ["v4"] }
 
 [patch.crates-io]
 email-lib = { git = "https://github.com/pimalaya/core" }
-imap-client = { git = "https://github.com/pimalaya/imap-client" }
 mml-lib = { git = "https://github.com/pimalaya/core" }
 oauth-lib = { git = "https://github.com/pimalaya/core" }
 pimalaya-tui = { git = "https://github.com/pimalaya/tui" }
