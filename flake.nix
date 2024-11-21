@@ -157,6 +157,8 @@
               ${pkgs.zip}/bin/zip -r himalaya.zip himalaya* share
               mv himalaya.zip ../
             '';
+
+            meta.mainProgram = "himalaya";
           };
         in
         rust.buildPackage package;
