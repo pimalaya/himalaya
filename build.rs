@@ -3,11 +3,26 @@ use std::env;
 use git2::Repository;
 
 fn main() {
-    if let Ok(repo) = Repository::open(".") {
-        let head = repo.head().expect("should get git HEAD");
-        let commit = head.peel_to_commit().expect("should get git HEAD commit");
-        println!("cargo::rustc-env=GIT_REV={}", commit.id());
-    }
+    let branch = if let Ok(describe) = env::var("GIT_DESCRIBE") {
+        describe
+    } else {
+        let repo = Repository::open(".").expect("should open git repository");
+        let head = repo.head().expect("should get HEAD");
+        head.shorthand()
+            .expect("should get branch name")
+            .to_string()
+    };
+    println!("cargo::rustc-env=GIT_DESCRIBE={branch}");
+
+    let rev = if let Ok(rev) = env::var("GIT_REV") {
+        rev
+    } else {
+        let repo = Repository::open(".").expect("should open git repository");
+        let head = repo.head().expect("should get HEAD");
+        let commit = head.peel_to_commit().expect("should get HEAD commit");
+        commit.id().to_string()
+    };
+    println!("cargo::rustc-env=GIT_REV={rev}");
 
     let os = env::var("CARGO_CFG_TARGET_OS").expect("should get CARGO_CFG_TARGET_OS");
     println!("cargo::rustc-env=TARGET_OS={os}");

@@ -29,15 +29,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: x86_64-linux
+          - host: x86_64-linux
+            target: x86_64-linux
             os: ubuntu-latest
-          - target: aarch64-linux
+          - host: x86_64-linux
+            target: aarch64-linux
             os: ubuntu-latest
-          - target: x86_64-windows
+          - host: x86_64-linux
+            target: x86_64-windows
             os: ubuntu-latest
-          - target: x86_64-darwin
+          - host: x86_64-darwin
+            target: x86_64-darwin
             os: macos-13
-          - target: aarch64-darwin
+          - host: aarch64-darwin
+            target: aarch64-darwin
             os: macos-14
     steps:
       - name: Checkout code
@@ -55,7 +60,11 @@ jobs:
           extraPullNames: nix-community
       - name: Build release archive
         run: |
-          nix build -L .#${{ matrix.target }}
+          nix build -L --expr "
+          (builtins.getFlake \"git+file://${PWD}?shallow=1&rev=$(git rev-parse HEAD)\")
+          .outputs.packages.${{ matrix.host }}.${{ matrix.target }}.overrideAttrs {
+            GIT_DESCRIBE = \"$(git describe)\";
+          }"
           cp result/himalaya* .
       - name: Upload tgz release archive
         uses: actions/upload-release-asset@v1

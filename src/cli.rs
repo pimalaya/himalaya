@@ -84,7 +84,9 @@ impl Cli {
         env!("TARGET_ENV"),
         " ",
         env!("TARGET_ARCH"),
-        ", git rev ",
+        ", git ",
+        env!("GIT_DESCRIBE"),
+        " rev ",
         env!("GIT_REV"),
     );
 }
