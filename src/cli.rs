@@ -78,6 +78,7 @@ impl Cli {
     pub const LONG_VERSION: &'static str = concat!(
         "v",
         env!("CARGO_PKG_VERSION"),
+        " ",
         env!("CARGO_FEATURES"),
         "\nbuild: ",
         env!("CARGO_CFG_TARGET_OS"),
