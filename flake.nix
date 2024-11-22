@@ -13,17 +13,14 @@
       url = "github:soywod/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    naersk = {
-      url = "github:nix-community/naersk";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    crane.url = "github:ipetkov/crane";
     flake-compat = {
       url = "github:edolstra/flake-compat";
       flake = false;
     };
   };
 
-  outputs = { self, nixpkgs, gitignore, fenix, naersk, ... }:
+  outputs = { self, nixpkgs, gitignore, fenix, crane, ... }:
     let
       inherit (nixpkgs) lib;
       inherit (gitignore.lib) gitignoreSource;
@@ -72,11 +69,6 @@
 
         x86_64-darwin.x86_64-darwin = {
           rustTarget = "x86_64-apple-darwin";
-          mkPackage = { pkgs, ... }: package:
-            let inherit (pkgs.darwin.apple_sdk_11_0.frameworks) Security;
-            in package // {
-              NIX_LDFLAGS = "-F${Security}/Library/Frameworks -framework Security";
-            };
         };
 
         aarch64-darwin.aarch64-darwin = {
@@ -118,10 +110,7 @@
             inherit pkgs buildSystem;
             targetSystem = targetConfig.rustTarget;
           };
-          rust = naersk.lib.${buildSystem}.override {
-            cargo = toolchain;
-            rustc = toolchain;
-          };
+          rust = (crane.mkLib pkgs).overrideToolchain toolchain;
           mkPackage' = targetConfig.mkPackage or (_: p: p);
           himalaya = "./himalaya";
           runner = targetConfig.runner or (_: himalaya) { inherit pkgs himalaya; };
@@ -131,6 +120,10 @@
             strictDeps = true;
             doCheck = false;
             auditable = false;
+            buildInputs = lib.optionals pkgs.stdenv.isDarwin [
+              pkgs.libiconv
+              pkgs.darwin.apple_sdk_11_0.frameworks.Security
+            ];
             nativeBuildInputs = with pkgs; [ pkg-config ];
             CARGO_BUILD_TARGET = targetConfig.rustTarget;
             CARGO_BUILD_RUSTFLAGS = [ "-Ctarget-feature=+crt-static" ];
@@ -157,6 +150,8 @@
               ${pkgs.zip}/bin/zip -r himalaya.zip himalaya* share
               mv himalaya.zip ../
             '';
+
+            meta.mainProgram = "himalaya";
           };
         in
         rust.buildPackage package;
