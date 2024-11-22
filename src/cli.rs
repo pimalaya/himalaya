@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::{Parser, Subcommand};
 use color_eyre::Result;
 use pimalaya_tui::terminal::{
@@ -7,7 +9,6 @@ use pimalaya_tui::terminal::{
     },
     config::TomlConfig as _,
 };
-use std::path::PathBuf;
 
 use crate::{
     account::command::AccountSubcommand,
