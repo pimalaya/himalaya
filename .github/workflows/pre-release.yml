@@ -10,21 +10,21 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - host: x86_64-linux
+          - os: ubuntu-latest
+            host: x86_64-linux
             target: x86_64-linux
-            os: ubuntu-latest
-          - host: x86_64-linux
+          - os: ubuntu-latest
+            host: x86_64-linux
             target: aarch64-linux
-            os: ubuntu-latest
-          - host: x86_64-linux
+          - os: ubuntu-latest
+            host: x86_64-linux
             target: x86_64-windows
-            os: ubuntu-latest
-          - host: x86_64-darwin
+          - os: macos-13
+            host: x86_64-darwin
             target: x86_64-darwin
-            os: macos-13
-          - host: aarch64-darwin
+          - os: macos-14
+            host: aarch64-darwin
             target: aarch64-darwin
-            os: macos-14
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -45,7 +45,7 @@ jobs:
           nix build -L --expr "
           (builtins.getFlake \"git+file://${PWD}?shallow=1&rev=$(git rev-parse HEAD)\")
           .outputs.packages.${{ matrix.host }}.${{ matrix.target }}.overrideAttrs {
-            GIT_DESCRIBE = \"$(git describe --always)\";
+            GIT_DESCRIBE = \"$(git describe --all --always --dirty)\";
           }"
           nix run -L .#${{ matrix.target }} -- --version
       - name: Upload release artifacts

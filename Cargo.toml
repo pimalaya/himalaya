@@ -47,6 +47,8 @@ pgp-native = ["email-lib/pgp-native", "mml-lib/pgp-native", "pimalaya-tui/pgp-na
 
 [build-dependencies]
 git2 = { version = "0.19", default-features = false }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
 
 [dependencies]
 ariadne = "0.2"
