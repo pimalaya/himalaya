@@ -1,6 +1,7 @@
 { lib
 , rustPlatform
 , fetchFromGitHub
+, hostPlatform
 , stdenv
 , pkg-config
 , darwin
@@ -30,12 +31,13 @@ rustPlatform.buildRustPackage rec {
 
   cargoHash = "sha256-YS8IamapvmdrOPptQh2Ef9Yold0IK1XIeGs0kDIQ5b8=";
 
-  NIX_BUILD_CORES = 4;
+  # NIX_BUILD_CORES = 4;
   # "CARGO_TARGET_${builtins.replaceStrings ["-"] ["_"] (lib.strings.toUpper stdenv.hostPlatform.config)}_LINKER" = "${stdenv.cc.targetPrefix}cc";
-  CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER = "${stdenv.cc.targetPrefix}cc";
+  CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc";
   TARGET_CC = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc";
   # CARGO_BUILD_RUSTFLAGS = [ "-Ctarget-feature=+crt-static" ];
   CARGO_CFG_TARGET_FEATURE = "crt-static";
+  CARGO_BUILD_RUSTFLAGS = [ "-Clinker=${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc" ];
 
   doCheck = false;
   cargoTestFlags = [
@@ -44,14 +46,14 @@ rustPlatform.buildRustPackage rec {
     "--lib"
   ];
 
-  depsBuildBuild = lib.optionals stdenv.hostPlatform.isWindows [ stdenv.cc windows.pthreads ];
+  depsBuildBuild = lib.optionals hostPlatform.isWindows [ stdenv.cc windows.pthreads ];
 
   nativeBuildInputs = [ ]
     ++ lib.optional (builtins.elem "pgp-gpg" buildFeatures) pkg-config
     ++ lib.optional (installManPages || installShellCompletions) installShellFiles;
 
   buildInputs = [ ]
-    ++ lib.optionals stdenv.hostPlatform.isDarwin (with darwin.apple_sdk_11_0.frameworks; [ Security ])
+    ++ lib.optionals hostPlatform.isDarwin (with darwin.apple_sdk_11_0.frameworks; [ Security ])
     ++ lib.optional (builtins.elem "notmuch" buildFeatures) notmuch
     ++ lib.optional (builtins.elem "pgp-gpg" buildFeatures) gpgme;
 

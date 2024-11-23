@@ -33,7 +33,7 @@ let
   };
 
   himalaya = import ./package.nix {
-    inherit lib rustPlatform;
+    inherit lib hostPlatform rustPlatform;
     fetchFromGitHub = hostPkgs.fetchFromGitHub;
     pkg-config = hostPkgs.pkg-config;
     darwin = hostPkgs.darwin;
@@ -45,8 +45,8 @@ let
     gpgme = hostPkgs.gpgme;
     stdenv =
       if hostPlatform.isWindows
-      then hostPkgs.pkgsCross.mingwW64.stdenv
-      else hostPkgs.stdenv;
+      then pkgs.pkgsCross.mingwW64.stdenv
+      else pkgs.stdenv;
   };
 in
 
