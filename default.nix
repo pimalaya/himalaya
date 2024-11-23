@@ -1,43 +1,43 @@
-# https://nixos.org/manual/nixpkgs/stable/#sec-cross-usage
-{ crossSystem ? null }:
+{ target ? null }:
 
 let
-  crossBuildEnabled = crossSystem != null && crossSystem != "";
+  pkgs = import <nixpkgs> { };
+  crossPkgs = if isNull target then pkgs else import <nixpkgs> { crossSystem.config = target; };
   crossSystems = import ./cross-systems.nix;
 
-  buildPkgs = import <nixpkgs> { };
-  hostPkgs = if crossBuildEnabled then import <nixpkgs> { inherit crossSystem; } else buildPkgs;
+  inherit (crossPkgs.stdenv) buildPlatform hostPlatform;
 
-  inherit (hostPkgs.stdenv) buildPlatform hostPlatform;
+  crossSystem = crossSystems.${buildPlatform.system}.${hostPlatform.config}
+    or throw ("Platform not supported: " + hostPlatform.config);
 
-  runner = if crossBuildEnabled then crossSystems.${hostPlatform.config}.runner buildPkgs else "./himalaya";
+  runner = crossSystem.runner or (_: "./himalaya") pkgs;
 
   fenix = import (fetchTarball "https://github.com/soywod/fenix/archive/main.tar.gz") { };
 
   mkToolchain = import ./rust-toolchain.nix fenix;
 
   rustToolchain = mkToolchain.fromTarget {
-    pkgs = hostPkgs;
+    pkgs = crossPkgs;
     targetSystem = buildPlatform.config;
   };
 
-  rustPlatform = hostPkgs.makeRustPlatform {
+  rustPlatform = crossPkgs.makeRustPlatform {
     rustc = rustToolchain;
     cargo = rustToolchain;
   };
 
   himalaya = import ./package.nix {
     inherit rustPlatform;
-    lib = hostPkgs.lib;
-    fetchFromGitHub = hostPkgs.fetchFromGitHub;
-    pkg-config = hostPkgs.pkg-config;
-    darwin = hostPkgs.darwin;
+    lib = crossPkgs.lib;
+    fetchFromGitHub = crossPkgs.fetchFromGitHub;
+    pkg-config = crossPkgs.pkg-config;
+    darwin = crossPkgs.darwin;
     installShellFiles = false;
     installShellCompletions = false;
     installManPages = false;
-    notmuch = hostPkgs.notmuch;
-    gpgme = hostPkgs.gpgme;
-    stdenv = hostPkgs.stdenv;
+    notmuch = crossPkgs.notmuch;
+    gpgme = crossPkgs.gpgme;
+    stdenv = crossPkgs.stdenv;
   };
 in
 
@@ -59,10 +59,10 @@ himalaya.overrideAttrs (drv: {
     tar -czf himalaya.tgz himalaya* share
     mv himalaya.tgz ../
 
-    ${hostPkgs.zip}/bin/zip -r himalaya.zip himalaya* share
+    ${crossPkgs.zip}/bin/zip -r himalaya.zip himalaya* share
     mv himalaya.zip ../
   '';
-  src = hostPkgs.nix-gitignore.gitignoreSource [ ] ./.;
+  src = crossPkgs.nix-gitignore.gitignoreSource [ ] ./.;
   cargoDeps = rustPlatform.importCargoLock {
     lockFile = ./Cargo.lock;
     allowBuiltinFetchGit = true;
