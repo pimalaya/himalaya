@@ -1,75 +1,64 @@
 { target ? null }:
 
 let
-  pkgs = import <nixpkgs> { };
-  hostPkgs =
-    if isNull target || pkgs.stdenv.buildPlatform.config == target
-    then pkgs else import <nixpkgs> { crossSystem.config = target; };
-
-  inherit (hostPkgs) lib;
-  inherit (hostPkgs.stdenv) buildPlatform hostPlatform;
-
-  crossSystems = import ./cross-systems.nix;
-  crossSystem =
-    if lib.attrsets.hasAttrByPath [ buildPlatform.system hostPlatform.config ] crossSystems then
-      crossSystems.${buildPlatform.system}.${hostPlatform.config}
-    else
-      throw "Platform not supported: " + hostPlatform.config;
-
-  runner = crossSystem.runner or (_: "./himalaya") pkgs;
+  pkgs = import <nixpkgs> (
+    if isNull target then { }
+    else { crossSystem.config = target; }
+  );
 
   fenix = import (fetchTarball "https://github.com/soywod/fenix/archive/main.tar.gz") { };
 
   mkToolchain = import ./rust-toolchain.nix fenix;
 
   rustToolchain = mkToolchain.fromTarget {
-    pkgs = hostPkgs;
-    targetSystem = hostPlatform.config;
+    lib = pkgs.lib;
+    targetSystem = pkgs.hostPlatform.config;
   };
 
-  rustPlatform = hostPkgs.makeRustPlatform {
+  rustPlatform = pkgs.makeRustPlatform {
     rustc = rustToolchain;
     cargo = rustToolchain;
   };
 
   himalaya = import ./package.nix {
-    inherit lib hostPlatform rustPlatform;
-    fetchFromGitHub = hostPkgs.fetchFromGitHub;
-    pkg-config = hostPkgs.pkg-config;
-    darwin = hostPkgs.darwin;
-    windows = hostPkgs.pkgsCross.mingwW64.windows;
+    inherit rustPlatform;
+    darwin = pkgs.darwin;
+    windows = pkgs.windows;
+    lib = pkgs.lib;
+    hostPlatform = pkgs.hostPlatform;
+    fetchFromGitHub = pkgs.fetchFromGitHub;
+    pkg-config = pkgs.pkg-config;
     installShellFiles = false;
     installShellCompletions = false;
     installManPages = false;
-    notmuch = hostPkgs.notmuch;
-    gpgme = hostPkgs.gpgme;
+    notmuch = pkgs.notmuch;
+    gpgme = pkgs.gpgme;
+    stdenv = pkgs.stdenv;
     pkgsCross = pkgs.pkgsCross;
-    stdenv =
-      if hostPlatform.isWindows
-      then pkgs.pkgsCross.mingwW64.stdenv
-      else pkgs.stdenv;
   };
 in
 
 himalaya.overrideAttrs (drv: {
   version = "1.0.0";
   postInstall = ''
+    export WINEPREFIX="$(mktemp -d)"
+
     mkdir -p $out/bin/share/{applications,completions,man,services}
     cp assets/himalaya.desktop $out/bin/share/applications/
     cp assets/himalaya-watch@.service $out/bin/share/services/
 
     cd $out/bin
-    ${runner} man ./share/man
-    ${runner} completion bash > ./share/completions/himalaya.bash
-    ${runner} completion elvish > ./share/completions/himalaya.elvish
-    ${runner} completion fish > ./share/completions/himalaya.fish
-    ${runner} completion powershell > ./share/completions/himalaya.powershell
-    ${runner} completion zsh > ./share/completions/himalaya.zsh
+    ${pkgs.hostPlatform.emulator pkgs.buildPackages} himalaya man ./share/man
+    ${pkgs.hostPlatform.emulator pkgs.buildPackages} himalaya completion bash > ./share/completions/himalaya.bash
+    ${pkgs.hostPlatform.emulator pkgs.buildPackages} himalaya completion elvish > ./share/completions/himalaya.elvish
+    ${pkgs.hostPlatform.emulator pkgs.buildPackages} himalaya completion fish > ./share/completions/himalaya.fish
+    ${pkgs.hostPlatform.emulator pkgs.buildPackages} himalaya completion powershell > ./share/completions/himalaya.powershell
+    ${pkgs.hostPlatform.emulator pkgs.buildPackages} himalaya completion zsh > ./share/completions/himalaya.zsh
 
     tar -czf himalaya.tgz himalaya* share
     mv himalaya.tgz ../
 
-    ${pkgs.zip}/bin/zip -r himalaya.zip himalaya* share
+    ${pkgs.buildPackages.zip}/bin/zip -r himalaya.zip himalaya* share
     mv himalaya.zip ../
   '';
   src = pkgs.nix-gitignore.gitignoreSource [ ] ./.;

@@ -1,11 +1,11 @@
 { lib
+, darwin
+, windows
 , rustPlatform
 , fetchFromGitHub
 , hostPlatform
 , stdenv
 , pkg-config
-, darwin
-, windows
 , installShellFiles
 , installShellCompletions ? stdenv.buildPlatform.canExecute stdenv.hostPlatform
 , installManPages ? stdenv.buildPlatform.canExecute stdenv.hostPlatform
@@ -32,29 +32,25 @@ rustPlatform.buildRustPackage rec {
 
   cargoHash = "sha256-YS8IamapvmdrOPptQh2Ef9Yold0IK1XIeGs0kDIQ5b8=";
 
-  # NIX_BUILD_CORES = 4;
-  # "CARGO_TARGET_${builtins.replaceStrings ["-"] ["_"] (lib.strings.toUpper stdenv.hostPlatform.config)}_LINKER" = "${stdenv.cc.targetPrefix}cc";
-  # CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER = "${pkgsCross.mingwW64.stdenv.cc.targetPrefix}cc";
-  # TARGET_CC = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc";
-  # CARGO_BUILD_RUSTFLAGS = [ "-Ctarget-feature=+crt-static" ];
-  CARGO_CFG_TARGET_FEATURE = "crt-static";
-  CARGO_BUILD_RUSTFLAGS = [ "-Clinker=${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc" ];
-  CARGO_BUILD_TARGET = hostPlatform.config;
+  NIX_BUILD_CORES = 4;
+  # CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc";
+  TARGET_CC = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc";
+  CARGO_BUILD_RUSTFLAGS = [ "-Ctarget-feature=+crt-static" "-Clinker=${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc" ];
+  # CARGO_BUILD_RUSTFLAGS = [ "-Clinker=${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc" ];
+  CARGO_BUILD_TARGET = "x86_64-pc-windows-gnu";
 
   doCheck = false;
+  auditable = false;
+  strictDeps = true;
   cargoTestFlags = [
     # Only run lib tests (unit tests)
     # All other tests are integration tests which should not be run with Nix build
     "--lib"
   ];
 
-  depsBuildBuild = lib.optionals hostPlatform.isWindows [
-    pkgsCross.mingwW64.stdenv.cc
-    pkgsCross.mingwW64.windows.pthreads
-  ];
+  depsBuildBuild = [ stdenv.cc windows.pthreads ];
 
   nativeBuildInputs = [ ]
-    ++ lib.optional (builtins.elem "pgp-gpg" buildFeatures) pkg-config
     ++ lib.optional (installManPages || installShellCompletions) installShellFiles;
 
   buildInputs = [ ]
