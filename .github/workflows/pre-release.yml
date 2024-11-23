@@ -37,7 +37,7 @@ jobs:
           extraPullNames: nix-community
       - name: Build release
         run: |
-          nix-build --arg crossSystem '{ config = "${{ matrix.target }}"; }'
+          nix-build --argstr target ${{ matrix.target }}
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
