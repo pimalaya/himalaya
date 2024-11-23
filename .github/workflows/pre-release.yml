@@ -11,15 +11,15 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            target: null
+            target:
           - os: ubuntu-latest
             target: aarch64-unknown-linux-musl
           - os: ubuntu-latest
             target: x86_64-pc-windows-gnu
           - os: macos-13
-            target: null
+            target:
           - os: macos-14
-            target: null
+            target:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
