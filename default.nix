@@ -2,12 +2,14 @@
 
 let
   pkgs = import <nixpkgs> { };
-  crossPkgs = if isNull target then pkgs else import <nixpkgs> { crossSystem.config = target; };
+  hostPkgs =
+    if isNull target || pkgs.stdenv.buildPlatform.config == target
+    then pkgs else import <nixpkgs> { crossSystem.config = target; };
+
+  inherit (hostPkgs) lib;
+  inherit (hostPkgs.stdenv) buildPlatform hostPlatform;
+
   crossSystems = import ./cross-systems.nix;
-
-  inherit (crossPkgs) lib;
-  inherit (crossPkgs.stdenv) buildPlatform hostPlatform;
-
   crossSystem =
     if lib.attrsets.hasAttrByPath [ buildPlatform.system hostPlatform.config ] crossSystems then
       crossSystems.${buildPlatform.system}.${hostPlatform.config}
@@ -21,26 +23,26 @@ let
   mkToolchain = import ./rust-toolchain.nix fenix;
 
   rustToolchain = mkToolchain.fromTarget {
-    pkgs = crossPkgs;
-    targetSystem = buildPlatform.config;
+    pkgs = hostPkgs;
+    targetSystem = hostPlatform.config;
   };
 
-  rustPlatform = crossPkgs.makeRustPlatform {
+  rustPlatform = hostPkgs.makeRustPlatform {
     rustc = rustToolchain;
     cargo = rustToolchain;
   };
 
   himalaya = import ./package.nix {
     inherit lib rustPlatform;
-    fetchFromGitHub = crossPkgs.fetchFromGitHub;
-    pkg-config = crossPkgs.pkg-config;
-    darwin = crossPkgs.darwin;
+    fetchFromGitHub = hostPkgs.fetchFromGitHub;
+    pkg-config = hostPkgs.pkg-config;
+    darwin = hostPkgs.darwin;
     installShellFiles = false;
     installShellCompletions = false;
     installManPages = false;
-    notmuch = crossPkgs.notmuch;
-    gpgme = crossPkgs.gpgme;
-    stdenv = crossPkgs.stdenv;
+    notmuch = hostPkgs.notmuch;
+    gpgme = hostPkgs.gpgme;
+    stdenv = hostPkgs.stdenv;
   };
 in
 
@@ -62,10 +64,10 @@ himalaya.overrideAttrs (drv: {
     tar -czf himalaya.tgz himalaya* share
     mv himalaya.tgz ../
 
-    ${crossPkgs.zip}/bin/zip -r himalaya.zip himalaya* share
+    ${hostPkgs.zip}/bin/zip -r himalaya.zip himalaya* share
     mv himalaya.zip ../
   '';
-  src = crossPkgs.nix-gitignore.gitignoreSource [ ] ./.;
+  src = hostPkgs.nix-gitignore.gitignoreSource [ ] ./.;
   cargoDeps = rustPlatform.importCargoLock {
     lockFile = ./Cargo.lock;
     allowBuiltinFetchGit = true;
