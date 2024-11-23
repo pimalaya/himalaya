@@ -2,7 +2,7 @@
 { crossSystem ? null }:
 
 let
-  crossBuildEnabled = !isNull crossSystem;
+  crossBuildEnabled = crossSystem != null && crossSystem != "";
   crossSystems = import ./cross-systems.nix;
 
   buildPkgs = import <nixpkgs> { };

@@ -36,13 +36,8 @@ jobs:
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
           extraPullNames: nix-community
       - name: Build release
-        if: ${{ matrix.target }} != ""
         run: |
           nix-build --arg crossSystem '{ config = "${{ matrix.target }}"; }'
-      - name: Build release
-        if: ${{ matrix.target }} == ""
-        run: |
-          nix-build
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
