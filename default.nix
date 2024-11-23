@@ -37,6 +37,7 @@ let
     fetchFromGitHub = hostPkgs.fetchFromGitHub;
     pkg-config = hostPkgs.pkg-config;
     darwin = hostPkgs.darwin;
+    windows = hostPkgs.pkgsCross.mingwW64.windows;
     installShellFiles = false;
     installShellCompletions = false;
     installManPages = false;

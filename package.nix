@@ -4,6 +4,7 @@
 , stdenv
 , pkg-config
 , darwin
+, windows
 , installShellFiles
 , installShellCompletions ? stdenv.buildPlatform.canExecute stdenv.hostPlatform
 , installManPages ? stdenv.buildPlatform.canExecute stdenv.hostPlatform
@@ -39,6 +40,8 @@ rustPlatform.buildRustPackage rec {
     # All other tests are integration tests which should not be run with Nix build
     "--lib"
   ];
+
+  depsBuildBuild = lib.optionals stdenv.hostPlatform.isWindows [ stdenv.cc windows.pthreads ];
 
   nativeBuildInputs = [ ]
     ++ lib.optional (builtins.elem "pgp-gpg" buildFeatures) pkg-config
