@@ -74,6 +74,8 @@ fn git_envs() {
     // skip the process if the current directory is not a git
     // repository (for example, from a nix build root jail)
     let Ok(git) = Repository::open(".") else {
+        println!("cargo::rustc-env=GIT_DESCRIBE=unknown");
+        println!("cargo::rustc-env=GIT_REV=unknown");
         return;
     };
 

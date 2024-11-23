@@ -11,20 +11,15 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            host: x86_64-linux
-            target: x86_64-linux
+            target: null
           - os: ubuntu-latest
-            host: x86_64-linux
-            target: aarch64-linux
+            target: aarch64-unknown-linux-musl
           - os: ubuntu-latest
-            host: x86_64-linux
-            target: x86_64-windows
+            target: x86_64-pc-windows-gnu
           - os: macos-13
-            host: x86_64-darwin
-            target: x86_64-darwin
+            target: null
           - os: macos-14
-            host: aarch64-darwin
-            target: aarch64-darwin
+            target: null
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -33,7 +28,7 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-24.05
           enable_kvm: true
-          extra_nix_config: "experimental-features = nix-command flakes"
+          # extra_nix_config: "experimental-features = nix-command flakes"
       - name: Cache Nix store
         uses: cachix/cachix-action@v15
         with:
@@ -41,13 +36,13 @@ jobs:
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
           extraPullNames: nix-community
       - name: Build release
+        if: ${{ matrix.target }} != null
         run: |
-          nix build -L --expr "
-          (builtins.getFlake \"git+file://${PWD}?shallow=1&rev=$(git rev-parse HEAD)\")
-          .outputs.packages.${{ matrix.host }}.${{ matrix.target }}.overrideAttrs {
-            GIT_DESCRIBE = \"$(git describe --all --always --dirty)\";
-          }"
-          nix run -L .#${{ matrix.target }} -- --version
+          nix-build --arg '{ config = "${{ matrix.target }}"; }'
+      - name: Build release
+        if: ${{ matrix.target }} == null
+        run: |
+          nix-build
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
