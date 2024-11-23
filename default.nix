@@ -5,10 +5,14 @@ let
   crossPkgs = if isNull target then pkgs else import <nixpkgs> { crossSystem.config = target; };
   crossSystems = import ./cross-systems.nix;
 
+  inherit (crossPkgs) lib;
   inherit (crossPkgs.stdenv) buildPlatform hostPlatform;
 
-  crossSystem = crossSystems.${buildPlatform.system}.${hostPlatform.config}
-    or throw ("Platform not supported: " + hostPlatform.config);
+  crossSystem =
+    if lib.attrsets.hasAttrByPath [ buildPlatform.system hostPlatform.config ] crossSystems then
+      crossSystems.${buildPlatform.system}.${hostPlatform.config}
+    else
+      throw "Platform not supported: " + hostPlatform.config;
 
   runner = crossSystem.runner or (_: "./himalaya") pkgs;
 
@@ -27,8 +31,7 @@ let
   };
 
   himalaya = import ./package.nix {
-    inherit rustPlatform;
-    lib = crossPkgs.lib;
+    inherit lib rustPlatform;
     fetchFromGitHub = crossPkgs.fetchFromGitHub;
     pkg-config = crossPkgs.pkg-config;
     darwin = crossPkgs.darwin;
