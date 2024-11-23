@@ -30,9 +30,10 @@ rustPlatform.buildRustPackage rec {
 
   cargoHash = "sha256-YS8IamapvmdrOPptQh2Ef9Yold0IK1XIeGs0kDIQ5b8=";
 
-  # NIX_BUILD_CORES = 4;
-  "CARGO_TARGET_${builtins.replaceStrings ["-"] ["_"] (lib.strings.toUpper stdenv.hostPlatform.config)}_LINKER" = "${stdenv.cc.targetPrefix}cc";
-  # TARGET_CC = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc";
+  NIX_BUILD_CORES = 4;
+  # "CARGO_TARGET_${builtins.replaceStrings ["-"] ["_"] (lib.strings.toUpper stdenv.hostPlatform.config)}_LINKER" = "${stdenv.cc.targetPrefix}cc";
+  CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER = "${stdenv.cc.targetPrefix}cc";
+  TARGET_CC = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc";
   # CARGO_BUILD_RUSTFLAGS = [ "-Ctarget-feature=+crt-static" ];
   CARGO_CFG_TARGET_FEATURE = "crt-static";
 
