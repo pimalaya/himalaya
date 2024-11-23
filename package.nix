@@ -1,24 +1,20 @@
 { lib
-, darwin
-, windows
+, hostPlatform
 , rustPlatform
 , fetchFromGitHub
-, hostPlatform
 , stdenv
-, pkg-config
+, darwin
 , installShellFiles
 , installShellCompletions ? stdenv.buildPlatform.canExecute stdenv.hostPlatform
 , installManPages ? stdenv.buildPlatform.canExecute stdenv.hostPlatform
 , notmuch
 , gpgme
-, pkgsCross
 , buildNoDefaultFeatures ? false
 , buildFeatures ? [ ]
-, cargoLock ? null
 }:
 
 rustPlatform.buildRustPackage rec {
-  inherit buildNoDefaultFeatures buildFeatures cargoLock;
+  inherit buildNoDefaultFeatures buildFeatures;
 
   pname = "himalaya";
   version = "1.0.0-beta.4";
@@ -32,23 +28,14 @@ rustPlatform.buildRustPackage rec {
 
   cargoHash = "sha256-YS8IamapvmdrOPptQh2Ef9Yold0IK1XIeGs0kDIQ5b8=";
 
-  NIX_BUILD_CORES = 4;
-  # CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc";
-  TARGET_CC = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc";
-  CARGO_BUILD_RUSTFLAGS = [ "-Ctarget-feature=+crt-static" "-Clinker=${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc" ];
-  # CARGO_BUILD_RUSTFLAGS = [ "-Clinker=${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc" ];
-  CARGO_BUILD_TARGET = "x86_64-pc-windows-gnu";
+  CARGO_BUILD_RUSTFLAGS = [ "-Ctarget-feature=+crt-static" ];
 
   doCheck = false;
-  auditable = false;
-  strictDeps = true;
   cargoTestFlags = [
     # Only run lib tests (unit tests)
     # All other tests are integration tests which should not be run with Nix build
     "--lib"
   ];
-
-  depsBuildBuild = [ stdenv.cc windows.pthreads ];
 
   nativeBuildInputs = [ ]
     ++ lib.optional (installManPages || installShellCompletions) installShellFiles;
