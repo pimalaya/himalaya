@@ -6,7 +6,7 @@ let
     else { crossSystem.config = target; }
   );
 
-  inherit (pkgs) lib hostPlatform;
+  inherit (pkgs) lib hostPlatform buildPlatform;
 
   fenix = import (fetchTarball "https://github.com/soywod/fenix/archive/main.tar.gz") { };
 
@@ -33,6 +33,12 @@ let
     notmuch = pkgs.notmuch;
     gpgme = pkgs.gpgme;
   };
+
+  himalayaBin =
+    if hostPlatform == buildPlatform
+    then "./himalaya"
+    else "${hostPlatform.emulator pkgs.buildPackages} himalaya";
+
 in
 
 himalaya.overrideAttrs (drv: {
@@ -46,12 +52,12 @@ himalaya.overrideAttrs (drv: {
     cp assets/himalaya-watch@.service $out/bin/share/services/
 
     cd $out/bin
-    ${hostPlatform.emulator pkgs.buildPackages} himalaya man ./share/man
-    ${hostPlatform.emulator pkgs.buildPackages} himalaya completion bash > ./share/completions/himalaya.bash
-    ${hostPlatform.emulator pkgs.buildPackages} himalaya completion elvish > ./share/completions/himalaya.elvish
-    ${hostPlatform.emulator pkgs.buildPackages} himalaya completion fish > ./share/completions/himalaya.fish
-    ${hostPlatform.emulator pkgs.buildPackages} himalaya completion powershell > ./share/completions/himalaya.powershell
-    ${hostPlatform.emulator pkgs.buildPackages} himalaya completion zsh > ./share/completions/himalaya.zsh
+    ${himalayaBin} man ./share/man
+    ${himalayaBin} completion bash > ./share/completions/himalaya.bash
+    ${himalayaBin} completion elvish > ./share/completions/himalaya.elvish
+    ${himalayaBin} completion fish > ./share/completions/himalaya.fish
+    ${himalayaBin} completion powershell > ./share/completions/himalaya.powershell
+    ${himalayaBin} completion zsh > ./share/completions/himalaya.zsh
 
     ${lib.getExe pkgs.buildPackages.gnutar} -czf himalaya.tgz himalaya* share
     mv himalaya.tgz ../
