@@ -15,7 +15,7 @@ jobs:
           - os: ubuntu-latest
             target: aarch64-unknown-linux-musl
           - os: ubuntu-latest
-            target: x86_64-pc-windows-gnu
+            target: x86_64-w64-mingw32
           - os: macos-13
             target: x86_64-apple-darwin
           - os: macos-14
