@@ -43,6 +43,7 @@ let
     installManPages = false;
     notmuch = hostPkgs.notmuch;
     gpgme = hostPkgs.gpgme;
+    pkgsCross = pkgs.pkgsCross;
     stdenv =
       if hostPlatform.isWindows
       then pkgs.pkgsCross.mingwW64.stdenv
