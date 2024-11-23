@@ -34,11 +34,11 @@ rustPlatform.buildRustPackage rec {
 
   # NIX_BUILD_CORES = 4;
   # "CARGO_TARGET_${builtins.replaceStrings ["-"] ["_"] (lib.strings.toUpper stdenv.hostPlatform.config)}_LINKER" = "${stdenv.cc.targetPrefix}cc";
-  CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER = "${pkgsCross.mingwW64.stdenv.cc.targetPrefix}cc";
+  # CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER = "${pkgsCross.mingwW64.stdenv.cc.targetPrefix}cc";
   # TARGET_CC = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc";
   # CARGO_BUILD_RUSTFLAGS = [ "-Ctarget-feature=+crt-static" ];
   CARGO_CFG_TARGET_FEATURE = "crt-static";
-  # CARGO_BUILD_RUSTFLAGS = [ "-Clinker=${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc" ];
+  CARGO_BUILD_RUSTFLAGS = [ "-Clinker=${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc" ];
   CARGO_BUILD_TARGET = hostPlatform.config;
 
   doCheck = false;
