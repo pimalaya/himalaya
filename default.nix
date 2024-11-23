@@ -68,10 +68,10 @@ himalaya.overrideAttrs (drv: {
     tar -czf himalaya.tgz himalaya* share
     mv himalaya.tgz ../
 
-    ${hostPkgs.zip}/bin/zip -r himalaya.zip himalaya* share
+    ${pkgs.zip}/bin/zip -r himalaya.zip himalaya* share
     mv himalaya.zip ../
   '';
-  src = hostPkgs.nix-gitignore.gitignoreSource [ ] ./.;
+  src = pkgs.nix-gitignore.gitignoreSource [ ] ./.;
   cargoDeps = rustPlatform.importCargoLock {
     lockFile = ./Cargo.lock;
     allowBuiltinFetchGit = true;
