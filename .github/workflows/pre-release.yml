@@ -38,7 +38,7 @@ jobs:
       - name: Build release
         if: ${{ matrix.target }} != null
         run: |
-          nix-build --arg '{ config = "${{ matrix.target }}"; }'
+          nix-build --arg crossSystem '{ config = "${{ matrix.target }}"; }'
       - name: Build release
         if: ${{ matrix.target }} == null
         run: |
