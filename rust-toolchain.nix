@@ -12,6 +12,9 @@ rec {
 
   toRustTarget = target: {
     x86_64-w64-mingw32 = "x86_64-pc-windows-gnu";
+    i686-w64-mingw32 = "i686-pc-windows-gnu";
+    armv6l-unknown-linux-musleabihf = "arm-unknown-linux-musleabihf";
+    armv7l-unknown-linux-musleabihf = "arm7-unknown-linux-musleabihf";
   }.${target} or target;
 
   fromTarget = { lib, targetSystem }:
