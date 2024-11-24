@@ -2,8 +2,9 @@
 
 let
   pkgs = import <nixpkgs> (
-    if isNull target then { }
-    else { crossSystem.config = target; }
+    if isNull target then { } else {
+      crossSystem = { isStatic = true; config = target; };
+    }
   );
 
   inherit (pkgs) lib hostPlatform;

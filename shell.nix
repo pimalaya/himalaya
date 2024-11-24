@@ -1,14 +1,8 @@
-{ pkgs ? import <nixpkgs> {
-    overlays = [
-      (import (fetchTarball "https://github.com/oxalica/rust-overlay/archive/master.tar.gz"))
-    ];
-  }
-}:
-
-let
-  package = import ./default.nix { inherit pkgs; };
-in
+{ pkgs ? import <nixpkgs> { } }:
 
 pkgs.mkShell {
-  inputsFrom = [ package ];
+  buildInputs = with pkgs; [
+    nixd
+    nixpkgs-fmt
+  ];
 }
