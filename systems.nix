@@ -1,7 +1,7 @@
 {
   aarch64-apple-darwin = {
     rustTarget = "aarch64-apple-darwin";
-    isStatic = false;
+    isStatic = true;
   };
 
   aarch64-unknown-linux-musl = {
