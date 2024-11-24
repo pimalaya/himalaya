@@ -34,11 +34,9 @@ let
     gpgme = pkgs.gpgme;
   };
 
-  himalayaBin =
-    if hostPlatform == buildPlatform
-    then "./himalaya"
-    else "${hostPlatform.emulator pkgs.buildPackages} himalaya";
-
+  himalayaExe =
+    let ext = lib.optionalString hostPlatform.isWindows ".exe";
+    in "${hostPlatform.emulator pkgs.buildPackages} ./himalaya${ext}";
 in
 
 himalaya.overrideAttrs (drv: {
@@ -52,12 +50,12 @@ himalaya.overrideAttrs (drv: {
     cp assets/himalaya-watch@.service $out/bin/share/services/
 
     cd $out/bin
-    ${himalayaBin} man ./share/man
-    ${himalayaBin} completion bash > ./share/completions/himalaya.bash
-    ${himalayaBin} completion elvish > ./share/completions/himalaya.elvish
-    ${himalayaBin} completion fish > ./share/completions/himalaya.fish
-    ${himalayaBin} completion powershell > ./share/completions/himalaya.powershell
-    ${himalayaBin} completion zsh > ./share/completions/himalaya.zsh
+    ${himalayaExe} man ./share/man
+    ${himalayaExe} completion bash > ./share/completions/himalaya.bash
+    ${himalayaExe} completion elvish > ./share/completions/himalaya.elvish
+    ${himalayaExe} completion fish > ./share/completions/himalaya.fish
+    ${himalayaExe} completion powershell > ./share/completions/himalaya.powershell
+    ${himalayaExe} completion zsh > ./share/completions/himalaya.zsh
 
     ${lib.getExe pkgs.buildPackages.gnutar} -czf himalaya.tgz himalaya* share
     mv himalaya.tgz ../
