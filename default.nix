@@ -1,4 +1,4 @@
-{ target ? null }:
+{ target ? null, defaultFeatures ? true, features ? "" }:
 
 let
   pkgs = import <nixpkgs> (
@@ -6,7 +6,7 @@ let
     else { crossSystem.config = target; }
   );
 
-  inherit (pkgs) lib hostPlatform buildPlatform;
+  inherit (pkgs) lib hostPlatform;
 
   fenix = import (fetchTarball "https://github.com/soywod/fenix/archive/main.tar.gz") { };
 
@@ -36,6 +36,8 @@ let
     installManPages = false;
     notmuch = pkgs.notmuch;
     gpgme = pkgs.gpgme;
+    buildNoDefaultFeatures = !defaultFeatures;
+    buildFeatures = lib.strings.splitString "," features;
   };
 
 in
@@ -44,7 +46,7 @@ himalaya.overrideAttrs (drv: {
   version = "1.0.0";
 
   postInstall = lib.optionalString hostPlatform.isWindows ''
-    export WINEPREFIX="$(${lib.getExe pkgs.buildPackages.mktemp} -d)"
+    export WINEPREFIX="$(${lib.getExe' pkgs.buildPackages.mktemp "mktemp"} -d)"
   '' + ''
     mkdir -p $out/bin/share/{applications,completions,man,services}
     cp assets/himalaya.desktop $out/bin/share/applications/
