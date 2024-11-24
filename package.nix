@@ -28,14 +28,9 @@ rustPlatform.buildRustPackage rec {
 
   cargoHash = "sha256-YS8IamapvmdrOPptQh2Ef9Yold0IK1XIeGs0kDIQ5b8=";
 
-  CARGO_BUILD_RUSTFLAGS = [ "-Ctarget-feature=+crt-static" ];
-
+  # unit tests only
   doCheck = false;
-  cargoTestFlags = [
-    # Only run lib tests (unit tests)
-    # All other tests are integration tests which should not be run with Nix build
-    "--lib"
-  ];
+  cargoTestFlags = [ "--lib" ];
 
   nativeBuildInputs = [ ]
     ++ lib.optional (installManPages || installShellCompletions) installShellFiles;
