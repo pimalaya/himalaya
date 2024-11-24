@@ -10,32 +10,33 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: aarch64-apple-darwin
-            artifact: macos.aarch64
+          - system: aarch64-macos
+            target: aarch64-apple-darwin
             os: macos-14
-          - target: aarch64-unknown-linux-musl
-            artifact: linux.aarch64
+          - system: aarch64-linux
+            target: aarch64-unknown-linux-musl
             os: ubuntu-latest
-          - target: armv6l-unknown-linux-musleabihf
-            artifact: linux.armv6l
+          - system: armv6l-linux
+            target: armv6l-unknown-linux-musleabihf
             os: ubuntu-latest
-          - target: armv7l-unknown-linux-musleabihf
-            artifact: linux.armv7l
+          - system: armv7l-linux
+            target: armv7l-unknown-linux-musleabihf
             os: ubuntu-latest
-          - target: i686-unknown-linux-musl
-            artifact: linux.i686
+          - system: i686-linux
+            target: i686-unknown-linux-musl
             os: ubuntu-latest
-          - target: i686-w64-mingw32
-            artifact: windows.i686
-            os: ubuntu-latest
-          - target: x86_64-apple-darwin
-            artifact: macos.x86_64
+          # FIXME
+          # - system: i686-windows
+          #   target: i686-w64-mingw32
+          #   os: ubuntu-latest
+          - system: x86_64-macos
+            target: x86_64-apple-darwin
             os: macos-13
-          - target: x86_64-unknown-linux-musl
-            artifact: linux.x86_64
+          - system: x86_64-linux
+            target: x86_64-unknown-linux-musl
             os: ubuntu-latest
-          - target: x86_64-w64-mingw32
-            artifact: windows.x86_64
+          - system: x86_64-windows
+            target: x86_64-w64-mingw32
             os: ubuntu-latest
     steps:
       - name: Checkout code
@@ -57,7 +58,7 @@ jobs:
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: "himalaya.${{ matrix.artifact }}"
+          name: "himalaya-${{ matrix.system }}"
           path: |
             result/bin/himalaya*
             result/bin/share
