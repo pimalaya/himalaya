@@ -9,7 +9,6 @@ let
 
   pkgs = import <nixpkgs> {
     crossSystem = {
-      inherit isStatic;
       config = target;
     };
   };
@@ -25,7 +24,7 @@ let
     targetSystem = rustTarget;
   };
 
-  rustPlatform = pkgs.makeRustPlatform {
+  rustPlatform = pkgs.pkgsStatic.makeRustPlatform {
     rustc = rustToolchain;
     cargo = rustToolchain;
   };
@@ -37,13 +36,13 @@ let
   himalaya = import ./package.nix {
     inherit lib hostPlatform rustPlatform;
     fetchFromGitHub = pkgs.fetchFromGitHub;
-    stdenv = pkgs.stdenv;
+    stdenv = pkgs.pkgsStatic.stdenv;
     darwin = pkgs.darwin;
     installShellFiles = false;
     installShellCompletions = false;
     installManPages = false;
-    notmuch = pkgs.notmuch;
-    gpgme = pkgs.gpgme;
+    notmuch = pkgs.pkgsStatic.notmuch;
+    gpgme = pkgs.pkgsStatic.gpgme;
     buildNoDefaultFeatures = !defaultFeatures;
     buildFeatures = lib.strings.splitString "," features;
   };
