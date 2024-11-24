@@ -1,11 +1,18 @@
-{ target ? null, defaultFeatures ? true, features ? "" }:
+{ target
+, defaultFeatures ? true
+, features ? ""
+}:
 
 let
-  pkgs = import <nixpkgs> (
-    if isNull target then { } else {
-      crossSystem = { isStatic = true; config = target; };
-    }
-  );
+  systems = import ./systems.nix;
+  inherit (systems.${target}) rustTarget isStatic;
+
+  pkgs = import <nixpkgs> {
+    crossSystem = {
+      inherit isStatic;
+      config = target;
+    };
+  };
 
   inherit (pkgs) lib hostPlatform;
 
@@ -15,7 +22,7 @@ let
 
   rustToolchain = mkToolchain.fromTarget {
     inherit lib;
-    targetSystem = hostPlatform.config;
+    targetSystem = rustTarget;
   };
 
   rustPlatform = pkgs.makeRustPlatform {

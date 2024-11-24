@@ -28,19 +28,11 @@ rustPlatform.buildRustPackage rec {
 
   cargoHash = "sha256-YS8IamapvmdrOPptQh2Ef9Yold0IK1XIeGs0kDIQ5b8=";
 
-  # TARGET_CC = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc";
-  # CARGO_BUILD_RUSTFLAGS = [
-  #   "-Clinker=${TARGET_CC}"
-  #   "-Clink-args=-static -latomic"
-  #   "-Ctarget-feature=+crt-static"
-  # ];
-
   # unit tests only
   doCheck = false;
   cargoTestFlags = [ "--lib" ];
 
   nativeBuildInputs = [ ]
-    ++ lib.optional hostPlatform.isDarwin [ darwin.libiconv ]
     ++ lib.optional (installManPages || installShellCompletions) installShellFiles;
 
   buildInputs = [ ]
