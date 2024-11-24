@@ -7,8 +7,9 @@ let
   systems = import ./systems.nix;
   inherit (systems.${target}) rustTarget isStatic;
 
-  pkgs = import <nixpkgs> {
+  pkgs = import (fetchTarball "https://github.com/nixos/nixpkgs/archive/nixos-unstable.tar.gz") {
     crossSystem = {
+      isStatic = true;
       config = target;
     };
   };
@@ -24,7 +25,7 @@ let
     targetSystem = rustTarget;
   };
 
-  rustPlatform = pkgs.pkgsStatic.makeRustPlatform {
+  rustPlatform = pkgs.makeRustPlatform {
     rustc = rustToolchain;
     cargo = rustToolchain;
   };
@@ -36,13 +37,13 @@ let
   himalaya = import ./package.nix {
     inherit lib hostPlatform rustPlatform;
     fetchFromGitHub = pkgs.fetchFromGitHub;
-    stdenv = pkgs.pkgsStatic.stdenv;
+    stdenv = pkgs.stdenv;
     darwin = pkgs.darwin;
     installShellFiles = false;
     installShellCompletions = false;
     installManPages = false;
-    notmuch = pkgs.pkgsStatic.notmuch;
-    gpgme = pkgs.pkgsStatic.gpgme;
+    notmuch = pkgs.notmuch;
+    gpgme = pkgs.gpgme;
     buildNoDefaultFeatures = !defaultFeatures;
     buildFeatures = lib.strings.splitString "," features;
   };
