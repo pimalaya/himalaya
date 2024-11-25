@@ -1,6 +1,7 @@
 { lib
 , pkg-config
 , rustPlatform
+, windows
 , fetchFromGitHub
 , stdenv
 , apple-sdk
@@ -37,6 +38,7 @@ rustPlatform.buildRustPackage rec {
 
   buildInputs = [ ]
     ++ lib.optional stdenv.hostPlatform.isDarwin apple-sdk
+    ++ lib.optional (stdenv.hostPlatform.isWindows && stdenv.hostPlatform.isi686) windows.mcfgthreads
     ++ lib.optional (builtins.elem "notmuch" buildFeatures) notmuch
     ++ lib.optional (builtins.elem "pgp-gpg" buildFeatures) gpgme;
 

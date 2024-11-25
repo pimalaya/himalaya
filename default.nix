@@ -43,6 +43,7 @@ let
     stdenv = pkgs.stdenv;
     apple-sdk = if pkgs.stdenv.hostPlatform.isx86_64 then pkgs.apple-sdk_13 else pkgs.apple-sdk_14;
     installShellFiles = false;
+    windows = pkgs.windows;
     installShellCompletions = false;
     installManPages = false;
     notmuch = pkgs.notmuch;
