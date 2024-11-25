@@ -45,7 +45,7 @@ let
     notmuch = pkgs.notmuch;
     gpgme = pkgs.gpgme;
     pkg-config = pkgs.pkg-config;
-    libiconv = pkgs.pkgsStatic.libiconv;
+    libiconv = pkgs.libiconv-darwin;
     buildNoDefaultFeatures = !defaultFeatures;
     buildFeatures = lib.strings.splitString "," features;
   };
