@@ -7,6 +7,7 @@ let
   systems = import ./systems.nix;
   system = systems.${target};
 
+  buildPackages = import (fetchTarball "https://github.com/soywod/nixpkgs/archive/master.tar.gz") { };
   pkgs = import (fetchTarball "https://github.com/soywod/nixpkgs/archive/master.tar.gz") {
     crossSystem = {
       isStatic = true;
@@ -32,7 +33,7 @@ let
 
   himalayaExe =
     let ext = lib.optionalString hostPlatform.isWindows ".exe";
-    in "${(system.emulator or hostPlatform.emulator) pkgs.buildPackages} ./himalaya${ext}";
+    in "${hostPlatform.emulator buildPackages} ./himalaya${ext}";
 
   himalaya = import ./package.nix {
     inherit lib hostPlatform rustPlatform;
@@ -52,14 +53,14 @@ let
   # HACK: work around https://github.com/NixOS/nixpkgs/issues/177129
   # Though this is an issue between Clang and GCC,
   # so it may not get fixed anytime soon...
-  empty-libgcc_eh = pkgs.buildPackages.stdenv.mkDerivation {
+  empty-libgcc_eh = buildPackages.stdenv.mkDerivation {
     pname = "empty-libgcc_eh";
     version = "0";
     dontUnpack = true;
     installPhase = ''
       mkdir -p "$out"/lib
-      ls "${pkgs.buildPackages.binutils}"/bin/ -al
-      "${pkgs.buildPackages.binutils}/bin/${pkgs.buildPackages.binutils.targetPrefix}ar" r "$out"/lib/libgcc_eh.a
+      ls "${buildPackages.binutils}"/bin/ -al
+      "${buildPackages.binutils}/bin/${buildPackages.binutils.targetPrefix}ar" r "$out"/lib/libgcc_eh.a
     '';
   };
 
@@ -73,7 +74,7 @@ himalaya.overrideAttrs (drv: {
     ++ lib.optional hostPlatform.isWindows empty-libgcc_eh;
 
   postInstall = drv.postInstall + lib.optionalString hostPlatform.isWindows ''
-    export WINEPREFIX="$(${lib.getExe' pkgs.buildPackages.mktemp "mktemp"} -d)"
+    export WINEPREFIX="$(${lib.getExe' buildPackages.mktemp "mktemp"} -d)"
   '' + ''
     mkdir -p $out/bin/share/{applications,completions,man,services}
     cp assets/himalaya.desktop $out/bin/share/applications/
@@ -87,10 +88,10 @@ himalaya.overrideAttrs (drv: {
     ${himalayaExe} completion powershell > ./share/completions/himalaya.powershell
     ${himalayaExe} completion zsh > ./share/completions/himalaya.zsh
 
-    ${lib.getExe pkgs.buildPackages.gnutar} -czf himalaya.tgz himalaya* share
+    ${lib.getExe buildPackages.gnutar} -czf himalaya.tgz himalaya* share
     mv himalaya.tgz ../
 
-    ${lib.getExe pkgs.buildPackages.zip} -r himalaya.zip himalaya* share
+    ${lib.getExe buildPackages.zip} -r himalaya.zip himalaya* share
     mv himalaya.zip ../
   '';
 
