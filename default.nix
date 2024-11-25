@@ -1,18 +1,18 @@
-{ target ? null
+{ target
 , defaultFeatures ? true
 , features ? ""
 }:
 
 let
   systems = import ./systems.nix;
-  inherit (systems.${target}) rustTarget isStatic;
+  system = systems.${target};
 
-  pkgs = import (fetchTarball "https://github.com/soywod/nixpkgs/archive/master.tar.gz") (if isNull target then { } else {
+  pkgs = import (fetchTarball "https://github.com/soywod/nixpkgs/archive/master.tar.gz") {
     crossSystem = {
       isStatic = true;
       config = target;
     };
-  });
+  };
 
   inherit (pkgs) lib hostPlatform;
 
@@ -22,7 +22,7 @@ let
 
   rustToolchain = mkToolchain.fromTarget {
     inherit lib;
-    targetSystem = rustTarget;
+    targetSystem = system.rustTarget;
   };
 
   rustPlatform = pkgs.makeRustPlatform {
@@ -32,7 +32,7 @@ let
 
   himalayaExe =
     let ext = lib.optionalString hostPlatform.isWindows ".exe";
-    in "${hostPlatform.emulator pkgs.buildPackages} ./himalaya${ext}";
+    in "${(system.emulator or hostPlatform.emulator) pkgs.buildPackages} ./himalaya${ext}";
 
   himalaya = import ./package.nix {
     inherit lib hostPlatform rustPlatform;
