@@ -48,15 +48,32 @@ let
     libiconv = pkgs.pkgsStatic.libiconv;
     buildNoDefaultFeatures = !defaultFeatures;
     buildFeatures = lib.strings.splitString "," features;
-    binutils = pkgs.buildPackages.binutils;
+  };
+
+  # HACK: work around https://github.com/NixOS/nixpkgs/issues/177129
+  # Though this is an issue between Clang and GCC,
+  # so it may not get fixed anytime soon...
+  empty-libgcc_eh = pkgs.buildPackages.stdenv.mkDerivation {
+    pname = "empty-libgcc_eh";
+    version = "0";
+    dontUnpack = true;
+    installPhase = ''
+      mkdir -p "$out"/lib
+      ls "${pkgs.buildPackags.binutils}"/bin/ -al
+      "${pkgs.buildPackags.binutils}/bin/ar" r "$out"/lib/libgcc_eh.a
+    '';
   };
 
 in
 
+
 himalaya.overrideAttrs (drv: {
   version = "1.0.0";
 
-  postInstall = lib.optionalString hostPlatform.isWindows ''
+  propagatedBuildInputs = drv.propagatedBuildInputs
+    ++ lib.optional hostPlatform.isWindows empty-libgcc_eh;
+
+  postInstall = (builtins.trace drv drv).postInstall ++ lib.optionalString hostPlatform.isWindows ''
     export WINEPREFIX="$(${lib.getExe' pkgs.buildPackages.mktemp "mktemp"} -d)"
   '' + ''
     mkdir -p $out/bin/share/{applications,completions,man,services}

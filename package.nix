@@ -13,23 +13,7 @@
 , gpgme
 , buildNoDefaultFeatures ? false
 , buildFeatures ? [ ]
-, binutils
 }:
-
-let
-  # HACK: work around https://github.com/NixOS/nixpkgs/issues/177129
-  # Though this is an issue between Clang and GCC,
-  # so it may not get fixed anytime soon...
-  empty-libgcc_eh = stdenv.mkDerivation {
-    pname = "empty-libgcc_eh";
-    version = "0";
-    dontUnpack = true;
-    installPhase = ''
-      mkdir -p "$out"/lib
-      "${lib.getExe' binutils "ar"}" r "$out"/lib/libgcc_eh.a
-    '';
-  };
-in
 
 rustPlatform.buildRustPackage rec {
   inherit buildNoDefaultFeatures buildFeatures;
@@ -55,7 +39,6 @@ rustPlatform.buildRustPackage rec {
     ++ lib.optional (installManPages || installShellCompletions) installShellFiles;
 
   buildInputs = [ ]
-    ++ lib.optional hostPlatform.isWindows empty-libgcc_eh
     ++ lib.optional hostPlatform.isDarwin libiconv
     ++ lib.optionals hostPlatform.isDarwin (with darwin.apple_sdk_11_0.frameworks; [ Security ])
     ++ lib.optional (builtins.elem "notmuch" buildFeatures) notmuch
