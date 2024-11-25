@@ -9,7 +9,7 @@ let
 
   pkgs = import (fetchTarball "https://github.com/nixos/nixpkgs/archive/nixos-unstable.tar.gz") {
     crossSystem = {
-      inherit isStatic;
+      isStatic = true;
       config = target;
     };
   };
@@ -47,6 +47,7 @@ let
     pkg-config = pkgs.pkg-config;
     buildNoDefaultFeatures = !defaultFeatures;
     buildFeatures = lib.strings.splitString "," features;
+    binutils = pkgs.binutils;
   };
 
 in
