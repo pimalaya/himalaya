@@ -21,11 +21,12 @@
 
   i686-w64-mingw32 = {
     rustTarget = "i686-pc-windows-gnu";
-    emulator = pkgs: "${pkgs.wine}/bin/wine";
+    emulator = { lib, winePackages, ... }: lib.getExe' winePackages.minimal "wine";
   };
 
   x86_64-apple-darwin = {
     rustTarget = "x86_64-apple-darwin";
+    emulator = _: "";
   };
 
   x86_64-unknown-linux-musl = {
