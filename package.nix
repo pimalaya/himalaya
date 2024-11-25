@@ -29,7 +29,7 @@ rustPlatform.buildRustPackage rec {
   cargoHash = "sha256-YS8IamapvmdrOPptQh2Ef9Yold0IK1XIeGs0kDIQ5b8=";
 
   NIX_LDFLAGS = lib.optionals (stdenv.hostPlatform.isDarwin && stdenv.hostPlatform.isx86_64) [
-    "-L${darwin.apple_sdk_11_0.frameworks.Security}/Library/Frameworks -framework Security"
+    "-L${darwin.apple_sdk_11_0.frameworks.Security}/Library/Frameworks"
   ];
 
   # unit tests only
