@@ -9,7 +9,6 @@
 , installShellCompletions ? stdenv.buildPlatform.canExecute stdenv.hostPlatform
 , installManPages ? stdenv.buildPlatform.canExecute stdenv.hostPlatform
 , notmuch
-, libiconv
 , gpgme
 , buildNoDefaultFeatures ? false
 , buildFeatures ? [ ]
