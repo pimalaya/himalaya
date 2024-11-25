@@ -38,6 +38,7 @@ let
     inherit lib hostPlatform rustPlatform;
     fetchFromGitHub = pkgs.fetchFromGitHub;
     stdenv = pkgs.stdenv;
+    libiconv = pkgs.libiconv;
     darwin = pkgs.darwin;
     installShellFiles = false;
     installShellCompletions = false;

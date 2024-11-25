@@ -8,6 +8,7 @@
 , installShellCompletions ? stdenv.buildPlatform.canExecute stdenv.hostPlatform
 , installManPages ? stdenv.buildPlatform.canExecute stdenv.hostPlatform
 , notmuch
+, libiconv
 , gpgme
 , buildNoDefaultFeatures ? false
 , buildFeatures ? [ ]
@@ -33,6 +34,7 @@ rustPlatform.buildRustPackage rec {
   cargoTestFlags = [ "--lib" ];
 
   nativeBuildInputs = [ ]
+    ++ lib.optional hostPlatform.isDarwin libiconv
     ++ lib.optional (installManPages || installShellCompletions) installShellFiles;
 
   buildInputs = [ ]
