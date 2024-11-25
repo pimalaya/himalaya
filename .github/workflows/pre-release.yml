@@ -52,8 +52,6 @@ jobs:
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
           extraPullNames: nix-community
       - name: Build release
-        env:
-          NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM: 1
         run: |
           nix-build --argstr target ${{ matrix.target }}
       - name: Upload release artifacts
