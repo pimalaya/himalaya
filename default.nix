@@ -59,8 +59,8 @@ let
     dontUnpack = true;
     installPhase = ''
       mkdir -p "$out"/lib
-      ls "${pkgs.buildPackags.binutils}"/bin/ -al
-      "${pkgs.buildPackags.binutils}/bin/ar" r "$out"/lib/libgcc_eh.a
+      ls "${pkgs.buildPackages.binutils}"/bin/ -al
+      "${pkgs.buildPackages.binutils}/bin/ar" r "$out"/lib/libgcc_eh.a
     '';
   };
 
