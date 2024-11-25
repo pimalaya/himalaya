@@ -7,10 +7,10 @@ let
   systems = import ./systems.nix;
   system = systems.${target};
 
-  buildPackages = import (fetchTarball "https://github.com/nixos/nixpkgs/archive/nixos-unstable.tar.gz") { };
+  buildPackages = import (fetchTarball "https://github.com/soywod/nixpkgs/archive/master.tar.gz") { };
   inherit (buildPackages) stdenv binutils mktemp gnutar zip;
 
-  pkgs = import (fetchTarball "https://github.com/nixos/nixpkgs/archive/nixos-unstable.tar.gz") {
+  pkgs = import (fetchTarball "https://github.com/soywod/nixpkgs/archive/master.tar.gz") {
     crossSystem = {
       isStatic = true;
       config = target;
