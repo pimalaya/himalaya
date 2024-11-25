@@ -29,6 +29,10 @@ rustPlatform.buildRustPackage rec {
 
   cargoHash = "sha256-YS8IamapvmdrOPptQh2Ef9Yold0IK1XIeGs0kDIQ5b8=";
 
+  NIX_LDFLAGS = lib.optionals (stdenv.hostPlatform.isWindows && stdenv.hostPlatform.isi686) [
+    "-L${windows.mcfgthreads}/lib"
+  ];
+
   # unit tests only
   doCheck = false;
   cargoTestFlags = [ "--lib" ];
