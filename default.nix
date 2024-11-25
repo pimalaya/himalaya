@@ -35,7 +35,7 @@ let
 
   himalayaExe =
     let ext = lib.optionalString hostPlatform.isWindows ".exe";
-    in "${hostPlatform.emulator buildPackages} ./himalaya${ext}";
+    in "${(system.emulator or hostPlatform.emulator) buildPackages} ./himalaya${ext}";
 
   himalaya = import ./package.nix {
     inherit lib hostPlatform rustPlatform;
