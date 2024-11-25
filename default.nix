@@ -73,7 +73,7 @@ himalaya.overrideAttrs (drv: {
   propagatedBuildInputs = drv.propagatedBuildInputs
     ++ lib.optional hostPlatform.isWindows empty-libgcc_eh;
 
-  postInstall = (builtins.trace drv drv).postInstall + lib.optionalString hostPlatform.isWindows ''
+  postInstall = drv.postInstall + lib.optionalString hostPlatform.isWindows ''
     export WINEPREFIX="$(${lib.getExe' pkgs.buildPackages.mktemp "mktemp"} -d)"
   '' + ''
     mkdir -p $out/bin/share/{applications,completions,man,services}
