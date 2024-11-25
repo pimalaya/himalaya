@@ -33,6 +33,10 @@ rustPlatform.buildRustPackage rec {
   doCheck = false;
   cargoTestFlags = [ "--lib" ];
 
+  postPatch = ''
+    substituteInPlace configure.ac --replace "-lgcc_s" "-lgcc_eh"
+  '';
+
   nativeBuildInputs = [ ]
     ++ lib.optional (installManPages || installShellCompletions) installShellFiles;
 
