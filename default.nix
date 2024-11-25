@@ -45,6 +45,7 @@ let
     installManPages = false;
     notmuch = pkgs.notmuch;
     gpgme = pkgs.gpgme;
+    pkg-config = pkgs.pkg-config;
     buildNoDefaultFeatures = !defaultFeatures;
     buildFeatures = lib.strings.splitString "," features;
   };

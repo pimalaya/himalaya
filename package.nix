@@ -1,4 +1,5 @@
 { lib
+, pkg-config
 , hostPlatform
 , rustPlatform
 , fetchFromGitHub
@@ -38,10 +39,11 @@ rustPlatform.buildRustPackage rec {
   '';
 
   nativeBuildInputs = [ ]
+    ++ lib.optional hostPlatform.isDarwin pkg-config
     ++ lib.optional (installManPages || installShellCompletions) installShellFiles;
 
   buildInputs = [ ]
-    ++ lib.optionals hostPlatform.isDarwin (with darwin.apple_sdk_11_0.frameworks; [ libiconv Security ])
+    ++ lib.optionals hostPlatform.isDarwin (with darwin.apple_sdk_11_0.frameworks; [ Security ])
     ++ lib.optional (builtins.elem "notmuch" buildFeatures) notmuch
     ++ lib.optional (builtins.elem "pgp-gpg" buildFeatures) gpgme;
 
