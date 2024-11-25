@@ -34,9 +34,8 @@ rustPlatform.buildRustPackage rec {
   cargoTestFlags = [ "--lib" ];
 
   postPatch = ''
-    ls -al
-    grep -Ril "lgcc_eh" .
-    substituteInPlace configure.ac --replace "-lgcc_s" "-lgcc_eh"
+    cat package.nix
+    substituteInPlace package.nix --replace "-lgcc_eh" "-lgcc_s"
   '';
 
   nativeBuildInputs = [ ]
