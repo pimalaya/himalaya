@@ -33,7 +33,7 @@ rustPlatform.buildRustPackage rec {
     "-L${windows.mcfgthreads}/lib"
     "-L${windows.mingwrt}/lib"
     "-lmcfgthread"
-    "-lmingwrt"
+    "-lmingw32"
     "-lunwind"
   ];
 
