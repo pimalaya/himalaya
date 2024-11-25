@@ -31,7 +31,7 @@
 
   x86_64-apple-darwin = {
     rustTarget = "x86_64-apple-darwin";
-    isStatic = false;
+    isStatic = true;
   };
 
   x86_64-unknown-linux-musl = {

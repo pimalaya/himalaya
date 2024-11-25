@@ -38,12 +38,10 @@ rustPlatform.buildRustPackage rec {
     substituteInPlace package.nix --replace "-lgcc_eh" "-lgcc_s"
   '';
 
-  nativeBuildInputs = [ ]
-    ++ lib.optional (!hostPlatform.isLinux) pkg-config
+  nativeBuildInputs = [ pkg-config ]
     ++ lib.optional (installManPages || installShellCompletions) installShellFiles;
 
   buildInputs = [ ]
-    ++ lib.optionals hostPlatform.isDarwin (with darwin.apple_sdk_11_0.frameworks; [ Security ])
     ++ lib.optional (builtins.elem "notmuch" buildFeatures) notmuch
     ++ lib.optional (builtins.elem "pgp-gpg" buildFeatures) gpgme;
 

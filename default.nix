@@ -9,7 +9,7 @@ let
 
   pkgs = import (fetchTarball "https://github.com/nixos/nixpkgs/archive/nixos-unstable.tar.gz") {
     crossSystem = {
-      isStatic = true;
+      inherit isStatic;
       config = target;
     };
   };
