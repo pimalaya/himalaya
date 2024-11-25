@@ -1,4 +1,4 @@
-{ target
+{ target ? null
 , defaultFeatures ? true
 , features ? ""
 }:
@@ -7,12 +7,12 @@ let
   systems = import ./systems.nix;
   inherit (systems.${target}) rustTarget isStatic;
 
-  pkgs = import (fetchTarball "https://github.com/nixos/nixpkgs/archive/nixos-unstable.tar.gz") {
+  pkgs = import (fetchTarball "https://github.com/soywod/nixpkgs/archive/master.tar.gz") (if isNull target then { } else {
     crossSystem = {
       isStatic = true;
       config = target;
     };
-  };
+  });
 
   inherit (pkgs) lib hostPlatform;
 
@@ -60,7 +60,7 @@ let
     installPhase = ''
       mkdir -p "$out"/lib
       ls "${pkgs.buildPackages.binutils}"/bin/ -al
-      "${pkgs.buildPackages.binutils}/bin/ar" r "$out"/lib/libgcc_eh.a
+      "${pkgs.buildPackages.binutils}/bin/${pkgs.buildPackages.binutils.targetPrefix}ar" r "$out"/lib/libgcc_eh.a
     '';
   };
 
@@ -70,7 +70,7 @@ in
 himalaya.overrideAttrs (drv: {
   version = "1.0.0";
 
-  propagatedBuildInputs = drv.propagatedBuildInputs
+  propagatedBuildInputs = (drv.propagatedBuildInputs or [ ])
     ++ lib.optional hostPlatform.isWindows empty-libgcc_eh;
 
   postInstall = drv.postInstall + lib.optionalString hostPlatform.isWindows ''
