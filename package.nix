@@ -1,4 +1,5 @@
 { lib
+, libiconv
 , pkg-config
 , hostPlatform
 , rustPlatform
