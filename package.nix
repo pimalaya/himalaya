@@ -37,7 +37,6 @@ rustPlatform.buildRustPackage rec {
     ++ lib.optional (installManPages || installShellCompletions) installShellFiles;
 
   buildInputs = [ ]
-    ++ lib.optionals hostPlatform.isDarwin (with darwin.apple_sdk.frameworks; [ Security ])
     ++ lib.optional (builtins.elem "notmuch" buildFeatures) notmuch
     ++ lib.optional (builtins.elem "pgp-gpg" buildFeatures) gpgme;
 
