@@ -34,11 +34,10 @@ rustPlatform.buildRustPackage rec {
   cargoTestFlags = [ "--lib" ];
 
   nativeBuildInputs = [ ]
-    ++ lib.optional hostPlatform.isDarwin libiconv
     ++ lib.optional (installManPages || installShellCompletions) installShellFiles;
 
   buildInputs = [ ]
-    ++ lib.optionals hostPlatform.isDarwin (with darwin.apple_sdk_11_0.frameworks; [ Security ])
+    ++ lib.optionals hostPlatform.isDarwin (with darwin.apple_sdk_11_0.frameworks; [ libiconv Security ])
     ++ lib.optional (builtins.elem "notmuch" buildFeatures) notmuch
     ++ lib.optional (builtins.elem "pgp-gpg" buildFeatures) gpgme;
 
