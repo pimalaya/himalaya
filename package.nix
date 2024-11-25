@@ -29,7 +29,7 @@ rustPlatform.buildRustPackage rec {
   cargoHash = "sha256-YS8IamapvmdrOPptQh2Ef9Yold0IK1XIeGs0kDIQ5b8=";
 
   NIX_LDFLAGS = lib.optionals (stdenv.hostPlatform.isDarwin && stdenv.hostPlatform.isx86_64) [
-    "-L${darwin.apple_sdk_10_12.frameworks.Security}/Library/Frameworks -framework Security"
+    "-L${darwin.apple_sdk_11_0.frameworks.Security}/Library/Frameworks -framework Security"
   ];
 
   # unit tests only
@@ -37,11 +37,11 @@ rustPlatform.buildRustPackage rec {
   cargoTestFlags = [ "--lib" ];
 
   nativeBuildInputs = [ pkg-config ]
-    ++ lib.optional (stdenv.hostPlatform.isDarwin && stdenv.hostPlatform.isx86_64) darwin.apple_sdk_10_12.frameworks.Security
+    ++ lib.optional (stdenv.hostPlatform.isDarwin && stdenv.hostPlatform.isx86_64) darwin.apple_sdk_11_0.frameworks.Security
     ++ lib.optional (installManPages || installShellCompletions) installShellFiles;
 
   buildInputs = [ ]
-    ++ lib.optional (stdenv.hostPlatform.isDarwin && stdenv.hostPlatform.isx86_64) darwin.apple_sdk_10_12.frameworks.Security
+    ++ lib.optional (stdenv.hostPlatform.isDarwin && stdenv.hostPlatform.isx86_64) darwin.apple_sdk_11_0.frameworks.Security
     ++ lib.optional (builtins.elem "notmuch" buildFeatures) notmuch
     ++ lib.optional (builtins.elem "pgp-gpg" buildFeatures) gpgme;
 
