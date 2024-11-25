@@ -45,7 +45,7 @@ let
     notmuch = pkgs.notmuch;
     gpgme = pkgs.gpgme;
     pkg-config = pkgs.pkg-config;
-    libiconv = pkgs.libiconv;
+    libiconv = pkgs.pkgsStatic.libiconv;
     buildNoDefaultFeatures = !defaultFeatures;
     buildFeatures = lib.strings.splitString "," features;
     binutils = pkgs.buildPackages.binutils;
