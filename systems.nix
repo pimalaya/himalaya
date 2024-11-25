@@ -26,7 +26,6 @@
 
   x86_64-apple-darwin = {
     rustTarget = "x86_64-apple-darwin";
-    emulator = _: "";
   };
 
   x86_64-unknown-linux-musl = {

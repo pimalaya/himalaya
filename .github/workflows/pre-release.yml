@@ -10,9 +10,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # - system: aarch64-macos
-          #   target: aarch64-apple-darwin
-          #   os: macos-latest
+          - system: aarch64-macos-14
+            target: aarch64-apple-darwin
+            os: macos-14
+          - system: aarch64-macos-15
+            target: aarch64-apple-darwin
+            os: macos-15
           # - system: aarch64-linux
           #   target: aarch64-unknown-linux-musl
           #   os: ubuntu-latest
@@ -30,7 +33,7 @@ jobs:
           #   os: ubuntu-latest
           - system: x86_64-macos
             target: x86_64-apple-darwin
-            os: macos-latest
+            os: macos-13
           # - system: x86_64-linux
           #   target: x86_64-unknown-linux-musl
           #   os: ubuntu-latest

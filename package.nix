@@ -1,6 +1,5 @@
 { lib
 , pkg-config
-, hostPlatform
 , rustPlatform
 , fetchFromGitHub
 , stdenv
@@ -28,6 +27,10 @@ rustPlatform.buildRustPackage rec {
   };
 
   cargoHash = "sha256-YS8IamapvmdrOPptQh2Ef9Yold0IK1XIeGs0kDIQ5b8=";
+
+  NIX_LDFLAGS = lib.optionals (stdenv.hostPlatform.isDarwin && stdenv.hostPlatform.isx86_64) [
+    "-framework Security"
+  ];
 
   # unit tests only
   doCheck = false;

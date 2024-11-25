@@ -7,10 +7,10 @@ let
   systems = import ./systems.nix;
   system = systems.${target};
 
-  buildPackages = import (fetchTarball "https://github.com/soywod/nixpkgs/archive/master.tar.gz") { };
+  buildPackages = import (fetchTarball "https://github.com/nixos/nixpkgs/archive/nixos-unstable.tar.gz") { };
   inherit (buildPackages) stdenv binutils mktemp gnutar zip;
 
-  pkgs = import (fetchTarball "https://github.com/soywod/nixpkgs/archive/master.tar.gz") {
+  pkgs = import (fetchTarball "https://github.com/nixos/nixpkgs/archive/nixos-unstable.tar.gz") {
     crossSystem = {
       isStatic = true;
       config = target;
@@ -38,7 +38,7 @@ let
     in "${(system.emulator or hostPlatform.emulator) buildPackages} ./himalaya${ext}";
 
   himalaya = import ./package.nix {
-    inherit lib hostPlatform rustPlatform;
+    inherit lib rustPlatform;
     fetchFromGitHub = pkgs.fetchFromGitHub;
     stdenv = pkgs.stdenv;
     darwin = pkgs.darwin;
