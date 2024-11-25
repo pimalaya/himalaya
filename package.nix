@@ -49,16 +49,13 @@ rustPlatform.buildRustPackage rec {
   doCheck = false;
   cargoTestFlags = [ "--lib" ];
 
-  postPatch = ''
-    cat package.nix
-    substituteInPlace package.nix --replace "-lgcc_eh" "-lgcc_s"
-  '';
-
   nativeBuildInputs = [ pkg-config ]
+    ++ lib.optional hostPlatform.isDarwin [ darwin.libiconv ]
     ++ lib.optional (installManPages || installShellCompletions) installShellFiles;
 
   buildInputs = [ ]
-    ++ lib.optionals hostPlatform.isWindows empty-libgcc_eh
+    ++ lib.optional hostPlatform.isWindows empty-libgcc_eh
+    ++ lib.optional hostPlatform.isDarwin [ darwin.libiconv ]
     ++ lib.optionals hostPlatform.isDarwin (with darwin.apple_sdk_11_0.frameworks; [ Security ])
     ++ lib.optional (builtins.elem "notmuch" buildFeatures) notmuch
     ++ lib.optional (builtins.elem "pgp-gpg" buildFeatures) gpgme;
