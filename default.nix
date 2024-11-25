@@ -41,7 +41,7 @@ let
     inherit lib rustPlatform;
     fetchFromGitHub = pkgs.fetchFromGitHub;
     stdenv = pkgs.stdenv;
-    darwin = pkgs.darwin;
+    apple-sdk = if pkgs.stdenv.hostPlatform.isx86_64 then pkgs.apple-sdk_13 else pkgs.apple-sdk_14;
     installShellFiles = false;
     installShellCompletions = false;
     installManPages = false;
