@@ -31,6 +31,7 @@ rustPlatform.buildRustPackage rec {
 
   NIX_LDFLAGS = lib.optionals (stdenv.hostPlatform.isWindows && stdenv.hostPlatform.isi686) [
     "-L${windows.mcfgthreads}/lib"
+    "-lmcfgthread"
   ];
 
   # unit tests only

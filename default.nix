@@ -63,9 +63,7 @@ let
       "${lib.getExe' binutils "ar"}" r "$out"/lib/libgcc_eh.a
     '';
   };
-
 in
-
 
 himalaya.overrideAttrs (drv: {
   version = "1.0.0";
