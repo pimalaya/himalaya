@@ -1,7 +1,6 @@
 { lib
 , pkg-config
 , rustPlatform
-, windows
 , fetchFromGitHub
 , stdenv
 , apple-sdk
@@ -28,15 +27,6 @@ rustPlatform.buildRustPackage rec {
   };
 
   cargoHash = "sha256-YS8IamapvmdrOPptQh2Ef9Yold0IK1XIeGs0kDIQ5b8=";
-
-  NIX_LDFLAGS = lib.optionals stdenv.hostPlatform.isWindows [
-    #"-L${windows.mcfgthreads}/lib"
-    #"-L${}/lib"
-    #"-L${windows.mingwrt}/lib"
-    #"-L${windows.w32api}/lib"
-    #"-lmcfgthread"
-    "-lunwind"
-  ];
 
   doCheck = false;
   auditable = false;
