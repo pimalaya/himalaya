@@ -54,7 +54,7 @@ let
     pkg-config = pkgs.pkg-config;
     buildNoDefaultFeatures = !defaultFeatures;
     buildFeatures = lib.strings.splitString "," features;
-    libunwind = pkgs.libunwind;
+    libunwind = pkgs.llvmPackages.libunwind;
   };
 
   # HACK: https://github.com/NixOS/nixpkgs/issues/177129
