@@ -54,7 +54,6 @@ let
     pkg-config = pkgs.pkg-config;
     buildNoDefaultFeatures = !defaultFeatures;
     buildFeatures = lib.strings.splitString "," features;
-    libunwind = pkgs.llvmPackages.libunwind;
   };
 
   # HACK: https://github.com/NixOS/nixpkgs/issues/177129
@@ -73,7 +72,7 @@ himalaya.overrideAttrs (drv: {
   version = "1.0.0";
 
   propagatedBuildInputs = (drv.propagatedBuildInputs or [ ])
-    ++ lib.optional hostPlatform.isWindows empty-libgcc_eh;
+    ++ lib.optional false empty-libgcc_eh;
 
   postInstall = (drv.postInstall or "") + lib.optionalString hostPlatform.isWindows ''
     export WINEPREFIX="$(${lib.getExe' mktemp "mktemp"} -d)"
