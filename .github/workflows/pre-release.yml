@@ -10,33 +10,33 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - system: aarch64-macos
-            target: aarch64-apple-darwin
-            os: macos-14
-          - system: aarch64-linux
-            target: aarch64-unknown-linux-musl
-            os: ubuntu-latest
-          - system: armv6l-linux
-            target: armv6l-unknown-linux-musleabihf
-            os: ubuntu-latest
-          - system: armv7l-linux
-            target: armv7l-unknown-linux-musleabihf
-            os: ubuntu-latest
-          - system: i686-linux
-            target: i686-unknown-linux-musl
-            os: ubuntu-latest
+          # - system: aarch64-macos
+          #   target: aarch64-apple-darwin
+          #   os: macos-14
+          # - system: aarch64-linux
+          #   target: aarch64-unknown-linux-musl
+          #   os: ubuntu-latest
+          # - system: armv6l-linux
+          #   target: armv6l-unknown-linux-musleabihf
+          #   os: ubuntu-latest
+          # - system: armv7l-linux
+          #   target: armv7l-unknown-linux-musleabihf
+          #   os: ubuntu-latest
+          # - system: i686-linux
+          #   target: i686-unknown-linux-musl
+          #   os: ubuntu-latest
           - system: i686-windows
             target: i686-w64-mingw32
             os: ubuntu-latest
-          - system: x86_64-macos
-            target: x86_64-apple-darwin
-            os: macos-13
-          - system: x86_64-linux
-            target: x86_64-unknown-linux-musl
-            os: ubuntu-latest
-          - system: x86_64-windows
-            target: x86_64-w64-mingw32
-            os: ubuntu-latest
+          # - system: x86_64-macos
+          #   target: x86_64-apple-darwin
+          #   os: macos-13
+          # - system: x86_64-linux
+          #   target: x86_64-unknown-linux-musl
+          #   os: ubuntu-latest
+          # - system: x86_64-windows
+          #   target: x86_64-w64-mingw32
+          #   os: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
