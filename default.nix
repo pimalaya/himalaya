@@ -19,9 +19,9 @@ let
 
   inherit (pkgs) lib hostPlatform;
   fenix = import (fetchTarball "https://github.com/soywod/fenix/archive/main.tar.gz") { };
-  mkToolchain = import ./rust-toolchain.nix fenix;
+  mkToolchain = import ./rust-toolchain.nix { inherit lib fenix; };
   rustTarget = if isNull target then null else hostPlatform.rust.rustcTarget;
-  rustToolchain = mkToolchain.fromTarget { inherit lib; target = rustTarget; };
+  rustToolchain = mkToolchain.fromTarget rustTarget;
   rustPlatform = pkgs.makeRustPlatform {
     rustc = rustToolchain;
     cargo = rustToolchain;
