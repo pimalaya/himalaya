@@ -39,6 +39,7 @@ rustPlatform.buildRustPackage rec {
 
   # unit tests only
   doCheck = false;
+  auditable = false;
   cargoTestFlags = [ "--lib" ];
 
   nativeBuildInputs = [ pkg-config ]

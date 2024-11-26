@@ -1,21 +1,24 @@
-{ target
+{ target ? null
+, isStatic ? true
 , defaultFeatures ? true
 , features ? ""
 }:
 
 let
-  systems = import ./systems.nix;
-  system = systems.${target};
-
   buildPackages = import (fetchTarball "https://github.com/soywod/nixpkgs/archive/master.tar.gz") { };
   inherit (buildPackages) stdenv binutils mktemp gnutar zip;
 
-  pkgs = import (fetchTarball "https://github.com/soywod/nixpkgs/archive/master.tar.gz") {
-    crossSystem = {
-      isStatic = true;
-      config = target;
-    };
-  };
+  pkgs = import (fetchTarball "https://github.com/soywod/nixpkgs/archive/master.tar.gz") (
+    if isNull target then { } else {
+      crossSystem = {
+        inherit isStatic;
+        config = target;
+      };
+    }
+  );
+
+  systems = import ./systems.nix;
+  system = if isNull target then null else systems.${target};
 
   inherit (pkgs) lib hostPlatform;
 
@@ -25,7 +28,7 @@ let
 
   rustToolchain = mkToolchain.fromTarget {
     inherit lib;
-    targetSystem = system.rustTarget;
+    targetSystem = if isNull system then null else system.rustTarget;
   };
 
   rustPlatform = pkgs.makeRustPlatform {

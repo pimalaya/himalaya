@@ -6,11 +6,11 @@
 // use git2::{DescribeOptions, Repository};
 // use serde::Deserialize;
 
-// fn main() {
+fn main() {
 //     features_env();
 //     target_envs();
 //     git_envs();
-// }
+}
 
 // /// Builds the `CARGO_FEATURES` environment variable.
 // ///
