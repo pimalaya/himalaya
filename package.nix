@@ -29,18 +29,10 @@ rustPlatform.buildRustPackage rec {
 
   cargoHash = "sha256-YS8IamapvmdrOPptQh2Ef9Yold0IK1XIeGs0kDIQ5b8=";
 
-  # NIX_LDFLAGS = lib.optionals (stdenv.hostPlatform.isWindows && stdenv.hostPlatform.isi686) [
-  #   "-L${windows.mcfgthreads}/lib"
-  #   "-L${libunwind}/lib"
-  #   # "-L${windows.mingwrt}/lib"
-  #   #"-L${windows.w32api}/lib"
-  #   "-lmcfgthread"
-  #   "-lunwind"
-  # ];
-
-  # unit tests only
   doCheck = false;
   auditable = false;
+
+  # unit tests only
   cargoTestFlags = [ "--lib" ];
 
   nativeBuildInputs = [ pkg-config ]
@@ -48,7 +40,6 @@ rustPlatform.buildRustPackage rec {
 
   buildInputs = [ ]
     ++ lib.optional stdenv.hostPlatform.isDarwin apple-sdk
-    # ++ lib.optional (stdenv.hostPlatform.isWindows && stdenv.hostPlatform.isi686) windows.mcfgthreads
     ++ lib.optional (builtins.elem "notmuch" buildFeatures) notmuch
     ++ lib.optional (builtins.elem "pgp-gpg" buildFeatures) gpgme;
 

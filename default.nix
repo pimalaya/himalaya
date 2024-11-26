@@ -1,5 +1,5 @@
 { target ? null
-, isStatic ? true
+, isStatic ? false
 , defaultFeatures ? true
 , features ? ""
 }:
@@ -17,28 +17,30 @@ let
     }
   );
 
-  systems = import ./systems.nix;
-  system = if isNull target then null else systems.${target};
-
   inherit (pkgs) lib hostPlatform;
-
   fenix = import (fetchTarball "https://github.com/soywod/fenix/archive/main.tar.gz") { };
-
   mkToolchain = import ./rust-toolchain.nix fenix;
-
-  rustToolchain = mkToolchain.fromTarget {
-    inherit lib;
-    target = if isNull system then null else system.rustTarget;
-  };
-
+  rustTarget = if isNull target then null else hostPlatform.rust.rustcTarget;
+  rustToolchain = mkToolchain.fromTarget { inherit lib; target = rustTarget; };
   rustPlatform = pkgs.makeRustPlatform {
     rustc = rustToolchain;
     cargo = rustToolchain;
   };
 
+  # HACK: https://github.com/NixOS/nixpkgs/issues/177129
+  empty-libgcc_eh = stdenv.mkDerivation {
+    pname = "empty-libgcc_eh";
+    version = "0";
+    dontUnpack = true;
+    installPhase = ''
+      mkdir -p "$out"/lib
+      "${lib.getExe' binutils "ar"}" r "$out"/lib/libgcc_eh.a
+    '';
+  };
+
   himalayaExe =
     let ext = lib.optionalString hostPlatform.isWindows ".exe";
-    in "${(system.emulator or hostPlatform.emulator) buildPackages} ./himalaya${ext}";
+    in "${hostPlatform.emulator buildPackages} ./himalaya${ext}";
 
   himalaya = import ./package.nix {
     inherit lib rustPlatform;
@@ -55,24 +57,13 @@ let
     buildNoDefaultFeatures = !defaultFeatures;
     buildFeatures = lib.strings.splitString "," features;
   };
-
-  # HACK: https://github.com/NixOS/nixpkgs/issues/177129
-  empty-libgcc_eh = stdenv.mkDerivation {
-    pname = "empty-libgcc_eh";
-    version = "0";
-    dontUnpack = true;
-    installPhase = ''
-      mkdir -p "$out"/lib
-      "${lib.getExe' binutils "ar"}" r "$out"/lib/libgcc_eh.a
-    '';
-  };
 in
 
 himalaya.overrideAttrs (drv: {
   version = "1.0.0";
 
   propagatedBuildInputs = (drv.propagatedBuildInputs or [ ])
-    ++ lib.optional false empty-libgcc_eh;
+    ++ lib.optional hostPlatform.isWindows empty-libgcc_eh;
 
   postInstall = (drv.postInstall or "") + lib.optionalString hostPlatform.isWindows ''
     export WINEPREFIX="$(${lib.getExe' mktemp "mktemp"} -d)"
