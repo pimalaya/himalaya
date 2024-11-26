@@ -1,18 +1,17 @@
 { pkgs ? import <nixpkgs> { } }:
 
 let
-  package = import ./default.nix {
-    isStatic = false;
-  };
+  inherit (pkgs) lib;
+
+  fenix = import (fetchTarball "https://github.com/soywod/fenix/archive/main.tar.gz") { };
+  mkToolchain = import ./rust-toolchain.nix { inherit lib fenix; };
+  rust = mkToolchain.fromFile;
 in
 
 pkgs.mkShell {
-  inputsFrom = [
-    package
-  ];
-
   buildInputs = with pkgs; [
     nixd
     nixpkgs-fmt
+    rust
   ];
 }
