@@ -26,9 +26,9 @@ jobs:
           #   target: i686-unknown-linux-musl
           #   os: ubuntu-latest
           # FIXME
-          # - system: i686-windows
-          #   target: i686-w64-mingw32
-          #   os: ubuntu-latest
+          - system: i686-windows
+            target: i686-w64-mingw32
+            os: ubuntu-latest
           # - system: x86_64-macos-13
           #   target: x86_64-apple-darwin
           #   os: macos-13

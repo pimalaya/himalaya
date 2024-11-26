@@ -29,14 +29,14 @@ rustPlatform.buildRustPackage rec {
 
   cargoHash = "sha256-YS8IamapvmdrOPptQh2Ef9Yold0IK1XIeGs0kDIQ5b8=";
 
-  # NIX_LDFLAGS = lib.optionals (stdenv.hostPlatform.isWindows && stdenv.hostPlatform.isi686) [
-  #   "-L${windows.mcfgthreads}/lib"
-  #   "-L${}/lib"
-  #   # "-L${windows.mingwrt}/lib"
-  #   #"-L${windows.w32api}/lib"
-  #   "-lmcfgthread"
-  #   "-lunwind"
-  # ];
+  NIX_LDFLAGS = lib.optionals stdenv.hostPlatform.isWindows [
+    #"-L${windows.mcfgthreads}/lib"
+    #"-L${}/lib"
+    #"-L${windows.mingwrt}/lib"
+    #"-L${windows.w32api}/lib"
+    #"-lmcfgthread"
+    "-lunwind"
+  ];
 
   doCheck = false;
   auditable = false;
@@ -49,7 +49,6 @@ rustPlatform.buildRustPackage rec {
 
   buildInputs = [ ]
     ++ lib.optional stdenv.hostPlatform.isDarwin apple-sdk
-    ++ lib.optional stdenv.hostPlatform.isWindows windows.pthreads
     ++ lib.optional (builtins.elem "notmuch" buildFeatures) notmuch
     ++ lib.optional (builtins.elem "pgp-gpg" buildFeatures) gpgme;
 
