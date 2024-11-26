@@ -28,7 +28,7 @@ let
 
   rustToolchain = mkToolchain.fromTarget {
     inherit lib;
-    targetSystem = if isNull system then null else system.rustTarget;
+    target = if isNull system then null else system.rustTarget;
   };
 
   rustPlatform = pkgs.makeRustPlatform {

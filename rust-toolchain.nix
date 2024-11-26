@@ -17,14 +17,19 @@ rec {
     armv7l-unknown-linux-musleabihf = "armv7-unknown-linux-musleabihf";
   }.${target} or target;
 
-  fromTarget = { lib, targetSystem ? null }:
+  crossRustStd = name: target:
+    let
+      rustTarget = toRustTarget target;
+      crossToolchain = fenix.targets.${rustTarget}.fromToolchainName { inherit name sha256; };
+    in
+    crossToolchain.rust-std;
+
+  fromTarget = { lib, target ? null }:
     let
       name = (lib.importTOML file).toolchain.channel;
       toolchain = fenix.fromToolchainName { inherit name sha256; };
-      target = if isNull targetSystem then null else toRustTarget targetSystem;
       components = [ toolchain.rustc toolchain.cargo ]
-        ++ lib.optional (!isNull target) (fenix.targets.${target}.fromToolchainName { inherit name sha256; }.rust-std);
+        ++ lib.optional (!isNull target) (crossRustStd name target);
     in
-
     fenix.combine components;
 }
