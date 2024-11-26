@@ -1,4 +1,5 @@
 { lib
+, libunwind
 , pkg-config
 , rustPlatform
 , windows
@@ -31,10 +32,11 @@ rustPlatform.buildRustPackage rec {
 
   NIX_LDFLAGS = lib.optionals (stdenv.hostPlatform.isWindows && stdenv.hostPlatform.isi686) [
     "-L${windows.mcfgthreads}/lib"
+    "-L${libunwind}/lib"
     # "-L${windows.mingwrt}/lib"
     #"-L${windows.w32api}/lib"
     "-lmcfgthread"
-    #"-lunwind"
+    "-lunwind"
   ];
 
   # unit tests only
