@@ -71,7 +71,7 @@ impl TemplateSendCommand {
         #[allow(unused_mut)]
         let mut compiler = MmlCompilerBuilder::new();
 
-        #[cfg(feature = "pgp")]
+        #[cfg(any(feature = "pgp-gpg", feature = "pgp-commands", feature = "pgp-native"))]
         compiler.set_some_pgp(account_config.pgp.clone());
 
         let msg = compiler.build(tpl.as_str())?.compile().await?.into_vec()?;

@@ -1,12 +1,26 @@
-# This file exists for legacy nix-shell
-# https://nixos.wiki/wiki/Flakes#Using_flakes_project_from_a_legacy_Nix
-# You generally do *not* have to modify this ever.
-(import (
-  let
-    lock = builtins.fromJSON (builtins.readFile ./flake.lock);
-  in fetchTarball {
-    url = "https://github.com/edolstra/flake-compat/archive/${lock.nodes.flake-compat.locked.rev}.tar.gz";
-    sha256 = lock.nodes.flake-compat.locked.narHash; }
-) {
-  src =  ./.;
-}).shellNix
+{ pkgs ? import <nixpkgs> { }
+, fenix ? import (fetchTarball "https://github.com/nix-community/fenix/archive/main.tar.gz") { }
+, withNotmuch ? false
+, withGpg ? false
+, withOpenSsl ? false
+}:
+
+let
+  inherit (pkgs) lib;
+  mkRustToolchain = import ./rust-toolchain.nix { inherit lib fenix; };
+  rust = mkRustToolchain.fromFile;
+in
+
+pkgs.mkShell {
+  buildInputs = [ ]
+    # Nix language
+    ++ [ pkgs.nixd pkgs.nixpkgs-fmt ]
+
+    # Rust
+    ++ [ rust ]
+
+    # Cargo features
+    ++ lib.optional withNotmuch pkgs.notmuch
+    ++ lib.optional withGpg pkgs.gpgme
+    ++ lib.optional withOpenSsl pkgs.openssl;
+}

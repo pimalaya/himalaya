@@ -3,7 +3,7 @@ Type=Application
 Name=himalaya
 DesktopName=Himalaya
 GenericName=Mail Reader
-Comment=Command-line interface for email management
+Comment=CLI to manage emails
 Terminal=true
 Exec=himalaya %U
 Categories=Application;Network
@@ -13,4 +13,4 @@ Actions=Compose
 
 [Desktop Action Compose]
 Name=Compose
-Exec=himalaya write %U
+Exec=himalaya message write %U

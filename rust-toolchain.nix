@@ -1,24 +1,24 @@
-fenix:
+{ lib, fenix }:
 
 let
   file = ./rust-toolchain.toml;
-  sha256 = "+syqAd2kX8KVa8/U2gz3blIQTTsYYt3U63xBWaGOSc8=";
+  sha256 = "yMuSb5eQPO/bHv+Bcf/US8LVMbf/G/0MSfiPwBhiPpk=";
 in
-{
-  fromFile = { buildSystem }: fenix.packages.${buildSystem}.fromToolchainFile {
-    inherit file sha256;
-  };
 
-  fromTarget = { pkgs, buildSystem, targetSystem }:
+{
+  fromFile =
+    let spec = { inherit file sha256; };
+    in fenix.fromToolchainFile spec;
+
+  fromTarget = target:
     let
-      name = (pkgs.lib.importTOML file).toolchain.channel;
-      fenixPackage = fenix.packages.${buildSystem};
-      toolchain = fenixPackage.fromToolchainName { inherit name sha256; };
-      targetToolchain = fenixPackage.targets.${targetSystem}.fromToolchainName { inherit name sha256; };
+      name = (lib.importTOML file).toolchain.channel;
+      spec = { inherit name sha256; };
+      toolchain = fenix.fromToolchainName spec;
+      crossToolchain = fenix.targets.${target}.fromToolchainName spec;
+      components = [ toolchain.rustc toolchain.cargo ]
+        ++ lib.optional (!isNull target) crossToolchain.rust-std;
     in
-    fenixPackage.combine [
-      toolchain.rustc
-      toolchain.cargo
-      targetToolchain.rust-std
-    ];
+
+    fenix.combine components;
 }

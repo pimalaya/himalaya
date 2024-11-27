@@ -1,0 +1,58 @@
+name: build-on-demand
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Target
+        required: true
+        type: choice
+        options:
+          - aarch64-apple-darwin
+          - aarch64-unknown-linux-musl
+          - armv6l-unknown-linux-musleabihf
+          - armv7l-unknown-linux-musleabihf
+          - i686-unknown-linux-musl
+          # FIXME
+          # - i686-w64-mingw32
+          - x86_64-apple-darwin
+          - x86_64-unknown-linux-musl
+          - x86_64-w64-mingw32
+      defaultFeatures:
+        description: Enable default cargo features
+        default: true
+        type: bool
+      features:
+        description: Cargo features (comma-separated)
+        type: string
+
+jobs:
+  build-on-demand:
+    runs-on: ${{ inputs.target == "x86_64-apple-darwin" && "macos-13" || inputs.target == "aarch64-apple-darwin" && "macos-14" || "ubuntu-latest" }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          # TODO: nix_path: nixpkgs=channel:nixos-unstable
+          nix_path: nixpkgs=https://github.com/soywod/nixpkgs/archive/master.tar.gz
+          enable_kvm: true
+      - name: Cache Nix store
+        uses: cachix/cachix-action@v15
+        with:
+          name: soywod
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          extraPullNames: nix-community
+      - name: Build release
+        run: |
+          nix-build \
+            --arg crossPkgs 'import <nixpkgs> { crossSystem = { config = "${{ inputs.target }}"; isStatic = true; }; }' \
+            --arg fenix 'import (fetchTarball "https://github.com/soywod/fenix/archive/main.tar.gz") { }' \
+            --arg defaultFeatures ${{ inputs.defaultFeatures }} \
+            --argstr features ${{ inputs.features }}
+      - name: Upload release
+        uses: actions/upload-artifact@v4
+        with:
+          name: himalaya-${{ inputs.target }}
+          path: result/*
