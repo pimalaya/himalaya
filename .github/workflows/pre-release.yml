@@ -47,11 +47,16 @@ jobs:
       - name: Build release
         run: |
           nix build .#cross-${{ matrix.target }}
-          nix run .#cross-${{ matrix.target }} -- --version
-      - name: Upload release artifacts
+      - name: Upload release
         uses: actions/upload-artifact@v4
         with:
           name: "himalaya-${{ matrix.target }}"
           path: |
             result/bin/himalaya*
-            result/bin/share
+      - name: Upload share folder
+        uses: actions/upload-artifact@v4
+        if: matrix.target == "x86_64-linux"
+        with:
+          name: "share"
+          path: |
+            result/share

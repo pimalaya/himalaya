@@ -28,12 +28,6 @@ rustPlatform.buildRustPackage rec {
 
   cargoHash = "sha256-YS8IamapvmdrOPptQh2Ef9Yold0IK1XIeGs0kDIQ5b8=";
 
-  doCheck = false;
-  auditable = false;
-
-  # unit tests only
-  cargoTestFlags = [ "--lib" ];
-
   nativeBuildInputs = [ pkg-config ]
     ++ lib.optional (installManPages || installShellCompletions) installShellFiles;
 
@@ -42,15 +36,31 @@ rustPlatform.buildRustPackage rec {
     ++ lib.optional (builtins.elem "notmuch" buildFeatures) notmuch
     ++ lib.optional (builtins.elem "pgp-gpg" buildFeatures) gpgme;
 
-  postInstall = lib.optionalString installManPages ''
-    mkdir -p $out/man
-    $out/bin/himalaya man $out/man
-    installManPage $out/man/*
+  doCheck = false;
+  auditable = false;
+
+  # unit tests only
+  cargoTestFlags = [ "--lib" ];
+
+  preInstall = ''
+    mkdir -p $out/share/applications
+    cp assets/himalaya.desktop "$out"/share/applications/
+  '' + lib.optionalString installManPages ''
+    mkdir -p "$out"/share/man
+    "$out"/bin/himalaya man "$out"/share/man
   '' + lib.optionalString installShellCompletions ''
-    installShellCompletion --cmd himalaya \
-      --bash <($out/bin/himalaya completion bash) \
-      --fish <($out/bin/himalaya completion fish) \
-      --zsh <($out/bin/himalaya completion zsh)
+    mkdir -p "$out"/share/completions
+    "$out"/bin/himalaya completion bash > "$out"/share/completions/himalaya.bash
+    "$out"/bin/himalaya completion elvish > "$out"/share/completions/himalaya.elvish
+    "$out"/bin/himalaya completion fish > "$out"/share/completions/himalaya.fish
+    "$out"/bin/himalaya completion powershell > "$out"/share/completions/himalaya.powershell
+    "$out"/bin/himalaya completion zsh > "$out"/share/completions/himalaya.zsh
+  '';
+
+  postInstall = lib.optionalString installManPages ''
+    installManPage "$out"/share/man/*
+  '' + lib.optionalString installShellCompletions ''
+    installShellCompletion "$out"/share/completions/himalaya.{bash,fish,zsh}
   '';
 
   meta = {
