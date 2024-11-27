@@ -20,7 +20,7 @@ default = [
   "imap",
   #"maildir",
   #"notmuch",
-  "smtp",
+  #"smtp",
   #"sendmail",
   #"keyring",
   #"oauth2",
