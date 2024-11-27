@@ -9,7 +9,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        feature: [full, minimal]
         include:
           - target: aarch64-darwin
             os: macos-14
@@ -46,11 +45,11 @@ jobs:
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           extraPullNames: nix-community
       - name: Build release
-        run: nix build .#cross-${{ matrix.target }}${{ matrix.feature == 'minimal' && '-minimal' || '' }}
+        run: nix build .#cross-${{ matrix.target }}-minimal
       - name: Upload release
         uses: actions/upload-artifact@v4
         with:
-          name: himalaya${{ matrix.feature == 'minimal' && '-minimal' || '' }}-${{ matrix.target }}
+          name: himalaya-minimal-${{ matrix.target }}
           path: result/bin/himalaya*
       - name: Upload share folder
         uses: actions/upload-artifact@v4
