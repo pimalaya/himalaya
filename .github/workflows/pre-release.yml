@@ -10,33 +10,24 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - system: aarch64-macos-14
-            target: aarch64-apple-darwin
+          - target: aarch64-apple
             os: macos-14
-          - system: aarch64-linux
-            target: aarch64-unknown-linux-musl
+          - target: aarch64-linux
             os: ubuntu-latest
-          - system: armv6l-linux
-            target: armv6l-unknown-linux-musleabihf
+          - target: armv6l-linux
             os: ubuntu-latest
-          - system: armv7l-linux
-            target: armv7l-unknown-linux-musleabihf
+          - target: armv7l-linux
             os: ubuntu-latest
-          - system: i686-linux
-            target: i686-unknown-linux-musl
+          - target: i686-linux
             os: ubuntu-latest
           # FIXME
-          # - system: i686-windows
-          #   target: i686-w64-mingw32
+          # - target: i686-windows
           #   os: ubuntu-latest
-          - system: x86_64-macos-13
-            target: x86_64-apple-darwin
+          - target: x86_64-apple
             os: macos-13
-          - system: x86_64-linux
-            target: x86_64-unknown-linux-musl
+          - target: x86_64-linux
             os: ubuntu-latest
-          - system: x86_64-windows
-            target: x86_64-w64-mingw32
+          - target: x86_64-windows
             os: ubuntu-latest
     steps:
       - name: Checkout code
@@ -60,7 +51,7 @@ jobs:
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: "himalaya-${{ matrix.system }}"
+          name: "himalaya-${{ matrix.target }}"
           path: |
             result/bin/himalaya*
             result/bin/share
