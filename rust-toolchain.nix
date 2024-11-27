@@ -6,14 +6,16 @@ let
 in
 
 {
-  fromFile = fenix.fromToolchainFile { inherit file sha256; };
+  fromFile =
+    let spec = { inherit file sha256; };
+    in fenix.fromToolchainFile spec;
 
   fromTarget = target:
     let
       name = (lib.importTOML file).toolchain.channel;
-      specs = { inherit name sha256; };
-      toolchain = fenix.fromToolchainName specs;
-      crossToolchain = fenix.targets.${target}.fromToolchainName specs;
+      spec = { inherit name sha256; };
+      toolchain = fenix.fromToolchainName spec;
+      crossToolchain = fenix.targets.${target}.fromToolchainName spec;
       components = [ toolchain.rustc toolchain.cargo ]
         ++ lib.optional (!isNull target) crossToolchain.rust-std;
     in

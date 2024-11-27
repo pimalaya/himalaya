@@ -2,199 +2,94 @@
   description = "CLI to manage emails";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-24.05";
-    gitignore = {
-      url = "github:hercules-ci/gitignore.nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     fenix = {
       # https://github.com/nix-community/fenix/pull/145
-      # url = "github:nix-community/fenix";
       url = "github:soywod/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    crane.url = "github:ipetkov/crane";
-    flake-compat = {
-      url = "github:edolstra/flake-compat";
-      flake = false;
-    };
   };
 
-  outputs = { self, nixpkgs, gitignore, fenix, crane, ... }:
+  outputs = { self, nixpkgs, fenix }:
     let
       inherit (nixpkgs) lib;
-      inherit (gitignore.lib) gitignoreSource;
 
       crossSystems = {
-        x86_64-linux = {
-          x86_64-linux = {
-            rustTarget = "x86_64-unknown-linux-musl";
-          };
+        aarch64-apple = [ ];
+        aarch64-linux = [
+          "aarch64-unknown-linux-musl"
+        ];
+        x86_64-apple = [ ];
+        x86_64-linux = [
+          "aarch64-unknown-linux-musl"
+          "armv6l-unknown-linux-musleabihf"
+          "armv7l-unknown-linux-musleabihf"
+          "i686-unknown-linux-musl"
+          "x86_64-unknown-linux-musl"
+          "x86_64-w64-mingw32"
+        ];
+      };
 
-          aarch64-linux = rec {
-            rustTarget = "aarch64-unknown-linux-musl";
-            runner = { pkgs, himalaya }: "${pkgs.qemu}/bin/qemu-aarch64 ${himalaya}";
-            mkPackage = { system, ... }: package:
-              let
-                inherit (mkPkgsCross system rustTarget) stdenv;
-                cc = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc";
-              in
-              package // {
-                TARGET_CC = cc;
-                CARGO_BUILD_RUSTFLAGS = package.CARGO_BUILD_RUSTFLAGS ++ [ "-Clinker=${cc}" ];
-              };
-          };
+      # Dev shells
 
-          x86_64-windows = {
-            rustTarget = "x86_64-pc-windows-gnu";
-            runner = { pkgs, himalaya }:
-              let wine = pkgs.wine.override { wineBuild = "wine64"; };
-              in "${wine}/bin/wine64 ${himalaya}.exe";
-            mkPackage = { pkgs, ... }: package:
-              let
-                inherit (pkgs.pkgsCross.mingwW64) stdenv windows;
-                cc = "${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc";
-              in
-              package // {
-                depsBuildBuild = [ stdenv.cc windows.pthreads ];
-                TARGET_CC = cc;
-                CARGO_BUILD_RUSTFLAGS = package.CARGO_BUILD_RUSTFLAGS ++ [ "-Clinker=${cc}" ];
-              };
-          };
-        };
-
-        aarch64-linux.aarch64-linux = {
-          rustTarget = "aarch64-unknown-linux-musl";
-        };
-
-        x86_64-darwin.x86_64-darwin = {
-          rustTarget = "x86_64-apple-darwin";
-        };
-
-        aarch64-darwin.aarch64-darwin = {
-          rustTarget = "aarch64-apple-darwin";
+      mkDevShell = system: {
+        default = import ./shell.nix {
+          pkgs = import nixpkgs { inherit system; };
+          fenix = fenix.packages.${system};
         };
       };
 
-      eachBuildSystem = lib.genAttrs (builtins.attrNames crossSystems);
+      # Packages
 
-      mkPkgsCross = buildSystem: crossSystem: import nixpkgs {
-        system = buildSystem;
-        crossSystem.config = crossSystem;
+      mkPackages = system: mkCrossPackages system // {
+        default = withGitEnvs (import ./default.nix ({
+          pkgs = import nixpkgs { inherit system; };
+          fenix = fenix.packages.${system};
+        }));
       };
 
-      mkToolchain = import ./rust-toolchain.nix fenix;
+      withGitEnvs = package: package.overrideAttrs (drv: {
+        GIT_REV = drv.GIT_REV or self.rev or self.dirtyRev or "dirty";
+        GIT_DESCRIBE = drv.GIT_DESCRIBE or "flake-" + self.shortRev or self.dirtyShortRev or "dirty";
+      });
 
-      mkApp = { pkgs, buildSystem, targetSystem ? buildSystem }:
+      mkCrossPackages = system:
+        lib.attrsets.mergeAttrsList (map (mkCrossPackage system) crossSystems.${system});
+
+      mkCrossPackage = system: crossConfig:
         let
-          himalaya = lib.getExe self.packages.${buildSystem}.${targetSystem};
-          wrapper = crossSystems.${buildSystem}.${targetSystem}.runner or (_: himalaya) { inherit pkgs himalaya; };
-          program = lib.getExe (pkgs.writeShellScriptBin "himalaya" "${wrapper} $@");
-          app = { inherit program; type = "app"; };
+          pkgs = import nixpkgs { inherit system; };
+          crossSystem = { config = crossConfig; isStatic = true; };
+          crossPkgs = import nixpkgs { inherit system crossSystem; };
+          crossPkg = import ./default.nix { inherit pkgs crossPkgs; fenix = fenix.packages.${system}; };
         in
-        app;
+        { "cross-${crossPkgs.hostPlatform.system}" = withGitEnvs crossPkg; };
 
-      mkApps = buildSystem:
+      # Apps
+
+      mkApps = system: mkCrossApps system // {
+        default = { type = "app"; program = lib.getExe self.packages.${system}.default; };
+      };
+
+      mkCrossApps = system:
+        lib.attrsets.mergeAttrsList (map (mkCrossApp system) crossSystems.${system});
+
+      mkCrossApp = system: crossConfig:
         let
-          pkgs = import nixpkgs { system = buildSystem; };
-          mkApp' = targetSystem: _: mkApp { inherit pkgs buildSystem targetSystem; };
-          defaultApp = mkApp { inherit pkgs buildSystem; };
-          apps = builtins.mapAttrs mkApp' crossSystems.${buildSystem};
+          pkgs = import nixpkgs { inherit system; };
+          emulator = crossPkgs.hostPlatform.emulator pkgs;
+          crossSystem = { config = crossConfig; isStatic = true; };
+          crossPkgs = import nixpkgs { inherit system crossSystem; };
+          crossPkgName = "cross-${crossPkgs.hostPlatform.system}";
+          crossPkgExe = lib.getExe self.packages.${system}.${crossPkgName};
+          program = lib.getExe (pkgs.writeShellScriptBin "himalaya" "${emulator} ${crossPkgExe} $@");
         in
-        apps // { default = defaultApp; };
-
-      mkPackage = { pkgs, buildSystem, targetSystem ? buildSystem }:
-        let
-          targetConfig = crossSystems.${buildSystem}.${targetSystem};
-          toolchain = mkToolchain.fromTarget {
-            inherit pkgs buildSystem;
-            targetSystem = targetConfig.rustTarget;
-          };
-          rust = (crane.mkLib pkgs).overrideToolchain toolchain;
-          mkPackage' = targetConfig.mkPackage or (_: p: p);
-          himalaya = "./himalaya";
-          runner = targetConfig.runner or (_: himalaya) { inherit pkgs himalaya; };
-          package = mkPackage' { inherit pkgs; system = buildSystem; } {
-            name = "himalaya";
-            src = gitignoreSource ./.;
-            strictDeps = true;
-            doCheck = false;
-            auditable = false;
-            buildInputs = lib.optionals pkgs.stdenv.isDarwin [
-              pkgs.libiconv
-              pkgs.darwin.apple_sdk_11_0.frameworks.Security
-            ];
-            nativeBuildInputs = with pkgs; [ pkg-config ];
-            CARGO_BUILD_TARGET = targetConfig.rustTarget;
-            CARGO_BUILD_RUSTFLAGS = [ "-Ctarget-feature=+crt-static" ];
-            GIT_REV = self.rev or self.dirtyRev or "dirty";
-            GIT_DESCRIBE = "flake-" + self.shortRev or self.dirtyShortRev or "dirty";
-            postInstall = ''
-              export WINEPREFIX="$(mktemp -d)"
-
-              mkdir -p $out/bin/share/{applications,completions,man,services}
-              cp assets/himalaya.desktop $out/bin/share/applications/
-              cp assets/himalaya-watch@.service $out/bin/share/services/
-
-              cd $out/bin
-              ${runner} man ./share/man
-              ${runner} completion bash > ./share/completions/himalaya.bash
-              ${runner} completion elvish > ./share/completions/himalaya.elvish
-              ${runner} completion fish > ./share/completions/himalaya.fish
-              ${runner} completion powershell > ./share/completions/himalaya.powershell
-              ${runner} completion zsh > ./share/completions/himalaya.zsh
-
-              tar -czf himalaya.tgz himalaya* share
-              mv himalaya.tgz ../
-
-              ${pkgs.zip}/bin/zip -r himalaya.zip himalaya* share
-              mv himalaya.zip ../
-            '';
-
-            meta.mainProgram = "himalaya";
-          };
-        in
-        rust.buildPackage package;
-
-      mkPackages = buildSystem:
-        let
-          pkgs = import nixpkgs { system = buildSystem; };
-          mkPackage' = targetSystem: _: mkPackage { inherit pkgs buildSystem targetSystem; };
-          defaultPackage = mkPackage { inherit pkgs buildSystem; };
-          packages = builtins.mapAttrs mkPackage' crossSystems.${buildSystem};
-        in
-        packages // { default = defaultPackage; };
-
-      mkDevShells = buildSystem:
-        let
-          pkgs = import nixpkgs { system = buildSystem; };
-          rust-toolchain = mkToolchain.fromFile { inherit buildSystem; };
-          defaultShell = pkgs.mkShell {
-            nativeBuildInputs = with pkgs; [ pkg-config ];
-            buildInputs = with pkgs; [
-              # Nix
-              nixd
-              nixpkgs-fmt
-
-              # Rust
-              rust-toolchain
-              cargo-watch
-
-              # Email env
-              gnupg
-              gpgme
-              msmtp
-              notmuch
-              openssl.dev
-            ];
-          };
-        in
-        { default = defaultShell; };
-
+        { "${crossPkgName}" = { inherit program; type = "app"; }; };
     in
+
     {
-      apps = eachBuildSystem mkApps;
-      packages = eachBuildSystem mkPackages;
-      devShells = eachBuildSystem mkDevShells;
+      devShells = lib.genAttrs (lib.attrNames crossSystems) mkDevShell;
+      packages = lib.genAttrs (lib.attrNames crossSystems) mkPackages;
+      apps = lib.genAttrs (lib.attrNames crossSystems) mkApps;
     };
 }

@@ -21,11 +21,11 @@ default = [
   "maildir",
   #"notmuch",
   "smtp",
-  #"sendmail",
-  #"keyring",
-  #"oauth2",
+  "sendmail",
+  "keyring",
+  "oauth2",
   "wizard",
-  #"pgp-commands",
+  "pgp-commands",
   #"pgp-gpg",
   #"pgp-native",
 ]
@@ -40,10 +40,9 @@ keyring = ["email-lib/keyring", "pimalaya-tui/keyring", "secret-lib/keyring"]
 oauth2 = ["email-lib/oauth2", "pimalaya-tui/oauth2", "keyring"]
 wizard = ["email-lib/autoconfig", "pimalaya-tui/wizard"]
 
-pgp = []
-pgp-commands = ["email-lib/pgp-commands", "mml-lib/pgp-commands", "pimalaya-tui/pgp-commands", "pgp"]
-pgp-gpg = ["email-lib/pgp-gpg", "mml-lib/pgp-gpg", "pimalaya-tui/pgp-gpg", "pgp"]
-pgp-native = ["email-lib/pgp-native", "mml-lib/pgp-native", "pimalaya-tui/pgp-native", "pgp"]
+pgp-commands = ["email-lib/pgp-commands", "mml-lib/pgp-commands", "pimalaya-tui/pgp-commands"]
+pgp-gpg = ["email-lib/pgp-gpg", "mml-lib/pgp-gpg", "pimalaya-tui/pgp-gpg"]
+pgp-native = ["email-lib/pgp-native", "mml-lib/pgp-native", "pimalaya-tui/pgp-native"]
 
 [build-dependencies]
 git2 = { version = "0.19", default-features = false }

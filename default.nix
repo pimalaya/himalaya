@@ -1,28 +1,18 @@
-{ target ? null
-, isStatic ? false
+{ pkgs ? import <nixpkgs> { }
+, crossPkgs ? pkgs
+, fenix ? import (fetchTarball "https://github.com/nix-community/fenix/archive/main.tar.gz") { }
 , defaultFeatures ? true
 , features ? ""
 }:
 
 let
-  buildPackages = import (fetchTarball "https://github.com/soywod/nixpkgs/archive/master.tar.gz") { };
-  inherit (buildPackages) stdenv binutils mktemp gnutar zip;
+  inherit (pkgs) binutils gnutar lib mktemp stdenv zip;
+  inherit (crossPkgs) buildPlatform hostPlatform;
 
-  pkgs = import (fetchTarball "https://github.com/soywod/nixpkgs/archive/master.tar.gz") (
-    if isNull target then { } else {
-      crossSystem = {
-        inherit isStatic;
-        config = target;
-      };
-    }
-  );
-
-  inherit (pkgs) lib hostPlatform;
-  fenix = import (fetchTarball "https://github.com/soywod/fenix/archive/main.tar.gz") { };
   mkToolchain = import ./rust-toolchain.nix { inherit lib fenix; };
-  rustTarget = if isNull target then null else hostPlatform.rust.rustcTarget;
+  rustTarget = if buildPlatform == hostPlatform then null else hostPlatform.rust.rustcTarget;
   rustToolchain = mkToolchain.fromTarget rustTarget;
-  rustPlatform = pkgs.makeRustPlatform {
+  rustPlatform = crossPkgs.makeRustPlatform {
     rustc = rustToolchain;
     cargo = rustToolchain;
   };
@@ -40,19 +30,19 @@ let
 
   himalayaExe =
     let ext = lib.optionalString hostPlatform.isWindows ".exe";
-    in "${hostPlatform.emulator buildPackages} ./himalaya${ext}";
+    in "${hostPlatform.emulator pkgs} ./himalaya${ext}";
 
   himalaya = import ./package.nix {
     inherit lib rustPlatform;
-    fetchFromGitHub = pkgs.fetchFromGitHub;
-    stdenv = pkgs.stdenv;
-    apple-sdk = if pkgs.stdenv.hostPlatform.isx86_64 then pkgs.apple-sdk_13 else pkgs.apple-sdk_14;
+    fetchFromGitHub = crossPkgs.fetchFromGitHub;
+    stdenv = crossPkgs.stdenv;
+    apple-sdk = if hostPlatform.isx86_64 then crossPkgs.apple-sdk_13 else crossPkgs.apple-sdk_14;
     installShellFiles = false;
     installShellCompletions = false;
     installManPages = false;
-    notmuch = pkgs.notmuch;
-    gpgme = pkgs.gpgme;
-    pkg-config = pkgs.pkg-config;
+    notmuch = crossPkgs.notmuch;
+    gpgme = crossPkgs.gpgme;
+    pkg-config = crossPkgs.pkg-config;
     buildNoDefaultFeatures = !defaultFeatures;
     buildFeatures = lib.strings.splitString "," features;
   };
@@ -86,7 +76,7 @@ himalaya.overrideAttrs (drv: {
     mv himalaya.zip ../
   '';
 
-  src = pkgs.nix-gitignore.gitignoreSource [ ] ./.;
+  src = crossPkgs.nix-gitignore.gitignoreSource [ ] ./.;
 
   cargoDeps = rustPlatform.importCargoLock {
     lockFile = ./Cargo.lock;

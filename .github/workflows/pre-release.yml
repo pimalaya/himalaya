@@ -46,6 +46,7 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-24.05
           enable_kvm: true
+          extra_nix_config: "experimental-features = nix-command flakes"
       - name: Cache Nix store
         uses: cachix/cachix-action@v15
         with:
@@ -54,7 +55,8 @@ jobs:
           extraPullNames: nix-community
       - name: Build release
         run: |
-          nix-build --argstr target ${{ matrix.target }} --arg isStatic true
+          nix build .#cross-${{ matrix.target }}
+          nix run .#cross-${{ matrix.target }} -- --version
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:

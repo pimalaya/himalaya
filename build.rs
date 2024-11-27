@@ -71,32 +71,35 @@ fn target_envs() {
 /// variables. In case of failure, it tries to build them using
 /// [`git2`].
 fn git_envs() {
-    // skip the process if the current directory is not a git
-    // repository (for example, from a nix build root jail)
-    let Ok(git) = Repository::open(".") else {
-        println!("cargo::rustc-env=GIT_DESCRIBE=unknown");
-        println!("cargo::rustc-env=GIT_REV=unknown");
-        return;
-    };
+    let git = Repository::open(".").ok();
 
     if try_forward_env("GIT_DESCRIBE").is_err() {
-        let mut opts = DescribeOptions::new();
-        opts.describe_all();
-        opts.show_commit_oid_as_fallback(true);
+        let description = match &git {
+            None => String::from("unknown"),
+            Some(git) => {
+                let mut opts = DescribeOptions::new();
+                opts.describe_all();
+                opts.show_commit_oid_as_fallback(true);
 
-        let description = git
-            .describe(&opts)
-            .expect("should describe git object")
-            .format(None)
-            .expect("should format git object description");
+                git.describe(&opts)
+                    .expect("should describe git object")
+                    .format(None)
+                    .expect("should format git object description")
+            }
+        };
 
         println!("cargo::rustc-env=GIT_DESCRIBE={description}");
     };
 
     if try_forward_env("GIT_REV").is_err() {
-        let head = git.head().expect("should get git HEAD");
-        let commit = head.peel_to_commit().expect("should get git HEAD commit");
-        let rev = commit.id().to_string();
+        let rev = match &git {
+            None => String::from("unknown"),
+            Some(git) => {
+                let head = git.head().expect("should get git HEAD");
+                let commit = head.peel_to_commit().expect("should get git HEAD commit");
+                commit.id().to_string()
+            }
+        };
 
         println!("cargo::rustc-env=GIT_REV={rev}");
     };

@@ -4,7 +4,13 @@ use color_eyre::Result;
 use email::imap::config::ImapAuthConfig;
 #[cfg(feature = "smtp")]
 use email::smtp::config::SmtpAuthConfig;
-#[cfg(any(feature = "imap", feature = "smtp", feature = "pgp"))]
+#[cfg(any(
+    feature = "imap",
+    feature = "smtp",
+    feature = "pgp-gpg",
+    feature = "pgp-commands",
+    feature = "pgp-native",
+))]
 use pimalaya_tui::terminal::prompt;
 use pimalaya_tui::terminal::{cli::printer::Printer, config::TomlConfig as _};
 use tracing::info;
@@ -69,7 +75,7 @@ impl AccountConfigureCommand {
                 }
             }
 
-            #[cfg(feature = "pgp")]
+            #[cfg(any(feature = "pgp-gpg", feature = "pgp-commands", feature = "pgp-native"))]
             if let Some(config) = &toml_account_config.pgp {
                 config.reset().await?;
             }
@@ -107,7 +113,7 @@ impl AccountConfigureCommand {
             _ => Ok(()),
         }?;
 
-        #[cfg(feature = "pgp")]
+        #[cfg(any(feature = "pgp-gpg", feature = "pgp-commands", feature = "pgp-native"))]
         if let Some(config) = &toml_account_config.pgp {
             config
                 .configure(&toml_account_config.email, || {
