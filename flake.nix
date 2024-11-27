@@ -2,9 +2,12 @@
   description = "CLI to manage emails";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    # TODO: nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    # <https://github.com/NixOS/nixpkgs/pull/358989>
+    nixpkgs.url = "github:soywod/nixpkgs";
     fenix = {
-      # https://github.com/nix-community/fenix/pull/145
+      # TODO: url = "github:nix-community/fenix";
+      # <https://github.com/nix-community/fenix/pull/145>
       url = "github:soywod/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
