@@ -1,12 +1,12 @@
-name: build-on-demand
+name: custom-release
 
 on:
   workflow_dispatch:
     inputs:
       target:
+        type: choice
         description: Target
         required: true
-        type: choice
         options:
           - aarch64-apple-darwin
           - aarch64-unknown-linux-musl
@@ -19,16 +19,16 @@ on:
           - x86_64-unknown-linux-musl
           - x86_64-w64-mingw32
       defaultFeatures:
+        type: boolean
         description: Enable default cargo features
         default: true
-        type: bool
       features:
-        description: Cargo features (comma-separated)
         type: string
+        description: Cargo features (comma-separated)
 
 jobs:
-  build-on-demand:
-    runs-on: ${{ inputs.target == "x86_64-apple-darwin" && "macos-13" || inputs.target == "aarch64-apple-darwin" && "macos-14" || "ubuntu-latest" }}
+  custom-release:
+    runs-on: ${{ inputs.target == 'x86_64-apple-darwin' && 'macos-13' || inputs.target == 'aarch64-apple-darwin' && 'macos-14' || 'ubuntu-latest' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -44,15 +44,15 @@ jobs:
           name: soywod
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           extraPullNames: nix-community
-      - name: Build release
+      - name: Build custom release
         run: |
           nix-build \
             --arg crossPkgs 'import <nixpkgs> { crossSystem = { config = "${{ inputs.target }}"; isStatic = true; }; }' \
             --arg fenix 'import (fetchTarball "https://github.com/soywod/fenix/archive/main.tar.gz") { }' \
             --arg defaultFeatures ${{ inputs.defaultFeatures }} \
             --argstr features ${{ inputs.features }}
-      - name: Upload release
+      - name: Upload custom release
         uses: actions/upload-artifact@v4
         with:
           name: himalaya-${{ inputs.target }}
-          path: result/*
+          path: result/bin/himalaya*
