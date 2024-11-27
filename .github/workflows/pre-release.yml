@@ -10,7 +10,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: aarch64-apple
+          - target: aarch64-darwin
             os: macos-14
           - target: aarch64-linux
             os: ubuntu-latest
@@ -23,7 +23,7 @@ jobs:
           # FIXME
           # - target: i686-windows
           #   os: ubuntu-latest
-          - target: x86_64-apple
+          - target: x86_64-darwin
             os: macos-13
           - target: x86_64-linux
             os: ubuntu-latest
