@@ -34,6 +34,11 @@
         ];
       };
 
+      withGitEnvs = package: package.overrideAttrs (drv: {
+        GIT_REV = drv.GIT_REV or self.rev or self.dirtyRev or "unknown";
+        GIT_DESCRIBE = drv.GIT_DESCRIBE or "nix-flake-" + self.lastModifiedDate;
+      });
+
       # Dev shells
 
       mkDevShell = system: {
@@ -51,11 +56,6 @@
           fenix = fenix.packages.${system};
         }));
       };
-
-      withGitEnvs = package: package.overrideAttrs (drv: {
-        GIT_REV = drv.GIT_REV or self.rev or self.dirtyRev or "dirty";
-        GIT_DESCRIBE = drv.GIT_DESCRIBE or "flake-" + self.shortRev or self.dirtyShortRev or "dirty";
-      });
 
       mkCrossPackages = system:
         lib.attrsets.mergeAttrsList (map (mkCrossPackage system) crossSystems.${system});

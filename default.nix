@@ -6,7 +6,7 @@
 }:
 
 let
-  inherit (pkgs) binutils gnutar lib mktemp stdenv zip;
+  inherit (pkgs) binutils gnutar lib mktemp stdenv wine zip;
   inherit (crossPkgs) buildPlatform hostPlatform;
 
   mkToolchain = import ./rust-toolchain.nix { inherit lib fenix; };
@@ -54,8 +54,10 @@ himalaya.overrideAttrs (drv: {
   propagatedBuildInputs = (drv.propagatedBuildInputs or [ ])
     ++ lib.optional hostPlatform.isWindows empty-libgcc_eh;
 
+  # NOTE: manual wineprefix update is somehow needed:
+  # <https://github.com/NixOS/nixpkgs/issues/321332>
   postInstall = (drv.postInstall or "") + lib.optionalString hostPlatform.isWindows ''
-    export WINEPREFIX="$(${lib.getExe' mktemp "mktemp"} -d)"
+    ${lib.getExe' wine "wineboot"} -u
   '' + ''
     mkdir -p $out/bin/share/{applications,completions,man,services}
     cp assets/himalaya.desktop $out/bin/share/applications/
