@@ -68,14 +68,27 @@
           pkgs = import nixpkgs { inherit system; };
           crossSystem = { config = crossConfig; isStatic = true; };
           crossPkgs = import nixpkgs { inherit system crossSystem; };
-          crossPkg = import ./default.nix { inherit pkgs crossPkgs; fenix = fenix.packages.${system}; };
         in
-        { "cross-${crossPkgs.hostPlatform.system}" = withGitEnvs crossPkg; };
+        {
+          "cross-${crossPkgs.hostPlatform.system}" = withGitEnvs (import ./default.nix {
+            inherit pkgs crossPkgs;
+            fenix = fenix.packages.${system};
+          });
+          "cross-${crossPkgs.hostPlatform.system}-minimal" = withGitEnvs (import ./default.nix {
+            inherit pkgs crossPkgs;
+            fenix = fenix.packages.${system};
+            defaultFeatures = false;
+            features = "imap,smtp";
+          });
+        };
 
       # Apps
 
       mkApps = system: mkCrossApps system // {
-        default = { type = "app"; program = lib.getExe self.packages.${system}.default; };
+        default = {
+          type = "app";
+          program = lib.getExe self.packages.${system}.default;
+        };
       };
 
       mkCrossApps = system:
