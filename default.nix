@@ -57,7 +57,7 @@ himalaya.overrideAttrs (drv: {
   # NOTE: manual wineprefix update is somehow needed:
   # <https://github.com/NixOS/nixpkgs/issues/321332>
   postInstall = (drv.postInstall or "") + lib.optionalString hostPlatform.isWindows ''
-    ${lib.getExe' wine "wineboot"} --init
+    export WINEPREFIX="$(${lib.getExe mktemp} -d)"
   '' + ''
     mkdir -p $out/bin/share/{applications,completions,man,services}
     cp assets/himalaya.desktop $out/bin/share/applications/

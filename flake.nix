@@ -84,12 +84,16 @@
       mkCrossApp = system: crossConfig:
         let
           pkgs = import nixpkgs { inherit system; };
+          mktemp = "${lib.getExe pkgs.mktemp} -d";
           emulator = crossPkgs.hostPlatform.emulator pkgs;
           crossSystem = { config = crossConfig; isStatic = true; };
           crossPkgs = import nixpkgs { inherit system crossSystem; };
           crossPkgName = "cross-${crossPkgs.hostPlatform.system}";
           crossPkgExe = lib.getExe self.packages.${system}.${crossPkgName};
-          program = lib.getExe (pkgs.writeShellScriptBin "himalaya" "${emulator} ${crossPkgExe} $@");
+          program = lib.getExe (pkgs.writeShellScriptBin "himalaya" ''
+            ${lib.optionalString crossPkgs.hostPlatform.isWindows "export WINEPREFIX=$(${mktemp})"}
+            ${emulator} ${crossPkgExe} $@
+          '');
         in
         { "${crossPkgName}" = { inherit program; type = "app"; }; };
     in
