@@ -13,7 +13,8 @@ on:
           - armv6l-unknown-linux-musleabihf
           - armv7l-unknown-linux-musleabihf
           - i686-unknown-linux-musl
-          - i686-w64-mingw32
+          # FIXME
+          # - i686-w64-mingw32
           - x86_64-apple-darwin
           - x86_64-unknown-linux-musl
           - x86_64-w64-mingw32
@@ -34,7 +35,8 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@v27
         with:
-          nix_path: nixpkgs=channel:nixos-24.05
+          # TODO: nix_path: nixpkgs=channel:nixos-unstable
+          nix_path: nixpkgs=https://github.com/soywod/nixpkgs/archive/master.tar.gz
           enable_kvm: true
       - name: Cache Nix store
         uses: cachix/cachix-action@v15
@@ -43,17 +45,16 @@ jobs:
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
           extraPullNames: nix-community
       - name: Build release
-        env:
-          NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM: 1
         run: |
           nix-build \
-            --argstr target ${{ inputs.target }} \
+            --arg crossPkgs 'import <nixpkgs> { crossSystem = { config = "${{ inputs.target }}"; isStatic = true; }; }' \
+            --arg fenix 'import (fetchTarball "https://github.com/soywod/fenix/archive/main.tar.gz") { }' \
             --arg defaultFeatures ${{ inputs.defaultFeatures }} \
             --argstr features ${{ inputs.features }}
       - name: Upload release artifact
         uses: actions/upload-artifact@v4
         with:
-          name: "himalaya.${{ inputs.target }}"
+          name: "himalaya-${{ inputs.target }}"
           path: |
             result/bin/himalaya*
             result/bin/share
