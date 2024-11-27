@@ -34,6 +34,8 @@ let
     stdenv = crossPkgs.stdenv;
     apple-sdk = if hostPlatform.isx86_64 then crossPkgs.apple-sdk_13 else crossPkgs.apple-sdk_14;
     installShellFiles = crossPkgs.installShellFiles;
+    installShellCompletions = false;
+    installManPages = false;
     notmuch = crossPkgs.notmuch;
     gpgme = crossPkgs.gpgme;
     pkg-config = crossPkgs.pkg-config;
@@ -47,8 +49,6 @@ himalaya.overrideAttrs (drv: {
 
   propagatedBuildInputs = (drv.propagatedBuildInputs or [ ])
     ++ lib.optional hostPlatform.isWindows empty-libgcc_eh;
-
-  postInstall = null;
 
   src = crossPkgs.nix-gitignore.gitignoreSource [ ] ./.;
 
