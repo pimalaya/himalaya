@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: "Target"
+        description: Target
         required: true
         type: choice
         options:
@@ -19,11 +19,11 @@ on:
           - x86_64-unknown-linux-musl
           - x86_64-w64-mingw32
       defaultFeatures:
-        description: "Enable default cargo features"
+        description: Enable default cargo features
         default: true
         type: bool
       features:
-        description: "Cargo features (comma-separated)"
+        description: Cargo features (comma-separated)
         type: string
 
 jobs:
@@ -42,7 +42,7 @@ jobs:
         uses: cachix/cachix-action@v15
         with:
           name: soywod
-          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           extraPullNames: nix-community
       - name: Build release
         run: |
@@ -51,10 +51,8 @@ jobs:
             --arg fenix 'import (fetchTarball "https://github.com/soywod/fenix/archive/main.tar.gz") { }' \
             --arg defaultFeatures ${{ inputs.defaultFeatures }} \
             --argstr features ${{ inputs.features }}
-      - name: Upload release artifact
+      - name: Upload release
         uses: actions/upload-artifact@v4
         with:
-          name: "himalaya-${{ inputs.target }}"
-          path: |
-            result/bin/himalaya*
-            result/bin/share
+          name: himalaya-${{ inputs.target }}
+          path: result/*

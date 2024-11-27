@@ -18,14 +18,14 @@ rustdoc-args = ["--cfg", "docsrs"]
 [features]
 default = [
   "imap",
-  #"maildir",
+  "maildir",
   #"notmuch",
-  #"smtp",
-  #"sendmail",
+  "smtp",
+  "sendmail",
   #"keyring",
   #"oauth2",
-  #"wizard",
-  #"pgp-commands",
+  "wizard",
+  "pgp-commands",
   #"pgp-gpg",
   #"pgp-native",
 ]
