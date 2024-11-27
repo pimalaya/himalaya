@@ -37,26 +37,23 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-24.05
           enable_kvm: true
-          extra_nix_config: "experimental-features = nix-command flakes"
+          extra_nix_config: experimental-features = nix-command flakes
       - name: Cache Nix store
         uses: cachix/cachix-action@v15
         with:
           name: soywod
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           extraPullNames: nix-community
       - name: Build release
-        run: |
-          nix build .#cross-${{ matrix.target }}
+        run: nix build .#cross-${{ matrix.target }}
       - name: Upload release
         uses: actions/upload-artifact@v4
         with:
-          name: "himalaya-${{ matrix.target }}"
-          path: |
-            result/bin/himalaya*
+          name: himalaya-${{ matrix.target }}
+          path: result/bin/himalaya*
       - name: Upload share folder
         uses: actions/upload-artifact@v4
-        if: matrix.target == "x86_64-linux"
+        if: ${{ matrix.target == 'x86_64-linux' }}
         with:
-          name: "share"
-          path: |
-            result/share
+          name: share
+          path: result/share
