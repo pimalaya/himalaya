@@ -39,11 +39,11 @@
     "pimalaya": {
       "flake": false,
       "locked": {
-        "lastModified": 1732804333,
-        "narHash": "sha256-Umel9Au2eHcr9d9sYV6GjctBhLioEM4BBxkmiJlg/to=",
+        "lastModified": 1732806838,
+        "narHash": "sha256-/Xp2qCuobXwomUX6m4+ceCcp59tSYnUfPsOkfcj2tDk=",
         "owner": "pimalaya",
         "repo": "nix",
-        "rev": "84e4c7c81f390abf54ac103f6f838ed68a832ee9",
+        "rev": "7d8d42cc1e0d01304e945441809d2e451268c5e8",
         "type": "github"
       },
       "original": {
