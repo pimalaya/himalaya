@@ -36,10 +36,27 @@
         "type": "github"
       }
     },
+    "pimalaya": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1732804333,
+        "narHash": "sha256-Umel9Au2eHcr9d9sYV6GjctBhLioEM4BBxkmiJlg/to=",
+        "owner": "pimalaya",
+        "repo": "nix",
+        "rev": "84e4c7c81f390abf54ac103f6f838ed68a832ee9",
+        "type": "github"
+      },
+      "original": {
+        "owner": "pimalaya",
+        "repo": "nix",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "fenix": "fenix",
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs",
+        "pimalaya": "pimalaya"
       }
     },
     "rust-analyzer-src": {

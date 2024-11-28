@@ -2,108 +2,23 @@
   description = "CLI to manage emails";
 
   inputs = {
-    # TODO: nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    # <https://github.com/NixOS/nixpkgs/pull/358989>
+    # TODO: https://github.com/NixOS/nixpkgs/pull/358989
+    # nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     nixpkgs.url = "github:soywod/nixpkgs";
     fenix = {
-      # TODO: url = "github:nix-community/fenix";
-      # <https://github.com/nix-community/fenix/pull/145>
+      # TODO: https://github.com/nix-community/fenix/pull/145
+      # url = "github:nix-community/fenix";
       url = "github:soywod/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    pimalaya = {
+      url = "github:pimalaya/nix";
+      flake = false;
+    };
   };
 
-  outputs = { self, nixpkgs, fenix }:
-    let
-      inherit (nixpkgs) lib;
-
-      crossSystems = {
-        aarch64-darwin = [
-          "aarch64-apple-darwin"
-        ];
-        aarch64-linux = [
-          "aarch64-unknown-linux-musl"
-        ];
-        x86_64-darwin = [
-          "x86_64-apple-darwin"
-        ];
-        x86_64-linux = [
-          "aarch64-unknown-linux-musl"
-          "armv6l-unknown-linux-musleabihf"
-          "armv7l-unknown-linux-musleabihf"
-          "i686-unknown-linux-musl"
-          "x86_64-unknown-linux-musl"
-          "x86_64-w64-mingw32"
-        ];
-      };
-
-      withGitEnvs = package: package.overrideAttrs (drv: {
-        GIT_REV = drv.GIT_REV or self.rev or self.dirtyRev or "unknown";
-        GIT_DESCRIBE = drv.GIT_DESCRIBE or "nix-flake-" + self.lastModifiedDate;
-      });
-
-      # Dev shells
-
-      mkDevShell = system: {
-        default = import ./shell.nix {
-          pkgs = import nixpkgs { inherit system; };
-          fenix = fenix.packages.${system};
-        };
-      };
-
-      # Packages
-
-      mkPackages = system: mkCrossPackages system // {
-        default = withGitEnvs (import ./default.nix ({
-          pkgs = import nixpkgs { inherit system; };
-          fenix = fenix.packages.${system};
-        }));
-      };
-
-      mkCrossPackages = system:
-        lib.attrsets.mergeAttrsList (map (mkCrossPackage system) crossSystems.${system});
-
-      mkCrossPackage = system: crossConfig:
-        let
-          pkgs = import nixpkgs { inherit system; };
-          crossSystem = { config = crossConfig; isStatic = true; };
-          crossPkgs = import nixpkgs { inherit system crossSystem; };
-          crossPkg = import ./default.nix { inherit pkgs crossPkgs; fenix = fenix.packages.${system}; };
-        in
-        { "cross-${crossPkgs.hostPlatform.system}" = withGitEnvs crossPkg; };
-
-      # Apps
-
-      mkApps = system: mkCrossApps system // {
-        default = {
-          type = "app";
-          program = lib.getExe self.packages.${system}.default;
-        };
-      };
-
-      mkCrossApps = system:
-        lib.attrsets.mergeAttrsList (map (mkCrossApp system) crossSystems.${system});
-
-      mkCrossApp = system: crossConfig:
-        let
-          pkgs = import nixpkgs { inherit system; };
-          mktemp = "${lib.getExe pkgs.mktemp} -d";
-          emulator = crossPkgs.hostPlatform.emulator pkgs;
-          crossSystem = { config = crossConfig; isStatic = true; };
-          crossPkgs = import nixpkgs { inherit system crossSystem; };
-          crossPkgName = "cross-${crossPkgs.hostPlatform.system}";
-          crossPkgExe = lib.getExe self.packages.${system}.${crossPkgName};
-          program = lib.getExe (pkgs.writeShellScriptBin "himalaya" ''
-            ${lib.optionalString crossPkgs.hostPlatform.isWindows "export WINEPREFIX=$(${mktemp})"}
-            ${emulator} ${crossPkgExe} $@
-          '');
-        in
-        { "${crossPkgName}" = { inherit program; type = "app"; }; };
-    in
-
-    {
-      devShells = lib.genAttrs (lib.attrNames crossSystems) mkDevShell;
-      packages = lib.genAttrs (lib.attrNames crossSystems) mkPackages;
-      apps = lib.genAttrs (lib.attrNames crossSystems) mkApps;
-    };
+  outputs = inputs: (import inputs.pimalaya).mkFlakeOutputs inputs {
+    shell = ./shell.nix;
+    default = ./default.nix;
+  };
 }

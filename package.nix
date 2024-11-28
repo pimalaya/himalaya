@@ -1,3 +1,6 @@
+# TODO: move this to nixpkgs
+# This file aims to be a replacement for the nixpkgs derivation.
+
 { lib
 , pkg-config
 , rustPlatform
