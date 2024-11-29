@@ -1795,7 +1795,6 @@ dependencies = [
  "color-eyre",
  "email-lib",
  "himalaya",
- "mail-builder",
  "mml-lib",
  "once_cell",
  "pimalaya-tui",

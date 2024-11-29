@@ -3,7 +3,6 @@ use std::sync::Arc;
 use clap::Parser;
 use color_eyre::Result;
 use email::{backend::feature::BackendFeatureSource, config::Config};
-use mail_builder::MessageBuilder;
 use pimalaya_tui::{
     himalaya::{backend::BackendBuilder, editor},
     terminal::{cli::printer::Printer, config::TomlConfig as _},
@@ -62,40 +61,35 @@ impl MessageMailtoCommand {
         .build()
         .await?;
 
-        let mut builder = MessageBuilder::new().to(self.url.path());
-        let mut body = String::new();
+        let mut msg = Vec::<u8>::new();
+        let mut body = Vec::<u8>::new();
+
+        msg.extend(b"Content-Type: text/plain; charset=utf-8\r\n");
 
         for (key, val) in self.url.query_pairs() {
-            match key {
-                key if key.eq_ignore_ascii_case("in-reply-to") => {
-                    builder = builder.in_reply_to(val.to_string());
-                }
-                key if key.eq_ignore_ascii_case("cc") => {
-                    builder = builder.cc(val.to_string());
-                }
-                key if key.eq_ignore_ascii_case("bcc") => {
-                    builder = builder.bcc(val.to_string());
-                }
-                key if key.eq_ignore_ascii_case("subject") => {
-                    builder = builder.subject(val.to_string());
-                }
-                key if key.eq_ignore_ascii_case("body") => {
-                    body += &val;
-                }
-                _ => (),
+            if key.eq_ignore_ascii_case("body") {
+                body.extend(val.as_bytes());
+            } else {
+                msg.extend(key.as_bytes());
+                msg.extend(b": ");
+                msg.extend(val.as_bytes());
+                msg.extend(b"\r\n");
             }
         }
 
-        match account_config.find_full_signature() {
-            Some(ref sig) => builder = builder.text_body(body + "\n\n" + sig),
-            None => builder = builder.text_body(body),
+        msg.extend(b"\r\n");
+        msg.extend(body);
+
+        if let Some(sig) = account_config.find_full_signature() {
+            msg.extend(b"\r\n");
+            msg.extend(sig.as_bytes());
         }
 
         let tpl = account_config
             .generate_tpl_interpreter()
             .with_show_only_headers(account_config.get_message_write_headers())
             .build()
-            .from_msg_builder(builder)
+            .from_bytes(msg)
             .await?
             .into();
 
