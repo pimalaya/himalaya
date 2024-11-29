@@ -45,9 +45,7 @@ pgp-gpg = ["email-lib/pgp-gpg", "mml-lib/pgp-gpg", "pimalaya-tui/pgp-gpg"]
 pgp-native = ["email-lib/pgp-native", "mml-lib/pgp-native", "pimalaya-tui/pgp-native"]
 
 [build-dependencies]
-git2 = { version = "0.19", default-features = false }
-serde = { version = "1", features = ["derive"] }
-toml = "0.8"
+pimalaya-tui = { version = "=0.1", default-features = false, features = ["build-envs"] }
 
 [dependencies]
 ariadne = "0.2"
@@ -72,6 +70,7 @@ uuid = { version = "0.8", features = ["v4"] }
 
 [patch.crates-io]
 email-lib = { git = "https://github.com/pimalaya/core" }
+keyring-lib = { git = "https://github.com/pimalaya/core" }
 mml-lib = { git = "https://github.com/pimalaya/core" }
 oauth-lib = { git = "https://github.com/pimalaya/core" }
 pimalaya-tui = { git = "https://github.com/pimalaya/tui" }

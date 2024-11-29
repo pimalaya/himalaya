@@ -2,12 +2,15 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 use color_eyre::Result;
-use pimalaya_tui::terminal::{
-    cli::{
-        arg::path_parser,
-        printer::{OutputFmt, Printer},
+use pimalaya_tui::{
+    long_version,
+    terminal::{
+        cli::{
+            arg::path_parser,
+            printer::{OutputFmt, Printer},
+        },
+        config::TomlConfig as _,
     },
-    config::TomlConfig as _,
 };
 
 use crate::{
@@ -27,7 +30,7 @@ use crate::{
 #[derive(Parser, Debug)]
 #[command(name = env!("CARGO_PKG_NAME"))]
 #[command(author, version, about)]
-#[command(long_version = Cli::LONG_VERSION)]
+#[command(long_version = long_version!())]
 #[command(propagate_version = true, infer_subcommands = true)]
 pub struct Cli {
     #[command(subcommand)]
@@ -73,25 +76,6 @@ pub struct Cli {
     /// and `RUST_BACKTRACE=1` environment variables.
     #[arg(long, global = true, conflicts_with = "debug")]
     pub trace: bool,
-}
-
-impl Cli {
-    pub const LONG_VERSION: &'static str = concat!(
-        "v",
-        env!("CARGO_PKG_VERSION"),
-        " ",
-        env!("CARGO_FEATURES"),
-        "\nbuild: ",
-        env!("CARGO_CFG_TARGET_OS"),
-        " ",
-        env!("CARGO_CFG_TARGET_ENV"),
-        " ",
-        env!("CARGO_CFG_TARGET_ARCH"),
-        "\ngit: ",
-        env!("GIT_DESCRIBE"),
-        ", rev ",
-        env!("GIT_REV"),
-    );
 }
 
 #[derive(Subcommand, Debug)]

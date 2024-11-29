@@ -16,20 +16,24 @@
 , buildFeatures ? [ ]
 }:
 
+let
+  version = "1.0.0-beta.4";
+  hash = "sha256-NrWBg0sjaz/uLsNs8/T4MkUgHOUvAWRix1O5usKsw6o=";
+  cargoHash = "sha256-YS8IamapvmdrOPptQh2Ef9Yold0IK1XIeGs0kDIQ5b8=";
+in
+
 rustPlatform.buildRustPackage rec {
+  inherit cargoHash version;
   inherit buildNoDefaultFeatures buildFeatures;
 
   pname = "himalaya";
-  version = "1.0.0-beta.4";
 
   src = fetchFromGitHub {
-    owner = "soywod";
+    inherit hash;
+    owner = "pimalaya";
     repo = "himalaya";
     rev = "v${version}";
-    hash = "sha256-NrWBg0sjaz/uLsNs8/T4MkUgHOUvAWRix1O5usKsw6o=";
   };
-
-  cargoHash = "sha256-YS8IamapvmdrOPptQh2Ef9Yold0IK1XIeGs0kDIQ5b8=";
 
   nativeBuildInputs = [ pkg-config ]
     ++ lib.optional (installManPages || installShellCompletions) installShellFiles;
@@ -62,11 +66,11 @@ rustPlatform.buildRustPackage rec {
     installShellCompletion "$out"/share/completions/himalaya.{bash,fish,zsh}
   '';
 
-  meta = {
+  meta = rec {
     description = "CLI to manage emails";
     mainProgram = "himalaya";
-    homepage = "https://github.com/pimalaya/himalaya/";
-    changelog = "https://github.com/soywod/himalaya/blob/v${version}/CHANGELOG.md";
+    homepage = "https://github.com/pimalaya/himalaya";
+    changelog = "${homepage}/blob/v${version}/CHANGELOG.md";
     license = lib.licenses.mit;
     maintainers = with lib.maintainers; [ soywod toastal yanganto ];
   };
