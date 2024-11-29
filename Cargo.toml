@@ -16,36 +16,24 @@ features = ["imap", "maildir", "smtp", "sendmail", "oauth2", "wizard", "pgp-comm
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-default = [
-  "imap",
-  "maildir",
-  #"notmuch",
-  "smtp",
-  "sendmail",
-  #"keyring",
-  #"oauth2",
-  "wizard",
-  "pgp-commands",
-  #"pgp-gpg",
-  #"pgp-native",
-]
-
+default = ["imap", "maildir", "smtp", "sendmail", "wizard", "pgp-commands"]
 imap = ["email-lib/imap", "pimalaya-tui/imap"]
 maildir = ["email-lib/maildir", "pimalaya-tui/maildir"]
 notmuch = ["email-lib/notmuch", "pimalaya-tui/notmuch"]
 smtp = ["email-lib/smtp", "pimalaya-tui/smtp"]
 sendmail = ["email-lib/sendmail", "pimalaya-tui/sendmail"]
-
 keyring = ["email-lib/keyring", "pimalaya-tui/keyring", "secret-lib/keyring"]
 oauth2 = ["email-lib/oauth2", "pimalaya-tui/oauth2", "keyring"]
 wizard = ["email-lib/autoconfig", "pimalaya-tui/wizard"]
-
 pgp-commands = ["email-lib/pgp-commands", "mml-lib/pgp-commands", "pimalaya-tui/pgp-commands"]
 pgp-gpg = ["email-lib/pgp-gpg", "mml-lib/pgp-gpg", "pimalaya-tui/pgp-gpg"]
 pgp-native = ["email-lib/pgp-native", "mml-lib/pgp-native", "pimalaya-tui/pgp-native"]
 
 [build-dependencies]
 pimalaya-tui = { version = "=0.1", default-features = false, features = ["build-envs"] }
+
+[dev-dependencies]
+himalaya = { path = ".", features = ["notmuch", "keyring", "oauth2", "pgp-gpg", "pgp-native"] }
 
 [dependencies]
 ariadne = "0.2"
