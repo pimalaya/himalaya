@@ -90,6 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed pre-release archives issue. [#492]
 - Fixed mailto parsing issue. [core#10]
+- Fixed `Answered` flag not set when replying to a message. [#508]
 
 ## [1.0.0-beta.4] - 2024-04-16
 
@@ -897,4 +898,5 @@ Few major concepts changed:
 
 [#492]: https://github.com/pimalaya/himalaya/issues/492
 [#496]: https://github.com/pimalaya/himalaya/issues/496
+[#508]: https://github.com/pimalaya/himalaya/issues/508
 [core#10]: https://github.com/pimalaya/core/issues/10

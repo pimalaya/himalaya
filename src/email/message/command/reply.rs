@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use clap::Parser;
 use color_eyre::{eyre::eyre, Result};
-use email::{backend::feature::BackendFeatureSource, config::Config};
+use email::{backend::feature::BackendFeatureSource, config::Config, flag::Flag};
 use pimalaya_tui::{
     himalaya::{backend::BackendBuilder, editor},
     terminal::{cli::printer::Printer, config::TomlConfig as _},
@@ -82,6 +82,11 @@ impl MessageReplyCommand {
             .with_reply_all(self.reply.all)
             .build()
             .await?;
-        editor::edit_tpl_with_editor(account_config, printer, &backend, tpl).await
+
+        editor::edit_tpl_with_editor(account_config, printer, &backend, tpl).await?;
+
+        backend.add_flag(folder, &[id], Flag::Answered).await?;
+
+        Ok(())
     }
 }
