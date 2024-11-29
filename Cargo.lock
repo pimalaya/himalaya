@@ -509,9 +509,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.2.1"
+version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd9de9f2205d5ef3fd67e685b0df337994ddd4495e2a28d185500d0e1edfea47"
+checksum = "f34d93e62b03caf570cccc334cbc6c2fceca82f39211051345108adcba3eebdc"
 dependencies = [
  "jobserver",
  "libc",
@@ -1220,7 +1220,7 @@ dependencies = [
 [[package]]
 name = "email-lib"
 version = "0.26.0"
-source = "git+https://github.com/pimalaya/core#3e294453e5a34475e5197c1ccf3b534d221ad26f"
+source = "git+https://github.com/pimalaya/core#e83f761fcb5fcd73659e933648d40dcca573da44"
 dependencies = [
  "async-trait",
  "chrono",
@@ -1852,7 +1852,7 @@ dependencies = [
 [[package]]
 name = "http-lib"
 version = "0.1.0"
-source = "git+https://github.com/pimalaya/core#3e294453e5a34475e5197c1ccf3b534d221ad26f"
+source = "git+https://github.com/pimalaya/core#e83f761fcb5fcd73659e933648d40dcca573da44"
 dependencies = [
  "thiserror 1.0.69",
  "tokio",
@@ -2056,7 +2056,7 @@ dependencies = [
 [[package]]
 name = "imap-client"
 version = "0.1.5"
-source = "git+https://github.com/pimalaya/imap-client#3016ffb23a474d0fdce0392d497958e092f590b8"
+source = "git+https://github.com/pimalaya/imap-client#bca4048458585a4c3ed8e0fc71b82f8835ab8286"
 dependencies = [
  "futures-util",
  "imap-next",
@@ -2086,7 +2086,7 @@ dependencies = [
 [[package]]
 name = "imap-next"
 version = "0.3.0"
-source = "git+https://github.com/soywod/imap-next?branch=jakoschiko_futures-stream-without-split#c26634b4efc9dfcab0af08943fdcb92ed273a2f3"
+source = "git+https://github.com/soywod/imap-next?branch=jakoschiko_futures-stream-without-split#5addf10140ce81e906f114ca2fc767b1c69428a4"
 dependencies = [
  "futures-util",
  "imap-codec",
@@ -2277,7 +2277,7 @@ dependencies = [
 [[package]]
 name = "keyring-lib"
 version = "1.0.2"
-source = "git+https://github.com/pimalaya/core#3e294453e5a34475e5197c1ccf3b534d221ad26f"
+source = "git+https://github.com/pimalaya/core#e83f761fcb5fcd73659e933648d40dcca573da44"
 dependencies = [
  "keyring",
  "once_cell",
@@ -2318,9 +2318,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.166"
+version = "0.2.167"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2ccc108bbc0b1331bd061864e7cd823c0cab660bbe6970e66e2c0614decde36"
+checksum = "09d6582e104315a817dff97f75133544b2e094ee22447d2acf4a74e189ba06fc"
 
 [[package]]
 name = "libdbus-sys"
@@ -2587,7 +2587,7 @@ dependencies = [
 [[package]]
 name = "mml-lib"
 version = "1.1.0"
-source = "git+https://github.com/pimalaya/core#3e294453e5a34475e5197c1ccf3b534d221ad26f"
+source = "git+https://github.com/pimalaya/core#e83f761fcb5fcd73659e933648d40dcca573da44"
 dependencies = [
  "async-recursion",
  "chumsky",
@@ -2786,7 +2786,7 @@ dependencies = [
 [[package]]
 name = "oauth-lib"
 version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#3e294453e5a34475e5197c1ccf3b534d221ad26f"
+source = "git+https://github.com/pimalaya/core#e83f761fcb5fcd73659e933648d40dcca573da44"
 dependencies = [
  "http-lib",
  "oauth2",
@@ -3059,7 +3059,7 @@ dependencies = [
 [[package]]
 name = "pgp-lib"
 version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#3e294453e5a34475e5197c1ccf3b534d221ad26f"
+source = "git+https://github.com/pimalaya/core#e83f761fcb5fcd73659e933648d40dcca573da44"
 dependencies = [
  "async-recursion",
  "futures",
@@ -3077,7 +3077,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-tui"
 version = "0.1.0"
-source = "git+https://github.com/pimalaya/tui#3b1ea19c0e384827eba5aea2ee935cd23b02be45"
+source = "git+https://github.com/pimalaya/tui#7acc0db96b4a131a679928cc069b8e89dbc5dc43"
 dependencies = [
  "async-trait",
  "clap",
@@ -3237,7 +3237,7 @@ dependencies = [
 [[package]]
 name = "process-lib"
 version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#3e294453e5a34475e5197c1ccf3b534d221ad26f"
+source = "git+https://github.com/pimalaya/core#e83f761fcb5fcd73659e933648d40dcca573da44"
 dependencies = [
  "serde",
  "thiserror 1.0.69",
@@ -3673,7 +3673,7 @@ dependencies = [
 [[package]]
 name = "secret-lib"
 version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#3e294453e5a34475e5197c1ccf3b534d221ad26f"
+source = "git+https://github.com/pimalaya/core#e83f761fcb5fcd73659e933648d40dcca573da44"
 dependencies = [
  "keyring-lib",
  "process-lib",
@@ -4008,7 +4008,7 @@ checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 [[package]]
 name = "start-tls"
 version = "0.1.0"
-source = "git+https://github.com/pimalaya/core#3e294453e5a34475e5197c1ccf3b534d221ad26f"
+source = "git+https://github.com/pimalaya/core#e83f761fcb5fcd73659e933648d40dcca573da44"
 dependencies = [
  "futures-util",
  "tracing",
