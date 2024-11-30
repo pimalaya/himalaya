@@ -1,5 +1,6 @@
 pub mod copy;
 pub mod delete;
+pub mod export;
 pub mod forward;
 pub mod mailto;
 pub mod r#move;
@@ -12,6 +13,7 @@ pub mod write;
 
 use clap::Subcommand;
 use color_eyre::Result;
+use export::MessageExportCommand;
 use pimalaya_tui::terminal::cli::printer::Printer;
 
 use crate::config::TomlConfig;
@@ -33,6 +35,8 @@ use self::{
 pub enum MessageSubcommand {
     #[command(arg_required_else_help = true)]
     Read(MessageReadCommand),
+    #[command(arg_required_else_help = true)]
+    Export(MessageExportCommand),
 
     #[command(arg_required_else_help = true)]
     Thread(MessageThreadCommand),
@@ -71,6 +75,7 @@ impl MessageSubcommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         match self {
             Self::Read(cmd) => cmd.execute(printer, config).await,
+            Self::Export(cmd) => cmd.execute(config).await,
             Self::Thread(cmd) => cmd.execute(printer, config).await,
             Self::Write(cmd) => cmd.execute(printer, config).await,
             Self::Reply(cmd) => cmd.execute(printer, config).await,
