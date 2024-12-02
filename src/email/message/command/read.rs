@@ -37,7 +37,6 @@ pub struct MessageReadCommand {
     ///
     /// All headers will be removed from the message.
     #[arg(long)]
-    #[arg(conflicts_with = "raw")]
     #[arg(conflicts_with = "headers")]
     pub no_headers: bool,
 
@@ -48,7 +47,6 @@ pub struct MessageReadCommand {
     /// visible. If no header is given, defaults to the one set up in
     /// your TOML configuration file.
     #[arg(long = "header", short = 'H', value_name = "NAME")]
-    #[arg(conflicts_with = "raw")]
     #[arg(conflicts_with = "no_headers")]
     pub headers: Vec<String>,
 
