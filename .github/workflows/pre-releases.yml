@@ -3,7 +3,8 @@ name: Pre-releases
 on:
   workflow_dispatch:
   push:
-    branch: master
+    branches:
+      - master
 
 jobs:
   build:
