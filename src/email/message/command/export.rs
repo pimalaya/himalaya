@@ -1,4 +1,5 @@
 use std::{
+    env::temp_dir,
     fs,
     io::{stdout, Write},
     path::PathBuf,
@@ -39,6 +40,13 @@ pub struct MessageExportCommand {
     /// saving/sending/transfering messages.
     #[arg(long, short = 'F')]
     pub full: bool,
+
+    /// Try to open the exported message, if applicable.
+    ///
+    /// Only works with full message export, or when HTML or plain
+    /// text is present in the export.
+    #[arg(long, short = 'O')]
+    pub open: bool,
 
     /// Where the message should be exported into.
     ///
@@ -90,22 +98,53 @@ impl MessageExportCommand {
                     dest.push(format!("{id}.eml"));
                     fs::write(&dest, bytes)?;
                     let dest = dest.display();
-                    println!("Message {id} successfully exported at {dest}!\n");
+                    println!("Message {id} successfully exported at {dest}!");
                 }
                 Some(dest) => {
                     fs::write(&dest, bytes)?;
                     let dest = dest.display();
-                    println!("Message {id} successfully exported at {dest}!\n");
+                    println!("Message {id} successfully exported at {dest}!");
                 }
                 None => {
                     stdout().write_all(bytes)?;
                 }
             };
         } else {
-            let msg = msg.parsed()?;
+            let dest = match self.destination {
+                Some(dest) if dest.is_dir() => {
+                    let dest = msg.download_parts(&dest)?;
+                    let d = dest.display();
+                    println!("Message {id} successfully exported in {d}!");
+                    dest
+                }
+                Some(dest) => {
+                    let dest = dest.parent().unwrap_or(&dest);
+                    let dest = msg.download_parts(&dest)?;
+                    let d = dest.display();
+                    println!("Message {id} successfully exported in {d}!");
+                    dest
+                }
+                None => {
+                    let dest = temp_dir();
+                    let dest = msg.download_parts(&dest)?;
+                    let d = dest.display();
+                    println!("Message {id} successfully exported in {d}!");
+                    dest
+                }
+            };
 
-            for part in &msg.parts {
-                println!("part: {:#?}", part.body);
+            if self.open {
+                let index_html = dest.join("index.html");
+                if index_html.exists() {
+                    return Ok(open::that(index_html)?);
+                }
+
+                let plain_txt = dest.join("plain.txt");
+                if plain_txt.exists() {
+                    return Ok(open::that(plain_txt)?);
+                }
+
+                println!("--open was passed but nothing to open, ignoring");
             }
         }
 
