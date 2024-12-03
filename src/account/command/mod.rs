@@ -1,6 +1,8 @@
-mod check_up;
 mod configure;
+mod doctor;
 mod list;
+
+use std::path::PathBuf;
 
 use clap::Subcommand;
 use color_eyre::Result;
@@ -9,7 +11,7 @@ use pimalaya_tui::terminal::cli::printer::Printer;
 use crate::config::TomlConfig;
 
 use self::{
-    check_up::AccountCheckUpCommand, configure::AccountConfigureCommand, list::AccountListCommand,
+    configure::AccountConfigureCommand, doctor::AccountDoctorCommand, list::AccountListCommand,
 };
 
 /// Manage accounts.
@@ -19,11 +21,11 @@ use self::{
 /// file. This subcommand allows you to manage them.
 #[derive(Debug, Subcommand)]
 pub enum AccountSubcommand {
-    #[command(alias = "checkup")]
-    CheckUp(AccountCheckUpCommand),
-
     #[command(alias = "cfg")]
     Configure(AccountConfigureCommand),
+
+    #[command()]
+    Doctor(AccountDoctorCommand),
 
     #[command(alias = "lst")]
     List(AccountListCommand),
@@ -31,11 +33,16 @@ pub enum AccountSubcommand {
 
 impl AccountSubcommand {
     #[allow(unused)]
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
+    pub async fn execute(
+        self,
+        printer: &mut impl Printer,
+        config: TomlConfig,
+        config_path: Option<&PathBuf>,
+    ) -> Result<()> {
         match self {
-            Self::CheckUp(cmd) => cmd.execute(printer, config).await,
-            Self::Configure(cmd) => cmd.execute(printer, config).await,
-            Self::List(cmd) => cmd.execute(printer, config).await,
+            Self::Configure(cmd) => cmd.execute(config, config_path).await,
+            Self::Doctor(cmd) => cmd.execute(&config).await,
+            Self::List(cmd) => cmd.execute(printer, &config).await,
         }
     }
 }

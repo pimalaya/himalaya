@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Refactored the `account configure` command: this command stands now for creating or editing account configurations from the wizard. The command requires the `wizard` cargo feature.
+- Improved the `account doctor` command: it now checks the state of the config, and the new `--fix` argument allows you to configure keyring, OAuth 2.0 etc.
 - Improved long version `--version`. [#496]
 - Improved error messages when missing cargo features. For example, if a TOML configuration uses the IMAP backend without the `imap` cargo features, the error `missing "imap" feature` is displayed. [#20](https://github.com/pimalaya/core/issues/20)
 - Normalized enum-based configurations, using the [internally tagged representation](https://serde.rs/enum-representations.html#internally-tagged) `type =`. It should reduce issues due to misconfiguration, and improve othe error messages. Yet it is not perfect, see [#802](https://github.com/toml-rs/toml/issues/802):
