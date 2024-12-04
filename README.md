@@ -385,7 +385,7 @@ You can also manually edit your own configuration, from scratch:
   backend.auth.raw = "*****"
 
   message.send.backend.type = "smtp"
-  message.send.backend.host = "smtp.mail.outlook.com"
+  message.send.backend.host = "smtp-mail.outlook.com"
   message.send.backend.port = 587
   message.send.backend.encryption = "start-tls"
   message.send.backend.login = "example@outlook.com"
