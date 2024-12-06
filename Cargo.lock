@@ -1220,7 +1220,7 @@ dependencies = [
 [[package]]
 name = "email-lib"
 version = "0.26.0"
-source = "git+https://github.com/pimalaya/core#871843ab1c18f04517be5cfaf2c7dd38eaf6f9d5"
+source = "git+https://github.com/pimalaya/core#6b981f1aaa5ef20bf25367ac899eea5fcedfd2c3"
 dependencies = [
  "async-trait",
  "chrono",
@@ -1231,7 +1231,6 @@ dependencies = [
  "hickory-resolver",
  "http-lib",
  "imap-client",
- "imap-next",
  "keyring-lib",
  "mail-builder",
  "mail-parser",
@@ -1849,7 +1848,7 @@ dependencies = [
 [[package]]
 name = "http-lib"
 version = "0.1.0"
-source = "git+https://github.com/pimalaya/core#871843ab1c18f04517be5cfaf2c7dd38eaf6f9d5"
+source = "git+https://github.com/pimalaya/core#6b981f1aaa5ef20bf25367ac899eea5fcedfd2c3"
 dependencies = [
  "thiserror 1.0.69",
  "tokio",
@@ -2052,17 +2051,16 @@ dependencies = [
 
 [[package]]
 name = "imap-client"
-version = "0.1.5"
-source = "git+https://github.com/pimalaya/imap-client#bca4048458585a4c3ed8e0fc71b82f8835ab8286"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd76710ea4d32c874d42a666d71800ba92f29ef4ba8eed3f6f717f5d14b17d1e"
 dependencies = [
- "futures-util",
  "imap-next",
- "rustls-platform-verifier",
- "start-tls",
+ "rip-starttls",
+ "rustls-platform-verifier 0.4.0",
  "thiserror 2.0.4",
  "tokio",
  "tokio-rustls 0.26.0",
- "tokio-util",
  "tracing",
 ]
 
@@ -2082,12 +2080,15 @@ dependencies = [
 
 [[package]]
 name = "imap-next"
-version = "0.3.0"
-source = "git+https://github.com/soywod/imap-next?branch=jakoschiko_futures-stream-without-split#450f4bf1719d88ee9672aea1b6b2787430758787"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56d85520e742d9e8d9edbf9df9e0876f560ed08650db8f9de562bc7cd46b9b43"
 dependencies = [
- "futures-util",
+ "bytes",
  "imap-codec",
- "thiserror 1.0.69",
+ "thiserror 2.0.4",
+ "tokio",
+ "tokio-rustls 0.26.0",
  "tracing",
 ]
 
@@ -2294,7 +2295,7 @@ dependencies = [
 [[package]]
 name = "keyring-lib"
 version = "1.0.2"
-source = "git+https://github.com/pimalaya/core#871843ab1c18f04517be5cfaf2c7dd38eaf6f9d5"
+source = "git+https://github.com/pimalaya/core#6b981f1aaa5ef20bf25367ac899eea5fcedfd2c3"
 dependencies = [
  "keyring",
  "once_cell",
@@ -2619,7 +2620,7 @@ dependencies = [
 [[package]]
 name = "mml-lib"
 version = "1.1.0"
-source = "git+https://github.com/pimalaya/core#871843ab1c18f04517be5cfaf2c7dd38eaf6f9d5"
+source = "git+https://github.com/pimalaya/core#6b981f1aaa5ef20bf25367ac899eea5fcedfd2c3"
 dependencies = [
  "async-recursion",
  "chumsky",
@@ -2818,7 +2819,7 @@ dependencies = [
 [[package]]
 name = "oauth-lib"
 version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#871843ab1c18f04517be5cfaf2c7dd38eaf6f9d5"
+source = "git+https://github.com/pimalaya/core#6b981f1aaa5ef20bf25367ac899eea5fcedfd2c3"
 dependencies = [
  "http-lib",
  "oauth2",
@@ -3108,7 +3109,7 @@ dependencies = [
 [[package]]
 name = "pgp-lib"
 version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#871843ab1c18f04517be5cfaf2c7dd38eaf6f9d5"
+source = "git+https://github.com/pimalaya/core#6b981f1aaa5ef20bf25367ac899eea5fcedfd2c3"
 dependencies = [
  "async-recursion",
  "futures",
@@ -3126,7 +3127,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-tui"
 version = "0.1.0"
-source = "git+https://github.com/pimalaya/tui#bec01501329e07eb044ae6e3811d956693c12056"
+source = "git+https://github.com/pimalaya/tui#b1cd79ed655bcf97615bbfccc9e10b8c81000544"
 dependencies = [
  "async-trait",
  "clap",
@@ -3286,7 +3287,7 @@ dependencies = [
 [[package]]
 name = "process-lib"
 version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#871843ab1c18f04517be5cfaf2c7dd38eaf6f9d5"
+source = "git+https://github.com/pimalaya/core#6b981f1aaa5ef20bf25367ac899eea5fcedfd2c3"
 dependencies = [
  "serde",
  "thiserror 1.0.69",
@@ -3485,6 +3486,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rip-starttls"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "edf1f62c7965137bde00221c63e20e511bb4d576e2ddf9bdf57e1d03042ba112"
+dependencies = [
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "ripemd"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3633,6 +3644,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustls-platform-verifier"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4c7dc240fec5517e6c4eab3310438636cfe6391dfc345ba013109909a90d136"
+dependencies = [
+ "core-foundation 0.9.4",
+ "core-foundation-sys",
+ "jni",
+ "log",
+ "once_cell",
+ "rustls 0.23.19",
+ "rustls-native-certs",
+ "rustls-platform-verifier-android",
+ "rustls-webpki 0.102.8",
+ "security-framework 2.11.1",
+ "security-framework-sys",
+ "webpki-root-certs",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "rustls-platform-verifier-android"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3722,7 +3754,7 @@ dependencies = [
 [[package]]
 name = "secret-lib"
 version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#871843ab1c18f04517be5cfaf2c7dd38eaf6f9d5"
+source = "git+https://github.com/pimalaya/core#6b981f1aaa5ef20bf25367ac899eea5fcedfd2c3"
 dependencies = [
  "keyring-lib",
  "process-lib",
@@ -4055,15 +4087,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
-name = "start-tls"
-version = "0.1.0"
-source = "git+https://github.com/pimalaya/core#871843ab1c18f04517be5cfaf2c7dd38eaf6f9d5"
-dependencies = [
- "futures-util",
- "tracing",
-]
-
-[[package]]
 name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4313,20 +4336,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio-util"
-version = "0.7.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61e7c3654c13bcd040d4a03abee2c75b1d14a37b423cf5a813ceae1cc903ec6a"
-dependencies = [
- "bytes",
- "futures-core",
- "futures-io",
- "futures-sink",
- "pin-project-lite",
- "tokio",
-]
-
-[[package]]
 name = "toml"
 version = "0.8.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4536,7 +4545,7 @@ dependencies = [
  "rustls 0.23.19",
  "rustls-pemfile 2.2.0",
  "rustls-pki-types",
- "rustls-platform-verifier",
+ "rustls-platform-verifier 0.3.4",
  "ureq-proto",
  "utf-8",
  "webpki-roots",
@@ -4719,6 +4728,15 @@ name = "wasm-bindgen-shared"
 version = "0.2.97"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ee99da9c5ba11bd675621338ef6fa52296b76b83305e9b6e5c77d4c286d6d49"
+
+[[package]]
+name = "webpki-root-certs"
+version = "0.26.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9cd5da49bdf1f30054cfe0b8ce2958b8fbeb67c4d82c8967a598af481bef255c"
+dependencies = [
+ "rustls-pki-types",
+]
 
 [[package]]
 name = "webpki-roots"

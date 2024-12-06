@@ -5,6 +5,8 @@ use std::{
 
 use clap::Parser;
 use color_eyre::{Result, Section};
+#[cfg(all(feature = "keyring", feature = "imap"))]
+use email::imap::config::ImapAuthConfig;
 #[cfg(feature = "imap")]
 use email::imap::ImapContextBuilder;
 #[cfg(feature = "maildir")]
@@ -13,15 +15,16 @@ use email::maildir::MaildirContextBuilder;
 use email::notmuch::NotmuchContextBuilder;
 #[cfg(feature = "sendmail")]
 use email::sendmail::SendmailContextBuilder;
+#[cfg(all(feature = "keyring", feature = "smtp"))]
+use email::smtp::config::SmtpAuthConfig;
 #[cfg(feature = "smtp")]
 use email::smtp::SmtpContextBuilder;
-use email::{
-    backend::BackendBuilder, config::Config, imap::config::ImapAuthConfig,
-    smtp::config::SmtpAuthConfig,
-};
+use email::{backend::BackendBuilder, config::Config};
+#[cfg(feature = "keyring")]
+use pimalaya_tui::terminal::prompt;
 use pimalaya_tui::{
     himalaya::config::{Backend, SendingBackend},
-    terminal::{config::TomlConfig as _, prompt},
+    terminal::config::TomlConfig as _,
 };
 
 use crate::{account::arg::name::OptionalAccountNameArg, config::TomlConfig};
