@@ -1,5 +1,6 @@
 pub mod copy;
 pub mod delete;
+pub mod edit;
 pub mod export;
 pub mod forward;
 pub mod mailto;
@@ -13,16 +14,16 @@ pub mod write;
 
 use clap::Subcommand;
 use color_eyre::Result;
-use export::MessageExportCommand;
 use pimalaya_tui::terminal::cli::printer::Printer;
 
 use crate::config::TomlConfig;
 
 use self::{
-    copy::MessageCopyCommand, delete::MessageDeleteCommand, forward::MessageForwardCommand,
-    mailto::MessageMailtoCommand, r#move::MessageMoveCommand, read::MessageReadCommand,
-    reply::MessageReplyCommand, save::MessageSaveCommand, send::MessageSendCommand,
-    thread::MessageThreadCommand, write::MessageWriteCommand,
+    copy::MessageCopyCommand, delete::MessageDeleteCommand, edit::MessageEditCommand,
+    export::MessageExportCommand, forward::MessageForwardCommand, mailto::MessageMailtoCommand,
+    r#move::MessageMoveCommand, read::MessageReadCommand, reply::MessageReplyCommand,
+    save::MessageSaveCommand, send::MessageSendCommand, thread::MessageThreadCommand,
+    write::MessageWriteCommand,
 };
 
 /// Manage messages.
@@ -49,6 +50,9 @@ pub enum MessageSubcommand {
 
     #[command(aliases = ["fwd", "fd"])]
     Forward(MessageForwardCommand),
+
+    #[command()]
+    Edit(MessageEditCommand),
 
     #[command()]
     Mailto(MessageMailtoCommand),
@@ -80,6 +84,7 @@ impl MessageSubcommand {
             Self::Write(cmd) => cmd.execute(printer, config).await,
             Self::Reply(cmd) => cmd.execute(printer, config).await,
             Self::Forward(cmd) => cmd.execute(printer, config).await,
+            Self::Edit(cmd) => cmd.execute(printer, config).await,
             Self::Mailto(cmd) => cmd.execute(printer, config).await,
             Self::Save(cmd) => cmd.execute(printer, config).await,
             Self::Send(cmd) => cmd.execute(printer, config).await,

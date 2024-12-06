@@ -594,9 +594,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.5.21"
+version = "4.5.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb3b4b9e5a7c7514dfa52869339ee98b3156b0bfb4e8a77c4ff4babb64b1604f"
+checksum = "3135e7ec2ef7b10c6ed8950f0f792ed96ee093fa088608f1c76e569722700c84"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -604,9 +604,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.5.21"
+version = "4.5.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b17a95aa67cc7b5ebd32aa5370189aa0d79069ef1c64ce893bd30fb24bff20ec"
+checksum = "30582fc632330df2bd26877bde0c1f4470d57c582bbc070376afcd04d8cb4838"
 dependencies = [
  "anstream",
  "anstyle",
@@ -638,9 +638,9 @@ dependencies = [
 
 [[package]]
 name = "clap_lex"
-version = "0.7.3"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "afb84c814227b90d6895e01398aee0d8033c00e7466aca416fb6a8e0eb19d8a7"
+checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 
 [[package]]
 name = "clap_mangen"
@@ -1220,7 +1220,7 @@ dependencies = [
 [[package]]
 name = "email-lib"
 version = "0.26.0"
-source = "git+https://github.com/pimalaya/core#6b981f1aaa5ef20bf25367ac899eea5fcedfd2c3"
+source = "git+https://github.com/pimalaya/core#7156b66a22a06d02308a0100df7ccf59db82c3d3"
 dependencies = [
  "async-trait",
  "chrono",
@@ -1255,7 +1255,7 @@ dependencies = [
  "shellexpand-utils",
  "thiserror 1.0.69",
  "tokio",
- "tokio-rustls 0.26.0",
+ "tokio-rustls 0.26.1",
  "tracing",
  "tree_magic_mini",
  "urlencoding",
@@ -1848,7 +1848,7 @@ dependencies = [
 [[package]]
 name = "http-lib"
 version = "0.1.0"
-source = "git+https://github.com/pimalaya/core#6b981f1aaa5ef20bf25367ac899eea5fcedfd2c3"
+source = "git+https://github.com/pimalaya/core#7156b66a22a06d02308a0100df7ccf59db82c3d3"
 dependencies = [
  "thiserror 1.0.69",
  "tokio",
@@ -2060,7 +2060,7 @@ dependencies = [
  "rustls-platform-verifier 0.4.0",
  "thiserror 2.0.4",
  "tokio",
- "tokio-rustls 0.26.0",
+ "tokio-rustls 0.26.1",
  "tracing",
 ]
 
@@ -2088,7 +2088,7 @@ dependencies = [
  "imap-codec",
  "thiserror 2.0.4",
  "tokio",
- "tokio-rustls 0.26.0",
+ "tokio-rustls 0.26.1",
  "tracing",
 ]
 
@@ -2295,7 +2295,7 @@ dependencies = [
 [[package]]
 name = "keyring-lib"
 version = "1.0.2"
-source = "git+https://github.com/pimalaya/core#6b981f1aaa5ef20bf25367ac899eea5fcedfd2c3"
+source = "git+https://github.com/pimalaya/core#7156b66a22a06d02308a0100df7ccf59db82c3d3"
 dependencies = [
  "keyring",
  "once_cell",
@@ -2484,7 +2484,7 @@ dependencies = [
  "rustls-pki-types",
  "smtp-proto",
  "tokio",
- "tokio-rustls 0.26.0",
+ "tokio-rustls 0.26.1",
  "webpki-roots",
 ]
 
@@ -2620,7 +2620,7 @@ dependencies = [
 [[package]]
 name = "mml-lib"
 version = "1.1.0"
-source = "git+https://github.com/pimalaya/core#6b981f1aaa5ef20bf25367ac899eea5fcedfd2c3"
+source = "git+https://github.com/pimalaya/core#7156b66a22a06d02308a0100df7ccf59db82c3d3"
 dependencies = [
  "async-recursion",
  "chumsky",
@@ -2819,7 +2819,7 @@ dependencies = [
 [[package]]
 name = "oauth-lib"
 version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#6b981f1aaa5ef20bf25367ac899eea5fcedfd2c3"
+source = "git+https://github.com/pimalaya/core#7156b66a22a06d02308a0100df7ccf59db82c3d3"
 dependencies = [
  "http-lib",
  "oauth2",
@@ -3109,7 +3109,7 @@ dependencies = [
 [[package]]
 name = "pgp-lib"
 version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#6b981f1aaa5ef20bf25367ac899eea5fcedfd2c3"
+source = "git+https://github.com/pimalaya/core#7156b66a22a06d02308a0100df7ccf59db82c3d3"
 dependencies = [
  "async-recursion",
  "futures",
@@ -3127,7 +3127,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-tui"
 version = "0.1.0"
-source = "git+https://github.com/pimalaya/tui#b1cd79ed655bcf97615bbfccc9e10b8c81000544"
+source = "git+https://github.com/pimalaya/tui#7a39d760409460fa33dead374dc65ae70fb16749"
 dependencies = [
  "async-trait",
  "clap",
@@ -3287,7 +3287,7 @@ dependencies = [
 [[package]]
 name = "process-lib"
 version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#6b981f1aaa5ef20bf25367ac899eea5fcedfd2c3"
+source = "git+https://github.com/pimalaya/core#7156b66a22a06d02308a0100df7ccf59db82c3d3"
 dependencies = [
  "serde",
  "thiserror 1.0.69",
@@ -3754,7 +3754,7 @@ dependencies = [
 [[package]]
 name = "secret-lib"
 version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#6b981f1aaa5ef20bf25367ac899eea5fcedfd2c3"
+source = "git+https://github.com/pimalaya/core#7156b66a22a06d02308a0100df7ccf59db82c3d3"
 dependencies = [
  "keyring-lib",
  "process-lib",
@@ -4326,12 +4326,11 @@ dependencies = [
 
 [[package]]
 name = "tokio-rustls"
-version = "0.26.0"
+version = "0.26.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c7bc40d0e5a97695bb96e27995cd3a08538541b0a846f65bba7a359f36700d4"
+checksum = "5f6d0975eaace0cf0fcadee4e4aaa5da15b5c079146f2cffb67c113be122bf37"
 dependencies = [
  "rustls 0.23.19",
- "rustls-pki-types",
  "tokio",
 ]
 
