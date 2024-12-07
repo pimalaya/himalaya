@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The Himalaya CLI scope has changed. It does not include anymore the synchronization, nor the envelope watching. These scopes have moved to dedicated projects:
+
+- [Neverest CLI](https://github.com/pimalaya/neverest), CLI to synchronize, backup and restore emails
+- [Mirador CLI](https://github.com/pimalaya/mirador), CLI to watch mailbox changes
+
 ### Added
 
 - Added `message edit` command to edit a message. To edit on place (replace a message), use `--on-place`.
@@ -31,7 +36,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Moved IMAP and SMTP `encryption` to `encryption.type`.
 - Refactored the `account configure` command: this command stands now for creating or editing account configurations from the wizard. The command requires the `wizard` cargo feature.
 - Improved the `account doctor` command: it now checks the state of the config, and the new `--fix` argument allows you to configure keyring, OAuth 2.0 etc.
 - Improved long version `--version`. [#496]
@@ -90,11 +94,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     message.send.backend.auth.method = "xoauth2"
     ```
 
+- Moved IMAP and SMTP `encryption` to `encryption.type`.
+
+  This change prepares the config to accept different TLS providers with their options. The `true` and `false` variant have been removed as well:
+
+	```toml
+	# before
+	backend.encryption = "none" # or false
+	backend.encryption = "start-tls"
+	message.send.backend.encryption = "tls" # or true
+
+	# after
+	backend.encryption.type = "none"
+	backend.encryption.type = "start-tls"
+	message.send.backend.encryption.type = "tls"
+	```
+
 ### Fixed
 
 - Fixed pre-release archives issue. [#492]
 - Fixed mailto parsing issue. [core#10]
 - Fixed `Answered` flag not set when replying to a message. [#508]
+
+### Removed
+
+- Removed systemd service from `assets/` folder, as Himalaya CLI scope does not include synchronization nor watching anymore.
 
 ## [1.0.0-beta.4] - 2024-04-16
 
