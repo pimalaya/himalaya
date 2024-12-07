@@ -15,7 +15,7 @@ use crate::{
     account::arg::name::AccountNameFlag, config::TomlConfig, folder::arg::name::FolderNameArg,
 };
 
-/// Expunge a folder.
+/// Expunge the given folder.
 ///
 /// The concept of expunging is similar to the IMAP one: it definitely
 /// deletes emails from the given folder that contain the "deleted"

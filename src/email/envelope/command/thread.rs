@@ -17,12 +17,12 @@ use crate::{
     folder::arg::name::FolderNameOptionalFlag,
 };
 
-/// Thread all envelopes.
+/// Search and sort envelopes as a thread.
 ///
-/// This command allows you to thread all envelopes included in the
-/// given folder.
+/// This command allows you to thread envelopes included in the given
+/// folder, matching the given query.
 #[derive(Debug, Parser)]
-pub struct ThreadEnvelopesCommand {
+pub struct EnvelopeThreadCommand {
     #[command(flatten)]
     pub folder: FolderNameOptionalFlag,
 
@@ -33,11 +33,14 @@ pub struct ThreadEnvelopesCommand {
     #[arg(long, short)]
     pub id: Option<usize>,
 
+    /// The list envelopes filter and sort query.
+    ///
+    /// See `envelope list --help` for more information.
     #[arg(allow_hyphen_values = true, trailing_var_arg = true)]
     pub query: Option<Vec<String>>,
 }
 
-impl ThreadEnvelopesCommand {
+impl EnvelopeThreadCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing thread envelopes command");
 
@@ -102,9 +105,7 @@ impl ThreadEnvelopesCommand {
 
         let tree = EnvelopesTree::new(account_config, envelopes);
 
-        printer.out(tree)?;
-
-        Ok(())
+        printer.out(tree)
     }
 }
 

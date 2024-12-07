@@ -14,25 +14,18 @@ use self::{
     configure::AccountConfigureCommand, doctor::AccountDoctorCommand, list::AccountListCommand,
 };
 
-/// Manage accounts.
+/// Configure, list and diagnose your accounts.
 ///
-/// An account is a set of settings, identified by an account
-/// name. Settings are directly taken from your TOML configuration
-/// file. This subcommand allows you to manage them.
+/// An account is a group of settings, identified by a unique
+/// name. This subcommand allows you to manage your accounts.
 #[derive(Debug, Subcommand)]
 pub enum AccountSubcommand {
-    #[command(alias = "cfg")]
     Configure(AccountConfigureCommand),
-
-    #[command()]
     Doctor(AccountDoctorCommand),
-
-    #[command(alias = "lst")]
     List(AccountListCommand),
 }
 
 impl AccountSubcommand {
-    #[allow(unused)]
     pub async fn execute(
         self,
         printer: &mut impl Printer,

@@ -16,7 +16,7 @@ use crate::{
     folder::arg::name::FolderNameOptionalFlag,
 };
 
-/// Remove flag(s) from an envelope.
+/// Remove flag(s) from a given envelope.
 ///
 /// This command allows you to remove the given flag(s) from the given
 /// envelope(s).

@@ -15,11 +15,12 @@ use crate::{
     folder::arg::name::FolderNameOptionalFlag,
 };
 
-/// Read a message.
+/// Read a human-friendly version of the message associated to the
+/// given envelope id(s).
 ///
 /// This command allows you to read a message. When reading a message,
 /// the "seen" flag is automatically applied to the corresponding
-/// envelope. To prevent this behaviour, use the --preview flag.
+/// envelope. To prevent this behaviour, use the "--preview" flag.
 #[derive(Debug, Parser)]
 pub struct MessageReadCommand {
     #[command(flatten)]
@@ -76,6 +77,7 @@ impl MessageReadCommand {
                 builder
                     .without_features()
                     .with_get_messages(BackendFeatureSource::Context)
+                    .with_peek_messages(BackendFeatureSource::Context)
             },
         )
         .without_sending_backend()

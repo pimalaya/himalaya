@@ -26,7 +26,7 @@ use self::{
     write::MessageWriteCommand,
 };
 
-/// Manage messages.
+/// Read, write, send, copy, move and delete your messages.
 ///
 /// A message is the content of an email. It is composed of headers
 /// (located at the top of the message) and a body (located at the
@@ -36,6 +36,7 @@ use self::{
 pub enum MessageSubcommand {
     #[command(arg_required_else_help = true)]
     Read(MessageReadCommand),
+
     #[command(arg_required_else_help = true)]
     Export(MessageExportCommand),
 
@@ -45,16 +46,13 @@ pub enum MessageSubcommand {
     #[command(aliases = ["add", "create", "new", "compose"])]
     Write(MessageWriteCommand),
 
-    #[command()]
     Reply(MessageReplyCommand),
 
     #[command(aliases = ["fwd", "fd"])]
     Forward(MessageForwardCommand),
 
-    #[command()]
     Edit(MessageEditCommand),
 
-    #[command()]
     Mailto(MessageMailtoCommand),
 
     Save(MessageSaveCommand),

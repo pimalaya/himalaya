@@ -12,18 +12,17 @@ use email::{backend::feature::BackendFeatureSource, config::Config};
 use pimalaya_tui::{himalaya::backend::BackendBuilder, terminal::config::TomlConfig as _};
 use tracing::info;
 
-use crate::envelope::arg::ids::EnvelopeIdArg;
-#[allow(unused)]
 use crate::{
-    account::arg::name::AccountNameFlag, config::TomlConfig, envelope::arg::ids::EnvelopeIdsArgs,
+    account::arg::name::AccountNameFlag, config::TomlConfig, envelope::arg::ids::EnvelopeIdArg,
     folder::arg::name::FolderNameOptionalFlag,
 };
 
-/// Export a message.
+/// Export the message associated to the given envelope id.
 ///
-/// This command allows you to export a message. When exporting a message,
-/// the "seen" flag is automatically applied to the corresponding
-/// envelope. To prevent this behaviour, use the --preview flag.
+/// This command allows you to export a message. A message can be
+/// fully exported in one single file, or exported in multiple files
+/// (one per MIME part found in the message). This is useful, for
+/// example, to read a HTML message.
 #[derive(Debug, Parser)]
 pub struct MessageExportCommand {
     #[command(flatten)]
@@ -41,14 +40,14 @@ pub struct MessageExportCommand {
     #[arg(long, short = 'F')]
     pub full: bool,
 
-    /// Try to open the exported message, if applicable.
+    /// Try to open the exported message, when applicable.
     ///
-    /// Only works with full message export, or when HTML or plain
-    /// text is present in the export.
+    /// This argument only works with full message export, or when
+    /// HTML or plain text is present in the export.
     #[arg(long, short = 'O')]
     pub open: bool,
 
-    /// Where the message should be exported into.
+    /// Where the message should be exported to.
     ///
     /// The destination should point to a valid directory. If `--full`
     /// is given, it can also point to a .eml file.
@@ -117,12 +116,15 @@ impl MessageExportCommand {
                     println!("Message {id} successfully exported in {d}!");
                     dest
                 }
-                Some(dest) => {
+                Some(dest) if dest.is_file() => {
                     let dest = dest.parent().unwrap_or(&dest);
                     let dest = msg.download_parts(&dest)?;
                     let d = dest.display();
                     println!("Message {id} successfully exported in {d}!");
                     dest
+                }
+                Some(dest) => {
+                    return Err(eyre!("Destination {} does not exist!", dest.display()));
                 }
                 None => {
                     let dest = temp_dir();

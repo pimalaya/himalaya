@@ -2,35 +2,30 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use color_eyre::Result;
-use pimalaya_tui::{himalaya::wizard, terminal::config::TomlConfig as _};
-use tracing::info;
 
 use crate::{account::arg::name::AccountNameArg, config::TomlConfig};
 
-/// Configure an account.
+/// Configure the given account.
 ///
-/// This command is mostly used to define or reset passwords managed
-/// by your global keyring. If you do not use the keyring system, you
-/// can skip this command.
+/// This command allows you to configure an existing account or to
+/// create a new one, using the wizard. The `wizard` cargo feature is
+/// required.
 #[derive(Debug, Parser)]
 pub struct AccountConfigureCommand {
     #[command(flatten)]
     pub account: AccountNameArg,
-
-    /// Reset keyring passwords.
-    ///
-    /// This argument will force passwords to be prompted again, then
-    /// saved to your global keyring.
-    #[arg(long, short)]
-    pub reset: bool,
 }
 
 impl AccountConfigureCommand {
+    #[cfg(feature = "wizard")]
     pub async fn execute(
         self,
         mut config: TomlConfig,
         config_path: Option<&PathBuf>,
     ) -> Result<()> {
+        use pimalaya_tui::{himalaya::wizard, terminal::config::TomlConfig as _};
+        use tracing::info;
+
         info!("executing account configure command");
 
         let path = match config_path {
@@ -48,5 +43,10 @@ impl AccountConfigureCommand {
         wizard::edit(path, config, account_name, account_config).await?;
 
         Ok(())
+    }
+
+    #[cfg(not(feature = "wizard"))]
+    pub async fn execute(self, _: TomlConfig, _: Option<&PathBuf>) -> Result<()> {
+        color_eyre::eyre::bail!("This command requires the `wizard` cargo feature to work");
     }
 }

@@ -29,17 +29,20 @@ use pimalaya_tui::{
 
 use crate::{account::arg::name::OptionalAccountNameArg, config::TomlConfig};
 
-/// Check up the given account.
+/// Diagnose and fix the given account.
 ///
-/// This command performs a doctor of the given account. It checks if
-/// the configuration is valid, if backend can be created and if
-/// sessions work as expected.
+/// This command diagnoses the given account and can even try to fix
+/// it. It mostly checks if the configuration is valid, if backends
+/// can be instanciated and if sessions work as expected.
 #[derive(Debug, Parser)]
 pub struct AccountDoctorCommand {
     #[command(flatten)]
     pub account: OptionalAccountNameArg,
 
-    /// Try to fix misconfigurations.
+    /// Try to fix the given account.
+    ///
+    /// This argument can be used to (re)configure keyring entries for
+    /// example.
     #[arg(long, short)]
     pub fix: bool,
 }

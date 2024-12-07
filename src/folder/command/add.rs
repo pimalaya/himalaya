@@ -16,12 +16,12 @@ use crate::{
     account::arg::name::AccountNameFlag, config::TomlConfig, folder::arg::name::FolderNameArg,
 };
 
-/// Create a new folder.
+/// Create the given folder.
 ///
 /// This command allows you to create a new folder using the given
 /// name.
 #[derive(Debug, Parser)]
-pub struct AddFolderCommand {
+pub struct FolderAddCommand {
     #[command(flatten)]
     pub folder: FolderNameArg,
 
@@ -29,7 +29,7 @@ pub struct AddFolderCommand {
     pub account: AccountNameFlag,
 }
 
-impl AddFolderCommand {
+impl FolderAddCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing create folder command");
 

@@ -7,9 +7,9 @@ use pimalaya_tui::terminal::cli::printer::Printer;
 
 use crate::config::TomlConfig;
 
-use self::{list::ListEnvelopesCommand, thread::ThreadEnvelopesCommand};
+use self::{list::EnvelopeListCommand, thread::EnvelopeThreadCommand};
 
-/// Manage envelopes.
+/// List, search and sort your envelopes.
 ///
 /// An envelope is a small representation of a message. It contains an
 /// identifier (given by the backend), some flags as well as few
@@ -18,10 +18,10 @@ use self::{list::ListEnvelopesCommand, thread::ThreadEnvelopesCommand};
 #[derive(Debug, Subcommand)]
 pub enum EnvelopeSubcommand {
     #[command(alias = "lst")]
-    List(ListEnvelopesCommand),
+    List(EnvelopeListCommand),
 
     #[command()]
-    Thread(ThreadEnvelopesCommand),
+    Thread(EnvelopeThreadCommand),
 }
 
 impl EnvelopeSubcommand {

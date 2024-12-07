@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Moved IMAP and SMTP `encryption` to `encryption.type`.
 - Refactored the `account configure` command: this command stands now for creating or editing account configurations from the wizard. The command requires the `wizard` cargo feature.
 - Improved the `account doctor` command: it now checks the state of the config, and the new `--fix` argument allows you to configure keyring, OAuth 2.0 etc.
 - Improved long version `--version`. [#496]

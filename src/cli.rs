@@ -123,8 +123,7 @@ impl HimalayaCommand {
         match self {
             Self::Account(cmd) => {
                 let config = TomlConfig::from_paths_or_default(config_paths).await?;
-                let config_path = config_paths.first();
-                cmd.execute(printer, config, config_path).await
+                cmd.execute(printer, config, config_paths.first()).await
             }
             Self::Folder(cmd) => {
                 let config = TomlConfig::from_paths_or_default(config_paths).await?;
