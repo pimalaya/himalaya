@@ -14,7 +14,7 @@ use crate::{
     folder::arg::name::FolderNameOptionalFlag,
 };
 
-/// Mark as deleted a message from a folder.
+/// Mark as deleted the message associated to the given envelope id(s).
 ///
 /// This command does not really delete the message: if the given
 /// folder points to the trash folder, it adds the "deleted" flag to

@@ -12,7 +12,7 @@ use url::Url;
 
 use crate::{account::arg::name::AccountNameFlag, config::TomlConfig};
 
-/// Parse and edit a message from a mailto URL string.
+/// Parse and edit a message from the given mailto URL string.
 ///
 /// This command allows you to edit a message from the mailto format
 /// using the editor defined in your environment variable

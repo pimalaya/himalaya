@@ -14,7 +14,7 @@ use crate::{
     folder::arg::name::FolderNameOptionalFlag,
 };
 
-/// Download all attachments for the given message.
+/// Download all attachments found in the given message.
 ///
 /// This command allows you to download all attachments found for the
 /// given message to your downloads directory.
@@ -69,14 +69,14 @@ impl AttachmentDownloadCommand {
             let attachments = email.attachments()?;
 
             if attachments.is_empty() {
-                printer.log(format!("No attachment found for message {id}!"))?;
+                printer.log(format!("No attachment found for message {id}!\n"))?;
                 continue;
             } else {
                 emails_count += 1;
             }
 
             printer.log(format!(
-                "{} attachment(s) found for message {id}!",
+                "{} attachment(s) found for message {id}!\n",
                 attachments.len()
             ))?;
 
@@ -86,7 +86,7 @@ impl AttachmentDownloadCommand {
                     .unwrap_or_else(|| Uuid::new_v4().to_string())
                     .into();
                 let filepath = account_config.get_download_file_path(&filename)?;
-                printer.log(format!("Downloading {:?}…", filepath))?;
+                printer.log(format!("Downloading {:?}…\n", filepath))?;
                 fs::write(&filepath, &attachment.body)
                     .with_context(|| format!("cannot save attachment at {filepath:?}"))?;
                 attachments_count += 1;
@@ -94,10 +94,10 @@ impl AttachmentDownloadCommand {
         }
 
         match attachments_count {
-            0 => printer.out("No attachment found!"),
-            1 => printer.out("Downloaded 1 attachment!"),
+            0 => printer.out("No attachment found!\n"),
+            1 => printer.out("Downloaded 1 attachment!\n"),
             n => printer.out(format!(
-                "Downloaded {} attachment(s) from {} messages(s)!",
+                "Downloaded {} attachment(s) from {} messages(s)!\n",
                 n, emails_count,
             )),
         }

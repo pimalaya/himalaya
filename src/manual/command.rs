@@ -1,14 +1,15 @@
+use std::{fs, path::PathBuf};
+
 use clap::{CommandFactory, Parser};
 use clap_mangen::Man;
 use color_eyre::Result;
 use pimalaya_tui::terminal::cli::printer::Printer;
 use shellexpand_utils::{canonicalize, expand};
-use std::{fs, path::PathBuf};
 use tracing::info;
 
 use crate::cli::Cli;
 
-/// Generate manual pages to a directory.
+/// Generate manual pages to the given directory.
 ///
 /// This command allows you to generate manual pages (following the
 /// man page format) to the given directory. If the directory does not
@@ -34,7 +35,7 @@ impl ManualGenerateCommand {
         Man::new(cmd).render(&mut buffer)?;
 
         fs::create_dir_all(&self.dir)?;
-        printer.log(format!("Generating man page for command {cmd_name}…"))?;
+        printer.log(format!("Generating man page for command {cmd_name}…\n"))?;
         fs::write(self.dir.join(format!("{}.1", cmd_name)), buffer)?;
 
         for subcmd in subcmds {
@@ -43,7 +44,9 @@ impl ManualGenerateCommand {
             let mut buffer = Vec::new();
             Man::new(subcmd).render(&mut buffer)?;
 
-            printer.log(format!("Generating man page for subcommand {subcmd_name}…"))?;
+            printer.log(format!(
+                "Generating man page for subcommand {subcmd_name}…\n"
+            ))?;
             fs::write(
                 self.dir.join(format!("{}-{}.1", cmd_name, subcmd_name)),
                 buffer,
@@ -51,8 +54,8 @@ impl ManualGenerateCommand {
         }
 
         printer.log(format!(
-            "{subcmds_len} man page(s) successfully generated in {:?}!",
-            self.dir
+            "{subcmds_len} man page(s) successfully generated in {}!\n",
+            self.dir.display()
         ))?;
 
         Ok(())

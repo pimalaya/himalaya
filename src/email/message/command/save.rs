@@ -16,7 +16,7 @@ use crate::{
     folder::arg::name::FolderNameOptionalFlag, message::arg::MessageRawArg,
 };
 
-/// Save a message to a folder.
+/// Save the given raw message to the given folder.
 ///
 /// This command allows you to add a raw message to the given folder.
 #[derive(Debug, Parser)]

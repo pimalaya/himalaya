@@ -8,18 +8,19 @@ use tracing::info;
 
 use crate::config::TomlConfig;
 
-/// List all accounts.
+/// List all existing accounts.
 ///
-/// This command lists all accounts defined in your TOML configuration
-/// file.
+/// This command lists all the accounts defined in your TOML
+/// configuration file.
 #[derive(Debug, Parser)]
 pub struct AccountListCommand {
     /// The maximum width the table should not exceed.
     ///
     /// This argument will force the table not to exceed the given
-    /// width in pixels. Columns may shrink with ellipsis in order to
+    /// width, in pixels. Columns may shrink with ellipsis in order to
     /// fit the width.
-    #[arg(long, short = 'w', name = "table_max_width", value_name = "PIXELS")]
+    #[arg(long = "max-width", short = 'w')]
+    #[arg(name = "table_max_width", value_name = "PIXELS")]
     pub table_max_width: Option<u16>,
 }
 
@@ -35,7 +36,6 @@ impl AccountListCommand {
             .with_some_backends_color(config.account_list_table_backends_color())
             .with_some_default_color(config.account_list_table_default_color());
 
-        printer.out(table)?;
-        Ok(())
+        printer.out(table)
     }
 }

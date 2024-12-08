@@ -17,7 +17,7 @@ use crate::{
     message::arg::{body::MessageRawBodyArg, header::HeaderRawArgs, reply::MessageReplyAllArg},
 };
 
-/// Reply to a message.
+/// Reply to the message associated to the given envelope id.
 ///
 /// This command allows you to reply to the given message using the
 /// editor defined in your environment variable $EDITOR. When the

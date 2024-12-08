@@ -15,15 +15,14 @@ use self::{
     send::TemplateSendCommand, write::TemplateWriteCommand,
 };
 
-/// Manage templates.
+/// Generate, save and send message templates.
 ///
 /// A template is an editable version of a message (headers +
 /// body). It uses a specific language called MML that allows you to
 /// attach file or encrypt content. This subcommand allows you manage
 /// them.
 ///
-/// You can learn more about MML at
-/// <https://crates.io/crates/mml-lib>.
+/// Learn more about MML at: <https://crates.io/crates/mml-lib>.
 #[derive(Debug, Subcommand)]
 pub enum TemplateSubcommand {
     #[command(aliases = ["add", "create", "new", "compose"])]

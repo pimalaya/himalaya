@@ -13,7 +13,7 @@ use tracing::info;
 
 use crate::{account::arg::name::AccountNameFlag, config::TomlConfig, message::arg::MessageRawArg};
 
-/// Send a message.
+/// Send the given raw message.
 ///
 /// This command allows you to send a raw message and to save a copy
 /// to your send folder.

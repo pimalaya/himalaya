@@ -16,7 +16,7 @@ use crate::{
     account::arg::name::AccountNameFlag, config::TomlConfig, folder::arg::name::FolderNameArg,
 };
 
-/// Delete a folder.
+/// Delete the given folder.
 ///
 /// All emails from the given folder are definitely deleted. The
 /// folder is also deleted after execution of the command.

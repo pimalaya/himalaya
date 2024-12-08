@@ -16,7 +16,7 @@ use crate::{
     folder::arg::name::FolderNameOptionalFlag,
 };
 
-/// Replace flag(s) of an envelope.
+/// Replace flag(s) of a given envelope.
 ///
 /// This command allows you to replace existing flags of the given
 /// envelope(s) with the given flag(s).

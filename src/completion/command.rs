@@ -1,12 +1,13 @@
+use std::io;
+
 use clap::{value_parser, CommandFactory, Parser};
 use clap_complete::Shell;
 use color_eyre::Result;
-use std::io;
 use tracing::info;
 
 use crate::cli::Cli;
 
-/// Print completion script for a shell to stdout.
+/// Print completion script for the given shell to stdout.
 ///
 /// This command allows you to generate completion script for a given
 /// shell. The script is printed to the standard output. If you want

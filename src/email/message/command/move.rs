@@ -17,7 +17,8 @@ use crate::{
     folder::arg::name::{SourceFolderNameOptionalFlag, TargetFolderNameArg},
 };
 
-/// Move a message from a source folder to a target folder.
+/// Move the message associated to the given envelope id(s) to the
+/// given target folder.
 #[derive(Debug, Parser)]
 pub struct MessageMoveCommand {
     #[command(flatten)]

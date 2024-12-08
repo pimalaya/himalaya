@@ -11,18 +11,18 @@ use pimalaya_tui::terminal::cli::printer::Printer;
 use crate::config::TomlConfig;
 
 use self::{
-    add::AddFolderCommand, delete::FolderDeleteCommand, expunge::FolderExpungeCommand,
+    add::FolderAddCommand, delete::FolderDeleteCommand, expunge::FolderExpungeCommand,
     list::FolderListCommand, purge::FolderPurgeCommand,
 };
 
-/// Manage folders.
+/// Create, list and purge your folders (as known as mailboxes).
 ///
-/// A folder (as known as mailbox, or directory) contains one or more
-/// emails. This subcommand allows you to manage them.
+/// A folder (as known as mailbox, or directory) is a messages
+/// container. This subcommand allows you to manage them.
 #[derive(Debug, Subcommand)]
 pub enum FolderSubcommand {
     #[command(visible_alias = "create", alias = "new")]
-    Add(AddFolderCommand),
+    Add(FolderAddCommand),
 
     #[command(alias = "lst")]
     List(FolderListCommand),

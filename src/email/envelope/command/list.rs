@@ -18,12 +18,12 @@ use crate::{
     folder::arg::name::FolderNameOptionalFlag,
 };
 
-/// List all envelopes.
+/// Search and sort envelopes as a list.
 ///
-/// This command allows you to list all envelopes included in the
-/// given folder.
+/// This command allows you to list envelopes included in the given
+/// folder, matching the given query.
 #[derive(Debug, Parser)]
-pub struct ListEnvelopesCommand {
+pub struct EnvelopeListCommand {
     #[command(flatten)]
     pub folder: FolderNameOptionalFlag,
 
@@ -123,7 +123,7 @@ pub struct ListEnvelopesCommand {
     pub query: Option<Vec<String>>,
 }
 
-impl Default for ListEnvelopesCommand {
+impl Default for EnvelopeListCommand {
     fn default() -> Self {
         Self {
             folder: Default::default(),
@@ -136,7 +136,7 @@ impl Default for ListEnvelopesCommand {
     }
 }
 
-impl ListEnvelopesCommand {
+impl EnvelopeListCommand {
     pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
         info!("executing list envelopes command");
 
@@ -213,7 +213,6 @@ impl ListEnvelopesCommand {
             .with_some_sender_color(toml_account_config.envelope_list_table_sender_color())
             .with_some_date_color(toml_account_config.envelope_list_table_date_color());
 
-        printer.out(table)?;
-        Ok(())
+        printer.out(table)
     }
 }

@@ -10,12 +10,11 @@ use crate::config::TomlConfig;
 
 use self::{add::FlagAddCommand, remove::FlagRemoveCommand, set::FlagSetCommand};
 
-/// Manage flags.
+/// Add, change and remove your envelopes flags.
 ///
 /// A flag is a tag associated to an envelope. Existing flags are
 /// seen, answered, flagged, deleted, draft. Other flags are
-/// considered custom, which are not always supported (the
-/// synchronization does not take care of them yet).
+/// considered custom, which are not always supported.
 #[derive(Debug, Subcommand)]
 pub enum FlagSubcommand {
     #[command(arg_required_else_help = true)]
