@@ -53,7 +53,7 @@ $ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
 
   These commands install the latest binary from the GitHub [releases](https://github.com/pimalaya/himalaya/releases) section.
 
-  If you want a more up-to-date version than the latest release, check out the [`pre-releases`](https://github.com/pimalaya/himalaya/actions/workflows/pre-releases.yml) GitHub workflow and look for the *Artifacts* section. You should find a pre-built binary matching your OS. These pre-built binaries are built from the `master` branch.
+  If you want a more up-to-date version than the latest release, check out the [`releases`](https://github.com/pimalaya/himalaya/actions/workflows/releases.yml) GitHub workflow and look for the *Artifacts* section. You should find a pre-built binary matching your OS. These pre-built binaries are built from the `master` branch.
 
   *Such binaries are built with the default cargo features. If you want to enable or disable a feature, please use another installation method.*
 </details>
