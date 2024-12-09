@@ -502,6 +502,16 @@ You can also manually edit your own configuration, from scratch:
 ## FAQ
 
 <details>
+  <summary>How different is it from aerc, mutt or alpine?</summary>
+
+  Aerc, mutt and alpine can be categorized as Terminal User Interfaces (TUI). When the program is executed, your terminal is locked into an event loop and you interact with your emails using keybinds.
+
+  Himalaya is also a TUI, but more specifically a Command-Line Interface (CLI). There is no event loop: you interact with your emails using shell commands, in a stateless way.
+
+  Additionaly, Himalaya CLI is based on `email-lib`, which is also part of the Pimalaya project. The aim is not just to propose a new terminal interface, but also to expose Rust tools to deal with emails. Anyone who knows Rust language can build his own email interface, without re-inventing the wheel.
+</details>
+
+<details>
   <summary>How to compose a message?</summary>
 
   An email message is a list of **headers** (`key: val`) followed by a **body**. They form together a template:
