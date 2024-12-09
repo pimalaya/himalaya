@@ -499,6 +499,13 @@ You can also manually edit your own configuration, from scratch:
     Running `himalaya configure -a icloud` will ask for your IMAP password, just paste the one generated previously.
 </details>
 
+## Other interfaces
+
+- [pimalaya/himalaya-vim](https://github.com/pimalaya/himalaya-vim), a Vim plugin sitting at the top of Himalaya CLI
+- [dantecatalfamo/himalaya-emacs](https://github.com/dantecatalfamo/himalaya-emacs), an Emacs plugin sitting at the top of Himalaya CLI
+- [jns/himalaya-raycast](https://www.raycast.com/jns/himalaya), a Raycast extension for Himalaya CLI
+- [pimalaya/himalaya-repl](https://github.com/pimalaya/himalaya-repl), an experimental Read-Eval-Print-Loop variant of Himalaya CLI
+
 ## FAQ
 
 <details>
