@@ -16,7 +16,8 @@ use crate::{
     folder::arg::name::{SourceFolderNameOptionalFlag, TargetFolderNameArg},
 };
 
-/// Copy a message from a source folder to a target folder.
+/// Copy the message associated to the given envelope id(s) to the
+/// given target folder.
 #[derive(Debug, Parser)]
 pub struct MessageCopyCommand {
     #[command(flatten)]

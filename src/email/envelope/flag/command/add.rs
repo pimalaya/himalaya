@@ -16,7 +16,7 @@ use crate::{
     folder::arg::name::FolderNameOptionalFlag,
 };
 
-/// Add flag(s) to an envelope.
+/// Add flag(s) to the given envelope.
 ///
 /// This command allows you to attach the given flag(s) to the given
 /// envelope(s).

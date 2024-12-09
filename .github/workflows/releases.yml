@@ -1,0 +1,15 @@
+name: Releases
+
+on:
+  push:
+    tags:
+      - v*
+    branches:
+      - master
+
+jobs:
+  release:
+    uses: pimalaya/nix/.github/workflows/releases.yml@master
+    secrets: inherit
+    with:
+      project: himalaya

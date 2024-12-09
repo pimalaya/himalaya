@@ -1,130 +1,52 @@
+use std::path::PathBuf;
+
 use clap::Parser;
 use color_eyre::Result;
-#[cfg(feature = "imap")]
-use email::imap::config::ImapAuthConfig;
-#[cfg(feature = "smtp")]
-use email::smtp::config::SmtpAuthConfig;
-#[cfg(any(
-    feature = "imap",
-    feature = "smtp",
-    feature = "pgp-gpg",
-    feature = "pgp-commands",
-    feature = "pgp-native",
-))]
-use pimalaya_tui::terminal::prompt;
-use pimalaya_tui::terminal::{cli::printer::Printer, config::TomlConfig as _};
-use tracing::info;
-#[cfg(any(feature = "imap", feature = "smtp"))]
-use tracing::{debug, warn};
 
 use crate::{account::arg::name::AccountNameArg, config::TomlConfig};
 
-/// Configure an account.
+/// Configure the given account.
 ///
-/// This command is mostly used to define or reset passwords managed
-/// by your global keyring. If you do not use the keyring system, you
-/// can skip this command.
+/// This command allows you to configure an existing account or to
+/// create a new one, using the wizard. The `wizard` cargo feature is
+/// required.
 #[derive(Debug, Parser)]
 pub struct AccountConfigureCommand {
     #[command(flatten)]
     pub account: AccountNameArg,
-
-    /// Reset keyring passwords.
-    ///
-    /// This argument will force passwords to be prompted again, then
-    /// saved to your global keyring.
-    #[arg(long, short)]
-    pub reset: bool,
 }
 
 impl AccountConfigureCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
-        info!("executing configure account command");
+    #[cfg(feature = "wizard")]
+    pub async fn execute(
+        self,
+        mut config: TomlConfig,
+        config_path: Option<&PathBuf>,
+    ) -> Result<()> {
+        use pimalaya_tui::{himalaya::wizard, terminal::config::TomlConfig as _};
+        use tracing::info;
 
-        let account = &self.account.name;
-        let (_, toml_account_config) = config.to_toml_account_config(Some(account))?;
+        info!("executing account configure command");
 
-        if self.reset {
-            #[cfg(feature = "imap")]
-            {
-                let reset = match toml_account_config.imap_auth_config() {
-                    Some(ImapAuthConfig::Password(config)) => config.reset().await,
-                    #[cfg(feature = "oauth2")]
-                    Some(ImapAuthConfig::OAuth2(config)) => config.reset().await,
-                    _ => Ok(()),
-                };
+        let path = match config_path {
+            Some(path) => path.clone(),
+            None => TomlConfig::default_path()?,
+        };
 
-                if let Err(err) = reset {
-                    warn!("error while resetting imap secrets: {err}");
-                    debug!("error while resetting imap secrets: {err:?}");
-                }
-            }
+        let account_name = Some(self.account.name.as_str());
 
-            #[cfg(feature = "smtp")]
-            {
-                let reset = match toml_account_config.smtp_auth_config() {
-                    Some(SmtpAuthConfig::Password(config)) => config.reset().await,
-                    #[cfg(feature = "oauth2")]
-                    Some(SmtpAuthConfig::OAuth2(config)) => config.reset().await,
-                    _ => Ok(()),
-                };
+        let account_config = config
+            .accounts
+            .remove(&self.account.name)
+            .unwrap_or_default();
 
-                if let Err(err) = reset {
-                    warn!("error while resetting smtp secrets: {err}");
-                    debug!("error while resetting smtp secrets: {err:?}");
-                }
-            }
+        wizard::edit(path, config, account_name, account_config).await?;
 
-            #[cfg(any(feature = "pgp-gpg", feature = "pgp-commands", feature = "pgp-native"))]
-            if let Some(config) = &toml_account_config.pgp {
-                config.reset().await?;
-            }
-        }
+        Ok(())
+    }
 
-        #[cfg(feature = "imap")]
-        match toml_account_config.imap_auth_config() {
-            Some(ImapAuthConfig::Password(config)) => {
-                config
-                    .configure(|| Ok(prompt::password("IMAP password")?))
-                    .await
-            }
-            #[cfg(feature = "oauth2")]
-            Some(ImapAuthConfig::OAuth2(config)) => {
-                config
-                    .configure(|| Ok(prompt::secret("IMAP OAuth 2.0 client secret")?))
-                    .await
-            }
-            _ => Ok(()),
-        }?;
-
-        #[cfg(feature = "smtp")]
-        match toml_account_config.smtp_auth_config() {
-            Some(SmtpAuthConfig::Password(config)) => {
-                config
-                    .configure(|| Ok(prompt::password("SMTP password")?))
-                    .await
-            }
-            #[cfg(feature = "oauth2")]
-            Some(SmtpAuthConfig::OAuth2(config)) => {
-                config
-                    .configure(|| Ok(prompt::secret("SMTP OAuth 2.0 client secret")?))
-                    .await
-            }
-            _ => Ok(()),
-        }?;
-
-        #[cfg(any(feature = "pgp-gpg", feature = "pgp-commands", feature = "pgp-native"))]
-        if let Some(config) = &toml_account_config.pgp {
-            config
-                .configure(&toml_account_config.email, || {
-                    Ok(prompt::password("PGP secret key password")?)
-                })
-                .await?;
-        }
-
-        printer.out(format!(
-            "Account {account} successfully {}configured!\n",
-            if self.reset { "re" } else { "" }
-        ))
+    #[cfg(not(feature = "wizard"))]
+    pub async fn execute(self, _: TomlConfig, _: Option<&PathBuf>) -> Result<()> {
+        color_eyre::eyre::bail!("This command requires the `wizard` cargo feature to work");
     }
 }

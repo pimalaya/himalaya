@@ -18,7 +18,7 @@ use crate::{
     message::arg::{body::MessageRawBodyArg, header::HeaderRawArgs},
 };
 
-/// Write a new message.
+/// Compose a new message, from scratch.
 ///
 /// This command allows you to write a new message using the editor
 /// defined in your environment variable $EDITOR. When the edition

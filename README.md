@@ -17,49 +17,31 @@ $ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
 
 ## Features
 
-- Multi-accounting
-- Interactive configuration via **wizard** (requires `wizard` feature)
-- Mailbox, envelope, message and flag management
+- Multi-accounting configuration:
+  - interactive via **wizard** (requires `wizard` feature)
+  - manual via **TOML**-based configuration file (see [`./config.sample.toml`](./config.sample.toml))
 - Message composition based on `$EDITOR`
 - **IMAP** backend (requires `imap` feature)
 - **Maildir** backend (requires `maildir` feature)
 - **Notmuch** backend (requires `notmuch` feature)
 - **SMTP** backend (requires `smtp` feature)
 - **Sendmail** backend (requires `sendmail` feature)
-- Global system **keyring** for managing secrets (requires `keyring` feature)
-- **OAuth 2.0** authorization (requires `oauth2` feature)
+- Global system **keyring** for secret management (requires `keyring` feature)
+- **OAuth 2.0** authorization flow (requires `oauth2` feature)
 - **JSON** output via `--output json`
 - **PGP** encryption:
   - via shell commands (requires `pgp-commands` feature)
   - via [GPG](https://www.gnupg.org/) bindings (requires `pgp-gpg` feature)
   - via native implementation (requires `pgp-native` feature)
 
-*Himalaya CLI is written in [Rust](https://www.rust-lang.org/), and relies on [cargo features](https://doc.rust-lang.org/cargo/reference/features.html) to enable or disable functionalities. Default features can be found in the `features` section of the [`Cargo.toml`](https://github.com/pimalaya/himalaya/blob/master/Cargo.toml#L18).*
+*Himalaya CLI is written in [Rust](https://www.rust-lang.org/), and relies on [cargo features](https://doc.rust-lang.org/cargo/reference/features.html) to enable or disable functionalities. Default features can be found in the `features` section of the [`Cargo.toml`](./Cargo.toml#L18), or on [docs.rs](https://docs.rs/crate/himalaya/latest/features).*
 
 ## Installation
-
-*The `v1.0.0` is currently being tested on the `master` branch, and is the prefered version to use. Previous versions (including GitHub beta releases and repositories published versions) are not recommended.*
-
-### Pre-built binary
-
-Himalaya CLI `v1.0.0` can be installed with a pre-built binary. Find the latest [`pre-releases`](https://github.com/pimalaya/himalaya/actions/workflows/pre-releases.yml) GitHub workflow and look for the *Artifacts* section. You should find a pre-built binary matching your OS.
-
-### Cargo (git)
-
-Himalaya CLI `v1.0.0` can also be installed with [cargo](https://doc.rust-lang.org/cargo/):
-
-```bash
-$ cargo install --frozen --force --git https://github.com/pimalaya/himalaya.git
-```
-
-### Other outdated methods
-
-These installation methods should not be used until the `v1.0.0` is finally released, as they are all (temporarily) outdated:
 
 <details>
   <summary>Pre-built binary</summary>
 
-  Himalaya CLI can be installed with a prebuilt binary:
+  Himalaya CLI can be installed with the installer:
 
   ```bash
   # As root:
@@ -71,7 +53,9 @@ These installation methods should not be used until the `v1.0.0` is finally rele
 
   These commands install the latest binary from the GitHub [releases](https://github.com/pimalaya/himalaya/releases) section.
 
-  *Binaries are built with [default](https://github.com/pimalaya/himalaya/blob/master/Cargo.toml#L18) cargo features. If you want to enable or disable a feature, please use another installation method.*
+  If you want a more up-to-date version than the latest release, check out the [`releases`](https://github.com/pimalaya/himalaya/actions/workflows/releases.yml) GitHub workflow and look for the *Artifacts* section. You should find a pre-built binary matching your OS. These pre-built binaries are built from the `master` branch.
+
+  *Such binaries are built with the default cargo features. If you want to enable or disable a feature, please use another installation method.*
 </details>
 
 <details>
@@ -89,7 +73,7 @@ These installation methods should not be used until the `v1.0.0` is finally rele
   You can also use the git repository for a more up-to-date (but less stable) version:
 
   ```bash
-  $ cargo install --git https://github.com/pimalaya/himalaya.git himalaya
+  $ cargo install --frozen --force --git https://github.com/pimalaya/himalaya.git
   ```
 </details>
 
@@ -215,6 +199,8 @@ These installation methods should not be used until the `v1.0.0` is finally rele
 
 Just run `himalaya`, the wizard will help you to configure your default account.
 
+Accounts can be (re)configured via the wizard using the command `himalaya account configure <name>`.
+
 You can also manually edit your own configuration, from scratch:
 
 - Copy the content of the documented [`./config.sample.toml`](./config.sample.toml)
@@ -237,7 +223,7 @@ You can also manually edit your own configuration, from scratch:
   backend.type = "imap"
   backend.host = "127.0.0.1"
   backend.port = 1143
-  backend.encryption = false
+  backend.encryption.type = "none"
   backend.login = "example@proton.me"
   backend.auth.type = "password"
   backend.auth.raw = "*****"
@@ -245,7 +231,7 @@ You can also manually edit your own configuration, from scratch:
   message.send.backend.type = "smtp"
   message.send.backend.host = "127.0.0.1"
   message.send.backend.port = 1025
-  message.send.backend.encryption = false
+  message.send.backend.encryption.type = "none"
   message.send.backend.login = "example@proton.me"
   message.send.backend.auth.type = "password"
   message.send.backend.auth.raw = "*****"
@@ -387,7 +373,7 @@ You can also manually edit your own configuration, from scratch:
   message.send.backend.type = "smtp"
   message.send.backend.host = "smtp-mail.outlook.com"
   message.send.backend.port = 587
-  message.send.backend.encryption = "start-tls"
+  message.send.backend.encryption.type = "start-tls"
   message.send.backend.login = "example@outlook.com"
   message.send.backend.auth.type = "password"
   message.send.backend.auth.raw = "*****"
@@ -474,7 +460,7 @@ You can also manually edit your own configuration, from scratch:
   message.send.backend.type = "smtp"
   message.send.backend.host = "smtp.mail.me.com"
   message.send.backend.port = 587
-  message.send.backend.encryption = "start-tls"
+  message.send.backend.encryption.type = "start-tls"
   message.send.backend.login = "johnappleseed@icloud.com"
   message.send.backend.auth.type = "password"
   message.send.backend.auth.raw = "*****"

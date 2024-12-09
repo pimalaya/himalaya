@@ -1,5 +1,5 @@
 ################################################################################
-#### Global configuration ######################################################
+###[ Global configuration ]#####################################################
 ################################################################################
 
 # Default display name for all accounts. It is used to build the full
@@ -11,11 +11,11 @@ display-name = "Example"
 # bottom of all messages. It can be a path or a string. Supports TOML
 # multilines.
 #
-# signature = "/path/to/signature/file"
-# signature = """
-#   Thanks you,
-#   Regards
-# """
+#signature = "/path/to/signature/file"
+#signature = """
+#  Thanks you,
+#  Regards
+#"""
 signature = "Regards,\n"
 
 # Default signature delimiter for all accounts. It delimits the end of
@@ -27,10 +27,10 @@ signature-delim = "-- \n"
 # for downloading attachments. Defaults to the system temporary
 # directory.
 #
-downloads-dir = "~/downloads"
+downloads-dir = "~/Downloads"
 
-# Customizes the charset used to build the table. Defaults to markdown
-# table style.
+# Customizes the charset used to build the accounts listing
+# table. Defaults to markdown table style.
 #
 # See <https://docs.rs/comfy-table/latest/comfy_table/presets/index.html>.
 #
@@ -52,9 +52,11 @@ account.list.table.backends-color = "blue"
 account.list.table.default-color = "black"
 
 ################################################################################
-#### Account configuration #####################################################
+###[ Account configuration ]####################################################
 ################################################################################
 
+# The account name should be unique.
+#
 [accounts.example]
 
 # Defaultness of the account. The current account will be used by
@@ -88,11 +90,10 @@ signature-delim = "-- \n"
 
 # Downloads directory path. It is mostly used for downloading
 # attachments. Defaults to the system temporary directory.
+#
 downloads-dir = "~/downloads"
 
-########################################
-#### Folder configuration ##############
-########################################
+
 
 # Defines aliases for your mailboxes. There are 4 special aliases used
 # by the tool: inbox, sent, drafts and trash. Other aliases can be
@@ -123,9 +124,7 @@ folder.list.table.name-color = "blue"
 #
 folder.list.table.desc-color = "green"
 
-########################################
-#### Envelope configuration ############
-########################################
+
 
 # Customizes the number of envelopes to show by page.
 #
@@ -194,9 +193,7 @@ envelope.list.table.sender-color = "blue"
 #
 envelope.list.table.date-color = "yellow"
 
-########################################
-#### Message configuration #############
-########################################
+
 
 # Defines headers to show at the top of messages when reading them.
 #
@@ -233,9 +230,7 @@ message.send.pre-hook = "process-markdown.sh"
 #message.delete.style = "flag"
 message.delete.style = "folder"
 
-########################################
-#### Template configuration ############
-########################################
+
 
 # Defines how and where the signature should be displayed when writing
 # a new message.
@@ -287,18 +282,14 @@ template.forward.signature-style = "inlined"
 # 
 template.forward.quote-headline = "-------- Forwarded Message --------\n"
 
-########################################
-#### GPG-based PGP configuration #######
-########################################
+
 
 # Enables PGP using GPG bindings. It requires the GPG lib to be
 # installed on the system, and the `pgp-gpg` cargo feature on.
 #
 #pgp.type = "gpg"
 
-########################################
-#### Command-based PGP configuration ###
-########################################
+
 
 # Enables PGP using shell commands. A PGP client needs to be installed
 # on the system, like gpg. It also requires the `pgp-commands` cargo
@@ -334,9 +325,7 @@ template.forward.quote-headline = "-------- Forwarded Message --------\n"
 #
 #pgp.verify-cmd = "gpg --verify --quiet"
 
-########################################
-#### Native PGP configuration ##########
-########################################
+
 
 # Enables the native Rust implementation of PGP. It requires the
 # `pgp-native` cargo feature.
@@ -363,9 +352,7 @@ template.forward.quote-headline = "-------- Forwarded Message --------\n"
 #
 #pgp.key-servers = ["hkps://keys.openpgp.org", "hkps://keys.mailvelope.com"]
 
-########################################
-#### IMAP configuration ################
-########################################
+
 
 # Defines the IMAP backend as the default one for all features.
 #
@@ -382,9 +369,9 @@ backend.port = 993
 
 # IMAP server encryption.
 #
-#backend.encryption = "none" # or false
-#backend.encryption = "start-tls"
-backend.encryption = "tls" # or true
+#backend.encryption.type = "none"
+#backend.encryption.type = "start-tls"
+backend.encryption.type = "tls"
 
 # IMAP server login.
 #
@@ -488,9 +475,7 @@ backend.auth.cmd = "pass show example-imap"
 #
 #backend.auth.redirect-port = 9999
 
-########################################
-#### Maildir configuration #############
-########################################
+
 
 # Defines the Maildir backend as the default one for all features.
 #
@@ -507,9 +492,7 @@ backend.auth.cmd = "pass show example-imap"
 #
 #backend.maildirpp = false
 
-########################################
-#### Notmuch configuration #############
-########################################
+
 
 # Defines the Notmuch backend as the default one for all features.
 #
@@ -533,9 +516,7 @@ backend.auth.cmd = "pass show example-imap"
 #
 #backend.profile = "example"
 
-########################################
-#### SMTP configuration ################
-########################################
+
 
 # Defines the SMTP backend for the message sending feature.
 #
@@ -553,9 +534,9 @@ message.send.backend.port = 587
 
 # SMTP server encryption.
 #
-#message.send.backend.encryption = "none" # or false
-#message.send.backend.encryption = "start-tls"
-message.send.backend.encryption = "tls" # or true
+#message.send.backend.encryption.type = "none"
+#message.send.backend.encryption.type = "start-tls"
+message.send.backend.encryption.type = "tls"
 
 # SMTP server login.
 #
@@ -659,9 +640,7 @@ message.send.backend.auth.cmd = "pass show example-smtp"
 #
 #message.send.backend.auth.redirect-port = 9999
 
-########################################
-#### Sendmail configuration ############
-########################################
+
 
 # Defines the Sendmail backend for the message sending feature.
 #

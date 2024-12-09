@@ -3,7 +3,6 @@ use std::sync::Arc;
 use clap::Parser;
 use color_eyre::Result;
 use email::{backend::feature::BackendFeatureSource, config::Config};
-use mml::message::FilterParts;
 use pimalaya_tui::{
     himalaya::backend::BackendBuilder,
     terminal::{cli::printer::Printer, config::TomlConfig as _},
@@ -17,7 +16,8 @@ use crate::{
     folder::arg::name::FolderNameOptionalFlag,
 };
 
-/// Thread a message.
+/// Read human-friendly version of messages associated to the
+/// given envelope id's thread.
 ///
 /// This command allows you to thread a message. When threading a message,
 /// the "seen" flag is automatically applied to the corresponding
@@ -35,31 +35,10 @@ pub struct MessageThreadCommand {
     #[arg(long, short)]
     pub preview: bool,
 
-    /// Thread the raw version of the given message.
-    ///
-    /// The raw message represents the headers and the body as it is
-    /// on the backend, unedited: not decoded nor decrypted. This is
-    /// useful for debugging faulty messages, but also for
-    /// saving/sending/transfering messages.
-    #[arg(long, short)]
-    #[arg(conflicts_with = "no_headers")]
-    #[arg(conflicts_with = "headers")]
-    pub raw: bool,
-
-    /// Thread only body of text/html parts.
-    ///
-    /// This argument is useful when you need to thread the HTML version
-    /// of a message. Combined with --no-headers, you can write it to
-    /// a .html file and open it with your favourite browser.
-    #[arg(long)]
-    #[arg(conflicts_with = "raw")]
-    pub html: bool,
-
     /// Thread only the body of the message.
     ///
     /// All headers will be removed from the message.
     #[arg(long)]
-    #[arg(conflicts_with = "raw")]
     #[arg(conflicts_with = "headers")]
     pub no_headers: bool,
 
@@ -70,7 +49,6 @@ pub struct MessageThreadCommand {
     /// visible. If no header is given, defaults to the one set up in
     /// your TOML configuration file.
     #[arg(long = "header", short = 'H', value_name = "NAME")]
-    #[arg(conflicts_with = "raw")]
     #[arg(conflicts_with = "no_headers")]
     pub headers: Vec<String>,
 
@@ -100,6 +78,7 @@ impl MessageThreadCommand {
                 builder
                     .without_features()
                     .with_get_messages(BackendFeatureSource::Context)
+                    .with_peek_messages(BackendFeatureSource::Context)
                     .with_thread_envelopes(BackendFeatureSource::Context)
             },
         )
@@ -130,29 +109,19 @@ impl MessageThreadCommand {
             bodies.push_str(glue);
             bodies.push_str(&format!("-------- Message {} --------\n\n", ids[i + 1]));
 
-            if self.raw {
-                // emails do not always have valid utf8, uses "lossy" to
-                // display what can be displayed
-                bodies.push_str(&String::from_utf8_lossy(email.raw()?));
-            } else {
-                let tpl = email
-                    .to_read_tpl(&account_config, |mut tpl| {
-                        if self.no_headers {
-                            tpl = tpl.with_hide_all_headers();
-                        } else if !self.headers.is_empty() {
-                            tpl = tpl.with_show_only_headers(&self.headers);
-                        }
+            let tpl = email
+                .to_read_tpl(&account_config, |mut tpl| {
+                    if self.no_headers {
+                        tpl = tpl.with_hide_all_headers();
+                    } else if !self.headers.is_empty() {
+                        tpl = tpl.with_show_only_headers(&self.headers);
+                    }
 
-                        if self.html {
-                            tpl = tpl.with_filter_parts(FilterParts::Only("text/html".into()));
-                        }
+                    tpl
+                })
+                .await?;
 
-                        tpl
-                    })
-                    .await?;
-                bodies.push_str(&tpl);
-            }
-
+            bodies.push_str(&tpl);
             glue = "\n\n";
         }
 

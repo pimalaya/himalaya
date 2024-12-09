@@ -13,7 +13,7 @@ use crate::{
     account::arg::name::AccountNameFlag, config::TomlConfig, folder::arg::name::FolderNameArg,
 };
 
-/// Purge a folder.
+/// Purge the given folder.
 ///
 /// All emails from the given folder are definitely deleted. The
 /// purged folder will remain empty after execution of the command.

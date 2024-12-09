@@ -7,8 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2024-12-09
+
+The Himalaya CLI scope has changed. It does not include anymore the synchronization, nor the envelope watching. These scopes have moved to dedicated projects:
+
+- [Neverest CLI](https://github.com/pimalaya/neverest), CLI to synchronize, backup and restore emails
+- [Mirador CLI](https://github.com/pimalaya/mirador), CLI to watch mailbox changes
+
+Due to the long time difference with the previous `v1.0.0-beta.4` release, this changelog may be incomplete. The simplest way to upgrade is to reconfigure Himalaya CLI from scratch, using the wizard or the [`config.sample.toml`](./config.sample.toml).
+
+Himalaya CLI will now try to adopt the [conventional commits specification](https://github.com/conventional-commits/conventionalcommits.org). Tools like [`git-cliff`](https://git-cliff.org/) may help us generating more accurate changelogs in the future.
+
 ### Added
 
+- Added `message edit` command to edit a message. To edit on place (replace a message), use `--on-place`.
 - Added `account.list.table.preset` global config option, `accounts.<name>.folder.list.table.preset` and `accounts.<name>.envelope.list.table.preset` account config options.
 
   These options customize the shape of tables, see examples at [`comfy_table::presets`](https://docs.rs/comfy-table/latest/comfy_table/presets/index.html). Defaults to `"||  |-|||           "`, which corresponds to [`comfy_table::presets::ASCII_MARKDOWN`](https://docs.rs/comfy-table/latest/comfy_table/presets/constant.ASCII_MARKDOWN.html).
@@ -30,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Refactored the `account configure` command: this command stands now for creating or editing account configurations from the wizard. The command requires the `wizard` cargo feature.
+- Improved the `account doctor` command: it now checks the state of the config, and the new `--fix` argument allows you to configure keyring, OAuth 2.0 etc.
 - Improved long version `--version`. [#496]
 - Improved error messages when missing cargo features. For example, if a TOML configuration uses the IMAP backend without the `imap` cargo features, the error `missing "imap" feature` is displayed. [#20](https://github.com/pimalaya/core/issues/20)
 - Normalized enum-based configurations, using the [internally tagged representation](https://serde.rs/enum-representations.html#internally-tagged) `type =`. It should reduce issues due to misconfiguration, and improve othe error messages. Yet it is not perfect, see [#802](https://github.com/toml-rs/toml/issues/802):
@@ -86,11 +100,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     message.send.backend.auth.method = "xoauth2"
     ```
 
+- Moved IMAP and SMTP `encryption` to `encryption.type`.
+
+  This change prepares the config to accept different TLS providers with their options. The `true` and `false` variant have been removed as well:
+
+	```toml
+	# before
+	backend.encryption = "none" # or false
+	backend.encryption = "start-tls"
+	message.send.backend.encryption = "tls" # or true
+
+	# after
+	backend.encryption.type = "none"
+	backend.encryption.type = "start-tls"
+	message.send.backend.encryption.type = "tls"
+	```
+
 ### Fixed
 
 - Fixed pre-release archives issue. [#492]
 - Fixed mailto parsing issue. [core#10]
 - Fixed `Answered` flag not set when replying to a message. [#508]
+
+### Removed
+
+- Removed systemd service from `assets/` folder, as Himalaya CLI scope does not include synchronization nor watching anymore.
 
 ## [1.0.0-beta.4] - 2024-04-16
 
@@ -856,7 +890,10 @@ Few major concepts changed:
 - Password from command
 - Set up README
 
-[Unreleased]: https://github.com/soywod/himalaya/compare/v1.0.0-beta.2...HEAD
+[Unreleased]: https://github.com/soywod/himalaya/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/soywod/himalaya/compare/v1.0.0-beta.4...v1.0.0
+[1.0.0-beta.4]: https://github.com/soywod/himalaya/compare/v1.0.0-beta.3...v1.0.0-beta.4
+[1.0.0-beta.3]: https://github.com/soywod/himalaya/compare/v1.0.0-beta.2...v1.0.0-beta.3
 [1.0.0-beta.2]: https://github.com/soywod/himalaya/compare/v1.0.0-beta...v1.0.0-beta.2
 [1.0.0-beta]: https://github.com/soywod/himalaya/compare/v0.9.0...v1.0.0-beta
 [0.9.0]: https://github.com/soywod/himalaya/compare/v0.8.4...v0.9.0
