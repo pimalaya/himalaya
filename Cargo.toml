@@ -30,7 +30,7 @@ pgp-gpg = ["email-lib/pgp-gpg", "mml-lib/pgp-gpg", "pimalaya-tui/pgp-gpg"]
 pgp-native = ["email-lib/pgp-native", "mml-lib/pgp-native", "pimalaya-tui/pgp-native"]
 
 [build-dependencies]
-pimalaya-tui = { version = "=0.1", default-features = false, features = ["build-envs"] }
+pimalaya-tui = { version = "0.2", default-features = false, features = ["build-envs"] }
 
 [dev-dependencies]
 himalaya = { path = ".", features = ["notmuch", "keyring", "oauth2", "pgp-gpg", "pgp-native"] }
@@ -41,11 +41,11 @@ clap = { version = "4.4", features = ["derive", "env", "wrap_help"] }
 clap_complete = "4.4"
 clap_mangen = "0.2"
 color-eyre = "0.6"
-email-lib = { version = "=0.26", default-features = false, features = ["tokio-rustls", "derive", "thread"] }
+email-lib = { version = "0.26", default-features = false, features = ["tokio-rustls", "derive", "thread"] }
 mml-lib = { version = "1", default-features = false, features = ["compiler", "interpreter", "derive"]  }
 once_cell = "1.16"
 open = "5.3"
-pimalaya-tui = { version = "=0.1", default-features = false, features = ["rustls", "email", "path", "cli", "himalaya", "tracing", "sled"] }
+pimalaya-tui = { version = "0.2", default-features = false, features = ["rustls", "email", "path", "cli", "himalaya", "tracing", "sled"] }
 secret-lib = { version = "1", default-features = false, features = ["tokio", "rustls", "command", "derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -55,12 +55,3 @@ toml = "0.8"
 tracing = "0.1"
 url = "2.2"
 uuid = { version = "0.8", features = ["v4"] }
-
-[patch.crates-io]
-email-lib = { git = "https://github.com/pimalaya/core" }
-keyring-lib = { git = "https://github.com/pimalaya/core" }
-mml-lib = { git = "https://github.com/pimalaya/core" }
-oauth-lib = { git = "https://github.com/pimalaya/core" }
-process-lib = { git = "https://github.com/pimalaya/core" }
-secret-lib = { git = "https://github.com/pimalaya/core" }
-pimalaya-tui = { git = "https://github.com/pimalaya/tui" }
