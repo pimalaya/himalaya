@@ -10,7 +10,7 @@
 </div>
 
 ```
-$ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
+himalaya envelope list --account posteo --folder Archives.FOSS --page 2
 ```
 
 ![screenshot](./screenshot.jpeg)
@@ -43,12 +43,16 @@ $ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
 
   Himalaya CLI can be installed with the installer:
 
-  ```bash
-  # As root:
-  $ curl -sSL https://raw.githubusercontent.com/pimalaya/himalaya/master/install.sh | sudo sh
+  *As root:*
 
-  # As a regular user:
-  $ curl -sSL https://raw.githubusercontent.com/pimalaya/himalaya/master/install.sh | PREFIX=~/.local sh
+  ```
+  curl -sSL https://raw.githubusercontent.com/pimalaya/himalaya/master/install.sh | sudo sh
+  ```
+
+  *As a regular user:*
+
+  ```
+  curl -sSL https://raw.githubusercontent.com/pimalaya/himalaya/master/install.sh | PREFIX=~/.local sh
   ```
 
   These commands install the latest binary from the GitHub [releases](https://github.com/pimalaya/himalaya/releases) section.
@@ -63,17 +67,20 @@ $ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
 
   Himalaya CLI can be installed with [cargo](https://doc.rust-lang.org/cargo/):
 
-  ```bash
-  $ cargo install himalaya
+  ```
+  cargo install himalaya
+  ```
 
-  # With only IMAP support:
-  $ cargo install himalaya --no-default-features --features imap
+  *With only IMAP support:*
+
+  ```
+  cargo install himalaya --no-default-features --features imap
   ```
 
   You can also use the git repository for a more up-to-date (but less stable) version:
 
-  ```bash
-  $ cargo install --frozen --force --git https://github.com/pimalaya/himalaya.git
+  ```
+  cargo install --frozen --force --git https://github.com/pimalaya/himalaya.git
   ```
 </details>
 
@@ -82,22 +89,22 @@ $ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
 
   Himalaya CLI can be installed on [Arch Linux](https://archlinux.org/) with either the community repository:
 
-  ```bash
-  $ pacman -S himalaya
+  ```
+  pacman -S himalaya
   ```
 
   or the [user repository](https://aur.archlinux.org/):
 
-  ```bash
-  $ git clone https://aur.archlinux.org/himalaya-git.git
-  $ cd himalaya-git
-  $ makepkg -isc
+  ```
+  git clone https://aur.archlinux.org/himalaya-git.git
+  cd himalaya-git
+  makepkg -isc
   ```
 
   If you use [yay](https://github.com/Jguer/yay), it is even simplier:
 
-  ```bash
-  $ yay -S himalaya-git
+  ```
+  yay -S himalaya-git
   ```
 
 </details>
@@ -107,8 +114,8 @@ $ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
 
   Himalaya CLI can be installed with [Homebrew](https://brew.sh/):
 
-  ```bash
-  $ brew install himalaya
+  ```
+  brew install himalaya
   ```
 
 </details>
@@ -118,8 +125,8 @@ $ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
 
   Himalaya CLI can be installed with [Scoop](https://scoop.sh/):
 
-  ```bash
-  $ scoop install himalaya
+  ```
+  scoop install himalaya
   ```
 
 </details>
@@ -129,9 +136,9 @@ $ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
 
   Himalaya CLI can be installed on [Fedora Linux](https://fedoraproject.org/)/CentOS/RHEL via [COPR](https://copr.fedorainfracloud.org/coprs/atim/himalaya/) repo:
 
-  ```bash
-  $ dnf copr enable atim/himalaya
-  $ dnf install himalaya
+  ```
+  dnf copr enable atim/himalaya
+  dnf install himalaya
   ```
 
 </details>
@@ -141,29 +148,38 @@ $ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
 
   Himalaya CLI can be installed with [Nix](https://serokell.io/blog/what-is-nix):
 
-  ```bash
-  $ nix-env -i himalaya
+  ```
+  nix-env -i himalaya
   ```
 
   You can also use the git repository for a more up-to-date (but less stable) version:
 
-  ```bash
-  $ nix-env -if https://github.com/pimalaya/himalaya/archive/master.tar.gz
+  ```
+  nix-env -if https://github.com/pimalaya/himalaya/archive/master.tar.gz
+  ```
 
-  # or, from within the source tree checkout
-  $ nix-env -if .
+  *Or, from within the source tree checkout:*
+
+  ```
+  nix-env -if .
   ```
 
   If you have the [Flakes](https://nixos.wiki/wiki/Flakes) feature enabled:
 
-  ```bash
-  $ nix profile install himalaya
+  ```
+  nix profile install himalaya
+  ```
 
-  # or, from within the source tree checkout
-  $ nix profile install
+  *Or, from within the source tree checkout:*
 
-  # you can also run Himalaya directly without installing it:
-  $ nix run himalaya
+  ```
+  nix profile install
+  ```
+
+  *You can also run Himalaya directly without installing it:*
+
+  ```
+  nix run himalaya
   ```
 </details>
 
@@ -174,22 +190,22 @@ $ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
 
   First you need to install the Rust development environment (see the [rust installation documentation](https://doc.rust-lang.org/cargo/getting-started/installation.html)):
 
-  ```bash
-  $ curl https://sh.rustup.rs -sSf | sh
+  ```
+  curl https://sh.rustup.rs -sSf | sh
   ```
 
   Then, you need to clone the repository and install dependencies:
 
-  ```bash
-  $ git clone https://github.com/pimalaya/himalaya.git
-  $ cd himalaya
-  $ cargo check
+  ```
+  git clone https://github.com/pimalaya/himalaya.git
+  cd himalaya
+  cargo check
   ```
 
   Now, you can build Himalaya:
 
-  ```bash
-  $ cargo build --release
+  ```
+  cargo build --release
   ```
 
   *Binaries are available under the `target/release` folder.*
