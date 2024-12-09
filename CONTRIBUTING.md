@@ -16,3 +16,7 @@ $ cargo build
 # run the CLI
 $ cargo run --feature pgp-gpg -- envelope list
 ```
+
+## Commit style
+
+Starting from the `v1.0.0`, Himalaya CLI tries to adopt the [conventional commits specification](https://github.com/conventional-commits/conventionalcommits.org).

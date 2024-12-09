@@ -7,10 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2024-12-09
+
 The Himalaya CLI scope has changed. It does not include anymore the synchronization, nor the envelope watching. These scopes have moved to dedicated projects:
 
 - [Neverest CLI](https://github.com/pimalaya/neverest), CLI to synchronize, backup and restore emails
 - [Mirador CLI](https://github.com/pimalaya/mirador), CLI to watch mailbox changes
+
+Due to the long time difference with the previous `v1.0.0-beta.4` release, this changelog may be incomplete. The simplest way to upgrade is to reconfigure Himalaya CLI from scratch, using the wizard or the [`config.sample.toml`](./config.sample.toml).
+
+Himalaya CLI will now try to adopt the [conventional commits specification](https://github.com/conventional-commits/conventionalcommits.org). Tools like [`git-cliff`](https://git-cliff.org/) may help us generating more accurate changelogs in the future.
 
 ### Added
 
@@ -884,7 +890,10 @@ Few major concepts changed:
 - Password from command
 - Set up README
 
-[Unreleased]: https://github.com/soywod/himalaya/compare/v1.0.0-beta.2...HEAD
+[Unreleased]: https://github.com/soywod/himalaya/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/soywod/himalaya/compare/v1.0.0-beta.4...v1.0.0
+[1.0.0-beta.4]: https://github.com/soywod/himalaya/compare/v1.0.0-beta.3...v1.0.0-beta.4
+[1.0.0-beta.3]: https://github.com/soywod/himalaya/compare/v1.0.0-beta.2...v1.0.0-beta.3
 [1.0.0-beta.2]: https://github.com/soywod/himalaya/compare/v1.0.0-beta...v1.0.0-beta.2
 [1.0.0-beta]: https://github.com/soywod/himalaya/compare/v0.9.0...v1.0.0-beta
 [0.9.0]: https://github.com/soywod/himalaya/compare/v0.8.4...v0.9.0
