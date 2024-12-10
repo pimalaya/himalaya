@@ -567,7 +567,7 @@ You can also manually edit your own configuration, from scratch:
   Hello, world!
   ```
 
-  ### MML boby
+  ### MML body
 
   Email message template body can also be written in MML. The MIME Meta Language was introduced by the Emacs [`mml`](https://www.gnu.org/software/emacs/manual/html_node/emacs-mime/Composing.html) ELisp module. Pimalaya [ported it](https://github.com/pimalaya/core/tree/master/mml) in Rust.
 
