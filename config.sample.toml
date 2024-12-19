@@ -99,11 +99,11 @@ downloads-dir = "~/downloads"
 # by the tool: inbox, sent, drafts and trash. Other aliases can be
 # defined as well.
 #
-folder.alias.inbox = "INBOX"
-folder.alias.sent = "Sent"
-folder.alias.drafts = "Drafts"
-folder.alias.trash = "Trash"
-folder.alias.a23 = "Archives/2023"
+folder.aliases.inbox = "INBOX"
+folder.aliases.sent = "Sent"
+folder.aliases.drafts = "Drafts"
+folder.aliases.trash = "Trash"
+folder.aliases.a23 = "Archives/2023"
 
 # Customizes the number of folders to show by page.
 #
@@ -213,7 +213,7 @@ message.read.format = "auto"
 message.write.headers = ["From", "To", "In-Reply-To", "Cc", "Subject"]
 
 # Saves a copy of sent messages to the sent folder. The sent folder is
-# taken from folder.alias, defaults to Sent.
+# taken from folder.aliases, defaults to Sent.
 #
 message.send.save-copy = true
 

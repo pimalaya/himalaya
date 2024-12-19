@@ -289,10 +289,10 @@ You can also manually edit your own configuration, from scratch:
   [accounts.gmail]
   email = "example@gmail.com"
 
-  folder.alias.inbox = "INBOX"
-  folder.alias.sent = "[Gmail]/Sent Mail"
-  folder.alias.drafts = "[Gmail]/Drafts"
-  folder.alias.trash = "[Gmail]/Trash"
+  folder.aliases.inbox = "INBOX"
+  folder.aliases.sent = "[Gmail]/Sent Mail"
+  folder.aliases.drafts = "[Gmail]/Drafts"
+  folder.aliases.trash = "[Gmail]/Trash"
 
   backend.type = "imap"
   backend.type.host = "imap.gmail.com"
@@ -335,10 +335,10 @@ You can also manually edit your own configuration, from scratch:
   [accounts.gmail]
   email = "example@gmail.com"
 
-  folder.alias.inbox = "INBOX"
-  folder.alias.sent = "[Gmail]/Sent Mail"
-  folder.alias.drafts = "[Gmail]/Drafts"
-  folder.alias.trash = "[Gmail]/Trash"
+  folder.aliases.inbox = "INBOX"
+  folder.aliases.sent = "[Gmail]/Sent Mail"
+  folder.aliases.drafts = "[Gmail]/Drafts"
+  folder.aliases.trash = "[Gmail]/Trash"
 
   backend.type = "imap"
   backend.host = "imap.gmail.com"
