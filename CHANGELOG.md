@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed permissions issues when using `install.sh`. [#515]
+
 ## [1.0.0] - 2024-12-09
 
 The Himalaya CLI scope has changed. It does not include anymore the synchronization, nor the envelope watching. These scopes have moved to dedicated projects:
@@ -936,4 +940,5 @@ Few major concepts changed:
 [#492]: https://github.com/pimalaya/himalaya/issues/492
 [#496]: https://github.com/pimalaya/himalaya/issues/496
 [#508]: https://github.com/pimalaya/himalaya/issues/508
+[#515]: https://github.com/pimalaya/himalaya/issues/515
 [core#10]: https://github.com/pimalaya/core/issues/10

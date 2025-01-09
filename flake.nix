@@ -2,9 +2,7 @@
   description = "CLI to manage emails";
 
   inputs = {
-    # TODO: https://github.com/NixOS/nixpkgs/pull/358989
-    # nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    nixpkgs.url = "github:soywod/nixpkgs";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     fenix = {
       # TODO: https://github.com/nix-community/fenix/pull/145
       # url = "github:nix-community/fenix";
@@ -17,8 +15,10 @@
     };
   };
 
-  outputs = inputs: (import inputs.pimalaya).mkFlakeOutputs inputs {
-    shell = ./shell.nix;
-    default = ./default.nix;
-  };
+  outputs =
+    inputs:
+    (import inputs.pimalaya).mkFlakeOutputs inputs {
+      shell = ./shell.nix;
+      default = ./default.nix;
+    };
 }
