@@ -55,3 +55,6 @@ toml = "0.8"
 tracing = "0.1"
 url = "2.2"
 uuid = { version = "0.8", features = ["v4"] }
+
+[patch.crates-io]
+pimalaya-tui.git = "https://github.com/pimalaya/tui"
