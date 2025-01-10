@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Changed `message.send.save-copy` default to `true` when omitted. [#536]
 
+- Changed default downloads directory. [core#1]
+
 ### Fixed
 
 - Fixed permissions issues when using `install.sh`. [#515]
@@ -958,4 +960,6 @@ Few major concepts changed:
 [#523]: https://github.com/pimalaya/himalaya/issues/523
 [#535]: https://github.com/pimalaya/himalaya/issues/535
 [#536]: https://github.com/pimalaya/himalaya/issues/536
+
+[core#1]: https://github.com/pimalaya/core/issues/1
 [core#10]: https://github.com/pimalaya/core/issues/10
