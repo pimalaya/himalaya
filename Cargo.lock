@@ -1200,11 +1200,12 @@ dependencies = [
 [[package]]
 name = "email-lib"
 version = "0.26.2"
-source = "git+https://github.com/pimalaya/core#54aa97e39768ee8b6482fea7560bd15daadfa739"
+source = "git+https://github.com/pimalaya/core#09c2283c54e37b99450a63b1285944456ba19ebc"
 dependencies = [
  "async-trait",
  "chrono",
  "chumsky",
+ "dirs",
  "email-macros",
  "email_address",
  "futures",
@@ -1828,7 +1829,7 @@ dependencies = [
 [[package]]
 name = "http-lib"
 version = "0.1.0"
-source = "git+https://github.com/pimalaya/core#54aa97e39768ee8b6482fea7560bd15daadfa739"
+source = "git+https://github.com/pimalaya/core#09c2283c54e37b99450a63b1285944456ba19ebc"
 dependencies = [
  "thiserror 1.0.69",
  "tokio",
@@ -2274,7 +2275,7 @@ dependencies = [
 [[package]]
 name = "keyring-lib"
 version = "1.0.2"
-source = "git+https://github.com/pimalaya/core#54aa97e39768ee8b6482fea7560bd15daadfa739"
+source = "git+https://github.com/pimalaya/core#09c2283c54e37b99450a63b1285944456ba19ebc"
 dependencies = [
  "keyring",
  "once_cell",
@@ -2599,7 +2600,7 @@ dependencies = [
 [[package]]
 name = "mml-lib"
 version = "1.1.1"
-source = "git+https://github.com/pimalaya/core#54aa97e39768ee8b6482fea7560bd15daadfa739"
+source = "git+https://github.com/pimalaya/core#09c2283c54e37b99450a63b1285944456ba19ebc"
 dependencies = [
  "async-recursion",
  "chumsky",
@@ -2798,7 +2799,7 @@ dependencies = [
 [[package]]
 name = "oauth-lib"
 version = "2.0.0"
-source = "git+https://github.com/pimalaya/core#54aa97e39768ee8b6482fea7560bd15daadfa739"
+source = "git+https://github.com/pimalaya/core#09c2283c54e37b99450a63b1285944456ba19ebc"
 dependencies = [
  "http-lib",
  "oauth2",
@@ -3082,7 +3083,7 @@ dependencies = [
 [[package]]
 name = "pgp-lib"
 version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#54aa97e39768ee8b6482fea7560bd15daadfa739"
+source = "git+https://github.com/pimalaya/core#09c2283c54e37b99450a63b1285944456ba19ebc"
 dependencies = [
  "async-recursion",
  "futures",
@@ -3261,7 +3262,7 @@ dependencies = [
 [[package]]
 name = "process-lib"
 version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#54aa97e39768ee8b6482fea7560bd15daadfa739"
+source = "git+https://github.com/pimalaya/core#09c2283c54e37b99450a63b1285944456ba19ebc"
 dependencies = [
  "serde",
  "thiserror 1.0.69",
@@ -3737,7 +3738,7 @@ dependencies = [
 [[package]]
 name = "secret-lib"
 version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#54aa97e39768ee8b6482fea7560bd15daadfa739"
+source = "git+https://github.com/pimalaya/core#09c2283c54e37b99450a63b1285944456ba19ebc"
 dependencies = [
  "keyring-lib",
  "process-lib",

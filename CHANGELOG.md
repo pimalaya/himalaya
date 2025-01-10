@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `-y|--yes` flag for `folder purge` and `folder delete` commands. [#469]
+
 ### Changed
 
 - Put back `warn` the default log level. [#522]
@@ -951,6 +955,7 @@ Few major concepts changed:
 [0.2.0]: https://github.com/soywod/himalaya/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/soywod/himalaya/releases/tag/v0.1.0
 
+[#469]: https://github.com/pimalaya/himalaya/issues/469
 [#492]: https://github.com/pimalaya/himalaya/issues/492
 [#496]: https://github.com/pimalaya/himalaya/issues/496
 [#508]: https://github.com/pimalaya/himalaya/issues/508

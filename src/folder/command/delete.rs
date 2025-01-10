@@ -27,6 +27,9 @@ pub struct FolderDeleteCommand {
 
     #[command(flatten)]
     pub account: AccountNameFlag,
+
+    #[arg(long, short)]
+    pub yes: bool,
 }
 
 impl FolderDeleteCommand {
@@ -35,12 +38,14 @@ impl FolderDeleteCommand {
 
         let folder = &self.folder.name;
 
-        let confirm = format!("Do you really want to delete the folder {folder}");
-        let confirm = format!("{confirm}? All emails will be definitely deleted.");
+        if !self.yes {
+            let confirm = format!("Do you really want to delete the folder {folder}");
+            let confirm = format!("{confirm}? All emails will be definitely deleted.");
 
-        if !prompt::bool(confirm, false)? {
-            process::exit(0);
-        };
+            if !prompt::bool(confirm, false)? {
+                process::exit(0);
+            };
+        }
 
         let (toml_account_config, account_config) = config
             .clone()
