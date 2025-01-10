@@ -1,0 +1,42 @@
+name: Release on demand
+
+on:
+  workflow_dispatch:
+    inputs:
+      os:
+        description: Operating system
+        type: choice
+        required: true
+        default: ubuntu-latest
+        options:
+          - ubuntu-latest
+          - macos-13
+          - macos-14
+          - windows-latest
+      target:
+        description: Architecture
+        type: choice
+        required: true
+        options:
+          - aarch64-darwin
+          - aarch64-linux
+          - armv6l-linux
+          - armv7l-linux
+          - i686-linux
+          - i686-windows
+          - x86_64-darwin
+          - x86_64-windows
+      features:
+        description: Cargo features
+        type: string
+        required: true
+
+jobs:
+  release-on-demand:
+    uses: pimalaya/nix/.github/workflows/release-on-demand.yml@master
+    secrets: inherit
+    with:
+      project: himalaya
+      os: ${{ inputs.os }}
+      target: ${{ inputs.target }}
+      features: ${{ inputs.features }}
