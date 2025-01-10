@@ -579,6 +579,7 @@ dependencies = [
  "hashbrown 0.14.5",
  "regex-automata 0.3.9",
  "serde",
+ "stacker",
  "unicode-ident",
 ]
 
@@ -1100,16 +1101,7 @@ version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca3aa72a6f96ea37bbc5aa912f6788242832f75369bdfdadcb0e38423f100059"
 dependencies = [
- "dirs-sys 0.3.7",
-]
-
-[[package]]
-name = "dirs"
-version = "5.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44c45a9d03d6676652bcb5e724c7e988de1acad23a711b5217ab9cbecbec2225"
-dependencies = [
- "dirs-sys 0.4.1",
+ "dirs-sys",
 ]
 
 [[package]]
@@ -1121,18 +1113,6 @@ dependencies = [
  "libc",
  "redox_users",
  "winapi",
-]
-
-[[package]]
-name = "dirs-sys"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "520f05a5cbd335fae5a99ff7a6ab8627577660ee5cfd6a94a6a929b52ff0321c"
-dependencies = [
- "libc",
- "option-ext",
- "redox_users",
- "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -1220,8 +1200,7 @@ dependencies = [
 [[package]]
 name = "email-lib"
 version = "0.26.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8625e58d8fd41ac4f497ead618664d8ab7b86291cffbbf6feb2457c52561e721"
+source = "git+https://github.com/pimalaya/core#da79a2457c4d8459a6f261b4a9814bef99f3f048"
 dependencies = [
  "async-trait",
  "chrono",
@@ -1849,8 +1828,7 @@ dependencies = [
 [[package]]
 name = "http-lib"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "994cbd23c90551cb5821d1c9d9b1e41383f338b31fc122671edc7d1695a61338"
+source = "git+https://github.com/pimalaya/core#da79a2457c4d8459a6f261b4a9814bef99f3f048"
 dependencies = [
  "thiserror 1.0.69",
  "tokio",
@@ -2297,8 +2275,7 @@ dependencies = [
 [[package]]
 name = "keyring-lib"
 version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56921558c465f33d51c6047b86b76764cd2a86b69b99653b43ba1f9a32965218"
+source = "git+https://github.com/pimalaya/core#da79a2457c4d8459a6f261b4a9814bef99f3f048"
 dependencies = [
  "keyring",
  "once_cell",
@@ -2623,8 +2600,7 @@ dependencies = [
 [[package]]
 name = "mml-lib"
 version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39e7cb0490a34b47734055fd39a6df4349fcaf9ee425208e48172e443936c590"
+source = "git+https://github.com/pimalaya/core#da79a2457c4d8459a6f261b4a9814bef99f3f048"
 dependencies = [
  "async-recursion",
  "chumsky",
@@ -2823,8 +2799,7 @@ dependencies = [
 [[package]]
 name = "oauth-lib"
 version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d4a367f5fbc5e9d1971e3dae045c7d6c8b1f9984691d2c1624882b40057f92a"
+source = "git+https://github.com/pimalaya/core#da79a2457c4d8459a6f261b4a9814bef99f3f048"
 dependencies = [
  "http-lib",
  "oauth2",
@@ -2883,12 +2858,6 @@ name = "openssl-probe"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
-
-[[package]]
-name = "option-ext"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "ordered-stream"
@@ -3114,8 +3083,7 @@ dependencies = [
 [[package]]
 name = "pgp-lib"
 version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62b1a64cb843daaa31d7109d77871ba6fcaa25be5b488c97eeb28fc378e5fed7"
+source = "git+https://github.com/pimalaya/core#da79a2457c4d8459a6f261b4a9814bef99f3f048"
 dependencies = [
  "async-recursion",
  "futures",
@@ -3140,7 +3108,7 @@ dependencies = [
  "color-eyre",
  "comfy-table",
  "crossterm 0.27.0",
- "dirs 4.0.0",
+ "dirs",
  "email-lib",
  "email_address",
  "git2",
@@ -3294,13 +3262,21 @@ dependencies = [
 [[package]]
 name = "process-lib"
 version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3eb47ed33aeaf6b32cecbbde6f56dde6c8740f2dac4a146179cc82f797918c46"
+source = "git+https://github.com/pimalaya/core#da79a2457c4d8459a6f261b4a9814bef99f3f048"
 dependencies = [
  "serde",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "psm"
+version = "0.1.24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "200b9ff220857e53e184257720a14553b2f4aa02577d2ed9842d45d4b9654810"
+dependencies = [
+ "cc",
 ]
 
 [[package]]
@@ -3762,8 +3738,7 @@ dependencies = [
 [[package]]
 name = "secret-lib"
 version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba34b385def61154faed219ac86f80ad8c72877a278208bac2ecdd85d68f962f"
+source = "git+https://github.com/pimalaya/core#da79a2457c4d8459a6f261b4a9814bef99f3f048"
 dependencies = [
  "keyring-lib",
  "process-lib",
@@ -3965,7 +3940,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da03fa3b94cc19e3ebfc88c4229c49d8f08cdbd1228870a45f0ffdf84988e14b"
 dependencies = [
  "bstr",
- "dirs 5.0.1",
+ "dirs",
  "os_str_bytes",
 ]
 
@@ -4094,6 +4069,19 @@ name = "stable_deref_trait"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
+
+[[package]]
+name = "stacker"
+version = "0.1.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "799c883d55abdb5e98af1a7b3f23b9b6de8ecada0ecac058672d7635eb48ca7b"
+dependencies = [
+ "cc",
+ "cfg-if",
+ "libc",
+ "psm",
+ "windows-sys 0.59.0",
+]
 
 [[package]]
 name = "static_assertions"

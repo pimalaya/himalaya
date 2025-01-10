@@ -13,9 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Since logs are sent to `stderr`, warnings can be easily discarded by prepending commands with `RUST_LOG=off` or by appending commands with `2>/dev/null`.
 
+- Changed `message.send.save-copy` default to `true` when omitted. [#536]
+
 ### Fixed
 
 - Fixed permissions issues when using `install.sh`. [#515]
+
 - Fixed de/serialization issues of backends' `none` variant. [#523]
 
 ## [1.0.0] - 2024-12-09
@@ -950,4 +953,5 @@ Few major concepts changed:
 [#515]: https://github.com/pimalaya/himalaya/issues/515
 [#522]: https://github.com/pimalaya/himalaya/issues/522
 [#523]: https://github.com/pimalaya/himalaya/issues/523
+[#536]: https://github.com/pimalaya/himalaya/issues/536
 [core#10]: https://github.com/pimalaya/core/issues/10
