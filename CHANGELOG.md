@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed permissions issues when using `install.sh`. [#515]
+- Fixed de/serialization issues of backends' `none` variant. [#523]
 
 ## [1.0.0] - 2024-12-09
 
@@ -948,4 +949,5 @@ Few major concepts changed:
 [#508]: https://github.com/pimalaya/himalaya/issues/508
 [#515]: https://github.com/pimalaya/himalaya/issues/515
 [#522]: https://github.com/pimalaya/himalaya/issues/522
+[#523]: https://github.com/pimalaya/himalaya/issues/523
 [core#10]: https://github.com/pimalaya/core/issues/10

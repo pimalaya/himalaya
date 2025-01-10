@@ -3133,7 +3133,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-tui"
 version = "0.2.1"
-source = "git+https://github.com/pimalaya/tui#82fea1ad7d76a0b32806f2a4fc92d635de9a3aeb"
+source = "git+https://github.com/pimalaya/tui#0a3d2df10eea188a187836c59eeca5fc3fd902d6"
 dependencies = [
  "async-trait",
  "clap",
