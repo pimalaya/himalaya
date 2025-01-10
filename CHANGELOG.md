@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed de/serialization issues of backends' `none` variant. [#523]
 
-- Fixed list envelopes out of bound error when empty result. [#518]
+- Fixed list envelopes out of bound error when empty result. [#535]
 
 ## [1.0.0] - 2024-12-09
 
@@ -956,5 +956,6 @@ Few major concepts changed:
 [#518]: https://github.com/pimalaya/himalaya/issues/518
 [#522]: https://github.com/pimalaya/himalaya/issues/522
 [#523]: https://github.com/pimalaya/himalaya/issues/523
+[#535]: https://github.com/pimalaya/himalaya/issues/535
 [#536]: https://github.com/pimalaya/himalaya/issues/536
 [core#10]: https://github.com/pimalaya/core/issues/10
