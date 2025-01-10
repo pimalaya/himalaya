@@ -18,15 +18,15 @@ on:
         type: choice
         required: true
         options:
-          - aarch64-darwin
-          - aarch64-linux
-          - armv6l-linux
-          - armv7l-linux
-          - i686-linux
-          - i686-windows
-          - x86_64-linux
-          - x86_64-darwin
-          - x86_64-windows
+          - aarch64-apple-darwin
+          - aarch64-unknown-linux-musl
+          - aarch64-unknown-linux-musl
+          - armv6l-unknown-linux-musleabihf
+          - armv7l-unknown-linux-musleabihf
+          - i686-unknown-linux-musl
+          - x86_64-apple-darwin
+          - x86_64-unknown-linux-musl
+          - x86_64-w64-mingw32
       features:
         description: Cargo features
         type: string
