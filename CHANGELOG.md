@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2025-01-11
+
 ### Added
 
 - Added `-y|--yes` flag for `folder purge` and `folder delete` commands. [#469]
