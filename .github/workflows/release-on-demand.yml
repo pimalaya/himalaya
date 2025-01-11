@@ -9,10 +9,9 @@ on:
         required: true
         default: ubuntu-latest
         options:
-          - ubuntu-latest
+          - ubuntu-24.04
           - macos-13
           - macos-14
-          - windows-latest
       target:
         description: Architecture
         type: choice
