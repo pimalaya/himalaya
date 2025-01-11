@@ -66,4 +66,4 @@ secret-lib.path = "/path/to/core/secret"
 
 ## Commit style
 
-Starting from the `v1.0.0`, Himalaya CLI tries to adopt the [conventional commits specification](https://github.com/conventional-commits/conventionalcommits.org).
+Starting from the `v1.0.0`, Himalaya CLI tries to adopt the [conventional commits specification](https://www.conventionalcommits.org/en/v1.0.0/#summary).
