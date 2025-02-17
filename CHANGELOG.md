@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed invalid fetch with NIL body encoding. [#525]
+
 ## [1.1.0] - 2025-01-11
 
 ### Added
@@ -964,6 +968,7 @@ Few major concepts changed:
 [#518]: https://github.com/pimalaya/himalaya/issues/518
 [#522]: https://github.com/pimalaya/himalaya/issues/522
 [#523]: https://github.com/pimalaya/himalaya/issues/523
+[#525]: https://github.com/pimalaya/himalaya/issues/525
 [#535]: https://github.com/pimalaya/himalaya/issues/535
 [#536]: https://github.com/pimalaya/himalaya/issues/536
 [#538]: https://github.com/pimalaya/himalaya/issues/538
