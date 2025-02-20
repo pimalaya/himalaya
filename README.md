@@ -295,11 +295,11 @@ You can also manually edit your own configuration, from scratch:
   folder.aliases.trash = "[Gmail]/Trash"
 
   backend.type = "imap"
-  backend.type.host = "imap.gmail.com"
-  backend.type.port = 993
-  backend.type.login = "example@gmail.com"
-  backend.type.auth.type = "password"
-  backend.type.auth.raw = "*****"
+  backend.host = "imap.gmail.com"
+  backend.port = 993
+  backend.login = "example@gmail.com"
+  backend.auth.type = "password"
+  backend.auth.raw = "*****"
 
   message.send.backend.type = "smtp"
   message.send.backend.host = "smtp.gmail.com"
@@ -546,7 +546,7 @@ You can also manually edit your own configuration, from scratch:
   - `Reply-To`: represents the address the receiver should reply to instead of the `From` header
   - `Cc`: represents the addresses of the other receivers (carbon copy)
   - `Bcc`: represents the addresses of the other hidden receivers (blind carbon copy)
-    
+
   An address can be:
 
   - a single email address `user@domain`
