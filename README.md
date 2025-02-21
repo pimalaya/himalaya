@@ -668,6 +668,12 @@ You can also manually edit your own configuration, from scratch:
   5. try to guess (`imap.example.com`, `smtp.example.com`…)
 </details>
 
+<details>
+  <summary>How to disable color output?</summary>
+
+  Simply set the environment variable NO_COLOR=1
+</details>
+
 ## Sponsoring
 
 [![nlnet](https://nlnet.nl/logo/banner-160x60.png)](https://nlnet.nl/)
