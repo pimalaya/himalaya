@@ -1,31 +1,42 @@
 # TODO: move this to nixpkgs
-# This file aims to be a replacement for the nixpkgs derivation.
+# This file aims to be an up-to-date replacement on master for the nixpkgs derivation.
 
-{
-  lib,
-  pkg-config,
-  rustPlatform,
-  fetchFromGitHub,
-  stdenv,
-  apple-sdk,
-  installShellFiles,
-  installShellCompletions ? stdenv.buildPlatform.canExecute stdenv.hostPlatform,
-  installManPages ? stdenv.buildPlatform.canExecute stdenv.hostPlatform,
-  notmuch,
-  gpgme,
-  buildNoDefaultFeatures ? false,
-  buildFeatures ? [ ],
-}:
+{ lib
+, rustPlatform
+, fetchFromGitHub
+, stdenv
+, buildPackages
+, pkg-config
+, apple-sdk
+, installShellFiles
+, installShellCompletions ? stdenv.buildPlatform.canExecute stdenv.hostPlatform
+, installManPages ? stdenv.buildPlatform.canExecute stdenv.hostPlatform
+, notmuch
+, gpgme
+, buildNoDefaultFeatures ? false
+, buildFeatures ? [ ]
+, withNoDefaultFeatures ? buildNoDefaultFeatures
+, withFeatures ? buildFeatures
+}@args:
 
 let
-  version = "1.0.0-beta.4";
-  hash = "sha256-NrWBg0sjaz/uLsNs8/T4MkUgHOUvAWRix1O5usKsw6o=";
-  cargoHash = "sha256-YS8IamapvmdrOPptQh2Ef9Yold0IK1XIeGs0kDIQ5b8=";
+  version = "1.1.0";
+  hash = "sha256-gdrhzyhxRHZkALB3SG/aWOdA5iMYkel3Cjk5VBy3E4M=";
+  cargoHash = "sha256-ulqMjpW3UI509vs3jVHXAEQUhxU/f/hN8XiIo8UBRq8=";
+
+  noDefaultFeatures = lib.warnIf
+    (args ? buildNoDefaultFeatures)
+    "buildNoDefaultFeatures is deprecated in favour of withNoDefaultFeatures and will be removed in the next release"
+    withNoDefaultFeatures;
+
+  features = lib.warnIf
+    (args ? buildFeatures)
+    "buildFeatures is deprecated in favour of withFeatures and will be removed in the next release"
+    withFeatures;
 in
 
-rustPlatform.buildRustPackage rec {
-  inherit cargoHash version;
-  inherit buildNoDefaultFeatures buildFeatures;
+rustPlatform.buildRustPackage {
+  inherit version cargoHash;
 
   pname = "himalaya";
 
@@ -36,54 +47,44 @@ rustPlatform.buildRustPackage rec {
     rev = "v${version}";
   };
 
-  nativeBuildInputs = [
-    pkg-config
-  ] ++ lib.optional (installManPages || installShellCompletions) installShellFiles;
+  useFetchCargoVendor = true;
 
-  buildInputs =
-    [ ]
+  buildNoDefaultFeatures = noDefaultFeatures;
+  buildFeatures = features;
+
+  nativeBuildInputs = [ pkg-config ]
+    ++ lib.optional (installManPages || installShellCompletions) installShellFiles;
+
+  buildInputs = [ ]
     ++ lib.optional stdenv.hostPlatform.isDarwin apple-sdk
-    ++ lib.optional (builtins.elem "notmuch" buildFeatures) notmuch
-    ++ lib.optional (builtins.elem "pgp-gpg" buildFeatures) gpgme;
+    ++ lib.optional (builtins.elem "notmuch" withFeatures) notmuch
+    ++ lib.optional (builtins.elem "pgp-gpg" withFeatures) gpgme;
 
+  # most of the tests are lib side
   doCheck = false;
   auditable = false;
 
-  # unit tests only
-  cargoTestFlags = [ "--lib" ];
+  postInstall = let emulator = stdenv.hostPlatform.emulator buildPackages; in ''
+    mkdir -p $out/share/{applications,completions,man}
+    cp assets/himalaya.desktop "$out"/share/applications/
+    ${emulator} "$out"/bin/himalaya man "$out"/share/man
+    ${emulator} "$out"/bin/himalaya completion bash > "$out"/share/completions/himalaya.bash
+    ${emulator} "$out"/bin/himalaya completion elvish > "$out"/share/completions/himalaya.elvish
+    ${emulator} "$out"/bin/himalaya completion fish > "$out"/share/completions/himalaya.fish
+    ${emulator} "$out"/bin/himalaya completion powershell > "$out"/share/completions/himalaya.powershell
+    ${emulator} "$out"/bin/himalaya completion zsh > "$out"/share/completions/himalaya.zsh
+  '' + lib.optionalString installManPages ''
+    installManPage "$out"/share/man/*
+  '' + lib.optionalString installShellCompletions ''
+    installShellCompletion "$out"/share/completions/himalaya.{bash,fish,zsh}
+  '';
 
-  postInstall =
-    ''
-      mkdir -p $out/share/{applications,completions,man}
-      cp assets/himalaya.desktop "$out"/share/applications/
-    ''
-    + lib.optionalString (stdenv.buildPlatform.canExecute stdenv.hostPlatform) ''
-      "$out"/bin/himalaya man "$out"/share/man
-    ''
-    + lib.optionalString installManPages ''
-      installManPage "$out"/share/man/*
-    ''
-    + lib.optionalString (stdenv.buildPlatform.canExecute stdenv.hostPlatform) ''
-      "$out"/bin/himalaya completion bash > "$out"/share/completions/himalaya.bash
-      "$out"/bin/himalaya completion elvish > "$out"/share/completions/himalaya.elvish
-      "$out"/bin/himalaya completion fish > "$out"/share/completions/himalaya.fish
-      "$out"/bin/himalaya completion powershell > "$out"/share/completions/himalaya.powershell
-      "$out"/bin/himalaya completion zsh > "$out"/share/completions/himalaya.zsh
-    ''
-    + lib.optionalString installShellCompletions ''
-      installShellCompletion "$out"/share/completions/himalaya.{bash,fish,zsh}
-    '';
-
-  meta = rec {
+  meta = with lib; {
     description = "CLI to manage emails";
     mainProgram = "himalaya";
     homepage = "https://github.com/pimalaya/himalaya";
-    changelog = "${homepage}/blob/v${version}/CHANGELOG.md";
-    license = lib.licenses.mit;
-    maintainers = with lib.maintainers; [
-      soywod
-      toastal
-      yanganto
-    ];
+    changelog = "https://github.com/pimalaya/himalaya/blob/v${version}/CHANGELOG.md";
+    license = licenses.mit;
+    maintainers = with maintainers; [ soywod yanganto ];
   };
 }
