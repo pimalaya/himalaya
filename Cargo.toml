@@ -23,7 +23,7 @@ notmuch = ["email-lib/notmuch", "pimalaya-tui/notmuch"]
 smtp = ["email-lib/smtp", "pimalaya-tui/smtp"]
 sendmail = ["email-lib/sendmail", "pimalaya-tui/sendmail"]
 keyring = ["email-lib/keyring", "pimalaya-tui/keyring", "secret-lib/keyring"]
-oauth2 = ["email-lib/oauth2", "pimalaya-tui/oauth2", "keyring"]
+oauth2 = ["email-lib/oauth2", "pimalaya-tui/oauth2", "keyring", "reqwest", "sha2", "base64"]
 wizard = ["email-lib/autoconfig", "pimalaya-tui/wizard"]
 pgp-commands = ["email-lib/pgp-commands", "mml-lib/pgp-commands", "pimalaya-tui/pgp-commands"]
 pgp-gpg = ["email-lib/pgp-gpg", "mml-lib/pgp-gpg", "pimalaya-tui/pgp-gpg"]
@@ -55,6 +55,9 @@ toml = "0.8"
 tracing = "0.1"
 url = "2.2"
 uuid = { version = "0.8", features = ["v4"] }
+reqwest = { version = "0.11", features = ["json"], optional = true }
+sha2 = { version = "0.10", optional = true }
+base64 = { version = "0.21", optional = true }
 
 [patch.crates-io]
 imap-codec.git = "https://github.com/duesee/imap-codec"
