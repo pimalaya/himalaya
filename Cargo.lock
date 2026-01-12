@@ -1817,7 +1817,6 @@ dependencies = [
  "clap_mangen",
  "color-eyre",
  "email-lib",
- "himalaya",
  "mml-lib",
  "once_cell",
  "open",

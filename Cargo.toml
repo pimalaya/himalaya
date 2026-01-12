@@ -32,9 +32,6 @@ pgp-native = ["email-lib/pgp-native", "mml-lib/pgp-native", "pimalaya-tui/pgp-na
 [build-dependencies]
 pimalaya-tui = { version = "0.3", default-features = false, features = ["build-envs"] }
 
-[dev-dependencies]
-himalaya = { path = ".", features = ["notmuch", "keyring", "oauth2", "pgp-gpg", "pgp-native"] }
-
 [dependencies]
 ariadne = "0.2"
 clap = { version = "4.4", features = ["derive", "env", "wrap_help"] }
