@@ -12,6 +12,7 @@ pimalaya.mkDefault (
       {
         lib,
         pkgs,
+        buildPackages,
         rustPlatform,
         defaultFeatures,
         features,
@@ -21,23 +22,28 @@ pimalaya.mkDefault (
         buildNoDefaultFeatures = !defaultFeatures;
         buildFeatures = lib.splitString "," features;
       })
-      # HACK: needed until new derivation available on nixpkgs
+      # HACK: needed until new derivation available on nixpkgs's
+      # master branch
       .overrideAttrs
         {
           postInstall =
             let
-              inherit (pkgs) stdenv buildPackages;
+              inherit (pkgs) stdenv;
               emulator = stdenv.hostPlatform.emulator buildPackages;
+              exe = stdenv.hostPlatform.extensions.executable;
             in
+            lib.optionalString (lib.hasInfix "wine" emulator) ''
+              wineboot --init
             ''
+            + ''
               mkdir -p $out/share/{applications,completions,man}
               cp assets/himalaya.desktop "$out"/share/applications/
-              ${emulator} "$out"/bin/himalaya man "$out"/share/man
-              ${emulator} "$out"/bin/himalaya completion bash > "$out"/share/completions/himalaya.bash
-              ${emulator} "$out"/bin/himalaya completion elvish > "$out"/share/completions/himalaya.elvish
-              ${emulator} "$out"/bin/himalaya completion fish > "$out"/share/completions/himalaya.fish
-              ${emulator} "$out"/bin/himalaya completion powershell > "$out"/share/completions/himalaya.powershell
-              ${emulator} "$out"/bin/himalaya completion zsh > "$out"/share/completions/himalaya.zsh
+              ${emulator} "$out"/bin/himalaya${exe} man "$out"/share/man
+              ${emulator} "$out"/bin/himalaya${exe} completion bash > "$out"/share/completions/himalaya.bash
+              ${emulator} "$out"/bin/himalaya${exe} completion elvish > "$out"/share/completions/himalaya.elvish
+              ${emulator} "$out"/bin/himalaya${exe} completion fish > "$out"/share/completions/himalaya.fish
+              ${emulator} "$out"/bin/himalaya${exe} completion powershell > "$out"/share/completions/himalaya.powershell
+              ${emulator} "$out"/bin/himalaya${exe} completion zsh > "$out"/share/completions/himalaya.zsh
             ''
             + lib.optionalString (stdenv.buildPlatform.canExecute stdenv.hostPlatform) ''
               installManPage "$out"/share/man/*
