@@ -553,7 +553,7 @@ You can also manually edit your own configuration, from scratch:
   - a named address `Name <user@domain>`
   - a quoted named address `"Name" <user@domain>`
 
-  Multiple address are separated by a coma `,`: `user@domain, Name <user@domain>, "Name" <user@domain>`.
+  Multiple address are separated by a comma `,`: `user@domain, Name <user@domain>, "Name" <user@domain>`.
 
   ### Plain text body
 
