@@ -2,10 +2,10 @@ name: Releases
 
 on:
   push:
-    # tags:
-    #   - v*
-    # branches:
-    #   - master
+    tags:
+      - v*
+    branches:
+      - master
 
 jobs:
   release:
@@ -13,3 +13,4 @@ jobs:
     secrets: inherit
     with:
       project: himalaya
+      nixpkgs: staging-next
