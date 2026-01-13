@@ -33,6 +33,7 @@ pimalaya.mkDefault (
               exe = stdenv.hostPlatform.extensions.executable;
             in
             lib.optionalString (lib.hasInfix "wine" emulator) ''
+              export WINEPREFIX=`mktemp -d`
               wineboot --init
             ''
             + ''
