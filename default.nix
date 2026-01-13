@@ -33,8 +33,9 @@ pimalaya.mkDefault (
               exe = stdenv.hostPlatform.extensions.executable;
             in
             lib.optionalString (lib.hasInfix "wine" emulator) ''
-              export WINEPREFIX=`mktemp -d`
-              wineboot --init
+              if [ ! -d "$WINEPREFIX" ] ; then
+                mkdir -p "$WINEPREFIX"
+              fi
             ''
             + ''
               mkdir -p $out/share/{applications,completions,man}
