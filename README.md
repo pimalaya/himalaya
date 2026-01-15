@@ -267,7 +267,7 @@ You can also manually edit your own configuration, from scratch:
     backend.auth.keyring = "proton-example"
     ```
 
-    Running `himalaya configure -a proton` will ask for your IMAP password, just paste the one generated previously.
+    Running `himalaya account configure proton` will ask for your IMAP password, just paste the one generated previously.
 </details>
 
 <details>
@@ -369,7 +369,7 @@ You can also manually edit your own configuration, from scratch:
   message.send.backend.auth.scope = "https://mail.google.com/"
   ```
 
-  Running `himalaya configure -a gmail` will complete your OAuth 2.0 setup and ask for your client secret.
+  Running `himalaya account configure gmail` will complete your OAuth 2.0 setup and ask for your client secret.
 </details>
 
 <details>
@@ -409,7 +409,7 @@ You can also manually edit your own configuration, from scratch:
     backend.auth.keyring = "outlook-example"
     ```
 
-    Running `himalaya configure -a outlook` will ask for your IMAP password, just paste the one generated previously.
+    Running `himalaya account configure outlook` will ask for your IMAP password, just paste the one generated previously.
 
   ### Using OAuth 2.0
 
@@ -449,7 +449,7 @@ You can also manually edit your own configuration, from scratch:
   message.send.backend.auth.scopes = ["https://outlook.office.com/IMAP.AccessAsUser.All", "https://outlook.office.com/SMTP.Send"]
   ```
 
-  Running `himalaya configure -a outlook` will complete your OAuth 2.0 setup and ask for your client secret.
+  Running `himalaya account configure outlook` will complete your OAuth 2.0 setup and ask for your client secret.
 </details>
 
 <details>
@@ -496,7 +496,7 @@ You can also manually edit your own configuration, from scratch:
     backend.auth.keyring = "icloud-example"
     ```
 
-    Running `himalaya configure -a icloud` will ask for your IMAP password, just paste the one generated previously.
+    Running `himalaya account configure icloud` will ask for your IMAP password, just paste the one generated previously.
 </details>
 
 ## Other interfaces
