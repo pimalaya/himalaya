@@ -347,6 +347,7 @@ You can also manually edit your own configuration, from scratch:
   backend.port = 993
   backend.login = "example@gmail.com"
   backend.auth.type = "oauth2"
+  backend.auth.method = "xoauth2"
   backend.auth.client-id = "*****"
   backend.auth.client-secret.keyring = "gmail-oauth2-client-secret"
   backend.auth.access-token.keyring = "gmail-oauth2-access-token"
@@ -361,6 +362,7 @@ You can also manually edit your own configuration, from scratch:
   message.send.backend.port = 465
   message.send.backend.login = "example@gmail.com"
   message.send.backend.auth.type = "oauth2"
+  message.send.backend.auth.method = "xoauth2"
   message.send.backend.auth.client-id = "*****"
   message.send.backend.auth.client-secret.keyring = "gmail-oauth2-client-secret"
   message.send.backend.auth.access-token.keyring = "gmail-oauth2-access-token"
