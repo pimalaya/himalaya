@@ -118,6 +118,8 @@ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
   brew install himalaya
   ```
 
+  Note: OAuth 2.0 authorization is not currently supported with the Homebrew installation.
+
 </details>
 
 <details>
