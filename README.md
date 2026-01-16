@@ -68,13 +68,13 @@ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
   Himalaya CLI can be installed with [cargo](https://doc.rust-lang.org/cargo/):
 
   ```
-  cargo install himalaya
+  cargo install himalaya --locked
   ```
 
   *With only IMAP support:*
 
   ```
-  cargo install himalaya --no-default-features --features imap
+  cargo install himalaya --locked --no-default-features --features imap
   ```
 
   You can also use the git repository for a more up-to-date (but less stable) version:
