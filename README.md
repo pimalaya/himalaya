@@ -68,13 +68,13 @@ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
   Himalaya CLI can be installed with [cargo](https://doc.rust-lang.org/cargo/):
 
   ```
-  cargo install himalaya
+  cargo install himalaya --locked
   ```
 
   *With only IMAP support:*
 
   ```
-  cargo install himalaya --no-default-features --features imap
+  cargo install himalaya --locked --no-default-features --features imap
   ```
 
   You can also use the git repository for a more up-to-date (but less stable) version:
@@ -117,6 +117,8 @@ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
   ```
   brew install himalaya
   ```
+
+  Note: cargo features are not compatible with brew. If you need features like OAuth 2.0, please use a different installation method.
 
 </details>
 
@@ -267,7 +269,7 @@ You can also manually edit your own configuration, from scratch:
     backend.auth.keyring = "proton-example"
     ```
 
-    Running `himalaya configure -a proton` will ask for your IMAP password, just paste the one generated previously.
+    Running `himalaya account configure proton` will ask for your IMAP password, just paste the one generated previously.
 </details>
 
 <details>
@@ -345,6 +347,7 @@ You can also manually edit your own configuration, from scratch:
   backend.port = 993
   backend.login = "example@gmail.com"
   backend.auth.type = "oauth2"
+  backend.auth.method = "xoauth2"
   backend.auth.client-id = "*****"
   backend.auth.client-secret.keyring = "gmail-oauth2-client-secret"
   backend.auth.access-token.keyring = "gmail-oauth2-access-token"
@@ -359,6 +362,7 @@ You can also manually edit your own configuration, from scratch:
   message.send.backend.port = 465
   message.send.backend.login = "example@gmail.com"
   message.send.backend.auth.type = "oauth2"
+  message.send.backend.auth.method = "xoauth2"
   message.send.backend.auth.client-id = "*****"
   message.send.backend.auth.client-secret.keyring = "gmail-oauth2-client-secret"
   message.send.backend.auth.access-token.keyring = "gmail-oauth2-access-token"
@@ -369,7 +373,7 @@ You can also manually edit your own configuration, from scratch:
   message.send.backend.auth.scope = "https://mail.google.com/"
   ```
 
-  Running `himalaya configure -a gmail` will complete your OAuth 2.0 setup and ask for your client secret.
+  Running `himalaya account configure gmail` will complete your OAuth 2.0 setup and ask for your client secret.
 </details>
 
 <details>
@@ -409,7 +413,7 @@ You can also manually edit your own configuration, from scratch:
     backend.auth.keyring = "outlook-example"
     ```
 
-    Running `himalaya configure -a outlook` will ask for your IMAP password, just paste the one generated previously.
+    Running `himalaya account configure outlook` will ask for your IMAP password, just paste the one generated previously.
 
   ### Using OAuth 2.0
 
@@ -449,7 +453,7 @@ You can also manually edit your own configuration, from scratch:
   message.send.backend.auth.scopes = ["https://outlook.office.com/IMAP.AccessAsUser.All", "https://outlook.office.com/SMTP.Send"]
   ```
 
-  Running `himalaya configure -a outlook` will complete your OAuth 2.0 setup and ask for your client secret.
+  Running `himalaya account configure outlook` will complete your OAuth 2.0 setup and ask for your client secret.
 </details>
 
 <details>
@@ -496,7 +500,7 @@ You can also manually edit your own configuration, from scratch:
     backend.auth.keyring = "icloud-example"
     ```
 
-    Running `himalaya configure -a icloud` will ask for your IMAP password, just paste the one generated previously.
+    Running `himalaya account configure icloud` will ask for your IMAP password, just paste the one generated previously.
 </details>
 
 ## Other interfaces
