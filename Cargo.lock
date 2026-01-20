@@ -1216,7 +1216,7 @@ dependencies = [
 [[package]]
 name = "email-lib"
 version = "0.26.4"
-source = "git+https://github.com/pimalaya/core#9d0a8fcb6df7ec5cd7bba82aeec9c6708cfa5540"
+source = "git+https://github.com/pimalaya/core#88611d831c3c4a4645f7901389f9ed62f30392ed"
 dependencies = [
  "async-trait",
  "chrono",
@@ -1250,7 +1250,7 @@ dependencies = [
  "serde",
  "serde-xml-rs",
  "shellexpand-utils",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-rustls 0.26.4",
  "tracing",
@@ -1395,14 +1395,13 @@ checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
 
 [[package]]
 name = "filetime"
-version = "0.2.26"
+version = "0.2.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc0505cd1b6fa6580283f6bdf70a73fcf4aba1184038c90902b92b3dd0df63ed"
+checksum = "f98844151eee8917efc50bd9e8318cb963ae8b297431495d3f758616ea5c57db"
 dependencies = [
  "cfg-if",
  "libc",
  "libredox",
- "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1863,9 +1862,9 @@ dependencies = [
 [[package]]
 name = "http-lib"
 version = "0.1.0"
-source = "git+https://github.com/pimalaya/core#9d0a8fcb6df7ec5cd7bba82aeec9c6708cfa5540"
+source = "git+https://github.com/pimalaya/core#88611d831c3c4a4645f7901389f9ed62f30392ed"
 dependencies = [
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
  "ureq",
@@ -2021,12 +2020,13 @@ dependencies = [
 [[package]]
 name = "imap-client"
 version = "0.2.3"
-source = "git+https://github.com/pimalaya/imap-client#768baa91d508bca96edf47d19196b10ac06a6a46"
+source = "git+https://github.com/pimalaya/imap-client#a6bb21651db537e297576009e7fb0df8b9ffec26"
 dependencies = [
  "imap-next",
  "rip-starttls",
  "rustls-platform-verifier",
- "thiserror 2.0.17",
+ "sha2",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-rustls 0.26.4",
  "tracing",
@@ -2053,7 +2053,7 @@ checksum = "1eb8b333fe6c4ea89e1a7b5ee01fde0c870b9e1faad5251ff36989f5181e3bb0"
 dependencies = [
  "bytes",
  "imap-codec",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-rustls 0.26.4",
  "tracing",
@@ -2069,7 +2069,7 @@ dependencies = [
  "bounded-static-derive",
  "chrono",
  "rand",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -2265,12 +2265,12 @@ dependencies = [
 [[package]]
 name = "keyring-lib"
 version = "1.0.2"
-source = "git+https://github.com/pimalaya/core#9d0a8fcb6df7ec5cd7bba82aeec9c6708cfa5540"
+source = "git+https://github.com/pimalaya/core#88611d831c3c4a4645f7901389f9ed62f30392ed"
 dependencies = [
  "keyring",
  "once_cell",
  "serde",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
 ]
@@ -2581,7 +2581,7 @@ dependencies = [
 [[package]]
 name = "mml-lib"
 version = "1.1.1"
-source = "git+https://github.com/pimalaya/core#9d0a8fcb6df7ec5cd7bba82aeec9c6708cfa5540"
+source = "git+https://github.com/pimalaya/core#88611d831c3c4a4645f7901389f9ed62f30392ed"
 dependencies = [
  "async-recursion",
  "chumsky",
@@ -2594,7 +2594,7 @@ dependencies = [
  "secret-lib",
  "serde",
  "shellexpand-utils",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tracing",
  "tree_magic_mini",
 ]
@@ -2787,11 +2787,11 @@ dependencies = [
 [[package]]
 name = "oauth-lib"
 version = "2.0.0"
-source = "git+https://github.com/pimalaya/core#9d0a8fcb6df7ec5cd7bba82aeec9c6708cfa5540"
+source = "git+https://github.com/pimalaya/core#88611d831c3c4a4645f7901389f9ed62f30392ed"
 dependencies = [
  "http-lib",
  "oauth2",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
 ]
@@ -2858,9 +2858,9 @@ dependencies = [
 
 [[package]]
 name = "openssl-probe"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f50d9b3dabb09ecd771ad0aa242ca6894994c130308ca3d7684634df8037391"
+checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
 
 [[package]]
 name = "option-ext"
@@ -3097,7 +3097,7 @@ dependencies = [
 [[package]]
 name = "pgp-lib"
 version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#9d0a8fcb6df7ec5cd7bba82aeec9c6708cfa5540"
+source = "git+https://github.com/pimalaya/core#88611d831c3c4a4645f7901389f9ed62f30392ed"
 dependencies = [
  "async-recursion",
  "futures",
@@ -3106,7 +3106,7 @@ dependencies = [
  "rand",
  "sha1",
  "smallvec",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
  "z-base-32",
@@ -3139,7 +3139,7 @@ dependencies = [
  "serde_json",
  "shellexpand-utils",
  "sled",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
  "toml 0.9.11+spec-1.1.0",
  "toml_edit 0.24.0+spec-1.1.0",
@@ -3284,10 +3284,10 @@ dependencies = [
 [[package]]
 name = "process-lib"
 version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#9d0a8fcb6df7ec5cd7bba82aeec9c6708cfa5540"
+source = "git+https://github.com/pimalaya/core#88611d831c3c4a4645f7901389f9ed62f30392ed"
 dependencies = [
  "serde",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
 ]
@@ -3413,7 +3413,7 @@ checksum = "a4e608c6638b9c18977b00b475ac1f28d14e84b27d8d42f70e0bf1e3dec127ac"
 dependencies = [
  "getrandom 0.2.17",
  "libredox",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -3727,12 +3727,12 @@ dependencies = [
 [[package]]
 name = "secret-lib"
 version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#9d0a8fcb6df7ec5cd7bba82aeec9c6708cfa5540"
+source = "git+https://github.com/pimalaya/core#88611d831c3c4a4645f7901389f9ed62f30392ed"
 dependencies = [
  "keyring-lib",
  "process-lib",
  "serde",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tracing",
 ]
 
@@ -4222,11 +4222,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.17"
+version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f63587ca0f12b72a0600bcba1d40081f830876000bb46dd2337a3051618f4fc8"
+checksum = "4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4"
 dependencies = [
- "thiserror-impl 2.0.17",
+ "thiserror-impl 2.0.18",
 ]
 
 [[package]]
@@ -4242,9 +4242,9 @@ dependencies = [
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.17"
+version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ff15c8ecd7de3849db632e14d18d2571fa09dfc5ed93479bc4485c7a517c913"
+checksum = "ebc4ee7f67670e9b64d05fa4253e753e016c6c95ff35b89b7941d6b856dec1d5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5450,9 +5450,9 @@ dependencies = [
 
 [[package]]
 name = "zmij"
-version = "1.0.14"
+version = "1.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd8f3f50b848df28f887acb68e41201b5aea6bc8a8dacc00fb40635ff9a72fea"
+checksum = "dfcd145825aace48cff44a8844de64bf75feec3080e0aa5cdbde72961ae51a65"
 
 [[package]]
 name = "zvariant"
