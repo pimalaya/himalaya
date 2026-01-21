@@ -3115,7 +3115,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-tui"
 version = "0.3.0"
-source = "git+https://github.com/pimalaya/tui?branch=bump-deps#e035e7c0d4cd254a7b2d30b98350859f9f4e489c"
+source = "git+https://github.com/pimalaya/tui?branch=bump-deps#694ecf28535c6b38801369bed907c8d78bd417bb"
 dependencies = [
  "async-trait",
  "clap",

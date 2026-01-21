@@ -46,8 +46,8 @@ pub struct Cli {
     /// private(s) one(s).
     /// you can also provide multiple paths by delimiting them with a :
     /// like you would when setting $PATH in a posix shell
-    #[arg(short, long = "config", global = true, env = "HIMALAYA_CONFIG", value_delimiter = ':')]
-    #[arg(value_name = "PATH", value_parser = path_parser)]
+    #[arg(short, long = "config", global = true, env = "HIMALAYA_CONFIG")]
+    #[arg(value_name = "PATH", value_parser = path_parser, value_delimiter = ':')]
     pub config_paths: Vec<PathBuf>,
 
     /// Customize the output format.
@@ -65,18 +65,31 @@ pub struct Cli {
     #[arg(value_name = "FORMAT", value_enum, default_value_t = Default::default())]
     pub output: OutputFmt,
 
-    /// Enable logs with spantrace.
+    /// Disable all logs.
     ///
-    /// This is the same as running the command with `RUST_LOG=debug`
-    /// environment variable.
-    #[arg(long, global = true, conflicts_with = "trace")]
+    /// Same as running command with `RUST_LOG=off` environment
+    /// variable.
+    #[arg(long, global = true)]
+    #[arg(conflicts_with = "debug")]
+    #[arg(conflicts_with = "trace")]
+    pub quiet: bool,
+
+    /// Enable debug logs.
+    ///
+    /// Same as running command with `RUST_LOG=debug` environment
+    /// variable.
+    #[arg(long, global = true)]
+    #[arg(conflicts_with = "quiet")]
+    #[arg(conflicts_with = "trace")]
     pub debug: bool,
 
-    /// Enable verbose logs with backtrace.
+    /// Enable verbose trace logs with backtrace.
     ///
-    /// This is the same as running the command with `RUST_LOG=trace`
-    /// and `RUST_BACKTRACE=1` environment variables.
-    #[arg(long, global = true, conflicts_with = "debug")]
+    /// Same as running command with `RUST_LOG=trace` and
+    /// `RUST_BACKTRACE=1` environment variables.
+    #[arg(long, global = true)]
+    #[arg(conflicts_with = "quiet")]
+    #[arg(conflicts_with = "debug")]
     pub trace: bool,
 }
 
