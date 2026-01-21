@@ -10,8 +10,8 @@ use tracing::info;
 use uuid::Uuid;
 
 use crate::{
-    account::arg::name::AccountNameFlag, config::TomlConfig, envelope::arg::ids::EnvelopeIdsArgs,
-    folder::arg::name::FolderNameOptionalFlag,
+    account::arg::name::AccountNameFlag, config::TomlConfig, dir_parser,
+    envelope::arg::ids::EnvelopeIdsArgs, folder::arg::name::FolderNameOptionalFlag,
 };
 
 /// Download all attachments found in the given message.
@@ -28,6 +28,13 @@ pub struct AttachmentDownloadCommand {
 
     #[command(flatten)]
     pub account: AccountNameFlag,
+
+    /// Override the download directory.
+    ///
+    /// If omitted, it uses the downloads directory from the config,
+    /// or `XDG_DOWNLOAD_DIR`.
+    #[arg(short = 'd', long, value_name = "PATH", value_parser = dir_parser)]
+    pub downloads_dir: Option<PathBuf>,
 }
 
 impl AttachmentDownloadCommand {
@@ -85,7 +92,8 @@ impl AttachmentDownloadCommand {
                     .filename
                     .unwrap_or_else(|| Uuid::new_v4().to_string())
                     .into();
-                let filepath = account_config.get_download_file_path(&filename)?;
+                let filepath = account_config
+                    .get_download_file_path(self.downloads_dir.as_deref(), &filename)?;
                 printer.log(format!("Downloading {:?}…\n", filepath))?;
                 fs::write(&filepath, &attachment.body)
                     .with_context(|| format!("cannot save attachment at {filepath:?}"))?;

@@ -4,10 +4,9 @@ use clap::{CommandFactory, Parser};
 use clap_mangen::Man;
 use color_eyre::Result;
 use pimalaya_tui::terminal::cli::printer::Printer;
-use shellexpand_utils::{canonicalize, expand};
 use tracing::info;
 
-use crate::cli::Cli;
+use crate::{cli::Cli, dir_parser};
 
 /// Generate manual pages to the given directory.
 ///
@@ -60,14 +59,4 @@ impl ManualGenerateCommand {
 
         Ok(())
     }
-}
-
-/// Parse the given [`str`] as [`PathBuf`].
-///
-/// The path is first shell expanded, then canonicalized (if
-/// applicable).
-fn dir_parser(path: &str) -> Result<PathBuf, String> {
-    expand::try_path(path)
-        .map(canonicalize::path)
-        .map_err(|err| err.to_string())
 }
