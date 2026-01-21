@@ -44,7 +44,9 @@ pub struct Cli {
     /// configuration file. Other paths are merged with the first one,
     /// which allows you to separate your public config from your
     /// private(s) one(s).
-    #[arg(short, long = "config", global = true, env = "HIMALAYA_CONFIG")]
+    /// you can also provide multiple paths by delimiting them with a :
+    /// like you would when setting $PATH in a posix shell
+    #[arg(short, long = "config", global = true, env = "HIMALAYA_CONFIG", value_delimiter = ':')]
     #[arg(value_name = "PATH", value_parser = path_parser)]
     pub config_paths: Vec<PathBuf>,
 
