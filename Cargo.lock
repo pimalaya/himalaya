@@ -3115,7 +3115,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-tui"
 version = "0.3.0"
-source = "git+https://github.com/pimalaya/tui?branch=bump-deps#694ecf28535c6b38801369bed907c8d78bd417bb"
+source = "git+https://github.com/pimalaya/tui?branch=bump-deps#f2b2695239dedfc7c517f67ff659aaad1f08608c"
 dependencies = [
  "async-trait",
  "clap",
@@ -3274,9 +3274,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.105"
+version = "1.0.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "535d180e0ecab6268a3e718bb9fd44db66bbbc256257165fc699dadf70d16fe7"
+checksum = "8fd00f0bb2e90d81d1044c2b32617f68fcb9fa3bb7640c23e9c748e53fb30934"
 dependencies = [
  "unicode-ident",
 ]
