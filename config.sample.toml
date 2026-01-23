@@ -475,6 +475,14 @@ backend.auth.cmd = "pass show example-imap"
 #
 #backend.auth.redirect-port = 9999
 
+# IMAP extensions
+#
+# Automatically sends the ID command straight after
+# authentication. Some providers enforce this rule (like
+# imap.126.com), but it is not standard at all.
+#
+#backend.extensions.id.send_after_auth = true
+
 
 
 # Defines the Maildir backend as the default one for all features.
