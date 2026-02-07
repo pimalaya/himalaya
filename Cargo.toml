@@ -56,6 +56,7 @@ uuid = { version = "1.19", features = ["v4"] }
 [patch.crates-io]
 email-lib.git = "https://github.com/pimalaya/core"
 imap-client.git = "https://github.com/pimalaya/imap-client"
+imap-next.git = "https://github.com/soywod/imap-next"
 imap-codec.git = "https://github.com/duesee/imap-codec"
 keyring-lib.git = "https://github.com/pimalaya/core"
 mml-lib.git = "https://github.com/pimalaya/core"
