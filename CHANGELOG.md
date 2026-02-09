@@ -9,11 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added `--quiet` flag. [#545]
+- Added `--quiet` flag ([#545]).
 - Added support for custom TLS certificate.
-- Added support for multiple config files via `HIMALAYA_CONFIG=path1:path2:…`. [#612]
-- Added `-d|--downloads-dir` argument to `attachment download` command. [#559]
-- Added `View` and `View MIME` post edit choices. [#486]
+- Added support for multiple config files via `HIMALAYA_CONFIG=path1:path2:…` ([#612]).
+- Added `-d|--downloads-dir` argument to `attachment download` command ([#559]).
+- Added `View` and `View MIME` post edit choices ([#486]).
 
 ### Changed
 
@@ -21,33 +21,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fixed invalid fetch with NIL body encoding. [#525]
-- Fixed freeze when sending large attachments. [#593]
-- Fixed abusive warn logs from IMAP libs. [#552]
-- Downgraded `toml@0.8` due to regression. [#611]
+- Fixed invalid fetch with NIL body encoding ([#525]).
+- Fixed freeze when sending large attachments ([#593]).
+- Fixed abusive warn logs from IMAP libs ([#552]).
+- Downgraded `toml@0.8` due to regression ([#611]).
 
 ## [1.1.0] - 2025-01-11
 
 ### Added
 
-- Added `-y|--yes` flag for `folder purge` and `folder delete` commands. [#469]
+- Added `-y|--yes` flag for `folder purge` and `folder delete` commands ([#469]).
 
 ### Changed
 
-- Put back `warn` the default log level. [#522]
+- Put back `warn` the default log level ([#522]).
 
   Since logs are sent to `stderr`, warnings can be easily discarded by prepending commands with `RUST_LOG=off` or by appending commands with `2>/dev/null`.
 
-- Changed `message.send.save-copy` default to `true`. [#536]
+- Changed `message.send.save-copy` default to `true` ([#536]).
 
 - Changed default downloads directory. [core#1]
 
 ### Fixed
 
-- Fixed permissions issues when using `install.sh`. [#515]
-- Fixed de/serialization issues of backends' `none` variant. [#523]
-- Fixed list envelopes out of bound error when empty result. [#535]
-- Fixed macOS x86_64 builds. [#538]
+- Fixed permissions issues when using `install.sh` ([#515]).
+- Fixed de/serialization issues of backends' `none` variant ([#523]).
+- Fixed list envelopes out of bound error when empty result ([#535]).
+- Fixed macOS x86_64 builds ([#538]).
 
 ## [1.0.0] - 2024-12-09
 
@@ -86,9 +86,9 @@ Himalaya CLI will now try to adopt the [conventional commits specification](http
 
 - Refactored the `account configure` command: this command stands now for creating or editing account configurations from the wizard. The command requires the `wizard` cargo feature.
 - Improved the `account doctor` command: it now checks the state of the config, and the new `--fix` argument allows you to configure keyring, OAuth 2.0 etc.
-- Improved long version `--version`. [#496]
-- Improved error messages when missing cargo features. For example, if a TOML configuration uses the IMAP backend without the `imap` cargo features, the error `missing "imap" feature` is displayed. [#20](https://github.com/pimalaya/core/issues/20)
-- Normalized enum-based configurations, using the [internally tagged representation](https://serde.rs/enum-representations.html#internally-tagged) `type =`. It should reduce issues due to misconfiguration, and improve othe error messages. Yet it is not perfect, see [#802](https://github.com/toml-rs/toml/issues/802):
+- Improved long version `--version` ([#496]).
+- Improved error messages when missing cargo features. For example, if a TOML configuration uses the IMAP backend without the `imap` cargo features, the error `missing "imap" feature` is displayed ([#20]).(https://github.com/pimalaya/core/issues/20)
+- Normalized enum-based configurations, using the [internally tagged representation](https://serde.rs/enum-representations.html#internally-tagged) `type =`. It should reduce issues due to misconfiguration, and improve othe error messages. Yet it is not perfect, se ([#802]).(https://github.com/toml-rs/toml/issues/802):
 
   - `imap.*`, `maildir.*` and `notmuch.*` moved to `backend.*`:
 
@@ -160,9 +160,9 @@ Himalaya CLI will now try to adopt the [conventional commits specification](http
 
 ### Fixed
 
-- Fixed pre-release archives issue. [#492]
+- Fixed pre-release archives issue ([#492]).
 - Fixed mailto parsing issue. [core#10]
-- Fixed `Answered` flag not set when replying to a message. [#508]
+- Fixed `Answered` flag not set when replying to a message ([#508]).
 
 ### Removed
 
@@ -182,7 +182,7 @@ Himalaya CLI will now try to adopt the [conventional commits specification](http
 
 - **Added back the search feature**: you can now give an optional filter and sort query at the end of the `envelope list` command. See `envelope list --help` or [pimalaya.org](https://pimalaya.org/himalaya/cli/master/usage/advanced/envelope/list.html#query) for more detail on the search API.
 - Changed the `envelope list` folder argument due to the search query: it became a flag `--folder|-f`.
-- Made the global `--config|-c` option repeatable: the first option is considered the path to the main config, and successive options are considered partial overrides [#184].
+- Made the global `--config|-c` option repeatable: the first option is considered the path to the main config, and successive options are considered partial override ([#184]).
 - Refactored error management: error should be more clear, colored and can now contain spantrace and backtrace.
 - Made `--help` content wrapping properly thanks to the `clap` cargo feature `wrap_help`.
 - Improved `template {new,reply,forward}` command JSON output: they return now a JSON object with 3 properties:
@@ -192,17 +192,17 @@ Himalaya CLI will now try to adopt the [conventional commits specification](http
 
 ### Fixed
 
-- Fixed watch IMAP envelopes when folder was empty [#179].
-- Prevented parsing of undefined config options [#188].
-- Fixed `In-Reply-To` header being skipped from mailto URLs [#194].
-- Fixed error page out of bounds when filtering envelopes returned an empty result [#195].
+- Fixed watch IMAP envelopes when folder was empt ([#179]).
+- Prevented parsing of undefined config option ([#188]).
+- Fixed `In-Reply-To` header being skipped from mailto URL ([#194]).
+- Fixed error page out of bounds when filtering envelopes returned an empty resul ([#195]).
 
 ## [1.0.0-beta.3] - 2024-02-25
 
 ### Added
 
 - Added `account check-up` command.
-- Added wizard warning about google passwords [#41].
+- Added wizard warning about google password ([#41]).
 
 ### Changed
 
@@ -212,7 +212,7 @@ Himalaya CLI will now try to adopt the [conventional commits specification](http
 - Changed location of the synchronization data from `$XDG_DATA_HOME/himalaya/<account-name>` to `$XDG_DATA_HOME/pimalaya/email/sync/<account-name>-cache`.
 - Changed location of the synchronization cache from `sync.dir` to `$XDG_CACHE_HOME/pimalaya/email/sync/<hash>/`.
 - Replaced id mapping database `SQLite` by `sled`, a pure key-val store written in Rust to improve portability of the tool. **Therefore, id aliases are reset**.
-- Improved pre and post edit choices interaction [#58].
+- Improved pre and post edit choices interactio ([#58]).
 - Improved account synchronization performances, making it 50% faster than `mbsync` and 370% faster than `OfflineIMAP`.
 - Changed `envelope.watch.{event}.{hook}`: hooks can now be cumulated. For example it is possible to send a system notification and execute a shell command when receiving a new envelope:
 
@@ -227,8 +227,8 @@ Himalaya CLI will now try to adopt the [conventional commits specification](http
 - Fixed bug that was preventing watch placeholders to be replaced when using shell command hook.
 - Fixed watch IMAP envelopes issue preventing events to be triggered.
 - Fixed DNS account discovery priority issues.
-- Fixed SMTP messages not properly sent to all recipients [#172].
-- Fixed backend feature badly linked, leading to reply and forward message errors [#173].
+- Fixed SMTP messages not properly sent to all recipient ([#172]).
+- Fixed backend feature badly linked, leading to reply and forward message error ([#173]).
 
 ## [1.0.0-beta.2] - 2024-01-27
 
@@ -330,7 +330,7 @@ Few major concepts changed:
 ### Removed
 
 - Disabled temporarily the `notmuch` backend because it needs to be refactored using the backend features system (it should be reimplemented soon).
-- Disabled temporarily the `search` and `sort` command because they need to be refactored, see [#39].
+- Disabled temporarily the `search` and `sort` command because they need to be refactored, se ([#39]).
 - Removed the `notify` command (replaced by the new `watch` command).
 - Removed all global options except for `display-name`, `signature`, `signature-delim` and `downloads-dir`.
 
@@ -373,7 +373,7 @@ Few major concepts changed:
 
 ### Fixed
 
-- Fixed the way folder aliases are resolved. In some case, aliases were resolved CLI side and lib side, which led to alias errors [#95].
+- Fixed the way folder aliases are resolved. In some case, aliases were resolved CLI side and lib side, which led to alias error ([#95]).
 
 ## [0.8.1] - 2023-06-15
 
@@ -445,9 +445,9 @@ Few major concepts changed:
 
 ### Added
 
-- Added `create` and `delete` folder commands [#54].
-- Added generated completions and man pages to releases [#43].
-- Added new account config option `sync-folders-strategy` which allows to choose a folders synchronization strategy [#59]:
+- Added `create` and `delete` folder command ([#54]).
+- Added generated completions and man pages to release ([#43]).
+- Added new account config option `sync-folders-strategy` which allows to choose a folders synchronization strateg ([#59]).:
   
   - `sync-folders-strategy = "all"`: synchronize all existing folders for the current account
   - `sync-folders-strategy.include = ["folder1", "folder2", …]`: synchronize only the given folders for the current account
@@ -463,7 +463,7 @@ Few major concepts changed:
 
 ### Changed
 
-- Made global options truly global, which means they can be used everywhere (not only *before* commands but also *after*) [#60].
+- Made global options truly global, which means they can be used everywhere (not only *before* commands but also *after* ([#60]).
 - Replaced reply all `-a` argument with `-A` because it conflicted with the global option `-a|--account`.
 - Replaced `himalaya-lib` by `pimalaya-email`.
 - Renamed feature `vendored` to `native-tls-vendored`.
