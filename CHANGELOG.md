@@ -7,9 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `--quiet` flag. [#545]
+- Added support for custom TLS certificate.
+- Added support for multiple config files via `HIMALAYA_CONFIG=path1:path2:…`. [#612]
+- Added `-d|--downloads-dir` argument to `attachment download` command. [#559]
+- Added `View` and `View MIME` post edit choices. [#486]
+
+### Changed
+
+- Bumped all deps, fixing `rustls-platform-verifier` compatibility version issue.
+
 ### Fixed
 
 - Fixed invalid fetch with NIL body encoding. [#525]
+- Fixed freeze when sending large attachments. [#593]
+- Fixed abusive warn logs from IMAP libs. [#552]
+- Downgraded `toml@0.8` due to regression. [#611]
 
 ## [1.1.0] - 2025-01-11
 
@@ -917,7 +932,8 @@ Few major concepts changed:
 - Password from command
 - Set up README
 
-[Unreleased]: https://github.com/soywod/himalaya/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/soywod/himalaya/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/soywod/himalaya/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/soywod/himalaya/compare/v1.0.0-beta.4...v1.0.0
 [1.0.0-beta.4]: https://github.com/soywod/himalaya/compare/v1.0.0-beta.3...v1.0.0-beta.4
 [1.0.0-beta.3]: https://github.com/soywod/himalaya/compare/v1.0.0-beta.2...v1.0.0-beta.3
@@ -961,6 +977,7 @@ Few major concepts changed:
 [0.1.0]: https://github.com/soywod/himalaya/releases/tag/v0.1.0
 
 [#469]: https://github.com/pimalaya/himalaya/issues/469
+[#486]: https://github.com/pimalaya/himalaya/issues/486
 [#492]: https://github.com/pimalaya/himalaya/issues/492
 [#496]: https://github.com/pimalaya/himalaya/issues/496
 [#508]: https://github.com/pimalaya/himalaya/issues/508
@@ -972,6 +989,12 @@ Few major concepts changed:
 [#535]: https://github.com/pimalaya/himalaya/issues/535
 [#536]: https://github.com/pimalaya/himalaya/issues/536
 [#538]: https://github.com/pimalaya/himalaya/issues/538
+[#545]: https://github.com/pimalaya/himalaya/issues/545
+[#552]: https://github.com/pimalaya/himalaya/issues/552
+[#559]: https://github.com/pimalaya/himalaya/issues/559
+[#593]: https://github.com/pimalaya/himalaya/issues/593
+[#611]: https://github.com/pimalaya/himalaya/issues/611
+[#612]: https://github.com/pimalaya/himalaya/issues/612
 
 [core#1]: https://github.com/pimalaya/core/issues/1
 [core#10]: https://github.com/pimalaya/core/issues/10
