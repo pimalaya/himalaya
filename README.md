@@ -1,13 +1,13 @@
 <div align="center">
   <img src="./logo.svg" alt="Logo" width="128" height="128" />
   <h1>📫 Himalaya</h1>
-  <p>CLI to manage emails, based on <a href="https://crates.io/crates/email-lib"><code>email-lib</code></a></p>
   <p>
     <a href="https://github.com/pimalaya/himalaya/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/pimalaya/himalaya?color=success"/></a>
     <a href="https://repology.org/project/himalaya/versions"><img alt="Repology" src="https://img.shields.io/repology/repositories/himalaya?color=success"></a>
     <a href="https://matrix.to/#/#pimalaya:matrix.org"><img alt="Matrix" src="https://img.shields.io/badge/chat-%23pimalaya-blue?style=flat&logo=matrix&logoColor=white"/></a>
     <a href="https://fosstodon.org/@pimalaya"><img alt="Mastodon" src="https://img.shields.io/badge/social-%40pimalaya-blue?style=flat&logo=mastodon&logoColor=white"/></a>
   </p>
+  <p>CLI to manage emails</p>
 </div>
 
 ```
@@ -15,6 +15,19 @@ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
 ```
 
 ![screenshot](./screenshot.jpeg)
+
+## Table of contents
+
+- [Features](#features)
+- [Usage](#usage)
+- [Installation](#installation)
+- [Configuration](#configuration)
+  - [Proton Mail](#proton-mail)
+  - [Gmail](#gmail)
+  - [Outlook](#outlook)
+  - [iCloud Mail](#icloud-mail)
+- [FAQ](#faq)
+- [Sponsoring](#sponsoring)
 
 ## Features
 
@@ -39,8 +52,10 @@ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
 
 ## Installation
 
+### Pre-built binary
+
 <details>
-  <summary>Pre-built binary</summary>
+  <summary>Instructions</summary>
 
   Himalaya CLI can be installed with the installer:
 
@@ -63,8 +78,10 @@ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
   *Such binaries are built with the default cargo features. If you want to enable or disable a feature, please use another installation method.*
 </details>
 
+### Cargo
+
 <details>
-  <summary>Cargo</summary>
+  <summary>Instructions</summary>
 
   Himalaya CLI can be installed with [cargo](https://doc.rust-lang.org/cargo/):
 
@@ -85,8 +102,10 @@ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
   ```
 </details>
 
+### Arch Linux
+
 <details>
-  <summary>Arch Linux</summary>
+  <summary>Instructions</summary>
 
   Himalaya CLI can be installed on [Arch Linux](https://archlinux.org/) with either the community repository:
 
@@ -110,8 +129,10 @@ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
 
 </details>
 
+### Homebrew
+
 <details>
-  <summary>Homebrew</summary>
+  <summary>Instructions</summary>
 
   Himalaya CLI can be installed with [Homebrew](https://brew.sh/):
 
@@ -123,8 +144,10 @@ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
 
 </details>
 
+### Scoop
+
 <details>
-  <summary>Scoop</summary>
+  <summary>Instructions</summary>
 
   Himalaya CLI can be installed with [Scoop](https://scoop.sh/):
 
@@ -134,8 +157,10 @@ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
 
 </details>
 
+### Fedora Linux/CentOS/RHEL
+
 <details>
-  <summary>Fedora Linux/CentOS/RHEL</summary>
+  <summary>Instructions</summary>
 
   Himalaya CLI can be installed on [Fedora Linux](https://fedoraproject.org/)/CentOS/RHEL via [COPR](https://copr.fedorainfracloud.org/coprs/atim/himalaya/) repo:
 
@@ -146,8 +171,10 @@ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
 
 </details>
 
+### Nix
+
 <details>
-  <summary>Nix</summary>
+  <summary>Instructions</summary>
 
   Himalaya CLI can be installed with [Nix](https://serokell.io/blog/what-is-nix):
 
@@ -186,8 +213,10 @@ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
   ```
 </details>
 
+### Sources
+
 <details>
-  <summary>Sources</summary>
+  <summary>Instructions</summary>
 
   Himalaya CLI can be installed from sources.
 
@@ -226,8 +255,10 @@ You can also manually edit your own configuration, from scratch:
 - Paste it in a new file `~/.config/himalaya/config.toml`
 - Edit, then comment or uncomment the options you want
 
+### Proton Mail
+
 <details>
-  <summary>Proton Mail (Bridge)</summary>
+  <summary>Instructions</summary>
 
   When using Proton Bridge, emails are synchronized locally and exposed via a local IMAP/SMTP server. This implies 2 things:
 
@@ -283,8 +314,10 @@ You can also manually edit your own configuration, from scratch:
     Running `himalaya account configure proton` will ask for your IMAP password, just paste the one generated previously.
 </details>
 
+### Gmail
+
 <details>
-  <summary>Gmail</summary>
+  <summary>Instructions</summary>
 
   Google passwords cannot be used directly. There is two ways to authenticate yourself:
 
@@ -338,7 +371,7 @@ You can also manually edit your own configuration, from scratch:
 
     Running `himalaya configure -a gmail` will ask for your IMAP password, just paste the one generated previously.
 
-  ### Using OAuth 2.0
+  #### Using OAuth 2.0
 
   This option is the most secure but the hardest to configure. It requires the `oauth2` and `keyring` cargo features.
 
@@ -387,8 +420,10 @@ You can also manually edit your own configuration, from scratch:
   Running `himalaya account configure gmail` will complete your OAuth 2.0 setup and ask for your client secret.
 </details>
 
+### Outlook
+
 <details>
-  <summary>Outlook</summary>
+  <summary>Instructions</summary>
 
   ```toml
   [accounts.outlook]
@@ -467,8 +502,10 @@ You can also manually edit your own configuration, from scratch:
   Running `himalaya account configure outlook` will complete your OAuth 2.0 setup and ask for your client secret.
 </details>
 
+### iCloud Mail
+
 <details>
-  <summary>iCloud Mail</summary>
+  <summary>Instructions</summary>
 
   From the [iCloud Mail](https://support.apple.com/en-us/HT202304) support page:
 
@@ -514,12 +551,15 @@ You can also manually edit your own configuration, from scratch:
     Running `himalaya account configure icloud` will ask for your IMAP password, just paste the one generated previously.
 </details>
 
-## Other interfaces
+## Interfaces
 
-- [pimalaya/himalaya-vim](https://github.com/pimalaya/himalaya-vim), a Vim plugin sitting at the top of Himalaya CLI
-- [dantecatalfamo/himalaya-emacs](https://github.com/dantecatalfamo/himalaya-emacs), an Emacs plugin sitting at the top of Himalaya CLI
-- [jns/himalaya-raycast](https://www.raycast.com/jns/himalaya), a Raycast extension for Himalaya CLI
-- [pimalaya/himalaya-repl](https://github.com/pimalaya/himalaya-repl), an experimental Read-Eval-Print-Loop variant of Himalaya CLI
+These interfaces are built at the top of Himalaya CLI to improve the User Experience:
+
+- [pimalaya/himalaya-vim](https://github.com/pimalaya/himalaya-vim): Vim plugin
+- [dantecatalfamo/himalaya-emacs](https://github.com/dantecatalfamo/himalaya-emacs): Emacs plugin
+- [jns/himalaya](https://www.raycast.com/jns/himalaya): Raycast extension
+- [openclaw/openclaw](https://github.com/openclaw/openclaw/blob/main/skills/himalaya/SKILL.md): OpenClaw SKILL
+- [parisni/dfzf](https://github.com/parisni/dfzf): dfzf integration
 
 ## FAQ
 
@@ -693,11 +733,11 @@ You can also manually edit your own configuration, from scratch:
 
 [![nlnet](https://nlnet.nl/logo/banner-160x60.png)](https://nlnet.nl/)
 
-Special thanks to the [NLnet foundation](https://nlnet.nl/) and the [European Commission](https://www.ngi.eu/) that helped the project to receive financial support from various programs:
+Special thanks to the [NLnet foundation](https://nlnet.nl/) and the [European Commission](https://www.ngi.eu/) that have been financially supporting the project for years:
 
-- [NGI Assure](https://nlnet.nl/project/Himalaya/) in 2022
-- [NGI Zero Entrust](https://nlnet.nl/project/Pimalaya/) in 2023
-- [NGI Zero Core](https://nlnet.nl/project/Pimalaya-PIM/) in 2024 *(still ongoing)*
+- 2022: [NGI Assure](https://nlnet.nl/project/Himalaya/)
+- 2023: [NGI Zero Entrust](https://nlnet.nl/project/Pimalaya/)
+- 2024: [NGI Zero Core](https://nlnet.nl/project/Pimalaya-PIM/) *(still ongoing in 2026)*
 
 If you appreciate the project, feel free to donate using one of the following providers:
 
