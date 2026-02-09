@@ -19,14 +19,13 @@ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
 ## Table of contents
 
 - [Features](#features)
-- [Usage](#usage)
 - [Installation](#installation)
   - [Pre-built binary](#pre-built-binary)
   - [Cargo](#cargo)
   - [Arch linux](#arch-linux)
   - [Homebrew](#homebrew)
   - [Scoop](#scoop)
-  - [Fedora Linux/CentOS/RHEL](#fedora-linux-centos-rhel)
+  - [Fedora Linux/CentOS/RHEL](#fedora-linuxcentosrhel)
   - [Nix](#nix)
   - [Sources](#sources)
 - [Configuration](#configuration)
@@ -34,6 +33,7 @@ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
   - [Gmail](#gmail)
   - [Outlook](#outlook)
   - [iCloud Mail](#icloud-mail)
+- [Interfaces](#interfaces)
 - [FAQ](#faq)
 - [Sponsoring](#sponsoring)
 
@@ -288,240 +288,228 @@ You can also manually edit your own configuration, from scratch:
 
 ### Gmail
 
-<details>
-  <summary>Instructions</summary>
+Google passwords cannot be used directly. There is two ways to authenticate yourself:
 
-  Google passwords cannot be used directly. There is two ways to authenticate yourself:
+### Using [App Passwords](https://support.google.com/mail/answer/185833)
 
-  ### Using [App Passwords](https://support.google.com/mail/answer/185833)
+This option is the simplest and the fastest. First, be sure that:
 
-  This option is the simplest and the fastest. First, be sure that:
+- IMAP is enabled
+- Two-step authentication is enabled
+- Less secure app access is enabled
 
-  - IMAP is enabled
-  - Two-step authentication is enabled
-  - Less secure app access is enabled
+First create a [dedicated password](https://myaccount.google.com/apppasswords) for Himalaya.
 
-  First create a [dedicated password](https://myaccount.google.com/apppasswords) for Himalaya.
+```toml
+[accounts.gmail]
+email = "example@gmail.com"
 
-  ```toml
-  [accounts.gmail]
-  email = "example@gmail.com"
+folder.aliases.inbox = "INBOX"
+folder.aliases.sent = "[Gmail]/Sent Mail"
+folder.aliases.drafts = "[Gmail]/Drafts"
+folder.aliases.trash = "[Gmail]/Trash"
 
-  folder.aliases.inbox = "INBOX"
-  folder.aliases.sent = "[Gmail]/Sent Mail"
-  folder.aliases.drafts = "[Gmail]/Drafts"
-  folder.aliases.trash = "[Gmail]/Trash"
+backend.type = "imap"
+backend.host = "imap.gmail.com"
+backend.port = 993
+backend.login = "example@gmail.com"
+backend.auth.type = "password"
+backend.auth.raw = "*****"
 
-  backend.type = "imap"
-  backend.host = "imap.gmail.com"
-  backend.port = 993
-  backend.login = "example@gmail.com"
-  backend.auth.type = "password"
-  backend.auth.raw = "*****"
+message.send.backend.type = "smtp"
+message.send.backend.host = "smtp.gmail.com"
+message.send.backend.port = 465
+message.send.backend.login = "example@gmail.com"
+message.send.backend.auth.type = "password"
+message.send.backend.auth.cmd = "*****"
+```
 
-  message.send.backend.type = "smtp"
-  message.send.backend.host = "smtp.gmail.com"
-  message.send.backend.port = 465
-  message.send.backend.login = "example@gmail.com"
-  message.send.backend.auth.type = "password"
-  message.send.backend.auth.cmd = "*****"
-  ```
+Keeping your password inside the configuration file is good for testing purpose, but it is not safe. You have 2 better alternatives:
 
-  Keeping your password inside the configuration file is good for testing purpose, but it is not safe. You have 2 better alternatives:
-
-  - Save your password in any password manager that can be queried via the CLI:
-
-    ```toml
-    backend.auth.cmd = "pass show gmail"
-    ```
-
-  - Use the global keyring of your system (requires the `keyring` cargo feature):
-
-    ```toml
-    backend.auth.keyring = "gmail-example"
-    ```
-
-    Running `himalaya configure -a gmail` will ask for your IMAP password, just paste the one generated previously.
-
-  #### Using OAuth 2.0
-
-  This option is the most secure but the hardest to configure. It requires the `oauth2` and `keyring` cargo features.
-
-  First, you need to get your OAuth 2.0 credentials by following [this guide](https://developers.google.com/identity/protocols/oauth2#1.-obtain-oauth-2.0-credentials-from-the-dynamic_data.setvar.console_name-.). Once you get your client id and your client secret, you can configure your Himalaya account this way:
+- Save your password in any password manager that can be queried via the CLI:
 
   ```toml
-  [accounts.gmail]
-  email = "example@gmail.com"
-
-  folder.aliases.inbox = "INBOX"
-  folder.aliases.sent = "[Gmail]/Sent Mail"
-  folder.aliases.drafts = "[Gmail]/Drafts"
-  folder.aliases.trash = "[Gmail]/Trash"
-
-  backend.type = "imap"
-  backend.host = "imap.gmail.com"
-  backend.port = 993
-  backend.login = "example@gmail.com"
-  backend.auth.type = "oauth2"
-  backend.auth.method = "xoauth2"
-  backend.auth.client-id = "*****"
-  backend.auth.client-secret.keyring = "gmail-oauth2-client-secret"
-  backend.auth.access-token.keyring = "gmail-oauth2-access-token"
-  backend.auth.refresh-token.keyring = "gmail-oauth2-refresh-token"
-  backend.auth.auth-url = "https://accounts.google.com/o/oauth2/v2/auth"
-  backend.auth.token-url = "https://www.googleapis.com/oauth2/v3/token"
-  backend.auth.pkce = true
-  backend.auth.scope = "https://mail.google.com/"
-
-  message.send.backend.type = "smtp"
-  message.send.backend.host = "smtp.gmail.com"
-  message.send.backend.port = 465
-  message.send.backend.login = "example@gmail.com"
-  message.send.backend.auth.type = "oauth2"
-  message.send.backend.auth.method = "xoauth2"
-  message.send.backend.auth.client-id = "*****"
-  message.send.backend.auth.client-secret.keyring = "gmail-oauth2-client-secret"
-  message.send.backend.auth.access-token.keyring = "gmail-oauth2-access-token"
-  message.send.backend.auth.refresh-token.keyring = "gmail-oauth2-refresh-token"
-  message.send.backend.auth.auth-url = "https://accounts.google.com/o/oauth2/v2/auth"
-  message.send.backend.auth.token-url = "https://www.googleapis.com/oauth2/v3/token"
-  message.send.backend.auth.pkce = true
-  message.send.backend.auth.scope = "https://mail.google.com/"
+  backend.auth.cmd = "pass show gmail"
   ```
 
-  Running `himalaya account configure gmail` will complete your OAuth 2.0 setup and ask for your client secret.
-</details>
+- Use the global keyring of your system (requires the `keyring` cargo feature):
+
+  ```toml
+  backend.auth.keyring = "gmail-example"
+  ```
+
+  Running `himalaya configure -a gmail` will ask for your IMAP password, just paste the one generated previously.
+
+#### Using OAuth 2.0
+
+This option is the most secure but the hardest to configure. It requires the `oauth2` and `keyring` cargo features.
+
+First, you need to get your OAuth 2.0 credentials by following [this guide](https://developers.google.com/identity/protocols/oauth2#1.-obtain-oauth-2.0-credentials-from-the-dynamic_data.setvar.console_name-.). Once you get your client id and your client secret, you can configure your Himalaya account this way:
+
+```toml
+[accounts.gmail]
+email = "example@gmail.com"
+
+folder.aliases.inbox = "INBOX"
+folder.aliases.sent = "[Gmail]/Sent Mail"
+folder.aliases.drafts = "[Gmail]/Drafts"
+folder.aliases.trash = "[Gmail]/Trash"
+
+backend.type = "imap"
+backend.host = "imap.gmail.com"
+backend.port = 993
+backend.login = "example@gmail.com"
+backend.auth.type = "oauth2"
+backend.auth.method = "xoauth2"
+backend.auth.client-id = "*****"
+backend.auth.client-secret.keyring = "gmail-oauth2-client-secret"
+backend.auth.access-token.keyring = "gmail-oauth2-access-token"
+backend.auth.refresh-token.keyring = "gmail-oauth2-refresh-token"
+backend.auth.auth-url = "https://accounts.google.com/o/oauth2/v2/auth"
+backend.auth.token-url = "https://www.googleapis.com/oauth2/v3/token"
+backend.auth.pkce = true
+backend.auth.scope = "https://mail.google.com/"
+
+message.send.backend.type = "smtp"
+message.send.backend.host = "smtp.gmail.com"
+message.send.backend.port = 465
+message.send.backend.login = "example@gmail.com"
+message.send.backend.auth.type = "oauth2"
+message.send.backend.auth.method = "xoauth2"
+message.send.backend.auth.client-id = "*****"
+message.send.backend.auth.client-secret.keyring = "gmail-oauth2-client-secret"
+message.send.backend.auth.access-token.keyring = "gmail-oauth2-access-token"
+message.send.backend.auth.refresh-token.keyring = "gmail-oauth2-refresh-token"
+message.send.backend.auth.auth-url = "https://accounts.google.com/o/oauth2/v2/auth"
+message.send.backend.auth.token-url = "https://www.googleapis.com/oauth2/v3/token"
+message.send.backend.auth.pkce = true
+message.send.backend.auth.scope = "https://mail.google.com/"
+```
+
+Running `himalaya account configure gmail` will complete your OAuth 2.0 setup and ask for your client secret.
 
 ### Outlook
 
-<details>
-  <summary>Instructions</summary>
+```toml
+[accounts.outlook]
+email = "example@outlook.com"
+
+backend.type = "imap"
+backend.host = "outlook.office365.com"
+backend.port = 993
+backend.login = "example@outlook.com"
+backend.auth.type = "password"
+backend.auth.raw = "*****"
+
+message.send.backend.type = "smtp"
+message.send.backend.host = "smtp-mail.outlook.com"
+message.send.backend.port = 587
+message.send.backend.encryption.type = "start-tls"
+message.send.backend.login = "example@outlook.com"
+message.send.backend.auth.type = "password"
+message.send.backend.auth.raw = "*****"
+```
+
+Keeping your password inside the configuration file is good for testing purpose, but it is not safe. You have 2 better alternatives:
+
+- Save your password in any password manager that can be queried via the CLI:
 
   ```toml
-  [accounts.outlook]
-  email = "example@outlook.com"
-
-  backend.type = "imap"
-  backend.host = "outlook.office365.com"
-  backend.port = 993
-  backend.login = "example@outlook.com"
-  backend.auth.type = "password"
-  backend.auth.raw = "*****"
-
-  message.send.backend.type = "smtp"
-  message.send.backend.host = "smtp-mail.outlook.com"
-  message.send.backend.port = 587
-  message.send.backend.encryption.type = "start-tls"
-  message.send.backend.login = "example@outlook.com"
-  message.send.backend.auth.type = "password"
-  message.send.backend.auth.raw = "*****"
+  backend.auth.cmd = "pass show outlook"
   ```
 
-  Keeping your password inside the configuration file is good for testing purpose, but it is not safe. You have 2 better alternatives:
-
-  - Save your password in any password manager that can be queried via the CLI:
-
-    ```toml
-    backend.auth.cmd = "pass show outlook"
-    ```
-
-  - Use the global keyring of your system (requires the `keyring` cargo feature):
-
-    ```toml
-    backend.auth.keyring = "outlook-example"
-    ```
-
-    Running `himalaya account configure outlook` will ask for your IMAP password, just paste the one generated previously.
-
-  ### Using OAuth 2.0
-
-  This option is the most secure but the hardest to configure. First, you need to get your OAuth 2.0 credentials by following [this guide](https://learn.microsoft.com/en-us/exchange/client-developer/legacy-protocols/how-to-authenticate-an-imap-pop-smtp-application-by-using-oauth). Once you get your client id and your client secret, you can configure your Himalaya account this way:
+- Use the global keyring of your system (requires the `keyring` cargo feature):
 
   ```toml
-  [accounts.outlook]
-  email = "example@outlook.com"
-
-  backend.type = "imap"
-  backend.host = "outlook.office365.com"
-  backend.port = 993
-  backend.login = "example@outlook.com"
-  backend.auth.type = "oauth2"
-  backend.auth.client-id = "*****"
-  backend.auth.client-secret.keyring = "outlook-oauth2-client-secret"
-  backend.auth.access-token.keyring = "outlook-oauth2-access-token"
-  backend.auth.refresh-token.keyring = "outlook-oauth2-refresh-token"
-  backend.auth.auth-url = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
-  backend.auth.token-url = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
-  backend.auth.pkce = true
-  backend.auth.scopes = ["https://outlook.office.com/IMAP.AccessAsUser.All", "https://outlook.office.com/SMTP.Send"]
-
-  message.send.backend.type = "smtp"
-  message.send.backend.host = "smtp.mail.outlook.com"
-  message.send.backend.port = 587
-  message.send.backend.starttls = true
-  message.send.backend.login = "example@outlook.com"
-  message.send.backend.auth.type = "oauth2"
-  message.send.backend.auth.client-id = "*****"
-  message.send.backend.auth.client-secret.keyring = "outlook-oauth2-client-secret"
-  message.send.backend.auth.access-token.keyring = "outlook-oauth2-access-token"
-  message.send.backend.auth.refresh-token.keyring = "outlook-oauth2-refresh-token"
-  message.send.backend.auth.auth-url = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
-  message.send.backend.auth.token-url = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
-  message.send.backend.auth.pkce = true
-  message.send.backend.auth.scopes = ["https://outlook.office.com/IMAP.AccessAsUser.All", "https://outlook.office.com/SMTP.Send"]
+  backend.auth.keyring = "outlook-example"
   ```
 
-  Running `himalaya account configure outlook` will complete your OAuth 2.0 setup and ask for your client secret.
-</details>
+  Running `himalaya account configure outlook` will ask for your IMAP password, just paste the one generated previously.
+
+### Using OAuth 2.0
+
+This option is the most secure but the hardest to configure. First, you need to get your OAuth 2.0 credentials by following [this guide](https://learn.microsoft.com/en-us/exchange/client-developer/legacy-protocols/how-to-authenticate-an-imap-pop-smtp-application-by-using-oauth). Once you get your client id and your client secret, you can configure your Himalaya account this way:
+
+```toml
+[accounts.outlook]
+email = "example@outlook.com"
+
+backend.type = "imap"
+backend.host = "outlook.office365.com"
+backend.port = 993
+backend.login = "example@outlook.com"
+backend.auth.type = "oauth2"
+backend.auth.client-id = "*****"
+backend.auth.client-secret.keyring = "outlook-oauth2-client-secret"
+backend.auth.access-token.keyring = "outlook-oauth2-access-token"
+backend.auth.refresh-token.keyring = "outlook-oauth2-refresh-token"
+backend.auth.auth-url = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
+backend.auth.token-url = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+backend.auth.pkce = true
+backend.auth.scopes = ["https://outlook.office.com/IMAP.AccessAsUser.All", "https://outlook.office.com/SMTP.Send"]
+
+message.send.backend.type = "smtp"
+message.send.backend.host = "smtp.mail.outlook.com"
+message.send.backend.port = 587
+message.send.backend.starttls = true
+message.send.backend.login = "example@outlook.com"
+message.send.backend.auth.type = "oauth2"
+message.send.backend.auth.client-id = "*****"
+message.send.backend.auth.client-secret.keyring = "outlook-oauth2-client-secret"
+message.send.backend.auth.access-token.keyring = "outlook-oauth2-access-token"
+message.send.backend.auth.refresh-token.keyring = "outlook-oauth2-refresh-token"
+message.send.backend.auth.auth-url = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
+message.send.backend.auth.token-url = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+message.send.backend.auth.pkce = true
+message.send.backend.auth.scopes = ["https://outlook.office.com/IMAP.AccessAsUser.All", "https://outlook.office.com/SMTP.Send"]
+```
+
+Running `himalaya account configure outlook` will complete your OAuth 2.0 setup and ask for your client secret.
 
 ### iCloud Mail
 
-<details>
-  <summary>Instructions</summary>
+From the [iCloud Mail](https://support.apple.com/en-us/HT202304) support page:
 
-  From the [iCloud Mail](https://support.apple.com/en-us/HT202304) support page:
+- IMAP port = `993`.
+- IMAP login = name of your iCloud Mail email address (for example, `johnappleseed`, not `johnappleseed@icloud.com`)
+- SMTP port = `587` with `STARTTLS`
+- SMTP login = full iCloud Mail email address (for example, `johnappleseed@icloud.com`, not `johnappleseed`)
 
-  - IMAP port = `993`.
-  - IMAP login = name of your iCloud Mail email address (for example, `johnappleseed`, not `johnappleseed@icloud.com`)
-  - SMTP port = `587` with `STARTTLS`
-  - SMTP login = full iCloud Mail email address (for example, `johnappleseed@icloud.com`, not `johnappleseed`)
+```toml
+[accounts.icloud]
+email = "johnappleseed@icloud.com"
+
+backend.type = "imap"
+backend.host = "imap.mail.me.com"
+backend.port = 993
+backend.login = "johnappleseed"
+backend.auth.type = "password"
+backend.auth.raw = "*****"
+
+message.send.backend.type = "smtp"
+message.send.backend.host = "smtp.mail.me.com"
+message.send.backend.port = 587
+message.send.backend.encryption.type = "start-tls"
+message.send.backend.login = "johnappleseed@icloud.com"
+message.send.backend.auth.type = "password"
+message.send.backend.auth.raw = "*****"
+```
+
+Keeping your password inside the configuration file is good for testing purpose, but it is not safe. You have 2 better alternatives:
+
+- Save your password in any password manager that can be queried via the CLI:
 
   ```toml
-  [accounts.icloud]
-  email = "johnappleseed@icloud.com"
-
-  backend.type = "imap"
-  backend.host = "imap.mail.me.com"
-  backend.port = 993
-  backend.login = "johnappleseed"
-  backend.auth.type = "password"
-  backend.auth.raw = "*****"
-
-  message.send.backend.type = "smtp"
-  message.send.backend.host = "smtp.mail.me.com"
-  message.send.backend.port = 587
-  message.send.backend.encryption.type = "start-tls"
-  message.send.backend.login = "johnappleseed@icloud.com"
-  message.send.backend.auth.type = "password"
-  message.send.backend.auth.raw = "*****"
+  backend.auth.cmd = "pass show icloud"
   ```
 
-  Keeping your password inside the configuration file is good for testing purpose, but it is not safe. You have 2 better alternatives:
+- Use the global keyring of your system (requires the `keyring` cargo feature):
 
-  - Save your password in any password manager that can be queried via the CLI:
+  ```toml
+  backend.auth.keyring = "icloud-example"
+  ```
 
-    ```toml
-    backend.auth.cmd = "pass show icloud"
-    ```
-
-  - Use the global keyring of your system (requires the `keyring` cargo feature):
-
-    ```toml
-    backend.auth.keyring = "icloud-example"
-    ```
-
-    Running `himalaya account configure icloud` will ask for your IMAP password, just paste the one generated previously.
-</details>
+  Running `himalaya account configure icloud` will ask for your IMAP password, just paste the one generated previously.
 
 ## Interfaces
 
