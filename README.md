@@ -1,13 +1,13 @@
 <div align="center">
   <img src="./logo.svg" alt="Logo" width="128" height="128" />
   <h1>📫 Himalaya</h1>
+  <p>CLI to manage emails</p>
   <p>
     <a href="https://github.com/pimalaya/himalaya/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/pimalaya/himalaya?color=success"/></a>
     <a href="https://repology.org/project/himalaya/versions"><img alt="Repology" src="https://img.shields.io/repology/repositories/himalaya?color=success"></a>
     <a href="https://matrix.to/#/#pimalaya:matrix.org"><img alt="Matrix" src="https://img.shields.io/badge/chat-%23pimalaya-blue?style=flat&logo=matrix&logoColor=white"/></a>
     <a href="https://fosstodon.org/@pimalaya"><img alt="Mastodon" src="https://img.shields.io/badge/social-%40pimalaya-blue?style=flat&logo=mastodon&logoColor=white"/></a>
   </p>
-  <p>CLI to manage emails</p>
 </div>
 
 ```
@@ -21,6 +21,14 @@ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
 - [Features](#features)
 - [Usage](#usage)
 - [Installation](#installation)
+  - [Pre-built binary](#pre-built-binary)
+  - [Cargo](#cargo)
+  - [Arch linux](#arch-linux)
+  - [Homebrew](#homebrew)
+  - [Scoop](#scoop)
+  - [Fedora Linux/CentOS/RHEL](#fedora-linux-centos-rhel)
+  - [Nix](#nix)
+  - [Sources](#sources)
 - [Configuration](#configuration)
   - [Proton Mail](#proton-mail)
   - [Gmail](#gmail)
@@ -54,194 +62,158 @@ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
 
 ### Pre-built binary
 
-<details>
-  <summary>Instructions</summary>
+Himalaya CLI can be installed with the `install.sh` installer:
 
-  Himalaya CLI can be installed with the installer:
+*As root:*
 
-  *As root:*
+```
+curl -sSL https://raw.githubusercontent.com/pimalaya/himalaya/master/install.sh | sudo sh
+```
 
-  ```
-  curl -sSL https://raw.githubusercontent.com/pimalaya/himalaya/master/install.sh | sudo sh
-  ```
+*As a regular user:*
 
-  *As a regular user:*
+```
+curl -sSL https://raw.githubusercontent.com/pimalaya/himalaya/master/install.sh | PREFIX=~/.local sh
+```
 
-  ```
-  curl -sSL https://raw.githubusercontent.com/pimalaya/himalaya/master/install.sh | PREFIX=~/.local sh
-  ```
+These commands install the latest binary from the GitHub [releases](https://github.com/pimalaya/himalaya/releases) section.
 
-  These commands install the latest binary from the GitHub [releases](https://github.com/pimalaya/himalaya/releases) section.
+If you want a more up-to-date version than the latest release, check out the [releases](https://github.com/pimalaya/himalaya/actions/workflows/releases.yml) GitHub workflow and look for the *Artifacts* section. You will find a pre-built binary matching your OS. These pre-built binaries are built from the `master` branch.
 
-  If you want a more up-to-date version than the latest release, check out the [`releases`](https://github.com/pimalaya/himalaya/actions/workflows/releases.yml) GitHub workflow and look for the *Artifacts* section. You should find a pre-built binary matching your OS. These pre-built binaries are built from the `master` branch.
-
-  *Such binaries are built with the default cargo features. If you want to enable or disable a feature, please use another installation method.*
-</details>
+*Such binaries are built with the default cargo features. If you need more features, please use another installation method.*
 
 ### Cargo
 
-<details>
-  <summary>Instructions</summary>
+Himalaya CLI can be installed with [cargo](https://doc.rust-lang.org/cargo/):
 
-  Himalaya CLI can be installed with [cargo](https://doc.rust-lang.org/cargo/):
+```
+cargo install himalaya --locked
+```
 
-  ```
-  cargo install himalaya --locked
-  ```
+With only IMAP support:
 
-  *With only IMAP support:*
+```
+cargo install himalaya --locked --no-default-features --features imap
+```
 
-  ```
-  cargo install himalaya --locked --no-default-features --features imap
-  ```
+You can also use the git repository for a more up-to-date (but less stable) version:
 
-  You can also use the git repository for a more up-to-date (but less stable) version:
-
-  ```
-  cargo install --frozen --force --git https://github.com/pimalaya/himalaya.git
-  ```
-</details>
+```
+cargo install --locked --git https://github.com/pimalaya/himalaya.git
+```
 
 ### Arch Linux
 
-<details>
-  <summary>Instructions</summary>
+Himalaya CLI can be installed on [Arch Linux](https://archlinux.org/) with either the community repository:
 
-  Himalaya CLI can be installed on [Arch Linux](https://archlinux.org/) with either the community repository:
+```
+pacman -S himalaya
+```
 
-  ```
-  pacman -S himalaya
-  ```
+or the [user repository](https://aur.archlinux.org/):
 
-  or the [user repository](https://aur.archlinux.org/):
+```
+git clone https://aur.archlinux.org/himalaya-git.git
+cd himalaya-git
+makepkg -isc
+```
 
-  ```
-  git clone https://aur.archlinux.org/himalaya-git.git
-  cd himalaya-git
-  makepkg -isc
-  ```
+If you use [yay](https://github.com/Jguer/yay), it is even simplier:
 
-  If you use [yay](https://github.com/Jguer/yay), it is even simplier:
-
-  ```
-  yay -S himalaya-git
-  ```
-
-</details>
+```
+yay -S himalaya-git
+```
 
 ### Homebrew
 
-<details>
-  <summary>Instructions</summary>
+Himalaya CLI can be installed with [Homebrew](https://brew.sh/):
 
-  Himalaya CLI can be installed with [Homebrew](https://brew.sh/):
+```
+brew install himalaya
+```
 
-  ```
-  brew install himalaya
-  ```
-
-  Note: cargo features are not compatible with brew. If you need features like OAuth 2.0, please use a different installation method.
-
-</details>
+Note: cargo features are not compatible with brew. If you need features like OAuth 2.0, please use a different installation method.
 
 ### Scoop
 
-<details>
-  <summary>Instructions</summary>
+Himalaya CLI can be installed with [Scoop](https://scoop.sh/):
 
-  Himalaya CLI can be installed with [Scoop](https://scoop.sh/):
-
-  ```
-  scoop install himalaya
-  ```
-
-</details>
+```
+scoop install himalaya
+```
 
 ### Fedora Linux/CentOS/RHEL
 
-<details>
-  <summary>Instructions</summary>
+Himalaya CLI can be installed on [Fedora Linux](https://fedoraproject.org/)/CentOS/RHEL via [COPR](https://copr.fedorainfracloud.org/coprs/atim/himalaya/) repo:
 
-  Himalaya CLI can be installed on [Fedora Linux](https://fedoraproject.org/)/CentOS/RHEL via [COPR](https://copr.fedorainfracloud.org/coprs/atim/himalaya/) repo:
-
-  ```
-  dnf copr enable atim/himalaya
-  dnf install himalaya
-  ```
-
-</details>
+```
+dnf copr enable atim/himalaya
+dnf install himalaya
+```
 
 ### Nix
 
-<details>
-  <summary>Instructions</summary>
+Himalaya CLI can be installed with [Nix](https://serokell.io/blog/what-is-nix):
 
-  Himalaya CLI can be installed with [Nix](https://serokell.io/blog/what-is-nix):
+```
+nix-env -i himalaya
+```
 
-  ```
-  nix-env -i himalaya
-  ```
+You can also use the git repository for a more up-to-date (but less stable) version:
 
-  You can also use the git repository for a more up-to-date (but less stable) version:
+```
+nix-env -if https://github.com/pimalaya/himalaya/archive/master.tar.gz
+```
 
-  ```
-  nix-env -if https://github.com/pimalaya/himalaya/archive/master.tar.gz
-  ```
+*Or, from within the source tree checkout:*
 
-  *Or, from within the source tree checkout:*
+```
+nix-env -if .
+```
 
-  ```
-  nix-env -if .
-  ```
+If you have the [Flakes](https://nixos.wiki/wiki/Flakes) feature enabled:
 
-  If you have the [Flakes](https://nixos.wiki/wiki/Flakes) feature enabled:
+```
+nix profile install himalaya
+```
 
-  ```
-  nix profile install himalaya
-  ```
+*Or, from within the source tree checkout:*
 
-  *Or, from within the source tree checkout:*
+```
+nix profile install
+```
 
-  ```
-  nix profile install
-  ```
+*You can also run Himalaya directly without installing it:*
 
-  *You can also run Himalaya directly without installing it:*
-
-  ```
-  nix run himalaya
-  ```
-</details>
+```
+nix run himalaya
+```
 
 ### Sources
 
-<details>
-  <summary>Instructions</summary>
+Himalaya CLI can be installed from sources.
 
-  Himalaya CLI can be installed from sources.
+First you need to install the Rust development environment (see the [rust installation documentation](https://doc.rust-lang.org/cargo/getting-started/installation.html)):
 
-  First you need to install the Rust development environment (see the [rust installation documentation](https://doc.rust-lang.org/cargo/getting-started/installation.html)):
+```
+curl https://sh.rustup.rs -sSf | sh
+```
 
-  ```
-  curl https://sh.rustup.rs -sSf | sh
-  ```
+Then, you need to clone the repository and install dependencies:
 
-  Then, you need to clone the repository and install dependencies:
+```
+git clone https://github.com/pimalaya/himalaya.git
+cd himalaya
+cargo check
+```
 
-  ```
-  git clone https://github.com/pimalaya/himalaya.git
-  cd himalaya
-  cargo check
-  ```
+Now, you can build Himalaya:
 
-  Now, you can build Himalaya:
+```
+cargo build --release
+```
 
-  ```
-  cargo build --release
-  ```
-
-  *Binaries are available under the `target/release` folder.*
-</details>
+*Binaries are available under the `target/release` folder.*
 
 ## Configuration
 
