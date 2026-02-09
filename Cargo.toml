@@ -33,7 +33,7 @@ pgp-native = ["email-lib/pgp-native", "mml-lib/pgp-native", "pimalaya-tui/pgp-na
 pimalaya-tui = { version = "0.3", default-features = false, features = ["build-envs"] }
 
 [dependencies]
-ariadne = "0.2"
+ariadne = { version = "0.2", features = ["auto-color"] }
 clap = { version = "4.4", features = ["derive", "env", "wrap_help"] }
 clap_complete = "4.4"
 clap_mangen = "0.2"
