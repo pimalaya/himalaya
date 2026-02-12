@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added support for multiple config files via `HIMALAYA_CONFIG=path1:path2:…` ([#612]).
 - Added `-d|--downloads-dir` argument to `attachment download` command ([#559]).
 - Added `View` and `View MIME` post edit choices ([#486]).
+- Made `message send` and `template send` return id ([#627]).
 
 ### Changed
 
@@ -932,50 +933,6 @@ Few major concepts changed:
 - Password from command
 - Set up README
 
-[Unreleased]: https://github.com/soywod/himalaya/compare/v1.1.0...HEAD
-[1.1.0]: https://github.com/soywod/himalaya/compare/v1.0.0...v1.1.0
-[1.0.0]: https://github.com/soywod/himalaya/compare/v1.0.0-beta.4...v1.0.0
-[1.0.0-beta.4]: https://github.com/soywod/himalaya/compare/v1.0.0-beta.3...v1.0.0-beta.4
-[1.0.0-beta.3]: https://github.com/soywod/himalaya/compare/v1.0.0-beta.2...v1.0.0-beta.3
-[1.0.0-beta.2]: https://github.com/soywod/himalaya/compare/v1.0.0-beta...v1.0.0-beta.2
-[1.0.0-beta]: https://github.com/soywod/himalaya/compare/v0.9.0...v1.0.0-beta
-[0.9.0]: https://github.com/soywod/himalaya/compare/v0.8.4...v0.9.0
-[0.8.4]: https://github.com/soywod/himalaya/compare/v0.8.3...v0.8.4
-[0.8.3]: https://github.com/soywod/himalaya/compare/v0.8.2...v0.8.3
-[0.8.2]: https://github.com/soywod/himalaya/compare/v0.8.1...v0.8.2
-[0.8.1]: https://github.com/soywod/himalaya/compare/v0.8.0...v0.8.1
-[0.8.0]: https://github.com/soywod/himalaya/compare/v0.7.3...v0.8.0
-[0.7.3]: https://github.com/soywod/himalaya/compare/v0.7.2...v0.7.3
-[0.7.2]: https://github.com/soywod/himalaya/compare/v0.7.1...v0.7.2
-[0.7.1]: https://github.com/soywod/himalaya/compare/v0.7.0...v0.7.1
-[0.7.0]: https://github.com/soywod/himalaya/compare/v0.6.1...v0.7.0
-[0.6.1]: https://github.com/soywod/himalaya/compare/v0.6.0...v0.6.1
-[0.6.0]: https://github.com/soywod/himalaya/compare/v0.5.10...v0.6.0
-[0.5.10]: https://github.com/soywod/himalaya/compare/v0.5.9...v0.5.10
-[0.5.9]: https://github.com/soywod/himalaya/compare/v0.5.8...v0.5.9
-[0.5.8]: https://github.com/soywod/himalaya/compare/v0.5.7...v0.5.8
-[0.5.7]: https://github.com/soywod/himalaya/compare/v0.5.6...v0.5.7
-[0.5.6]: https://github.com/soywod/himalaya/compare/v0.5.5...v0.5.6
-[0.5.5]: https://github.com/soywod/himalaya/compare/v0.5.4...v0.5.5
-[0.5.4]: https://github.com/soywod/himalaya/compare/v0.5.3...v0.5.4
-[0.5.3]: https://github.com/soywod/himalaya/compare/v0.5.2...v0.5.3
-[0.5.2]: https://github.com/soywod/himalaya/compare/v0.5.1...v0.5.2
-[0.5.1]: https://github.com/soywod/himalaya/compare/v0.5.0...v0.5.1
-[0.5.0]: https://github.com/soywod/himalaya/compare/v0.4.0...v0.5.0
-[0.4.0]: https://github.com/soywod/himalaya/compare/v0.3.2...v0.4.0
-[0.3.2]: https://github.com/soywod/himalaya/compare/v0.3.1...v0.3.2
-[0.3.1]: https://github.com/soywod/himalaya/compare/v0.3.0...v0.3.1
-[0.3.0]: https://github.com/soywod/himalaya/compare/v0.2.7...v0.3.0
-[0.2.7]: https://github.com/soywod/himalaya/compare/v0.2.6...v0.2.7
-[0.2.6]: https://github.com/soywod/himalaya/compare/v0.2.5...v0.2.6
-[0.2.5]: https://github.com/soywod/himalaya/compare/v0.2.4...v0.2.5
-[0.2.4]: https://github.com/soywod/himalaya/compare/v0.2.3...v0.2.4
-[0.2.3]: https://github.com/soywod/himalaya/compare/v0.2.2...v0.2.3
-[0.2.2]: https://github.com/soywod/himalaya/compare/v0.2.1...v0.2.2
-[0.2.1]: https://github.com/soywod/himalaya/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/soywod/himalaya/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/soywod/himalaya/releases/tag/v0.1.0
-
 [#469]: https://github.com/pimalaya/himalaya/issues/469
 [#486]: https://github.com/pimalaya/himalaya/issues/486
 [#492]: https://github.com/pimalaya/himalaya/issues/492
@@ -995,6 +952,51 @@ Few major concepts changed:
 [#593]: https://github.com/pimalaya/himalaya/issues/593
 [#611]: https://github.com/pimalaya/himalaya/issues/611
 [#612]: https://github.com/pimalaya/himalaya/issues/612
+[#627]: https://github.com/pimalaya/himalaya/issues/627
 
 [core#1]: https://github.com/pimalaya/core/issues/1
 [core#10]: https://github.com/pimalaya/core/issues/10
+
+[Unreleased]: https://github.com/pimalaya/himalaya/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/pimalaya/himalaya/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/pimalaya/himalaya/compare/v1.0.0-beta.4...v1.0.0
+[1.0.0-beta.4]: https://github.com/pimalaya/himalaya/compare/v1.0.0-beta.3...v1.0.0-beta.4
+[1.0.0-beta.3]: https://github.com/pimalaya/himalaya/compare/v1.0.0-beta.2...v1.0.0-beta.3
+[1.0.0-beta.2]: https://github.com/pimalaya/himalaya/compare/v1.0.0-beta...v1.0.0-beta.2
+[1.0.0-beta]: https://github.com/pimalaya/himalaya/compare/v0.9.0...v1.0.0-beta
+[0.9.0]: https://github.com/pimalaya/himalaya/compare/v0.8.4...v0.9.0
+[0.8.4]: https://github.com/pimalaya/himalaya/compare/v0.8.3...v0.8.4
+[0.8.3]: https://github.com/pimalaya/himalaya/compare/v0.8.2...v0.8.3
+[0.8.2]: https://github.com/pimalaya/himalaya/compare/v0.8.1...v0.8.2
+[0.8.1]: https://github.com/pimalaya/himalaya/compare/v0.8.0...v0.8.1
+[0.8.0]: https://github.com/pimalaya/himalaya/compare/v0.7.3...v0.8.0
+[0.7.3]: https://github.com/pimalaya/himalaya/compare/v0.7.2...v0.7.3
+[0.7.2]: https://github.com/pimalaya/himalaya/compare/v0.7.1...v0.7.2
+[0.7.1]: https://github.com/pimalaya/himalaya/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/pimalaya/himalaya/compare/v0.6.1...v0.7.0
+[0.6.1]: https://github.com/pimalaya/himalaya/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/pimalaya/himalaya/compare/v0.5.10...v0.6.0
+[0.5.10]: https://github.com/pimalaya/himalaya/compare/v0.5.9...v0.5.10
+[0.5.9]: https://github.com/pimalaya/himalaya/compare/v0.5.8...v0.5.9
+[0.5.8]: https://github.com/pimalaya/himalaya/compare/v0.5.7...v0.5.8
+[0.5.7]: https://github.com/pimalaya/himalaya/compare/v0.5.6...v0.5.7
+[0.5.6]: https://github.com/pimalaya/himalaya/compare/v0.5.5...v0.5.6
+[0.5.5]: https://github.com/pimalaya/himalaya/compare/v0.5.4...v0.5.5
+[0.5.4]: https://github.com/pimalaya/himalaya/compare/v0.5.3...v0.5.4
+[0.5.3]: https://github.com/pimalaya/himalaya/compare/v0.5.2...v0.5.3
+[0.5.2]: https://github.com/pimalaya/himalaya/compare/v0.5.1...v0.5.2
+[0.5.1]: https://github.com/pimalaya/himalaya/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/pimalaya/himalaya/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/pimalaya/himalaya/compare/v0.3.2...v0.4.0
+[0.3.2]: https://github.com/pimalaya/himalaya/compare/v0.3.1...v0.3.2
+[0.3.1]: https://github.com/pimalaya/himalaya/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/pimalaya/himalaya/compare/v0.2.7...v0.3.0
+[0.2.7]: https://github.com/pimalaya/himalaya/compare/v0.2.6...v0.2.7
+[0.2.6]: https://github.com/pimalaya/himalaya/compare/v0.2.5...v0.2.6
+[0.2.5]: https://github.com/pimalaya/himalaya/compare/v0.2.4...v0.2.5
+[0.2.4]: https://github.com/pimalaya/himalaya/compare/v0.2.3...v0.2.4
+[0.2.3]: https://github.com/pimalaya/himalaya/compare/v0.2.2...v0.2.3
+[0.2.2]: https://github.com/pimalaya/himalaya/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/pimalaya/himalaya/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/pimalaya/himalaya/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/pimalaya/himalaya/releases/tag/v0.1.0
