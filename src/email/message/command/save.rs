@@ -1,14 +1,17 @@
+use std::{
+    fmt,
+    io::{self, BufRead, IsTerminal},
+    sync::Arc,
+};
+
 use clap::Parser;
 use color_eyre::Result;
-use email::{backend::feature::BackendFeatureSource, config::Config};
+use email::{backend::feature::BackendFeatureSource, config::Config, envelope::SingleId};
 use pimalaya_tui::{
     himalaya::backend::BackendBuilder,
     terminal::{cli::printer::Printer, config::TomlConfig as _},
 };
-use std::{
-    io::{self, BufRead, IsTerminal},
-    sync::Arc,
-};
+use serde::{ser::SerializeStruct, Serialize, Serializer};
 use tracing::info;
 
 use crate::{
@@ -69,8 +72,30 @@ impl MessageSaveCommand {
                 .join("\r\n")
         };
 
-        backend.add_message(folder, msg.as_bytes()).await?;
+        let id = backend.add_message(folder, msg.as_bytes()).await?;
 
-        printer.out(format!("Message successfully saved to {folder}!\n"))
+        printer.out(MessageAdded { folder, id })
+    }
+}
+
+struct MessageAdded<'a> {
+    folder: &'a String,
+    id: SingleId,
+}
+
+impl fmt::Display for MessageAdded<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let id = self.id.as_str();
+        let folder = self.folder;
+        writeln!(f, "Message {id} successfully saved to {folder}")
+    }
+}
+
+impl Serialize for MessageAdded<'_> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut state = serializer.serialize_struct("MessageAdded", 2)?;
+        state.serialize_field("folder", self.folder)?;
+        state.serialize_field("id", self.id.as_str())?;
+        state.end()
     }
 }

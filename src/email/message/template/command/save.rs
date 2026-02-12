@@ -1,15 +1,18 @@
+use std::{
+    fmt,
+    io::{self, BufRead, IsTerminal},
+    sync::Arc,
+};
+
 use clap::Parser;
 use color_eyre::Result;
-use email::{backend::feature::BackendFeatureSource, config::Config};
+use email::{backend::feature::BackendFeatureSource, config::Config, envelope::SingleId};
 use mml::MmlCompilerBuilder;
 use pimalaya_tui::{
     himalaya::backend::BackendBuilder,
     terminal::{cli::printer::Printer, config::TomlConfig as _},
 };
-use std::{
-    io::{self, BufRead, IsTerminal},
-    sync::Arc,
-};
+use serde::{ser::SerializeStruct, Serialize, Serializer};
 use tracing::info;
 
 use crate::{
@@ -85,6 +88,30 @@ impl TemplateSaveCommand {
 
         backend.add_message(folder, &msg).await?;
 
-        printer.out(format!("Template successfully saved to {folder}!\n"))
+        let id = backend.add_message(folder, &msg).await?;
+
+        printer.out(TemplateAdded { folder, id })
+    }
+}
+
+struct TemplateAdded<'a> {
+    folder: &'a String,
+    id: SingleId,
+}
+
+impl fmt::Display for TemplateAdded<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let id = self.id.as_str();
+        let folder = self.folder;
+        writeln!(f, "Template {id} successfully saved to {folder}")
+    }
+}
+
+impl Serialize for TemplateAdded<'_> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut state = serializer.serialize_struct("TemplateAdded", 2)?;
+        state.serialize_field("folder", self.folder)?;
+        state.serialize_field("id", self.id.as_str())?;
+        state.end()
     }
 }
