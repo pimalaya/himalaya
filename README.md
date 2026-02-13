@@ -489,6 +489,8 @@ message.send.backend.encryption.type = "start-tls"
 message.send.backend.login = "johnappleseed@icloud.com"
 message.send.backend.auth.type = "password"
 message.send.backend.auth.raw = "*****"
+
+folder.aliases.sent = "Sent Messages"
 ```
 
 Keeping your password inside the configuration file is good for testing purpose, but it is not safe. You have 2 better alternatives:
