@@ -35,6 +35,7 @@ himalaya envelope list --account posteo --folder Archives.FOSS --page 2
   - [iCloud Mail](#icloud-mail)
 - [Interfaces](#interfaces)
 - [FAQ](#faq)
+- [Social](#social)
 - [Sponsoring](#sponsoring)
 
 ## Features
@@ -686,6 +687,12 @@ These interfaces are built at the top of Himalaya CLI to improve the User Experi
 
   Simply set the environment variable NO_COLOR=1
 </details>
+
+## Social
+
+- Chat on [Matrix](https://matrix.to/#/#pimalaya:matrix.org)
+- News on [Mastodon](https://fosstodon.org/@pimalaya) or [RSS](https://fosstodon.org/@pimalaya.rss)
+- Mail at [pimalaya.org@posteo.net](mailto:pimalaya.org@posteo.net)
 
 ## Sponsoring
 
