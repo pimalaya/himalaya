@@ -93,7 +93,10 @@ impl MessageThreadCommand {
         let ids: Vec<_> = envelopes
             .graph()
             .nodes()
-            .map(|e| e.id.parse::<usize>().unwrap())
+            .filter_map(|e| {
+                let id = e.id.parse::<usize>().unwrap_or(0);
+                if id > 0 { Some(id) } else { None }
+            })
             .collect();
 
         let emails = if self.preview {
@@ -107,7 +110,7 @@ impl MessageThreadCommand {
 
         for (i, email) in emails.to_vec().iter().enumerate() {
             bodies.push_str(glue);
-            bodies.push_str(&format!("-------- Message {} --------\n\n", ids[i + 1]));
+            bodies.push_str(&format!("-------- Message {} --------\n\n", ids[i]));
 
             let tpl = email
                 .to_read_tpl(&account_config, |mut tpl| {
