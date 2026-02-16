@@ -62,6 +62,6 @@ keyring-lib.git = "https://github.com/pimalaya/core"
 mml-lib.git = "https://github.com/pimalaya/core"
 oauth-lib.git = "https://github.com/pimalaya/core"
 pgp-lib.git = "https://github.com/pimalaya/core"
-pimalaya-tui = { git = "https://github.com/pimalaya/tui", branch = "bump-deps" }
+pimalaya-tui.git = "https://github.com/pimalaya/tui"
 process-lib.git = "https://github.com/pimalaya/core"
 secret-lib.git = "https://github.com/pimalaya/core"

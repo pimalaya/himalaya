@@ -1240,7 +1240,7 @@ dependencies = [
 [[package]]
 name = "email-lib"
 version = "0.26.4"
-source = "git+https://github.com/pimalaya/core#3935609cf4d16e6677dd92d520d086c7293e3a60"
+source = "git+https://github.com/pimalaya/core#f46ae2fbb2f711f5d96cdcf9df35b9b306a154fa"
 dependencies = [
  "async-trait",
  "chrono",
@@ -1898,7 +1898,7 @@ dependencies = [
 [[package]]
 name = "http-lib"
 version = "0.1.0"
-source = "git+https://github.com/pimalaya/core#3935609cf4d16e6677dd92d520d086c7293e3a60"
+source = "git+https://github.com/pimalaya/core#f46ae2fbb2f711f5d96cdcf9df35b9b306a154fa"
 dependencies = [
  "thiserror 2.0.18",
  "tokio",
@@ -2319,7 +2319,7 @@ dependencies = [
 [[package]]
 name = "keyring-lib"
 version = "1.0.3"
-source = "git+https://github.com/pimalaya/core#3935609cf4d16e6677dd92d520d086c7293e3a60"
+source = "git+https://github.com/pimalaya/core#f46ae2fbb2f711f5d96cdcf9df35b9b306a154fa"
 dependencies = [
  "keyring",
  "once_cell",
@@ -2641,7 +2641,7 @@ dependencies = [
 [[package]]
 name = "mml-lib"
 version = "1.1.1"
-source = "git+https://github.com/pimalaya/core#3935609cf4d16e6677dd92d520d086c7293e3a60"
+source = "git+https://github.com/pimalaya/core#f46ae2fbb2f711f5d96cdcf9df35b9b306a154fa"
 dependencies = [
  "async-recursion",
  "chumsky",
@@ -2847,7 +2847,7 @@ dependencies = [
 [[package]]
 name = "oauth-lib"
 version = "2.0.0"
-source = "git+https://github.com/pimalaya/core#3935609cf4d16e6677dd92d520d086c7293e3a60"
+source = "git+https://github.com/pimalaya/core#f46ae2fbb2f711f5d96cdcf9df35b9b306a154fa"
 dependencies = [
  "http-lib",
  "oauth2",
@@ -3148,7 +3148,7 @@ dependencies = [
 [[package]]
 name = "pgp-lib"
 version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#3935609cf4d16e6677dd92d520d086c7293e3a60"
+source = "git+https://github.com/pimalaya/core#f46ae2fbb2f711f5d96cdcf9df35b9b306a154fa"
 dependencies = [
  "async-recursion",
  "futures",
@@ -3166,7 +3166,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-tui"
 version = "0.3.0"
-source = "git+https://github.com/pimalaya/tui?branch=bump-deps#993ed66ded2abda316e923f60ae18f2572a42b0c"
+source = "git+https://github.com/pimalaya/tui#b1c7718755f613e2d9e8bccc6ee9b2237a8c11c3"
 dependencies = [
  "async-trait",
  "clap",
@@ -3339,7 +3339,7 @@ dependencies = [
 [[package]]
 name = "process-lib"
 version = "1.0.0"
-source = "git+https://github.com/pimalaya/core#3935609cf4d16e6677dd92d520d086c7293e3a60"
+source = "git+https://github.com/pimalaya/core#f46ae2fbb2f711f5d96cdcf9df35b9b306a154fa"
 dependencies = [
  "serde",
  "thiserror 2.0.18",
@@ -3782,7 +3782,7 @@ dependencies = [
 [[package]]
 name = "secret-lib"
 version = "1.0.1"
-source = "git+https://github.com/pimalaya/core#3935609cf4d16e6677dd92d520d086c7293e3a60"
+source = "git+https://github.com/pimalaya/core#f46ae2fbb2f711f5d96cdcf9df35b9b306a154fa"
 dependencies = [
  "keyring-lib",
  "process-lib",
