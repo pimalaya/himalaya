@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `-d|--downloads-dir` argument to `attachment download` command ([#559]).
 - Added `View` and `View MIME` post edit choices ([#486]).
 - Made `message send` and `template send` return id ([#627]).
+- Enabled shell expansion for email, IMAP and SMTP login fields, which allows usage of environment variables ([#632]).
 
 ### Changed
 
@@ -953,6 +954,7 @@ Few major concepts changed:
 [#611]: https://github.com/pimalaya/himalaya/issues/611
 [#612]: https://github.com/pimalaya/himalaya/issues/612
 [#627]: https://github.com/pimalaya/himalaya/issues/627
+[#632]: https://github.com/pimalaya/himalaya/issues/632
 
 [core#1]: https://github.com/pimalaya/core/issues/1
 [core#10]: https://github.com/pimalaya/core/issues/10
