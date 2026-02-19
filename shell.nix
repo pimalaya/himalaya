@@ -1,8 +1,16 @@
 {
+  nixpkgs ? <nixpkgs>,
+  system ? builtins.currentSystem,
+  pkgs ? import nixpkgs { inherit system; },
   pimalaya ? import (fetchTarball "https://github.com/pimalaya/nix/archive/master.tar.gz"),
-  ...
+  fenix ? import (fetchTarball "https://github.com/nix-community/fenix/archive/monthly.tar.gz") { },
 }:
 
 pimalaya.mkShell {
-  extraBuildInputs = "nixd,nixfmt-rfc-style,git-cliff,cargo-deny";
+  inherit
+    nixpkgs
+    system
+    pkgs
+    fenix
+    ;
 }

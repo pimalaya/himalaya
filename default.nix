@@ -7,7 +7,7 @@
 pimalaya.mkDefault (
   {
     src = ./.;
-    version = "1.1.0";
+    version = "1.2.0";
     mkPackage = (
       {
         lib,
@@ -33,7 +33,8 @@ pimalaya.mkDefault (
               exe = stdenv.hostPlatform.extensions.executable;
             in
             lib.optionalString (lib.hasInfix "wine" emulator) ''
-              export WINEPREFIX=`mktemp -d`
+              export WINEPREFIX="''${WINEPREFIX:-$(mktemp -d)}"
+              mkdir -p $WINEPREFIX
             ''
             + ''
               mkdir -p $out/share/{applications,completions,man}
