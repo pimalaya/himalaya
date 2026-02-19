@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-02-19
+
 ### Added
 
 - Added `--quiet` flag ([#545]).
@@ -17,12 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Made `message send` and `template send` return id ([#627]).
 - Enabled shell expansion for email, IMAP and SMTP login fields, which allows usage of environment variables ([#632]).
 
-### Changed
-
-- Bumped all deps, fixing `rustls-platform-verifier` compatibility version issue.
-
 ### Fixed
 
+- Bumped all deps, fixing `rustls-platform-verifier` compatibility version issue.
 - Fixed invalid fetch with NIL body encoding ([#525]).
 - Fixed freeze when sending large attachments ([#593]).
 - Fixed abusive warn logs from IMAP libs ([#552]).
@@ -959,7 +958,8 @@ Few major concepts changed:
 [core#1]: https://github.com/pimalaya/core/issues/1
 [core#10]: https://github.com/pimalaya/core/issues/10
 
-[Unreleased]: https://github.com/pimalaya/himalaya/compare/v1.1.0...HEAD
+[unreleased]: https://github.com/pimalaya/himalaya/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/pimalaya/himalaya/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/pimalaya/himalaya/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/pimalaya/himalaya/compare/v1.0.0-beta.4...v1.0.0
 [1.0.0-beta.4]: https://github.com/pimalaya/himalaya/compare/v1.0.0-beta.3...v1.0.0-beta.4

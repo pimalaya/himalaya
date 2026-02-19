@@ -1,15 +1,15 @@
 [package]
 name = "himalaya"
 description = "CLI to manage emails"
-version = "1.1.0"
-authors = ["soywod <clement.douin@posteo.net>"]
+version = "1.2.0"
+authors = ["Clément DOUIN <pimalaya.org@posteo.net>"]
 edition = "2021"
 license = "MIT"
 categories = ["command-line-utilities", "email"]
 keywords = ["cli", "email", "imap", "maildir", "smtp"]
-homepage = "https://pimalaya.org/"
-documentation = "https://github.com/pimalaya/himalaya/"
-repository = "https://github.com/pimalaya/himalaya/"
+homepage = "https://pimalaya.org"
+documentation = "https://github.com/pimalaya/himalaya"
+repository = "https://github.com/pimalaya/himalaya"
 
 [package.metadata.docs.rs]
 features = ["imap", "maildir", "smtp", "sendmail", "oauth2", "wizard", "pgp-commands", "pgp-native"]
