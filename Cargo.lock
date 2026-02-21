@@ -3176,8 +3176,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-tui"
 version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "421a00b7804b153cfe9019cddbf4f07769d98015f513d7761922627e97c712ba"
+source = "git+https://github.com/pimalaya/tui#f6dd618d74c13b95f31c25dab1a0eca0711be875"
 dependencies = [
  "async-trait",
  "clap",

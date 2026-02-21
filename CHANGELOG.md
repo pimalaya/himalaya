@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed compilation error when `wizard` feature was disabled ([#634]).
+
 ## [1.2.0] - 2026-02-19
 
 ### Added
@@ -954,6 +958,7 @@ Few major concepts changed:
 [#612]: https://github.com/pimalaya/himalaya/issues/612
 [#627]: https://github.com/pimalaya/himalaya/issues/627
 [#632]: https://github.com/pimalaya/himalaya/issues/632
+[#634]: https://github.com/pimalaya/himalaya/issues/634
 
 [core#1]: https://github.com/pimalaya/core/issues/1
 [core#10]: https://github.com/pimalaya/core/issues/10
