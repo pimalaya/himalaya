@@ -1,0 +1,94 @@
+[package]
+name = "imap-codec"
+description = "Rock-solid and complete codec for IMAP"
+keywords = ["email", "imap", "codec", "parser"]
+categories = ["email", "parser-implementations", "encoding", "network-programming"]
+version = "2.0.0-alpha.7"
+authors = ["Damian Poddebniak <poddebniak@mailbox.org>"]
+repository = "https://github.com/duesee/imap-codec"
+license = "MIT OR Apache-2.0"
+rust-version.workspace = true
+edition = "2024"
+exclude = [
+    ".github",
+]
+
+[features]
+default = ["quirk"]
+
+# Expose internal parsers for fuzzing
+fuzz = []
+
+# IMAP quirks
+#
+# These features bypass interoperability issues to allow safe processing of *almost* correct message.
+quirk = [
+    #"quirk_crlf_relaxed",
+    #"quirk_id_empty_to_nil",
+    "quirk_missing_text",
+    "quirk_rectify_numbers",
+    "quirk_excessive_space_quota_resource",
+    "quirk_trailing_space_status",
+    "quirk_trailing_space_capability",
+    "quirk_trailing_space_id",
+    "quirk_trailing_space_search",
+    "quirk_spaces_between_addresses",
+    "quirk_empty_continue_req",
+    "quirk_body_fld_enc_nil_to_empty",
+    "quirk_always_normalize_sequence_sets",
+]
+# Make `\r` in `\r\n` optional.
+quirk_crlf_relaxed = []
+# Encode `A ID ()` as `A ID NIL`
+quirk_id_empty_to_nil = []
+# Add missing `text` by adding [" "] "<missing text>".
+quirk_missing_text = []
+# Rectify (invalid) numbers.
+quirk_rectify_numbers = []
+# Accept excessive space in quota-resource
+quirk_excessive_space_quota_resource = []
+# Accept spaces between envelope addresses in `FETCH` data response.
+quirk_spaces_between_addresses = []
+# Accept a trailing space in `STATUS` data response.
+quirk_trailing_space_status = []
+# Accept a trailing space in `CAPABILITY` data response.
+quirk_trailing_space_capability = []
+# Accept a trailing space in `ID` data response.
+quirk_trailing_space_id = []
+# Accept a trailing space in `SEARCH` data response.
+quirk_trailing_space_search = []
+# Accept continuation request commands without required space `+\r\n`
+quirk_empty_continue_req = []
+# Encode NIL `body-fld-enc` as empty string.
+quirk_body_fld_enc_nil_to_empty = []
+# Always normalize sequence sets during encoding
+quirk_always_normalize_sequence_sets = []
+
+# <Forward to imap-types>
+arbitrary = ["imap-types/arbitrary"]
+arbitrary_simplified = ["imap-types/arbitrary_simplified"]
+serde = ["imap-types/serde"]
+tag_generator = ["imap-types/tag_generator"]
+
+# IMAP
+starttls = ["imap-types/starttls"]
+ext_condstore_qresync = ["imap-types/ext_condstore_qresync"]
+ext_id = ["imap-types/ext_id"]
+ext_login_referrals = ["imap-types/ext_login_referrals"]
+ext_mailbox_referrals = ["imap-types/ext_mailbox_referrals"]
+ext_metadata = ["imap-types/ext_metadata"]
+ext_namespace = ["imap-types/ext_namespace"]
+ext_utf8 = ["imap-types/ext_utf8"]
+# </Forward to imap-types>
+
+[dependencies]
+abnf-core = "0.6.0"
+base64 = { version = "0.22", default-features = false, features = ["alloc"] }
+chrono = { version = "0.4", default-features = false, features = ["alloc"] }
+imap-types = { version = "2.0.0-alpha.6", path = "../imap-types", default-features = false }
+nom = { version = "7", default-features = false }
+log = { version = "0.4.28", default-features = false }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
