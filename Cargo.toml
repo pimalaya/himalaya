@@ -16,43 +16,48 @@ features = ["imap", "maildir", "smtp", "sendmail", "oauth2", "wizard", "pgp-comm
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-default = ["imap", "maildir", "smtp", "sendmail", "wizard", "pgp-commands"]
-imap = ["email-lib/imap", "pimalaya-tui/imap"]
-maildir = ["email-lib/maildir", "pimalaya-tui/maildir"]
-notmuch = ["email-lib/notmuch", "pimalaya-tui/notmuch"]
-smtp = ["email-lib/smtp", "pimalaya-tui/smtp"]
-sendmail = ["email-lib/sendmail", "pimalaya-tui/sendmail"]
-keyring = ["email-lib/keyring", "pimalaya-tui/keyring", "secret-lib/keyring"]
-oauth2 = ["email-lib/oauth2", "pimalaya-tui/oauth2", "keyring"]
-wizard = ["email-lib/autoconfig", "pimalaya-tui/wizard"]
-pgp-commands = ["email-lib/pgp-commands", "mml-lib/pgp-commands", "pimalaya-tui/pgp-commands"]
-pgp-gpg = ["email-lib/pgp-gpg", "mml-lib/pgp-gpg", "pimalaya-tui/pgp-gpg"]
-pgp-native = ["email-lib/pgp-native", "mml-lib/pgp-native", "pimalaya-tui/pgp-native"]
+default = ["imap", "rustls-ring"]
+imap = ["dep:io-imap"]
+rustls-aws = ["dep:rustls", "dep:rustls-platform-verifier", "rustls/aws-lc-rs"]
+rustls-ring = ["dep:rustls", "dep:rustls-platform-verifier", "rustls/ring"]
+native-tls = ["pimalaya-toolbox/native-tls"]
+# maildir = ["email-lib/maildir", "pimalaya-tui/maildir"]
+# notmuch = ["email-lib/notmuch", "pimalaya-tui/notmuch"]
+# smtp = ["email-lib/smtp", "pimalaya-tui/smtp"]
+# sendmail = ["email-lib/sendmail", "pimalaya-tui/sendmail"]
+# keyring = ["email-lib/keyring", "pimalaya-tui/keyring", "secret-lib/keyring"]
+# oauth2 = ["email-lib/oauth2", "pimalaya-tui/oauth2", "keyring"]
+# wizard = ["email-lib/autoconfig", "pimalaya-tui/wizard"]
+# pgp-commands = ["email-lib/pgp-commands", "mml-lib/pgp-commands", "pimalaya-tui/pgp-commands"]
+# pgp-gpg = ["email-lib/pgp-gpg", "mml-lib/pgp-gpg", "pimalaya-tui/pgp-gpg"]
+# pgp-native = ["email-lib/pgp-native", "mml-lib/pgp-native", "pimalaya-tui/pgp-native"]
 
 [build-dependencies]
-pimalaya-tui = { version = "0.3", default-features = false, features = ["build-envs"] }
+pimalaya-toolbox = { version = "0.0.4", default-features = false, features = ["build"] }
 
 [dependencies]
+anyhow = "1"
 ariadne = { version = "0.2", features = ["auto-color"] }
 clap = { version = "4.4", features = ["derive", "env", "wrap_help"] }
-clap_complete = "4.4"
-clap_mangen = "0.2"
-color-eyre = "0.6"
-email-lib = { version = "0.27", default-features = false, features = ["tokio-rustls", "derive", "thread"] }
-mml-lib = { version = "1", default-features = false, features = ["compiler", "interpreter", "derive"]  }
-once_cell = "1.16"
-open = "5.3"
-pimalaya-tui = { version = "0.3", default-features = false, features = ["rustls", "email", "path", "cli", "himalaya", "tracing", "sled"] }
-secret-lib = { version = "1", default-features = false, features = ["tokio", "rustls", "command", "derive"] }
+# email-lib = { version = "0.27", default-features = false, features = ["tokio-rustls", "derive", "thread"] }
+# mml-lib = { version = "1", default-features = false, features = ["compiler", "interpreter", "derive"]  }
+# once_cell = "1.16"
+# open = "5.3"
+io-imap = { version = "0.0.1", default-features = false, optional = true }
+io-process = { version = "0.0.2", default-features = false }
+io-stream = { version = "0.0.2", default-features = false, features = ["std"] }
+log = "0.4"
+pimalaya-toolbox = { version = "0.0.4", default-features = false, features = ["config", "secret", "stream", "terminal", "command"] }
+rustls = { version = "0.23", default-features = false, features = ["logging", "std", "tls12"], optional = true }
+rustls-platform-verifier = { version = "0.5", optional = true }
+secrecy = "0.10"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-shellexpand-utils = "=0.2.1"
-tokio = { version = "1.23", default-features = false, features = ["macros", "rt-multi-thread"] }
-toml = "0.8"
-tracing = "0.1"
+shellexpand = "3.1"
 url = "2.2"
 uuid = { version = "1.19", features = ["v4"] }
 
 [patch.crates-io]
-pimalaya-tui.git = "https://github.com/pimalaya/tui"
-imap-client.git = "https://github.com/pimalaya/io-imap"
+pimalaya-toolbox.path = "../toolbox"
+io-imap.path = "../imap"
+io-process.path = "../process"

@@ -1,51 +1,43 @@
-mod add;
-mod delete;
-mod expunge;
+// mod add;
+// mod delete;
+// mod expunge;
 mod list;
-mod purge;
+// mod purge;
 
+use anyhow::Result;
 use clap::Subcommand;
-use color_eyre::Result;
-use pimalaya_tui::terminal::cli::printer::Printer;
+use pimalaya_toolbox::terminal::printer::Printer;
 
-use crate::config::TomlConfig;
+use crate::{account::Account, folder::command::list::ListMailboxesCommand};
 
-use self::{
-    add::FolderAddCommand, delete::FolderDeleteCommand, expunge::FolderExpungeCommand,
-    list::FolderListCommand, purge::FolderPurgeCommand,
-};
-
-/// Create, list and purge your folders (as known as mailboxes).
+/// Create, list and purge mailboxes.
 ///
-/// A folder (as known as mailbox, or directory) is a messages
-/// container. This subcommand allows you to manage them.
+/// A mailbox is a message container. This subcommand allows you to
+/// manage them.
 #[derive(Debug, Subcommand)]
-pub enum FolderSubcommand {
-    #[command(visible_alias = "create", alias = "new")]
-    Add(FolderAddCommand),
+pub enum MailboxCommand {
+    // #[command(visible_alias = "create", alias = "new")]
+    // Add(FolderAddCommand),
+    List(ListMailboxesCommand),
+    // #[command()]
+    // Expunge(FolderExpungeCommand),
 
-    #[command(alias = "lst")]
-    List(FolderListCommand),
+    // #[command()]
+    // Purge(FolderPurgeCommand),
 
-    #[command()]
-    Expunge(FolderExpungeCommand),
-
-    #[command()]
-    Purge(FolderPurgeCommand),
-
-    #[command(alias = "remove", alias = "rm")]
-    Delete(FolderDeleteCommand),
+    // #[command(alias = "remove", alias = "rm")]
+    // Delete(FolderDeleteCommand),
 }
 
-impl FolderSubcommand {
+impl MailboxCommand {
     #[allow(unused)]
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, account: Account) -> Result<()> {
         match self {
-            Self::Add(cmd) => cmd.execute(printer, config).await,
-            Self::List(cmd) => cmd.execute(printer, config).await,
-            Self::Expunge(cmd) => cmd.execute(printer, config).await,
-            Self::Purge(cmd) => cmd.execute(printer, config).await,
-            Self::Delete(cmd) => cmd.execute(printer, config).await,
+            // Self::Add(cmd) => cmd.execute(printer, config).await,
+            Self::List(cmd) => cmd.execute(printer, account),
+            // Self::Expunge(cmd) => cmd.execute(printer, config).await,
+            // Self::Purge(cmd) => cmd.execute(printer, config).await,
+            // Self::Delete(cmd) => cmd.execute(printer, config).await,
         }
     }
 }
