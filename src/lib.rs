@@ -1,7 +1,8 @@
 pub mod account;
 pub mod cli;
 pub mod config;
-pub mod folder;
+#[cfg(feature = "imap")]
+pub mod imap;
 pub mod sasl;
 pub mod stream;
 pub mod tls;

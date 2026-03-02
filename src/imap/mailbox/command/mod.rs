@@ -1,14 +1,14 @@
 // mod add;
 // mod delete;
 // mod expunge;
-mod list;
+pub mod list;
 // mod purge;
 
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_toolbox::terminal::printer::Printer;
 
-use crate::{account::Account, folder::command::list::ListMailboxesCommand};
+use crate::{account::Account, imap::mailbox::command::list::ListMailboxesCommand};
 
 /// Create, list and purge mailboxes.
 ///
