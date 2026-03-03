@@ -2,7 +2,10 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_toolbox::terminal::printer::Printer;
 
-use crate::{config::ImapConfig, imap::mailbox::command::MailboxCommand};
+use crate::{
+    config::ImapConfig,
+    imap::{flag::command::FlagCommand, mailbox::command::MailboxCommand},
+};
 
 /// IMAP CLI (requires `imap` cargo feature).
 ///
@@ -13,6 +16,8 @@ use crate::{config::ImapConfig, imap::mailbox::command::MailboxCommand};
 #[command(rename_all = "lowercase")]
 pub enum ImapCommand {
     #[command(subcommand)]
+    Flags(FlagCommand),
+    #[command(subcommand)]
     #[command(aliases = ["mboxes", "mbox"])]
     Mailboxes(MailboxCommand),
 }
@@ -20,6 +25,7 @@ pub enum ImapCommand {
 impl ImapCommand {
     pub fn execute(self, printer: &mut impl Printer, config: ImapConfig) -> Result<()> {
         match self {
+            Self::Flags(cmd) => cmd.execute(printer, config),
             Self::Mailboxes(cmd) => cmd.execute(printer, config),
         }
     }
