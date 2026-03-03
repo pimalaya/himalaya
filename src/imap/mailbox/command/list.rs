@@ -4,41 +4,52 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use comfy_table::{presets, Cell, ContentArrangement, Row, Table};
 use crossterm::style::Color;
-use io_imap::coroutines::list::*;
+use io_imap::coroutines::{list::*, lsub::*};
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::{Serialize, Serializer};
 
 use crate::{config::ImapConfig, imap::stream};
 
-/// List all mailboxes.
+/// List mailboxes.
 ///
-/// This command allows you to list all exsting mailboxes from your
-/// IMAP account.
+/// This command allows you to list mailboxes from your IMAP account.
+/// By default, only subscribed mailboxes are listed. Use --all to
+/// list all mailboxes.
 #[derive(Debug, Parser)]
 pub struct ListMailboxesCommand {
-    // /// The maximum width the table should not exceed.
-    // ///
-    // /// This argument will force the table not to exceed the given
-    // /// width, in pixels. Columns may shrink with ellipsis in order to
-    // /// fit the width.
-    // #[arg(long = "max-width", short = 'w')]
-    // #[arg(name = "table_max_width", value_name = "PIXELS")]
-    // pub table_max_width: Option<u16>,
+    /// List all mailboxes, not just subscribed ones.
+    #[arg(short = 'A', long)]
+    pub all: bool,
 }
 
 impl ListMailboxesCommand {
     pub fn execute(self, printer: &mut impl Printer, config: ImapConfig) -> Result<()> {
         let (context, mut stream) = stream::connect(config)?;
 
-        let mut arg = None;
-        let mut coroutine = ImapList::new(context, "".try_into().unwrap(), "*".try_into().unwrap());
+        let mailboxes = if self.all {
+            let mut arg = None;
+            let mut coroutine =
+                ImapList::new(context, "".try_into().unwrap(), "*".try_into().unwrap());
 
-        let mailboxes = loop {
-            match coroutine.resume(arg.take()) {
-                ImapListResult::Io(io) => arg = Some(handle(&mut stream, io)?),
-                ImapListResult::Ok { mailboxes, .. } => break mailboxes,
-                ImapListResult::Err { err, .. } => bail!(err),
+            loop {
+                match coroutine.resume(arg.take()) {
+                    ImapListResult::Io(io) => arg = Some(handle(&mut stream, io)?),
+                    ImapListResult::Ok { mailboxes, .. } => break mailboxes,
+                    ImapListResult::Err { err, .. } => bail!(err),
+                }
+            }
+        } else {
+            let mut arg = None;
+            let mut coroutine =
+                ImapLsub::new(context, "".try_into().unwrap(), "*".try_into().unwrap());
+
+            loop {
+                match coroutine.resume(arg.take()) {
+                    ImapLsubResult::Io(io) => arg = Some(handle(&mut stream, io)?),
+                    ImapLsubResult::Ok { mailboxes, .. } => break mailboxes,
+                    ImapLsubResult::Err { err, .. } => bail!(err),
+                }
             }
         };
 
