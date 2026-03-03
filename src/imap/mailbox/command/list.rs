@@ -21,16 +21,26 @@ pub struct ListMailboxesCommand {
     /// List all mailboxes, not just subscribed ones.
     #[arg(short = 'A', long)]
     pub all: bool,
+
+    /// The reference name for the LIST/LSUB command.
+    #[arg(short, long, default_value = "")]
+    pub reference: String,
+
+    /// The mailbox name pattern with wildcards (* and %).
+    #[arg(short, long, default_value = "*")]
+    pub pattern: String,
 }
 
 impl ListMailboxesCommand {
     pub fn execute(self, printer: &mut impl Printer, config: ImapConfig) -> Result<()> {
         let (context, mut stream) = stream::connect(config)?;
 
+        let reference = self.reference.try_into()?;
+        let pattern = self.pattern.try_into()?;
+
         let mailboxes = if self.all {
             let mut arg = None;
-            let mut coroutine =
-                ImapList::new(context, "".try_into().unwrap(), "*".try_into().unwrap());
+            let mut coroutine = ImapList::new(context, reference, pattern);
 
             loop {
                 match coroutine.resume(arg.take()) {
@@ -41,8 +51,7 @@ impl ListMailboxesCommand {
             }
         } else {
             let mut arg = None;
-            let mut coroutine =
-                ImapLsub::new(context, "".try_into().unwrap(), "*".try_into().unwrap());
+            let mut coroutine = ImapLsub::new(context, reference, pattern);
 
             loop {
                 match coroutine.resume(arg.take()) {
