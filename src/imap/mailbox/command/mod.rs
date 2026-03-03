@@ -8,7 +8,7 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_toolbox::terminal::printer::Printer;
 
-use crate::{account::Account, imap::mailbox::command::list::ListMailboxesCommand};
+use crate::{config::ImapConfig, imap::mailbox::command::list::ListMailboxesCommand};
 
 /// Create, list and purge mailboxes.
 ///
@@ -31,10 +31,10 @@ pub enum MailboxCommand {
 
 impl MailboxCommand {
     #[allow(unused)]
-    pub fn execute(self, printer: &mut impl Printer, account: Account) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, config: ImapConfig) -> Result<()> {
         match self {
             // Self::Add(cmd) => cmd.execute(printer, config).await,
-            Self::List(cmd) => cmd.execute(printer, account),
+            Self::List(cmd) => cmd.execute(printer, config),
             // Self::Expunge(cmd) => cmd.execute(printer, config).await,
             // Self::Purge(cmd) => cmd.execute(printer, config).await,
             // Self::Delete(cmd) => cmd.execute(printer, config).await,

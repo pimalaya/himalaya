@@ -1,13 +1,13 @@
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
 use pimalaya_toolbox::{
     config::TomlConfig,
     long_version,
     terminal::{
         clap::{
-            args::{AccountArg, JsonFlag, LogFlags},
+            args::{AccountFlag, JsonFlag, LogFlags},
             parsers::path_parser,
         },
         printer::Printer,
@@ -41,7 +41,7 @@ pub struct HimalayaCli {
     #[arg(value_name = "PATH", value_parser = path_parser, value_delimiter = ':')]
     pub config_paths: Vec<PathBuf>,
     #[command(flatten)]
-    pub account: AccountArg,
+    pub account: AccountFlag,
     #[command(flatten)]
     pub json: JsonFlag,
     #[command(flatten)]
@@ -65,8 +65,12 @@ impl BackendCommand {
         match self {
             Self::Imap(cmd) => {
                 let config = Config::from_paths_or_default(config_paths)?;
-                let (_, account) = config.get_account(account_name)?;
-                cmd.execute(printer, account)
+                let (_, account_config) = config.get_account(account_name)?;
+                let Some(imap_config) = account_config.imap else {
+                    bail!("IMAP config is missing for this account")
+                };
+
+                cmd.execute(printer, imap_config)
             }
         }
     }
