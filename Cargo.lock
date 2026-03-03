@@ -583,6 +583,7 @@ version = "1.2.0"
 dependencies = [
  "anyhow",
  "ariadne",
+ "chrono",
  "clap",
  "comfy-table",
  "crossterm 0.27.0",

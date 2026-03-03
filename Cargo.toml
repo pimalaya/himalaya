@@ -38,6 +38,7 @@ pimalaya-toolbox = { version = "0.0.4", default-features = false, features = ["b
 [dependencies]
 anyhow = "1"
 ariadne = { version = "0.2", features = ["auto-color"] }
+chrono = { version = "0.4", default-features = false }
 clap = { version = "4.4", features = ["derive", "env", "wrap_help"] }
 comfy-table = "7"
 crossterm = { version = "0.27", features = ["serde"] }
