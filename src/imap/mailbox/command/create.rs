@@ -27,7 +27,7 @@ impl CreateMailboxCommand {
 
         loop {
             match coroutine.resume(arg.take()) {
-                ImapCreateResult::Io(io) => arg = Some(handle(&mut stream, io)?),
+                ImapCreateResult::Io { io } => arg = Some(handle(&mut stream, io)?),
                 ImapCreateResult::Ok { .. } => break,
                 ImapCreateResult::Err { err, .. } => bail!(err),
             }

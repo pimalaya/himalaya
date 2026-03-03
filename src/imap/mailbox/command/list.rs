@@ -34,7 +34,7 @@ impl ListMailboxesCommand {
 
             loop {
                 match coroutine.resume(arg.take()) {
-                    ImapListResult::Io(io) => arg = Some(handle(&mut stream, io)?),
+                    ImapListResult::Io { io } => arg = Some(handle(&mut stream, io)?),
                     ImapListResult::Ok { mailboxes, .. } => break mailboxes,
                     ImapListResult::Err { err, .. } => bail!(err),
                 }
@@ -46,7 +46,7 @@ impl ListMailboxesCommand {
 
             loop {
                 match coroutine.resume(arg.take()) {
-                    ImapLsubResult::Io(io) => arg = Some(handle(&mut stream, io)?),
+                    ImapLsubResult::Io { io } => arg = Some(handle(&mut stream, io)?),
                     ImapLsubResult::Ok { mailboxes, .. } => break mailboxes,
                     ImapLsubResult::Err { err, .. } => bail!(err),
                 }

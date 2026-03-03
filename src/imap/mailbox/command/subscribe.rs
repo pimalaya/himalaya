@@ -27,7 +27,7 @@ impl SubscribeMailboxCommand {
 
         loop {
             match coroutine.resume(arg.take()) {
-                ImapSubscribeResult::Io(io) => arg = Some(handle(&mut stream, io)?),
+                ImapSubscribeResult::Io { io } => arg = Some(handle(&mut stream, io)?),
                 ImapSubscribeResult::Ok { .. } => break,
                 ImapSubscribeResult::Err { err, .. } => bail!(err),
             }

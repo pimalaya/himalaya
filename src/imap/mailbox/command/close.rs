@@ -23,7 +23,7 @@ impl CloseMailboxCommand {
 
         loop {
             match close_coroutine.resume(arg.take()) {
-                ImapCloseResult::Io(io) => arg = Some(handle(&mut stream, io)?),
+                ImapCloseResult::Io { io } => arg = Some(handle(&mut stream, io)?),
                 ImapCloseResult::Ok { .. } => break,
                 ImapCloseResult::Err { err, .. } => bail!(err),
             }

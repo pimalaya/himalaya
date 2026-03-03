@@ -39,7 +39,7 @@ impl StatusMailboxCommand {
 
         let items = loop {
             match coroutine.resume(arg.take()) {
-                ImapStatusResult::Io(io) => arg = Some(handle(&mut stream, io)?),
+                ImapStatusResult::Io { io } => arg = Some(handle(&mut stream, io)?),
                 ImapStatusResult::Ok { items, .. } => break items,
                 ImapStatusResult::Err { err, .. } => bail!(err),
             }

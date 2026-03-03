@@ -34,7 +34,7 @@ impl RenameMailboxCommand {
 
         loop {
             match coroutine.resume(arg.take()) {
-                ImapRenameResult::Io(io) => arg = Some(handle(&mut stream, io)?),
+                ImapRenameResult::Io { io } => arg = Some(handle(&mut stream, io)?),
                 ImapRenameResult::Ok { .. } => break,
                 ImapRenameResult::Err { err, .. } => bail!(err),
             }

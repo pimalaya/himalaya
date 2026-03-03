@@ -27,7 +27,7 @@ impl UnsubscribeMailboxCommand {
 
         loop {
             match coroutine.resume(arg.take()) {
-                ImapUnsubscribeResult::Io(io) => arg = Some(handle(&mut stream, io)?),
+                ImapUnsubscribeResult::Io { io } => arg = Some(handle(&mut stream, io)?),
                 ImapUnsubscribeResult::Ok { .. } => break,
                 ImapUnsubscribeResult::Err { err, .. } => bail!(err),
             }

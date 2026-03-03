@@ -27,7 +27,7 @@ impl DeleteMailboxCommand {
 
         loop {
             match coroutine.resume(arg.take()) {
-                ImapDeleteResult::Io(io) => arg = Some(handle(&mut stream, io)?),
+                ImapDeleteResult::Io { io } => arg = Some(handle(&mut stream, io)?),
                 ImapDeleteResult::Ok { .. } => break,
                 ImapDeleteResult::Err { err, .. } => bail!(err),
             }

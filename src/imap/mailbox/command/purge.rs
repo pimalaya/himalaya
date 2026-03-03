@@ -34,7 +34,7 @@ impl PurgeMailboxCommand {
 
         let context = loop {
             match coroutine.resume(arg.take()) {
-                ImapSelectResult::Io(io) => arg = Some(handle(&mut stream, io)?),
+                ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
                 ImapSelectResult::Ok { context, .. } => break context,
                 ImapSelectResult::Err { err, .. } => bail!(err),
             }
@@ -53,7 +53,7 @@ impl PurgeMailboxCommand {
 
         let context = loop {
             match coroutine.resume(arg.take()) {
-                ImapStoreSilentResult::Io(io) => arg = Some(handle(&mut stream, io)?),
+                ImapStoreSilentResult::Io { io } => arg = Some(handle(&mut stream, io)?),
                 ImapStoreSilentResult::Ok { context, .. } => break context,
                 ImapStoreSilentResult::Err { err, .. } => bail!(err),
             }
@@ -65,7 +65,7 @@ impl PurgeMailboxCommand {
 
         loop {
             match coroutine.resume(arg.take()) {
-                ImapExpungeResult::Io(io) => arg = Some(handle(&mut stream, io)?),
+                ImapExpungeResult::Io { io } => arg = Some(handle(&mut stream, io)?),
                 ImapExpungeResult::Ok { .. } => break,
                 ImapExpungeResult::Err { err, .. } => bail!(err),
             }

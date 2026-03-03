@@ -28,7 +28,7 @@ impl UnselectMailboxCommand {
 
         let context = loop {
             match select_coroutine.resume(arg.take()) {
-                ImapSelectResult::Io(io) => arg = Some(handle(&mut stream, io)?),
+                ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
                 ImapSelectResult::Ok { context, .. } => break context,
                 ImapSelectResult::Err { err, .. } => bail!(err),
             }
@@ -40,7 +40,7 @@ impl UnselectMailboxCommand {
 
         loop {
             match unselect_coroutine.resume(arg.take()) {
-                ImapUnselectResult::Io(io) => arg = Some(handle(&mut stream, io)?),
+                ImapUnselectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
                 ImapUnselectResult::Ok { .. } => break,
                 ImapUnselectResult::Err { err, .. } => bail!(err),
             }

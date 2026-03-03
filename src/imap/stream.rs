@@ -96,7 +96,7 @@ pub fn connect(mut config: ImapConfig) -> Result<(ImapContext, Stream)> {
 
             loop {
                 match coroutine.resume(arg.take()) {
-                    GetImapGreetingWithCapabilityResult::Io(io) => {
+                    GetImapGreetingWithCapabilityResult::Io { io } => {
                         arg = Some(handle(&mut stream, io)?)
                     }
                     GetImapGreetingWithCapabilityResult::Ok { context: c } => break context = c,
@@ -116,7 +116,7 @@ pub fn connect(mut config: ImapConfig) -> Result<(ImapContext, Stream)> {
 
                 loop {
                     match coroutine.resume(arg.take()) {
-                        ImapStartTlsResult::Io(io) => arg = Some(handle(&mut stream, io)?),
+                        ImapStartTlsResult::Io { io } => arg = Some(handle(&mut stream, io)?),
                         ImapStartTlsResult::Ok { context: c } => break context = c,
                         ImapStartTlsResult::Err { err, .. } => Err(err)?,
                     }
@@ -247,7 +247,7 @@ pub fn connect(mut config: ImapConfig) -> Result<(ImapContext, Stream)> {
 
                 loop {
                     match coroutine.resume(arg.take()) {
-                        GetImapCapabilityResult::Io(io) => arg = Some(handle(&mut stream, io)?),
+                        GetImapCapabilityResult::Io { io } => arg = Some(handle(&mut stream, io)?),
                         GetImapCapabilityResult::Ok { context: c } => break context = c,
                         GetImapCapabilityResult::Err { err, .. } => Err(err)?,
                     }
@@ -258,7 +258,7 @@ pub fn connect(mut config: ImapConfig) -> Result<(ImapContext, Stream)> {
 
                 loop {
                     match coroutine.resume(arg.take()) {
-                        GetImapGreetingWithCapabilityResult::Io(io) => {
+                        GetImapGreetingWithCapabilityResult::Io { io } => {
                             arg = Some(handle(&mut stream, io)?)
                         }
                         GetImapGreetingWithCapabilityResult::Ok { context: c } => {
@@ -280,7 +280,7 @@ pub fn connect(mut config: ImapConfig) -> Result<(ImapContext, Stream)> {
 
             loop {
                 match coroutine.resume(arg.take()) {
-                    GetImapGreetingWithCapabilityResult::Io(io) => {
+                    GetImapGreetingWithCapabilityResult::Io { io } => {
                         arg = Some(handle(&mut stream, io)?)
                     }
                     GetImapGreetingWithCapabilityResult::Ok { context: c } => break context = c,
@@ -367,7 +367,7 @@ pub fn connect(mut config: ImapConfig) -> Result<(ImapContext, Stream)> {
 
         loop {
             match coroutine.resume(arg.take()) {
-                ImapAuthenticateResult::Io(io) => arg = Some(handle(&mut stream, io)?),
+                ImapAuthenticateResult::Io { io } => arg = Some(handle(&mut stream, io)?),
                 ImapAuthenticateResult::Ok { context: c, .. } => break context = c,
                 ImapAuthenticateResult::Err { err, .. } => bail!(err),
             }
