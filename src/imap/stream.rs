@@ -1,9 +1,10 @@
+#[cfg(unix)]
+use std::os::unix::net::UnixStream;
 use std::{
     fs,
     io::{self, Read, Write},
     net::TcpStream,
     sync::Arc,
-    time::Duration,
 };
 
 use anyhow::{bail, Result};
@@ -28,33 +29,25 @@ use rustls::{
 };
 #[cfg(any(feature = "rustls-aws", feature = "rustls-ring"))]
 use rustls_platform_verifier::{ConfigVerifierExt, Verifier};
+#[cfg(windows)]
+use uds_windows::UnixStream;
 
 use crate::config::{ImapConfig, RustlsCryptoConfig, SaslMechanismConfig, TlsProviderConfig};
 
 pub enum Stream {
-    Plain(TcpStream),
+    Tcp(TcpStream),
+    Unix(UnixStream),
     #[cfg(any(feature = "rustls-aws", feature = "rustls-ring"))]
     Rustls(StreamOwned<ClientConnection, TcpStream>),
     #[cfg(feature = "native-tls")]
     NativeTls(native_tls::TlsStream<TcpStream>),
 }
 
-impl Stream {
-    pub fn set_read_timeout(&self, dur: Option<Duration>) -> io::Result<()> {
-        match self {
-            Self::Plain(s) => s.set_read_timeout(dur),
-            #[cfg(any(feature = "rustls-aws", feature = "rustls-ring"))]
-            Self::Rustls(s) => s.get_ref().set_read_timeout(dur),
-            #[cfg(feature = "native-tls")]
-            Self::NativeTls(s) => s.get_ref().set_read_timeout(dur),
-        }
-    }
-}
-
 impl Read for Stream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match self {
-            Self::Plain(s) => s.read(buf),
+            Self::Tcp(s) => s.read(buf),
+            Self::Unix(s) => s.read(buf),
             #[cfg(any(feature = "rustls-aws", feature = "rustls-ring"))]
             Self::Rustls(s) => s.read(buf),
             #[cfg(feature = "native-tls")]
@@ -66,7 +59,8 @@ impl Read for Stream {
 impl Write for Stream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match self {
-            Self::Plain(s) => s.write(buf),
+            Self::Tcp(s) => s.write(buf),
+            Self::Unix(s) => s.write(buf),
             #[cfg(any(feature = "rustls-aws", feature = "rustls-ring"))]
             Self::Rustls(s) => s.write(buf),
             #[cfg(feature = "native-tls")]
@@ -76,7 +70,8 @@ impl Write for Stream {
 
     fn flush(&mut self) -> io::Result<()> {
         match self {
-            Self::Plain(s) => s.flush(),
+            Self::Tcp(s) => s.flush(),
+            Self::Unix(s) => s.flush(),
             #[cfg(any(feature = "rustls-aws", feature = "rustls-ring"))]
             Self::Rustls(s) => s.flush(),
             #[cfg(feature = "native-tls")]
@@ -109,11 +104,11 @@ pub fn connect(mut config: ImapConfig) -> Result<(ImapContext, Stream)> {
                 }
             }
 
-            (context, Stream::Plain(stream))
+            (context, Stream::Tcp(stream))
         }
         scheme if scheme.eq_ignore_ascii_case("imaps") => {
             let port = config.url.port().unwrap_or(993);
-            let mut tcp = TcpStream::connect((host, port))?;
+            let mut stream = TcpStream::connect((host, port))?;
 
             if config.starttls {
                 let mut coroutine = ImapStartTls::new(context);
@@ -121,7 +116,7 @@ pub fn connect(mut config: ImapConfig) -> Result<(ImapContext, Stream)> {
 
                 loop {
                     match coroutine.resume(arg.take()) {
-                        ImapStartTlsResult::Io(io) => arg = Some(handle(&mut tcp, io)?),
+                        ImapStartTlsResult::Io(io) => arg = Some(handle(&mut stream, io)?),
                         ImapStartTlsResult::Ok { context: c } => break context = c,
                         ImapStartTlsResult::Err { err, .. } => Err(err)?,
                     }
@@ -226,7 +221,7 @@ pub fn connect(mut config: ImapConfig) -> Result<(ImapContext, Stream)> {
 
                     let server_name = host.to_string().try_into()?;
                     let conn = ClientConnection::new(Arc::new(config), server_name)?;
-                    Stream::Rustls(StreamOwned::new(conn, tcp))
+                    Stream::Rustls(StreamOwned::new(conn, stream))
                 }
                 #[cfg(feature = "native-tls")]
                 TlsProviderConfig::NativeTls => {
@@ -240,7 +235,7 @@ pub fn connect(mut config: ImapConfig) -> Result<(ImapContext, Stream)> {
                     }
 
                     let connector = builder.build()?;
-                    Stream::NativeTls(connector.connect(host, tcp)?)
+                    Stream::NativeTls(connector.connect(host, stream)?)
                 }
                 #[allow(unreachable_patterns)]
                 _ => unreachable!(),
@@ -277,7 +272,23 @@ pub fn connect(mut config: ImapConfig) -> Result<(ImapContext, Stream)> {
             (context, stream)
         }
         scheme if scheme.eq_ignore_ascii_case("unix") => {
-            todo!()
+            let sock_path = config.url.path();
+            let mut stream = UnixStream::connect(&sock_path)?;
+
+            let mut coroutine = GetImapGreetingWithCapability::new(context);
+            let mut arg = None;
+
+            loop {
+                match coroutine.resume(arg.take()) {
+                    GetImapGreetingWithCapabilityResult::Io(io) => {
+                        arg = Some(handle(&mut stream, io)?)
+                    }
+                    GetImapGreetingWithCapabilityResult::Ok { context: c } => break context = c,
+                    GetImapGreetingWithCapabilityResult::Err { err, .. } => Err(err)?,
+                }
+            }
+
+            (context, Stream::Unix(stream))
         }
         scheme => {
             bail!("Unknown scheme {scheme}, expected imap, imaps or unix");

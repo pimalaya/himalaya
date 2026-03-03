@@ -39,10 +39,8 @@ pimalaya-toolbox = { version = "0.0.4", default-features = false, features = ["b
 anyhow = "1"
 ariadne = { version = "0.2", features = ["auto-color"] }
 clap = { version = "4.4", features = ["derive", "env", "wrap_help"] }
-# email-lib = { version = "0.27", default-features = false, features = ["tokio-rustls", "derive", "thread"] }
-# mml-lib = { version = "1", default-features = false, features = ["compiler", "interpreter", "derive"]  }
-# once_cell = "1.16"
-# open = "5.3"
+comfy-table = "7"
+crossterm = { version = "0.27", features = ["serde"] }
 io-imap = { version = "0.0.1", default-features = false, optional = true }
 io-process = { version = "0.0.2", default-features = false }
 io-stream = { version = "0.0.2", default-features = false, features = ["std"] }
@@ -57,6 +55,9 @@ serde_json = "1"
 shellexpand = "3.1"
 url = { version = "2.2", features = ["serde"] }
 uuid = { version = "1.19", features = ["v4"] }
+
+[target.'cfg(windows)'.dependencies]
+uds_windows = "1"
 
 [patch.crates-io]
 pimalaya-toolbox.path = "../toolbox"
