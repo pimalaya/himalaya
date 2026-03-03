@@ -1,14 +1,20 @@
-// mod add;
-// mod delete;
-// mod expunge;
+pub mod create;
+pub mod delete;
+pub mod expunge;
 pub mod list;
-// mod purge;
+pub mod purge;
 
 use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_toolbox::terminal::printer::Printer;
 
-use crate::{config::ImapConfig, imap::mailbox::command::list::ListMailboxesCommand};
+use crate::{
+    config::ImapConfig,
+    imap::mailbox::command::{
+        create::CreateMailboxCommand, delete::DeleteMailboxCommand,
+        expunge::ExpungeMailboxCommand, list::ListMailboxesCommand, purge::PurgeMailboxCommand,
+    },
+};
 
 /// Create, list and purge mailboxes.
 ///
@@ -16,28 +22,23 @@ use crate::{config::ImapConfig, imap::mailbox::command::list::ListMailboxesComma
 /// manage them.
 #[derive(Debug, Subcommand)]
 pub enum MailboxCommand {
-    // #[command(visible_alias = "create", alias = "new")]
-    // Add(FolderAddCommand),
+    #[command(alias = "add", alias = "new")]
+    Create(CreateMailboxCommand),
+    #[command(alias = "remove", alias = "rm")]
+    Delete(DeleteMailboxCommand),
+    Expunge(ExpungeMailboxCommand),
     List(ListMailboxesCommand),
-    // #[command()]
-    // Expunge(FolderExpungeCommand),
-
-    // #[command()]
-    // Purge(FolderPurgeCommand),
-
-    // #[command(alias = "remove", alias = "rm")]
-    // Delete(FolderDeleteCommand),
+    Purge(PurgeMailboxCommand),
 }
 
 impl MailboxCommand {
-    #[allow(unused)]
     pub fn execute(self, printer: &mut impl Printer, config: ImapConfig) -> Result<()> {
         match self {
-            // Self::Add(cmd) => cmd.execute(printer, config).await,
+            Self::Create(cmd) => cmd.execute(printer, config),
+            Self::Delete(cmd) => cmd.execute(printer, config),
+            Self::Expunge(cmd) => cmd.execute(printer, config),
             Self::List(cmd) => cmd.execute(printer, config),
-            // Self::Expunge(cmd) => cmd.execute(printer, config).await,
-            // Self::Purge(cmd) => cmd.execute(printer, config).await,
-            // Self::Delete(cmd) => cmd.execute(printer, config).await,
+            Self::Purge(cmd) => cmd.execute(printer, config),
         }
     }
 }

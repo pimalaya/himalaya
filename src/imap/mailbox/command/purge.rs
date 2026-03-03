@@ -1,70 +1,76 @@
-use std::{process, sync::Arc};
-
+use anyhow::{bail, Result};
 use clap::Parser;
-use color_eyre::Result;
-use email::{backend::feature::BackendFeatureSource, config::Config, folder::purge::PurgeFolder};
-use pimalaya_tui::{
-    himalaya::backend::BackendBuilder,
-    terminal::{cli::printer::Printer, config::TomlConfig as _, prompt},
+use io_imap::{
+    coroutines::{expunge::*, select::*, store::*},
+    types::{
+        flag::{Flag, StoreType},
+        sequence::SequenceSet,
+    },
 };
-use tracing::info;
+use io_stream::runtimes::std::handle;
+use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
-use crate::{
-    account::arg::name::AccountNameFlag, config::TomlConfig, folder::arg::name::FolderNameArg,
-};
+use crate::{config::ImapConfig, imap::mailbox::arg::name::MailboxNameArg, imap::stream};
 
-/// Purge the given folder.
+/// Purge the given mailbox.
 ///
-/// All emails from the given folder are definitely deleted. The
-/// purged folder will remain empty after execution of the command.
+/// All emails from the given mailbox are definitely deleted. The
+/// purged mailbox will remain empty after execution of the command.
 #[derive(Debug, Parser)]
-pub struct FolderPurgeCommand {
+pub struct PurgeMailboxCommand {
     #[command(flatten)]
-    pub folder: FolderNameArg,
-
-    #[command(flatten)]
-    pub account: AccountNameFlag,
-
-    #[arg(long, short)]
-    pub yes: bool,
+    pub mailbox: MailboxNameArg,
 }
 
-impl FolderPurgeCommand {
-    pub async fn execute(self, printer: &mut impl Printer, config: &TomlConfig) -> Result<()> {
-        info!("executing purge folder command");
+impl PurgeMailboxCommand {
+    pub fn execute(self, printer: &mut impl Printer, config: ImapConfig) -> Result<()> {
+        let (context, mut stream) = stream::connect(config)?;
 
-        let folder = &self.folder.name;
+        let mailbox = self.mailbox.name.try_into()?;
 
-        if !self.yes {
-            let confirm = format!("Do you really want to purge the folder {folder}");
-            let confirm = format!("{confirm}? All emails will be definitely deleted.");
+        // First, select the mailbox
+        let mut arg = None;
+        let mut coroutine = ImapSelect::new(context, mailbox);
 
-            if !prompt::bool(confirm, false)? {
-                process::exit(0);
-            };
+        let context = loop {
+            match coroutine.resume(arg.take()) {
+                ImapSelectResult::Io(io) => arg = Some(handle(&mut stream, io)?),
+                ImapSelectResult::Ok { context, .. } => break context,
+                ImapSelectResult::Err { err, .. } => bail!(err),
+            }
         };
 
-        let (toml_account_config, account_config) = config
-            .clone()
-            .into_account_configs(self.account.name.as_deref(), |c: &Config, name| {
-                c.account(name).ok()
-            })?;
+        // Then, mark all messages as deleted (1:*)
+        let mut arg = None;
+        let sequence_set: SequenceSet = "1:*".try_into()?;
+        let mut coroutine = ImapStoreSilent::new(
+            context,
+            sequence_set,
+            StoreType::Add,
+            vec![Flag::Deleted],
+            false,
+        );
 
-        let backend = BackendBuilder::new(
-            Arc::new(toml_account_config),
-            Arc::new(account_config),
-            |builder| {
-                builder
-                    .without_features()
-                    .with_purge_folder(BackendFeatureSource::Context)
-            },
-        )
-        .without_sending_backend()
-        .build()
-        .await?;
+        let context = loop {
+            match coroutine.resume(arg.take()) {
+                ImapStoreSilentResult::Io(io) => arg = Some(handle(&mut stream, io)?),
+                ImapStoreSilentResult::Ok { context, .. } => break context,
+                ImapStoreSilentResult::Err { err, .. } => bail!(err),
+            }
+        };
 
-        backend.purge_folder(folder).await?;
+        // Finally, expunge the mailbox
+        let mut arg = None;
+        let mut coroutine = ImapExpunge::new(context);
 
-        printer.out(format!("Folder {folder} successfully purged!\n"))
+        loop {
+            match coroutine.resume(arg.take()) {
+                ImapExpungeResult::Io(io) => arg = Some(handle(&mut stream, io)?),
+                ImapExpungeResult::Ok { .. } => break,
+                ImapExpungeResult::Err { err, .. } => bail!(err),
+            }
+        }
+
+        printer.out(Message::new("Mailbox successfully purged"))
     }
 }
