@@ -6,7 +6,7 @@ use crate::{
     config::ImapConfig,
     imap::{
         envelope::command::EnvelopeCommand, flag::command::FlagCommand,
-        mailbox::command::MailboxCommand,
+        mailbox::command::MailboxCommand, message::command::MessageCommand,
     },
 };
 
@@ -26,6 +26,9 @@ pub enum ImapCommand {
     #[command(subcommand)]
     #[command(aliases = ["mboxes", "mbox"])]
     Mailboxes(MailboxCommand),
+    #[command(subcommand)]
+    #[command(aliases = ["message", "msg"])]
+    Messages(MessageCommand),
 }
 
 impl ImapCommand {
@@ -34,6 +37,7 @@ impl ImapCommand {
             Self::Envelopes(cmd) => cmd.execute(printer, config),
             Self::Flags(cmd) => cmd.execute(printer, config),
             Self::Mailboxes(cmd) => cmd.execute(printer, config),
+            Self::Messages(cmd) => cmd.execute(printer, config),
         }
     }
 }
