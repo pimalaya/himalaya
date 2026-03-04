@@ -17,7 +17,9 @@ use serde::{Serialize, Serializer};
 use crate::{
     config::ImapConfig,
     imap::{
-        envelope::command::search::parse_query, mailbox::arg::name::MailboxNameOptionalArg, stream,
+        envelope::command::{list::decode_mime, search::parse_query},
+        mailbox::arg::name::MailboxNameOptionalArg,
+        stream,
     },
 };
 
@@ -188,7 +190,7 @@ fn fetch_subjects(
                 MessageDataItem::Envelope(env) => {
                     // NString wraps Option<IString>, access via .0
                     if let Some(s) = &env.subject.0 {
-                        subject = String::from_utf8_lossy(s.as_ref()).to_string();
+                        subject = decode_mime(&String::from_utf8_lossy(s.as_ref()));
                     }
                 }
                 _ => {}

@@ -46,6 +46,7 @@ io-imap = { version = "0.0.1", default-features = false, optional = true }
 io-process = { version = "0.0.2", default-features = false }
 io-stream = { version = "0.0.2", default-features = false, features = ["std"] }
 log = "0.4"
+rfc2047-decoder = "1"
 native-tls = { version = "0.2", optional = true }
 pimalaya-toolbox = { version = "0.0.4", default-features = false, features = ["config", "terminal", "secret", "command"] }
 rustls = { version = "0.23", default-features = false, optional = true }

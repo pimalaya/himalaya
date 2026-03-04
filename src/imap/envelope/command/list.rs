@@ -7,15 +7,30 @@ use io_imap::{
     coroutines::{fetch::*, select::*},
     types::{
         core::Vec1,
+        envelope::Address,
         fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
         sequence::SequenceSet,
     },
 };
 use io_stream::runtimes::std::handle;
+use log::debug;
 use pimalaya_toolbox::terminal::printer::Printer;
+use rfc2047_decoder::{Decoder, RecoverStrategy};
 use serde::{Serialize, Serializer};
 
 use crate::{config::ImapConfig, imap::mailbox::arg::name::MailboxNameOptionalArg, imap::stream};
+
+/// Decode RFC 2047 MIME-encoded string, falling back to original on error.
+pub fn decode_mime(s: &str) -> String {
+    let decoder = Decoder::new().too_long_encoded_word_strategy(RecoverStrategy::Decode);
+    match decoder.decode(s.as_bytes()) {
+        Ok(s) => s,
+        Err(err) => {
+            debug!("cannot decode rfc2047 string `{s}`: {err}");
+            s.to_string()
+        }
+    }
+}
 
 /// List message envelopes in a mailbox.
 ///
@@ -58,9 +73,8 @@ impl ListEnvelopesCommand {
         let sequence_set: SequenceSet = self.sequence.parse()?;
 
         // FETCH envelopes
-        let item_names = MacroOrMessageDataItemNames::MessageDataItemNames(vec![
-            MessageDataItemName::Envelope,
-        ]);
+        let item_names =
+            MacroOrMessageDataItemNames::MessageDataItemNames(vec![MessageDataItemName::Envelope]);
 
         let mut arg = None;
         let mut coroutine = ImapFetch::new(context, sequence_set, item_names, self.uid);
@@ -119,9 +133,9 @@ impl EnvelopesTable {
                                 date = String::from_utf8_lossy(d.as_ref()).to_string();
                             }
                             if let Some(s) = &env.subject.0 {
-                                subject = String::from_utf8_lossy(s.as_ref()).to_string();
+                                subject = decode_mime(String::from_utf8_lossy(s.as_ref()).as_ref());
                             }
-                            from = format_addresses(&env.from);
+                            from = format_addresses_short(&env.from);
                         }
                         _ => {}
                     }
@@ -138,10 +152,7 @@ impl EnvelopesTable {
 
         entries.sort_by_key(|e| e.id);
 
-        Self {
-            entries,
-            uid_mode,
-        }
+        Self { entries, uid_mode }
     }
 }
 
@@ -184,10 +195,8 @@ impl Serialize for EnvelopesTable {
     }
 }
 
-use io_imap::types::envelope::Address;
-
-pub fn format_address(addr: &Address<'_>) -> String {
-    // NString wraps Option<IString>, access via .0
+/// Format email address from mailbox and host parts.
+fn format_email(addr: &Address<'_>) -> String {
     let mailbox = addr
         .mailbox
         .0
@@ -200,24 +209,49 @@ pub fn format_address(addr: &Address<'_>) -> String {
         .as_ref()
         .map(|h| String::from_utf8_lossy(h.as_ref()).to_string())
         .unwrap_or_default();
-    let name = addr
-        .name
-        .0
-        .as_ref()
-        .map(|n| String::from_utf8_lossy(n.as_ref()).to_string());
 
-    let email = if !mailbox.is_empty() && !host.is_empty() {
+    if !mailbox.is_empty() && !host.is_empty() {
         format!("{mailbox}@{host}")
     } else {
         mailbox
-    };
-
-    match name {
-        Some(n) if !n.is_empty() => format!("{n} <{email}>"),
-        _ => email,
     }
 }
 
+/// Short format for list view (name OR email, not both).
+pub fn format_address_short(addr: &Address<'_>) -> String {
+    // If name exists, show decoded name only
+    if let Some(n) = &addr.name.0 {
+        let name = decode_mime(&String::from_utf8_lossy(n.as_ref()));
+        if !name.is_empty() {
+            return name;
+        }
+    }
+    // Otherwise show email
+    format_email(addr)
+}
+
+/// Full format for detailed view (Name <email> or email).
+pub fn format_address(addr: &Address<'_>) -> String {
+    let email = format_email(addr);
+    if let Some(n) = &addr.name.0 {
+        let name = decode_mime(&String::from_utf8_lossy(n.as_ref()));
+        if !name.is_empty() {
+            return format!("{name} <{email}>");
+        }
+    }
+    email
+}
+
+/// Short addresses formatter for list view.
+pub fn format_addresses_short(addrs: &[Address<'_>]) -> String {
+    addrs
+        .iter()
+        .map(format_address_short)
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// Full addresses formatter for detailed view.
 pub fn format_addresses(addrs: &[Address<'_>]) -> String {
     addrs
         .iter()

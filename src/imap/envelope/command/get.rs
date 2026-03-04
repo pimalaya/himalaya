@@ -17,7 +17,7 @@ use serde::{Serialize, Serializer};
 use crate::{
     config::ImapConfig,
     imap::{
-        envelope::command::list::format_addresses,
+        envelope::command::list::{decode_mime, format_addresses},
         mailbox::arg::name::MailboxNameOptionalFlag,
         stream,
     },
@@ -125,7 +125,7 @@ impl EnvelopeDetailTable {
                     detail.date = String::from_utf8_lossy(d.as_ref()).to_string();
                 }
                 if let Some(s) = &env.subject.0 {
-                    detail.subject = String::from_utf8_lossy(s.as_ref()).to_string();
+                    detail.subject = decode_mime(&String::from_utf8_lossy(s.as_ref()));
                 }
                 if let Some(m) = &env.message_id.0 {
                     detail.message_id = String::from_utf8_lossy(m.as_ref()).to_string();
