@@ -44,9 +44,9 @@ pub struct ThreadEnvelopesCommand {
     #[arg(name = "query", value_name = "QUERY", default_value = "all")]
     pub query: String,
 
-    /// Use UID THREAD instead of THREAD.
+    /// Use sequence numbers instead of UIDs.
     #[arg(long)]
-    pub uid: bool,
+    pub seq: bool,
 }
 
 impl ThreadEnvelopesCommand {
@@ -75,7 +75,7 @@ impl ThreadEnvelopesCommand {
 
         // THREAD
         let mut arg = None;
-        let mut coroutine = ImapThread::new(context, algorithm, search_criteria, self.uid);
+        let mut coroutine = ImapThread::new(context, algorithm, search_criteria, !self.seq);
 
         let (context, threads) = loop {
             match coroutine.resume(arg.take()) {
@@ -90,12 +90,12 @@ impl ThreadEnvelopesCommand {
 
         // Fetch subjects for all messages in threads
         let subjects = if !all_ids.is_empty() {
-            fetch_subjects(&mut stream, context, &all_ids, self.uid)?
+            fetch_subjects(&mut stream, context, &all_ids, !self.seq)?
         } else {
             HashMap::new()
         };
 
-        let table = ThreadResultsTable::new(threads, subjects, self.uid);
+        let table = ThreadResultsTable::new(threads, subjects, !self.seq);
 
         printer.out(table)?;
         Ok(())

@@ -52,9 +52,9 @@ pub struct SortEnvelopesCommand {
     #[arg(name = "query", value_name = "QUERY", default_value = "all")]
     pub query: String,
 
-    /// Use UID SORT instead of SORT.
+    /// Use sequence numbers instead of UIDs.
     #[arg(long)]
-    pub uid: bool,
+    pub seq: bool,
 }
 
 impl SortEnvelopesCommand {
@@ -87,7 +87,7 @@ impl SortEnvelopesCommand {
 
         // SORT
         let mut arg = None;
-        let mut coroutine = ImapSort::new(context, sort_criteria, search_criteria, self.uid);
+        let mut coroutine = ImapSort::new(context, sort_criteria, search_criteria, !self.seq);
 
         let ids = loop {
             match coroutine.resume(arg.take()) {
@@ -97,7 +97,7 @@ impl SortEnvelopesCommand {
             }
         };
 
-        let table = SortResultsTable::new(ids, self.uid);
+        let table = SortResultsTable::new(ids, !self.seq);
 
         printer.out(table)?;
         Ok(())

@@ -51,9 +51,9 @@ pub struct SearchEnvelopesCommand {
     #[arg(name = "query", value_name = "QUERY", default_value = "all")]
     pub query: String,
 
-    /// Use UID SEARCH instead of SEARCH.
+    /// Use sequence numbers instead of UIDs.
     #[arg(long)]
-    pub uid: bool,
+    pub seq: bool,
 }
 
 impl SearchEnvelopesCommand {
@@ -79,7 +79,7 @@ impl SearchEnvelopesCommand {
 
         // SEARCH
         let mut arg = None;
-        let mut coroutine = ImapSearch::new(context, criteria, self.uid);
+        let mut coroutine = ImapSearch::new(context, criteria, !self.seq);
 
         let ids = loop {
             match coroutine.resume(arg.take()) {
@@ -89,7 +89,7 @@ impl SearchEnvelopesCommand {
             }
         };
 
-        let table = SearchResultsTable::new(ids, self.uid);
+        let table = SearchResultsTable::new(ids, !self.seq);
 
         printer.out(table)?;
         Ok(())

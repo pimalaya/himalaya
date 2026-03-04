@@ -33,13 +33,13 @@ pub struct GetEnvelopeCommand {
     #[command(flatten)]
     pub mailbox: MailboxNameOptionalFlag,
 
-    /// The message sequence number or UID.
+    /// The message UID (or sequence number with --seq).
     #[arg(name = "id", value_name = "ID")]
     pub id: u32,
 
-    /// Use UID FETCH instead of FETCH.
+    /// Use sequence numbers instead of UIDs.
     #[arg(long)]
-    pub uid: bool,
+    pub seq: bool,
 }
 
 impl GetEnvelopeCommand {
@@ -68,7 +68,7 @@ impl GetEnvelopeCommand {
         ]);
 
         let mut arg = None;
-        let mut coroutine = ImapFetchFirst::new(context, id, item_names, self.uid);
+        let mut coroutine = ImapFetchFirst::new(context, id, item_names, !self.seq);
 
         let items = loop {
             match coroutine.resume(arg.take()) {

@@ -29,9 +29,9 @@ pub struct RemoveFlagsCommand {
     #[arg(short, long, required = true, num_args = 1..)]
     pub flags: Vec<String>,
 
-    /// Use UID STORE instead of STORE.
+    /// Use sequence numbers instead of UIDs.
     #[arg(long)]
-    pub uid: bool,
+    pub seq: bool,
 }
 
 impl RemoveFlagsCommand {
@@ -65,7 +65,7 @@ impl RemoveFlagsCommand {
         // Store flags
         let mut arg = None;
         let mut coroutine =
-            ImapStoreSilent::new(context, sequence_set, StoreType::Remove, flags, self.uid);
+            ImapStoreSilent::new(context, sequence_set, StoreType::Remove, flags, !self.seq);
 
         loop {
             match coroutine.resume(arg.take()) {

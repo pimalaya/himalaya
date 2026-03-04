@@ -46,9 +46,9 @@ pub struct ListEnvelopesCommand {
     #[arg(short, long, default_value = "1:*")]
     pub sequence: String,
 
-    /// Use UID FETCH instead of FETCH.
+    /// Use sequence numbers instead of UIDs.
     #[arg(long)]
-    pub uid: bool,
+    pub seq: bool,
 }
 
 impl ListEnvelopesCommand {
@@ -77,7 +77,7 @@ impl ListEnvelopesCommand {
             MacroOrMessageDataItemNames::MessageDataItemNames(vec![MessageDataItemName::Envelope]);
 
         let mut arg = None;
-        let mut coroutine = ImapFetch::new(context, sequence_set, item_names, self.uid);
+        let mut coroutine = ImapFetch::new(context, sequence_set, item_names, !self.seq);
 
         let data = loop {
             match coroutine.resume(arg.take()) {
@@ -87,7 +87,7 @@ impl ListEnvelopesCommand {
             }
         };
 
-        let table = EnvelopesTable::new(data, self.uid);
+        let table = EnvelopesTable::new(data, !self.seq);
 
         printer.out(table)?;
         Ok(())
