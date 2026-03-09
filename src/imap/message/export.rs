@@ -126,7 +126,7 @@ impl ExportMessageCommand {
 
                 // Generate filename from subject or message-id
                 let filename = generate_eml_filename(&message, self.id);
-                let dir = self.directory.unwrap_or_else(|| PathBuf::from("."));
+                let dir = self.directory.unwrap_or(account.downloads_dir);
 
                 if !dir.exists() {
                     fs::create_dir_all(&dir)?;

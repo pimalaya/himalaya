@@ -2,7 +2,7 @@ use std::fmt;
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use comfy_table::{Cell, ContentArrangement, Row, Table};
+use comfy_table::{Cell, Row, Table};
 use io_imap::{
     coroutines::{list::*, lsub::*},
     types::{core::QuotedChar, flag::FlagNameAttribute, mailbox::Mailbox},
@@ -13,7 +13,7 @@ use serde::{Serialize, Serializer};
 
 use crate::imap::{account::ImapAccount, stream};
 
-/// List mailboxes.
+/// List, search and filter mailboxes.
 ///
 /// This command allows you to list mailboxes from your IMAP account.
 /// By default, only subscribed mailboxes are listed. Use --all to
@@ -65,8 +65,8 @@ impl ListMailboxesCommand {
         };
 
         let table = MailboxesTable {
-            rows: mailboxes.into_iter().map(From::from).collect(),
             preset: account.table_preset,
+            rows: mailboxes.into_iter().map(From::from).collect(),
         };
 
         printer.out(table)
@@ -75,8 +75,8 @@ impl ListMailboxesCommand {
 
 #[derive(Clone, Debug, Default)]
 pub struct MailboxesTable {
+    pub preset: String,
     pub rows: Vec<MailboxRow>,
-    pub preset: &'static str,
 }
 
 impl fmt::Display for MailboxesTable {
@@ -84,8 +84,7 @@ impl fmt::Display for MailboxesTable {
         let mut table = Table::new();
 
         table
-            .load_preset(self.preset)
-            .set_content_arrangement(ContentArrangement::DynamicFullWidth)
+            .load_preset(&self.preset)
             .set_header(Row::from([
                 Cell::new("NAME"),
                 Cell::new("DELIMITER"),
@@ -93,11 +92,11 @@ impl fmt::Display for MailboxesTable {
             ]))
             .add_rows(self.rows.iter().map(|mbox| {
                 let mut row = Row::new();
-                row.max_height(1);
 
-                row.add_cell(Cell::new(&mbox.name));
-                row.add_cell(Cell::new(&mbox.delimiter));
-                row.add_cell(Cell::new(&mbox.attributes.join(", ")));
+                row.max_height(1)
+                    .add_cell(Cell::new(&mbox.name))
+                    .add_cell(Cell::new(&mbox.delimiter))
+                    .add_cell(Cell::new(&mbox.attributes.join(", ")));
 
                 row
             }));

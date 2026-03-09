@@ -2,14 +2,11 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_toolbox::terminal::printer::Printer;
 
-use crate::{
-    config::ImapConfig,
-    imap::{
-        account::ImapAccount,
-        envelope::{
-            get::GetEnvelopeCommand, list::ListEnvelopesCommand, search::SearchEnvelopesCommand,
-            sort::SortEnvelopesCommand, thread::ThreadEnvelopesCommand,
-        },
+use crate::imap::{
+    account::ImapAccount,
+    envelope::{
+        get::GetEnvelopeCommand, list::ListEnvelopesCommand, search::SearchEnvelopesCommand,
+        sort::SortEnvelopesCommand, thread::ThreadEnvelopesCommand,
     },
 };
 

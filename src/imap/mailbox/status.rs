@@ -2,7 +2,7 @@ use std::fmt;
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use comfy_table::{presets, Cell, ContentArrangement, Row, Table};
+use comfy_table::{Cell, Row, Table};
 use io_imap::{
     coroutines::status::*,
     types::status::{StatusDataItem, StatusDataItemName},
@@ -47,10 +47,12 @@ impl StatusMailboxCommand {
             }
         };
 
-        let table = MailboxStatusTable::from(items);
+        let table = MailboxStatusTable {
+            preset: account.table_preset,
+            status: items.into(),
+        };
 
-        printer.out(table)?;
-        Ok(())
+        printer.out(table)
     }
 }
 
@@ -97,15 +99,8 @@ impl From<Vec<StatusDataItem>> for MailboxStatus {
 }
 
 pub struct MailboxStatusTable {
-    status: MailboxStatus,
-}
-
-impl From<Vec<StatusDataItem>> for MailboxStatusTable {
-    fn from(items: Vec<StatusDataItem>) -> Self {
-        Self {
-            status: MailboxStatus::from(items),
-        }
-    }
+    pub preset: String,
+    pub status: MailboxStatus,
 }
 
 impl fmt::Display for MailboxStatusTable {
@@ -113,8 +108,7 @@ impl fmt::Display for MailboxStatusTable {
         let mut table = Table::new();
 
         table
-            .load_preset(presets::ASCII_MARKDOWN)
-            .set_content_arrangement(ContentArrangement::DynamicFullWidth)
+            .load_preset(&self.preset)
             .set_header(Row::from([Cell::new("ATTRIBUTE"), Cell::new("VALUE")]));
 
         if let Some(n) = self.status.messages {

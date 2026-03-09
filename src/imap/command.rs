@@ -4,7 +4,7 @@ use pimalaya_toolbox::terminal::printer::Printer;
 
 use crate::imap::{
     account::ImapAccount, envelope::command::EnvelopeCommand, flag::command::FlagCommand,
-    mailbox::command::MailboxCommand, message::command::MessageCommand,
+    id::IdCommand, mailbox::command::MailboxCommand, message::command::MessageCommand,
 };
 
 /// IMAP CLI (requires `imap` cargo feature).
@@ -25,6 +25,7 @@ pub enum ImapCommand {
     #[command(subcommand)]
     #[command(aliases = ["msgs", "msg"])]
     Messages(MessageCommand),
+    Id(IdCommand),
 }
 
 impl ImapCommand {
@@ -32,6 +33,7 @@ impl ImapCommand {
         match self {
             Self::Envelopes(cmd) => cmd.exec(printer, account),
             Self::Flags(cmd) => cmd.exec(printer, account),
+            Self::Id(cmd) => cmd.exec(printer, account),
             Self::Mailboxes(cmd) => cmd.exec(printer, account),
             Self::Messages(cmd) => cmd.exec(printer, account),
         }

@@ -12,11 +12,8 @@ use url::Url;
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct Config {
-    pub display_name: Option<String>,
-    pub signature: Option<String>,
-    pub signature_delim: Option<String>,
     pub downloads_dir: Option<PathBuf>,
-
+    pub table_preset: Option<String>,
     pub accounts: HashMap<String, AccountConfig>,
 }
 
@@ -48,12 +45,8 @@ pub struct AccountConfig {
     #[serde(default)]
     pub default: bool,
 
-    #[serde(deserialize_with = "shell_expanded_string")]
-    pub email: String,
-    pub display_name: Option<String>,
-    pub signature: Option<String>,
-    pub signature_delim: Option<String>,
     pub downloads_dir: Option<PathBuf>,
+    pub table_preset: Option<String>,
 
     pub imap: Option<ImapConfig>,
     pub smtp: Option<SmtpConfig>,
@@ -64,36 +57,12 @@ pub struct AccountConfig {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ImapConfig {
     pub url: Url,
-
     #[serde(default)]
     pub tls: TlsConfig,
     #[serde(default)]
     pub starttls: bool,
     #[serde(default)]
     pub sasl: SaslConfig,
-
-    #[serde(default)]
-    pub ext: ImapExtensionsConfig,
-}
-
-/// IMAP extensions configuration.
-#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct ImapExtensionsConfig {
-    #[serde(default)]
-    id: ImapIdExtensionConfig,
-}
-
-/// IMAP ID configuration.
-///
-/// https://www.rfc-editor.org/rfc/rfc2971.html
-#[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct ImapIdExtensionConfig {
-    /// Automatically sends the ID command straight after
-    /// authentication.
-    #[serde(default)]
-    send_after_auth: bool,
 }
 
 /// SMTP configuration.
@@ -101,7 +70,6 @@ pub struct ImapIdExtensionConfig {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SmtpConfig {
     pub url: Url,
-
     #[serde(default)]
     pub tls: TlsConfig,
     #[serde(default)]
@@ -171,6 +139,7 @@ pub enum SaslMechanismConfig {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SaslLoginConfig {
+    #[serde(deserialize_with = "shell_expanded_string")]
     pub username: String,
     pub password: SecretConfig,
 }
@@ -180,6 +149,7 @@ pub struct SaslLoginConfig {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SaslPlainConfig {
     pub authzid: Option<String>,
+    #[serde(deserialize_with = "shell_expanded_string")]
     pub authcid: String,
     pub passwd: SecretConfig,
 }

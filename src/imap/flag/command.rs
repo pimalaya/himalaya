@@ -2,14 +2,11 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_toolbox::terminal::printer::Printer;
 
-use crate::{
-    config::ImapConfig,
-    imap::{
-        account::ImapAccount,
-        flag::{
-            add::AddFlagsCommand, list::ListFlagsCommand, remove::RemoveFlagsCommand,
-            set::SetFlagsCommand,
-        },
+use crate::imap::{
+    account::ImapAccount,
+    flag::{
+        add::AddFlagsCommand, list::ListFlagsCommand, remove::RemoveFlagsCommand,
+        set::SetFlagsCommand,
     },
 };
 

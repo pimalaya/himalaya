@@ -2,17 +2,14 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_toolbox::terminal::printer::Printer;
 
-use crate::{
-    config::ImapConfig,
-    imap::{
-        account::ImapAccount,
-        mailbox::{
-            close::CloseMailboxCommand, create::CreateMailboxCommand, delete::DeleteMailboxCommand,
-            expunge::ExpungeMailboxCommand, list::ListMailboxesCommand, purge::PurgeMailboxCommand,
-            rename::RenameMailboxCommand, select::SelectMailboxCommand,
-            status::StatusMailboxCommand, subscribe::SubscribeMailboxCommand,
-            unselect::UnselectMailboxCommand, unsubscribe::UnsubscribeMailboxCommand,
-        },
+use crate::imap::{
+    account::ImapAccount,
+    mailbox::{
+        close::CloseMailboxCommand, create::CreateMailboxCommand, delete::DeleteMailboxCommand,
+        expunge::ExpungeMailboxCommand, list::ListMailboxesCommand, purge::PurgeMailboxCommand,
+        rename::RenameMailboxCommand, select::SelectMailboxCommand, status::StatusMailboxCommand,
+        subscribe::SubscribeMailboxCommand, unselect::UnselectMailboxCommand,
+        unsubscribe::UnsubscribeMailboxCommand,
     },
 };
 
