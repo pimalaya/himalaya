@@ -1,18 +1,18 @@
-use std::io::{stdin, Read};
+use std::io::{stdin, BufRead, IsTerminal};
 
 use anyhow::{bail, Result};
 use clap::Parser;
 use io_imap::{
-    coroutines::{
-        append::*,
-        select::{ImapSelect, ImapSelectResult},
+    coroutines::append::*,
+    types::{
+        core::Literal, extensions::binary::LiteralOrLiteral8, flag::Flag, mailbox::Mailbox,
+        IntoStatic,
     },
-    types::{core::Literal, extensions::binary::LiteralOrLiteral8, mailbox::Mailbox},
 };
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
-use crate::imap::{account::ImapAccount, stream};
+use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg, stream};
 
 /// Save a message to a mailbox.
 ///
@@ -20,51 +20,50 @@ use crate::imap::{account::ImapAccount, stream};
 /// message is read from stdin in RFC 5322 format (raw email).
 #[derive(Debug, Parser)]
 pub struct SaveMessageCommand {
-    /// The mailbox to save the message to.
-    #[arg(name = "mailbox", value_name = "MAILBOX")]
-    pub mailbox: String,
+    #[command(flatten)]
+    pub mailbox: MailboxNameArg,
 
-    /// Select the given mailbox before saving message into it.
-    ///
-    /// This argument can be omitted when stateful IMAP sessions are
-    /// used, for example with:
-    ///
-    /// https://github.com/pimalaya/sirup
-    #[arg(short, long, default_value_t)]
-    pub select: bool,
+    /// The flags to add to the message.
+    #[arg(short, long, num_args = 0..)]
+    pub flag: Vec<String>,
+
+    /// The raw message, including headers and body.
+    #[arg(trailing_var_arg = true)]
+    #[arg(name = "message", value_name = "MESSAGE")]
+    pub message: Vec<String>,
 }
 
 impl SaveMessageCommand {
     pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let (mut context, mut stream) = stream::connect(account.backend)?;
+        let (context, mut stream) = stream::connect(account.backend)?;
 
-        // Read message from stdin
-        let mut message = Vec::new();
-        stdin().read_to_end(&mut message)?;
+        let mailbox: Mailbox<'static> = self.mailbox.name.try_into()?;
 
-        if message.is_empty() {
-            bail!("No message provided on stdin");
-        }
+        let message = if stdin().is_terminal() || printer.is_json() {
+            self.message
+                .join(" ")
+                .replace('\r', "")
+                .replace('\n', "\r\n")
+        } else {
+            stdin()
+                .lock()
+                .lines()
+                .map_while(Result::ok)
+                .collect::<Vec<String>>()
+                .join("\r\n")
+        };
+        let message = Literal::try_from(message)?;
+        let message = LiteralOrLiteral8::Literal(message);
 
-        let mailbox: Mailbox<'static> = self.mailbox.try_into()?;
-        let literal = Literal::try_from(message)?;
-        let message = LiteralOrLiteral8::Literal(literal);
-
-        if self.select {
-            let mut arg = None;
-            let mut coroutine = ImapSelect::new(context, mailbox.clone());
-
-            context = loop {
-                match coroutine.resume(arg.take()) {
-                    ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
-                    ImapSelectResult::Ok { context, .. } => break context,
-                    ImapSelectResult::Err { err, .. } => bail!(err),
-                }
-            };
-        }
+        let flags: Vec<_> = self
+            .flag
+            .iter()
+            .map(String::as_str)
+            .map(|f| Flag::try_from(f).map(IntoStatic::into_static))
+            .collect::<Result<_, _>>()?;
 
         let mut arg = None;
-        let mut coroutine = ImapAppend::new(context, mailbox, vec![], None, message);
+        let mut coroutine = ImapAppend::new(context, mailbox, flags, None, message);
 
         loop {
             match coroutine.resume(arg.take()) {

@@ -7,7 +7,11 @@ use io_imap::{
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
-use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg, stream};
+use crate::imap::{
+    account::ImapAccount,
+    mailbox::arg::{MailboxNameArg, MailboxSelectFlag},
+    stream,
+};
 
 /// Shortcut for marking as deleted all envelopes then expunging the
 /// given mailbox.
@@ -18,15 +22,8 @@ use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg, stream};
 pub struct PurgeMailboxCommand {
     #[command(flatten)]
     pub mailbox: MailboxNameArg,
-
-    /// Select the given mailbox before purging it.
-    ///
-    /// This argument can be omitted when stateful IMAP sessions are
-    /// used, for example with:
-    ///
-    /// https://github.com/pimalaya/sirup
-    #[arg(short, long, default_value_t)]
-    pub select: bool,
+    #[command(flatten)]
+    pub select: MailboxSelectFlag,
 }
 
 impl PurgeMailboxCommand {
@@ -35,7 +32,7 @@ impl PurgeMailboxCommand {
 
         let mailbox = self.mailbox.name.try_into()?;
 
-        if self.select {
+        if self.select.r#true {
             let mut arg = None;
             let mut coroutine = ImapSelect::new(context, mailbox);
 

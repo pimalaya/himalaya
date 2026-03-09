@@ -34,7 +34,7 @@ pimalaya-toolbox = { version = "0.0.4", default-features = false, features = ["b
 anyhow = "1"
 chrono = { version = "0.4", default-features = false }
 clap = { version = "4.4", features = ["derive", "env", "wrap_help"] }
-comfy-table = { version = "7", default-features = false }
+comfy-table = "7"
 dirs = "6"
 gethostname = "1"
 html2text = "0.12"

@@ -8,11 +8,15 @@ use io_imap::{
     types::fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
 };
 use io_stream::runtimes::std::handle;
-use mail_parser::{Addr, Address, ContentType, MessageParser, MimeHeaders};
+use mail_parser::{Addr, Address, ContentType, Message, MessageParser, MimeHeaders};
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 
-use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameOptionalFlag, stream};
+use crate::imap::{
+    account::ImapAccount,
+    mailbox::arg::{MailboxNameOptionalFlag, MailboxSelectFlag},
+    stream,
+};
 
 /// Get a message and display its structure.
 ///
@@ -22,11 +26,11 @@ use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameOptionalFlag, s
 pub struct GetMessageCommand {
     #[command(flatten)]
     pub mailbox: MailboxNameOptionalFlag,
+    #[command(flatten)]
+    pub select: MailboxSelectFlag,
 
     /// The message UID (or sequence number with --seq).
-    #[arg(name = "id", value_name = "ID")]
     pub id: u32,
-
     /// Use sequence numbers instead of UIDs.
     #[arg(long)]
     pub seq: bool,
@@ -34,24 +38,25 @@ pub struct GetMessageCommand {
 
 impl GetMessageCommand {
     pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let (context, mut stream) = stream::connect(account.backend)?;
+        let (mut context, mut stream) = stream::connect(account.backend)?;
 
         let mailbox = self.mailbox.name.try_into()?;
-
-        // SELECT mailbox
-        let mut arg = None;
-        let mut coroutine = ImapSelect::new(context, mailbox);
-
-        let context = loop {
-            match coroutine.resume(arg.take()) {
-                ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
-                ImapSelectResult::Ok { context, .. } => break context,
-                ImapSelectResult::Err { err, .. } => bail!(err),
-            }
+        let Some(id) = NonZeroU32::new(self.id) else {
+            bail!("ID must be non-zero");
         };
 
-        // FETCH with BODY.PEEK[] to avoid marking as read
-        let id = NonZeroU32::new(self.id).ok_or_else(|| anyhow::anyhow!("ID must be non-zero"))?;
+        if self.select.r#true {
+            let mut arg = None;
+            let mut coroutine = ImapSelect::new(context, mailbox);
+
+            context = loop {
+                match coroutine.resume(arg.take()) {
+                    ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                    ImapSelectResult::Ok { context, .. } => break context,
+                    ImapSelectResult::Err { err, .. } => bail!(err),
+                }
+            };
+        }
 
         let item_names =
             MacroOrMessageDataItemNames::MessageDataItemNames(vec![MessageDataItemName::BodyExt {
@@ -71,7 +76,6 @@ impl GetMessageCommand {
             }
         };
 
-        // Extract raw message bytes
         let mut raw_message: Option<Vec<u8>> = None;
         for item in items.into_iter() {
             if let MessageDataItem::BodyExt { data, .. } = item {
@@ -81,17 +85,16 @@ impl GetMessageCommand {
             }
         }
 
-        let raw = raw_message.ok_or_else(|| anyhow::anyhow!("No message data returned"))?;
+        let Some(raw) = raw_message else {
+            bail!("No message found");
+        };
 
-        // Parse message using mail-parser
-        let message = MessageParser::default()
-            .parse(&raw)
-            .ok_or_else(|| anyhow::anyhow!("Failed to parse message"))?;
+        let Some(message) = MessageParser::new().parse(&raw) else {
+            bail!("Invalid message");
+        };
 
         let structure = MessageStructure::from_parsed(&message);
-
-        printer.out(structure)?;
-        Ok(())
+        printer.out(structure)
     }
 }
 
@@ -124,7 +127,7 @@ pub struct MessageStructure {
 }
 
 impl MessageStructure {
-    pub fn from_parsed(message: &mail_parser::Message<'_>) -> Self {
+    pub fn from_parsed(message: &Message<'_>) -> Self {
         // Extract headers
         let headers = MessageHeaders {
             date: message.date().map(|d| d.to_rfc3339()),

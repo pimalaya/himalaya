@@ -3,6 +3,7 @@ use std::{collections::HashMap, fmt, num::NonZeroU32};
 use anyhow::{bail, Result};
 use clap::Parser;
 use io_imap::{
+    context::ImapContext,
     coroutines::{fetch::*, select::*, thread::*},
     types::{
         extensions::thread::{Thread, ThreadingAlgorithm},
@@ -17,11 +18,11 @@ use serde::{Serialize, Serializer};
 use crate::imap::{
     account::ImapAccount,
     envelope::{list::decode_mime, search::parse_query},
-    mailbox::arg::MailboxNameOptionalArg,
-    stream,
+    mailbox::arg::{MailboxNameOptionalFlag, MailboxSelectFlag},
+    stream::{self, Stream},
 };
 
-/// Thread messages by algorithm.
+/// Thread IMAP messages by algorithm.
 ///
 /// This command groups messages into conversation threads using the
 /// specified threading algorithm. Requires the THREAD IMAP extension.
@@ -32,7 +33,9 @@ use crate::imap::{
 #[derive(Debug, Parser)]
 pub struct ThreadEnvelopesCommand {
     #[command(flatten)]
-    pub mailbox: MailboxNameOptionalArg,
+    pub mailbox: MailboxNameOptionalFlag,
+    #[command(flatten)]
+    pub select: MailboxSelectFlag,
 
     /// Threading algorithm (orderedsubject or references).
     #[arg(short = 'A', long, default_value = "references")]
@@ -49,29 +52,26 @@ pub struct ThreadEnvelopesCommand {
 
 impl ThreadEnvelopesCommand {
     pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let (context, mut stream) = stream::connect(account.backend)?;
+        let (mut context, mut stream) = stream::connect(account.backend)?;
 
         let mailbox = self.mailbox.name.try_into()?;
 
-        // SELECT mailbox
-        let mut arg = None;
-        let mut coroutine = ImapSelect::new(context, mailbox);
+        if self.select.r#true {
+            let mut arg = None;
+            let mut coroutine = ImapSelect::new(context, mailbox);
 
-        let context = loop {
-            match coroutine.resume(arg.take()) {
-                ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
-                ImapSelectResult::Ok { context, .. } => break context,
-                ImapSelectResult::Err { err, .. } => bail!(err),
-            }
-        };
+            context = loop {
+                match coroutine.resume(arg.take()) {
+                    ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                    ImapSelectResult::Ok { context, .. } => break context,
+                    ImapSelectResult::Err { err, .. } => bail!(err),
+                }
+            };
+        }
 
-        // Parse threading algorithm
         let algorithm = parse_algorithm(&self.algorithm)?;
-
-        // Parse search criteria
         let search_criteria = parse_query(&self.query)?;
 
-        // THREAD
         let mut arg = None;
         let mut coroutine = ImapThread::new(context, algorithm, search_criteria, !self.seq);
 
@@ -95,10 +95,9 @@ impl ThreadEnvelopesCommand {
             HashMap::new()
         };
 
-        let table = ThreadResultsTable::new(threads, subjects, !self.seq);
+        let table = ThreadResultsTable::new(threads, subjects);
 
-        printer.out(table)?;
-        Ok(())
+        printer.out(table)
     }
 }
 
@@ -139,8 +138,8 @@ fn collect_thread_ids_recursive(thread: &Thread, ids: &mut Vec<NonZeroU32>) {
 }
 
 fn fetch_subjects(
-    stream: &mut stream::Stream,
-    context: io_imap::context::ImapContext,
+    stream: &mut Stream,
+    context: ImapContext,
     ids: &[NonZeroU32],
     uid: bool,
 ) -> Result<HashMap<u32, String>> {
@@ -211,17 +210,11 @@ pub struct ThreadEntry {
 pub struct ThreadResultsTable {
     threads: Vec<Thread>,
     subjects: HashMap<u32, String>,
-    #[allow(dead_code)]
-    uid_mode: bool,
 }
 
 impl ThreadResultsTable {
-    pub fn new(threads: Vec<Thread>, subjects: HashMap<u32, String>, uid_mode: bool) -> Self {
-        Self {
-            threads,
-            subjects,
-            uid_mode,
-        }
+    pub fn new(threads: Vec<Thread>, subjects: HashMap<u32, String>) -> Self {
+        Self { threads, subjects }
     }
 
     fn build_entries(&self) -> Vec<ThreadEntry> {

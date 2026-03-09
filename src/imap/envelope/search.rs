@@ -1,8 +1,8 @@
 use std::fmt;
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use clap::Parser;
-use comfy_table::{presets, Cell, ContentArrangement, Row, Table};
+use comfy_table::{Cell, ContentArrangement, Row, Table};
 use io_imap::{
     coroutines::{search::*, select::*},
     types::{
@@ -13,11 +13,15 @@ use io_imap::{
 };
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
-use serde::{Serialize, Serializer};
+use serde::Serialize;
 
-use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameOptionalArg, stream};
+use crate::imap::{
+    account::ImapAccount,
+    mailbox::arg::{MailboxNameOptionalFlag, MailboxSelectFlag},
+    stream,
+};
 
-/// Search messages by criteria.
+/// Search IMAP messages by criteria.
 ///
 /// This command searches for messages matching the given criteria and
 /// returns a list of matching sequence numbers or UIDs.
@@ -45,7 +49,9 @@ use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameOptionalArg, st
 #[derive(Debug, Parser)]
 pub struct SearchEnvelopesCommand {
     #[command(flatten)]
-    pub mailbox: MailboxNameOptionalArg,
+    pub mailbox: MailboxNameOptionalFlag,
+    #[command(flatten)]
+    pub select: MailboxSelectFlag,
 
     /// Search query (e.g., "from:alice unseen").
     #[arg(name = "query", value_name = "QUERY", default_value = "all")]
@@ -58,26 +64,25 @@ pub struct SearchEnvelopesCommand {
 
 impl SearchEnvelopesCommand {
     pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let (context, mut stream) = stream::connect(account.backend)?;
+        let (mut context, mut stream) = stream::connect(account.backend)?;
 
         let mailbox = self.mailbox.name.try_into()?;
 
-        // SELECT mailbox
-        let mut arg = None;
-        let mut coroutine = ImapSelect::new(context, mailbox);
+        if self.select.r#true {
+            let mut arg = None;
+            let mut coroutine = ImapSelect::new(context, mailbox);
 
-        let context = loop {
-            match coroutine.resume(arg.take()) {
-                ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
-                ImapSelectResult::Ok { context, .. } => break context,
-                ImapSelectResult::Err { err, .. } => bail!(err),
-            }
-        };
+            context = loop {
+                match coroutine.resume(arg.take()) {
+                    ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                    ImapSelectResult::Ok { context, .. } => break context,
+                    ImapSelectResult::Err { err, .. } => bail!(err),
+                }
+            };
+        }
 
-        // Parse query into search criteria
         let criteria = parse_query(&self.query)?;
 
-        // SEARCH
         let mut arg = None;
         let mut coroutine = ImapSearch::new(context, criteria, !self.seq);
 
@@ -89,9 +94,54 @@ impl SearchEnvelopesCommand {
             }
         };
 
-        let table = SearchResultsTable::new(ids, !self.seq);
+        let table = SearchTable {
+            preset: account.table_preset,
+            arrangement: account.table_arrangement,
+            ids: ids
+                .into_iter()
+                .map(|id| SearchResult { id: id.get() })
+                .collect(),
+            uid_mode: !self.seq,
+        };
 
-        printer.out(table)?;
+        printer.out(table)
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct SearchResult {
+    pub id: u32,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct SearchTable {
+    #[serde(skip)]
+    preset: String,
+    #[serde(skip)]
+    arrangement: ContentArrangement,
+    uid_mode: bool,
+    ids: Vec<SearchResult>,
+}
+
+impl fmt::Display for SearchTable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut table = Table::new();
+
+        let id_header = if self.uid_mode { "UID" } else { "SEQ" };
+
+        table
+            .load_preset(&self.preset)
+            .set_content_arrangement(self.arrangement.clone())
+            .set_header(Row::from([Cell::new(id_header)]));
+
+        for result in &self.ids {
+            table.add_row(Row::from([Cell::new(result.id)]));
+        }
+
+        writeln!(f)?;
+        write!(f, "{table}")?;
+        writeln!(f)?;
+        writeln!(f, "Found {} message(s)", self.ids.len())?;
         Ok(())
     }
 }
@@ -206,67 +256,18 @@ fn parse_date(s: &str) -> Result<NaiveDate> {
 
     let year: i32 = parts[0]
         .parse()
-        .map_err(|_| anyhow::anyhow!("Invalid year in date '{s}'"))?;
+        .map_err(|_| anyhow!("Invalid year in date '{s}'"))?;
     let month: u32 = parts[1]
         .parse()
-        .map_err(|_| anyhow::anyhow!("Invalid month in date '{s}'"))?;
+        .map_err(|_| anyhow!("Invalid month in date '{s}'"))?;
     let day: u32 = parts[2]
         .parse()
-        .map_err(|_| anyhow::anyhow!("Invalid day in date '{s}'"))?;
+        .map_err(|_| anyhow!("Invalid day in date '{s}'"))?;
 
     // Create chrono::NaiveDate first
     let chrono_date = chrono::NaiveDate::from_ymd_opt(year, month, day)
-        .ok_or_else(|| anyhow::anyhow!("Invalid date '{s}'"))?;
+        .ok_or_else(|| anyhow!("Invalid date '{s}'"))?;
 
     // Convert to imap-types NaiveDate
-    NaiveDate::try_from(chrono_date).map_err(|e| anyhow::anyhow!("Invalid date '{s}': {e}"))
-}
-
-#[derive(Clone, Debug, Serialize)]
-pub struct SearchResult {
-    pub id: u32,
-}
-
-pub struct SearchResultsTable {
-    results: Vec<SearchResult>,
-    uid_mode: bool,
-}
-
-impl SearchResultsTable {
-    pub fn new(ids: Vec<std::num::NonZeroU32>, uid_mode: bool) -> Self {
-        let results = ids
-            .into_iter()
-            .map(|id| SearchResult { id: id.get() })
-            .collect();
-        Self { results, uid_mode }
-    }
-}
-
-impl fmt::Display for SearchResultsTable {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut table = Table::new();
-
-        let id_header = if self.uid_mode { "UID" } else { "SEQ" };
-
-        table
-            .load_preset(presets::ASCII_MARKDOWN)
-            .set_content_arrangement(ContentArrangement::DynamicFullWidth)
-            .set_header(Row::from([Cell::new(id_header)]));
-
-        for result in &self.results {
-            table.add_row(Row::from([Cell::new(result.id)]));
-        }
-
-        writeln!(f)?;
-        write!(f, "{table}")?;
-        writeln!(f)?;
-        writeln!(f, "Found {} message(s)", self.results.len())?;
-        Ok(())
-    }
-}
-
-impl Serialize for SearchResultsTable {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.results.serialize(serializer)
-    }
+    NaiveDate::try_from(chrono_date).map_err(|e| anyhow!("Invalid date '{s}': {e}"))
 }

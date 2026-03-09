@@ -5,17 +5,16 @@ use pimalaya_toolbox::terminal::printer::Printer;
 use crate::imap::{
     account::ImapAccount,
     message::{
-        copy::CopyMessageCommand, delete::DeleteMessageCommand, export::ExportMessageCommand,
-        get::GetMessageCommand, r#move::MoveMessageCommand, read::ReadMessageCommand,
-        save::SaveMessageCommand,
+        copy::CopyMessageCommand, export::ExportMessageCommand, get::GetMessageCommand,
+        r#move::MoveMessageCommand, read::ReadMessageCommand, save::SaveMessageCommand,
     },
 };
 
-/// Manage messages.
+/// Manage IMAP messages.
 ///
 /// A message is a complete email including headers and body. This
-/// subcommand allows you to save, get, read, export, copy, move, and
-/// delete messages.
+/// subcommand allows you to save, get, read, export, copy, and move
+/// messages.
 #[derive(Debug, Subcommand)]
 pub enum MessageCommand {
     Save(SaveMessageCommand),
@@ -24,7 +23,6 @@ pub enum MessageCommand {
     Export(ExportMessageCommand),
     Copy(CopyMessageCommand),
     Move(MoveMessageCommand),
-    Delete(DeleteMessageCommand),
 }
 
 impl MessageCommand {
@@ -36,7 +34,6 @@ impl MessageCommand {
             Self::Export(cmd) => cmd.exec(printer, account),
             Self::Copy(cmd) => cmd.exec(printer, account),
             Self::Move(cmd) => cmd.exec(printer, account),
-            Self::Delete(cmd) => cmd.exec(printer, account),
         }
     }
 }

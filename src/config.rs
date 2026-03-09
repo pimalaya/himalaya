@@ -1,6 +1,7 @@
 use std::{collections::HashMap, fmt, path::PathBuf, process::Command};
 
 use anyhow::{bail, Result};
+use comfy_table::ContentArrangement;
 use pimalaya_toolbox::config::TomlConfig;
 use secrecy::SecretString;
 use serde::{de::Visitor, Deserialize, Deserializer};
@@ -14,6 +15,7 @@ use url::Url;
 pub struct Config {
     pub downloads_dir: Option<PathBuf>,
     pub table_preset: Option<String>,
+    pub table_arrangement: Option<TableArrangementConfig>,
     pub accounts: HashMap<String, AccountConfig>,
 }
 
@@ -47,9 +49,29 @@ pub struct AccountConfig {
 
     pub downloads_dir: Option<PathBuf>,
     pub table_preset: Option<String>,
+    pub table_arrangement: Option<TableArrangementConfig>,
 
     pub imap: Option<ImapConfig>,
     pub smtp: Option<SmtpConfig>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub enum TableArrangementConfig {
+    #[default]
+    Dynamic,
+    DynamicFullWidth,
+    Disabled,
+}
+
+impl From<TableArrangementConfig> for ContentArrangement {
+    fn from(arrangement: TableArrangementConfig) -> Self {
+        match arrangement {
+            TableArrangementConfig::Dynamic => ContentArrangement::Dynamic,
+            TableArrangementConfig::DynamicFullWidth => ContentArrangement::DynamicFullWidth,
+            TableArrangementConfig::Disabled => ContentArrangement::Disabled,
+        }
+    }
 }
 
 /// IMAP configuration.

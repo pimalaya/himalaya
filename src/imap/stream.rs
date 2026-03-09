@@ -43,43 +43,6 @@ pub enum Stream {
     NativeTls(native_tls::TlsStream<TcpStream>),
 }
 
-impl Read for Stream {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match self {
-            Self::Tcp(s) => s.read(buf),
-            Self::Unix(s) => s.read(buf),
-            #[cfg(any(feature = "rustls-aws", feature = "rustls-ring"))]
-            Self::Rustls(s) => s.read(buf),
-            #[cfg(feature = "native-tls")]
-            Self::NativeTls(s) => s.read(buf),
-        }
-    }
-}
-
-impl Write for Stream {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match self {
-            Self::Tcp(s) => s.write(buf),
-            Self::Unix(s) => s.write(buf),
-            #[cfg(any(feature = "rustls-aws", feature = "rustls-ring"))]
-            Self::Rustls(s) => s.write(buf),
-            #[cfg(feature = "native-tls")]
-            Self::NativeTls(s) => s.write(buf),
-        }
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        match self {
-            Self::Tcp(s) => s.flush(),
-            Self::Unix(s) => s.flush(),
-            #[cfg(any(feature = "rustls-aws", feature = "rustls-ring"))]
-            Self::Rustls(s) => s.flush(),
-            #[cfg(feature = "native-tls")]
-            Self::NativeTls(s) => s.flush(),
-        }
-    }
-}
-
 pub fn connect(mut config: ImapConfig) -> Result<(ImapContext, Stream)> {
     info!("connecting to IMAP server using {}", config.url);
 
@@ -375,4 +338,41 @@ pub fn connect(mut config: ImapConfig) -> Result<(ImapContext, Stream)> {
     }
 
     Ok((context, stream))
+}
+
+impl Read for Stream {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        match self {
+            Self::Tcp(s) => s.read(buf),
+            Self::Unix(s) => s.read(buf),
+            #[cfg(any(feature = "rustls-aws", feature = "rustls-ring"))]
+            Self::Rustls(s) => s.read(buf),
+            #[cfg(feature = "native-tls")]
+            Self::NativeTls(s) => s.read(buf),
+        }
+    }
+}
+
+impl Write for Stream {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self {
+            Self::Tcp(s) => s.write(buf),
+            Self::Unix(s) => s.write(buf),
+            #[cfg(any(feature = "rustls-aws", feature = "rustls-ring"))]
+            Self::Rustls(s) => s.write(buf),
+            #[cfg(feature = "native-tls")]
+            Self::NativeTls(s) => s.write(buf),
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        match self {
+            Self::Tcp(s) => s.flush(),
+            Self::Unix(s) => s.flush(),
+            #[cfg(any(feature = "rustls-aws", feature = "rustls-ring"))]
+            Self::Rustls(s) => s.flush(),
+            #[cfg(feature = "native-tls")]
+            Self::NativeTls(s) => s.flush(),
+        }
+    }
 }

@@ -10,24 +10,29 @@ use io_imap::{
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
-use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameOptionalFlag, stream};
+use crate::imap::{
+    account::ImapAccount,
+    mailbox::arg::{MailboxNameOptionalFlag, MailboxSelectFlag},
+    stream,
+};
 
-/// Remove flags from messages.
+/// Remove IMAP flag(s) from message(s).
 ///
-/// This command removes the specified flags from messages identified
-/// by the given sequence set.
+/// This command removes the specified flag(s) from message(s)
+/// identified by the given sequence set.
 #[derive(Debug, Parser)]
 pub struct RemoveFlagsCommand {
     #[command(flatten)]
     pub mailbox: MailboxNameOptionalFlag,
+    #[command(flatten)]
+    pub select: MailboxSelectFlag,
 
     /// The sequence set of messages (e.g., "1", "1,2,3", "1:*").
     #[arg(name = "sequence_set", value_name = "SEQUENCE")]
     pub sequence_set: String,
-
     /// The flags to remove (e.g., "\\Seen", "\\Flagged").
     #[arg(short, long, required = true, num_args = 1..)]
-    pub flags: Vec<String>,
+    pub flag: Vec<String>,
 
     /// Use sequence numbers instead of UIDs.
     #[arg(long)]
@@ -36,33 +41,30 @@ pub struct RemoveFlagsCommand {
 
 impl RemoveFlagsCommand {
     pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let (context, mut stream) = stream::connect(account.backend)?;
+        let (mut context, mut stream) = stream::connect(account.backend)?;
 
         let mailbox = self.mailbox.name.try_into()?;
 
-        // First, SELECT the mailbox
-        let mut arg = None;
-        let mut coroutine = ImapSelect::new(context, mailbox);
+        if self.select.r#true {
+            let mut arg = None;
+            let mut coroutine = ImapSelect::new(context, mailbox);
 
-        let context = loop {
-            match coroutine.resume(arg.take()) {
-                ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
-                ImapSelectResult::Ok { context, .. } => break context,
-                ImapSelectResult::Err { err, .. } => bail!(err),
-            }
-        };
+            context = loop {
+                match coroutine.resume(arg.take()) {
+                    ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                    ImapSelectResult::Ok { context, .. } => break context,
+                    ImapSelectResult::Err { err, .. } => bail!(err),
+                }
+            };
+        }
 
-        // Parse flags
+        let sequence_set = self.sequence_set.as_str().try_into()?;
         let flags: Vec<Flag<'static>> = self
-            .flags
+            .flag
             .iter()
             .map(|f| Flag::try_from(f.as_str()).map(|flag| flag.into_static()))
             .collect::<Result<_, _>>()?;
 
-        // Parse sequence set
-        let sequence_set = self.sequence_set.as_str().try_into()?;
-
-        // Store flags
         let mut arg = None;
         let mut coroutine =
             ImapStoreSilent::new(context, sequence_set, StoreType::Remove, flags, !self.seq);

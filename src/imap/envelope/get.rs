@@ -2,7 +2,7 @@ use std::{fmt, num::NonZeroU32};
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use comfy_table::{presets, Cell, ContentArrangement, Row, Table};
+use comfy_table::{Cell, Row, Table};
 use io_imap::{
     coroutines::{fetch::*, select::*},
     types::{
@@ -12,16 +12,16 @@ use io_imap::{
 };
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
-use serde::{Serialize, Serializer};
+use serde::Serialize;
 
 use crate::imap::{
     account::ImapAccount,
-    envelope::list::{decode_mime, format_addresses},
-    mailbox::arg::MailboxNameOptionalFlag,
+    envelope::list::{decode_mime, format_address},
+    mailbox::arg::{MailboxNameOptionalFlag, MailboxSelectFlag},
     stream,
 };
 
-/// Get a single message envelope.
+/// Get a single IMAP envelope.
 ///
 /// This command displays detailed envelope information for a specific
 /// message, including all header fields like date, subject, from, to,
@@ -30,11 +30,12 @@ use crate::imap::{
 pub struct GetEnvelopeCommand {
     #[command(flatten)]
     pub mailbox: MailboxNameOptionalFlag,
+    #[command(flatten)]
+    pub select: MailboxSelectFlag,
 
     /// The message UID (or sequence number with --seq).
     #[arg(name = "id", value_name = "ID")]
     pub id: u32,
-
     /// Use sequence numbers instead of UIDs.
     #[arg(long)]
     pub seq: bool,
@@ -42,24 +43,26 @@ pub struct GetEnvelopeCommand {
 
 impl GetEnvelopeCommand {
     pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let (context, mut stream) = stream::connect(account.backend)?;
+        let (mut context, mut stream) = stream::connect(account.backend)?;
 
         let mailbox = self.mailbox.name.try_into()?;
 
-        // SELECT mailbox
-        let mut arg = None;
-        let mut coroutine = ImapSelect::new(context, mailbox);
+        if self.select.r#true {
+            let mut arg = None;
+            let mut coroutine = ImapSelect::new(context, mailbox);
 
-        let context = loop {
-            match coroutine.resume(arg.take()) {
-                ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
-                ImapSelectResult::Ok { context, .. } => break context,
-                ImapSelectResult::Err { err, .. } => bail!(err),
-            }
+            context = loop {
+                match coroutine.resume(arg.take()) {
+                    ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                    ImapSelectResult::Ok { context, .. } => break context,
+                    ImapSelectResult::Err { err, .. } => bail!(err),
+                }
+            };
+        }
+
+        let Some(id) = NonZeroU32::new(self.id) else {
+            bail!("ID must be non-zero");
         };
-
-        // FETCH envelope
-        let id = NonZeroU32::new(self.id).ok_or_else(|| anyhow::anyhow!("ID must be non-zero"))?;
 
         let item_names =
             MacroOrMessageDataItemNames::MessageDataItemNames(vec![MessageDataItemName::Envelope]);
@@ -75,109 +78,153 @@ impl GetEnvelopeCommand {
             }
         };
 
-        let table = EnvelopeDetailTable::new(items);
+        let table = EnvelopeTable {
+            preset: account.table_preset,
+            envelope: items.into(),
+        };
 
-        printer.out(table)?;
-        Ok(())
+        printer.out(table)
     }
 }
 
 #[derive(Clone, Debug, Serialize)]
-pub struct EnvelopeDetail {
-    pub date: String,
-    pub subject: String,
-    pub message_id: String,
-    pub in_reply_to: String,
-    pub from: String,
-    pub sender: String,
-    pub reply_to: String,
-    pub to: String,
-    pub cc: String,
-    pub bcc: String,
+pub struct EnvelopeTable {
+    #[serde(skip)]
+    pub preset: String,
+    pub envelope: EnvelopeTableItems,
 }
 
-pub struct EnvelopeDetailTable {
-    detail: EnvelopeDetail,
-}
-
-impl EnvelopeDetailTable {
-    pub fn new(items: Vec1<MessageDataItem<'static>>) -> Self {
-        let mut detail = EnvelopeDetail {
-            date: String::new(),
-            subject: String::new(),
-            message_id: String::new(),
-            in_reply_to: String::new(),
-            from: String::new(),
-            sender: String::new(),
-            reply_to: String::new(),
-            to: String::new(),
-            cc: String::new(),
-            bcc: String::new(),
-        };
-
-        for item in items.into_iter() {
-            if let MessageDataItem::Envelope(env) = item {
-                // NString wraps Option<IString>, access via .0
-                if let Some(d) = &env.date.0 {
-                    detail.date = String::from_utf8_lossy(d.as_ref()).to_string();
-                }
-                if let Some(s) = &env.subject.0 {
-                    detail.subject = decode_mime(&String::from_utf8_lossy(s.as_ref()));
-                }
-                if let Some(m) = &env.message_id.0 {
-                    detail.message_id = String::from_utf8_lossy(m.as_ref()).to_string();
-                }
-                if let Some(r) = &env.in_reply_to.0 {
-                    detail.in_reply_to = String::from_utf8_lossy(r.as_ref()).to_string();
-                }
-                detail.from = format_addresses(&env.from);
-                detail.sender = format_addresses(&env.sender);
-                detail.reply_to = format_addresses(&env.reply_to);
-                detail.to = format_addresses(&env.to);
-                detail.cc = format_addresses(&env.cc);
-                detail.bcc = format_addresses(&env.bcc);
-            }
-        }
-
-        Self { detail }
-    }
-}
-
-impl fmt::Display for EnvelopeDetailTable {
+impl fmt::Display for EnvelopeTable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 
         table
-            .load_preset(presets::ASCII_MARKDOWN)
-            .set_content_arrangement(ContentArrangement::DynamicFullWidth)
-            .set_header(Row::from([Cell::new("FIELD"), Cell::new("VALUE")]));
+            .load_preset(&self.preset)
+            .set_header(Row::from([Cell::new("HEADER"), Cell::new("VALUE")]));
 
-        let fields = [
-            ("Date", &self.detail.date),
-            ("Subject", &self.detail.subject),
-            ("Message-ID", &self.detail.message_id),
-            ("From", &self.detail.from),
-            ("Sender", &self.detail.sender),
-            ("To", &self.detail.to),
-            ("Cc", &self.detail.cc),
-            ("Bcc", &self.detail.bcc),
-            ("Reply-To", &self.detail.reply_to),
-            ("In-Reply-To", &self.detail.in_reply_to),
-        ];
+        table.add_row(Row::from([
+            Cell::new("Message ID"),
+            match &self.envelope.message_id {
+                Some(id) => Cell::new(id),
+                None => Cell::new(""),
+            },
+        ]));
 
-        for (name, value) in fields {
-            table.add_row(Row::from([Cell::new(name), Cell::new(value)]));
-        }
+        table.add_row(Row::from([
+            Cell::new("In Reply To"),
+            match &self.envelope.in_reply_to {
+                Some(id) => Cell::new(id),
+                None => Cell::new(""),
+            },
+        ]));
+
+        table.add_row(Row::from([
+            Cell::new("Date"),
+            match &self.envelope.date {
+                Some(date) => Cell::new(date),
+                None => Cell::new(""),
+            },
+        ]));
+
+        table.add_row(Row::from([
+            Cell::new("Subject"),
+            match &self.envelope.subject {
+                Some(subject) => Cell::new(subject),
+                None => Cell::new(""),
+            },
+        ]));
+
+        table.add_row(Row::from([
+            Cell::new("Sender"),
+            Cell::new(self.envelope.sender.join(", ")),
+        ]));
+
+        table.add_row(Row::from([
+            Cell::new("From"),
+            Cell::new(self.envelope.from.join(", ")),
+        ]));
+
+        table.add_row(Row::from([
+            Cell::new("Reply To"),
+            Cell::new(self.envelope.reply_to.join(", ")),
+        ]));
+
+        table.add_row(Row::from([
+            Cell::new("To"),
+            Cell::new(self.envelope.to.join(", ")),
+        ]));
+
+        table.add_row(Row::from([
+            Cell::new("Cc"),
+            Cell::new(self.envelope.cc.join(", ")),
+        ]));
+
+        table.add_row(Row::from([
+            Cell::new("Bcc"),
+            Cell::new(self.envelope.bcc.join(", ")),
+        ]));
 
         writeln!(f)?;
-        write!(f, "{table}")?;
-        writeln!(f)?;
-        Ok(())
+        writeln!(f, "{table}")
     }
 }
 
-impl Serialize for EnvelopeDetailTable {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.detail.serialize(serializer)
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct EnvelopeTableItems {
+    pub date: Option<String>,
+    pub subject: Option<String>,
+    pub message_id: Option<String>,
+    pub in_reply_to: Option<String>,
+
+    pub from: Vec<String>,
+    pub sender: Vec<String>,
+    pub reply_to: Vec<String>,
+    pub to: Vec<String>,
+    pub cc: Vec<String>,
+    pub bcc: Vec<String>,
+}
+
+impl From<Vec1<MessageDataItem<'_>>> for EnvelopeTableItems {
+    fn from(items: Vec1<MessageDataItem<'_>>) -> Self {
+        let mut table = EnvelopeTableItems::default();
+
+        for item in items.into_iter() {
+            if let MessageDataItem::Envelope(env) = item {
+                if let Some(d) = &env.date.into_option() {
+                    table
+                        .date
+                        .replace(String::from_utf8_lossy(d.as_ref()).to_string());
+                }
+
+                if let Some(s) = &env.subject.into_option() {
+                    table
+                        .subject
+                        .replace(decode_mime(&String::from_utf8_lossy(s.as_ref())));
+                }
+
+                if let Some(m) = &env.message_id.into_option() {
+                    table
+                        .message_id
+                        .replace(String::from_utf8_lossy(m.as_ref()).to_string());
+                }
+
+                if let Some(r) = &env.in_reply_to.into_option() {
+                    table
+                        .in_reply_to
+                        .replace(String::from_utf8_lossy(r.as_ref()).to_string());
+                }
+
+                table.from.extend(env.from.iter().map(format_address));
+                table.sender.extend(env.sender.iter().map(format_address));
+                table
+                    .reply_to
+                    .extend(env.reply_to.iter().map(format_address));
+                table.to.extend(env.to.iter().map(format_address));
+                table.cc.extend(env.cc.iter().map(format_address));
+                table.bcc.extend(env.bcc.iter().map(format_address));
+            }
+        }
+
+        table
     }
 }

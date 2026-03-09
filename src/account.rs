@@ -2,14 +2,16 @@ use std::{env::temp_dir, path::PathBuf};
 
 use crate::config::{AccountConfig, Config};
 use anyhow::Result;
-use comfy_table::presets;
+use comfy_table::{presets, ContentArrangement};
 use dirs::download_dir;
 
 #[derive(Debug)]
 pub struct Account<B> {
     pub backend: B,
     pub downloads_dir: PathBuf,
+
     pub table_preset: String,
+    pub table_arrangement: ContentArrangement,
 }
 
 impl<B> Account<B> {
@@ -36,6 +38,11 @@ impl<B> Account<B> {
                 .table_preset
                 .or(account_config.table_preset)
                 .unwrap_or(presets::UTF8_FULL_CONDENSED.to_string()),
+            table_arrangement: config
+                .table_arrangement
+                .or(account_config.table_arrangement)
+                .unwrap_or_default()
+                .into(),
         })
     }
 }

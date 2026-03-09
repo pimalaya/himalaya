@@ -4,7 +4,11 @@ use io_imap::coroutines::{expunge::*, select::*};
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
-use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg, stream};
+use crate::imap::{
+    account::ImapAccount,
+    mailbox::arg::{MailboxNameArg, MailboxSelectFlag},
+    stream,
+};
 
 /// Expunge the given mailbox.
 ///
@@ -14,15 +18,8 @@ use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg, stream};
 pub struct ExpungeMailboxCommand {
     #[command(flatten)]
     pub mailbox: MailboxNameArg,
-
-    /// Select the given mailbox before expunging it.
-    ///
-    /// This argument can be omitted when stateful IMAP sessions are
-    /// used, for example with:
-    ///
-    /// https://github.com/pimalaya/sirup
-    #[arg(short, long, default_value_t)]
-    pub select: bool,
+    #[command(flatten)]
+    pub select: MailboxSelectFlag,
 }
 
 impl ExpungeMailboxCommand {
@@ -31,7 +28,7 @@ impl ExpungeMailboxCommand {
 
         let mailbox = self.mailbox.name.try_into()?;
 
-        if self.select {
+        if self.select.r#true {
             let mut arg = None;
             let mut coroutine = ImapSelect::new(context, mailbox);
 

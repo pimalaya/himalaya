@@ -35,6 +35,19 @@ impl Default for MailboxNameOptionalArg {
     }
 }
 
+#[derive(Debug, Parser)]
+pub struct MailboxSelectFlag {
+    /// Select the given mailbox before performing the current action.
+    ///
+    /// This argument can be omitted when stateful IMAP sessions are
+    /// used, for example with:
+    ///
+    /// https://github.com/pimalaya/sirup
+    #[arg(long = "select", default_value_t)]
+    #[arg(name = "mailbox_select")]
+    pub r#true: bool,
+}
+
 /// The required mailbox name argument parser.
 #[derive(Debug, Parser)]
 pub struct MailboxNameArg {
@@ -53,7 +66,7 @@ pub struct SourceMailboxNameOptionalFlag {
 }
 
 /// The target mailbox name argument parser.
-#[derive(Debug, Parser)]
+#[derive(Debug, Clone, Parser)]
 pub struct TargetMailboxNameArg {
     /// The name of the target mailbox.
     #[arg(name = "target_mailbox_name", value_name = "TARGET")]

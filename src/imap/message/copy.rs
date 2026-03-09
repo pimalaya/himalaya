@@ -7,24 +7,28 @@ use io_imap::{
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
-use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameOptionalFlag, stream};
+use crate::imap::{
+    account::ImapAccount,
+    mailbox::arg::{MailboxNameOptionalFlag, MailboxSelectFlag, TargetMailboxNameArg},
+    stream,
+};
 
-/// Copy messages to another mailbox.
+/// Copy IMAP message(s) to the given mailbox.
 ///
-/// This command copies messages identified by the given sequence set
-/// from the source mailbox to the destination mailbox.
+/// This command copies message(s) identified by the given sequence
+/// set from the source mailbox to the destination mailbox.
 #[derive(Debug, Parser)]
 pub struct CopyMessageCommand {
     #[command(flatten)]
     pub mailbox: MailboxNameOptionalFlag,
+    #[command(flatten)]
+    pub select: MailboxSelectFlag,
 
     /// The sequence set of messages (e.g., "1", "1,2,3", "1:*").
     #[arg(name = "sequence_set", value_name = "SEQUENCE")]
     pub sequence_set: String,
-
-    /// The destination mailbox.
-    #[arg(name = "destination", value_name = "DESTINATION")]
-    pub destination: String,
+    #[command(flatten)]
+    pub destination: TargetMailboxNameArg,
 
     /// Use sequence numbers instead of UIDs.
     #[arg(long)]
@@ -33,27 +37,26 @@ pub struct CopyMessageCommand {
 
 impl CopyMessageCommand {
     pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let (context, mut stream) = stream::connect(account.backend)?;
+        let (mut context, mut stream) = stream::connect(account.backend)?;
 
         let mailbox = self.mailbox.name.try_into()?;
 
-        // SELECT mailbox
-        let mut arg = None;
-        let mut coroutine = ImapSelect::new(context, mailbox);
+        if self.select.r#true {
+            let mut arg = None;
+            let mut coroutine = ImapSelect::new(context, mailbox);
 
-        let context = loop {
-            match coroutine.resume(arg.take()) {
-                ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
-                ImapSelectResult::Ok { context, .. } => break context,
-                ImapSelectResult::Err { err, .. } => bail!(err),
-            }
-        };
+            context = loop {
+                match coroutine.resume(arg.take()) {
+                    ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                    ImapSelectResult::Ok { context, .. } => break context,
+                    ImapSelectResult::Err { err, .. } => bail!(err),
+                }
+            };
+        }
 
-        // Parse sequence set and destination
         let sequence_set = self.sequence_set.as_str().try_into()?;
-        let destination: Mailbox<'static> = self.destination.try_into()?;
+        let destination: Mailbox = self.destination.name.try_into()?;
 
-        // COPY
         let mut arg = None;
         let mut coroutine = ImapCopy::new(context, sequence_set, destination, !self.seq);
 

@@ -10,11 +10,10 @@ use crate::imap::{
     },
 };
 
-/// Manage message flags.
+/// Manage IMAP flags.
 ///
 /// A flag is a label attached to a message. This subcommand allows
-/// you to manage them: list available flags, add flags to messages,
-/// remove flags from messages, etc.
+/// you to manage them.
 #[derive(Debug, Subcommand)]
 pub enum FlagCommand {
     List(ListFlagsCommand),

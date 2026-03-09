@@ -1,6 +1,6 @@
 use std::{fmt, num::NonZeroU32};
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use io_imap::{
     coroutines::{fetch::*, select::*},
@@ -11,7 +11,11 @@ use mail_parser::MessageParser;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 
-use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameOptionalFlag, stream};
+use crate::imap::{
+    account::ImapAccount,
+    mailbox::arg::{MailboxNameOptionalFlag, MailboxSelectFlag},
+    stream,
+};
 
 /// Read message content.
 ///
@@ -21,6 +25,8 @@ use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameOptionalFlag, s
 pub struct ReadMessageCommand {
     #[command(flatten)]
     pub mailbox: MailboxNameOptionalFlag,
+    #[command(flatten)]
+    pub select: MailboxSelectFlag,
 
     /// The message UID (or sequence number with --seq).
     #[arg(name = "id", value_name = "ID")]
@@ -41,24 +47,26 @@ pub struct ReadMessageCommand {
 
 impl ReadMessageCommand {
     pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let (context, mut stream) = stream::connect(account.backend)?;
+        let (mut context, mut stream) = stream::connect(account.backend)?;
 
         let mailbox = self.mailbox.name.try_into()?;
 
-        // SELECT mailbox
-        let mut arg = None;
-        let mut coroutine = ImapSelect::new(context, mailbox);
+        if self.select.r#true {
+            let mut arg = None;
+            let mut coroutine = ImapSelect::new(context, mailbox);
 
-        let context = loop {
-            match coroutine.resume(arg.take()) {
-                ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
-                ImapSelectResult::Ok { context, .. } => break context,
-                ImapSelectResult::Err { err, .. } => bail!(err),
-            }
+            context = loop {
+                match coroutine.resume(arg.take()) {
+                    ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                    ImapSelectResult::Ok { context, .. } => break context,
+                    ImapSelectResult::Err { err, .. } => bail!(err),
+                }
+            };
+        }
+
+        let Some(id) = NonZeroU32::new(self.id) else {
+            bail!("ID must be non-zero");
         };
-
-        // FETCH with BODY.PEEK[] to avoid marking as read
-        let id = NonZeroU32::new(self.id).ok_or_else(|| anyhow::anyhow!("ID must be non-zero"))?;
 
         let item_names =
             MacroOrMessageDataItemNames::MessageDataItemNames(vec![MessageDataItemName::BodyExt {
@@ -78,8 +86,8 @@ impl ReadMessageCommand {
             }
         };
 
-        // Extract raw message bytes
         let mut raw_message: Option<Vec<u8>> = None;
+
         for item in items.into_iter() {
             if let MessageDataItem::BodyExt { data, .. } = item {
                 if let Some(data) = data.0 {
@@ -88,25 +96,23 @@ impl ReadMessageCommand {
             }
         }
 
-        let raw = raw_message.ok_or_else(|| anyhow::anyhow!("No message data returned"))?;
+        let Some(raw) = raw_message else {
+            bail!("No message found");
+        };
 
-        // Parse message using mail-parser
-        let message = MessageParser::default()
-            .parse(&raw)
-            .ok_or_else(|| anyhow::anyhow!("Failed to parse message"))?;
+        let Some(message) = MessageParser::new().parse(&raw) else {
+            bail!("Invalid message");
+        };
 
         let content = if self.html {
-            // Get HTML content
             message
                 .body_html(0)
                 .map(|s| s.to_string())
-                .ok_or_else(|| anyhow::anyhow!("No HTML content found"))?
+                .ok_or_else(|| anyhow!("No HTML content found"))?
         } else {
-            // Get plain text, or convert HTML to text
             if let Some(text) = message.body_text(0) {
                 text.to_string()
             } else if let Some(html) = message.body_html(0) {
-                // Convert HTML to text
                 html2text::from_read(html.as_bytes(), self.width)
             } else {
                 bail!("No text or HTML content found");
@@ -114,9 +120,7 @@ impl ReadMessageCommand {
         };
 
         let output = MessageContent { content };
-
-        printer.out(output)?;
-        Ok(())
+        printer.out(output)
     }
 }
 
