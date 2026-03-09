@@ -19,9 +19,7 @@ fn main() {
     let config_paths = cli.config_paths.as_ref();
     let account_name = cli.account.name.as_deref();
 
-    let result = cli
-        .command
-        .execute(&mut printer, config_paths, account_name);
+    let result = cli.command.exec(&mut printer, config_paths, account_name);
 
     ErrorReport::eval(&mut printer, result)
 }

@@ -13,14 +13,14 @@ use crate::{config::SmtpConfig, smtp::message::command::MessageCommand};
 #[command(rename_all = "lowercase")]
 pub enum SmtpCommand {
     #[command(subcommand)]
-    #[command(aliases = ["message", "msg"])]
+    #[command(aliases = ["msgs", "msg"])]
     Messages(MessageCommand),
 }
 
 impl SmtpCommand {
-    pub fn execute(self, printer: &mut impl Printer, config: SmtpConfig) -> Result<()> {
+    pub fn exec(self, printer: &mut impl Printer, config: SmtpConfig) -> Result<()> {
         match self {
-            Self::Messages(cmd) => cmd.execute(printer, config),
+            Self::Messages(cmd) => cmd.exec(printer, config),
         }
     }
 }

@@ -19,7 +19,6 @@ use crate::{
 #[command(rename_all = "lowercase")]
 pub enum ImapCommand {
     #[command(subcommand)]
-    #[command(aliases = ["envelope", "env"])]
     Envelopes(EnvelopeCommand),
     #[command(subcommand)]
     Flags(FlagCommand),
@@ -27,17 +26,17 @@ pub enum ImapCommand {
     #[command(aliases = ["mboxes", "mbox"])]
     Mailboxes(MailboxCommand),
     #[command(subcommand)]
-    #[command(aliases = ["message", "msg"])]
+    #[command(aliases = ["msgs", "msg"])]
     Messages(MessageCommand),
 }
 
 impl ImapCommand {
-    pub fn execute(self, printer: &mut impl Printer, config: ImapConfig) -> Result<()> {
+    pub fn exec(self, printer: &mut impl Printer, config: ImapConfig) -> Result<()> {
         match self {
-            Self::Envelopes(cmd) => cmd.execute(printer, config),
-            Self::Flags(cmd) => cmd.execute(printer, config),
-            Self::Mailboxes(cmd) => cmd.execute(printer, config),
-            Self::Messages(cmd) => cmd.execute(printer, config),
+            Self::Envelopes(cmd) => cmd.exec(printer, config),
+            Self::Flags(cmd) => cmd.exec(printer, config),
+            Self::Mailboxes(cmd) => cmd.exec(printer, config),
+            Self::Messages(cmd) => cmd.exec(printer, config),
         }
     }
 }

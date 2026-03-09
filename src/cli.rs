@@ -61,31 +61,35 @@ pub enum BackendCommand {
 }
 
 impl BackendCommand {
-    pub fn execute(
+    pub fn exec(
         self,
         printer: &mut impl Printer,
         config_paths: &[PathBuf],
         account_name: Option<&str>,
     ) -> Result<()> {
         match self {
+            #[cfg(feature = "imap")]
             Self::Imap(cmd) => {
                 let config = Config::from_paths_or_default(config_paths)?;
-                let (_, account_config) = config.get_account(account_name)?;
+                let (account_name, account_config) = config.get_account(account_name)?;
                 let Some(imap_config) = account_config.imap else {
-                    bail!("IMAP config is missing for this account")
+                    bail!("IMAP config is missing for account `{account_name}`")
                 };
 
-                cmd.execute(printer, imap_config)
+                cmd.exec(printer, imap_config)
             }
+            #[cfg(feature = "smtp")]
             Self::Smtp(cmd) => {
                 let config = Config::from_paths_or_default(config_paths)?;
-                let (_, account_config) = config.get_account(account_name)?;
+                let (account_name, account_config) = config.get_account(account_name)?;
                 let Some(smtp_config) = account_config.smtp else {
-                    bail!("SMTP config is missing for this account")
+                    bail!("SMTP config is missing for account `{account_name}`")
                 };
 
-                cmd.execute(printer, smtp_config)
+                cmd.exec(printer, smtp_config)
             }
+            #[allow(unreachable_patterns)]
+            _ => bail!("No backend available"),
         }
     }
 }

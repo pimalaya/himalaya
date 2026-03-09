@@ -12,33 +12,26 @@ documentation = "https://github.com/pimalaya/himalaya"
 repository = "https://github.com/pimalaya/himalaya"
 
 [package.metadata.docs.rs]
-features = ["imap", "maildir", "smtp", "sendmail", "oauth2", "wizard", "pgp-commands", "pgp-native"]
+all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-default = ["smtp", "imap", "rustls-ring"]
-smtp = ["dep:io-smtp"]
+default = ["imap", "smtp", "rustls-ring"]
+
 imap = ["dep:io-imap"]
+smtp = ["dep:io-smtp"]
+
 rustls-aws = ["dep:rustls-platform-verifier", "rustls/aws-lc-rs"]
 rustls-ring = ["dep:rustls-platform-verifier", "rustls/ring"]
 native-tls = ["dep:native-tls"]
-# maildir = ["email-lib/maildir", "pimalaya-tui/maildir"]
-# notmuch = ["email-lib/notmuch", "pimalaya-tui/notmuch"]
-# smtp = ["email-lib/smtp", "pimalaya-tui/smtp"]
-# sendmail = ["email-lib/sendmail", "pimalaya-tui/sendmail"]
-# keyring = ["email-lib/keyring", "pimalaya-tui/keyring", "secret-lib/keyring"]
-# oauth2 = ["email-lib/oauth2", "pimalaya-tui/oauth2", "keyring"]
-# wizard = ["email-lib/autoconfig", "pimalaya-tui/wizard"]
-# pgp-commands = ["email-lib/pgp-commands", "mml-lib/pgp-commands", "pimalaya-tui/pgp-commands"]
-# pgp-gpg = ["email-lib/pgp-gpg", "mml-lib/pgp-gpg", "pimalaya-tui/pgp-gpg"]
-# pgp-native = ["email-lib/pgp-native", "mml-lib/pgp-native", "pimalaya-tui/pgp-native"]
+
+vendored = ["native-tls?/vendored"]
 
 [build-dependencies]
 pimalaya-toolbox = { version = "0.0.4", default-features = false, features = ["build"] }
 
 [dependencies]
 anyhow = "1"
-ariadne = { version = "0.2", features = ["auto-color"] }
 chrono = { version = "0.4", default-features = false }
 clap = { version = "4.4", features = ["derive", "env", "wrap_help"] }
 comfy-table = "7"
@@ -59,10 +52,8 @@ rustls = { version = "0.23", default-features = false, optional = true }
 rustls-platform-verifier = { version = "0.6", optional = true }
 secrecy = "0.10"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
 shellexpand = "3.1"
 url = { version = "2.2", features = ["serde"] }
-uuid = { version = "1.19", features = ["v4"] }
 
 [target.'cfg(windows)'.dependencies]
 uds_windows = "1"
