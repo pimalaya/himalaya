@@ -14,11 +14,11 @@ use pimalaya_toolbox::{
     },
 };
 
-use crate::config::Config;
 #[cfg(feature = "imap")]
 use crate::imap::command::ImapCommand;
 #[cfg(feature = "smtp")]
 use crate::smtp::command::SmtpCommand;
+use crate::{account::Account, config::Config};
 
 #[derive(Parser, Debug)]
 #[command(name = env!("CARGO_PKG_NAME"))]
@@ -71,22 +71,28 @@ impl BackendCommand {
             #[cfg(feature = "imap")]
             Self::Imap(cmd) => {
                 let config = Config::from_paths_or_default(config_paths)?;
-                let (account_name, account_config) = config.get_account(account_name)?;
-                let Some(imap_config) = account_config.imap else {
+                let (account_name, mut account_config) = config.get_account(account_name)?;
+
+                let Some(imap_config) = account_config.imap.take() else {
                     bail!("IMAP config is missing for account `{account_name}`")
                 };
 
-                cmd.exec(printer, imap_config)
+                let account = Account::new(config, account_config, imap_config)?;
+
+                cmd.exec(printer, account)
             }
             #[cfg(feature = "smtp")]
             Self::Smtp(cmd) => {
                 let config = Config::from_paths_or_default(config_paths)?;
-                let (account_name, account_config) = config.get_account(account_name)?;
-                let Some(smtp_config) = account_config.smtp else {
+                let (account_name, mut account_config) = config.get_account(account_name)?;
+
+                let Some(smtp_config) = account_config.smtp.take() else {
                     bail!("SMTP config is missing for account `{account_name}`")
                 };
 
-                cmd.exec(printer, smtp_config)
+                let account = Account::new(config, account_config, smtp_config)?;
+
+                cmd.exec(printer, account)
             }
             #[allow(unreachable_patterns)]
             _ => bail!("No backend available"),

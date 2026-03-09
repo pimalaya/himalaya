@@ -4,9 +4,12 @@ use pimalaya_toolbox::terminal::printer::Printer;
 
 use crate::{
     config::ImapConfig,
-    imap::envelope::{
-        get::GetEnvelopeCommand, list::ListEnvelopesCommand, search::SearchEnvelopesCommand,
-        sort::SortEnvelopesCommand, thread::ThreadEnvelopesCommand,
+    imap::{
+        account::ImapAccount,
+        envelope::{
+            get::GetEnvelopeCommand, list::ListEnvelopesCommand, search::SearchEnvelopesCommand,
+            sort::SortEnvelopesCommand, thread::ThreadEnvelopesCommand,
+        },
     },
 };
 
@@ -25,13 +28,13 @@ pub enum EnvelopeCommand {
 }
 
 impl EnvelopeCommand {
-    pub fn exec(self, printer: &mut impl Printer, config: ImapConfig) -> Result<()> {
+    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         match self {
-            Self::List(cmd) => cmd.exec(printer, config),
-            Self::Get(cmd) => cmd.exec(printer, config),
-            Self::Search(cmd) => cmd.exec(printer, config),
-            Self::Sort(cmd) => cmd.exec(printer, config),
-            Self::Thread(cmd) => cmd.exec(printer, config),
+            Self::List(cmd) => cmd.exec(printer, account),
+            Self::Get(cmd) => cmd.exec(printer, account),
+            Self::Search(cmd) => cmd.exec(printer, account),
+            Self::Sort(cmd) => cmd.exec(printer, account),
+            Self::Thread(cmd) => cmd.exec(printer, account),
         }
     }
 }

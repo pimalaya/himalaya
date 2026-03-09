@@ -14,13 +14,11 @@ use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::{Serialize, Serializer};
 
-use crate::{
-    config::ImapConfig,
-    imap::{
-        envelope::list::{decode_mime, format_addresses},
-        mailbox::arg::MailboxNameOptionalFlag,
-        stream,
-    },
+use crate::imap::{
+    account::ImapAccount,
+    envelope::list::{decode_mime, format_addresses},
+    mailbox::arg::MailboxNameOptionalFlag,
+    stream,
 };
 
 /// Get a single message envelope.
@@ -43,8 +41,8 @@ pub struct GetEnvelopeCommand {
 }
 
 impl GetEnvelopeCommand {
-    pub fn exec(self, printer: &mut impl Printer, config: ImapConfig) -> Result<()> {
-        let (context, mut stream) = stream::connect(config)?;
+    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+        let (context, mut stream) = stream::connect(account.backend)?;
 
         let mailbox = self.mailbox.name.try_into()?;
 

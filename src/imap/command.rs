@@ -2,12 +2,9 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_toolbox::terminal::printer::Printer;
 
-use crate::{
-    config::ImapConfig,
-    imap::{
-        envelope::command::EnvelopeCommand, flag::command::FlagCommand,
-        mailbox::command::MailboxCommand, message::command::MessageCommand,
-    },
+use crate::imap::{
+    account::ImapAccount, envelope::command::EnvelopeCommand, flag::command::FlagCommand,
+    mailbox::command::MailboxCommand, message::command::MessageCommand,
 };
 
 /// IMAP CLI (requires `imap` cargo feature).
@@ -31,12 +28,12 @@ pub enum ImapCommand {
 }
 
 impl ImapCommand {
-    pub fn exec(self, printer: &mut impl Printer, config: ImapConfig) -> Result<()> {
+    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         match self {
-            Self::Envelopes(cmd) => cmd.exec(printer, config),
-            Self::Flags(cmd) => cmd.exec(printer, config),
-            Self::Mailboxes(cmd) => cmd.exec(printer, config),
-            Self::Messages(cmd) => cmd.exec(printer, config),
+            Self::Envelopes(cmd) => cmd.exec(printer, account),
+            Self::Flags(cmd) => cmd.exec(printer, account),
+            Self::Mailboxes(cmd) => cmd.exec(printer, account),
+            Self::Messages(cmd) => cmd.exec(printer, account),
         }
     }
 }

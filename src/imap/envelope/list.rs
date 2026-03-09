@@ -18,7 +18,7 @@ use pimalaya_toolbox::terminal::printer::Printer;
 use rfc2047_decoder::{Decoder, RecoverStrategy};
 use serde::{Serialize, Serializer};
 
-use crate::{config::ImapConfig, imap::mailbox::arg::MailboxNameOptionalArg, imap::stream};
+use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameOptionalArg, stream};
 
 /// Decode RFC 2047 MIME-encoded string, falling back to original on error.
 pub fn decode_mime(s: &str) -> String {
@@ -52,8 +52,8 @@ pub struct ListEnvelopesCommand {
 }
 
 impl ListEnvelopesCommand {
-    pub fn exec(self, printer: &mut impl Printer, config: ImapConfig) -> Result<()> {
-        let (context, mut stream) = stream::connect(config)?;
+    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+        let (context, mut stream) = stream::connect(account.backend)?;
 
         let mailbox = self.mailbox.name.try_into()?;
 
@@ -163,7 +163,7 @@ impl fmt::Display for EnvelopesTable {
         let id_header = if self.uid_mode { "UID" } else { "SEQ" };
 
         table
-            .load_preset(presets::ASCII_MARKDOWN)
+            .load_preset(presets::ASCII_FULL)
             .set_content_arrangement(ContentArrangement::DynamicFullWidth)
             .set_header(Row::from([
                 Cell::new(id_header),

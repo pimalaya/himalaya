@@ -1,4 +1,4 @@
-use std::io::{self, Read};
+use std::io::{stdin, Read};
 
 use anyhow::{bail, Result};
 use clap::Parser;
@@ -12,7 +12,7 @@ use io_imap::{
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
-use crate::{config::ImapConfig, imap::stream};
+use crate::imap::{account::ImapAccount, stream};
 
 /// Save a message to a mailbox.
 ///
@@ -35,12 +35,12 @@ pub struct SaveMessageCommand {
 }
 
 impl SaveMessageCommand {
-    pub fn exec(self, printer: &mut impl Printer, config: ImapConfig) -> Result<()> {
-        let (mut context, mut stream) = stream::connect(config)?;
+    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+        let (mut context, mut stream) = stream::connect(account.backend)?;
 
         // Read message from stdin
         let mut message = Vec::new();
-        io::stdin().read_to_end(&mut message)?;
+        stdin().read_to_end(&mut message)?;
 
         if message.is_empty() {
             bail!("No message provided on stdin");

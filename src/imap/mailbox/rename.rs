@@ -4,12 +4,10 @@ use io_imap::coroutines::rename::*;
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
-use crate::{
-    config::ImapConfig,
-    imap::{
-        mailbox::arg::{MailboxNameArg, TargetMailboxNameArg},
-        stream,
-    },
+use crate::imap::{
+    account::ImapAccount,
+    mailbox::arg::{MailboxNameArg, TargetMailboxNameArg},
+    stream,
 };
 
 /// Rename the given mailbox.
@@ -25,8 +23,8 @@ pub struct RenameMailboxCommand {
 }
 
 impl RenameMailboxCommand {
-    pub fn exec(self, printer: &mut impl Printer, config: ImapConfig) -> Result<()> {
-        let (context, mut stream) = stream::connect(config)?;
+    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+        let (context, mut stream) = stream::connect(account.backend)?;
 
         let from = self.from.name.try_into()?;
         let to = self.to.name.try_into()?;

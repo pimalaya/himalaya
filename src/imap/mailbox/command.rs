@@ -4,12 +4,15 @@ use pimalaya_toolbox::terminal::printer::Printer;
 
 use crate::{
     config::ImapConfig,
-    imap::mailbox::{
-        close::CloseMailboxCommand, create::CreateMailboxCommand, delete::DeleteMailboxCommand,
-        expunge::ExpungeMailboxCommand, list::ListMailboxesCommand, purge::PurgeMailboxCommand,
-        rename::RenameMailboxCommand, select::SelectMailboxCommand, status::StatusMailboxCommand,
-        subscribe::SubscribeMailboxCommand, unselect::UnselectMailboxCommand,
-        unsubscribe::UnsubscribeMailboxCommand,
+    imap::{
+        account::ImapAccount,
+        mailbox::{
+            close::CloseMailboxCommand, create::CreateMailboxCommand, delete::DeleteMailboxCommand,
+            expunge::ExpungeMailboxCommand, list::ListMailboxesCommand, purge::PurgeMailboxCommand,
+            rename::RenameMailboxCommand, select::SelectMailboxCommand,
+            status::StatusMailboxCommand, subscribe::SubscribeMailboxCommand,
+            unselect::UnselectMailboxCommand, unsubscribe::UnsubscribeMailboxCommand,
+        },
     },
 };
 
@@ -37,20 +40,20 @@ pub enum MailboxCommand {
 }
 
 impl MailboxCommand {
-    pub fn exec(self, printer: &mut impl Printer, config: ImapConfig) -> Result<()> {
+    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         match self {
-            Self::Close(cmd) => cmd.exec(printer, config),
-            Self::Create(cmd) => cmd.exec(printer, config),
-            Self::Delete(cmd) => cmd.exec(printer, config),
-            Self::Expunge(cmd) => cmd.exec(printer, config),
-            Self::List(cmd) => cmd.exec(printer, config),
-            Self::Purge(cmd) => cmd.exec(printer, config),
-            Self::Rename(cmd) => cmd.exec(printer, config),
-            Self::Select(cmd) => cmd.exec(printer, config),
-            Self::Status(cmd) => cmd.exec(printer, config),
-            Self::Subscribe(cmd) => cmd.exec(printer, config),
-            Self::Unselect(cmd) => cmd.exec(printer, config),
-            Self::Unsubscribe(cmd) => cmd.exec(printer, config),
+            Self::Close(cmd) => cmd.exec(printer, account),
+            Self::Create(cmd) => cmd.exec(printer, account),
+            Self::Delete(cmd) => cmd.exec(printer, account),
+            Self::Expunge(cmd) => cmd.exec(printer, account),
+            Self::List(cmd) => cmd.exec(printer, account),
+            Self::Purge(cmd) => cmd.exec(printer, account),
+            Self::Rename(cmd) => cmd.exec(printer, account),
+            Self::Select(cmd) => cmd.exec(printer, account),
+            Self::Status(cmd) => cmd.exec(printer, account),
+            Self::Subscribe(cmd) => cmd.exec(printer, account),
+            Self::Unselect(cmd) => cmd.exec(printer, account),
+            Self::Unsubscribe(cmd) => cmd.exec(printer, account),
         }
     }
 }

@@ -7,7 +7,7 @@ use io_imap::{
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
-use crate::{config::ImapConfig, imap::mailbox::arg::MailboxNameOptionalFlag, imap::stream};
+use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameOptionalFlag, stream};
 
 /// Copy messages to another mailbox.
 ///
@@ -32,8 +32,8 @@ pub struct CopyMessageCommand {
 }
 
 impl CopyMessageCommand {
-    pub fn exec(self, printer: &mut impl Printer, config: ImapConfig) -> Result<()> {
-        let (context, mut stream) = stream::connect(config)?;
+    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+        let (context, mut stream) = stream::connect(account.backend)?;
 
         let mailbox = self.mailbox.name.try_into()?;
 

@@ -13,7 +13,7 @@ use io_stream::runtimes::std::handle;
 use mail_parser::{Addr, Address, HeaderName, HeaderValue, MessageParser};
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
-use crate::{config::SmtpConfig, smtp::stream};
+use crate::smtp::{account::SmtpAccount, stream};
 
 /// Send a message to a mailbox.
 ///
@@ -28,8 +28,8 @@ pub struct SendMessageCommand {
 }
 
 impl SendMessageCommand {
-    pub fn exec(self, printer: &mut impl Printer, config: SmtpConfig) -> Result<()> {
-        let (context, mut stream) = stream::connect(config)?;
+    pub fn exec(self, printer: &mut impl Printer, account: SmtpAccount) -> Result<()> {
+        let (context, mut stream) = stream::connect(account.backend)?;
 
         let message = if stdin().is_terminal() || printer.is_json() {
             self.message

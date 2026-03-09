@@ -4,7 +4,7 @@ use io_imap::coroutines::delete::*;
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
-use crate::{config::ImapConfig, imap::mailbox::arg::MailboxNameArg, imap::stream};
+use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg, stream};
 
 /// Delete the given mailbox.
 ///
@@ -17,8 +17,8 @@ pub struct DeleteMailboxCommand {
 }
 
 impl DeleteMailboxCommand {
-    pub fn exec(self, printer: &mut impl Printer, config: ImapConfig) -> Result<()> {
-        let (context, mut stream) = stream::connect(config)?;
+    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+        let (context, mut stream) = stream::connect(account.backend)?;
 
         let mailbox = self.mailbox.name.try_into()?;
 

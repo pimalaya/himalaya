@@ -11,7 +11,7 @@ use mail_parser::MessageParser;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 
-use crate::{config::ImapConfig, imap::mailbox::arg::MailboxNameOptionalFlag, imap::stream};
+use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameOptionalFlag, stream};
 
 /// Read message content.
 ///
@@ -40,8 +40,8 @@ pub struct ReadMessageCommand {
 }
 
 impl ReadMessageCommand {
-    pub fn exec(self, printer: &mut impl Printer, config: ImapConfig) -> Result<()> {
-        let (context, mut stream) = stream::connect(config)?;
+    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+        let (context, mut stream) = stream::connect(account.backend)?;
 
         let mailbox = self.mailbox.name.try_into()?;
 

@@ -4,7 +4,7 @@ use io_imap::coroutines::close::*;
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
-use crate::{config::ImapConfig, imap::stream};
+use crate::imap::{account::ImapAccount, stream};
 
 /// Close the current, selected mailbox.
 ///
@@ -19,8 +19,8 @@ use crate::{config::ImapConfig, imap::stream};
 pub struct CloseMailboxCommand;
 
 impl CloseMailboxCommand {
-    pub fn exec(self, printer: &mut impl Printer, config: ImapConfig) -> Result<()> {
-        let (context, mut stream) = stream::connect(config)?;
+    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+        let (context, mut stream) = stream::connect(account.backend)?;
 
         let mut arg = None;
         let mut close_coroutine = ImapClose::new(context);

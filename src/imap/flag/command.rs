@@ -4,9 +4,12 @@ use pimalaya_toolbox::terminal::printer::Printer;
 
 use crate::{
     config::ImapConfig,
-    imap::flag::{
-        add::AddFlagsCommand, list::ListFlagsCommand, remove::RemoveFlagsCommand,
-        set::SetFlagsCommand,
+    imap::{
+        account::ImapAccount,
+        flag::{
+            add::AddFlagsCommand, list::ListFlagsCommand, remove::RemoveFlagsCommand,
+            set::SetFlagsCommand,
+        },
     },
 };
 
@@ -24,12 +27,12 @@ pub enum FlagCommand {
 }
 
 impl FlagCommand {
-    pub fn exec(self, printer: &mut impl Printer, config: ImapConfig) -> Result<()> {
+    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         match self {
-            Self::List(cmd) => cmd.exec(printer, config),
-            Self::Add(cmd) => cmd.exec(printer, config),
-            Self::Set(cmd) => cmd.exec(printer, config),
-            Self::Remove(cmd) => cmd.exec(printer, config),
+            Self::List(cmd) => cmd.exec(printer, account),
+            Self::Add(cmd) => cmd.exec(printer, account),
+            Self::Set(cmd) => cmd.exec(printer, account),
+            Self::Remove(cmd) => cmd.exec(printer, account),
         }
     }
 }

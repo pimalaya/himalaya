@@ -3,13 +3,15 @@ use std::fmt;
 use anyhow::{bail, Result};
 use clap::Parser;
 use comfy_table::{presets, Cell, ContentArrangement, Row, Table};
-use io_imap::coroutines::status::*;
-use io_imap::types::status::{StatusDataItem, StatusDataItemName};
+use io_imap::{
+    coroutines::status::*,
+    types::status::{StatusDataItem, StatusDataItemName},
+};
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::{Serialize, Serializer};
 
-use crate::{config::ImapConfig, imap::mailbox::arg::MailboxNameArg, imap::stream};
+use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg, stream};
 
 /// Get the status of the given mailbox.
 ///
@@ -22,8 +24,8 @@ pub struct StatusMailboxCommand {
 }
 
 impl StatusMailboxCommand {
-    pub fn exec(self, printer: &mut impl Printer, config: ImapConfig) -> Result<()> {
-        let (context, mut stream) = stream::connect(config)?;
+    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+        let (context, mut stream) = stream::connect(account.backend)?;
 
         let mailbox = self.mailbox.name.try_into()?;
         let item_names = vec![

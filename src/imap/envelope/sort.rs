@@ -14,9 +14,9 @@ use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::{Serialize, Serializer};
 
-use crate::{
-    config::ImapConfig,
-    imap::{envelope::search::parse_query, mailbox::arg::MailboxNameOptionalArg, stream},
+use crate::imap::{
+    account::ImapAccount, envelope::search::parse_query, mailbox::arg::MailboxNameOptionalArg,
+    stream,
 };
 
 /// Sort messages by criteria.
@@ -56,8 +56,8 @@ pub struct SortEnvelopesCommand {
 }
 
 impl SortEnvelopesCommand {
-    pub fn exec(self, printer: &mut impl Printer, config: ImapConfig) -> Result<()> {
-        let (context, mut stream) = stream::connect(config)?;
+    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+        let (context, mut stream) = stream::connect(account.backend)?;
 
         let mailbox = self.mailbox.name.try_into()?;
 
