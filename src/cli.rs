@@ -17,6 +17,8 @@ use pimalaya_toolbox::{
 use crate::config::Config;
 #[cfg(feature = "imap")]
 use crate::imap::command::ImapCommand;
+#[cfg(feature = "smtp")]
+use crate::smtp::command::SmtpCommand;
 
 #[derive(Parser, Debug)]
 #[command(name = env!("CARGO_PKG_NAME"))]
@@ -53,6 +55,9 @@ pub enum BackendCommand {
     #[cfg(feature = "imap")]
     #[command(subcommand)]
     Imap(ImapCommand),
+    #[cfg(feature = "smtp")]
+    #[command(subcommand)]
+    Smtp(SmtpCommand),
 }
 
 impl BackendCommand {
@@ -71,6 +76,15 @@ impl BackendCommand {
                 };
 
                 cmd.execute(printer, imap_config)
+            }
+            Self::Smtp(cmd) => {
+                let config = Config::from_paths_or_default(config_paths)?;
+                let (_, account_config) = config.get_account(account_name)?;
+                let Some(smtp_config) = account_config.smtp else {
+                    bail!("SMTP config is missing for this account")
+                };
+
+                cmd.execute(printer, smtp_config)
             }
         }
     }

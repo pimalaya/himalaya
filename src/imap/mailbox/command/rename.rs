@@ -6,11 +6,13 @@ use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::{
     config::ImapConfig,
-    imap::mailbox::arg::name::{MailboxNameArg, TargetMailboxNameArg},
-    imap::stream,
+    imap::{
+        mailbox::arg::name::{MailboxNameArg, TargetMailboxNameArg},
+        stream,
+    },
 };
 
-/// Rename a mailbox.
+/// Rename the given mailbox.
 ///
 /// This command renames an existing mailbox to a new name.
 #[derive(Debug, Parser)]

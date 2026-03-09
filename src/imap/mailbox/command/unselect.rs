@@ -1,40 +1,26 @@
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_imap::coroutines::{select::*, unselect::*};
+use io_imap::coroutines::unselect::*;
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
-use crate::{config::ImapConfig, imap::mailbox::arg::name::MailboxNameArg, imap::stream};
+use crate::{config::ImapConfig, imap::stream};
 
-/// Unselect a mailbox.
+/// Unselect a current, selected mailbox.
 ///
-/// This command first selects the given mailbox, then unselects it.
 /// Unlike CLOSE, UNSELECT does not expunge deleted messages.
+///
+/// NOTE: Since a selected mailbox is required, this command only
+/// works for stateful IMAP sessions. See:
+///
+/// https://github.com/pimalaya/sirup
 #[derive(Debug, Parser)]
-pub struct UnselectMailboxCommand {
-    #[command(flatten)]
-    pub mailbox: MailboxNameArg,
-}
+pub struct UnselectMailboxCommand;
 
 impl UnselectMailboxCommand {
     pub fn execute(self, printer: &mut impl Printer, config: ImapConfig) -> Result<()> {
         let (context, mut stream) = stream::connect(config)?;
 
-        let mailbox = self.mailbox.name.try_into()?;
-
-        // First SELECT the mailbox
-        let mut arg = None;
-        let mut select_coroutine = ImapSelect::new(context, mailbox);
-
-        let context = loop {
-            match select_coroutine.resume(arg.take()) {
-                ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
-                ImapSelectResult::Ok { context, .. } => break context,
-                ImapSelectResult::Err { err, .. } => bail!(err),
-            }
-        };
-
-        // Then UNSELECT
         let mut arg = None;
         let mut unselect_coroutine = ImapUnselect::new(context);
 

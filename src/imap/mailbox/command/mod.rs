@@ -5,6 +5,7 @@ pub mod expunge;
 pub mod list;
 pub mod purge;
 pub mod rename;
+pub mod select;
 pub mod status;
 pub mod subscribe;
 pub mod unselect;
@@ -19,13 +20,13 @@ use crate::{
     imap::mailbox::command::{
         close::CloseMailboxCommand, create::CreateMailboxCommand, delete::DeleteMailboxCommand,
         expunge::ExpungeMailboxCommand, list::ListMailboxesCommand, purge::PurgeMailboxCommand,
-        rename::RenameMailboxCommand, status::StatusMailboxCommand,
+        rename::RenameMailboxCommand, select::SelectMailboxCommand, status::StatusMailboxCommand,
         subscribe::SubscribeMailboxCommand, unselect::UnselectMailboxCommand,
         unsubscribe::UnsubscribeMailboxCommand,
     },
 };
 
-/// Create, list and purge mailboxes.
+/// Manage IMAP mailboxes.
 ///
 /// A mailbox is a message container. This subcommand allows you to
 /// manage them.
@@ -37,9 +38,11 @@ pub enum MailboxCommand {
     #[command(alias = "remove", alias = "rm")]
     Delete(DeleteMailboxCommand),
     Expunge(ExpungeMailboxCommand),
+    #[command(alias = "lst")]
     List(ListMailboxesCommand),
     Purge(PurgeMailboxCommand),
     Rename(RenameMailboxCommand),
+    Select(SelectMailboxCommand),
     Status(StatusMailboxCommand),
     Subscribe(SubscribeMailboxCommand),
     Unselect(UnselectMailboxCommand),
@@ -56,6 +59,7 @@ impl MailboxCommand {
             Self::List(cmd) => cmd.execute(printer, config),
             Self::Purge(cmd) => cmd.execute(printer, config),
             Self::Rename(cmd) => cmd.execute(printer, config),
+            Self::Select(cmd) => cmd.execute(printer, config),
             Self::Status(cmd) => cmd.execute(printer, config),
             Self::Subscribe(cmd) => cmd.execute(printer, config),
             Self::Unselect(cmd) => cmd.execute(printer, config),

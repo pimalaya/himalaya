@@ -46,6 +46,7 @@ pub struct AccountConfig {
     #[serde(default)]
     pub default: bool,
     pub imap: Option<ImapConfig>,
+    pub smtp: Option<SmtpConfig>,
     #[serde(deserialize_with = "shell_expanded_string")]
     pub email: String,
     pub display_name: Option<String>,
@@ -64,6 +65,20 @@ pub struct AccountConfig {
     // pub envelope: Option<EnvelopeConfig>,
     // pub message: Option<MessageConfig>,
     // pub template: Option<TemplateConfig>,
+}
+
+/// The account configuration.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct SmtpConfig {
+    pub url: Url,
+
+    #[serde(default)]
+    pub tls: TlsConfig,
+    #[serde(default)]
+    pub starttls: bool,
+    #[serde(default)]
+    pub sasl: SaslConfig,
 }
 
 /// The account configuration.

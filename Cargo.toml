@@ -16,7 +16,8 @@ features = ["imap", "maildir", "smtp", "sendmail", "oauth2", "wizard", "pgp-comm
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-default = ["imap", "rustls-ring"]
+default = ["smtp", "imap", "rustls-ring"]
+smtp = ["dep:io-smtp"]
 imap = ["dep:io-imap"]
 rustls-aws = ["dep:rustls-platform-verifier", "rustls/aws-lc-rs"]
 rustls-ring = ["dep:rustls-platform-verifier", "rustls/ring"]
@@ -42,13 +43,18 @@ chrono = { version = "0.4", default-features = false }
 clap = { version = "4.4", features = ["derive", "env", "wrap_help"] }
 comfy-table = "7"
 crossterm = { version = "0.27", features = ["serde"] }
+gethostname = "1"
+html2text = "0.12"
 io-imap = { version = "0.0.1", default-features = false, optional = true }
 io-process = { version = "0.0.2", default-features = false }
+io-smtp = { version = "0.0.1", default-features = false, features = ["ext_auth", "starttls"], optional = true }
 io-stream = { version = "0.0.2", default-features = false, features = ["std"] }
 log = "0.4"
-rfc2047-decoder = "1"
+mail-parser = "0.9"
 native-tls = { version = "0.2", optional = true }
+open = "5"
 pimalaya-toolbox = { version = "0.0.4", default-features = false, features = ["config", "terminal", "secret", "command"] }
+rfc2047-decoder = "1"
 rustls = { version = "0.23", default-features = false, optional = true }
 rustls-platform-verifier = { version = "0.6", optional = true }
 secrecy = "0.10"
@@ -57,14 +63,13 @@ serde_json = "1"
 shellexpand = "3.1"
 url = { version = "2.2", features = ["serde"] }
 uuid = { version = "1.19", features = ["v4"] }
-mail-parser = "0.9"
-html2text = "0.12"
-open = "5"
 
 [target.'cfg(windows)'.dependencies]
 uds_windows = "1"
 
 [patch.crates-io]
-pimalaya-toolbox.path = "../toolbox"
 io-imap.path = "../imap"
 io-process.path = "../process"
+io-smtp.path = "../smtp"
+pimalaya-toolbox.path = "../toolbox"
+smtp-codec.git = "https://github.com/pimalaya/smtp-codec"

@@ -8,34 +8,42 @@ use crate::{config::ImapConfig, imap::mailbox::arg::name::MailboxNameArg, imap::
 
 /// Expunge the given mailbox.
 ///
-/// The concept of expunging is similar to the IMAP one: it definitely
-/// deletes emails from the given mailbox that contain the "deleted"
-/// flag.
+/// All envelopes with the \Deleted flag will be definitely removed
+/// from the given mailbox.
 #[derive(Debug, Parser)]
 pub struct ExpungeMailboxCommand {
     #[command(flatten)]
     pub mailbox: MailboxNameArg,
+
+    /// Select the given mailbox before expunging it.
+    ///
+    /// This argument can be omitted when stateful IMAP sessions are
+    /// used, for example with:
+    ///
+    /// https://github.com/pimalaya/sirup
+    #[arg(short, long, default_value_t)]
+    pub select: bool,
 }
 
 impl ExpungeMailboxCommand {
     pub fn execute(self, printer: &mut impl Printer, config: ImapConfig) -> Result<()> {
-        let (context, mut stream) = stream::connect(config)?;
+        let (mut context, mut stream) = stream::connect(config)?;
 
         let mailbox = self.mailbox.name.try_into()?;
 
-        // First, select the mailbox
-        let mut arg = None;
-        let mut coroutine = ImapSelect::new(context, mailbox);
+        if self.select {
+            let mut arg = None;
+            let mut coroutine = ImapSelect::new(context, mailbox);
 
-        let context = loop {
-            match coroutine.resume(arg.take()) {
-                ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
-                ImapSelectResult::Ok { context, .. } => break context,
-                ImapSelectResult::Err { err, .. } => bail!(err),
-            }
-        };
+            context = loop {
+                match coroutine.resume(arg.take()) {
+                    ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                    ImapSelectResult::Ok { context, .. } => break context,
+                    ImapSelectResult::Err { err, .. } => bail!(err),
+                }
+            };
+        }
 
-        // Then, expunge it
         let mut arg = None;
         let mut coroutine = ImapExpunge::new(context);
 

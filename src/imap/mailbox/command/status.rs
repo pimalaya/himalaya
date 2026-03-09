@@ -11,7 +11,7 @@ use serde::{Serialize, Serializer};
 
 use crate::{config::ImapConfig, imap::mailbox::arg::name::MailboxNameArg, imap::stream};
 
-/// Get the status of a mailbox.
+/// Get the status of the given mailbox.
 ///
 /// This command displays status information about a mailbox,
 /// including message counts and UID values.
@@ -56,9 +56,12 @@ impl StatusMailboxCommand {
 pub struct MailboxStatus {
     pub messages: Option<u32>,
     pub recent: Option<u32>,
+    pub uid_next: Option<u32>,
+    pub uid_validity: Option<u32>,
     pub unseen: Option<u32>,
-    pub uidnext: Option<u32>,
-    pub uidvalidity: Option<u32>,
+    pub deleted: Option<u32>,
+    pub deleted_storage: Option<u64>,
+    pub highest_mod_seq: Option<u64>,
 }
 
 impl From<Vec<StatusDataItem>> for MailboxStatus {
@@ -66,19 +69,24 @@ impl From<Vec<StatusDataItem>> for MailboxStatus {
         let mut status = MailboxStatus {
             messages: None,
             recent: None,
+            uid_next: None,
+            uid_validity: None,
             unseen: None,
-            uidnext: None,
-            uidvalidity: None,
+            deleted: None,
+            deleted_storage: None,
+            highest_mod_seq: None,
         };
 
         for item in items {
             match item {
                 StatusDataItem::Messages(n) => status.messages = Some(n),
                 StatusDataItem::Recent(n) => status.recent = Some(n),
+                StatusDataItem::UidNext(n) => status.uid_next = Some(n.get()),
+                StatusDataItem::UidValidity(n) => status.uid_validity = Some(n.get()),
                 StatusDataItem::Unseen(n) => status.unseen = Some(n),
-                StatusDataItem::UidNext(n) => status.uidnext = Some(n.get()),
-                StatusDataItem::UidValidity(n) => status.uidvalidity = Some(n.get()),
-                _ => {}
+                StatusDataItem::Deleted(n) => status.deleted = Some(n),
+                StatusDataItem::DeletedStorage(n) => status.deleted_storage = Some(n),
+                StatusDataItem::HighestModSeq(n) => status.highest_mod_seq = Some(n),
             }
         }
 
@@ -107,29 +115,43 @@ impl fmt::Display for MailboxStatusTable {
             .set_content_arrangement(ContentArrangement::DynamicFullWidth)
             .set_header(Row::from([Cell::new("ATTRIBUTE"), Cell::new("VALUE")]));
 
-        if let Some(messages) = self.status.messages {
-            table.add_row(Row::from([Cell::new("Messages"), Cell::new(messages)]));
+        if let Some(n) = self.status.messages {
+            table.add_row(Row::from([Cell::new("Messages"), Cell::new(n)]));
         }
-        if let Some(recent) = self.status.recent {
-            table.add_row(Row::from([Cell::new("Recent"), Cell::new(recent)]));
+
+        if let Some(n) = self.status.recent {
+            table.add_row(Row::from([Cell::new("Recent"), Cell::new(n)]));
         }
-        if let Some(unseen) = self.status.unseen {
-            table.add_row(Row::from([Cell::new("Unseen"), Cell::new(unseen)]));
+
+        if let Some(n) = self.status.unseen {
+            table.add_row(Row::from([Cell::new("Unseen"), Cell::new(n)]));
         }
-        if let Some(uidnext) = self.status.uidnext {
-            table.add_row(Row::from([Cell::new("UIDNext"), Cell::new(uidnext)]));
+
+        if let Some(n) = self.status.deleted {
+            table.add_row(Row::from([Cell::new("Deleted"), Cell::new(n)]));
         }
-        if let Some(uidvalidity) = self.status.uidvalidity {
+
+        if let Some(n) = self.status.deleted_storage {
+            table.add_row(Row::from([Cell::new("Deleted storage"), Cell::new(n)]));
+        }
+
+        if let Some(deleted) = self.status.highest_mod_seq {
             table.add_row(Row::from([
-                Cell::new("UIDValidity"),
-                Cell::new(uidvalidity),
+                Cell::new("Highest modified sequence"),
+                Cell::new(deleted),
             ]));
         }
 
+        if let Some(n) = self.status.uid_next {
+            table.add_row(Row::from([Cell::new("UID next"), Cell::new(n)]));
+        }
+
+        if let Some(n) = self.status.uid_validity {
+            table.add_row(Row::from([Cell::new("UID validity"), Cell::new(n)]));
+        }
+
         writeln!(f)?;
-        write!(f, "{table}")?;
-        writeln!(f)?;
-        Ok(())
+        writeln!(f, "{table}")
     }
 }
 
