@@ -1,659 +1,108 @@
-################################################################################
-###[ Global configuration ]#####################################################
-################################################################################
+# --------------------------------
+# Global config
+# --------------------------------
 
-# Default display name for all accounts. It is used to build the full
-# email address of an account: "Example" <example@localhost>
-#
-display-name = "Example"
-
-# Default signature for all accounts. The signature is put at the
-# bottom of all messages. It can be a path or a string. Supports TOML
-# multilines.
-#
-#signature = "/path/to/signature/file"
-#signature = """
-#  Thanks you,
-#  Regards
-#"""
-signature = "Regards,\n"
-
-# Default signature delimiter for all accounts. It delimits the end of
-# the message body from the signature.
-#
-signature-delim = "-- \n"
-
-# Default downloads directory path for all accounts. It is mostly used
-# for downloading attachments. Defaults to the system temporary
-# directory.
-#
-downloads-dir = "~/Downloads"
-
-# Customizes the charset used to build the accounts listing
-# table. Defaults to markdown table style.
-#
-# See <https://docs.rs/comfy-table/latest/comfy_table/presets/index.html>.
-#
-account.list.table.preset = "||  |-|||           "
-
-# Customizes the color of the NAME column of the account listing
-# table.
-#
-account.list.table.name-color = "green"
-
-# Customizes the color of the BACKENDS column of the account listing
-# table.
-#
-account.list.table.backends-color = "blue"
-
-# Customizes the color of the DEFAULT column of the account listing
-# table.
-#
-account.list.table.default-color = "black"
-
-################################################################################
-###[ Account configuration ]####################################################
-################################################################################
-
-# The account name should be unique.
-#
-[accounts.example]
-
-# Defaultness of the account. The current account will be used by
-# default in all commands.
-#
-default = true
-
-# The email address associated to the current account.
-#
-email = "example@localhost"
-
-# The display name of the account. This and the email are used to
-# build the full email address: "Example" <example@localhost>
-#
-display-name = "Example"
-
-# The signature put at the bottom of composed messages. It can be a
-# path or a string. Supports TOML multilines.
-#
-#signature = "/path/to/signature/file"
-#signature = """
-#  Thanks you,
-#  Regards
-#"""
-signature = "Regards,\n"
-
-# Signature delimiter. It delimits the end of the message body from
-# the signature.
-#
-signature-delim = "-- \n"
-
-# Downloads directory path. It is mostly used for downloading
-# attachments. Defaults to the system temporary directory.
-#
+# Downloads directory for all accounts, defaults to /tmp
 downloads-dir = "~/downloads"
 
-
-
-# Defines aliases for your mailboxes. There are 4 special aliases used
-# by the tool: inbox, sent, drafts and trash. Other aliases can be
-# defined as well.
-#
-folder.aliases.inbox = "INBOX"
-folder.aliases.sent = "Sent"
-folder.aliases.drafts = "Drafts"
-folder.aliases.trash = "Trash"
-folder.aliases.a23 = "Archives/2023"
-
-# Customizes the number of folders to show by page.
-#
-folder.list.page-size = 10
-
-# Customizes the charset used to build the table. Defaults to markdown
-# table style.
-#
-# See <https://docs.rs/comfy-table/latest/comfy_table/presets/index.html>.
-#
-folder.list.table.preset = "||  |-|||           "
-
-# Customizes the color of the NAME column of the folder listing table.
-#
-folder.list.table.name-color = "blue"
-
-# Customizes the color of the DESC column of the folder listing table.
-#
-folder.list.table.desc-color = "green"
-
-
-
-# Customizes the number of envelopes to show by page.
-#
-envelope.list.page-size = 10
-
-# Customizes the format of the envelope date.
-#
-# See supported formats at <https://docs.rs/chrono/latest/chrono/format/strftime/>. 
-#
-envelope.list.datetime-fmt = "%F %R%:z"
-
-# Transforms envelopes date timezone into the user's local one. For
-# example, if the user's local timezone is UTC, the envelope date
-# `2023-06-15T09:00:00+02:00` becomes `2023-06-15T07:00:00-00:00`.
-#
-envelope.list.datetime-local-tz = true
-
-# Customizes the charset used to build the table. Defaults to markdown
-# table style.
-#
-# See <https://docs.rs/comfy-table/latest/comfy_table/presets/index.html>.
-#
-envelope.list.table.preset = "||  |-|||           "
-
-# Customizes the character of the unseen flag of the envelope listing
-# table.
-#
-envelope.list.table.unseen-char = "*"
-
-# Customizes the character of the replied flag of the envelope listing
-# table.
-#
-envelope.list.table.replied-char = "R"
-
-# Customizes the character of the flagged flag of the envelope listing
-# table.
-#
-envelope.list.table.flagged-char = "!"
-
-# Customizes the character of the attachment property of the envelope
-# listing table.
-#
-envelope.list.table.attachment-char = "@"
-
-# Customizes the color of the ID column of the envelope listing table.
-#
-envelope.list.table.id-color = "red"
-
-# Customizes the color of the FLAGS column of the envelope listing
-# table.
-#
-envelope.list.table.flags-color = "black"
-
-# Customizes the color of the SUBJECT column of the envelope listing
-# table.
-#
-envelope.list.table.subject-color = "green"
-
-# Customizes the color of the SENDER column of the envelope listing
-# table.
-#
-envelope.list.table.sender-color = "blue"
-
-# Customizes the color of the DATE column of the envelope listing
-# table.
-#
-envelope.list.table.date-color = "yellow"
-
-
-
-# Defines headers to show at the top of messages when reading them.
-#
-message.read.headers = ["From", "To", "Cc", "Subject"]
-
-# Represents the message text/plain format as defined in the
-# RFC2646.
-#
-# See <https://www.ietf.org/rfc/rfc2646.txt>.
-#
-#message.read.format.fixed = 80
-#message.read.format = "flowed"
-message.read.format = "auto"
-
-# Defines headers to show at the top of messages when writing them.
-#
-message.write.headers = ["From", "To", "In-Reply-To", "Cc", "Subject"]
-
-# Saves a copy of sent messages to the sent folder. The sent folder is
-# taken from folder.aliases, defaults to Sent.
-#
-message.send.save-copy = true
-
-# Hook called just before sending a message. The command should take a
-# raw message as standard input (stdin) and returns the modified raw
-# message to the standard output (stdout).
-#
-message.send.pre-hook = "process-markdown.sh"
-
-# Customizes the message deletion style. Message deletion can be
-# performed either by moving messages to the Trash folder or by adding
-# the Deleted flag to their respective envelopes.
-#
-#message.delete.style = "flag"
-message.delete.style = "folder"
-
-
-
-# Defines how and where the signature should be displayed when writing
-# a new message.
-#
-#template.new.signature-style = "hidden"
-#template.new.signature-style = "attached"
-template.new.signature-style = "inlined"
-
-# Defines the posting style when replying to a message.
-#
-# See <https://en.wikipedia.org/wiki/Posting_style>.
-#
-#template.reply.posting-style = "interleaved"
-#template.reply.posting-style = "bottom"
-template.reply.posting-style = "top"
-
-# Defines how and where the signature should be displayed when
-# repyling to a message.
-#
-#template.reply.signature-style = "hidden"
-#template.reply.signature-style = "attached"
-#template.reply.signature-style = "above-quote"
-template.reply.signature-style = "below-quote"
-
-# Defines the headline format put at the top of a quote when replying
-# to a message.
-# 
-# Available placeholders: {senders}
-# See supported date formats at <https://docs.rs/chrono/latest/chrono/format/strftime/>.
-#
-template.reply.quote-headline-fmt = "On %d/%m/%Y %H:%M, {senders} wrote:\n"
-
-# Defines the posting style when forwarding a message.
-#
-# See <https://en.wikipedia.org/wiki/Posting_style>.
-#
-#template.forward.posting-style = "attached"
-template.forward.posting-style = "top"
-
-# Defines how and where the signature should be displayed when
-# forwarding a message.
-#
-#template.forward.signature-style = "hidden"
-#template.forward.signature-style = "attached"
-template.forward.signature-style = "inlined"
-
-# Defines the headline format put at the top of the quote when
-# forwarding a message.
-# 
-template.forward.quote-headline = "-------- Forwarded Message --------\n"
-
-
-
-# Enables PGP using GPG bindings. It requires the GPG lib to be
-# installed on the system, and the `pgp-gpg` cargo feature on.
-#
-#pgp.type = "gpg"
-
-
-
-# Enables PGP using shell commands. A PGP client needs to be installed
-# on the system, like gpg. It also requires the `pgp-commands` cargo
-# feature.
-#
-#pgp.type = "commands"
-
-# Defines the encrypt command. The special placeholder `<recipients>`
-# represents the list of recipients, formatted by
-# `pgp.encrypt-recipient-fmt`.
-#
-#pgp.encrypt-cmd = "gpg --encrypt --quiet --armor <recipients>"
-
-# Formats recipients for `pgp.encrypt-cmd`. The special placeholder
-# `<recipient>` is replaced by an actual recipient at runtime.
-#
-#pgp.encrypt-recipient-fmt = "--recipient <recipient>"
-
-# Defines the separator used between formatted recipients
-# `pgp.encrypt-recipient-fmt`.
-#
-#pgp.encrypt-recipients-sep = " "
-
-# Defines the decrypt command.
-#
-#pgp.decrypt-cmd = "gpg --decrypt --quiet"
-
-# Defines the sign command.
-#
-#pgp.sign-cmd = "gpg --sign --quiet --armor"
-
-# Defines the verify command.
-#
-#pgp.verify-cmd = "gpg --verify --quiet"
-
-
-
-# Enables the native Rust implementation of PGP. It requires the
-# `pgp-native` cargo feature.
-#
-#pgp.type = "native"
-
-# Defines where to find the PGP secret key.
-#
-#pgp.secret-key.path = "/path/to/secret.key"
-#pgp.secret-key.keyring = "my-pgp-secret-key"
-
-# Defines how to retrieve the PGP secret key passphrase.
-#
-#pgp.secret-key-passphrase.raw = "p@assw0rd"
-#pgp.secret-key-passphrase.keyring = "my-pgp-passphrase"
-#pgp.secret-key-passphrase.cmd = "pass show pgp-passphrase"
-
-# Enables the Web Key Discovery protocol to discover recipients'
-# public key based on their email address.
-#
-#pgp.wkd = true
-
-# Enables public key servers discovery.
-#
-#pgp.key-servers = ["hkps://keys.openpgp.org", "hkps://keys.mailvelope.com"]
-
-
-
-# Defines the IMAP backend as the default one for all features.
-#
-backend.type = "imap"
-
-# IMAP server host name.
-#
-backend.host = "localhost"
-
-# IMAP server port.
-#
-#backend.port = 143
-backend.port = 993
-
-# IMAP server encryption.
-#
-#backend.encryption.type = "none"
-#backend.encryption.type = "start-tls"
-backend.encryption.type = "tls"
-
-# IMAP server login.
-#
-backend.login = "example@localhost"
-
-# IMAP server password authentication configuration.
-#
-backend.auth.type = "password"
-#
-# Password can be inlined (not recommended).
-#
-#backend.auth.raw = "p@assw0rd"
-#
-# Password can be stored inside your system global keyring (requires
-# the keyring cargo feature). You must run at least once `himalaya
-# account configure` to set up the password.
-#
-#backend.auth.keyring = "example-imap"
-#
-# Password can be retrieved from a shell command.
-#
-backend.auth.cmd = "pass show example-imap"
-
-# IMAP server OAuth 2.0 authorization configuration.
-#
-#backend.auth.type = "oauth2"
-#
-# Client identifier issued to the client during the registration
-# process described in RFC6749.
-# See <https://datatracker.ietf.org/doc/html/rfc6749#section-2.2>.
-#
-#backend.auth.client-id = "client-id"
-#
-# Client password issued to the client during the registration process
-# described in RFC6749.
-#
-# Defaults to keyring "<account-name>-imap-client-secret".
-# See <https://datatracker.ietf.org/doc/html/rfc6749#section-2.2>.
-#
-#backend.auth.client-secret.raw = "<raw-client-secret>"
-#backend.auth.client-secret.keyring = "example-imap-client-secret"
-#backend.auth.client-secret.cmd = "pass show example-imap-client-secret"
-#
-# Method for presenting an OAuth 2.0 bearer token to a service for
-# authentication.
-#
-#backend.auth.method = "oauthbearer"
-#backend.auth.method = "xoauth2"
-#
-# URL of the authorization server's authorization endpoint.
-#
-#backend.auth.auth-url = "https://accounts.google.com/o/oauth2/v2/auth"
-#
-# URL of the authorization server's token endpoint.
-#
-#backend.auth.token-url = "https://www.googleapis.com/oauth2/v3/token"
-#
-# Access token returned by the token endpoint and used to access
-# protected resources. It is recommended to use the keyring variant,
-# as it will refresh automatically.
-#
-# Defaults to keyring "<account-name>-imap-access-token".
-#
-#backend.auth.access-token.raw = "<raw-access-token>"
-#backend.auth.access-token.keyring = "example-imap-access-token"
-#backend.auth.access-token.cmd = "pass show example-imap-access-token"
-#
-# Refresh token used to obtain a new access token (if supported by the
-# authorization server). It is recommended to use the keyring variant,
-# as it will refresh automatically.
-#
-# Defaults to keyring "<account-name>-imap-refresh-token".
-#
-#backend.auth.refresh-token.raw = "<raw-refresh-token>"
-#backend.auth.refresh-token.keyring = "example-imap-refresh-token"
-#backend.auth.refresh-token.cmd = "pass show example-imap-refresh-token"
-#
-# Enable the protection, as defined in RFC7636.
-#
-# See <https://datatracker.ietf.org/doc/html/rfc7636>.
-#
-#backend.auth.pkce = true
-#
-# Access token scope(s), as defined by the authorization server.
-#
-#backend.auth.scope = "unique scope"
-#backend.auth.scopes = ["multiple", "scopes"]
-#
-# URL scheme of the redirect server.
-# Defaults to http.
-#
-#backend.auth.redirect-scheme = "http"
-#
-# Host name of the redirect server.
-# Defaults to localhost.
-#
-#backend.auth.redirect-host = "localhost"
-#
-# Port of the redirect server.
-# Defaults to the first available one.
-#
-#backend.auth.redirect-port = 9999
-
-# IMAP extensions
-#
-# Automatically sends the ID command straight after
-# authentication. Some providers enforce this rule (like
-# imap.126.com), but it is not standard at all.
-#
-#backend.extensions.id.send_after_auth = true
-
-
-
-# Defines the Maildir backend as the default one for all features.
-#
-#backend.type = "maildir"
-
-# The Maildir root directory. The path should point to the root level
-# of the Maildir directory.
-#
-#backend.root-dir = "~/.Mail/example"
-
-# Does the Maildir folder follows the Maildir++ standard?
-#
-# See <https://en.wikipedia.org/wiki/Maildir#Maildir++>.
-#
-#backend.maildirpp = false
-
-
-
-# Defines the Notmuch backend as the default one for all features.
-#
-#backend.type = "notmuch"
-
-# The path to the Notmuch database. The path should point to the root
-# directory containing the Notmuch database (usually the root Maildir
-# directory).
-#
-#backend.db-path = "~/.Mail/example"
-
-# Overrides the default path to the Maildir folder.
-#
-#backend.maildir-path = "~/.Mail/example"
-
-# Overrides the default Notmuch configuration file path.
-#
-#backend.config-path = "~/.notmuchrc"
-
-# Override the default Notmuch profile name.
-#
-#backend.profile = "example"
-
-
-
-# Defines the SMTP backend for the message sending feature.
-#
-message.send.backend.type = "smtp"
-
-# SMTP server host name.
-#
-message.send.backend.host = "localhost"
-
-# SMTP server port.
-#
-#message.send.backend.port = 25
-#message.send.backend.port = 465
-message.send.backend.port = 587
-
-# SMTP server encryption.
-#
-#message.send.backend.encryption.type = "none"
-#message.send.backend.encryption.type = "start-tls"
-message.send.backend.encryption.type = "tls"
-
-# SMTP server login.
-#
-message.send.backend.login = "example@localhost"
-
-# SMTP server password authentication configuration.
-#
-message.send.backend.auth.type = "password"
-#
-# Password can be inlined (not recommended).
-#
-#message.send.backend.auth.raw = "p@assw0rd"
-#
-# Password can be stored inside your system global keyring (requires
-# the keyring cargo feature). You must run at least once `himalaya
-# account configure` to set up the password.
-#
-#message.send.backend.auth.keyring = "example-smtp"
-#
-# Password can be retrieved from a shell command.
-#
-message.send.backend.auth.cmd = "pass show example-smtp"
-
-# SMTP server OAuth 2.0 authorization configuration.
-#
-#message.send.backend.auth.type = "oauth2"
-#
-# Client identifier issued to the client during the registration
-# process described in RFC6749.
-# See <https://datatracker.ietf.org/doc/html/rfc6749#section-2.2>.
-#
-#message.send.backend.auth.client-id = "client-id"
-#
-# Client password issued to the client during the registration process
-# described in RFC6749.
-#
-# Defaults to keyring "<account-name>-smtp-client-secret".
-# See <https://datatracker.ietf.org/doc/html/rfc6749#section-2.2>.
-#
-#message.send.backend.auth.client-secret.raw = "<raw-client-secret>"
-#message.send.backend.auth.client-secret.keyring = "example-smtp-client-secret"
-#message.send.backend.auth.client-secret.cmd = "pass show example-smtp-client-secret"
-#
-# Method for presenting an OAuth 2.0 bearer token to a service for
-# authentication.
-#
-#message.send.backend.auth.method = "oauthbearer"
-#message.send.backend.auth.method = "xoauth2"
-#
-# URL of the authorization server's authorization endpoint.
-#
-#message.send.backend.auth.auth-url = "https://accounts.google.com/o/oauth2/v2/auth"
-#
-# URL of the authorization server's token endpoint.
-#
-#message.send.backend.auth.token-url = "https://www.googleapis.com/oauth2/v3/token"
-#
-# Access token returned by the token endpoint and used to access
-# protected resources. It is recommended to use the keyring variant,
-# as it will refresh automatically.
-#
-# Defaults to keyring "<account-name>-smtp-access-token".
-#
-#message.send.backend.auth.access-token.raw = "<raw-access-token>"
-#message.send.backend.auth.access-token.keyring = "example-smtp-access-token"
-#message.send.backend.auth.access-token.cmd = "pass show example-smtp-access-token"
-#
-# Refresh token used to obtain a new access token (if supported by the
-# authorization server). It is recommended to use the keyring variant,
-# as it will refresh automatically.
-#
-# Defaults to keyring "<account-name>-smtp-refresh-token".
-#
-#message.send.backend.auth.refresh-token.raw = "<raw-refresh-token>"
-#message.send.backend.auth.refresh-token.keyring = "example-smtp-refresh-token"
-#message.send.backend.auth.refresh-token.cmd = "pass show example-smtp-refresh-token"
-#
-# Enable the protection, as defined in RFC7636.
-#
-# See <https://datatracker.ietf.org/doc/html/rfc7636>.
-#
-#message.send.backend.auth.pkce = true
-#
-# Access token scope(s), as defined by the authorization server.
-#
-#message.send.backend.auth.scope = "unique scope"
-#message.send.backend.auth.scopes = ["multiple", "scopes"]
-#
-# URL scheme of the redirect server.
-# Defaults to http.
-#
-#message.send.backend.auth.redirect-scheme = "http"
-#
-# Host name of the redirect server.
-# Defaults to localhost.
-#
-#message.send.backend.auth.redirect-host = "localhost"
-#
-# Port of the redirect server.
-# Defaults to the first available one.
-#
-#message.send.backend.auth.redirect-port = 9999
-
-
-
-# Defines the Sendmail backend for the message sending feature.
-#
-#message.send.backend.type = "sendmail"
-
-# Customizes the sendmail shell command.
-#
-#message.send.backend.cmd = "/usr/bin/sendmail"
+# https://docs.rs/comfy-table/latest/comfy_table/presets/index.html
+table-preset = "││──╞═╪╡┆    ┬┴┌┐└┘"
+
+# https://docs.rs/comfy-table/latest/comfy_table/enum.ContentArrangement.html#variants
+table-arrangement = "dynamic"
+#table-arrangement = "dynamic-full-width"
+#table-arrangement = "disabled"
+
+# --------------------------------
+# Account config
+# --------------------------------
+
+[accounts.example]
+
+# This account is used by default when `-a|--account` is omitted
+default = true
+
+# Options specific to this particular account
+downloads-dir = "~/downloads"
+table-preset = "││──╞═╪╡┆    ┬┴┌┐└┘"
+table-arrangement = "dynamic"
+
+# --------------------------------
+# IMAP config
+# --------------------------------
+
+# IMAP URL connection in form imap[s]://host[:port]
+imap.url = "imap://127.0.0.1"
+
+# IMAP TLS provider
+imap.tls.provider = "rustls"
+#imap.tls.provider = "native-tls"
+
+# IMAP crypto provider for rustls
+imap.tls.rustls.crypto = "ring"
+#imap.tls.rustls.crypto = "aws"
+
+# Custom IMAP TLS certificate
+#imap.tls.cert = "/path/to/custom/cert.pem"
+
+# Enable STARTTLS (when URL scheme is imaps)
+imap.starttls = false
+
+# SASL mechanisms to try in this particular order
+imap.sasl.mechanisms = ["plain", "login"]
+
+# SASL LOGIN
+# https://datatracker.ietf.org/doc/html/draft-murchison-sasl-login-00
+imap.sasl.login.username = "username"
+imap.sasl.plain.password.command = ["mimosa", "password", "read", "example"]
+#imap.sasl.plain.password.raw = "***"
+
+# SASL PLAIN
+# https://datatracker.ietf.org/doc/html/rfc4616
+imap.sasl.plain.authcid = "username"
+imap.sasl.plain.passwd.command = ["mimosa", "password", "read", "example"]
+#imap.sasl.plain.passwd.raw = "***"
+
+# SASL ANONYMOUS
+# https://datatracker.ietf.org/doc/html/rfc4505
+imap.sasl.anonymous.message = "himalaya"
+
+# --------------------------------
+# SMTP config
+# --------------------------------
+
+# SMTP URL connection in form smtp[s]://host[:port]
+smtp.url = "smtp://127.0.0.1"
+
+# SMTP TLS provider
+smtp.tls.provider = "rustls"
+#smtp.tls.provider = "native-tls"
+
+# SMTP crypto provider for rustls
+smtp.tls.rustls.crypto = "ring"
+#smtp.tls.rustls.crypto = "aws"
+
+# Custom SMTP TLS certificate
+#smtp.tls.cert = "/path/to/custom/cert.pem"
+
+# Enable STARTTLS (when URL scheme is smtps)
+smtp.starttls = false
+
+# SASL mechanisms to try in this particular order
+smtp.sasl.mechanisms = ["plain", "login"]
+
+# SASL LOGIN
+# https://datatracker.ietf.org/doc/html/draft-murchison-sasl-login-00
+smtp.sasl.login.username = "username"
+smtp.sasl.plain.password.command = ["mimosa", "password", "read", "example"]
+#smtp.sasl.plain.password.raw = "***"
+
+# SASL PLAIN
+# https://datatracker.ietf.org/doc/html/rfc4616
+smtp.sasl.plain.authcid = "username"
+smtp.sasl.plain.passwd.command = ["mimosa", "password", "read", "example"]
+#smtp.sasl.plain.passwd.raw = "***"
+
+# SASL ANONYMOUS
+# https://datatracker.ietf.org/doc/html/rfc4505
+smtp.sasl.anonymous.message = "himalaya"
