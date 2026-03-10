@@ -59,8 +59,7 @@ url = { version = "2.2", features = ["serde"] }
 uds_windows = "1"
 
 [patch.crates-io]
-io-imap.path = "../imap"
-io-process.path = "../process"
-io-smtp.path = "../smtp"
-pimalaya-toolbox.path = "../toolbox"
+io-imap = { git = "https://github.com/pimalaya/io-imap", branch = "io" }
+io-smtp.git = "https://github.com/pimalaya/io-smtp"
+pimalaya-toolbox.git = "https://github.com/pimalaya/toolbox"
 smtp-codec.git = "https://github.com/pimalaya/smtp-codec"

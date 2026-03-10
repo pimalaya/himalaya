@@ -613,15 +613,15 @@ dependencies = [
 
 [[package]]
 name = "html2text"
-version = "0.12.5"
+version = "0.12.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c66ee488a63a92237d5b48875b7e05bb293be8fb2894641c8118b60c08ab5ef"
+checksum = "042a9677c258ac2952dd026bb0cd21972f00f644a5a38f5a215cb22cdaf6834e"
 dependencies = [
  "html5ever",
  "markup5ever",
  "tendril",
  "thiserror 1.0.69",
- "unicode-width 0.1.14",
+ "unicode-width 0.1.13",
 ]
 
 [[package]]
@@ -789,6 +789,7 @@ dependencies = [
 [[package]]
 name = "io-imap"
 version = "0.0.1"
+source = "git+https://github.com/pimalaya/io-imap?branch=io#7e9db5349bb4b6495e10a5bba10c0c79a6bba610"
 dependencies = [
  "imap-codec",
  "io-stream",
@@ -801,6 +802,8 @@ dependencies = [
 [[package]]
 name = "io-process"
 version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54362e497536be1b10ad35a790838e89ce30d5095a66f12f5315154cf5041d03"
 dependencies = [
  "dirs",
  "log",
@@ -812,6 +815,7 @@ dependencies = [
 [[package]]
 name = "io-smtp"
 version = "0.0.1"
+source = "git+https://github.com/pimalaya/io-smtp#3a74933b9c6e98723c31c6f8a68b366657ccb395"
 dependencies = [
  "io-stream",
  "log",
@@ -953,9 +957,9 @@ dependencies = [
 
 [[package]]
 name = "libz-sys"
-version = "1.1.24"
+version = "1.1.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4735e9cbde5aac84a5ce588f6b23a90b9b0b528f6c5a8db8a4aff300463a0839"
+checksum = "d52f4c29e2a68ac30c9087e1b772dc9f44a2b66ed44edf2266cf2be9b03dafc1"
 dependencies = [
  "cc",
  "libc",
@@ -1256,6 +1260,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-toolbox"
 version = "0.0.4"
+source = "git+https://github.com/pimalaya/toolbox#d4e301ccbdbbfafcb7e9b18df8d6c098ac6ada0b"
 dependencies = [
  "anyhow",
  "clap",
@@ -1604,9 +1609,9 @@ dependencies = [
 
 [[package]]
 name = "schannel"
-version = "0.1.28"
+version = "0.1.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "891d81b926048e76efe18581bf793546b4c0eaf8448d72be8de2bbee5fd166e1"
+checksum = "91c1b7e4904c873ef0710c1f407dde2e6287de2bebc1bbbf7d430bb7cbffd939"
 dependencies = [
  "windows-sys 0.61.2",
 ]
@@ -1995,9 +2000,9 @@ checksum = "f6ccf251212114b54433ec949fd6a7841275f9ada20dddd2f29e9ceea4501493"
 
 [[package]]
 name = "unicode-width"
-version = "0.1.14"
+version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7dd6e30e90baa6f72411720665d41d89b9a3d039dc45b8faea1ddd07f617f6af"
+checksum = "0336d538f7abc86d282a4189614dfaa90810dfc2c6f6427eaf88e16311dd225d"
 
 [[package]]
 name = "unicode-width"
@@ -2527,18 +2532,18 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.8.40"
+version = "0.8.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a789c6e490b576db9f7e6b6d661bcc9799f7c0ac8352f56ea20193b2681532e5"
+checksum = "f2578b716f8a7a858b7f02d5bd870c14bf4ddbbcf3a4c05414ba6503640505e3"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.40"
+version = "0.8.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f65c489a7071a749c849713807783f70672b28094011623e200cb86dcb835953"
+checksum = "7e6cc098ea4d3bd6246687de65af3f920c430e236bee1e3bf2e441463f08a02f"
 dependencies = [
  "proc-macro2",
  "quote",
