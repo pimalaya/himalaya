@@ -97,7 +97,7 @@ At IMAP level (same for SMTP):
   #
   # SASL LOGIN:
   imap.sasl.login.username = "login"
-  imap.sasl.plain.password.raw = "***"
+  imap.sasl.login.password.raw = "***"
   #
   # SASL ANONYMOUS:
   imap.sasl.anonymous.message = "anon"
