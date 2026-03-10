@@ -95,7 +95,7 @@ smtp.sasl.mechanisms = ["plain", "login"]
 # https://datatracker.ietf.org/doc/html/draft-murchison-sasl-login-00
 smtp.sasl.login.username = "username"
 smtp.sasl.login.password.command = ["mimosa", "password", "read", "example"]
-#smtp.sasl.plain.password.raw = "***"
+#smtp.sasl.login.password.raw = "***"
 
 # SASL PLAIN
 # https://datatracker.ietf.org/doc/html/rfc4616
