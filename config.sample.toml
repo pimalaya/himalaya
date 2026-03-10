@@ -54,7 +54,7 @@ imap.sasl.mechanisms = ["plain", "login"]
 # SASL LOGIN
 # https://datatracker.ietf.org/doc/html/draft-murchison-sasl-login-00
 imap.sasl.login.username = "username"
-imap.sasl.plain.password.command = ["mimosa", "password", "read", "example"]
+imap.sasl.login.password.command = ["mimosa", "password", "read", "example"]
 #imap.sasl.plain.password.raw = "***"
 
 # SASL PLAIN
@@ -94,8 +94,8 @@ smtp.sasl.mechanisms = ["plain", "login"]
 # SASL LOGIN
 # https://datatracker.ietf.org/doc/html/draft-murchison-sasl-login-00
 smtp.sasl.login.username = "username"
-smtp.sasl.plain.password.command = ["mimosa", "password", "read", "example"]
-#smtp.sasl.plain.password.raw = "***"
+smtp.sasl.login.password.command = ["mimosa", "password", "read", "example"]
+#smtp.sasl.login.password.raw = "***"
 
 # SASL PLAIN
 # https://datatracker.ietf.org/doc/html/rfc4616
