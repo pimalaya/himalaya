@@ -1,13 +1,14 @@
 use std::path::PathBuf;
 
 use anyhow::{bail, Result};
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 use pimalaya_toolbox::{
     config::TomlConfig,
     long_version,
     terminal::{
         clap::{
             args::{AccountFlag, JsonFlag, LogFlags},
+            commands::{CompletionCommand, ManualCommand},
             parsers::path_parser,
         },
         printer::Printer,
@@ -52,6 +53,9 @@ pub struct HimalayaCli {
 
 #[derive(Debug, Subcommand)]
 pub enum BackendCommand {
+    Manuals(ManualCommand),
+    Completions(CompletionCommand),
+
     #[cfg(feature = "imap")]
     #[command(subcommand)]
     Imap(ImapCommand),
@@ -68,6 +72,9 @@ impl BackendCommand {
         account_name: Option<&str>,
     ) -> Result<()> {
         match self {
+            Self::Manuals(cmd) => cmd.execute(printer, HimalayaCli::command()),
+            Self::Completions(cmd) => cmd.execute(printer, HimalayaCli::command()),
+
             #[cfg(feature = "imap")]
             Self::Imap(cmd) => {
                 let config = Config::from_paths_or_default(config_paths)?;
@@ -94,8 +101,6 @@ impl BackendCommand {
 
                 cmd.exec(printer, account)
             }
-            #[allow(unreachable_patterns)]
-            _ => bail!("No backend available"),
         }
     }
 }
