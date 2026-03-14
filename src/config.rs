@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::PathBuf};
 use comfy_table::ContentArrangement;
 use pimalaya_toolbox::{
     config::{shell_expanded_string, TomlConfig},
-    sasl::{Sasl, SaslAnonymous, SaslLogin, SaslMechanism, SaslPlain},
+    sasl::{sasl_default_mechanisms, Sasl, SaslAnonymous, SaslLogin, SaslMechanism, SaslPlain},
     secret::{Secret, SecretError},
     stream::{Rustls, RustlsCrypto, Tls, TlsProvider},
 };
@@ -166,15 +166,10 @@ impl TryFrom<TlsConfig> for Tls {
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SaslConfig {
-    #[serde(default = "default_sasl_mechanisms")]
-    pub mechanisms: Vec<SaslMechanismConfig>,
+    pub mechanisms: Option<Vec<SaslMechanismConfig>>,
     pub login: Option<SaslLoginConfig>,
     pub plain: Option<SaslPlainConfig>,
     pub anonymous: Option<SaslAnonymousConfig>,
-}
-
-fn default_sasl_mechanisms() -> Vec<SaslMechanismConfig> {
-    vec![SaslMechanismConfig::Plain, SaslMechanismConfig::Login]
 }
 
 /// SASL mechanism configuration.
@@ -217,15 +212,17 @@ impl TryFrom<SaslConfig> for Sasl {
 
     fn try_from(config: SaslConfig) -> Result<Self, Self::Error> {
         Ok(Sasl {
-            mechanisms: config
-                .mechanisms
-                .into_iter()
-                .map(|m| match m {
-                    SaslMechanismConfig::Anonymous => SaslMechanism::Anonymous,
-                    SaslMechanismConfig::Plain => SaslMechanism::Plain,
-                    SaslMechanismConfig::Login => SaslMechanism::Login,
-                })
-                .collect(),
+            mechanisms: match config.mechanisms {
+                None => sasl_default_mechanisms(),
+                Some(config) => config
+                    .into_iter()
+                    .map(|m| match m {
+                        SaslMechanismConfig::Anonymous => SaslMechanism::Anonymous,
+                        SaslMechanismConfig::Plain => SaslMechanism::Plain,
+                        SaslMechanismConfig::Login => SaslMechanism::Login,
+                    })
+                    .collect(),
+            },
             anonymous: match config.anonymous {
                 None => None,
                 Some(config) => Some(SaslAnonymous {
