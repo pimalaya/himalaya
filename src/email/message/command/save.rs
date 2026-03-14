@@ -61,7 +61,7 @@ impl MessageSaveCommand {
 
         let is_tty = io::stdin().is_terminal();
         let is_json = printer.is_json();
-        let msg = if is_tty || is_json {
+        let msg = if !self.message.raw.is_empty() || is_tty || is_json {
             self.message.raw()
         } else {
             io::stdin()

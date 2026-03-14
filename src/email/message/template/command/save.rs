@@ -67,7 +67,7 @@ impl TemplateSaveCommand {
 
         let is_tty = io::stdin().is_terminal();
         let is_json = printer.is_json();
-        let tpl = if is_tty || is_json {
+        let tpl = if !self.template.raw.is_empty() || is_tty || is_json {
             self.template.raw()
         } else {
             io::stdin()
@@ -85,8 +85,6 @@ impl TemplateSaveCommand {
         compiler.set_some_pgp(account_config.pgp.clone());
 
         let msg = compiler.build(tpl.as_str())?.compile().await?.into_vec()?;
-
-        backend.add_message(folder, &msg).await?;
 
         let id = backend.add_message(folder, &msg).await?;
 
