@@ -15,7 +15,7 @@ use io_stream::runtimes::std::handle;
 use mail_parser::{MessageParser, MimeHeaders};
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
-use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameOptionalFlag, stream};
+use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameOptionalFlag};
 
 /// Export type for message export.
 #[derive(Debug, Clone, clap::ValueEnum)]
@@ -61,18 +61,17 @@ pub struct ExportMessageCommand {
 }
 
 impl ExportMessageCommand {
-    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let (context, mut stream) = stream::connect(account.backend)?;
-
+    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+        let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox.name.try_into()?;
 
         // SELECT mailbox
         let mut arg = None;
-        let mut coroutine = ImapSelect::new(context, mailbox);
+        let mut coroutine = ImapSelect::new(imap.context, mailbox);
 
         let context = loop {
             match coroutine.resume(arg.take()) {
-                ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                ImapSelectResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
                 ImapSelectResult::Ok { context, .. } => break context,
                 ImapSelectResult::Err { err, .. } => bail!(err),
             }
@@ -93,7 +92,7 @@ impl ExportMessageCommand {
 
         let items = loop {
             match coroutine.resume(arg.take()) {
-                ImapFetchFirstResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                ImapFetchFirstResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
                 ImapFetchFirstResult::Ok { items, .. } => break items,
                 ImapFetchFirstResult::Err { err, .. } => bail!(err),
             }

@@ -3,7 +3,6 @@ use std::{collections::HashMap, fmt, num::NonZeroU32};
 use anyhow::{bail, Result};
 use clap::Parser;
 use io_imap::{
-    context::ImapContext,
     coroutines::{fetch::*, select::*, thread::*},
     types::{
         extensions::thread::{Thread, ThreadingAlgorithm},
@@ -12,14 +11,13 @@ use io_imap::{
     },
 };
 use io_stream::runtimes::std::handle;
-use pimalaya_toolbox::terminal::printer::Printer;
+use pimalaya_toolbox::{stream::imap::ImapSession, terminal::printer::Printer};
 use serde::{Serialize, Serializer};
 
 use crate::imap::{
     account::ImapAccount,
     envelope::{list::decode_mime, search::parse_query},
     mailbox::arg::{MailboxNameOptionalFlag, MailboxSelectFlag},
-    stream::{self, Stream},
 };
 
 /// Thread IMAP messages by algorithm.
@@ -51,18 +49,17 @@ pub struct ThreadEnvelopesCommand {
 }
 
 impl ThreadEnvelopesCommand {
-    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let (mut context, mut stream) = stream::connect(account.backend)?;
-
+    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+        let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox.name.try_into()?;
 
         if self.select.r#true {
             let mut arg = None;
-            let mut coroutine = ImapSelect::new(context, mailbox);
+            let mut coroutine = ImapSelect::new(imap.context, mailbox);
 
-            context = loop {
+            imap.context = loop {
                 match coroutine.resume(arg.take()) {
-                    ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                    ImapSelectResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
                     ImapSelectResult::Ok { context, .. } => break context,
                     ImapSelectResult::Err { err, .. } => bail!(err),
                 }
@@ -73,14 +70,17 @@ impl ThreadEnvelopesCommand {
         let search_criteria = parse_query(&self.query)?;
 
         let mut arg = None;
-        let mut coroutine = ImapThread::new(context, algorithm, search_criteria, !self.seq);
+        let mut coroutine = ImapThread::new(imap.context, algorithm, search_criteria, !self.seq);
 
-        let (context, threads) = loop {
+        let threads = loop {
             match coroutine.resume(arg.take()) {
-                ImapThreadResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                ImapThreadResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
                 ImapThreadResult::Ok {
                     context, threads, ..
-                } => break (context, threads),
+                } => {
+                    imap.context = context;
+                    break threads;
+                }
                 ImapThreadResult::Err { err, .. } => bail!(err),
             }
         };
@@ -90,7 +90,7 @@ impl ThreadEnvelopesCommand {
 
         // Fetch subjects for all messages in threads
         let subjects = if !all_ids.is_empty() {
-            fetch_subjects(&mut stream, context, &all_ids, !self.seq)?
+            fetch_subjects(imap, &all_ids, !self.seq)?
         } else {
             HashMap::new()
         };
@@ -138,8 +138,7 @@ fn collect_thread_ids_recursive(thread: &Thread, ids: &mut Vec<NonZeroU32>) {
 }
 
 fn fetch_subjects(
-    stream: &mut Stream,
-    context: ImapContext,
+    mut imap: ImapSession,
     ids: &[NonZeroU32],
     uid: bool,
 ) -> Result<HashMap<u32, String>> {
@@ -161,11 +160,11 @@ fn fetch_subjects(
     ]);
 
     let mut arg = None;
-    let mut coroutine = ImapFetch::new(context, sequence_set, item_names, uid);
+    let mut coroutine = ImapFetch::new(imap.context, sequence_set, item_names, uid);
 
     let data = loop {
         match coroutine.resume(arg.take()) {
-            ImapFetchResult::Io { io } => arg = Some(handle(&mut *stream, io)?),
+            ImapFetchResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
             ImapFetchResult::Ok { data, .. } => break data,
             ImapFetchResult::Err { err, .. } => bail!(err),
         }

@@ -11,7 +11,7 @@ use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::{Serialize, Serializer};
 
-use crate::imap::{account::ImapAccount, stream};
+use crate::imap::account::ImapAccount;
 
 /// List, search and filter mailboxes.
 ///
@@ -34,30 +34,29 @@ pub struct ListMailboxesCommand {
 }
 
 impl ListMailboxesCommand {
-    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let (context, mut stream) = stream::connect(account.backend)?;
-
+    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+        let mut imap = account.new_imap_session()?;
         let reference = self.reference.try_into()?;
         let pattern = self.pattern.try_into()?;
 
         let mailboxes = if self.all {
             let mut arg = None;
-            let mut coroutine = ImapList::new(context, reference, pattern);
+            let mut coroutine = ImapList::new(imap.context, reference, pattern);
 
             loop {
                 match coroutine.resume(arg.take()) {
-                    ImapListResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                    ImapListResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
                     ImapListResult::Ok { mailboxes, .. } => break mailboxes,
                     ImapListResult::Err { err, .. } => bail!(err),
                 }
             }
         } else {
             let mut arg = None;
-            let mut coroutine = ImapLsub::new(context, reference, pattern);
+            let mut coroutine = ImapLsub::new(imap.context, reference, pattern);
 
             loop {
                 match coroutine.resume(arg.take()) {
-                    ImapLsubResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                    ImapLsubResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
                     ImapLsubResult::Ok { mailboxes, .. } => break mailboxes,
                     ImapLsubResult::Err { err, .. } => bail!(err),
                 }

@@ -4,7 +4,7 @@ use io_imap::coroutines::unselect::*;
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
-use crate::imap::{account::ImapAccount, stream};
+use crate::imap::account::ImapAccount;
 
 /// Unselect a current, selected mailbox.
 ///
@@ -18,15 +18,14 @@ use crate::imap::{account::ImapAccount, stream};
 pub struct UnselectMailboxCommand;
 
 impl UnselectMailboxCommand {
-    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let (context, mut stream) = stream::connect(account.backend)?;
-
+    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+        let mut imap = account.new_imap_session()?;
         let mut arg = None;
-        let mut unselect_coroutine = ImapUnselect::new(context);
+        let mut unselect_coroutine = ImapUnselect::new(imap.context);
 
         loop {
             match unselect_coroutine.resume(arg.take()) {
-                ImapUnselectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                ImapUnselectResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
                 ImapUnselectResult::Ok { .. } => break,
                 ImapUnselectResult::Err { err, .. } => bail!(err),
             }

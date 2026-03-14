@@ -7,7 +7,6 @@ use pimalaya_toolbox::terminal::printer::{Message, Printer};
 use crate::imap::{
     account::ImapAccount,
     mailbox::arg::{MailboxNameArg, TargetMailboxNameArg},
-    stream,
 };
 
 /// Rename the given mailbox.
@@ -23,18 +22,17 @@ pub struct RenameMailboxCommand {
 }
 
 impl RenameMailboxCommand {
-    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let (context, mut stream) = stream::connect(account.backend)?;
-
+    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+        let mut imap = account.new_imap_session()?;
         let from = self.from.name.try_into()?;
         let to = self.to.name.try_into()?;
 
         let mut arg = None;
-        let mut coroutine = ImapRename::new(context, from, to);
+        let mut coroutine = ImapRename::new(imap.context, from, to);
 
         loop {
             match coroutine.resume(arg.take()) {
-                ImapRenameResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                ImapRenameResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
                 ImapRenameResult::Ok { .. } => break,
                 ImapRenameResult::Err { err, .. } => bail!(err),
             }

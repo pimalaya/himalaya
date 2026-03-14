@@ -13,7 +13,6 @@ use pimalaya_toolbox::terminal::printer::{Message, Printer};
 use crate::imap::{
     account::ImapAccount,
     mailbox::arg::{MailboxNameOptionalFlag, MailboxSelectFlag},
-    stream,
 };
 
 /// Set IMAP flag(s) on message(s), replacing any existing flags.
@@ -40,18 +39,17 @@ pub struct SetFlagsCommand {
 }
 
 impl SetFlagsCommand {
-    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let (mut context, mut stream) = stream::connect(account.backend)?;
-
+    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+        let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox.name.try_into()?;
 
         if self.select.r#true {
             let mut arg = None;
-            let mut coroutine = ImapSelect::new(context, mailbox);
+            let mut coroutine = ImapSelect::new(imap.context, mailbox);
 
-            context = loop {
+            imap.context = loop {
                 match coroutine.resume(arg.take()) {
-                    ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                    ImapSelectResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
                     ImapSelectResult::Ok { context, .. } => break context,
                     ImapSelectResult::Err { err, .. } => bail!(err),
                 }
@@ -66,12 +64,17 @@ impl SetFlagsCommand {
             .collect::<Result<_, _>>()?;
 
         let mut arg = None;
-        let mut coroutine =
-            ImapStoreSilent::new(context, sequence_set, StoreType::Replace, flags, !self.seq);
+        let mut coroutine = ImapStoreSilent::new(
+            imap.context,
+            sequence_set,
+            StoreType::Replace,
+            flags,
+            !self.seq,
+        );
 
         loop {
             match coroutine.resume(arg.take()) {
-                ImapStoreSilentResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                ImapStoreSilentResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
                 ImapStoreSilentResult::Ok { .. } => break,
                 ImapStoreSilentResult::Err { err, .. } => bail!(err),
             }

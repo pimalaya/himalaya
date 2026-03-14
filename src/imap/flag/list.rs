@@ -11,7 +11,7 @@ use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::{Serialize, Serializer};
 
-use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg, stream};
+use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
 
 /// List available IMAP flags for the given mailbox.
 ///
@@ -25,17 +25,16 @@ pub struct ListFlagsCommand {
 }
 
 impl ListFlagsCommand {
-    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let (context, mut stream) = stream::connect(account.backend)?;
-
+    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+        let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox.name.try_into()?;
 
         let mut arg = None;
-        let mut coroutine = ImapSelect::new(context, mailbox);
+        let mut coroutine = ImapSelect::new(imap.context, mailbox);
 
         let (flags, permanent_flags) = loop {
             match coroutine.resume(arg.take()) {
-                ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                ImapSelectResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
                 ImapSelectResult::Ok { data, .. } => {
                     break (
                         data.flags.unwrap_or_default(),

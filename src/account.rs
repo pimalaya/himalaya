@@ -5,8 +5,8 @@ use anyhow::Result;
 use comfy_table::{presets, ContentArrangement};
 use dirs::download_dir;
 
-#[derive(Debug)]
-pub struct Account<B> {
+#[derive(Clone, Debug)]
+pub struct Account<B: Clone> {
     pub backend: B,
     pub downloads_dir: PathBuf,
 
@@ -14,7 +14,7 @@ pub struct Account<B> {
     pub table_arrangement: ContentArrangement,
 }
 
-impl<B> Account<B> {
+impl<B: Clone> Account<B> {
     pub fn new(config: Config, account_config: AccountConfig, backend: B) -> Result<Self> {
         Ok(Self {
             backend,

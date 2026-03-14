@@ -13,7 +13,7 @@ use io_stream::runtimes::std::handle;
 use mail_parser::{Addr, Address, HeaderName, HeaderValue, MessageParser};
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
-use crate::smtp::{account::SmtpAccount, stream};
+use crate::smtp::account::SmtpAccount;
 
 /// Send a message to a mailbox.
 ///
@@ -28,8 +28,8 @@ pub struct SendMessageCommand {
 }
 
 impl SendMessageCommand {
-    pub fn exec(self, printer: &mut impl Printer, account: SmtpAccount) -> Result<()> {
-        let (context, mut stream) = stream::connect(account.backend)?;
+    pub fn execute(self, printer: &mut impl Printer, account: SmtpAccount) -> Result<()> {
+        let mut imap = account.new_smtp_session()?;
 
         let message = if stdin().is_terminal() || printer.is_json() {
             self.message
@@ -48,12 +48,16 @@ impl SendMessageCommand {
         let (reverse_path, forward_paths) = into_smtp_msg(message.as_bytes())?;
 
         let mut arg = None;
-        let mut coroutine =
-            SendSmtpMessage::new(context, reverse_path, forward_paths, message.into_bytes());
+        let mut coroutine = SendSmtpMessage::new(
+            imap.context,
+            reverse_path,
+            forward_paths,
+            message.into_bytes(),
+        );
 
         loop {
             match coroutine.resume(arg.take()) {
-                SendSmtpMessageResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                SendSmtpMessageResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
                 SendSmtpMessageResult::Ok { .. } => break,
                 SendSmtpMessageResult::Err { err, .. } => bail!(err),
             }

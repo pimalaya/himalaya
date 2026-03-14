@@ -11,7 +11,7 @@ use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::{Serialize, Serializer};
 
-use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg, stream};
+use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
 
 /// Get the status of the given mailbox.
 ///
@@ -24,9 +24,8 @@ pub struct StatusMailboxCommand {
 }
 
 impl StatusMailboxCommand {
-    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let (context, mut stream) = stream::connect(account.backend)?;
-
+    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+        let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox.name.try_into()?;
         let item_names = vec![
             StatusDataItemName::Messages,
@@ -37,11 +36,11 @@ impl StatusMailboxCommand {
         ];
 
         let mut arg = None;
-        let mut coroutine = ImapStatus::new(context, mailbox, item_names);
+        let mut coroutine = ImapStatus::new(imap.context, mailbox, item_names);
 
         let items = loop {
             match coroutine.resume(arg.take()) {
-                ImapStatusResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                ImapStatusResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
                 ImapStatusResult::Ok { items, .. } => break items,
                 ImapStatusResult::Err { err, .. } => bail!(err),
             }

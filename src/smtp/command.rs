@@ -18,9 +18,9 @@ pub enum SmtpCommand {
 }
 
 impl SmtpCommand {
-    pub fn exec(self, printer: &mut impl Printer, account: SmtpAccount) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, account: SmtpAccount) -> Result<()> {
         match self {
-            Self::Messages(cmd) => cmd.exec(printer, account),
+            Self::Messages(cmd) => cmd.execute(printer, account),
         }
     }
 }

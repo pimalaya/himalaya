@@ -18,14 +18,14 @@ rustdoc-args = ["--cfg", "docsrs"]
 [features]
 default = ["imap", "smtp", "rustls-ring"]
 
-imap = ["dep:io-imap"]
-smtp = ["dep:io-smtp"]
+imap = ["dep:io-imap", "pimalaya-toolbox/imap"]
+smtp = ["dep:io-smtp", "pimalaya-toolbox/smtp"]
 
-rustls-aws = ["dep:rustls-platform-verifier", "rustls/aws-lc-rs"]
-rustls-ring = ["dep:rustls-platform-verifier", "rustls/ring"]
-native-tls = ["dep:native-tls"]
+native-tls = ["pimalaya-toolbox/native-tls"]
+rustls-aws = ["pimalaya-toolbox/rustls-aws"]
+rustls-ring = ["pimalaya-toolbox/rustls-ring"]
 
-vendored = ["native-tls?/vendored"]
+vendored = ["pimalaya-toolbox/vendored"]
 
 [build-dependencies]
 pimalaya-toolbox = { version = "0.0.4", default-features = false, features = ["build"] }
@@ -44,12 +44,9 @@ io-smtp = { version = "0.0.1", default-features = false, features = ["ext_auth",
 io-stream = { version = "0.0.2", default-features = false, features = ["std"] }
 log = "0.4"
 mail-parser = "0.9"
-native-tls = { version = "0.2", optional = true }
 open = "5"
-pimalaya-toolbox = { version = "0.0.4", default-features = false, features = ["config", "terminal", "secret", "command"] }
+pimalaya-toolbox = { version = "0.0.4", default-features = false, features = ["config", "terminal", "secret"] }
 rfc2047-decoder = "1"
-rustls = { version = "0.23", default-features = false, optional = true }
-rustls-platform-verifier = { version = "0.6", optional = true }
 secrecy = "0.10"
 serde = { version = "1", features = ["derive"] }
 shellexpand = "3.1"

@@ -10,7 +10,6 @@ use pimalaya_toolbox::terminal::printer::{Message, Printer};
 use crate::imap::{
     account::ImapAccount,
     mailbox::arg::{MailboxNameOptionalFlag, MailboxSelectFlag, TargetMailboxNameArg},
-    stream,
 };
 
 /// Copy IMAP message(s) to the given mailbox.
@@ -36,18 +35,17 @@ pub struct CopyMessageCommand {
 }
 
 impl CopyMessageCommand {
-    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let (mut context, mut stream) = stream::connect(account.backend)?;
-
+    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+        let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox.name.try_into()?;
 
         if self.select.r#true {
             let mut arg = None;
-            let mut coroutine = ImapSelect::new(context, mailbox);
+            let mut coroutine = ImapSelect::new(imap.context, mailbox);
 
-            context = loop {
+            imap.context = loop {
                 match coroutine.resume(arg.take()) {
-                    ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                    ImapSelectResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
                     ImapSelectResult::Ok { context, .. } => break context,
                     ImapSelectResult::Err { err, .. } => bail!(err),
                 }
@@ -58,11 +56,11 @@ impl CopyMessageCommand {
         let destination: Mailbox = self.destination.name.try_into()?;
 
         let mut arg = None;
-        let mut coroutine = ImapCopy::new(context, sequence_set, destination, !self.seq);
+        let mut coroutine = ImapCopy::new(imap.context, sequence_set, destination, !self.seq);
 
         loop {
             match coroutine.resume(arg.take()) {
-                ImapCopyResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                ImapCopyResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
                 ImapCopyResult::Ok { .. } => break,
                 ImapCopyResult::Err { err, .. } => bail!(err),
             }

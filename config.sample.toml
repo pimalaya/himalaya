@@ -51,11 +51,9 @@ imap.starttls = false
 # SASL mechanisms to try in this particular order
 imap.sasl.mechanisms = ["plain", "login"]
 
-# SASL LOGIN
-# https://datatracker.ietf.org/doc/html/draft-murchison-sasl-login-00
-imap.sasl.login.username = "username"
-imap.sasl.login.password.command = ["mimosa", "password", "read", "example"]
-#imap.sasl.plain.password.raw = "***"
+# SASL ANONYMOUS
+# https://datatracker.ietf.org/doc/html/rfc4505
+imap.sasl.anonymous.message = "himalaya"
 
 # SASL PLAIN
 # https://datatracker.ietf.org/doc/html/rfc4616
@@ -63,9 +61,11 @@ imap.sasl.plain.authcid = "username"
 imap.sasl.plain.passwd.command = ["mimosa", "password", "read", "example"]
 #imap.sasl.plain.passwd.raw = "***"
 
-# SASL ANONYMOUS
-# https://datatracker.ietf.org/doc/html/rfc4505
-imap.sasl.anonymous.message = "himalaya"
+# SASL LOGIN
+# https://datatracker.ietf.org/doc/html/draft-murchison-sasl-login-00
+imap.sasl.login.username = "username"
+imap.sasl.login.password.command = ["mimosa", "password", "read", "example"]
+#imap.sasl.login.password.raw = "***"
 
 # --------------------------------
 # SMTP config
@@ -91,11 +91,9 @@ smtp.starttls = false
 # SASL mechanisms to try in this particular order
 smtp.sasl.mechanisms = ["plain", "login"]
 
-# SASL LOGIN
-# https://datatracker.ietf.org/doc/html/draft-murchison-sasl-login-00
-smtp.sasl.login.username = "username"
-smtp.sasl.login.password.command = ["mimosa", "password", "read", "example"]
-#smtp.sasl.login.password.raw = "***"
+# SASL ANONYMOUS
+# https://datatracker.ietf.org/doc/html/rfc4505
+smtp.sasl.anonymous.message = "himalaya"
 
 # SASL PLAIN
 # https://datatracker.ietf.org/doc/html/rfc4616
@@ -103,6 +101,8 @@ smtp.sasl.plain.authcid = "username"
 smtp.sasl.plain.passwd.command = ["mimosa", "password", "read", "example"]
 #smtp.sasl.plain.passwd.raw = "***"
 
-# SASL ANONYMOUS
-# https://datatracker.ietf.org/doc/html/rfc4505
-smtp.sasl.anonymous.message = "himalaya"
+# SASL LOGIN
+# https://datatracker.ietf.org/doc/html/draft-murchison-sasl-login-00
+smtp.sasl.login.username = "username"
+smtp.sasl.login.password.command = ["mimosa", "password", "read", "example"]
+#smtp.sasl.login.password.raw = "***"

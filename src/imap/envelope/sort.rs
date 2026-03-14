@@ -16,7 +16,6 @@ use serde::{Serialize, Serializer};
 
 use crate::imap::{
     account::ImapAccount, envelope::search::parse_query, mailbox::arg::MailboxNameOptionalArg,
-    stream,
 };
 
 /// Sort messages by criteria.
@@ -56,18 +55,17 @@ pub struct SortEnvelopesCommand {
 }
 
 impl SortEnvelopesCommand {
-    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let (context, mut stream) = stream::connect(account.backend)?;
-
+    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+        let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox.name.try_into()?;
 
         // SELECT mailbox
         let mut arg = None;
-        let mut coroutine = ImapSelect::new(context, mailbox);
+        let mut coroutine = ImapSelect::new(imap.context, mailbox);
 
         let context = loop {
             match coroutine.resume(arg.take()) {
-                ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                ImapSelectResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
                 ImapSelectResult::Ok { context, .. } => break context,
                 ImapSelectResult::Err { err, .. } => bail!(err),
             }
@@ -89,7 +87,7 @@ impl SortEnvelopesCommand {
 
         let ids = loop {
             match coroutine.resume(arg.take()) {
-                ImapSortResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                ImapSortResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
                 ImapSortResult::Ok { ids, .. } => break ids,
                 ImapSortResult::Err { err, .. } => bail!(err),
             }

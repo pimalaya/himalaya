@@ -1,10 +1,13 @@
-use std::{collections::HashMap, fmt, path::PathBuf, process::Command};
+use std::{collections::HashMap, path::PathBuf};
 
-use anyhow::{bail, Result};
 use comfy_table::ContentArrangement;
-use pimalaya_toolbox::config::TomlConfig;
-use secrecy::SecretString;
-use serde::{de::Visitor, Deserialize, Deserializer};
+use pimalaya_toolbox::{
+    config::{shell_expanded_string, TomlConfig},
+    sasl::{Sasl, SaslAnonymous, SaslLogin, SaslMechanism, SaslPlain},
+    secret::{Secret, SecretError},
+    stream::{Rustls, RustlsCrypto, Tls, TlsProvider},
+};
+use serde::Deserialize;
 use url::Url;
 
 /// Global configuration.
@@ -133,6 +136,32 @@ pub enum RustlsCryptoConfig {
     Ring,
 }
 
+impl TryFrom<TlsConfig> for Tls {
+    type Error = SecretError;
+
+    fn try_from(config: TlsConfig) -> Result<Self, Self::Error> {
+        Ok(Tls {
+            provider: match config.provider {
+                None => None,
+                Some(config) => Some(match config {
+                    TlsProviderConfig::Rustls => TlsProvider::Rustls,
+                    TlsProviderConfig::NativeTls => TlsProvider::NativeTls,
+                }),
+            },
+            rustls: Rustls {
+                crypto: match config.rustls.crypto {
+                    None => None,
+                    Some(config) => Some(match config {
+                        RustlsCryptoConfig::Aws => RustlsCrypto::Aws,
+                        RustlsCryptoConfig::Ring => RustlsCrypto::Ring,
+                    }),
+                },
+            },
+            cert: config.cert,
+        })
+    }
+}
+
 /// SASL configuration.
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
@@ -163,7 +192,7 @@ pub enum SaslMechanismConfig {
 pub struct SaslLoginConfig {
     #[serde(deserialize_with = "shell_expanded_string")]
     pub username: String,
-    pub password: SecretConfig,
+    pub password: Secret,
 }
 
 /// SASL PLAIN configuration.
@@ -173,7 +202,7 @@ pub struct SaslPlainConfig {
     pub authzid: Option<String>,
     #[serde(deserialize_with = "shell_expanded_string")]
     pub authcid: String,
-    pub passwd: SecretConfig,
+    pub passwd: Secret,
 }
 
 /// SASL ANONYMOUS configuration.
@@ -183,64 +212,41 @@ pub struct SaslAnonymousConfig {
     pub message: Option<String>,
 }
 
-/// Secret configuration.
-#[derive(Clone, Debug, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum SecretConfig {
-    Raw(SecretString),
-    Command(Vec<String>),
-}
+impl TryFrom<SaslConfig> for Sasl {
+    type Error = SecretError;
 
-impl SecretConfig {
-    pub fn get(&self) -> Result<SecretString> {
-        match self {
-            Self::Raw(secret) => Ok(secret.clone()),
-            Self::Command(args) => {
-                let Some((program, args)) = args.split_first() else {
-                    bail!("Secret command cannot be empty")
-                };
-
-                let mut cmd = Command::new(program);
-                cmd.args(args);
-                let out = cmd.output()?;
-
-                if !out.status.success() {
-                    let err = String::from_utf8_lossy(&out.stderr);
-                    bail!("Cannot read secret from command: {err}");
-                }
-
-                let secret = String::from_utf8_lossy(&out.stdout);
-                let secret = secret.trim_matches(['\r', '\n']);
-                let secret = match secret.split_once('\n') {
-                    Some((secret, _)) => secret.trim_matches(['\r', '\n']),
-                    None => secret,
-                };
-
-                Ok(SecretString::from(secret))
-            }
-        }
+    fn try_from(config: SaslConfig) -> Result<Self, Self::Error> {
+        Ok(Sasl {
+            mechanisms: config
+                .mechanisms
+                .into_iter()
+                .map(|m| match m {
+                    SaslMechanismConfig::Anonymous => SaslMechanism::Anonymous,
+                    SaslMechanismConfig::Plain => SaslMechanism::Plain,
+                    SaslMechanismConfig::Login => SaslMechanism::Login,
+                })
+                .collect(),
+            anonymous: match config.anonymous {
+                None => None,
+                Some(config) => Some(SaslAnonymous {
+                    message: config.message,
+                }),
+            },
+            plain: match config.plain {
+                None => None,
+                Some(config) => Some(SaslPlain {
+                    authzid: config.authzid,
+                    authcid: config.authcid,
+                    passwd: config.passwd.get()?,
+                }),
+            },
+            login: match config.login {
+                None => None,
+                Some(config) => Some(SaslLogin {
+                    username: config.username,
+                    password: config.password.get()?,
+                }),
+            },
+        })
     }
-}
-
-struct ShellExpandedStringVisitor;
-
-impl<'de> Visitor<'de> for ShellExpandedStringVisitor {
-    type Value = String;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("an string containing environment variable(s)")
-    }
-
-    fn visit_string<E: serde::de::Error>(self, v: String) -> Result<Self::Value, E> {
-        match shellexpand::full(&v) {
-            Ok(v) => Ok(v.to_string()),
-            Err(_) => Ok(v),
-        }
-    }
-}
-
-pub fn shell_expanded_string<'de, D: Deserializer<'de>>(
-    deserializer: D,
-) -> Result<String, D::Error> {
-    deserializer.deserialize_string(ShellExpandedStringVisitor)
 }

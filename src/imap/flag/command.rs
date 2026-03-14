@@ -23,12 +23,12 @@ pub enum FlagCommand {
 }
 
 impl FlagCommand {
-    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         match self {
-            Self::List(cmd) => cmd.exec(printer, account),
-            Self::Add(cmd) => cmd.exec(printer, account),
-            Self::Set(cmd) => cmd.exec(printer, account),
-            Self::Remove(cmd) => cmd.exec(printer, account),
+            Self::List(cmd) => cmd.execute(printer, account),
+            Self::Add(cmd) => cmd.execute(printer, account),
+            Self::Set(cmd) => cmd.execute(printer, account),
+            Self::Remove(cmd) => cmd.execute(printer, account),
         }
     }
 }

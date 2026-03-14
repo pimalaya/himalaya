@@ -65,7 +65,7 @@ pub enum BackendCommand {
 }
 
 impl BackendCommand {
-    pub fn exec(
+    pub fn execute(
         self,
         printer: &mut impl Printer,
         config_paths: &[PathBuf],
@@ -86,7 +86,7 @@ impl BackendCommand {
 
                 let account = Account::new(config, account_config, imap_config)?;
 
-                cmd.exec(printer, account)
+                cmd.execute(printer, account)
             }
             #[cfg(feature = "smtp")]
             Self::Smtp(cmd) => {
@@ -99,7 +99,7 @@ impl BackendCommand {
 
                 let account = Account::new(config, account_config, smtp_config)?;
 
-                cmd.exec(printer, account)
+                cmd.execute(printer, account)
             }
         }
     }

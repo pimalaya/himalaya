@@ -4,7 +4,7 @@ use io_imap::coroutines::subscribe::*;
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
-use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg, stream};
+use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
 
 /// Subscribe to the given mailbox.
 ///
@@ -17,17 +17,16 @@ pub struct SubscribeMailboxCommand {
 }
 
 impl SubscribeMailboxCommand {
-    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let (context, mut stream) = stream::connect(account.backend)?;
-
+    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+        let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox.name.try_into()?;
 
         let mut arg = None;
-        let mut coroutine = ImapSubscribe::new(context, mailbox);
+        let mut coroutine = ImapSubscribe::new(imap.context, mailbox);
 
         loop {
             match coroutine.resume(arg.take()) {
-                ImapSubscribeResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                ImapSubscribeResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
                 ImapSubscribeResult::Ok { .. } => break,
                 ImapSubscribeResult::Err { err, .. } => bail!(err),
             }

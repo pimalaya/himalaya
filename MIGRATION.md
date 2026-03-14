@@ -28,6 +28,8 @@ The v2 also removes away some complexity:
 - Secrets do not support keyring natively anymore due to many issues with it. Instead use [pimalaya/mimosa](https://github.com/pimalaya/mimosa) or equivalent.
 - OAuth is not supported natively anymore. Instead use [pimalaya/ortie](https://github.com/pimalaya/ortie) or equivalent.
 
+A direct consequence is a v2 binary size 3 times smaller than the v1!
+
 ### I/O-free
 
 Additionally, Pimalaya has been working for the past year on an adaptation of the [Sans I/O](https://sans-io.readthedocs.io/) pattern for its libraries. It makes libraries not tied up to any sort of I/O: sync vs async, tokio vs async-std vs smol, rustls vs native-tls etc. The concept has been implemented into recent libraries, and has been tested in other CLIs like [pimalaya/ortie](https://github.com/pimalaya/ortie), [pimalaya/cardamum](https://github.com/pimalaya/cardamum) or [pimalaya/calendula](https://github.com/pimalaya/calendula). Himalaya CLI v2 implements these changes. As a direct consequence, it supports out of the box TLS via `native-tls` or via `rustls` (supporting both `aws-lc` and `ring` crypto providers)

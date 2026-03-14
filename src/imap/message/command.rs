@@ -26,14 +26,14 @@ pub enum MessageCommand {
 }
 
 impl MessageCommand {
-    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         match self {
-            Self::Save(cmd) => cmd.exec(printer, account),
-            Self::Get(cmd) => cmd.exec(printer, account),
-            Self::Read(cmd) => cmd.exec(printer, account),
-            Self::Export(cmd) => cmd.exec(printer, account),
-            Self::Copy(cmd) => cmd.exec(printer, account),
-            Self::Move(cmd) => cmd.exec(printer, account),
+            Self::Save(cmd) => cmd.execute(printer, account),
+            Self::Get(cmd) => cmd.execute(printer, account),
+            Self::Read(cmd) => cmd.execute(printer, account),
+            Self::Export(cmd) => cmd.execute(printer, account),
+            Self::Copy(cmd) => cmd.execute(printer, account),
+            Self::Move(cmd) => cmd.execute(printer, account),
         }
     }
 }

@@ -25,13 +25,13 @@ pub enum EnvelopeCommand {
 }
 
 impl EnvelopeCommand {
-    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         match self {
-            Self::Get(cmd) => cmd.exec(printer, account),
-            Self::List(cmd) => cmd.exec(printer, account),
-            Self::Search(cmd) => cmd.exec(printer, account),
-            Self::Sort(cmd) => cmd.exec(printer, account),
-            Self::Thread(cmd) => cmd.exec(printer, account),
+            Self::Get(cmd) => cmd.execute(printer, account),
+            Self::List(cmd) => cmd.execute(printer, account),
+            Self::Search(cmd) => cmd.execute(printer, account),
+            Self::Sort(cmd) => cmd.execute(printer, account),
+            Self::Thread(cmd) => cmd.execute(printer, account),
         }
     }
 }

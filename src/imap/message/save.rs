@@ -12,7 +12,7 @@ use io_imap::{
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
-use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg, stream};
+use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
 
 /// Save a message to a mailbox.
 ///
@@ -34,11 +34,9 @@ pub struct SaveMessageCommand {
 }
 
 impl SaveMessageCommand {
-    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let (context, mut stream) = stream::connect(account.backend)?;
-
+    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+        let mut imap = account.new_imap_session()?;
         let mailbox: Mailbox<'static> = self.mailbox.name.try_into()?;
-
         let message = if stdin().is_terminal() || printer.is_json() {
             self.message
                 .join(" ")
@@ -63,11 +61,11 @@ impl SaveMessageCommand {
             .collect::<Result<_, _>>()?;
 
         let mut arg = None;
-        let mut coroutine = ImapAppend::new(context, mailbox, flags, None, message);
+        let mut coroutine = ImapAppend::new(imap.context, mailbox, flags, None, message);
 
         loop {
             match coroutine.resume(arg.take()) {
-                ImapAppendResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                ImapAppendResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
                 ImapAppendResult::Ok { .. } => break,
                 ImapAppendResult::Err { err, .. } => bail!(err),
             }

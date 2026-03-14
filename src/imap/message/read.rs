@@ -14,7 +14,6 @@ use serde::Serialize;
 use crate::imap::{
     account::ImapAccount,
     mailbox::arg::{MailboxNameOptionalFlag, MailboxSelectFlag},
-    stream,
 };
 
 /// Read message content.
@@ -46,18 +45,17 @@ pub struct ReadMessageCommand {
 }
 
 impl ReadMessageCommand {
-    pub fn exec(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let (mut context, mut stream) = stream::connect(account.backend)?;
-
+    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+        let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox.name.try_into()?;
 
         if self.select.r#true {
             let mut arg = None;
-            let mut coroutine = ImapSelect::new(context, mailbox);
+            let mut coroutine = ImapSelect::new(imap.context, mailbox);
 
-            context = loop {
+            imap.context = loop {
                 match coroutine.resume(arg.take()) {
-                    ImapSelectResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                    ImapSelectResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
                     ImapSelectResult::Ok { context, .. } => break context,
                     ImapSelectResult::Err { err, .. } => bail!(err),
                 }
@@ -76,11 +74,11 @@ impl ReadMessageCommand {
             }]);
 
         let mut arg = None;
-        let mut coroutine = ImapFetchFirst::new(context, id, item_names, !self.seq);
+        let mut coroutine = ImapFetchFirst::new(imap.context, id, item_names, !self.seq);
 
         let items = loop {
             match coroutine.resume(arg.take()) {
-                ImapFetchFirstResult::Io { io } => arg = Some(handle(&mut stream, io)?),
+                ImapFetchFirstResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
                 ImapFetchFirstResult::Ok { items, .. } => break items,
                 ImapFetchFirstResult::Err { err, .. } => bail!(err),
             }
