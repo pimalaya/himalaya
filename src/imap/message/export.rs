@@ -37,7 +37,7 @@ pub enum ExportType {
 #[derive(Debug, Parser)]
 pub struct ExportMessageCommand {
     #[command(flatten)]
-    pub mailbox: MailboxNameOptionalFlag,
+    pub mailbox_name: MailboxNameOptionalFlag,
 
     /// The message UID (or sequence number with --seq).
     #[arg(name = "id", value_name = "ID")]
@@ -63,7 +63,7 @@ pub struct ExportMessageCommand {
 impl ExportMessageCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
-        let mailbox = self.mailbox.name.try_into()?;
+        let mailbox = self.mailbox_name.inner.try_into()?;
 
         // SELECT mailbox
         let mut arg = None;

@@ -9,7 +9,7 @@ use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::imap::{
     account::ImapAccount,
-    mailbox::arg::{MailboxNameOptionalFlag, MailboxSelectFlag, TargetMailboxNameArg},
+    mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag, TargetMailboxNameArg},
 };
 
 /// Move message(s) to the given mailbox.
@@ -20,15 +20,15 @@ use crate::imap::{
 #[derive(Debug, Parser)]
 pub struct MoveMessageCommand {
     #[command(flatten)]
-    pub mailbox: MailboxNameOptionalFlag,
+    pub mailbox_name: MailboxNameOptionalFlag,
     #[command(flatten)]
-    pub select: MailboxSelectFlag,
+    pub mailbox_no_select: MailboxNoSelectFlag,
 
     /// The sequence set of messages (e.g., "1", "1,2,3", "1:*").
     #[arg(name = "sequence_set", value_name = "SEQUENCE")]
     pub sequence_set: String,
     #[command(flatten)]
-    pub destination: TargetMailboxNameArg,
+    pub mailbox_dest_name: TargetMailboxNameArg,
 
     /// Use sequence numbers instead of UIDs.
     #[arg(long)]
@@ -38,9 +38,9 @@ pub struct MoveMessageCommand {
 impl MoveMessageCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
-        let mailbox = self.mailbox.name.try_into()?;
+        let mailbox = self.mailbox_name.inner.try_into()?;
 
-        if self.select.r#true {
+        if !self.mailbox_no_select.inner {
             let mut arg = None;
             let mut coroutine = ImapSelect::new(imap.context, mailbox);
 
@@ -54,7 +54,7 @@ impl MoveMessageCommand {
         }
 
         let sequence_set = self.sequence_set.as_str().try_into()?;
-        let destination: Mailbox<'static> = self.destination.name.try_into()?;
+        let destination: Mailbox<'static> = self.mailbox_dest_name.inner.try_into()?;
 
         let mut arg = None;
         let mut coroutine = ImapMove::new(imap.context, sequence_set, destination, !self.seq);

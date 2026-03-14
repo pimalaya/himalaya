@@ -17,7 +17,7 @@ use serde::Serialize;
 
 use crate::imap::{
     account::ImapAccount,
-    mailbox::arg::{MailboxNameOptionalFlag, MailboxSelectFlag},
+    mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
 };
 
 /// Search IMAP messages by criteria.
@@ -48,9 +48,9 @@ use crate::imap::{
 #[derive(Debug, Parser)]
 pub struct SearchEnvelopesCommand {
     #[command(flatten)]
-    pub mailbox: MailboxNameOptionalFlag,
+    pub mailbox_name: MailboxNameOptionalFlag,
     #[command(flatten)]
-    pub select: MailboxSelectFlag,
+    pub mailbox_no_select: MailboxNoSelectFlag,
 
     /// Search query (e.g., "from:alice unseen").
     #[arg(name = "query", value_name = "QUERY", default_value = "all")]
@@ -64,9 +64,9 @@ pub struct SearchEnvelopesCommand {
 impl SearchEnvelopesCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
-        let mailbox = self.mailbox.name.try_into()?;
+        let mailbox = self.mailbox_name.inner.try_into()?;
 
-        if self.select.r#true {
+        if !self.mailbox_no_select.inner {
             let mut arg = None;
             let mut coroutine = ImapSelect::new(imap.context, mailbox);
 

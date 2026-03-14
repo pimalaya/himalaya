@@ -20,13 +20,13 @@ use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
 #[derive(Debug, Parser)]
 pub struct StatusMailboxCommand {
     #[command(flatten)]
-    pub mailbox: MailboxNameArg,
+    pub mailbox_name: MailboxNameArg,
 }
 
 impl StatusMailboxCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
-        let mailbox = self.mailbox.name.try_into()?;
+        let mailbox = self.mailbox_name.inner.try_into()?;
         let item_names = vec![
             StatusDataItemName::Messages,
             StatusDataItemName::Recent,

@@ -12,7 +12,7 @@ use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::imap::{
     account::ImapAccount,
-    mailbox::arg::{MailboxNameOptionalFlag, MailboxSelectFlag},
+    mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
 };
 
 /// Add IMAP flag(s) to message(s).
@@ -22,9 +22,9 @@ use crate::imap::{
 #[derive(Debug, Parser)]
 pub struct AddFlagsCommand {
     #[command(flatten)]
-    pub mailbox: MailboxNameOptionalFlag,
+    pub mailbox_name: MailboxNameOptionalFlag,
     #[command(flatten)]
-    pub select: MailboxSelectFlag,
+    pub mailbox_no_select: MailboxNoSelectFlag,
 
     /// The sequence set of messages (e.g., "1", "1,2,3", "1:*").
     #[arg(value_name = "SEQUENCE")]
@@ -41,9 +41,9 @@ pub struct AddFlagsCommand {
 impl AddFlagsCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
-        let mailbox = self.mailbox.name.try_into()?;
+        let mailbox = self.mailbox_name.inner.try_into()?;
 
-        if self.select.r#true {
+        if !self.mailbox_no_select.inner {
             let mut arg = None;
             let mut coroutine = ImapSelect::new(imap.context, mailbox);
 

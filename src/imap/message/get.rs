@@ -14,7 +14,7 @@ use serde::Serialize;
 
 use crate::imap::{
     account::ImapAccount,
-    mailbox::arg::{MailboxNameOptionalFlag, MailboxSelectFlag},
+    mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
 };
 
 /// Get a message and display its structure.
@@ -24,9 +24,9 @@ use crate::imap::{
 #[derive(Debug, Parser)]
 pub struct GetMessageCommand {
     #[command(flatten)]
-    pub mailbox: MailboxNameOptionalFlag,
+    pub mailbox_name: MailboxNameOptionalFlag,
     #[command(flatten)]
-    pub select: MailboxSelectFlag,
+    pub mailbox_no_select: MailboxNoSelectFlag,
 
     /// The message UID (or sequence number with --seq).
     pub id: u32,
@@ -38,12 +38,12 @@ pub struct GetMessageCommand {
 impl GetMessageCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
-        let mailbox = self.mailbox.name.try_into()?;
+        let mailbox = self.mailbox_name.inner.try_into()?;
         let Some(id) = NonZeroU32::new(self.id) else {
             bail!("ID must be non-zero");
         };
 
-        if self.select.r#true {
+        if !self.mailbox_no_select.inner {
             let mut arg = None;
             let mut coroutine = ImapSelect::new(imap.context, mailbox);
 

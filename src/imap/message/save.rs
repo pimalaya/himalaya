@@ -36,7 +36,7 @@ pub struct SaveMessageCommand {
 impl SaveMessageCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
-        let mailbox: Mailbox<'static> = self.mailbox.name.try_into()?;
+        let mailbox: Mailbox<'static> = self.mailbox.inner.try_into()?;
         let message = if stdin().is_terminal() || printer.is_json() {
             self.message
                 .join(" ")

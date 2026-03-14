@@ -15,17 +15,16 @@ use crate::imap::{
 #[derive(Debug, Parser)]
 pub struct RenameMailboxCommand {
     #[command(flatten)]
-    pub from: MailboxNameArg,
-
+    pub mailbox_source_name: MailboxNameArg,
     #[command(flatten)]
-    pub to: TargetMailboxNameArg,
+    pub mailbox_dest_name: TargetMailboxNameArg,
 }
 
 impl RenameMailboxCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
-        let from = self.from.name.try_into()?;
-        let to = self.to.name.try_into()?;
+        let from = self.mailbox_source_name.inner.try_into()?;
+        let to = self.mailbox_dest_name.inner.try_into()?;
 
         let mut arg = None;
         let mut coroutine = ImapRename::new(imap.context, from, to);

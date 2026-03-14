@@ -35,7 +35,7 @@ use crate::imap::{
 #[derive(Debug, Parser)]
 pub struct SortEnvelopesCommand {
     #[command(flatten)]
-    pub mailbox: MailboxNameOptionalArg,
+    pub mailbox_name: MailboxNameOptionalArg,
 
     /// Sort criteria (e.g., "date", "from", "subject", "size").
     #[arg(short = 'S', long, default_value = "date")]
@@ -57,7 +57,7 @@ pub struct SortEnvelopesCommand {
 impl SortEnvelopesCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
-        let mailbox = self.mailbox.name.try_into()?;
+        let mailbox = self.mailbox_name.inner.try_into()?;
 
         // SELECT mailbox
         let mut arg = None;

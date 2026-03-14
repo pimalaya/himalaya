@@ -17,7 +17,7 @@ use serde::{Serialize, Serializer};
 use crate::imap::{
     account::ImapAccount,
     envelope::{list::decode_mime, search::parse_query},
-    mailbox::arg::{MailboxNameOptionalFlag, MailboxSelectFlag},
+    mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
 };
 
 /// Thread IMAP messages by algorithm.
@@ -31,9 +31,9 @@ use crate::imap::{
 #[derive(Debug, Parser)]
 pub struct ThreadEnvelopesCommand {
     #[command(flatten)]
-    pub mailbox: MailboxNameOptionalFlag,
+    pub mailbox_name: MailboxNameOptionalFlag,
     #[command(flatten)]
-    pub select: MailboxSelectFlag,
+    pub mailbox_no_select: MailboxNoSelectFlag,
 
     /// Threading algorithm (orderedsubject or references).
     #[arg(short = 'A', long, default_value = "references")]
@@ -51,9 +51,9 @@ pub struct ThreadEnvelopesCommand {
 impl ThreadEnvelopesCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
-        let mailbox = self.mailbox.name.try_into()?;
+        let mailbox = self.mailbox_name.inner.try_into()?;
 
-        if self.select.r#true {
+        if !self.mailbox_no_select.inner {
             let mut arg = None;
             let mut coroutine = ImapSelect::new(imap.context, mailbox);
 

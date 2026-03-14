@@ -9,7 +9,7 @@ use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::imap::{
     account::ImapAccount,
-    mailbox::arg::{MailboxNameArg, MailboxSelectFlag},
+    mailbox::arg::{MailboxNameArg, MailboxNoSelectFlag},
 };
 
 /// Shortcut for marking as deleted all envelopes then expunging the
@@ -20,17 +20,17 @@ use crate::imap::{
 #[derive(Debug, Parser)]
 pub struct PurgeMailboxCommand {
     #[command(flatten)]
-    pub mailbox: MailboxNameArg,
+    pub mailbox_name: MailboxNameArg,
     #[command(flatten)]
-    pub select: MailboxSelectFlag,
+    pub mailbox_no_select: MailboxNoSelectFlag,
 }
 
 impl PurgeMailboxCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
-        let mailbox = self.mailbox.name.try_into()?;
+        let mailbox = self.mailbox_name.inner.try_into()?;
 
-        if self.select.r#true {
+        if !self.mailbox_no_select.inner {
             let mut arg = None;
             let mut coroutine = ImapSelect::new(imap.context, mailbox);
 

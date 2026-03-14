@@ -20,7 +20,7 @@ use serde::Serialize;
 
 use crate::imap::{
     account::ImapAccount,
-    mailbox::arg::{MailboxNameOptionalArg, MailboxSelectFlag},
+    mailbox::arg::{MailboxNameOptionalArg, MailboxNoSelectFlag},
 };
 
 /// List IMAP envelopes from the given mailbox.
@@ -31,9 +31,9 @@ use crate::imap::{
 #[derive(Debug, Parser)]
 pub struct ListEnvelopesCommand {
     #[command(flatten)]
-    pub mailbox: MailboxNameOptionalArg,
+    pub mailbox_name: MailboxNameOptionalArg,
     #[command(flatten)]
-    pub select: MailboxSelectFlag,
+    pub mailbox_no_select: MailboxNoSelectFlag,
 
     /// The sequence set of envelopes.
     #[arg(short, long, default_value = "1:*")]
@@ -46,9 +46,9 @@ pub struct ListEnvelopesCommand {
 impl ListEnvelopesCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
-        let mailbox = self.mailbox.name.try_into()?;
+        let mailbox = self.mailbox_name.inner.try_into()?;
 
-        if self.select.r#true {
+        if !self.mailbox_no_select.inner {
             let mut arg = None;
             let mut coroutine = ImapSelect::new(imap.context, mailbox);
 

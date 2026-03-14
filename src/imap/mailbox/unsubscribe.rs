@@ -13,13 +13,13 @@ use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
 #[derive(Debug, Parser)]
 pub struct UnsubscribeMailboxCommand {
     #[command(flatten)]
-    pub mailbox: MailboxNameArg,
+    pub mailbox_name: MailboxNameArg,
 }
 
 impl UnsubscribeMailboxCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
-        let mailbox = self.mailbox.name.try_into()?;
+        let mailbox = self.mailbox_name.inner.try_into()?;
 
         let mut arg = None;
         let mut coroutine = ImapUnsubscribe::new(imap.context, mailbox);
