@@ -1,13 +1,13 @@
 use std::{fmt, num::NonZeroU32};
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use clap::Parser;
 use io_imap::{
     coroutines::{fetch::*, select::*},
     types::fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
 };
 use io_stream::runtimes::std::handle;
-use mail_parser::MessageParser;
+use mail_parser::{Message, MessageParser};
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 
@@ -99,47 +99,59 @@ impl ReadMessageCommand {
         };
 
         let Some(message) = MessageParser::new().parse(&raw) else {
-            bail!("Invalid message");
+            bail!("Invalid MIME message");
         };
 
-        let content = if self.html {
-            message
-                .body_html(0)
-                .map(|s| s.to_string())
-                .ok_or_else(|| anyhow!("No HTML content found"))?
+        if self.html {
+            printer.out(MessageHtmlView { message })
         } else {
-            if let Some(text) = message.body_text(0) {
-                text.to_string()
-            } else if let Some(html) = message.body_html(0) {
-                html2text::from_read(html.as_bytes(), self.width)
-            } else {
-                bail!("No text or HTML content found");
-            }
-        };
-
-        let output = MessageContent { content };
-        printer.out(output)
+            printer.out(MessagePlainView { message })
+        }
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct MessageContent {
-    pub content: String,
+#[derive(Serialize)]
+#[serde(transparent)]
+pub struct MessagePlainView<'a> {
+    message: Message<'a>,
 }
 
-impl fmt::Display for MessageContent {
+impl fmt::Display for MessagePlainView<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f)?;
-        write!(f, "{}", self.content)?;
-        if !self.content.ends_with('\n') {
-            writeln!(f)?;
+        for (i, part) in self.message.text_bodies().enumerate() {
+            if i > 0 {
+                writeln!(f)?;
+                writeln!(f)?;
+            }
+
+            if let Some(contents) = part.text_contents() {
+                write!(f, "{}", contents.trim_end())?;
+            }
         }
+
         Ok(())
     }
 }
 
-impl Serialize for MessageContent {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.content.serialize(serializer)
+#[derive(Serialize)]
+#[serde(transparent)]
+pub struct MessageHtmlView<'a> {
+    message: Message<'a>,
+}
+
+impl fmt::Display for MessageHtmlView<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (i, part) in self.message.html_bodies().enumerate() {
+            if i > 0 {
+                writeln!(f)?;
+                writeln!(f)?;
+            }
+
+            if let Some(contents) = part.text_contents() {
+                write!(f, "{}", contents.trim_end())?;
+            }
+        }
+
+        Ok(())
     }
 }

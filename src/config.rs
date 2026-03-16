@@ -55,6 +55,7 @@ pub struct AccountConfig {
     pub table_arrangement: Option<TableArrangementConfig>,
 
     pub imap: Option<ImapConfig>,
+    pub maildir: Option<MaildirConfig>,
     pub smtp: Option<SmtpConfig>,
 }
 
@@ -88,6 +89,13 @@ pub struct ImapConfig {
     pub starttls: bool,
     #[serde(default)]
     pub sasl: SaslConfig,
+}
+
+/// Maildir configuration.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct MaildirConfig {
+    pub root: PathBuf,
 }
 
 /// SMTP configuration.

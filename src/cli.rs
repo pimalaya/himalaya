@@ -17,6 +17,8 @@ use pimalaya_toolbox::{
 
 #[cfg(feature = "imap")]
 use crate::imap::command::ImapCommand;
+#[cfg(feature = "maildir")]
+use crate::maildir::command::MaildirCommand;
 #[cfg(feature = "smtp")]
 use crate::smtp::command::SmtpCommand;
 use crate::{account::Account, config::Config};
@@ -59,6 +61,9 @@ pub enum BackendCommand {
     #[cfg(feature = "imap")]
     #[command(subcommand)]
     Imap(ImapCommand),
+    #[cfg(feature = "maildir")]
+    #[command(subcommand)]
+    Maildir(MaildirCommand),
     #[cfg(feature = "smtp")]
     #[command(subcommand)]
     Smtp(SmtpCommand),
@@ -85,6 +90,19 @@ impl BackendCommand {
                 };
 
                 let account = Account::new(config, account_config, imap_config)?;
+
+                cmd.execute(printer, account)
+            }
+            #[cfg(feature = "maildir")]
+            Self::Maildir(cmd) => {
+                let config = Config::from_paths_or_default(config_paths)?;
+                let (account_name, mut account_config) = config.get_account(account_name)?;
+
+                let Some(maildir_config) = account_config.maildir.take() else {
+                    bail!("Maildir config is missing for account `{account_name}`")
+                };
+
+                let account = Account::new(config, account_config, maildir_config)?;
 
                 cmd.execute(printer, account)
             }

@@ -10,7 +10,7 @@ use crate::smtp::{account::SmtpAccount, message::command::MessageCommand};
 /// you to manage SMTP mailboxes: list mailboxes, read messages,
 /// add flags etc.
 #[derive(Debug, Subcommand)]
-#[command(rename_all = "lowercase")]
+#[command(rename_all = "kebab-case")]
 pub enum SmtpCommand {
     #[command(subcommand)]
     #[command(aliases = ["msgs", "msg"])]

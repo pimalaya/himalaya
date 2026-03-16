@@ -12,7 +12,7 @@ use crate::imap::{
 /// This command gives you access to the IMAP CLI API, and allows you
 /// to manage IMAP mailboxes, envelopes, flags, messages etc.
 #[derive(Debug, Subcommand)]
-#[command(rename_all = "lowercase")]
+#[command(rename_all = "kebab-case")]
 pub enum ImapCommand {
     Id(IdCommand),
 

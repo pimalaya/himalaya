@@ -18,7 +18,7 @@ use crate::imap::{
 /// from the source mailbox to the destination mailbox. Requires the
 /// MOVE IMAP extension.
 #[derive(Debug, Parser)]
-pub struct MoveMessageCommand {
+pub struct MoveMessagesCommand {
     #[command(flatten)]
     pub mailbox_name: MailboxNameOptionalFlag,
     #[command(flatten)]
@@ -35,7 +35,7 @@ pub struct MoveMessageCommand {
     pub seq: bool,
 }
 
-impl MoveMessageCommand {
+impl MoveMessagesCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
