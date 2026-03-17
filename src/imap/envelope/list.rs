@@ -4,12 +4,13 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, Row, Table};
 use io_imap::{
-    coroutines::{fetch::*, select::*},
+    coroutines::{fetch::*, select::*, status::*},
     types::{
         core::Vec1,
         envelope::Address,
         fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
-        sequence::SequenceSet,
+        sequence::{SeqOrUid, Sequence, SequenceSet},
+        status::{StatusDataItem, StatusDataItemName},
     },
 };
 use io_stream::runtimes::std::handle;
@@ -20,7 +21,7 @@ use serde::Serialize;
 
 use crate::imap::{
     account::ImapAccount,
-    mailbox::arg::{MailboxNameOptionalArg, MailboxNoSelectFlag},
+    mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
 };
 
 /// List IMAP envelopes from the given mailbox.
@@ -30,17 +31,26 @@ use crate::imap::{
 /// are fetched.
 #[derive(Debug, Parser)]
 pub struct ListEnvelopesCommand {
+    /// The sequence set of envelopes.
+    #[arg(value_name = "SEQUENCE")]
+    #[arg(conflicts_with = "page_size")]
+    #[arg(conflicts_with = "page")]
+    pub sequence_set: Option<String>,
+
     #[command(flatten)]
-    pub mailbox_name: MailboxNameOptionalArg,
+    pub mailbox_name: MailboxNameOptionalFlag,
     #[command(flatten)]
     pub mailbox_no_select: MailboxNoSelectFlag,
+    #[arg(long, default_value = "10")]
+    #[arg(conflicts_with = "sequence")]
+    pub page_size: usize,
+    #[arg(long, short, default_value = "0")]
+    #[arg(conflicts_with = "sequence")]
+    pub page: usize,
 
-    /// The sequence set of envelopes.
-    #[arg(short, long, default_value = "1:*")]
-    pub sequence: String,
     /// Use sequence numbers instead of UIDs.
-    #[arg(long)]
-    pub seq: bool,
+    #[arg(long, short, visible_alias = "seq")]
+    pub sequence: bool,
 }
 
 impl ListEnvelopesCommand {
@@ -48,25 +58,64 @@ impl ListEnvelopesCommand {
         let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        if !self.mailbox_no_select.inner {
+        let exists = if self.mailbox_no_select.inner {
+            let mut arg = None;
+            let mut coroutine =
+                ImapStatus::new(imap.context, mailbox, &[StatusDataItemName::Messages]);
+
+            loop {
+                match coroutine.resume(arg.take()) {
+                    ImapStatusResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
+                    ImapStatusResult::Ok { context, items } => {
+                        imap.context = context;
+                        break items.into_iter().find_map(|i| match i {
+                            StatusDataItem::Messages(exists) => Some(exists),
+                            _ => None,
+                        });
+                    }
+                    ImapStatusResult::Err { err, .. } => bail!(err),
+                }
+            }
+        } else {
             let mut arg = None;
             let mut coroutine = ImapSelect::new(imap.context, mailbox);
 
-            imap.context = loop {
+            loop {
                 match coroutine.resume(arg.take()) {
                     ImapSelectResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                    ImapSelectResult::Ok { context, .. } => break context,
+                    ImapSelectResult::Ok { context, data } => {
+                        imap.context = context;
+                        break data.exists;
+                    }
                     ImapSelectResult::Err { err, .. } => bail!(err),
                 }
-            };
-        }
+            }
+        };
 
-        let sequence_set: SequenceSet = self.sequence.parse()?;
-        let item_names =
-            MacroOrMessageDataItemNames::MessageDataItemNames(vec![MessageDataItemName::Envelope]);
+        let mut has_sequence = false;
+        let sequence_set = match self.sequence_set {
+            Some(seq) => {
+                has_sequence = true;
+                seq.parse()?
+            }
+            None => match exists {
+                Some(n) => build_paginated_sequence(self.page, self.page_size, n as usize)?,
+                None => "1:*".try_into()?,
+            },
+        };
+
+        let item_names = MacroOrMessageDataItemNames::MessageDataItemNames(vec![
+            MessageDataItemName::Uid,
+            MessageDataItemName::Envelope,
+        ]);
 
         let mut arg = None;
-        let mut coroutine = ImapFetch::new(imap.context, sequence_set, item_names, !self.seq);
+        let mut coroutine = ImapFetch::new(
+            imap.context,
+            sequence_set,
+            item_names,
+            !self.sequence && has_sequence,
+        );
 
         let data = loop {
             match coroutine.resume(arg.take()) {
@@ -79,8 +128,7 @@ impl ListEnvelopesCommand {
         let table = EnvelopesTable {
             preset: account.table_preset,
             arrangement: account.table_arrangement,
-            envelopes: map_envelopes_table_entries(!self.seq, data),
-            uid_mode: !self.seq,
+            envelopes: map_envelopes_table_entries(data),
         };
 
         printer.out(table)
@@ -94,29 +142,28 @@ pub struct EnvelopesTable {
     #[serde(skip)]
     arrangement: ContentArrangement,
     envelopes: Vec<EnvelopesTableEntry>,
-    uid_mode: bool,
 }
 
 impl fmt::Display for EnvelopesTable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 
-        let id_header = if self.uid_mode { "UID" } else { "SEQ" };
-
         table
             .load_preset(&self.preset)
             .set_content_arrangement(self.arrangement.clone())
             .set_header(Row::from([
-                Cell::new(id_header),
-                Cell::new("Subject"),
-                Cell::new("From"),
-                Cell::new("Date"),
+                Cell::new("SEQ"),
+                Cell::new("UID"),
+                Cell::new("SUBJECT"),
+                Cell::new("FROM"),
+                Cell::new("DATE"),
             ]));
 
         for entry in &self.envelopes {
             let mut row = Row::new();
             row.max_height(1);
-            row.add_cell(Cell::new(entry.id));
+            row.add_cell(Cell::new(entry.seq));
+            row.add_cell(Cell::new(entry.uid));
             row.add_cell(Cell::new(&entry.subject));
             row.add_cell(Cell::new(&entry.from));
             row.add_cell(Cell::new(&entry.date));
@@ -128,57 +175,50 @@ impl fmt::Display for EnvelopesTable {
     }
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Default, Serialize)]
 pub struct EnvelopesTableEntry {
-    pub id: u32,
+    pub seq: u32,
+    pub uid: u32,
     pub date: String,
     pub from: String,
     pub subject: String,
 }
 
 fn map_envelopes_table_entries(
-    uid_mode: bool,
     data: HashMap<NonZeroU32, Vec1<MessageDataItem<'_>>>,
 ) -> Vec<EnvelopesTableEntry> {
     let mut entries: Vec<EnvelopesTableEntry> = data
         .into_iter()
         .map(|(seq, items)| {
-            let mut id = seq.get();
-            let mut date = String::new();
-            let mut from = String::new();
-            let mut subject = String::new();
+            let mut entry = EnvelopesTableEntry::default();
+            entry.seq = seq.get();
 
             for item in items.into_iter() {
                 match item {
                     MessageDataItem::Uid(uid) => {
-                        if uid_mode {
-                            id = uid.get();
-                        }
+                        entry.uid = uid.get();
                     }
                     MessageDataItem::Envelope(env) => {
-                        // NString wraps Option<IString>, access via .0
-                        if let Some(d) = &env.date.0 {
-                            date = String::from_utf8_lossy(d.as_ref()).to_string();
+                        if let Some(d) = env.date.into_option() {
+                            entry.date = String::from_utf8_lossy(d.as_ref()).to_string();
                         }
-                        if let Some(s) = &env.subject.0 {
-                            subject = decode_mime(String::from_utf8_lossy(s.as_ref()).as_ref());
+
+                        if let Some(s) = env.subject.into_option() {
+                            entry.subject =
+                                decode_mime(String::from_utf8_lossy(s.as_ref()).as_ref());
                         }
-                        from = format_addresses_short(&env.from);
+
+                        entry.from = format_addresses_short(&env.from);
                     }
                     _ => {}
                 }
             }
 
-            EnvelopesTableEntry {
-                id,
-                date,
-                from,
-                subject,
-            }
+            entry
         })
         .collect();
 
-    entries.sort_by_key(|e| e.id);
+    entries.sort_by_key(|e| e.uid);
     entries.reverse();
     entries
 }
@@ -249,4 +289,29 @@ pub fn format_addresses_short(addrs: &[Address<'_>]) -> String {
         .map(format_address_short)
         .collect::<Vec<_>>()
         .join(", ")
+}
+
+fn build_paginated_sequence(page: usize, page_size: usize, total: usize) -> Result<SequenceSet> {
+    let seq = if page_size == 0 {
+        Sequence::Range(SeqOrUid::try_from(1).unwrap(), SeqOrUid::Asterisk)
+    } else {
+        let page_cursor = page * page_size;
+        if page_cursor >= total {
+            bail!("page {} out of bounds", page + 1);
+        }
+
+        let mut count = 1;
+        let mut cursor = total - (total.min(page_cursor));
+
+        let page_size = page_size.min(total);
+        let from = SeqOrUid::Value(NonZeroU32::new(cursor as u32).unwrap());
+        while cursor > 1 && count < page_size {
+            count += 1;
+            cursor -= 1;
+        }
+        let to = SeqOrUid::Value(NonZeroU32::new(cursor as u32).unwrap());
+        Sequence::Range(to, from)
+    };
+
+    Ok(seq.into())
 }
