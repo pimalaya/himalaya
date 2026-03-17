@@ -1,4 +1,4 @@
-use std::{fmt, path::PathBuf};
+use std::fmt;
 
 use anyhow::{bail, Result};
 use clap::Parser;
@@ -7,7 +7,10 @@ use io_maildir::{coroutines::get_message::*, maildir::Maildir, types::Message};
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 
-use crate::maildir::account::MaildirAccount;
+use crate::maildir::{
+    account::MaildirAccount,
+    arg::{MaildirPathFlag, MessageIdArg},
+};
 
 /// Read message content.
 ///
@@ -15,19 +18,14 @@ use crate::maildir::account::MaildirAccount;
 /// By default it shows plain text content; use --html to show HTML.
 #[derive(Debug, Parser)]
 pub struct ReadMessageCommand {
-    /// Path to the Maildir containing the message looked for.
-    #[arg(long, short, value_name = "PATH")]
-    #[arg(default_value = "Inbox")]
-    pub maildir: PathBuf,
-
-    /// Id of message to read.
-    #[arg()]
-    pub id: String,
+    #[command(flatten)]
+    pub maildir: MaildirPathFlag,
+    #[command(flatten)]
+    pub id: MessageIdArg,
 
     /// Show HTML content instead of plain text.
     #[arg(long)]
     pub html: bool,
-
     /// Terminal width for text wrapping.
     #[arg(long, short, default_value = "80")]
     pub width: usize,
@@ -35,13 +33,13 @@ pub struct ReadMessageCommand {
 
 impl ReadMessageCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
-        let maildir = match Maildir::try_from(self.maildir.clone()) {
+        let maildir = match Maildir::try_from(self.maildir.inner.clone()) {
             Ok(maildir) => maildir,
-            Err(_) => Maildir::try_from(account.backend.root.join(self.maildir))?,
+            Err(_) => Maildir::try_from(account.backend.root.join(self.maildir.inner))?,
         };
 
         let mut arg = None;
-        let mut coroutine = GetMaildirMessage::new(maildir, &self.id);
+        let mut coroutine = GetMaildirMessage::new(maildir, &self.id.inner);
 
         let message = loop {
             match coroutine.resume(arg.take()) {

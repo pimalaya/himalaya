@@ -824,7 +824,7 @@ dependencies = [
 [[package]]
 name = "io-maildir"
 version = "0.0.1"
-source = "git+https://github.com/pimalaya/io-maildir#e490e6ed98c2f5781b3e00319b61a4af7af15b1c"
+source = "git+https://github.com/pimalaya/io-maildir#105acf1b5e2e005c0afea4ecb27ebe2ae49d3e4f"
 dependencies = [
  "gethostname",
  "io-fs",

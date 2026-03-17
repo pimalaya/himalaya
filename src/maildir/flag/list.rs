@@ -1,0 +1,79 @@
+use std::fmt;
+
+use anyhow::Result;
+use clap::Parser;
+use comfy_table::{Cell, ContentArrangement, Row, Table};
+use io_maildir::flag::Flag;
+use pimalaya_toolbox::terminal::printer::Printer;
+use serde::Serialize;
+
+use crate::maildir::account::MaildirAccount;
+
+/// List available MAILDIR flags for the given mailbox.
+///
+/// This command displays the flags and permanent flags that are
+/// available in the given mailbox. These flags come from the SELECT
+/// response.
+#[derive(Debug, Parser)]
+pub struct ListFlagsCommand;
+
+impl ListFlagsCommand {
+    pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
+        let table = FlagsTable {
+            preset: account.table_preset,
+            arrangement: account.table_arrangement,
+            flags: vec![
+                FlagRow::new(Flag::Passed),
+                FlagRow::new(Flag::Replied),
+                FlagRow::new(Flag::Seen),
+                FlagRow::new(Flag::Trashed),
+                FlagRow::new(Flag::Draft),
+                FlagRow::new(Flag::Flagged),
+            ],
+        };
+
+        printer.out(table)
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct FlagsTable {
+    #[serde(skip_serializing)]
+    preset: String,
+    #[serde(skip_serializing)]
+    arrangement: ContentArrangement,
+    flags: Vec<FlagRow>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct FlagRow {
+    code: String,
+    name: String,
+}
+
+impl FlagRow {
+    pub fn new(flag: Flag) -> Self {
+        Self {
+            code: flag.to_string(),
+            name: format!("{flag:?}"),
+        }
+    }
+}
+
+impl fmt::Display for FlagsTable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut table = Table::new();
+
+        table
+            .load_preset(&self.preset)
+            .set_content_arrangement(self.arrangement.clone())
+            .set_header(Row::from([Cell::new("CODE"), Cell::new("NAME")]));
+
+        for flag in &self.flags {
+            table.add_row(Row::from([Cell::new(&flag.code), Cell::new(&flag.name)]));
+        }
+
+        writeln!(f)?;
+        writeln!(f, "{table}")
+    }
+}

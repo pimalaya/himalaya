@@ -18,7 +18,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 [features]
 default = ["imap", "smtp", "maildir", "rustls-ring"]
 
-imap = ["dep:io-imap", "pimalaya-toolbox/imap"]
+imap = ["dep:io-imap", "dep:rfc2047-decoder", "pimalaya-toolbox/imap"]
 smtp = ["dep:io-smtp", "pimalaya-toolbox/smtp"]
 maildir = ["dep:convert_case", "dep:io-fs", "dep:io-maildir", "dep:mime_guess"]
 
@@ -50,7 +50,7 @@ mail-parser = "0.11"
 mime_guess = { version = "2", optional = true }
 open = "5"
 pimalaya-toolbox = { version = "0.0.4", default-features = false, features = ["config", "terminal", "secret"] }
-rfc2047-decoder = "1"
+rfc2047-decoder = { version = "1", optional = true }
 secrecy = "0.10"
 serde = { version = "1", features = ["derive"] }
 shellexpand = "3.1"

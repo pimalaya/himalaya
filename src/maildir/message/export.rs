@@ -9,18 +9,10 @@ use mime_guess::{get_mime_extensions_str, mime::OCTET_STREAM};
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 
-use crate::maildir::account::MaildirAccount;
-
-/// Export type for message export.
-#[derive(Clone, Debug, Default, ValueEnum)]
-#[clap(rename_all = "kebab-case")]
-pub enum ExportType {
-    #[default]
-    /// Output raw RFC822 message to stdout.
-    Raw,
-    /// Export all MIME parts to separate files.
-    Parts,
-}
+use crate::maildir::{
+    account::MaildirAccount,
+    arg::{MaildirPathFlag, MessageIdArg},
+};
 
 /// Export a message.
 ///
@@ -30,14 +22,10 @@ pub enum ExportType {
 /// - parts: Export all MIME parts to separate files
 #[derive(Debug, Parser)]
 pub struct ExportMessageCommand {
-    /// Path to the Maildir containing the message looked for.
-    #[arg(long = "maildir", short)]
-    #[arg(value_name = "PATH", default_value = "Inbox")]
-    pub maildir_path: PathBuf,
-
-    /// Id of message to export.
-    #[arg()]
-    pub id: String,
+    #[command(flatten)]
+    pub maildir: MaildirPathFlag,
+    #[command(flatten)]
+    pub id: MessageIdArg,
 
     /// Type of the export.
     #[arg(long, short, value_enum, default_value_t)]
@@ -54,13 +42,13 @@ pub struct ExportMessageCommand {
 
 impl ExportMessageCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
-        let maildir = match Maildir::try_from(self.maildir_path.clone()) {
+        let maildir = match Maildir::try_from(self.maildir.inner.clone()) {
             Ok(maildir) => maildir,
-            Err(_) => Maildir::try_from(account.backend.root.join(self.maildir_path))?,
+            Err(_) => Maildir::try_from(account.backend.root.join(self.maildir.inner))?,
         };
 
         let mut arg = None;
-        let mut coroutine = GetMaildirMessage::new(maildir, &self.id);
+        let mut coroutine = GetMaildirMessage::new(maildir, &self.id.inner);
 
         let msg = loop {
             match coroutine.resume(arg.take()) {
@@ -80,7 +68,11 @@ impl ExportMessageCommand {
                     bail!("Invalid MIME message at {}", msg.path().display());
                 };
 
-                let dir = self.directory.unwrap_or_else(|| PathBuf::from(self.id));
+                let dir = match self.directory {
+                    Some(dir) => dir,
+                    None => PathBuf::from(self.id.inner),
+                };
+
                 fs::create_dir_all(&dir)?;
 
                 let mut parts = Vec::new();
@@ -135,6 +127,17 @@ impl ExportMessageCommand {
 
         Ok(())
     }
+}
+
+/// Export type for message export.
+#[derive(Clone, Debug, Default, ValueEnum)]
+#[clap(rename_all = "kebab-case")]
+pub enum ExportType {
+    #[default]
+    /// Output raw RFC822 message to stdout.
+    Raw,
+    /// Export all MIME parts to separate files.
+    Parts,
 }
 
 #[derive(Serialize)]

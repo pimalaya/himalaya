@@ -5,17 +5,17 @@ use std::{
 };
 
 use anyhow::{bail, Result};
-use clap::{Parser, ValueEnum};
+use clap::Parser;
 use io_fs::runtimes::std::handle;
-use io_maildir::{
-    coroutines::store_message::*,
-    flag::Flag,
-    maildir::{Maildir, MaildirSubdir},
-};
+use io_maildir::{coroutines::store_message::*, flag::Flags, maildir::Maildir};
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 
-use crate::maildir::account::MaildirAccount;
+use crate::maildir::{
+    account::MaildirAccount,
+    arg::{MaildirPathFlag, MaildirSubdirArg},
+    flag::arg::FlagArg,
+};
 
 /// Save a message to a mailbox.
 ///
@@ -23,13 +23,11 @@ use crate::maildir::account::MaildirAccount;
 /// message is read from stdin in RFC 5322 format (raw email).
 #[derive(Debug, Parser)]
 pub struct SaveMessageCommand {
-    /// Path to the Maildir to save message into.
-    #[arg(long, short, value_name = "PATH")]
-    #[arg(default_value = "Inbox")]
-    pub maildir: PathBuf,
+    #[command(flatten)]
+    pub maildir: MaildirPathFlag,
 
     /// The subdirectory of the Maildir
-    #[arg(long, short, value_name = "NAME", value_enum)]
+    #[arg(long, short, value_name = "DIR", value_enum)]
     #[arg(default_value = "new")]
     pub subdir: MaildirSubdirArg,
 
@@ -45,9 +43,9 @@ pub struct SaveMessageCommand {
 
 impl SaveMessageCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
-        let maildir = match Maildir::try_from(self.maildir.clone()) {
+        let maildir = match Maildir::try_from(self.maildir.inner.clone()) {
             Ok(maildir) => maildir,
-            Err(_) => Maildir::try_from(account.backend.root.join(self.maildir))?,
+            Err(_) => Maildir::try_from(account.backend.root.join(self.maildir.inner))?,
         };
 
         let msg = if stdin().is_terminal() || printer.is_json() {
@@ -64,7 +62,7 @@ impl SaveMessageCommand {
                 .join("\r\n")
         };
 
-        let flags = self.flags.into_iter().map(Into::into).into();
+        let flags = Flags::from_iter(self.flags.into_iter().map(Into::into));
 
         let mut arg = None;
         let mut coroutine =
@@ -79,47 +77,6 @@ impl SaveMessageCommand {
         };
 
         printer.out(out)
-    }
-}
-
-#[derive(Clone, Debug, ValueEnum)]
-pub enum MaildirSubdirArg {
-    Cur,
-    New,
-    Tmp,
-}
-
-impl From<MaildirSubdirArg> for MaildirSubdir {
-    fn from(value: MaildirSubdirArg) -> Self {
-        match value {
-            MaildirSubdirArg::Cur => MaildirSubdir::Cur,
-            MaildirSubdirArg::New => MaildirSubdir::New,
-            MaildirSubdirArg::Tmp => MaildirSubdir::Tmp,
-        }
-    }
-}
-
-#[derive(Clone, Debug, ValueEnum)]
-#[clap(rename_all = "kebab-case")]
-pub enum FlagArg {
-    Passed,
-    Replied,
-    Seen,
-    Trashed,
-    Draft,
-    Flagged,
-}
-
-impl From<FlagArg> for Flag {
-    fn from(flag: FlagArg) -> Self {
-        match flag {
-            FlagArg::Passed => Flag::Passed,
-            FlagArg::Replied => Flag::Replied,
-            FlagArg::Seen => Flag::Seen,
-            FlagArg::Trashed => Flag::Trashed,
-            FlagArg::Draft => Flag::Draft,
-            FlagArg::Flagged => Flag::Flagged,
-        }
     }
 }
 
