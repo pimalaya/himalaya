@@ -56,10 +56,10 @@ uuid = { version = "1.19", features = ["v4"] }
 [patch.crates-io]
 pimalaya-tui.git = "https://github.com/pimalaya/tui"
 imap-client.git = "https://github.com/pimalaya/io-imap"
-email-lib = { git = "https://github.com/gh503/core", subdir = "email" }
-keyring-lib = { git = "https://github.com/gh503/core", subdir = "keyring" }
-secret-lib = { git = "https://github.com/gh503/core", subdir = "secret" }
-process-lib = { git = "https://github.com/gh503/core", subdir = "process" }
-mml-lib = { git = "https://github.com/gh503/core", subdir = "mml" }
-oauth-lib = { git = "https://github.com/gh503/core", subdir = "oauth" }
-pgp-lib = { git = "https://github.com/gh503/core", subdir = "pgp" }
+email-lib = { git = "https://github.com/pimalaya/core", branch = "master", subdir = "email" }
+keyring-lib = { git = "https://github.com/pimalaya/core", branch = "master", subdir = "keyring" }
+secret-lib = { git = "https://github.com/pimalaya/core", branch = "master", subdir = "secret" }
+process-lib = { git = "https://github.com/pimalaya/core", branch = "master", subdir = "process" }
+mml-lib = { git = "https://github.com/pimalaya/core", branch = "master", subdir = "mml" }
+oauth-lib = { git = "https://github.com/pimalaya/core", branch = "master", subdir = "oauth" }
+pgp-lib = { git = "https://github.com/pimalaya/core", branch = "master", subdir = "pgp" }
