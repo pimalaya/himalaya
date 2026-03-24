@@ -3,6 +3,8 @@ mod cli;
 mod config;
 #[cfg(feature = "imap")]
 mod imap;
+#[cfg(feature = "jmap")]
+mod jmap;
 #[cfg(feature = "maildir")]
 mod maildir;
 #[cfg(feature = "smtp")]

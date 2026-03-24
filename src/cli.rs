@@ -17,6 +17,8 @@ use pimalaya_toolbox::{
 
 #[cfg(feature = "imap")]
 use crate::imap::command::ImapCommand;
+#[cfg(feature = "jmap")]
+use crate::jmap::command::JmapCommand;
 #[cfg(feature = "maildir")]
 use crate::maildir::command::MaildirCommand;
 #[cfg(feature = "smtp")]
@@ -61,6 +63,9 @@ pub enum BackendCommand {
     #[cfg(feature = "imap")]
     #[command(subcommand)]
     Imap(ImapCommand),
+    #[cfg(feature = "jmap")]
+    #[command(subcommand)]
+    Jmap(JmapCommand),
     #[cfg(feature = "maildir")]
     #[command(subcommand)]
     Maildir(MaildirCommand),
@@ -90,6 +95,19 @@ impl BackendCommand {
                 };
 
                 let account = Account::new(config, account_config, imap_config)?;
+
+                cmd.execute(printer, account)
+            }
+            #[cfg(feature = "jmap")]
+            Self::Jmap(cmd) => {
+                let config = Config::from_paths_or_default(config_paths)?;
+                let (account_name, mut account_config) = config.get_account(account_name)?;
+
+                let Some(jmap_config) = account_config.jmap.take() else {
+                    bail!("JMAP config is missing for account `{account_name}`")
+                };
+
+                let account = Account::new(config, account_config, jmap_config)?;
 
                 cmd.execute(printer, account)
             }

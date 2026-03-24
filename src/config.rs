@@ -54,8 +54,12 @@ pub struct AccountConfig {
     pub table_preset: Option<String>,
     pub table_arrangement: Option<TableArrangementConfig>,
 
+    #[allow(unused)]
     pub imap: Option<ImapConfig>,
+    pub jmap: Option<JmapConfig>,
+    #[allow(unused)]
     pub maildir: Option<MaildirConfig>,
+    #[allow(unused)]
     pub smtp: Option<SmtpConfig>,
 }
 
@@ -79,6 +83,7 @@ impl From<TableArrangementConfig> for ContentArrangement {
 }
 
 /// IMAP configuration.
+#[allow(unused)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ImapConfig {
@@ -92,6 +97,7 @@ pub struct ImapConfig {
 }
 
 /// Maildir configuration.
+#[allow(unused)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MaildirConfig {
@@ -99,6 +105,7 @@ pub struct MaildirConfig {
 }
 
 /// SMTP configuration.
+#[allow(unused)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SmtpConfig {
@@ -253,5 +260,53 @@ impl TryFrom<SaslConfig> for Sasl {
                 }),
             },
         })
+    }
+}
+
+/// JMAP configuration.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct JmapConfig {
+    /// The HTTPS base URL of the JMAP server.
+    ///
+    /// Must use the `https://` or `jmap://` scheme. Session discovery
+    /// (`GET /.well-known/jmap`) is performed automatically on connection.
+    pub url: Url,
+
+    /// TLS configuration.
+    #[serde(default)]
+    pub tls: TlsConfig,
+
+    /// Authentication configuration.
+    pub auth: JmapAuthConfig,
+}
+
+/// JMAP authentication configuration.
+// https://www.iana.org/assignments/http-authschemes/http-authschemes.xhtml#authschemes
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub enum JmapAuthConfig {
+    /// Bearer token (OAuth 2.0 access token).
+    Bearer { token: Secret },
+    /// HTTP Basic authentication (username + password).
+    Basic {
+        #[serde(deserialize_with = "shell_expanded_string")]
+        username: String,
+        password: Secret,
+    },
+}
+
+#[cfg(feature = "jmap")]
+impl TryFrom<JmapAuthConfig> for pimalaya_toolbox::stream::jmap::JmapAuth {
+    type Error = pimalaya_toolbox::secret::SecretError;
+
+    fn try_from(config: JmapAuthConfig) -> Result<Self, Self::Error> {
+        match config {
+            JmapAuthConfig::Bearer { token } => Ok(Self::Bearer(token.get()?)),
+            JmapAuthConfig::Basic { username, password } => Ok(Self::Basic {
+                username,
+                password: password.get()?,
+            }),
+        }
     }
 }

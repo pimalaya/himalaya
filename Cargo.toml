@@ -16,9 +16,10 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-default = ["imap", "smtp", "maildir", "rustls-ring"]
+default = ["imap", "maildir", "smtp", "rustls-ring"]
 
 imap = ["dep:io-imap", "dep:rfc2047-decoder", "pimalaya-toolbox/imap"]
+jmap = ["dep:io-jmap", "dep:serde_json", "pimalaya-toolbox/jmap"]
 smtp = ["dep:io-smtp", "pimalaya-toolbox/smtp"]
 maildir = ["dep:convert_case", "dep:io-fs", "dep:io-maildir", "dep:mime_guess"]
 
@@ -41,6 +42,7 @@ dirs = "6"
 gethostname = "1"
 io-fs = { version = "0.0.1", default-features = false, features = ["std"], optional = true }
 io-imap = { version = "0.0.1", default-features = false, optional = true }
+io-jmap = { version = "0.0.1", default-features = false, optional = true }
 io-maildir = { version = "0.0.1", default-features = false, features = ["serde"], optional = true }
 io-process = { version = "0.0.2", default-features = false }
 io-smtp = { version = "0.0.1", default-features = false, features = ["ext_auth", "starttls"], optional = true }
@@ -53,6 +55,7 @@ pimalaya-toolbox = { version = "0.0.4", default-features = false, features = ["c
 rfc2047-decoder = { version = "1", optional = true }
 secrecy = "0.10"
 serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", optional = true }
 shellexpand = "3.1"
 url = { version = "2.2", features = ["serde"] }
 
@@ -62,6 +65,8 @@ uds_windows = "1"
 [patch.crates-io]
 io-fs.git = "https://github.com/pimalaya/io-fs"
 io-imap = { git = "https://github.com/pimalaya/io-imap", branch = "io" }
+io-jmap.git = "https://github.com/pimalaya/io-jmap"
+io-http.git = "https://github.com/pimalaya/io-http"
 io-maildir.git = "https://github.com/pimalaya/io-maildir"
 io-smtp.git = "https://github.com/pimalaya/io-smtp"
 pimalaya-toolbox.git = "https://github.com/pimalaya/toolbox"
