@@ -44,7 +44,7 @@ impl GetIdentityCommand {
             }
         };
 
-        for id in &not_found {
+        for id in not_found {
             warn!("identity `{id}` not found");
         }
 

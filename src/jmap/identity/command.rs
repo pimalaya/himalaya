@@ -5,7 +5,7 @@ use pimalaya_toolbox::terminal::printer::Printer;
 use crate::jmap::{
     account::JmapAccount,
     identity::{
-        create::CreateIdentityCommand, delete::DeleteIdentityCommand, get::GetIdentityCommand,
+        create::JmapIdentityCreateCommand, delete::DeleteIdentityCommand, get::GetIdentityCommand,
         update::UpdateIdentityCommand,
     },
 };
@@ -18,7 +18,7 @@ pub enum IdentityCommand {
     Get(GetIdentityCommand),
     /// Create a new identity (Identity/set).
     #[command(aliases = ["add", "new"])]
-    Create(CreateIdentityCommand),
+    Create(JmapIdentityCreateCommand),
     /// Update an existing identity (Identity/set).
     #[command(alias = "edit")]
     Update(UpdateIdentityCommand),

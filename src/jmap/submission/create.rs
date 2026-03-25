@@ -1,4 +1,6 @@
-use anyhow::{bail, Result};
+use std::collections::HashMap;
+
+use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use io_jmap::{
     coroutines::email_submission_set::{SubmitJmapEmail, SubmitJmapEmailResult},
@@ -7,7 +9,7 @@ use io_jmap::{
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 
-use crate::jmap::account::JmapAccount;
+use crate::jmap::{account::JmapAccount, submission::query::SubmissionsTable};
 
 /// Submit a JMAP email for sending (EmailSubmission/set).
 ///
@@ -40,7 +42,10 @@ impl CreateSubmissionCommand {
             let rcpt_to = self
                 .rcpt_to
                 .into_iter()
-                .map(|addr| EmailAddressWithParameters { email: addr, parameters: None })
+                .map(|addr| EmailAddressWithParameters {
+                    email: addr,
+                    parameters: None,
+                })
                 .collect();
             Some(Envelope {
                 mail_from: EmailAddressWithParameters {
@@ -59,33 +64,44 @@ impl CreateSubmissionCommand {
             envelope,
         };
 
-        let mut submissions = std::collections::HashMap::new();
-        submissions.insert("send-1".to_string(), submission);
+        let mut submissions = HashMap::new();
+        submissions.insert(self.email_id.clone(), submission);
 
         let mut coroutine = SubmitJmapEmail::new(jmap.context, submissions)?;
         let mut arg = None;
 
-        loop {
+        let (created, errs) = loop {
             match coroutine.resume(arg.take()) {
                 SubmitJmapEmailResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
-                SubmitJmapEmailResult::Ok { context, not_created, .. } => {
-                    jmap.context = context;
-
-                    if let Some(err) = not_created.get("send-1") {
-                        bail!(
-                            "failed to send email `{}`: {} — {}",
-                            self.email_id,
-                            err.error_type,
-                            err.description.as_deref().unwrap_or("no description")
-                        );
-                    }
-
-                    break;
-                }
+                SubmitJmapEmailResult::Ok {
+                    created,
+                    not_created,
+                    ..
+                } => break (created, not_created),
                 SubmitJmapEmailResult::Err { err, .. } => bail!(err),
             }
+        };
+
+        if let Some(err) = errs.get(&self.email_id) {
+            let mut ctx = anyhow!("Send email `{}` error", &self.email_id);
+
+            if let Some(desc) = &err.description {
+                ctx = anyhow!("{desc}").context(ctx);
+            }
+
+            if !err.properties.is_empty() {
+                let props = err.properties.join(", ");
+                ctx = anyhow!("Invalid properties {props}").context(ctx);
+            }
+
+            bail!(ctx);
         }
 
-        printer.log(format!("Email `{}` successfully sent.", self.email_id))
+        let table = SubmissionsTable {
+            preset: account.table_preset,
+            submissions: created.into_values().collect(),
+        };
+
+        printer.out(table)
     }
 }

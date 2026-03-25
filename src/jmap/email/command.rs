@@ -5,9 +5,9 @@ use pimalaya_toolbox::terminal::printer::Printer;
 use crate::jmap::{
     account::JmapAccount,
     email::{
-        copy::CopyEmailCommand, delete::DeleteEmailCommand, get::JmapEmailGetCommand,
-        import::ImportEmailCommand, parse::ParseEmailCommand, query::JmapEmailQueryCommand,
-        update::JmapEmailUpdateCommand,
+        copy::JmapEmailCopyCommand, delete::JmapEmailDestroyCommand, export::ExportEmailCommand,
+        get::JmapEmailGetCommand, import::ImportEmailCommand, parse::ParseEmailCommand,
+        query::JmapEmailQueryCommand, read::ReadEmailCommand, update::JmapEmailUpdateCommand,
     },
 };
 
@@ -17,11 +17,13 @@ use crate::jmap::{
 pub enum JmapEmailCommand {
     Get(JmapEmailGetCommand),
     Query(JmapEmailQueryCommand),
+    Read(ReadEmailCommand),
     #[command(alias = "edit")]
     Update(JmapEmailUpdateCommand),
     #[command(aliases = ["remove", "rm"])]
-    Delete(DeleteEmailCommand),
-    Copy(CopyEmailCommand),
+    Delete(JmapEmailDestroyCommand),
+    Copy(JmapEmailCopyCommand),
+    Export(ExportEmailCommand),
     Import(ImportEmailCommand),
     Parse(ParseEmailCommand),
 }
@@ -31,9 +33,11 @@ impl JmapEmailCommand {
         match self {
             Self::Get(cmd) => cmd.execute(printer, account),
             Self::Query(cmd) => cmd.execute(printer, account),
+            Self::Read(cmd) => cmd.execute(printer, account),
             Self::Update(cmd) => cmd.execute(printer, account),
             Self::Delete(cmd) => cmd.execute(printer, account),
             Self::Copy(cmd) => cmd.execute(printer, account),
+            Self::Export(cmd) => cmd.execute(printer, account),
             Self::Import(cmd) => cmd.execute(printer, account),
             Self::Parse(cmd) => cmd.execute(printer, account),
         }

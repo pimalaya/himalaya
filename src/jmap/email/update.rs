@@ -12,31 +12,31 @@ use crate::jmap::account::JmapAccount;
 #[derive(Debug, Parser)]
 pub struct JmapEmailUpdateCommand {
     /// Email ID(s) to update.
-    #[arg(value_name = "EMAIL_ID", required = true, num_args = 1..)]
+    #[arg(value_name = "ID", required = true)]
     pub ids: Vec<String>,
 
     /// Add keyword(s) to the email(s).
-    #[arg(long, value_name = "KEYWORD", num_args = 0..)]
+    #[arg(long, value_name = "KEYWORD", required = false)]
     pub add_keyword: Vec<String>,
 
     /// Remove keyword(s) from the email(s).
-    #[arg(long, value_name = "KEYWORD", num_args = 0..)]
+    #[arg(long, value_name = "KEYWORD", required = false)]
     pub remove_keyword: Vec<String>,
 
-    /// Replace all keywords atomically (no fetch required).
-    #[arg(long, value_name = "KEYWORD", num_args = 0..)]
+    /// Replace all keywords atomically.
+    #[arg(long, value_name = "KEYWORD")]
     pub keywords: Option<Vec<String>>,
 
     /// Add email(s) to a mailbox.
-    #[arg(long, value_name = "MAILBOX-ID", num_args = 1..)]
+    #[arg(long, value_name = "MAILBOX-ID", required = false)]
     pub add_mailbox: Vec<String>,
 
     /// Remove email(s) from a mailbox.
-    #[arg(long, value_name = "MAILBOX-ID", num_args = 1..)]
+    #[arg(long, value_name = "MAILBOX-ID", required = false)]
     pub remove_mailbox: Vec<String>,
 
     /// Replace all mailbox memberships atomically.
-    #[arg(long, value_name = "MAILBOX-ID", num_args = 0..)]
+    #[arg(long, value_name = "MAILBOX-ID")]
     pub mailboxes: Option<Vec<String>>,
 }
 
@@ -84,18 +84,21 @@ impl JmapEmailUpdateCommand {
             }
         };
 
-        for (id, err) in &not_updated {
-            let mut ctx = anyhow!("Failed to update email `{id}`");
+        if !not_updated.is_empty() {
+            let mut ctx = anyhow!("Update JMAP email(s) error");
 
-            if let Some(desc) = &err.description {
-                ctx = anyhow!(desc.clone()).context(ctx);
+            for (id, err) in not_updated {
+                if let Some(desc) = &err.description {
+                    ctx = anyhow!("{id}: {desc}").context(ctx);
+                }
+
+                if !err.properties.is_empty() {
+                    let props = err.properties.join(", ");
+                    ctx = anyhow!("{id}: Invalid properties {props}").context(ctx);
+                }
             }
 
-            if !err.properties.is_empty() {
-                ctx = anyhow!("Invalid properties: {}", err.properties.join(", ")).context(ctx);
-            }
-
-            bail!(ctx);
+            bail!(ctx)
         }
 
         printer.out(Message::new("Email(s) successfully updated"))

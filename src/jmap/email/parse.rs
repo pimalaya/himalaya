@@ -2,6 +2,7 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use io_jmap::coroutines::email_parse::{ParseJmapEmails, ParseJmapEmailsResult};
 use io_stream::runtimes::std::handle;
+use log::warn;
 use pimalaya_toolbox::terminal::printer::Printer;
 
 use crate::jmap::account::JmapAccount;
@@ -13,7 +14,7 @@ use crate::jmap::account::JmapAccount;
 #[derive(Debug, Parser)]
 pub struct ParseEmailCommand {
     /// Blob ID(s) to parse as RFC 5322 messages.
-    #[arg(value_name = "BLOB-ID", required = true, num_args = 1..)]
+    #[arg(value_name = "ID", required = true)]
     pub blob_ids: Vec<String>,
 }
 
@@ -27,26 +28,19 @@ impl ParseEmailCommand {
         let (parsed, not_parsable, not_found) = loop {
             match coroutine.resume(arg.take()) {
                 ParseJmapEmailsResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
-                ParseJmapEmailsResult::Ok {
-                    context,
-                    parsed,
-                    not_parsable,
-                    not_found,
-                    ..
-                } => {
-                    jmap.context = context;
+                ParseJmapEmailsResult::Ok { parsed, not_parsable, not_found, .. } => {
                     break (parsed, not_parsable, not_found);
                 }
                 ParseJmapEmailsResult::Err { err, .. } => bail!(err),
             }
         };
 
-        for id in &not_found {
-            printer.log(format!("Blob `{id}` not found."))?;
+        for id in not_found {
+            warn!("blob `{id}` not found, ignoring it");
         }
 
-        for id in &not_parsable {
-            printer.log(format!("Blob `{id}` is not a valid RFC 5322 message."))?;
+        for id in not_parsable {
+            warn!("blob `{id}` not valid MIME message, ignoring it");
         }
 
         for (_blob_id, email) in parsed {

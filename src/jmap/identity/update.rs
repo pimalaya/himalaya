@@ -46,7 +46,7 @@ impl UpdateIdentityCommand {
         let mut coroutine = SetJmapIdentities::new(jmap.context, args)?;
         let mut arg = None;
 
-        let not_updated = loop {
+        let errs = loop {
             match coroutine.resume(arg.take()) {
                 SetJmapIdentitiesResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
                 SetJmapIdentitiesResult::Ok { not_updated, .. } => break not_updated,
@@ -54,11 +54,16 @@ impl UpdateIdentityCommand {
             }
         };
 
-        if let Some(err) = not_updated.get(&self.id) {
-            let mut ctx = anyhow!("Failed to update identity `{}`", self.id);
+        if let Some(err) = errs.get(&self.id) {
+            let mut ctx = anyhow!("Update identity `{}` error", &self.id);
 
             if let Some(desc) = &err.description {
-                ctx = anyhow!(desc.clone()).context(ctx);
+                ctx = anyhow!("{desc}").context(ctx);
+            }
+
+            if !err.properties.is_empty() {
+                let props = err.properties.join(", ");
+                ctx = anyhow!("Invalid properties {props}").context(ctx);
             }
 
             bail!(ctx);

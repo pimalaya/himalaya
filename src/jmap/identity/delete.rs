@@ -37,14 +37,21 @@ impl DeleteIdentityCommand {
             }
         };
 
-        for (id, err) in &not_destroyed {
-            let mut ctx = anyhow!("Failed to delete identity `{id}`");
+        if !not_destroyed.is_empty() {
+            let mut ctx = anyhow!("Destroy JMAP identities error");
 
-            if let Some(desc) = &err.description {
-                ctx = anyhow!(desc.clone()).context(ctx);
+            for (id, err) in not_destroyed {
+                if let Some(desc) = &err.description {
+                    ctx = anyhow!("{id}: {desc}").context(ctx);
+                }
+
+                if !err.properties.is_empty() {
+                    let props = err.properties.join(", ");
+                    ctx = anyhow!("{id}: Invalid properties {props}").context(ctx);
+                }
             }
 
-            bail!(ctx);
+            bail!(ctx)
         }
 
         printer.out(Message::new("Identity successfully deleted"))

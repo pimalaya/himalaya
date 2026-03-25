@@ -92,6 +92,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "assert_cmd"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a686bbee5efb88a82df0621b236e74d925f470e5445d3220a5648b892ec99c9"
+dependencies = [
+ "anstyle",
+ "bstr",
+ "libc",
+ "predicates",
+ "predicates-core",
+ "predicates-tree",
+ "wait-timeout",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -146,6 +161,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "bstr"
+version = "1.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "63044e1ae8e69f3b5a92c736ca6269b8d12fa7efe39bf34ddb06d102cf0e2cab"
+dependencies = [
+ "memchr",
+ "regex-automata 0.4.14",
+ "serde",
 ]
 
 [[package]]
@@ -360,6 +386,12 @@ checksum = "acdd7c62a3665c7f6830a51635d9ac9b23ed385797f70a83bb8bafe9c572ab2b"
 dependencies = [
  "winapi",
 ]
+
+[[package]]
+name = "difflib"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6184e33543162437515c2e2b48714794e37845ec9851711914eec9d308f6ebe8"
 
 [[package]]
 name = "dirs"
@@ -602,6 +634,7 @@ name = "himalaya"
 version = "1.2.0"
 dependencies = [
  "anyhow",
+ "assert_cmd",
  "chrono",
  "clap",
  "comfy-table",
@@ -625,6 +658,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shellexpand",
+ "tempfile",
  "uds_windows",
  "url",
 ]
@@ -796,6 +830,7 @@ dependencies = [
 [[package]]
 name = "io-fs"
 version = "0.0.1"
+source = "git+https://github.com/pimalaya/io-fs#6c2305c52fdd5ec9ed05e902183fdf2942ea0590"
 dependencies = [
  "log",
  "thiserror 2.0.18",
@@ -804,6 +839,7 @@ dependencies = [
 [[package]]
 name = "io-http"
 version = "0.0.3"
+source = "git+https://github.com/pimalaya/io-http#4123d10e62a05245c19292f1c88cf0f3ef24f4fc"
 dependencies = [
  "http",
  "httparse",
@@ -816,6 +852,7 @@ dependencies = [
 [[package]]
 name = "io-imap"
 version = "0.0.1"
+source = "git+https://github.com/pimalaya/io-imap?branch=io#356d1349d1956be668321657853d91fe33d98a16"
 dependencies = [
  "imap-codec",
  "io-stream",
@@ -828,6 +865,7 @@ dependencies = [
 [[package]]
 name = "io-jmap"
 version = "0.0.1"
+source = "git+https://github.com/pimalaya/io-jmap#bbc42f310ef6914af7d73ab2ff417a2d91183b87"
 dependencies = [
  "http",
  "io-http",
@@ -843,6 +881,7 @@ dependencies = [
 [[package]]
 name = "io-maildir"
 version = "0.0.1"
+source = "git+https://github.com/pimalaya/io-maildir#75e5b0dc4fd8ce7ac71578f22f5fb2d89831efac"
 dependencies = [
  "gethostname",
  "io-fs",
@@ -869,6 +908,7 @@ dependencies = [
 [[package]]
 name = "io-smtp"
 version = "0.0.1"
+source = "git+https://github.com/pimalaya/io-smtp#3a74933b9c6e98723c31c6f8a68b366657ccb395"
 dependencies = [
  "io-stream",
  "log",
@@ -1298,6 +1338,7 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 [[package]]
 name = "pimalaya-toolbox"
 version = "0.0.4"
+source = "git+https://github.com/pimalaya/toolbox#c16e4e530d5c303d61db09b5dd99a7d23d704dda"
 dependencies = [
  "anyhow",
  "base64",
@@ -1365,6 +1406,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85eae3c4ed2f50dcfe72643da4befc30deadb458a9b590d720cde2f2b1e97da9"
 dependencies = [
  "zerocopy",
+]
+
+[[package]]
+name = "predicates"
+version = "3.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ada8f2932f28a27ee7b70dd6c1c39ea0675c55a36879ab92f3a715eaa1e63cfe"
+dependencies = [
+ "anstyle",
+ "difflib",
+ "predicates-core",
+]
+
+[[package]]
+name = "predicates-core"
+version = "1.0.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cad38746f3166b4031b1a0d39ad9f954dd291e7854fcc0eed52ee41a0b50d144"
+
+[[package]]
+name = "predicates-tree"
+version = "1.0.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0de1b847b39c8131db0467e9df1ff60e6d0562ab8e9a16e568ad0fdb372e2f2"
+dependencies = [
+ "predicates-core",
+ "termtree",
 ]
 
 [[package]]
@@ -1796,6 +1864,7 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 [[package]]
 name = "smtp-codec"
 version = "0.2.0"
+source = "git+https://github.com/pimalaya/smtp-codec#baeb185ad0a63d43c48b05f7f7a4d9e81b291332"
 dependencies = [
  "abnf-core",
  "base64",
@@ -1807,6 +1876,7 @@ dependencies = [
 [[package]]
 name = "smtp-types"
 version = "0.2.0"
+source = "git+https://github.com/pimalaya/smtp-codec#baeb185ad0a63d43c48b05f7f7a4d9e81b291332"
 dependencies = [
  "base64",
  "bounded-static",
@@ -1889,6 +1959,12 @@ dependencies = [
  "rustix",
  "windows-sys 0.61.2",
 ]
+
+[[package]]
+name = "termtree"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f50febec83f5ee1df3015341d8bd429f2d1cc62bcba7ea2076759d315084683"
 
 [[package]]
 name = "thiserror"
@@ -2069,6 +2145,15 @@ name = "vcpkg"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
+
+[[package]]
+name = "wait-timeout"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09ac3b126d3914f9849036f826e054cbabdc8519970b8998ddaf3b5bd3c65f11"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "walkdir"

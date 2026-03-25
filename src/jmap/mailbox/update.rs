@@ -72,7 +72,7 @@ impl JmapMailboxUpdateCommand {
         let mut arg = None;
         let mut coroutine = SetJmapMailboxes::new(jmap.context, args)?;
 
-        let not_updated = loop {
+        let errs = loop {
             match coroutine.resume(arg.take()) {
                 SetJmapMailboxesResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
                 SetJmapMailboxesResult::Ok { not_updated, .. } => break not_updated,
@@ -80,15 +80,16 @@ impl JmapMailboxUpdateCommand {
             }
         };
 
-        if let Some(err) = not_updated.get(&self.id) {
+        if let Some(err) = errs.get(&self.id) {
             let mut ctx = anyhow!("Update JMAP mailbox `{}` error", self.id);
 
             if let Some(desc) = &err.description {
-                ctx = anyhow!(desc.clone()).context(ctx);
+                ctx = anyhow!("{desc}").context(ctx);
             }
 
             if !err.properties.is_empty() {
-                ctx = anyhow!("Invalid properties: {}", err.properties.join(", ")).context(ctx);
+                let props = err.properties.join(", ");
+                ctx = anyhow!("Invalid properties {props}").context(ctx);
             }
 
             bail!(ctx);

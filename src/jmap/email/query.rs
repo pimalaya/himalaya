@@ -169,21 +169,6 @@ impl JmapEmailQueryCommand {
     }
 }
 
-fn format_addresses(addrs: &[EmailAddress]) -> String {
-    addrs
-        .iter()
-        .map(|a| {
-            if let Some(name) = &a.name {
-                if !name.is_empty() {
-                    return name.clone();
-                }
-            }
-            a.email.clone()
-        })
-        .collect::<Vec<_>>()
-        .join(", ")
-}
-
 #[derive(Clone, Debug, Serialize)]
 #[serde(transparent)]
 pub struct EmailsTable {
@@ -278,4 +263,19 @@ impl From<SortArg> for EmailSortProperty {
             SortArg::HasAttachment => EmailSortProperty::HasAttachment,
         }
     }
+}
+
+fn format_addresses(addrs: &[EmailAddress]) -> String {
+    addrs
+        .iter()
+        .map(|a| {
+            if let Some(name) = &a.name {
+                if !name.is_empty() {
+                    return name.clone();
+                }
+            }
+            a.email.clone()
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
 }

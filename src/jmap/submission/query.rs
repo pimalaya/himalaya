@@ -1,13 +1,13 @@
 use std::fmt;
 
 use anyhow::{bail, Result};
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use comfy_table::{Cell, Row, Table};
 use io_jmap::{
     coroutines::email_submission_query::{
         QueryJmapEmailSubmissions, QueryJmapEmailSubmissionsResult,
     },
-    types::email_submission::EmailSubmission,
+    types::email_submission::{EmailSubmission, EmailSubmissionFilter, UndoStatus},
 };
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
@@ -15,12 +15,30 @@ use serde::Serialize;
 
 use crate::jmap::account::JmapAccount;
 
+/// CLI proxy for [`UndoStatus`].
+#[derive(Clone, Debug, ValueEnum)]
+pub enum UndoStatusArg {
+    Pending,
+    Final,
+    Canceled,
+}
+
+impl From<UndoStatusArg> for UndoStatus {
+    fn from(arg: UndoStatusArg) -> Self {
+        match arg {
+            UndoStatusArg::Pending => UndoStatus::Pending,
+            UndoStatusArg::Final => UndoStatus::Final,
+            UndoStatusArg::Canceled => UndoStatus::Canceled,
+        }
+    }
+}
+
 /// Query JMAP email submissions (EmailSubmission/query + EmailSubmission/get).
 #[derive(Debug, Parser)]
 pub struct QuerySubmissionCommand {
     /// Filter by undo status (`pending`, `final`, `canceled`).
     #[arg(long, value_name = "STATUS")]
-    pub undo_status: Option<String>,
+    pub undo_status: Option<UndoStatusArg>,
 
     /// Filter by sent-before date (RFC 3339).
     #[arg(long, value_name = "DATE")]
@@ -44,17 +62,23 @@ impl QuerySubmissionCommand {
         let mut jmap = account.new_jmap_session()?;
 
         let filter = {
-            use io_jmap::types::email_submission::EmailSubmissionFilter;
             let f = EmailSubmissionFilter {
-                undo_status: self.undo_status,
+                undo_status: self.undo_status.map(Into::into),
                 before: self.before,
                 after: self.after,
                 ..Default::default()
             };
+
             let has_one = f.undo_status.is_some() || f.before.is_some() || f.after.is_some();
-            if has_one { Some(f) } else { None }
+
+            if has_one {
+                Some(f)
+            } else {
+                None
+            }
         };
 
+        let mut arg = None;
         let mut coroutine = QueryJmapEmailSubmissions::new(
             jmap.context,
             filter,
@@ -62,17 +86,13 @@ impl QuerySubmissionCommand {
             Some(self.page.saturating_sub(1) * self.page_size),
             Some(self.page_size),
         )?;
-        let mut arg = None;
 
         let submissions = loop {
             match coroutine.resume(arg.take()) {
                 QueryJmapEmailSubmissionsResult::Io(io) => {
                     arg = Some(handle(&mut jmap.stream, io)?)
                 }
-                QueryJmapEmailSubmissionsResult::Ok { context, submissions, .. } => {
-                    jmap.context = context;
-                    break submissions;
-                }
+                QueryJmapEmailSubmissionsResult::Ok { submissions, .. } => break submissions,
                 QueryJmapEmailSubmissionsResult::Err { err, .. } => bail!(err),
             }
         };
@@ -110,9 +130,9 @@ impl fmt::Display for SubmissionsTable {
             .add_rows(self.submissions.iter().map(|s| {
                 Row::from([
                     Cell::new(s.id.as_deref().unwrap_or("")),
-                    Cell::new(&s.email_id),
-                    Cell::new(&s.identity_id),
-                    Cell::new(s.undo_status.as_deref().unwrap_or("")),
+                    Cell::new(s.email_id.as_deref().unwrap_or("")),
+                    Cell::new(s.identity_id.as_deref().unwrap_or("")),
+                    Cell::new(s.undo_status.as_ref().map(|s| s.to_string()).unwrap_or_default()),
                     Cell::new(s.send_at.as_deref().unwrap_or("")),
                 ])
             }));

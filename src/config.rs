@@ -267,11 +267,14 @@ impl TryFrom<SaslConfig> for Sasl {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct JmapConfig {
-    /// The HTTPS base URL of the JMAP server.
+    /// The JMAP server address.
     ///
-    /// Must use the `https://` or `jmap://` scheme. Session discovery
-    /// (`GET /.well-known/jmap`) is performed automatically on connection.
-    pub url: Url,
+    /// Accepts either a bare authority (`fastmail.com`, `mail.example.com:8080`)
+    /// for automatic discovery via `GET /.well-known/jmap`, or a full URL
+    /// (`https://api.fastmail.com/jmap/api/`) to connect directly to the
+    /// session endpoint. Supported schemes: `http`, `https`, `jmap` (→ http),
+    /// `jmaps` (→ https).
+    pub server: String,
 
     /// TLS configuration.
     #[serde(default)]

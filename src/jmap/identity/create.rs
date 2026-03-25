@@ -11,7 +11,7 @@ use crate::jmap::account::JmapAccount;
 
 /// Create a JMAP sender identity (Identity/set).
 #[derive(Debug, Parser)]
-pub struct CreateIdentityCommand {
+pub struct JmapIdentityCreateCommand {
     /// Display name for the sender.
     pub name: String,
 
@@ -27,7 +27,7 @@ pub struct CreateIdentityCommand {
     pub html_signature: Option<String>,
 }
 
-impl CreateIdentityCommand {
+impl JmapIdentityCreateCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         let mut jmap = account.new_jmap_session()?;
 
@@ -40,13 +40,15 @@ impl CreateIdentityCommand {
             html_signature: self.html_signature,
         };
 
+        let create_id = "new";
+
         let mut args = IdentitySetArgs::default();
-        args.create(self.email.clone(), identity);
+        args.create(create_id, identity);
 
         let mut coroutine = SetJmapIdentities::new(jmap.context, args)?;
         let mut arg = None;
 
-        let not_created = loop {
+        let errs = loop {
             match coroutine.resume(arg.take()) {
                 SetJmapIdentitiesResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
                 SetJmapIdentitiesResult::Ok { not_created, .. } => break not_created,
@@ -54,11 +56,16 @@ impl CreateIdentityCommand {
             }
         };
 
-        if let Some(err) = not_created.get(&self.email) {
-            let mut ctx = anyhow!("Failed to create identity `{}`", self.email);
+        if let Some(err) = errs.get(create_id) {
+            let mut ctx = anyhow!("Create identity for `{}` error", &self.email);
 
             if let Some(desc) = &err.description {
-                ctx = anyhow!(desc.clone()).context(ctx);
+                ctx = anyhow!("{desc}").context(ctx);
+            }
+
+            if !err.properties.is_empty() {
+                let props = err.properties.join(", ");
+                ctx = anyhow!("Invalid properties {props}").context(ctx);
             }
 
             bail!(ctx);

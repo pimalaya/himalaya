@@ -10,7 +10,7 @@ use crate::jmap::account::JmapAccount;
 #[derive(Debug, Parser)]
 pub struct JmapMailboxDestroyCommand {
     /// The ID of the mailbox to delete.
-    #[arg(value_name = "ID", required = true, num_args = 1..)]
+    #[arg(value_name = "ID", required = true)]
     pub ids: Vec<String>,
 
     /// Destroy all emails in the mailbox when deleting.
@@ -37,20 +37,21 @@ impl JmapMailboxDestroyCommand {
             }
         };
 
-        for ref id in self.ids {
-            if let Some(err) = not_destroyed.get(id) {
-                let mut ctx = anyhow!("Update JMAP mailbox `{id}` error");
+        if !not_destroyed.is_empty() {
+            let mut ctx = anyhow!("Destroy JMAP mailbox(es) error");
 
+            for (id, err) in not_destroyed {
                 if let Some(desc) = &err.description {
-                    ctx = anyhow!(desc.clone()).context(ctx);
+                    ctx = anyhow!("{id}: {desc}").context(ctx);
                 }
 
                 if !err.properties.is_empty() {
-                    ctx = anyhow!("Invalid properties: {}", err.properties.join(", ")).context(ctx);
+                    let props = err.properties.join(", ");
+                    ctx = anyhow!("{id}: Invalid properties {props}").context(ctx);
                 }
-
-                bail!(ctx);
             }
+
+            bail!(ctx)
         }
 
         printer.out(Message::new("Mailbox successfully deleted"))

@@ -1,10 +1,8 @@
 use anyhow::{bail, Result};
 use clap::Parser;
 use io_jmap::{
-    coroutines::vacation_response_set::{
-        SetJmapVacationResponse, SetJmapVacationResponseResult,
-    },
-    types::vacation_response::VacationResponseUpdate,
+    coroutines::vacation_response_set::{SetJmapVacationResponse, SetJmapVacationResponseResult},
+    types::{session::capabilities::VACATION_RESPONSE, vacation_response::VacationResponseUpdate},
 };
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
@@ -47,6 +45,20 @@ impl SetVacationCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         let mut jmap = account.new_jmap_session()?;
 
+        // Skip the request if the server does not advertise the
+        // vacation-response capability.
+        let has_vacation = jmap
+            .context
+            .session
+            .as_ref()
+            .unwrap()
+            .capabilities
+            .contains_key(VACATION_RESPONSE);
+
+        if !has_vacation {
+            bail!("Vacation response is not supported by the server");
+        }
+
         let is_enabled = if self.enable {
             Some(true)
         } else if self.disable {
@@ -69,17 +81,12 @@ impl SetVacationCommand {
 
         loop {
             match coroutine.resume(arg.take()) {
-                SetJmapVacationResponseResult::Io(io) => {
-                    arg = Some(handle(&mut jmap.stream, io)?)
-                }
-                SetJmapVacationResponseResult::Ok { context, .. } => {
-                    jmap.context = context;
-                    break;
-                }
+                SetJmapVacationResponseResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
+                SetJmapVacationResponseResult::Ok { .. } => break,
                 SetJmapVacationResponseResult::Err { err, .. } => bail!(err),
             }
         }
 
-        printer.out(Message::new("Vacation response updated."))
+        printer.out(Message::new("Vacation response successfully updated"))
     }
 }

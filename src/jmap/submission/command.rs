@@ -12,7 +12,6 @@ use crate::jmap::{
 
 /// Manage JMAP email submissions.
 #[derive(Debug, Subcommand)]
-#[command(rename_all = "kebab-case")]
 pub enum SubmissionCommand {
     /// Fetch submissions by ID (EmailSubmission/get).
     Get(GetSubmissionCommand),

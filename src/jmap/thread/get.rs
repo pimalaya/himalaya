@@ -1,8 +1,16 @@
+use std::fmt;
+
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_jmap::coroutines::thread_get::{GetJmapThreads, GetJmapThreadsResult};
+use comfy_table::{Cell, Row, Table};
+use io_jmap::{
+    coroutines::thread_get::{GetJmapThreads, GetJmapThreadsResult},
+    types::thread::Thread,
+};
 use io_stream::runtimes::std::handle;
+use log::warn;
 use pimalaya_toolbox::terminal::printer::Printer;
+use serde::Serialize;
 
 use crate::jmap::account::JmapAccount;
 
@@ -33,17 +41,39 @@ impl GetThreadCommand {
             }
         };
 
-        for id in &not_found {
-            printer.log(format!("Thread `{id}` not found."))?;
+        for id in not_found {
+            warn!("thread `{id}` not found, ignoring it");
         }
 
-        for thread in threads {
-            printer.out(serde_json::json!({
-                "id": thread.id,
-                "emailIds": thread.email_ids,
-            }))?;
-        }
+        printer.out(ThreadsTable {
+            preset: account.table_preset,
+            threads,
+        })
+    }
+}
 
-        Ok(())
+#[derive(Clone, Debug, Serialize)]
+#[serde(transparent)]
+pub struct ThreadsTable {
+    #[serde(skip)]
+    pub preset: String,
+    pub threads: Vec<Thread>,
+}
+
+impl fmt::Display for ThreadsTable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut table = Table::new();
+
+        table
+            .load_preset(&self.preset)
+            .set_header(Row::from([Cell::new("ID"), Cell::new("EMAIL IDS")]))
+            .add_rows(
+                self.threads
+                    .iter()
+                    .map(|t| Row::from([Cell::new(&t.id), Cell::new(t.email_ids.join(", "))])),
+            );
+
+        writeln!(f)?;
+        writeln!(f, "{table}")
     }
 }

@@ -13,9 +13,9 @@ use crate::jmap::account::JmapAccount;
 
 /// Copy JMAP emails from another account (Email/copy).
 #[derive(Debug, Parser)]
-pub struct CopyEmailCommand {
+pub struct JmapEmailCopyCommand {
     /// Email ID(s) to copy.
-    #[arg(value_name = "EMAIL-ID", required = true, num_args = 1..)]
+    #[arg(value_name = "ID", required = true)]
     pub ids: Vec<String>,
 
     /// Source account ID to copy from.
@@ -23,25 +23,25 @@ pub struct CopyEmailCommand {
     pub from_account: String,
 
     /// Destination mailbox ID(s) to place copies in.
-    #[arg(long, value_name = "MAILBOX-ID", num_args = 0..)]
+    #[arg(long, value_name = "MAILBOX-ID", required = false)]
     pub mailbox_id: Vec<String>,
 }
 
-impl CopyEmailCommand {
+impl JmapEmailCopyCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         let mut jmap = account.new_jmap_session()?;
 
         let mailbox_ids: HashMap<String, bool> =
-            self.mailbox_id.iter().map(|m| (m.clone(), true)).collect();
+            self.mailbox_id.into_iter().map(|m| (m, true)).collect();
 
         let emails: HashMap<String, EmailCopy> = self
             .ids
-            .iter()
+            .into_iter()
             .map(|id| {
                 (
                     id.clone(),
                     EmailCopy {
-                        id: id.clone(),
+                        id,
                         mailbox_ids: mailbox_ids.clone(),
                         keywords: None,
                         received_at: None,
@@ -61,14 +61,21 @@ impl CopyEmailCommand {
             }
         };
 
-        for (id, err) in &not_created {
-            let mut ctx = anyhow!("Failed to copy email `{id}`");
+        if !not_created.is_empty() {
+            let mut ctx = anyhow!("Copy JMAP email(s) error");
 
-            if let Some(desc) = &err.description {
-                ctx = anyhow!(desc.clone()).context(ctx);
+            for (id, err) in not_created {
+                if let Some(desc) = &err.description {
+                    ctx = anyhow!("{id}: {desc}").context(ctx);
+                }
+
+                if !err.properties.is_empty() {
+                    let props = err.properties.join(", ");
+                    ctx = anyhow!("{id}: Invalid properties {props}").context(ctx);
+                }
             }
 
-            bail!(ctx);
+            bail!(ctx)
         }
 
         printer.out(Message::new("Email(s) successfully copied"))

@@ -5,20 +5,16 @@ use io_stream::runtimes::std::handle;
 use log::warn;
 use pimalaya_toolbox::terminal::printer::Printer;
 
-use crate::jmap::account::JmapAccount;
+use crate::jmap::{account::JmapAccount, email::query::EmailsTable};
 
-/// Get a JMAP email by ID (Email/get).
+/// Get JMAP emails by ID (Email/get).
 ///
-/// Downloads and displays the full message content including body.
+/// Fetches and displays email envelopes as a table.
 #[derive(Debug, Parser)]
 pub struct JmapEmailGetCommand {
     /// The email ID(s) to retrieve.
     #[arg(value_name = "ID", required = true)]
     pub ids: Vec<String>,
-
-    /// Output raw RFC 5322 message headers.
-    #[arg(long, short)]
-    pub raw: bool,
 }
 
 impl JmapEmailGetCommand {
@@ -26,7 +22,7 @@ impl JmapEmailGetCommand {
         let mut jmap = account.new_jmap_session()?;
 
         let mut coroutine =
-            GetJmapEmails::new(jmap.context, self.ids.clone(), None, true, true, None)?;
+            GetJmapEmails::new(jmap.context, self.ids.clone(), None, false, false, 0)?;
         let mut arg = None;
 
         let (emails, not_found) = loop {
@@ -40,44 +36,15 @@ impl JmapEmailGetCommand {
         };
 
         for id in not_found {
-            warn!("email `{id}` not found");
+            warn!("email `{id}` not found, ignoring it");
         }
 
-        for email in emails {
-            if self.raw {
-                if let Some(headers) = &email.headers {
-                    for h in headers {
-                        printer.log(format!("{}: {}", h.name, h.value))?;
-                    }
-                }
-                printer.log("")?;
-            }
+        let table = EmailsTable {
+            preset: account.table_preset,
+            arrangement: account.table_arrangement,
+            emails,
+        };
 
-            if let Some(body_values) = &email.body_values {
-                if let Some(text_parts) = &email.text_body {
-                    for part in text_parts {
-                        if let Some(part_id) = &part.part_id {
-                            if let Some(body_value) = body_values.get(part_id) {
-                                printer.out(&body_value.value)?;
-                                continue;
-                            }
-                        }
-                    }
-                }
-
-                if let Some(html_parts) = &email.html_body {
-                    for part in html_parts {
-                        if let Some(part_id) = &part.part_id {
-                            if let Some(body_value) = body_values.get(part_id) {
-                                printer.out(&body_value.value)?;
-                                continue;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(())
+        printer.out(table)
     }
 }

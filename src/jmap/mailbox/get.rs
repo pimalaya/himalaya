@@ -35,7 +35,7 @@ impl JmapMailboxGetCommand {
         };
 
         for id in not_found {
-            warn!("mailbox `{id}` not found");
+            warn!("mailbox `{id}` not found, ignoring it");
         }
 
         let table = MailboxesTable {

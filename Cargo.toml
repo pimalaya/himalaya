@@ -62,6 +62,13 @@ url = { version = "2.2", features = ["serde"] }
 [target.'cfg(windows)'.dependencies]
 uds_windows = "1"
 
+[dev-dependencies]
+assert_cmd = "2"
+io-jmap = { version = "0.0.1", default-features = false }
+serde = "1"
+serde_json = "1"
+tempfile = "3"
+
 [patch.crates-io]
 io-fs.git = "https://github.com/pimalaya/io-fs"
 io-imap = { git = "https://github.com/pimalaya/io-imap", branch = "io" }

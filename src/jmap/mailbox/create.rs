@@ -56,18 +56,21 @@ impl JmapMailboxCreateCommand {
             }
         };
 
-        if let Some(err) = not_created.get(&self.name) {
+        if !not_created.is_empty() {
             let mut ctx = anyhow!("Create JMAP mailbox `{}` error", self.name);
 
-            if let Some(desc) = &err.description {
-                ctx = anyhow!(desc.clone()).context(ctx);
+            for (_, err) in not_created {
+                if let Some(desc) = &err.description {
+                    ctx = anyhow!(desc.clone()).context(ctx);
+                }
+
+                if !err.properties.is_empty() {
+                    let props = err.properties.join(", ");
+                    ctx = anyhow!("Invalid properties {props}").context(ctx);
+                }
             }
 
-            if !err.properties.is_empty() {
-                ctx = anyhow!("Invalid properties: {}", err.properties.join(", ")).context(ctx);
-            }
-
-            bail!(ctx);
+            bail!(ctx)
         }
 
         printer.out(Message::new("Mailbox successfully created"))
