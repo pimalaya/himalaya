@@ -4,8 +4,8 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
 use io_jmap::{
-    coroutines::identity_get::{GetJmapIdentities, GetJmapIdentitiesResult},
-    types::identity::Identity,
+    rfc8621::coroutines::identity_get::{JmapIdentityGet, JmapIdentityGetResult},
+    rfc8621::types::identity::Identity,
 };
 use io_stream::runtimes::std::handle;
 use log::warn;
@@ -29,18 +29,18 @@ impl GetIdentityCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         let mut jmap = account.new_jmap_session()?;
 
-        let mut coroutine = GetJmapIdentities::new(jmap.context, self.ids)?;
+        let mut coroutine = JmapIdentityGet::new(&jmap.session, &jmap.http_auth, self.ids)?;
         let mut arg = None;
 
         let (identities, not_found) = loop {
             match coroutine.resume(arg.take()) {
-                GetJmapIdentitiesResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
-                GetJmapIdentitiesResult::Ok {
+                JmapIdentityGetResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
+                JmapIdentityGetResult::Ok {
                     identities,
                     not_found,
                     ..
                 } => break (identities, not_found),
-                GetJmapIdentitiesResult::Err { err, .. } => bail!(err),
+                JmapIdentityGetResult::Err { err, .. } => bail!(err),
             }
         };
 

@@ -3,8 +3,12 @@ use std::collections::HashMap;
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use io_jmap::{
-    coroutines::email_submission_set::{SubmitJmapEmail, SubmitJmapEmailResult},
-    types::email_submission::{EmailAddressWithParameters, EmailSubmissionCreate, Envelope},
+    rfc8621::coroutines::email_submission_set::{
+        JmapEmailSubmissionSet, JmapEmailSubmissionSetResult,
+    },
+    rfc8621::types::email_submission::{
+        EmailAddressWithParameters, EmailSubmissionCreate, Envelope,
+    },
 };
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
@@ -67,18 +71,21 @@ impl CreateSubmissionCommand {
         let mut submissions = HashMap::new();
         submissions.insert(self.email_id.clone(), submission);
 
-        let mut coroutine = SubmitJmapEmail::new(jmap.context, submissions)?;
+        let mut coroutine =
+            JmapEmailSubmissionSet::new(&jmap.session, &jmap.http_auth, submissions)?;
         let mut arg = None;
 
         let (created, errs) = loop {
             match coroutine.resume(arg.take()) {
-                SubmitJmapEmailResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
-                SubmitJmapEmailResult::Ok {
+                JmapEmailSubmissionSetResult::Io { io } => {
+                    arg = Some(handle(&mut jmap.stream, io)?)
+                }
+                JmapEmailSubmissionSetResult::Ok {
                     created,
                     not_created,
                     ..
                 } => break (created, not_created),
-                SubmitJmapEmailResult::Err { err, .. } => bail!(err),
+                JmapEmailSubmissionSetResult::Err { err, .. } => bail!(err),
             }
         };
 

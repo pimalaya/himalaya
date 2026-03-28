@@ -1,7 +1,7 @@
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
-use io_jmap::coroutines::email_submission_cancel::{
-    CancelJmapEmailSubmissions, CancelJmapEmailSubmissionsResult,
+use io_jmap::rfc8621::coroutines::email_submission_cancel::{
+    JmapEmailSubmissionCancel, JmapEmailSubmissionCancelResult,
 };
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
@@ -24,19 +24,17 @@ impl CancelSubmissionCommand {
         let mut jmap = account.new_jmap_session()?;
 
         let mut coroutine =
-            CancelJmapEmailSubmissions::new(jmap.context, self.ids.clone())
+            JmapEmailSubmissionCancel::new(&jmap.session, &jmap.http_auth, self.ids.clone())
                 .map_err(|e| anyhow!("{e}"))?;
         let mut arg = None;
 
         let not_updated = loop {
             match coroutine.resume(arg.take()) {
-                CancelJmapEmailSubmissionsResult::Io(io) => {
+                JmapEmailSubmissionCancelResult::Io { io } => {
                     arg = Some(handle(&mut jmap.stream, io)?)
                 }
-                CancelJmapEmailSubmissionsResult::Ok { not_updated, .. } => {
-                    break not_updated
-                }
-                CancelJmapEmailSubmissionsResult::Err { err, .. } => bail!(err),
+                JmapEmailSubmissionCancelResult::Ok { not_updated, .. } => break not_updated,
+                JmapEmailSubmissionCancelResult::Err { err, .. } => bail!(err),
             }
         };
 
@@ -52,6 +50,9 @@ impl CancelSubmissionCommand {
             bail!(ctx);
         }
 
-        printer.out(Message::new(format!("{} submission(s) canceled.", self.ids.len())))
+        printer.out(Message::new(format!(
+            "{} submission(s) canceled.",
+            self.ids.len()
+        )))
     }
 }

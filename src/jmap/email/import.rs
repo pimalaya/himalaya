@@ -6,11 +6,10 @@ use std::{
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use io_jmap::{
-    coroutines::{
-        blob_upload::{UploadJmapBlob, UploadJmapBlobResult},
-        email_import::{ImportJmapEmail, ImportJmapEmailResult},
-    },
-    types::email::EmailImport,
+    rfc8620::coroutines::blob_upload::{JmapBlobUpload, JmapBlobUploadResult},
+    rfc8620::types::session::capabilities,
+    rfc8621::coroutines::email_import::{JmapEmailImport, JmapEmailImportResult},
+    rfc8621::types::email::EmailImport,
 };
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
@@ -58,20 +57,18 @@ impl ImportEmailCommand {
                 .replace('\n', "\r\n")
                 .into_bytes()
         } else {
-            let lines: Vec<String> = stdin()
-                .lock()
-                .lines()
-                .map_while(Result::ok)
-                .collect();
+            let lines: Vec<String> = stdin().lock().lines().map_while(Result::ok).collect();
             lines.join("\r\n").into_bytes()
         };
 
-        let account_id = jmap.context.account_id.as_deref().unwrap_or("");
-        let url: Url = jmap
-            .context
+        let account_id = jmap
             .session
-            .as_ref()
-            .unwrap()
+            .primary_accounts
+            .get(capabilities::MAIL)
+            .map(|s| s.as_str())
+            .unwrap_or("");
+        let url: Url = jmap
+            .session
             .upload_url
             .replace("{accountId}", account_id)
             .parse()?;
@@ -79,17 +76,16 @@ impl ImportEmailCommand {
         let mut extra_stream = jmap.connect_if_different(&url, &tls)?;
         let upload_stream = extra_stream.as_mut().unwrap_or(&mut jmap.stream);
 
-        let mut coroutine = UploadJmapBlob::new(jmap.context, &url, "message/rfc822", data)?;
+        let mut coroutine = JmapBlobUpload::new(&jmap.http_auth, &url, "message/rfc822", data)?;
         let mut arg = None;
 
         let blob_id = loop {
             match coroutine.resume(arg.take()) {
-                UploadJmapBlobResult::Io(io) => arg = Some(handle(&mut *upload_stream, io)?),
-                UploadJmapBlobResult::Ok { context, blob_id, .. } => {
-                    jmap.context = context;
+                JmapBlobUploadResult::Io { io } => arg = Some(handle(&mut *upload_stream, io)?),
+                JmapBlobUploadResult::Ok { blob_id, .. } => {
                     break blob_id;
                 }
-                UploadJmapBlobResult::Err { err, .. } => bail!(err),
+                JmapBlobUploadResult::Err { err, .. } => bail!(err),
             }
         };
 
@@ -116,14 +112,14 @@ impl ImportEmailCommand {
         let mut emails = HashMap::new();
         emails.insert(blob_id.clone(), import);
 
-        let mut coroutine = ImportJmapEmail::new(jmap.context, emails)?;
+        let mut coroutine = JmapEmailImport::new(&jmap.session, &jmap.http_auth, emails)?;
         let mut arg = None;
 
         let errs = loop {
             match coroutine.resume(arg.take()) {
-                ImportJmapEmailResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
-                ImportJmapEmailResult::Ok { not_created, .. } => break not_created,
-                ImportJmapEmailResult::Err { err, .. } => bail!(err),
+                JmapEmailImportResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
+                JmapEmailImportResult::Ok { not_created, .. } => break not_created,
+                JmapEmailImportResult::Err { err, .. } => bail!(err),
             }
         };
 

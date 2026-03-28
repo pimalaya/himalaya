@@ -4,10 +4,10 @@ use anyhow::{bail, Result};
 use clap::{Parser, ValueEnum};
 use comfy_table::{Cell, Row, Table};
 use io_jmap::{
-    coroutines::email_submission_query::{
-        QueryJmapEmailSubmissions, QueryJmapEmailSubmissionsResult,
+    rfc8621::coroutines::email_submission_query::{
+        JmapEmailSubmissionQuery, JmapEmailSubmissionQueryResult,
     },
-    types::email_submission::{EmailSubmission, EmailSubmissionFilter, UndoStatus},
+    rfc8621::types::email_submission::{EmailSubmission, EmailSubmissionFilter, UndoStatus},
 };
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
@@ -79,8 +79,9 @@ impl QuerySubmissionCommand {
         };
 
         let mut arg = None;
-        let mut coroutine = QueryJmapEmailSubmissions::new(
-            jmap.context,
+        let mut coroutine = JmapEmailSubmissionQuery::new(
+            &jmap.session,
+            &jmap.http_auth,
             filter,
             None,
             Some(self.page.saturating_sub(1) * self.page_size),
@@ -89,11 +90,11 @@ impl QuerySubmissionCommand {
 
         let submissions = loop {
             match coroutine.resume(arg.take()) {
-                QueryJmapEmailSubmissionsResult::Io(io) => {
+                JmapEmailSubmissionQueryResult::Io { io } => {
                     arg = Some(handle(&mut jmap.stream, io)?)
                 }
-                QueryJmapEmailSubmissionsResult::Ok { submissions, .. } => break submissions,
-                QueryJmapEmailSubmissionsResult::Err { err, .. } => bail!(err),
+                JmapEmailSubmissionQueryResult::Ok { submissions, .. } => break submissions,
+                JmapEmailSubmissionQueryResult::Err { err, .. } => bail!(err),
             }
         };
 
@@ -132,7 +133,12 @@ impl fmt::Display for SubmissionsTable {
                     Cell::new(s.id.as_deref().unwrap_or("")),
                     Cell::new(s.email_id.as_deref().unwrap_or("")),
                     Cell::new(s.identity_id.as_deref().unwrap_or("")),
-                    Cell::new(s.undo_status.as_ref().map(|s| s.to_string()).unwrap_or_default()),
+                    Cell::new(
+                        s.undo_status
+                            .as_ref()
+                            .map(|s| s.to_string())
+                            .unwrap_or_default(),
+                    ),
                     Cell::new(s.send_at.as_deref().unwrap_or("")),
                 ])
             }));

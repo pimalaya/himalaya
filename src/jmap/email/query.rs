@@ -4,8 +4,8 @@ use anyhow::{bail, Result};
 use clap::{Parser, ValueEnum};
 use comfy_table::{Cell, ContentArrangement, Row, Table};
 use io_jmap::{
-    coroutines::email_query::{QueryJmapEmails, QueryJmapEmailsResult},
-    types::email::{Email, EmailAddress, EmailComparator, EmailFilter, EmailSortProperty},
+    rfc8621::coroutines::email_query::{JmapEmailQuery, JmapEmailQueryResult},
+    rfc8621::types::email::{Email, EmailAddress, EmailComparator, EmailFilter, EmailSortProperty},
 };
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
@@ -142,8 +142,9 @@ impl JmapEmailQueryCommand {
         }]);
 
         let mut arg = None;
-        let mut coroutine = QueryJmapEmails::new(
-            jmap.context,
+        let mut coroutine = JmapEmailQuery::new(
+            &jmap.session,
+            &jmap.http_auth,
             filter,
             sort,
             Some(self.page.saturating_sub(1) * self.page_size),
@@ -153,9 +154,9 @@ impl JmapEmailQueryCommand {
 
         let emails = loop {
             match coroutine.resume(arg.take()) {
-                QueryJmapEmailsResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
-                QueryJmapEmailsResult::Ok { emails, .. } => break emails,
-                QueryJmapEmailsResult::Err { err, .. } => bail!(err),
+                JmapEmailQueryResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
+                JmapEmailQueryResult::Ok { emails, .. } => break emails,
+                JmapEmailQueryResult::Err { err, .. } => bail!(err),
             }
         };
 

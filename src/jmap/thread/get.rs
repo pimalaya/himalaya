@@ -4,8 +4,8 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
 use io_jmap::{
-    coroutines::thread_get::{GetJmapThreads, GetJmapThreadsResult},
-    types::thread::Thread,
+    rfc8621::coroutines::thread_get::{JmapThreadGet, JmapThreadGetResult},
+    rfc8621::types::thread::Thread,
 };
 use io_stream::runtimes::std::handle;
 use log::warn;
@@ -28,16 +28,16 @@ impl GetThreadCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         let mut jmap = account.new_jmap_session()?;
 
-        let mut coroutine = GetJmapThreads::new(jmap.context, self.ids.clone())?;
+        let mut coroutine = JmapThreadGet::new(&jmap.session, &jmap.http_auth, self.ids.clone())?;
         let mut arg = None;
 
         let (threads, not_found) = loop {
             match coroutine.resume(arg.take()) {
-                GetJmapThreadsResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
-                GetJmapThreadsResult::Ok {
+                JmapThreadGetResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
+                JmapThreadGetResult::Ok {
                     threads, not_found, ..
                 } => break (threads, not_found),
-                GetJmapThreadsResult::Err { err, .. } => bail!(err),
+                JmapThreadGetResult::Err { err, .. } => bail!(err),
             }
         };
 

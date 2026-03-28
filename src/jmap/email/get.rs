@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_jmap::coroutines::email_get::{GetJmapEmails, GetJmapEmailsResult};
+use io_jmap::rfc8621::coroutines::email_get::{JmapEmailGet, JmapEmailGetResult};
 use io_stream::runtimes::std::handle;
 use log::warn;
 use pimalaya_toolbox::terminal::printer::Printer;
@@ -21,17 +21,24 @@ impl JmapEmailGetCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         let mut jmap = account.new_jmap_session()?;
 
-        let mut coroutine =
-            GetJmapEmails::new(jmap.context, self.ids.clone(), None, false, false, 0)?;
+        let mut coroutine = JmapEmailGet::new(
+            &jmap.session,
+            &jmap.http_auth,
+            self.ids.clone(),
+            None,
+            false,
+            false,
+            0,
+        )?;
         let mut arg = None;
 
         let (emails, not_found) = loop {
             match coroutine.resume(arg.take()) {
-                GetJmapEmailsResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
-                GetJmapEmailsResult::Ok {
+                JmapEmailGetResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
+                JmapEmailGetResult::Ok {
                     emails, not_found, ..
                 } => break (emails, not_found),
-                GetJmapEmailsResult::Err { err, .. } => bail!(err),
+                JmapEmailGetResult::Err { err, .. } => bail!(err),
             }
         };
 

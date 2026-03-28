@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_jmap::coroutines::email_submission_get::{
-    GetJmapEmailSubmissions, GetJmapEmailSubmissionsResult,
+use io_jmap::rfc8621::coroutines::email_submission_get::{
+    JmapEmailSubmissionGet, JmapEmailSubmissionGetResult,
 };
 use io_stream::runtimes::std::handle;
 use log::warn;
@@ -21,18 +21,21 @@ impl GetSubmissionCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         let mut jmap = account.new_jmap_session()?;
 
-        let mut coroutine = GetJmapEmailSubmissions::new(jmap.context, Some(self.ids.clone()))?;
+        let mut coroutine =
+            JmapEmailSubmissionGet::new(&jmap.session, &jmap.http_auth, Some(self.ids.clone()))?;
         let mut arg = None;
 
         let (submissions, not_found) = loop {
             match coroutine.resume(arg.take()) {
-                GetJmapEmailSubmissionsResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
-                GetJmapEmailSubmissionsResult::Ok {
+                JmapEmailSubmissionGetResult::Io { io } => {
+                    arg = Some(handle(&mut jmap.stream, io)?)
+                }
+                JmapEmailSubmissionGetResult::Ok {
                     submissions,
                     not_found,
                     ..
                 } => break (submissions, not_found),
-                GetJmapEmailSubmissionsResult::Err { err, .. } => bail!(err),
+                JmapEmailSubmissionGetResult::Err { err, .. } => bail!(err),
             }
         };
 

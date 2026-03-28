@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use io_jmap::{
-    coroutines::mailbox_set::{MailboxSetArgs, SetJmapMailboxes, SetJmapMailboxesResult},
-    types::mailbox::MailboxUpdate,
+    rfc8621::coroutines::mailbox_set::{JmapMailboxSet, JmapMailboxSetArgs, JmapMailboxSetResult},
+    rfc8621::types::mailbox::MailboxUpdate,
 };
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
@@ -66,17 +66,17 @@ impl JmapMailboxUpdateCommand {
         let mut update = HashMap::new();
         update.insert(self.id.clone(), patch);
 
-        let mut args = MailboxSetArgs::default();
+        let mut args = JmapMailboxSetArgs::default();
         args.update = Some(update);
 
         let mut arg = None;
-        let mut coroutine = SetJmapMailboxes::new(jmap.context, args)?;
+        let mut coroutine = JmapMailboxSet::new(&jmap.session, &jmap.http_auth, args)?;
 
         let errs = loop {
             match coroutine.resume(arg.take()) {
-                SetJmapMailboxesResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
-                SetJmapMailboxesResult::Ok { not_updated, .. } => break not_updated,
-                SetJmapMailboxesResult::Err { err, .. } => bail!(err),
+                JmapMailboxSetResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
+                JmapMailboxSetResult::Ok { not_updated, .. } => break not_updated,
+                JmapMailboxSetResult::Err { err, .. } => bail!(err),
             }
         };
 

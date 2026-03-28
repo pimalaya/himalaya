@@ -1,8 +1,11 @@
 use anyhow::{bail, Result};
 use clap::Parser;
 use io_jmap::{
-    coroutines::vacation_response_set::{SetJmapVacationResponse, SetJmapVacationResponseResult},
-    types::{session::capabilities::VACATION_RESPONSE, vacation_response::VacationResponseUpdate},
+    rfc8620::types::session::capabilities::VACATION_RESPONSE,
+    rfc8621::coroutines::vacation_response_set::{
+        JmapVacationResponseSet, JmapVacationResponseSetResult,
+    },
+    rfc8621::types::vacation_response::VacationResponseUpdate,
 };
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
@@ -47,13 +50,7 @@ impl SetVacationCommand {
 
         // Skip the request if the server does not advertise the
         // vacation-response capability.
-        let has_vacation = jmap
-            .context
-            .session
-            .as_ref()
-            .unwrap()
-            .capabilities
-            .contains_key(VACATION_RESPONSE);
+        let has_vacation = jmap.session.capabilities.contains_key(VACATION_RESPONSE);
 
         if !has_vacation {
             bail!("Vacation response is not supported by the server");
@@ -76,14 +73,16 @@ impl SetVacationCommand {
             html_body: self.html_body,
         };
 
-        let mut coroutine = SetJmapVacationResponse::new(jmap.context, patch)?;
+        let mut coroutine = JmapVacationResponseSet::new(&jmap.session, &jmap.http_auth, patch)?;
         let mut arg = None;
 
         loop {
             match coroutine.resume(arg.take()) {
-                SetJmapVacationResponseResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
-                SetJmapVacationResponseResult::Ok { .. } => break,
-                SetJmapVacationResponseResult::Err { err, .. } => bail!(err),
+                JmapVacationResponseSetResult::Io { io } => {
+                    arg = Some(handle(&mut jmap.stream, io)?)
+                }
+                JmapVacationResponseSetResult::Ok { .. } => break,
+                JmapVacationResponseSetResult::Err { err, .. } => bail!(err),
             }
         }
 

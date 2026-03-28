@@ -1,7 +1,7 @@
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
-use io_jmap::coroutines::identity_set::{
-    IdentitySetArgs, SetJmapIdentities, SetJmapIdentitiesResult,
+use io_jmap::rfc8621::coroutines::identity_set::{
+    JmapIdentitySet, JmapIdentitySetArgs, JmapIdentitySetResult,
 };
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
@@ -20,20 +20,20 @@ impl DeleteIdentityCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         let mut jmap = account.new_jmap_session()?;
 
-        let mut args = IdentitySetArgs::default();
+        let mut args = JmapIdentitySetArgs::default();
 
         for id in self.ids {
             args.destroy(id);
         }
 
-        let mut coroutine = SetJmapIdentities::new(jmap.context, args)?;
+        let mut coroutine = JmapIdentitySet::new(&jmap.session, &jmap.http_auth, args)?;
         let mut arg = None;
 
         let not_destroyed = loop {
             match coroutine.resume(arg.take()) {
-                SetJmapIdentitiesResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
-                SetJmapIdentitiesResult::Ok { not_destroyed, .. } => break not_destroyed,
-                SetJmapIdentitiesResult::Err { err, .. } => bail!(err),
+                JmapIdentitySetResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
+                JmapIdentitySetResult::Ok { not_destroyed, .. } => break not_destroyed,
+                JmapIdentitySetResult::Err { err, .. } => bail!(err),
             }
         };
 

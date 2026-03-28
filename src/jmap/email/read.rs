@@ -1,8 +1,8 @@
 use anyhow::{bail, Result};
 use clap::Parser;
 use io_jmap::{
-    coroutines::email_get::{GetJmapEmails, GetJmapEmailsResult},
-    types::email::EmailAddress,
+    rfc8621::coroutines::email_get::{JmapEmailGet, JmapEmailGetResult},
+    rfc8621::types::email::EmailAddress,
 };
 use io_stream::runtimes::std::handle;
 use log::warn;
@@ -29,8 +29,9 @@ impl ReadEmailCommand {
         let mut jmap = account.new_jmap_session()?;
 
         let mut arg = None;
-        let mut coroutine = GetJmapEmails::new(
-            jmap.context,
+        let mut coroutine = JmapEmailGet::new(
+            &jmap.session,
+            &jmap.http_auth,
             self.ids.clone(),
             None,
             !self.html,
@@ -40,11 +41,11 @@ impl ReadEmailCommand {
 
         let (emails, not_found) = loop {
             match coroutine.resume(arg.take()) {
-                GetJmapEmailsResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
-                GetJmapEmailsResult::Ok {
+                JmapEmailGetResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
+                JmapEmailGetResult::Ok {
                     emails, not_found, ..
                 } => break (emails, not_found),
-                GetJmapEmailsResult::Err { err, .. } => bail!(err),
+                JmapEmailGetResult::Err { err, .. } => bail!(err),
             }
         };
 

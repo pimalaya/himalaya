@@ -5,7 +5,10 @@ use std::{
 
 use anyhow::{bail, Context, Result};
 use clap::Parser;
-use io_jmap::coroutines::send::{JmapRequest, SendJmapRequest, SendJmapRequestResult};
+use io_jmap::rfc8620::{
+    coroutines::send::{JmapRequest, JmapSend, JmapSendResult},
+    types::session::capabilities,
+};
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
@@ -57,7 +60,12 @@ impl QueryCommand {
             bail!("METHOD_CALLS must be a JSON array");
         };
 
-        let account_id = jmap.context.account_id.clone().unwrap_or_default();
+        let account_id = jmap
+            .session
+            .primary_accounts
+            .get(capabilities::MAIL)
+            .cloned()
+            .unwrap_or_default();
 
         // Parse and inject accountId into each call's args.
         let mut method_calls = Vec::with_capacity(calls_arr.len());
@@ -86,8 +94,8 @@ impl QueryCommand {
         }
 
         let mut using = vec![
-            io_jmap::types::session::capabilities::CORE.to_string(),
-            io_jmap::types::session::capabilities::MAIL.to_string(),
+            capabilities::CORE.to_string(),
+            capabilities::MAIL.to_string(),
         ];
         for extra in self.using {
             if !using.contains(&extra) {
@@ -95,29 +103,22 @@ impl QueryCommand {
             }
         }
 
-        let api_url = jmap
-            .context
-            .api_url()
-            .cloned()
-            .unwrap_or_else(|| "http://localhost".parse().unwrap());
-
         let request = JmapRequest {
             using,
             method_calls,
             created_ids: None,
         };
 
-        let mut coroutine = SendJmapRequest::new(jmap.context, &api_url, request)?;
+        let mut coroutine = JmapSend::new(&jmap.http_auth, &jmap.session.api_url, request)?;
         let mut arg = None;
 
         let response = loop {
             match coroutine.resume(arg.take()) {
-                SendJmapRequestResult::Ok { context, response, .. } => {
-                    jmap.context = context;
+                JmapSendResult::Ok { response, .. } => {
                     break response;
                 }
-                SendJmapRequestResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
-                SendJmapRequestResult::Err { err, .. } => return Err(err.into()),
+                JmapSendResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
+                JmapSendResult::Err { err, .. } => return Err(err.into()),
             }
         };
 

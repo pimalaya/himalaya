@@ -1,8 +1,10 @@
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use io_jmap::{
-    coroutines::identity_set::{IdentitySetArgs, SetJmapIdentities, SetJmapIdentitiesResult},
-    types::identity::IdentityUpdate,
+    rfc8621::coroutines::identity_set::{
+        JmapIdentitySet, JmapIdentitySetArgs, JmapIdentitySetResult,
+    },
+    rfc8621::types::identity::IdentityUpdate,
 };
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
@@ -40,17 +42,17 @@ impl UpdateIdentityCommand {
             html_signature: self.html_signature,
         };
 
-        let mut args = IdentitySetArgs::default();
+        let mut args = JmapIdentitySetArgs::default();
         args.update(self.id.clone(), patch);
 
-        let mut coroutine = SetJmapIdentities::new(jmap.context, args)?;
+        let mut coroutine = JmapIdentitySet::new(&jmap.session, &jmap.http_auth, args)?;
         let mut arg = None;
 
         let errs = loop {
             match coroutine.resume(arg.take()) {
-                SetJmapIdentitiesResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
-                SetJmapIdentitiesResult::Ok { not_updated, .. } => break not_updated,
-                SetJmapIdentitiesResult::Err { err, .. } => bail!(err),
+                JmapIdentitySetResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
+                JmapIdentitySetResult::Ok { not_updated, .. } => break not_updated,
+                JmapIdentitySetResult::Err { err, .. } => bail!(err),
             }
         };
 

@@ -4,8 +4,8 @@ use anyhow::{bail, Result};
 use clap::{Parser, ValueEnum};
 use comfy_table::{Cell, Row, Table};
 use io_jmap::{
-    coroutines::mailbox_query::{QueryJmapMailboxes, QueryJmapMailboxesResult},
-    types::mailbox::{
+    rfc8621::coroutines::mailbox_query::{JmapMailboxQuery, JmapMailboxQueryResult},
+    rfc8621::types::mailbox::{
         Mailbox, MailboxFilter, MailboxRole, MailboxSortComparator, MailboxSortProperty,
     },
 };
@@ -90,8 +90,9 @@ impl JmapMailboxQueryCommand {
         }]);
 
         let mut arg = None;
-        let mut coroutine = QueryJmapMailboxes::new(
-            jmap.context,
+        let mut coroutine = JmapMailboxQuery::new(
+            &jmap.session,
+            &jmap.http_auth,
             filter,
             sort,
             Some(self.page.saturating_sub(1) * self.page_size),
@@ -101,9 +102,9 @@ impl JmapMailboxQueryCommand {
 
         let mailboxes = loop {
             match coroutine.resume(arg.take()) {
-                QueryJmapMailboxesResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
-                QueryJmapMailboxesResult::Ok { mailboxes, .. } => break mailboxes,
-                QueryJmapMailboxesResult::Err { err, .. } => bail!(err),
+                JmapMailboxQueryResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
+                JmapMailboxQueryResult::Ok { mailboxes, .. } => break mailboxes,
+                JmapMailboxQueryResult::Err { err, .. } => bail!(err),
             }
         };
 

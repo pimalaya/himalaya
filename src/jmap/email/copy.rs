@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use io_jmap::{
-    coroutines::email_copy::{CopyJmapEmails, CopyJmapEmailsResult},
-    types::email::EmailCopy,
+    rfc8621::coroutines::email_copy::{JmapEmailCopy, JmapEmailCopyResult},
+    rfc8621::types::email::EmailCopy,
 };
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
@@ -50,14 +50,19 @@ impl JmapEmailCopyCommand {
             })
             .collect();
 
-        let mut coroutine = CopyJmapEmails::new(jmap.context, self.from_account.clone(), emails)?;
+        let mut coroutine = JmapEmailCopy::new(
+            &jmap.session,
+            &jmap.http_auth,
+            self.from_account.clone(),
+            emails,
+        )?;
         let mut arg = None;
 
         let not_created = loop {
             match coroutine.resume(arg.take()) {
-                CopyJmapEmailsResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
-                CopyJmapEmailsResult::Ok { not_created, .. } => break not_created,
-                CopyJmapEmailsResult::Err { err, .. } => bail!(err),
+                JmapEmailCopyResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
+                JmapEmailCopyResult::Ok { not_created, .. } => break not_created,
+                JmapEmailCopyResult::Err { err, .. } => bail!(err),
             }
         };
 

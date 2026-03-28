@@ -1,8 +1,9 @@
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
-use io_jmap::coroutines::{
-    blob_download::{DownloadJmapBlob, DownloadJmapBlobResult},
-    email_get::{GetJmapEmails, GetJmapEmailsResult},
+use io_jmap::{
+    rfc8620::coroutines::blob_download::{JmapBlobDownload, JmapBlobDownloadResult},
+    rfc8620::types::session::capabilities,
+    rfc8621::coroutines::email_get::{JmapEmailGet, JmapEmailGetResult},
 };
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
@@ -28,8 +29,9 @@ impl ExportEmailCommand {
         let properties = Some(vec!["id".to_owned(), "blobId".to_owned()]);
 
         let mut arg = None;
-        let mut coroutine = GetJmapEmails::new(
-            jmap.context,
+        let mut coroutine = JmapEmailGet::new(
+            &jmap.session,
+            &jmap.http_auth,
             vec![self.id.clone()],
             properties,
             false,
@@ -39,18 +41,20 @@ impl ExportEmailCommand {
 
         let emails = loop {
             match coroutine.resume(arg.take()) {
-                GetJmapEmailsResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
-                GetJmapEmailsResult::Ok {
-                    context, emails, ..
-                } => {
-                    jmap.context = context;
+                JmapEmailGetResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
+                JmapEmailGetResult::Ok { emails, .. } => {
                     break emails;
                 }
-                GetJmapEmailsResult::Err { err, .. } => bail!(err),
+                JmapEmailGetResult::Err { err, .. } => bail!(err),
             }
         };
 
-        let account_id = jmap.context.account_id.as_deref().unwrap_or("");
+        let account_id = jmap
+            .session
+            .primary_accounts
+            .get(capabilities::MAIL)
+            .map(|s| s.as_str())
+            .unwrap_or("");
         let blob_id = emails
             .into_iter()
             .next()
@@ -58,10 +62,7 @@ impl ExportEmailCommand {
             .ok_or_else(|| anyhow!("Email `{}` not found or has no blobId", self.id))?;
 
         let url: Url = jmap
-            .context
             .session
-            .as_ref()
-            .unwrap()
             .download_url
             .replace("{accountId}", account_id)
             .replace("{blobId}", &blob_id)
@@ -72,14 +73,14 @@ impl ExportEmailCommand {
         let mut stream = jmap.connect_if_different(&url, &tls)?;
         let stream = stream.as_mut().unwrap_or(&mut jmap.stream);
 
-        let mut coroutine = DownloadJmapBlob::new(jmap.context, &url)?;
+        let mut coroutine = JmapBlobDownload::new(&jmap.http_auth, &url)?;
         let mut arg = None;
 
         let data = loop {
             match coroutine.resume(arg.take()) {
-                DownloadJmapBlobResult::Io(io) => arg = Some(handle(&mut *stream, io)?),
-                DownloadJmapBlobResult::Ok { data, .. } => break data,
-                DownloadJmapBlobResult::Err { err, .. } => bail!(err),
+                JmapBlobDownloadResult::Io { io } => arg = Some(handle(&mut *stream, io)?),
+                JmapBlobDownloadResult::Ok { data, .. } => break data,
+                JmapBlobDownloadResult::Err { err, .. } => bail!(err),
             }
         };
 

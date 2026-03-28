@@ -5,7 +5,7 @@ use std::{
 };
 
 use assert_cmd::Command;
-use io_jmap::types::{
+use io_jmap::rfc8621::types::{
     email::Email, email_submission::EmailSubmission, identity::Identity, mailbox::Mailbox,
     thread::Thread, vacation_response::VacationResponse,
 };

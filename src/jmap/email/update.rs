@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
-use io_jmap::coroutines::email_set::{EmailSetArgs, SetJmapEmails, SetJmapEmailsResult};
+use io_jmap::rfc8621::coroutines::email_set::{JmapEmailSet, JmapEmailSetArgs, JmapEmailSetResult};
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
@@ -43,7 +43,7 @@ pub struct JmapEmailUpdateCommand {
 impl JmapEmailUpdateCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         let mut jmap = account.new_jmap_session()?;
-        let mut args = EmailSetArgs::default();
+        let mut args = JmapEmailSetArgs::default();
 
         for id in &self.ids {
             for kw in &self.add_keyword {
@@ -73,14 +73,14 @@ impl JmapEmailUpdateCommand {
             }
         }
 
-        let mut coroutine = SetJmapEmails::new(jmap.context, args)?;
+        let mut coroutine = JmapEmailSet::new(&jmap.session, &jmap.http_auth, args)?;
         let mut arg = None;
 
         let not_updated = loop {
             match coroutine.resume(arg.take()) {
-                SetJmapEmailsResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
-                SetJmapEmailsResult::Ok { not_updated, .. } => break not_updated,
-                SetJmapEmailsResult::Err { err, .. } => bail!(err),
+                JmapEmailSetResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
+                JmapEmailSetResult::Ok { not_updated, .. } => break not_updated,
+                JmapEmailSetResult::Err { err, .. } => bail!(err),
             }
         };
 

@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_jmap::coroutines::email_parse::{ParseJmapEmails, ParseJmapEmailsResult};
+use io_jmap::rfc8621::coroutines::email_parse::{JmapEmailParse, JmapEmailParseResult};
 use io_stream::runtimes::std::handle;
 use log::warn;
 use pimalaya_toolbox::terminal::printer::Printer;
@@ -22,16 +22,22 @@ impl ParseEmailCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         let mut jmap = account.new_jmap_session()?;
 
-        let mut coroutine = ParseJmapEmails::new(jmap.context, self.blob_ids.clone(), None)?;
+        let mut coroutine =
+            JmapEmailParse::new(&jmap.session, &jmap.http_auth, self.blob_ids.clone(), None)?;
         let mut arg = None;
 
         let (parsed, not_parsable, not_found) = loop {
             match coroutine.resume(arg.take()) {
-                ParseJmapEmailsResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
-                ParseJmapEmailsResult::Ok { parsed, not_parsable, not_found, .. } => {
+                JmapEmailParseResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
+                JmapEmailParseResult::Ok {
+                    parsed,
+                    not_parsable,
+                    not_found,
+                    ..
+                } => {
                     break (parsed, not_parsable, not_found);
                 }
-                ParseJmapEmailsResult::Err { err, .. } => bail!(err),
+                JmapEmailParseResult::Err { err, .. } => bail!(err),
             }
         };
 

@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use io_jmap::{
-    coroutines::mailbox_set::{MailboxSetArgs, SetJmapMailboxes, SetJmapMailboxesResult},
-    types::mailbox::MailboxCreate,
+    rfc8621::coroutines::mailbox_set::{JmapMailboxSet, JmapMailboxSetArgs, JmapMailboxSetResult},
+    rfc8621::types::mailbox::MailboxCreate,
 };
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
@@ -42,17 +42,17 @@ impl JmapMailboxCreateCommand {
         let mut create = HashMap::new();
         create.insert(self.name.clone(), new_mailbox);
 
-        let mut args = MailboxSetArgs::default();
+        let mut args = JmapMailboxSetArgs::default();
         args.create = Some(create);
 
-        let mut coroutine = SetJmapMailboxes::new(jmap.context, args)?;
+        let mut coroutine = JmapMailboxSet::new(&jmap.session, &jmap.http_auth, args)?;
         let mut arg = None;
 
         let not_created = loop {
             match coroutine.resume(arg.take()) {
-                SetJmapMailboxesResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
-                SetJmapMailboxesResult::Ok { not_created, .. } => break not_created,
-                SetJmapMailboxesResult::Err { err, .. } => bail!(err),
+                JmapMailboxSetResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
+                JmapMailboxSetResult::Ok { not_created, .. } => break not_created,
+                JmapMailboxSetResult::Err { err, .. } => bail!(err),
             }
         };
 

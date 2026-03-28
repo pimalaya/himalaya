@@ -1,6 +1,8 @@
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
-use io_jmap::coroutines::mailbox_set::{MailboxSetArgs, SetJmapMailboxes, SetJmapMailboxesResult};
+use io_jmap::rfc8621::coroutines::mailbox_set::{
+    JmapMailboxSet, JmapMailboxSetArgs, JmapMailboxSetResult,
+};
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
@@ -22,18 +24,18 @@ impl JmapMailboxDestroyCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         let mut jmap = account.new_jmap_session()?;
 
-        let mut args = MailboxSetArgs::default();
+        let mut args = JmapMailboxSetArgs::default();
         args.destroy = Some(self.ids.clone());
         args.on_destroy_remove_emails = if self.purge { Some(true) } else { None };
 
         let mut arg = None;
-        let mut coroutine = SetJmapMailboxes::new(jmap.context, args)?;
+        let mut coroutine = JmapMailboxSet::new(&jmap.session, &jmap.http_auth, args)?;
 
         let not_destroyed = loop {
             match coroutine.resume(arg.take()) {
-                SetJmapMailboxesResult::Io(io) => arg = Some(handle(&mut jmap.stream, io)?),
-                SetJmapMailboxesResult::Ok { not_destroyed, .. } => break not_destroyed,
-                SetJmapMailboxesResult::Err { err, .. } => bail!(err),
+                JmapMailboxSetResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
+                JmapMailboxSetResult::Ok { not_destroyed, .. } => break not_destroyed,
+                JmapMailboxSetResult::Err { err, .. } => bail!(err),
             }
         };
 
