@@ -118,7 +118,6 @@ impl JmapMailboxQueryCommand {
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
-#[serde(transparent)]
 pub struct MailboxesTable {
     #[serde(skip)]
     pub preset: String,

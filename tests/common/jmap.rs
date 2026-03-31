@@ -68,6 +68,38 @@ fn parse_output<T: DeserializeOwned>(config: &Path, args: &[&str]) -> T {
     })
 }
 
+/// Runs a JSON-mode command, asserts success, extracts `key` from the wrapper
+/// object, and deserializes the value into `Vec<T>`.
+fn parse_list<T: DeserializeOwned>(config: &Path, args: &[&str], key: &str) -> Vec<T> {
+    let stdout = jmap_json(config)
+        .args(args)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&stdout).unwrap_or_else(|e| {
+        panic!(
+            "failed to parse output for {:?}: {e}\nstdout: {}",
+            args,
+            String::from_utf8_lossy(&stdout)
+        )
+    });
+
+    serde_json::from_value(
+        value
+            .get(key)
+            .cloned()
+            .unwrap_or_else(|| panic!("missing `{key}` key in output for {args:?}: {value}")),
+    )
+    .unwrap_or_else(|e| {
+        panic!(
+            "failed to deserialize `{key}` from output for {args:?}: {e}\nvalue: {value}"
+        )
+    })
+}
+
 /// Shared JMAP integration test suite.
 ///
 /// Exercises every command in a single ordered flow. Pass a path to a
@@ -91,7 +123,7 @@ pub fn run(config: &Path, email: impl ToString) {
     // ── 1. MAILBOXES ──────────────────────────────────────────────────────
 
     // baseline list — must return at least one mailbox (e.g. INBOX)
-    let mboxes: Vec<Mailbox> = parse_output(config, &["mailboxes", "query"]);
+    let mboxes: Vec<Mailbox> = parse_list(config, &["mailboxes", "query"], "mailboxes");
 
     assert!(
         !mboxes.is_empty(),
@@ -105,7 +137,8 @@ pub fn run(config: &Path, email: impl ToString) {
         .success();
 
     // query by name — verify name matches
-    let mboxes: Vec<Mailbox> = parse_output(config, &["mailboxes", "query", "--name", &mbox_name]);
+    let mboxes: Vec<Mailbox> =
+        parse_list(config, &["mailboxes", "query", "--name", &mbox_name], "mailboxes");
 
     assert_eq!(
         mboxes[0].name.as_deref(),
@@ -117,7 +150,7 @@ pub fn run(config: &Path, email: impl ToString) {
     cleanup.mbox_id = Some(mbox_id.clone());
 
     // get by id — verify id and name
-    let got: Vec<Mailbox> = parse_output(config, &["mailboxes", "get", &mbox_id]);
+    let got: Vec<Mailbox> = parse_list(config, &["mailboxes", "get", &mbox_id], "mailboxes");
 
     assert_eq!(
         got[0].id.as_deref(),
@@ -140,7 +173,7 @@ pub fn run(config: &Path, email: impl ToString) {
         .success();
 
     // get by id again — verify the rename took effect
-    let got: Vec<Mailbox> = parse_output(config, &["mailboxes", "get", &mbox_id]);
+    let got: Vec<Mailbox> = parse_list(config, &["mailboxes", "get", &mbox_id], "mailboxes");
 
     assert_eq!(
         got[0].name.as_deref(),
@@ -170,14 +203,15 @@ pub fn run(config: &Path, email: impl ToString) {
         .success();
 
     // query — verify exactly one email landed in the mailbox
-    let emails: Vec<Email> = parse_output(config, &["emails", "query", "--mailbox", &mbox_id]);
+    let emails: Vec<Email> =
+        parse_list(config, &["emails", "query", "--mailbox", &mbox_id], "emails");
     assert_eq!(emails.len(), 1, "expected exactly one email after import");
 
     let email_id = emails[0].id.clone().expect("email id");
     let thread_id = emails[0].thread_id.clone().expect("thread id");
 
     // get by id — verify the returned row matches the imported email
-    let got: Vec<Email> = parse_output(config, &["emails", "get", &email_id]);
+    let got: Vec<Email> = parse_list(config, &["emails", "get", &email_id], "emails");
 
     assert_eq!(
         got[0].id.as_deref(),
@@ -215,7 +249,7 @@ pub fn run(config: &Path, email: impl ToString) {
         .assert()
         .success();
 
-    let seen: Vec<Email> = parse_output(
+    let seen: Vec<Email> = parse_list(
         config,
         &[
             "emails",
@@ -225,6 +259,7 @@ pub fn run(config: &Path, email: impl ToString) {
             "--has-keyword",
             "$seen",
         ],
+        "emails",
     );
 
     assert!(
@@ -251,7 +286,7 @@ pub fn run(config: &Path, email: impl ToString) {
         .assert()
         .success();
 
-    let flagged: Vec<Email> = parse_output(
+    let flagged: Vec<Email> = parse_list(
         config,
         &[
             "emails",
@@ -261,6 +296,7 @@ pub fn run(config: &Path, email: impl ToString) {
             "--has-keyword",
             "$flagged",
         ],
+        "emails",
     );
 
     assert!(
@@ -324,7 +360,8 @@ pub fn run(config: &Path, email: impl ToString) {
     // ── 3. THREADS ────────────────────────────────────────────────────────
 
     // get thread — verify it references the imported email
-    let threads: Vec<Thread> = parse_output(config, &["threads", "get", &thread_id]);
+    let threads: Vec<Thread> =
+        parse_list(config, &["threads", "get", &thread_id], "threads");
 
     assert_eq!(threads[0].id, thread_id, "thread: id mismatch");
 
@@ -349,7 +386,7 @@ pub fn run(config: &Path, email: impl ToString) {
         .success();
 
     // list — find by name and verify signature field
-    let identities: Vec<Identity> = parse_output(config, &["identity", "get"]);
+    let identities: Vec<Identity> = parse_list(config, &["identity", "get"], "identities");
     let identity = identities
         .iter()
         .find(|i| i.name == "Test")
@@ -372,7 +409,7 @@ pub fn run(config: &Path, email: impl ToString) {
         .success();
 
     // list — verify rename
-    let identities: Vec<Identity> = parse_output(config, &["identity", "get"]);
+    let identities: Vec<Identity> = parse_list(config, &["identity", "get"], "identities");
 
     assert!(
         identities.iter().any(|i| i.name == "Test Updated"),
@@ -407,7 +444,7 @@ pub fn run(config: &Path, email: impl ToString) {
         .success();
 
     // query to get draft id — verify it is flagged $draft
-    let emails: Vec<Email> = parse_output(
+    let emails: Vec<Email> = parse_list(
         config,
         &[
             "emails",
@@ -417,6 +454,7 @@ pub fn run(config: &Path, email: impl ToString) {
             "--has-keyword",
             "$draft",
         ],
+        "emails",
     );
 
     assert!(!emails.is_empty(), "draft email not found after import");
@@ -424,7 +462,7 @@ pub fn run(config: &Path, email: impl ToString) {
     let draft_id = emails[0].id.clone().expect("draft id");
 
     // create submission (send) — JSON mode returns the created submission(s)
-    let created: Vec<EmailSubmission> = parse_output(
+    let created: Vec<EmailSubmission> = parse_list(
         config,
         &[
             "submission",
@@ -433,6 +471,7 @@ pub fn run(config: &Path, email: impl ToString) {
             "--identity-id",
             &identity_id,
         ],
+        "submissions",
     );
 
     assert!(
@@ -445,7 +484,8 @@ pub fn run(config: &Path, email: impl ToString) {
     // get the submission by ID — EmailSubmission objects are short-lived on
     // some servers (e.g. Fastmail) and may already be gone by the time we
     // query; accept both found and not-found outcomes.
-    let got: Vec<EmailSubmission> = parse_output(config, &["submission", "get", &sub_id]);
+    let got: Vec<EmailSubmission> =
+        parse_list(config, &["submission", "get", &sub_id], "submissions");
 
     if !got.is_empty() {
         assert_eq!(
@@ -460,7 +500,8 @@ pub fn run(config: &Path, email: impl ToString) {
     // Requires JMAP_FROM_ACCOUNT_ID env var (the server-side JMAP accountId,
     // e.g. "u1d764051" for FastMail). Set it to enable this step.
     if let Ok(from_account) = env::var("JMAP_FROM_ACCOUNT_ID") {
-        let before: Vec<Email> = parse_output(config, &["emails", "query", "--mailbox", &mbox_id]);
+        let before: Vec<Email> =
+            parse_list(config, &["emails", "query", "--mailbox", &mbox_id], "emails");
         let count_before = before.len();
 
         jmap(config)
@@ -476,7 +517,8 @@ pub fn run(config: &Path, email: impl ToString) {
             .assert()
             .success();
 
-        let after: Vec<Email> = parse_output(config, &["emails", "query", "--mailbox", &mbox_id]);
+        let after: Vec<Email> =
+            parse_list(config, &["emails", "query", "--mailbox", &mbox_id], "emails");
 
         assert!(
             after.len() > count_before,
@@ -548,8 +590,13 @@ pub fn run(config: &Path, email: impl ToString) {
         &["query", r#"[["Mailbox/get", {"ids": null}, "c0"]]"#],
     );
 
+    let responses = raw
+        .get("method_responses")
+        .and_then(|v| v.as_array())
+        .expect("method_responses should be an array in raw query output");
+
     assert!(
-        raw.as_array().map(|a| !a.is_empty()).unwrap_or(false),
+        !responses.is_empty(),
         "raw query response should be a non-empty array"
     );
 

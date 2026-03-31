@@ -9,7 +9,7 @@ use io_imap::{
 };
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
-use serde::{Serialize, Serializer};
+use serde::Serialize;
 
 use crate::imap::account::ImapAccount;
 
@@ -65,17 +65,18 @@ impl ListMailboxesCommand {
 
         let table = MailboxesTable {
             preset: account.table_preset,
-            rows: mailboxes.into_iter().map(From::from).collect(),
+            mailboxes: mailboxes.into_iter().map(From::from).collect(),
         };
 
         printer.out(table)
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize)]
 pub struct MailboxesTable {
+    #[serde(skip)]
     pub preset: String,
-    pub rows: Vec<MailboxRow>,
+    pub mailboxes: Vec<MailboxRow>,
 }
 
 impl fmt::Display for MailboxesTable {
@@ -89,7 +90,7 @@ impl fmt::Display for MailboxesTable {
                 Cell::new("DELIMITER"),
                 Cell::new("ATTRIBUTES"),
             ]))
-            .add_rows(self.rows.iter().map(|mbox| {
+            .add_rows(self.mailboxes.iter().map(|mbox| {
                 let mut row = Row::new();
 
                 row.max_height(1)
@@ -104,12 +105,6 @@ impl fmt::Display for MailboxesTable {
         write!(f, "{table}")?;
         writeln!(f)?;
         Ok(())
-    }
-}
-
-impl Serialize for MailboxesTable {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.rows.serialize(serializer)
     }
 }
 

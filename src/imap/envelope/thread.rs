@@ -12,7 +12,7 @@ use io_imap::{
 };
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::{stream::imap::ImapSession, terminal::printer::Printer};
-use serde::{Serialize, Serializer};
+use serde::{ser::SerializeStruct, Serialize, Serializer};
 
 use crate::imap::{
     account::ImapAccount,
@@ -320,6 +320,8 @@ impl ThreadResultsTable {
 
 impl Serialize for ThreadResultsTable {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.build_entries().serialize(serializer)
+        let mut s = serializer.serialize_struct("ThreadResultsTable", 1)?;
+        s.serialize_field("threads", &self.build_entries())?;
+        s.end()
     }
 }

@@ -38,10 +38,6 @@ pub struct ReadMessageCommand {
     /// Show HTML content instead of plain text.
     #[arg(long)]
     pub html: bool,
-
-    /// Terminal width for text wrapping.
-    #[arg(long, short = 'w', default_value = "80")]
-    pub width: usize,
 }
 
 impl ReadMessageCommand {

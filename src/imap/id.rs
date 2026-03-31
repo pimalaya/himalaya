@@ -74,14 +74,14 @@ impl IdCommand {
             server_id: params
                 .unwrap_or_default()
                 .into_iter()
-                .map(|(key, val)| {
-                    (
-                        String::from_utf8(key.into_inner().into_owned()).unwrap(),
+                .filter_map(|(key, val)| {
+                    Some((
+                        String::from_utf8(key.into_inner().into_owned()).ok()?,
                         match val.into_option() {
-                            Some(val) => Some(String::from_utf8(val.into_owned()).unwrap()),
+                            Some(val) => Some(String::from_utf8(val.into_owned()).ok()?),
                             None => None,
                         },
-                    )
+                    ))
                 })
                 .collect(),
         };

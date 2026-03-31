@@ -6,10 +6,14 @@ use std::{
 use anyhow::{bail, Result};
 use clap::Parser;
 use io_jmap::{
-    rfc8620::coroutines::blob_upload::{JmapBlobUpload, JmapBlobUploadResult},
-    rfc8620::types::session::capabilities,
-    rfc8621::coroutines::email_import::{JmapEmailImport, JmapEmailImportResult},
-    rfc8621::types::email::EmailImport,
+    rfc8620::{
+        coroutines::blob_upload::{JmapBlobUpload, JmapBlobUploadResult},
+        types::session::capabilities::{self, MAIL},
+    },
+    rfc8621::{
+        coroutines::email_import::{JmapEmailImport, JmapEmailImportResult},
+        types::email::EmailImport,
+    },
 };
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
@@ -64,7 +68,7 @@ impl ImportEmailCommand {
         let account_id = jmap
             .session
             .primary_accounts
-            .get(capabilities::MAIL)
+            .get(MAIL)
             .map(|s| s.as_str())
             .unwrap_or("");
         let url: Url = jmap

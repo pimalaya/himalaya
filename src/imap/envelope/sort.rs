@@ -12,7 +12,7 @@ use io_imap::{
 };
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
-use serde::{Serialize, Serializer};
+use serde::Serialize;
 
 use crate::imap::{
     account::ImapAccount, envelope::search::parse_query, mailbox::arg::MailboxNameOptionalArg,
@@ -116,22 +116,15 @@ fn parse_sort_key(s: &str) -> Result<SortKey> {
 }
 
 #[derive(Clone, Debug, Serialize)]
-pub struct SortResult {
-    pub id: u32,
-}
-
 pub struct SortResultsTable {
-    results: Vec<SortResult>,
+    ids: Vec<u32>,
     uid_mode: bool,
 }
 
 impl SortResultsTable {
     pub fn new(ids: Vec<std::num::NonZeroU32>, uid_mode: bool) -> Self {
-        let results = ids
-            .into_iter()
-            .map(|id| SortResult { id: id.get() })
-            .collect();
-        Self { results, uid_mode }
+        let ids = ids.into_iter().map(|id| id.get()).collect();
+        Self { ids, uid_mode }
     }
 }
 
@@ -146,20 +139,13 @@ impl fmt::Display for SortResultsTable {
             .set_content_arrangement(ContentArrangement::DynamicFullWidth)
             .set_header(Row::from([Cell::new(id_header)]));
 
-        for result in &self.results {
-            table.add_row(Row::from([Cell::new(result.id)]));
+        for id in &self.ids {
+            table.add_row(Row::from([Cell::new(id)]));
         }
 
         writeln!(f)?;
         write!(f, "{table}")?;
         writeln!(f)?;
-        writeln!(f, "Found {} message(s)", self.results.len())?;
-        Ok(())
-    }
-}
-
-impl Serialize for SortResultsTable {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.results.serialize(serializer)
+        writeln!(f, "Found {} message(s)", self.ids.len())
     }
 }

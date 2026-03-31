@@ -7,11 +7,12 @@ use anyhow::{bail, Context, Result};
 use clap::Parser;
 use io_jmap::rfc8620::{
     coroutines::send::{JmapRequest, JmapSend, JmapSendResult},
-    types::session::capabilities,
+    types::session::capabilities::{CORE, MAIL},
 };
 use io_stream::runtimes::std::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
+use serde_json::Value;
 
 use crate::jmap::account::JmapAccount;
 
@@ -53,50 +54,52 @@ impl QueryCommand {
             self.method_calls.join(" ")
         };
 
-        let calls_value: serde_json::Value =
+        let calls_value: Value =
             serde_json::from_str(&raw).context("METHOD_CALLS is not valid JSON")?;
 
-        let serde_json::Value::Array(calls_arr) = calls_value else {
+        let Value::Array(calls_arr) = calls_value else {
             bail!("METHOD_CALLS must be a JSON array");
         };
 
         let account_id = jmap
             .session
             .primary_accounts
-            .get(capabilities::MAIL)
+            .get(MAIL)
             .cloned()
             .unwrap_or_default();
 
         // Parse and inject accountId into each call's args.
         let mut method_calls = Vec::with_capacity(calls_arr.len());
         for (i, call) in calls_arr.into_iter().enumerate() {
-            let serde_json::Value::Array(mut tuple) = call else {
+            let Value::Array(mut tuple) = call else {
                 bail!("method call #{i} must be a JSON array [name, args, callId]");
             };
+
             if tuple.len() != 3 {
                 bail!("method call #{i} must have exactly 3 elements [name, args, callId]");
             }
+
             let call_id = match tuple.remove(2) {
-                serde_json::Value::String(s) => s,
+                Value::String(s) => s,
                 v => bail!("method call #{i} callId must be a string, got {v}"),
             };
+
             let mut args = tuple.remove(1);
             let name = match tuple.remove(0) {
-                serde_json::Value::String(s) => s,
+                Value::String(s) => s,
                 v => bail!("method call #{i} name must be a string, got {v}"),
             };
+
             // Inject accountId if the args object doesn't already have it.
-            if let serde_json::Value::Object(ref mut map) = args {
+            if let Value::Object(ref mut map) = args {
                 map.entry("accountId")
-                    .or_insert_with(|| serde_json::Value::String(account_id.clone()));
+                    .or_insert_with(|| Value::String(account_id.clone()));
             }
+
             method_calls.push((name, args, call_id));
         }
 
-        let mut using = vec![
-            capabilities::CORE.to_string(),
-            capabilities::MAIL.to_string(),
-        ];
+        let mut using = vec![CORE.to_string(), MAIL.to_string()];
         for extra in self.using {
             if !using.contains(&extra) {
                 using.push(extra);
@@ -122,17 +125,21 @@ impl QueryCommand {
             }
         };
 
-        printer.out(RawResponse(response.method_responses))
+        printer.out(RawResponse {
+            method_responses: response.method_responses,
+        })
     }
 }
 
 /// Wraps the raw method_responses for display.
 #[derive(Serialize)]
-struct RawResponse(Vec<(String, serde_json::Value, String)>);
+struct RawResponse {
+    method_responses: Vec<(String, Value, String)>,
+}
 
 impl fmt::Display for RawResponse {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match serde_json::to_string_pretty(&self.0) {
+        match serde_json::to_string_pretty(&self.method_responses) {
             Ok(s) => write!(f, "{s}"),
             Err(e) => write!(f, "<serialization error: {e}>"),
         }

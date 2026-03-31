@@ -53,7 +53,6 @@ impl GetThreadCommand {
 }
 
 #[derive(Clone, Debug, Serialize)]
-#[serde(transparent)]
 pub struct ThreadsTable {
     #[serde(skip)]
     pub preset: String,

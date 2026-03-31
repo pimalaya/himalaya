@@ -58,7 +58,6 @@ impl GetIdentityCommand {
 }
 
 #[derive(Clone, Debug, Serialize)]
-#[serde(transparent)]
 pub struct IdentitiesTable {
     #[serde(skip)]
     pub preset: String,

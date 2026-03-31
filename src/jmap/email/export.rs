@@ -1,8 +1,10 @@
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use io_jmap::{
-    rfc8620::coroutines::blob_download::{JmapBlobDownload, JmapBlobDownloadResult},
-    rfc8620::types::session::capabilities,
+    rfc8620::{
+        coroutines::blob_download::{JmapBlobDownload, JmapBlobDownloadResult},
+        types::session::capabilities::{self, MAIL},
+    },
     rfc8621::coroutines::email_get::{JmapEmailGet, JmapEmailGetResult},
 };
 use io_stream::runtimes::std::handle;
@@ -52,7 +54,7 @@ impl ExportEmailCommand {
         let account_id = jmap
             .session
             .primary_accounts
-            .get(capabilities::MAIL)
+            .get(MAIL)
             .map(|s| s.as_str())
             .unwrap_or("");
         let blob_id = emails

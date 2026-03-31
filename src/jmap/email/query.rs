@@ -171,7 +171,6 @@ impl JmapEmailQueryCommand {
 }
 
 #[derive(Clone, Debug, Serialize)]
-#[serde(transparent)]
 pub struct EmailsTable {
     #[serde(skip)]
     pub preset: String,

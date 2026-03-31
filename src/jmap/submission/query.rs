@@ -108,7 +108,6 @@ impl QuerySubmissionCommand {
 }
 
 #[derive(Clone, Debug, Serialize)]
-#[serde(transparent)]
 pub struct SubmissionsTable {
     #[serde(skip)]
     pub preset: String,

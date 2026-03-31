@@ -4,6 +4,7 @@ use std::{
 };
 
 use assert_cmd::Command;
+use serde_json::Value;
 
 /// Resources to clean up after the test, even on failure.
 struct Cleanup<'a> {
@@ -148,7 +149,7 @@ pub fn run(config: &Path, email: impl ToString) {
         .stdout
         .clone();
 
-    let envelopes: Vec<serde_json::Value> = serde_json::from_slice::<serde_json::Value>(&stdout)
+    let envelopes: Vec<Value> = serde_json::from_slice::<Value>(&stdout)
         .unwrap_or_else(|e| {
             panic!(
                 "failed to parse envelope list output: {e}\nstdout: {}",
@@ -201,7 +202,7 @@ pub fn run(config: &Path, email: impl ToString) {
         .stdout
         .clone();
 
-    let results: Vec<serde_json::Value> = serde_json::from_slice::<serde_json::Value>(&stdout)
+    let results: Vec<Value> = serde_json::from_slice::<Value>(&stdout)
         .unwrap_or_else(|e| {
             panic!(
                 "failed to parse search output: {e}\nstdout: {}",
@@ -273,22 +274,21 @@ pub fn run(config: &Path, email: impl ToString) {
         .stdout
         .clone();
 
-    let dest_envelopes: Vec<serde_json::Value> =
-        serde_json::from_slice::<serde_json::Value>(&stdout)
-            .unwrap_or_else(|e| {
-                panic!(
-                    "failed to parse destination envelope list: {e}\nstdout: {}",
-                    String::from_utf8_lossy(&stdout)
-                )
-            })
-            .get("envelopes")
-            .and_then(|v| serde_json::from_value(v.clone()).ok())
-            .unwrap_or_else(|| {
-                panic!(
-                    "missing `envelopes` key in destination output: {}",
-                    String::from_utf8_lossy(&stdout)
-                )
-            });
+    let dest_envelopes: Vec<Value> = serde_json::from_slice::<Value>(&stdout)
+        .unwrap_or_else(|e| {
+            panic!(
+                "failed to parse destination envelope list: {e}\nstdout: {}",
+                String::from_utf8_lossy(&stdout)
+            )
+        })
+        .get("envelopes")
+        .and_then(|v| serde_json::from_value(v.clone()).ok())
+        .unwrap_or_else(|| {
+            panic!(
+                "missing `envelopes` key in destination output: {}",
+                String::from_utf8_lossy(&stdout)
+            )
+        });
 
     assert_eq!(
         dest_envelopes.len(),
