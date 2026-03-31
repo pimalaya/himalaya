@@ -110,7 +110,7 @@ fn parse_sort_key(s: &str) -> Result<SortKey> {
         "subject" => Ok(SortKey::Subject),
         "size" => Ok(SortKey::Size),
         _ => bail!(
-            "Unknown sort key: {s}. Valid options: date, arrival, from, to, cc, subject, size"
+            "Unknown sort key `{s}`, valid options: date, arrival, from, to, cc, subject, size"
         ),
     }
 }

@@ -78,7 +78,9 @@ impl ExportMessageCommand {
         };
 
         // FETCH with BODY.PEEK[] to avoid marking as read
-        let id = NonZeroU32::new(self.id).ok_or_else(|| anyhow::anyhow!("ID must be non-zero"))?;
+        let Some(id) = NonZeroU32::new(self.id) else {
+            bail!("Export message error: ID must be non-zero");
+        };
 
         let item_names =
             MacroOrMessageDataItemNames::MessageDataItemNames(vec![MessageDataItemName::BodyExt {
@@ -108,7 +110,12 @@ impl ExportMessageCommand {
             }
         }
 
-        let raw = raw_message.ok_or_else(|| anyhow::anyhow!("No message data returned"))?;
+        let Some(raw) = raw_message else {
+            bail!(
+                "Export message `{}` error: no message data returned",
+                self.id
+            );
+        };
 
         match self.r#type {
             ExportType::Raw => {
@@ -119,9 +126,12 @@ impl ExportMessageCommand {
             }
             ExportType::Eml => {
                 // Save as .eml file
-                let message = MessageParser::default()
-                    .parse(&raw)
-                    .ok_or_else(|| anyhow::anyhow!("Failed to parse message"))?;
+                let Some(message) = MessageParser::default().parse(&raw) else {
+                    bail!(
+                        "Export message `{}` error: failed to parse MIME message",
+                        self.id
+                    );
+                };
 
                 // Generate filename from subject or message-id
                 let filename = generate_eml_filename(&message, self.id);
@@ -145,9 +155,12 @@ impl ExportMessageCommand {
             }
             ExportType::Parts => {
                 // Export all MIME parts to separate files
-                let message = MessageParser::default()
-                    .parse(&raw)
-                    .ok_or_else(|| anyhow::anyhow!("Failed to parse message"))?;
+                let Some(message) = MessageParser::default().parse(&raw) else {
+                    bail!(
+                        "Export message `{}` error: failed to parse MIME message",
+                        self.id
+                    );
+                };
 
                 let dir = self
                     .directory
@@ -183,7 +196,7 @@ impl ExportMessageCommand {
                 }
 
                 if exported_files.is_empty() {
-                    bail!("No parts to export");
+                    bail!("Export message `{}` error: no parts to export", self.id);
                 }
 
                 if self.open {

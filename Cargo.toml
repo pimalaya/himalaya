@@ -18,10 +18,10 @@ rustdoc-args = ["--cfg", "docsrs"]
 [features]
 default = ["imap", "maildir", "smtp", "rustls-ring"]
 
-imap = ["dep:io-imap", "dep:rfc2047-decoder", "pimalaya-toolbox/imap"]
+imap = ["dep:io-imap", "dep:mail-parser", "dep:rfc2047-decoder", "pimalaya-toolbox/imap"]
 jmap = ["dep:io-jmap", "dep:serde_json", "pimalaya-toolbox/jmap"]
-smtp = ["dep:io-smtp", "pimalaya-toolbox/smtp"]
-maildir = ["dep:convert_case", "dep:io-fs", "dep:io-maildir", "dep:mime_guess"]
+smtp = ["dep:io-smtp", "dep:mail-parser", "pimalaya-toolbox/smtp"]
+maildir = ["dep:convert_case", "dep:io-fs", "dep:io-maildir", "dep:mail-parser", "dep:mime_guess"]
 
 native-tls = ["pimalaya-toolbox/native-tls"]
 rustls-aws = ["pimalaya-toolbox/rustls-aws"]
@@ -48,7 +48,7 @@ io-process = { version = "0.0.2", default-features = false }
 io-smtp = { version = "0.0.1", default-features = false, features = ["ext_auth", "starttls"], optional = true }
 io-stream = { version = "0.0.2", default-features = false, features = ["std"] }
 log = "0.4"
-mail-parser = "0.11"
+mail-parser = { version = "0.11", features = ["serde"], optional = true }
 mime_guess = { version = "2", optional = true }
 open = "5"
 pimalaya-toolbox = { version = "0.0.4", default-features = false, features = ["config", "terminal", "secret"] }

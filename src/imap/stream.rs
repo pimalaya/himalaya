@@ -254,7 +254,7 @@ pub fn connect(mut config: ImapConfig) -> Result<(ImapContext, Stream)> {
             (context, Stream::Unix(stream))
         }
         scheme => {
-            bail!("Unknown scheme {scheme}, expected imap, imaps or unix");
+            bail!("Unknown scheme `{scheme}`, expected imap, imaps or unix");
         }
     };
 

@@ -1,28 +1,25 @@
+#![cfg(feature = "jmap")]
+
 #[path = "common/jmap.rs"]
 mod jmap;
 
-use std::{env, io::Write};
+use std::io::Write;
 
 use tempfile::NamedTempFile;
 
 #[test]
-#[ignore = "requires STALWART_{EMAIL,URL,USER,PASS} env vars and --ignored"]
+#[ignore = "requires a running Stalwart instance and --ignored"]
 fn stalwart_jmap() {
-    let email = env::var("STALWART_EMAIL").unwrap_or("test@pimalaya.org".into());
-    let url = env::var("STALWART_URL").unwrap_or("http://localhost:8080/jmap/session".into());
-    let user = env::var("STALWART_USER").unwrap_or("test".into());
-    let pass = env::var("STALWART_PASS").unwrap_or("test".into());
-
     let mut config = NamedTempFile::new().unwrap();
     let config_tpl = format!(
         r#"[accounts.stalwart]
 default = true
-jmap.server = "{url}"
-jmap.auth.basic.username = "{user}"
-jmap.auth.basic.password.raw = "{pass}""#
+jmap.server = "http://localhost:8080/jmap/session"
+jmap.auth.basic.username = "test"
+jmap.auth.basic.password.raw = "test""#
     );
 
     config.write(&config_tpl.into_bytes()).unwrap();
 
-    jmap::run(config.path(), email);
+    jmap::run(config.path(), "test@pimalaya.org");
 }

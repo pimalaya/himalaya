@@ -84,11 +84,14 @@ impl GetMessageCommand {
         }
 
         let Some(raw) = raw_message else {
-            bail!("No message found");
+            bail!("Get message `{}` error: no message data returned", self.id);
         };
 
         let Some(message) = MessageParser::new().parse(&raw) else {
-            bail!("Invalid message");
+            bail!(
+                "Get message `{}` error: failed to parse MIME message",
+                self.id
+            );
         };
 
         let structure = MessageStructure::from_parsed(&message);

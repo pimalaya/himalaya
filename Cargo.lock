@@ -852,7 +852,7 @@ dependencies = [
 [[package]]
 name = "io-imap"
 version = "0.0.1"
-source = "git+https://github.com/pimalaya/io-imap?branch=io#356d1349d1956be668321657853d91fe33d98a16"
+source = "git+https://github.com/pimalaya/io-imap?branch=io#32ca082c281da619ae008be17966c73e4e3f6c57"
 dependencies = [
  "imap-codec",
  "io-stream",

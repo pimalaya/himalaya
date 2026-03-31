@@ -95,11 +95,14 @@ impl ReadMessageCommand {
         }
 
         let Some(raw) = raw_message else {
-            bail!("No message found");
+            bail!("Read message `{}` error: no message data returned", self.id);
         };
 
         let Some(message) = MessageParser::new().parse(&raw) else {
-            bail!("Invalid MIME message");
+            bail!(
+                "Read message `{}` error: failed to parse MIME message",
+                self.id
+            );
         };
 
         if self.html {

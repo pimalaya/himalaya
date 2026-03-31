@@ -105,7 +105,7 @@ fn parse_algorithm(s: &str) -> Result<ThreadingAlgorithm<'static>> {
     match s.to_lowercase().as_str() {
         "references" => Ok(ThreadingAlgorithm::References),
         "orderedsubject" => Ok(ThreadingAlgorithm::OrderedSubject),
-        _ => bail!("Unknown threading algorithm: {s}. Valid options: references, orderedsubject"),
+        _ => bail!("Unknown threading algorithm `{s}`, valid options: references, orderedsubject"),
     }
 }
 

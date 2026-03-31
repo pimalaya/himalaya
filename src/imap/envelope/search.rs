@@ -242,30 +242,30 @@ fn parse_term(term: &str) -> Result<SearchKey<'static>> {
         }
     }
 
-    bail!("Unknown search term: {term}")
+    bail!("Unknown search term `{term}`")
 }
 
 fn parse_date(s: &str) -> Result<NaiveDate> {
     // Parse YYYY-MM-DD format
     let parts: Vec<&str> = s.split('-').collect();
     if parts.len() != 3 {
-        bail!("Invalid date format '{s}'. Expected YYYY-MM-DD");
+        bail!("Invalid date format `{s}`, expected YYYY-MM-DD");
     }
 
     let year: i32 = parts[0]
         .parse()
-        .map_err(|_| anyhow!("Invalid year in date '{s}'"))?;
+        .map_err(|_| anyhow!("Invalid year in date `{s}`"))?;
     let month: u32 = parts[1]
         .parse()
-        .map_err(|_| anyhow!("Invalid month in date '{s}'"))?;
+        .map_err(|_| anyhow!("Invalid month in date `{s}`"))?;
     let day: u32 = parts[2]
         .parse()
-        .map_err(|_| anyhow!("Invalid day in date '{s}'"))?;
+        .map_err(|_| anyhow!("Invalid day in date `{s}`"))?;
 
     // Create chrono::NaiveDate first
     let chrono_date = chrono::NaiveDate::from_ymd_opt(year, month, day)
-        .ok_or_else(|| anyhow!("Invalid date '{s}'"))?;
+        .ok_or_else(|| anyhow!("Invalid date `{s}`"))?;
 
     // Convert to imap-types NaiveDate
-    NaiveDate::try_from(chrono_date).map_err(|e| anyhow!("Invalid date '{s}': {e}"))
+    NaiveDate::try_from(chrono_date).map_err(|e| anyhow!("Invalid date `{s}`: {e}"))
 }

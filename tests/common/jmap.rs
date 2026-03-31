@@ -72,7 +72,9 @@ fn parse_output<T: DeserializeOwned>(config: &Path, args: &[&str]) -> T {
 ///
 /// Exercises every command in a single ordered flow. Pass a path to a
 /// valid TOML config file with a default JMAP account configured.
-pub fn run(config: &Path, email: String) {
+pub fn run(config: &Path, email: impl ToString) {
+    let email = email.to_string();
+
     let ts = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
