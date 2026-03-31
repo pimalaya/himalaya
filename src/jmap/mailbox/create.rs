@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use clap::Parser;
 use io_jmap::{
     rfc8621::coroutines::mailbox_set::{JmapMailboxSet, JmapMailboxSetArgs, JmapMailboxSetResult},
@@ -56,21 +56,22 @@ impl JmapMailboxCreateCommand {
             }
         };
 
-        if !not_created.is_empty() {
-            let mut ctx = anyhow!("Create JMAP mailbox `{}` error", self.name);
+        if let Some(err) = not_created.get(&self.name) {
+            let mut msg = format!("Create JMAP mailbox `{}` error", self.name);
 
-            for (_, err) in not_created {
-                if let Some(desc) = &err.description {
-                    ctx = anyhow!(desc.clone()).context(ctx);
-                }
-
-                if !err.properties.is_empty() {
-                    let props = err.properties.join(", ");
-                    ctx = anyhow!("Invalid properties {props}").context(ctx);
-                }
+            if !err.properties.is_empty() {
+                msg.push_str(": invalid properties `");
+                msg.push_str(&err.properties.join("`, `"));
+                msg.push('`');
             }
 
-            bail!(ctx)
+            if let Some(desc) = &err.description {
+                msg.push_str(" (");
+                msg.push_str(desc.to_lowercase().trim_end_matches(['.', '\n']));
+                msg.push(')');
+            }
+
+            bail!(msg)
         }
 
         printer.out(Message::new("Mailbox successfully created"))

@@ -16,10 +16,16 @@ jobs:
       - run: |
           echo "ADMIN_PASSWORD=$(docker logs stalwart-test-for-himalaya 2>&1 | grep -oP "(?<=with password ')[^']+")" >> $GITHUB_ENV
       - run: |
-          curl -u "admin:${ADMIN_PASSWORD}" -X POST -H 'Content-Type: application/json' -d '{"type":"domain","name":"pimalaya.org","description":"","quota":0,"secrets":[],"emails":[],"urls":[],"memberOf":[],"roles":[],"lists":[],"members":[],"enabledPermissions":[],"disabledPermissions":[],"externalMembers":[]}' http://localhost:8080/api/principal
+          curl -X POST \
+               -u "admin:${ADMIN_PASSWORD}" \
+               -H 'Content-Type: application/json' \
+               -d '{"type":"domain","name":"pimalaya.org"}' \
+               http://localhost:8080/api/principal
       - run: |
-          curl -u "admin:${ADMIN_PASSWORD}" -X POST -H 'Content-Type: application/json' -d '{"type":"individual","name":"test","description":"","quota":0,"secrets":["test"],"emails":["test@pimalaya.org"],"memberOf":[],"roles":["user"],"lists":[],"enabledPermissions":[],"disabledPermissions":[],"externalMembers":[]}' http://localhost:8080/api/principal
+          curl -X POST \
+               -u "admin:${ADMIN_PASSWORD}" \
+               -H 'Content-Type: application/json' \
+               -d '{"type":"individual","name":"test","emails":["test@pimalaya.org"],"secrets":["test"],"roles":["user"]}' \
+               http://localhost:8080/api/principal
       - run: cargo test --no-default-features --features jmap,rustls-ring --test stalwart-jmap -- --ignored
-        env:
-          EMAIL: test@pimalaya.org
       - run: docker stop stalwart-test-for-himalaya

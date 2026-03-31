@@ -38,16 +38,26 @@ impl CancelSubmissionCommand {
             }
         };
 
-        for (id, err) in &not_updated {
-            let mut ctx = anyhow!("Cancel submission `{id}` error");
-            if let Some(desc) = &err.description {
-                ctx = anyhow!("{desc}").context(ctx);
+        if !not_updated.is_empty() {
+            let mut msg = String::from("Cancel submission(s) error");
+
+            for (id, err) in &not_updated {
+                msg.push_str(&format!("\n  `{id}`"));
+
+                if !err.properties.is_empty() {
+                    msg.push_str(": invalid properties `");
+                    msg.push_str(&err.properties.join("`, `"));
+                    msg.push('`');
+                }
+
+                if let Some(desc) = &err.description {
+                    msg.push_str(" (");
+                    msg.push_str(desc.to_lowercase().trim_end_matches(['.', '\n']));
+                    msg.push(')');
+                }
             }
-            if !err.properties.is_empty() {
-                let props = err.properties.join(", ");
-                ctx = anyhow!("Invalid properties {props}").context(ctx);
-            }
-            bail!(ctx);
+
+            bail!(msg);
         }
 
         printer.out(Message::new(format!(

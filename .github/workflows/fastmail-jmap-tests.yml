@@ -13,5 +13,5 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo test --no-default-features --features jmap,rustls-ring --test fastmail-jmap -- --ignored
         env:
-          EMAIL: ${{ secrets.FASTMAIL_EMAIL }}
-          BEARER_TOKEN: ${{ secrets.FASTMAIL_BEARER_TOKEN }}
+          FASTMAIL_EMAIL: ${{ secrets.FASTMAIL_EMAIL }}
+          FASTMAIL_BEARER_TOKEN: ${{ secrets.FASTMAIL_BEARER_TOKEN }}

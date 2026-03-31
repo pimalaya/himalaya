@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use clap::Parser;
 use io_jmap::{
     rfc8621::coroutines::mailbox_set::{JmapMailboxSet, JmapMailboxSetArgs, JmapMailboxSetResult},
@@ -72,7 +72,7 @@ impl JmapMailboxUpdateCommand {
         let mut arg = None;
         let mut coroutine = JmapMailboxSet::new(&jmap.session, &jmap.http_auth, args)?;
 
-        let errs = loop {
+        let not_updated = loop {
             match coroutine.resume(arg.take()) {
                 JmapMailboxSetResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
                 JmapMailboxSetResult::Ok { not_updated, .. } => break not_updated,
@@ -80,19 +80,22 @@ impl JmapMailboxUpdateCommand {
             }
         };
 
-        if let Some(err) = errs.get(&self.id) {
-            let mut ctx = anyhow!("Update JMAP mailbox `{}` error", self.id);
-
-            if let Some(desc) = &err.description {
-                ctx = anyhow!("{desc}").context(ctx);
-            }
+        if let Some(err) = not_updated.get(&self.id) {
+            let mut msg = format!("Update JMAP mailbox `{}` error", self.id);
 
             if !err.properties.is_empty() {
-                let props = err.properties.join(", ");
-                ctx = anyhow!("Invalid properties {props}").context(ctx);
+                msg.push_str(": invalid properties `");
+                msg.push_str(&err.properties.join("`, `"));
+                msg.push('`');
             }
 
-            bail!(ctx);
+            if let Some(desc) = &err.description {
+                msg.push_str(" (");
+                msg.push_str(desc.to_lowercase().trim_end_matches(['.', '\n']));
+                msg.push(')');
+            }
+
+            bail!(msg);
         }
 
         printer.out(Message::new("Mailbox successfully updated"))

@@ -3,7 +3,7 @@ use std::{
     io::{stdin, BufRead, IsTerminal},
 };
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use clap::Parser;
 use io_jmap::{
     rfc8620::coroutines::blob_upload::{JmapBlobUpload, JmapBlobUploadResult},
@@ -115,7 +115,7 @@ impl ImportEmailCommand {
         let mut coroutine = JmapEmailImport::new(&jmap.session, &jmap.http_auth, emails)?;
         let mut arg = None;
 
-        let errs = loop {
+        let not_created = loop {
             match coroutine.resume(arg.take()) {
                 JmapEmailImportResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
                 JmapEmailImportResult::Ok { not_created, .. } => break not_created,
@@ -123,19 +123,22 @@ impl ImportEmailCommand {
             }
         };
 
-        if let Some(err) = errs.get(&blob_id) {
-            let mut ctx = anyhow!("Import JMAP email from blob `{blob_id}` error");
-
-            if let Some(desc) = &err.description {
-                ctx = anyhow!("{desc}").context(ctx);
-            }
+        if let Some(err) = not_created.get(&blob_id) {
+            let mut msg = format!("Import JMAP email from blob `{blob_id}` error");
 
             if !err.properties.is_empty() {
-                let props = err.properties.join(", ");
-                ctx = anyhow!("Invalid properties {props}").context(ctx);
+                msg.push_str(": invalid properties `");
+                msg.push_str(&err.properties.join("`, `"));
+                msg.push('`');
             }
 
-            bail!(ctx);
+            if let Some(desc) = &err.description {
+                msg.push_str(" (");
+                msg.push_str(desc.to_lowercase().trim_end_matches(['.', '\n']));
+                msg.push(')');
+            }
+
+            bail!(msg);
         }
 
         printer.out(Message::new("Email successfully imported"))

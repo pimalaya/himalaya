@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use clap::Parser;
 use io_jmap::rfc8621::coroutines::mailbox_set::{
     JmapMailboxSet, JmapMailboxSetArgs, JmapMailboxSetResult,
@@ -40,20 +40,25 @@ impl JmapMailboxDestroyCommand {
         };
 
         if !not_destroyed.is_empty() {
-            let mut ctx = anyhow!("Destroy JMAP mailbox(es) error");
+            let mut msg = String::from("Destroy JMAP mailbox(es) error");
 
             for (id, err) in not_destroyed {
-                if let Some(desc) = &err.description {
-                    ctx = anyhow!("{id}: {desc}").context(ctx);
-                }
+                msg.push_str(&format!("\n  `{id}`"));
 
                 if !err.properties.is_empty() {
-                    let props = err.properties.join(", ");
-                    ctx = anyhow!("{id}: Invalid properties {props}").context(ctx);
+                    msg.push_str(": invalid properties `");
+                    msg.push_str(&err.properties.join("`, `"));
+                    msg.push('`');
+                }
+
+                if let Some(desc) = &err.description {
+                    msg.push_str(" (");
+                    msg.push_str(desc.to_lowercase().trim_end_matches(['.', '\n']));
+                    msg.push(')');
                 }
             }
 
-            bail!(ctx)
+            bail!(msg)
         }
 
         printer.out(Message::new("Mailbox successfully deleted"))

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use clap::Parser;
 use io_jmap::{
     rfc8621::coroutines::email_submission_set::{
@@ -75,7 +75,7 @@ impl CreateSubmissionCommand {
             JmapEmailSubmissionSet::new(&jmap.session, &jmap.http_auth, submissions)?;
         let mut arg = None;
 
-        let (created, errs) = loop {
+        let (created, not_created) = loop {
             match coroutine.resume(arg.take()) {
                 JmapEmailSubmissionSetResult::Io { io } => {
                     arg = Some(handle(&mut jmap.stream, io)?)
@@ -89,19 +89,22 @@ impl CreateSubmissionCommand {
             }
         };
 
-        if let Some(err) = errs.get(&self.email_id) {
-            let mut ctx = anyhow!("Send email `{}` error", &self.email_id);
-
-            if let Some(desc) = &err.description {
-                ctx = anyhow!("{desc}").context(ctx);
-            }
+        if let Some(err) = not_created.get(&self.email_id) {
+            let mut msg = format!("Send email `{}` error", self.email_id);
 
             if !err.properties.is_empty() {
-                let props = err.properties.join(", ");
-                ctx = anyhow!("Invalid properties {props}").context(ctx);
+                msg.push_str(": invalid properties `");
+                msg.push_str(&err.properties.join("`, `"));
+                msg.push('`');
             }
 
-            bail!(ctx);
+            if let Some(desc) = &err.description {
+                msg.push_str(" (");
+                msg.push_str(desc.to_lowercase().trim_end_matches(['.', '\n']));
+                msg.push(')');
+            }
+
+            bail!(msg);
         }
 
         let table = SubmissionsTable {
