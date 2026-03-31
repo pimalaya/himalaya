@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use clap::Parser;
 use io_jmap::{
     rfc8621::coroutines::identity_set::{
@@ -50,7 +50,7 @@ impl JmapIdentityCreateCommand {
         let mut coroutine = JmapIdentitySet::new(&jmap.session, &jmap.http_auth, args)?;
         let mut arg = None;
 
-        let errs = loop {
+        let not_created = loop {
             match coroutine.resume(arg.take()) {
                 JmapIdentitySetResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
                 JmapIdentitySetResult::Ok { not_created, .. } => break not_created,
@@ -58,19 +58,22 @@ impl JmapIdentityCreateCommand {
             }
         };
 
-        if let Some(err) = errs.get(create_id) {
-            let mut ctx = anyhow!("Create identity for `{}` error", &self.email);
-
-            if let Some(desc) = &err.description {
-                ctx = anyhow!("{desc}").context(ctx);
-            }
+        if let Some(err) = not_created.get(create_id) {
+            let mut msg = format!("Create identity for `{}` error", self.email);
 
             if !err.properties.is_empty() {
-                let props = err.properties.join(", ");
-                ctx = anyhow!("Invalid properties {props}").context(ctx);
+                msg.push_str(": invalid propertie(s) `");
+                msg.push_str(&err.properties.join("`, `"));
+                msg.push('`');
             }
 
-            bail!(ctx);
+            if let Some(desc) = &err.description {
+                msg.push_str(" (");
+                msg.push_str(desc.to_lowercase().trim_end_matches(['.', '\n']));
+                msg.push_str(")");
+            }
+
+            bail!(msg);
         }
 
         printer.out(Message::new("Identity successfully created"))

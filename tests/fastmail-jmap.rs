@@ -6,9 +6,9 @@ use std::{env, io::Write};
 use tempfile::NamedTempFile;
 
 #[test]
-#[ignore = "requires FASTMAIL_API_TOKEN env var and --ignored"]
+#[ignore = "requires BEARER_TOKEN env var and --ignored"]
 fn fastmail_jmap() {
-    let token = env::var("FASTMAIL_API_TOKEN").expect("FASTMAIL_API_TOKEN env var");
+    let token = env::var("BEARER_TOKEN").expect("BEARER_TOKEN env var");
 
     let mut config = NamedTempFile::new().unwrap();
     let config_tpl = format!(

@@ -12,18 +12,6 @@ use io_jmap::rfc8621::types::{
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-/// Minimal RFC 5322 message used as the email fixture throughout the suite.
-const EML: &str = concat!(
-    "From: Himalaya Test <himalaya@test.invalid>\r\n",
-    "To: Himalaya Test <himalaya@test.invalid>\r\n",
-    "Subject: Himalaya integration test\r\n",
-    "Date: Thu, 01 Jan 2026 00:00:00 +0000\r\n",
-    "MIME-Version: 1.0\r\n",
-    "Content-Type: text/plain; charset=utf-8\r\n",
-    "\r\n",
-    "This is a test email for himalaya integration tests.\r\n",
-);
-
 /// Resources to clean up after the test, even on failure.
 struct Cleanup<'a> {
     config: &'a Path,
@@ -85,6 +73,8 @@ fn parse_output<T: DeserializeOwned>(config: &Path, args: &[&str]) -> T {
 /// Exercises every command in a single ordered flow. Pass a path to a
 /// valid TOML config file with a default JMAP account configured.
 pub fn run(config: &Path) {
+    let email = env::var("EMAIL").expect("EMAIL env var");
+
     let ts = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
@@ -160,10 +150,22 @@ pub fn run(config: &Path) {
 
     // ── 2. EMAILS ─────────────────────────────────────────────────────────
 
+    let eml = [
+        &format!("From: Himalaya Test <{email}>"),
+        &format!("To: Himalaya Test <{email}>"),
+        "Subject: Himalaya integration test",
+        "Date: Thu, 01 Jan 2026 00:00:00 +0000",
+        "MIME-Version: 1.0",
+        "Content-Type: text/plain; charset=utf-8",
+        "",
+        "This is a test email for himalaya integration tests.",
+    ]
+    .join("\r\n");
+
     // import from stdin
     jmap(config)
         .args(["emails", "import", "--mailbox-id", &mbox_id])
-        .write_stdin(EML)
+        .write_stdin(eml.as_bytes())
         .assert()
         .success();
 
@@ -292,7 +294,7 @@ pub fn run(config: &Path) {
     // import --upload-only: upload blob and get its id
     let stdout = jmap(config)
         .args(["emails", "import", "--upload-only"])
-        .write_stdin(EML)
+        .write_stdin(eml)
         .assert()
         .success()
         .get_output()
@@ -333,60 +335,47 @@ pub fn run(config: &Path) {
 
     // ── 4. IDENTITY ───────────────────────────────────────────────────────
 
-    // list all identities
-    let identities: Vec<Identity> = parse_output(config, &["identity", "get"]);
-    assert!(!identities.is_empty(), "expected at least one identity");
-
-    let primary_identity_id = identities[0].id.clone();
-    let identity_email = identities[0].email.clone();
-
-    // create a new identity
+    // create
     jmap(config)
         .args([
             "identity",
             "create",
-            "Himalaya Test Identity",
-            &identity_email,
+            "Test",
+            &email,
             "--text-signature",
             "Sent by himalaya integration tests",
         ])
         .assert()
         .success();
 
-    // list again — find by name and verify signature field
+    // list — find by name and verify signature field
     let identities: Vec<Identity> = parse_output(config, &["identity", "get"]);
-    let new_identity = identities
+    let identity = identities
         .iter()
-        .find(|i| i.name == "Himalaya Test Identity")
+        .find(|i| i.name == "Test")
         .expect("created identity not found in list");
 
     assert_eq!(
-        new_identity.text_signature.as_deref(),
+        identity.text_signature.as_deref(),
         Some("Sent by himalaya integration tests"),
         "identity textSignature mismatch after create"
     );
 
-    let identity_id = new_identity.id.clone();
+    let identity_id = identity.id.clone();
+    let identity_email = identity.email.clone();
     cleanup.identity_id = Some(identity_id.clone());
 
-    // update: rename — then verify the new name appears in the list
+    // update: rename
     jmap(config)
-        .args([
-            "identity",
-            "update",
-            &identity_id,
-            "--name",
-            "Himalaya Test Identity Updated",
-        ])
+        .args(["identity", "update", &identity_id, "--name", "Test Updated"])
         .assert()
         .success();
 
+    // list — verify rename
     let identities: Vec<Identity> = parse_output(config, &["identity", "get"]);
 
     assert!(
-        identities
-            .iter()
-            .any(|i| i.name == "Himalaya Test Identity Updated"),
+        identities.iter().any(|i| i.name == "Test Updated"),
         "updated identity name not found in list"
     );
 
@@ -442,7 +431,7 @@ pub fn run(config: &Path) {
             "create",
             &draft_id,
             "--identity-id",
-            &primary_identity_id,
+            &identity_id,
         ],
     );
 

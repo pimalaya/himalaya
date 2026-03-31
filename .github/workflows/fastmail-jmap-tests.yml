@@ -1,0 +1,17 @@
+name: Fastmail JMAP tests
+
+on:
+  push:
+    branches:
+      - v2
+
+jobs:
+  fastmail-jmap-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --no-default-features --features jmap,rustls-ring --test fastmail-jmap -- --ignored
+        env:
+          EMAIL: ${{ secrets.FASTMAIL_EMAIL }}
+          BEARER_TOKEN: ${{ secrets.FASTMAIL_BEARER_TOKEN }}

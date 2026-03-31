@@ -289,8 +289,11 @@ pub struct JmapConfig {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum JmapAuthConfig {
+    Header(Secret),
     /// Bearer token (OAuth 2.0 access token).
-    Bearer { token: Secret },
+    Bearer {
+        token: Secret,
+    },
     /// HTTP Basic authentication (username + password).
     Basic {
         #[serde(deserialize_with = "shell_expanded_string")]
@@ -305,6 +308,7 @@ impl TryFrom<JmapAuthConfig> for pimalaya_toolbox::stream::jmap::JmapAuth {
 
     fn try_from(config: JmapAuthConfig) -> Result<Self, Self::Error> {
         match config {
+            JmapAuthConfig::Header(token) => Ok(Self::Header(token.get()?)),
             JmapAuthConfig::Bearer { token } => Ok(Self::Bearer(token.get()?)),
             JmapAuthConfig::Basic { username, password } => Ok(Self::Basic {
                 username,
