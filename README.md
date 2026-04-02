@@ -11,7 +11,7 @@
 </div>
 
 ```
-himalaya envelope list --account posteo --folder Archives.FOSS --page 2
+himalaya envelope list -a posteo --folder Archives.FOSS --page 2
 ```
 
 ![screenshot](./screenshot.jpeg)
@@ -335,7 +335,7 @@ Keeping your password inside the configuration file is good for testing purpose,
   backend.auth.keyring = "gmail-example"
   ```
 
-  Running `himalaya configure -a gmail` will ask for your IMAP password, just paste the one generated previously.
+  Running `himalaya account configure gmail` will ask for your IMAP password, just paste the one generated previously.
 
 #### Using OAuth 2.0
 
