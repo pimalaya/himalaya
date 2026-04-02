@@ -1,6 +1,8 @@
+#!/usr/bin/env bash
+
 set -eu
 
-container=$(docker run -d --name himalaya-tests --rm -p 8080:8080 -p 25:25 -p 143:143 stalwartlabs/stalwart:latest-alpine)
+container=$(docker run -d --name himalaya-tests --rm -p 8080:8080 -p 25:25 -p 143:143 stalwartlabs/stalwart:v0.15.5-alpine)
 sleep 1
 admin_password=$(docker logs $container 2>&1 | grep -oP "(?<=with password ')[^']+")
 
