@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_toolbox::terminal::printer::Printer;
 
-use crate::smtp::{account::SmtpAccount, message::command::MessageCommand};
+use crate::smtp::{account::SmtpAccount, message::command::SmtpMessageCommand};
 
 /// SMTP CLI (requires `smtp` cargo feature).
 ///
@@ -14,7 +14,7 @@ use crate::smtp::{account::SmtpAccount, message::command::MessageCommand};
 pub enum SmtpCommand {
     #[command(subcommand)]
     #[command(aliases = ["msgs", "msg"])]
-    Messages(MessageCommand),
+    Messages(SmtpMessageCommand),
 }
 
 impl SmtpCommand {

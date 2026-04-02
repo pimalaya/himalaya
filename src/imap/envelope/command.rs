@@ -5,8 +5,9 @@ use pimalaya_toolbox::terminal::printer::Printer;
 use crate::imap::{
     account::ImapAccount,
     envelope::{
-        get::GetEnvelopeCommand, list::ListEnvelopesCommand, search::SearchEnvelopesCommand,
-        sort::SortEnvelopesCommand, thread::ThreadEnvelopesCommand,
+        get::ImapEnvelopeGetCommand, list::ImapEnvelopeListCommand,
+        search::ImapEnvelopeSearchCommand, sort::ImapEnvelopeSortCommand,
+        thread::ImapEnvelopeThreadCommand,
     },
 };
 
@@ -16,15 +17,15 @@ use crate::imap::{
 /// date, subject, from, to, cc, bcc, etc. This subcommand allows you
 /// to get, list, search, sort, and thread envelopes.
 #[derive(Debug, Subcommand)]
-pub enum EnvelopeCommand {
-    Get(GetEnvelopeCommand),
-    List(ListEnvelopesCommand),
-    Search(SearchEnvelopesCommand),
-    Sort(SortEnvelopesCommand),
-    Thread(ThreadEnvelopesCommand),
+pub enum ImapEnvelopeCommand {
+    Get(ImapEnvelopeGetCommand),
+    List(ImapEnvelopeListCommand),
+    Search(ImapEnvelopeSearchCommand),
+    Sort(ImapEnvelopeSortCommand),
+    Thread(ImapEnvelopeThreadCommand),
 }
 
-impl EnvelopeCommand {
+impl ImapEnvelopeCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         match self {
             Self::Get(cmd) => cmd.execute(printer, account),

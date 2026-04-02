@@ -17,7 +17,7 @@ use crate::maildir::{
 /// This command fetches a message and displays its text content.
 /// By default it shows plain text content; use --html to show HTML.
 #[derive(Debug, Parser)]
-pub struct ReadMessageCommand {
+pub struct MaildirMessageReadCommand {
     #[command(flatten)]
     pub maildir: MaildirPathFlag,
     #[command(flatten)]
@@ -31,7 +31,7 @@ pub struct ReadMessageCommand {
     pub width: usize,
 }
 
-impl ReadMessageCommand {
+impl MaildirMessageReadCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
         let maildir = match Maildir::try_from(self.maildir.inner.clone()) {
             Ok(maildir) => maildir,

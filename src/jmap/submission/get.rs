@@ -3,7 +3,7 @@ use clap::Parser;
 use io_jmap::rfc8621::coroutines::email_submission_get::{
     JmapEmailSubmissionGet, JmapEmailSubmissionGetResult,
 };
-use io_stream::runtimes::std::handle;
+use io_socket::runtimes::std_stream::handle;
 use log::warn;
 use pimalaya_toolbox::terminal::printer::Printer;
 
@@ -11,13 +11,13 @@ use crate::jmap::{account::JmapAccount, submission::query::SubmissionsTable};
 
 /// Get JMAP email submissions by ID (EmailSubmission/get).
 #[derive(Debug, Parser)]
-pub struct GetSubmissionCommand {
+pub struct JmapSubmissionGetCommand {
     /// Submission ID(s) to retrieve.
     #[arg(value_name = "ID", required = true)]
     pub ids: Vec<String>,
 }
 
-impl GetSubmissionCommand {
+impl JmapSubmissionGetCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         let mut jmap = account.new_jmap_session()?;
 

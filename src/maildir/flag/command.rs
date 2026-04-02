@@ -5,8 +5,8 @@ use pimalaya_toolbox::terminal::printer::Printer;
 use crate::maildir::{
     account::MaildirAccount,
     flag::{
-        add::AddFlagsCommand, list::ListFlagsCommand, remove::RemoveFlagsCommand,
-        set::SetFlagsCommand,
+        add::MaildirFlagAddCommand, list::MaildirFlagListCommand, remove::MaildirFlagRemoveCommand,
+        set::MaildirFlagSetCommand,
     },
 };
 
@@ -15,14 +15,14 @@ use crate::maildir::{
 /// A flag is a label attached to a message. This subcommand allows
 /// you to manage them.
 #[derive(Debug, Subcommand)]
-pub enum FlagCommand {
-    List(ListFlagsCommand),
-    Add(AddFlagsCommand),
-    Set(SetFlagsCommand),
-    Remove(RemoveFlagsCommand),
+pub enum MaildirFlagCommand {
+    List(MaildirFlagListCommand),
+    Add(MaildirFlagAddCommand),
+    Set(MaildirFlagSetCommand),
+    Remove(MaildirFlagRemoveCommand),
 }
 
-impl FlagCommand {
+impl MaildirFlagCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
         match self {
             Self::List(cmd) => cmd.execute(printer, account),

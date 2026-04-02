@@ -5,8 +5,9 @@ use pimalaya_toolbox::terminal::printer::Printer;
 use crate::maildir::{
     account::MaildirAccount,
     message::{
-        copy::CopyMessagesCommand, export::ExportMessageCommand, get::GetMessageCommand,
-        r#move::MoveMessagesCommand, read::ReadMessageCommand, save::SaveMessageCommand,
+        copy::MaildirMessageCopyCommand, export::MaildirMessageExportCommand,
+        get::MaildirMessageGetCommand, r#move::MaildirMessageMoveCommand,
+        read::MaildirMessageReadCommand, save::MaildirMessageSaveCommand,
     },
 };
 
@@ -16,16 +17,16 @@ use crate::maildir::{
 /// subcommand allows you to save, get, read, export, copy, and move
 /// messages.
 #[derive(Debug, Subcommand)]
-pub enum MessageCommand {
-    Save(SaveMessageCommand),
-    Get(GetMessageCommand),
-    Read(ReadMessageCommand),
-    Export(ExportMessageCommand),
-    Copy(CopyMessagesCommand),
-    Move(MoveMessagesCommand),
+pub enum MaildirMessageCommand {
+    Save(MaildirMessageSaveCommand),
+    Get(MaildirMessageGetCommand),
+    Read(MaildirMessageReadCommand),
+    Export(MaildirMessageExportCommand),
+    Copy(MaildirMessageCopyCommand),
+    Move(MaildirMessageMoveCommand),
 }
 
-impl MessageCommand {
+impl MaildirMessageCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
         match self {
             Self::Save(cmd) => cmd.execute(printer, account),

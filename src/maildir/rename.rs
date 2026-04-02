@@ -14,14 +14,14 @@ use crate::maildir::{
 /// This command allows you to rename a new mailbox using the given
 /// name.
 #[derive(Debug, Parser)]
-pub struct RenameMaildirCommand {
+pub struct MaildirMailboxRenameCommand {
     #[command(flatten)]
     pub maildir_path: MaildirPathFlag,
     #[command(flatten)]
     pub maildir_name: MaildirNameArg,
 }
 
-impl RenameMaildirCommand {
+impl MaildirMailboxRenameCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
         let path = account.backend.root.join(self.maildir_path.inner);
 

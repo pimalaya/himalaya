@@ -20,14 +20,14 @@ use crate::maildir::{
 /// message, including all header fields like date, subject, from, to,
 /// cc, bcc, reply-to, message-id, and in-reply-to.
 #[derive(Debug, Parser)]
-pub struct GetEnvelopeCommand {
+pub struct MaildirEnvelopeGetCommand {
     #[command(flatten)]
     pub maildir: MaildirPathFlag,
     #[command(flatten)]
     pub id: MessageIdArg,
 }
 
-impl GetEnvelopeCommand {
+impl MaildirEnvelopeGetCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
         let maildir = match Maildir::try_from(self.maildir.inner.clone()) {
             Ok(maildir) => maildir,

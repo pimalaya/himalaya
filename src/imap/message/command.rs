@@ -5,8 +5,8 @@ use pimalaya_toolbox::terminal::printer::Printer;
 use crate::imap::{
     account::ImapAccount,
     message::{
-        copy::CopyMessageCommand, export::ExportMessageCommand, get::GetMessageCommand,
-        r#move::MoveMessagesCommand, read::ReadMessageCommand, save::SaveMessageCommand,
+        copy::ImapMessageCopyCommand, export::ImapMessageExportCommand, get::ImapMessageGetCommand,
+        r#move::ImapMessageMoveCommand, read::ImapMessageReadCommand, save::ImapMessageSaveCommand,
     },
 };
 
@@ -16,16 +16,16 @@ use crate::imap::{
 /// subcommand allows you to save, get, read, export, copy, and move
 /// messages.
 #[derive(Debug, Subcommand)]
-pub enum MessageCommand {
-    Save(SaveMessageCommand),
-    Get(GetMessageCommand),
-    Read(ReadMessageCommand),
-    Export(ExportMessageCommand),
-    Copy(CopyMessageCommand),
-    Move(MoveMessagesCommand),
+pub enum ImapMessageCommand {
+    Save(ImapMessageSaveCommand),
+    Get(ImapMessageGetCommand),
+    Read(ImapMessageReadCommand),
+    Export(ImapMessageExportCommand),
+    Copy(ImapMessageCopyCommand),
+    Move(ImapMessageMoveCommand),
 }
 
-impl MessageCommand {
+impl ImapMessageCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         match self {
             Self::Save(cmd) => cmd.execute(printer, account),

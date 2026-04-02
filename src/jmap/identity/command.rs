@@ -5,29 +5,29 @@ use pimalaya_toolbox::terminal::printer::Printer;
 use crate::jmap::{
     account::JmapAccount,
     identity::{
-        create::JmapIdentityCreateCommand, delete::DeleteIdentityCommand, get::GetIdentityCommand,
-        update::UpdateIdentityCommand,
+        create::JmapIdentityCreateCommand, delete::JmapIdentityDeleteCommand,
+        get::JmapIdentityGetCommand, update::JmapIdentityUpdateCommand,
     },
 };
 
 /// Manage JMAP sender identities.
 #[derive(Debug, Subcommand)]
-pub enum IdentityCommand {
+pub enum JmapIdentityCommand {
     /// Fetch identities (Identity/get).
     #[command(aliases = ["lst", "list"])]
-    Get(GetIdentityCommand),
+    Get(JmapIdentityGetCommand),
     /// Create a new identity (Identity/set).
     #[command(aliases = ["add", "new"])]
     Create(JmapIdentityCreateCommand),
     /// Update an existing identity (Identity/set).
     #[command(alias = "edit")]
-    Update(UpdateIdentityCommand),
+    Update(JmapIdentityUpdateCommand),
     /// Delete an identity (Identity/set).
     #[command(aliases = ["remove", "rm"])]
-    Delete(DeleteIdentityCommand),
+    Delete(JmapIdentityDeleteCommand),
 }
 
-impl IdentityCommand {
+impl JmapIdentityCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         match self {
             Self::Get(cmd) => cmd.execute(printer, account),

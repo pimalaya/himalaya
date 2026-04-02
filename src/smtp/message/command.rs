@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_toolbox::terminal::printer::Printer;
 
-use crate::smtp::{account::SmtpAccount, message::send::SendMessageCommand};
+use crate::smtp::{account::SmtpAccount, message::send::SmtpMessageSendCommand};
 
 /// Manage messages.
 ///
@@ -10,11 +10,11 @@ use crate::smtp::{account::SmtpAccount, message::send::SendMessageCommand};
 /// subcommand allows you to save, get, read, export, copy, move, and
 /// delete messages.
 #[derive(Debug, Subcommand)]
-pub enum MessageCommand {
-    Send(SendMessageCommand),
+pub enum SmtpMessageCommand {
+    Send(SmtpMessageSendCommand),
 }
 
-impl MessageCommand {
+impl SmtpMessageCommand {
     pub fn execute(self, printer: &mut impl Printer, account: SmtpAccount) -> Result<()> {
         match self {
             Self::Send(cmd) => cmd.execute(printer, account),

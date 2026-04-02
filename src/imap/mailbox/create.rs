@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_imap::coroutines::create::*;
-use io_stream::runtimes::std::handle;
+use io_imap::rfc3501::create::*;
+use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
@@ -11,25 +11,27 @@ use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
 /// This command allows you to create a new mailbox using the given
 /// name.
 #[derive(Debug, Parser)]
-pub struct CreateMailboxCommand {
+pub struct ImapMailboxCreateCommand {
     #[command(flatten)]
     pub mailbox_name: MailboxNameArg,
 }
 
-impl CreateMailboxCommand {
+impl ImapMailboxCreateCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
 
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         let mut arg = None;
-        let mut coroutine = ImapCreate::new(imap.context, mailbox);
+        let mut coroutine = ImapMailboxCreate::new(imap.context, mailbox);
 
         loop {
             match coroutine.resume(arg.take()) {
-                ImapCreateResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                ImapCreateResult::Ok { .. } => break,
-                ImapCreateResult::Err { err, .. } => bail!(err),
+                ImapMailboxCreateResult::Io { input } => {
+                    arg = Some(handle(&mut imap.stream, input)?)
+                }
+                ImapMailboxCreateResult::Ok { .. } => break,
+                ImapMailboxCreateResult::Err { err, .. } => bail!(err),
             }
         }
 

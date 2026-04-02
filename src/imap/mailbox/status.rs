@@ -4,10 +4,10 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
 use io_imap::{
-    coroutines::status::*,
+    rfc3501::status::*,
     types::status::{StatusDataItem, StatusDataItemName},
 };
-use io_stream::runtimes::std::handle;
+use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::{Serialize, Serializer};
 
@@ -18,12 +18,12 @@ use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
 /// This command displays status information about a mailbox,
 /// including message counts and UID values.
 #[derive(Debug, Parser)]
-pub struct StatusMailboxCommand {
+pub struct ImapMailboxStatusCommand {
     #[command(flatten)]
     pub mailbox_name: MailboxNameArg,
 }
 
-impl StatusMailboxCommand {
+impl ImapMailboxStatusCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
@@ -36,13 +36,15 @@ impl StatusMailboxCommand {
         ];
 
         let mut arg = None;
-        let mut coroutine = ImapStatus::new(imap.context, mailbox, item_names);
+        let mut coroutine = ImapMailboxStatus::new(imap.context, mailbox, item_names);
 
         let items = loop {
             match coroutine.resume(arg.take()) {
-                ImapStatusResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                ImapStatusResult::Ok { items, .. } => break items,
-                ImapStatusResult::Err { err, .. } => bail!(err),
+                ImapMailboxStatusResult::Io { input } => {
+                    arg = Some(handle(&mut imap.stream, input)?)
+                }
+                ImapMailboxStatusResult::Ok { items, .. } => break items,
+                ImapMailboxStatusResult::Err { err, .. } => bail!(err),
             }
         };
 

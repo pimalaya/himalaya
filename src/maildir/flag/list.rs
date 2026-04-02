@@ -15,9 +15,9 @@ use crate::maildir::account::MaildirAccount;
 /// available in the given mailbox. These flags come from the SELECT
 /// response.
 #[derive(Debug, Parser)]
-pub struct ListFlagsCommand;
+pub struct MaildirFlagListCommand;
 
-impl ListFlagsCommand {
+impl MaildirFlagListCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
         let table = FlagsTable {
             preset: account.table_preset,

@@ -15,7 +15,7 @@ use crate::maildir::{
 /// This command sets the given flags to messages identified by the
 /// given sequence set.
 #[derive(Debug, Parser)]
-pub struct SetFlagsCommand {
+pub struct MaildirFlagSetCommand {
     #[command(flatten)]
     pub ids: MessageIdsArg,
 
@@ -26,7 +26,7 @@ pub struct SetFlagsCommand {
     pub flags: Vec<FlagArg>,
 }
 
-impl SetFlagsCommand {
+impl MaildirFlagSetCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
         let maildir = match Maildir::try_from(self.maildir.inner.clone()) {
             Ok(maildir) => maildir,

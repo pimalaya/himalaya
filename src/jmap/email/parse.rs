@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use clap::Parser;
 use io_jmap::rfc8621::coroutines::email_parse::{JmapEmailParse, JmapEmailParseResult};
-use io_stream::runtimes::std::handle;
+use io_socket::runtimes::std_stream::handle;
 use log::warn;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
@@ -13,13 +13,13 @@ use crate::jmap::account::JmapAccount;
 /// Useful for reading attached .eml files or message blobs that are
 /// not yet stored as Email objects.
 #[derive(Debug, Parser)]
-pub struct ParseEmailCommand {
+pub struct JmapEmailParseCommand {
     /// Blob ID(s) to parse as RFC 5322 messages.
     #[arg(value_name = "ID", required = true)]
     pub blob_ids: Vec<String>,
 }
 
-impl ParseEmailCommand {
+impl JmapEmailParseCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         let mut jmap = account.new_jmap_session()?;
 

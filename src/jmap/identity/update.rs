@@ -6,14 +6,14 @@ use io_jmap::{
     },
     rfc8621::types::identity::IdentityUpdate,
 };
-use io_stream::runtimes::std::handle;
+use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::jmap::account::JmapAccount;
 
 /// Update a JMAP sender identity (Identity/set).
 #[derive(Debug, Parser)]
-pub struct UpdateIdentityCommand {
+pub struct JmapIdentityUpdateCommand {
     /// Identity ID to update.
     pub id: String,
 
@@ -30,7 +30,7 @@ pub struct UpdateIdentityCommand {
     pub html_signature: Option<String>,
 }
 
-impl UpdateIdentityCommand {
+impl JmapIdentityUpdateCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         let mut jmap = account.new_jmap_session()?;
 

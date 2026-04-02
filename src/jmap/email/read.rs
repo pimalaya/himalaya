@@ -4,7 +4,7 @@ use io_jmap::{
     rfc8621::coroutines::email_get::{JmapEmailGet, JmapEmailGetResult},
     rfc8621::types::email::EmailAddress,
 };
-use io_stream::runtimes::std::handle;
+use io_socket::runtimes::std_stream::handle;
 use log::warn;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
@@ -14,7 +14,7 @@ use crate::jmap::account::JmapAccount;
 ///
 /// Shows headers and plain text body by default.
 #[derive(Debug, Parser)]
-pub struct ReadEmailCommand {
+pub struct JmapEmailReadCommand {
     /// The email ID(s) to read.
     #[arg(value_name = "ID", required = true)]
     pub ids: Vec<String>,
@@ -24,7 +24,7 @@ pub struct ReadEmailCommand {
     pub html: bool,
 }
 
-impl ReadEmailCommand {
+impl JmapEmailReadCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         let mut jmap = account.new_jmap_session()?;
 

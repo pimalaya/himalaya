@@ -7,7 +7,7 @@ use io_jmap::{
     rfc8621::coroutines::email_query::{JmapEmailQuery, JmapEmailQueryResult},
     rfc8621::types::email::{Email, EmailAddress, EmailComparator, EmailFilter, EmailSortProperty},
 };
-use io_stream::runtimes::std::handle;
+use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 

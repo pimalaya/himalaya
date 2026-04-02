@@ -3,9 +3,10 @@ use clap::Subcommand;
 use pimalaya_toolbox::terminal::printer::Printer;
 
 use crate::maildir::{
-    account::MaildirAccount, create::CreateMaildirCommand, delete::DeleteMaildirCommand,
-    envelope::command::EnvelopesCommand, flag::command::FlagCommand, list::ListMaildirsCommand,
-    message::command::MessageCommand, rename::RenameMaildirCommand,
+    account::MaildirAccount, create::MaildirMailboxCreateCommand,
+    delete::MaildirMailboxDeleteCommand, envelope::command::MaildirEnvelopeCommand,
+    flag::command::MaildirFlagCommand, list::MaildirMailboxListCommand,
+    message::command::MaildirMessageCommand, rename::MaildirMailboxRenameCommand,
 };
 
 /// MAILDIR CLI (requires the `maildir` cargo feature).
@@ -15,18 +16,18 @@ use crate::maildir::{
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum MaildirCommand {
-    Create(CreateMaildirCommand),
-    Rename(RenameMaildirCommand),
-    Delete(DeleteMaildirCommand),
-    List(ListMaildirsCommand),
+    Create(MaildirMailboxCreateCommand),
+    Rename(MaildirMailboxRenameCommand),
+    Delete(MaildirMailboxDeleteCommand),
+    List(MaildirMailboxListCommand),
 
     #[command(subcommand)]
     #[command(aliases = ["msgs", "msg"])]
-    Messages(MessageCommand),
+    Messages(MaildirMessageCommand),
     #[command(subcommand)]
-    Flags(FlagCommand),
+    Flags(MaildirFlagCommand),
     #[command(subcommand)]
-    Envelopes(EnvelopesCommand),
+    Envelopes(MaildirEnvelopeCommand),
 }
 
 impl MaildirCommand {

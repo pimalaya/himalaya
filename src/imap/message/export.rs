@@ -8,10 +8,10 @@ use std::{
 use anyhow::{bail, Result};
 use clap::Parser;
 use io_imap::{
-    coroutines::{fetch::*, select::*},
+    rfc3501::{fetch::*, select::*},
     types::fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
 };
-use io_stream::runtimes::std::handle;
+use io_socket::runtimes::std_stream::handle;
 use mail_parser::{MessageParser, MimeHeaders};
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
@@ -35,7 +35,7 @@ pub enum ExportType {
 /// - eml: Save as .eml file
 /// - parts: Export all MIME parts to separate files
 #[derive(Debug, Parser)]
-pub struct ExportMessageCommand {
+pub struct ImapMessageExportCommand {
     #[command(flatten)]
     pub mailbox_name: MailboxNameOptionalFlag,
 
@@ -60,20 +60,22 @@ pub struct ExportMessageCommand {
     pub open: bool,
 }
 
-impl ExportMessageCommand {
+impl ImapMessageExportCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         // SELECT mailbox
         let mut arg = None;
-        let mut coroutine = ImapSelect::new(imap.context, mailbox);
+        let mut coroutine = ImapMailboxSelect::new(imap.context, mailbox);
 
         let context = loop {
             match coroutine.resume(arg.take()) {
-                ImapSelectResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                ImapSelectResult::Ok { context, .. } => break context,
-                ImapSelectResult::Err { err, .. } => bail!(err),
+                ImapMailboxSelectResult::Io { input } => {
+                    arg = Some(handle(&mut imap.stream, input)?)
+                }
+                ImapMailboxSelectResult::Ok { context, .. } => break context,
+                ImapMailboxSelectResult::Err { err, .. } => bail!(err),
             }
         };
 
@@ -90,13 +92,15 @@ impl ExportMessageCommand {
             }]);
 
         let mut arg = None;
-        let mut coroutine = ImapFetchFirst::new(context, id, item_names, !self.seq);
+        let mut coroutine = ImapMessageFetchFirst::new(context, id, item_names, !self.seq);
 
         let items = loop {
             match coroutine.resume(arg.take()) {
-                ImapFetchFirstResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                ImapFetchFirstResult::Ok { items, .. } => break items,
-                ImapFetchFirstResult::Err { err, .. } => bail!(err),
+                ImapMessageFetchFirstResult::Io { input } => {
+                    arg = Some(handle(&mut imap.stream, input)?)
+                }
+                ImapMessageFetchFirstResult::Ok { items, .. } => break items,
+                ImapMessageFetchFirstResult::Err { err, .. } => bail!(err),
             }
         };
 

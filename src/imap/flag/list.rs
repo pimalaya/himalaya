@@ -4,10 +4,10 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, Row, Table};
 use io_imap::{
-    coroutines::select::*,
+    rfc3501::select::*,
     types::flag::{Flag, FlagPerm},
 };
-use io_stream::runtimes::std::handle;
+use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::{Serialize, Serializer};
 
@@ -19,29 +19,31 @@ use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
 /// available in the given mailbox. These flags come from the SELECT
 /// response.
 #[derive(Debug, Parser)]
-pub struct ListFlagsCommand {
+pub struct ImapFlagListCommand {
     #[command(flatten)]
     pub mailbox_name: MailboxNameArg,
 }
 
-impl ListFlagsCommand {
+impl ImapFlagListCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         let mut arg = None;
-        let mut coroutine = ImapSelect::new(imap.context, mailbox);
+        let mut coroutine = ImapMailboxSelect::new(imap.context, mailbox);
 
         let (flags, permanent_flags) = loop {
             match coroutine.resume(arg.take()) {
-                ImapSelectResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                ImapSelectResult::Ok { data, .. } => {
+                ImapMailboxSelectResult::Io { input } => {
+                    arg = Some(handle(&mut imap.stream, input)?)
+                }
+                ImapMailboxSelectResult::Ok { data, .. } => {
                     break (
                         data.flags.unwrap_or_default(),
                         data.permanent_flags.unwrap_or_default(),
                     )
                 }
-                ImapSelectResult::Err { err, .. } => bail!(err),
+                ImapMailboxSelectResult::Err { err, .. } => bail!(err),
             }
         };
 

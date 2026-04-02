@@ -5,9 +5,10 @@ use pimalaya_toolbox::terminal::printer::Printer;
 use crate::jmap::{
     account::JmapAccount,
     email::{
-        copy::JmapEmailCopyCommand, delete::JmapEmailDestroyCommand, export::ExportEmailCommand,
-        get::JmapEmailGetCommand, import::ImportEmailCommand, parse::ParseEmailCommand,
-        query::JmapEmailQueryCommand, read::ReadEmailCommand, update::JmapEmailUpdateCommand,
+        copy::JmapEmailCopyCommand, delete::JmapEmailDestroyCommand,
+        export::JmapEmailExportCommand, get::JmapEmailGetCommand, import::JmapEmailImportCommand,
+        parse::JmapEmailParseCommand, query::JmapEmailQueryCommand, read::JmapEmailReadCommand,
+        update::JmapEmailUpdateCommand,
     },
 };
 
@@ -17,15 +18,15 @@ use crate::jmap::{
 pub enum JmapEmailCommand {
     Get(JmapEmailGetCommand),
     Query(JmapEmailQueryCommand),
-    Read(ReadEmailCommand),
+    Read(JmapEmailReadCommand),
     #[command(alias = "edit")]
     Update(JmapEmailUpdateCommand),
     #[command(aliases = ["remove", "rm"])]
     Delete(JmapEmailDestroyCommand),
     Copy(JmapEmailCopyCommand),
-    Export(ExportEmailCommand),
-    Import(ImportEmailCommand),
-    Parse(ParseEmailCommand),
+    Export(JmapEmailExportCommand),
+    Import(JmapEmailImportCommand),
+    Parse(JmapEmailParseCommand),
 }
 
 impl JmapEmailCommand {

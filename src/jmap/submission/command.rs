@@ -5,27 +5,27 @@ use pimalaya_toolbox::terminal::printer::Printer;
 use crate::jmap::{
     account::JmapAccount,
     submission::{
-        cancel::CancelSubmissionCommand, create::CreateSubmissionCommand,
-        get::GetSubmissionCommand, query::QuerySubmissionCommand,
+        cancel::JmapSubmissionCancelCommand, create::JmapSubmissionCreateCommand,
+        get::JmapSubmissionGetCommand, query::JmapSubmissionQueryCommand,
     },
 };
 
 /// Manage JMAP email submissions.
 #[derive(Debug, Subcommand)]
-pub enum SubmissionCommand {
+pub enum JmapSubmissionCommand {
     /// Fetch submissions by ID (EmailSubmission/get).
-    Get(GetSubmissionCommand),
+    Get(JmapSubmissionGetCommand),
     /// Query and list submissions (EmailSubmission/query + EmailSubmission/get).
     #[command(aliases = ["lst", "list"])]
-    Query(QuerySubmissionCommand),
+    Query(JmapSubmissionQueryCommand),
     /// Submit a draft email for sending (EmailSubmission/set).
     #[command(aliases = ["send", "submit"])]
-    Create(CreateSubmissionCommand),
+    Create(JmapSubmissionCreateCommand),
     /// Cancel a pending submission (EmailSubmission/set).
-    Cancel(CancelSubmissionCommand),
+    Cancel(JmapSubmissionCancelCommand),
 }
 
-impl SubmissionCommand {
+impl JmapSubmissionCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         match self {
             Self::Get(cmd) => cmd.execute(printer, account),

@@ -1,13 +1,13 @@
 use anyhow::{bail, Result};
 use clap::Parser;
 use io_imap::{
-    coroutines::{select::*, store::*},
+    rfc3501::{select::*, store::*},
     types::{
         flag::{Flag, StoreType},
         IntoStatic,
     },
 };
-use io_stream::runtimes::std::handle;
+use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::imap::{
@@ -20,7 +20,7 @@ use crate::imap::{
 /// This command replaces all existing flags on messages identified by
 /// the given sequence set with the specified flags.
 #[derive(Debug, Parser)]
-pub struct SetFlagsCommand {
+pub struct ImapFlagSetCommand {
     #[command(flatten)]
     pub mailbox_name: MailboxNameOptionalFlag,
     #[command(flatten)]
@@ -38,20 +38,22 @@ pub struct SetFlagsCommand {
     pub seq: bool,
 }
 
-impl SetFlagsCommand {
+impl ImapFlagSetCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         if !self.mailbox_no_select.inner {
             let mut arg = None;
-            let mut coroutine = ImapSelect::new(imap.context, mailbox);
+            let mut coroutine = ImapMailboxSelect::new(imap.context, mailbox);
 
             imap.context = loop {
                 match coroutine.resume(arg.take()) {
-                    ImapSelectResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                    ImapSelectResult::Ok { context, .. } => break context,
-                    ImapSelectResult::Err { err, .. } => bail!(err),
+                    ImapMailboxSelectResult::Io { input } => {
+                        arg = Some(handle(&mut imap.stream, input)?)
+                    }
+                    ImapMailboxSelectResult::Ok { context, .. } => break context,
+                    ImapMailboxSelectResult::Err { err, .. } => bail!(err),
                 }
             };
         }
@@ -64,7 +66,7 @@ impl SetFlagsCommand {
             .collect::<Result<_, _>>()?;
 
         let mut arg = None;
-        let mut coroutine = ImapStoreSilent::new(
+        let mut coroutine = ImapMessageStoreSilent::new(
             imap.context,
             sequence_set,
             StoreType::Replace,
@@ -74,9 +76,11 @@ impl SetFlagsCommand {
 
         loop {
             match coroutine.resume(arg.take()) {
-                ImapStoreSilentResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                ImapStoreSilentResult::Ok { .. } => break,
-                ImapStoreSilentResult::Err { err, .. } => bail!(err),
+                ImapMessageStoreSilentResult::Io { input } => {
+                    arg = Some(handle(&mut imap.stream, input)?)
+                }
+                ImapMessageStoreSilentResult::Ok { .. } => break,
+                ImapMessageStoreSilentResult::Err { err, .. } => bail!(err),
             }
         }
 

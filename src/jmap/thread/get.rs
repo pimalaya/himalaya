@@ -7,7 +7,7 @@ use io_jmap::{
     rfc8621::coroutines::thread_get::{JmapThreadGet, JmapThreadGetResult},
     rfc8621::types::thread::Thread,
 };
-use io_stream::runtimes::std::handle;
+use io_socket::runtimes::std_stream::handle;
 use log::warn;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
@@ -18,13 +18,13 @@ use crate::jmap::account::JmapAccount;
 ///
 /// Each thread contains an ordered list of email IDs in the thread.
 #[derive(Debug, Parser)]
-pub struct GetThreadCommand {
+pub struct JmapThreadGetCommand {
     /// Thread ID(s) to retrieve.
     #[arg(value_name = "ID", required = true)]
     pub ids: Vec<String>,
 }
 
-impl GetThreadCommand {
+impl JmapThreadGetCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         let mut jmap = account.new_jmap_session()?;
 

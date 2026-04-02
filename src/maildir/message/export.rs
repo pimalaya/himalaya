@@ -21,7 +21,7 @@ use crate::maildir::{
 /// - eml: Save as .eml file
 /// - parts: Export all MIME parts to separate files
 #[derive(Debug, Parser)]
-pub struct ExportMessageCommand {
+pub struct MaildirMessageExportCommand {
     #[command(flatten)]
     pub maildir: MaildirPathFlag,
     #[command(flatten)]
@@ -40,7 +40,7 @@ pub struct ExportMessageCommand {
     pub open: bool,
 }
 
-impl ExportMessageCommand {
+impl MaildirMessageExportCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
         let maildir = match Maildir::try_from(self.maildir.inner.clone()) {
             Ok(maildir) => maildir,

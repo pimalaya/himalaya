@@ -22,7 +22,7 @@ use crate::maildir::{
 /// This command appends a message to the specified mailbox. The
 /// message is read from stdin in RFC 5322 format (raw email).
 #[derive(Debug, Parser)]
-pub struct SaveMessageCommand {
+pub struct MaildirMessageSaveCommand {
     #[command(flatten)]
     pub maildir: MaildirPathFlag,
 
@@ -41,7 +41,7 @@ pub struct SaveMessageCommand {
     pub message: Vec<String>,
 }
 
-impl SaveMessageCommand {
+impl MaildirMessageSaveCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
         let maildir = match Maildir::try_from(self.maildir.inner.clone()) {
             Ok(maildir) => maildir,

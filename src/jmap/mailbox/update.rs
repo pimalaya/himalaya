@@ -6,7 +6,7 @@ use io_jmap::{
     rfc8621::coroutines::mailbox_set::{JmapMailboxSet, JmapMailboxSetArgs, JmapMailboxSetResult},
     rfc8621::types::mailbox::MailboxUpdate,
 };
-use io_stream::runtimes::std::handle;
+use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::jmap::{account::JmapAccount, mailbox::query::RoleArg};

@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_imap::coroutines::unsubscribe::*;
-use io_stream::runtimes::std::handle;
+use io_imap::rfc3501::unsubscribe::*;
+use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
@@ -11,24 +11,26 @@ use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
 /// This command unsubscribes from a mailbox, removing it from the
 /// list of subscribed mailboxes.
 #[derive(Debug, Parser)]
-pub struct UnsubscribeMailboxCommand {
+pub struct ImapMailboxUnsubscribeCommand {
     #[command(flatten)]
     pub mailbox_name: MailboxNameArg,
 }
 
-impl UnsubscribeMailboxCommand {
+impl ImapMailboxUnsubscribeCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         let mut arg = None;
-        let mut coroutine = ImapUnsubscribe::new(imap.context, mailbox);
+        let mut coroutine = ImapMailboxUnsubscribe::new(imap.context, mailbox);
 
         loop {
             match coroutine.resume(arg.take()) {
-                ImapUnsubscribeResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                ImapUnsubscribeResult::Ok { .. } => break,
-                ImapUnsubscribeResult::Err { err, .. } => bail!(err),
+                ImapMailboxUnsubscribeResult::Io { input } => {
+                    arg = Some(handle(&mut imap.stream, input)?)
+                }
+                ImapMailboxUnsubscribeResult::Ok { .. } => break,
+                ImapMailboxUnsubscribeResult::Err { err, .. } => bail!(err),
             }
         }
 

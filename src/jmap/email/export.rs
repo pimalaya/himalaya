@@ -7,7 +7,7 @@ use io_jmap::{
     },
     rfc8621::coroutines::email_get::{JmapEmailGet, JmapEmailGetResult},
 };
-use io_stream::runtimes::std::handle;
+use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 use url::Url;
 
@@ -17,13 +17,13 @@ use crate::jmap::account::JmapAccount;
 ///
 /// Fetches the blobId via Email/get then downloads the raw message blob.
 #[derive(Debug, Parser)]
-pub struct ExportEmailCommand {
+pub struct JmapEmailExportCommand {
     /// The email ID to export.
     #[arg(value_name = "ID")]
     pub id: String,
 }
 
-impl ExportEmailCommand {
+impl JmapEmailExportCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         let tls = account.backend.tls.clone().try_into()?;
         let mut jmap = account.new_jmap_session()?;

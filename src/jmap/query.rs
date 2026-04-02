@@ -9,7 +9,7 @@ use io_jmap::rfc8620::{
     coroutines::send::{JmapRequest, JmapSend, JmapSendResult},
     types::session::capabilities::{CORE, MAIL},
 };
-use io_stream::runtimes::std::handle;
+use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 use serde_json::Value;
@@ -26,7 +26,7 @@ use crate::jmap::account::JmapAccount;
 /// automatically if not already present. Pass `-` or omit to read
 /// from stdin.
 #[derive(Debug, Parser)]
-pub struct QueryCommand {
+pub struct JmapQueryCommand {
     /// Extra capability URNs to declare (core and mail are always included).
     #[arg(long = "using", value_name = "URN")]
     pub using: Vec<String>,
@@ -37,7 +37,7 @@ pub struct QueryCommand {
     pub method_calls: Vec<String>,
 }
 
-impl QueryCommand {
+impl JmapQueryCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         let mut jmap = account.new_jmap_session()?;
 

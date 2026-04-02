@@ -9,7 +9,7 @@ use io_jmap::{
     },
     rfc8621::types::email_submission::{EmailSubmission, EmailSubmissionFilter, UndoStatus},
 };
-use io_stream::runtimes::std::handle;
+use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 
@@ -35,7 +35,7 @@ impl From<UndoStatusArg> for UndoStatus {
 
 /// Query JMAP email submissions (EmailSubmission/query + EmailSubmission/get).
 #[derive(Debug, Parser)]
-pub struct QuerySubmissionCommand {
+pub struct JmapSubmissionQueryCommand {
     /// Filter by undo status (`pending`, `final`, `canceled`).
     #[arg(long, value_name = "STATUS")]
     pub undo_status: Option<UndoStatusArg>,
@@ -57,7 +57,7 @@ pub struct QuerySubmissionCommand {
     pub page: u64,
 }
 
-impl QuerySubmissionCommand {
+impl JmapSubmissionQueryCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         let mut jmap = account.new_jmap_session()?;
 

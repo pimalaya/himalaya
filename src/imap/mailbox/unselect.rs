@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_imap::coroutines::unselect::*;
-use io_stream::runtimes::std::handle;
+use io_imap::rfc3691::unselect::*;
+use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::imap::account::ImapAccount;
@@ -15,19 +15,21 @@ use crate::imap::account::ImapAccount;
 ///
 /// https://github.com/pimalaya/sirup
 #[derive(Debug, Parser)]
-pub struct UnselectMailboxCommand;
+pub struct ImapMailboxUnselectCommand;
 
-impl UnselectMailboxCommand {
+impl ImapMailboxUnselectCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
         let mut arg = None;
-        let mut unselect_coroutine = ImapUnselect::new(imap.context);
+        let mut coroutine = ImapMailboxUnselect::new(imap.context);
 
         loop {
-            match unselect_coroutine.resume(arg.take()) {
-                ImapUnselectResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                ImapUnselectResult::Ok { .. } => break,
-                ImapUnselectResult::Err { err, .. } => bail!(err),
+            match coroutine.resume(arg.take()) {
+                ImapMailboxUnselectResult::Io { input } => {
+                    arg = Some(handle(&mut imap.stream, input)?)
+                }
+                ImapMailboxUnselectResult::Ok { .. } => break,
+                ImapMailboxUnselectResult::Err { err, .. } => bail!(err),
             }
         }
 

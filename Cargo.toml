@@ -16,7 +16,6 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-# default = ["imap", "maildir", "smtp", "rustls-ring"]
 default = ["imap", "smtp", "rustls-ring"]
 
 imap = ["dep:io-imap", "dep:mail-parser", "dep:rfc2047-decoder", "pimalaya-toolbox/imap"]
@@ -41,13 +40,13 @@ comfy-table = "7"
 convert_case = { version = "0.11", optional = true }
 dirs = "6"
 gethostname = "1"
-io-fs = { version = "0.0.1", default-features = false, features = ["std"], optional = true }
+io-fs = { version = "0.0.2", default-features = false, features = ["std"], optional = true }
 io-imap = { version = "0.0.1", default-features = false, optional = true }
 io-jmap = { version = "0.0.1", default-features = false, optional = true }
 io-maildir = { version = "0.0.1", default-features = false, features = ["serde"], optional = true }
 io-process = { version = "0.0.2", default-features = false }
 io-smtp = { version = "0.0.1", default-features = false, optional = true }
-io-stream = { version = "0.0.2", default-features = false, features = ["std"] }
+io-socket = { version = "0.0.1", default-features = false, features = ["std-stream"] }
 log = "0.4"
 mail-parser = { version = "0.11", features = ["serde"], optional = true }
 mime_guess = { version = "2", optional = true }
@@ -77,4 +76,5 @@ io-imap = { git = "https://github.com/pimalaya/io-imap", branch = "io" }
 io-jmap.git = "https://github.com/pimalaya/io-jmap"
 io-maildir.git = "https://github.com/pimalaya/io-maildir"
 io-smtp.git = "https://github.com/pimalaya/io-smtp"
+io-socket.git = "https://github.com/pimalaya/io-socket"
 pimalaya-toolbox.git = "https://github.com/pimalaya/toolbox"

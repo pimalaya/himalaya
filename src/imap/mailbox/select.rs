@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_imap::coroutines::select::*;
-use io_stream::runtimes::std::handle;
+use io_imap::rfc3501::select::*;
+use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
@@ -15,24 +15,26 @@ use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
 ///
 /// https://github.com/pimalaya/sirup
 #[derive(Debug, Parser)]
-pub struct SelectMailboxCommand {
+pub struct ImapMailboxSelectCommand {
     #[command(flatten)]
     pub mailbox_name: MailboxNameArg,
 }
 
-impl SelectMailboxCommand {
+impl ImapMailboxSelectCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         let mut arg = None;
-        let mut coroutine = ImapSelect::new(imap.context, mailbox);
+        let mut coroutine = ImapMailboxSelect::new(imap.context, mailbox);
 
         loop {
             match coroutine.resume(arg.take()) {
-                ImapSelectResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                ImapSelectResult::Ok { .. } => break,
-                ImapSelectResult::Err { err, .. } => bail!(err),
+                ImapMailboxSelectResult::Io { input } => {
+                    arg = Some(handle(&mut imap.stream, input)?)
+                }
+                ImapMailboxSelectResult::Ok { .. } => break,
+                ImapMailboxSelectResult::Err { err, .. } => bail!(err),
             }
         }
 

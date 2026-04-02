@@ -5,8 +5,8 @@ use pimalaya_toolbox::terminal::printer::Printer;
 use crate::imap::{
     account::ImapAccount,
     flag::{
-        add::AddFlagsCommand, list::ListFlagsCommand, remove::RemoveFlagsCommand,
-        set::SetFlagsCommand,
+        add::ImapFlagAddCommand, list::ImapFlagListCommand, remove::ImapFlagRemoveCommand,
+        set::ImapFlagSetCommand,
     },
 };
 
@@ -15,14 +15,14 @@ use crate::imap::{
 /// A flag is a label attached to a message. This subcommand allows
 /// you to manage them.
 #[derive(Debug, Subcommand)]
-pub enum FlagCommand {
-    List(ListFlagsCommand),
-    Add(AddFlagsCommand),
-    Set(SetFlagsCommand),
-    Remove(RemoveFlagsCommand),
+pub enum ImapFlagCommand {
+    List(ImapFlagListCommand),
+    Add(ImapFlagAddCommand),
+    Set(ImapFlagSetCommand),
+    Remove(ImapFlagRemoveCommand),
 }
 
-impl FlagCommand {
+impl ImapFlagCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         match self {
             Self::List(cmd) => cmd.execute(printer, account),

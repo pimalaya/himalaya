@@ -11,12 +11,12 @@ use crate::maildir::{account::MaildirAccount, arg::MaildirNameArg};
 /// This command allows you to create a new mailbox using the given
 /// name.
 #[derive(Debug, Parser)]
-pub struct CreateMaildirCommand {
+pub struct MaildirMailboxCreateCommand {
     #[command(flatten)]
     pub maildir_name: MaildirNameArg,
 }
 
-impl CreateMaildirCommand {
+impl MaildirMailboxCreateCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
         let path = account.backend.root.join(self.maildir_name.inner);
 

@@ -4,10 +4,10 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use comfy_table::{presets, Cell, ContentArrangement, Row, Table};
 use io_imap::{
-    coroutines::{fetch::*, select::*},
+    rfc3501::{fetch::*, select::*},
     types::fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
 };
-use io_stream::runtimes::std::handle;
+use io_socket::runtimes::std_stream::handle;
 use mail_parser::{Addr, Address, ContentType, Message, MessageParser, MimeHeaders};
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
@@ -22,7 +22,7 @@ use crate::imap::{
 /// This command fetches a message and displays its headers along with
 /// the body structure tree showing all MIME parts.
 #[derive(Debug, Parser)]
-pub struct GetMessageCommand {
+pub struct ImapMessageGetCommand {
     #[command(flatten)]
     pub mailbox_name: MailboxNameOptionalFlag,
     #[command(flatten)]
@@ -35,7 +35,7 @@ pub struct GetMessageCommand {
     pub seq: bool,
 }
 
-impl GetMessageCommand {
+impl ImapMessageGetCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
@@ -45,13 +45,15 @@ impl GetMessageCommand {
 
         if !self.mailbox_no_select.inner {
             let mut arg = None;
-            let mut coroutine = ImapSelect::new(imap.context, mailbox);
+            let mut coroutine = ImapMailboxSelect::new(imap.context, mailbox);
 
             imap.context = loop {
                 match coroutine.resume(arg.take()) {
-                    ImapSelectResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                    ImapSelectResult::Ok { context, .. } => break context,
-                    ImapSelectResult::Err { err, .. } => bail!(err),
+                    ImapMailboxSelectResult::Io { input } => {
+                        arg = Some(handle(&mut imap.stream, input)?)
+                    }
+                    ImapMailboxSelectResult::Ok { context, .. } => break context,
+                    ImapMailboxSelectResult::Err { err, .. } => bail!(err),
                 }
             };
         }
@@ -64,13 +66,15 @@ impl GetMessageCommand {
             }]);
 
         let mut arg = None;
-        let mut coroutine = ImapFetchFirst::new(imap.context, id, item_names, !self.seq);
+        let mut coroutine = ImapMessageFetchFirst::new(imap.context, id, item_names, !self.seq);
 
         let items = loop {
             match coroutine.resume(arg.take()) {
-                ImapFetchFirstResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                ImapFetchFirstResult::Ok { items, .. } => break items,
-                ImapFetchFirstResult::Err { err, .. } => bail!(err),
+                ImapMessageFetchFirstResult::Io { input } => {
+                    arg = Some(handle(&mut imap.stream, input)?)
+                }
+                ImapMessageFetchFirstResult::Ok { items, .. } => break items,
+                ImapMessageFetchFirstResult::Err { err, .. } => bail!(err),
             }
         };
 

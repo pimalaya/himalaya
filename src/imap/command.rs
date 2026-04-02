@@ -3,8 +3,8 @@ use clap::Subcommand;
 use pimalaya_toolbox::terminal::printer::Printer;
 
 use crate::imap::{
-    account::ImapAccount, envelope::command::EnvelopeCommand, flag::command::FlagCommand,
-    id::IdCommand, mailbox::command::MailboxCommand, message::command::MessageCommand,
+    account::ImapAccount, envelope::command::ImapEnvelopeCommand, flag::command::ImapFlagCommand,
+    id::ImapIdCommand, mailbox::command::ImapMailboxCommand, message::command::ImapMessageCommand,
 };
 
 /// IMAP CLI (requires the `imap` cargo feature).
@@ -14,18 +14,18 @@ use crate::imap::{
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum ImapCommand {
-    Id(IdCommand),
+    Id(ImapIdCommand),
 
     #[command(subcommand)]
     #[command(aliases = ["mboxes", "mbox"])]
-    Mailboxes(MailboxCommand),
+    Mailboxes(ImapMailboxCommand),
     #[command(subcommand)]
-    Envelopes(EnvelopeCommand),
+    Envelopes(ImapEnvelopeCommand),
     #[command(subcommand)]
-    Flags(FlagCommand),
+    Flags(ImapFlagCommand),
     #[command(subcommand)]
     #[command(aliases = ["msgs", "msg"])]
-    Messages(MessageCommand),
+    Messages(ImapMessageCommand),
 }
 
 impl ImapCommand {

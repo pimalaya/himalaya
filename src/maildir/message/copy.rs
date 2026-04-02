@@ -14,7 +14,7 @@ use crate::maildir::{
 /// This command copies message(s) identified by the given sequence
 /// set from the source mailbox to the destination mailbox.
 #[derive(Debug, Parser)]
-pub struct CopyMessagesCommand {
+pub struct MaildirMessageCopyCommand {
     #[command(flatten)]
     pub ids: MessageIdsArg,
     #[command(flatten)]
@@ -27,7 +27,7 @@ pub struct CopyMessagesCommand {
     pub subdir: Option<MaildirSubdirArg>,
 }
 
-impl CopyMessagesCommand {
+impl MaildirMessageCopyCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
         let source = match Maildir::try_from(self.source.inner.clone()) {
             Ok(maildir) => maildir,

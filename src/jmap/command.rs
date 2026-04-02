@@ -3,10 +3,10 @@ use clap::Subcommand;
 use pimalaya_toolbox::terminal::printer::Printer;
 
 use crate::jmap::{
-    account::JmapAccount, email::command::JmapEmailCommand, identity::command::IdentityCommand,
-    mailbox::command::JmapMailboxCommand, query::QueryCommand,
-    submission::command::SubmissionCommand, thread::command::ThreadCommand,
-    vacation::command::VacationCommand,
+    account::JmapAccount, email::command::JmapEmailCommand, identity::command::JmapIdentityCommand,
+    mailbox::command::JmapMailboxCommand, query::JmapQueryCommand,
+    submission::command::JmapSubmissionCommand, thread::command::JmapThreadCommand,
+    vacation::command::JmapVacationCommand,
 };
 
 /// JMAP CLI (requires the `jmap` cargo feature).
@@ -26,17 +26,17 @@ pub enum JmapCommand {
     Emails(JmapEmailCommand),
 
     #[command(subcommand)]
-    Threads(ThreadCommand),
+    Threads(JmapThreadCommand),
     #[command(subcommand)]
     #[command(aliases = ["identities"])]
-    Identity(IdentityCommand),
+    Identity(JmapIdentityCommand),
     #[command(subcommand)]
     #[command(aliases = ["submissions", "submit"])]
-    Submission(SubmissionCommand),
+    Submission(JmapSubmissionCommand),
     #[command(subcommand)]
     #[command(alias = "vacation-response")]
-    Vacation(VacationCommand),
-    Query(QueryCommand),
+    Vacation(JmapVacationCommand),
+    Query(JmapQueryCommand),
 }
 
 impl JmapCommand {

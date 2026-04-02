@@ -15,7 +15,7 @@ use io_jmap::{
         types::email::EmailImport,
     },
 };
-use io_stream::runtimes::std::handle;
+use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 use url::Url;
 
@@ -26,7 +26,7 @@ use crate::jmap::account::JmapAccount;
 /// Reads the raw message from stdin or as trailing arguments. Use
 /// `--upload-only` to stop after the upload and print the blobId.
 #[derive(Debug, Parser)]
-pub struct ImportEmailCommand {
+pub struct JmapEmailImportCommand {
     /// Mailbox ID(s) to place the imported email in.
     #[arg(long, value_name = "MAILBOX-ID")]
     pub mailbox_id: Vec<String>,
@@ -49,7 +49,7 @@ pub struct ImportEmailCommand {
     pub message: Vec<String>,
 }
 
-impl ImportEmailCommand {
+impl JmapEmailImportCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         let tls = account.backend.tls.clone().try_into()?;
         let mut jmap = account.new_jmap_session()?;

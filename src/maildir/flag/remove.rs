@@ -15,7 +15,7 @@ use crate::maildir::{
 /// This command removes the given flags to messages identified by the
 /// given sequence set.
 #[derive(Debug, Parser)]
-pub struct RemoveFlagsCommand {
+pub struct MaildirFlagRemoveCommand {
     #[command(flatten)]
     pub ids: MessageIdsArg,
 
@@ -26,7 +26,7 @@ pub struct RemoveFlagsCommand {
     pub flags: Vec<FlagArg>,
 }
 
-impl RemoveFlagsCommand {
+impl MaildirFlagRemoveCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
         let maildir = match Maildir::try_from(self.maildir.inner.clone()) {
             Ok(maildir) => maildir,

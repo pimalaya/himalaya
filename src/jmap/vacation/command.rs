@@ -4,19 +4,19 @@ use pimalaya_toolbox::terminal::printer::Printer;
 
 use crate::jmap::{
     account::JmapAccount,
-    vacation::{get::GetVacationCommand, set::SetVacationCommand},
+    vacation::{get::JmapVacationGetCommand, set::JmapVacationSetCommand},
 };
 
 /// Manage JMAP vacation response.
 #[derive(Debug, Subcommand)]
-pub enum VacationCommand {
+pub enum JmapVacationCommand {
     /// Get the vacation response (VacationResponse/get).
-    Get(GetVacationCommand),
+    Get(JmapVacationGetCommand),
     /// Update the vacation response (VacationResponse/set).
-    Set(SetVacationCommand),
+    Set(JmapVacationSetCommand),
 }
 
-impl VacationCommand {
+impl JmapVacationCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         match self {
             Self::Get(cmd) => cmd.execute(printer, account),

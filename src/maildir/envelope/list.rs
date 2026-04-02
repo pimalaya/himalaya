@@ -16,12 +16,12 @@ use crate::maildir::{account::MaildirAccount, arg::MaildirPathFlag};
 /// mailbox. You can specify a sequence set to limit which messages
 /// are fetched.
 #[derive(Debug, Parser)]
-pub struct ListEnvelopesCommand {
+pub struct MaildirEnvelopeListCommand {
     #[command(flatten)]
     pub maildir: MaildirPathFlag,
 }
 
-impl ListEnvelopesCommand {
+impl MaildirEnvelopeListCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
         let maildir = match Maildir::try_from(self.maildir.inner.clone()) {
             Ok(maildir) => maildir,

@@ -1,10 +1,10 @@
-use std::{collections::HashMap, fmt, num::NonZeroU32};
+use std::{collections::BTreeMap, fmt, num::NonZeroU32};
 
 use anyhow::{bail, Result};
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, Row, Table};
 use io_imap::{
-    coroutines::{fetch::*, select::*, status::*},
+    rfc3501::{fetch::*, select::*, status::*},
     types::{
         core::Vec1,
         envelope::Address,
@@ -13,7 +13,7 @@ use io_imap::{
         status::{StatusDataItem, StatusDataItemName},
     },
 };
-use io_stream::runtimes::std::handle;
+use io_socket::runtimes::std_stream::handle;
 use log::debug;
 use pimalaya_toolbox::terminal::printer::Printer;
 use rfc2047_decoder::{Decoder, RecoverStrategy};
@@ -30,7 +30,7 @@ use crate::imap::{
 /// mailbox. You can specify a sequence set to limit which messages
 /// are fetched.
 #[derive(Debug, Parser)]
-pub struct ListEnvelopesCommand {
+pub struct ImapEnvelopeListCommand {
     /// The sequence set of envelopes.
     #[arg(value_name = "SEQUENCE")]
     #[arg(conflicts_with = "page_size")]
@@ -53,7 +53,7 @@ pub struct ListEnvelopesCommand {
     pub sequence: bool,
 }
 
-impl ListEnvelopesCommand {
+impl ImapEnvelopeListCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
@@ -61,33 +61,37 @@ impl ListEnvelopesCommand {
         let exists = if self.mailbox_no_select.inner {
             let mut arg = None;
             let mut coroutine =
-                ImapStatus::new(imap.context, mailbox, &[StatusDataItemName::Messages]);
+                ImapMailboxStatus::new(imap.context, mailbox, &[StatusDataItemName::Messages]);
 
             loop {
                 match coroutine.resume(arg.take()) {
-                    ImapStatusResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                    ImapStatusResult::Ok { context, items } => {
+                    ImapMailboxStatusResult::Io { input } => {
+                        arg = Some(handle(&mut imap.stream, input)?)
+                    }
+                    ImapMailboxStatusResult::Ok { context, items } => {
                         imap.context = context;
                         break items.into_iter().find_map(|i| match i {
                             StatusDataItem::Messages(exists) => Some(exists),
                             _ => None,
                         });
                     }
-                    ImapStatusResult::Err { err, .. } => bail!(err),
+                    ImapMailboxStatusResult::Err { err, .. } => bail!(err),
                 }
             }
         } else {
             let mut arg = None;
-            let mut coroutine = ImapSelect::new(imap.context, mailbox);
+            let mut coroutine = ImapMailboxSelect::new(imap.context, mailbox);
 
             loop {
                 match coroutine.resume(arg.take()) {
-                    ImapSelectResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                    ImapSelectResult::Ok { context, data } => {
+                    ImapMailboxSelectResult::Io { input } => {
+                        arg = Some(handle(&mut imap.stream, input)?)
+                    }
+                    ImapMailboxSelectResult::Ok { context, data } => {
                         imap.context = context;
                         break data.exists;
                     }
-                    ImapSelectResult::Err { err, .. } => bail!(err),
+                    ImapMailboxSelectResult::Err { err, .. } => bail!(err),
                 }
             }
         };
@@ -110,7 +114,7 @@ impl ListEnvelopesCommand {
         ]);
 
         let mut arg = None;
-        let mut coroutine = ImapFetch::new(
+        let mut coroutine = ImapMessageFetch::new(
             imap.context,
             sequence_set,
             item_names,
@@ -119,9 +123,11 @@ impl ListEnvelopesCommand {
 
         let data = loop {
             match coroutine.resume(arg.take()) {
-                ImapFetchResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                ImapFetchResult::Ok { data, .. } => break data,
-                ImapFetchResult::Err { err, .. } => bail!(err),
+                ImapMessageFetchResult::Io { input } => {
+                    arg = Some(handle(&mut imap.stream, input)?)
+                }
+                ImapMessageFetchResult::Ok { data, .. } => break data,
+                ImapMessageFetchResult::Err { err, .. } => bail!(err),
             }
         };
 
@@ -185,7 +191,7 @@ pub struct EnvelopesTableEntry {
 }
 
 fn map_envelopes_table_entries(
-    data: HashMap<NonZeroU32, Vec1<MessageDataItem<'_>>>,
+    data: BTreeMap<NonZeroU32, Vec1<MessageDataItem<'_>>>,
 ) -> Vec<EnvelopesTableEntry> {
     let mut entries: Vec<EnvelopesTableEntry> = data
         .into_iter()

@@ -5,11 +5,12 @@ use pimalaya_toolbox::terminal::printer::Printer;
 use crate::imap::{
     account::ImapAccount,
     mailbox::{
-        close::CloseMailboxCommand, create::CreateMailboxCommand, delete::DeleteMailboxCommand,
-        expunge::ExpungeMailboxCommand, list::ListMailboxesCommand, purge::PurgeMailboxCommand,
-        rename::RenameMailboxCommand, select::SelectMailboxCommand, status::StatusMailboxCommand,
-        subscribe::SubscribeMailboxCommand, unselect::UnselectMailboxCommand,
-        unsubscribe::UnsubscribeMailboxCommand,
+        close::ImapMailboxCloseCommand, create::ImapMailboxCreateCommand,
+        delete::ImapMailboxDeleteCommand, expunge::ImapMailboxExpungeCommand,
+        list::ImapMailboxListCommand, purge::ImapMailboxPurgeCommand,
+        rename::ImapMailboxRenameCommand, select::ImapMailboxSelectCommand,
+        status::ImapMailboxStatusCommand, subscribe::ImapMailboxSubscribeCommand,
+        unselect::ImapMailboxUnselectCommand, unsubscribe::ImapMailboxUnsubscribeCommand,
     },
 };
 
@@ -18,25 +19,25 @@ use crate::imap::{
 /// A mailbox is a message container. This subcommand allows you to
 /// manage them.
 #[derive(Debug, Subcommand)]
-pub enum MailboxCommand {
-    Close(CloseMailboxCommand),
+pub enum ImapMailboxCommand {
+    Close(ImapMailboxCloseCommand),
     #[command(alias = "add", alias = "new")]
-    Create(CreateMailboxCommand),
+    Create(ImapMailboxCreateCommand),
     #[command(alias = "remove", alias = "rm")]
-    Delete(DeleteMailboxCommand),
-    Expunge(ExpungeMailboxCommand),
+    Delete(ImapMailboxDeleteCommand),
+    Expunge(ImapMailboxExpungeCommand),
     #[command(alias = "lst")]
-    List(ListMailboxesCommand),
-    Purge(PurgeMailboxCommand),
-    Rename(RenameMailboxCommand),
-    Select(SelectMailboxCommand),
-    Status(StatusMailboxCommand),
-    Subscribe(SubscribeMailboxCommand),
-    Unselect(UnselectMailboxCommand),
-    Unsubscribe(UnsubscribeMailboxCommand),
+    List(ImapMailboxListCommand),
+    Purge(ImapMailboxPurgeCommand),
+    Rename(ImapMailboxRenameCommand),
+    Select(ImapMailboxSelectCommand),
+    Status(ImapMailboxStatusCommand),
+    Subscribe(ImapMailboxSubscribeCommand),
+    Unselect(ImapMailboxUnselectCommand),
+    Unsubscribe(ImapMailboxUnsubscribeCommand),
 }
 
-impl MailboxCommand {
+impl ImapMailboxCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         match self {
             Self::Close(cmd) => cmd.execute(printer, account),

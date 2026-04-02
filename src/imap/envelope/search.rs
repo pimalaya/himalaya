@@ -4,14 +4,14 @@ use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, Row, Table};
 use io_imap::{
-    coroutines::{search::*, select::*},
+    rfc3501::{search::*, select::*},
     types::{
         core::{AString, Vec1},
         datetime::NaiveDate,
         search::SearchKey,
     },
 };
-use io_stream::runtimes::std::handle;
+use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 
@@ -46,7 +46,7 @@ use crate::imap::{
 ///   - smaller:5000      - messages smaller than 5000 bytes
 ///   - all               - all messages
 #[derive(Debug, Parser)]
-pub struct SearchEnvelopesCommand {
+pub struct ImapEnvelopeSearchCommand {
     #[command(flatten)]
     pub mailbox_name: MailboxNameOptionalFlag,
     #[command(flatten)]
@@ -61,20 +61,22 @@ pub struct SearchEnvelopesCommand {
     pub seq: bool,
 }
 
-impl SearchEnvelopesCommand {
+impl ImapEnvelopeSearchCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         if !self.mailbox_no_select.inner {
             let mut arg = None;
-            let mut coroutine = ImapSelect::new(imap.context, mailbox);
+            let mut coroutine = ImapMailboxSelect::new(imap.context, mailbox);
 
             imap.context = loop {
                 match coroutine.resume(arg.take()) {
-                    ImapSelectResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                    ImapSelectResult::Ok { context, .. } => break context,
-                    ImapSelectResult::Err { err, .. } => bail!(err),
+                    ImapMailboxSelectResult::Io { input } => {
+                        arg = Some(handle(&mut imap.stream, input)?)
+                    }
+                    ImapMailboxSelectResult::Ok { context, .. } => break context,
+                    ImapMailboxSelectResult::Err { err, .. } => bail!(err),
                 }
             };
         }
@@ -82,13 +84,15 @@ impl SearchEnvelopesCommand {
         let criteria = parse_query(&self.query)?;
 
         let mut arg = None;
-        let mut coroutine = ImapSearch::new(imap.context, criteria, !self.seq);
+        let mut coroutine = ImapMessageSearch::new(imap.context, criteria, !self.seq);
 
         let ids = loop {
             match coroutine.resume(arg.take()) {
-                ImapSearchResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                ImapSearchResult::Ok { ids, .. } => break ids,
-                ImapSearchResult::Err { err, .. } => bail!(err),
+                ImapMessageSearchResult::Io { input } => {
+                    arg = Some(handle(&mut imap.stream, input)?)
+                }
+                ImapMessageSearchResult::Ok { ids, .. } => break ids,
+                ImapMessageSearchResult::Err { err, .. } => bail!(err),
             }
         };
 

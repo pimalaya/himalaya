@@ -16,9 +16,9 @@ use crate::maildir::account::MaildirAccount;
 /// By default, only subscribed maildirs are listed. Use --all to
 /// list all maildirs.
 #[derive(Debug, Parser)]
-pub struct ListMaildirsCommand;
+pub struct MaildirMailboxListCommand;
 
-impl ListMaildirsCommand {
+impl MaildirMailboxListCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
         let mut arg = None;
         let mut coroutine = ListMaildirs::new(account.backend.root);

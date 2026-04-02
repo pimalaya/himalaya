@@ -1,10 +1,10 @@
 use anyhow::{bail, Result};
 use clap::Parser;
 use io_imap::{
-    coroutines::{expunge::*, select::*, store::*},
+    rfc3501::{expunge::*, select::*, store::*},
     types::flag::{Flag, StoreType},
 };
-use io_stream::runtimes::std::handle;
+use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::imap::{
@@ -18,33 +18,35 @@ use crate::imap::{
 /// All emails from the given mailbox are definitely deleted. The
 /// purged mailbox will remain empty after execution of the command.
 #[derive(Debug, Parser)]
-pub struct PurgeMailboxCommand {
+pub struct ImapMailboxPurgeCommand {
     #[command(flatten)]
     pub mailbox_name: MailboxNameArg,
     #[command(flatten)]
     pub mailbox_no_select: MailboxNoSelectFlag,
 }
 
-impl PurgeMailboxCommand {
+impl ImapMailboxPurgeCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         if !self.mailbox_no_select.inner {
             let mut arg = None;
-            let mut coroutine = ImapSelect::new(imap.context, mailbox);
+            let mut coroutine = ImapMailboxSelect::new(imap.context, mailbox);
 
             imap.context = loop {
                 match coroutine.resume(arg.take()) {
-                    ImapSelectResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                    ImapSelectResult::Ok { context, .. } => break context,
-                    ImapSelectResult::Err { err, .. } => bail!(err),
+                    ImapMailboxSelectResult::Io { input } => {
+                        arg = Some(handle(&mut imap.stream, input)?)
+                    }
+                    ImapMailboxSelectResult::Ok { context, .. } => break context,
+                    ImapMailboxSelectResult::Err { err, .. } => bail!(err),
                 }
             };
         }
 
         let mut arg = None;
-        let mut coroutine = ImapStoreSilent::new(
+        let mut coroutine = ImapMessageStoreSilent::new(
             imap.context,
             "1:*".try_into()?,
             StoreType::Add,
@@ -54,20 +56,24 @@ impl PurgeMailboxCommand {
 
         imap.context = loop {
             match coroutine.resume(arg.take()) {
-                ImapStoreSilentResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                ImapStoreSilentResult::Ok { context, .. } => break context,
-                ImapStoreSilentResult::Err { err, .. } => bail!(err),
+                ImapMessageStoreSilentResult::Io { input } => {
+                    arg = Some(handle(&mut imap.stream, input)?)
+                }
+                ImapMessageStoreSilentResult::Ok { context, .. } => break context,
+                ImapMessageStoreSilentResult::Err { err, .. } => bail!(err),
             }
         };
 
         let mut arg = None;
-        let mut coroutine = ImapExpunge::new(imap.context);
+        let mut coroutine = ImapMailboxExpunge::new(imap.context);
 
         loop {
             match coroutine.resume(arg.take()) {
-                ImapExpungeResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                ImapExpungeResult::Ok { .. } => break,
-                ImapExpungeResult::Err { err, .. } => bail!(err),
+                ImapMailboxExpungeResult::Io { input } => {
+                    arg = Some(handle(&mut imap.stream, input)?)
+                }
+                ImapMailboxExpungeResult::Ok { .. } => break,
+                ImapMailboxExpungeResult::Err { err, .. } => bail!(err),
             }
         }
 

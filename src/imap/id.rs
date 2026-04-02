@@ -4,13 +4,13 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
 use io_imap::{
-    coroutines::id::*,
+    rfc2971::id::*,
     types::{
         core::{IString, NString},
         IntoStatic,
     },
 };
-use io_stream::runtimes::std::handle;
+use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 
@@ -24,13 +24,13 @@ use crate::imap::account::ImapAccount;
 ///
 /// [RFC 2971]: https://www.rfc-editor.org/rfc/rfc2971.html
 #[derive(Debug, Parser)]
-pub struct IdCommand {
+pub struct ImapIdCommand {
     #[arg(short, long, num_args = 1..)]
     #[arg(value_name = "KEY:VAL", value_parser = parameter_parser)]
     parameter: Option<Vec<(IString<'static>, NString<'static>)>>,
 }
 
-impl IdCommand {
+impl ImapIdCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
         let mut params = HashMap::new();
@@ -59,13 +59,13 @@ impl IdCommand {
         }
 
         let mut arg = None;
-        let mut coroutine = ImapId::new(imap.context, Some(params.into_iter().collect()));
+        let mut coroutine = ImapServerId::new(imap.context, Some(params.into_iter().collect()));
 
         let params = loop {
             match coroutine.resume(arg.take()) {
-                ImapIdResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                ImapIdResult::Ok { server_id, .. } => break server_id,
-                ImapIdResult::Err { err, .. } => bail!(err),
+                ImapServerIdResult::Io { input } => arg = Some(handle(&mut imap.stream, input)?),
+                ImapServerIdResult::Ok { server_id, .. } => break server_id,
+                ImapServerIdResult::Err { err, .. } => bail!(err),
             }
         };
 

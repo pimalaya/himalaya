@@ -4,7 +4,7 @@ use pimalaya_toolbox::terminal::printer::Printer;
 
 use crate::maildir::{
     account::MaildirAccount,
-    envelope::{get::GetEnvelopeCommand, list::ListEnvelopesCommand},
+    envelope::{get::MaildirEnvelopeGetCommand, list::MaildirEnvelopeListCommand},
 };
 
 /// Manage MAILDIR envelopes.
@@ -13,12 +13,12 @@ use crate::maildir::{
 /// date, subject, from, to, cc, bcc, etc. This subcommand allows you
 /// to get, list, search, sort, and thread envelopes.
 #[derive(Debug, Subcommand)]
-pub enum EnvelopesCommand {
-    Get(GetEnvelopeCommand),
-    List(ListEnvelopesCommand),
+pub enum MaildirEnvelopeCommand {
+    Get(MaildirEnvelopeGetCommand),
+    List(MaildirEnvelopeListCommand),
 }
 
-impl EnvelopesCommand {
+impl MaildirEnvelopeCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
         match self {
             Self::Get(cmd) => cmd.execute(printer, account),

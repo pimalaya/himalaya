@@ -11,12 +11,12 @@ use crate::maildir::{account::MaildirAccount, arg::MaildirPathFlag};
 /// This command allows you to delete a new mailbox using the given
 /// name.
 #[derive(Debug, Parser)]
-pub struct DeleteMaildirCommand {
+pub struct MaildirMailboxDeleteCommand {
     #[command(flatten)]
     pub maildir_path: MaildirPathFlag,
 }
 
-impl DeleteMaildirCommand {
+impl MaildirMailboxDeleteCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
         let path = account.backend.root.join(self.maildir_path.inner);
 

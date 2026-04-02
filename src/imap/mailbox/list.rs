@@ -4,10 +4,10 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
 use io_imap::{
-    coroutines::{list::*, lsub::*},
+    rfc3501::{list::*, lsub::*},
     types::{core::QuotedChar, flag::FlagNameAttribute, mailbox::Mailbox},
 };
-use io_stream::runtimes::std::handle;
+use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 
@@ -19,7 +19,7 @@ use crate::imap::account::ImapAccount;
 /// By default, only subscribed mailboxes are listed. Use --all to
 /// list all mailboxes.
 #[derive(Debug, Parser)]
-pub struct ListMailboxesCommand {
+pub struct ImapMailboxListCommand {
     /// List all mailboxes, not just subscribed ones.
     #[arg(short = 'A', long)]
     pub all: bool,
@@ -33,7 +33,7 @@ pub struct ListMailboxesCommand {
     pub pattern: String,
 }
 
-impl ListMailboxesCommand {
+impl ImapMailboxListCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
         let reference = self.reference.try_into()?;
@@ -41,24 +41,28 @@ impl ListMailboxesCommand {
 
         let mailboxes = if self.all {
             let mut arg = None;
-            let mut coroutine = ImapList::new(imap.context, reference, pattern);
+            let mut coroutine = ImapMailboxList::new(imap.context, reference, pattern);
 
             loop {
                 match coroutine.resume(arg.take()) {
-                    ImapListResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                    ImapListResult::Ok { mailboxes, .. } => break mailboxes,
-                    ImapListResult::Err { err, .. } => bail!(err),
+                    ImapMailboxListResult::Io { input } => {
+                        arg = Some(handle(&mut imap.stream, input)?)
+                    }
+                    ImapMailboxListResult::Ok { mailboxes, .. } => break mailboxes,
+                    ImapMailboxListResult::Err { err, .. } => bail!(err),
                 }
             }
         } else {
             let mut arg = None;
-            let mut coroutine = ImapLsub::new(imap.context, reference, pattern);
+            let mut coroutine = ImapMailboxLsub::new(imap.context, reference, pattern);
 
             loop {
                 match coroutine.resume(arg.take()) {
-                    ImapLsubResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                    ImapLsubResult::Ok { mailboxes, .. } => break mailboxes,
-                    ImapLsubResult::Err { err, .. } => bail!(err),
+                    ImapMailboxLsubResult::Io { input } => {
+                        arg = Some(handle(&mut imap.stream, input)?)
+                    }
+                    ImapMailboxLsubResult::Ok { mailboxes, .. } => break mailboxes,
+                    ImapMailboxLsubResult::Err { err, .. } => bail!(err),
                 }
             }
         };

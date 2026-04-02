@@ -10,7 +10,7 @@ use io_jmap::{
         EmailAddressWithParameters, EmailSubmissionCreate, Envelope,
     },
 };
-use io_stream::runtimes::std::handle;
+use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 
 use crate::jmap::{account::JmapAccount, submission::query::SubmissionsTable};
@@ -20,7 +20,7 @@ use crate::jmap::{account::JmapAccount, submission::query::SubmissionsTable};
 /// The email must already exist as a draft in the JMAP account.
 /// This is the JMAP equivalent of SMTP message submission.
 #[derive(Debug, Parser)]
-pub struct CreateSubmissionCommand {
+pub struct JmapSubmissionCreateCommand {
     /// The ID of the draft email to send.
     #[arg(value_name = "EMAIL_ID")]
     pub email_id: String,
@@ -38,7 +38,7 @@ pub struct CreateSubmissionCommand {
     pub rcpt_to: Vec<String>,
 }
 
-impl CreateSubmissionCommand {
+impl JmapSubmissionCreateCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         let mut jmap = account.new_jmap_session()?;
 

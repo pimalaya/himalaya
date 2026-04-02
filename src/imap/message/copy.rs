@@ -1,10 +1,10 @@
 use anyhow::{bail, Result};
 use clap::Parser;
 use io_imap::{
-    coroutines::{copy::*, select::*},
+    rfc3501::{copy::*, select::*},
     types::mailbox::Mailbox,
 };
-use io_stream::runtimes::std::handle;
+use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::imap::{
@@ -17,7 +17,7 @@ use crate::imap::{
 /// This command copies message(s) identified by the given sequence
 /// set from the source mailbox to the destination mailbox.
 #[derive(Debug, Parser)]
-pub struct CopyMessageCommand {
+pub struct ImapMessageCopyCommand {
     #[command(flatten)]
     pub mailbox_name: MailboxNameOptionalFlag,
     #[command(flatten)]
@@ -34,20 +34,22 @@ pub struct CopyMessageCommand {
     pub seq: bool,
 }
 
-impl CopyMessageCommand {
+impl ImapMessageCopyCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         if !self.mailbox_no_select.inner {
             let mut arg = None;
-            let mut coroutine = ImapSelect::new(imap.context, mailbox);
+            let mut coroutine = ImapMailboxSelect::new(imap.context, mailbox);
 
             imap.context = loop {
                 match coroutine.resume(arg.take()) {
-                    ImapSelectResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                    ImapSelectResult::Ok { context, .. } => break context,
-                    ImapSelectResult::Err { err, .. } => bail!(err),
+                    ImapMailboxSelectResult::Io { input } => {
+                        arg = Some(handle(&mut imap.stream, input)?)
+                    }
+                    ImapMailboxSelectResult::Ok { context, .. } => break context,
+                    ImapMailboxSelectResult::Err { err, .. } => bail!(err),
                 }
             };
         }
@@ -56,13 +58,14 @@ impl CopyMessageCommand {
         let destination: Mailbox = self.mailbox_dest_name.inner.try_into()?;
 
         let mut arg = None;
-        let mut coroutine = ImapCopy::new(imap.context, sequence_set, destination, !self.seq);
+        let mut coroutine =
+            ImapMessageCopy::new(imap.context, sequence_set, destination, !self.seq);
 
         loop {
             match coroutine.resume(arg.take()) {
-                ImapCopyResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                ImapCopyResult::Ok { .. } => break,
-                ImapCopyResult::Err { err, .. } => bail!(err),
+                ImapMessageCopyResult::Io { input } => arg = Some(handle(&mut imap.stream, input)?),
+                ImapMessageCopyResult::Ok { .. } => break,
+                ImapMessageCopyResult::Err { err, .. } => bail!(err),
             }
         }
 

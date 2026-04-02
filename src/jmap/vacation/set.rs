@@ -7,14 +7,14 @@ use io_jmap::{
     },
     rfc8621::types::vacation_response::VacationResponseUpdate,
 };
-use io_stream::runtimes::std::handle;
+use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::jmap::account::JmapAccount;
 
 /// Update the JMAP vacation response (VacationResponse/set).
 #[derive(Debug, Parser)]
-pub struct SetVacationCommand {
+pub struct JmapVacationSetCommand {
     /// Enable the vacation response.
     #[arg(long, conflicts_with = "disable")]
     pub enable: bool,
@@ -44,7 +44,7 @@ pub struct SetVacationCommand {
     pub html_body: Option<String>,
 }
 
-impl SetVacationCommand {
+impl JmapVacationSetCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         let mut jmap = account.new_jmap_session()?;
 
