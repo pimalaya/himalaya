@@ -6,7 +6,13 @@ use std::{
 
 use clap::Parser;
 use color_eyre::Result;
-use email::{backend::feature::BackendFeatureSource, config::Config, envelope::SingleId};
+use email::{
+    backend::feature::BackendFeatureSource,
+    config::Config,
+    envelope::SingleId,
+    flag::{Flag, Flags},
+    folder::FolderKind,
+};
 use pimalaya_tui::{
     himalaya::backend::BackendBuilder,
     terminal::{cli::printer::Printer, config::TomlConfig as _},
@@ -72,7 +78,17 @@ impl MessageSaveCommand {
                 .join("\r\n")
         };
 
-        let id = backend.add_message(folder, msg.as_bytes()).await?;
+        let id = if FolderKind::matches_drafts(folder) {
+            backend
+                .add_message_with_flags(
+                    folder,
+                    msg.as_bytes(),
+                    &Flags::from_iter([Flag::Seen, Flag::Draft]),
+                )
+                .await?
+        } else {
+            backend.add_message(folder, msg.as_bytes()).await?
+        };
 
         printer.out(MessageAdded { folder, id })
     }
@@ -97,5 +113,21 @@ impl Serialize for MessageAdded<'_> {
         state.serialize_field("folder", self.folder)?;
         state.serialize_field("id", self.id.as_str())?;
         state.end()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use email::folder::FolderKind;
+
+    #[test]
+    fn drafts_folder_detected() {
+        assert!(FolderKind::matches_drafts("Drafts"));
+        assert!(FolderKind::matches_drafts("drafts"));
+        assert!(FolderKind::matches_drafts("DRAFTS"));
+        assert!(!FolderKind::matches_drafts("Draft"));
+        assert!(!FolderKind::matches_drafts("INBOX"));
+        assert!(!FolderKind::matches_drafts("Sent"));
+        assert!(!FolderKind::matches_drafts("Trash"));
     }
 }

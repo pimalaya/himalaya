@@ -6,7 +6,13 @@ use std::{
 
 use clap::Parser;
 use color_eyre::Result;
-use email::{backend::feature::BackendFeatureSource, config::Config, envelope::SingleId};
+use email::{
+    backend::feature::BackendFeatureSource,
+    config::Config,
+    envelope::SingleId,
+    flag::{Flag, Flags},
+    folder::FolderKind,
+};
 use mml::MmlCompilerBuilder;
 use pimalaya_tui::{
     himalaya::backend::BackendBuilder,
@@ -86,9 +92,17 @@ impl TemplateSaveCommand {
 
         let msg = compiler.build(tpl.as_str())?.compile().await?.into_vec()?;
 
-        backend.add_message(folder, &msg).await?;
-
-        let id = backend.add_message(folder, &msg).await?;
+        let id = if FolderKind::matches_drafts(folder) {
+            backend
+                .add_message_with_flags(
+                    folder,
+                    &msg,
+                    &Flags::from_iter([Flag::Seen, Flag::Draft]),
+                )
+                .await?
+        } else {
+            backend.add_message(folder, &msg).await?
+        };
 
         printer.out(TemplateAdded { folder, id })
     }
