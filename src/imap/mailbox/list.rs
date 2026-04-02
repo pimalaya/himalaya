@@ -96,7 +96,7 @@ impl fmt::Display for MailboxesTable {
                 row.max_height(1)
                     .add_cell(Cell::new(&mbox.name))
                     .add_cell(Cell::new(&mbox.delimiter))
-                    .add_cell(Cell::new(&mbox.attributes.join(", ")));
+                    .add_cell(Cell::new(mbox.attributes.join(", ")));
 
                 row
             }));

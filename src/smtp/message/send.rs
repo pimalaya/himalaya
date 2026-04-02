@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     collections::HashSet,
     io::{stdin, BufRead, IsTerminal},
 };
@@ -6,8 +7,11 @@ use std::{
 use anyhow::{bail, Result};
 use clap::Parser;
 use io_smtp::{
-    coroutines::send_message::*,
-    types::core::{EhloDomain, ForwardPath, Mailbox, ReversePath},
+    rfc5321::types::{
+        domain::Domain, ehlo_domain::EhloDomain, forward_path::ForwardPath, local_part::LocalPart,
+        mailbox::Mailbox, reverse_path::ReversePath,
+    },
+    send_message::*,
 };
 use io_stream::runtimes::std::handle;
 use mail_parser::{Addr, Address, HeaderName, HeaderValue, MessageParser};
@@ -48,18 +52,13 @@ impl SendMessageCommand {
         let (reverse_path, forward_paths) = into_smtp_msg(message.as_bytes())?;
 
         let mut arg = None;
-        let mut coroutine = SendSmtpMessage::new(
-            imap.context,
-            reverse_path,
-            forward_paths,
-            message.into_bytes(),
-        );
+        let mut coroutine = SendSmtpMessage::new(reverse_path, forward_paths, message.into_bytes());
 
         loop {
             match coroutine.resume(arg.take()) {
                 SendSmtpMessageResult::Io { io } => arg = Some(handle(&mut imap.stream, io)?),
-                SendSmtpMessageResult::Ok { .. } => break,
-                SendSmtpMessageResult::Err { err, .. } => bail!(err),
+                SendSmtpMessageResult::Ok => break,
+                SendSmtpMessageResult::Err { err } => bail!(err),
             }
         }
 
@@ -125,10 +124,10 @@ fn into_smtp_msg<'a>(msg: &[u8]) -> Result<(ReversePath<'a>, Vec<ForwardPath<'a>
         bail!("The message contains an invalid sender");
     };
 
-    let mbox = Mailbox::new(
-        local.to_owned().try_into()?,
-        EhloDomain::Domain(domain.to_owned().try_into()?),
-    );
+    let mbox = Mailbox {
+        local_part: LocalPart(Cow::Owned(local.to_owned())),
+        domain: EhloDomain::Domain(Domain(Cow::Owned(domain.to_owned()))),
+    };
 
     let reverse_path = ReversePath::Mailbox(mbox);
 
@@ -139,10 +138,10 @@ fn into_smtp_msg<'a>(msg: &[u8]) -> Result<(ReversePath<'a>, Vec<ForwardPath<'a>
             bail!("The message contains an invalid recipient: {rcpt_to}");
         };
 
-        let mbox = Mailbox::new(
-            local.to_owned().try_into()?,
-            EhloDomain::Domain(domain.to_owned().try_into()?),
-        );
+        let mbox = Mailbox {
+            local_part: LocalPart(Cow::Owned(local.to_owned())),
+            domain: EhloDomain::Domain(Domain(Cow::Owned(domain.to_owned()))),
+        };
 
         forward_paths.push(ForwardPath(mbox))
     }

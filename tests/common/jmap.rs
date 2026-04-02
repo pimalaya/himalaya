@@ -94,9 +94,7 @@ fn parse_list<T: DeserializeOwned>(config: &Path, args: &[&str], key: &str) -> V
             .unwrap_or_else(|| panic!("missing `{key}` key in output for {args:?}: {value}")),
     )
     .unwrap_or_else(|e| {
-        panic!(
-            "failed to deserialize `{key}` from output for {args:?}: {e}\nvalue: {value}"
-        )
+        panic!("failed to deserialize `{key}` from output for {args:?}: {e}\nvalue: {value}")
     })
 }
 
@@ -137,8 +135,11 @@ pub fn run(config: &Path, email: impl ToString) {
         .success();
 
     // query by name — verify name matches
-    let mboxes: Vec<Mailbox> =
-        parse_list(config, &["mailboxes", "query", "--name", &mbox_name], "mailboxes");
+    let mboxes: Vec<Mailbox> = parse_list(
+        config,
+        &["mailboxes", "query", "--name", &mbox_name],
+        "mailboxes",
+    );
 
     assert_eq!(
         mboxes[0].name.as_deref(),
@@ -203,8 +204,11 @@ pub fn run(config: &Path, email: impl ToString) {
         .success();
 
     // query — verify exactly one email landed in the mailbox
-    let emails: Vec<Email> =
-        parse_list(config, &["emails", "query", "--mailbox", &mbox_id], "emails");
+    let emails: Vec<Email> = parse_list(
+        config,
+        &["emails", "query", "--mailbox", &mbox_id],
+        "emails",
+    );
     assert_eq!(emails.len(), 1, "expected exactly one email after import");
 
     let email_id = emails[0].id.clone().expect("email id");
@@ -360,8 +364,7 @@ pub fn run(config: &Path, email: impl ToString) {
     // ── 3. THREADS ────────────────────────────────────────────────────────
 
     // get thread — verify it references the imported email
-    let threads: Vec<Thread> =
-        parse_list(config, &["threads", "get", &thread_id], "threads");
+    let threads: Vec<Thread> = parse_list(config, &["threads", "get", &thread_id], "threads");
 
     assert_eq!(threads[0].id, thread_id, "thread: id mismatch");
 
@@ -500,8 +503,11 @@ pub fn run(config: &Path, email: impl ToString) {
     // Requires JMAP_FROM_ACCOUNT_ID env var (the server-side JMAP accountId,
     // e.g. "u1d764051" for FastMail). Set it to enable this step.
     if let Ok(from_account) = env::var("JMAP_FROM_ACCOUNT_ID") {
-        let before: Vec<Email> =
-            parse_list(config, &["emails", "query", "--mailbox", &mbox_id], "emails");
+        let before: Vec<Email> = parse_list(
+            config,
+            &["emails", "query", "--mailbox", &mbox_id],
+            "emails",
+        );
         let count_before = before.len();
 
         jmap(config)
@@ -517,8 +523,11 @@ pub fn run(config: &Path, email: impl ToString) {
             .assert()
             .success();
 
-        let after: Vec<Email> =
-            parse_list(config, &["emails", "query", "--mailbox", &mbox_id], "emails");
+        let after: Vec<Email> = parse_list(
+            config,
+            &["emails", "query", "--mailbox", &mbox_id],
+            "emails",
+        );
 
         assert!(
             after.len() > count_before,

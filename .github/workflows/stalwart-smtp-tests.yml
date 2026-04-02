@@ -1,0 +1,16 @@
+name: Stalwart SMTP tests
+
+on:
+  push:
+    branches:
+      - v2
+
+jobs:
+  stalwart-smtp-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: ./tests/stalwart.sh
+      - run: cargo test --no-default-features --features smtp,rustls-ring --test stalwart-smtp -- --ignored
+      - run: docker stop himalaya-tests

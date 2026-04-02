@@ -3,7 +3,7 @@ use clap::Parser;
 use io_jmap::{
     rfc8620::{
         coroutines::blob_download::{JmapBlobDownload, JmapBlobDownloadResult},
-        types::session::capabilities::{self, MAIL},
+        types::session::capabilities::MAIL,
     },
     rfc8621::coroutines::email_get::{JmapEmailGet, JmapEmailGetResult},
 };

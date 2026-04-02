@@ -156,21 +156,15 @@ impl TryFrom<TlsConfig> for Tls {
 
     fn try_from(config: TlsConfig) -> Result<Self, Self::Error> {
         Ok(Tls {
-            provider: match config.provider {
-                None => None,
-                Some(config) => Some(match config {
-                    TlsProviderConfig::Rustls => TlsProvider::Rustls,
-                    TlsProviderConfig::NativeTls => TlsProvider::NativeTls,
-                }),
-            },
+            provider: config.provider.map(|config| match config {
+                TlsProviderConfig::Rustls => TlsProvider::Rustls,
+                TlsProviderConfig::NativeTls => TlsProvider::NativeTls,
+            }),
             rustls: Rustls {
-                crypto: match config.rustls.crypto {
-                    None => None,
-                    Some(config) => Some(match config {
-                        RustlsCryptoConfig::Aws => RustlsCrypto::Aws,
-                        RustlsCryptoConfig::Ring => RustlsCrypto::Ring,
-                    }),
-                },
+                crypto: config.rustls.crypto.map(|config| match config {
+                    RustlsCryptoConfig::Aws => RustlsCrypto::Aws,
+                    RustlsCryptoConfig::Ring => RustlsCrypto::Ring,
+                }),
             },
             cert: config.cert,
         })

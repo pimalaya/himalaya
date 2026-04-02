@@ -8,7 +8,7 @@ use clap::Parser;
 use io_jmap::{
     rfc8620::{
         coroutines::blob_upload::{JmapBlobUpload, JmapBlobUploadResult},
-        types::session::capabilities::{self, MAIL},
+        types::session::capabilities::MAIL,
     },
     rfc8621::{
         coroutines::email_import::{JmapEmailImport, JmapEmailImportResult},
