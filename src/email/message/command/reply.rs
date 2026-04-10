@@ -1,8 +1,12 @@
 use std::sync::Arc;
 
 use clap::Parser;
-use color_eyre::{eyre::eyre, Result};
+use color_eyre::{
+    eyre::{bail, eyre},
+    Result,
+};
 use email::{backend::feature::BackendFeatureSource, config::Config, flag::Flag};
+use mml::MmlCompilerBuilder;
 use pimalaya_tui::{
     himalaya::{backend::BackendBuilder, editor},
     terminal::{cli::printer::Printer, config::TomlConfig as _},
@@ -14,7 +18,10 @@ use crate::{
     config::TomlConfig,
     envelope::arg::ids::EnvelopeIdArg,
     folder::arg::name::FolderNameOptionalFlag,
-    message::arg::{body::MessageRawBodyArg, header::HeaderRawArgs, reply::MessageReplyAllArg},
+    message::arg::{
+        body::MessageRawBodyArg, header::HeaderRawArgs, reply::MessageReplyAllArg,
+        yes::MessageYesArg,
+    },
 };
 
 /// Reply to the message associated to the given envelope id.
@@ -23,6 +30,10 @@ use crate::{
 /// editor defined in your environment variable $EDITOR. When the
 /// edition process finishes, you can choose between saving or sending
 /// the final message.
+///
+/// When --yes is given together with --body, the editor is skipped
+/// and the reply is sent immediately. This is useful for automated
+/// or scripted workflows that do not have an interactive terminal.
 #[derive(Debug, Parser)]
 pub struct MessageReplyCommand {
     #[command(flatten)]
@@ -39,6 +50,9 @@ pub struct MessageReplyCommand {
 
     #[command(flatten)]
     pub body: MessageRawBodyArg,
+
+    #[command(flatten)]
+    pub yes: MessageYesArg,
 
     #[command(flatten)]
     pub account: AccountNameFlag,
@@ -71,6 +85,11 @@ impl MessageReplyCommand {
         .await?;
 
         let id = self.envelope.id;
+
+        if self.yes.yes && self.body.is_empty() {
+            bail!("--yes requires --body to be set");
+        }
+
         let tpl = backend
             .get_messages(folder, &[id])
             .await?
@@ -83,7 +102,18 @@ impl MessageReplyCommand {
             .build()
             .await?;
 
-        editor::edit_tpl_with_editor(account_config, printer, &backend, tpl).await?;
+        if self.yes.yes {
+            let email = MmlCompilerBuilder::new()
+                .build(tpl.as_str())?
+                .compile()
+                .await?
+                .into_vec()?;
+
+            backend.send_message_then_save_copy(&email).await?;
+            printer.out("Message successfully sent!\n")?;
+        } else {
+            editor::edit_tpl_with_editor(account_config, printer, &backend, tpl).await?;
+        }
 
         backend.add_flag(folder, &[id], Flag::Answered).await?;
 

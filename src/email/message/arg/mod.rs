@@ -3,6 +3,7 @@ use clap::Parser;
 pub mod body;
 pub mod header;
 pub mod reply;
+pub mod yes;
 
 /// The raw message argument parser.
 #[derive(Debug, Parser)]
