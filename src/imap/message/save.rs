@@ -37,7 +37,7 @@ impl ImapMessageSaveCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
         let mailbox: Mailbox<'static> = self.mailbox.inner.try_into()?;
-        let message = if stdin().is_terminal() || printer.is_json() {
+        let message = if !self.message.is_empty() || stdin().is_terminal() || printer.is_json() {
             self.message
                 .join(" ")
                 .replace('\r', "")
