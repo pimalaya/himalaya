@@ -1,16 +1,17 @@
+use std::io::{Read, Write};
+
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_jmap::{
-    rfc8620::types::session::capabilities::VACATION_RESPONSE,
-    rfc8621::coroutines::vacation_response_set::{
-        JmapVacationResponseSet, JmapVacationResponseSetResult,
-    },
-    rfc8621::types::vacation_response::VacationResponseUpdate,
+use io_jmap::rfc8621::{
+    capabilities::VACATION_RESPONSE,
+    vacation_response::VacationResponseUpdate,
+    vacation_response_set::{JmapVacationResponseSet, JmapVacationResponseSetResult},
 };
-use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::jmap::account::JmapAccount;
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Update the JMAP vacation response (VacationResponse/set).
 #[derive(Debug, Parser)]
@@ -74,15 +75,21 @@ impl JmapVacationSetCommand {
         };
 
         let mut coroutine = JmapVacationResponseSet::new(&jmap.session, &jmap.http_auth, patch)?;
-        let mut arg = None;
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         loop {
             match coroutine.resume(arg.take()) {
-                JmapVacationResponseSetResult::Io { io } => {
-                    arg = Some(handle(&mut jmap.stream, io)?)
-                }
                 JmapVacationResponseSetResult::Ok { .. } => break,
-                JmapVacationResponseSetResult::Err { err, .. } => bail!(err),
+                JmapVacationResponseSetResult::WantsRead => {
+                    let n = jmap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                JmapVacationResponseSetResult::WantsWrite(bytes) => {
+                    jmap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                JmapVacationResponseSetResult::Err(err) => bail!("{err}"),
             }
         }
 

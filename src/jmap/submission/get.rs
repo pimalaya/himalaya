@@ -1,13 +1,16 @@
+use std::io::{Read, Write};
+
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_jmap::rfc8621::coroutines::email_submission_get::{
+use io_jmap::rfc8621::email_submission_get::{
     JmapEmailSubmissionGet, JmapEmailSubmissionGetResult,
 };
-use io_socket::runtimes::std_stream::handle;
 use log::warn;
 use pimalaya_toolbox::terminal::printer::Printer;
 
 use crate::jmap::{account::JmapAccount, submission::query::SubmissionsTable};
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Get JMAP email submissions by ID (EmailSubmission/get).
 #[derive(Debug, Parser)]
@@ -23,19 +26,25 @@ impl JmapSubmissionGetCommand {
 
         let mut coroutine =
             JmapEmailSubmissionGet::new(&jmap.session, &jmap.http_auth, Some(self.ids.clone()))?;
-        let mut arg = None;
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         let (submissions, not_found) = loop {
             match coroutine.resume(arg.take()) {
-                JmapEmailSubmissionGetResult::Io { io } => {
-                    arg = Some(handle(&mut jmap.stream, io)?)
-                }
                 JmapEmailSubmissionGetResult::Ok {
                     submissions,
                     not_found,
                     ..
                 } => break (submissions, not_found),
-                JmapEmailSubmissionGetResult::Err { err, .. } => bail!(err),
+                JmapEmailSubmissionGetResult::WantsRead => {
+                    let n = jmap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                JmapEmailSubmissionGetResult::WantsWrite(bytes) => {
+                    jmap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                JmapEmailSubmissionGetResult::Err(err) => bail!("{err}"),
             }
         };
 

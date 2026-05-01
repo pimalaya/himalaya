@@ -1,11 +1,14 @@
+use std::io::{Read, Write};
+
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_jmap::rfc8621::coroutines::mailbox_get::{JmapMailboxGet, JmapMailboxGetResult};
-use io_socket::runtimes::std_stream::handle;
+use io_jmap::rfc8621::mailbox_get::{JmapMailboxGet, JmapMailboxGetResult};
 use log::warn;
 use pimalaya_toolbox::terminal::printer::Printer;
 
 use crate::jmap::{account::JmapAccount, mailbox::query::MailboxesTable};
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Get JMAP mailboxes by ID (Mailbox/get).
 #[derive(Debug, Parser)]
@@ -21,17 +24,25 @@ impl JmapMailboxGetCommand {
 
         let mut coroutine =
             JmapMailboxGet::new(&jmap.session, &jmap.http_auth, Some(self.ids.clone()), None)?;
-        let mut arg = None;
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         let (mailboxes, not_found) = loop {
             match coroutine.resume(arg.take()) {
-                JmapMailboxGetResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
                 JmapMailboxGetResult::Ok {
                     mailboxes,
                     not_found,
                     ..
                 } => break (mailboxes, not_found),
-                JmapMailboxGetResult::Err { err, .. } => bail!(err),
+                JmapMailboxGetResult::WantsRead => {
+                    let n = jmap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                JmapMailboxGetResult::WantsWrite(bytes) => {
+                    jmap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                JmapMailboxGetResult::Err(err) => bail!("{err}"),
             }
         };
 

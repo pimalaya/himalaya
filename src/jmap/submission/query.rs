@@ -1,19 +1,21 @@
-use std::fmt;
+use std::{
+    fmt,
+    io::{Read, Write},
+};
 
 use anyhow::{bail, Result};
 use clap::{Parser, ValueEnum};
 use comfy_table::{Cell, Row, Table};
-use io_jmap::{
-    rfc8621::coroutines::email_submission_query::{
-        JmapEmailSubmissionQuery, JmapEmailSubmissionQueryResult,
-    },
-    rfc8621::types::email_submission::{EmailSubmission, EmailSubmissionFilter, UndoStatus},
+use io_jmap::rfc8621::{
+    email_submission::{EmailSubmission, EmailSubmissionFilter, UndoStatus},
+    email_submission_query::{JmapEmailSubmissionQuery, JmapEmailSubmissionQueryResult},
 };
-use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 
 use crate::jmap::account::JmapAccount;
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// CLI proxy for [`UndoStatus`].
 #[derive(Clone, Debug, ValueEnum)]
@@ -78,7 +80,6 @@ impl JmapSubmissionQueryCommand {
             }
         };
 
-        let mut arg = None;
         let mut coroutine = JmapEmailSubmissionQuery::new(
             &jmap.session,
             &jmap.http_auth,
@@ -87,14 +88,21 @@ impl JmapSubmissionQueryCommand {
             Some(self.page.saturating_sub(1) * self.page_size),
             Some(self.page_size),
         )?;
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         let submissions = loop {
             match coroutine.resume(arg.take()) {
-                JmapEmailSubmissionQueryResult::Io { io } => {
-                    arg = Some(handle(&mut jmap.stream, io)?)
-                }
                 JmapEmailSubmissionQueryResult::Ok { submissions, .. } => break submissions,
-                JmapEmailSubmissionQueryResult::Err { err, .. } => bail!(err),
+                JmapEmailSubmissionQueryResult::WantsRead => {
+                    let n = jmap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                JmapEmailSubmissionQueryResult::WantsWrite(bytes) => {
+                    jmap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                JmapEmailSubmissionQueryResult::Err(err) => bail!("{err}"),
             }
         };
 

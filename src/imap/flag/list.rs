@@ -1,4 +1,8 @@
-use std::{collections::BTreeMap, fmt};
+use std::{
+    collections::BTreeMap,
+    fmt,
+    io::{Read, Write},
+};
 
 use anyhow::{bail, Result};
 use clap::Parser;
@@ -7,11 +11,12 @@ use io_imap::{
     rfc3501::select::*,
     types::flag::{Flag, FlagPerm},
 };
-use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::{Serialize, Serializer};
 
 use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// List available IMAP flags for the given mailbox.
 ///
@@ -29,21 +34,27 @@ impl ImapFlagListCommand {
         let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        let mut arg = None;
         let mut coroutine = ImapMailboxSelect::new(imap.context, mailbox);
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         let (flags, permanent_flags) = loop {
             match coroutine.resume(arg.take()) {
-                ImapMailboxSelectResult::Io { input } => {
-                    arg = Some(handle(&mut imap.stream, input)?)
-                }
                 ImapMailboxSelectResult::Ok { data, .. } => {
                     break (
                         data.flags.unwrap_or_default(),
                         data.permanent_flags.unwrap_or_default(),
                     )
                 }
-                ImapMailboxSelectResult::Err { err, .. } => bail!(err),
+                ImapMailboxSelectResult::WantsRead => {
+                    let n = imap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                ImapMailboxSelectResult::WantsWrite(bytes) => {
+                    imap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                ImapMailboxSelectResult::Err { err, .. } => bail!("{err}"),
             }
         };
 

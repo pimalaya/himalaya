@@ -1,10 +1,13 @@
+use std::io::{Read, Write};
+
 use anyhow::{bail, Result};
 use clap::Parser;
 use io_imap::rfc3501::close::*;
-use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::imap::account::ImapAccount;
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Close the current, selected mailbox.
 ///
@@ -22,16 +25,22 @@ impl ImapMailboxCloseCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
         let mut imap = account.new_imap_session()?;
 
-        let mut arg = None;
         let mut close_coroutine = ImapMailboxClose::new(imap.context);
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         loop {
             match close_coroutine.resume(arg.take()) {
-                ImapMailboxCloseResult::Io { input } => {
-                    arg = Some(handle(&mut imap.stream, input)?)
+                ImapMailboxCloseResult::Ok(_) => break,
+                ImapMailboxCloseResult::WantsRead => {
+                    let n = imap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
                 }
-                ImapMailboxCloseResult::Ok { .. } => break,
-                ImapMailboxCloseResult::Err { err, .. } => bail!(err),
+                ImapMailboxCloseResult::WantsWrite(bytes) => {
+                    imap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                ImapMailboxCloseResult::Err { err, .. } => bail!("{err}"),
             }
         }
 

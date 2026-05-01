@@ -1,20 +1,22 @@
-use std::fmt;
+use std::{
+    fmt,
+    io::{Read, Write},
+};
 
 use anyhow::{bail, Result};
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
-use io_jmap::{
-    rfc8620::types::session::capabilities::VACATION_RESPONSE,
-    rfc8621::coroutines::vacation_response_get::{
-        JmapVacationResponseGet, JmapVacationResponseGetResult,
-    },
-    rfc8621::types::vacation_response::VacationResponse,
+use io_jmap::rfc8621::{
+    capabilities::VACATION_RESPONSE,
+    vacation_response::VacationResponse,
+    vacation_response_get::{JmapVacationResponseGet, JmapVacationResponseGetResult},
 };
-use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 use serde::Serialize;
 
 use crate::jmap::account::JmapAccount;
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Get the JMAP vacation response (VacationResponse/get).
 #[derive(Debug, Parser)]
@@ -33,17 +35,23 @@ impl JmapVacationGetCommand {
         }
 
         let mut coroutine = JmapVacationResponseGet::new(&jmap.session, &jmap.http_auth)?;
-        let mut arg = None;
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         let vacation = loop {
             match coroutine.resume(arg.take()) {
-                JmapVacationResponseGetResult::Io { io } => {
-                    arg = Some(handle(&mut jmap.stream, io)?)
-                }
                 JmapVacationResponseGetResult::Ok {
                     vacation_response, ..
                 } => break vacation_response,
-                JmapVacationResponseGetResult::Err { err, .. } => bail!(err),
+                JmapVacationResponseGetResult::WantsRead => {
+                    let n = jmap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                JmapVacationResponseGetResult::WantsWrite(bytes) => {
+                    jmap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                JmapVacationResponseGetResult::Err(err) => bail!("{err}"),
             }
         };
 

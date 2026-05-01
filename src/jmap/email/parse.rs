@@ -1,12 +1,15 @@
+use std::io::{Read, Write};
+
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_jmap::rfc8621::coroutines::email_parse::{JmapEmailParse, JmapEmailParseResult};
-use io_socket::runtimes::std_stream::handle;
+use io_jmap::rfc8621::email_parse::{JmapEmailParse, JmapEmailParseResult};
 use log::warn;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 
 use crate::jmap::account::JmapAccount;
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Parse RFC 5322 message blobs without storing them (Email/parse).
 ///
@@ -25,20 +28,26 @@ impl JmapEmailParseCommand {
 
         let mut coroutine =
             JmapEmailParse::new(&jmap.session, &jmap.http_auth, self.blob_ids.clone(), None)?;
-        let mut arg = None;
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         let (parsed, not_parsable, not_found) = loop {
             match coroutine.resume(arg.take()) {
-                JmapEmailParseResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
                 JmapEmailParseResult::Ok {
                     parsed,
                     not_parsable,
                     not_found,
                     ..
-                } => {
-                    break (parsed, not_parsable, not_found);
+                } => break (parsed, not_parsable, not_found),
+                JmapEmailParseResult::WantsRead => {
+                    let n = jmap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
                 }
-                JmapEmailParseResult::Err { err, .. } => bail!(err),
+                JmapEmailParseResult::WantsWrite(bytes) => {
+                    jmap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                JmapEmailParseResult::Err(err) => bail!("{err}"),
             }
         };
 

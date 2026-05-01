@@ -1,4 +1,7 @@
-use std::fmt;
+use std::{
+    fmt,
+    io::{Read, Write},
+};
 
 use anyhow::{bail, Result};
 use clap::Parser;
@@ -7,11 +10,12 @@ use io_imap::{
     rfc3501::status::*,
     types::status::{StatusDataItem, StatusDataItemName},
 };
-use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::{Serialize, Serializer};
 
 use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Get the status of the given mailbox.
 ///
@@ -35,16 +39,22 @@ impl ImapMailboxStatusCommand {
             StatusDataItemName::UidValidity,
         ];
 
-        let mut arg = None;
         let mut coroutine = ImapMailboxStatus::new(imap.context, mailbox, item_names);
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         let items = loop {
             match coroutine.resume(arg.take()) {
-                ImapMailboxStatusResult::Io { input } => {
-                    arg = Some(handle(&mut imap.stream, input)?)
-                }
                 ImapMailboxStatusResult::Ok { items, .. } => break items,
-                ImapMailboxStatusResult::Err { err, .. } => bail!(err),
+                ImapMailboxStatusResult::WantsRead => {
+                    let n = imap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                ImapMailboxStatusResult::WantsWrite(bytes) => {
+                    imap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                ImapMailboxStatusResult::Err { err, .. } => bail!("{err}"),
             }
         };
 

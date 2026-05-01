@@ -1,14 +1,17 @@
+use std::io::{Read, Write};
+
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_jmap::{
-    rfc8621::coroutines::email_get::{JmapEmailGet, JmapEmailGetResult},
-    rfc8621::types::email::EmailAddress,
+use io_jmap::rfc8621::{
+    email::EmailAddress,
+    email_get::{JmapEmailGet, JmapEmailGetResult},
 };
-use io_socket::runtimes::std_stream::handle;
 use log::warn;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::jmap::account::JmapAccount;
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Read the content of a JMAP email (Email/get with body).
 ///
@@ -28,7 +31,6 @@ impl JmapEmailReadCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         let mut jmap = account.new_jmap_session()?;
 
-        let mut arg = None;
         let mut coroutine = JmapEmailGet::new(
             &jmap.session,
             &jmap.http_auth,
@@ -38,14 +40,23 @@ impl JmapEmailReadCommand {
             self.html,
             0,
         )?;
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         let (emails, not_found) = loop {
             match coroutine.resume(arg.take()) {
-                JmapEmailGetResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
                 JmapEmailGetResult::Ok {
                     emails, not_found, ..
                 } => break (emails, not_found),
-                JmapEmailGetResult::Err { err, .. } => bail!(err),
+                JmapEmailGetResult::WantsRead => {
+                    let n = jmap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                JmapEmailGetResult::WantsWrite(bytes) => {
+                    jmap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                JmapEmailGetResult::Err(err) => bail!("{err}"),
             }
         };
 

@@ -1,15 +1,19 @@
-use std::collections::HashMap;
+use std::{
+    collections::BTreeMap,
+    io::{Read, Write},
+};
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_jmap::{
-    rfc8621::coroutines::email_copy::{JmapEmailCopy, JmapEmailCopyResult},
-    rfc8621::types::email::EmailCopy,
+use io_jmap::rfc8621::{
+    email::EmailCopy,
+    email_copy::{JmapEmailCopy, JmapEmailCopyResult},
 };
-use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
-use crate::jmap::account::JmapAccount;
+use crate::jmap::{account::JmapAccount, error::format_set_error};
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Copy JMAP emails from another account (Email/copy).
 #[derive(Debug, Parser)]
@@ -31,10 +35,10 @@ impl JmapEmailCopyCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         let mut jmap = account.new_jmap_session()?;
 
-        let mailbox_ids: HashMap<String, bool> =
+        let mailbox_ids: BTreeMap<String, bool> =
             self.mailbox_id.into_iter().map(|m| (m, true)).collect();
 
-        let emails: HashMap<String, EmailCopy> = self
+        let emails: BTreeMap<String, EmailCopy> = self
             .ids
             .into_iter()
             .map(|id| {
@@ -56,13 +60,21 @@ impl JmapEmailCopyCommand {
             self.from_account.clone(),
             emails,
         )?;
-        let mut arg = None;
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         let not_created = loop {
             match coroutine.resume(arg.take()) {
-                JmapEmailCopyResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
                 JmapEmailCopyResult::Ok { not_created, .. } => break not_created,
-                JmapEmailCopyResult::Err { err, .. } => bail!(err),
+                JmapEmailCopyResult::WantsRead => {
+                    let n = jmap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                JmapEmailCopyResult::WantsWrite(bytes) => {
+                    jmap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                JmapEmailCopyResult::Err(err) => bail!("{err}"),
             }
         };
 
@@ -71,18 +83,7 @@ impl JmapEmailCopyCommand {
 
             for (id, err) in not_created {
                 msg.push_str(&format!("\n  `{id}`"));
-
-                if !err.properties.is_empty() {
-                    msg.push_str(": invalid properties `");
-                    msg.push_str(&err.properties.join("`, `"));
-                    msg.push('`');
-                }
-
-                if let Some(desc) = &err.description {
-                    msg.push_str(" (");
-                    msg.push_str(desc.to_lowercase().trim_end_matches(['.', '\n']));
-                    msg.push(')');
-                }
+                msg.push_str(&format_set_error(&err));
             }
 
             bail!(msg)

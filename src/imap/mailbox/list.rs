@@ -1,4 +1,7 @@
-use std::fmt;
+use std::{
+    fmt,
+    io::{Read, Write},
+};
 
 use anyhow::{bail, Result};
 use clap::Parser;
@@ -7,11 +10,12 @@ use io_imap::{
     rfc3501::{list::*, lsub::*},
     types::{core::QuotedChar, flag::FlagNameAttribute, mailbox::Mailbox},
 };
-use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 
 use crate::imap::account::ImapAccount;
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// List, search and filter mailboxes.
 ///
@@ -39,30 +43,42 @@ impl ImapMailboxListCommand {
         let reference = self.reference.try_into()?;
         let pattern = self.pattern.try_into()?;
 
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+
         let mailboxes = if self.all {
-            let mut arg = None;
             let mut coroutine = ImapMailboxList::new(imap.context, reference, pattern);
+            let mut arg: Option<&[u8]> = None;
 
             loop {
                 match coroutine.resume(arg.take()) {
-                    ImapMailboxListResult::Io { input } => {
-                        arg = Some(handle(&mut imap.stream, input)?)
-                    }
                     ImapMailboxListResult::Ok { mailboxes, .. } => break mailboxes,
-                    ImapMailboxListResult::Err { err, .. } => bail!(err),
+                    ImapMailboxListResult::WantsRead => {
+                        let n = imap.stream.read(&mut buf)?;
+                        arg = Some(&buf[..n]);
+                    }
+                    ImapMailboxListResult::WantsWrite(bytes) => {
+                        imap.stream.write_all(&bytes)?;
+                        arg = None;
+                    }
+                    ImapMailboxListResult::Err { err, .. } => bail!("{err}"),
                 }
             }
         } else {
-            let mut arg = None;
             let mut coroutine = ImapMailboxLsub::new(imap.context, reference, pattern);
+            let mut arg: Option<&[u8]> = None;
 
             loop {
                 match coroutine.resume(arg.take()) {
-                    ImapMailboxLsubResult::Io { input } => {
-                        arg = Some(handle(&mut imap.stream, input)?)
-                    }
                     ImapMailboxLsubResult::Ok { mailboxes, .. } => break mailboxes,
-                    ImapMailboxLsubResult::Err { err, .. } => bail!(err),
+                    ImapMailboxLsubResult::WantsRead => {
+                        let n = imap.stream.read(&mut buf)?;
+                        arg = Some(&buf[..n]);
+                    }
+                    ImapMailboxLsubResult::WantsWrite(bytes) => {
+                        imap.stream.write_all(&bytes)?;
+                        arg = None;
+                    }
+                    ImapMailboxLsubResult::Err { err, .. } => bail!("{err}"),
                 }
             }
         };

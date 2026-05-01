@@ -3,8 +3,10 @@ use std::fmt;
 use anyhow::{bail, Result};
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
-use io_fs::runtimes::std::handle;
-use io_maildir::{coroutines::get_message::*, maildir::Maildir};
+use io_maildir::{
+    coroutines::message_get::{MaildirMessageGet, MaildirMessageGetArg, MaildirMessageGetResult},
+    maildir::Maildir,
+};
 use mail_parser::Header;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
@@ -12,6 +14,7 @@ use serde::Serialize;
 use crate::maildir::{
     account::MaildirAccount,
     arg::{MaildirPathFlag, MessageIdArg},
+    runtime,
 };
 
 /// Get a single MAILDIR envelope.
@@ -34,24 +37,31 @@ impl MaildirEnvelopeGetCommand {
             Err(_) => Maildir::try_from(account.backend.root.join(self.maildir.inner))?,
         };
 
+        let mut coroutine = MaildirMessageGet::new(maildir, &self.id.inner);
         let mut arg = None;
-        let mut coroutine = GetMaildirMessage::new(maildir, &self.id.inner);
 
         let message = loop {
             match coroutine.resume(arg.take()) {
-                GetMaildirMessageResult::Io(io) => arg = Some(handle(io)?),
-                GetMaildirMessageResult::Ok(msg) => break msg,
-                GetMaildirMessageResult::Err(err) => bail!(err),
-            };
+                MaildirMessageGetResult::Ok(message) => break message,
+                MaildirMessageGetResult::WantsDirRead(paths) => {
+                    arg = Some(MaildirMessageGetArg::DirRead(runtime::dir_read(paths)?));
+                }
+                MaildirMessageGetResult::WantsFileRead(paths) => {
+                    arg = Some(MaildirMessageGetArg::FileRead(runtime::file_read(paths)?));
+                }
+                MaildirMessageGetResult::Err(err) => bail!("{err}"),
+            }
         };
 
-        let Some(message) = message.headers() else {
-            bail!("Invalid MIME message at {}", message.path().display());
+        let path = message.path().to_owned();
+
+        let Some(parsed) = message.headers() else {
+            bail!("Invalid MIME message at {}", path.display());
         };
 
         let table = EnvelopeTable {
             preset: account.table_preset,
-            headers: message.headers(),
+            headers: parsed.headers(),
         };
 
         printer.out(table)

@@ -1,12 +1,15 @@
+use std::io::{Read, Write};
+
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
-use io_jmap::rfc8621::coroutines::email_submission_cancel::{
+use io_jmap::rfc8621::email_submission_cancel::{
     JmapEmailSubmissionCancel, JmapEmailSubmissionCancelResult,
 };
-use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
-use crate::jmap::account::JmapAccount;
+use crate::jmap::{account::JmapAccount, error::format_set_error};
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Cancel (undo) a pending JMAP email submission (EmailSubmission/set).
 ///
@@ -26,15 +29,21 @@ impl JmapSubmissionCancelCommand {
         let mut coroutine =
             JmapEmailSubmissionCancel::new(&jmap.session, &jmap.http_auth, self.ids.clone())
                 .map_err(|e| anyhow!("{e}"))?;
-        let mut arg = None;
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         let not_updated = loop {
             match coroutine.resume(arg.take()) {
-                JmapEmailSubmissionCancelResult::Io { io } => {
-                    arg = Some(handle(&mut jmap.stream, io)?)
-                }
                 JmapEmailSubmissionCancelResult::Ok { not_updated, .. } => break not_updated,
-                JmapEmailSubmissionCancelResult::Err { err, .. } => bail!(err),
+                JmapEmailSubmissionCancelResult::WantsRead => {
+                    let n = jmap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                JmapEmailSubmissionCancelResult::WantsWrite(bytes) => {
+                    jmap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                JmapEmailSubmissionCancelResult::Err(err) => bail!("{err}"),
             }
         };
 
@@ -43,18 +52,7 @@ impl JmapSubmissionCancelCommand {
 
             for (id, err) in &not_updated {
                 msg.push_str(&format!("\n  `{id}`"));
-
-                if !err.properties.is_empty() {
-                    msg.push_str(": invalid properties `");
-                    msg.push_str(&err.properties.join("`, `"));
-                    msg.push('`');
-                }
-
-                if let Some(desc) = &err.description {
-                    msg.push_str(" (");
-                    msg.push_str(desc.to_lowercase().trim_end_matches(['.', '\n']));
-                    msg.push(')');
-                }
+                msg.push_str(&format_set_error(err));
             }
 
             bail!(msg);

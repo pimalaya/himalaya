@@ -3,12 +3,16 @@ use std::fmt;
 use anyhow::{bail, Result};
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, Row, Table};
-use io_fs::runtimes::std::handle;
-use io_maildir::{coroutines::list_messages::*, maildir::Maildir};
+use io_maildir::{
+    coroutines::message_list::{
+        MaildirMessagesList, MaildirMessagesListArg, MaildirMessagesListResult,
+    },
+    maildir::Maildir,
+};
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 
-use crate::maildir::{account::MaildirAccount, arg::MaildirPathFlag};
+use crate::maildir::{account::MaildirAccount, arg::MaildirPathFlag, runtime};
 
 /// List MAILDIR envelopes from the given mailbox.
 ///
@@ -28,15 +32,20 @@ impl MaildirEnvelopeListCommand {
             Err(_) => Maildir::try_from(account.backend.root.join(self.maildir.inner))?,
         };
 
+        let mut coroutine = MaildirMessagesList::new(maildir);
         let mut arg = None;
-        let mut coroutine = ListMaildirMessages::new(maildir);
 
         let messages = loop {
             match coroutine.resume(arg.take()) {
-                ListMaildirMessagesResult::Io(io) => arg = Some(handle(io)?),
-                ListMaildirMessagesResult::Ok(messages) => break messages,
-                ListMaildirMessagesResult::Err(err) => bail!(err),
-            };
+                MaildirMessagesListResult::Ok(messages) => break messages,
+                MaildirMessagesListResult::WantsDirRead(paths) => {
+                    arg = Some(MaildirMessagesListArg::DirRead(runtime::dir_read(paths)?));
+                }
+                MaildirMessagesListResult::WantsFileRead(paths) => {
+                    arg = Some(MaildirMessagesListArg::FileRead(runtime::file_read(paths)?));
+                }
+                MaildirMessagesListResult::Err(err) => bail!("{err}"),
+            }
         };
 
         let mut envelopes = Vec::with_capacity(messages.len());
@@ -45,21 +54,22 @@ impl MaildirEnvelopeListCommand {
             let Some(id) = message.id() else {
                 continue;
             };
+            let id = id.to_owned();
 
-            let Some(headers) = message.headers() else {
+            let Some(parsed) = message.headers() else {
                 continue;
             };
 
             let mut row = EnvelopesTableEntry::default();
 
-            row.id = id.to_owned();
-            row.subject = headers.subject().unwrap_or("").to_owned();
+            row.id = id;
+            row.subject = parsed.subject().unwrap_or("").to_owned();
 
-            if let Some(addr) = headers.from().and_then(|a| a.first()) {
+            if let Some(addr) = parsed.from().and_then(|a| a.first()) {
                 row.from = addr.name().or(addr.address()).unwrap_or("").to_owned();
             }
 
-            if let Some(date) = headers.date() {
+            if let Some(date) = parsed.date() {
                 row.date = date.to_rfc822();
             }
 

@@ -1,19 +1,23 @@
-use std::{convert::Infallible, fmt, str::FromStr};
+use std::{
+    convert::Infallible,
+    fmt,
+    io::{Read, Write},
+    str::FromStr,
+};
 
 use anyhow::{bail, Result};
 use clap::{Parser, ValueEnum};
 use comfy_table::{Cell, Row, Table};
-use io_jmap::{
-    rfc8621::coroutines::mailbox_query::{JmapMailboxQuery, JmapMailboxQueryResult},
-    rfc8621::types::mailbox::{
-        Mailbox, MailboxFilter, MailboxRole, MailboxSortComparator, MailboxSortProperty,
-    },
+use io_jmap::rfc8621::{
+    mailbox::{Mailbox, MailboxFilter, MailboxRole, MailboxSortComparator, MailboxSortProperty},
+    mailbox_query::{JmapMailboxQuery, JmapMailboxQueryResult},
 };
-use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 
 use crate::jmap::account::JmapAccount;
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Query JMAP mailboxes (Mailbox/query + Mailbox/get).
 ///
@@ -89,7 +93,6 @@ impl JmapMailboxQueryCommand {
             is_ascending: Some(!self.desc),
         }]);
 
-        let mut arg = None;
         let mut coroutine = JmapMailboxQuery::new(
             &jmap.session,
             &jmap.http_auth,
@@ -99,12 +102,21 @@ impl JmapMailboxQueryCommand {
             Some(self.page_size),
             None,
         )?;
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         let mailboxes = loop {
             match coroutine.resume(arg.take()) {
-                JmapMailboxQueryResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
                 JmapMailboxQueryResult::Ok { mailboxes, .. } => break mailboxes,
-                JmapMailboxQueryResult::Err { err, .. } => bail!(err),
+                JmapMailboxQueryResult::WantsRead => {
+                    let n = jmap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                JmapMailboxQueryResult::WantsWrite(bytes) => {
+                    jmap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                JmapMailboxQueryResult::Err(err) => bail!("{err}"),
             }
         };
 

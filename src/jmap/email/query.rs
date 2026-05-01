@@ -1,17 +1,21 @@
-use std::fmt;
+use std::{
+    fmt,
+    io::{Read, Write},
+};
 
 use anyhow::{bail, Result};
 use clap::{Parser, ValueEnum};
 use comfy_table::{Cell, ContentArrangement, Row, Table};
-use io_jmap::{
-    rfc8621::coroutines::email_query::{JmapEmailQuery, JmapEmailQueryResult},
-    rfc8621::types::email::{Email, EmailAddress, EmailComparator, EmailFilter, EmailSortProperty},
+use io_jmap::rfc8621::{
+    email::{Email, EmailAddress, EmailComparator, EmailFilter, EmailSortProperty},
+    email_query::{JmapEmailQuery, JmapEmailQueryResult},
 };
-use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 
 use crate::jmap::account::JmapAccount;
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Query JMAP emails (Email/query + Email/get).
 ///
@@ -141,7 +145,6 @@ impl JmapEmailQueryCommand {
             keyword: None,
         }]);
 
-        let mut arg = None;
         let mut coroutine = JmapEmailQuery::new(
             &jmap.session,
             &jmap.http_auth,
@@ -151,12 +154,21 @@ impl JmapEmailQueryCommand {
             Some(self.page_size),
             None,
         )?;
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         let emails = loop {
             match coroutine.resume(arg.take()) {
-                JmapEmailQueryResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
                 JmapEmailQueryResult::Ok { emails, .. } => break emails,
-                JmapEmailQueryResult::Err { err, .. } => bail!(err),
+                JmapEmailQueryResult::WantsRead => {
+                    let n = jmap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                JmapEmailQueryResult::WantsWrite(bytes) => {
+                    jmap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                JmapEmailQueryResult::Err(err) => bail!("{err}"),
             }
         };
 

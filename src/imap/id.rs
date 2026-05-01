@@ -1,4 +1,8 @@
-use std::{collections::HashMap, fmt};
+use std::{
+    collections::HashMap,
+    fmt,
+    io::{Read, Write},
+};
 
 use anyhow::{bail, Result};
 use clap::Parser;
@@ -10,11 +14,12 @@ use io_imap::{
         IntoStatic,
     },
 };
-use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 
 use crate::imap::account::ImapAccount;
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Get information about the IMAP server.
 ///
@@ -58,14 +63,22 @@ impl ImapIdCommand {
             params.extend(more);
         }
 
-        let mut arg = None;
         let mut coroutine = ImapServerId::new(imap.context, Some(params.into_iter().collect()));
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         let params = loop {
             match coroutine.resume(arg.take()) {
-                ImapServerIdResult::Io { input } => arg = Some(handle(&mut imap.stream, input)?),
                 ImapServerIdResult::Ok { server_id, .. } => break server_id,
-                ImapServerIdResult::Err { err, .. } => bail!(err),
+                ImapServerIdResult::WantsRead => {
+                    let n = imap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                ImapServerIdResult::WantsWrite(bytes) => {
+                    imap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                ImapServerIdResult::Err { err, .. } => bail!("{err}"),
             }
         };
 

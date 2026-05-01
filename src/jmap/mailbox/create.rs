@@ -1,15 +1,19 @@
-use std::collections::HashMap;
+use std::{
+    collections::BTreeMap,
+    io::{Read, Write},
+};
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_jmap::{
-    rfc8621::coroutines::mailbox_set::{JmapMailboxSet, JmapMailboxSetArgs, JmapMailboxSetResult},
-    rfc8621::types::mailbox::MailboxCreate,
+use io_jmap::rfc8621::{
+    mailbox::MailboxCreate,
+    mailbox_set::{JmapMailboxSet, JmapMailboxSetArgs, JmapMailboxSetResult},
 };
-use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
-use crate::jmap::account::JmapAccount;
+use crate::jmap::{account::JmapAccount, error::format_set_error};
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Create a JMAP mailbox.
 #[derive(Debug, Parser)]
@@ -39,38 +43,34 @@ impl JmapMailboxCreateCommand {
             ..Default::default()
         };
 
-        let mut create = HashMap::new();
+        let mut create = BTreeMap::new();
         create.insert(self.name.clone(), new_mailbox);
 
         let mut args = JmapMailboxSetArgs::default();
         args.create = Some(create);
 
         let mut coroutine = JmapMailboxSet::new(&jmap.session, &jmap.http_auth, args)?;
-        let mut arg = None;
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         let not_created = loop {
             match coroutine.resume(arg.take()) {
-                JmapMailboxSetResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
                 JmapMailboxSetResult::Ok { not_created, .. } => break not_created,
-                JmapMailboxSetResult::Err { err, .. } => bail!(err),
+                JmapMailboxSetResult::WantsRead => {
+                    let n = jmap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                JmapMailboxSetResult::WantsWrite(bytes) => {
+                    jmap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                JmapMailboxSetResult::Err(err) => bail!("{err}"),
             }
         };
 
         if let Some(err) = not_created.get(&self.name) {
             let mut msg = format!("Create JMAP mailbox `{}` error", self.name);
-
-            if !err.properties.is_empty() {
-                msg.push_str(": invalid properties `");
-                msg.push_str(&err.properties.join("`, `"));
-                msg.push('`');
-            }
-
-            if let Some(desc) = &err.description {
-                msg.push_str(" (");
-                msg.push_str(desc.to_lowercase().trim_end_matches(['.', '\n']));
-                msg.push(')');
-            }
-
+            msg.push_str(&format_set_error(err));
             bail!(msg)
         }
 

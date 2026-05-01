@@ -6,8 +6,13 @@ use std::{
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_fs::runtimes::std::handle;
-use io_maildir::{coroutines::store_message::*, flag::Flags, maildir::Maildir};
+use io_maildir::{
+    coroutines::message_store::{
+        MaildirMessageStore, MaildirMessageStoreArg, MaildirMessageStoreResult,
+    },
+    flag::Flags,
+    maildir::Maildir,
+};
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 
@@ -15,6 +20,7 @@ use crate::maildir::{
     account::MaildirAccount,
     arg::{MaildirPathFlag, MaildirSubdirArg},
     flag::arg::FlagArg,
+    runtime,
 };
 
 /// Save a message to a mailbox.
@@ -64,15 +70,22 @@ impl MaildirMessageSaveCommand {
 
         let flags = Flags::from_iter(self.flags.into_iter().map(Into::into));
 
-        let mut arg = None;
         let mut coroutine =
-            StoreMaildirMessage::new(maildir, self.subdir.into(), flags, msg.into_bytes());
+            MaildirMessageStore::new(maildir, self.subdir.into(), flags, msg.into_bytes());
+        let mut arg = None;
 
         let out = loop {
             match coroutine.resume(arg.take()) {
-                StoreMaildirMessageResult::Io(io) => arg = Some(handle(io)?),
-                StoreMaildirMessageResult::Ok { id, path } => break StoredMessage { id, path },
-                StoreMaildirMessageResult::Err(err) => bail!(err),
+                MaildirMessageStoreResult::Ok { id, path } => break StoredMessage { id, path },
+                MaildirMessageStoreResult::WantsFileCreate(files) => {
+                    runtime::file_create(files)?;
+                    arg = Some(MaildirMessageStoreArg::FileCreate);
+                }
+                MaildirMessageStoreResult::WantsRename(pairs) => {
+                    runtime::rename(pairs)?;
+                    arg = Some(MaildirMessageStoreArg::Rename);
+                }
+                MaildirMessageStoreResult::Err(err) => bail!("{err}"),
             }
         };
 

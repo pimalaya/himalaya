@@ -1,12 +1,16 @@
-use std::collections::HashMap;
+use std::{
+    collections::BTreeMap,
+    io::{Read, Write},
+};
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_jmap::rfc8621::coroutines::email_set::{JmapEmailSet, JmapEmailSetArgs, JmapEmailSetResult};
-use io_socket::runtimes::std_stream::handle;
+use io_jmap::rfc8621::email_set::{JmapEmailSet, JmapEmailSetArgs, JmapEmailSetResult};
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
-use crate::jmap::account::JmapAccount;
+use crate::jmap::{account::JmapAccount, error::format_set_error};
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Update JMAP emails via patch operations (Email/set).
 #[derive(Debug, Parser)]
@@ -55,7 +59,7 @@ impl JmapEmailUpdateCommand {
             }
 
             if let Some(kws) = &self.keywords {
-                let map: HashMap<String, bool> = kws.iter().map(|kw| (kw.clone(), true)).collect();
+                let map: BTreeMap<String, bool> = kws.iter().map(|kw| (kw.clone(), true)).collect();
                 args.replace_keywords(id.clone(), map);
             }
 
@@ -68,19 +72,28 @@ impl JmapEmailUpdateCommand {
             }
 
             if let Some(mboxes) = &self.mailboxes {
-                let map: HashMap<String, bool> = mboxes.iter().map(|m| (m.clone(), true)).collect();
+                let map: BTreeMap<String, bool> =
+                    mboxes.iter().map(|m| (m.clone(), true)).collect();
                 args.replace_mailbox_ids(id.clone(), map);
             }
         }
 
         let mut coroutine = JmapEmailSet::new(&jmap.session, &jmap.http_auth, args)?;
-        let mut arg = None;
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         let not_updated = loop {
             match coroutine.resume(arg.take()) {
-                JmapEmailSetResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
                 JmapEmailSetResult::Ok { not_updated, .. } => break not_updated,
-                JmapEmailSetResult::Err { err, .. } => bail!(err),
+                JmapEmailSetResult::WantsRead => {
+                    let n = jmap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                JmapEmailSetResult::WantsWrite(bytes) => {
+                    jmap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                JmapEmailSetResult::Err(err) => bail!("{err}"),
             }
         };
 
@@ -89,18 +102,7 @@ impl JmapEmailUpdateCommand {
 
             for (id, err) in not_updated {
                 msg.push_str(&format!("\n  `{id}`"));
-
-                if !err.properties.is_empty() {
-                    msg.push_str(": invalid properties `");
-                    msg.push_str(&err.properties.join("`, `"));
-                    msg.push('`');
-                }
-
-                if let Some(desc) = &err.description {
-                    msg.push_str(" (");
-                    msg.push_str(desc.to_lowercase().trim_end_matches(['.', '\n']));
-                    msg.push(')');
-                }
+                msg.push_str(&format_set_error(&err));
             }
 
             bail!(msg)

@@ -1,10 +1,11 @@
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_fs::runtimes::std::handle;
-use io_maildir::coroutines::create_maildir::*;
+use io_maildir::coroutines::maildir_create::{
+    MaildirCreate, MaildirCreateArg, MaildirCreateResult,
+};
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
-use crate::maildir::{account::MaildirAccount, arg::MaildirNameArg};
+use crate::maildir::{account::MaildirAccount, arg::MaildirNameArg, runtime};
 
 /// Create the given mailbox.
 ///
@@ -20,14 +21,17 @@ impl MaildirMailboxCreateCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
         let path = account.backend.root.join(self.maildir_name.inner);
 
+        let mut coroutine = MaildirCreate::new(path);
         let mut arg = None;
-        let mut coroutine = CreateMaildir::new(path);
 
         loop {
             match coroutine.resume(arg.take()) {
-                CreateMaildirResult::Ok => break,
-                CreateMaildirResult::Io(io) => arg = Some(handle(io)?),
-                CreateMaildirResult::Err(err) => bail!(err),
+                MaildirCreateResult::Ok => break,
+                MaildirCreateResult::WantsDirCreate(paths) => {
+                    runtime::dir_create(paths)?;
+                    arg = Some(MaildirCreateArg::DirCreate);
+                }
+                MaildirCreateResult::Err(err) => bail!("{err}"),
             }
         }
 

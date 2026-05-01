@@ -1,10 +1,13 @@
+use std::io::{Read, Write};
+
 use anyhow::{bail, Result};
 use clap::Parser;
 use io_imap::rfc3501::delete::*;
-use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Delete the given mailbox.
 ///
@@ -21,16 +24,22 @@ impl ImapMailboxDeleteCommand {
         let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        let mut arg = None;
         let mut coroutine = ImapMailboxDelete::new(imap.context, mailbox);
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         loop {
             match coroutine.resume(arg.take()) {
-                ImapMailboxDeleteResult::Io { input } => {
-                    arg = Some(handle(&mut imap.stream, input)?)
+                ImapMailboxDeleteResult::Ok(_) => break,
+                ImapMailboxDeleteResult::WantsRead => {
+                    let n = imap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
                 }
-                ImapMailboxDeleteResult::Ok { .. } => break,
-                ImapMailboxDeleteResult::Err { err, .. } => bail!(err),
+                ImapMailboxDeleteResult::WantsWrite(bytes) => {
+                    imap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                ImapMailboxDeleteResult::Err { err, .. } => bail!("{err}"),
             }
         }
 

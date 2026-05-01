@@ -68,6 +68,47 @@ imap.sasl.login.password.command = ["mimosa", "password", "read", "example"]
 #imap.sasl.login.password.raw = "***"
 
 # --------------------------------
+# JMAP config
+# --------------------------------
+
+# JMAP server address. Either a bare authority (auto-discovered via
+# /.well-known/jmap) or a full session URL.
+#jmap.server = "fastmail.com"
+#jmap.server = "https://api.fastmail.com/jmap/session"
+
+# JMAP TLS provider (mirrors the imap.tls block above)
+#jmap.tls.provider = "rustls"
+#jmap.tls.rustls.crypto = "ring"
+
+# Authentication. Pick exactly one of header/bearer/basic.
+
+# Raw "Authorization" header value, used verbatim
+#jmap.auth.header.raw = "Bearer eyJhbGciOiJ..."
+
+# OAuth 2.0 / API token bearer
+#jmap.auth.bearer.token.command = ["mimosa", "password", "read", "fastmail-api"]
+
+# HTTP Basic
+#jmap.auth.basic.username = "user@example.com"
+#jmap.auth.basic.password.command = ["mimosa", "password", "read", "fastmail"]
+
+# Identity to send as. Required only for `himalaya messages send` over
+# JMAP; can be discovered with `himalaya jmap identity get`.
+#jmap.identity-id = "I0123abc"
+
+# Drafts mailbox id used to stage outgoing messages before submission.
+# Required only for `himalaya messages send` over JMAP; can be
+# discovered with `himalaya jmap mailbox query --role drafts`.
+#jmap.drafts-mailbox-id = "M0123abc"
+
+# --------------------------------
+# Maildir config
+# --------------------------------
+
+# Root directory containing one subdirectory per mailbox (Maildir++ layout)
+#maildir.root = "~/Mail/example"
+
+# --------------------------------
 # SMTP config
 # --------------------------------
 

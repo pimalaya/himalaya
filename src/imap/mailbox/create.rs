@@ -1,10 +1,13 @@
+use std::io::{Read, Write};
+
 use anyhow::{bail, Result};
 use clap::Parser;
 use io_imap::rfc3501::create::*;
-use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Create the given mailbox.
 ///
@@ -22,16 +25,22 @@ impl ImapMailboxCreateCommand {
 
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        let mut arg = None;
         let mut coroutine = ImapMailboxCreate::new(imap.context, mailbox);
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         loop {
             match coroutine.resume(arg.take()) {
-                ImapMailboxCreateResult::Io { input } => {
-                    arg = Some(handle(&mut imap.stream, input)?)
+                ImapMailboxCreateResult::Ok(_) => break,
+                ImapMailboxCreateResult::WantsRead => {
+                    let n = imap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
                 }
-                ImapMailboxCreateResult::Ok { .. } => break,
-                ImapMailboxCreateResult::Err { err, .. } => bail!(err),
+                ImapMailboxCreateResult::WantsWrite(bytes) => {
+                    imap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                ImapMailboxCreateResult::Err { err, .. } => bail!("{err}"),
             }
         }
 

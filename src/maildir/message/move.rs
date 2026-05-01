@@ -1,12 +1,17 @@
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_fs::runtimes::std::handle;
-use io_maildir::{coroutines::move_message::*, maildir::Maildir};
+use io_maildir::{
+    coroutines::message_move::{
+        MaildirMessageMove, MaildirMessageMoveArg, MaildirMessageMoveResult,
+    },
+    maildir::Maildir,
+};
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::maildir::{
     account::MaildirAccount,
     arg::{MaildirPathFlag, MaildirSubdirArg, MessageIdsArg, TargetMaildirPathFlag},
+    runtime,
 };
 
 /// Move Maildir message to the given mailbox.
@@ -40,19 +45,25 @@ impl MaildirMessageMoveCommand {
         };
 
         for id in self.ids.inner {
-            let mut arg = None;
-            let mut coroutine = MoveMaildirMessage::new(
+            let mut coroutine = MaildirMessageMove::new(
                 id,
                 source.clone(),
                 target.clone(),
                 self.subdir.clone().map(Into::into),
             );
+            let mut arg = None;
 
             loop {
                 match coroutine.resume(arg.take()) {
-                    MoveMaildirMessageResult::Io(io) => arg = Some(handle(io)?),
-                    MoveMaildirMessageResult::Ok => break,
-                    MoveMaildirMessageResult::Err(err) => bail!(err),
+                    MaildirMessageMoveResult::Ok => break,
+                    MaildirMessageMoveResult::WantsDirRead(paths) => {
+                        arg = Some(MaildirMessageMoveArg::DirRead(runtime::dir_read(paths)?));
+                    }
+                    MaildirMessageMoveResult::WantsRename(pairs) => {
+                        runtime::rename(pairs)?;
+                        arg = Some(MaildirMessageMoveArg::Rename);
+                    }
+                    MaildirMessageMoveResult::Err(err) => bail!("{err}"),
                 }
             }
         }

@@ -1,13 +1,19 @@
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_fs::runtimes::std::handle;
-use io_maildir::{coroutines::remove_flags::*, flag::Flags, maildir::Maildir};
+use io_maildir::{
+    coroutines::flags_remove::{
+        MaildirFlagsRemove, MaildirFlagsRemoveArg, MaildirFlagsRemoveResult,
+    },
+    flag::Flags,
+    maildir::Maildir,
+};
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::maildir::{
     account::MaildirAccount,
     arg::{MaildirPathFlag, MessageIdsArg},
     flag::arg::FlagArg,
+    runtime,
 };
 
 /// Remove MAILDIR flag(s) to message(s).
@@ -36,14 +42,20 @@ impl MaildirFlagRemoveCommand {
         let flags = Flags::from_iter(self.flags.into_iter().map(Into::into));
 
         for id in self.ids.inner {
+            let mut coroutine = MaildirFlagsRemove::new(maildir.clone(), id, flags.clone());
             let mut arg = None;
-            let mut coroutine = RemoveMaildirFlags::new(maildir.clone(), id, flags.clone());
 
             loop {
                 match coroutine.resume(arg.take()) {
-                    RemoveMaildirFlagsResult::Ok => break,
-                    RemoveMaildirFlagsResult::Io(io) => arg = Some(handle(io)?),
-                    RemoveMaildirFlagsResult::Err(err) => bail!(err),
+                    MaildirFlagsRemoveResult::Ok => break,
+                    MaildirFlagsRemoveResult::WantsDirRead(paths) => {
+                        arg = Some(MaildirFlagsRemoveArg::DirRead(runtime::dir_read(paths)?));
+                    }
+                    MaildirFlagsRemoveResult::WantsRename(pairs) => {
+                        runtime::rename(pairs)?;
+                        arg = Some(MaildirFlagsRemoveArg::Rename);
+                    }
+                    MaildirFlagsRemoveResult::Err(err) => bail!("{err}"),
                 }
             }
         }

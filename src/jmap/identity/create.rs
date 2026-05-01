@@ -1,15 +1,16 @@
+use std::io::{Read, Write};
+
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_jmap::{
-    rfc8621::coroutines::identity_set::{
-        JmapIdentitySet, JmapIdentitySetArgs, JmapIdentitySetResult,
-    },
-    rfc8621::types::identity::IdentityCreate,
+use io_jmap::rfc8621::{
+    identity::IdentityCreate,
+    identity_set::{JmapIdentitySet, JmapIdentitySetArgs, JmapIdentitySetResult},
 };
-use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
-use crate::jmap::account::JmapAccount;
+use crate::jmap::{account::JmapAccount, error::format_set_error};
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Create a JMAP sender identity (Identity/set).
 #[derive(Debug, Parser)]
@@ -48,31 +49,27 @@ impl JmapIdentityCreateCommand {
         args.create(create_id, identity);
 
         let mut coroutine = JmapIdentitySet::new(&jmap.session, &jmap.http_auth, args)?;
-        let mut arg = None;
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         let not_created = loop {
             match coroutine.resume(arg.take()) {
-                JmapIdentitySetResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
                 JmapIdentitySetResult::Ok { not_created, .. } => break not_created,
-                JmapIdentitySetResult::Err { err, .. } => bail!(err),
+                JmapIdentitySetResult::WantsRead => {
+                    let n = jmap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                JmapIdentitySetResult::WantsWrite(bytes) => {
+                    jmap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                JmapIdentitySetResult::Err(err) => bail!("{err}"),
             }
         };
 
         if let Some(err) = not_created.get(create_id) {
             let mut msg = format!("Create identity for `{}` error", self.email);
-
-            if !err.properties.is_empty() {
-                msg.push_str(": invalid propertie(s) `");
-                msg.push_str(&err.properties.join("`, `"));
-                msg.push('`');
-            }
-
-            if let Some(desc) = &err.description {
-                msg.push_str(" (");
-                msg.push_str(desc.to_lowercase().trim_end_matches(['.', '\n']));
-                msg.push_str(")");
-            }
-
+            msg.push_str(&format_set_error(err));
             bail!(msg);
         }
 

@@ -1,4 +1,9 @@
-use std::{collections::BTreeMap, fmt, num::NonZeroU32};
+use std::{
+    collections::BTreeMap,
+    fmt,
+    io::{Read, Write},
+    num::NonZeroU32,
+};
 
 use anyhow::{bail, Result};
 use clap::Parser;
@@ -13,7 +18,6 @@ use io_imap::{
         status::{StatusDataItem, StatusDataItemName},
     },
 };
-use io_socket::runtimes::std_stream::handle;
 use log::debug;
 use pimalaya_toolbox::terminal::printer::Printer;
 use rfc2047_decoder::{Decoder, RecoverStrategy};
@@ -23,6 +27,8 @@ use crate::imap::{
     account::ImapAccount,
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
 };
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// List IMAP envelopes from the given mailbox.
 ///
@@ -58,16 +64,15 @@ impl ImapEnvelopeListCommand {
         let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
 
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+
         let exists = if self.mailbox_no_select.inner {
-            let mut arg = None;
             let mut coroutine =
                 ImapMailboxStatus::new(imap.context, mailbox, &[StatusDataItemName::Messages]);
+            let mut arg: Option<&[u8]> = None;
 
             loop {
                 match coroutine.resume(arg.take()) {
-                    ImapMailboxStatusResult::Io { input } => {
-                        arg = Some(handle(&mut imap.stream, input)?)
-                    }
                     ImapMailboxStatusResult::Ok { context, items } => {
                         imap.context = context;
                         break items.into_iter().find_map(|i| match i {
@@ -75,23 +80,36 @@ impl ImapEnvelopeListCommand {
                             _ => None,
                         });
                     }
-                    ImapMailboxStatusResult::Err { err, .. } => bail!(err),
+                    ImapMailboxStatusResult::WantsRead => {
+                        let n = imap.stream.read(&mut buf)?;
+                        arg = Some(&buf[..n]);
+                    }
+                    ImapMailboxStatusResult::WantsWrite(bytes) => {
+                        imap.stream.write_all(&bytes)?;
+                        arg = None;
+                    }
+                    ImapMailboxStatusResult::Err { err, .. } => bail!("{err}"),
                 }
             }
         } else {
-            let mut arg = None;
             let mut coroutine = ImapMailboxSelect::new(imap.context, mailbox);
+            let mut arg: Option<&[u8]> = None;
 
             loop {
                 match coroutine.resume(arg.take()) {
-                    ImapMailboxSelectResult::Io { input } => {
-                        arg = Some(handle(&mut imap.stream, input)?)
-                    }
                     ImapMailboxSelectResult::Ok { context, data } => {
                         imap.context = context;
                         break data.exists;
                     }
-                    ImapMailboxSelectResult::Err { err, .. } => bail!(err),
+                    ImapMailboxSelectResult::WantsRead => {
+                        let n = imap.stream.read(&mut buf)?;
+                        arg = Some(&buf[..n]);
+                    }
+                    ImapMailboxSelectResult::WantsWrite(bytes) => {
+                        imap.stream.write_all(&bytes)?;
+                        arg = None;
+                    }
+                    ImapMailboxSelectResult::Err { err, .. } => bail!("{err}"),
                 }
             }
         };
@@ -113,21 +131,26 @@ impl ImapEnvelopeListCommand {
             MessageDataItemName::Envelope,
         ]);
 
-        let mut arg = None;
         let mut coroutine = ImapMessageFetch::new(
             imap.context,
             sequence_set,
             item_names,
             !self.sequence && has_sequence,
         );
+        let mut arg: Option<&[u8]> = None;
 
         let data = loop {
             match coroutine.resume(arg.take()) {
-                ImapMessageFetchResult::Io { input } => {
-                    arg = Some(handle(&mut imap.stream, input)?)
-                }
                 ImapMessageFetchResult::Ok { data, .. } => break data,
-                ImapMessageFetchResult::Err { err, .. } => bail!(err),
+                ImapMessageFetchResult::WantsRead => {
+                    let n = imap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                ImapMessageFetchResult::WantsWrite(bytes) => {
+                    imap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                ImapMessageFetchResult::Err { err, .. } => bail!("{err}"),
             }
         };
 

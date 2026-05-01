@@ -2,14 +2,18 @@ use std::fmt;
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_fs::runtimes::std::handle;
-use io_maildir::{coroutines::get_message::*, maildir::Maildir, types::Message};
+use io_maildir::{
+    coroutines::message_get::{MaildirMessageGet, MaildirMessageGetArg, MaildirMessageGetResult},
+    maildir::Maildir,
+    types::Message,
+};
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 
 use crate::maildir::{
     account::MaildirAccount,
     arg::{MaildirPathFlag, MessageIdArg},
+    runtime,
 };
 
 /// Read message content.
@@ -38,25 +42,32 @@ impl MaildirMessageReadCommand {
             Err(_) => Maildir::try_from(account.backend.root.join(self.maildir.inner))?,
         };
 
+        let mut coroutine = MaildirMessageGet::new(maildir, &self.id.inner);
         let mut arg = None;
-        let mut coroutine = GetMaildirMessage::new(maildir, &self.id.inner);
 
         let message = loop {
             match coroutine.resume(arg.take()) {
-                GetMaildirMessageResult::Io(io) => arg = Some(handle(io)?),
-                GetMaildirMessageResult::Ok(msg) => break msg,
-                GetMaildirMessageResult::Err(err) => bail!(err),
-            };
+                MaildirMessageGetResult::Ok(msg) => break msg,
+                MaildirMessageGetResult::WantsDirRead(paths) => {
+                    arg = Some(MaildirMessageGetArg::DirRead(runtime::dir_read(paths)?));
+                }
+                MaildirMessageGetResult::WantsFileRead(paths) => {
+                    arg = Some(MaildirMessageGetArg::FileRead(runtime::file_read(paths)?));
+                }
+                MaildirMessageGetResult::Err(err) => bail!("{err}"),
+            }
         };
 
-        let Some(message) = message.parsed() else {
-            bail!("Invalid MIME message at {}", message.path().display());
+        let path = message.path().to_owned();
+
+        let Some(parsed) = message.parsed() else {
+            bail!("Invalid MIME message at {}", path.display());
         };
 
         if self.html {
-            printer.out(MessageHtmlView { message })
+            printer.out(MessageHtmlView { message: parsed })
         } else {
-            printer.out(MessagePlainView { message })
+            printer.out(MessagePlainView { message: parsed })
         }
     }
 }

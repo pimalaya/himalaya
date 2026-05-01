@@ -1,10 +1,13 @@
+use std::io::{Read, Write};
+
 use anyhow::{bail, Result};
 use clap::Parser;
 use io_imap::rfc3501::unsubscribe::*;
-use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Unsubscribe from the given mailbox.
 ///
@@ -21,16 +24,22 @@ impl ImapMailboxUnsubscribeCommand {
         let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        let mut arg = None;
         let mut coroutine = ImapMailboxUnsubscribe::new(imap.context, mailbox);
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         loop {
             match coroutine.resume(arg.take()) {
-                ImapMailboxUnsubscribeResult::Io { input } => {
-                    arg = Some(handle(&mut imap.stream, input)?)
+                ImapMailboxUnsubscribeResult::Ok(_) => break,
+                ImapMailboxUnsubscribeResult::WantsRead => {
+                    let n = imap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
                 }
-                ImapMailboxUnsubscribeResult::Ok { .. } => break,
-                ImapMailboxUnsubscribeResult::Err { err, .. } => bail!(err),
+                ImapMailboxUnsubscribeResult::WantsWrite(bytes) => {
+                    imap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                ImapMailboxUnsubscribeResult::Err { err, .. } => bail!("{err}"),
             }
         }
 

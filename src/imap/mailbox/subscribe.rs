@@ -1,10 +1,13 @@
+use std::io::{Read, Write};
+
 use anyhow::{bail, Result};
 use clap::Parser;
 use io_imap::rfc3501::subscribe::*;
-use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Subscribe to the given mailbox.
 ///
@@ -21,16 +24,22 @@ impl ImapMailboxSubscribeCommand {
         let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        let mut arg = None;
         let mut coroutine = ImapMailboxSubscribe::new(imap.context, mailbox);
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         loop {
             match coroutine.resume(arg.take()) {
-                ImapMailboxSubscribeResult::Io { input } => {
-                    arg = Some(handle(&mut imap.stream, input)?)
+                ImapMailboxSubscribeResult::Ok(_) => break,
+                ImapMailboxSubscribeResult::WantsRead => {
+                    let n = imap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
                 }
-                ImapMailboxSubscribeResult::Ok { .. } => break,
-                ImapMailboxSubscribeResult::Err { err, .. } => bail!(err),
+                ImapMailboxSubscribeResult::WantsWrite(bytes) => {
+                    imap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                ImapMailboxSubscribeResult::Err { err, .. } => bail!("{err}"),
             }
         }
 

@@ -1,18 +1,22 @@
-use std::fmt;
+use std::{
+    fmt,
+    io::{Read, Write},
+};
 
 use anyhow::{bail, Result};
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
-use io_jmap::{
-    rfc8621::coroutines::identity_get::{JmapIdentityGet, JmapIdentityGetResult},
-    rfc8621::types::identity::Identity,
+use io_jmap::rfc8621::{
+    identity::Identity,
+    identity_get::{JmapIdentityGet, JmapIdentityGetResult},
 };
-use io_socket::runtimes::std_stream::handle;
 use log::warn;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 
 use crate::jmap::account::JmapAccount;
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Get JMAP identities (Identity/get).
 ///
@@ -30,17 +34,25 @@ impl JmapIdentityGetCommand {
         let mut jmap = account.new_jmap_session()?;
 
         let mut coroutine = JmapIdentityGet::new(&jmap.session, &jmap.http_auth, self.ids)?;
-        let mut arg = None;
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         let (identities, not_found) = loop {
             match coroutine.resume(arg.take()) {
-                JmapIdentityGetResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
                 JmapIdentityGetResult::Ok {
                     identities,
                     not_found,
                     ..
                 } => break (identities, not_found),
-                JmapIdentityGetResult::Err { err, .. } => bail!(err),
+                JmapIdentityGetResult::WantsRead => {
+                    let n = jmap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                JmapIdentityGetResult::WantsWrite(bytes) => {
+                    jmap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                JmapIdentityGetResult::Err(err) => bail!("{err}"),
             }
         };
 

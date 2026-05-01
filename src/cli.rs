@@ -1,6 +1,6 @@
-use std::path::PathBuf;
+use std::{fmt, path::PathBuf, str::FromStr};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Error, Result};
 use clap::{CommandFactory, Parser, Subcommand};
 use pimalaya_toolbox::{
     config::TomlConfig,
@@ -23,7 +23,11 @@ use crate::jmap::command::JmapCommand;
 use crate::maildir::command::MaildirCommand;
 #[cfg(feature = "smtp")]
 use crate::smtp::command::SmtpCommand;
-use crate::{account::Account, config::Config};
+use crate::{
+    account::Account, config::Config, envelopes::command::EnvelopesCommand,
+    flags::command::FlagsCommand, mailboxes::command::MailboxesCommand,
+    messages::command::MessagesCommand,
+};
 
 #[derive(Parser, Debug)]
 #[command(name = env!("CARGO_PKG_NAME"))]
@@ -49,16 +53,112 @@ pub struct HimalayaCli {
     pub config_paths: Vec<PathBuf>,
     #[command(flatten)]
     pub account: AccountFlag,
+
+    /// Force a specific backend for cross-protocol commands.
+    ///
+    /// Only consumed by the shared commands (`mailboxes`, `envelopes`,
+    /// `flags`, `messages`); the protocol-specific subcommands
+    /// (`imap`, `jmap`, `maildir`, `smtp`) ignore it and always use
+    /// their own backend.
+    ///
+    /// Possible values: `auto` (default), `imap`, `jmap`, `maildir`,
+    /// `smtp`. With `auto`, the shared command picks the first
+    /// configured backend it supports; with an explicit value, it uses
+    /// only that backend (and bails if the account has no matching
+    /// config block, or if the operation has no implementation for it
+    /// — e.g. `--backend smtp mailboxes list`).
+    #[arg(short, long, global = true, default_value_t)]
+    pub backend: BackendArg,
+
     #[command(flatten)]
     pub json: JsonFlag,
     #[command(flatten)]
     pub log: LogFlags,
 }
 
+/// Selects which backend a cross-protocol command should target.
+///
+/// `Auto` lets the command pick the first configured-and-supported
+/// backend in its own priority order. The named variants pin the
+/// command to that backend; the command bails if it cannot be served
+/// (config missing, or the operation has no arm for that backend).
+///
+/// The protocol-specific subcommands (`imap`, `jmap`, `maildir`,
+/// `smtp`) ignore this arg entirely.
+#[derive(Clone, Copy, Debug, Default, Parser, PartialEq, Eq)]
+pub enum BackendArg {
+    #[default]
+    Auto,
+    Imap,
+    Jmap,
+    Maildir,
+    Smtp,
+}
+
+impl BackendArg {
+    /// Whether the IMAP arm of a shared command is allowed to run.
+    pub fn allows_imap(self) -> bool {
+        matches!(self, Self::Auto | Self::Imap)
+    }
+
+    /// Whether the JMAP arm of a shared command is allowed to run.
+    pub fn allows_jmap(self) -> bool {
+        matches!(self, Self::Auto | Self::Jmap)
+    }
+
+    /// Whether the Maildir arm of a shared command is allowed to run.
+    pub fn allows_maildir(self) -> bool {
+        matches!(self, Self::Auto | Self::Maildir)
+    }
+
+    /// Whether the SMTP arm of a shared command is allowed to run.
+    pub fn allows_smtp(self) -> bool {
+        matches!(self, Self::Auto | Self::Smtp)
+    }
+}
+
+impl FromStr for BackendArg {
+    type Err = Error;
+
+    fn from_str(backend: &str) -> Result<Self, Self::Err> {
+        match backend {
+            "auto" => Ok(Self::Auto),
+            "imap" => Ok(Self::Imap),
+            "jmap" => Ok(Self::Jmap),
+            "maildir" => Ok(Self::Maildir),
+            "smtp" => Ok(Self::Smtp),
+            backend => bail!("Invalid backend {backend}"),
+        }
+    }
+}
+impl fmt::Display for BackendArg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Auto => write!(f, "auto"),
+            Self::Imap => write!(f, "imap"),
+            Self::Jmap => write!(f, "jmap"),
+            Self::Maildir => write!(f, "maildir"),
+            Self::Smtp => write!(f, "smtp"),
+        }
+    }
+}
+
 #[derive(Debug, Subcommand)]
 pub enum BackendCommand {
     Manuals(ManualCommand),
     Completions(CompletionCommand),
+
+    #[command(subcommand)]
+    Mailboxes(MailboxesCommand),
+    #[command(subcommand)]
+    Envelopes(EnvelopesCommand),
+    #[command(subcommand)]
+    Flags(FlagsCommand),
+    #[command(subcommand)]
+    Messages(MessagesCommand),
+    #[cfg(any(feature = "imap", feature = "jmap", feature = "maildir"))]
+    #[command(subcommand)]
+    Attachments(crate::attachments::command::AttachmentsCommand),
 
     #[cfg(feature = "imap")]
     #[command(subcommand)]
@@ -80,10 +180,38 @@ impl BackendCommand {
         printer: &mut impl Printer,
         config_paths: &[PathBuf],
         account_name: Option<&str>,
+        backend: BackendArg,
     ) -> Result<()> {
         match self {
             Self::Manuals(cmd) => cmd.execute(printer, HimalayaCli::command()),
             Self::Completions(cmd) => cmd.execute(printer, HimalayaCli::command()),
+
+            Self::Mailboxes(cmd) => {
+                let config = Config::from_paths_or_default(config_paths)?;
+                let (_, account_config) = config.get_account(account_name)?;
+                cmd.execute(printer, config, account_config, backend)
+            }
+            Self::Envelopes(cmd) => {
+                let config = Config::from_paths_or_default(config_paths)?;
+                let (_, account_config) = config.get_account(account_name)?;
+                cmd.execute(printer, config, account_config, backend)
+            }
+            Self::Flags(cmd) => {
+                let config = Config::from_paths_or_default(config_paths)?;
+                let (_, account_config) = config.get_account(account_name)?;
+                cmd.execute(printer, config, account_config, backend)
+            }
+            Self::Messages(cmd) => {
+                let config = Config::from_paths_or_default(config_paths)?;
+                let (_, account_config) = config.get_account(account_name)?;
+                cmd.execute(printer, config, account_config, backend)
+            }
+            #[cfg(any(feature = "imap", feature = "jmap", feature = "maildir"))]
+            Self::Attachments(cmd) => {
+                let config = Config::from_paths_or_default(config_paths)?;
+                let (_, account_config) = config.get_account(account_name)?;
+                cmd.execute(printer, config, account_config, backend)
+            }
 
             #[cfg(feature = "imap")]
             Self::Imap(cmd) => {

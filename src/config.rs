@@ -56,6 +56,7 @@ pub struct AccountConfig {
 
     #[allow(unused)]
     pub imap: Option<ImapConfig>,
+    #[allow(unused)]
     pub jmap: Option<JmapConfig>,
     #[allow(unused)]
     pub maildir: Option<MaildirConfig>,
@@ -271,6 +272,16 @@ pub struct JmapConfig {
 
     /// Authentication configuration.
     pub auth: JmapAuthConfig,
+
+    /// Identity id used by `messages send` to submit emails. Required
+    /// only for JMAP send; can be discovered with `himalaya jmap
+    /// identity get`.
+    pub identity_id: Option<String>,
+
+    /// Drafts mailbox id used by `messages send` to stage emails before
+    /// submission. Required only for JMAP send; can be discovered with
+    /// `himalaya jmap mailbox query --role drafts`.
+    pub drafts_mailbox_id: Option<String>,
 }
 
 /// JMAP authentication configuration.

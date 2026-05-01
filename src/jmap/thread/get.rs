@@ -1,18 +1,22 @@
-use std::fmt;
+use std::{
+    fmt,
+    io::{Read, Write},
+};
 
 use anyhow::{bail, Result};
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
-use io_jmap::{
-    rfc8621::coroutines::thread_get::{JmapThreadGet, JmapThreadGetResult},
-    rfc8621::types::thread::Thread,
+use io_jmap::rfc8621::{
+    thread::Thread,
+    thread_get::{JmapThreadGet, JmapThreadGetResult},
 };
-use io_socket::runtimes::std_stream::handle;
 use log::warn;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 
 use crate::jmap::account::JmapAccount;
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Get JMAP threads by ID (Thread/get).
 ///
@@ -29,15 +33,23 @@ impl JmapThreadGetCommand {
         let mut jmap = account.new_jmap_session()?;
 
         let mut coroutine = JmapThreadGet::new(&jmap.session, &jmap.http_auth, self.ids.clone())?;
-        let mut arg = None;
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         let (threads, not_found) = loop {
             match coroutine.resume(arg.take()) {
-                JmapThreadGetResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
                 JmapThreadGetResult::Ok {
                     threads, not_found, ..
                 } => break (threads, not_found),
-                JmapThreadGetResult::Err { err, .. } => bail!(err),
+                JmapThreadGetResult::WantsRead => {
+                    let n = jmap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                JmapThreadGetResult::WantsWrite(bytes) => {
+                    jmap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                JmapThreadGetResult::Err(err) => bail!("{err}"),
             }
         };
 

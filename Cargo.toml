@@ -18,10 +18,10 @@ rustdoc-args = ["--cfg", "docsrs"]
 [features]
 default = ["imap", "smtp", "rustls-ring"]
 
-imap = ["dep:io-imap", "dep:mail-parser", "dep:rfc2047-decoder", "pimalaya-toolbox/imap"]
-jmap = ["dep:io-jmap", "dep:serde_json", "pimalaya-toolbox/jmap"]
-smtp = ["dep:io-smtp", "dep:mail-parser", "pimalaya-toolbox/smtp"]
-maildir = ["dep:convert_case", "dep:io-fs", "dep:io-maildir", "dep:mail-parser", "dep:mime_guess"]
+imap = ["dep:io-imap", "dep:mail-parser", "dep:rfc2047-decoder", "pimalaya-toolbox/imap", "io-email/imap"]
+jmap = ["dep:io-jmap", "dep:mail-parser", "dep:serde_json", "pimalaya-toolbox/jmap", "io-email/jmap"]
+smtp = ["dep:io-smtp", "dep:mail-parser", "pimalaya-toolbox/smtp", "io-email/smtp"]
+maildir = ["dep:convert_case", "dep:io-maildir", "dep:mail-parser", "dep:mime_guess", "io-email/maildir"]
 
 native-tls = ["pimalaya-toolbox/native-tls"]
 rustls-aws = ["pimalaya-toolbox/rustls-aws"]
@@ -40,18 +40,18 @@ comfy-table = "7"
 convert_case = { version = "0.11", optional = true }
 dirs = "6"
 gethostname = "1"
-io-fs = { version = "0.0.2", default-features = false, features = ["std"], optional = true }
+io-email = { version = "0.0.1", default-features = false, features = ["serde"] }
 io-imap = { version = "0.0.1", default-features = false, optional = true }
 io-jmap = { version = "0.0.1", default-features = false, optional = true }
 io-maildir = { version = "0.0.1", default-features = false, features = ["serde"], optional = true }
 io-process = { version = "0.0.2", default-features = false }
 io-smtp = { version = "0.0.1", default-features = false, optional = true }
-io-socket = { version = "0.0.1", default-features = false, features = ["std-stream"] }
 log = "0.4"
+mail-builder = "0.3"
 mail-parser = { version = "0.11", features = ["serde"], optional = true }
 mime_guess = { version = "2", optional = true }
 open = "5"
-pimalaya-toolbox = { version = "0.0.4", default-features = false, features = ["config", "terminal", "secret"] }
+pimalaya-toolbox = { version = "0.0.4", default-features = false, features = ["config", "terminal", "secret", "sasl", "stream"] }
 rfc2047-decoder = { version = "1", optional = true }
 secrecy = "0.10"
 serde = { version = "1", features = ["derive"] }
@@ -70,11 +70,10 @@ serde_json = "1"
 tempfile = "3"
 
 [patch.crates-io]
-io-fs.git = "https://github.com/pimalaya/io-fs"
+io-email.path = "../io-email"
 io-http.git = "https://github.com/pimalaya/io-http"
 io-imap = { git = "https://github.com/pimalaya/io-imap", branch = "io" }
 io-jmap.git = "https://github.com/pimalaya/io-jmap"
-io-maildir.git = "https://github.com/pimalaya/io-maildir"
+io-maildir.path = "../io-maildir"
 io-smtp.git = "https://github.com/pimalaya/io-smtp"
-io-socket.git = "https://github.com/pimalaya/io-socket"
 pimalaya-toolbox.git = "https://github.com/pimalaya/toolbox"

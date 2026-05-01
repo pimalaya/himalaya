@@ -1,7 +1,7 @@
 use std::{
     borrow::Cow,
     collections::HashSet,
-    io::{stdin, BufRead, IsTerminal},
+    io::{stdin, BufRead, IsTerminal, Read, Write},
 };
 
 use anyhow::{bail, Result};
@@ -13,11 +13,12 @@ use io_smtp::{
     },
     send::*,
 };
-use io_socket::runtimes::std_stream::handle;
 use mail_parser::{Addr, Address, HeaderName, HeaderValue, MessageParser};
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::smtp::account::SmtpAccount;
+
+const READ_BUFFER_SIZE: usize = 8 * 1024;
 
 /// Send a message to a mailbox.
 ///
@@ -33,7 +34,7 @@ pub struct SmtpMessageSendCommand {
 
 impl SmtpMessageSendCommand {
     pub fn execute(self, printer: &mut impl Printer, account: SmtpAccount) -> Result<()> {
-        let mut imap = account.new_smtp_session()?;
+        let mut smtp = account.new_smtp_session()?;
 
         let message = if stdin().is_terminal() || printer.is_json() {
             self.message
@@ -51,14 +52,22 @@ impl SmtpMessageSendCommand {
 
         let (reverse_path, forward_paths) = into_smtp_msg(message.as_bytes())?;
 
-        let mut arg = None;
         let mut coroutine = SmtpMessageSend::new(reverse_path, forward_paths, message.into_bytes());
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         loop {
             match coroutine.resume(arg.take()) {
-                SmtpMessageSendResult::Io { input } => arg = Some(handle(&mut imap.stream, input)?),
                 SmtpMessageSendResult::Ok => break,
-                SmtpMessageSendResult::Err { err } => bail!(err),
+                SmtpMessageSendResult::WantsRead => {
+                    let n = smtp.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                SmtpMessageSendResult::WantsWrite(bytes) => {
+                    smtp.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                SmtpMessageSendResult::Err(err) => bail!("{err}"),
             }
         }
 

@@ -1,25 +1,24 @@
 use std::{
-    collections::HashMap,
-    io::{stdin, BufRead, IsTerminal},
+    collections::BTreeMap,
+    io::{stdin, BufRead, IsTerminal, Read, Write},
 };
 
 use anyhow::{bail, Result};
 use clap::Parser;
 use io_jmap::{
-    rfc8620::{
-        coroutines::blob_upload::{JmapBlobUpload, JmapBlobUploadResult},
-        types::session::capabilities::MAIL,
-    },
+    rfc8620::blob_upload::{JmapBlobUpload, JmapBlobUploadResult},
     rfc8621::{
-        coroutines::email_import::{JmapEmailImport, JmapEmailImportResult},
-        types::email::EmailImport,
+        capabilities::MAIL,
+        email::EmailImport,
+        email_import::{JmapEmailImport, JmapEmailImportResult},
     },
 };
-use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 use url::Url;
 
-use crate::jmap::account::JmapAccount;
+use crate::jmap::{account::JmapAccount, error::format_set_error};
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Import an RFC 5322 message into a mailbox (upload + Email/import).
 ///
@@ -78,18 +77,25 @@ impl JmapEmailImportCommand {
             .parse()?;
 
         let mut extra_stream = jmap.connect_if_different(&url, &tls)?;
-        let upload_stream = extra_stream.as_mut().unwrap_or(&mut jmap.stream);
 
-        let mut coroutine = JmapBlobUpload::new(&jmap.http_auth, &url, "message/rfc822", data)?;
-        let mut arg = None;
+        let mut coroutine = JmapBlobUpload::new(&jmap.http_auth, &url, "message/rfc822", data);
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         let blob_id = loop {
+            let stream = extra_stream.as_mut().unwrap_or(&mut jmap.stream);
+
             match coroutine.resume(arg.take()) {
-                JmapBlobUploadResult::Io { io } => arg = Some(handle(&mut *upload_stream, io)?),
-                JmapBlobUploadResult::Ok { blob_id, .. } => {
-                    break blob_id;
+                JmapBlobUploadResult::Ok { blob_id, .. } => break blob_id,
+                JmapBlobUploadResult::WantsRead => {
+                    let n = stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
                 }
-                JmapBlobUploadResult::Err { err, .. } => bail!(err),
+                JmapBlobUploadResult::WantsWrite(bytes) => {
+                    stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                JmapBlobUploadResult::Err(err) => bail!("{err}"),
             }
         };
 
@@ -97,7 +103,7 @@ impl JmapEmailImportCommand {
             return printer.out(Message::new(blob_id));
         }
 
-        let mailbox_ids: HashMap<String, bool> =
+        let mailbox_ids: BTreeMap<String, bool> =
             self.mailbox_id.into_iter().map(|m| (m, true)).collect();
 
         let keywords = if self.keyword.is_empty() {
@@ -113,35 +119,30 @@ impl JmapEmailImportCommand {
             received_at: self.received_at,
         };
 
-        let mut emails = HashMap::new();
+        let mut emails = BTreeMap::new();
         emails.insert(blob_id.clone(), import);
 
         let mut coroutine = JmapEmailImport::new(&jmap.session, &jmap.http_auth, emails)?;
-        let mut arg = None;
+        let mut arg: Option<&[u8]> = None;
 
         let not_created = loop {
             match coroutine.resume(arg.take()) {
-                JmapEmailImportResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
                 JmapEmailImportResult::Ok { not_created, .. } => break not_created,
-                JmapEmailImportResult::Err { err, .. } => bail!(err),
+                JmapEmailImportResult::WantsRead => {
+                    let n = jmap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                JmapEmailImportResult::WantsWrite(bytes) => {
+                    jmap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                JmapEmailImportResult::Err(err) => bail!("{err}"),
             }
         };
 
         if let Some(err) = not_created.get(&blob_id) {
             let mut msg = format!("Import JMAP email from blob `{blob_id}` error");
-
-            if !err.properties.is_empty() {
-                msg.push_str(": invalid properties `");
-                msg.push_str(&err.properties.join("`, `"));
-                msg.push('`');
-            }
-
-            if let Some(desc) = &err.description {
-                msg.push_str(" (");
-                msg.push_str(desc.to_lowercase().trim_end_matches(['.', '\n']));
-                msg.push(')');
-            }
-
+            msg.push_str(&format_set_error(err));
             bail!(msg);
         }
 

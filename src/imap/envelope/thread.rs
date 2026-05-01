@@ -1,4 +1,9 @@
-use std::{collections::HashMap, fmt, num::NonZeroU32};
+use std::{
+    collections::HashMap,
+    fmt,
+    io::{Read, Write},
+    num::NonZeroU32,
+};
 
 use anyhow::{bail, Result};
 use clap::Parser;
@@ -11,7 +16,6 @@ use io_imap::{
         sequence::SequenceSet,
     },
 };
-use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::{stream::imap::ImapSession, terminal::printer::Printer};
 use serde::{ser::SerializeStruct, Serialize, Serializer};
 
@@ -20,6 +24,8 @@ use crate::imap::{
     envelope::{list::decode_mime, search::parse_query},
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
 };
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Thread IMAP messages by algorithm.
 ///
@@ -54,17 +60,24 @@ impl ImapEnvelopeThreadCommand {
         let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
 
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+
         if !self.mailbox_no_select.inner {
-            let mut arg = None;
             let mut coroutine = ImapMailboxSelect::new(imap.context, mailbox);
+            let mut arg: Option<&[u8]> = None;
 
             imap.context = loop {
                 match coroutine.resume(arg.take()) {
-                    ImapMailboxSelectResult::Io { input } => {
-                        arg = Some(handle(&mut imap.stream, input)?)
-                    }
                     ImapMailboxSelectResult::Ok { context, .. } => break context,
-                    ImapMailboxSelectResult::Err { err, .. } => bail!(err),
+                    ImapMailboxSelectResult::WantsRead => {
+                        let n = imap.stream.read(&mut buf)?;
+                        arg = Some(&buf[..n]);
+                    }
+                    ImapMailboxSelectResult::WantsWrite(bytes) => {
+                        imap.stream.write_all(&bytes)?;
+                        arg = None;
+                    }
+                    ImapMailboxSelectResult::Err { err, .. } => bail!("{err}"),
                 }
             };
         }
@@ -72,22 +85,27 @@ impl ImapEnvelopeThreadCommand {
         let algorithm = parse_algorithm(&self.algorithm)?;
         let search_criteria = parse_query(&self.query)?;
 
-        let mut arg = None;
         let mut coroutine =
             ImapMessageThread::new(imap.context, algorithm, search_criteria, !self.seq);
+        let mut arg: Option<&[u8]> = None;
 
         let threads = loop {
             match coroutine.resume(arg.take()) {
-                ImapMessageThreadResult::Io { input } => {
-                    arg = Some(handle(&mut imap.stream, input)?)
-                }
                 ImapMessageThreadResult::Ok {
                     context, threads, ..
                 } => {
                     imap.context = context;
                     break threads;
                 }
-                ImapMessageThreadResult::Err { err, .. } => bail!(err),
+                ImapMessageThreadResult::WantsRead => {
+                    let n = imap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                ImapMessageThreadResult::WantsWrite(bytes) => {
+                    imap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                ImapMessageThreadResult::Err { err, .. } => bail!("{err}"),
             }
         };
 
@@ -165,14 +183,22 @@ fn fetch_subjects(
         MessageDataItemName::Uid,
     ]);
 
-    let mut arg = None;
     let mut coroutine = ImapMessageFetch::new(imap.context, sequence_set, item_names, uid);
+    let mut buf = [0u8; READ_BUFFER_SIZE];
+    let mut arg: Option<&[u8]> = None;
 
     let data = loop {
         match coroutine.resume(arg.take()) {
-            ImapMessageFetchResult::Io { input } => arg = Some(handle(&mut imap.stream, input)?),
             ImapMessageFetchResult::Ok { data, .. } => break data,
-            ImapMessageFetchResult::Err { err, .. } => bail!(err),
+            ImapMessageFetchResult::WantsRead => {
+                let n = imap.stream.read(&mut buf)?;
+                arg = Some(&buf[..n]);
+            }
+            ImapMessageFetchResult::WantsWrite(bytes) => {
+                imap.stream.write_all(&bytes)?;
+                arg = None;
+            }
+            ImapMessageFetchResult::Err { err, .. } => bail!("{err}"),
         }
     };
 

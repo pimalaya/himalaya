@@ -1,6 +1,7 @@
 pub mod account;
 pub mod command;
 pub mod email;
+pub mod error;
 pub mod identity;
 pub mod mailbox;
 pub mod query;

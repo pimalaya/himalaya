@@ -1,17 +1,20 @@
+use std::io::{Read, Write};
+
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use io_jmap::{
-    rfc8620::{
-        coroutines::blob_download::{JmapBlobDownload, JmapBlobDownloadResult},
-        types::session::capabilities::MAIL,
+    rfc8620::blob_download::{JmapBlobDownload, JmapBlobDownloadResult},
+    rfc8621::{
+        capabilities::MAIL,
+        email_get::{JmapEmailGet, JmapEmailGetResult},
     },
-    rfc8621::coroutines::email_get::{JmapEmailGet, JmapEmailGetResult},
 };
-use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 use url::Url;
 
 use crate::jmap::account::JmapAccount;
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Export a raw RFC 5322 message to stdout (Email/get + blob download).
 ///
@@ -30,7 +33,6 @@ impl JmapEmailExportCommand {
 
         let properties = Some(vec!["id".to_owned(), "blobId".to_owned()]);
 
-        let mut arg = None;
         let mut coroutine = JmapEmailGet::new(
             &jmap.session,
             &jmap.http_auth,
@@ -40,14 +42,21 @@ impl JmapEmailExportCommand {
             false,
             0,
         )?;
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         let emails = loop {
             match coroutine.resume(arg.take()) {
-                JmapEmailGetResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
-                JmapEmailGetResult::Ok { emails, .. } => {
-                    break emails;
+                JmapEmailGetResult::Ok { emails, .. } => break emails,
+                JmapEmailGetResult::WantsRead => {
+                    let n = jmap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
                 }
-                JmapEmailGetResult::Err { err, .. } => bail!(err),
+                JmapEmailGetResult::WantsWrite(bytes) => {
+                    jmap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                JmapEmailGetResult::Err(err) => bail!("{err}"),
             }
         };
 
@@ -63,7 +72,7 @@ impl JmapEmailExportCommand {
             .and_then(|e| e.blob_id)
             .ok_or_else(|| anyhow!("Email `{}` not found or has no blobId", self.id))?;
 
-        let url: Url = jmap
+        let mut url: Url = jmap
             .session
             .download_url
             .replace("{accountId}", account_id)
@@ -72,17 +81,30 @@ impl JmapEmailExportCommand {
             .replace("{name}", "message.eml")
             .parse()?;
 
-        let mut stream = jmap.connect_if_different(&url, &tls)?;
-        let stream = stream.as_mut().unwrap_or(&mut jmap.stream);
-
-        let mut coroutine = JmapBlobDownload::new(&jmap.http_auth, &url)?;
-        let mut arg = None;
+        let mut extra_stream = jmap.connect_if_different(&url, &tls)?;
+        let mut coroutine = JmapBlobDownload::new(&jmap.http_auth, &url);
+        let mut arg: Option<&[u8]> = None;
 
         let data = loop {
             match coroutine.resume(arg.take()) {
-                JmapBlobDownloadResult::Io { io } => arg = Some(handle(&mut *stream, io)?),
                 JmapBlobDownloadResult::Ok { data, .. } => break data,
-                JmapBlobDownloadResult::Err { err, .. } => bail!(err),
+                JmapBlobDownloadResult::WantsRead => {
+                    let stream = extra_stream.as_mut().unwrap_or(&mut jmap.stream);
+                    let n = stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                JmapBlobDownloadResult::WantsWrite(bytes) => {
+                    let stream = extra_stream.as_mut().unwrap_or(&mut jmap.stream);
+                    stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                JmapBlobDownloadResult::WantsRedirect { url: new_url, .. } => {
+                    url = new_url;
+                    extra_stream = jmap.connect_if_different(&url, &tls)?;
+                    coroutine = JmapBlobDownload::new(&jmap.http_auth, &url);
+                    arg = None;
+                }
+                JmapBlobDownloadResult::Err(err) => bail!("{err}"),
             }
         };
 

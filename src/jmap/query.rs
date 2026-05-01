@@ -1,20 +1,24 @@
 use std::{
     fmt,
-    io::{stdin, BufRead},
+    io::{stdin, BufRead, Read, Write},
 };
 
 use anyhow::{bail, Context, Result};
 use clap::Parser;
-use io_jmap::rfc8620::{
-    coroutines::send::{JmapRequest, JmapSend, JmapSendResult},
-    types::session::capabilities::{CORE, MAIL},
+use io_jmap::{
+    rfc8620::{
+        send::{JmapRequest, JmapSend, JmapSendResult},
+        session::capabilities::CORE,
+    },
+    rfc8621::capabilities::MAIL,
 };
-use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 use serde_json::Value;
 
 use crate::jmap::account::JmapAccount;
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Send a raw JMAP method-calls array and print the response.
 ///
@@ -113,15 +117,21 @@ impl JmapQueryCommand {
         };
 
         let mut coroutine = JmapSend::new(&jmap.http_auth, &jmap.session.api_url, request)?;
-        let mut arg = None;
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         let response = loop {
             match coroutine.resume(arg.take()) {
-                JmapSendResult::Ok { response, .. } => {
-                    break response;
+                JmapSendResult::Ok { response, .. } => break response,
+                JmapSendResult::WantsRead => {
+                    let n = jmap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
                 }
-                JmapSendResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
-                JmapSendResult::Err { err, .. } => return Err(err.into()),
+                JmapSendResult::WantsWrite(bytes) => {
+                    jmap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                JmapSendResult::Err(err) => return Err(err.into()),
             }
         };
 

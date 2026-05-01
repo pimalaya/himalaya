@@ -1,13 +1,17 @@
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_fs::runtimes::std::handle;
-use io_maildir::{coroutines::set_flags::*, flag::Flags, maildir::Maildir};
+use io_maildir::{
+    coroutines::flags_set::{MaildirFlagsSet, MaildirFlagsSetArg, MaildirFlagsSetResult},
+    flag::Flags,
+    maildir::Maildir,
+};
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::maildir::{
     account::MaildirAccount,
     arg::{MaildirPathFlag, MessageIdsArg},
     flag::arg::FlagArg,
+    runtime,
 };
 
 /// Set MAILDIR flag(s) to message(s).
@@ -36,14 +40,20 @@ impl MaildirFlagSetCommand {
         let flags = Flags::from_iter(self.flags.into_iter().map(Into::into));
 
         for id in self.ids.inner {
+            let mut coroutine = MaildirFlagsSet::new(maildir.clone(), id, flags.clone());
             let mut arg = None;
-            let mut coroutine = SetMaildirFlags::new(maildir.clone(), id, flags.clone());
 
             loop {
                 match coroutine.resume(arg.take()) {
-                    SetMaildirFlagsResult::Ok => break,
-                    SetMaildirFlagsResult::Io(io) => arg = Some(handle(io)?),
-                    SetMaildirFlagsResult::Err(err) => bail!(err),
+                    MaildirFlagsSetResult::Ok => break,
+                    MaildirFlagsSetResult::WantsDirRead(paths) => {
+                        arg = Some(MaildirFlagsSetArg::DirRead(runtime::dir_read(paths)?));
+                    }
+                    MaildirFlagsSetResult::WantsRename(pairs) => {
+                        runtime::rename(pairs)?;
+                        arg = Some(MaildirFlagsSetArg::Rename);
+                    }
+                    MaildirFlagsSetResult::Err(err) => bail!("{err}"),
                 }
             }
         }

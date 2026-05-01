@@ -1,4 +1,4 @@
-use std::io::{stdin, BufRead, IsTerminal};
+use std::io::{stdin, BufRead, IsTerminal, Read, Write};
 
 use anyhow::{bail, Result};
 use clap::Parser;
@@ -9,10 +9,11 @@ use io_imap::{
         IntoStatic,
     },
 };
-use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
 use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Save a message to a mailbox.
 ///
@@ -60,16 +61,22 @@ impl ImapMessageSaveCommand {
             .map(|f| Flag::try_from(f).map(IntoStatic::into_static))
             .collect::<Result<_, _>>()?;
 
-        let mut arg = None;
         let mut coroutine = ImapMessageAppend::new(imap.context, mailbox, flags, None, message);
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         loop {
             match coroutine.resume(arg.take()) {
-                ImapMessageAppendResult::Io { input } => {
-                    arg = Some(handle(&mut imap.stream, input)?)
-                }
                 ImapMessageAppendResult::Ok { .. } => break,
-                ImapMessageAppendResult::Err { err, .. } => bail!(err),
+                ImapMessageAppendResult::WantsRead => {
+                    let n = imap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                ImapMessageAppendResult::WantsWrite(bytes) => {
+                    imap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                ImapMessageAppendResult::Err { err, .. } => bail!("{err}"),
             }
         }
 

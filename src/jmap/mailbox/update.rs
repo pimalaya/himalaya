@@ -1,15 +1,19 @@
-use std::collections::HashMap;
+use std::{
+    collections::BTreeMap,
+    io::{Read, Write},
+};
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_jmap::{
-    rfc8621::coroutines::mailbox_set::{JmapMailboxSet, JmapMailboxSetArgs, JmapMailboxSetResult},
-    rfc8621::types::mailbox::MailboxUpdate,
+use io_jmap::rfc8621::{
+    mailbox::MailboxUpdate,
+    mailbox_set::{JmapMailboxSet, JmapMailboxSetArgs, JmapMailboxSetResult},
 };
-use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::{Message, Printer};
 
-use crate::jmap::{account::JmapAccount, mailbox::query::RoleArg};
+use crate::jmap::{account::JmapAccount, error::format_set_error, mailbox::query::RoleArg};
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Update a JMAP mailbox.
 #[derive(Debug, Parser)]
@@ -63,38 +67,34 @@ impl JmapMailboxUpdateCommand {
             is_subscribed,
         };
 
-        let mut update = HashMap::new();
+        let mut update = BTreeMap::new();
         update.insert(self.id.clone(), patch);
 
         let mut args = JmapMailboxSetArgs::default();
         args.update = Some(update);
 
-        let mut arg = None;
         let mut coroutine = JmapMailboxSet::new(&jmap.session, &jmap.http_auth, args)?;
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+        let mut arg: Option<&[u8]> = None;
 
         let not_updated = loop {
             match coroutine.resume(arg.take()) {
-                JmapMailboxSetResult::Io { io } => arg = Some(handle(&mut jmap.stream, io)?),
                 JmapMailboxSetResult::Ok { not_updated, .. } => break not_updated,
-                JmapMailboxSetResult::Err { err, .. } => bail!(err),
+                JmapMailboxSetResult::WantsRead => {
+                    let n = jmap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                JmapMailboxSetResult::WantsWrite(bytes) => {
+                    jmap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                JmapMailboxSetResult::Err(err) => bail!("{err}"),
             }
         };
 
         if let Some(err) = not_updated.get(&self.id) {
             let mut msg = format!("Update JMAP mailbox `{}` error", self.id);
-
-            if !err.properties.is_empty() {
-                msg.push_str(": invalid properties `");
-                msg.push_str(&err.properties.join("`, `"));
-                msg.push('`');
-            }
-
-            if let Some(desc) = &err.description {
-                msg.push_str(" (");
-                msg.push_str(desc.to_lowercase().trim_end_matches(['.', '\n']));
-                msg.push(')');
-            }
-
+            msg.push_str(&format_set_error(err));
             bail!(msg);
         }
 

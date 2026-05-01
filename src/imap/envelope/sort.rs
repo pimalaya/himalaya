@@ -1,4 +1,7 @@
-use std::fmt;
+use std::{
+    fmt,
+    io::{Read, Write},
+};
 
 use anyhow::{bail, Result};
 use clap::Parser;
@@ -11,13 +14,14 @@ use io_imap::{
         extensions::sort::{SortCriterion, SortKey},
     },
 };
-use io_socket::runtimes::std_stream::handle;
 use pimalaya_toolbox::terminal::printer::Printer;
 use serde::Serialize;
 
 use crate::imap::{
     account::ImapAccount, envelope::search::parse_query, mailbox::arg::MailboxNameOptionalArg,
 };
+
+const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Sort messages by criteria.
 ///
@@ -60,17 +64,24 @@ impl ImapEnvelopeSortCommand {
         let mut imap = account.new_imap_session()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
 
+        let mut buf = [0u8; READ_BUFFER_SIZE];
+
         // SELECT mailbox
-        let mut arg = None;
         let mut coroutine = ImapMailboxSelect::new(imap.context, mailbox);
+        let mut arg: Option<&[u8]> = None;
 
         let context = loop {
             match coroutine.resume(arg.take()) {
-                ImapMailboxSelectResult::Io { input } => {
-                    arg = Some(handle(&mut imap.stream, input)?)
-                }
                 ImapMailboxSelectResult::Ok { context, .. } => break context,
-                ImapMailboxSelectResult::Err { err, .. } => bail!(err),
+                ImapMailboxSelectResult::WantsRead => {
+                    let n = imap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                ImapMailboxSelectResult::WantsWrite(bytes) => {
+                    imap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                ImapMailboxSelectResult::Err { err, .. } => bail!("{err}"),
             }
         };
 
@@ -85,15 +96,22 @@ impl ImapEnvelopeSortCommand {
         let search_criteria = parse_query(&self.query)?;
 
         // SORT
-        let mut arg = None;
         let mut coroutine =
             ImapMailboxSort::new(context, sort_criteria, search_criteria, !self.seq);
+        let mut arg: Option<&[u8]> = None;
 
         let ids = loop {
             match coroutine.resume(arg.take()) {
-                ImapMailboxSortResult::Io { input } => arg = Some(handle(&mut imap.stream, input)?),
                 ImapMailboxSortResult::Ok { ids, .. } => break ids,
-                ImapMailboxSortResult::Err { err, .. } => bail!(err),
+                ImapMailboxSortResult::WantsRead => {
+                    let n = imap.stream.read(&mut buf)?;
+                    arg = Some(&buf[..n]);
+                }
+                ImapMailboxSortResult::WantsWrite(bytes) => {
+                    imap.stream.write_all(&bytes)?;
+                    arg = None;
+                }
+                ImapMailboxSortResult::Err { err, .. } => bail!("{err}"),
             }
         };
 
