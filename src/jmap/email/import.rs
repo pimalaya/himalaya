@@ -1,24 +1,21 @@
 use std::{
     collections::BTreeMap,
-    io::{stdin, BufRead, IsTerminal, Read, Write},
+    io::{stdin, BufRead, IsTerminal},
+    net::TcpStream,
 };
 
 use anyhow::{bail, Result};
 use clap::Parser;
 use io_jmap::{
-    rfc8620::blob_upload::{JmapBlobUpload, JmapBlobUploadResult},
-    rfc8621::{
-        capabilities::MAIL,
-        email::EmailImport,
-        email_import::{JmapEmailImport, JmapEmailImportResult},
-    },
+    client::JmapClient,
+    rfc8621::{capabilities::MAIL, email::EmailImport},
 };
-use pimalaya_toolbox::terminal::printer::{Message, Printer};
+use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_stream::tls::upgrade_tls;
+use secrecy::SecretString;
 use url::Url;
 
-use crate::jmap::{account::JmapAccount, error::format_set_error};
-
-const READ_BUFFER_SIZE: usize = 16 * 1024;
+use crate::jmap::{account::JmapAccount, error::format_set_error, session::JmapAuth};
 
 /// Import an RFC 5322 message into a mailbox (upload + Email/import).
 ///
@@ -51,7 +48,10 @@ pub struct JmapEmailImportCommand {
 impl JmapEmailImportCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
         let tls = account.backend.tls.clone().try_into()?;
-        let mut jmap = account.new_jmap_session()?;
+        let auth: JmapAuth = account.backend.auth.clone().try_into()?;
+        let http_auth: SecretString = auth.into();
+
+        let mut client = account.new_jmap_client()?;
 
         let data: Vec<u8> = if stdin().is_terminal() || printer.is_json() {
             self.message
@@ -64,39 +64,31 @@ impl JmapEmailImportCommand {
             lines.join("\r\n").into_bytes()
         };
 
-        let account_id = jmap
-            .session
+        let session = client.session().expect("session loaded by new_jmap_client");
+        let api_url = session.api_url.clone();
+        let account_id = session
             .primary_accounts
             .get(MAIL)
             .map(|s| s.as_str())
             .unwrap_or("");
-        let url: Url = jmap
-            .session
+        let upload_url: Url = session
             .upload_url
             .replace("{accountId}", account_id)
             .parse()?;
 
-        let mut extra_stream = jmap.connect_if_different(&url, &tls)?;
-
-        let mut coroutine = JmapBlobUpload::new(&jmap.http_auth, &url, "message/rfc822", data);
-        let mut buf = [0u8; READ_BUFFER_SIZE];
-        let mut arg: Option<&[u8]> = None;
-
-        let blob_id = loop {
-            let stream = extra_stream.as_mut().unwrap_or(&mut jmap.stream);
-
-            match coroutine.resume(arg.take()) {
-                JmapBlobUploadResult::Ok { blob_id, .. } => break blob_id,
-                JmapBlobUploadResult::WantsRead => {
-                    let n = stream.read(&mut buf)?;
-                    arg = Some(&buf[..n]);
-                }
-                JmapBlobUploadResult::WantsWrite(bytes) => {
-                    stream.write_all(&bytes)?;
-                    arg = None;
-                }
-                JmapBlobUploadResult::Err(err) => bail!("{err}"),
-            }
+        let blob_id = if same_authority(&api_url, &upload_url) {
+            client
+                .blob_upload(&upload_url, "message/rfc822", data)?
+                .blob_id
+        } else {
+            let host = upload_url.host_str().unwrap_or("localhost");
+            let port = upload_url.port_or_known_default().unwrap_or(443);
+            let tcp = TcpStream::connect((host, port))?;
+            let stream = upgrade_tls(host, tcp, &tls, &[b"http/1.1"])?;
+            let mut upload_client = JmapClient::new(stream, http_auth);
+            upload_client
+                .blob_upload(&upload_url, "message/rfc822", data)?
+                .blob_id
         };
 
         if self.upload_only {
@@ -122,25 +114,9 @@ impl JmapEmailImportCommand {
         let mut emails = BTreeMap::new();
         emails.insert(blob_id.clone(), import);
 
-        let mut coroutine = JmapEmailImport::new(&jmap.session, &jmap.http_auth, emails)?;
-        let mut arg: Option<&[u8]> = None;
+        let output = client.email_import(emails)?;
 
-        let not_created = loop {
-            match coroutine.resume(arg.take()) {
-                JmapEmailImportResult::Ok { not_created, .. } => break not_created,
-                JmapEmailImportResult::WantsRead => {
-                    let n = jmap.stream.read(&mut buf)?;
-                    arg = Some(&buf[..n]);
-                }
-                JmapEmailImportResult::WantsWrite(bytes) => {
-                    jmap.stream.write_all(&bytes)?;
-                    arg = None;
-                }
-                JmapEmailImportResult::Err(err) => bail!("{err}"),
-            }
-        };
-
-        if let Some(err) = not_created.get(&blob_id) {
+        if let Some(err) = output.not_created.get(&blob_id) {
             let mut msg = format!("Import JMAP email from blob `{blob_id}` error");
             msg.push_str(&format_set_error(err));
             bail!(msg);
@@ -148,4 +124,8 @@ impl JmapEmailImportCommand {
 
         printer.out(Message::new("Email successfully imported"))
     }
+}
+
+fn same_authority(a: &Url, b: &Url) -> bool {
+    a.host() == b.host() && a.port_or_known_default() == b.port_or_known_default()
 }

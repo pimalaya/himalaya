@@ -1,24 +1,19 @@
 use std::{
     fmt,
-    io::{stdin, BufRead, Read, Write},
+    io::{stdin, BufRead},
 };
 
 use anyhow::{bail, Context, Result};
 use clap::Parser;
 use io_jmap::{
-    rfc8620::{
-        send::{JmapRequest, JmapSend, JmapSendResult},
-        session::capabilities::CORE,
-    },
+    rfc8620::{send::JmapRequest, session::capabilities::CORE},
     rfc8621::capabilities::MAIL,
 };
-use pimalaya_toolbox::terminal::printer::Printer;
+use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 use serde_json::Value;
 
 use crate::jmap::account::JmapAccount;
-
-const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Send a raw JMAP method-calls array and print the response.
 ///
@@ -43,7 +38,7 @@ pub struct JmapQueryCommand {
 
 impl JmapQueryCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut jmap = account.new_jmap_session()?;
+        let mut client = account.new_jmap_client()?;
 
         let raw = if self.method_calls.is_empty()
             || self.method_calls.first().map(|s| s.as_str()) == Some("-")
@@ -65,14 +60,11 @@ impl JmapQueryCommand {
             bail!("METHOD_CALLS must be a JSON array");
         };
 
-        let account_id = jmap
-            .session
-            .primary_accounts
-            .get(MAIL)
-            .cloned()
+        let account_id = client
+            .session()
+            .and_then(|s| s.primary_accounts.get(MAIL).cloned())
             .unwrap_or_default();
 
-        // Parse and inject accountId into each call's args.
         let mut method_calls = Vec::with_capacity(calls_arr.len());
         for (i, call) in calls_arr.into_iter().enumerate() {
             let Value::Array(mut tuple) = call else {
@@ -94,7 +86,6 @@ impl JmapQueryCommand {
                 v => bail!("method call #{i} name must be a string, got {v}"),
             };
 
-            // Inject accountId if the args object doesn't already have it.
             if let Value::Object(ref mut map) = args {
                 map.entry("accountId")
                     .or_insert_with(|| Value::String(account_id.clone()));
@@ -116,24 +107,7 @@ impl JmapQueryCommand {
             created_ids: None,
         };
 
-        let mut coroutine = JmapSend::new(&jmap.http_auth, &jmap.session.api_url, request)?;
-        let mut buf = [0u8; READ_BUFFER_SIZE];
-        let mut arg: Option<&[u8]> = None;
-
-        let response = loop {
-            match coroutine.resume(arg.take()) {
-                JmapSendResult::Ok { response, .. } => break response,
-                JmapSendResult::WantsRead => {
-                    let n = jmap.stream.read(&mut buf)?;
-                    arg = Some(&buf[..n]);
-                }
-                JmapSendResult::WantsWrite(bytes) => {
-                    jmap.stream.write_all(&bytes)?;
-                    arg = None;
-                }
-                JmapSendResult::Err(err) => return Err(err.into()),
-            }
-        };
+        let response = client.send_raw(request)?;
 
         printer.out(RawResponse {
             method_responses: response.method_responses,

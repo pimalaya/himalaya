@@ -1,3 +1,3 @@
-pub mod command;
+pub mod cli;
 pub mod list;
 pub mod table;

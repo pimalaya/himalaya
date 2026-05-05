@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use clap::Parser;
 use mail_parser::{MessageParser, MessagePart, MimeHeaders};
-use pimalaya_toolbox::terminal::printer::Printer;
+use pimalaya_cli::printer::Printer;
 
 use crate::{
     account::Account,

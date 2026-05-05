@@ -6,7 +6,7 @@ use std::{
 use anyhow::{bail, Result};
 use clap::Parser;
 use mail_parser::{MessageParser, MimeHeaders};
-use pimalaya_toolbox::terminal::printer::{Message, Printer};
+use pimalaya_cli::printer::{Message, Printer};
 
 use crate::{
     account::Account,

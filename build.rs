@@ -1,4 +1,4 @@
-use pimalaya_toolbox::build::{features_env, git_envs, target_envs};
+use pimalaya_cli::build::{features_env, git_envs, target_envs};
 
 fn main() {
     features_env(include_str!("./Cargo.toml"));

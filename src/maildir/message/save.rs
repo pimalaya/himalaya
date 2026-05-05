@@ -4,23 +4,16 @@ use std::{
     path::PathBuf,
 };
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Parser;
-use io_maildir::{
-    coroutines::message_store::{
-        MaildirMessageStore, MaildirMessageStoreArg, MaildirMessageStoreResult,
-    },
-    flag::Flags,
-    maildir::Maildir,
-};
-use pimalaya_toolbox::terminal::printer::Printer;
+use io_maildir::{flag::Flags, maildir::Maildir};
+use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
 use crate::maildir::{
     account::MaildirAccount,
     arg::{MaildirPathFlag, MaildirSubdirArg},
     flag::arg::FlagArg,
-    runtime,
 };
 
 /// Save a message to a mailbox.
@@ -51,7 +44,7 @@ impl MaildirMessageSaveCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
         let maildir = match Maildir::try_from(self.maildir.inner.clone()) {
             Ok(maildir) => maildir,
-            Err(_) => Maildir::try_from(account.backend.root.join(self.maildir.inner))?,
+            Err(_) => Maildir::try_from(account.backend.root.join(&self.maildir.inner))?,
         };
 
         let msg = if stdin().is_terminal() || printer.is_json() {
@@ -69,27 +62,10 @@ impl MaildirMessageSaveCommand {
         };
 
         let flags = Flags::from_iter(self.flags.into_iter().map(Into::into));
+        let client = account.new_maildir_client();
+        let (id, path) = client.store(maildir, self.subdir.into(), flags, msg.into_bytes())?;
 
-        let mut coroutine =
-            MaildirMessageStore::new(maildir, self.subdir.into(), flags, msg.into_bytes());
-        let mut arg = None;
-
-        let out = loop {
-            match coroutine.resume(arg.take()) {
-                MaildirMessageStoreResult::Ok { id, path } => break StoredMessage { id, path },
-                MaildirMessageStoreResult::WantsFileCreate(files) => {
-                    runtime::file_create(files)?;
-                    arg = Some(MaildirMessageStoreArg::FileCreate);
-                }
-                MaildirMessageStoreResult::WantsRename(pairs) => {
-                    runtime::rename(pairs)?;
-                    arg = Some(MaildirMessageStoreArg::Rename);
-                }
-                MaildirMessageStoreResult::Err(err) => bail!("{err}"),
-            }
-        };
-
-        printer.out(out)
+        printer.out(StoredMessage { id, path })
     }
 }
 

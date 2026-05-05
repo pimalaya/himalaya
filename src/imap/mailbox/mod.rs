@@ -1,6 +1,6 @@
 pub mod arg;
+pub mod cli;
 pub mod close;
-pub mod command;
 pub mod create;
 pub mod delete;
 pub mod expunge;

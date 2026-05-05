@@ -3,6 +3,7 @@ mod account;
 mod attachments;
 mod cli;
 mod config;
+mod email_client;
 mod envelopes;
 mod flags;
 #[cfg(feature = "imap")]
@@ -15,9 +16,10 @@ mod maildir;
 mod messages;
 #[cfg(feature = "smtp")]
 mod smtp;
+mod wizard;
 
 use clap::Parser;
-use pimalaya_toolbox::terminal::{error::ErrorReport, log::Logger, printer::StdoutPrinter};
+use pimalaya_cli::{error::ErrorReport, log::Logger, printer::StdoutPrinter};
 
 use crate::cli::HimalayaCli;
 

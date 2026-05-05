@@ -1,11 +1,8 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Parser;
-use io_maildir::coroutines::maildir_delete::{
-    MaildirDelete, MaildirDeleteArg, MaildirDeleteResult,
-};
-use pimalaya_toolbox::terminal::printer::{Message, Printer};
+use pimalaya_cli::printer::{Message, Printer};
 
-use crate::maildir::{account::MaildirAccount, arg::MaildirPathFlag, runtime};
+use crate::maildir::{account::MaildirAccount, arg::MaildirPathFlag};
 
 /// Delete the given mailbox.
 ///
@@ -19,22 +16,9 @@ pub struct MaildirMailboxDeleteCommand {
 
 impl MaildirMailboxDeleteCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
-        let path = account.backend.root.join(self.maildir_path.inner);
-
-        let mut coroutine = MaildirDelete::new(path);
-        let mut arg = None;
-
-        loop {
-            match coroutine.resume(arg.take()) {
-                MaildirDeleteResult::Ok => break,
-                MaildirDeleteResult::WantsDirRemove(paths) => {
-                    runtime::dir_remove(paths)?;
-                    arg = Some(MaildirDeleteArg::DirRemove);
-                }
-                MaildirDeleteResult::Err(err) => bail!("{err}"),
-            }
-        }
-
+        let path = account.backend.root.join(&self.maildir_path.inner);
+        let client = account.new_maildir_client();
+        client.delete_maildir(path)?;
         printer.out(Message::new("Maildir successfully deleted"))
     }
 }

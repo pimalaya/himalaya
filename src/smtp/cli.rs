@@ -1,8 +1,8 @@
 use anyhow::Result;
 use clap::Subcommand;
-use pimalaya_toolbox::terminal::printer::Printer;
+use pimalaya_cli::printer::Printer;
 
-use crate::smtp::{account::SmtpAccount, message::command::SmtpMessageCommand};
+use crate::smtp::{account::SmtpAccount, message::cli::SmtpMessageCommand};
 
 /// SMTP CLI (requires `smtp` cargo feature).
 ///

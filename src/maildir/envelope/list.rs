@@ -1,18 +1,13 @@
 use std::fmt;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, Row, Table};
-use io_maildir::{
-    coroutines::message_list::{
-        MaildirMessagesList, MaildirMessagesListArg, MaildirMessagesListResult,
-    },
-    maildir::Maildir,
-};
-use pimalaya_toolbox::terminal::printer::Printer;
+use io_maildir::maildir::Maildir;
+use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
-use crate::maildir::{account::MaildirAccount, arg::MaildirPathFlag, runtime};
+use crate::maildir::{account::MaildirAccount, arg::MaildirPathFlag};
 
 /// List MAILDIR envelopes from the given mailbox.
 ///
@@ -29,24 +24,11 @@ impl MaildirEnvelopeListCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
         let maildir = match Maildir::try_from(self.maildir.inner.clone()) {
             Ok(maildir) => maildir,
-            Err(_) => Maildir::try_from(account.backend.root.join(self.maildir.inner))?,
+            Err(_) => Maildir::try_from(account.backend.root.join(&self.maildir.inner))?,
         };
 
-        let mut coroutine = MaildirMessagesList::new(maildir);
-        let mut arg = None;
-
-        let messages = loop {
-            match coroutine.resume(arg.take()) {
-                MaildirMessagesListResult::Ok(messages) => break messages,
-                MaildirMessagesListResult::WantsDirRead(paths) => {
-                    arg = Some(MaildirMessagesListArg::DirRead(runtime::dir_read(paths)?));
-                }
-                MaildirMessagesListResult::WantsFileRead(paths) => {
-                    arg = Some(MaildirMessagesListArg::FileRead(runtime::file_read(paths)?));
-                }
-                MaildirMessagesListResult::Err(err) => bail!("{err}"),
-            }
-        };
+        let client = account.new_maildir_client();
+        let messages = client.list_messages(maildir)?;
 
         let mut envelopes = Vec::with_capacity(messages.len());
 

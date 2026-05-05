@@ -1,4 +1,4 @@
-pub mod command;
+pub mod cli;
 pub mod create;
 pub mod destroy;
 pub mod get;

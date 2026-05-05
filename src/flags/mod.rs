@@ -1,5 +1,5 @@
 pub mod add;
 pub mod arg;
-pub mod command;
+pub mod cli;
 pub mod delete;
 pub mod set;

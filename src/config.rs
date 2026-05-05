@@ -1,19 +1,22 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, fs, path::Path, path::PathBuf};
 
+use anyhow::{Context, Result};
 use comfy_table::ContentArrangement;
-use pimalaya_toolbox::{
-    config::{shell_expanded_string, TomlConfig},
-    sasl::{Sasl, SaslAnonymous, SaslLogin, SaslMechanism, SaslPlain},
+use pimalaya_config::{
     secret::{Secret, SecretError},
-    stream::{Rustls, RustlsCrypto, Tls, TlsProvider},
+    toml::{shell_expanded_string, TomlConfig},
 };
-use serde::Deserialize;
+use pimalaya_stream::{
+    sasl::{Sasl, SaslAnonymous, SaslLogin, SaslMechanism, SaslPlain},
+    tls::{Rustls, RustlsCrypto, Tls, TlsProvider},
+};
+use serde::{Deserialize, Serialize};
 use url::Url;
 
 /// Global configuration.
 ///
 /// Represents the whole TOML user's configuration file.
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct Config {
     pub downloads_dir: Option<PathBuf>,
@@ -43,8 +46,28 @@ impl TomlConfig for Config {
     }
 }
 
+impl Config {
+    /// Serializes `self` to TOML and writes it to `path`, creating
+    /// any missing parent directories. Used by the wizard to persist
+    /// a freshly-built configuration.
+    pub fn write(&self, path: &Path) -> Result<()> {
+        let toml = toml::to_string_pretty(self).context("Serialize TOML config error")?;
+
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).with_context(|| {
+                format!("Create TOML config parent `{}` error", parent.display())
+            })?;
+        }
+
+        fs::write(path, toml)
+            .with_context(|| format!("Write TOML config `{}` error", path.display()))?;
+
+        Ok(())
+    }
+}
+
 /// Account configuration.
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct AccountConfig {
     #[serde(default)]
@@ -64,7 +87,7 @@ pub struct AccountConfig {
     pub smtp: Option<SmtpConfig>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum TableArrangementConfig {
     #[default]
@@ -85,7 +108,7 @@ impl From<TableArrangementConfig> for ContentArrangement {
 
 /// IMAP configuration.
 #[allow(unused)]
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ImapConfig {
     pub url: Url,
@@ -99,7 +122,7 @@ pub struct ImapConfig {
 
 /// Maildir configuration.
 #[allow(unused)]
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MaildirConfig {
     pub root: PathBuf,
@@ -107,7 +130,7 @@ pub struct MaildirConfig {
 
 /// SMTP configuration.
 #[allow(unused)]
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SmtpConfig {
     pub url: Url,
@@ -120,7 +143,7 @@ pub struct SmtpConfig {
 }
 
 /// SSL/TLS configuration.
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct TlsConfig {
     pub provider: Option<TlsProviderConfig>,
@@ -130,7 +153,7 @@ pub struct TlsConfig {
 }
 
 /// SSL/TLS provider configuration.
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum TlsProviderConfig {
     Rustls,
@@ -138,14 +161,14 @@ pub enum TlsProviderConfig {
 }
 
 /// Rustls configuration.
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct RustlsConfig {
     pub crypto: Option<RustlsCryptoConfig>,
 }
 
 /// Rustls crypto provider configuration.
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum RustlsCryptoConfig {
     Aws,
@@ -173,7 +196,7 @@ impl TryFrom<TlsConfig> for Tls {
 }
 
 /// SASL configuration.
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SaslConfig {
     pub mechanism: Option<SaslMechanismConfig>,
@@ -183,7 +206,7 @@ pub struct SaslConfig {
 }
 
 /// SASL mechanism configuration.
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum SaslMechanismConfig {
     Login,
@@ -193,7 +216,7 @@ pub enum SaslMechanismConfig {
 }
 
 /// SASL LOGIN configuration.
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SaslLoginConfig {
     #[serde(deserialize_with = "shell_expanded_string")]
@@ -202,7 +225,7 @@ pub struct SaslLoginConfig {
 }
 
 /// SASL PLAIN configuration.
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SaslPlainConfig {
     pub authzid: Option<String>,
@@ -212,7 +235,7 @@ pub struct SaslPlainConfig {
 }
 
 /// SASL ANONYMOUS configuration.
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SaslAnonymousConfig {
     pub message: Option<String>,
@@ -254,7 +277,7 @@ impl TryFrom<SaslConfig> for Sasl {
 }
 
 /// JMAP configuration.
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct JmapConfig {
     /// The JMAP server address.
@@ -286,7 +309,7 @@ pub struct JmapConfig {
 
 /// JMAP authentication configuration.
 // https://www.iana.org/assignments/http-authschemes/http-authschemes.xhtml#authschemes
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum JmapAuthConfig {
     Header(Secret),
@@ -303,8 +326,8 @@ pub enum JmapAuthConfig {
 }
 
 #[cfg(feature = "jmap")]
-impl TryFrom<JmapAuthConfig> for pimalaya_toolbox::stream::jmap::JmapAuth {
-    type Error = pimalaya_toolbox::secret::SecretError;
+impl TryFrom<JmapAuthConfig> for crate::jmap::session::JmapAuth {
+    type Error = pimalaya_config::secret::SecretError;
 
     fn try_from(config: JmapAuthConfig) -> Result<Self, Self::Error> {
         match config {

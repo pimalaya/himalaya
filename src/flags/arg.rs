@@ -53,6 +53,20 @@ impl From<&FlagArg> for io_maildir::flag::Flag {
     }
 }
 
+impl From<&FlagArg> for io_email::flag::Flag {
+    fn from(flag: &FlagArg) -> Self {
+        use io_email::flag::Flag;
+
+        match flag {
+            FlagArg::Seen => Flag::Seen,
+            FlagArg::Answered => Flag::Answered,
+            FlagArg::Flagged => Flag::Flagged,
+            FlagArg::Deleted => Flag::Deleted,
+            FlagArg::Draft => Flag::Draft,
+        }
+    }
+}
+
 #[derive(Debug, Parser)]
 pub struct MessageIdsArg {
     /// Identifier(s) of message(s) (IMAP UID, JMAP email ID, Maildir filename id).

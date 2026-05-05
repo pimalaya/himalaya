@@ -1,21 +1,15 @@
-use std::{
-    collections::BTreeMap,
-    io::{Read, Write},
-};
+use std::collections::BTreeMap;
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_jmap::rfc8621::{
-    email_submission::{EmailAddressWithParameters, EmailSubmissionCreate, Envelope},
-    email_submission_set::{JmapEmailSubmissionSet, JmapEmailSubmissionSetResult},
+use io_jmap::rfc8621::email_submission::{
+    EmailAddressWithParameters, EmailSubmissionCreate, Envelope,
 };
-use pimalaya_toolbox::terminal::printer::Printer;
+use pimalaya_cli::printer::Printer;
 
 use crate::jmap::{
     account::JmapAccount, error::format_set_error, submission::query::SubmissionsTable,
 };
-
-const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Submit a JMAP email for sending (EmailSubmission/set).
 ///
@@ -42,7 +36,7 @@ pub struct JmapSubmissionCreateCommand {
 
 impl JmapSubmissionCreateCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut jmap = account.new_jmap_session()?;
+        let mut client = account.new_jmap_client()?;
 
         let envelope = if let Some(mail_from_addr) = self.mail_from {
             let rcpt_to = self
@@ -73,31 +67,9 @@ impl JmapSubmissionCreateCommand {
         let mut submissions = BTreeMap::new();
         submissions.insert(self.email_id.clone(), submission);
 
-        let mut coroutine =
-            JmapEmailSubmissionSet::new(&jmap.session, &jmap.http_auth, submissions)?;
-        let mut buf = [0u8; READ_BUFFER_SIZE];
-        let mut arg: Option<&[u8]> = None;
+        let output = client.email_submission_set(submissions)?;
 
-        let (created, not_created) = loop {
-            match coroutine.resume(arg.take()) {
-                JmapEmailSubmissionSetResult::Ok {
-                    created,
-                    not_created,
-                    ..
-                } => break (created, not_created),
-                JmapEmailSubmissionSetResult::WantsRead => {
-                    let n = jmap.stream.read(&mut buf)?;
-                    arg = Some(&buf[..n]);
-                }
-                JmapEmailSubmissionSetResult::WantsWrite(bytes) => {
-                    jmap.stream.write_all(&bytes)?;
-                    arg = None;
-                }
-                JmapEmailSubmissionSetResult::Err(err) => bail!("{err}"),
-            }
-        };
-
-        if let Some(err) = not_created.get(&self.email_id) {
+        if let Some(err) = output.not_created.get(&self.email_id) {
             let mut msg = format!("Send email `{}` error", self.email_id);
             msg.push_str(&format_set_error(err));
             bail!(msg);
@@ -105,7 +77,7 @@ impl JmapSubmissionCreateCommand {
 
         let table = SubmissionsTable {
             preset: account.table_preset,
-            submissions: created.into_values().collect(),
+            submissions: output.created.into_values().collect(),
         };
 
         printer.out(table)

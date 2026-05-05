@@ -1,22 +1,14 @@
-use std::{
-    fmt,
-    io::{Read, Write},
-};
+use std::fmt;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
-use io_jmap::rfc8621::{
-    thread::Thread,
-    thread_get::{JmapThreadGet, JmapThreadGetResult},
-};
+use io_jmap::rfc8621::thread::Thread;
 use log::warn;
-use pimalaya_toolbox::terminal::printer::Printer;
+use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
 use crate::jmap::account::JmapAccount;
-
-const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Get JMAP threads by ID (Thread/get).
 ///
@@ -30,36 +22,16 @@ pub struct JmapThreadGetCommand {
 
 impl JmapThreadGetCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut jmap = account.new_jmap_session()?;
+        let mut client = account.new_jmap_client()?;
+        let output = client.thread_get(self.ids.clone())?;
 
-        let mut coroutine = JmapThreadGet::new(&jmap.session, &jmap.http_auth, self.ids.clone())?;
-        let mut buf = [0u8; READ_BUFFER_SIZE];
-        let mut arg: Option<&[u8]> = None;
-
-        let (threads, not_found) = loop {
-            match coroutine.resume(arg.take()) {
-                JmapThreadGetResult::Ok {
-                    threads, not_found, ..
-                } => break (threads, not_found),
-                JmapThreadGetResult::WantsRead => {
-                    let n = jmap.stream.read(&mut buf)?;
-                    arg = Some(&buf[..n]);
-                }
-                JmapThreadGetResult::WantsWrite(bytes) => {
-                    jmap.stream.write_all(&bytes)?;
-                    arg = None;
-                }
-                JmapThreadGetResult::Err(err) => bail!("{err}"),
-            }
-        };
-
-        for id in not_found {
+        for id in output.not_found {
             warn!("thread `{id}` not found, ignoring it");
         }
 
         printer.out(ThreadsTable {
             preset: account.table_preset,
-            threads,
+            threads: output.threads,
         })
     }
 }

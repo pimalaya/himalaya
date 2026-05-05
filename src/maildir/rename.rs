@@ -1,14 +1,10 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Parser;
-use io_maildir::coroutines::maildir_rename::{
-    MaildirRename, MaildirRenameArg, MaildirRenameResult,
-};
-use pimalaya_toolbox::terminal::printer::{Message, Printer};
+use pimalaya_cli::printer::{Message, Printer};
 
 use crate::maildir::{
     account::MaildirAccount,
     arg::{MaildirNameArg, MaildirPathFlag},
-    runtime,
 };
 
 /// Rename the given mailbox.
@@ -25,22 +21,9 @@ pub struct MaildirMailboxRenameCommand {
 
 impl MaildirMailboxRenameCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
-        let path = account.backend.root.join(self.maildir_path.inner);
-
-        let mut coroutine = MaildirRename::new(path, self.maildir_name.inner);
-        let mut arg = None;
-
-        loop {
-            match coroutine.resume(arg.take()) {
-                MaildirRenameResult::Ok => break,
-                MaildirRenameResult::WantsRename(pairs) => {
-                    runtime::rename(pairs)?;
-                    arg = Some(MaildirRenameArg::Rename);
-                }
-                MaildirRenameResult::Err(err) => bail!("{err}"),
-            }
-        }
-
+        let path = account.backend.root.join(&self.maildir_path.inner);
+        let client = account.new_maildir_client();
+        client.rename_maildir(path, self.maildir_name.inner)?;
         printer.out(Message::new("Maildir successfully renamed"))
     }
 }

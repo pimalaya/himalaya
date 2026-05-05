@@ -1,15 +1,10 @@
-use std::io::{Read, Write};
-
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Parser;
-use io_jmap::rfc8621::email_parse::{JmapEmailParse, JmapEmailParseResult};
 use log::warn;
-use pimalaya_toolbox::terminal::printer::Printer;
+use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
 use crate::jmap::account::JmapAccount;
-
-const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Parse RFC 5322 message blobs without storing them (Email/parse).
 ///
@@ -24,44 +19,20 @@ pub struct JmapEmailParseCommand {
 
 impl JmapEmailParseCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut jmap = account.new_jmap_session()?;
+        let mut client = account.new_jmap_client()?;
+        let output = client.email_parse(self.blob_ids.clone(), None)?;
 
-        let mut coroutine =
-            JmapEmailParse::new(&jmap.session, &jmap.http_auth, self.blob_ids.clone(), None)?;
-        let mut buf = [0u8; READ_BUFFER_SIZE];
-        let mut arg: Option<&[u8]> = None;
-
-        let (parsed, not_parsable, not_found) = loop {
-            match coroutine.resume(arg.take()) {
-                JmapEmailParseResult::Ok {
-                    parsed,
-                    not_parsable,
-                    not_found,
-                    ..
-                } => break (parsed, not_parsable, not_found),
-                JmapEmailParseResult::WantsRead => {
-                    let n = jmap.stream.read(&mut buf)?;
-                    arg = Some(&buf[..n]);
-                }
-                JmapEmailParseResult::WantsWrite(bytes) => {
-                    jmap.stream.write_all(&bytes)?;
-                    arg = None;
-                }
-                JmapEmailParseResult::Err(err) => bail!("{err}"),
-            }
-        };
-
-        for id in not_found {
+        for id in output.not_found {
             warn!("blob `{id}` not found, ignoring it");
         }
 
-        for id in not_parsable {
+        for id in output.not_parsable {
             warn!("blob `{id}` not valid MIME message, ignoring it");
         }
 
         let mut bodies = Vec::new();
 
-        for (_blob_id, email) in parsed {
+        for (_blob_id, email) in output.parsed {
             if let Some(body_values) = &email.body_values {
                 if let Some(text_parts) = &email.text_body {
                     for part in text_parts {

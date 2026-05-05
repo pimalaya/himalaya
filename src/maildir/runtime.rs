@@ -8,6 +8,10 @@
 //! Each helper performs the operation and returns the raw output
 //! (only meaningful for read-style ops). Callers wrap the result in
 //! the appropriate `*Arg` variant for their coroutine.
+//!
+//! Used by the cross-protocol shared commands (`messages add`, `mv`,
+//! `copy`); the protocol-specific `maildir` subcommands now go
+//! through [`io_maildir::client::MaildirClient`].
 
 use std::{
     collections::{BTreeMap, BTreeSet},

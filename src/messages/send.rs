@@ -4,7 +4,7 @@ use std::io::{Read, Write};
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use pimalaya_toolbox::terminal::printer::{Message, Printer};
+use pimalaya_cli::printer::{Message, Printer};
 
 use crate::{
     cli::BackendArg,
@@ -52,7 +52,7 @@ impl MessagesSendCommand {
         if backend.allows_smtp() {
             if let Some(smtp_config) = account_config.smtp.take() {
                 use io_email::smtp::message_send::{MessageSend, MessageSendResult};
-                use pimalaya_toolbox::stream::smtp::SmtpSession;
+                use pimalaya_stream::std::smtp::SmtpSession;
 
                 let account = crate::account::Account::new(config, account_config, smtp_config)?;
                 let mut session = SmtpSession::new(
@@ -88,8 +88,8 @@ impl MessagesSendCommand {
         #[cfg(feature = "jmap")]
         if backend.allows_jmap() {
             if let Some(jmap_config) = account_config.jmap.take() {
+                use crate::jmap::session::JmapSession;
                 use io_email::jmap::message_send::{MessageSend, MessageSendResult};
-                use pimalaya_toolbox::stream::jmap::JmapSession;
 
                 let identity_id = jmap_config.identity_id.clone().ok_or_else(|| {
                     anyhow::anyhow!(

@@ -16,31 +16,33 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-default = ["imap", "smtp", "rustls-ring"]
+default = ["imap", "smtp", "maildir", "jmap", "rustls-ring"]
 
-imap = ["dep:io-imap", "dep:mail-parser", "dep:rfc2047-decoder", "pimalaya-toolbox/imap", "io-email/imap"]
-jmap = ["dep:io-jmap", "dep:mail-parser", "dep:serde_json", "pimalaya-toolbox/jmap", "io-email/jmap"]
-smtp = ["dep:io-smtp", "dep:mail-parser", "pimalaya-toolbox/smtp", "io-email/smtp"]
-maildir = ["dep:convert_case", "dep:io-maildir", "dep:mail-parser", "dep:mime_guess", "io-email/maildir"]
+imap = ["dep:io-imap", "dep:mail-parser", "dep:rfc2047-decoder", "io-email/imap", "io-imap/client"]
+jmap = ["dep:base64", "dep:io-jmap", "dep:mail-parser", "dep:serde_json", "io-email/jmap", "io-jmap/client"]
+smtp = ["dep:io-smtp", "dep:mail-parser", "pimalaya-stream/smtp", "io-email/smtp"]
+maildir = ["dep:convert_case", "dep:io-maildir", "dep:mail-parser", "dep:mime_guess", "io-email/maildir", "io-maildir/client"]
 
-native-tls = ["pimalaya-toolbox/native-tls"]
-rustls-aws = ["pimalaya-toolbox/rustls-aws"]
-rustls-ring = ["pimalaya-toolbox/rustls-ring"]
+native-tls = ["pimalaya-stream/native-tls", "io-discovery/native-tls"]
+rustls-aws = ["pimalaya-stream/rustls-aws", "io-discovery/rustls-aws"]
+rustls-ring = ["pimalaya-stream/rustls-ring", "io-discovery/rustls-ring"]
 
-vendored = ["pimalaya-toolbox/vendored"]
+vendored = ["pimalaya-stream/vendored"]
 
 [build-dependencies]
-pimalaya-toolbox = { version = "0.0.4", default-features = false, features = ["build"] }
+pimalaya-cli = { version = "0.0.1", default-features = false, features = ["build"] }
 
 [dependencies]
 anyhow = "1"
+base64 = { version = "0.22", optional = true }
 chrono = { version = "0.4", default-features = false }
 clap = { version = "4.4", features = ["derive", "env", "wrap_help"] }
 comfy-table = "7"
 convert_case = { version = "0.11", optional = true }
 dirs = "6"
 gethostname = "1"
-io-email = { version = "0.0.1", default-features = false, features = ["serde"] }
+io-discovery = { version = "0.0.1", default-features = false, features = ["pacc", "autoconfig", "client"] }
+io-email = { version = "0.0.1", default-features = false, features = ["serde", "client"] }
 io-imap = { version = "0.0.1", default-features = false, optional = true }
 io-jmap = { version = "0.0.1", default-features = false, optional = true }
 io-maildir = { version = "0.0.1", default-features = false, features = ["serde"], optional = true }
@@ -51,12 +53,15 @@ mail-builder = "0.3"
 mail-parser = { version = "0.11", features = ["serde"], optional = true }
 mime_guess = { version = "2", optional = true }
 open = "5"
-pimalaya-toolbox = { version = "0.0.4", default-features = false, features = ["config", "terminal", "secret", "sasl", "stream"] }
+pimalaya-cli = { version = "0.0.1", default-features = false, features = ["terminal", "table", "prompt", "wizard", "imap", "smtp"] }
+pimalaya-config = { version = "0.0.1", default-features = false, features = ["toml", "secret"] }
+pimalaya-stream = { version = "0.0.1", default-features = false, features = ["std", "http"] }
 rfc2047-decoder = { version = "1", optional = true }
 secrecy = "0.10"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", optional = true }
 shellexpand = "3.1"
+toml = "0.8"
 url = { version = "2.2", features = ["serde"] }
 
 [target.'cfg(windows)'.dependencies]
@@ -70,10 +75,14 @@ serde_json = "1"
 tempfile = "3"
 
 [patch.crates-io]
+domain = { git = "https://github.com/soywod/domain", branch = "new-srv" }
+io-discovery.path = "../io-discovery"
 io-email.path = "../io-email"
 io-http.git = "https://github.com/pimalaya/io-http"
-io-imap = { git = "https://github.com/pimalaya/io-imap", branch = "io" }
-io-jmap.git = "https://github.com/pimalaya/io-jmap"
+io-imap.path = "../io-imap"
+io-jmap.path = "../io-jmap"
 io-maildir.path = "../io-maildir"
-io-smtp.git = "https://github.com/pimalaya/io-smtp"
-pimalaya-toolbox.git = "https://github.com/pimalaya/toolbox"
+io-smtp.path = "../io-smtp"
+pimalaya-cli.path = "../cli"
+pimalaya-config.path = "../config"
+pimalaya-stream.path = "../stream"

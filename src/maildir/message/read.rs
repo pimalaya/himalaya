@@ -2,18 +2,13 @@ use std::fmt;
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_maildir::{
-    coroutines::message_get::{MaildirMessageGet, MaildirMessageGetArg, MaildirMessageGetResult},
-    maildir::Maildir,
-    types::Message,
-};
-use pimalaya_toolbox::terminal::printer::Printer;
+use io_maildir::{maildir::Maildir, types::Message};
+use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
 use crate::maildir::{
     account::MaildirAccount,
     arg::{MaildirPathFlag, MessageIdArg},
-    runtime,
 };
 
 /// Read message content.
@@ -39,24 +34,11 @@ impl MaildirMessageReadCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
         let maildir = match Maildir::try_from(self.maildir.inner.clone()) {
             Ok(maildir) => maildir,
-            Err(_) => Maildir::try_from(account.backend.root.join(self.maildir.inner))?,
+            Err(_) => Maildir::try_from(account.backend.root.join(&self.maildir.inner))?,
         };
 
-        let mut coroutine = MaildirMessageGet::new(maildir, &self.id.inner);
-        let mut arg = None;
-
-        let message = loop {
-            match coroutine.resume(arg.take()) {
-                MaildirMessageGetResult::Ok(msg) => break msg,
-                MaildirMessageGetResult::WantsDirRead(paths) => {
-                    arg = Some(MaildirMessageGetArg::DirRead(runtime::dir_read(paths)?));
-                }
-                MaildirMessageGetResult::WantsFileRead(paths) => {
-                    arg = Some(MaildirMessageGetArg::FileRead(runtime::file_read(paths)?));
-                }
-                MaildirMessageGetResult::Err(err) => bail!("{err}"),
-            }
-        };
+        let client = account.new_maildir_client();
+        let message = client.get(maildir, &self.id.inner)?;
 
         let path = message.path().to_owned();
 

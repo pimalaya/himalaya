@@ -4,7 +4,7 @@ use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, Row, Table};
 use io_maildir::flag::Flag;
-use pimalaya_toolbox::terminal::printer::Printer;
+use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
 use crate::maildir::account::MaildirAccount;

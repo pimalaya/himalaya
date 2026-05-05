@@ -8,8 +8,8 @@ use std::{
 use anyhow::{bail, Result};
 use clap::Parser;
 #[cfg(any(feature = "imap", feature = "jmap", feature = "maildir"))]
-use pimalaya_toolbox::terminal::printer::Message;
-use pimalaya_toolbox::terminal::printer::Printer;
+use pimalaya_cli::printer::Message;
+use pimalaya_cli::printer::Printer;
 
 use crate::{
     cli::BackendArg,
@@ -60,9 +60,9 @@ impl MessagesAddCommand {
         #[cfg(feature = "imap")]
         if backend.allows_imap() {
             if let Some(imap_config) = account_config.imap.take() {
+                use crate::imap::session::ImapSession;
                 use io_email::imap::message_add::{MessageAdd, MessageAddResult};
                 use io_imap::types::mailbox::Mailbox;
-                use pimalaya_toolbox::stream::imap::ImapSession;
 
                 let account = crate::account::Account::new(config, account_config, imap_config)?;
                 let mut session = ImapSession::new(
@@ -99,8 +99,8 @@ impl MessagesAddCommand {
         #[cfg(feature = "jmap")]
         if backend.allows_jmap() {
             if let Some(jmap_config) = account_config.jmap.take() {
+                use crate::jmap::session::JmapSession;
                 use io_email::jmap::message_add::{MessageAdd, MessageAddResult};
-                use pimalaya_toolbox::stream::jmap::JmapSession;
 
                 let account = crate::account::Account::new(config, account_config, jmap_config)?;
                 let mut session = JmapSession::new(

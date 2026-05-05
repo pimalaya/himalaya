@@ -1,12 +1,12 @@
 use anyhow::Result;
 use clap::Subcommand;
-use pimalaya_toolbox::terminal::printer::Printer;
+use pimalaya_cli::printer::Printer;
 
 use crate::jmap::{
-    account::JmapAccount, email::command::JmapEmailCommand, identity::command::JmapIdentityCommand,
-    mailbox::command::JmapMailboxCommand, query::JmapQueryCommand,
-    submission::command::JmapSubmissionCommand, thread::command::JmapThreadCommand,
-    vacation::command::JmapVacationCommand,
+    account::JmapAccount, email::cli::JmapEmailCommand, identity::cli::JmapIdentityCommand,
+    mailbox::cli::JmapMailboxCommand, query::JmapQueryCommand,
+    submission::cli::JmapSubmissionCommand, thread::cli::JmapThreadCommand,
+    vacation::cli::JmapVacationCommand,
 };
 
 /// JMAP CLI (requires the `jmap` cargo feature).

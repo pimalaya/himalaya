@@ -2,31 +2,28 @@ use std::{fmt, path::PathBuf, str::FromStr};
 
 use anyhow::{bail, Error, Result};
 use clap::{CommandFactory, Parser, Subcommand};
-use pimalaya_toolbox::{
-    config::TomlConfig,
-    long_version,
-    terminal::{
-        clap::{
-            args::{AccountFlag, JsonFlag, LogFlags},
-            commands::{CompletionCommand, ManualCommand},
-            parsers::path_parser,
-        },
-        printer::Printer,
+use pimalaya_cli::{
+    clap::{
+        args::{AccountFlag, JsonFlag, LogFlags},
+        commands::{CompletionCommand, ManualCommand},
+        parsers::path_parser,
     },
+    long_version,
+    printer::Printer,
 };
+use pimalaya_config::toml::TomlConfig;
 
 #[cfg(feature = "imap")]
-use crate::imap::command::ImapCommand;
+use crate::imap::cli::ImapCommand;
 #[cfg(feature = "jmap")]
-use crate::jmap::command::JmapCommand;
+use crate::jmap::cli::JmapCommand;
 #[cfg(feature = "maildir")]
-use crate::maildir::command::MaildirCommand;
+use crate::maildir::cli::MaildirCommand;
 #[cfg(feature = "smtp")]
-use crate::smtp::command::SmtpCommand;
+use crate::smtp::cli::SmtpCommand;
 use crate::{
-    account::Account, config::Config, envelopes::command::EnvelopesCommand,
-    flags::command::FlagsCommand, mailboxes::command::MailboxesCommand,
-    messages::command::MessagesCommand,
+    account::Account, config::Config, envelopes::cli::EnvelopesCommand, flags::cli::FlagsCommand,
+    mailboxes::cli::MailboxesCommand, messages::cli::MessagesCommand,
 };
 
 #[derive(Parser, Debug)]
@@ -158,7 +155,7 @@ pub enum BackendCommand {
     Messages(MessagesCommand),
     #[cfg(any(feature = "imap", feature = "jmap", feature = "maildir"))]
     #[command(subcommand)]
-    Attachments(crate::attachments::command::AttachmentsCommand),
+    Attachments(crate::attachments::cli::AttachmentsCommand),
 
     #[cfg(feature = "imap")]
     #[command(subcommand)]
@@ -187,35 +184,35 @@ impl BackendCommand {
             Self::Completions(cmd) => cmd.execute(printer, HimalayaCli::command()),
 
             Self::Mailboxes(cmd) => {
-                let config = Config::from_paths_or_default(config_paths)?;
+                let config = load_or_wizard(config_paths)?;
                 let (_, account_config) = config.get_account(account_name)?;
                 cmd.execute(printer, config, account_config, backend)
             }
             Self::Envelopes(cmd) => {
-                let config = Config::from_paths_or_default(config_paths)?;
+                let config = load_or_wizard(config_paths)?;
                 let (_, account_config) = config.get_account(account_name)?;
                 cmd.execute(printer, config, account_config, backend)
             }
             Self::Flags(cmd) => {
-                let config = Config::from_paths_or_default(config_paths)?;
+                let config = load_or_wizard(config_paths)?;
                 let (_, account_config) = config.get_account(account_name)?;
                 cmd.execute(printer, config, account_config, backend)
             }
             Self::Messages(cmd) => {
-                let config = Config::from_paths_or_default(config_paths)?;
+                let config = load_or_wizard(config_paths)?;
                 let (_, account_config) = config.get_account(account_name)?;
                 cmd.execute(printer, config, account_config, backend)
             }
             #[cfg(any(feature = "imap", feature = "jmap", feature = "maildir"))]
             Self::Attachments(cmd) => {
-                let config = Config::from_paths_or_default(config_paths)?;
+                let config = load_or_wizard(config_paths)?;
                 let (_, account_config) = config.get_account(account_name)?;
                 cmd.execute(printer, config, account_config, backend)
             }
 
             #[cfg(feature = "imap")]
             Self::Imap(cmd) => {
-                let config = Config::from_paths_or_default(config_paths)?;
+                let config = load_or_wizard(config_paths)?;
                 let (account_name, mut account_config) = config.get_account(account_name)?;
 
                 let Some(imap_config) = account_config.imap.take() else {
@@ -228,7 +225,7 @@ impl BackendCommand {
             }
             #[cfg(feature = "jmap")]
             Self::Jmap(cmd) => {
-                let config = Config::from_paths_or_default(config_paths)?;
+                let config = load_or_wizard(config_paths)?;
                 let (account_name, mut account_config) = config.get_account(account_name)?;
 
                 let Some(jmap_config) = account_config.jmap.take() else {
@@ -241,7 +238,7 @@ impl BackendCommand {
             }
             #[cfg(feature = "maildir")]
             Self::Maildir(cmd) => {
-                let config = Config::from_paths_or_default(config_paths)?;
+                let config = load_or_wizard(config_paths)?;
                 let (account_name, mut account_config) = config.get_account(account_name)?;
 
                 let Some(maildir_config) = account_config.maildir.take() else {
@@ -254,7 +251,7 @@ impl BackendCommand {
             }
             #[cfg(feature = "smtp")]
             Self::Smtp(cmd) => {
-                let config = Config::from_paths_or_default(config_paths)?;
+                let config = load_or_wizard(config_paths)?;
                 let (account_name, mut account_config) = config.get_account(account_name)?;
 
                 let Some(smtp_config) = account_config.smtp.take() else {
@@ -266,5 +263,15 @@ impl BackendCommand {
                 cmd.execute(printer, account)
             }
         }
+    }
+}
+
+/// Loads `Config` from `paths`, or runs the wizard if no config file
+/// is found. Centralises the `Result<Option<Config>>` → `Config`
+/// adaptation so call sites stay readable.
+fn load_or_wizard(paths: &[PathBuf]) -> Result<Config> {
+    match Config::from_paths_or_default(paths)? {
+        Some(config) => Ok(config),
+        None => crate::wizard::run_or_exit(&Config::target_path(paths)?),
     }
 }

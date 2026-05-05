@@ -1,3 +1,3 @@
 pub mod account;
-pub mod command;
+pub mod cli;
 pub mod message;

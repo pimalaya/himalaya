@@ -1,25 +1,16 @@
-use std::{
-    collections::HashMap,
-    fmt,
-    io::{Read, Write},
-};
+use std::{collections::HashMap, fmt};
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
-use io_imap::{
-    rfc2971::id::*,
-    types::{
-        core::{IString, NString},
-        IntoStatic,
-    },
+use io_imap::types::{
+    core::{IString, NString},
+    IntoStatic,
 };
-use pimalaya_toolbox::terminal::printer::Printer;
+use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
 use crate::imap::account::ImapAccount;
-
-const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Get information about the IMAP server.
 ///
@@ -37,7 +28,7 @@ pub struct ImapIdCommand {
 
 impl ImapIdCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let mut imap = account.new_imap_session()?;
+        let mut client = account.new_imap_client()?;
         let mut params = HashMap::new();
 
         params.extend([
@@ -63,24 +54,7 @@ impl ImapIdCommand {
             params.extend(more);
         }
 
-        let mut coroutine = ImapServerId::new(imap.context, Some(params.into_iter().collect()));
-        let mut buf = [0u8; READ_BUFFER_SIZE];
-        let mut arg: Option<&[u8]> = None;
-
-        let params = loop {
-            match coroutine.resume(arg.take()) {
-                ImapServerIdResult::Ok { server_id, .. } => break server_id,
-                ImapServerIdResult::WantsRead => {
-                    let n = imap.stream.read(&mut buf)?;
-                    arg = Some(&buf[..n]);
-                }
-                ImapServerIdResult::WantsWrite(bytes) => {
-                    imap.stream.write_all(&bytes)?;
-                    arg = None;
-                }
-                ImapServerIdResult::Err { err, .. } => bail!("{err}"),
-            }
-        };
+        let params = client.id(Some(params.into_iter().collect()))?;
 
         let table = ServerIdTable {
             preset: account.table_preset,

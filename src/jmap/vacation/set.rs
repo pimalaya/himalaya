@@ -1,17 +1,11 @@
-use std::io::{Read, Write};
-
 use anyhow::{bail, Result};
 use clap::Parser;
 use io_jmap::rfc8621::{
-    capabilities::VACATION_RESPONSE,
-    vacation_response::VacationResponseUpdate,
-    vacation_response_set::{JmapVacationResponseSet, JmapVacationResponseSetResult},
+    capabilities::VACATION_RESPONSE, vacation_response::VacationResponseUpdate,
 };
-use pimalaya_toolbox::terminal::printer::{Message, Printer};
+use pimalaya_cli::printer::{Message, Printer};
 
 use crate::jmap::account::JmapAccount;
-
-const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Update the JMAP vacation response (VacationResponse/set).
 #[derive(Debug, Parser)]
@@ -47,11 +41,12 @@ pub struct JmapVacationSetCommand {
 
 impl JmapVacationSetCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut jmap = account.new_jmap_session()?;
+        let mut client = account.new_jmap_client()?;
 
-        // Skip the request if the server does not advertise the
-        // vacation-response capability.
-        let has_vacation = jmap.session.capabilities.contains_key(VACATION_RESPONSE);
+        let has_vacation = client
+            .session()
+            .map(|s| s.capabilities.contains_key(VACATION_RESPONSE))
+            .unwrap_or(false);
 
         if !has_vacation {
             bail!("Vacation response is not supported by the server");
@@ -74,24 +69,7 @@ impl JmapVacationSetCommand {
             html_body: self.html_body,
         };
 
-        let mut coroutine = JmapVacationResponseSet::new(&jmap.session, &jmap.http_auth, patch)?;
-        let mut buf = [0u8; READ_BUFFER_SIZE];
-        let mut arg: Option<&[u8]> = None;
-
-        loop {
-            match coroutine.resume(arg.take()) {
-                JmapVacationResponseSetResult::Ok { .. } => break,
-                JmapVacationResponseSetResult::WantsRead => {
-                    let n = jmap.stream.read(&mut buf)?;
-                    arg = Some(&buf[..n]);
-                }
-                JmapVacationResponseSetResult::WantsWrite(bytes) => {
-                    jmap.stream.write_all(&bytes)?;
-                    arg = None;
-                }
-                JmapVacationResponseSetResult::Err(err) => bail!("{err}"),
-            }
-        }
+        client.vacation_response_set(patch)?;
 
         printer.out(Message::new("Vacation response successfully updated"))
     }

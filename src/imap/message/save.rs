@@ -1,19 +1,13 @@
-use std::io::{stdin, BufRead, IsTerminal, Read, Write};
+use std::io::{stdin, BufRead, IsTerminal};
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Parser;
-use io_imap::{
-    rfc3501::append::*,
-    types::{
-        core::Literal, extensions::binary::LiteralOrLiteral8, flag::Flag, mailbox::Mailbox,
-        IntoStatic,
-    },
+use io_imap::types::{
+    core::Literal, extensions::binary::LiteralOrLiteral8, flag::Flag, mailbox::Mailbox, IntoStatic,
 };
-use pimalaya_toolbox::terminal::printer::{Message, Printer};
+use pimalaya_cli::printer::{Message, Printer};
 
 use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
-
-const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Save a message to a mailbox.
 ///
@@ -36,7 +30,7 @@ pub struct ImapMessageSaveCommand {
 
 impl ImapMessageSaveCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let mut imap = account.new_imap_session()?;
+        let mut client = account.new_imap_client()?;
         let mailbox: Mailbox<'static> = self.mailbox.inner.try_into()?;
         let message = if !self.message.is_empty() || stdin().is_terminal() || printer.is_json() {
             self.message
@@ -61,24 +55,7 @@ impl ImapMessageSaveCommand {
             .map(|f| Flag::try_from(f).map(IntoStatic::into_static))
             .collect::<Result<_, _>>()?;
 
-        let mut coroutine = ImapMessageAppend::new(imap.context, mailbox, flags, None, message);
-        let mut buf = [0u8; READ_BUFFER_SIZE];
-        let mut arg: Option<&[u8]> = None;
-
-        loop {
-            match coroutine.resume(arg.take()) {
-                ImapMessageAppendResult::Ok { .. } => break,
-                ImapMessageAppendResult::WantsRead => {
-                    let n = imap.stream.read(&mut buf)?;
-                    arg = Some(&buf[..n]);
-                }
-                ImapMessageAppendResult::WantsWrite(bytes) => {
-                    imap.stream.write_all(&bytes)?;
-                    arg = None;
-                }
-                ImapMessageAppendResult::Err { err, .. } => bail!("{err}"),
-            }
-        }
+        client.append(mailbox, flags, None, message)?;
 
         printer.out(Message::new("Message successfully saved"))
     }

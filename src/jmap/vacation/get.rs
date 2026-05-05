@@ -1,22 +1,13 @@
-use std::{
-    fmt,
-    io::{Read, Write},
-};
+use std::fmt;
 
 use anyhow::{bail, Result};
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
-use io_jmap::rfc8621::{
-    capabilities::VACATION_RESPONSE,
-    vacation_response::VacationResponse,
-    vacation_response_get::{JmapVacationResponseGet, JmapVacationResponseGetResult},
-};
-use pimalaya_toolbox::terminal::printer::{Message, Printer};
+use io_jmap::rfc8621::{capabilities::VACATION_RESPONSE, vacation_response::VacationResponse};
+use pimalaya_cli::printer::{Message, Printer};
 use serde::Serialize;
 
 use crate::jmap::account::JmapAccount;
-
-const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Get the JMAP vacation response (VacationResponse/get).
 #[derive(Debug, Parser)]
@@ -24,38 +15,18 @@ pub struct JmapVacationGetCommand;
 
 impl JmapVacationGetCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut jmap = account.new_jmap_session()?;
+        let mut client = account.new_jmap_client()?;
 
-        // Skip the request if the server does not advertise the
-        // vacation-response capability.
-        let has_vacation = jmap.session.capabilities.contains_key(VACATION_RESPONSE);
+        let has_vacation = client
+            .session()
+            .map(|s| s.capabilities.contains_key(VACATION_RESPONSE))
+            .unwrap_or(false);
 
         if !has_vacation {
             bail!("Vacation response is not supported by the server");
         }
 
-        let mut coroutine = JmapVacationResponseGet::new(&jmap.session, &jmap.http_auth)?;
-        let mut buf = [0u8; READ_BUFFER_SIZE];
-        let mut arg: Option<&[u8]> = None;
-
-        let vacation = loop {
-            match coroutine.resume(arg.take()) {
-                JmapVacationResponseGetResult::Ok {
-                    vacation_response, ..
-                } => break vacation_response,
-                JmapVacationResponseGetResult::WantsRead => {
-                    let n = jmap.stream.read(&mut buf)?;
-                    arg = Some(&buf[..n]);
-                }
-                JmapVacationResponseGetResult::WantsWrite(bytes) => {
-                    jmap.stream.write_all(&bytes)?;
-                    arg = None;
-                }
-                JmapVacationResponseGetResult::Err(err) => bail!("{err}"),
-            }
-        };
-
-        let Some(vacation) = vacation else {
+        let Some(vacation) = client.vacation_response_get()? else {
             return printer.out(Message::new("No vacation response configured"));
         };
 

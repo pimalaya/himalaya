@@ -1,19 +1,11 @@
-use std::{
-    collections::BTreeMap,
-    io::{Read, Write},
-};
+use std::collections::BTreeMap;
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_jmap::rfc8621::{
-    email::EmailCopy,
-    email_copy::{JmapEmailCopy, JmapEmailCopyResult},
-};
-use pimalaya_toolbox::terminal::printer::{Message, Printer};
+use io_jmap::rfc8621::email::EmailCopy;
+use pimalaya_cli::printer::{Message, Printer};
 
 use crate::jmap::{account::JmapAccount, error::format_set_error};
-
-const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Copy JMAP emails from another account (Email/copy).
 #[derive(Debug, Parser)]
@@ -33,7 +25,7 @@ pub struct JmapEmailCopyCommand {
 
 impl JmapEmailCopyCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut jmap = account.new_jmap_session()?;
+        let mut client = account.new_jmap_client()?;
 
         let mailbox_ids: BTreeMap<String, bool> =
             self.mailbox_id.into_iter().map(|m| (m, true)).collect();
@@ -54,34 +46,12 @@ impl JmapEmailCopyCommand {
             })
             .collect();
 
-        let mut coroutine = JmapEmailCopy::new(
-            &jmap.session,
-            &jmap.http_auth,
-            self.from_account.clone(),
-            emails,
-        )?;
-        let mut buf = [0u8; READ_BUFFER_SIZE];
-        let mut arg: Option<&[u8]> = None;
+        let output = client.email_copy(self.from_account.clone(), emails)?;
 
-        let not_created = loop {
-            match coroutine.resume(arg.take()) {
-                JmapEmailCopyResult::Ok { not_created, .. } => break not_created,
-                JmapEmailCopyResult::WantsRead => {
-                    let n = jmap.stream.read(&mut buf)?;
-                    arg = Some(&buf[..n]);
-                }
-                JmapEmailCopyResult::WantsWrite(bytes) => {
-                    jmap.stream.write_all(&bytes)?;
-                    arg = None;
-                }
-                JmapEmailCopyResult::Err(err) => bail!("{err}"),
-            }
-        };
-
-        if !not_created.is_empty() {
+        if !output.not_created.is_empty() {
             let mut msg = String::from("Copy JMAP email(s) error");
 
-            for (id, err) in not_created {
+            for (id, err) in output.not_created {
                 msg.push_str(&format!("\n  `{id}`"));
                 msg.push_str(&format_set_error(&err));
             }

@@ -1,22 +1,15 @@
-use std::io::{Read, Write};
-
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Parser;
-use io_imap::{
-    rfc3501::{select::*, store::*},
-    types::{
-        flag::{Flag, StoreType},
-        IntoStatic,
-    },
+use io_imap::types::{
+    flag::{Flag, StoreType},
+    IntoStatic,
 };
-use pimalaya_toolbox::terminal::printer::{Message, Printer};
+use pimalaya_cli::printer::{Message, Printer};
 
 use crate::imap::{
     account::ImapAccount,
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
 };
-
-const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Add IMAP flag(s) to message(s).
 ///
@@ -43,29 +36,11 @@ pub struct ImapFlagAddCommand {
 
 impl ImapFlagAddCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let mut imap = account.new_imap_session()?;
+        let mut client = account.new_imap_client()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        let mut buf = [0u8; READ_BUFFER_SIZE];
-
         if !self.mailbox_no_select.inner {
-            let mut coroutine = ImapMailboxSelect::new(imap.context, mailbox);
-            let mut arg: Option<&[u8]> = None;
-
-            imap.context = loop {
-                match coroutine.resume(arg.take()) {
-                    ImapMailboxSelectResult::Ok { context, .. } => break context,
-                    ImapMailboxSelectResult::WantsRead => {
-                        let n = imap.stream.read(&mut buf)?;
-                        arg = Some(&buf[..n]);
-                    }
-                    ImapMailboxSelectResult::WantsWrite(bytes) => {
-                        imap.stream.write_all(&bytes)?;
-                        arg = None;
-                    }
-                    ImapMailboxSelectResult::Err { err, .. } => bail!("{err}"),
-                }
-            };
+            client.select(mailbox)?;
         }
 
         let sequence_set = self.sequence_set.as_str().try_into()?;
@@ -75,29 +50,7 @@ impl ImapFlagAddCommand {
             .map(|f| Flag::try_from(f.as_str()).map(|flag| flag.into_static()))
             .collect::<Result<_, _>>()?;
 
-        let mut coroutine = ImapMessageStoreSilent::new(
-            imap.context,
-            sequence_set,
-            StoreType::Add,
-            flags,
-            !self.seq,
-        );
-        let mut arg: Option<&[u8]> = None;
-
-        loop {
-            match coroutine.resume(arg.take()) {
-                ImapMessageStoreSilentResult::Ok(_) => break,
-                ImapMessageStoreSilentResult::WantsRead => {
-                    let n = imap.stream.read(&mut buf)?;
-                    arg = Some(&buf[..n]);
-                }
-                ImapMessageStoreSilentResult::WantsWrite(bytes) => {
-                    imap.stream.write_all(&bytes)?;
-                    arg = None;
-                }
-                ImapMessageStoreSilentResult::Err { err, .. } => bail!("{err}"),
-            }
-        }
+        client.store(sequence_set, StoreType::Add, flags, !self.seq)?;
 
         printer.out(Message::new("Flag(s) successfully added"))
     }

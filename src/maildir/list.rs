@@ -1,16 +1,13 @@
 use std::{fmt, path::PathBuf};
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
-use io_maildir::{
-    coroutines::maildir_list::{MaildirList, MaildirListArg, MaildirListResult},
-    maildir::Maildir,
-};
-use pimalaya_toolbox::terminal::printer::Printer;
+use io_maildir::maildir::Maildir;
+use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
-use crate::maildir::{account::MaildirAccount, runtime};
+use crate::maildir::account::MaildirAccount;
 
 /// List, search and filter maildirs.
 ///
@@ -22,18 +19,8 @@ pub struct MaildirMailboxListCommand;
 
 impl MaildirMailboxListCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
-        let mut coroutine = MaildirList::new(account.backend.root);
-        let mut arg = None;
-
-        let maildirs = loop {
-            match coroutine.resume(arg.take()) {
-                MaildirListResult::Ok(maildirs) => break maildirs,
-                MaildirListResult::WantsDirRead(paths) => {
-                    arg = Some(MaildirListArg::DirRead(runtime::dir_read(paths)?));
-                }
-                MaildirListResult::Err(err) => bail!("{err}"),
-            }
-        };
+        let client = account.new_maildir_client();
+        let maildirs = client.list_maildirs()?;
 
         let table = MaildirsTable {
             preset: account.table_preset,

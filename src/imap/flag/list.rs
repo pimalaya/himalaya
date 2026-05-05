@@ -1,22 +1,13 @@
-use std::{
-    collections::BTreeMap,
-    fmt,
-    io::{Read, Write},
-};
+use std::{collections::BTreeMap, fmt};
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, Row, Table};
-use io_imap::{
-    rfc3501::select::*,
-    types::flag::{Flag, FlagPerm},
-};
-use pimalaya_toolbox::terminal::printer::Printer;
+use io_imap::types::flag::{Flag, FlagPerm};
+use pimalaya_cli::printer::Printer;
 use serde::{Serialize, Serializer};
 
 use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
-
-const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// List available IMAP flags for the given mailbox.
 ///
@@ -31,32 +22,12 @@ pub struct ImapFlagListCommand {
 
 impl ImapFlagListCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let mut imap = account.new_imap_session()?;
+        let mut client = account.new_imap_client()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        let mut coroutine = ImapMailboxSelect::new(imap.context, mailbox);
-        let mut buf = [0u8; READ_BUFFER_SIZE];
-        let mut arg: Option<&[u8]> = None;
-
-        let (flags, permanent_flags) = loop {
-            match coroutine.resume(arg.take()) {
-                ImapMailboxSelectResult::Ok { data, .. } => {
-                    break (
-                        data.flags.unwrap_or_default(),
-                        data.permanent_flags.unwrap_or_default(),
-                    )
-                }
-                ImapMailboxSelectResult::WantsRead => {
-                    let n = imap.stream.read(&mut buf)?;
-                    arg = Some(&buf[..n]);
-                }
-                ImapMailboxSelectResult::WantsWrite(bytes) => {
-                    imap.stream.write_all(&bytes)?;
-                    arg = None;
-                }
-                ImapMailboxSelectResult::Err { err, .. } => bail!("{err}"),
-            }
-        };
+        let data = client.select(mailbox)?;
+        let flags = data.flags.unwrap_or_default();
+        let permanent_flags = data.permanent_flags.unwrap_or_default();
 
         let table = FlagsTable {
             preset: account.table_preset,

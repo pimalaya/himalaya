@@ -3,19 +3,15 @@ use std::{fmt, fs, path::PathBuf};
 use anyhow::{bail, Result};
 use clap::{Parser, ValueEnum};
 use convert_case::ccase;
-use io_maildir::{
-    coroutines::message_get::{MaildirMessageGet, MaildirMessageGetArg, MaildirMessageGetResult},
-    maildir::Maildir,
-};
+use io_maildir::maildir::Maildir;
 use mail_parser::MimeHeaders;
 use mime_guess::{get_mime_extensions_str, mime::OCTET_STREAM};
-use pimalaya_toolbox::terminal::printer::Printer;
+use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
 use crate::maildir::{
     account::MaildirAccount,
     arg::{MaildirPathFlag, MessageIdArg},
-    runtime,
 };
 
 /// Export a message.
@@ -48,24 +44,11 @@ impl MaildirMessageExportCommand {
     pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
         let maildir = match Maildir::try_from(self.maildir.inner.clone()) {
             Ok(maildir) => maildir,
-            Err(_) => Maildir::try_from(account.backend.root.join(self.maildir.inner))?,
+            Err(_) => Maildir::try_from(account.backend.root.join(&self.maildir.inner))?,
         };
 
-        let mut coroutine = MaildirMessageGet::new(maildir, &self.id.inner);
-        let mut arg = None;
-
-        let msg = loop {
-            match coroutine.resume(arg.take()) {
-                MaildirMessageGetResult::Ok(msg) => break msg,
-                MaildirMessageGetResult::WantsDirRead(paths) => {
-                    arg = Some(MaildirMessageGetArg::DirRead(runtime::dir_read(paths)?));
-                }
-                MaildirMessageGetResult::WantsFileRead(paths) => {
-                    arg = Some(MaildirMessageGetArg::FileRead(runtime::file_read(paths)?));
-                }
-                MaildirMessageGetResult::Err(err) => bail!("{err}"),
-            }
-        };
+        let client = account.new_maildir_client();
+        let msg = client.get(maildir, &self.id.inner)?;
 
         match self.r#type {
             ExportType::Raw => {

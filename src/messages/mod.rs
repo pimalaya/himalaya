@@ -1,5 +1,5 @@
 pub mod add;
-pub mod command;
+pub mod cli;
 pub mod compose;
 pub mod copy;
 #[cfg(any(feature = "imap", feature = "jmap", feature = "maildir"))]

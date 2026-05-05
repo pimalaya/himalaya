@@ -1,16 +1,9 @@
-use std::io::{Read, Write};
-
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_jmap::rfc8621::{
-    identity::IdentityCreate,
-    identity_set::{JmapIdentitySet, JmapIdentitySetArgs, JmapIdentitySetResult},
-};
-use pimalaya_toolbox::terminal::printer::{Message, Printer};
+use io_jmap::rfc8621::{identity::IdentityCreate, identity_set::JmapIdentitySetArgs};
+use pimalaya_cli::printer::{Message, Printer};
 
 use crate::jmap::{account::JmapAccount, error::format_set_error};
-
-const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Create a JMAP sender identity (Identity/set).
 #[derive(Debug, Parser)]
@@ -32,7 +25,7 @@ pub struct JmapIdentityCreateCommand {
 
 impl JmapIdentityCreateCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut jmap = account.new_jmap_session()?;
+        let mut client = account.new_jmap_client()?;
 
         let identity = IdentityCreate {
             name: self.name.clone(),
@@ -48,26 +41,9 @@ impl JmapIdentityCreateCommand {
         let mut args = JmapIdentitySetArgs::default();
         args.create(create_id, identity);
 
-        let mut coroutine = JmapIdentitySet::new(&jmap.session, &jmap.http_auth, args)?;
-        let mut buf = [0u8; READ_BUFFER_SIZE];
-        let mut arg: Option<&[u8]> = None;
+        let output = client.identity_set(args)?;
 
-        let not_created = loop {
-            match coroutine.resume(arg.take()) {
-                JmapIdentitySetResult::Ok { not_created, .. } => break not_created,
-                JmapIdentitySetResult::WantsRead => {
-                    let n = jmap.stream.read(&mut buf)?;
-                    arg = Some(&buf[..n]);
-                }
-                JmapIdentitySetResult::WantsWrite(bytes) => {
-                    jmap.stream.write_all(&bytes)?;
-                    arg = None;
-                }
-                JmapIdentitySetResult::Err(err) => bail!("{err}"),
-            }
-        };
-
-        if let Some(err) = not_created.get(create_id) {
+        if let Some(err) = output.not_created.get(create_id) {
             let mut msg = format!("Create identity for `{}` error", self.email);
             msg.push_str(&format_set_error(err));
             bail!(msg);

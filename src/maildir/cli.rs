@@ -4,9 +4,9 @@ use pimalaya_cli::printer::Printer;
 
 use crate::maildir::{
     account::MaildirAccount, create::MaildirMailboxCreateCommand,
-    delete::MaildirMailboxDeleteCommand, envelope::command::MaildirEnvelopeCommand,
-    flag::command::MaildirFlagCommand, list::MaildirMailboxListCommand,
-    message::command::MaildirMessageCommand, rename::MaildirMailboxRenameCommand,
+    delete::MaildirMailboxDeleteCommand, envelope::cli::MaildirEnvelopeCommand,
+    flag::cli::MaildirFlagCommand, list::MaildirMailboxListCommand,
+    message::cli::MaildirMessageCommand, rename::MaildirMailboxRenameCommand,
 };
 
 /// MAILDIR CLI (requires the `maildir` cargo feature).

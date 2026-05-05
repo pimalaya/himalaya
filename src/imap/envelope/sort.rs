@@ -1,27 +1,18 @@
-use std::{
-    fmt,
-    io::{Read, Write},
-};
+use std::fmt;
 
 use anyhow::{bail, Result};
 use clap::Parser;
 use comfy_table::{presets, Cell, ContentArrangement, Row, Table};
-use io_imap::{
-    rfc3501::select::*,
-    rfc5256::sort::*,
-    types::{
-        core::Vec1,
-        extensions::sort::{SortCriterion, SortKey},
-    },
+use io_imap::types::{
+    core::Vec1,
+    extensions::sort::{SortCriterion, SortKey},
 };
-use pimalaya_toolbox::terminal::printer::Printer;
+use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
 use crate::imap::{
     account::ImapAccount, envelope::search::parse_query, mailbox::arg::MailboxNameOptionalArg,
 };
-
-const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Sort messages by criteria.
 ///
@@ -61,59 +52,19 @@ pub struct ImapEnvelopeSortCommand {
 
 impl ImapEnvelopeSortCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let mut imap = account.new_imap_session()?;
+        let mut client = account.new_imap_client()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        let mut buf = [0u8; READ_BUFFER_SIZE];
+        client.select(mailbox)?;
 
-        // SELECT mailbox
-        let mut coroutine = ImapMailboxSelect::new(imap.context, mailbox);
-        let mut arg: Option<&[u8]> = None;
-
-        let context = loop {
-            match coroutine.resume(arg.take()) {
-                ImapMailboxSelectResult::Ok { context, .. } => break context,
-                ImapMailboxSelectResult::WantsRead => {
-                    let n = imap.stream.read(&mut buf)?;
-                    arg = Some(&buf[..n]);
-                }
-                ImapMailboxSelectResult::WantsWrite(bytes) => {
-                    imap.stream.write_all(&bytes)?;
-                    arg = None;
-                }
-                ImapMailboxSelectResult::Err { err, .. } => bail!("{err}"),
-            }
-        };
-
-        // Parse sort criteria
         let sort_key = parse_sort_key(&self.sort)?;
         let sort_criteria = Vec1::unvalidated(vec![SortCriterion {
             reverse: self.reverse,
             key: sort_key,
         }]);
-
-        // Parse search criteria
         let search_criteria = parse_query(&self.query)?;
 
-        // SORT
-        let mut coroutine =
-            ImapMailboxSort::new(context, sort_criteria, search_criteria, !self.seq);
-        let mut arg: Option<&[u8]> = None;
-
-        let ids = loop {
-            match coroutine.resume(arg.take()) {
-                ImapMailboxSortResult::Ok { ids, .. } => break ids,
-                ImapMailboxSortResult::WantsRead => {
-                    let n = imap.stream.read(&mut buf)?;
-                    arg = Some(&buf[..n]);
-                }
-                ImapMailboxSortResult::WantsWrite(bytes) => {
-                    imap.stream.write_all(&bytes)?;
-                    arg = None;
-                }
-                ImapMailboxSortResult::Err { err, .. } => bail!("{err}"),
-            }
-        };
+        let ids = client.sort(sort_criteria, search_criteria, !self.seq)?;
 
         let table = SortResultsTable::new(ids, !self.seq);
 

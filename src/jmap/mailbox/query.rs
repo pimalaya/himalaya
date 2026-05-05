@@ -1,23 +1,15 @@
-use std::{
-    convert::Infallible,
-    fmt,
-    io::{Read, Write},
-    str::FromStr,
-};
+use std::{convert::Infallible, fmt, str::FromStr};
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use comfy_table::{Cell, Row, Table};
-use io_jmap::rfc8621::{
-    mailbox::{Mailbox, MailboxFilter, MailboxRole, MailboxSortComparator, MailboxSortProperty},
-    mailbox_query::{JmapMailboxQuery, JmapMailboxQueryResult},
+use io_jmap::rfc8621::mailbox::{
+    Mailbox, MailboxFilter, MailboxRole, MailboxSortComparator, MailboxSortProperty,
 };
-use pimalaya_toolbox::terminal::printer::Printer;
+use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
 use crate::jmap::account::JmapAccount;
-
-const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Query JMAP mailboxes (Mailbox/query + Mailbox/get).
 ///
@@ -64,7 +56,7 @@ pub struct JmapMailboxQueryCommand {
 
 impl JmapMailboxQueryCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut jmap = account.new_jmap_session()?;
+        let mut client = account.new_jmap_client()?;
 
         let filter = {
             let f = MailboxFilter {
@@ -93,36 +85,17 @@ impl JmapMailboxQueryCommand {
             is_ascending: Some(!self.desc),
         }]);
 
-        let mut coroutine = JmapMailboxQuery::new(
-            &jmap.session,
-            &jmap.http_auth,
+        let output = client.mailbox_query(
             filter,
             sort,
             Some(self.page.saturating_sub(1) * self.page_size),
             Some(self.page_size),
             None,
         )?;
-        let mut buf = [0u8; READ_BUFFER_SIZE];
-        let mut arg: Option<&[u8]> = None;
-
-        let mailboxes = loop {
-            match coroutine.resume(arg.take()) {
-                JmapMailboxQueryResult::Ok { mailboxes, .. } => break mailboxes,
-                JmapMailboxQueryResult::WantsRead => {
-                    let n = jmap.stream.read(&mut buf)?;
-                    arg = Some(&buf[..n]);
-                }
-                JmapMailboxQueryResult::WantsWrite(bytes) => {
-                    jmap.stream.write_all(&bytes)?;
-                    arg = None;
-                }
-                JmapMailboxQueryResult::Err(err) => bail!("{err}"),
-            }
-        };
 
         let table = MailboxesTable {
             preset: account.table_preset,
-            mailboxes,
+            mailboxes: output.mailboxes,
         };
 
         printer.out(table)

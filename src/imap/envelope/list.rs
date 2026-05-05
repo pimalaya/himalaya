@@ -1,25 +1,17 @@
-use std::{
-    collections::BTreeMap,
-    fmt,
-    io::{Read, Write},
-    num::NonZeroU32,
-};
+use std::{collections::BTreeMap, fmt, num::NonZeroU32};
 
 use anyhow::{bail, Result};
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, Row, Table};
-use io_imap::{
-    rfc3501::{fetch::*, select::*, status::*},
-    types::{
-        core::Vec1,
-        envelope::Address,
-        fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
-        sequence::{SeqOrUid, Sequence, SequenceSet},
-        status::{StatusDataItem, StatusDataItemName},
-    },
+use io_imap::types::{
+    core::Vec1,
+    envelope::Address,
+    fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
+    sequence::{SeqOrUid, Sequence, SequenceSet},
+    status::{StatusDataItem, StatusDataItemName},
 };
 use log::debug;
-use pimalaya_toolbox::terminal::printer::Printer;
+use pimalaya_cli::printer::Printer;
 use rfc2047_decoder::{Decoder, RecoverStrategy};
 use serde::Serialize;
 
@@ -27,8 +19,6 @@ use crate::imap::{
     account::ImapAccount,
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
 };
-
-const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// List IMAP envelopes from the given mailbox.
 ///
@@ -61,57 +51,17 @@ pub struct ImapEnvelopeListCommand {
 
 impl ImapEnvelopeListCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let mut imap = account.new_imap_session()?;
+        let mut client = account.new_imap_client()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        let mut buf = [0u8; READ_BUFFER_SIZE];
-
         let exists = if self.mailbox_no_select.inner {
-            let mut coroutine =
-                ImapMailboxStatus::new(imap.context, mailbox, &[StatusDataItemName::Messages]);
-            let mut arg: Option<&[u8]> = None;
-
-            loop {
-                match coroutine.resume(arg.take()) {
-                    ImapMailboxStatusResult::Ok { context, items } => {
-                        imap.context = context;
-                        break items.into_iter().find_map(|i| match i {
-                            StatusDataItem::Messages(exists) => Some(exists),
-                            _ => None,
-                        });
-                    }
-                    ImapMailboxStatusResult::WantsRead => {
-                        let n = imap.stream.read(&mut buf)?;
-                        arg = Some(&buf[..n]);
-                    }
-                    ImapMailboxStatusResult::WantsWrite(bytes) => {
-                        imap.stream.write_all(&bytes)?;
-                        arg = None;
-                    }
-                    ImapMailboxStatusResult::Err { err, .. } => bail!("{err}"),
-                }
-            }
+            let items = client.status(mailbox, &[StatusDataItemName::Messages])?;
+            items.into_iter().find_map(|i| match i {
+                StatusDataItem::Messages(exists) => Some(exists),
+                _ => None,
+            })
         } else {
-            let mut coroutine = ImapMailboxSelect::new(imap.context, mailbox);
-            let mut arg: Option<&[u8]> = None;
-
-            loop {
-                match coroutine.resume(arg.take()) {
-                    ImapMailboxSelectResult::Ok { context, data } => {
-                        imap.context = context;
-                        break data.exists;
-                    }
-                    ImapMailboxSelectResult::WantsRead => {
-                        let n = imap.stream.read(&mut buf)?;
-                        arg = Some(&buf[..n]);
-                    }
-                    ImapMailboxSelectResult::WantsWrite(bytes) => {
-                        imap.stream.write_all(&bytes)?;
-                        arg = None;
-                    }
-                    ImapMailboxSelectResult::Err { err, .. } => bail!("{err}"),
-                }
-            }
+            client.select(mailbox)?.exists
         };
 
         let mut has_sequence = false;
@@ -131,28 +81,7 @@ impl ImapEnvelopeListCommand {
             MessageDataItemName::Envelope,
         ]);
 
-        let mut coroutine = ImapMessageFetch::new(
-            imap.context,
-            sequence_set,
-            item_names,
-            !self.sequence && has_sequence,
-        );
-        let mut arg: Option<&[u8]> = None;
-
-        let data = loop {
-            match coroutine.resume(arg.take()) {
-                ImapMessageFetchResult::Ok { data, .. } => break data,
-                ImapMessageFetchResult::WantsRead => {
-                    let n = imap.stream.read(&mut buf)?;
-                    arg = Some(&buf[..n]);
-                }
-                ImapMessageFetchResult::WantsWrite(bytes) => {
-                    imap.stream.write_all(&bytes)?;
-                    arg = None;
-                }
-                ImapMessageFetchResult::Err { err, .. } => bail!("{err}"),
-            }
-        };
+        let data = client.fetch(sequence_set, item_names, !self.sequence && has_sequence)?;
 
         let table = EnvelopesTable {
             preset: account.table_preset,

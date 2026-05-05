@@ -1,16 +1,24 @@
 use anyhow::Result;
-use pimalaya_toolbox::stream::jmap::JmapSession;
+use io_jmap::client::JmapClient;
 
-use crate::{account::Account, config::JmapConfig};
+use crate::{account::Account, config::JmapConfig, jmap::session::JmapSession};
 
 pub type JmapAccount = Account<JmapConfig>;
 
 impl JmapAccount {
-    pub fn new_jmap_session(&self) -> Result<JmapSession> {
-        JmapSession::new(
+    /// Establishes the JMAP session (TLS, `/.well-known/jmap` discovery)
+    /// then hands the resulting stream, bearer token and discovered
+    /// session off to a fresh [`JmapClient`].
+    pub fn new_jmap_client(&self) -> Result<JmapClient> {
+        let session = JmapSession::new(
             self.backend.server.clone(),
             self.backend.tls.clone().try_into()?,
             self.backend.auth.clone().try_into()?,
-        )
+        )?;
+        Ok(JmapClient::from_parts(
+            session.stream,
+            session.http_auth,
+            session.session,
+        ))
     }
 }

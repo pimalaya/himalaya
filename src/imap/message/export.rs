@@ -1,22 +1,16 @@
 use std::{
     fs,
-    io::{self, Read, Write},
-    num::NonZeroU32,
+    io::{self, Write},
     path::PathBuf,
 };
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_imap::{
-    rfc3501::{fetch::*, select::*},
-    types::fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
-};
+use io_imap::types::fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName};
 use mail_parser::{MessageParser, MimeHeaders};
-use pimalaya_toolbox::terminal::printer::{Message, Printer};
+use pimalaya_cli::printer::{Message, Printer};
 
 use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameOptionalFlag};
-
-const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Export type for message export.
 #[derive(Debug, Clone, clap::ValueEnum)]
@@ -63,34 +57,14 @@ pub struct ImapMessageExportCommand {
 
 impl ImapMessageExportCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let mut imap = account.new_imap_session()?;
+        let mut client = account.new_imap_client()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        let mut buf = [0u8; READ_BUFFER_SIZE];
+        client.select(mailbox)?;
 
-        // SELECT mailbox
-        let mut coroutine = ImapMailboxSelect::new(imap.context, mailbox);
-        let mut arg: Option<&[u8]> = None;
-
-        let context = loop {
-            match coroutine.resume(arg.take()) {
-                ImapMailboxSelectResult::Ok { context, .. } => break context,
-                ImapMailboxSelectResult::WantsRead => {
-                    let n = imap.stream.read(&mut buf)?;
-                    arg = Some(&buf[..n]);
-                }
-                ImapMailboxSelectResult::WantsWrite(bytes) => {
-                    imap.stream.write_all(&bytes)?;
-                    arg = None;
-                }
-                ImapMailboxSelectResult::Err { err, .. } => bail!("{err}"),
-            }
-        };
-
-        // FETCH with BODY.PEEK[] to avoid marking as read
-        let Some(id) = NonZeroU32::new(self.id) else {
+        if self.id == 0 {
             bail!("Export message error: ID must be non-zero");
-        };
+        }
 
         let item_names =
             MacroOrMessageDataItemNames::MessageDataItemNames(vec![MessageDataItemName::BodyExt {
@@ -99,25 +73,16 @@ impl ImapMessageExportCommand {
                 peek: true,
             }]);
 
-        let mut coroutine = ImapMessageFetchFirst::new(context, id, item_names, !self.seq);
-        let mut arg: Option<&[u8]> = None;
+        let sequence_set = self.id.to_string().parse()?;
+        let mut data = client.fetch(sequence_set, item_names, !self.seq)?;
 
-        let items = loop {
-            match coroutine.resume(arg.take()) {
-                ImapMessageFetchFirstResult::Ok { items, .. } => break items,
-                ImapMessageFetchFirstResult::WantsRead => {
-                    let n = imap.stream.read(&mut buf)?;
-                    arg = Some(&buf[..n]);
-                }
-                ImapMessageFetchFirstResult::WantsWrite(bytes) => {
-                    imap.stream.write_all(&bytes)?;
-                    arg = None;
-                }
-                ImapMessageFetchFirstResult::Err { err, .. } => bail!("{err}"),
-            }
+        let Some((_, items)) = data.pop_first() else {
+            bail!(
+                "Export message `{}` error: no message data returned",
+                self.id
+            );
         };
 
-        // Extract raw message bytes
         let mut raw_message: Option<Vec<u8>> = None;
         for item in items.into_iter() {
             if let MessageDataItem::BodyExt { data, .. } = item {

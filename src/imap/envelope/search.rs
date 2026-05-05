@@ -1,28 +1,20 @@
-use std::{
-    fmt,
-    io::{Read, Write},
-};
+use std::fmt;
 
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, Row, Table};
-use io_imap::{
-    rfc3501::{search::*, select::*},
-    types::{
-        core::{AString, Vec1},
-        datetime::NaiveDate,
-        search::SearchKey,
-    },
+use io_imap::types::{
+    core::{AString, Vec1},
+    datetime::NaiveDate,
+    search::SearchKey,
 };
-use pimalaya_toolbox::terminal::printer::Printer;
+use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
 use crate::imap::{
     account::ImapAccount,
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
 };
-
-const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Search IMAP messages by criteria.
 ///
@@ -67,50 +59,15 @@ pub struct ImapEnvelopeSearchCommand {
 
 impl ImapEnvelopeSearchCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let mut imap = account.new_imap_session()?;
+        let mut client = account.new_imap_client()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        let mut buf = [0u8; READ_BUFFER_SIZE];
-
         if !self.mailbox_no_select.inner {
-            let mut coroutine = ImapMailboxSelect::new(imap.context, mailbox);
-            let mut arg: Option<&[u8]> = None;
-
-            imap.context = loop {
-                match coroutine.resume(arg.take()) {
-                    ImapMailboxSelectResult::Ok { context, .. } => break context,
-                    ImapMailboxSelectResult::WantsRead => {
-                        let n = imap.stream.read(&mut buf)?;
-                        arg = Some(&buf[..n]);
-                    }
-                    ImapMailboxSelectResult::WantsWrite(bytes) => {
-                        imap.stream.write_all(&bytes)?;
-                        arg = None;
-                    }
-                    ImapMailboxSelectResult::Err { err, .. } => bail!("{err}"),
-                }
-            };
+            client.select(mailbox)?;
         }
 
         let criteria = parse_query(&self.query)?;
-
-        let mut coroutine = ImapMessageSearch::new(imap.context, criteria, !self.seq);
-        let mut arg: Option<&[u8]> = None;
-
-        let ids = loop {
-            match coroutine.resume(arg.take()) {
-                ImapMessageSearchResult::Ok { ids, .. } => break ids,
-                ImapMessageSearchResult::WantsRead => {
-                    let n = imap.stream.read(&mut buf)?;
-                    arg = Some(&buf[..n]);
-                }
-                ImapMessageSearchResult::WantsWrite(bytes) => {
-                    imap.stream.write_all(&bytes)?;
-                    arg = None;
-                }
-                ImapMessageSearchResult::Err { err, .. } => bail!("{err}"),
-            }
-        };
+        let ids = client.search(criteria, !self.seq)?;
 
         let table = SearchTable {
             preset: account.table_preset,

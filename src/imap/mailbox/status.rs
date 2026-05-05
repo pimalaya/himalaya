@@ -1,21 +1,13 @@
-use std::{
-    fmt,
-    io::{Read, Write},
-};
+use std::fmt;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
-use io_imap::{
-    rfc3501::status::*,
-    types::status::{StatusDataItem, StatusDataItemName},
-};
-use pimalaya_toolbox::terminal::printer::Printer;
+use io_imap::types::status::{StatusDataItem, StatusDataItemName};
+use pimalaya_cli::printer::Printer;
 use serde::{Serialize, Serializer};
 
 use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
-
-const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Get the status of the given mailbox.
 ///
@@ -29,7 +21,7 @@ pub struct ImapMailboxStatusCommand {
 
 impl ImapMailboxStatusCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let mut imap = account.new_imap_session()?;
+        let mut client = account.new_imap_client()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
         let item_names = vec![
             StatusDataItemName::Messages,
@@ -39,24 +31,7 @@ impl ImapMailboxStatusCommand {
             StatusDataItemName::UidValidity,
         ];
 
-        let mut coroutine = ImapMailboxStatus::new(imap.context, mailbox, item_names);
-        let mut buf = [0u8; READ_BUFFER_SIZE];
-        let mut arg: Option<&[u8]> = None;
-
-        let items = loop {
-            match coroutine.resume(arg.take()) {
-                ImapMailboxStatusResult::Ok { items, .. } => break items,
-                ImapMailboxStatusResult::WantsRead => {
-                    let n = imap.stream.read(&mut buf)?;
-                    arg = Some(&buf[..n]);
-                }
-                ImapMailboxStatusResult::WantsWrite(bytes) => {
-                    imap.stream.write_all(&bytes)?;
-                    arg = None;
-                }
-                ImapMailboxStatusResult::Err { err, .. } => bail!("{err}"),
-            }
-        };
+        let items = client.status(mailbox, item_names)?;
 
         let table = MailboxStatusTable {
             preset: account.table_preset,

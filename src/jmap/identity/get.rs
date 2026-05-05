@@ -1,22 +1,14 @@
-use std::{
-    fmt,
-    io::{Read, Write},
-};
+use std::fmt;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
-use io_jmap::rfc8621::{
-    identity::Identity,
-    identity_get::{JmapIdentityGet, JmapIdentityGetResult},
-};
+use io_jmap::rfc8621::identity::Identity;
 use log::warn;
-use pimalaya_toolbox::terminal::printer::Printer;
+use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
 use crate::jmap::account::JmapAccount;
-
-const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Get JMAP identities (Identity/get).
 ///
@@ -31,38 +23,16 @@ pub struct JmapIdentityGetCommand {
 
 impl JmapIdentityGetCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut jmap = account.new_jmap_session()?;
+        let mut client = account.new_jmap_client()?;
+        let output = client.identity_get(self.ids)?;
 
-        let mut coroutine = JmapIdentityGet::new(&jmap.session, &jmap.http_auth, self.ids)?;
-        let mut buf = [0u8; READ_BUFFER_SIZE];
-        let mut arg: Option<&[u8]> = None;
-
-        let (identities, not_found) = loop {
-            match coroutine.resume(arg.take()) {
-                JmapIdentityGetResult::Ok {
-                    identities,
-                    not_found,
-                    ..
-                } => break (identities, not_found),
-                JmapIdentityGetResult::WantsRead => {
-                    let n = jmap.stream.read(&mut buf)?;
-                    arg = Some(&buf[..n]);
-                }
-                JmapIdentityGetResult::WantsWrite(bytes) => {
-                    jmap.stream.write_all(&bytes)?;
-                    arg = None;
-                }
-                JmapIdentityGetResult::Err(err) => bail!("{err}"),
-            }
-        };
-
-        for id in not_found {
+        for id in output.not_found {
             warn!("identity `{id}` not found");
         }
 
         let table = IdentitiesTable {
             preset: account.table_preset,
-            identities,
+            identities: output.identities,
         };
 
         printer.out(table)

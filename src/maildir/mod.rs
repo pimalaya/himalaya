@@ -1,6 +1,6 @@
 pub mod account;
 pub mod arg;
-pub mod command;
+pub mod cli;
 pub mod create;
 pub mod delete;
 pub mod envelope;

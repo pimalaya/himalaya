@@ -3,7 +3,7 @@ use std::io::{Read, Write};
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use pimalaya_toolbox::terminal::printer::{Message, Printer};
+use pimalaya_cli::printer::{Message, Printer};
 
 use crate::{
     account::Account,
@@ -53,9 +53,9 @@ impl MessagesMoveCommand {
         #[cfg(feature = "imap")]
         if backend.allows_imap() {
             if let Some(imap_config) = account_config.imap.take() {
+                use crate::imap::session::ImapSession;
                 use io_email::imap::message_move::{MessageMove, MessageMoveResult};
                 use io_imap::types::{mailbox::Mailbox, sequence::SequenceSet};
-                use pimalaya_toolbox::stream::imap::ImapSession;
 
                 let account = Account::new(config, account_config, imap_config)?;
                 let mut session = ImapSession::new(
@@ -93,8 +93,8 @@ impl MessagesMoveCommand {
         #[cfg(feature = "jmap")]
         if backend.allows_jmap() {
             if let Some(jmap_config) = account_config.jmap.take() {
+                use crate::jmap::session::JmapSession;
                 use io_email::jmap::message_move::{MessageMove, MessageMoveResult};
-                use pimalaya_toolbox::stream::jmap::JmapSession;
 
                 let account = Account::new(config, account_config, jmap_config)?;
                 let mut session = JmapSession::new(

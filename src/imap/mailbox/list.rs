@@ -1,21 +1,13 @@
-use std::{
-    fmt,
-    io::{Read, Write},
-};
+use std::fmt;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
-use io_imap::{
-    rfc3501::{list::*, lsub::*},
-    types::{core::QuotedChar, flag::FlagNameAttribute, mailbox::Mailbox},
-};
-use pimalaya_toolbox::terminal::printer::Printer;
+use io_imap::types::{core::QuotedChar, flag::FlagNameAttribute, mailbox::Mailbox};
+use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
 use crate::imap::account::ImapAccount;
-
-const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// List, search and filter mailboxes.
 ///
@@ -39,48 +31,14 @@ pub struct ImapMailboxListCommand {
 
 impl ImapMailboxListCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let mut imap = account.new_imap_session()?;
+        let mut client = account.new_imap_client()?;
         let reference = self.reference.try_into()?;
         let pattern = self.pattern.try_into()?;
 
-        let mut buf = [0u8; READ_BUFFER_SIZE];
-
         let mailboxes = if self.all {
-            let mut coroutine = ImapMailboxList::new(imap.context, reference, pattern);
-            let mut arg: Option<&[u8]> = None;
-
-            loop {
-                match coroutine.resume(arg.take()) {
-                    ImapMailboxListResult::Ok { mailboxes, .. } => break mailboxes,
-                    ImapMailboxListResult::WantsRead => {
-                        let n = imap.stream.read(&mut buf)?;
-                        arg = Some(&buf[..n]);
-                    }
-                    ImapMailboxListResult::WantsWrite(bytes) => {
-                        imap.stream.write_all(&bytes)?;
-                        arg = None;
-                    }
-                    ImapMailboxListResult::Err { err, .. } => bail!("{err}"),
-                }
-            }
+            client.list(reference, pattern)?
         } else {
-            let mut coroutine = ImapMailboxLsub::new(imap.context, reference, pattern);
-            let mut arg: Option<&[u8]> = None;
-
-            loop {
-                match coroutine.resume(arg.take()) {
-                    ImapMailboxLsubResult::Ok { mailboxes, .. } => break mailboxes,
-                    ImapMailboxLsubResult::WantsRead => {
-                        let n = imap.stream.read(&mut buf)?;
-                        arg = Some(&buf[..n]);
-                    }
-                    ImapMailboxLsubResult::WantsWrite(bytes) => {
-                        imap.stream.write_all(&bytes)?;
-                        arg = None;
-                    }
-                    ImapMailboxLsubResult::Err { err, .. } => bail!("{err}"),
-                }
-            }
+            client.lsub(reference, pattern)?
         };
 
         let table = MailboxesTable {

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Subcommand;
-use pimalaya_toolbox::terminal::printer::Printer;
+use pimalaya_cli::printer::Printer;
 
 use crate::maildir::{
     account::MaildirAccount,

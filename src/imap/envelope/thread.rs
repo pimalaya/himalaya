@@ -1,22 +1,16 @@
-use std::{
-    collections::HashMap,
-    fmt,
-    io::{Read, Write},
-    num::NonZeroU32,
-};
+use std::{collections::HashMap, fmt, num::NonZeroU32};
 
 use anyhow::{bail, Result};
 use clap::Parser;
 use io_imap::{
-    rfc3501::{fetch::*, select::*},
-    rfc5256::thread::*,
+    client::ImapClient,
     types::{
         extensions::thread::{Thread, ThreadingAlgorithm},
         fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
         sequence::SequenceSet,
     },
 };
-use pimalaya_toolbox::{stream::imap::ImapSession, terminal::printer::Printer};
+use pimalaya_cli::printer::Printer;
 use serde::{ser::SerializeStruct, Serialize, Serializer};
 
 use crate::imap::{
@@ -24,8 +18,6 @@ use crate::imap::{
     envelope::{list::decode_mime, search::parse_query},
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
 };
-
-const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Thread IMAP messages by algorithm.
 ///
@@ -57,64 +49,21 @@ pub struct ImapEnvelopeThreadCommand {
 
 impl ImapEnvelopeThreadCommand {
     pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let mut imap = account.new_imap_session()?;
+        let mut client = account.new_imap_client()?;
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        let mut buf = [0u8; READ_BUFFER_SIZE];
-
         if !self.mailbox_no_select.inner {
-            let mut coroutine = ImapMailboxSelect::new(imap.context, mailbox);
-            let mut arg: Option<&[u8]> = None;
-
-            imap.context = loop {
-                match coroutine.resume(arg.take()) {
-                    ImapMailboxSelectResult::Ok { context, .. } => break context,
-                    ImapMailboxSelectResult::WantsRead => {
-                        let n = imap.stream.read(&mut buf)?;
-                        arg = Some(&buf[..n]);
-                    }
-                    ImapMailboxSelectResult::WantsWrite(bytes) => {
-                        imap.stream.write_all(&bytes)?;
-                        arg = None;
-                    }
-                    ImapMailboxSelectResult::Err { err, .. } => bail!("{err}"),
-                }
-            };
+            client.select(mailbox)?;
         }
 
         let algorithm = parse_algorithm(&self.algorithm)?;
         let search_criteria = parse_query(&self.query)?;
 
-        let mut coroutine =
-            ImapMessageThread::new(imap.context, algorithm, search_criteria, !self.seq);
-        let mut arg: Option<&[u8]> = None;
+        let threads = client.thread(algorithm, search_criteria, !self.seq)?;
 
-        let threads = loop {
-            match coroutine.resume(arg.take()) {
-                ImapMessageThreadResult::Ok {
-                    context, threads, ..
-                } => {
-                    imap.context = context;
-                    break threads;
-                }
-                ImapMessageThreadResult::WantsRead => {
-                    let n = imap.stream.read(&mut buf)?;
-                    arg = Some(&buf[..n]);
-                }
-                ImapMessageThreadResult::WantsWrite(bytes) => {
-                    imap.stream.write_all(&bytes)?;
-                    arg = None;
-                }
-                ImapMessageThreadResult::Err { err, .. } => bail!("{err}"),
-            }
-        };
-
-        // Collect all message IDs from threads to fetch subjects
         let all_ids = collect_thread_ids(&threads);
-
-        // Fetch subjects for all messages in threads
         let subjects = if !all_ids.is_empty() {
-            fetch_subjects(imap, &all_ids, !self.seq)?
+            fetch_subjects(&mut client, &all_ids, !self.seq)?
         } else {
             HashMap::new()
         };
@@ -162,7 +111,7 @@ fn collect_thread_ids_recursive(thread: &Thread, ids: &mut Vec<NonZeroU32>) {
 }
 
 fn fetch_subjects(
-    mut imap: ImapSession,
+    client: &mut ImapClient,
     ids: &[NonZeroU32],
     uid: bool,
 ) -> Result<HashMap<u32, String>> {
@@ -170,7 +119,6 @@ fn fetch_subjects(
         return Ok(HashMap::new());
     }
 
-    // Build sequence set from IDs
     let seq_set_str = ids
         .iter()
         .map(|id| id.to_string())
@@ -183,24 +131,7 @@ fn fetch_subjects(
         MessageDataItemName::Uid,
     ]);
 
-    let mut coroutine = ImapMessageFetch::new(imap.context, sequence_set, item_names, uid);
-    let mut buf = [0u8; READ_BUFFER_SIZE];
-    let mut arg: Option<&[u8]> = None;
-
-    let data = loop {
-        match coroutine.resume(arg.take()) {
-            ImapMessageFetchResult::Ok { data, .. } => break data,
-            ImapMessageFetchResult::WantsRead => {
-                let n = imap.stream.read(&mut buf)?;
-                arg = Some(&buf[..n]);
-            }
-            ImapMessageFetchResult::WantsWrite(bytes) => {
-                imap.stream.write_all(&bytes)?;
-                arg = None;
-            }
-            ImapMessageFetchResult::Err { err, .. } => bail!("{err}"),
-        }
-    };
+    let data = client.fetch(sequence_set, item_names, uid)?;
 
     let mut subjects: HashMap<u32, String> = HashMap::new();
 

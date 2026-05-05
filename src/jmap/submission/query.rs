@@ -1,21 +1,13 @@
-use std::{
-    fmt,
-    io::{Read, Write},
-};
+use std::fmt;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use comfy_table::{Cell, Row, Table};
-use io_jmap::rfc8621::{
-    email_submission::{EmailSubmission, EmailSubmissionFilter, UndoStatus},
-    email_submission_query::{JmapEmailSubmissionQuery, JmapEmailSubmissionQueryResult},
-};
-use pimalaya_toolbox::terminal::printer::Printer;
+use io_jmap::rfc8621::email_submission::{EmailSubmission, EmailSubmissionFilter, UndoStatus};
+use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
 use crate::jmap::account::JmapAccount;
-
-const READ_BUFFER_SIZE: usize = 16 * 1024;
 
 /// CLI proxy for [`UndoStatus`].
 #[derive(Clone, Debug, ValueEnum)]
@@ -61,7 +53,7 @@ pub struct JmapSubmissionQueryCommand {
 
 impl JmapSubmissionQueryCommand {
     pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut jmap = account.new_jmap_session()?;
+        let mut client = account.new_jmap_client()?;
 
         let filter = {
             let f = EmailSubmissionFilter {
@@ -80,35 +72,16 @@ impl JmapSubmissionQueryCommand {
             }
         };
 
-        let mut coroutine = JmapEmailSubmissionQuery::new(
-            &jmap.session,
-            &jmap.http_auth,
+        let output = client.email_submission_query(
             filter,
             None,
             Some(self.page.saturating_sub(1) * self.page_size),
             Some(self.page_size),
         )?;
-        let mut buf = [0u8; READ_BUFFER_SIZE];
-        let mut arg: Option<&[u8]> = None;
-
-        let submissions = loop {
-            match coroutine.resume(arg.take()) {
-                JmapEmailSubmissionQueryResult::Ok { submissions, .. } => break submissions,
-                JmapEmailSubmissionQueryResult::WantsRead => {
-                    let n = jmap.stream.read(&mut buf)?;
-                    arg = Some(&buf[..n]);
-                }
-                JmapEmailSubmissionQueryResult::WantsWrite(bytes) => {
-                    jmap.stream.write_all(&bytes)?;
-                    arg = None;
-                }
-                JmapEmailSubmissionQueryResult::Err(err) => bail!("{err}"),
-            }
-        };
 
         let table = SubmissionsTable {
             preset: account.table_preset,
-            submissions,
+            submissions: output.submissions,
         };
 
         printer.out(table)

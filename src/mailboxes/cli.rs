@@ -1,25 +1,25 @@
 use anyhow::Result;
 use clap::Subcommand;
-use pimalaya_toolbox::terminal::printer::Printer;
+use pimalaya_cli::printer::Printer;
 
 use crate::{
     cli::BackendArg,
     config::{AccountConfig, Config},
-    envelopes::list::EnvelopesListCommand,
+    mailboxes::list::MailboxesListCommand,
 };
 
-/// List envelopes through whichever backend the active account has
+/// Manage mailboxes through whichever backend the active account has
 /// configured.
 ///
 /// The active backend is selected by `--backend` (defaults to `auto`,
 /// which picks the first configured backend in priority order).
 #[derive(Debug, Subcommand)]
-pub enum EnvelopesCommand {
+pub enum MailboxesCommand {
     #[command(visible_alias = "ls")]
-    List(EnvelopesListCommand),
+    List(MailboxesListCommand),
 }
 
-impl EnvelopesCommand {
+impl MailboxesCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,

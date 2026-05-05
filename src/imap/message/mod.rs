@@ -1,4 +1,4 @@
-pub mod command;
+pub mod cli;
 pub mod copy;
 pub mod export;
 pub mod get;

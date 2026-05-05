@@ -1,10 +1,10 @@
 use anyhow::Result;
 use clap::Subcommand;
-use pimalaya_toolbox::terminal::printer::Printer;
+use pimalaya_cli::printer::Printer;
 
 use crate::imap::{
-    account::ImapAccount, envelope::command::ImapEnvelopeCommand, flag::command::ImapFlagCommand,
-    id::ImapIdCommand, mailbox::command::ImapMailboxCommand, message::command::ImapMessageCommand,
+    account::ImapAccount, envelope::cli::ImapEnvelopeCommand, flag::cli::ImapFlagCommand,
+    id::ImapIdCommand, mailbox::cli::ImapMailboxCommand, message::cli::ImapMessageCommand,
 };
 
 /// IMAP CLI (requires the `imap` cargo feature).
