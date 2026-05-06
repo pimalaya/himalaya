@@ -319,7 +319,7 @@ template.forward.quote-headline = "-------- Forwarded Message --------\n"
 
 # Defines the sign command.
 #
-#pgp.sign-cmd = "gpg --sign --quiet --armor"
+#pgp.sign-cmd = "gpg --detach-sign --quiet --armor"
 
 # Defines the verify command.
 #
