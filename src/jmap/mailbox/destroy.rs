@@ -3,7 +3,7 @@ use clap::Parser;
 use io_jmap::rfc8621::mailbox_set::JmapMailboxSetArgs;
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::jmap::{account::JmapAccount, error::format_set_error};
+use crate::jmap::{client::JmapClient, error::format_set_error};
 
 /// Delete a JMAP mailbox.
 #[derive(Debug, Parser)]
@@ -18,9 +18,7 @@ pub struct JmapMailboxDestroyCommand {
 }
 
 impl JmapMailboxDestroyCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut client = account.new_jmap_client()?;
-
+    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
         let mut args = JmapMailboxSetArgs::default();
         args.destroy = Some(self.ids.clone());
         args.on_destroy_remove_emails = if self.purge { Some(true) } else { None };

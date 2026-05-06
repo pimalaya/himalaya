@@ -7,7 +7,7 @@ use io_jmap::rfc8621::email_submission::{EmailSubmission, EmailSubmissionFilter,
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
-use crate::jmap::account::JmapAccount;
+use crate::jmap::client::JmapClient;
 
 /// CLI proxy for [`UndoStatus`].
 #[derive(Clone, Debug, ValueEnum)]
@@ -52,9 +52,7 @@ pub struct JmapSubmissionQueryCommand {
 }
 
 impl JmapSubmissionQueryCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut client = account.new_jmap_client()?;
-
+    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
         let filter = {
             let f = EmailSubmissionFilter {
                 undo_status: self.undo_status.map(Into::into),
@@ -80,7 +78,7 @@ impl JmapSubmissionQueryCommand {
         )?;
 
         let table = SubmissionsTable {
-            preset: account.table_preset,
+            preset: client.account.table_preset().to_string(),
             submissions: output.submissions,
         };
 

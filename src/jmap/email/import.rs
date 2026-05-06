@@ -7,15 +7,15 @@ use std::{
 use anyhow::{bail, Result};
 use clap::Parser;
 use io_jmap::{
-    client::JmapClient,
+    client::JmapClient as InnerJmapClient,
     rfc8621::{capabilities::MAIL, email::EmailImport},
 };
 use pimalaya_cli::printer::{Message, Printer};
-use pimalaya_stream::tls::upgrade_tls;
+use pimalaya_stream::std::tls::upgrade_tls;
 use secrecy::SecretString;
 use url::Url;
 
-use crate::jmap::{account::JmapAccount, error::format_set_error, session::JmapAuth};
+use crate::jmap::{client::JmapClient, error::format_set_error, session::JmapAuth};
 
 /// Import an RFC 5322 message into a mailbox (upload + Email/import).
 ///
@@ -46,12 +46,10 @@ pub struct JmapEmailImportCommand {
 }
 
 impl JmapEmailImportCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let tls = account.backend.tls.clone().try_into()?;
-        let auth: JmapAuth = account.backend.auth.clone().try_into()?;
+    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
+        let tls = client.config.tls.clone().try_into()?;
+        let auth: JmapAuth = client.config.auth.clone().try_into()?;
         let http_auth: SecretString = auth.into();
-
-        let mut client = account.new_jmap_client()?;
 
         let data: Vec<u8> = if stdin().is_terminal() || printer.is_json() {
             self.message
@@ -85,7 +83,7 @@ impl JmapEmailImportCommand {
             let port = upload_url.port_or_known_default().unwrap_or(443);
             let tcp = TcpStream::connect((host, port))?;
             let stream = upgrade_tls(host, tcp, &tls, &[b"http/1.1"])?;
-            let mut upload_client = JmapClient::new(stream, http_auth);
+            let mut upload_client = InnerJmapClient::new(stream, http_auth);
             upload_client
                 .blob_upload(&upload_url, "message/rfc822", data)?
                 .blob_id

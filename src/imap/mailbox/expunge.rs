@@ -3,7 +3,7 @@ use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::imap::{
-    account::ImapAccount,
+    client::ImapClient,
     mailbox::arg::{MailboxNameArg, MailboxNoSelectFlag},
 };
 
@@ -20,8 +20,7 @@ pub struct ImapMailboxExpungeCommand {
 }
 
 impl ImapMailboxExpungeCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let mut client = account.new_imap_client()?;
+    pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         if !self.mailbox_no_select.inner {

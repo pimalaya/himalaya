@@ -3,7 +3,7 @@ use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
 use crate::jmap::{
-    account::JmapAccount,
+    client::JmapClient,
     identity::{
         create::JmapIdentityCreateCommand, delete::JmapIdentityDeleteCommand,
         get::JmapIdentityGetCommand, update::JmapIdentityUpdateCommand,
@@ -28,12 +28,12 @@ pub enum JmapIdentityCommand {
 }
 
 impl JmapIdentityCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: JmapClient) -> Result<()> {
         match self {
-            Self::Get(cmd) => cmd.execute(printer, account),
-            Self::Create(cmd) => cmd.execute(printer, account),
-            Self::Update(cmd) => cmd.execute(printer, account),
-            Self::Delete(cmd) => cmd.execute(printer, account),
+            Self::Get(cmd) => cmd.execute(printer, client),
+            Self::Create(cmd) => cmd.execute(printer, client),
+            Self::Update(cmd) => cmd.execute(printer, client),
+            Self::Delete(cmd) => cmd.execute(printer, client),
         }
     }
 }

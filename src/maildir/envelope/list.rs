@@ -7,7 +7,7 @@ use io_maildir::maildir::Maildir;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
-use crate::maildir::{account::MaildirAccount, arg::MaildirPathFlag};
+use crate::maildir::{arg::MaildirPathFlag, client::MaildirClient};
 
 /// List MAILDIR envelopes from the given mailbox.
 ///
@@ -21,13 +21,12 @@ pub struct MaildirEnvelopeListCommand {
 }
 
 impl MaildirEnvelopeListCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
         let maildir = match Maildir::try_from(self.maildir.inner.clone()) {
             Ok(maildir) => maildir,
-            Err(_) => Maildir::try_from(account.backend.root.join(&self.maildir.inner))?,
+            Err(_) => Maildir::try_from(client.root.join(&self.maildir.inner))?,
         };
 
-        let client = account.new_maildir_client();
         let messages = client.list_messages(maildir)?;
 
         let mut envelopes = Vec::with_capacity(messages.len());
@@ -61,8 +60,8 @@ impl MaildirEnvelopeListCommand {
         envelopes.sort_by(|a, b| a.date.cmp(&b.date));
 
         let table = EnvelopesTable {
-            preset: account.table_preset,
-            arrangement: account.table_arrangement,
+            preset: client.account.table_preset().to_string(),
+            arrangement: client.account.table_arrangement(),
             envelopes,
         };
 

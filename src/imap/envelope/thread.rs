@@ -2,19 +2,16 @@ use std::{collections::HashMap, fmt, num::NonZeroU32};
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_imap::{
-    client::ImapClient,
-    types::{
-        extensions::thread::{Thread, ThreadingAlgorithm},
-        fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
-        sequence::SequenceSet,
-    },
+use io_imap::types::{
+    extensions::thread::{Thread, ThreadingAlgorithm},
+    fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
+    sequence::SequenceSet,
 };
 use pimalaya_cli::printer::Printer;
 use serde::{ser::SerializeStruct, Serialize, Serializer};
 
 use crate::imap::{
-    account::ImapAccount,
+    client::ImapClient,
     envelope::{list::decode_mime, search::parse_query},
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
 };
@@ -48,8 +45,7 @@ pub struct ImapEnvelopeThreadCommand {
 }
 
 impl ImapEnvelopeThreadCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let mut client = account.new_imap_client()?;
+    pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         if !self.mailbox_no_select.inner {

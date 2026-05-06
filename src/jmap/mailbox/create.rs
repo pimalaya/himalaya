@@ -5,7 +5,7 @@ use clap::Parser;
 use io_jmap::rfc8621::{mailbox::MailboxCreate, mailbox_set::JmapMailboxSetArgs};
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::jmap::{account::JmapAccount, error::format_set_error};
+use crate::jmap::{client::JmapClient, error::format_set_error};
 
 /// Create a JMAP mailbox.
 #[derive(Debug, Parser)]
@@ -25,9 +25,7 @@ pub struct JmapMailboxCreateCommand {
 }
 
 impl JmapMailboxCreateCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut client = account.new_jmap_client()?;
-
+    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
         let new_mailbox = MailboxCreate {
             name: Some(self.name.clone()),
             parent_id: self.parent_id,

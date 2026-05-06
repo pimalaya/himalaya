@@ -4,8 +4,8 @@ use io_maildir::{flag::Flags, maildir::Maildir};
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::maildir::{
-    account::MaildirAccount,
     arg::{MaildirPathFlag, MessageIdsArg},
+    client::MaildirClient,
     flag::arg::FlagArg,
 };
 
@@ -26,14 +26,13 @@ pub struct MaildirFlagSetCommand {
 }
 
 impl MaildirFlagSetCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
         let maildir = match Maildir::try_from(self.maildir.inner.clone()) {
             Ok(maildir) => maildir,
-            Err(_) => Maildir::try_from(account.backend.root.join(&self.maildir.inner))?,
+            Err(_) => Maildir::try_from(client.root.join(&self.maildir.inner))?,
         };
 
         let flags = Flags::from_iter(self.flags.into_iter().map(Into::into));
-        let client = account.new_maildir_client();
 
         for id in self.ids.inner {
             client.set_flags(maildir.clone(), id, flags.clone())?;

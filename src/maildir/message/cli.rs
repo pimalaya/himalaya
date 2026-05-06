@@ -3,7 +3,7 @@ use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
 use crate::maildir::{
-    account::MaildirAccount,
+    client::MaildirClient,
     message::{
         copy::MaildirMessageCopyCommand, export::MaildirMessageExportCommand,
         get::MaildirMessageGetCommand, r#move::MaildirMessageMoveCommand,
@@ -27,14 +27,14 @@ pub enum MaildirMessageCommand {
 }
 
 impl MaildirMessageCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
         match self {
-            Self::Save(cmd) => cmd.execute(printer, account),
-            Self::Get(cmd) => cmd.execute(printer, account),
-            Self::Read(cmd) => cmd.execute(printer, account),
-            Self::Export(cmd) => cmd.execute(printer, account),
-            Self::Copy(cmd) => cmd.execute(printer, account),
-            Self::Move(cmd) => cmd.execute(printer, account),
+            Self::Save(cmd) => cmd.execute(printer, client),
+            Self::Get(cmd) => cmd.execute(printer, client),
+            Self::Read(cmd) => cmd.execute(printer, client),
+            Self::Export(cmd) => cmd.execute(printer, client),
+            Self::Copy(cmd) => cmd.execute(printer, client),
+            Self::Move(cmd) => cmd.execute(printer, client),
         }
     }
 }

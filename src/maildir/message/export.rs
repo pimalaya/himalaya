@@ -10,8 +10,8 @@ use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
 use crate::maildir::{
-    account::MaildirAccount,
     arg::{MaildirPathFlag, MessageIdArg},
+    client::MaildirClient,
 };
 
 /// Export a message.
@@ -41,13 +41,12 @@ pub struct MaildirMessageExportCommand {
 }
 
 impl MaildirMessageExportCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
         let maildir = match Maildir::try_from(self.maildir.inner.clone()) {
             Ok(maildir) => maildir,
-            Err(_) => Maildir::try_from(account.backend.root.join(&self.maildir.inner))?,
+            Err(_) => Maildir::try_from(client.root.join(&self.maildir.inner))?,
         };
 
-        let client = account.new_maildir_client();
         let msg = client.get(maildir, &self.id.inner)?;
 
         match self.r#type {

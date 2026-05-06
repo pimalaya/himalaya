@@ -4,8 +4,8 @@ use io_maildir::maildir::Maildir;
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::maildir::{
-    account::MaildirAccount,
     arg::{MaildirPathFlag, MaildirSubdirArg, MessageIdsArg, TargetMaildirPathFlag},
+    client::MaildirClient,
 };
 
 /// Move Maildir message to the given mailbox.
@@ -27,18 +27,16 @@ pub struct MaildirMessageMoveCommand {
 }
 
 impl MaildirMessageMoveCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
         let source = match Maildir::try_from(self.source.inner.clone()) {
             Ok(maildir) => maildir,
-            Err(_) => Maildir::try_from(account.backend.root.join(&self.source.inner))?,
+            Err(_) => Maildir::try_from(client.root.join(&self.source.inner))?,
         };
 
         let target = match Maildir::try_from(self.target.inner.clone()) {
             Ok(maildir) => maildir,
-            Err(_) => Maildir::try_from(account.backend.root.join(&self.target.inner))?,
+            Err(_) => Maildir::try_from(client.root.join(&self.target.inner))?,
         };
-
-        let client = account.new_maildir_client();
 
         for id in self.ids.inner {
             client.r#move(

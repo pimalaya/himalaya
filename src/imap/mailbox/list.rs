@@ -3,11 +3,12 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
+use io_email::mailbox::MailboxRole;
 use io_imap::types::{core::QuotedChar, flag::FlagNameAttribute, mailbox::Mailbox};
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
-use crate::imap::account::ImapAccount;
+use crate::imap::client::ImapClient;
 
 /// List, search and filter mailboxes.
 ///
@@ -30,8 +31,7 @@ pub struct ImapMailboxListCommand {
 }
 
 impl ImapMailboxListCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let mut client = account.new_imap_client()?;
+    pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
         let reference = self.reference.try_into()?;
         let pattern = self.pattern.try_into()?;
 
@@ -42,7 +42,7 @@ impl ImapMailboxListCommand {
         };
 
         let table = MailboxesTable {
-            preset: account.table_preset,
+            preset: client.account.table_preset().to_string(),
             mailboxes: mailboxes.into_iter().map(From::from).collect(),
         };
 
@@ -66,14 +66,25 @@ impl fmt::Display for MailboxesTable {
             .set_header(Row::from([
                 Cell::new("NAME"),
                 Cell::new("DELIMITER"),
+                Cell::new("ROLE"),
                 Cell::new("ATTRIBUTES"),
             ]))
             .add_rows(self.mailboxes.iter().map(|mbox| {
                 let mut row = Row::new();
 
+                let role = mbox
+                    .attributes
+                    .iter()
+                    .find_map(|raw| match MailboxRole::parse(raw) {
+                        MailboxRole::Other(_) => None,
+                        role => Some(format!("{role:?}")),
+                    })
+                    .unwrap_or_default();
+
                 row.max_height(1)
                     .add_cell(Cell::new(&mbox.name))
                     .add_cell(Cell::new(&mbox.delimiter))
+                    .add_cell(Cell::new(role))
                     .add_cell(Cell::new(mbox.attributes.join(", ")));
 
                 row

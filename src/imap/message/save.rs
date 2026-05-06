@@ -7,7 +7,7 @@ use io_imap::types::{
 };
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
+use crate::imap::{client::ImapClient, mailbox::arg::MailboxNameArg};
 
 /// Save a message to a mailbox.
 ///
@@ -29,8 +29,7 @@ pub struct ImapMessageSaveCommand {
 }
 
 impl ImapMessageSaveCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let mut client = account.new_imap_client()?;
+    pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
         let mailbox: Mailbox<'static> = self.mailbox.inner.try_into()?;
         let message = if !self.message.is_empty() || stdin().is_terminal() || printer.is_json() {
             self.message

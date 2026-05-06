@@ -1,5 +1,5 @@
-pub mod account;
 pub mod cli;
+pub mod client;
 pub mod email;
 pub mod error;
 pub mod identity;

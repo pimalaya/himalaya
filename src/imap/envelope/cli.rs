@@ -3,7 +3,7 @@ use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
 use crate::imap::{
-    account::ImapAccount,
+    client::ImapClient,
     envelope::{
         get::ImapEnvelopeGetCommand, list::ImapEnvelopeListCommand,
         search::ImapEnvelopeSearchCommand, sort::ImapEnvelopeSortCommand,
@@ -26,13 +26,13 @@ pub enum ImapEnvelopeCommand {
 }
 
 impl ImapEnvelopeCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: ImapClient) -> Result<()> {
         match self {
-            Self::Get(cmd) => cmd.execute(printer, account),
-            Self::List(cmd) => cmd.execute(printer, account),
-            Self::Search(cmd) => cmd.execute(printer, account),
-            Self::Sort(cmd) => cmd.execute(printer, account),
-            Self::Thread(cmd) => cmd.execute(printer, account),
+            Self::Get(cmd) => cmd.execute(printer, client),
+            Self::List(cmd) => cmd.execute(printer, client),
+            Self::Search(cmd) => cmd.execute(printer, client),
+            Self::Sort(cmd) => cmd.execute(printer, client),
+            Self::Thread(cmd) => cmd.execute(printer, client),
         }
     }
 }

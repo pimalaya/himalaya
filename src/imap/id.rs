@@ -10,7 +10,7 @@ use io_imap::types::{
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
-use crate::imap::account::ImapAccount;
+use crate::imap::client::ImapClient;
 
 /// Get information about the IMAP server.
 ///
@@ -27,8 +27,7 @@ pub struct ImapIdCommand {
 }
 
 impl ImapIdCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let mut client = account.new_imap_client()?;
+    pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
         let mut params = HashMap::new();
 
         params.extend([
@@ -57,7 +56,7 @@ impl ImapIdCommand {
         let params = client.id(Some(params.into_iter().collect()))?;
 
         let table = ServerIdTable {
-            preset: account.table_preset,
+            preset: client.account.table_preset().to_string(),
             server_id: params
                 .unwrap_or_default()
                 .into_iter()

@@ -7,7 +7,7 @@ use io_maildir::maildir::Maildir;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
-use crate::maildir::account::MaildirAccount;
+use crate::maildir::client::MaildirClient;
 
 /// List, search and filter maildirs.
 ///
@@ -18,12 +18,11 @@ use crate::maildir::account::MaildirAccount;
 pub struct MaildirMailboxListCommand;
 
 impl MaildirMailboxListCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
-        let client = account.new_maildir_client();
+    pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
         let maildirs = client.list_maildirs()?;
 
         let table = MaildirsTable {
-            preset: account.table_preset,
+            preset: client.account.table_preset().to_string(),
             rows: maildirs.into_iter().map(From::from).collect(),
         };
 

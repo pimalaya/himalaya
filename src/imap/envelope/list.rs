@@ -16,7 +16,7 @@ use rfc2047_decoder::{Decoder, RecoverStrategy};
 use serde::Serialize;
 
 use crate::imap::{
-    account::ImapAccount,
+    client::ImapClient,
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
 };
 
@@ -50,8 +50,7 @@ pub struct ImapEnvelopeListCommand {
 }
 
 impl ImapEnvelopeListCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let mut client = account.new_imap_client()?;
+    pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         let exists = if self.mailbox_no_select.inner {
@@ -84,8 +83,8 @@ impl ImapEnvelopeListCommand {
         let data = client.fetch(sequence_set, item_names, !self.sequence && has_sequence)?;
 
         let table = EnvelopesTable {
-            preset: account.table_preset,
-            arrangement: account.table_arrangement,
+            preset: client.account.table_preset().to_string(),
+            arrangement: client.account.table_arrangement(),
             envelopes: map_envelopes_table_entries(data),
         };
 

@@ -5,7 +5,7 @@ use clap::Parser;
 use io_jmap::rfc8621::email::EmailCopy;
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::jmap::{account::JmapAccount, error::format_set_error};
+use crate::jmap::{client::JmapClient, error::format_set_error};
 
 /// Copy JMAP emails from another account (Email/copy).
 #[derive(Debug, Parser)]
@@ -24,9 +24,7 @@ pub struct JmapEmailCopyCommand {
 }
 
 impl JmapEmailCopyCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut client = account.new_jmap_client()?;
-
+    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
         let mailbox_ids: BTreeMap<String, bool> =
             self.mailbox_id.into_iter().map(|m| (m, true)).collect();
 

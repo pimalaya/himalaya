@@ -3,7 +3,7 @@ use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
 use crate::imap::{
-    account::ImapAccount,
+    client::ImapClient,
     message::{
         copy::ImapMessageCopyCommand, export::ImapMessageExportCommand, get::ImapMessageGetCommand,
         r#move::ImapMessageMoveCommand, read::ImapMessageReadCommand, save::ImapMessageSaveCommand,
@@ -26,14 +26,14 @@ pub enum ImapMessageCommand {
 }
 
 impl ImapMessageCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: ImapClient) -> Result<()> {
         match self {
-            Self::Save(cmd) => cmd.execute(printer, account),
-            Self::Get(cmd) => cmd.execute(printer, account),
-            Self::Read(cmd) => cmd.execute(printer, account),
-            Self::Export(cmd) => cmd.execute(printer, account),
-            Self::Copy(cmd) => cmd.execute(printer, account),
-            Self::Move(cmd) => cmd.execute(printer, account),
+            Self::Save(cmd) => cmd.execute(printer, client),
+            Self::Get(cmd) => cmd.execute(printer, client),
+            Self::Read(cmd) => cmd.execute(printer, client),
+            Self::Export(cmd) => cmd.execute(printer, client),
+            Self::Copy(cmd) => cmd.execute(printer, client),
+            Self::Move(cmd) => cmd.execute(printer, client),
         }
     }
 }

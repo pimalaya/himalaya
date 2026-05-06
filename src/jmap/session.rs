@@ -15,8 +15,8 @@ use io_jmap::rfc8620::{
     session_get::{JmapSessionGet, JmapSessionGetResult},
 };
 use log::info;
-use pimalaya_stream::{
-    std::stream::Stream,
+use pimalaya_stream::std::{
+    stream::Stream,
     tls::{upgrade_tls, Tls},
 };
 use secrecy::{ExposeSecret, SecretString};

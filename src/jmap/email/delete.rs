@@ -3,7 +3,7 @@ use clap::Parser;
 use io_jmap::rfc8621::email_set::JmapEmailSetArgs;
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::jmap::{account::JmapAccount, error::format_set_error};
+use crate::jmap::{client::JmapClient, error::format_set_error};
 
 /// Delete JMAP emails (Email/set destroy).
 #[derive(Debug, Parser)]
@@ -14,8 +14,7 @@ pub struct JmapEmailDestroyCommand {
 }
 
 impl JmapEmailDestroyCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut client = account.new_jmap_client()?;
+    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
         let mut args = JmapEmailSetArgs::default();
 
         for id in self.ids {

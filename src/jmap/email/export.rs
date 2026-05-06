@@ -2,13 +2,13 @@ use std::net::TcpStream;
 
 use anyhow::{anyhow, Result};
 use clap::Parser;
-use io_jmap::{client::JmapClient, rfc8621::capabilities::MAIL};
+use io_jmap::{client::JmapClient as InnerJmapClient, rfc8621::capabilities::MAIL};
 use pimalaya_cli::printer::{Message, Printer};
-use pimalaya_stream::tls::upgrade_tls;
+use pimalaya_stream::std::tls::upgrade_tls;
 use secrecy::SecretString;
 use url::Url;
 
-use crate::jmap::{account::JmapAccount, session::JmapAuth};
+use crate::jmap::{client::JmapClient, session::JmapAuth};
 
 /// Export a raw RFC 5322 message to stdout (Email/get + blob download).
 ///
@@ -21,12 +21,10 @@ pub struct JmapEmailExportCommand {
 }
 
 impl JmapEmailExportCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let tls = account.backend.tls.clone().try_into()?;
-        let auth: JmapAuth = account.backend.auth.clone().try_into()?;
+    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
+        let tls = client.config.tls.clone().try_into()?;
+        let auth: JmapAuth = client.config.auth.clone().try_into()?;
         let http_auth: SecretString = auth.into();
-
-        let mut client = account.new_jmap_client()?;
 
         let properties = Some(vec!["id".to_owned(), "blobId".to_owned()]);
         let output = client.email_get(vec![self.id.clone()], properties, false, false, 0)?;
@@ -61,7 +59,7 @@ impl JmapEmailExportCommand {
             let port = download_url.port_or_known_default().unwrap_or(443);
             let tcp = TcpStream::connect((host, port))?;
             let stream = upgrade_tls(host, tcp, &tls, &[b"http/1.1"])?;
-            let mut download_client = JmapClient::new(stream, http_auth);
+            let mut download_client = InnerJmapClient::new(stream, http_auth);
             download_client.blob_download(&download_url)?
         };
 

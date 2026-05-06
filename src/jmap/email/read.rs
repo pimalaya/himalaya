@@ -4,7 +4,7 @@ use io_jmap::rfc8621::email::EmailAddress;
 use log::warn;
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::jmap::account::JmapAccount;
+use crate::jmap::client::JmapClient;
 
 /// Read the content of a JMAP email (Email/get with body).
 ///
@@ -21,8 +21,7 @@ pub struct JmapEmailReadCommand {
 }
 
 impl JmapEmailReadCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut client = account.new_jmap_client()?;
+    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
         let output = client.email_get(self.ids.clone(), None, !self.html, self.html, 0)?;
 
         for id in output.not_found {

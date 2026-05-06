@@ -7,16 +7,14 @@ use io_jmap::rfc8621::{capabilities::VACATION_RESPONSE, vacation_response::Vacat
 use pimalaya_cli::printer::{Message, Printer};
 use serde::Serialize;
 
-use crate::jmap::account::JmapAccount;
+use crate::jmap::client::JmapClient;
 
 /// Get the JMAP vacation response (VacationResponse/get).
 #[derive(Debug, Parser)]
 pub struct JmapVacationGetCommand;
 
 impl JmapVacationGetCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut client = account.new_jmap_client()?;
-
+    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
         let has_vacation = client
             .session()
             .map(|s| s.capabilities.contains_key(VACATION_RESPONSE))
@@ -31,7 +29,7 @@ impl JmapVacationGetCommand {
         };
 
         let table = VacationTable {
-            preset: account.table_preset,
+            preset: client.account.table_preset().to_string(),
             vacation,
         };
 

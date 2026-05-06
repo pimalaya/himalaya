@@ -9,7 +9,7 @@ use io_jmap::rfc8621::email::{
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
-use crate::jmap::account::JmapAccount;
+use crate::jmap::client::JmapClient;
 
 /// Query JMAP emails (Email/query + Email/get).
 ///
@@ -86,9 +86,7 @@ pub struct JmapEmailQueryCommand {
 }
 
 impl JmapEmailQueryCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut client = account.new_jmap_client()?;
-
+    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
         let filter = {
             let f = EmailFilter {
                 in_mailbox: self.mailbox,
@@ -148,8 +146,8 @@ impl JmapEmailQueryCommand {
         )?;
 
         let table = EmailsTable {
-            preset: account.table_preset,
-            arrangement: account.table_arrangement,
+            preset: client.account.table_preset().to_string(),
+            arrangement: client.account.table_arrangement(),
             emails: output.emails,
         };
 

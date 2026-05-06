@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
+use crate::imap::{client::ImapClient, mailbox::arg::MailboxNameArg};
 
 /// Subscribe to the given mailbox.
 ///
@@ -15,8 +15,7 @@ pub struct ImapMailboxSubscribeCommand {
 }
 
 impl ImapMailboxSubscribeCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let mut client = account.new_imap_client()?;
+    pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
         client.subscribe(mailbox)?;
         printer.out(Message::new("Mailbox successfully subscribed"))

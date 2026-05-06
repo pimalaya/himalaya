@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::imap::account::ImapAccount;
+use crate::imap::client::ImapClient;
 
 /// Unselect a current, selected mailbox.
 ///
@@ -16,8 +16,7 @@ use crate::imap::account::ImapAccount;
 pub struct ImapMailboxUnselectCommand;
 
 impl ImapMailboxUnselectCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let mut client = account.new_imap_client()?;
+    pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
         client.unselect()?;
         printer.out(Message::new("Mailbox successfully unselected"))
     }

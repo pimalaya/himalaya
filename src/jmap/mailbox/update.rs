@@ -5,7 +5,7 @@ use clap::Parser;
 use io_jmap::rfc8621::{mailbox::MailboxUpdate, mailbox_set::JmapMailboxSetArgs};
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::jmap::{account::JmapAccount, error::format_set_error, mailbox::query::RoleArg};
+use crate::jmap::{client::JmapClient, error::format_set_error, mailbox::query::RoleArg};
 
 /// Update a JMAP mailbox.
 #[derive(Debug, Parser)]
@@ -40,9 +40,7 @@ pub struct JmapMailboxUpdateCommand {
 }
 
 impl JmapMailboxUpdateCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut client = account.new_jmap_client()?;
-
+    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
         let is_subscribed = if self.subscribe {
             Some(true)
         } else if self.unsubscribe {

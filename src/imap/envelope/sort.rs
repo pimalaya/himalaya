@@ -11,7 +11,7 @@ use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
 use crate::imap::{
-    account::ImapAccount, envelope::search::parse_query, mailbox::arg::MailboxNameOptionalArg,
+    client::ImapClient, envelope::search::parse_query, mailbox::arg::MailboxNameOptionalArg,
 };
 
 /// Sort messages by criteria.
@@ -51,8 +51,7 @@ pub struct ImapEnvelopeSortCommand {
 }
 
 impl ImapEnvelopeSortCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let mut client = account.new_imap_client()?;
+    pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         client.select(mailbox)?;

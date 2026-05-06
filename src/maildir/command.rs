@@ -3,7 +3,7 @@ use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
 use crate::maildir::{
-    account::MaildirAccount, create::MaildirMailboxCreateCommand,
+    client::MaildirClient, create::MaildirMailboxCreateCommand,
     delete::MaildirMailboxDeleteCommand, envelope::command::MaildirEnvelopeCommand,
     flag::command::MaildirFlagCommand, list::MaildirMailboxListCommand,
     message::command::MaildirMessageCommand, rename::MaildirMailboxRenameCommand,

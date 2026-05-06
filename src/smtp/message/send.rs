@@ -13,7 +13,7 @@ use io_smtp::rfc5321::types::{
 use mail_parser::{Addr, Address, HeaderName, HeaderValue, MessageParser};
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::smtp::account::SmtpAccount;
+use crate::smtp::client::SmtpClient;
 
 /// Send a message to a mailbox.
 ///
@@ -28,9 +28,7 @@ pub struct SmtpMessageSendCommand {
 }
 
 impl SmtpMessageSendCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: SmtpAccount) -> Result<()> {
-        let mut client = account.new_smtp_client()?;
-
+    pub fn execute(self, printer: &mut impl Printer, mut client: SmtpClient) -> Result<()> {
         let message = if stdin().is_terminal() || printer.is_json() {
             self.message
                 .join(" ")

@@ -3,7 +3,7 @@ use clap::Parser;
 use io_jmap::rfc8621::{identity::IdentityUpdate, identity_set::JmapIdentitySetArgs};
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::jmap::{account::JmapAccount, error::format_set_error};
+use crate::jmap::{client::JmapClient, error::format_set_error};
 
 /// Update a JMAP sender identity (Identity/set).
 #[derive(Debug, Parser)]
@@ -25,9 +25,7 @@ pub struct JmapIdentityUpdateCommand {
 }
 
 impl JmapIdentityUpdateCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut client = account.new_jmap_client()?;
-
+    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
         let patch = IdentityUpdate {
             name: self.name,
             reply_to: None,

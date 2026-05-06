@@ -3,8 +3,8 @@ use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::maildir::{
-    account::MaildirAccount,
     arg::{MaildirNameArg, MaildirPathFlag},
+    client::MaildirClient,
 };
 
 /// Rename the given mailbox.
@@ -20,9 +20,9 @@ pub struct MaildirMailboxRenameCommand {
 }
 
 impl MaildirMailboxRenameCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
-        let path = account.backend.root.join(&self.maildir_path.inner);
-        let client = account.new_maildir_client();
+    pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
+        let path = client.root.join(&self.maildir_path.inner);
+
         client.rename_maildir(path, self.maildir_name.inner)?;
         printer.out(Message::new("Maildir successfully renamed"))
     }

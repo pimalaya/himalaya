@@ -5,7 +5,7 @@ use io_jmap::rfc8621::{
 };
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::jmap::account::JmapAccount;
+use crate::jmap::client::JmapClient;
 
 /// Update the JMAP vacation response (VacationResponse/set).
 #[derive(Debug, Parser)]
@@ -40,9 +40,7 @@ pub struct JmapVacationSetCommand {
 }
 
 impl JmapVacationSetCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut client = account.new_jmap_client()?;
-
+    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
         let has_vacation = client
             .session()
             .map(|s| s.capabilities.contains_key(VACATION_RESPONSE))

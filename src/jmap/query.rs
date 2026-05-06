@@ -13,7 +13,7 @@ use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::jmap::account::JmapAccount;
+use crate::jmap::client::JmapClient;
 
 /// Send a raw JMAP method-calls array and print the response.
 ///
@@ -37,9 +37,7 @@ pub struct JmapQueryCommand {
 }
 
 impl JmapQueryCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut client = account.new_jmap_client()?;
-
+    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
         let raw = if self.method_calls.is_empty()
             || self.method_calls.first().map(|s| s.as_str()) == Some("-")
         {

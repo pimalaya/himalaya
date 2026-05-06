@@ -4,7 +4,7 @@ use log::warn;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
-use crate::jmap::account::JmapAccount;
+use crate::jmap::client::JmapClient;
 
 /// Parse RFC 5322 message blobs without storing them (Email/parse).
 ///
@@ -18,8 +18,7 @@ pub struct JmapEmailParseCommand {
 }
 
 impl JmapEmailParseCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut client = account.new_jmap_client()?;
+    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
         let output = client.email_parse(self.blob_ids.clone(), None)?;
 
         for id in output.not_found {

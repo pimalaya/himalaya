@@ -1,5 +1,5 @@
-pub mod account;
 pub mod cli;
+pub mod client;
 pub mod envelope;
 pub mod flag;
 pub mod id;

@@ -7,7 +7,7 @@ use io_maildir::flag::Flag;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
-use crate::maildir::account::MaildirAccount;
+use crate::maildir::client::MaildirClient;
 
 /// List available MAILDIR flags for the given mailbox.
 ///
@@ -18,10 +18,10 @@ use crate::maildir::account::MaildirAccount;
 pub struct MaildirFlagListCommand;
 
 impl MaildirFlagListCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
         let table = FlagsTable {
-            preset: account.table_preset,
-            arrangement: account.table_arrangement,
+            preset: client.account.table_preset().to_string(),
+            arrangement: client.account.table_arrangement(),
             flags: vec![
                 FlagRow::new(Flag::Passed),
                 FlagRow::new(Flag::Replied),

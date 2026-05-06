@@ -7,7 +7,7 @@ use io_imap::types::status::{StatusDataItem, StatusDataItemName};
 use pimalaya_cli::printer::Printer;
 use serde::{Serialize, Serializer};
 
-use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
+use crate::imap::{client::ImapClient, mailbox::arg::MailboxNameArg};
 
 /// Get the status of the given mailbox.
 ///
@@ -20,8 +20,7 @@ pub struct ImapMailboxStatusCommand {
 }
 
 impl ImapMailboxStatusCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let mut client = account.new_imap_client()?;
+    pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
         let item_names = vec![
             StatusDataItemName::Messages,
@@ -34,7 +33,7 @@ impl ImapMailboxStatusCommand {
         let items = client.status(mailbox, item_names)?;
 
         let table = MailboxStatusTable {
-            preset: account.table_preset,
+            preset: client.account.table_preset().to_string(),
             status: items.into(),
         };
 

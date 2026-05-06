@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::maildir::{account::MaildirAccount, arg::MaildirPathFlag};
+use crate::maildir::{arg::MaildirPathFlag, client::MaildirClient};
 
 /// Delete the given mailbox.
 ///
@@ -15,9 +15,9 @@ pub struct MaildirMailboxDeleteCommand {
 }
 
 impl MaildirMailboxDeleteCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
-        let path = account.backend.root.join(&self.maildir_path.inner);
-        let client = account.new_maildir_client();
+    pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
+        let path = client.root.join(&self.maildir_path.inner);
+
         client.delete_maildir(path)?;
         printer.out(Message::new("Maildir successfully deleted"))
     }

@@ -8,7 +8,7 @@ use pimalaya_config::{
 };
 use pimalaya_stream::{
     sasl::{Sasl, SaslAnonymous, SaslLogin, SaslMechanism, SaslPlain},
-    tls::{Rustls, RustlsCrypto, Tls, TlsProvider},
+    std::tls::{Rustls, RustlsCrypto, Tls, TlsProvider},
 };
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -22,6 +22,10 @@ pub struct Config {
     pub downloads_dir: Option<PathBuf>,
     pub table_preset: Option<String>,
     pub table_arrangement: Option<TableArrangementConfig>,
+    #[serde(default)]
+    pub envelope: EnvelopeConfig,
+    #[serde(default)]
+    pub message: MessageConfig,
     pub accounts: HashMap<String, AccountConfig>,
 }
 
@@ -32,17 +36,17 @@ impl TomlConfig for Config {
         env!("CARGO_PKG_NAME")
     }
 
-    fn find_default_account(&self) -> Option<(String, Self::Account)> {
-        self.accounts
-            .iter()
-            .find(|(_, account)| account.default)
-            .map(|(name, account)| (name.to_owned(), account.clone()))
+    fn take_named_account(&mut self, name: &str) -> Option<(String, Self::Account)> {
+        self.accounts.remove_entry(name)
     }
 
-    fn find_account(&self, name: &str) -> Option<(String, Self::Account)> {
-        self.accounts
-            .get(name)
-            .map(|account| (name.to_owned(), account.clone()))
+    fn take_default_account(&mut self) -> Option<(String, Self::Account)> {
+        let name = self
+            .accounts
+            .iter()
+            .find_map(|(name, account)| account.default.then(|| name.clone()))?;
+
+        self.take_named_account(&name)
     }
 }
 
@@ -77,6 +81,9 @@ pub struct AccountConfig {
     pub table_preset: Option<String>,
     pub table_arrangement: Option<TableArrangementConfig>,
 
+    #[serde(default)]
+    pub envelope: EnvelopeConfig,
+
     #[allow(unused)]
     pub imap: Option<ImapConfig>,
     #[allow(unused)]
@@ -85,6 +92,80 @@ pub struct AccountConfig {
     pub maildir: Option<MaildirConfig>,
     #[allow(unused)]
     pub smtp: Option<SmtpConfig>,
+}
+
+/// Envelope-level rendering options.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct EnvelopeConfig {
+    #[serde(default)]
+    pub list: EnvelopeListConfig,
+}
+
+/// `envelopes list` rendering options. Mirrors the pre-v2
+/// `envelope.list.*` keys.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct EnvelopeListConfig {
+    /// chrono `strftime` format used to render the DATE column.
+    /// Defaults to `"%F %R%:z"` (e.g. `2026-05-06 14:30+02:00`) when
+    /// neither the global nor the account config sets it.
+    pub datetime_fmt: Option<String>,
+
+    /// When `true`, the `Date:` header timezone offset is converted
+    /// to the system's local timezone before formatting. Defaults to
+    /// `false`, which preserves the wire offset.
+    pub datetime_local_tz: Option<bool>,
+}
+
+/// Message-level configuration: user-defined composers and readers.
+///
+/// Composers produce a MIME draft on stdout (called by `compose-with`,
+/// `reply-with`, `forward-with`). Readers consume a MIME message from
+/// stdin and emit human-readable bytes on stdout (called by
+/// `read-with`). Both are looked up by name; the entry flagged
+/// `default = true` is used when no name is passed.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct MessageConfig {
+    #[serde(default)]
+    pub composer: HashMap<String, ComposerConfig>,
+    #[serde(default)]
+    pub reader: HashMap<String, ReaderConfig>,
+}
+
+/// Single composer entry under `[message.composer.<name>]`.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct ComposerConfig {
+    /// Shell command line invoked via `sh -c`. Stdin carries the
+    /// source MIME bytes (empty for new messages); stdout is
+    /// captured as the MIME draft; stderr is inherited so the
+    /// composer can prompt the user.
+    pub command: String,
+
+    /// Marks this entry as the fallback when `compose-with` /
+    /// `reply-with` / `forward-with` are invoked without a name.
+    /// Exactly one composer should set this; if several do, the
+    /// first one returned by the config lookup wins.
+    #[serde(default)]
+    pub default: bool,
+}
+
+/// Single reader entry under `[message.reader.<name>]`.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct ReaderConfig {
+    /// Shell command line invoked via `sh -c`. Stdin carries the
+    /// source MIME bytes; stdout is forwarded to the terminal (zero
+    /// bytes is fine — the reader may have spawned its own UI);
+    /// stderr is inherited.
+    pub command: String,
+
+    /// Marks this entry as the fallback when `read-with` is
+    /// invoked without a name.
+    #[serde(default)]
+    pub default: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

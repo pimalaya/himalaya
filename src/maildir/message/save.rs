@@ -11,8 +11,8 @@ use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
 use crate::maildir::{
-    account::MaildirAccount,
     arg::{MaildirPathFlag, MaildirSubdirArg},
+    client::MaildirClient,
     flag::arg::FlagArg,
 };
 
@@ -41,10 +41,10 @@ pub struct MaildirMessageSaveCommand {
 }
 
 impl MaildirMessageSaveCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: MaildirAccount) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
         let maildir = match Maildir::try_from(self.maildir.inner.clone()) {
             Ok(maildir) => maildir,
-            Err(_) => Maildir::try_from(account.backend.root.join(&self.maildir.inner))?,
+            Err(_) => Maildir::try_from(client.root.join(&self.maildir.inner))?,
         };
 
         let msg = if stdin().is_terminal() || printer.is_json() {
@@ -62,7 +62,7 @@ impl MaildirMessageSaveCommand {
         };
 
         let flags = Flags::from_iter(self.flags.into_iter().map(Into::into));
-        let client = account.new_maildir_client();
+
         let (id, path) = client.store(maildir, self.subdir.into(), flags, msg.into_bytes())?;
 
         printer.out(StoredMessage { id, path })

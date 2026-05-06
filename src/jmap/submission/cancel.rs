@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::jmap::{account::JmapAccount, error::format_set_error};
+use crate::jmap::{client::JmapClient, error::format_set_error};
 
 /// Cancel (undo) a pending JMAP email submission (EmailSubmission/set).
 ///
@@ -16,8 +16,7 @@ pub struct JmapSubmissionCancelCommand {
 }
 
 impl JmapSubmissionCancelCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut client = account.new_jmap_client()?;
+    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
         let output = client.email_submission_cancel(self.ids.clone())?;
 
         if !output.not_updated.is_empty() {

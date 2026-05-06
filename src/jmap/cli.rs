@@ -3,13 +3,13 @@ use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
 use crate::jmap::{
-    account::JmapAccount, email::cli::JmapEmailCommand, identity::cli::JmapIdentityCommand,
+    client::JmapClient, email::cli::JmapEmailCommand, identity::cli::JmapIdentityCommand,
     mailbox::cli::JmapMailboxCommand, query::JmapQueryCommand,
     submission::cli::JmapSubmissionCommand, thread::cli::JmapThreadCommand,
     vacation::cli::JmapVacationCommand,
 };
 
-/// JMAP CLI (requires the `jmap` cargo feature).
+/// JMAP CLI.
 ///
 /// This command gives you access to the JMAP CLI API, and allows you
 /// to manage JMAP mailboxes, threads, emails, identities, submissions
@@ -40,16 +40,16 @@ pub enum JmapCommand {
 }
 
 impl JmapCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: JmapClient) -> Result<()> {
         match self {
-            Self::Mailboxes(cmd) => cmd.execute(printer, account),
-            Self::Emails(cmd) => cmd.execute(printer, account),
+            Self::Mailboxes(cmd) => cmd.execute(printer, client),
+            Self::Emails(cmd) => cmd.execute(printer, client),
 
-            Self::Threads(cmd) => cmd.execute(printer, account),
-            Self::Identity(cmd) => cmd.execute(printer, account),
-            Self::Submission(cmd) => cmd.execute(printer, account),
-            Self::Vacation(cmd) => cmd.execute(printer, account),
-            Self::Query(cmd) => cmd.execute(printer, account),
+            Self::Threads(cmd) => cmd.execute(printer, client),
+            Self::Identity(cmd) => cmd.execute(printer, client),
+            Self::Submission(cmd) => cmd.execute(printer, client),
+            Self::Vacation(cmd) => cmd.execute(printer, client),
+            Self::Query(cmd) => cmd.execute(printer, client),
         }
     }
 }

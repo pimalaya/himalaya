@@ -8,7 +8,7 @@ use log::warn;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
-use crate::jmap::account::JmapAccount;
+use crate::jmap::client::JmapClient;
 
 /// Get JMAP threads by ID (Thread/get).
 ///
@@ -21,8 +21,7 @@ pub struct JmapThreadGetCommand {
 }
 
 impl JmapThreadGetCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
-        let mut client = account.new_jmap_client()?;
+    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
         let output = client.thread_get(self.ids.clone())?;
 
         for id in output.not_found {
@@ -30,7 +29,7 @@ impl JmapThreadGetCommand {
         }
 
         printer.out(ThreadsTable {
-            preset: account.table_preset,
+            preset: client.account.table_preset().to_string(),
             threads: output.threads,
         })
     }

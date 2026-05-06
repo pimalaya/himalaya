@@ -7,7 +7,7 @@ use io_imap::types::flag::{Flag, FlagPerm};
 use pimalaya_cli::printer::Printer;
 use serde::{Serialize, Serializer};
 
-use crate::imap::{account::ImapAccount, mailbox::arg::MailboxNameArg};
+use crate::imap::{client::ImapClient, mailbox::arg::MailboxNameArg};
 
 /// List available IMAP flags for the given mailbox.
 ///
@@ -21,8 +21,7 @@ pub struct ImapFlagListCommand {
 }
 
 impl ImapFlagListCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: ImapAccount) -> Result<()> {
-        let mut client = account.new_imap_client()?;
+    pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         let data = client.select(mailbox)?;
@@ -30,8 +29,8 @@ impl ImapFlagListCommand {
         let permanent_flags = data.permanent_flags.unwrap_or_default();
 
         let table = FlagsTable {
-            preset: account.table_preset,
-            arrangement: account.table_arrangement,
+            preset: client.account.table_preset().to_string(),
+            arrangement: client.account.table_arrangement(),
             flags,
             permanent_flags,
         };

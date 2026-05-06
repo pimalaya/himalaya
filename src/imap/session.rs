@@ -30,8 +30,10 @@ use io_imap::{
 use log::info;
 use pimalaya_stream::{
     sasl::{Sasl, SaslMechanism},
-    std::stream::Stream,
-    tls::{upgrade_tls, Tls},
+    std::{
+        stream::Stream,
+        tls::{upgrade_tls, Tls},
+    },
 };
 #[cfg(windows)]
 use uds_windows::UnixStream;

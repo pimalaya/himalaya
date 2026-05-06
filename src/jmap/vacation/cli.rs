@@ -3,7 +3,7 @@ use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
 use crate::jmap::{
-    account::JmapAccount,
+    client::JmapClient,
     vacation::{get::JmapVacationGetCommand, set::JmapVacationSetCommand},
 };
 
@@ -17,10 +17,10 @@ pub enum JmapVacationCommand {
 }
 
 impl JmapVacationCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: JmapAccount) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: JmapClient) -> Result<()> {
         match self {
-            Self::Get(cmd) => cmd.execute(printer, account),
-            Self::Set(cmd) => cmd.execute(printer, account),
+            Self::Get(cmd) => cmd.execute(printer, client),
+            Self::Set(cmd) => cmd.execute(printer, client),
         }
     }
 }

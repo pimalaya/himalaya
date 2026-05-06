@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
-use crate::smtp::{account::SmtpAccount, message::send::SmtpMessageSendCommand};
+use crate::smtp::{client::SmtpClient, message::send::SmtpMessageSendCommand};
 
 /// Manage messages.
 ///
@@ -15,9 +15,9 @@ pub enum SmtpMessageCommand {
 }
 
 impl SmtpMessageCommand {
-    pub fn execute(self, printer: &mut impl Printer, account: SmtpAccount) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: SmtpClient) -> Result<()> {
         match self {
-            Self::Send(cmd) => cmd.execute(printer, account),
+            Self::Send(cmd) => cmd.execute(printer, client),
         }
     }
 }

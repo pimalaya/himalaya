@@ -1,6 +1,6 @@
-pub mod account;
 pub mod arg;
 pub mod cli;
+pub mod client;
 pub mod create;
 pub mod delete;
 pub mod envelope;
@@ -8,4 +8,3 @@ pub mod flag;
 pub mod list;
 pub mod message;
 pub mod rename;
-pub mod runtime;
