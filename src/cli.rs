@@ -1,6 +1,6 @@
-use std::{fmt, path::PathBuf, str::FromStr};
+use std::path::PathBuf;
 
-use anyhow::{bail, Error, Result};
+use anyhow::{bail, Result};
 use clap::{CommandFactory, Parser, Subcommand};
 use pimalaya_cli::{
     clap::{
@@ -23,11 +23,11 @@ use crate::maildir::{cli::MaildirCommand, client::build_maildir_client};
 use crate::smtp::{cli::SmtpCommand, client::build_smtp_client};
 use crate::{
     account::cli::AccountCommand,
+    backend::Backend,
     config::Config,
     shared::{
-        attachments::cli::AttachmentCommand, client::build_email_client,
-        envelopes::cli::EnvelopeCommand, flags::cli::FlagCommand, mailboxes::cli::MailboxCommand,
-        messages::cli::MessageCommand,
+        attachments::cli::AttachmentCommand, client::EmailClient, envelopes::cli::EnvelopeCommand,
+        flags::cli::FlagCommand, mailboxes::cli::MailboxCommand, messages::cli::MessageCommand,
     },
     wizard,
 };
@@ -70,7 +70,7 @@ pub struct HimalayaCli {
     /// config block, or if the operation has no implementation for it
     /// — e.g. `--backend smtp mailboxes list`).
     #[arg(short, long, global = true, default_value_t)]
-    pub backend: BackendFlag,
+    pub backend: Backend,
     #[command(flatten)]
     pub json: JsonFlag,
     #[command(flatten)]
@@ -115,35 +115,61 @@ pub enum HimalayaCommand {
     Manuals(ManualCommand),
 }
 
+/// Loads `Config` from the merged `config_paths` or, when no file
+/// exists, runs the wizard to bootstrap one at the target path. Used
+/// by every `build_*_client` helper to get a populated `Config` before
+/// the per-backend client opens its connection.
+pub fn load_or_wizard(config_paths: &[PathBuf]) -> Result<Config> {
+    match Config::from_paths_or_default(config_paths)? {
+        Some(config) => Ok(config),
+        None => wizard::run_or_exit(&Config::target_path(config_paths)?),
+    }
+}
+
 impl HimalayaCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
         config_paths: &[PathBuf],
         account_name: Option<&str>,
-        backend: BackendFlag,
+        backend: Backend,
     ) -> Result<()> {
+        let configs = || {
+            let mut config = load_or_wizard(config_paths)?;
+
+            let Some((_, account_config)) = config.take_account(account_name)? else {
+                bail!("Cannot find account")
+            };
+
+            Ok((config, account_config))
+        };
+
         match self {
             // --- Shared API
             //
             Self::Mailboxes(cmd) => {
-                let client = build_email_client(config_paths, account_name, backend)?;
+                let (config, account_config) = configs()?;
+                let client = EmailClient::new(config, account_config, backend)?;
                 cmd.execute(printer, client)
             }
             Self::Envelopes(cmd) => {
-                let client = build_email_client(config_paths, account_name, backend)?;
+                let (config, account_config) = configs()?;
+                let client = EmailClient::new(config, account_config, backend)?;
                 cmd.execute(printer, client)
             }
             Self::Flags(cmd) => {
-                let client = build_email_client(config_paths, account_name, backend)?;
+                let (config, account_config) = configs()?;
+                let client = EmailClient::new(config, account_config, backend)?;
                 cmd.execute(printer, client)
             }
             Self::Messages(cmd) => {
-                let client = build_email_client(config_paths, account_name, backend)?;
+                let (config, account_config) = configs()?;
+                let client = EmailClient::new(config, account_config, backend)?;
                 cmd.execute(printer, client)
             }
             Self::Attachments(cmd) => {
-                let client = build_email_client(config_paths, account_name, backend)?;
+                let (config, account_config) = configs()?;
+                let client = EmailClient::new(config, account_config, backend)?;
                 cmd.execute(printer, client)
             }
 
@@ -176,82 +202,5 @@ impl HimalayaCommand {
             Self::Completions(cmd) => cmd.execute(printer, HimalayaCli::command()),
             Self::Manuals(cmd) => cmd.execute(printer, HimalayaCli::command()),
         }
-    }
-}
-
-/// Selects which backend a cross-protocol command should target.
-///
-/// `Auto` lets the command pick the first configured-and-supported
-/// backend in its own priority order. The named variants pin the
-/// command to that backend; the command bails if it cannot be served
-/// (config missing, or the operation has no arm for that backend).
-///
-/// The protocol-specific subcommands (`imap`, `jmap`, `maildir`,
-/// `smtp`) ignore this arg entirely.
-#[derive(Clone, Copy, Debug, Default, Parser, PartialEq, Eq)]
-pub enum BackendFlag {
-    #[default]
-    Auto,
-    Imap,
-    Jmap,
-    Maildir,
-    Smtp,
-}
-
-impl BackendFlag {
-    /// Whether the IMAP arm of a shared command is allowed to run.
-    pub fn allows_imap(self) -> bool {
-        matches!(self, Self::Auto | Self::Imap)
-    }
-
-    /// Whether the JMAP arm of a shared command is allowed to run.
-    pub fn allows_jmap(self) -> bool {
-        matches!(self, Self::Auto | Self::Jmap)
-    }
-
-    /// Whether the Maildir arm of a shared command is allowed to run.
-    pub fn allows_maildir(self) -> bool {
-        matches!(self, Self::Auto | Self::Maildir)
-    }
-
-    /// Whether the SMTP arm of a shared command is allowed to run.
-    pub fn allows_smtp(self) -> bool {
-        matches!(self, Self::Auto | Self::Smtp)
-    }
-}
-
-impl FromStr for BackendFlag {
-    type Err = Error;
-
-    fn from_str(backend: &str) -> Result<Self, Self::Err> {
-        match backend {
-            "auto" => Ok(Self::Auto),
-            "imap" => Ok(Self::Imap),
-            "jmap" => Ok(Self::Jmap),
-            "maildir" => Ok(Self::Maildir),
-            "smtp" => Ok(Self::Smtp),
-            backend => bail!("Invalid backend {backend}"),
-        }
-    }
-}
-impl fmt::Display for BackendFlag {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Auto => write!(f, "auto"),
-            Self::Imap => write!(f, "imap"),
-            Self::Jmap => write!(f, "jmap"),
-            Self::Maildir => write!(f, "maildir"),
-            Self::Smtp => write!(f, "smtp"),
-        }
-    }
-}
-
-/// Loads `Config` from `paths`, or runs the wizard if no config file
-/// is found. Centralises the `Result<Option<Config>>` → `Config`
-/// adaptation so call sites stay readable.
-pub(crate) fn load_or_wizard(paths: &[PathBuf]) -> Result<Config> {
-    match Config::from_paths_or_default(paths)? {
-        Some(config) => Ok(config),
-        None => wizard::run_or_exit(&Config::target_path(paths)?),
     }
 }

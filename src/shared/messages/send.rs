@@ -4,12 +4,13 @@ use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::shared::client::EmailClient;
+use crate::shared::{client::EmailClient, messages::output::extract_envelope};
 
 /// Send a message via the active account.
 ///
-/// Supported over JMAP. JMAP requires `identity-id` and
-/// `drafts-mailbox-id` to be set on the account's `[jmap]` config block.
+/// Routes through SMTP or JMAP depending on the account's configured
+/// outgoing backend. The envelope sender is taken from the `From:`
+/// header and recipients are collected from `To:` / `Cc:` / `Bcc:`.
 #[derive(Debug, Parser)]
 pub struct MessageSendCommand {
     /// The raw message, including headers and body.
@@ -34,8 +35,10 @@ impl MessageSendCommand {
                 .join("\r\n")
         };
 
-        let opts = client.send_opts.clone();
-        client.send_message(raw.into_bytes(), opts)?;
+        let raw = raw.into_bytes();
+        let (from, to) = extract_envelope(&raw)?;
+        let to_refs: Vec<&str> = to.iter().map(String::as_str).collect();
+        client.send_message(raw, &from, &to_refs)?;
         printer.out(Message::new("Message successfully sent"))
     }
 }

@@ -1,4 +1,4 @@
-//! Himalaya wrapper around [`io_smtp::client::SmtpClient`] that
+//! Himalaya wrapper around [`io_smtp::client::SmtpClientStd`] that
 //! bundles the merged [`Account`] alongside the live SMTP client.
 //!
 //! Built up front by the dispatch layer (`crate::cli`) via
@@ -7,41 +7,40 @@
 //! context needs to follow the stream.
 
 use std::{
+    net::Ipv4Addr,
     ops::{Deref, DerefMut},
     path::PathBuf,
 };
 
 use anyhow::{anyhow, Result};
-use io_smtp::client::SmtpClient as Inner;
+use io_smtp::{client::SmtpClientStd as Inner, rfc5321::types::ehlo_domain::EhloDomain};
 use pimalaya_config::toml::TomlConfig;
+use pimalaya_stream::{sasl::Sasl, std::stream::StreamStd, tls::Tls};
 
-use crate::{
-    account::context::Account, cli::load_or_wizard, config::SmtpConfig, smtp::session::SmtpSession,
-};
+use crate::{account::context::Account, cli::load_or_wizard, config::SmtpConfig};
 
 pub struct SmtpClient {
-    inner: Inner,
+    inner: Inner<StreamStd>,
     #[allow(dead_code)]
     pub account: Account,
 }
 
 impl SmtpClient {
     /// Opens the SMTP connection (TCP/TLS/STARTTLS, greeting, EHLO,
-    /// SASL) then wraps the resulting stream alongside `account`.
+    /// SASL) then wraps the resulting client alongside `account`.
     pub fn new(config: SmtpConfig, account: Account) -> Result<Self> {
-        let session = SmtpSession::new(
-            config.url,
-            config.tls.try_into()?,
-            config.starttls,
-            config.sasl.try_into()?,
-        )?;
-        let inner = Inner::new(session.stream);
+        let mut tls: Tls = config.tls.into();
+        tls.rustls.alpn = vec!["smtp".into()];
+        let sasl: Sasl = config.sasl.try_into()?;
+        let domain: EhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
+        let inner =
+            Inner::<StreamStd>::connect(&config.url, &tls, config.starttls, domain, Some(sasl))?;
         Ok(Self { inner, account })
     }
 }
 
 impl Deref for SmtpClient {
-    type Target = Inner;
+    type Target = Inner<StreamStd>;
 
     fn deref(&self) -> &Self::Target {
         &self.inner

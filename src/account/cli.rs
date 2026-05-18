@@ -8,7 +8,7 @@ use crate::{
     account::{
         check::AccountCheckCommand, configure::AccountConfigureCommand, list::AccountListCommand,
     },
-    cli::BackendFlag,
+    backend::Backend,
 };
 
 /// Manage accounts defined in the TOML configuration file.
@@ -31,7 +31,7 @@ impl AccountCommand {
         printer: &mut impl Printer,
         config_paths: &[PathBuf],
         account_name: Option<&str>,
-        backend: BackendFlag,
+        backend: Backend,
     ) -> Result<()> {
         match self {
             Self::List(cmd) => cmd.execute(printer, config_paths),

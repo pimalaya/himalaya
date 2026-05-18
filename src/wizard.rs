@@ -8,9 +8,9 @@
 //!
 //! 1. Confirm with the user. Exit if they decline.
 //! 2. Ask for an account name and email address.
-//! 3. Run discovery sequentially — PACC first, then Mozilla
-//!    Autoconfig — with one spinner per method. Sub-step messages
-//!    track which URL is being probed.
+//! 3. Try PACC, then Autoconfig ISP main / fallback / ISPDB (secure
+//!    variants only) in series. Each probe owns its own spinner;
+//!    first success wins.
 //! 4. If PACC returned a JMAP endpoint, ask the user whether to use
 //!    it instead of IMAP+SMTP and run the matching protocol wizard(s).
 //! 5. Build a [`Config`], write it to `target`, return it.
@@ -20,14 +20,10 @@ use std::{collections::HashMap, path::Path, process::exit, process::Command};
 use anyhow::{anyhow, bail, Result};
 use io_discovery::{
     autoconfig::{
-        client::DiscoveryAutoconfigClient,
-        coroutines::{dns_mx::mx_parent_domain, isp::DiscoveryIsp},
+        client::DiscoveryAutoconfigClientStd,
         types::{Autoconfig, SecurityType, Server, ServerType},
     },
-    pacc::{
-        client::{DiscoveryPaccClient, DiscoveryPaccClientError},
-        types::PaccConfig,
-    },
+    pacc::{client::DiscoveryPaccClientStd, types::PaccConfig},
 };
 use log::{debug, info};
 use pimalaya_cli::{
@@ -46,6 +42,7 @@ use pimalaya_cli::{
     },
 };
 use pimalaya_config::{command::shell, secret::Secret};
+use pimalaya_stream::tls::Tls;
 use url::Url;
 
 use crate::config::{
@@ -57,6 +54,15 @@ use crate::config::{
 /// `1.1.1.1` is a reasonable default; we'll make this configurable
 /// later.
 const DEFAULT_RESOLVER: &str = "tcp://1.1.1.1:53";
+
+/// Builds the [`Tls`] profile passed to the per-mechanism discovery
+/// clients via `with_tls`. Discovery only speaks HTTPS to `_well-known`
+/// endpoints, so `http/1.1` is the only ALPN protocol we offer.
+fn discovery_tls() -> Tls {
+    let mut tls = Tls::default();
+    tls.rustls.alpn = vec!["http/1.1".into()];
+    tls
+}
 
 pub fn run_or_exit(target: &Path) -> Result<Config> {
     let prompt = format!(
@@ -94,68 +100,91 @@ pub fn run_or_exit(target: &Path) -> Result<Config> {
     Ok(config)
 }
 
+#[derive(Default)]
 struct DiscoveryResult {
+    jmap: Option<WizardJmapConfig>,
     imap: Option<WizardImapConfig>,
     smtp: Option<WizardSmtpConfig>,
-    jmap: Option<WizardJmapConfig>,
 }
 
-/// Drives PACC then Mozilla Autoconfig sequentially, each with its
-/// own spinner. PACC values win on overlap; Autoconfig only fills
-/// IMAP/SMTP fields PACC didn't yield. JMAP is PACC-only.
+/// Tries PACC, then Autoconfig ISP main / fallback / ISPDB (secure
+/// variants only) in series; each probe owns its own spinner and
+/// reports its own success or failure line. First hit wins. The
+/// returned `DiscoveryResult` is empty when every mechanism failed;
+/// the caller falls back to pure manual entry in that case.
 fn discover(local_part: &str, domain: &str) -> DiscoveryResult {
-    let pacc = run_pacc_with_spinner(domain);
-    let autoconfig = run_autoconfig_with_spinner(local_part, domain);
+    if let Some(config) = run_pacc(domain) {
+        let (imap, smtp, jmap) = pacc_defaults(&config);
+        if imap.is_some() || smtp.is_some() || jmap.is_some() {
+            return DiscoveryResult { imap, smtp, jmap };
+        }
+    }
 
-    let (pacc_imap, pacc_smtp, pacc_jmap) = pacc
-        .as_ref()
-        .map(pacc_defaults)
-        .unwrap_or((None, None, None));
-    let (ac_imap, ac_smtp) = autoconfig
+    let (imap, smtp) = run_autoconfig(local_part, domain)
         .as_ref()
         .map(autoconfig_defaults)
         .unwrap_or((None, None));
 
     DiscoveryResult {
-        imap: pacc_imap.or(ac_imap),
-        smtp: pacc_smtp.or(ac_smtp),
-        jmap: pacc_jmap,
+        imap,
+        smtp,
+        jmap: None,
     }
 }
 
-fn run_pacc_with_spinner(domain: &str) -> Option<PaccConfig> {
+fn discovery_resolver() -> Url {
+    DEFAULT_RESOLVER
+        .parse()
+        .expect("DEFAULT_RESOLVER must be a valid URL")
+}
+
+fn run_pacc(domain: &str) -> Option<PaccConfig> {
     let spinner = Spinner::start(format!("Probing PACC for {domain}…"));
+    let mut client = DiscoveryPaccClientStd::new(discovery_resolver()).with_tls(discovery_tls());
 
-    let resolver: Url = match DEFAULT_RESOLVER.parse() {
-        Ok(url) => url,
-        Err(err) => {
-            debug!("PACC: invalid default resolver `{DEFAULT_RESOLVER}`: {err}");
-            spinner.failure(format!("PACC: invalid resolver `{DEFAULT_RESOLVER}`"));
-            return None;
-        }
-    };
-
-    spinner.set_message(format!(
-        "PACC: fetching .well-known config from ua-auto-config.{domain} and verifying digest…"
-    ));
-
-    let mut client = DiscoveryPaccClient::new(resolver);
     match client.discover(domain) {
         Ok(config) => {
             spinner.success(pacc_summary(domain, &config));
             Some(config)
         }
-        Err(DiscoveryPaccClientError::Discovery(err)) => {
+        Err(err) => {
             debug!("PACC discovery for {domain} failed: {err}");
             spinner.failure(format!("PACC: no valid configuration for {domain}"));
             None
         }
-        Err(err) => {
-            debug!("PACC transport error for {domain}: {err}");
-            spinner.failure(format!("PACC: endpoint unreachable for {domain}"));
-            None
+    }
+}
+
+fn run_autoconfig(local_part: &str, domain: &str) -> Option<Autoconfig> {
+    let mut client =
+        DiscoveryAutoconfigClientStd::new(discovery_resolver()).with_tls(discovery_tls());
+
+    let attempts: [(&str, &dyn Fn(&mut DiscoveryAutoconfigClientStd) -> _); 3] = [
+        ("Autoconfig ISP main URL", &|c| {
+            c.isp(local_part, domain, true)
+        }),
+        ("Autoconfig ISP fallback URL", &|c| {
+            c.isp_fallback(domain, true)
+        }),
+        ("Thunderbird ISPDB", &|c| c.ispdb(domain, true)),
+    ];
+
+    for (label, run) in attempts {
+        let spinner = Spinner::start(format!("Probing {label} for {domain}…"));
+
+        match run(&mut client) {
+            Ok(config) => {
+                spinner.success(autoconfig_summary(domain, &config));
+                return Some(config);
+            }
+            Err(err) => {
+                debug!("{label} for {domain} failed: {err}");
+                spinner.failure(format!("{label}: not available for {domain}"));
+            }
         }
     }
+
+    None
 }
 
 fn pacc_summary(domain: &str, config: &PaccConfig) -> String {
@@ -177,92 +206,6 @@ fn pacc_summary(domain: &str, config: &PaccConfig) -> String {
     }
 }
 
-/// Tries the Mozilla Autoconfig chain — direct ISP URLs, then
-/// MX-derived parent domain ISP URLs. The TXT mailconf and SRV
-/// fallbacks from the autoconfig CLI are skipped here; we keep the
-/// wizard fast and let manual entry handle the long tail. The
-/// spinner message is updated for every sub-attempt so the user sees
-/// which URL is currently being probed.
-fn run_autoconfig_with_spinner(local_part: &str, domain: &str) -> Option<Autoconfig> {
-    let spinner = Spinner::start(format!("Probing Mozilla Autoconfig for {domain}…"));
-
-    let resolver: Url = match DEFAULT_RESOLVER.parse() {
-        Ok(url) => url,
-        Err(err) => {
-            debug!("Autoconfig: invalid default resolver `{DEFAULT_RESOLVER}`: {err}");
-            spinner.failure(format!("Autoconfig: invalid resolver `{DEFAULT_RESOLVER}`"));
-            return None;
-        }
-    };
-
-    let mut client = DiscoveryAutoconfigClient::new(resolver);
-
-    if let Some(ac) = try_isp_urls_with_spinner(&spinner, &mut client, local_part, domain) {
-        spinner.success(autoconfig_summary(domain, &ac));
-        return Some(ac);
-    }
-
-    spinner.set_message(format!("Autoconfig: looking up MX records for {domain}…"));
-
-    let mx_parent = match client.mx(domain) {
-        Ok(records) => records
-            .first()
-            .map(|r| r.rdata.exchange.to_string())
-            .and_then(|t| mx_parent_domain(&t))
-            .filter(|d| d != domain),
-        Err(err) => {
-            debug!("Autoconfig MX lookup for {domain} failed: {err}");
-            None
-        }
-    };
-
-    if let Some(parent) = mx_parent {
-        debug!("Autoconfig: re-trying ISPs against MX parent {parent}");
-        if let Some(ac) = try_isp_urls_with_spinner(&spinner, &mut client, local_part, &parent) {
-            spinner.success(autoconfig_summary(domain, &ac));
-            return Some(ac);
-        }
-    }
-
-    spinner.failure(format!(
-        "Autoconfig: no provider configuration found for {domain}"
-    ));
-    None
-}
-
-const ISP_LABELS: [&str; 5] = [
-    "ISP main URL (HTTPS)",
-    "ISP main URL (HTTP)",
-    "ISP well-known URL (HTTPS)",
-    "ISP well-known URL (HTTP)",
-    "Thunderbird ISPDB",
-];
-
-fn try_isp_urls_with_spinner(
-    spinner: &Spinner,
-    client: &mut DiscoveryAutoconfigClient,
-    local_part: &str,
-    domain: &str,
-) -> Option<Autoconfig> {
-    let urls = match DiscoveryIsp::all_urls(local_part, domain) {
-        Ok(urls) => urls,
-        Err(err) => {
-            debug!("Autoconfig: cannot build ISP URLs for {domain}: {err}");
-            return None;
-        }
-    };
-
-    for (url, label) in urls.iter().zip(ISP_LABELS.iter()) {
-        spinner.set_message(format!("Autoconfig: trying {label} for {domain}…"));
-        match client.isp(url.clone()) {
-            Ok(ac) => return Some(ac),
-            Err(err) => debug!("Autoconfig ISP attempt at {url} failed: {err}"),
-        }
-    }
-
-    None
-}
-
 fn autoconfig_summary(domain: &str, ac: &Autoconfig) -> String {
     let has_imap = ac
         .email_provider
@@ -274,13 +217,17 @@ fn autoconfig_summary(domain: &str, ac: &Autoconfig) -> String {
         .outgoing_server
         .iter()
         .any(|s| matches!(s.r#type, ServerType::Smtp));
+
     let mut protos = Vec::with_capacity(2);
+
     if has_imap {
         protos.push("IMAP");
     }
+
     if has_smtp {
         protos.push("SMTP");
     }
+
     if protos.is_empty() {
         format!("Autoconfig: configuration found for {domain} (no IMAP/SMTP fields)")
     } else {

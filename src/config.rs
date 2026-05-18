@@ -3,12 +3,12 @@ use std::{collections::HashMap, fs, path::Path, path::PathBuf};
 use anyhow::{Context, Result};
 use comfy_table::ContentArrangement;
 use pimalaya_config::{
-    secret::{Secret, SecretError},
+    secret::Secret,
     toml::{shell_expanded_string, TomlConfig},
 };
 use pimalaya_stream::{
-    sasl::{Sasl, SaslAnonymous, SaslLogin, SaslMechanism, SaslPlain},
-    std::tls::{Rustls, RustlsCrypto, Tls, TlsProvider},
+    sasl::{Sasl, SaslAnonymous, SaslLogin, SaslPlain},
+    tls::{Rustls, RustlsCrypto, Tls, TlsProvider},
 };
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -256,11 +256,9 @@ pub enum RustlsCryptoConfig {
     Ring,
 }
 
-impl TryFrom<TlsConfig> for Tls {
-    type Error = SecretError;
-
-    fn try_from(config: TlsConfig) -> Result<Self, Self::Error> {
-        Ok(Tls {
+impl From<TlsConfig> for Tls {
+    fn from(config: TlsConfig) -> Self {
+        Tls {
             provider: config.provider.map(|config| match config {
                 TlsProviderConfig::Rustls => TlsProvider::Rustls,
                 TlsProviderConfig::NativeTls => TlsProvider::NativeTls,
@@ -270,9 +268,10 @@ impl TryFrom<TlsConfig> for Tls {
                     RustlsCryptoConfig::Aws => RustlsCrypto::Aws,
                     RustlsCryptoConfig::Ring => RustlsCrypto::Ring,
                 }),
+                alpn: Vec::new(),
             },
             cert: config.cert,
-        })
+        }
     }
 }
 
@@ -323,37 +322,46 @@ pub struct SaslAnonymousConfig {
 }
 
 impl TryFrom<SaslConfig> for Sasl {
-    type Error = SecretError;
+    type Error = anyhow::Error;
 
-    fn try_from(config: SaslConfig) -> Result<Self, Self::Error> {
-        Ok(Sasl {
-            mechanism: config.mechanism.map(|m| match m {
-                SaslMechanismConfig::Anonymous => SaslMechanism::Anonymous,
-                SaslMechanismConfig::Plain => SaslMechanism::Plain,
-                SaslMechanismConfig::Login => SaslMechanism::Login,
-            }),
-            anonymous: match config.anonymous {
-                None => None,
-                Some(config) => Some(SaslAnonymous {
-                    message: config.message,
-                }),
-            },
-            plain: match config.plain {
-                None => None,
-                Some(config) => Some(SaslPlain {
-                    authzid: config.authzid,
-                    authcid: config.authcid,
-                    passwd: config.passwd.get()?,
-                }),
-            },
-            login: match config.login {
-                None => None,
-                Some(config) => Some(SaslLogin {
-                    username: config.username,
-                    password: config.password.get()?,
-                }),
-            },
-        })
+    fn try_from(config: SaslConfig) -> Result<Self> {
+        // Pick the mechanism explicitly if set; otherwise infer from the
+        // first populated credential block. Anonymous is the last-resort
+        // fallback since it carries no secrets.
+        let mechanism = config.mechanism.unwrap_or_else(|| {
+            if config.plain.is_some() {
+                SaslMechanismConfig::Plain
+            } else if config.login.is_some() {
+                SaslMechanismConfig::Login
+            } else {
+                SaslMechanismConfig::Anonymous
+            }
+        });
+
+        match mechanism {
+            SaslMechanismConfig::Anonymous => Ok(Sasl::Anonymous(SaslAnonymous {
+                message: config.anonymous.and_then(|c| c.message),
+            })),
+            SaslMechanismConfig::Login => {
+                let c = config
+                    .login
+                    .ok_or_else(|| anyhow::anyhow!("missing SASL LOGIN configuration"))?;
+                Ok(Sasl::Login(SaslLogin {
+                    username: c.username,
+                    password: c.password.get()?,
+                }))
+            }
+            SaslMechanismConfig::Plain => {
+                let c = config
+                    .plain
+                    .ok_or_else(|| anyhow::anyhow!("missing SASL PLAIN configuration"))?;
+                Ok(Sasl::Plain(SaslPlain {
+                    authzid: c.authzid,
+                    authcid: c.authcid,
+                    passwd: c.passwd.get()?,
+                }))
+            }
+        }
     }
 }
 
@@ -404,20 +412,4 @@ pub enum JmapAuthConfig {
         username: String,
         password: Secret,
     },
-}
-
-#[cfg(feature = "jmap")]
-impl TryFrom<JmapAuthConfig> for crate::jmap::session::JmapAuth {
-    type Error = pimalaya_config::secret::SecretError;
-
-    fn try_from(config: JmapAuthConfig) -> Result<Self, Self::Error> {
-        match config {
-            JmapAuthConfig::Header(token) => Ok(Self::Header(token.get()?)),
-            JmapAuthConfig::Bearer { token } => Ok(Self::Bearer(token.get()?)),
-            JmapAuthConfig::Basic { username, password } => Ok(Self::Basic {
-                username,
-                password: password.get()?,
-            }),
-        }
-    }
 }

@@ -1,4 +1,5 @@
 mod account;
+mod backend;
 mod cli;
 mod config;
 #[cfg(feature = "imap")]

@@ -2,7 +2,8 @@ use std::fmt;
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use io_maildir::{maildir::Maildir, types::Message};
+use io_maildir::maildir::Maildir;
+use mail_parser::Message;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 

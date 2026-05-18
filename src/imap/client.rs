@@ -1,4 +1,4 @@
-//! Himalaya wrapper around [`io_imap::client::ImapClient`] that
+//! Himalaya wrapper around [`io_imap::client::ImapClientStd`] that
 //! bundles the merged [`Account`] alongside the live IMAP client.
 //!
 //! This is what every IMAP-specific subcommand receives: the dispatch
@@ -11,36 +11,31 @@ use std::{
 };
 
 use anyhow::{anyhow, Result};
-use io_imap::client::ImapClient as Inner;
+use io_imap::client::ImapClientStd as Inner;
 use pimalaya_config::toml::TomlConfig;
+use pimalaya_stream::{sasl::Sasl, std::stream::StreamStd, tls::Tls};
 
-use crate::{
-    account::context::Account, cli::load_or_wizard, config::ImapConfig, imap::session::ImapSession,
-};
+use crate::{account::context::Account, cli::load_or_wizard, config::ImapConfig};
 
 pub struct ImapClient {
-    inner: Inner,
+    inner: Inner<StreamStd>,
     pub account: Account,
 }
 
 impl ImapClient {
     /// Opens the IMAP connection (TCP/TLS/STARTTLS, greeting, SASL)
-    /// then wraps the resulting stream + context in an
-    /// [`io_imap::client::ImapClient`] alongside `account`.
+    /// then wraps the resulting client alongside `account`.
     pub fn new(config: ImapConfig, account: Account) -> Result<Self> {
-        let session = ImapSession::new(
-            config.url,
-            config.tls.try_into()?,
-            config.starttls,
-            config.sasl.try_into()?,
-        )?;
-        let inner = Inner::from_parts(session.stream, session.context);
+        let mut tls: Tls = config.tls.into();
+        tls.rustls.alpn = vec!["imap".into()];
+        let sasl: Sasl = config.sasl.try_into()?;
+        let inner = Inner::<StreamStd>::connect(&config.url, &tls, config.starttls, Some(sasl))?;
         Ok(Self { inner, account })
     }
 }
 
 impl Deref for ImapClient {
-    type Target = Inner;
+    type Target = Inner<StreamStd>;
 
     fn deref(&self) -> &Self::Target {
         &self.inner

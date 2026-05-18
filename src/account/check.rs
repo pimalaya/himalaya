@@ -7,7 +7,7 @@ use pimalaya_config::toml::TomlConfig;
 use serde::Serialize;
 
 use crate::{
-    cli::BackendFlag,
+    backend::Backend,
     config::{AccountConfig, Config},
 };
 
@@ -27,7 +27,7 @@ impl AccountCheckCommand {
         printer: &mut impl Printer,
         config_paths: &[PathBuf],
         account_name: Option<&str>,
-        backend: BackendFlag,
+        backend: Backend,
     ) -> Result<()> {
         let mut config = match Config::from_paths_or_default(config_paths)? {
             Some(config) => config,
@@ -96,14 +96,18 @@ fn check_imap(
     _account_config: &AccountConfig,
     imap_config: crate::config::ImapConfig,
 ) -> BackendCheck {
-    use crate::imap::session::ImapSession;
+    use io_imap::client::ImapClientStd;
+    use pimalaya_stream::{sasl::Sasl, std::stream::StreamStd, tls::Tls};
 
     let result = (|| -> Result<()> {
-        let _session = ImapSession::new(
-            imap_config.url.clone(),
-            imap_config.tls.clone().try_into()?,
+        let mut tls: Tls = imap_config.tls.clone().into();
+        tls.rustls.alpn = vec!["imap".into()];
+        let sasl: Sasl = imap_config.sasl.clone().try_into()?;
+        let _client = ImapClientStd::<StreamStd>::connect(
+            &imap_config.url,
+            &tls,
             imap_config.starttls,
-            imap_config.sasl.clone().try_into()?,
+            Some(sasl),
         )?;
         Ok(())
     })();
@@ -117,14 +121,18 @@ fn check_jmap(
     _account_config: &AccountConfig,
     jmap_config: crate::config::JmapConfig,
 ) -> BackendCheck {
-    use crate::jmap::session::JmapSession;
+    use io_jmap::client::JmapClientStd;
+    use pimalaya_stream::tls::Tls;
+
+    use crate::jmap::client::{jmap_http_auth, parse_server_url};
 
     let result = (|| -> Result<()> {
-        let _session = JmapSession::new(
-            jmap_config.server.clone(),
-            jmap_config.tls.clone().try_into()?,
-            jmap_config.auth.clone().try_into()?,
-        )?;
+        let mut tls: Tls = jmap_config.tls.clone().into();
+        tls.rustls.alpn = vec!["http/1.1".into()];
+        let http_auth = jmap_http_auth(jmap_config.auth.clone())?;
+        let url = parse_server_url(&jmap_config.server)?;
+        let mut client = JmapClientStd::connect(&url, &tls, http_auth)?;
+        client.session_get(&url)?;
         Ok(())
     })();
 
@@ -156,14 +164,22 @@ fn check_smtp(
     _account_config: &AccountConfig,
     smtp_config: crate::config::SmtpConfig,
 ) -> BackendCheck {
-    use crate::smtp::session::SmtpSession;
+    use std::net::Ipv4Addr;
+
+    use io_smtp::{client::SmtpClientStd, rfc5321::types::ehlo_domain::EhloDomain};
+    use pimalaya_stream::{sasl::Sasl, std::stream::StreamStd, tls::Tls};
 
     let result = (|| -> Result<()> {
-        let _session = SmtpSession::new(
-            smtp_config.url.clone(),
-            smtp_config.tls.clone().try_into()?,
+        let mut tls: Tls = smtp_config.tls.clone().into();
+        tls.rustls.alpn = vec!["smtp".into()];
+        let sasl: Sasl = smtp_config.sasl.clone().try_into()?;
+        let domain: EhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
+        let _client = SmtpClientStd::<StreamStd>::connect(
+            &smtp_config.url,
+            &tls,
             smtp_config.starttls,
-            smtp_config.sasl.clone().try_into()?,
+            domain,
+            Some(sasl),
         )?;
         Ok(())
     })();

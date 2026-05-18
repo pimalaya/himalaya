@@ -1,4 +1,4 @@
-//! Himalaya wrapper around [`io_jmap::client::JmapClient`] that
+//! Himalaya wrapper around [`io_jmap::client::JmapClientStd`] that
 //! bundles the merged [`Account`] alongside the live JMAP client.
 //!
 //! Built up front by the dispatch layer (`crate::cli`) via
@@ -11,11 +11,17 @@ use std::{
 };
 
 use anyhow::{anyhow, Result};
-use io_jmap::client::JmapClient as Inner;
+use base64::{prelude::BASE64_STANDARD, Engine};
+use io_jmap::client::JmapClientStd as Inner;
 use pimalaya_config::toml::TomlConfig;
+use pimalaya_stream::tls::Tls;
+use secrecy::{ExposeSecret, SecretString};
+use url::Url;
 
 use crate::{
-    account::context::Account, cli::load_or_wizard, config::JmapConfig, jmap::session::JmapSession,
+    account::context::Account,
+    cli::load_or_wizard,
+    config::{JmapAuthConfig, JmapConfig},
 };
 
 pub struct JmapClient {
@@ -33,12 +39,14 @@ impl JmapClient {
     /// discovery) then wraps the resulting client alongside
     /// `account`.
     pub fn new(config: JmapConfig, account: Account) -> Result<Self> {
-        let session = JmapSession::new(
-            config.server.clone(),
-            config.tls.clone().try_into()?,
-            config.auth.clone().try_into()?,
-        )?;
-        let inner = Inner::from_parts(session.stream, session.http_auth, session.session);
+        let mut tls: Tls = config.tls.clone().into();
+        tls.rustls.alpn = vec!["http/1.1".into()];
+
+        let http_auth = jmap_http_auth(config.auth.clone())?;
+        let url = parse_server_url(&config.server)?;
+
+        let mut inner = Inner::connect(&url, &tls, http_auth)?;
+        inner.session_get(&url)?;
 
         Ok(Self {
             inner,
@@ -79,4 +87,35 @@ pub fn build_jmap_client(
         .ok_or_else(|| anyhow!("JMAP config is missing for account `{name}`"))?;
     let account = Account::from(config).merge(Account::from(ac));
     JmapClient::new(jmap_config, account)
+}
+
+/// Parses the JMAP `server` field into a [`Url`], defaulting bare
+/// authorities (e.g. `mail.example.com`) to `https://`.
+pub fn parse_server_url(server: &str) -> Result<Url> {
+    match Url::parse(server) {
+        Ok(url) => Ok(url),
+        Err(url::ParseError::RelativeUrlWithoutBase) => {
+            Ok(Url::parse(&format!("https://{server}"))?)
+        }
+        Err(err) => Err(err.into()),
+    }
+}
+
+/// Converts a [`JmapAuthConfig`] into the pre-formatted HTTP
+/// `Authorization` header value [`JmapClientStd::connect`] expects.
+///
+/// [`JmapClientStd::connect`]: io_jmap::client::JmapClientStd::connect
+pub fn jmap_http_auth(config: JmapAuthConfig) -> Result<SecretString> {
+    match config {
+        JmapAuthConfig::Header(token) => Ok(token.get()?),
+        JmapAuthConfig::Bearer { token } => {
+            let token = token.get()?;
+            Ok(format!("Bearer {}", token.expose_secret()).into())
+        }
+        JmapAuthConfig::Basic { username, password } => {
+            let creds = format!("{}:{}", username, password.get()?.expose_secret());
+            let encoded = BASE64_STANDARD.encode(creds.into_bytes());
+            Ok(format!("Basic {encoded}").into())
+        }
+    }
 }

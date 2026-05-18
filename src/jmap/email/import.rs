@@ -1,21 +1,22 @@
 use std::{
     collections::BTreeMap,
     io::{stdin, BufRead, IsTerminal},
-    net::TcpStream,
 };
 
 use anyhow::{bail, Result};
 use clap::Parser;
 use io_jmap::{
-    client::JmapClient as InnerJmapClient,
+    client::JmapClientStd,
     rfc8621::{capabilities::MAIL, email::EmailImport},
 };
 use pimalaya_cli::printer::{Message, Printer};
-use pimalaya_stream::std::tls::upgrade_tls;
-use secrecy::SecretString;
+use pimalaya_stream::tls::Tls;
 use url::Url;
 
-use crate::jmap::{client::JmapClient, error::format_set_error, session::JmapAuth};
+use crate::jmap::{
+    client::{jmap_http_auth, JmapClient},
+    error::format_set_error,
+};
 
 /// Import an RFC 5322 message into a mailbox (upload + Email/import).
 ///
@@ -47,10 +48,6 @@ pub struct JmapEmailImportCommand {
 
 impl JmapEmailImportCommand {
     pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
-        let tls = client.config.tls.clone().try_into()?;
-        let auth: JmapAuth = client.config.auth.clone().try_into()?;
-        let http_auth: SecretString = auth.into();
-
         let data: Vec<u8> = if stdin().is_terminal() || printer.is_json() {
             self.message
                 .join(" ")
@@ -79,11 +76,10 @@ impl JmapEmailImportCommand {
                 .blob_upload(&upload_url, "message/rfc822", data)?
                 .blob_id
         } else {
-            let host = upload_url.host_str().unwrap_or("localhost");
-            let port = upload_url.port_or_known_default().unwrap_or(443);
-            let tcp = TcpStream::connect((host, port))?;
-            let stream = upgrade_tls(host, tcp, &tls, &[b"http/1.1"])?;
-            let mut upload_client = InnerJmapClient::new(stream, http_auth);
+            let mut tls: Tls = client.config.tls.clone().into();
+            tls.rustls.alpn = vec!["http/1.1".into()];
+            let http_auth = jmap_http_auth(client.config.auth.clone())?;
+            let mut upload_client = JmapClientStd::connect(&upload_url, &tls, http_auth)?;
             upload_client
                 .blob_upload(&upload_url, "message/rfc822", data)?
                 .blob_id
