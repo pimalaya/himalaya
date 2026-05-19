@@ -1,6 +1,7 @@
 use clap::Parser;
-use color_eyre::Result;
+use color_eyre::{eyre::bail, Result};
 use email::{backend::feature::BackendFeatureSource, config::Config};
+use mail_parser::MessageParser;
 use pimalaya_tui::{
     himalaya::backend::BackendBuilder,
     terminal::{cli::printer::Printer, config::TomlConfig as _},
@@ -59,6 +60,10 @@ impl MessageSendCommand {
                 .collect::<Vec<_>>()
                 .join("\r\n")
         };
+
+        if MessageParser::new().parse(msg.as_bytes()).is_none() {
+            bail!("cannot parse raw email message.\nHint: pipe a valid .eml file, e.g. `cat msg.eml | himalaya message send`");
+        }
 
         backend.send_message_then_save_copy(msg.as_bytes()).await?;
 

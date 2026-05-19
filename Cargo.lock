@@ -1853,6 +1853,7 @@ dependencies = [
  "clap_mangen",
  "color-eyre",
  "email-lib",
+ "mail-parser",
  "mml-lib",
  "once_cell",
  "open",
