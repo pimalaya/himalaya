@@ -1,0 +1,9 @@
+name: Audit
+
+on:
+  push:
+
+jobs:
+  audit:
+    uses: pimalaya/nix/.github/workflows/audit.yml@master
+    secrets: inherit

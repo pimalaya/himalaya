@@ -1,9 +1,9 @@
 {
-  description = "CLI to manage emails";
+  description = "Client library and CLI to discover PIM-related services, written in Rust";
 
   inputs = {
     nixpkgs = {
-      url = "github:nixos/nixpkgs/staging-next";
+      url = "github:nixos/nixpkgs/nixos-25.11";
     };
     fenix = {
       url = "github:nix-community/fenix/monthly";

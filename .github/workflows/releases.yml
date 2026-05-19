@@ -6,7 +6,6 @@ on:
       - v*
     branches:
       - master
-      - v2
 
 jobs:
   release:
@@ -14,4 +13,4 @@ jobs:
     secrets: inherit
     with:
       project: himalaya
-      nixpkgs: staging-next
+      nixpkgs: nixos-25.11
