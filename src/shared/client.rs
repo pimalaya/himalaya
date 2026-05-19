@@ -73,13 +73,10 @@ impl EmailClient {
                 let account = Account::from(config).merge(Account::from(account_config));
                 let mut tls: Tls = imap_config.tls.into();
                 tls.rustls.alpn = vec!["imap".into()];
-                let sasl: Sasl = imap_config.sasl.try_into()?;
-                let client = ImapClientStd::<StreamStd>::connect(
-                    &imap_config.url,
-                    &tls,
-                    imap_config.starttls,
-                    Some(sasl),
-                )?;
+                let sasl: Option<Sasl> = imap_config.sasl.map(Sasl::try_from).transpose()?;
+                let server = crate::imap::client::parse_imap_server(&imap_config.server)?;
+                let client =
+                    ImapClientStd::<StreamStd>::connect(&server, &tls, imap_config.starttls, sasl)?;
 
                 return Ok(Self {
                     inner: EmailClientStd::Imap(client),

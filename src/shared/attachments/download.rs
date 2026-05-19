@@ -12,7 +12,7 @@ use pimalaya_cli::printer::Printer;
 use crate::shared::{
     attachments::list::{mime_string, Attachment, Attachments},
     client::EmailClient,
-    flags::arg::MailboxIdArg,
+    mailboxes::arg::MailboxArg,
 };
 
 /// Download specific attachments of a single message to disk.
@@ -29,7 +29,7 @@ use crate::shared::{
 #[derive(Debug, Parser)]
 pub struct AttachmentDownloadCommand {
     #[command(flatten)]
-    pub mailbox_id: MailboxIdArg,
+    pub mailbox: MailboxArg,
 
     /// Identifier of the message.
     #[arg(value_name = "MESSAGE-ID")]
@@ -50,7 +50,8 @@ pub struct AttachmentDownloadCommand {
 
 impl AttachmentDownloadCommand {
     pub fn execute(self, printer: &mut impl Printer, mut client: EmailClient) -> Result<()> {
-        let raw = client.get_message(&self.mailbox_id.inner, &self.message_id)?;
+        let mailbox = self.mailbox.resolve(&client.account)?;
+        let raw = client.get_message(&mailbox, &self.message_id)?;
 
         let Some(message) = MessageParser::new().parse(&raw) else {
             bail!("Failed to parse RFC 5322 message");

@@ -8,8 +8,9 @@ use crate::shared::{
         add::MessageAddCommand, compose::MessageComposeCommand,
         compose_with::MessageComposeWithCommand, copy::MessageCopyCommand,
         forward::MessageForwardCommand, forward_with::MessageForwardWithCommand,
-        mv::MessageMoveCommand, read::MessageReadCommand, read_with::MessageReadWithCommand,
-        reply::MessageReplyCommand, reply_with::MessageReplyWithCommand, send::MessageSendCommand,
+        mailto::MessageMailtoCommand, mv::MessageMoveCommand, read::MessageReadCommand,
+        read_with::MessageReadWithCommand, reply::MessageReplyCommand,
+        reply_with::MessageReplyWithCommand, send::MessageSendCommand,
     },
 };
 
@@ -23,14 +24,19 @@ use crate::shared::{
 /// `[message.composer.*]` / `[message.reader.*]`.
 #[derive(Debug, Subcommand)]
 pub enum MessageCommand {
+    #[command(visible_alias = "save")]
     Add(MessageAddCommand),
+    #[command(visible_alias = "write", alias = "new")]
     Compose(MessageComposeCommand),
+    #[command(visible_alias = "write-with")]
     ComposeWith(MessageComposeWithCommand),
-    #[command(alias = "cp")]
+    #[command(visible_alias = "cp")]
     Copy(MessageCopyCommand),
+    #[command(visible_alias = "fwd")]
     Forward(MessageForwardCommand),
     ForwardWith(MessageForwardWithCommand),
-    #[command(alias = "mv")]
+    Mailto(MessageMailtoCommand),
+    #[command(visible_alias = "mv")]
     Move(MessageMoveCommand),
     Read(MessageReadCommand),
     ReadWith(MessageReadWithCommand),
@@ -48,6 +54,7 @@ impl MessageCommand {
             Self::Copy(cmd) => cmd.execute(printer, client),
             Self::Forward(cmd) => cmd.execute(printer, client),
             Self::ForwardWith(cmd) => cmd.execute(printer, client),
+            Self::Mailto(cmd) => cmd.execute(printer, client),
             Self::Move(cmd) => cmd.execute(printer, client),
             Self::Read(cmd) => cmd.execute(printer, client),
             Self::ReadWith(cmd) => cmd.execute(printer, client),

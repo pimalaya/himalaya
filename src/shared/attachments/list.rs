@@ -8,7 +8,7 @@ use mail_parser::{MessageParser, MessagePart, MimeHeaders};
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
-use crate::shared::{client::EmailClient, flags::arg::MailboxIdArg};
+use crate::shared::{client::EmailClient, mailboxes::arg::MailboxArg};
 
 /// List the attachments carried by a single message in the active
 /// account.
@@ -26,7 +26,7 @@ use crate::shared::{client::EmailClient, flags::arg::MailboxIdArg};
 #[derive(Debug, Parser)]
 pub struct AttachmentListCommand {
     #[command(flatten)]
-    pub mailbox_id: MailboxIdArg,
+    pub mailbox: MailboxArg,
     /// Identifier of the message.
     #[arg(value_name = "MESSAGE-ID")]
     pub message_id: String,
@@ -37,7 +37,8 @@ pub struct AttachmentListCommand {
 
 impl AttachmentListCommand {
     pub fn execute(self, printer: &mut impl Printer, mut client: EmailClient) -> Result<()> {
-        let raw = client.get_message(&self.mailbox_id.inner, &self.message_id)?;
+        let mailbox = self.mailbox.resolve(&client.account)?;
+        let raw = client.get_message(&mailbox, &self.message_id)?;
 
         let Some(message) = MessageParser::new().parse(&raw) else {
             bail!("Failed to parse RFC 5322 message");

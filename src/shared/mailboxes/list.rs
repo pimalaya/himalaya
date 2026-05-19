@@ -19,6 +19,15 @@ pub struct MailboxListCommand {
     /// with many mailboxes. Maildir does not implement counts yet.
     #[arg(long)]
     pub counts: bool,
+
+    /// Maximum width of the rendered table, in terminal columns.
+    ///
+    /// Overrides comfy-table's auto-detection. Columns shrink with
+    /// ellipsis if needed. Useful when piping through `less -S` or
+    /// rendering into a fixed-width log.
+    #[arg(long = "max-width", short = 'w')]
+    #[arg(value_name = "COLUMNS")]
+    pub max_width: Option<u16>,
 }
 
 impl MailboxListCommand {
@@ -28,6 +37,7 @@ impl MailboxListCommand {
         let mailboxes = Mailboxes {
             preset: client.account.table_preset().to_string(),
             arrangement: client.account.table_arrangement(),
+            max_width: self.max_width,
             with_counts: self.counts,
             mailboxes,
         };
@@ -42,6 +52,8 @@ pub struct Mailboxes {
     pub preset: String,
     #[serde(skip)]
     pub arrangement: ContentArrangement,
+    #[serde(skip)]
+    pub max_width: Option<u16>,
     #[serde(skip)]
     pub with_counts: bool,
     pub mailboxes: Vec<Mailbox>,
@@ -72,6 +84,10 @@ impl fmt::Display for Mailboxes {
                 }
                 row
             }));
+
+        if let Some(width) = self.max_width {
+            table.set_width(width);
+        }
 
         writeln!(f)?;
         writeln!(f, "{table}")

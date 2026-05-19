@@ -27,7 +27,7 @@ impl AccountConfigureCommand {
         let target = Config::target_path(config_paths)?;
         let config = Config::from_paths_or_default(config_paths)?.unwrap_or_default();
 
-        wizard::edit_account(&target, config, &self.name)?;
+        wizard::edit::edit_account(&target, config, &self.name)?;
 
         Ok(())
     }

@@ -102,13 +102,10 @@ fn check_imap(
     let result = (|| -> Result<()> {
         let mut tls: Tls = imap_config.tls.clone().into();
         tls.rustls.alpn = vec!["imap".into()];
-        let sasl: Sasl = imap_config.sasl.clone().try_into()?;
-        let _client = ImapClientStd::<StreamStd>::connect(
-            &imap_config.url,
-            &tls,
-            imap_config.starttls,
-            Some(sasl),
-        )?;
+        let sasl: Option<Sasl> = imap_config.sasl.clone().map(Sasl::try_from).transpose()?;
+        let server = crate::imap::client::parse_imap_server(&imap_config.server)?;
+        let _client =
+            ImapClientStd::<StreamStd>::connect(&server, &tls, imap_config.starttls, sasl)?;
         Ok(())
     })();
 
@@ -172,15 +169,11 @@ fn check_smtp(
     let result = (|| -> Result<()> {
         let mut tls: Tls = smtp_config.tls.clone().into();
         tls.rustls.alpn = vec!["smtp".into()];
-        let sasl: Sasl = smtp_config.sasl.clone().try_into()?;
+        let sasl: Option<Sasl> = smtp_config.sasl.clone().map(Sasl::try_from).transpose()?;
         let domain: EhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
-        let _client = SmtpClientStd::<StreamStd>::connect(
-            &smtp_config.url,
-            &tls,
-            smtp_config.starttls,
-            domain,
-            Some(sasl),
-        )?;
+        let server = crate::smtp::client::parse_smtp_server(&smtp_config.server)?;
+        let _client =
+            SmtpClientStd::<StreamStd>::connect(&server, &tls, smtp_config.starttls, domain, sasl)?;
         Ok(())
     })();
 

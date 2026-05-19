@@ -9,14 +9,18 @@ use io_email::{address::Address, envelope::Envelope, flag::Flag};
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
-use crate::shared::{client::EmailClient, flags::arg::MailboxIdArg};
+use crate::shared::{client::EmailClient, mailboxes::arg::MailboxArg};
 
 /// List envelopes for the active account, regardless of the underlying
 /// backend (IMAP, JMAP or Maildir).
+///
+/// Envelopes are ordered by date descending (most recent first). Use
+/// `envelope search` to filter and/or sort with the shared search
+/// query DSL.
 #[derive(Debug, Parser)]
 pub struct EnvelopeListCommand {
     #[command(flatten)]
-    pub mailbox_id: MailboxIdArg,
+    pub mailbox: MailboxArg,
 
     /// Page number, starting from 1. The most recent envelopes are on
     /// page 1.
@@ -25,9 +29,20 @@ pub struct EnvelopeListCommand {
     pub page: u32,
 
     /// Maximum number of envelopes per page.
+    ///
+    /// When omitted, the merged `envelope.list.page-size` config
+    /// value is used; when neither is set, the hard fallback is 25.
     #[arg(long = "page-size", short = 's')]
-    #[arg(value_name = "N", default_value = "25")]
-    pub page_size: u32,
+    #[arg(value_name = "N")]
+    pub page_size: Option<u32>,
+
+    /// Maximum width of the rendered table, in terminal columns.
+    ///
+    /// Overrides comfy-table's auto-detection. Columns shrink with
+    /// ellipsis if needed.
+    #[arg(long = "max-width", short = 'w')]
+    #[arg(value_name = "COLUMNS")]
+    pub max_width: Option<u16>,
 
     /// Render recipients (`To:`) instead of senders (`From:`). Useful
     /// for sent folders.
@@ -45,14 +60,18 @@ pub struct EnvelopeListCommand {
 impl EnvelopeListCommand {
     pub fn execute(self, printer: &mut impl Printer, mut client: EmailClient) -> Result<()> {
         let page = Some(self.page).filter(|p| *p > 0);
-        let page_size = Some(self.page_size).filter(|p| *p > 0);
+        let page_size = self
+            .page_size
+            .or(Some(client.account.envelopes_list_page_size()))
+            .filter(|p| *p > 0);
+        let mailbox = self.mailbox.resolve(&client.account)?;
 
-        let envelopes =
-            client.list_envelopes(&self.mailbox_id.inner, page, page_size, self.has_attachment)?;
+        let envelopes = client.list_envelopes(&mailbox, page, page_size, self.has_attachment)?;
 
         let envelopes = Envelopes {
             preset: client.account.table_preset().to_string(),
             arrangement: client.account.table_arrangement(),
+            max_width: self.max_width,
             datetime_fmt: client.account.datetime_fmt().to_string(),
             datetime_local_tz: client.account.datetime_local_tz(),
             recipient: self.recipient,
@@ -70,6 +89,8 @@ pub struct Envelopes {
     pub preset: String,
     #[serde(skip)]
     pub arrangement: ContentArrangement,
+    #[serde(skip)]
+    pub max_width: Option<u16>,
     #[serde(skip)]
     pub datetime_fmt: String,
     #[serde(skip)]
@@ -120,15 +141,19 @@ impl fmt::Display for Envelopes {
                 row
             }));
 
+        if let Some(width) = self.max_width {
+            table.set_width(width);
+        }
+
         writeln!(f)?;
         writeln!(f, "{table}")
     }
 }
 
-/// 4-character flag widget — one slot per LCD variant. Unread (no
+/// 4-character flag widget: one slot per LCD variant. Unread (no
 /// `Seen`) shows `N` in the first slot since unread is the
 /// attention-grabbing case.
-fn format_flags(flags: &BTreeSet<Flag>) -> String {
+pub(super) fn format_flags(flags: &BTreeSet<Flag>) -> String {
     let mut out = String::with_capacity(4);
     out.push(if flags.contains(&Flag::Seen) {
         ' '
@@ -153,7 +178,7 @@ fn format_flags(flags: &BTreeSet<Flag>) -> String {
     out
 }
 
-fn format_attachment(has: Option<bool>) -> &'static str {
+pub(super) fn format_attachment(has: Option<bool>) -> &'static str {
     match has {
         Some(true) => "@",
         Some(false) => "",
@@ -161,7 +186,7 @@ fn format_attachment(has: Option<bool>) -> &'static str {
     }
 }
 
-fn format_addresses(addrs: &[Address]) -> String {
+pub(super) fn format_addresses(addrs: &[Address]) -> String {
     addrs
         .iter()
         .map(|a| match &a.name {
@@ -172,7 +197,11 @@ fn format_addresses(addrs: &[Address]) -> String {
         .join(", ")
 }
 
-fn format_date(date: Option<DateTime<FixedOffset>>, fmt: &str, local_tz: bool) -> String {
+pub(super) fn format_date(
+    date: Option<DateTime<FixedOffset>>,
+    fmt: &str,
+    local_tz: bool,
+) -> String {
     let Some(date) = date else {
         return String::new();
     };

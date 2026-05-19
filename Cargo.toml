@@ -1,8 +1,8 @@
 [package]
 name = "himalaya"
 description = "CLI to manage emails"
-version = "1.2.0"
-authors = ["Clément DOUIN <pimalaya.org@posteo.net>"]
+version = "2.0.0-alpha.1"
+authors = ["soywod <pimalaya.org@posteo.net>"]
 edition = "2021"
 license = "MIT"
 categories = ["command-line-utilities", "email"]
@@ -39,8 +39,9 @@ convert_case = { version = "0.11", optional = true }
 dirs = "6"
 gethostname = "1"
 humansize = "2"
-io-discovery = { version = "0.0.1", default-features = false, features = ["pacc", "autoconfig", "client"] }
-io-email = { version = "0.0.1", default-features = false, features = ["serde", "client"] }
+io-discovery = { version = "0.0.1", default-features = false, features = ["pacc", "autoconfig", "rfc6186", "client"] }
+ariadne = "0.5"
+io-email = { version = "0.0.1", default-features = false, features = ["serde", "client", "search"] }
 io-imap = { version = "0.0.1", default-features = false, optional = true }
 io-jmap = { version = "0.0.1", default-features = false, optional = true }
 io-maildir = { version = "0.0.1", default-features = false, features = ["serde"], optional = true }
@@ -59,6 +60,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", optional = true }
 shellexpand = "3.1"
 toml = "0.8"
+percent-encoding = "2"
 url = { version = "2.2", features = ["serde"] }
 
 [target.'cfg(windows)'.dependencies]

@@ -6,6 +6,7 @@ pub mod compose_with;
 pub mod copy;
 pub mod forward;
 pub mod forward_with;
+pub mod mailto;
 pub mod mv;
 pub mod output;
 pub mod read;

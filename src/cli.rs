@@ -48,9 +48,8 @@ pub struct HimalayaCli {
     /// the wizard will propose to assist you in the creation of the
     /// configuration file. Other paths are merged with the first one,
     /// which allows you to separate your public config from your
-    /// private(s) one(s).
-    /// you can also provide multiple paths by delimiting them with a :
-    /// like you would when setting $PATH in a posix shell
+    /// private(s) one(s). Multiple paths can also be provided by
+    /// delimiting them with `:` (like `$PATH` in a POSIX shell).
     #[arg(short, long = "config", global = true, env = "HIMALAYA_CONFIG")]
     #[arg(value_name = "PATH", value_parser = path_parser, value_delimiter = ':')]
     pub config_paths: Vec<PathBuf>,
@@ -81,13 +80,13 @@ pub struct HimalayaCli {
 pub enum HimalayaCommand {
     // --- Shared API
     //
-    #[command(subcommand, aliases = ["mboxes", "mbox"])]
+    #[command(subcommand, visible_alias = "mbox", alias = "mboxes")]
     Mailboxes(MailboxCommand),
     #[command(subcommand)]
     Envelopes(EnvelopeCommand),
     #[command(subcommand)]
     Flags(FlagCommand),
-    #[command(subcommand)]
+    #[command(subcommand, visible_alias = "msg", alias = "msgs")]
     Messages(MessageCommand),
     #[command(subcommand)]
     Attachments(AttachmentCommand),
@@ -122,7 +121,7 @@ pub enum HimalayaCommand {
 pub fn load_or_wizard(config_paths: &[PathBuf]) -> Result<Config> {
     match Config::from_paths_or_default(config_paths)? {
         Some(config) => Ok(config),
-        None => wizard::run_or_exit(&Config::target_path(config_paths)?),
+        None => wizard::discover::run_or_exit(&Config::target_path(config_paths)?),
     }
 }
 

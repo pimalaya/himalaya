@@ -1,149 +1,276 @@
-# --------------------------------
-# Global config
-# --------------------------------
+# ================================================================================
+# `himalaya` configuration file.
+#
+# Loaded from the first valid path among:
+#   - $XDG_CONFIG_HOME/himalaya/config.toml
+#   - $HOME/.config/himalaya/config.toml
+#   - $HOME/.himalayarc
+#
+# Override with `himalaya -c <PATH>` or `HIMALAYA_CONFIG=<PATH>`. Multiple paths
+# can be passed at once, separated by `:`; the first one is the base and the
+# rest are deep-merged on top of it.
+#
+# Run `himalaya` once with no config file to launch the wizard, which discovers
+# IMAP/SMTP/JMAP defaults via PACC, Thunderbird Autoconfiguration and RFC 6186
+# SRV, then writes the result here. `himalaya account configure <name>` can be
+# used afterwards to edit (or add) an account through the same wizard.
+# ================================================================================
 
-# Downloads directory for all accounts, defaults to /tmp
-downloads-dir = "~/downloads"
+# --------------------------------------------------------------------------------
+# Global config
+# --------------------------------------------------------------------------------
+
+# Default download directory for attachments. Falls back to `$TMPDIR`.
+#downloads-dir = "~/downloads"
 
 # https://docs.rs/comfy-table/latest/comfy_table/presets/index.html
-table-preset = "││──╞═╪╡┆    ┬┴┌┐└┘"
+#table-preset = "││──╞═╪╡┆    ┬┴┌┐└┘"
 
-# https://docs.rs/comfy-table/latest/comfy_table/enum.ContentArrangement.html#variants
-table-arrangement = "dynamic"
+# https://docs.rs/comfy-table/latest/comfy_table/enum.ContentArrangement.html
+#table-arrangement = "dynamic"
 #table-arrangement = "dynamic-full-width"
 #table-arrangement = "disabled"
 
-# --------------------------------
-# Account config
-# --------------------------------
+# `chrono` strftime format used to render the DATE column of `envelopes list`.
+# Defaults to `"%F %R%:z"`, e.g. `2026-05-06 14:30+02:00`.
+#envelope.list.datetime-fmt = "%F %R%:z"
 
+# Convert each envelope's `Date` header offset to the system's local timezone
+# before formatting. Defaults to `false`, which preserves the wire offset.
+#envelope.list.datetime-local-tz = false
+
+# Default page size for `envelopes list`. The `-s/--page-size` CLI flag wins
+# when passed; otherwise the merged account/global value wins; otherwise the
+# hard fallback is 25.
+#envelope.list.page-size = 50
+
+# --------------------------------------------------------------------------------
+# Mailbox aliases
+# --------------------------------------------------------------------------------
+
+# Map a friendly name to a backend-native mailbox id. Alias names are
+# case-insensitive on lookup AND on storage, so `INBOX`, `Inbox` and `inbox`
+# all hit the same entry. Ids are stored verbatim.
+#
+# The entry named `inbox` (case-insensitive) is the implicit default mailbox:
+# shared commands fall back to this id when `-m/--mailbox` is not passed.
+#
+# Account-level entries override same-named global entries.
+#[mailbox.alias]
+#inbox = "INBOX"
+#sent = "[Gmail]/Sent Mail"
+#drafts = "[Gmail]/Drafts"
+#trash = "[Gmail]/Trash"
+
+# --------------------------------------------------------------------------------
+# User-defined composers and readers
+# --------------------------------------------------------------------------------
+
+# Composers produce a MIME draft on stdout. They are invoked by the
+# `messages compose-with` / `reply-with` / `forward-with` subcommands.
+# Stdin carries the source MIME bytes (empty for new messages); stderr is
+# inherited so the composer can prompt the user.
+#
+# Pick one with `compose-with <name>`, or let himalaya use the entry flagged
+# `default = true` when no name is passed.
+#
+# Example using https://github.com/pimalaya/mml:
+#[message.composer.mml]
+#command = "mml compose"
+#default = true
+
+# Readers consume a MIME message on stdin and emit human-readable bytes on
+# stdout. They are invoked by `messages read-with`.
+#
+#[message.reader.mml]
+#command = "mml read"
+#default = true
+
+# --------------------------------------------------------------------------------
+# Account config
+# --------------------------------------------------------------------------------
+
+# Declare one section per account. Pick one with `-a/--account <NAME>` or let
+# himalaya use the entry flagged `default = true`.
 [accounts.example]
 
-# This account is used by default when `-a|--account` is omitted
+# Use this account when `-a/--account` is not passed.
 default = true
 
-# Options specific to this particular account
-downloads-dir = "~/downloads"
-table-preset = "││──╞═╪╡┆    ┬┴┌┐└┘"
-table-arrangement = "dynamic"
+# Per-account overrides for the global options above.
+#downloads-dir = "~/downloads/example"
+#table-preset = "││──╞═╪╡┆    ┬┴┌┐└┘"
+#table-arrangement = "dynamic"
+#envelope.list.datetime-fmt = "%F %R%:z"
+#envelope.list.datetime-local-tz = false
 
-# --------------------------------
+# --------------------------------------------------------------------------------
 # IMAP config
-# --------------------------------
+# https://www.iana.org/go/rfc9051
+# --------------------------------------------------------------------------------
 
-# IMAP URL connection in form imap[s]://host[:port]
-imap.url = "imap://127.0.0.1"
+# IMAP server. Either a bare authority (`host[:port]`, treated as
+# `imaps://<authority>` by default), or a full URL with `imap://` (cleartext,
+# optionally upgraded via STARTTLS) or `imaps://` (implicit TLS) scheme.
+imap.server = "example.com"
+#imap.server = "imap.example.com:143"
+#imap.server = "imap://example.com:143"
+#imap.server = "imaps://example.com:993"
 
-# IMAP TLS provider
-imap.tls.provider = "rustls"
+# TLS provider, defaults to the first available at runtime.
+#imap.tls.provider = "rustls"
 #imap.tls.provider = "native-tls"
 
-# IMAP crypto provider for rustls
-imap.tls.rustls.crypto = "ring"
+# Crypto provider for rustls, defaults to the first available at runtime.
+#imap.tls.rustls.crypto = "ring"
 #imap.tls.rustls.crypto = "aws"
 
-# Custom IMAP TLS certificate
+# Custom TLS certificate (extra root, PEM-encoded).
 #imap.tls.cert = "/path/to/custom/cert.pem"
 
-# Enable STARTTLS (when URL scheme is imaps)
-imap.starttls = false
+# Enable STARTTLS (only valid when the server resolves to `imap://`).
+#imap.starttls = false
 
-# SASL mechanisms to try in this particular order
-imap.sasl.mechanisms = ["plain", "login"]
+# Pick exactly one SASL mechanism among `anonymous`, `login`, `plain`,
+# `oauthbearer`, `xoauth2`, `scram-sha-256`. Omit the whole `imap.sasl` table
+# to skip authentication entirely (no `AUTHENTICATE` command sent).
 
 # SASL ANONYMOUS
 # https://datatracker.ietf.org/doc/html/rfc4505
-imap.sasl.anonymous.message = "himalaya"
+#imap.sasl.anonymous.message = "himalaya"
 
 # SASL PLAIN
 # https://datatracker.ietf.org/doc/html/rfc4616
-imap.sasl.plain.authcid = "username"
-imap.sasl.plain.passwd.command = ["mimosa", "password", "read", "example"]
-#imap.sasl.plain.passwd.raw = "***"
+imap.sasl.plain.authcid = "user@example.com"
+imap.sasl.plain.passwd.raw = "***"
+#imap.sasl.plain.passwd.command = "pass show example"
+#imap.sasl.plain.passwd.command = ["mimosa", "password", "read", "example"]
 
 # SASL LOGIN
 # https://datatracker.ietf.org/doc/html/draft-murchison-sasl-login-00
-imap.sasl.login.username = "username"
-imap.sasl.login.password.command = ["mimosa", "password", "read", "example"]
+#imap.sasl.login.username = "user@example.com"
 #imap.sasl.login.password.raw = "***"
 
-# --------------------------------
+# SASL OAUTHBEARER (host/port echoed in the GS2 header; usually mirror the
+# server you actually connect to).
+# https://datatracker.ietf.org/doc/html/rfc7628
+#imap.sasl.oauthbearer.username = "user@example.com"
+#imap.sasl.oauthbearer.host = "imap.example.com"
+#imap.sasl.oauthbearer.port = 993
+#imap.sasl.oauthbearer.token.raw = "***"
+#imap.sasl.oauthbearer.token.command = ["ortie", "token", "read", "example"]
+
+# SASL XOAUTH2 (Google's pre-standard OAuth 2.0 SASL).
+# https://developers.google.com/gmail/imap/xoauth2-protocol
+#imap.sasl.xoauth2.username = "user@example.com"
+#imap.sasl.xoauth2.token.raw = "***"
+
+# SASL SCRAM-SHA-256.
+# https://datatracker.ietf.org/doc/html/rfc7677
+#imap.sasl.scram-sha-256.username = "user@example.com"
+#imap.sasl.scram-sha-256.password.raw = "***"
+
+# --------------------------------------------------------------------------------
 # JMAP config
-# --------------------------------
+# https://www.iana.org/go/rfc8620
+# https://www.iana.org/go/rfc8621
+# --------------------------------------------------------------------------------
 
 # JMAP server address. Either a bare authority (auto-discovered via
-# /.well-known/jmap) or a full session URL.
+# `GET /.well-known/jmap`) or a full session URL.
 #jmap.server = "fastmail.com"
 #jmap.server = "https://api.fastmail.com/jmap/session"
 
-# JMAP TLS provider (mirrors the imap.tls block above)
+# JMAP TLS provider (mirrors the imap.tls block above).
 #jmap.tls.provider = "rustls"
 #jmap.tls.rustls.crypto = "ring"
+#jmap.tls.cert = "/path/to/custom/cert.pem"
 
-# Authentication. Pick exactly one of header/bearer/basic.
+# Pick exactly one of `header`, `bearer`, `basic`.
 
-# Raw "Authorization" header value, used verbatim
+# Raw `Authorization` header value, used verbatim.
 #jmap.auth.header.raw = "Bearer eyJhbGciOiJ..."
+#jmap.auth.header.command = "pass show fastmail-token"
 
-# OAuth 2.0 / API token bearer
+# OAuth 2.0 / API token bearer.
+#jmap.auth.bearer.token.raw = "***"
 #jmap.auth.bearer.token.command = ["mimosa", "password", "read", "fastmail-api"]
 
-# HTTP Basic
+# HTTP Basic.
 #jmap.auth.basic.username = "user@example.com"
-#jmap.auth.basic.password.command = ["mimosa", "password", "read", "fastmail"]
+#jmap.auth.basic.password.raw = "***"
+#jmap.auth.basic.password.command = "pass show fastmail"
 
-# Identity to send as. Required only for `himalaya messages send` over
-# JMAP; can be discovered with `himalaya jmap identity get`.
+# Identity to send as. Required only for `messages send` over JMAP; can be
+# discovered with `himalaya jmap identity get`.
 #jmap.identity-id = "I0123abc"
 
 # Drafts mailbox id used to stage outgoing messages before submission.
-# Required only for `himalaya messages send` over JMAP; can be
-# discovered with `himalaya jmap mailbox query --role drafts`.
+# Required only for `messages send` over JMAP; can be discovered with
+# `himalaya jmap mailbox query --role drafts`.
 #jmap.drafts-mailbox-id = "M0123abc"
 
-# --------------------------------
+# --------------------------------------------------------------------------------
 # Maildir config
-# --------------------------------
+# --------------------------------------------------------------------------------
 
-# Root directory containing one subdirectory per mailbox (Maildir++ layout)
+# Root directory containing one subdirectory per mailbox (Maildir++ layout).
 #maildir.root = "~/Mail/example"
 
-# --------------------------------
+# --------------------------------------------------------------------------------
 # SMTP config
-# --------------------------------
+# https://www.iana.org/go/rfc5321
+# --------------------------------------------------------------------------------
 
-# SMTP URL connection in form smtp[s]://host[:port]
-smtp.url = "smtp://127.0.0.1"
+# SMTP server. Either a bare authority (`host[:port]`, treated as
+# `smtps://<authority>` by default), or a full URL with `smtp://` (cleartext,
+# optionally upgraded via STARTTLS) or `smtps://` (implicit TLS) scheme.
+smtp.server = "example.com"
+#smtp.server = "smtp.example.com:587"
+#smtp.server = "smtp://example.com:587"
+#smtp.server = "smtps://example.com:465"
 
-# SMTP TLS provider
-smtp.tls.provider = "rustls"
+# TLS provider, defaults to the first available at runtime.
+#smtp.tls.provider = "rustls"
 #smtp.tls.provider = "native-tls"
 
-# SMTP crypto provider for rustls
-smtp.tls.rustls.crypto = "ring"
+# Crypto provider for rustls, defaults to the first available at runtime.
+#smtp.tls.rustls.crypto = "ring"
 #smtp.tls.rustls.crypto = "aws"
 
-# Custom SMTP TLS certificate
+# Custom TLS certificate (extra root, PEM-encoded).
 #smtp.tls.cert = "/path/to/custom/cert.pem"
 
-# Enable STARTTLS (when URL scheme is smtps)
-smtp.starttls = false
+# Enable STARTTLS (only valid when the server resolves to `smtp://`).
+#smtp.starttls = false
 
-# SASL mechanisms to try in this particular order
-smtp.sasl.mechanisms = ["plain", "login"]
+# Pick exactly one SASL mechanism among `anonymous`, `login`, `plain`,
+# `oauthbearer`, `xoauth2`, `scram-sha-256`. Omit the whole `smtp.sasl` table
+# to skip authentication entirely.
 
 # SASL ANONYMOUS
-# https://datatracker.ietf.org/doc/html/rfc4505
-smtp.sasl.anonymous.message = "himalaya"
+#smtp.sasl.anonymous.message = "himalaya"
 
 # SASL PLAIN
-# https://datatracker.ietf.org/doc/html/rfc4616
-smtp.sasl.plain.authcid = "username"
-smtp.sasl.plain.passwd.command = ["mimosa", "password", "read", "example"]
-#smtp.sasl.plain.passwd.raw = "***"
+smtp.sasl.plain.authcid = "user@example.com"
+smtp.sasl.plain.passwd.raw = "***"
+#smtp.sasl.plain.passwd.command = "pass show example"
+#smtp.sasl.plain.passwd.command = ["mimosa", "password", "read", "example"]
 
 # SASL LOGIN
-# https://datatracker.ietf.org/doc/html/draft-murchison-sasl-login-00
-smtp.sasl.login.username = "username"
-smtp.sasl.login.password.command = ["mimosa", "password", "read", "example"]
+#smtp.sasl.login.username = "user@example.com"
 #smtp.sasl.login.password.raw = "***"
+
+# SASL OAUTHBEARER
+#smtp.sasl.oauthbearer.username = "user@example.com"
+#smtp.sasl.oauthbearer.host = "smtp.example.com"
+#smtp.sasl.oauthbearer.port = 465
+#smtp.sasl.oauthbearer.token.raw = "***"
+
+# SASL XOAUTH2
+#smtp.sasl.xoauth2.username = "user@example.com"
+#smtp.sasl.xoauth2.token.raw = "***"
+
+# SASL SCRAM-SHA-256
+#smtp.sasl.scram-sha-256.username = "user@example.com"
+#smtp.sasl.scram-sha-256.password.raw = "***"

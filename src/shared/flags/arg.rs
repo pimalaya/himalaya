@@ -96,10 +96,3 @@ pub struct FlagsArg {
     #[arg(long = "flag", short, required = true, num_args = 1..)]
     pub inner: Vec<FlagArg>,
 }
-
-#[derive(Debug, Parser)]
-pub struct MailboxIdArg {
-    /// Mailbox identifier.
-    #[arg(name = "mailbox_id", value_name = "MAILBOX-ID")]
-    pub inner: String,
-}

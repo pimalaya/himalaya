@@ -8,14 +8,15 @@ use serde::Serialize;
 
 use crate::shared::{
     client::EmailClient,
-    flags::arg::{FlagsArg, MailboxIdArg, MessageIdsArg},
+    flags::arg::{FlagsArg, MessageIdsArg},
+    mailboxes::arg::MailboxArg,
 };
 
 /// Replace flag(s) of message(s) for the active account.
 #[derive(Debug, Parser)]
 pub struct FlagSetCommand {
     #[command(flatten)]
-    pub mailbox_id: MailboxIdArg,
+    pub mailbox: MailboxArg,
     #[command(flatten)]
     pub message_ids: MessageIdsArg,
     #[command(flatten)]
@@ -24,10 +25,11 @@ pub struct FlagSetCommand {
 
 impl FlagSetCommand {
     pub fn execute(self, printer: &mut impl Printer, mut client: EmailClient) -> Result<()> {
+        let mailbox = self.mailbox.resolve(&client.account)?;
         let ids: Vec<&str> = self.message_ids.inner.iter().map(String::as_str).collect();
         let flags: Vec<Flag> = self.flags.inner.iter().map(Into::into).collect();
 
-        client.set_flags(&self.mailbox_id.inner, &ids, &flags)?;
+        client.set_flags(&mailbox, &ids, &flags)?;
 
         let flags: Vec<String> = self.flags.inner.iter().map(ToString::to_string).collect();
         printer.out(SetFlags { flags })

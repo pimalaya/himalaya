@@ -7,11 +7,12 @@ use pimalaya_config::{
     toml::{shell_expanded_string, TomlConfig},
 };
 use pimalaya_stream::{
-    sasl::{Sasl, SaslAnonymous, SaslLogin, SaslPlain},
+    sasl::{
+        Sasl, SaslAnonymous, SaslLogin, SaslOauthbearer, SaslPlain, SaslScramSha256, SaslXoauth2,
+    },
     tls::{Rustls, RustlsCrypto, Tls, TlsProvider},
 };
 use serde::{Deserialize, Serialize};
-use url::Url;
 
 /// Global configuration.
 ///
@@ -24,6 +25,8 @@ pub struct Config {
     pub table_arrangement: Option<TableArrangementConfig>,
     #[serde(default)]
     pub envelope: EnvelopeConfig,
+    #[serde(default)]
+    pub mailbox: MailboxConfig,
     #[serde(default)]
     pub message: MessageConfig,
     pub accounts: HashMap<String, AccountConfig>,
@@ -84,6 +87,9 @@ pub struct AccountConfig {
     #[serde(default)]
     pub envelope: EnvelopeConfig,
 
+    #[serde(default)]
+    pub mailbox: MailboxConfig,
+
     #[allow(unused)]
     pub imap: Option<ImapConfig>,
     #[allow(unused)]
@@ -102,6 +108,21 @@ pub struct EnvelopeConfig {
     pub list: EnvelopeListConfig,
 }
 
+/// Mailbox-level configuration.
+///
+/// Currently exposes user-defined aliases mapping a friendly name to a
+/// backend-native id. Alias names are looked up case-insensitively at
+/// resolution time, so `INBOX`, `Inbox` and `inbox` all hit the same
+/// entry. Ids are stored verbatim. The entry `inbox` (case-insensitive)
+/// acts as the implicit default mailbox when a shared command omits
+/// `-m/--mailbox`.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct MailboxConfig {
+    #[serde(default, alias = "aliases")]
+    pub alias: HashMap<String, String>,
+}
+
 /// `envelopes list` rendering options. Mirrors the pre-v2
 /// `envelope.list.*` keys.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -116,6 +137,11 @@ pub struct EnvelopeListConfig {
     /// to the system's local timezone before formatting. Defaults to
     /// `false`, which preserves the wire offset.
     pub datetime_local_tz: Option<bool>,
+
+    /// Default `-s/--page-size` value for `envelopes list`. The CLI
+    /// flag wins when passed; otherwise the merged account/global
+    /// config wins; otherwise the hard fallback (25) is used.
+    pub page_size: Option<u32>,
 }
 
 /// Message-level configuration: user-defined composers and readers.
@@ -192,13 +218,23 @@ impl From<TableArrangementConfig> for ContentArrangement {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ImapConfig {
-    pub url: Url,
+    /// IMAP server address. Either a bare authority
+    /// (`imap.example.com[:port]`, treated as `imaps://<authority>` by
+    /// default), or a full URL with `imap://` (cleartext, with
+    /// optional STARTTLS upgrade) or `imaps://` (implicit TLS) scheme
+    /// used verbatim. Mirrors [`JmapConfig::server`].
+    pub server: String,
+
     #[serde(default)]
     pub tls: TlsConfig,
     #[serde(default)]
     pub starttls: bool,
-    #[serde(default)]
-    pub sasl: SaslConfig,
+
+    /// Optional SASL credentials. When omitted, the connection skips
+    /// authentication entirely (no `AUTHENTICATE` command is sent);
+    /// to advertise the ANONYMOUS mechanism explicitly, set
+    /// `sasl.anonymous = {}`.
+    pub sasl: Option<SaslConfig>,
 }
 
 /// Maildir configuration.
@@ -214,13 +250,20 @@ pub struct MaildirConfig {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SmtpConfig {
-    pub url: Url,
+    /// SMTP server address. Either a bare authority
+    /// (`smtp.example.com[:port]`, treated as `smtps://<authority>`
+    /// by default), or a full URL with `smtp://` (cleartext, with
+    /// optional STARTTLS upgrade) or `smtps://` (implicit TLS) scheme
+    /// used verbatim. Mirrors [`JmapConfig::server`].
+    pub server: String,
+
     #[serde(default)]
     pub tls: TlsConfig,
     #[serde(default)]
     pub starttls: bool,
-    #[serde(default)]
-    pub sasl: SaslConfig,
+
+    /// Optional SASL credentials. See [`ImapConfig::sasl`].
+    pub sasl: Option<SaslConfig>,
 }
 
 /// SSL/TLS configuration.
@@ -276,26 +319,35 @@ impl From<TlsConfig> for Tls {
 }
 
 /// SASL configuration.
+///
+/// Exactly one mechanism per `[*.sasl]` block. Each variant carries
+/// only the bits its mechanism actually transmits; serde picks the
+/// variant from the field name (`plain`, `login`, `anonymous`,
+/// `oauthbearer`, `xoauth2`, `scram-sha-256`).
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub enum SaslConfig {
+    Anonymous(SaslAnonymousConfig),
+    Login(SaslLoginConfig),
+    Plain(SaslPlainConfig),
+    Oauthbearer(SaslOauthbearerConfig),
+    Xoauth2(SaslXoauth2Config),
+    #[serde(rename = "scram-sha-256")]
+    ScramSha256(SaslScramSha256Config),
+}
+
+/// SASL ANONYMOUS configuration <sup>[rfc4505]</sup>.
+///
+/// [rfc4505]: https://www.iana.org/go/rfc4505
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct SaslConfig {
-    pub mechanism: Option<SaslMechanismConfig>,
-    pub login: Option<SaslLoginConfig>,
-    pub plain: Option<SaslPlainConfig>,
-    pub anonymous: Option<SaslAnonymousConfig>,
+pub struct SaslAnonymousConfig {
+    pub message: Option<String>,
 }
 
-/// SASL mechanism configuration.
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum SaslMechanismConfig {
-    Login,
-    Plain,
-    #[default]
-    Anonymous,
-}
-
-/// SASL LOGIN configuration.
+/// SASL LOGIN configuration <sup>[draft]</sup>.
+///
+/// [draft]: https://datatracker.ietf.org/doc/html/draft-murchison-sasl-login-00
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SaslLoginConfig {
@@ -304,7 +356,9 @@ pub struct SaslLoginConfig {
     pub password: Secret,
 }
 
-/// SASL PLAIN configuration.
+/// SASL PLAIN configuration <sup>[rfc4616]</sup>.
+///
+/// [rfc4616]: https://www.iana.org/go/rfc4616
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SaslPlainConfig {
@@ -314,54 +368,73 @@ pub struct SaslPlainConfig {
     pub passwd: Secret,
 }
 
-/// SASL ANONYMOUS configuration.
+/// SASL OAUTHBEARER configuration <sup>[rfc7628]</sup>.
+///
+/// `host` and `port` are echoed verbatim in the GS2 header and should
+/// match the server the connection is actually opened against.
+///
+/// [rfc7628]: https://www.iana.org/go/rfc7628
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct SaslAnonymousConfig {
-    pub message: Option<String>,
+pub struct SaslOauthbearerConfig {
+    #[serde(deserialize_with = "shell_expanded_string")]
+    pub username: String,
+    pub host: String,
+    pub port: u16,
+    pub token: Secret,
+}
+
+/// SASL XOAUTH2 configuration. Google's pre-standard OAuth 2.0 SASL
+/// scheme; see <https://developers.google.com/gmail/imap/xoauth2-protocol>.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct SaslXoauth2Config {
+    #[serde(deserialize_with = "shell_expanded_string")]
+    pub username: String,
+    pub token: Secret,
+}
+
+/// SASL SCRAM-SHA-256 configuration <sup>[rfc7677]</sup>.
+///
+/// [rfc7677]: https://www.iana.org/go/rfc7677
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct SaslScramSha256Config {
+    #[serde(deserialize_with = "shell_expanded_string")]
+    pub username: String,
+    pub password: Secret,
 }
 
 impl TryFrom<SaslConfig> for Sasl {
     type Error = anyhow::Error;
 
     fn try_from(config: SaslConfig) -> Result<Self> {
-        // Pick the mechanism explicitly if set; otherwise infer from the
-        // first populated credential block. Anonymous is the last-resort
-        // fallback since it carries no secrets.
-        let mechanism = config.mechanism.unwrap_or_else(|| {
-            if config.plain.is_some() {
-                SaslMechanismConfig::Plain
-            } else if config.login.is_some() {
-                SaslMechanismConfig::Login
-            } else {
-                SaslMechanismConfig::Anonymous
-            }
-        });
-
-        match mechanism {
-            SaslMechanismConfig::Anonymous => Ok(Sasl::Anonymous(SaslAnonymous {
-                message: config.anonymous.and_then(|c| c.message),
-            })),
-            SaslMechanismConfig::Login => {
-                let c = config
-                    .login
-                    .ok_or_else(|| anyhow::anyhow!("missing SASL LOGIN configuration"))?;
-                Ok(Sasl::Login(SaslLogin {
-                    username: c.username,
-                    password: c.password.get()?,
-                }))
-            }
-            SaslMechanismConfig::Plain => {
-                let c = config
-                    .plain
-                    .ok_or_else(|| anyhow::anyhow!("missing SASL PLAIN configuration"))?;
-                Ok(Sasl::Plain(SaslPlain {
-                    authzid: c.authzid,
-                    authcid: c.authcid,
-                    passwd: c.passwd.get()?,
-                }))
-            }
-        }
+        Ok(match config {
+            SaslConfig::Anonymous(c) => Sasl::Anonymous(SaslAnonymous { message: c.message }),
+            SaslConfig::Login(c) => Sasl::Login(SaslLogin {
+                username: c.username,
+                password: c.password.get()?,
+            }),
+            SaslConfig::Plain(c) => Sasl::Plain(SaslPlain {
+                authzid: c.authzid,
+                authcid: c.authcid,
+                passwd: c.passwd.get()?,
+            }),
+            SaslConfig::Oauthbearer(c) => Sasl::Oauthbearer(SaslOauthbearer {
+                username: c.username,
+                host: c.host,
+                port: c.port,
+                token: c.token.get()?,
+            }),
+            SaslConfig::Xoauth2(c) => Sasl::Xoauth2(SaslXoauth2 {
+                username: c.username,
+                token: c.token.get()?,
+            }),
+            SaslConfig::ScramSha256(c) => Sasl::ScramSha256(SaslScramSha256 {
+                username: c.username,
+                password: c.password.get()?,
+            }),
+        })
     }
 }
 
