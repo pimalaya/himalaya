@@ -43,6 +43,7 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 clap = { version = "4.4", features = ["derive", "env", "wrap_help"] }
 comfy-table = "7"
 convert_case = { version = "0.11", optional = true }
+crossterm = { version = "0.29", default-features = false, features = ["serde"] }
 dirs = "6"
 humansize = "2"
 io-discovery = { version = "0.0.1", default-features = false, features = ["pacc", "autoconfig", "rfc6186", "client"] }

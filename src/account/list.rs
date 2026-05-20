@@ -19,12 +19,16 @@ use std::{fmt, path::PathBuf};
 
 use anyhow::Result;
 use clap::Parser;
-use comfy_table::{Cell, ContentArrangement, Row, Table};
+use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
+use crossterm::style::Color as CrosstermColor;
 use pimalaya_cli::printer::Printer;
 use pimalaya_config::toml::TomlConfig;
 use serde::Serialize;
 
-use crate::config::{AccountConfig, Config, TableArrangementConfig};
+use crate::{
+    account::context::map_color_or,
+    config::{AccountConfig, Config, TableArrangementConfig},
+};
 
 /// List all accounts declared in the configuration.
 ///
@@ -38,14 +42,24 @@ impl AccountListCommand {
         let config = load_config(config_paths)?;
 
         let preset = config
-            .table_preset
+            .table
+            .preset
             .clone()
             .unwrap_or_else(|| comfy_table::presets::UTF8_FULL_CONDENSED.to_string());
         let arrangement = config
-            .table_arrangement
+            .table
+            .arrangement
             .clone()
             .unwrap_or(TableArrangementConfig::Dynamic)
             .into();
+
+        let table_cfg = &config.account.list.table;
+        let colors = AccountColors {
+            // v1.2.0 defaults: name=Green, backends=Blue, default=Reset.
+            name: map_color_or(table_cfg.name_color, CrosstermColor::Green),
+            backends: map_color_or(table_cfg.backends_color, CrosstermColor::Blue),
+            default: map_color_or(table_cfg.default_color, CrosstermColor::Reset),
+        };
 
         let mut accounts: Vec<AccountRow> = config
             .accounts
@@ -57,11 +71,19 @@ impl AccountListCommand {
         let table = AccountsTable {
             preset,
             arrangement,
+            colors,
             accounts,
         };
 
         printer.out(table)
     }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct AccountColors {
+    name: Color,
+    backends: Color,
+    default: Color,
 }
 
 fn load_config(paths: &[PathBuf]) -> Result<Config> {
@@ -111,6 +133,8 @@ pub struct AccountsTable {
     pub preset: String,
     #[serde(skip)]
     pub arrangement: ContentArrangement,
+    #[serde(skip)]
+    colors: AccountColors,
     pub accounts: Vec<AccountRow>,
 }
 
@@ -129,9 +153,11 @@ impl fmt::Display for AccountsTable {
             .add_rows(self.accounts.iter().map(|account| {
                 let mut row = Row::new();
                 row.max_height(1);
-                row.add_cell(Cell::new(&account.name));
-                row.add_cell(Cell::new(account.backends.join(", ")));
-                row.add_cell(Cell::new(if account.default { "yes" } else { "" }));
+                row.add_cell(Cell::new(&account.name).fg(self.colors.name));
+                row.add_cell(Cell::new(account.backends.join(", ")).fg(self.colors.backends));
+                row.add_cell(
+                    Cell::new(if account.default { "yes" } else { "" }).fg(self.colors.default),
+                );
                 row
             }));
 

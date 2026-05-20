@@ -19,7 +19,7 @@ use std::{fmt, path::PathBuf};
 
 use anyhow::Result;
 use clap::Parser;
-use comfy_table::{Cell, Row, Table};
+use comfy_table::{Cell, Color, Row, Table};
 use io_maildir::maildir::Maildir;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
@@ -40,6 +40,7 @@ impl MaildirMailboxListCommand {
 
         let table = MaildirsTable {
             preset: client.account.table_preset().to_string(),
+            name_color: client.account.mailboxes_list_table_name_color(),
             rows: maildirs.into_iter().map(From::from).collect(),
         };
 
@@ -47,10 +48,12 @@ impl MaildirMailboxListCommand {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct MaildirsTable {
     #[serde(skip)]
     pub preset: String,
+    #[serde(skip)]
+    pub name_color: Color,
     #[serde(rename = "maildirs")]
     pub rows: Vec<MaildirRow>,
 }
@@ -66,7 +69,7 @@ impl fmt::Display for MaildirsTable {
                 let mut row = Row::new();
 
                 row.max_height(1)
-                    .add_cell(Cell::new(&m.name))
+                    .add_cell(Cell::new(&m.name).fg(self.name_color))
                     .add_cell(Cell::new(format!("{}", m.path.display())));
 
                 row

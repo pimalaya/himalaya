@@ -20,7 +20,7 @@ use std::{collections::BTreeSet, fmt};
 use anyhow::Result;
 use chrono::{DateTime, FixedOffset, Local};
 use clap::Parser;
-use comfy_table::{Cell, ContentArrangement, Row, Table};
+use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use humansize::{format_size, BINARY};
 use io_email::{address::Address, envelope::Envelope, flag::Flag};
 use pimalaya_cli::printer::Printer;
@@ -93,11 +93,51 @@ impl EnvelopeListCommand {
             datetime_local_tz: client.account.datetime_local_tz(),
             recipient: self.recipient,
             with_attachment: self.has_attachment,
+            chars: FlagChars {
+                unseen: client.account.envelopes_list_table_unseen_char(),
+                replied: client.account.envelopes_list_table_replied_char(),
+                flagged: client.account.envelopes_list_table_flagged_char(),
+                attachment: client.account.envelopes_list_table_attachment_char(),
+            },
+            colors: EnvelopeColors {
+                id: client.account.envelopes_list_table_id_color(),
+                flags: client.account.envelopes_list_table_flags_color(),
+                att: client.account.envelopes_list_table_att_color(),
+                subject: client.account.envelopes_list_table_subject_color(),
+                from: client.account.envelopes_list_table_from_color(),
+                to: client.account.envelopes_list_table_to_color(),
+                date: client.account.envelopes_list_table_date_color(),
+                size: client.account.envelopes_list_table_size_color(),
+            },
             envelopes,
         };
 
         printer.out(envelopes)
     }
+}
+
+/// Glyphs the FLAGS / ATT columns substitute in, sourced from the
+/// merged account config (v1.2.0 defaults: `*`, `R`, `!`, `@`).
+#[derive(Clone, Copy, Debug)]
+pub(super) struct FlagChars {
+    pub unseen: char,
+    pub replied: char,
+    pub flagged: char,
+    pub attachment: char,
+}
+
+/// Per-column foreground colors for the envelopes table. `Color::Reset`
+/// means "use the terminal default" (i.e. no override).
+#[derive(Clone, Copy, Debug)]
+pub(super) struct EnvelopeColors {
+    pub id: Color,
+    pub flags: Color,
+    pub att: Color,
+    pub subject: Color,
+    pub from: Color,
+    pub to: Color,
+    pub date: Color,
+    pub size: Color,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -116,6 +156,10 @@ pub struct Envelopes {
     pub recipient: bool,
     #[serde(skip)]
     pub with_attachment: bool,
+    #[serde(skip)]
+    pub(super) chars: FlagChars,
+    #[serde(skip)]
+    pub(super) colors: EnvelopeColors,
     pub envelopes: Vec<Envelope>,
 }
 
@@ -139,22 +183,33 @@ impl fmt::Display for Envelopes {
             .add_rows(self.envelopes.iter().map(|env| {
                 let mut row = Row::new();
                 row.max_height(1);
-                row.add_cell(Cell::new(&env.id));
-                row.add_cell(Cell::new(format_flags(&env.flags)));
+                row.add_cell(Cell::new(&env.id).fg(self.colors.id));
+                row.add_cell(Cell::new(format_flags(&env.flags, &self.chars)).fg(self.colors.flags));
                 if self.with_attachment {
-                    row.add_cell(Cell::new(format_attachment(env.has_attachment)));
+                    row.add_cell(
+                        Cell::new(format_attachment(env.has_attachment, self.chars.attachment))
+                            .fg(self.colors.att),
+                    );
                 }
-                row.add_cell(Cell::new(&env.subject));
+                row.add_cell(Cell::new(&env.subject).fg(self.colors.subject));
 
                 let addresses = if self.recipient { &env.to } else { &env.from };
-                row.add_cell(Cell::new(format_addresses(addresses)));
+                let from_or_to_color = if self.recipient {
+                    self.colors.to
+                } else {
+                    self.colors.from
+                };
+                row.add_cell(Cell::new(format_addresses(addresses)).fg(from_or_to_color));
 
-                row.add_cell(Cell::new(format_date(
-                    env.date,
-                    &self.datetime_fmt,
-                    self.datetime_local_tz,
-                )));
-                row.add_cell(Cell::new(format_size(env.size, BINARY)));
+                row.add_cell(
+                    Cell::new(format_date(
+                        env.date,
+                        &self.datetime_fmt,
+                        self.datetime_local_tz,
+                    ))
+                    .fg(self.colors.date),
+                );
+                row.add_cell(Cell::new(format_size(env.size, BINARY)).fg(self.colors.size));
                 row
             }));
 
@@ -167,39 +222,34 @@ impl fmt::Display for Envelopes {
     }
 }
 
-/// 4-character flag widget: one slot per LCD variant. Unread (no
-/// `Seen`) shows `N` in the first slot since unread is the
-/// attention-grabbing case.
-pub(super) fn format_flags(flags: &BTreeSet<Flag>) -> String {
-    let mut out = String::with_capacity(4);
+/// 3-character flag widget: unseen, replied, flagged. Each slot is a
+/// space when the flag is absent, otherwise the configured glyph
+/// (v1.2.0 defaults: `*`, `R`, `!`).
+pub(super) fn format_flags(flags: &BTreeSet<Flag>, chars: &FlagChars) -> String {
+    let mut out = String::with_capacity(3);
     out.push(if flags.contains(&Flag::Seen) {
         ' '
     } else {
-        'N'
+        chars.unseen
     });
     out.push(if flags.contains(&Flag::Answered) {
-        'r'
+        chars.replied
     } else {
         ' '
     });
     out.push(if flags.contains(&Flag::Flagged) {
-        '*'
-    } else {
-        ' '
-    });
-    out.push(if flags.contains(&Flag::Draft) {
-        'D'
+        chars.flagged
     } else {
         ' '
     });
     out
 }
 
-pub(super) fn format_attachment(has: Option<bool>) -> &'static str {
+pub(super) fn format_attachment(has: Option<bool>, glyph: char) -> String {
     match has {
-        Some(true) => "@",
-        Some(false) => "",
-        None => "?",
+        Some(true) => glyph.to_string(),
+        Some(false) => String::new(),
+        None => "?".to_string(),
     }
 }
 

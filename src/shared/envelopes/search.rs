@@ -23,7 +23,11 @@ use clap::Parser;
 use io_email::search::{error::Error as SearchQueryError, query::SearchEmailsQuery};
 use pimalaya_cli::printer::Printer;
 
-use crate::shared::{client::EmailClient, envelopes::list::Envelopes, mailboxes::arg::MailboxArg};
+use crate::shared::{
+    client::EmailClient,
+    envelopes::list::{EnvelopeColors, Envelopes, FlagChars},
+    mailboxes::arg::MailboxArg,
+};
 
 /// Search envelopes for the active account using the shared search
 /// query DSL, regardless of the underlying backend (IMAP, JMAP or
@@ -102,6 +106,22 @@ impl EnvelopeSearchCommand {
             datetime_local_tz: client.account.datetime_local_tz(),
             recipient: self.recipient,
             with_attachment: self.has_attachment,
+            chars: FlagChars {
+                unseen: client.account.envelopes_list_table_unseen_char(),
+                replied: client.account.envelopes_list_table_replied_char(),
+                flagged: client.account.envelopes_list_table_flagged_char(),
+                attachment: client.account.envelopes_list_table_attachment_char(),
+            },
+            colors: EnvelopeColors {
+                id: client.account.envelopes_list_table_id_color(),
+                flags: client.account.envelopes_list_table_flags_color(),
+                att: client.account.envelopes_list_table_att_color(),
+                subject: client.account.envelopes_list_table_subject_color(),
+                from: client.account.envelopes_list_table_from_color(),
+                to: client.account.envelopes_list_table_to_color(),
+                date: client.account.envelopes_list_table_date_color(),
+                size: client.account.envelopes_list_table_size_color(),
+            },
             envelopes,
         };
 

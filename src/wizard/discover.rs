@@ -113,11 +113,12 @@ pub fn run_or_exit(target: &Path) -> Result<Config> {
 
     let config = Config {
         downloads_dir: None,
-        table_preset: None,
-        table_arrangement: None,
+        table: Default::default(),
         envelope: Default::default(),
         mailbox: Default::default(),
         message: Default::default(),
+        attachment: Default::default(),
+        account: Default::default(),
         accounts: HashMap::from([(account_name, account)]),
     };
 
@@ -185,10 +186,10 @@ fn build_account_from_discovery(
         Ok(AccountConfig {
             default: true,
             downloads_dir: None,
-            table_preset: None,
-            table_arrangement: None,
+            table: Default::default(),
             envelope: Default::default(),
             mailbox: Default::default(),
+            attachment: Default::default(),
             imap: None,
             jmap: Some(jmap_to_config(jmap)?),
             maildir: None,
@@ -201,10 +202,10 @@ fn build_account_from_discovery(
         Ok(AccountConfig {
             default: true,
             downloads_dir: None,
-            table_preset: None,
-            table_arrangement: None,
+            table: Default::default(),
             envelope: Default::default(),
             mailbox: Default::default(),
+            attachment: Default::default(),
             imap: Some(imap_to_config(imap)?),
             jmap: None,
             maildir: None,

@@ -19,7 +19,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use comfy_table::{Cell, ContentArrangement, Row, Table};
+use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use io_email::mailbox::Mailbox;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
@@ -56,11 +56,25 @@ impl MailboxListCommand {
             arrangement: client.account.table_arrangement(),
             max_width: self.max_width,
             with_counts: self.counts,
+            colors: MailboxColors {
+                id: client.account.mailboxes_list_table_id_color(),
+                name: client.account.mailboxes_list_table_name_color(),
+                total: client.account.mailboxes_list_table_total_color(),
+                unread: client.account.mailboxes_list_table_unread_color(),
+            },
             mailboxes,
         };
 
         printer.out(mailboxes)
     }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct MailboxColors {
+    id: Color,
+    name: Color,
+    total: Color,
+    unread: Color,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -73,6 +87,8 @@ pub struct Mailboxes {
     pub max_width: Option<u16>,
     #[serde(skip)]
     pub with_counts: bool,
+    #[serde(skip)]
+    colors: MailboxColors,
     pub mailboxes: Vec<Mailbox>,
 }
 
@@ -93,11 +109,11 @@ impl fmt::Display for Mailboxes {
             .add_rows(self.mailboxes.iter().map(|m| {
                 let mut row = Row::new();
                 row.max_height(1);
-                row.add_cell(Cell::new(&m.id));
-                row.add_cell(Cell::new(&m.name));
+                row.add_cell(Cell::new(&m.id).fg(self.colors.id));
+                row.add_cell(Cell::new(&m.name).fg(self.colors.name));
                 if self.with_counts {
-                    row.add_cell(count_cell(m.total));
-                    row.add_cell(count_cell(m.unread));
+                    row.add_cell(count_cell(m.total).fg(self.colors.total));
+                    row.add_cell(count_cell(m.unread).fg(self.colors.unread));
                 }
                 row
             }));

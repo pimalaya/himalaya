@@ -96,9 +96,14 @@ The full configuration schema is documented in [config.sample.toml](./config.sam
 
 - Removed `display-name`, `signature`, `signature-delim`: composition left the CLI.
 - Only `downloads-dir` remains for the `attachments download` command.
-- Per-type table customization (`{account,folder,envelope}.list.table.*`) collapsed into a single `table-preset` plus a `table-arrangement` (`dynamic`, `dynamic-full-width`, `disabled`). Color customization is gone.
 - Composition / reading hooks live under `[message.composer.<name>]` and `[message.reader.<name>]`; each entry sets a `command` and optionally `default = true`.
 - The `message`, `template` and `pgp` top-level entries are removed.
+
+#### Table customization
+
+- The per-type `{account,folder,envelope}.list.table.{preset,arrangement}` keys collapse into a single `table.{preset,arrangement}` (global / per-account). `table.arrangement` (`dynamic`, `dynamic-full-width`, `disabled`) is new.
+- Rename `folder.list.table.*` → `mailbox.list.table.*` (mirrors the `folders` → `mailboxes` command rename).
+- Rename `envelope.list.table.sender-color` → `envelope.list.table.from-color` (the column is now `FROM`).
 
 #### Mailbox aliases
 

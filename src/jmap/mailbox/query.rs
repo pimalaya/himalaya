@@ -19,7 +19,7 @@ use std::{convert::Infallible, fmt, str::FromStr};
 
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
-use comfy_table::{Cell, Row, Table};
+use comfy_table::{Cell, Color, Row, Table};
 use io_jmap::rfc8621::mailbox::{
     Mailbox, MailboxFilter, MailboxRole, MailboxSortComparator, MailboxSortProperty,
 };
@@ -110,6 +110,12 @@ impl JmapMailboxQueryCommand {
 
         let table = MailboxesTable {
             preset: client.account.table_preset().to_string(),
+            colors: MailboxColors {
+                id: client.account.mailboxes_list_table_id_color(),
+                name: client.account.mailboxes_list_table_name_color(),
+                total: client.account.mailboxes_list_table_total_color(),
+                unread: client.account.mailboxes_list_table_unread_color(),
+            },
             mailboxes: output.mailboxes,
         };
 
@@ -117,10 +123,31 @@ impl JmapMailboxQueryCommand {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct MailboxColors {
+    pub id: Color,
+    pub name: Color,
+    pub total: Color,
+    pub unread: Color,
+}
+
+impl Default for MailboxColors {
+    fn default() -> Self {
+        Self {
+            id: Color::Reset,
+            name: Color::Reset,
+            total: Color::Reset,
+            unread: Color::Reset,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct MailboxesTable {
     #[serde(skip)]
     pub preset: String,
+    #[serde(skip)]
+    pub colors: MailboxColors,
     pub mailboxes: Vec<Mailbox>,
 }
 
@@ -141,14 +168,16 @@ impl fmt::Display for MailboxesTable {
             .add_rows(self.mailboxes.iter().map(|r| {
                 let mut row = Row::new();
                 row.max_height(1)
-                    .add_cell(Cell::new(r.id.as_deref().unwrap_or("Unknown")))
-                    .add_cell(Cell::new(r.name.as_deref().unwrap_or("Unknown")))
+                    .add_cell(Cell::new(r.id.as_deref().unwrap_or("Unknown")).fg(self.colors.id))
+                    .add_cell(
+                        Cell::new(r.name.as_deref().unwrap_or("Unknown")).fg(self.colors.name),
+                    )
                     .add_cell(match r.role.as_ref() {
                         Some(r) => Cell::new(r.to_string()),
                         None => Cell::new(""),
                     })
-                    .add_cell(Cell::new(r.total_emails))
-                    .add_cell(Cell::new(r.unread_emails))
+                    .add_cell(Cell::new(r.total_emails).fg(self.colors.total))
+                    .add_cell(Cell::new(r.unread_emails).fg(self.colors.unread))
                     .add_cell(Cell::new(if r.is_subscribed { "yes" } else { "" }));
                 row
             }));

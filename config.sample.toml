@@ -24,12 +24,12 @@
 #downloads-dir = "~/downloads"
 
 # https://docs.rs/comfy-table/latest/comfy_table/presets/index.html
-#table-preset = "││──╞═╪╡┆    ┬┴┌┐└┘"
+#table.preset = "││──╞═╪╡┆    ┬┴┌┐└┘"
 
 # https://docs.rs/comfy-table/latest/comfy_table/enum.ContentArrangement.html
-#table-arrangement = "dynamic"
-#table-arrangement = "dynamic-full-width"
-#table-arrangement = "disabled"
+#table.arrangement = "dynamic"
+#table.arrangement = "dynamic-full-width"
+#table.arrangement = "disabled"
 
 # `chrono` strftime format used to render the DATE column of `envelopes list`.
 # Defaults to `"%F %R%:z"`, e.g. `2026-05-06 14:30+02:00`.
@@ -43,6 +43,65 @@
 # when passed; otherwise the merged account/global value wins; otherwise the
 # hard fallback is 25.
 #envelope.list.page-size = 50
+
+# --------------------------------------------------------------------------------
+# Table rendering — envelopes list
+# --------------------------------------------------------------------------------
+
+# Per-column foreground colors for the `envelopes list` table. Each value is
+# a crossterm-style color: a named variant (`"red"`, `"dark-magenta"`,
+# `"reset"`, …), or a `{ Rgb = { r, g, b } }` / `{ AnsiValue = N }` table.
+# Applied to both shared `envelopes list` and the protocol-specific
+# `imap`/`jmap`/`maildir` envelope listings so a single key affects every
+# backend. The values below are the v1.2.0 defaults and are used when the
+# key is left unset.
+#envelope.list.table.id-color = "red"
+#envelope.list.table.flags-color = "reset"
+#envelope.list.table.att-color = "reset"
+#envelope.list.table.subject-color = "green"
+#envelope.list.table.from-color = "blue"
+#envelope.list.table.to-color = "blue"
+#envelope.list.table.date-color = "dark-yellow"
+#envelope.list.table.size-color = "reset"
+
+# Single-character glyphs used inside the FLAGS / ATT columns of the
+# envelopes table. Defaults match v1.2.0.
+#envelope.list.table.unseen-char = "*"      # FLAGS slot 1, when `\Seen` is absent
+#envelope.list.table.replied-char = "R"     # FLAGS slot 2, when `\Answered` is set
+#envelope.list.table.flagged-char = "!"     # FLAGS slot 3, when `\Flagged` is set
+#envelope.list.table.attachment-char = "@"  # ATT column, when the message carries an attachment
+
+# --------------------------------------------------------------------------------
+# Table rendering — mailboxes list
+# --------------------------------------------------------------------------------
+
+# The `name-color` default matches v1.2.0 (`folder.list.table.name-color`);
+# the other columns are new in v2 and default to the terminal foreground.
+#mailbox.list.table.id-color = "reset"
+#mailbox.list.table.name-color = "blue"
+#mailbox.list.table.total-color = "reset"
+#mailbox.list.table.unread-color = "reset"
+
+# --------------------------------------------------------------------------------
+# Table rendering — attachments list
+# --------------------------------------------------------------------------------
+
+# No v1 precedent; every column defaults to the terminal foreground.
+#attachment.list.table.id-color = "reset"
+#attachment.list.table.filename-color = "reset"
+#attachment.list.table.type-color = "reset"
+#attachment.list.table.size-color = "reset"
+#attachment.list.table.inline-color = "reset"
+#attachment.list.table.path-color = "reset"
+
+# --------------------------------------------------------------------------------
+# Table rendering — account list
+# --------------------------------------------------------------------------------
+
+# Defaults match v1.2.0.
+#account.list.table.name-color = "green"
+#account.list.table.backends-color = "blue"
+#account.list.table.default-color = "reset"
 
 # --------------------------------------------------------------------------------
 # Mailbox aliases
@@ -99,8 +158,8 @@ default = true
 
 # Per-account overrides for the global options above.
 #downloads-dir = "~/downloads/example"
-#table-preset = "││──╞═╪╡┆    ┬┴┌┐└┘"
-#table-arrangement = "dynamic"
+#table.preset = "││──╞═╪╡┆    ┬┴┌┐└┘"
+#table.arrangement = "dynamic"
 #envelope.list.datetime-fmt = "%F %R%:z"
 #envelope.list.datetime-local-tz = false
 

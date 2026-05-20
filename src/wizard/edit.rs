@@ -94,8 +94,10 @@ pub fn edit_account(target: &Path, mut config: Config, account_name: &str) -> Re
         .map(|a| a.default)
         .unwrap_or(is_first_account);
     let downloads_dir = existing.as_ref().and_then(|a| a.downloads_dir.clone());
-    let table_preset = existing.as_ref().and_then(|a| a.table_preset.clone());
-    let table_arrangement = existing.as_ref().and_then(|a| a.table_arrangement.clone());
+    let table = existing
+        .as_ref()
+        .map(|a| a.table.clone())
+        .unwrap_or_default();
     let envelope = existing
         .as_ref()
         .map(|a| a.envelope.clone())
@@ -104,6 +106,10 @@ pub fn edit_account(target: &Path, mut config: Config, account_name: &str) -> Re
         .as_ref()
         .map(|a| a.mailbox.clone())
         .unwrap_or_default();
+    let attachment = existing
+        .as_ref()
+        .map(|a| a.attachment.clone())
+        .unwrap_or_default();
     let maildir = existing.as_ref().and_then(|a| a.maildir.clone());
 
     let account = if jmap_defaults.is_some() {
@@ -111,10 +117,10 @@ pub fn edit_account(target: &Path, mut config: Config, account_name: &str) -> Re
         AccountConfig {
             default,
             downloads_dir,
-            table_preset,
-            table_arrangement,
+            table,
             envelope,
             mailbox,
+            attachment,
             imap: None,
             jmap: Some(jmap_to_config(jmap)?),
             maildir,
@@ -126,10 +132,10 @@ pub fn edit_account(target: &Path, mut config: Config, account_name: &str) -> Re
         AccountConfig {
             default,
             downloads_dir,
-            table_preset,
-            table_arrangement,
+            table,
             envelope,
             mailbox,
+            attachment,
             imap: Some(imap_to_config(imap)?),
             jmap: None,
             maildir,

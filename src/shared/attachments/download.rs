@@ -27,7 +27,7 @@ use mail_parser::{MessageParser, MimeHeaders};
 use pimalaya_cli::printer::Printer;
 
 use crate::shared::{
-    attachments::list::{mime_string, Attachment, Attachments},
+    attachments::list::{mime_string, Attachment, AttachmentColors, Attachments},
     client::EmailClient,
     mailboxes::arg::MailboxArg,
 };
@@ -130,6 +130,14 @@ impl AttachmentDownloadCommand {
             arrangement: client.account.table_arrangement(),
             with_inline: written.iter().any(|a| a.inline),
             with_path: true,
+            colors: AttachmentColors {
+                id: client.account.attachments_list_table_id_color(),
+                filename: client.account.attachments_list_table_filename_color(),
+                r#type: client.account.attachments_list_table_type_color(),
+                size: client.account.attachments_list_table_size_color(),
+                inline: client.account.attachments_list_table_inline_color(),
+                path: client.account.attachments_list_table_path_color(),
+            },
             attachments: written,
         };
 

@@ -19,7 +19,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
-use comfy_table::{Cell, ContentArrangement, Row, Table};
+use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use io_jmap::rfc8621::email::{
     Email, EmailAddress, EmailComparator, EmailFilter, EmailSortProperty,
 };
@@ -165,11 +165,39 @@ impl JmapEmailQueryCommand {
         let table = EmailsTable {
             preset: client.account.table_preset().to_string(),
             arrangement: client.account.table_arrangement(),
+            colors: EmailsColors {
+                id: client.account.envelopes_list_table_id_color(),
+                flags: client.account.envelopes_list_table_flags_color(),
+                subject: client.account.envelopes_list_table_subject_color(),
+                from: client.account.envelopes_list_table_from_color(),
+                date: client.account.envelopes_list_table_date_color(),
+            },
+            chars: EmailsChars {
+                unseen: client.account.envelopes_list_table_unseen_char(),
+                flagged: client.account.envelopes_list_table_flagged_char(),
+                attachment: client.account.envelopes_list_table_attachment_char(),
+            },
             emails: output.emails,
         };
 
         printer.out(table)
     }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct EmailsColors {
+    pub id: Color,
+    pub flags: Color,
+    pub subject: Color,
+    pub from: Color,
+    pub date: Color,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct EmailsChars {
+    pub unseen: char,
+    pub flagged: char,
+    pub attachment: char,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -178,6 +206,10 @@ pub struct EmailsTable {
     pub preset: String,
     #[serde(skip)]
     pub arrangement: ContentArrangement,
+    #[serde(skip)]
+    pub colors: EmailsColors,
+    #[serde(skip)]
+    pub chars: EmailsChars,
     pub emails: Vec<Email>,
 }
 
@@ -200,24 +232,25 @@ impl fmt::Display for EmailsTable {
             let mut flags = String::new();
             let kw = e.keywords.as_ref();
             if !kw.and_then(|k| k.get("$seen")).copied().unwrap_or(false) {
-                flags.push('U');
+                flags.push(self.chars.unseen);
             }
             if kw.and_then(|k| k.get("$flagged")).copied().unwrap_or(false) {
-                flags.push('F');
+                flags.push(self.chars.flagged);
             }
             if e.has_attachment.unwrap_or(false) {
-                flags.push('A');
+                flags.push(self.chars.attachment);
             }
 
             let mut row = Row::new();
             row.max_height(1);
-            row.add_cell(Cell::new(e.id.as_deref().unwrap_or("")));
-            row.add_cell(Cell::new(&flags));
-            row.add_cell(Cell::new(e.subject.as_deref().unwrap_or("")));
-            row.add_cell(Cell::new(format_addresses(
-                e.from.as_deref().unwrap_or(&[]),
-            )));
-            row.add_cell(Cell::new(e.received_at.as_deref().unwrap_or("")));
+            row.add_cell(Cell::new(e.id.as_deref().unwrap_or("")).fg(self.colors.id));
+            row.add_cell(Cell::new(&flags).fg(self.colors.flags));
+            row.add_cell(Cell::new(e.subject.as_deref().unwrap_or("")).fg(self.colors.subject));
+            row.add_cell(
+                Cell::new(format_addresses(e.from.as_deref().unwrap_or(&[])))
+                    .fg(self.colors.from),
+            );
+            row.add_cell(Cell::new(e.received_at.as_deref().unwrap_or("")).fg(self.colors.date));
             table.add_row(row);
         }
 

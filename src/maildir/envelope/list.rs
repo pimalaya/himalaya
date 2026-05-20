@@ -19,7 +19,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use comfy_table::{Cell, ContentArrangement, Row, Table};
+use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use io_maildir::maildir::Maildir;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
@@ -79,11 +79,25 @@ impl MaildirEnvelopeListCommand {
         let table = EnvelopesTable {
             preset: client.account.table_preset().to_string(),
             arrangement: client.account.table_arrangement(),
+            colors: EnvelopeColors {
+                id: client.account.envelopes_list_table_id_color(),
+                subject: client.account.envelopes_list_table_subject_color(),
+                from: client.account.envelopes_list_table_from_color(),
+                date: client.account.envelopes_list_table_date_color(),
+            },
             envelopes,
         };
 
         printer.out(table)
     }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct EnvelopeColors {
+    id: Color,
+    subject: Color,
+    from: Color,
+    date: Color,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -92,6 +106,8 @@ pub struct EnvelopesTable {
     preset: String,
     #[serde(skip)]
     arrangement: ContentArrangement,
+    #[serde(skip)]
+    colors: EnvelopeColors,
     envelopes: Vec<EnvelopesTableEntry>,
 }
 
@@ -113,10 +129,10 @@ impl fmt::Display for EnvelopesTable {
             let mut row = Row::new();
 
             row.max_height(1)
-                .add_cell(Cell::new(&entry.id))
-                .add_cell(Cell::new(&entry.subject))
-                .add_cell(Cell::new(&entry.from))
-                .add_cell(Cell::new(&entry.date));
+                .add_cell(Cell::new(&entry.id).fg(self.colors.id))
+                .add_cell(Cell::new(&entry.subject).fg(self.colors.subject))
+                .add_cell(Cell::new(&entry.from).fg(self.colors.from))
+                .add_cell(Cell::new(&entry.date).fg(self.colors.date));
 
             table.add_row(row);
         }

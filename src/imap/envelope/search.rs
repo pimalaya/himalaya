@@ -19,7 +19,7 @@ use std::fmt;
 
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
-use comfy_table::{Cell, ContentArrangement, Row, Table};
+use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use io_imap::types::{
     core::{AString, Vec1},
     datetime::NaiveDate,
@@ -88,6 +88,7 @@ impl ImapEnvelopeSearchCommand {
         let table = SearchTable {
             preset: client.account.table_preset().to_string(),
             arrangement: client.account.table_arrangement(),
+            id_color: client.account.envelopes_list_table_id_color(),
             ids: ids
                 .into_iter()
                 .map(|id| SearchResult { id: id.get() })
@@ -110,6 +111,8 @@ pub struct SearchTable {
     preset: String,
     #[serde(skip)]
     arrangement: ContentArrangement,
+    #[serde(skip)]
+    id_color: Color,
     uid_mode: bool,
     ids: Vec<SearchResult>,
 }
@@ -126,7 +129,7 @@ impl fmt::Display for SearchTable {
             .set_header(Row::from([Cell::new(id_header)]));
 
         for result in &self.ids {
-            table.add_row(Row::from([Cell::new(result.id)]));
+            table.add_row(Row::from([Cell::new(result.id).fg(self.id_color)]));
         }
 
         writeln!(f)?;

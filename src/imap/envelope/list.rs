@@ -19,7 +19,7 @@ use std::{collections::BTreeMap, fmt, num::NonZeroU32};
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use comfy_table::{Cell, ContentArrangement, Row, Table};
+use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use io_imap::types::{
     core::Vec1,
     envelope::Address,
@@ -102,11 +102,25 @@ impl ImapEnvelopeListCommand {
         let table = EnvelopesTable {
             preset: client.account.table_preset().to_string(),
             arrangement: client.account.table_arrangement(),
+            colors: EnvelopeColors {
+                id: client.account.envelopes_list_table_id_color(),
+                subject: client.account.envelopes_list_table_subject_color(),
+                from: client.account.envelopes_list_table_from_color(),
+                date: client.account.envelopes_list_table_date_color(),
+            },
             envelopes: map_envelopes_table_entries(data),
         };
 
         printer.out(table)
     }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct EnvelopeColors {
+    id: Color,
+    subject: Color,
+    from: Color,
+    date: Color,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -115,6 +129,8 @@ pub struct EnvelopesTable {
     preset: String,
     #[serde(skip)]
     arrangement: ContentArrangement,
+    #[serde(skip)]
+    colors: EnvelopeColors,
     envelopes: Vec<EnvelopesTableEntry>,
 }
 
@@ -136,11 +152,13 @@ impl fmt::Display for EnvelopesTable {
         for entry in &self.envelopes {
             let mut row = Row::new();
             row.max_height(1);
-            row.add_cell(Cell::new(entry.seq));
-            row.add_cell(Cell::new(entry.uid));
-            row.add_cell(Cell::new(&entry.subject));
-            row.add_cell(Cell::new(&entry.from));
-            row.add_cell(Cell::new(&entry.date));
+            // SEQ and UID share the same `id_color` since both are
+            // protocol-side identifiers for the row.
+            row.add_cell(Cell::new(entry.seq).fg(self.colors.id));
+            row.add_cell(Cell::new(entry.uid).fg(self.colors.id));
+            row.add_cell(Cell::new(&entry.subject).fg(self.colors.subject));
+            row.add_cell(Cell::new(&entry.from).fg(self.colors.from));
+            row.add_cell(Cell::new(&entry.date).fg(self.colors.date));
             table.add_row(row);
         }
 

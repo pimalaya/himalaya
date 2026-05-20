@@ -19,7 +19,7 @@ use std::fmt;
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use comfy_table::{Cell, ContentArrangement, Row, Table};
+use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use humansize::{format_size, BINARY};
 use mail_parser::{MessageParser, MessagePart, MimeHeaders};
 use pimalaya_cli::printer::Printer;
@@ -87,11 +87,29 @@ impl AttachmentListCommand {
             arrangement: client.account.table_arrangement(),
             with_inline: self.inline,
             with_path: false,
+            colors: AttachmentColors {
+                id: client.account.attachments_list_table_id_color(),
+                filename: client.account.attachments_list_table_filename_color(),
+                r#type: client.account.attachments_list_table_type_color(),
+                size: client.account.attachments_list_table_size_color(),
+                inline: client.account.attachments_list_table_inline_color(),
+                path: client.account.attachments_list_table_path_color(),
+            },
             attachments,
         };
 
         printer.out(attachments)
     }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct AttachmentColors {
+    pub id: Color,
+    pub filename: Color,
+    pub r#type: Color,
+    pub size: Color,
+    pub inline: Color,
+    pub path: Color,
 }
 
 /// One row of the `attachments list` / `attachments download` output.
@@ -127,6 +145,8 @@ pub struct Attachments {
     pub with_inline: bool,
     #[serde(skip)]
     pub with_path: bool,
+    #[serde(skip)]
+    pub(crate) colors: AttachmentColors,
     pub attachments: Vec<Attachment>,
 }
 
@@ -154,15 +174,19 @@ impl fmt::Display for Attachments {
             .add_rows(self.attachments.iter().map(|a| {
                 let mut row = Row::new();
                 row.max_height(1);
-                row.add_cell(Cell::new(&a.id));
-                row.add_cell(Cell::new(a.filename.as_deref().unwrap_or("")));
-                row.add_cell(Cell::new(a.mime.as_deref().unwrap_or("")));
-                row.add_cell(Cell::new(format_size(a.size, BINARY)));
+                row.add_cell(Cell::new(&a.id).fg(self.colors.id));
+                row.add_cell(
+                    Cell::new(a.filename.as_deref().unwrap_or("")).fg(self.colors.filename),
+                );
+                row.add_cell(Cell::new(a.mime.as_deref().unwrap_or("")).fg(self.colors.r#type));
+                row.add_cell(Cell::new(format_size(a.size, BINARY)).fg(self.colors.size));
                 if self.with_inline {
-                    row.add_cell(Cell::new(if a.inline { "yes" } else { "no" }));
+                    row.add_cell(
+                        Cell::new(if a.inline { "yes" } else { "no" }).fg(self.colors.inline),
+                    );
                 }
                 if self.with_path {
-                    row.add_cell(Cell::new(a.path.as_deref().unwrap_or("")));
+                    row.add_cell(Cell::new(a.path.as_deref().unwrap_or("")).fg(self.colors.path));
                 }
                 row
             }));

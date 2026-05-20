@@ -19,6 +19,7 @@ use std::{collections::HashMap, fs, path::Path, path::PathBuf};
 
 use anyhow::{Context, Result};
 use comfy_table::ContentArrangement;
+use crossterm::style::Color;
 use pimalaya_config::{
     secret::Secret,
     toml::{shell_expanded_string, TomlConfig},
@@ -38,14 +39,20 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct Config {
     pub downloads_dir: Option<PathBuf>,
-    pub table_preset: Option<String>,
-    pub table_arrangement: Option<TableArrangementConfig>,
+    #[serde(default)]
+    pub table: TableConfig,
     #[serde(default)]
     pub envelope: EnvelopeConfig,
     #[serde(default)]
     pub mailbox: MailboxConfig,
     #[serde(default)]
     pub message: MessageConfig,
+    #[serde(default)]
+    pub attachment: AttachmentConfig,
+    /// `account list` rendering options (global only — there is no
+    /// per-account override for the listing of accounts).
+    #[serde(default)]
+    pub account: AccountListingConfig,
     pub accounts: HashMap<String, AccountConfig>,
 }
 
@@ -98,14 +105,17 @@ pub struct AccountConfig {
     pub default: bool,
 
     pub downloads_dir: Option<PathBuf>,
-    pub table_preset: Option<String>,
-    pub table_arrangement: Option<TableArrangementConfig>,
+    #[serde(default)]
+    pub table: TableConfig,
 
     #[serde(default)]
     pub envelope: EnvelopeConfig,
 
     #[serde(default)]
     pub mailbox: MailboxConfig,
+
+    #[serde(default)]
+    pub attachment: AttachmentConfig,
 
     #[allow(unused)]
     pub imap: Option<ImapConfig>,
@@ -127,21 +137,88 @@ pub struct EnvelopeConfig {
 
 /// Mailbox-level configuration.
 ///
-/// Currently exposes user-defined aliases mapping a friendly name to a
-/// backend-native id. Alias names are looked up case-insensitively at
-/// resolution time, so `INBOX`, `Inbox` and `inbox` all hit the same
-/// entry. Ids are stored verbatim. The entry `inbox` (case-insensitive)
-/// acts as the implicit default mailbox when a shared command omits
-/// `-m/--mailbox`.
+/// Exposes user-defined aliases mapping a friendly name to a
+/// backend-native id (looked up case-insensitively at resolution
+/// time; the `inbox` alias acts as the implicit default mailbox when
+/// a shared command omits `-m/--mailbox`) and the `mailboxes list`
+/// rendering options.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MailboxConfig {
     #[serde(default, alias = "aliases")]
     pub alias: HashMap<String, String>,
+
+    #[serde(default)]
+    pub list: MailboxListConfig,
 }
 
-/// `envelopes list` rendering options. Mirrors the pre-v2
-/// `envelope.list.*` keys.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct MailboxListConfig {
+    #[serde(default)]
+    pub table: MailboxListTableConfig,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct MailboxListTableConfig {
+    pub id_color: Option<Color>,
+    pub name_color: Option<Color>,
+    pub total_color: Option<Color>,
+    pub unread_color: Option<Color>,
+}
+
+/// `attachments list` rendering options.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct AttachmentConfig {
+    #[serde(default)]
+    pub list: AttachmentListConfig,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct AttachmentListConfig {
+    #[serde(default)]
+    pub table: AttachmentListTableConfig,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct AttachmentListTableConfig {
+    pub id_color: Option<Color>,
+    pub filename_color: Option<Color>,
+    pub type_color: Option<Color>,
+    pub size_color: Option<Color>,
+    pub inline_color: Option<Color>,
+    pub path_color: Option<Color>,
+}
+
+/// `account list` rendering options. Top-level only — there is no
+/// per-account override.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct AccountListingConfig {
+    #[serde(default)]
+    pub list: AccountListingListConfig,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct AccountListingListConfig {
+    #[serde(default)]
+    pub table: AccountListingTableConfig,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct AccountListingTableConfig {
+    pub name_color: Option<Color>,
+    pub backends_color: Option<Color>,
+    pub default_color: Option<Color>,
+}
+
+/// `envelopes list` rendering options under `envelope.list.*`.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct EnvelopeListConfig {
@@ -159,6 +236,43 @@ pub struct EnvelopeListConfig {
     /// flag wins when passed; otherwise the merged account/global
     /// config wins; otherwise the hard fallback (25) is used.
     pub page_size: Option<u32>,
+
+    /// Per-column color overrides + flag glyph customization for the
+    /// rendered envelopes table. Keys mirror the v1.2.0 layout
+    /// (`envelope.list.table.id-color`, `envelope.list.table.unseen-char`,
+    /// etc.). Color values accept either a named [crossterm color]
+    /// (`"red"`, `"dark-magenta"`, …) or an `{ Rgb = { r = .., g = ..,
+    /// b = .. } }`/`{ AnsiValue = N }` table.
+    ///
+    /// [crossterm color]: https://docs.rs/crossterm/latest/crossterm/style/enum.Color.html
+    #[serde(default)]
+    pub table: EnvelopeListTableConfig,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct EnvelopeListTableConfig {
+    /// Single character used in the FLAGS column for messages that
+    /// lack `\Seen`. Defaults to `*` (v1.2.0 default).
+    pub unseen_char: Option<char>,
+    /// Single character used in the FLAGS column for messages with
+    /// `\Answered`. Defaults to `R`.
+    pub replied_char: Option<char>,
+    /// Single character used in the FLAGS column for messages with
+    /// `\Flagged`. Defaults to `!`.
+    pub flagged_char: Option<char>,
+    /// Single character used in the ATT column for messages with at
+    /// least one attachment. Defaults to `@`.
+    pub attachment_char: Option<char>,
+
+    pub id_color: Option<Color>,
+    pub flags_color: Option<Color>,
+    pub att_color: Option<Color>,
+    pub subject_color: Option<Color>,
+    pub from_color: Option<Color>,
+    pub to_color: Option<Color>,
+    pub date_color: Option<Color>,
+    pub size_color: Option<Color>,
 }
 
 /// Message-level configuration: user-defined composers and readers.
@@ -209,6 +323,21 @@ pub struct ReaderConfig {
     /// invoked without a name.
     #[serde(default)]
     pub default: bool,
+}
+
+/// Global / per-account table rendering knobs shared across every list
+/// command (envelopes, mailboxes, attachments). The per-column color
+/// blocks live under `*.list.table.*-color` (see [`EnvelopeListTableConfig`]
+/// & co.).
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct TableConfig {
+    /// `comfy_table` preset string (chars for borders / corners /
+    /// separators). Defaults to `UTF8_FULL_CONDENSED`. See
+    /// <https://docs.rs/comfy-table/latest/comfy_table/presets/>.
+    pub preset: Option<String>,
+    /// Column-arrangement strategy. Defaults to `Dynamic`.
+    pub arrangement: Option<TableArrangementConfig>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

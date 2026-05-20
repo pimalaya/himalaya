@@ -19,7 +19,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use comfy_table::{Cell, Row, Table};
+use comfy_table::{Cell, Color, Row, Table};
 use io_email::mailbox::MailboxRole;
 use io_imap::types::{core::QuotedChar, flag::FlagNameAttribute, mailbox::Mailbox};
 use pimalaya_cli::printer::Printer;
@@ -60,6 +60,7 @@ impl ImapMailboxListCommand {
 
         let table = MailboxesTable {
             preset: client.account.table_preset().to_string(),
+            name_color: client.account.mailboxes_list_table_name_color(),
             mailboxes: mailboxes.into_iter().map(From::from).collect(),
         };
 
@@ -67,10 +68,12 @@ impl ImapMailboxListCommand {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct MailboxesTable {
     #[serde(skip)]
     pub preset: String,
+    #[serde(skip)]
+    pub name_color: Color,
     pub mailboxes: Vec<MailboxRow>,
 }
 
@@ -99,7 +102,7 @@ impl fmt::Display for MailboxesTable {
                     .unwrap_or_default();
 
                 row.max_height(1)
-                    .add_cell(Cell::new(&mbox.name))
+                    .add_cell(Cell::new(&mbox.name).fg(self.name_color))
                     .add_cell(Cell::new(&mbox.delimiter))
                     .add_cell(Cell::new(role))
                     .add_cell(Cell::new(mbox.attributes.join(", ")));

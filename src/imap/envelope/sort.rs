@@ -19,7 +19,7 @@ use std::fmt;
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use comfy_table::{presets, Cell, ContentArrangement, Row, Table};
+use comfy_table::{presets, Cell, Color, ContentArrangement, Row, Table};
 use io_imap::types::{
     core::Vec1,
     extensions::sort::{SortCriterion, SortKey},
@@ -82,7 +82,8 @@ impl ImapEnvelopeSortCommand {
 
         let ids = client.sort(sort_criteria, search_criteria, !self.seq)?;
 
-        let table = SortResultsTable::new(ids, !self.seq);
+        let id_color = client.account.envelopes_list_table_id_color();
+        let table = SortResultsTable::new(ids, !self.seq, id_color);
 
         printer.out(table)?;
         Ok(())
@@ -108,12 +109,18 @@ fn parse_sort_key(s: &str) -> Result<SortKey> {
 pub struct SortResultsTable {
     ids: Vec<u32>,
     uid_mode: bool,
+    #[serde(skip)]
+    id_color: Color,
 }
 
 impl SortResultsTable {
-    pub fn new(ids: Vec<std::num::NonZeroU32>, uid_mode: bool) -> Self {
+    pub fn new(ids: Vec<std::num::NonZeroU32>, uid_mode: bool, id_color: Color) -> Self {
         let ids = ids.into_iter().map(|id| id.get()).collect();
-        Self { ids, uid_mode }
+        Self {
+            ids,
+            uid_mode,
+            id_color,
+        }
     }
 }
 
@@ -129,7 +136,7 @@ impl fmt::Display for SortResultsTable {
             .set_header(Row::from([Cell::new(id_header)]));
 
         for id in &self.ids {
-            table.add_row(Row::from([Cell::new(id)]));
+            table.add_row(Row::from([Cell::new(id).fg(self.id_color)]));
         }
 
         writeln!(f)?;
