@@ -23,7 +23,7 @@
 - **Composition and reading moved out** to [pimalaya/mml](https://github.com/pimalaya/mml).
 - **Session reuse moved out** to [pimalaya/sirup](https://github.com/pimalaya/sirup), which exposes a pre-authenticated IMAP/SMTP session over a Unix socket.
 
-A direct consequence: the v2 binary is about two times smaller than v1.
+A direct consequence: the v2 binary is about three times smaller than v1!
 
 ### Foundations: I/O-free
 
