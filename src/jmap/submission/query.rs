@@ -80,11 +80,7 @@ impl JmapSubmissionQueryCommand {
 
             let has_one = f.undo_status.is_some() || f.before.is_some() || f.after.is_some();
 
-            if has_one {
-                Some(f)
-            } else {
-                None
-            }
+            if has_one { Some(f) } else { None }
         };
 
         let output = client.email_submission_query(

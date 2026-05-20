@@ -17,7 +17,7 @@
 
 use std::{collections::BTreeMap, fmt, num::NonZeroU32};
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Parser;
 use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use io_imap::types::{

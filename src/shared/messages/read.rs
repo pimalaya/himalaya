@@ -17,10 +17,10 @@
 
 use std::{
     fmt,
-    io::{stdout, Write},
+    io::{Write, stdout},
 };
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Parser;
 use mail_parser::{Message, MessageParser};
 use pimalaya_cli::printer::Printer;

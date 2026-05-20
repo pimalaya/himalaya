@@ -88,11 +88,7 @@ impl JmapMailboxQueryCommand {
                 || f.is_subscribed.is_some()
                 || f.has_any_role.is_some();
 
-            if has_one_filter {
-                Some(f)
-            } else {
-                None
-            }
+            if has_one_filter { Some(f) } else { None }
         };
 
         let sort = Some(vec![MailboxSortComparator {

@@ -29,15 +29,15 @@
 //! external command and never go through this module.
 
 use std::{
-    io::{stdin, IsTerminal, Read as _},
+    io::{IsTerminal, Read as _, stdin},
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::ValueEnum;
 use mail_builder::{
-    headers::{address::Address, raw::Raw},
     MessageBuilder,
+    headers::{address::Address, raw::Raw},
 };
 use mail_parser::{HeaderValue, MessageParser};
 

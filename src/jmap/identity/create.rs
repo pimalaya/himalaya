@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Parser;
 use io_jmap::rfc8621::{identity::IdentityCreate, identity_set::JmapIdentitySetArgs};
 use pimalaya_cli::printer::{Message, Printer};

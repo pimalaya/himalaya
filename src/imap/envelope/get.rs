@@ -17,7 +17,7 @@
 
 use std::fmt;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
 use io_imap::types::{

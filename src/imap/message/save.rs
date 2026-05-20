@@ -15,12 +15,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::io::{stdin, BufRead, IsTerminal};
+use std::io::{BufRead, IsTerminal, stdin};
 
 use anyhow::Result;
 use clap::Parser;
 use io_imap::types::{
-    core::Literal, extensions::binary::LiteralOrLiteral8, flag::Flag, mailbox::Mailbox, IntoStatic,
+    IntoStatic, core::Literal, extensions::binary::LiteralOrLiteral8, flag::Flag, mailbox::Mailbox,
 };
 use pimalaya_cli::printer::{Message, Printer};
 

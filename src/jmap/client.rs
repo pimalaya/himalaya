@@ -27,8 +27,8 @@ use std::{
     path::PathBuf,
 };
 
-use anyhow::{anyhow, Result};
-use base64::{prelude::BASE64_STANDARD, Engine};
+use anyhow::{Result, anyhow};
+use base64::{Engine, prelude::BASE64_STANDARD};
 use io_jmap::client::JmapClientStd as Inner;
 use pimalaya_config::toml::TomlConfig;
 use pimalaya_stream::tls::Tls;

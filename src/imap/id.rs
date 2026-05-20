@@ -21,8 +21,8 @@ use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
 use io_imap::types::{
-    core::{IString, NString},
     IntoStatic,
+    core::{IString, NString},
 };
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;

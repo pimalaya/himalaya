@@ -17,9 +17,9 @@
 
 use std::fmt;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Parser;
-use comfy_table::{presets, Cell, Color, ContentArrangement, Row, Table};
+use comfy_table::{Cell, Color, ContentArrangement, Row, Table, presets};
 use io_imap::types::{
     core::Vec1,
     extensions::sort::{SortCriterion, SortKey},

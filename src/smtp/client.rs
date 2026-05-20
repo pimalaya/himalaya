@@ -29,7 +29,7 @@ use std::{
     path::PathBuf,
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use io_smtp::{client::SmtpClientStd as Inner, rfc5321::types::ehlo_domain::EhloDomain};
 use pimalaya_config::toml::TomlConfig;
 use pimalaya_stream::{sasl::Sasl, std::stream::StreamStd, tls::Tls};

@@ -17,7 +17,7 @@
 
 use std::{fmt, fs, path::PathBuf};
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::{Parser, ValueEnum};
 use convert_case::ccase;
 use io_maildir::maildir::Maildir;

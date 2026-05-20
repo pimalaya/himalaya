@@ -17,10 +17,10 @@
 
 use std::fmt;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Parser;
 use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
-use humansize::{format_size, BINARY};
+use humansize::{BINARY, format_size};
 use mail_parser::{MessageParser, MessagePart, MimeHeaders};
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;

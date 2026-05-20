@@ -17,7 +17,7 @@
 
 use std::{fmt, str::FromStr};
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 use clap::Parser;
 
 /// Selects which backend a cross-protocol command should target.
@@ -39,6 +39,7 @@ pub enum Backend {
     Smtp,
 }
 
+#[allow(unused)]
 impl Backend {
     /// Whether the IMAP arm of a shared command is allowed to run.
     pub fn allows_imap(self) -> bool {

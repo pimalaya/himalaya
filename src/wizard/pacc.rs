@@ -28,7 +28,7 @@ use pimalaya_cli::{
     },
 };
 
-use crate::wizard::discover::{discovery_resolver, discovery_tls, DiscoveryResult};
+use crate::wizard::discover::{DiscoveryResult, discovery_resolver, discovery_tls};
 
 pub fn run(domain: &str) -> Option<PaccConfig> {
     let spinner = Spinner::start(format!("Probing PACC for {domain}…"));

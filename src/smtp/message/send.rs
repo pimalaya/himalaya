@@ -18,10 +18,10 @@
 use std::{
     borrow::Cow,
     collections::HashSet,
-    io::{stdin, BufRead, IsTerminal},
+    io::{BufRead, IsTerminal, stdin},
 };
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Parser;
 use io_smtp::rfc5321::types::{
     domain::Domain, ehlo_domain::EhloDomain, forward_path::ForwardPath, local_part::LocalPart,

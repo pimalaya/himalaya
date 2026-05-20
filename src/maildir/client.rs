@@ -27,7 +27,7 @@ use std::{
     path::PathBuf,
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use io_maildir::client::MaildirClient as Inner;
 use pimalaya_config::toml::TomlConfig;
 

@@ -17,7 +17,7 @@
 
 use std::{fmt, path::PathBuf};
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 use pimalaya_config::toml::TomlConfig;

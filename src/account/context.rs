@@ -30,7 +30,7 @@
 
 use std::{collections::HashMap, env::temp_dir, path::PathBuf};
 
-use comfy_table::{presets, Color as TableColor, ContentArrangement};
+use comfy_table::{Color as TableColor, ContentArrangement, presets};
 use crossterm::style::Color;
 use dirs::download_dir;
 

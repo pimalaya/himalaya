@@ -34,7 +34,7 @@
 
 use std::{collections::HashMap, path::Path, process::exit};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use log::info;
 use pimalaya_cli::{
     prompt,

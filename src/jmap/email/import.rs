@@ -17,10 +17,10 @@
 
 use std::{
     collections::BTreeMap,
-    io::{stdin, BufRead, IsTerminal},
+    io::{BufRead, IsTerminal, stdin},
 };
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Parser;
 use io_jmap::{
     client::JmapClientStd,
@@ -31,7 +31,7 @@ use pimalaya_stream::tls::Tls;
 use url::Url;
 
 use crate::jmap::{
-    client::{jmap_http_auth, JmapClient},
+    client::{JmapClient, jmap_http_auth},
     error::format_set_error,
 };
 

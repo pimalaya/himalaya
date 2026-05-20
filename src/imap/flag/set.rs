@@ -18,8 +18,8 @@
 use anyhow::Result;
 use clap::Parser;
 use io_imap::types::{
-    flag::{Flag, StoreType},
     IntoStatic,
+    flag::{Flag, StoreType},
 };
 use pimalaya_cli::printer::{Message, Printer};
 

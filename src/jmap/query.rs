@@ -17,10 +17,10 @@
 
 use std::{
     fmt,
-    io::{stdin, BufRead},
+    io::{BufRead, stdin},
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use clap::Parser;
 use io_jmap::{
     rfc8620::{send::JmapRequest, session::capabilities::CORE},

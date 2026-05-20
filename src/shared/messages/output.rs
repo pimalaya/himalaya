@@ -23,9 +23,9 @@
 //! `Sent` mailbox. With neither flag, the raw bytes are written to
 //! stdout — same shape as a manual `mml compile > out.eml`.
 
-use std::io::{stdout, Write};
+use std::io::{Write, stdout};
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use mail_parser::{Address as ParserAddress, HeaderValue, MessageParser};
 use pimalaya_cli::printer::{Message, Printer};
 

@@ -15,14 +15,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::Parser;
 use io_jmap::{client::JmapClientStd, rfc8621::capabilities::MAIL};
 use pimalaya_cli::printer::{Message, Printer};
 use pimalaya_stream::tls::Tls;
 use url::Url;
 
-use crate::jmap::client::{jmap_http_auth, JmapClient};
+use crate::jmap::client::{JmapClient, jmap_http_auth};
 
 /// Export a raw RFC 5322 message to stdout (Email/get + blob download).
 ///

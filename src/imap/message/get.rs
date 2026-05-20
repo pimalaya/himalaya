@@ -17,9 +17,9 @@
 
 use std::fmt;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Parser;
-use comfy_table::{presets, Cell, ContentArrangement, Row, Table};
+use comfy_table::{Cell, ContentArrangement, Row, Table, presets};
 use io_imap::types::fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName};
 use mail_parser::{Addr, Address, ContentType, Message, MessageParser, MimeHeaders};
 use pimalaya_cli::printer::Printer;

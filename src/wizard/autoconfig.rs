@@ -33,7 +33,7 @@ use pimalaya_cli::{
     },
 };
 
-use crate::wizard::discover::{discovery_resolver, discovery_tls, DiscoveryResult};
+use crate::wizard::discover::{DiscoveryResult, discovery_resolver, discovery_tls};
 
 pub fn run(local_part: &str, domain: &str) -> Option<Autoconfig> {
     let mut client =

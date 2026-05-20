@@ -16,11 +16,11 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
-    io::{stdin, IsTerminal, Read},
+    io::{IsTerminal, Read, stdin},
     path::PathBuf,
 };
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Parser;
 use io_email::flag::Flag;
 use pimalaya_cli::printer::Message;

@@ -17,7 +17,7 @@
 
 use std::{
     fmt,
-    io::{stdin, BufRead, IsTerminal},
+    io::{BufRead, IsTerminal, stdin},
     path::PathBuf,
 };
 

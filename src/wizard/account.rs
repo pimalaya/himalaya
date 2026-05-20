@@ -23,7 +23,7 @@
 
 use std::process::Command;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use pimalaya_cli::wizard::{
     imap::{Encryption as ImapEncryption, ImapAuth, ImapSecret, WizardImapConfig},
     jmap::{JmapAuth, JmapSecret, WizardJmapConfig},

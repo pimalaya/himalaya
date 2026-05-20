@@ -17,7 +17,7 @@
 
 use std::{collections::HashMap, fmt, num::NonZeroU32};
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Parser;
 use io_imap::types::{
     extensions::thread::{Thread, ThreadingAlgorithm},
@@ -25,7 +25,7 @@ use io_imap::types::{
     sequence::SequenceSet,
 };
 use pimalaya_cli::printer::Printer;
-use serde::{ser::SerializeStruct, Serialize, Serializer};
+use serde::{Serialize, Serializer, ser::SerializeStruct};
 
 use crate::imap::{
     client::ImapClient,

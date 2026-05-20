@@ -27,7 +27,7 @@ use std::{
     path::PathBuf,
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use io_imap::client::ImapClientStd as Inner;
 use pimalaya_config::toml::TomlConfig;
 use pimalaya_stream::{sasl::Sasl, std::stream::StreamStd, tls::Tls};

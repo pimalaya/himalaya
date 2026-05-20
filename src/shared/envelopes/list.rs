@@ -21,7 +21,7 @@ use anyhow::Result;
 use chrono::{DateTime, FixedOffset, Local};
 use clap::Parser;
 use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
-use humansize::{format_size, BINARY};
+use humansize::{BINARY, format_size};
 use io_email::{address::Address, envelope::Envelope, flag::Flag};
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
@@ -184,7 +184,9 @@ impl fmt::Display for Envelopes {
                 let mut row = Row::new();
                 row.max_height(1);
                 row.add_cell(Cell::new(&env.id).fg(self.colors.id));
-                row.add_cell(Cell::new(format_flags(&env.flags, &self.chars)).fg(self.colors.flags));
+                row.add_cell(
+                    Cell::new(format_flags(&env.flags, &self.chars)).fg(self.colors.flags),
+                );
                 if self.with_attachment {
                     row.add_cell(
                         Cell::new(format_attachment(env.has_attachment, self.chars.attachment))

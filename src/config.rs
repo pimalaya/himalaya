@@ -22,7 +22,7 @@ use comfy_table::ContentArrangement;
 use crossterm::style::Color;
 use pimalaya_config::{
     secret::Secret,
-    toml::{shell_expanded_string, TomlConfig},
+    toml::{TomlConfig, shell_expanded_string},
 };
 use pimalaya_stream::{
     sasl::{

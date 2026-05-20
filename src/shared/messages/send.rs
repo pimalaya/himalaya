@@ -16,7 +16,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
-    io::{stdin, BufRead, IsTerminal},
+    io::{BufRead, IsTerminal, stdin},
     path::PathBuf,
 };
 

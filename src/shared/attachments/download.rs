@@ -21,13 +21,13 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Parser;
 use mail_parser::{MessageParser, MimeHeaders};
 use pimalaya_cli::printer::Printer;
 
 use crate::shared::{
-    attachments::list::{mime_string, Attachment, AttachmentColors, Attachments},
+    attachments::list::{Attachment, AttachmentColors, Attachments, mime_string},
     client::EmailClient,
     mailboxes::arg::MailboxArg,
 };

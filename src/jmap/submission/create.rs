@@ -17,7 +17,7 @@
 
 use std::collections::BTreeMap;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Parser;
 use io_jmap::rfc8621::email_submission::{
     EmailAddressWithParameters, EmailSubmissionCreate, Envelope,

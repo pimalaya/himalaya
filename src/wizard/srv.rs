@@ -36,7 +36,7 @@ use pimalaya_cli::{
     },
 };
 
-use crate::wizard::discover::{discovery_resolver, DiscoveryResult};
+use crate::wizard::discover::{DiscoveryResult, discovery_resolver};
 
 pub fn run(domain: &str) -> Option<SrvReport> {
     let spinner = Spinner::start(format!("Probing SRV records for {domain}…"));

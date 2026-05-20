@@ -23,7 +23,7 @@
 
 use std::path::Path;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use log::info;
 use pimalaya_cli::{
     prompt,

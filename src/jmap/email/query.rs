@@ -140,11 +140,7 @@ impl JmapEmailQueryCommand {
                 || f.subject.is_some()
                 || f.body.is_some();
 
-            if has_one_filter {
-                Some(f)
-            } else {
-                None
-            }
+            if has_one_filter { Some(f) } else { None }
         };
 
         let sort = Some(vec![EmailComparator {
@@ -247,8 +243,7 @@ impl fmt::Display for EmailsTable {
             row.add_cell(Cell::new(&flags).fg(self.colors.flags));
             row.add_cell(Cell::new(e.subject.as_deref().unwrap_or("")).fg(self.colors.subject));
             row.add_cell(
-                Cell::new(format_addresses(e.from.as_deref().unwrap_or(&[])))
-                    .fg(self.colors.from),
+                Cell::new(format_addresses(e.from.as_deref().unwrap_or(&[]))).fg(self.colors.from),
             );
             row.add_cell(Cell::new(e.received_at.as_deref().unwrap_or("")).fg(self.colors.date));
             table.add_row(row);
