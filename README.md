@@ -45,18 +45,18 @@ himalaya envelopes list --account posteo -m Archives.FOSS --page 2
 
 ## Features
 
-- **Shared API** that maps `mailboxes`, `envelopes`, `flags`, `messages` and `attachments` to the active backend (IMAP, JMAP or Maildir)
-- **Protocol-specific APIs** exposing each backend's full surface (`himalaya imap …`, `himalaya jmap …`, `himalaya maildir …`, `himalaya smtp …`)
-- **IMAP** backend <sup>[rfc9051](https://www.iana.org/go/rfc9051)</sup> (requires `imap` cargo feature)
-- **JMAP** backend <sup>[rfc8620](https://www.iana.org/go/rfc8620), [rfc8621](https://www.iana.org/go/rfc8621)</sup> (requires `jmap` cargo feature)
-- **Maildir** backend (requires `maildir` cargo feature)
-- **SMTP** backend <sup>[rfc5321](https://www.iana.org/go/rfc5321)</sup> (requires `smtp` cargo feature)
+- **Shared API** that maps `mailboxes`, `envelopes`, `flags`, `messages` and `attachments` to the active backend
+- **Protocol-specific APIs** exposing each backend's full surface (`himalaya imap/smtp/maildir/jmap…`)
+- **IMAP** support <sup>[rfc9051](https://www.iana.org/go/rfc9051)</sup> (requires `imap` feature)
+- **JMAP** support <sup>[rfc8620](https://www.iana.org/go/rfc8620), [rfc8621](https://www.iana.org/go/rfc8621)</sup> (requires `jmap` feature)
+- **Maildir** support (requires `maildir` feature)
+- **SMTP** backend <sup>[rfc5321](https://www.iana.org/go/rfc5321)</sup> (requires `smtp` feature)
 - **TLS** support:
   - [native-tls](https://crates.io/crates/native-tls) (requires `native-tls` feature)
   - [rustls](https://crates.io/crates/rustls):
     - AWS-LC crypto provider (requires `rustls-aws` feature)
     - Ring crypto provider (requires `rustls-ring` feature)
-- **SASL** support: ANONYMOUS, LOGIN, PLAIN (IMAP/SMTP)
+- **SASL** support: anonymous, login, plain, oauthbearer, xoauth2, scram-sha-256
 - **Provider discovery** wizard powered by [io-discovery](https://github.com/pimalaya/io-discovery): Thunderbird Autoconfiguration, PACC and RFC 6186 SRV lookups
 - **TOML** configuration with multi-account support
 - **JSON** output via `--json`
@@ -212,7 +212,7 @@ Accounts can be (re)configured later with `himalaya account configure <name>`. T
 
 You can also write the configuration by hand:
 
-- Copy the documented [`./config.sample.toml`](./config.sample.toml)
+- Copy the documented [./config.sample.toml](./config.sample.toml)
 - Paste it into one of:
   - `$XDG_CONFIG_HOME/himalaya/config.toml`
   - `$HOME/.config/himalaya/config.toml`
@@ -230,7 +230,7 @@ Backend-agnostic commands operate on the account's first configured backend, or 
 ```
 himalaya mailboxes list
 himalaya envelopes list -m INBOX --page 2
-himalaya envelopes list from alice and after 2026-01-01 order by date desc
+himalaya envelopes search from alice and after 2026-01-01 order by date desc
 himalaya flags add -m INBOX --flag seen 1:3,5
 himalaya messages copy --from INBOX --to Archives 42
 himalaya attachments download -m INBOX 42
@@ -238,13 +238,7 @@ himalaya attachments download -m INBOX 42
 
 When the `inbox` alias is configured under `[mailbox.alias]`, `-m/--mailbox` becomes optional: shared commands fall back to that id. With `[mailbox.alias] inbox = "INBOX"`, the calls above shorten to `envelopes list --page 2`, `flags add --flag seen 1:3,5`, etc.
 
-`envelopes list` accepts a trailing search query covering `date`, `after`, `from`, `to`, `subject`, `body`, `flag` conditions (combined with `and`, `or`, `not`, grouped with parens) and a `order by date|from|to|subject [asc|desc]` sort chain. Date clauses target the `Date:` header (sent-at) on every backend.
-
-Backend coverage:
-
-- **IMAP**: full grammar via `SEARCH` (RFC 9051) + `SORT` (RFC 5256). `SENTON` / `SENTSINCE` keep date semantics anchored to the `Date:` header.
-- **JMAP**: conjunctive filters only (`or` / `not` rejected; the JMAP wire model does not expose `FilterOperator` in `io-jmap` yet). Date clauses use an over-approximating `receivedAt` server filter plus a client-side `sentAt` post-filter so the sent-at rule is honored exactly.
-- **Maildir**: full grammar except `body` (would require parsing every candidate message file; planned).
+`envelopes list` is plain pagination, ordered by date descending. To filter or sort, use `envelopes search` with a trailing query covering `date`, `after`, `from`, `to`, `subject`, `body`, `flag` conditions (combined with `and`, `or`, `not`, grouped with parens) and an `order by date|from|to|subject [asc|desc]` sort chain. Date clauses target the `Date:` header (sent-at) on every backend.
 
 The shared surface is a strict least-common-denominator subset across IMAP, JMAP and Maildir. Operations that do not generalize (mailbox roles, attribute flags, JMAP-specific queries…) live under the protocol-specific subcommands.
 

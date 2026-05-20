@@ -17,7 +17,7 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-default = ["imap", "smtp", "maildir", "jmap", "rustls-ring"]
+default = ["imap", "smtp", "rustls-ring"]
 imap = ["dep:io-imap", "dep:mail-parser", "dep:rfc2047-decoder", "io-email/imap", "io-imap/client"]
 jmap = ["dep:base64", "dep:io-jmap", "dep:mail-parser", "dep:serde_json", "io-email/jmap", "io-jmap/client"]
 smtp = ["dep:io-smtp", "dep:mail-parser", "io-email/smtp"]
@@ -26,6 +26,12 @@ native-tls = ["pimalaya-stream/native-tls", "io-discovery/native-tls", "io-imap?
 rustls-aws = ["pimalaya-stream/rustls-aws", "io-discovery/rustls-aws", "io-imap?/rustls-aws", "io-jmap?/rustls-aws", "io-smtp?/rustls-aws"]
 rustls-ring = ["pimalaya-stream/rustls-ring", "io-discovery/rustls-ring", "io-imap?/rustls-ring", "io-jmap?/rustls-ring", "io-smtp?/rustls-ring"]
 vendored = ["pimalaya-stream/vendored"]
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
 
 [build-dependencies]
 pimalaya-cli = { version = "0.0.1", default-features = false, features = ["build"] }
@@ -38,14 +44,13 @@ clap = { version = "4.4", features = ["derive", "env", "wrap_help"] }
 comfy-table = "7"
 convert_case = { version = "0.11", optional = true }
 dirs = "6"
-gethostname = "1"
 humansize = "2"
 io-discovery = { version = "0.0.1", default-features = false, features = ["pacc", "autoconfig", "rfc6186", "client"] }
 ariadne = "0.5"
 io-email = { version = "0.0.1", default-features = false, features = ["serde", "client", "search"] }
 io-imap = { version = "0.0.1", default-features = false, optional = true }
 io-jmap = { version = "0.0.1", default-features = false, optional = true }
-io-maildir = { version = "0.0.1", default-features = false, features = ["serde"], optional = true }
+io-maildir = { version = "0.0.1", default-features = false, optional = true }
 io-smtp = { version = "0.0.1", default-features = false, optional = true }
 log = "0.4"
 mail-builder = "0.3"
