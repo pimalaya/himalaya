@@ -16,6 +16,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
+    fmt,
     io::{IsTerminal, Read, stdin},
     path::PathBuf,
 };
@@ -23,8 +24,8 @@ use std::{
 use anyhow::{Result, bail};
 use clap::Parser;
 use io_email::flag::Flag;
-use pimalaya_cli::printer::Message;
 use pimalaya_cli::printer::Printer;
+use serde::Serialize;
 
 use crate::shared::{client::EmailClient, flags::arg::FlagArg};
 
@@ -55,8 +56,19 @@ impl MessageAddCommand {
     pub fn execute(self, printer: &mut impl Printer, mut client: EmailClient) -> Result<()> {
         let raw = read_raw(&self.file)?;
         let flags: Vec<Flag> = self.flag.iter().map(Into::into).collect();
-        client.add_message(&self.mailbox, &flags, raw)?;
-        printer.out(Message::new("Message successfully added"))
+        let id = client.add_message(&self.mailbox, &flags, raw)?;
+        printer.out(MessageAddOutput { id })
+    }
+}
+
+#[derive(Serialize)]
+struct MessageAddOutput {
+    id: String,
+}
+
+impl fmt::Display for MessageAddOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Message {} successfully added", self.id)
     }
 }
 

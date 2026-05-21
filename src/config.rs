@@ -35,8 +35,12 @@ use serde::{Deserialize, Serialize};
 /// Global configuration.
 ///
 /// Represents the whole TOML user's configuration file.
+/// `deny_unknown_fields` is intentionally omitted so the same TOML
+/// file can be shared with `himalaya-tui`: top-level TUI-only fields
+/// (`display-name`, `signature`, `signature-delim`) are silently
+/// ignored here.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[serde(rename_all = "kebab-case")]
 pub struct Config {
     pub downloads_dir: Option<PathBuf>,
     #[serde(default)]
@@ -98,8 +102,12 @@ impl Config {
 }
 
 /// Account configuration.
+///
+/// `deny_unknown_fields` is omitted so per-account TUI-only fields
+/// (`email`, `display-name`, `signature`, `signature-delim`) coexist
+/// in the same `[accounts.<name>]` block when the file is shared.
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[serde(rename_all = "kebab-case")]
 pub struct AccountConfig {
     #[serde(default)]
     pub default: bool,
