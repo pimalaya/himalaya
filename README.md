@@ -8,6 +8,16 @@
     <a href="https://matrix.to/#/#pimalaya:matrix.org"><img alt="Matrix" src="https://img.shields.io/badge/chat-%23pimalaya-blue?style=flat&logo=matrix&logoColor=white"/></a>
     <a href="https://fosstodon.org/@pimalaya"><img alt="Mastodon" src="https://img.shields.io/badge/news-%40pimalaya-blue?style=flat&logo=mastodon&logoColor=white"/></a>
   </p>
+  <p>
+    <strong>Languages:</strong>
+    <a href="README.md">English</a> ·
+    <a href="README-ZH.md">中文</a> ·
+    <a href="README-ES.md">Español</a> ·
+    <a href="README-FR.md">Français</a> ·
+    <a href="README-PT.md">Português</a> ·
+    <a href="README-RU.md">Русский</a> ·
+    <a href="README-DE.md">Deutsch</a>
+  </p>
 </div>
 
 ```
