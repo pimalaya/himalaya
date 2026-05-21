@@ -1061,7 +1061,7 @@ dependencies = [
 [[package]]
 name = "io-email"
 version = "0.0.1"
-source = "git+https://github.com/pimalaya/io-email#046c1c051f497fc84d72763a22abc55d4335ea8a"
+source = "git+https://github.com/pimalaya/io-email#df1b87d0b12f580df917e6e3947be13f86b7a665"
 dependencies = [
  "chrono",
  "chumsky",
