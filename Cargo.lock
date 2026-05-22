@@ -1061,7 +1061,7 @@ dependencies = [
 [[package]]
 name = "io-email"
 version = "0.0.1"
-source = "git+https://github.com/pimalaya/io-email#3def9d557ce633575dca8ae4ee494e326a4aecb3"
+source = "git+https://github.com/pimalaya/io-email#87a09fbc6cbc5e91cb6e80b029e85b8f1f8195f3"
 dependencies = [
  "chrono",
  "chumsky",
@@ -1099,7 +1099,7 @@ dependencies = [
 [[package]]
 name = "io-imap"
 version = "0.0.1"
-source = "git+https://github.com/pimalaya/io-imap#47f38b23fc8e082d3bc0bd8e6c48b1f2356432f4"
+source = "git+https://github.com/pimalaya/io-imap#0677d429f92f7e6bea021c2742df5f74be052e77"
 dependencies = [
  "anyhow",
  "imap-codec",
@@ -2109,9 +2109,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.149"
+version = "1.0.150"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
+checksum = "e8014e44b4736ed0538adeecded0fce2a272f22dc9578a7eb6b2d9993c74cfb9"
 dependencies = [
  "itoa",
  "memchr",
