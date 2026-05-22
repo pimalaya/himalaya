@@ -1061,7 +1061,7 @@ dependencies = [
 [[package]]
 name = "io-email"
 version = "0.0.1"
-source = "git+https://github.com/pimalaya/io-email#87a09fbc6cbc5e91cb6e80b029e85b8f1f8195f3"
+source = "git+https://github.com/pimalaya/io-email#4dc69352fc31cae441611ce638f42fbab207e98b"
 dependencies = [
  "chrono",
  "chumsky",
@@ -1099,9 +1099,10 @@ dependencies = [
 [[package]]
 name = "io-imap"
 version = "0.0.1"
-source = "git+https://github.com/pimalaya/io-imap#0677d429f92f7e6bea021c2742df5f74be052e77"
+source = "git+https://github.com/pimalaya/io-imap#f627d6ac1e5b04d293aaff3863eac4c6bfe1a16d"
 dependencies = [
  "anyhow",
+ "base64",
  "imap-codec",
  "log",
  "pimalaya-stream",
