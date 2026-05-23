@@ -300,17 +300,35 @@ pub struct MessageConfig {
 }
 
 /// Single composer entry under `[message.composer.<name>]`.
+///
+/// For all shell command strings defined below:
+/// - The command is invoked via `sh -c`.
+/// - stdin behavior varies by command as documented below.
+/// - stdout is captured as the MIME draft.
+/// - stderr is inherited so the composer can prompt the user.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ComposerConfig {
-    /// Shell command line invoked via `sh -c`. Stdin carries the
-    /// source MIME bytes (empty for new messages); stdout is
-    /// captured as the MIME draft; stderr is inherited so the
-    /// composer can prompt the user.
+    /// Command used to write a brand new message.
+    ///
+    /// This is invoked by the `compose-with` and `mailto` commands.
+    ///
+    /// - When invoked by `compose-with`, stdin is empty.
+    /// - When invoked by `mailto`, stdin is piped with a pre-filled RFC 5322
+    ///   draft skeleton built from the parsed RFC 6068 `mailto:` URI parameters
+    ///   (such as to, cc, bcc, subject, and body).
     pub compose_command: String,
 
+    /// Command used to reply to an existing message.
+    ///
+    /// This is invoked by the `reply-with` command. The original message's
+    /// MIME bytes are passed via stdin.
     pub reply_command: String,
 
+    /// Command used to forward an existing message.
+    ///
+    /// This is invoked by the `forward-with` command. The original message's
+    /// MIME bytes are passed via stdin.
     pub forward_command: String,
 
     /// Marks this entry as the fallback when `compose-with` /
