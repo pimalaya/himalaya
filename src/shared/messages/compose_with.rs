@@ -19,9 +19,12 @@ use anyhow::{Result, bail};
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 
-use crate::shared::{
-    client::EmailClient,
-    messages::{output, runner},
+use crate::{
+    config::Composer,
+    shared::{
+        client::EmailClient,
+        messages::{output, runner},
+    },
 };
 
 /// Compose a new message by delegating to a user-defined composer.
@@ -59,9 +62,12 @@ impl MessageComposeWithCommand {
     pub fn execute(self, printer: &mut impl Printer, mut client: EmailClient) -> Result<()> {
         let command = match self.command.as_deref() {
             Some(cmd) => cmd.to_owned(),
-            None => {
-                runner::resolve_composer(&client.account.composer, self.name.as_deref())?.to_owned()
-            }
+            None => runner::resolve_composer(
+                Composer::Compose,
+                &client.account.composer,
+                self.name.as_deref(),
+            )?
+            .to_owned(),
         };
 
         let raw = runner::run(&command, &[])?;

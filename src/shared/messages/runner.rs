@@ -33,22 +33,23 @@ use std::{
 
 use anyhow::{Result, anyhow, bail};
 
-use crate::config::{ComposerConfig, ReaderConfig};
+use crate::config::{Composer, ComposerConfig, ReaderConfig};
 
 /// Resolves a composer entry to its shell command line. When `name`
 /// is given, looks up the corresponding entry and bails if missing.
 /// When `name` is `None`, returns the entry with `default = true`,
 /// or bails with a hint if no default is set.
 pub fn resolve_composer<'a>(
+    composer_type: Composer,
     composers: &'a HashMap<String, ComposerConfig>,
     name: Option<&str>,
 ) -> Result<&'a str> {
     match name {
         Some(name) => match composers.get(name) {
-            Some(entry) => Ok(entry.command.as_str()),
+            Some(entry) => Ok(entry.get_command(composer_type).as_str()),
             None => bail!("no composer named `{name}` in [message.composer]"),
         },
-        None => default_composer(composers).map(|entry| entry.command.as_str()),
+        None => default_composer(composers).map(|entry| entry.get_command(composer_type).as_str()),
     }
 }
 

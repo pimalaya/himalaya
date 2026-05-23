@@ -19,9 +19,12 @@ use anyhow::{Result, bail};
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 
-use crate::shared::{
-    client::EmailClient,
-    messages::{output, runner},
+use crate::{
+    config::Composer,
+    shared::{
+        client::EmailClient,
+        messages::{output, runner},
+    },
 };
 
 /// Reply to a message by delegating to a user-defined composer.
@@ -66,9 +69,12 @@ impl MessageReplyWithCommand {
 
         let command = match self.command.as_deref() {
             Some(cmd) => cmd.to_owned(),
-            None => {
-                runner::resolve_composer(&client.account.composer, self.name.as_deref())?.to_owned()
-            }
+            None => runner::resolve_composer(
+                Composer::Reply,
+                &client.account.composer,
+                self.name.as_deref(),
+            )?
+            .to_owned(),
         };
 
         let raw = runner::run(&command, &source)?;

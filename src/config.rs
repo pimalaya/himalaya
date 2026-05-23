@@ -307,7 +307,11 @@ pub struct ComposerConfig {
     /// source MIME bytes (empty for new messages); stdout is
     /// captured as the MIME draft; stderr is inherited so the
     /// composer can prompt the user.
-    pub command: String,
+    pub compose_command: String,
+
+    pub reply_command: String,
+
+    pub forward_command: String,
 
     /// Marks this entry as the fallback when `compose-with` /
     /// `reply-with` / `forward-with` are invoked without a name.
@@ -315,6 +319,23 @@ pub struct ComposerConfig {
     /// first one returned by the config lookup wins.
     #[serde(default)]
     pub default: bool,
+}
+
+#[derive(Clone, Copy)]
+pub enum Composer {
+    Compose,
+    Reply,
+    Forward,
+}
+
+impl ComposerConfig {
+    pub fn get_command(&self, composer: Composer) -> &String {
+        match composer {
+            Composer::Compose => &self.compose_command,
+            Composer::Reply => &self.reply_command,
+            Composer::Forward => &self.forward_command,
+        }
+    }
 }
 
 /// Single reader entry under `[message.reader.<name>]`.
