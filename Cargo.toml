@@ -17,11 +17,12 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-default = ["imap", "smtp", "jmap", "maildir", "rustls-ring"]
+default = ["imap", "smtp", "jmap", "maildir", "m2dir", "rustls-ring"]
 imap = ["dep:io-imap", "dep:mail-parser", "dep:rfc2047-decoder", "io-email/imap", "io-imap/client"]
 jmap = ["dep:base64", "dep:io-jmap", "dep:mail-parser", "dep:serde_json", "io-email/jmap", "io-jmap/client"]
 smtp = ["dep:io-smtp", "dep:mail-parser", "io-email/smtp"]
 maildir = ["dep:convert_case", "dep:io-maildir", "dep:mail-parser", "dep:mime_guess", "io-email/maildir", "io-maildir/client"]
+m2dir = ["dep:io-m2dir", "dep:mail-parser", "io-email/m2dir", "io-m2dir/client"]
 native-tls = ["pimalaya-stream/native-tls", "io-discovery/native-tls", "io-imap?/native-tls", "io-jmap?/native-tls", "io-smtp?/native-tls"]
 rustls-aws = ["pimalaya-stream/rustls-aws", "io-discovery/rustls-aws", "io-imap?/rustls-aws", "io-jmap?/rustls-aws", "io-smtp?/rustls-aws"]
 rustls-ring = ["pimalaya-stream/rustls-ring", "io-discovery/rustls-ring", "io-imap?/rustls-ring", "io-jmap?/rustls-ring", "io-smtp?/rustls-ring"]
@@ -51,6 +52,7 @@ ariadne = "0.6"
 io-email = { version = "0.0.1", default-features = false, features = ["serde", "client", "search"] }
 io-imap = { version = "0.0.1", default-features = false, optional = true }
 io-jmap = { version = "0.0.1", default-features = false, optional = true }
+io-m2dir = { version = "0.0.1", default-features = false, optional = true }
 io-maildir = { version = "0.0.1", default-features = false, optional = true }
 io-smtp = { version = "0.0.1", default-features = false, optional = true }
 log = "0.4"
@@ -87,6 +89,7 @@ io-email.git = "https://github.com/pimalaya/io-email"
 io-http.git = "https://github.com/pimalaya/io-http"
 io-imap.git = "https://github.com/pimalaya/io-imap"
 io-jmap.git = "https://github.com/pimalaya/io-jmap"
+io-m2dir.git = "https://github.com/pimalaya/io-m2dir"
 io-maildir.git = "https://github.com/pimalaya/io-maildir"
 io-smtp.git = "https://github.com/pimalaya/io-smtp"
 pimalaya-cli.git = "https://github.com/pimalaya/cli"

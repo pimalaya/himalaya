@@ -17,7 +17,6 @@
 
 use anyhow::Result;
 use clap::Parser;
-use io_maildir::maildir::Maildir;
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::maildir::{
@@ -45,15 +44,8 @@ pub struct MaildirMessageMoveCommand {
 
 impl MaildirMessageMoveCommand {
     pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
-        let source = match Maildir::try_from(self.source.inner.clone()) {
-            Ok(maildir) => maildir,
-            Err(_) => Maildir::try_from(client.root.join(&self.source.inner))?,
-        };
-
-        let target = match Maildir::try_from(self.target.inner.clone()) {
-            Ok(maildir) => maildir,
-            Err(_) => Maildir::try_from(client.root.join(&self.target.inner))?,
-        };
+        let source = client.resolve_maildir(&self.source.inner)?;
+        let target = client.resolve_maildir(&self.target.inner)?;
 
         for id in self.ids.inner {
             client.r#move(

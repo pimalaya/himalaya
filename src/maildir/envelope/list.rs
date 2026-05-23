@@ -20,7 +20,6 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
-use io_maildir::maildir::Maildir;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
@@ -39,10 +38,7 @@ pub struct MaildirEnvelopeListCommand {
 
 impl MaildirEnvelopeListCommand {
     pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
-        let maildir = match Maildir::try_from(self.maildir.inner.clone()) {
-            Ok(maildir) => maildir,
-            Err(_) => Maildir::try_from(client.root.join(&self.maildir.inner))?,
-        };
+        let maildir = client.resolve_maildir(&self.maildir.inner)?;
 
         let messages = client.list_messages(maildir)?;
 

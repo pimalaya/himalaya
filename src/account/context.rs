@@ -470,7 +470,10 @@ mod tests {
             .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
             .collect();
         let config = Config {
-            mailbox: MailboxConfig { alias },
+            mailbox: MailboxConfig {
+                alias,
+                ..MailboxConfig::default()
+            },
             ..Config::default()
         };
         Account::from(config)

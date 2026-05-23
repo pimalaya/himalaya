@@ -111,6 +111,7 @@ pub fn edit_account(target: &Path, mut config: Config, account_name: &str) -> Re
         .map(|a| a.attachment.clone())
         .unwrap_or_default();
     let maildir = existing.as_ref().and_then(|a| a.maildir.clone());
+    let m2dir = existing.as_ref().and_then(|a| a.m2dir.clone());
 
     let account = if jmap_defaults.is_some() {
         let jmap = jmap_wizard::run(account_name, local_part, domain, jmap_defaults.as_ref())?;
@@ -124,6 +125,7 @@ pub fn edit_account(target: &Path, mut config: Config, account_name: &str) -> Re
             imap: None,
             jmap: Some(jmap_to_config(jmap)?),
             maildir,
+            m2dir,
             smtp: None,
         }
     } else {
@@ -139,6 +141,7 @@ pub fn edit_account(target: &Path, mut config: Config, account_name: &str) -> Re
             imap: Some(imap_to_config(imap)?),
             jmap: None,
             maildir,
+            m2dir,
             smtp: Some(smtp_to_config(smtp)?),
         }
     };

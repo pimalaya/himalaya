@@ -15,33 +15,29 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{fmt, path::PathBuf};
+use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, Color, Row, Table};
-use io_maildir::maildir::Maildir;
+use io_m2dir::m2dir::M2dir;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
-use crate::maildir::client::MaildirClient;
+use crate::m2dir::client::M2dirClient;
 
-/// List, search and filter maildirs.
-///
-/// This command allows you to list maildirs from your MAILDIR account.
-/// By default, only subscribed maildirs are listed. Use --all to
-/// list all maildirs.
+/// List m2dir folders found under the store root.
 #[derive(Debug, Parser)]
-pub struct MaildirMailboxListCommand;
+pub struct M2dirMailboxListCommand;
 
-impl MaildirMailboxListCommand {
-    pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
-        let maildirs = client.list_maildirs()?;
+impl M2dirMailboxListCommand {
+    pub fn execute(self, printer: &mut impl Printer, client: M2dirClient) -> Result<()> {
+        let m2dirs = client.list_mailboxes()?;
 
-        let table = MaildirsTable {
+        let table = M2dirsTable {
             preset: client.account.table_preset().to_string(),
             name_color: client.account.mailboxes_list_table_name_color(),
-            rows: maildirs.into_iter().map(From::from).collect(),
+            rows: m2dirs.into_iter().map(From::from).collect(),
         };
 
         printer.out(table)
@@ -49,16 +45,16 @@ impl MaildirMailboxListCommand {
 }
 
 #[derive(Clone, Debug, Serialize)]
-pub struct MaildirsTable {
+pub struct M2dirsTable {
     #[serde(skip)]
     pub preset: String,
     #[serde(skip)]
     pub name_color: Color,
-    #[serde(rename = "maildirs")]
-    pub rows: Vec<MaildirRow>,
+    #[serde(rename = "m2dirs")]
+    pub rows: Vec<M2dirRow>,
 }
 
-impl fmt::Display for MaildirsTable {
+impl fmt::Display for M2dirsTable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = Table::new();
 
@@ -70,7 +66,7 @@ impl fmt::Display for MaildirsTable {
 
                 row.max_height(1)
                     .add_cell(Cell::new(&m.name).fg(self.name_color))
-                    .add_cell(Cell::new(format!("{}", m.path.display())));
+                    .add_cell(Cell::new(&m.path));
 
                 row
             }));
@@ -83,16 +79,19 @@ impl fmt::Display for MaildirsTable {
 }
 
 #[derive(Clone, Debug, Serialize)]
-pub struct MaildirRow {
+pub struct M2dirRow {
     pub name: String,
-    pub path: PathBuf,
+    pub path: String,
 }
 
-impl From<Maildir> for MaildirRow {
-    fn from(maildir: Maildir) -> Self {
-        Self {
-            name: maildir.name().unwrap_or("Unknown").to_owned(),
-            path: PathBuf::from(maildir.path().as_str()),
-        }
+impl From<M2dir> for M2dirRow {
+    fn from(m2dir: M2dir) -> Self {
+        let name = m2dir
+            .path()
+            .file_name()
+            .map(str::to_owned)
+            .unwrap_or_default();
+        let path = m2dir.path().as_str().to_owned();
+        Self { name, path }
     }
 }

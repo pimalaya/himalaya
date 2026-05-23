@@ -24,11 +24,11 @@
 
 use std::{
     ops::{Deref, DerefMut},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use anyhow::{Result, anyhow};
-use io_maildir::client::MaildirClient as Inner;
+use io_maildir::{client::MaildirClient as Inner, maildir::Maildir};
 use pimalaya_config::toml::TomlConfig;
 
 use crate::{account::context::Account, cli::load_or_wizard, config::MaildirConfig};
@@ -47,12 +47,23 @@ impl MaildirClient {
     /// path.
     pub fn new(config: MaildirConfig, account: Account) -> Self {
         let root = config.root.clone();
-        let inner = Inner::new(config.root);
+        let inner = Inner::new(root.to_string_lossy().into_owned());
         Self {
             inner,
             account,
             root,
         }
+    }
+
+    /// Resolves a maildir CLI argument: tries `path` as-is first, then
+    /// falls back to `self.root.join(path)`. Both attempts go through
+    /// [`io_maildir::client::MaildirClient::load_maildir`] so the
+    /// `cur` / `new` / `tmp` markers are validated.
+    pub fn resolve_maildir(&self, path: &Path) -> Result<Maildir> {
+        if let Ok(maildir) = self.load_maildir(path.to_string_lossy().into_owned()) {
+            return Ok(maildir);
+        }
+        Ok(self.load_maildir(self.root.join(path).to_string_lossy().into_owned())?)
     }
 }
 

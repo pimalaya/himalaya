@@ -23,6 +23,8 @@ mod config;
 mod imap;
 #[cfg(feature = "jmap")]
 mod jmap;
+#[cfg(feature = "m2dir")]
+mod m2dir;
 #[cfg(feature = "maildir")]
 mod maildir;
 mod shared;

@@ -101,9 +101,21 @@ impl EmailClient {
             if let Some(maildir_config) = account_config.maildir.take() {
                 use io_maildir::client::MaildirClient;
 
-                let client = MaildirClient::new(maildir_config.root);
+                let client = MaildirClient::new(maildir_config.root.to_string_lossy().into_owned());
 
                 inner = inner.with_maildir(client);
+                configured = true;
+            }
+        }
+
+        #[cfg(feature = "m2dir")]
+        if !configured && backend.allows_m2dir() {
+            if let Some(m2dir_config) = account_config.m2dir.take() {
+                use io_m2dir::client::M2dirClient;
+
+                let client = M2dirClient::new(m2dir_config.root.to_string_lossy().into_owned());
+
+                inner = inner.with_m2dir(client);
                 configured = true;
             }
         }

@@ -34,6 +34,8 @@ use pimalaya_config::toml::TomlConfig;
 use crate::imap::{cli::ImapCommand, client::build_imap_client};
 #[cfg(feature = "jmap")]
 use crate::jmap::{cli::JmapCommand, client::build_jmap_client};
+#[cfg(feature = "m2dir")]
+use crate::m2dir::{cli::M2dirCommand, client::build_m2dir_client};
 #[cfg(feature = "maildir")]
 use crate::maildir::{cli::MaildirCommand, client::build_maildir_client};
 #[cfg(feature = "smtp")]
@@ -119,6 +121,9 @@ pub enum HimalayaCommand {
     #[cfg(feature = "maildir")]
     #[command(subcommand)]
     Maildir(MaildirCommand),
+    #[cfg(feature = "m2dir")]
+    #[command(subcommand)]
+    M2dir(M2dirCommand),
     #[cfg(feature = "smtp")]
     #[command(subcommand)]
     Smtp(SmtpCommand),
@@ -204,6 +209,11 @@ impl HimalayaCommand {
             #[cfg(feature = "maildir")]
             Self::Maildir(cmd) => {
                 let client = build_maildir_client(config_paths, account_name)?;
+                cmd.execute(printer, client)
+            }
+            #[cfg(feature = "m2dir")]
+            Self::M2dir(cmd) => {
+                let client = build_m2dir_client(config_paths, account_name)?;
                 cmd.execute(printer, client)
             }
             #[cfg(feature = "smtp")]

@@ -19,7 +19,6 @@ use std::fmt;
 
 use anyhow::{Result, bail};
 use clap::Parser;
-use io_maildir::maildir::Maildir;
 use mail_parser::Message;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
@@ -43,17 +42,14 @@ pub struct MaildirMessageGetCommand {
 
 impl MaildirMessageGetCommand {
     pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
-        let maildir = match Maildir::try_from(self.maildir.inner.clone()) {
-            Ok(maildir) => maildir,
-            Err(_) => Maildir::try_from(client.root.join(&self.maildir.inner))?,
-        };
+        let maildir = client.resolve_maildir(&self.maildir.inner)?;
 
         let msg = client.get(maildir, &self.id.inner)?;
 
-        let path = msg.path().to_owned();
+        let path = msg.path().clone();
 
         let Some(parsed) = msg.headers() else {
-            bail!("Invalid MIME message at {}", path.display());
+            bail!("Invalid MIME message at {path}");
         };
 
         printer.out(MessageView(parsed))

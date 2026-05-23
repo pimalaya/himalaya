@@ -20,7 +20,6 @@ use std::{fmt, fs, path::PathBuf};
 use anyhow::{Result, bail};
 use clap::{Parser, ValueEnum};
 use convert_case::ccase;
-use io_maildir::maildir::Maildir;
 use mail_parser::MimeHeaders;
 use mime_guess::{get_mime_extensions_str, mime::OCTET_STREAM};
 use pimalaya_cli::printer::Printer;
@@ -59,10 +58,7 @@ pub struct MaildirMessageExportCommand {
 
 impl MaildirMessageExportCommand {
     pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
-        let maildir = match Maildir::try_from(self.maildir.inner.clone()) {
-            Ok(maildir) => maildir,
-            Err(_) => Maildir::try_from(client.root.join(&self.maildir.inner))?,
-        };
+        let maildir = client.resolve_maildir(&self.maildir.inner)?;
 
         let msg = client.get(maildir, &self.id.inner)?;
 
@@ -72,10 +68,10 @@ impl MaildirMessageExportCommand {
                 printer.out(ExportRaw { contents })?;
             }
             ExportType::Parts => {
-                let path = msg.path().to_owned();
+                let path = msg.path().clone();
 
                 let Some(parsed) = msg.parsed() else {
-                    bail!("Invalid MIME message at {}", path.display());
+                    bail!("Invalid MIME message at {path}");
                 };
 
                 let dir = match self.directory {

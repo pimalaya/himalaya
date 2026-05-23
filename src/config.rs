@@ -107,7 +107,7 @@ impl Config {
 /// `deny_unknown_fields` is omitted so per-account TUI-only fields
 /// (`email`, `display-name`, `signature`, `signature-delim`) coexist
 /// in the same `[accounts.<name>]` block when the file is shared.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct AccountConfig {
     #[serde(default)]
@@ -132,6 +132,8 @@ pub struct AccountConfig {
     pub jmap: Option<JmapConfig>,
     #[allow(unused)]
     pub maildir: Option<MaildirConfig>,
+    #[allow(unused)]
+    pub m2dir: Option<M2dirConfig>,
     #[allow(unused)]
     pub smtp: Option<SmtpConfig>,
 }
@@ -423,6 +425,14 @@ pub struct ImapConfig {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MaildirConfig {
+    pub root: PathBuf,
+}
+
+/// m2dir configuration.
+#[allow(unused)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct M2dirConfig {
     pub root: PathBuf,
 }
 

@@ -229,17 +229,17 @@ impl fmt::Display for Envelopes {
 /// (v1.2.0 defaults: `*`, `R`, `!`).
 pub(super) fn format_flags(flags: &BTreeSet<Flag>, chars: &FlagChars) -> String {
     let mut out = String::with_capacity(3);
-    out.push(if flags.contains(&Flag::Seen) {
+    out.push(if flags.iter().any(Flag::is_seen) {
         ' '
     } else {
         chars.unseen
     });
-    out.push(if flags.contains(&Flag::Answered) {
+    out.push(if flags.iter().any(Flag::is_answered) {
         chars.replied
     } else {
         ' '
     });
-    out.push(if flags.contains(&Flag::Flagged) {
+    out.push(if flags.iter().any(Flag::is_flagged) {
         chars.flagged
     } else {
         ' '

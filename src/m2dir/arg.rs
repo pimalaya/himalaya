@@ -15,31 +15,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::{Message, Printer};
 
-use crate::maildir::{arg::MaildirPathFlag, client::MaildirClient};
-
-/// Delete the given mailbox.
-///
-/// This command allows you to delete a new mailbox using the given
-/// name.
 #[derive(Debug, Parser)]
-pub struct MaildirMailboxDeleteCommand {
-    #[command(flatten)]
-    pub maildir_path: MaildirPathFlag,
-}
-
-impl MaildirMailboxDeleteCommand {
-    pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
-        let path = client
-            .root
-            .join(&self.maildir_path.inner)
-            .to_string_lossy()
-            .into_owned();
-
-        client.delete_maildir(path)?;
-        printer.out(Message::new("Maildir successfully deleted"))
-    }
+pub struct M2dirNameArg {
+    /// Name of the m2dir folder, relative to the m2store root.
+    #[arg(name = "m2dir_name", value_name = "NAME")]
+    pub inner: String,
 }

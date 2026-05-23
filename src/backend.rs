@@ -28,7 +28,7 @@ use clap::Parser;
 /// (config missing, or the operation has no arm for that backend).
 ///
 /// The protocol-specific subcommands (`imap`, `jmap`, `maildir`,
-/// `smtp`) ignore this arg entirely.
+/// `m2dir`, `smtp`) ignore this arg entirely.
 #[derive(Clone, Copy, Debug, Default, Parser, PartialEq, Eq)]
 pub enum Backend {
     #[default]
@@ -36,6 +36,7 @@ pub enum Backend {
     Imap,
     Jmap,
     Maildir,
+    M2dir,
     Smtp,
 }
 
@@ -56,6 +57,11 @@ impl Backend {
         matches!(self, Self::Auto | Self::Maildir)
     }
 
+    /// Whether the m2dir arm of a shared command is allowed to run.
+    pub fn allows_m2dir(self) -> bool {
+        matches!(self, Self::Auto | Self::M2dir)
+    }
+
     /// Whether the SMTP arm of a shared command is allowed to run.
     pub fn allows_smtp(self) -> bool {
         matches!(self, Self::Auto | Self::Smtp)
@@ -71,6 +77,7 @@ impl FromStr for Backend {
             "imap" => Ok(Self::Imap),
             "jmap" => Ok(Self::Jmap),
             "maildir" => Ok(Self::Maildir),
+            "m2dir" => Ok(Self::M2dir),
             "smtp" => Ok(Self::Smtp),
             backend => bail!("Invalid backend {backend}"),
         }
@@ -84,6 +91,7 @@ impl fmt::Display for Backend {
             Self::Imap => write!(f, "imap"),
             Self::Jmap => write!(f, "jmap"),
             Self::Maildir => write!(f, "maildir"),
+            Self::M2dir => write!(f, "m2dir"),
             Self::Smtp => write!(f, "smtp"),
         }
     }

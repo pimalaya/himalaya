@@ -20,7 +20,6 @@ use std::fmt;
 use anyhow::{Result, bail};
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
-use io_maildir::maildir::Maildir;
 use mail_parser::Header;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
@@ -45,17 +44,14 @@ pub struct MaildirEnvelopeGetCommand {
 
 impl MaildirEnvelopeGetCommand {
     pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
-        let maildir = match Maildir::try_from(self.maildir.inner.clone()) {
-            Ok(maildir) => maildir,
-            Err(_) => Maildir::try_from(client.root.join(&self.maildir.inner))?,
-        };
+        let maildir = client.resolve_maildir(&self.maildir.inner)?;
 
         let message = client.get(maildir, &self.id.inner)?;
 
-        let path = message.path().to_owned();
+        let path = message.path().clone();
 
         let Some(parsed) = message.headers() else {
-            bail!("Invalid MIME message at {}", path.display());
+            bail!("Invalid MIME message at {path}");
         };
 
         let table = EnvelopeTable {

@@ -193,6 +193,7 @@ fn build_account_from_discovery(
             imap: None,
             jmap: Some(jmap_to_config(jmap)?),
             maildir: None,
+            m2dir: None,
             smtp: None,
         })
     } else {
@@ -209,6 +210,7 @@ fn build_account_from_discovery(
             imap: Some(imap_to_config(imap)?),
             jmap: None,
             maildir: None,
+            m2dir: None,
             smtp: Some(smtp_to_config(smtp)?),
         })
     }

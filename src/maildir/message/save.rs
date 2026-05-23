@@ -23,7 +23,7 @@ use std::{
 
 use anyhow::Result;
 use clap::Parser;
-use io_maildir::{flag::Flags, maildir::Maildir};
+use io_maildir::flag::Flags;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
@@ -59,10 +59,7 @@ pub struct MaildirMessageSaveCommand {
 
 impl MaildirMessageSaveCommand {
     pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
-        let maildir = match Maildir::try_from(self.maildir.inner.clone()) {
-            Ok(maildir) => maildir,
-            Err(_) => Maildir::try_from(client.root.join(&self.maildir.inner))?,
-        };
+        let maildir = client.resolve_maildir(&self.maildir.inner)?;
 
         let msg = if stdin().is_terminal() || printer.is_json() {
             self.message
@@ -81,6 +78,7 @@ impl MaildirMessageSaveCommand {
         let flags = Flags::from_iter(self.flags.into_iter().map(Into::into));
 
         let (id, path) = client.store(maildir, self.subdir.into(), flags, msg.into_bytes())?;
+        let path = PathBuf::from(path.into_string());
 
         printer.out(StoredMessage { id, path })
     }

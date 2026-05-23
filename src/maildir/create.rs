@@ -33,7 +33,11 @@ pub struct MaildirMailboxCreateCommand {
 
 impl MaildirMailboxCreateCommand {
     pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
-        let path = client.root.join(&self.maildir_name.inner);
+        let path = client
+            .root
+            .join(&self.maildir_name.inner)
+            .to_string_lossy()
+            .into_owned();
 
         client.create_maildir(path)?;
         printer.out(Message::new("Maildir successfully created"))
