@@ -15,12 +15,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, fs, path::Path, path::PathBuf};
+use std::{collections::HashMap, fs, path::Path, path::PathBuf, process::Command};
 
 use anyhow::{Context, Result};
 use comfy_table::ContentArrangement;
 use crossterm::style::Color;
 use pimalaya_config::{
+    command,
     secret::Secret,
     toml::{TomlConfig, shell_expanded_string},
 };
@@ -39,7 +40,7 @@ use serde::{Deserialize, Serialize};
 /// file can be shared with `himalaya-tui`: top-level TUI-only fields
 /// (`display-name`, `signature`, `signature-delim`) are silently
 /// ignored here.
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Config {
     pub downloads_dir: Option<PathBuf>,
@@ -290,7 +291,7 @@ pub struct EnvelopeListTableConfig {
 /// stdin and emit human-readable bytes on stdout (called by
 /// `read-with`). Both are looked up by name; the entry flagged
 /// `default = true` is used when no name is passed.
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MessageConfig {
     #[serde(default)]
@@ -300,14 +301,39 @@ pub struct MessageConfig {
 }
 
 /// Single composer entry under `[message.composer.<name>]`.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+///
+/// For all shell command strings defined below:
+/// - The command is invoked via `sh -c`.
+/// - stdin behavior varies by command as documented below.
+/// - stdout is captured as the MIME draft.
+/// - stderr is inherited so the composer can prompt the user.
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ComposerConfig {
-    /// Shell command line invoked via `sh -c`. Stdin carries the
-    /// source MIME bytes (empty for new messages); stdout is
-    /// captured as the MIME draft; stderr is inherited so the
-    /// composer can prompt the user.
-    pub command: String,
+    /// Command used to write a brand new message.
+    ///
+    /// This is invoked by the `compose-with` and `mailto` commands.
+    ///
+    /// - When invoked by `compose-with`, stdin is empty.
+    /// - When invoked by `mailto`, stdin is piped with a pre-filled RFC 5322
+    ///   draft skeleton built from the parsed RFC 6068 `mailto:` URI parameters
+    ///   (such as to, cc, bcc, subject, and body).
+    #[serde(with = "command")]
+    pub compose: Command,
+
+    /// Command used to reply to an existing message.
+    ///
+    /// This is invoked by the `reply-with` command. The original message's
+    /// MIME bytes are passed via stdin.
+    #[serde(with = "command")]
+    pub reply: Command,
+
+    /// Command used to forward an existing message.
+    ///
+    /// This is invoked by the `forward-with` command. The original message's
+    /// MIME bytes are passed via stdin.
+    #[serde(with = "command")]
+    pub forward: Command,
 
     /// Marks this entry as the fallback when `compose-with` /
     /// `reply-with` / `forward-with` are invoked without a name.
@@ -318,14 +344,15 @@ pub struct ComposerConfig {
 }
 
 /// Single reader entry under `[message.reader.<name>]`.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ReaderConfig {
     /// Shell command line invoked via `sh -c`. Stdin carries the
     /// source MIME bytes; stdout is forwarded to the terminal (zero
     /// bytes is fine — the reader may have spawned its own UI);
     /// stderr is inherited.
-    pub command: String,
+    #[serde(with = "command")]
+    pub command: Command,
 
     /// Marks this entry as the fallback when `read-with` is
     /// invoked without a name.

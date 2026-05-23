@@ -18,6 +18,7 @@
 use anyhow::{Result, bail};
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
+use pimalaya_config::command::shell;
 
 use crate::shared::{
     client::EmailClient,
@@ -59,16 +60,17 @@ impl MessageForwardWithCommand {
     pub fn execute(self, printer: &mut impl Printer, mut client: EmailClient) -> Result<()> {
         let source = client.get_message(&self.mailbox, &self.id)?;
 
-        let command = match self.command.as_deref() {
-            Some(cmd) => cmd.to_owned(),
-            None => {
-                runner::resolve_composer(&client.account.composer, self.name.as_deref())?.to_owned()
-            }
-        };
+        let mut command = self.command.map(|cmd| shell(&cmd));
+        let command = command.as_mut().unwrap_or(
+            &mut client
+                .account
+                .get_composer_mut(self.name.as_deref())?
+                .forward,
+        );
 
-        let raw = runner::run(&command, &source)?;
+        let raw = runner::run(command, &source)?;
         if raw.is_empty() {
-            bail!("composer `{command}` produced no output");
+            bail!("composer `{command:?}` produced no output");
         }
 
         output::route(printer, &mut client, raw, self.save.as_deref(), self.send)
