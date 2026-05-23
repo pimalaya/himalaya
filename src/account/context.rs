@@ -30,6 +30,7 @@
 
 use std::{collections::HashMap, env::temp_dir, path::PathBuf};
 
+use anyhow::{Result, anyhow};
 use comfy_table::{Color as TableColor, ContentArrangement, presets};
 use crossterm::style::Color;
 use dirs::download_dir;
@@ -195,6 +196,36 @@ impl Account {
         self.mailbox_alias
             .get(DEFAULT_MAILBOX_ALIAS)
             .map(String::as_str)
+    }
+
+    /// Gets a composer configuration. When `name` is given, looks up
+    /// the corresponding entry and bails if missing.
+    /// When `name` is `None`, returns the entry with `default = true`,
+    /// or bails with a hint if no default is set.
+    pub fn get_composer(&self, name: Option<&str>) -> Result<&ComposerConfig> {
+        match name {
+            Some(name) => self
+                .composer
+                .get(name)
+                .ok_or(anyhow!("no composer named `{name}` in [message.composer]")),
+            None => self.composer.values().find(|c| c.default).ok_or(anyhow!(
+                "no composer specified and no default in [message.composer.*]; \
+                 pass a <name> or set `default = true` on one entry"
+            )),
+        }
+    }
+
+    pub fn get_reader(&self, name: Option<&str>) -> Result<&ReaderConfig> {
+        match name {
+            Some(name) => self
+                .reader
+                .get(name)
+                .ok_or(anyhow!("no reader named `{name}` in [message.reader]")),
+            None => self.reader.values().find(|c| c.default).ok_or(anyhow!(
+                "no reader specified and no default in [message.reader.*]; \
+             pass a <name> or set `default = true` on one entry"
+            )),
+        }
     }
 
     // ── envelopes list — flag glyphs ─────────────────────────────────────

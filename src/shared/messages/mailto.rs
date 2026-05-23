@@ -21,14 +21,11 @@ use percent_encoding::percent_decode_str;
 use pimalaya_cli::printer::Printer;
 use url::Url;
 
-use crate::{
-    config::Composer,
-    shared::{
-        client::EmailClient,
-        messages::{
-            builder::{self, BuilderArgs},
-            output, runner,
-        },
+use crate::shared::{
+    client::EmailClient,
+    messages::{
+        builder::{self, BuilderArgs},
+        output, runner,
     },
 };
 
@@ -91,17 +88,14 @@ impl MessageMailtoCommand {
             None,
         )?;
 
-        let command = match self.command.as_deref() {
-            Some(cmd) => cmd.to_owned(),
-            None => runner::resolve_composer(
-                Composer::Compose,
-                &client.account.composer,
-                self.name.as_deref(),
-            )?
-            .to_owned(),
-        };
+        let command = self.command.as_deref().unwrap_or(
+            &client
+                .account
+                .get_composer(self.name.as_deref())?
+                .compose_command,
+        );
 
-        let raw = runner::run(&command, &draft)?;
+        let raw = runner::run(command, &draft)?;
         if raw.is_empty() {
             bail!("composer `{command}` produced no output");
         }

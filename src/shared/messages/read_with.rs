@@ -59,13 +59,15 @@ impl MessageReadWithCommand {
         let source = client.get_message(&self.mailbox, &self.id)?;
 
         let command = match self.command.as_deref() {
-            Some(cmd) => cmd.to_owned(),
-            None => {
-                runner::resolve_reader(&client.account.reader, self.name.as_deref())?.to_owned()
-            }
+            Some(cmd) => cmd,
+            None => client
+                .account
+                .get_reader(self.name.as_deref())?
+                .command
+                .as_str(),
         };
 
-        let bytes = runner::run(&command, &source)?;
+        let bytes = runner::run(command, &source)?;
 
         if !bytes.is_empty() {
             let mut out = stdout().lock();

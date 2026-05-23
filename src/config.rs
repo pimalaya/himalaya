@@ -339,23 +339,6 @@ pub struct ComposerConfig {
     pub default: bool,
 }
 
-#[derive(Clone, Copy)]
-pub enum Composer {
-    Compose,
-    Reply,
-    Forward,
-}
-
-impl ComposerConfig {
-    pub fn get_command(&self, composer: Composer) -> &String {
-        match composer {
-            Composer::Compose => &self.compose_command,
-            Composer::Reply => &self.reply_command,
-            Composer::Forward => &self.forward_command,
-        }
-    }
-}
-
 /// Single reader entry under `[message.reader.<name>]`.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]

@@ -26,64 +26,11 @@
 //! `/dev/tty` once they've consumed stdin — standard Unix practice.
 
 use std::{
-    collections::HashMap,
     io::Write,
     process::{Command, Stdio},
 };
 
 use anyhow::{Result, anyhow, bail};
-
-use crate::config::{Composer, ComposerConfig, ReaderConfig};
-
-/// Resolves a composer entry to its shell command line. When `name`
-/// is given, looks up the corresponding entry and bails if missing.
-/// When `name` is `None`, returns the entry with `default = true`,
-/// or bails with a hint if no default is set.
-pub fn resolve_composer<'a>(
-    composer_type: Composer,
-    composers: &'a HashMap<String, ComposerConfig>,
-    name: Option<&str>,
-) -> Result<&'a str> {
-    match name {
-        Some(name) => match composers.get(name) {
-            Some(entry) => Ok(entry.get_command(composer_type).as_str()),
-            None => bail!("no composer named `{name}` in [message.composer]"),
-        },
-        None => default_composer(composers).map(|entry| entry.get_command(composer_type).as_str()),
-    }
-}
-
-/// Same as [`resolve_composer`] but for readers.
-pub fn resolve_reader<'a>(
-    readers: &'a HashMap<String, ReaderConfig>,
-    name: Option<&str>,
-) -> Result<&'a str> {
-    match name {
-        Some(name) => match readers.get(name) {
-            Some(entry) => Ok(entry.command.as_str()),
-            None => bail!("no reader named `{name}` in [message.reader]"),
-        },
-        None => default_reader(readers).map(|entry| entry.command.as_str()),
-    }
-}
-
-fn default_composer(composers: &HashMap<String, ComposerConfig>) -> Result<&ComposerConfig> {
-    composers.values().find(|c| c.default).ok_or_else(|| {
-        anyhow!(
-            "no composer specified and no default in [message.composer.*]; \
-                 pass a <name> or set `default = true` on one entry"
-        )
-    })
-}
-
-fn default_reader(readers: &HashMap<String, ReaderConfig>) -> Result<&ReaderConfig> {
-    readers.values().find(|c| c.default).ok_or_else(|| {
-        anyhow!(
-            "no reader specified and no default in [message.reader.*]; \
-             pass a <name> or set `default = true` on one entry"
-        )
-    })
-}
 
 /// Spawns `command` through `sh -c`, writes `stdin_bytes` to its
 /// stdin, and returns the captured stdout bytes. Stderr is inherited.

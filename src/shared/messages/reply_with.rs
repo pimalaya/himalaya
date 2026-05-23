@@ -19,12 +19,9 @@ use anyhow::{Result, bail};
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 
-use crate::{
-    config::Composer,
-    shared::{
-        client::EmailClient,
-        messages::{output, runner},
-    },
+use crate::shared::{
+    client::EmailClient,
+    messages::{output, runner},
 };
 
 /// Reply to a message by delegating to a user-defined composer.
@@ -67,17 +64,14 @@ impl MessageReplyWithCommand {
     pub fn execute(self, printer: &mut impl Printer, mut client: EmailClient) -> Result<()> {
         let source = client.get_message(&self.mailbox, &self.id)?;
 
-        let command = match self.command.as_deref() {
-            Some(cmd) => cmd.to_owned(),
-            None => runner::resolve_composer(
-                Composer::Reply,
-                &client.account.composer,
-                self.name.as_deref(),
-            )?
-            .to_owned(),
-        };
+        let command = self.command.as_deref().unwrap_or(
+            &client
+                .account
+                .get_composer(self.name.as_deref())?
+                .reply_command,
+        );
 
-        let raw = runner::run(&command, &source)?;
+        let raw = runner::run(command, &source)?;
         if raw.is_empty() {
             bail!("composer `{command}` produced no output");
         }
