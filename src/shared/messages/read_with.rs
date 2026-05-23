@@ -20,6 +20,7 @@ use std::io::{Write, stdout};
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
+use pimalaya_config::command::shell;
 
 use crate::shared::{client::EmailClient, messages::runner};
 
@@ -58,14 +59,10 @@ impl MessageReadWithCommand {
     pub fn execute(self, _printer: &mut impl Printer, mut client: EmailClient) -> Result<()> {
         let source = client.get_message(&self.mailbox, &self.id)?;
 
-        let command = match self.command.as_deref() {
-            Some(cmd) => cmd,
-            None => client
-                .account
-                .get_reader(self.name.as_deref())?
-                .command
-                .as_str(),
-        };
+        let mut command = self.command.map(|cmd| shell(&cmd));
+        let command = command
+            .as_mut()
+            .unwrap_or(&mut client.account.get_reader_mut(self.name.as_deref())?.command);
 
         let bytes = runner::run(command, &source)?;
 

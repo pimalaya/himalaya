@@ -49,7 +49,7 @@ const DEFAULT_REPLIED_CHAR: char = 'R';
 const DEFAULT_FLAGGED_CHAR: char = '!';
 const DEFAULT_ATTACHMENT_CHAR: char = '@';
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 pub struct Account {
     pub downloads_dir: Option<PathBuf>,
     pub table_preset: Option<String>,
@@ -202,26 +202,30 @@ impl Account {
     /// the corresponding entry and bails if missing.
     /// When `name` is `None`, returns the entry with `default = true`,
     /// or bails with a hint if no default is set.
-    pub fn get_composer(&self, name: Option<&str>) -> Result<&ComposerConfig> {
+    pub fn get_composer_mut(&mut self, name: Option<&str>) -> Result<&mut ComposerConfig> {
         match name {
             Some(name) => self
                 .composer
-                .get(name)
+                .get_mut(name)
                 .ok_or(anyhow!("no composer named `{name}` in [message.composer]")),
-            None => self.composer.values().find(|c| c.default).ok_or(anyhow!(
-                "no composer specified and no default in [message.composer.*]; \
+            None => self
+                .composer
+                .values_mut()
+                .find(|c| c.default)
+                .ok_or(anyhow!(
+                    "no composer specified and no default in [message.composer.*]; \
                  pass a <name> or set `default = true` on one entry"
-            )),
+                )),
         }
     }
 
-    pub fn get_reader(&self, name: Option<&str>) -> Result<&ReaderConfig> {
+    pub fn get_reader_mut(&mut self, name: Option<&str>) -> Result<&mut ReaderConfig> {
         match name {
             Some(name) => self
                 .reader
-                .get(name)
+                .get_mut(name)
                 .ok_or(anyhow!("no reader named `{name}` in [message.reader]")),
-            None => self.reader.values().find(|c| c.default).ok_or(anyhow!(
+            None => self.reader.values_mut().find(|c| c.default).ok_or(anyhow!(
                 "no reader specified and no default in [message.reader.*]; \
              pass a <name> or set `default = true` on one entry"
             )),

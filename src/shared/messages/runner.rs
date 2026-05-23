@@ -32,32 +32,31 @@ use std::{
 
 use anyhow::{Result, anyhow, bail};
 
-/// Spawns `command` through `sh -c`, writes `stdin_bytes` to its
-/// stdin, and returns the captured stdout bytes. Stderr is inherited.
+/// Spawns `command`, writes `stdin_bytes` to its
+/// stdin, and returns the captured stdout bytes.
+/// Stderr is inherited.
 /// Bails on a non-zero exit status.
-pub fn run(command: &str, stdin_bytes: &[u8]) -> Result<Vec<u8>> {
-    let mut child = Command::new("sh")
-        .arg("-c")
-        .arg(command)
+pub fn run(command: &mut Command, stdin_bytes: &[u8]) -> Result<Vec<u8>> {
+    let mut child = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .spawn()
-        .map_err(|err| anyhow!("spawn `{command}`: {err}"))?;
+        .map_err(|err| anyhow!("spawn `{command:?}`: {err}"))?;
 
     if let Some(mut stdin) = child.stdin.take() {
         stdin
             .write_all(stdin_bytes)
-            .map_err(|err| anyhow!("write stdin to `{command}`: {err}"))?;
+            .map_err(|err| anyhow!("write stdin to `{command:?}`: {err}"))?;
     }
 
     let output = child
         .wait_with_output()
-        .map_err(|err| anyhow!("wait `{command}`: {err}"))?;
+        .map_err(|err| anyhow!("wait `{command:?}`: {err}"))?;
 
     if !output.status.success() {
         bail!(
-            "`{command}` exited with status {}",
+            "`{command:?}` exited with status {}",
             output
                 .status
                 .code()

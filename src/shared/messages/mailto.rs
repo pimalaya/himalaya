@@ -19,6 +19,7 @@ use anyhow::{Result, anyhow, bail};
 use clap::Parser;
 use percent_encoding::percent_decode_str;
 use pimalaya_cli::printer::Printer;
+use pimalaya_config::command::shell;
 use url::Url;
 
 use crate::shared::{
@@ -88,16 +89,17 @@ impl MessageMailtoCommand {
             None,
         )?;
 
-        let command = self.command.as_deref().unwrap_or(
-            &client
+        let mut command = self.command.map(|cmd| shell(&cmd));
+        let command = command.as_mut().unwrap_or(
+            &mut client
                 .account
-                .get_composer(self.name.as_deref())?
-                .compose_command,
+                .get_composer_mut(self.name.as_deref())?
+                .compose,
         );
 
         let raw = runner::run(command, &draft)?;
         if raw.is_empty() {
-            bail!("composer `{command}` produced no output");
+            bail!("composer `{command:?}` produced no output");
         }
 
         output::route(printer, &mut client, raw, self.save.as_deref(), self.send)
