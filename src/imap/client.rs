@@ -29,6 +29,7 @@ use std::{
 
 use anyhow::{Result, anyhow};
 use io_imap::client::ImapClientStd as Inner;
+use io_imap::types::core::{IString, NString};
 use pimalaya_config::toml::TomlConfig;
 use pimalaya_stream::{sasl::Sasl, std::stream::StreamStd, tls::Tls};
 use url::Url;
@@ -48,7 +49,58 @@ impl ImapClient {
         tls.rustls.alpn = vec!["imap".into()];
         let sasl: Option<Sasl> = config.sasl.map(Sasl::try_from).transpose()?;
         let server = parse_imap_server(&config.server)?;
-        let inner = Inner::<StreamStd>::connect(&server, &tls, config.starttls, sasl)?;
+        let mut inner = Inner::<StreamStd>::connect(&server, &tls, config.starttls, sasl)?;
+
+        // Send IMAP ID (RFC 2971) after authentication when configured.
+        // Some servers (e.g. NetEase 163) require this before allowing
+        // mailbox SELECT.
+        if config.extensions.id.send_after_auth {
+            let name = config
+                .extensions
+                .id
+                .name
+                .clone()
+                .unwrap_or_else(|| "Himalaya".into());
+            let version = config
+                .extensions
+                .id
+                .version
+                .clone()
+                .unwrap_or_else(|| env!("CARGO_PKG_VERSION").into());
+            let vendor = config
+                .extensions
+                .id
+                .vendor
+                .clone()
+                .unwrap_or_else(|| "Pimalaya".into());
+            let support_email = config
+                .extensions
+                .id
+                .support_email
+                .clone()
+                .unwrap_or_else(|| "pimalaya.org@posteo.net".into());
+
+            let id_fields: Vec<(IString<'static>, NString<'static>)> = [
+                ("name", NString::try_from(name.into_bytes()).unwrap()),
+                (
+                    "version",
+                    NString::try_from(version.into_bytes()).unwrap(),
+                ),
+                ("vendor", NString::try_from(vendor.into_bytes()).unwrap()),
+                (
+                    "support-email",
+                    NString::try_from(support_email.into_bytes()).unwrap(),
+                ),
+            ]
+            .into_iter()
+            .map(|(k, v)| (IString::try_from(k).unwrap(), v))
+            .collect();
+
+            if let Err(err) = inner.id(Some(id_fields)) {
+                log::warn!("IMAP ID command failed (non-fatal): {err}");
+            }
+        }
+
         Ok(Self { inner, account })
     }
 }

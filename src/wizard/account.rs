@@ -49,6 +49,7 @@ pub fn imap_to_config(w: WizardImapConfig) -> Result<ImapConfig> {
         tls: Default::default(),
         starttls,
         sasl,
+        extensions: Default::default(),
     })
 }
 

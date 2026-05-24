@@ -418,6 +418,68 @@ pub struct ImapConfig {
     /// to advertise the ANONYMOUS mechanism explicitly, set
     /// `sasl.anonymous = {}`.
     pub sasl: Option<SaslConfig>,
+
+    /// IMAP extensions configuration (RFC 2971 ID, etc.).
+    #[serde(default)]
+    pub extensions: ImapExtensionsConfig,
+}
+
+/// IMAP extensions configuration.
+///
+/// Controls optional IMAP extensions such as RFC 2971 (ID command).
+/// Each extension is nested under its RFC or feature name.
+///
+/// # Example
+///
+/// ```toml
+/// [accounts.myaccount.imap.extensions.id]
+/// send-after-auth = true
+/// name = "MyClient"           # optional override
+/// version = "1.0"             # optional override
+/// ```
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct ImapExtensionsConfig {
+    /// RFC 2971 ID command configuration. When `send-after-auth`
+    /// is true, an IMAP ID command is sent after authentication.
+    /// The field values are optional overrides; when omitted,
+    /// sensible defaults (name = "Himalaya", vendor = "Pimalaya",
+    /// version = `CARGO_PKG_VERSION`, support-email =
+    /// "pimalaya.org@posteo.net") are used.
+    #[serde(default)]
+    pub id: ImapIdConfig,
+}
+
+/// RFC 2971 IMAP ID command configuration.
+///
+/// Controls whether and how the IMAP ID command is sent after
+/// authentication. Some servers (e.g. NetEase 163) require this
+/// before allowing mailbox SELECT.
+///
+/// When `send-after-auth` is `false` (the default), no ID command
+/// is sent, preserving the behavior of previous versions.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct ImapIdConfig {
+    /// Whether to send the IMAP ID command after authentication.
+    #[serde(default)]
+    pub send_after_auth: bool,
+
+    /// Client name advertised in the ID command.
+    /// Defaults to `"Himalaya"`.
+    pub name: Option<String>,
+
+    /// Client version advertised in the ID command.
+    /// Defaults to `CARGO_PKG_VERSION` at compile time.
+    pub version: Option<String>,
+
+    /// Client vendor advertised in the ID command.
+    /// Defaults to `"Pimalaya"`.
+    pub vendor: Option<String>,
+
+    /// Support email advertised in the ID command.
+    /// Defaults to `"pimalaya.org@posteo.net"`.
+    pub support_email: Option<String>,
 }
 
 /// Maildir configuration.
