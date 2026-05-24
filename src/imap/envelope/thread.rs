@@ -154,10 +154,9 @@ fn fetch_subjects(
 
         for item in items.into_iter() {
             match item {
-                MessageDataItem::Uid(uid_val)
-                    if uid => {
-                        id = uid_val.get();
-                    }
+                MessageDataItem::Uid(uid_val) if uid => {
+                    id = uid_val.get();
+                }
                 MessageDataItem::Envelope(env) => {
                     // NString wraps Option<IString>, access via .0
                     if let Some(s) = &env.subject.0 {
