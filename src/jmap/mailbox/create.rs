@@ -53,8 +53,10 @@ impl JmapMailboxCreateCommand {
         let mut create = BTreeMap::new();
         create.insert(self.name.clone(), new_mailbox);
 
-        let mut args = JmapMailboxSetArgs::default();
-        args.create = Some(create);
+        let args = JmapMailboxSetArgs {
+            create: Some(create),
+            ..Default::default()
+        };
 
         let output = client.mailbox_set(args)?;
 

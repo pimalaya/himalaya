@@ -77,8 +77,10 @@ impl JmapMailboxUpdateCommand {
         let mut update = BTreeMap::new();
         update.insert(self.id.clone(), patch);
 
-        let mut args = JmapMailboxSetArgs::default();
-        args.update = Some(update);
+        let args = JmapMailboxSetArgs {
+            update: Some(update),
+            ..Default::default()
+        };
 
         let output = client.mailbox_set(args)?;
 

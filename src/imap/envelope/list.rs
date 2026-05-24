@@ -182,8 +182,10 @@ fn map_envelopes_table_entries(
     let mut entries: Vec<EnvelopesTableEntry> = data
         .into_iter()
         .map(|(seq, items)| {
-            let mut entry = EnvelopesTableEntry::default();
-            entry.seq = seq.get();
+            let mut entry = EnvelopesTableEntry {
+                seq: seq.get(),
+                ..Default::default()
+            };
 
             for item in items.into_iter() {
                 match item {
