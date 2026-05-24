@@ -1,0 +1,9 @@
+name: Tests
+
+on:
+  push:
+
+jobs:
+  tests:
+    uses: pimalaya/nix/.github/workflows/tests.yml@master
+    secrets: inherit

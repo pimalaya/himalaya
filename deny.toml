@@ -1,7 +1,32 @@
 [sources]
-allow-git = ["https://github.com/soywod/domain", "https://github.com/pimalaya/io-discovery", "https://github.com/pimalaya/io-email", "https://github.com/pimalaya/io-http", "https://github.com/pimalaya/io-imap", "https://github.com/pimalaya/io-jmap", "https://github.com/pimalaya/io-maildir", "https://github.com/pimalaya/io-smtp", "https://github.com/pimalaya/cli", "https://github.com/pimalaya/config", "https://github.com/pimalaya/stream"]
+allow-git = [
+  "https://github.com/pimalaya/cli",
+  "https://github.com/pimalaya/config",
+  "https://github.com/pimalaya/io-discovery",
+  "https://github.com/pimalaya/io-email",
+  "https://github.com/pimalaya/io-http",
+  "https://github.com/pimalaya/io-imap",
+  "https://github.com/pimalaya/io-jmap",
+  "https://github.com/pimalaya/io-m2dir",
+  "https://github.com/pimalaya/io-maildir",
+  "https://github.com/pimalaya/io-smtp",
+  "https://github.com/pimalaya/stream",
+  "https://github.com/soywod/domain"
+]
 unknown-git = "deny"
 unknown-registry = "deny"
 
 [licenses]
-allow = ["0BSD", "AGPL-3.0-only", "Apache-2.0", "Apache-2.0 WITH LLVM-exception", "BSD-3-Clause", "CDLA-Permissive-2.0", "ISC", "MIT", "MPL-2.0", "Unicode-3.0", "Zlib"]
+allow = [
+  "0BSD",
+  "AGPL-3.0-only",
+  "Apache-2.0 WITH LLVM-exception",
+  "Apache-2.0",
+  "BSD-3-Clause",
+  "CDLA-Permissive-2.0",
+  "ISC",
+  "MIT",
+  "MPL-2.0",
+  "Unicode-3.0",
+  "Zlib"
+]
