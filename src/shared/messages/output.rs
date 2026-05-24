@@ -71,10 +71,8 @@ pub fn extract_envelope(raw: &[u8]) -> Result<(String, Vec<String>)> {
         .ok_or_else(|| anyhow!("failed to parse outgoing message"))?;
 
     let mut from_emails = Vec::new();
-    if let Some(header) = parsed.header("From").cloned() {
-        if let HeaderValue::Address(addr) = header {
-            collect_emails(addr, &mut from_emails);
-        }
+    if let Some(HeaderValue::Address(addr)) = parsed.header("From").cloned() {
+        collect_emails(addr, &mut from_emails);
     }
     let from = from_emails
         .into_iter()
@@ -83,10 +81,8 @@ pub fn extract_envelope(raw: &[u8]) -> Result<(String, Vec<String>)> {
 
     let mut to = Vec::new();
     for name in ["To", "Cc", "Bcc"] {
-        if let Some(header) = parsed.header(name).cloned() {
-            if let HeaderValue::Address(addr) = header {
-                collect_emails(addr, &mut to);
-            }
+        if let Some(HeaderValue::Address(addr)) = parsed.header(name).cloned() {
+            collect_emails(addr, &mut to);
         }
     }
 

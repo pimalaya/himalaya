@@ -36,9 +36,11 @@ pub struct JmapMailboxDestroyCommand {
 
 impl JmapMailboxDestroyCommand {
     pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
-        let mut args = JmapMailboxSetArgs::default();
-        args.destroy = Some(self.ids.clone());
-        args.on_destroy_remove_emails = if self.purge { Some(true) } else { None };
+        let args = JmapMailboxSetArgs {
+            destroy: Some(self.ids.clone()),
+            on_destroy_remove_emails: if self.purge { Some(true) } else { None },
+            ..Default::default()
+        };
 
         let output = client.mailbox_set(args)?;
 

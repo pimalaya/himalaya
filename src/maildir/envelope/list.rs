@@ -54,18 +54,20 @@ impl MaildirEnvelopeListCommand {
                 continue;
             };
 
-            let mut row = EnvelopesTableEntry::default();
-
-            row.id = id;
-            row.subject = parsed.subject().unwrap_or("").to_owned();
-
-            if let Some(addr) = parsed.from().and_then(|a| a.first()) {
-                row.from = addr.name().or(addr.address()).unwrap_or("").to_owned();
-            }
-
-            if let Some(date) = parsed.date() {
-                row.date = date.to_rfc822();
-            }
+            let row = EnvelopesTableEntry {
+                id,
+                subject: parsed.subject().unwrap_or("").to_owned(),
+                from: parsed
+                    .from()
+                    .and_then(|a| a.first())
+                    .and_then(|addr| addr.name().or(addr.address()))
+                    .map(str::to_owned)
+                    .unwrap_or_default(),
+                date: parsed
+                    .date()
+                    .map(|date| date.to_rfc822())
+                    .unwrap_or_default(),
+            };
 
             envelopes.push(row);
         }

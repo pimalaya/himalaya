@@ -378,7 +378,7 @@ fn mime_for(path: &Path) -> &'static str {
     {
         let guess = mime_guess::from_path(path).first_or_octet_stream();
         let s = guess.essence_str().to_string();
-        return Box::leak(s.into_boxed_str());
+        Box::leak(s.into_boxed_str())
     }
     #[cfg(not(feature = "maildir"))]
     {

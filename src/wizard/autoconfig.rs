@@ -21,7 +21,7 @@
 //! spinner.
 
 use io_discovery::autoconfig::{
-    client::DiscoveryAutoconfigClientStd,
+    client::{DiscoveryAutoconfigClientStd, DiscoveryAutoconfigClientStdError},
     types::{Autoconfig, SecurityType, Server, ServerType},
 };
 use log::debug;
@@ -35,31 +35,43 @@ use pimalaya_cli::{
 
 use crate::wizard::discover::{DiscoveryResult, discovery_resolver, discovery_tls};
 
+struct Attempt<'a> {
+    label: &'a str,
+    run: &'a dyn Fn(
+        &mut DiscoveryAutoconfigClientStd,
+    ) -> Result<Autoconfig, DiscoveryAutoconfigClientStdError>,
+}
+
 pub fn run(local_part: &str, domain: &str) -> Option<Autoconfig> {
     let mut client =
         DiscoveryAutoconfigClientStd::new(discovery_resolver()).with_tls(discovery_tls());
 
-    let attempts: [(&str, &dyn Fn(&mut DiscoveryAutoconfigClientStd) -> _); 3] = [
-        ("Autoconfig ISP main URL", &|c| {
-            c.isp(local_part, domain, true)
-        }),
-        ("Autoconfig ISP fallback URL", &|c| {
-            c.isp_fallback(domain, true)
-        }),
-        ("Thunderbird ISPDB", &|c| c.ispdb(domain, true)),
+    let attempts = [
+        Attempt {
+            label: "Autoconfig ISP main URL",
+            run: &|c| c.isp(local_part, domain, true),
+        },
+        Attempt {
+            label: "Autoconfig ISP fallback URL",
+            run: &|c| c.isp_fallback(domain, true),
+        },
+        Attempt {
+            label: "Thunderbird ISPDB",
+            run: &|c| c.ispdb(domain, true),
+        },
     ];
 
-    for (label, run) in attempts {
-        let spinner = Spinner::start(format!("Probing {label} for {domain}…"));
+    for attempt in attempts {
+        let spinner = Spinner::start(format!("Probing {} for {domain}…", attempt.label));
 
-        match run(&mut client) {
+        match (attempt.run)(&mut client) {
             Ok(config) => {
                 spinner.success(summary(domain, &config));
                 return Some(config);
             }
             Err(err) => {
-                debug!("{label} for {domain} failed: {err}");
-                spinner.failure(format!("{label}: not available for {domain}"));
+                debug!("{} for {domain} failed: {err}", attempt.label);
+                spinner.failure(format!("{}: not available for {domain}", attempt.label));
             }
         }
     }
