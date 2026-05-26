@@ -127,15 +127,19 @@
 
 # Composers produce a MIME draft on stdout. They are invoked by the
 # `messages compose-with` / `reply-with` / `forward-with` subcommands.
-# Stdin carries the source MIME bytes (empty for new messages); stderr is
-# inherited so the composer can prompt the user.
+# Each entry declares one shell command per operation: `compose` (for blank
+# drafts and `mailto`), `reply`, and `forward`. Stdin carries the source MIME
+# bytes for `reply` / `forward` and is empty for `compose`; stderr is inherited
+# so the composer can prompt the user.
 #
 # Pick one with `compose-with <name>`, or let himalaya use the entry flagged
 # `default = true` when no name is passed.
 #
 # Example using https://github.com/pimalaya/mml:
 #[message.composer.mml]
-#command = "mml compose"
+#compose = "mml compose"
+#reply = "mml reply"
+#forward = "mml forward"
 #default = true
 
 # Readers consume a MIME message on stdin and emit human-readable bytes on

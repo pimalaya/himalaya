@@ -82,6 +82,20 @@ serde = "1"
 serde_json = "1"
 tempfile = "3"
 
+# [patch.crates-io]
+# domain = { git = "https://github.com/soywod/domain", branch = "new-srv" }
+# io-discovery.path = "../io-discovery"
+# io-email.path = "../io-email"
+# io-http.path = "../io-http"
+# io-imap.path = "../io-imap"
+# io-jmap.path = "../io-jmap"
+# io-m2dir.path = "../io-m2dir"
+# io-maildir.path = "../io-maildir"
+# io-smtp.path = "../io-smtp"
+# pimalaya-cli.path = "../cli"
+# pimalaya-config.path = "../config"
+# pimalaya-stream.path = "../stream"
+
 [patch.crates-io]
 domain = { git = "https://github.com/soywod/domain", branch = "new-srv" }
 io-discovery.git = "https://github.com/pimalaya/io-discovery"

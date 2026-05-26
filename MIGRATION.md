@@ -96,7 +96,7 @@ The full configuration schema is documented in [config.sample.toml](./config.sam
 
 - Removed `display-name`, `signature`, `signature-delim`: composition left the CLI.
 - Only `downloads-dir` remains for the `attachments download` command.
-- Composition / reading hooks live under `[message.composer.<name>]` and `[message.reader.<name>]`; each entry sets a `command` and optionally `default = true`.
+- Composition / reading hooks live under `[message.composer.<name>]` and `[message.reader.<name>]`, each optionally flagged `default = true`. A composer entry sets one shell command per operation (`compose`, `reply`, `forward`); a reader entry sets a single `command`.
 - The `message`, `template` and `pgp` top-level entries are removed.
 
 #### Table customization

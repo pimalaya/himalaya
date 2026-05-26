@@ -3,16 +3,10 @@
   <h1>📫 Himalaya</h1>
   <p>CLI to manage emails</p>
   <p>
-    <a href="https://github.com/pimalaya/himalaya/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/pimalaya/himalaya?color=success"/></a>
-    <a href="https://repology.org/project/himalaya/versions"><img alt="Repology" src="https://img.shields.io/repology/repositories/himalaya?color=success"></a>
     <a href="https://matrix.to/#/#pimalaya:matrix.org"><img alt="Matrix" src="https://img.shields.io/badge/chat-%23pimalaya-blue?style=flat&logo=matrix&logoColor=white"/></a>
     <a href="https://fosstodon.org/@pimalaya"><img alt="Mastodon" src="https://img.shields.io/badge/news-%40pimalaya-blue?style=flat&logo=mastodon&logoColor=white"/></a>
   </p>
 </div>
-
-```
-himalaya envelopes list --account posteo -m Archives.FOSS --page 2
-```
 
 ![screenshot](./screenshot.jpeg)
 
@@ -47,27 +41,30 @@ himalaya envelopes list --account posteo -m Archives.FOSS --page 2
 
 - **Shared API** that maps `mailboxes`, `envelopes`, `flags`, `messages` and `attachments` to the active backend
 - **Protocol-specific APIs** exposing each backend's full surface (`himalaya imap/smtp/maildir/jmap…`)
-- **IMAP** support <sup>[rfc9051](https://www.iana.org/go/rfc9051)</sup> (requires `imap` feature)
-- **JMAP** support <sup>[rfc8620](https://www.iana.org/go/rfc8620), [rfc8621](https://www.iana.org/go/rfc8621)</sup> (requires `jmap` feature)
-- **Maildir** support (requires `maildir` feature)
-- **SMTP** backend <sup>[rfc5321](https://www.iana.org/go/rfc5321)</sup> (requires `smtp` feature)
+- Remote backend support: **IMAP**, **SMTP**, **JMAP**
+- Local (filesystem) backends support: **Maildir** <sup>[specs](https://cr.yp.to/proto/maildir.html)</sup>, **m2dir** <sup>[specs](https://man.sr.ht/~bitfehler/m2dir/)</sup>
+- **Simple auth** support for IMAP/SMTP: anonymous, login, plain, oauthbearer, xoauth2, scram-sha-256
+- **HTTP auth** support for JMAP: basic, bearer
 - **TLS** support:
-  - [native-tls](https://crates.io/crates/native-tls) (requires `native-tls` feature)
-  - [rustls](https://crates.io/crates/rustls):
-    - AWS-LC crypto provider (requires `rustls-aws` feature)
-    - Ring crypto provider (requires `rustls-ring` feature)
-- **SASL** support: anonymous, login, plain, oauthbearer, xoauth2, scram-sha-256
-- **Provider discovery** wizard powered by [io-discovery](https://github.com/pimalaya/io-discovery): Thunderbird Autoconfiguration, PACC and RFC 6186 SRV lookups
-- **TOML** configuration with multi-account support
+  - [Rustls](https://crates.io/crates/rustls) with ring crypto
+  - [Rustls](https://crates.io/crates/rustls) with aws crypto (requires `rustls-aws` feature)
+  - [Native TLS](https://crates.io/crates/native-tls) (requires `native-tls` feature)
+- **Discovery** support:
+  - PACC <sup>[specs](https://datatracker.ietf.org/doc/html/draft-ietf-mailmaint-pacc)</sup>
+  - Autoconfiguration (Thunderbird) <sup>[specs](https://wiki.mozilla.org/Thunderbird:Autoconfiguration)</sup>
+  - SRV DNS lookups <sup>[rfc6186](https://datatracker.ietf.org/doc/html/rfc6186)</sup>
+- **TOML configuration** with multi-account support
+- **Shared configuration file** with `himalaya-tui`: same `[accounts.<name>]` blocks load on both binaries (see [Configuration](#configuration))
 - **JSON** output via `--json`
 
-*Himalaya CLI is written in [Rust](https://www.rust-lang.org/), and relies on [cargo features](https://doc.rust-lang.org/cargo/reference/features.html) to enable or disable functionalities. Default features can be found in the `features` section of the [`Cargo.toml`](./Cargo.toml#L18), or on [docs.rs](https://docs.rs/crate/himalaya/latest/features).*
+> [!TIP]
+> Himalaya is written in [Rust](https://www.rust-lang.org/) and uses [cargo features](https://doc.rust-lang.org/cargo/reference/features.html) to gate backend support. The default feature set is declared in [Cargo.toml](./Cargo.toml).
 
 ## Installation
 
 ### Pre-built binary
 
-Himalaya CLI can be installed with the `install.sh` installer:
+Himalaya can be installed with the `install.sh` installer:
 
 *As root:*
 
@@ -83,39 +80,34 @@ curl -sSL https://raw.githubusercontent.com/pimalaya/himalaya/master/install.sh 
 
 These commands install the latest binary from the GitHub [releases](https://github.com/pimalaya/himalaya/releases) section.
 
-If you want a more up-to-date version than the latest release, check out the [releases](https://github.com/pimalaya/himalaya/actions/workflows/releases.yml) GitHub workflow and look for the *Artifacts* section. You will find a pre-built binary matching your OS. These pre-built binaries are built from the `master` branch.
+For a more up-to-date version than the latest release, check out the [releases](https://github.com/pimalaya/himalaya/actions/workflows/releases.yml) GitHub workflow and look for the *Artifacts* section. These pre-built binaries are built from the `master` branch.
 
-*Such binaries are built with the default cargo features. If you need more features, please use another installation method.*
+> [!NOTE]
+> Such binaries are built with the default cargo features. If you need specific features, please use another installation method.
 
 ### Cargo
-
-Himalaya CLI can be installed with [cargo](https://doc.rust-lang.org/cargo/):
-
-```
-cargo install himalaya --locked
-```
-
-With only IMAP support:
-
-```
-cargo install himalaya --locked --no-default-features --features imap
-```
-
-You can also use the git repository for a more up-to-date (but less stable) version:
 
 ```
 cargo install --locked --git https://github.com/pimalaya/himalaya.git
 ```
 
+With only IMAP+SMTP support:
+
+```
+cargo install --locked --git https://github.com/pimalaya/himalaya.git \
+  --no-default-features \
+  --features imap,smtp,rustls-ring
+```
+
 ### Arch Linux
 
-Himalaya CLI can be installed on [Arch Linux](https://archlinux.org/) with either the community repository:
+From the community repository:
 
 ```
 pacman -S himalaya
 ```
 
-or the [user repository](https://aur.archlinux.org/):
+Or the [user repository](https://aur.archlinux.org/):
 
 ```
 git clone https://aur.archlinux.org/himalaya-git.git
@@ -123,7 +115,7 @@ cd himalaya-git
 makepkg -isc
 ```
 
-If you use [yay](https://github.com/Jguer/yay), it is even simplier:
+Or with [yay](https://github.com/Jguer/yay):
 
 ```
 yay -S himalaya-git
@@ -131,17 +123,14 @@ yay -S himalaya-git
 
 ### Homebrew
 
-Himalaya CLI can be installed with [Homebrew](https://brew.sh/):
-
 ```
 brew install himalaya
 ```
 
-Note: cargo features are not compatible with brew. If you need a different feature set, please use another installation method.
+> [!NOTE]
+> Cargo features are not compatible with brew. If you need a different feature set, please use another installation method.
 
 ### Scoop
-
-Himalaya CLI can be installed with [Scoop](https://scoop.sh/):
 
 ```
 scoop install himalaya
@@ -149,7 +138,7 @@ scoop install himalaya
 
 ### Fedora Linux/CentOS/RHEL
 
-Himalaya CLI can be installed on [Fedora Linux](https://fedoraproject.org/)/CentOS/RHEL via the [COPR](https://copr.fedorainfracloud.org/coprs/atim/himalaya/) repo:
+From the [COPR](https://copr.fedorainfracloud.org/coprs/atim/himalaya/) repo:
 
 ```
 dnf copr enable atim/himalaya
@@ -158,37 +147,13 @@ dnf install himalaya
 
 ### Nix
 
-Himalaya CLI can be installed with [Nix](https://serokell.io/blog/what-is-nix):
-
-```
-nix-env -i himalaya
-```
-
-You can also use the git repository for a more up-to-date (but less stable) version:
-
-```
-nix-env -if https://github.com/pimalaya/himalaya/archive/master.tar.gz
-```
-
-*Or, from within the source tree checkout:*
-
-```
-nix-env -if .
-```
-
 If you have the [Flakes](https://nixos.wiki/wiki/Flakes) feature enabled:
 
 ```
 nix profile install github:pimalaya/himalaya
 ```
 
-*Or, from within the source tree checkout:*
-
-```
-nix profile install
-```
-
-*You can also run Himalaya directly without installing it:*
+Or run without installing:
 
 ```
 nix run github:pimalaya/himalaya
@@ -199,27 +164,24 @@ nix run github:pimalaya/himalaya
 ```
 git clone https://github.com/pimalaya/himalaya
 cd himalaya
-nix develop --command cargo build --release
+nix run
 ```
-
-*Binaries are available under the `target/release` folder.*
 
 ## Configuration
 
-Just run `himalaya`. When no configuration file is found, the wizard prompts for an account name and email address, runs [provider discovery](https://github.com/pimalaya/io-discovery) (PACC → Thunderbird Autoconfiguration → RFC 6186 SRV), fills the IMAP/SMTP (or JMAP) prompts with the discovered defaults, and writes the result to disk.
+Run `himalaya`. With no configuration file on disk the wizard prompts for an account name and an email address, runs provider discovery (PACC, then Thunderbird Autoconfiguration, then RFC 6186 SRV), fills the IMAP/SMTP (or JMAP) prompts with the discovered defaults, then writes the result to disk.
+
+A persistent configuration is loaded from the first valid path among:
+
+- `$XDG_CONFIG_HOME/himalaya/config.toml`
+- `$HOME/.config/himalaya/config.toml`
+- `$HOME/.himalayarc`
+
+These are the same paths the [himalaya-tui](https://github.com/pimalaya/himalaya-tui) TUI looks at: one TOML file backs both binaries. CLI-only fields and TUI-only sections coexist without errors. See [config.sample.toml](./config.sample.toml) for a documented template.
+
+Override the path with `-c <PATH>` or `HIMALAYA_CONFIG=<PATH>`; multiple paths can be passed at once, separated by `:`. The first one is the base and the rest are deep-merged on top.
 
 Accounts can be (re)configured later with `himalaya account configure <name>`. The wizard skips discovery in this mode: it reuses the existing values as prompt defaults.
-
-You can also write the configuration by hand:
-
-- Copy the documented [./config.sample.toml](./config.sample.toml)
-- Paste it into one of:
-  - `$XDG_CONFIG_HOME/himalaya/config.toml`
-  - `$HOME/.config/himalaya/config.toml`
-  - `$HOME/.himalayarc`
-- Comment or uncomment the options you want
-
-…or pass `-c <PATH>` / set `HIMALAYA_CONFIG=<PATH>`. Multiple paths can be passed at once, separated by `:`; the first is the base and the rest are deep-merged on top.
 
 ## Usage
 
@@ -272,11 +234,13 @@ himalaya messages compose --from me@example.org --to you@example.org \
     --subject "Hello" --body "Hi!" --send
 ```
 
-For richer composition (multipart MIME, MML directives, signing/encryption, editor-driven workflows…), wire a user-defined composer in `[message.composer.*]` and invoke it with the `-with` variants. For example, with [`mml`](https://github.com/pimalaya/mml):
+For richer composition (multipart MIME, MML directives, signing/encryption, editor-driven workflows…), wire a user-defined composer in `[message.composer.*]` and invoke it with the `-with` variants. Each entry declares one shell command per operation (`compose` for blank drafts and `mailto`, `reply` for replies, `forward` for forwards); the source message is piped on stdin for `reply` / `forward`. For example, with [mml](https://github.com/pimalaya/mml):
 
 ```toml
 [message.composer.mml]
-command = "mml compose"
+compose = "mml compose"
+reply = "mml reply"
+forward = "mml forward"
 default = true
 ```
 
@@ -287,7 +251,7 @@ himalaya messages forward-with -m INBOX 42 --send
 himalaya messages mailto 'mailto:bob@example.org?subject=Hi&body=Hello'
 ```
 
-`messages mailto <URI>` parses an RFC 6068 `mailto:` URI (recipient list in the path, `to` / `cc` / `bcc` / `subject` / `body` query parameters), builds a draft RFC 5322 skeleton with those headers pre-filled, then pipes it on stdin to the named (or default) composer for editing. The composer's output is routed through `--save` / `--send` like the other `-with` variants. Useful as a desktop `mailto:` handler.
+`messages mailto <URI>` parses an RFC 6068 `mailto:` URI (recipient list in the path, `to` / `cc` / `bcc` / `subject` / `body` query parameters), builds a draft RFC 5322 skeleton with those headers pre-filled, then pipes it on stdin to the named (or default) composer's `compose` command. The composer's output is routed through `--save` / `--send` like the other `-with` variants. Useful as a desktop `mailto:` handler.
 
 ### Reading messages
 
@@ -309,7 +273,7 @@ Each invocation opens a fresh TCP+TLS+SASL session by default. To amortize the h
 
 ## Interfaces
 
-These interfaces are built at the top of Himalaya CLI to improve the User Experience:
+Himalaya CLI is one of several front-ends to the Pimalaya libraries:
 
 - [pimalaya/himalaya-tui](https://github.com/pimalaya/himalaya-tui): official TUI (in active development)
 - [pimalaya/himalaya-vim](https://github.com/pimalaya/himalaya-vim): Vim plugin
@@ -327,7 +291,7 @@ These interfaces are built at the top of Himalaya CLI to improve the User Experi
 
   Himalaya is a Command-Line Interface (CLI). There is no event loop: you interact with your emails using shell commands, in a stateless way.
 
-  A dedicated TUI ([himalaya-tui](https://github.com/pimalaya/himalaya-tui)) is in active development on top of the same Pimalaya libraries.
+  A dedicated TUI ([himalaya-tui](https://github.com/pimalaya/himalaya-tui)) is in active development on top of the same Pimalaya libraries, and is definitely closer to aerc, mutt and alpine.
 </details>
 
 <details>
@@ -363,7 +327,7 @@ These interfaces are built at the top of Himalaya CLI to improve the User Experi
 </details>
 
 <details>
-  <summary>How to debug Himalaya CLI?</summary>
+  <summary>How to debug Himalaya?</summary>
 
   Use `--log-level <level>` (alias `--log`) where `<level>` is one of `off`, `error`, `warn`, `info`, `debug`, `trace`:
 

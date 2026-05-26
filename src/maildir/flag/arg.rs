@@ -16,7 +16,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use clap::ValueEnum;
-use io_maildir::flag::Flag;
+use io_maildir::flag::MaildirFlag;
 
 #[derive(Clone, Debug, ValueEnum)]
 #[clap(rename_all = "kebab-case")]
@@ -29,15 +29,15 @@ pub enum FlagArg {
     Flagged,
 }
 
-impl From<FlagArg> for Flag {
+impl From<FlagArg> for MaildirFlag {
     fn from(flag: FlagArg) -> Self {
         match flag {
-            FlagArg::Passed => Flag::Passed,
-            FlagArg::Replied => Flag::Replied,
-            FlagArg::Seen => Flag::Seen,
-            FlagArg::Trashed => Flag::Trashed,
-            FlagArg::Draft => Flag::Draft,
-            FlagArg::Flagged => Flag::Flagged,
+            FlagArg::Passed => MaildirFlag::Passed,
+            FlagArg::Replied => MaildirFlag::Replied,
+            FlagArg::Seen => MaildirFlag::Seen,
+            FlagArg::Trashed => MaildirFlag::Trashed,
+            FlagArg::Draft => MaildirFlag::Draft,
+            FlagArg::Flagged => MaildirFlag::Flagged,
         }
     }
 }

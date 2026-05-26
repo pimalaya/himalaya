@@ -17,7 +17,7 @@
 
 use anyhow::Result;
 use clap::Parser;
-use io_maildir::flag::Flags;
+use io_maildir::flag::MaildirFlags;
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::maildir::{
@@ -37,7 +37,7 @@ pub struct MaildirFlagAddCommand {
 
     #[command(flatten)]
     pub maildir: MaildirPathFlag,
-    /// Flag(s) to add to the message
+    /// MaildirFlag(s) to add to the message
     #[arg(long = "flag", short, num_args = 1..)]
     pub flags: Vec<FlagArg>,
 }
@@ -46,12 +46,12 @@ impl MaildirFlagAddCommand {
     pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
         let maildir = client.resolve_maildir(&self.maildir.inner)?;
 
-        let flags = Flags::from_iter(self.flags.into_iter().map(Into::into));
+        let flags = MaildirFlags::from_iter(self.flags.into_iter().map(Into::into));
 
         for id in self.ids.inner {
             client.add_flags(maildir.clone(), id, flags.clone())?;
         }
 
-        printer.out(Message::new("Flag(s) successfully added"))
+        printer.out(Message::new("MaildirFlag(s) successfully added"))
     }
 }

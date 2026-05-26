@@ -20,7 +20,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, Row, Table};
-use io_maildir::flag::Flag;
+use io_maildir::flag::MaildirFlag;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
@@ -40,12 +40,12 @@ impl MaildirFlagListCommand {
             preset: client.account.table_preset().to_string(),
             arrangement: client.account.table_arrangement(),
             flags: vec![
-                FlagRow::new(Flag::Passed),
-                FlagRow::new(Flag::Replied),
-                FlagRow::new(Flag::Seen),
-                FlagRow::new(Flag::Trashed),
-                FlagRow::new(Flag::Draft),
-                FlagRow::new(Flag::Flagged),
+                FlagRow::new(MaildirFlag::Passed),
+                FlagRow::new(MaildirFlag::Replied),
+                FlagRow::new(MaildirFlag::Seen),
+                FlagRow::new(MaildirFlag::Trashed),
+                FlagRow::new(MaildirFlag::Draft),
+                FlagRow::new(MaildirFlag::Flagged),
             ],
         };
 
@@ -69,7 +69,7 @@ pub struct FlagRow {
 }
 
 impl FlagRow {
-    pub fn new(flag: Flag) -> Self {
+    pub fn new(flag: MaildirFlag) -> Self {
         Self {
             code: flag.to_string(),
             name: format!("{flag:?}"),

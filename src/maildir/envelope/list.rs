@@ -40,7 +40,8 @@ impl MaildirEnvelopeListCommand {
     pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
         let maildir = client.resolve_maildir(&self.maildir.inner)?;
 
-        let messages = client.list_messages(maildir)?;
+        let entries: Vec<_> = client.list_entries(maildir)?.into_iter().collect();
+        let messages = client.read_entries_par(&entries)?;
 
         let mut envelopes = Vec::with_capacity(messages.len());
 

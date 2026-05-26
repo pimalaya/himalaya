@@ -23,7 +23,7 @@ use std::{
 
 use anyhow::Result;
 use clap::Parser;
-use io_maildir::flag::Flags;
+use io_maildir::flag::MaildirFlags;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
@@ -75,7 +75,7 @@ impl MaildirMessageSaveCommand {
                 .join("\r\n")
         };
 
-        let flags = Flags::from_iter(self.flags.into_iter().map(Into::into));
+        let flags = MaildirFlags::from_iter(self.flags.into_iter().map(Into::into));
 
         let (id, path) = client.store(maildir, self.subdir.into(), flags, msg.into_bytes())?;
         let path = PathBuf::from(path.into_string());
