@@ -1,6 +1,0 @@
-{
-    "recommendations": [
-        "matklad.rust-analyzer",
-        "arrterian.nix-env-selector"
-    ]
-}
