@@ -47,7 +47,7 @@ convert_case = { version = "0.11", optional = true }
 crossterm = { version = "0.29", default-features = false, features = ["serde"] }
 dirs = "6"
 humansize = "2"
-io-discovery = { version = "0.0.1", default-features = false, features = ["pacc", "autoconfig", "rfc6186", "client"] }
+io-discovery = { version = "0.1.0", default-features = false, features = ["pacc", "autoconfig", "rfc6186", "client"] }
 ariadne = "0.6"
 io-email = { version = "0.0.1", default-features = false, features = ["serde", "client", "search"] }
 io-imap = { version = "0.0.1", default-features = false, optional = true }
