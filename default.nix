@@ -19,8 +19,8 @@ pimalaya.mkDefault (
       }:
       (pkgs.callPackage "${nixpkgs}/pkgs/by-name/hi/himalaya/package.nix" {
         inherit lib rustPlatform;
-        buildNoDefaultFeatures = !defaultFeatures;
-        buildFeatures = lib.splitString "," features;
+        withNoDefaultFeatures = !defaultFeatures;
+        withFeatures = lib.splitString "," features;
       })
       # HACK: needed until new derivation available on nixpkgs's
       # master branch
