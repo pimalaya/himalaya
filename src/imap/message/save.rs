@@ -15,8 +15,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::io::{BufRead, IsTerminal, stdin};
-
 use anyhow::Result;
 use clap::Parser;
 use io_imap::types::{
@@ -24,12 +22,16 @@ use io_imap::types::{
 };
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::imap::{client::ImapClient, mailbox::arg::MailboxNameArg};
+use crate::{
+    imap::{client::ImapClient, mailbox::arg::MailboxNameArg},
+    shared::messages::arg::MessageArg,
+};
 
 /// Save a message to a mailbox.
 ///
-/// This command appends a message to the specified mailbox. The
-/// message is read from stdin in RFC 5322 format (raw email).
+/// Appends a message to the specified mailbox. The message can be
+/// passed as a positional file path, an inline raw string, or piped
+/// via stdin (see [`MessageArg`] for resolution order).
 #[derive(Debug, Parser)]
 pub struct ImapMessageSaveCommand {
     #[command(flatten)]
@@ -39,28 +41,14 @@ pub struct ImapMessageSaveCommand {
     #[arg(short, long, num_args = 0..)]
     pub flag: Vec<String>,
 
-    /// The raw message, including headers and body.
-    #[arg(trailing_var_arg = true)]
-    #[arg(name = "message", value_name = "MESSAGE")]
-    pub message: Vec<String>,
+    #[command(flatten)]
+    pub message: MessageArg,
 }
 
 impl ImapMessageSaveCommand {
     pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
         let mailbox: Mailbox<'static> = self.mailbox.inner.try_into()?;
-        let message = if !self.message.is_empty() || stdin().is_terminal() || printer.is_json() {
-            self.message
-                .join(" ")
-                .replace('\r', "")
-                .replace('\n', "\r\n")
-        } else {
-            stdin()
-                .lock()
-                .lines()
-                .map_while(Result::ok)
-                .collect::<Vec<String>>()
-                .join("\r\n")
-        };
+        let message = self.message.parse()?;
         let message = Literal::try_from(message)?;
         let message = LiteralOrLiteral8::Literal(message);
 

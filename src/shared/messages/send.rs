@@ -15,16 +15,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    io::{BufRead, IsTerminal, stdin},
-    path::PathBuf,
-};
-
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::shared::client::EmailClient;
+use crate::shared::{client::EmailClient, messages::arg::MessageArg};
 
 /// Send a message via the active account.
 ///
@@ -32,42 +27,18 @@ use crate::shared::client::EmailClient;
 /// outgoing backend. The envelope sender is taken from the `From:`
 /// header and recipients are collected from `To:` / `Cc:` / `Bcc:`.
 ///
-/// Source priority: `--file <PATH>` (read from file), otherwise stdin
-/// when piped, otherwise the positional `<MESSAGE>` args joined with
-/// CRLF.
+/// The message can be passed as a positional file path, an inline
+/// raw string, or piped via stdin (see [`MessageArg`] for resolution
+/// order).
 #[derive(Debug, Parser)]
 pub struct MessageSendCommand {
-    /// Read the raw message from this file instead of stdin or the
-    /// positional argument.
-    #[arg(long = "file", value_name = "PATH")]
-    pub file: Option<PathBuf>,
-
-    /// The raw message, including headers and body.
-    #[arg(trailing_var_arg = true)]
-    #[arg(name = "message", value_name = "MESSAGE")]
-    pub message: Vec<String>,
+    #[command(flatten)]
+    pub message: MessageArg,
 }
 
 impl MessageSendCommand {
     pub fn execute(self, printer: &mut impl Printer, mut client: EmailClient) -> Result<()> {
-        let raw: Vec<u8> = if let Some(path) = self.file.as_deref() {
-            std::fs::read(path)?
-        } else if stdin().is_terminal() || printer.is_json() {
-            self.message
-                .join(" ")
-                .replace('\r', "")
-                .replace('\n', "\r\n")
-                .into_bytes()
-        } else {
-            stdin()
-                .lock()
-                .lines()
-                .map_while(Result::ok)
-                .collect::<Vec<String>>()
-                .join("\r\n")
-                .into_bytes()
-        };
-
+        let raw = self.message.parse()?.into_bytes();
         client.send_message(raw)?;
         printer.out(Message::new("Message successfully sent"))
     }

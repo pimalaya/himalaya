@@ -16,6 +16,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 pub mod add;
+pub mod arg;
 pub mod builder;
 pub mod cli;
 pub mod compose;

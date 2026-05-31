@@ -15,11 +15,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    fmt,
-    io::{BufRead, IsTerminal, stdin},
-    path::PathBuf,
-};
+use std::{fmt, path::PathBuf};
 
 use anyhow::Result;
 use clap::Parser;
@@ -27,16 +23,20 @@ use io_maildir::flag::MaildirFlags;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
-use crate::maildir::{
-    arg::{MaildirPathFlag, MaildirSubdirArg},
-    client::MaildirClient,
-    flag::arg::FlagArg,
+use crate::{
+    maildir::{
+        arg::{MaildirPathFlag, MaildirSubdirArg},
+        client::MaildirClient,
+        flag::arg::FlagArg,
+    },
+    shared::messages::arg::MessageArg,
 };
 
 /// Save a message to a mailbox.
 ///
-/// This command appends a message to the specified mailbox. The
-/// message is read from stdin in RFC 5322 format (raw email).
+/// Appends a message to the specified maildir. The message can be
+/// passed as a positional file path, an inline raw string, or piped
+/// via stdin (see [`MessageArg`] for resolution order).
 #[derive(Debug, Parser)]
 pub struct MaildirMessageSaveCommand {
     #[command(flatten)]
@@ -51,30 +51,14 @@ pub struct MaildirMessageSaveCommand {
     #[arg(long = "flag", short, num_args = 0..)]
     pub flags: Vec<FlagArg>,
 
-    /// The raw message, including headers and body.
-    #[arg(trailing_var_arg = true)]
-    #[arg(name = "message", value_name = "MESSAGE")]
-    pub message: Vec<String>,
+    #[command(flatten)]
+    pub message: MessageArg,
 }
 
 impl MaildirMessageSaveCommand {
     pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
         let maildir = client.resolve_maildir(&self.maildir.inner)?;
-
-        let msg = if stdin().is_terminal() || printer.is_json() {
-            self.message
-                .join(" ")
-                .replace('\r', "")
-                .replace('\n', "\r\n")
-        } else {
-            stdin()
-                .lock()
-                .lines()
-                .map_while(Result::ok)
-                .collect::<Vec<String>>()
-                .join("\r\n")
-        };
-
+        let msg = self.message.parse()?;
         let flags = MaildirFlags::from_iter(self.flags.into_iter().map(Into::into));
 
         let (id, path) = client.store(maildir, self.subdir.into(), flags, msg.into_bytes())?;

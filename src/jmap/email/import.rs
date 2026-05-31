@@ -15,10 +15,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    collections::BTreeMap,
-    io::{BufRead, IsTerminal, stdin},
-};
+use std::collections::BTreeMap;
 
 use anyhow::{Result, bail};
 use clap::Parser;
@@ -30,15 +27,20 @@ use pimalaya_cli::printer::{Message, Printer};
 use pimalaya_stream::tls::Tls;
 use url::Url;
 
-use crate::jmap::{
-    client::{JmapClient, jmap_http_auth},
-    error::format_set_error,
+use crate::{
+    jmap::{
+        client::{JmapClient, jmap_http_auth},
+        error::format_set_error,
+    },
+    shared::messages::arg::MessageArg,
 };
 
 /// Import an RFC 5322 message into a mailbox (upload + Email/import).
 ///
-/// Reads the raw message from stdin or as trailing arguments. Use
-/// `--upload-only` to stop after the upload and print the blobId.
+/// The message can be passed as a positional file path, an inline
+/// raw string, or piped via stdin (see [`MessageArg`] for resolution
+/// order). Use `--upload-only` to stop after the upload and print
+/// the blobId.
 #[derive(Debug, Parser)]
 pub struct JmapEmailImportCommand {
     /// Mailbox ID(s) to place the imported email in.
@@ -57,24 +59,13 @@ pub struct JmapEmailImportCommand {
     #[arg(long)]
     pub upload_only: bool,
 
-    /// The raw RFC 5322 message (headers + body). Read from stdin if omitted.
-    #[arg(trailing_var_arg = true)]
-    #[arg(name = "message", value_name = "MESSAGE")]
-    pub message: Vec<String>,
+    #[command(flatten)]
+    pub message: MessageArg,
 }
 
 impl JmapEmailImportCommand {
     pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
-        let data: Vec<u8> = if stdin().is_terminal() || printer.is_json() {
-            self.message
-                .join(" ")
-                .replace('\r', "")
-                .replace('\n', "\r\n")
-                .into_bytes()
-        } else {
-            let lines: Vec<String> = stdin().lock().lines().map_while(Result::ok).collect();
-            lines.join("\r\n").into_bytes()
-        };
+        let data = self.message.parse()?.into_bytes();
 
         let session = client.session().expect("session loaded by new_jmap_client");
         let api_url = session.api_url.clone();

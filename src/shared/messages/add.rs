@@ -15,28 +15,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    fmt,
-    io::{IsTerminal, Read, stdin},
-    path::PathBuf,
-};
+use std::fmt;
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::Parser;
 use io_email::flag::Flag;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
-use crate::shared::{client::EmailClient, flags::arg::FlagArg};
+use crate::shared::{client::EmailClient, flags::arg::FlagArg, messages::arg::MessageArg};
 
 /// Add a raw RFC 5322 message to a mailbox.
 ///
-/// The message body is read from stdin by default; pass `--file
-/// <PATH>` to read from a file instead. IMAP appends via `APPEND`
-/// (RFC 3501); JMAP uploads the blob and imports it via `Email/import`
-/// (the destination mailbox is resolved from `--mailbox` by exact-match
-/// name); Maildir writes a new file under the target maildir's `cur/`
-/// subdir using the standard tmp-then-rename delivery protocol.
+/// The message can be passed as a positional file path, an inline raw
+/// string, or piped via stdin (see [`MessageArg`] for resolution
+/// order). IMAP appends via `APPEND` (RFC 3501); JMAP uploads the
+/// blob and imports it via `Email/import` (the destination mailbox
+/// is resolved from `--mailbox` by exact-match name); Maildir writes
+/// a new file under the target maildir's `cur/` subdir using the
+/// standard tmp-then-rename delivery protocol.
 #[derive(Debug, Parser)]
 pub struct MessageAddCommand {
     /// Destination mailbox name or path. Mandatory.
@@ -47,14 +44,13 @@ pub struct MessageAddCommand {
     #[arg(long = "flag", short = 'f', value_name = "FLAG", num_args = 0..)]
     pub flag: Vec<FlagArg>,
 
-    /// Read the raw message from this file instead of stdin.
-    #[arg(long = "file", value_name = "PATH")]
-    pub file: Option<PathBuf>,
+    #[command(flatten)]
+    pub message: MessageArg,
 }
 
 impl MessageAddCommand {
     pub fn execute(self, printer: &mut impl Printer, mut client: EmailClient) -> Result<()> {
-        let raw = read_raw(&self.file)?;
+        let raw = self.message.parse()?.into_bytes();
         let flags: Vec<Flag> = self.flag.iter().map(Into::into).collect();
         let id = client.add_message(&self.mailbox, &flags, raw)?;
         printer.out(MessageAddOutput { id })
@@ -70,21 +66,4 @@ impl fmt::Display for MessageAddOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Message {} successfully added", self.id)
     }
-}
-
-fn read_raw(file: &Option<PathBuf>) -> Result<Vec<u8>> {
-    if let Some(path) = file {
-        return Ok(std::fs::read(path)?);
-    }
-
-    if stdin().is_terminal() {
-        bail!(
-            "`messages add` reads the raw message from stdin or `--file <PATH>` — \
-             nothing was provided"
-        );
-    }
-
-    let mut buf = Vec::new();
-    stdin().read_to_end(&mut buf)?;
-    Ok(buf)
 }

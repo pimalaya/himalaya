@@ -15,11 +15,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    borrow::Cow,
-    collections::HashSet,
-    io::{BufRead, IsTerminal, stdin},
-};
+use std::{borrow::Cow, collections::HashSet};
 
 use anyhow::{Result, bail};
 use clap::Parser;
@@ -30,40 +26,25 @@ use io_smtp::rfc5321::types::{
 use mail_parser::{Addr, Address, HeaderName, HeaderValue, MessageParser};
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::smtp::client::SmtpClient;
+use crate::{shared::messages::arg::MessageArg, smtp::client::SmtpClient};
 
-/// Send a message to a mailbox.
+/// Send a raw RFC 5322 message via SMTP.
 ///
-/// This command appends a message to the specified mailbox. The
-/// message is read from stdin in RFC 5322 format (raw email).
+/// The message can be passed as a positional file path, an inline
+/// raw string, or piped via stdin (see [`MessageArg`] for resolution
+/// order). The envelope sender is taken from the `From:` header and
+/// recipients are collected from `To:` / `Cc:` / `Bcc:`.
 #[derive(Debug, Parser)]
 pub struct SmtpMessageSendCommand {
-    /// The raw message, including headers and body.
-    #[arg(trailing_var_arg = true)]
-    #[arg(name = "message", value_name = "MESSAGE")]
-    pub message: Vec<String>,
+    #[command(flatten)]
+    pub message: MessageArg,
 }
 
 impl SmtpMessageSendCommand {
     pub fn execute(self, printer: &mut impl Printer, mut client: SmtpClient) -> Result<()> {
-        let message = if stdin().is_terminal() || printer.is_json() {
-            self.message
-                .join(" ")
-                .replace('\r', "")
-                .replace('\n', "\r\n")
-        } else {
-            stdin()
-                .lock()
-                .lines()
-                .map_while(Result::ok)
-                .collect::<Vec<String>>()
-                .join("\r\n")
-        };
-
+        let message = self.message.parse()?;
         let (reverse_path, forward_paths) = into_smtp_msg(message.as_bytes())?;
-
         client.send(reverse_path, forward_paths, message.into_bytes())?;
-
         printer.out(Message::new("Message successfully sent"))
     }
 }
