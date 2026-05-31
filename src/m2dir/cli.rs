@@ -21,21 +21,30 @@ use pimalaya_cli::printer::Printer;
 
 use crate::m2dir::{
     client::M2dirClient, create::M2dirMailboxCreateCommand, delete::M2dirMailboxDeleteCommand,
-    list::M2dirMailboxListCommand,
+    envelope::cli::M2dirEnvelopeCommand, flag::cli::M2dirFlagCommand,
+    list::M2dirMailboxListCommand, message::cli::M2dirMessageCommand,
 };
 
 /// m2dir CLI.
 ///
-/// Protocol-specific entry point for the m2dir backend. Wider
-/// operations (envelopes, flags, messages) go through the shared
-/// commands `himalaya envelopes`, `himalaya flags`, `himalaya
-/// messages` with `--backend m2dir`.
+/// Protocol-specific entry point for the m2dir backend. Mailbox and
+/// per-folder operations (messages, flags, envelopes) live here;
+/// cross-backend shared commands also dispatch here when
+/// `--backend m2dir` is passed.
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum M2dirCommand {
     Create(M2dirMailboxCreateCommand),
     Delete(M2dirMailboxDeleteCommand),
     List(M2dirMailboxListCommand),
+
+    #[command(subcommand)]
+    #[command(aliases = ["msgs", "msg"])]
+    Messages(M2dirMessageCommand),
+    #[command(subcommand)]
+    Flags(M2dirFlagCommand),
+    #[command(subcommand)]
+    Envelopes(M2dirEnvelopeCommand),
 }
 
 impl M2dirCommand {
@@ -44,6 +53,10 @@ impl M2dirCommand {
             Self::Create(cmd) => cmd.execute(printer, client),
             Self::Delete(cmd) => cmd.execute(printer, client),
             Self::List(cmd) => cmd.execute(printer, client),
+
+            Self::Messages(cmd) => cmd.execute(printer, client),
+            Self::Flags(cmd) => cmd.execute(printer, client),
+            Self::Envelopes(cmd) => cmd.execute(printer, client),
         }
     }
 }
