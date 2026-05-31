@@ -17,7 +17,7 @@
 
 use std::{collections::HashMap, fmt};
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
 use io_imap::types::{
@@ -27,7 +27,7 @@ use io_imap::types::{
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
-use crate::imap::client::ImapClient;
+use crate::{config::ImapIdConfig, imap::client::ImapClient};
 
 /// Get information about the IMAP server.
 ///
@@ -45,26 +45,11 @@ pub struct ImapIdCommand {
 
 impl ImapIdCommand {
     pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
-        let mut params = HashMap::new();
-
-        params.extend([
-            (
-                IString::try_from("name").unwrap(),
-                NString::try_from(env!("CARGO_PKG_NAME")).unwrap(),
-            ),
-            (
-                IString::try_from("version").unwrap(),
-                NString::try_from(env!("CARGO_PKG_VERSION")).unwrap(),
-            ),
-            (
-                IString::try_from("vendor").unwrap(),
-                NString::try_from("Pimalaya").unwrap(),
-            ),
-            (
-                IString::try_from("support-url").unwrap(),
-                NString::try_from("https://github.com/pimalaya/himalaya").unwrap(),
-            ),
-        ]);
+        let mut params: HashMap<IString<'static>, NString<'static>> = HashMap::new();
+        for key in ["name", "version", "vendor", "support-url"] {
+            let (k, v) = build_canned_pair(key)?;
+            params.insert(k, v);
+        }
 
         if let Some(more) = self.parameter {
             params.extend(more);
@@ -91,28 +76,6 @@ impl ImapIdCommand {
 
         printer.out(table)
     }
-}
-
-fn parameter_parser(param: &str) -> Result<(IString<'static>, NString<'static>), String> {
-    let Some((key, val)) = param.split_once(':') else {
-        return Err(format!("Invalid parameter `{param}`: missing `:`"));
-    };
-
-    let Ok(ikey) = IString::try_from(key.trim()) else {
-        return Err(format!("Invalid parameter key `{key}`"));
-    };
-
-    let nval = if val.trim().is_empty() {
-        NString::NIL
-    } else {
-        let Ok(nval) = NString::try_from(val.trim()) else {
-            return Err(format!("Invalid parameter value `{val}` for `{key}`"));
-        };
-
-        nval
-    };
-
-    Ok((ikey.into_static(), nval.into_static()))
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -144,4 +107,89 @@ impl fmt::Display for ServerIdTable {
         writeln!(f)?;
         writeln!(f, "{table}")
     }
+}
+
+/// Resolves an [`ImapIdConfig`] into the wire-level parameter list
+/// passed to the io-imap auth coroutines.
+///
+/// [`None`] when `auto = false`; otherwise a vec where each entry
+/// maps the user-supplied key to either himalaya's canned value
+/// (when the user set `true` and the key is well-known) or `NIL`.
+/// Unknown keys with `true` log a warning and fall back to `NIL`.
+pub fn resolve_auto_id_params(
+    config: &ImapIdConfig,
+) -> Result<Option<Vec<(IString<'static>, NString<'static>)>>> {
+    if !config.auto {
+        return Ok(None);
+    }
+
+    let mut params = Vec::with_capacity(config.fields.len());
+    for (key, &use_canned) in &config.fields {
+        let ikey = IString::try_from(key.clone())
+            .map_err(|err| anyhow!("Invalid IMAP ID parameter key `{key}`: {err}"))?
+            .into_static();
+
+        let nval = if use_canned {
+            match canned_value(key) {
+                Some(value) => NString::try_from(value)
+                    .map_err(|err| {
+                        anyhow!("Invalid canned IMAP ID value `{value}` for `{key}`: {err}")
+                    })?
+                    .into_static(),
+                None => {
+                    log::warn!("imap.id.fields.{key} = true: no canned value defined, sending NIL");
+                    NString::NIL
+                }
+            }
+        } else {
+            NString::NIL
+        };
+
+        params.push((ikey, nval));
+    }
+    Ok(Some(params))
+}
+
+fn parameter_parser(param: &str) -> Result<(IString<'static>, NString<'static>), String> {
+    let Some((key, val)) = param.split_once(':') else {
+        return Err(format!("Invalid parameter `{param}`: missing `:`"));
+    };
+
+    let Ok(ikey) = IString::try_from(key.trim()) else {
+        return Err(format!("Invalid parameter key `{key}`"));
+    };
+
+    let nval = if val.trim().is_empty() {
+        NString::NIL
+    } else {
+        let Ok(nval) = NString::try_from(val.trim()) else {
+            return Err(format!("Invalid parameter value `{val}` for `{key}`"));
+        };
+
+        nval
+    };
+
+    Ok((ikey.into_static(), nval.into_static()))
+}
+
+fn canned_value(key: &str) -> Option<&'static str> {
+    match key {
+        "name" => Some(env!("CARGO_PKG_NAME")),
+        "version" => Some(env!("CARGO_PKG_VERSION")),
+        "vendor" => Some("Pimalaya"),
+        "support-url" => Some("https://github.com/pimalaya/himalaya"),
+        _ => None,
+    }
+}
+
+fn build_canned_pair(key: &str) -> Result<(IString<'static>, NString<'static>)> {
+    let ikey = IString::try_from(key)
+        .map_err(|err| anyhow!("Invalid IMAP ID parameter key `{key}`: {err}"))?
+        .into_static();
+    let value =
+        canned_value(key).ok_or_else(|| anyhow!("No canned IMAP ID value defined for `{key}`"))?;
+    let nval = NString::try_from(value)
+        .map_err(|err| anyhow!("Invalid canned IMAP ID value `{value}` for `{key}`: {err}"))?
+        .into_static();
+    Ok((ikey, nval))
 }

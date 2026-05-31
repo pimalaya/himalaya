@@ -2,7 +2,6 @@
 allow-git = [
   "https://github.com/pimalaya/cli",
   "https://github.com/pimalaya/config",
-  "https://github.com/pimalaya/io-discovery",
   "https://github.com/pimalaya/io-email",
   "https://github.com/pimalaya/io-http",
   "https://github.com/pimalaya/io-imap",
@@ -10,8 +9,10 @@ allow-git = [
   "https://github.com/pimalaya/io-m2dir",
   "https://github.com/pimalaya/io-maildir",
   "https://github.com/pimalaya/io-smtp",
+  "https://github.com/pimalaya/pimconf",
   "https://github.com/pimalaya/stream",
   "https://github.com/soywod/domain",
+  "https://github.com/soywod/imap-codec",
 ]
 unknown-git = "deny"
 unknown-registry = "deny"

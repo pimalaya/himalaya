@@ -20,10 +20,6 @@
 //! ISPDB in series (secure variants only); each probe owns its own
 //! spinner.
 
-use io_discovery::autoconfig::{
-    client::{DiscoveryAutoconfigClientStd, DiscoveryAutoconfigClientStdError},
-    types::{Autoconfig, SecurityType, Server, ServerType},
-};
 use log::debug;
 use pimalaya_cli::{
     spinner::Spinner,
@@ -31,6 +27,10 @@ use pimalaya_cli::{
         imap::{Encryption as ImapEncryption, ImapAuth, ImapSecret, WizardImapConfig},
         smtp::{Encryption as SmtpEncryption, SmtpAuth, SmtpSecret, WizardSmtpConfig},
     },
+};
+use pimconf::autoconfig::{
+    client::{DiscoveryAutoconfigClientStd, DiscoveryAutoconfigClientStdError},
+    types::{Autoconfig, SecurityType, Server, ServerType},
 };
 
 use crate::wizard::discover::{DiscoveryResult, discovery_resolver, discovery_tls};

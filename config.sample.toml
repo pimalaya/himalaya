@@ -233,6 +233,17 @@ imap.sasl.plain.passwd.raw = "***"
 #imap.sasl.scram-sha-256.username = "user@example.com"
 #imap.sasl.scram-sha-256.password.raw = "***"
 
+# RFC 2971 ID extension. Some providers (mail.qq.com, fastmail) require an `ID`
+# exchange straight after authentication; set `auto = true` to opt in.
+# https://www.rfc-editor.org/rfc/rfc2971.html
+#imap.id.auto = false
+
+# Per-field policy for the auto-ID command. Keys not listed here are NOT sent.
+# `true` substitutes himalaya's canned value for the well-known keys (name,
+# version, vendor, support-url); unknown keys with `true` fall back to NIL with
+# a warning. `false` always sends NIL. An empty map sends `ID NIL`.
+#imap.id.fields = { name = true, version = true, vendor = true, support-url = true }
+
 # --------------------------------------------------------------------------------
 # JMAP config
 # https://www.iana.org/go/rfc8620

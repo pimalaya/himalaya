@@ -24,7 +24,7 @@ use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::shared::{client::EmailClient, messages::output::extract_envelope};
+use crate::shared::client::EmailClient;
 
 /// Send a message via the active account.
 ///
@@ -68,9 +68,7 @@ impl MessageSendCommand {
                 .into_bytes()
         };
 
-        let (from, to) = extract_envelope(&raw)?;
-        let to_refs: Vec<&str> = to.iter().map(String::as_str).collect();
-        client.send_message(raw, &from, &to_refs)?;
+        client.send_message(raw)?;
         printer.out(Message::new("Message successfully sent"))
     }
 }

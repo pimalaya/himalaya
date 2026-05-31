@@ -114,15 +114,17 @@ fn check_imap(
     imap_config: crate::config::ImapConfig,
 ) -> BackendCheck {
     use io_imap::client::ImapClientStd;
-    use pimalaya_stream::{sasl::Sasl, std::stream::StreamStd, tls::Tls};
+    use pimalaya_stream::{sasl::Sasl, tls::Tls};
+
+    use crate::imap::id::resolve_auto_id_params;
 
     let result = (|| -> Result<()> {
         let mut tls: Tls = imap_config.tls.clone().into();
         tls.rustls.alpn = vec!["imap".into()];
         let sasl: Option<Sasl> = imap_config.sasl.clone().map(Sasl::try_from).transpose()?;
+        let auto_id = resolve_auto_id_params(&imap_config.id)?;
         let server = crate::imap::client::parse_imap_server(&imap_config.server)?;
-        let _client =
-            ImapClientStd::<StreamStd>::connect(&server, &tls, imap_config.starttls, sasl)?;
+        let _ = ImapClientStd::connect(&server, &tls, imap_config.starttls, sasl, auto_id)?;
         Ok(())
     })();
 
@@ -181,7 +183,7 @@ fn check_smtp(
     use std::net::Ipv4Addr;
 
     use io_smtp::{client::SmtpClientStd, rfc5321::types::ehlo_domain::EhloDomain};
-    use pimalaya_stream::{sasl::Sasl, std::stream::StreamStd, tls::Tls};
+    use pimalaya_stream::{sasl::Sasl, tls::Tls};
 
     let result = (|| -> Result<()> {
         let mut tls: Tls = smtp_config.tls.clone().into();
@@ -189,8 +191,7 @@ fn check_smtp(
         let sasl: Option<Sasl> = smtp_config.sasl.clone().map(Sasl::try_from).transpose()?;
         let domain: EhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
         let server = crate::smtp::client::parse_smtp_server(&smtp_config.server)?;
-        let _client =
-            SmtpClientStd::<StreamStd>::connect(&server, &tls, smtp_config.starttls, domain, sasl)?;
+        let _client = SmtpClientStd::connect(&server, &tls, smtp_config.starttls, domain, sasl)?;
         Ok(())
     })();
 

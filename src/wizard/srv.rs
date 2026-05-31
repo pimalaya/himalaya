@@ -23,10 +23,6 @@
 //! SMTP: from `_submission`; the encryption is inferred from the
 //! record's port (465 → implicit TLS, otherwise StartTls).
 
-use io_discovery::rfc6186::{
-    client::DiscoverySrvClientStd,
-    types::{SrvReport, SrvService},
-};
 use log::debug;
 use pimalaya_cli::{
     spinner::Spinner,
@@ -34,6 +30,10 @@ use pimalaya_cli::{
         imap::{Encryption as ImapEncryption, ImapAuth, ImapSecret, WizardImapConfig},
         smtp::{Encryption as SmtpEncryption, SmtpAuth, SmtpSecret, WizardSmtpConfig},
     },
+};
+use pimconf::rfc6186::{
+    client::DiscoverySrvClientStd,
+    types::{SrvReport, SrvService},
 };
 
 use crate::wizard::discover::{DiscoveryResult, discovery_resolver};

@@ -30,25 +30,32 @@ use std::{
 use anyhow::{Result, anyhow};
 use io_imap::client::ImapClientStd as Inner;
 use pimalaya_config::toml::TomlConfig;
-use pimalaya_stream::{sasl::Sasl, std::stream::StreamStd, tls::Tls};
+use pimalaya_stream::{sasl::Sasl, tls::Tls};
 use url::Url;
 
-use crate::{account::context::Account, cli::load_or_wizard, config::ImapConfig};
+use crate::{
+    account::context::Account, cli::load_or_wizard, config::ImapConfig,
+    imap::id::resolve_auto_id_params,
+};
 
 pub struct ImapClient {
-    inner: Inner<StreamStd>,
+    inner: Inner,
     pub account: Account,
 }
 
 impl ImapClient {
     /// Opens the IMAP connection (TCP/TLS/STARTTLS, greeting, SASL)
-    /// then wraps the resulting client alongside `account`.
+    /// then wraps the resulting client alongside `account`. The
+    /// capability list reported by the connect handshake is discarded;
+    /// IMAP-specific subcommands that need it should call
+    /// [`Inner::capability`] explicitly.
     pub fn new(config: ImapConfig, account: Account) -> Result<Self> {
         let mut tls: Tls = config.tls.into();
         tls.rustls.alpn = vec!["imap".into()];
         let sasl: Option<Sasl> = config.sasl.map(Sasl::try_from).transpose()?;
+        let auto_id = resolve_auto_id_params(&config.id)?;
         let server = parse_imap_server(&config.server)?;
-        let inner = Inner::<StreamStd>::connect(&server, &tls, config.starttls, sasl)?;
+        let (inner, _capability) = Inner::connect(&server, &tls, config.starttls, sasl, auto_id)?;
         Ok(Self { inner, account })
     }
 }
@@ -70,7 +77,7 @@ pub fn parse_imap_server(server: &str) -> Result<Url> {
 }
 
 impl Deref for ImapClient {
-    type Target = Inner<StreamStd>;
+    type Target = Inner;
 
     fn deref(&self) -> &Self::Target {
         &self.inner

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Restored the RFC 2971 `ID`-after-auth quirk under the new shape `imap.id.{auto, fields}`. Set `imap.id.auto = true` to chain an `ID` exchange straight after IMAP authentication (required by mail.qq.com, fastmail). `imap.id.fields` is a `{ name = bool, … }` map: missing keys are not transmitted, `false` sends `NIL`, `true` sends himalaya's canned value for the well-known keys (`name`, `version`, `vendor`, `support-url`) or `NIL` (with a warning) for any other key. Replaces the v1.2.0 `imap.extensions.id.send-after-auth` flag dropped during the v2 migration.
+
 ### Fixed
 
 - Fixed compilation error when `wizard` feature was disabled ([#634]).

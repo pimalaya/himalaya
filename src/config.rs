@@ -116,13 +116,10 @@ pub struct AccountConfig {
     pub downloads_dir: Option<PathBuf>,
     #[serde(default)]
     pub table: TableConfig,
-
     #[serde(default)]
     pub envelope: EnvelopeConfig,
-
     #[serde(default)]
     pub mailbox: MailboxConfig,
-
     #[serde(default)]
     pub attachment: AttachmentConfig,
 
@@ -362,7 +359,7 @@ pub struct ReaderConfig {
     pub default: bool,
 }
 
-/// Global / per-account table rendering knobs shared across every list
+/// Global / per-account table rendering quirks shared across every list
 /// command (envelopes, mailboxes, attachments). The per-column color
 /// blocks live under `*.list.table.*-color` (see [`EnvelopeListTableConfig`]
 /// & co.).
@@ -418,6 +415,32 @@ pub struct ImapConfig {
     /// to advertise the ANONYMOUS mechanism explicitly, set
     /// `sasl.anonymous = {}`.
     pub sasl: Option<SaslConfig>,
+
+    /// RFC 2971 `ID` extension quirks. Some providers (notably
+    /// mail.qq.com, fastmail) require an `ID` exchange straight after
+    /// authentication; set `id.auto = true` to opt in.
+    #[serde(default)]
+    pub id: ImapIdConfig,
+}
+
+/// Per-account `imap.id.*` quirks.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct ImapIdConfig {
+    /// When `true`, the auth coroutine chains an `ID` round-trip
+    /// after the tagged auth response. Default `false` skips ID
+    /// entirely.
+    #[serde(default)]
+    pub auto: bool,
+
+    /// Parameters sent with the auto-ID command. Empty (default)
+    /// sends `ID NIL`. For each entry: `true` substitutes himalaya's
+    /// canned value for the well-known keys (`name`, `version`,
+    /// `vendor`, `support-url`) or `NIL` for unknown keys; `false`
+    /// always sends `NIL`. Keys absent from this map are not
+    /// transmitted.
+    #[serde(default)]
+    pub fields: HashMap<String, bool>,
 }
 
 /// Maildir configuration.

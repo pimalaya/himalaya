@@ -32,13 +32,13 @@ use std::{
 use anyhow::{Result, anyhow};
 use io_smtp::{client::SmtpClientStd as Inner, rfc5321::types::ehlo_domain::EhloDomain};
 use pimalaya_config::toml::TomlConfig;
-use pimalaya_stream::{sasl::Sasl, std::stream::StreamStd, tls::Tls};
+use pimalaya_stream::{sasl::Sasl, tls::Tls};
 use url::Url;
 
 use crate::{account::context::Account, cli::load_or_wizard, config::SmtpConfig};
 
 pub struct SmtpClient {
-    inner: Inner<StreamStd>,
+    inner: Inner,
     #[allow(dead_code)]
     pub account: Account,
 }
@@ -52,7 +52,7 @@ impl SmtpClient {
         let sasl: Option<Sasl> = config.sasl.map(Sasl::try_from).transpose()?;
         let domain: EhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
         let server = parse_smtp_server(&config.server)?;
-        let inner = Inner::<StreamStd>::connect(&server, &tls, config.starttls, domain, sasl)?;
+        let inner = Inner::connect(&server, &tls, config.starttls, domain, sasl)?;
         Ok(Self { inner, account })
     }
 }
@@ -74,7 +74,7 @@ pub fn parse_smtp_server(server: &str) -> Result<Url> {
 }
 
 impl Deref for SmtpClient {
-    type Target = Inner<StreamStd>;
+    type Target = Inner;
 
     fn deref(&self) -> &Self::Target {
         &self.inner

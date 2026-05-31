@@ -34,6 +34,7 @@
   - [Re-using sessions](#re-using-sessions)
 - [Interfaces](#interfaces)
 - [FAQ](#faq)
+- [AI disclosure](#ai-disclosure)
 - [Social](#social)
 - [Sponsoring](#sponsoring)
 
@@ -64,7 +65,7 @@
 
 ### Pre-built binary
 
-Himalaya can be installed with the `install.sh` installer:
+Himalaya can be installed with the installer:
 
 *As root:*
 
@@ -323,7 +324,7 @@ Himalaya CLI is one of several front-ends to the Pimalaya libraries:
   2. **Thunderbird Autoconfiguration**: ISP main / well-known / ISPDB lookups, then MX-based retry, then the `mailconf=<URL>` TXT redirect.
   3. **RFC 6186 SRV**: `_imap._tcp`, `_imaps._tcp`, `_submission._tcp` lookups assembled into a single report.
 
-  See [io-discovery](https://github.com/pimalaya/io-discovery) for the full chain.
+  See [pimconf](https://github.com/pimalaya/pimconf) for the full chain.
 </details>
 
 <details>
@@ -355,6 +356,22 @@ Himalaya CLI is one of several front-ends to the Pimalaya libraries:
 
   Set `NO_COLOR=1` in your environment.
 </details>
+
+## AI disclosure
+
+This project is developed with AI assistance. This section documents how, so users and downstream packagers can make informed decisions.
+
+- **Tools**: Claude Code (Anthropic), Opus 4.7, invoked locally with a persistent project-scoped memory and a small set of repo-specific rules.
+
+- **Used for**: Refactors, mechanical multi-file edits, boilerplate (feature gates, error enums, derive macros, trait impls), test scaffolding, doc polish, exploratory design conversations.
+
+- **Not used for**: Engineering, critical code, git manipulation (commit, merge, rebase…), real-world tests.
+
+- **Verification**: Every AI-assisted change is read, compiled, tested, and formatted before commit (`nix develop --command cargo check / cargo test / cargo fmt`). Behavioural correctness is verified against the relevant RFC or upstream spec, not assumed from the model output. Tests are never adjusted to fit AI-generated code; the code is adjusted to fit correct behaviour.
+
+- **Limitations**: AI models occasionally produce code that compiles and passes tests but is subtly wrong: off-by-one errors, missed edge cases, plausible but nonexistent APIs, stale RFC references. The verification workflow catches most of this; it does not catch all of it. Bug reports are welcome and taken seriously.
+
+- **Last reviewed**: 31/05/2026
 
 ## Social
 

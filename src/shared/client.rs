@@ -25,16 +25,17 @@
 //! its methods directly.
 //!
 //! Construction picks the first storage backend (`jmap → imap →
-//! maildir`) allowed by the `BackendFlag` that is configured on the
-//! account. When the account also has SMTP configured, an SMTP slot
-//! is registered on the same client so `send_message` works for
-//! IMAP/Maildir accounts; JMAP accounts already send via JMAP
-//! submission. SMTP connection failures are logged and skipped — the
-//! client still opens for reading.
+//! maildir → m2dir`) allowed by the [`Backend`] flag that is
+//! configured on the account. When the account also has SMTP
+//! configured, an SMTP slot is registered on the same client so
+//! `send_message` works for IMAP/Maildir accounts; JMAP accounts
+//! already send via JMAP submission. SMTP connection failures are
+//! logged and skipped: the client still opens for reading.
 
 use std::ops::{Deref, DerefMut};
 
 use anyhow::{Result, bail};
+use io_email::client::EmailClientStd;
 
 use crate::{
     account::context::Account,
@@ -43,7 +44,7 @@ use crate::{
 };
 
 pub struct EmailClient {
-    inner: io_email::client::EmailClientStd,
+    inner: EmailClientStd,
     pub account: Account,
 }
 
@@ -53,15 +54,12 @@ impl EmailClient {
         mut account_config: AccountConfig,
         backend: Backend,
     ) -> Result<Self> {
-        use io_email::client::EmailClientStd;
-
         let mut inner = EmailClientStd::new();
         let mut configured = false;
 
         #[cfg(feature = "jmap")]
         if !configured && backend.allows_jmap() {
             if let Some(jmap_config) = account_config.jmap.take() {
-                use io_jmap::client::JmapClientStd;
                 use pimalaya_stream::tls::Tls;
 
                 use crate::jmap::client::{jmap_http_auth, parse_server_url};
@@ -70,10 +68,7 @@ impl EmailClient {
                 tls.rustls.alpn = vec!["http/1.1".into()];
                 let http_auth = jmap_http_auth(jmap_config.auth.clone())?;
                 let url = parse_server_url(&jmap_config.server)?;
-                let mut client = JmapClientStd::connect(&url, &tls, http_auth)?;
-                client.session_get(&url)?;
-
-                inner = inner.with_jmap(client);
+                inner = inner.connect_jmap(&url, &tls, http_auth)?;
                 configured = true;
             }
         }
@@ -81,17 +76,19 @@ impl EmailClient {
         #[cfg(feature = "imap")]
         if !configured && backend.allows_imap() {
             if let Some(imap_config) = account_config.imap.take() {
-                use io_imap::client::ImapClientStd;
-                use pimalaya_stream::{sasl::Sasl, std::stream::StreamStd, tls::Tls};
+                use io_email::imap::client::ImapClientStd;
+                use pimalaya_stream::{sasl::Sasl, tls::Tls};
+
+                use crate::imap::id::resolve_auto_id_params;
 
                 let mut tls: Tls = imap_config.tls.into();
                 tls.rustls.alpn = vec!["imap".into()];
                 let sasl: Option<Sasl> = imap_config.sasl.map(Sasl::try_from).transpose()?;
+                let auto_id = resolve_auto_id_params(&imap_config.id)?;
                 let server = crate::imap::client::parse_imap_server(&imap_config.server)?;
-                let client =
-                    ImapClientStd::<StreamStd>::connect(&server, &tls, imap_config.starttls, sasl)?;
-
-                inner = inner.with_imap(client);
+                let imap =
+                    ImapClientStd::connect(&server, &tls, imap_config.starttls, sasl, auto_id)?;
+                inner = inner.with_imap(imap);
                 configured = true;
             }
         }
@@ -99,10 +96,9 @@ impl EmailClient {
         #[cfg(feature = "maildir")]
         if !configured && backend.allows_maildir() {
             if let Some(maildir_config) = account_config.maildir.take() {
-                use io_maildir::client::MaildirClient;
+                use io_email::maildir::client::MaildirClient;
 
                 let client = MaildirClient::new(maildir_config.root.to_string_lossy().into_owned());
-
                 inner = inner.with_maildir(client);
                 configured = true;
             }
@@ -111,10 +107,9 @@ impl EmailClient {
         #[cfg(feature = "m2dir")]
         if !configured && backend.allows_m2dir() {
             if let Some(m2dir_config) = account_config.m2dir.take() {
-                use io_m2dir::client::M2dirClient;
+                use io_email::m2dir::client::M2dirClient;
 
                 let client = M2dirClient::new(m2dir_config.root.to_string_lossy().into_owned());
-
                 inner = inner.with_m2dir(client);
                 configured = true;
             }
@@ -126,22 +121,23 @@ impl EmailClient {
 
         // Register SMTP alongside the storage backend so shared
         // `send_message` works for IMAP/Maildir accounts. JMAP already
-        // sends via submission, but if both are present, SMTP wins
-        // because storage is registered first.
+        // sends via submission; the dispatch priority (JMAP → SMTP in
+        // the send path) keeps that working when both are present.
         #[cfg(feature = "smtp")]
         if let Some(smtp_config) = account_config.smtp.take() {
             use std::net::Ipv4Addr;
 
-            use io_smtp::{client::SmtpClientStd, rfc5321::types::ehlo_domain::EhloDomain};
-            use pimalaya_stream::{sasl::Sasl, std::stream::StreamStd, tls::Tls};
+            use io_email::smtp::client::SmtpClientStd;
+            use io_smtp::rfc5321::types::ehlo_domain::EhloDomain;
+            use pimalaya_stream::{sasl::Sasl, tls::Tls};
 
-            let smtp = (|| -> Result<SmtpClientStd<StreamStd>> {
+            let smtp = (|| -> Result<SmtpClientStd> {
                 let mut tls: Tls = smtp_config.tls.into();
                 tls.rustls.alpn = vec!["smtp".into()];
                 let sasl: Option<Sasl> = smtp_config.sasl.map(Sasl::try_from).transpose()?;
                 let domain: EhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
                 let server = crate::smtp::client::parse_smtp_server(&smtp_config.server)?;
-                Ok(SmtpClientStd::<StreamStd>::connect(
+                Ok(SmtpClientStd::connect(
                     &server,
                     &tls,
                     smtp_config.starttls,
@@ -165,7 +161,7 @@ impl EmailClient {
 }
 
 impl Deref for EmailClient {
-    type Target = io_email::client::EmailClientStd;
+    type Target = EmailClientStd;
 
     fn deref(&self) -> &Self::Target {
         &self.inner

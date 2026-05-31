@@ -38,7 +38,7 @@ Himalaya CLI is the command-line front-end of the [Pimalaya](https://github.com/
 - [io-email](https://github.com/pimalaya/io-email): cross-protocol email client (`EmailClientStd`, shared `Envelope` / `Mailbox` / `Flag` / `Address` types, search DSL).
 - [io-imap](https://github.com/pimalaya/io-imap), [io-jmap](https://github.com/pimalaya/io-jmap), [io-maildir](https://github.com/pimalaya/io-maildir), [io-smtp](https://github.com/pimalaya/io-smtp): per-protocol I/O-free coroutines plus the std-blocking clients that drive them.
 - [io-http](https://github.com/pimalaya/io-http): I/O-free HTTP request/response state machines used by JMAP and the discovery wizard.
-- [io-discovery](https://github.com/pimalaya/io-discovery): provider discovery (PACC, Thunderbird Autoconfiguration, RFC 6186 SRV) consumed by the wizard.
+- [pimconf](https://github.com/pimalaya/pimconf): PIM service discovery (PACC, Thunderbird Autoconfiguration, RFC 6186 SRV) consumed by the wizard.
 - [pimalaya/stream](https://github.com/pimalaya/stream): TCP / TLS / SASL plumbing shared by all std clients.
 - [pimalaya/cli](https://github.com/pimalaya/cli): cross-binary CLI helpers (printer, prompt, wizard primitives, clap args, build-time env, spinner).
 - [pimalaya/config](https://github.com/pimalaya/config): TOML configuration loader and shell-expanded secrets.
@@ -55,7 +55,6 @@ Bugs touching protocol semantics usually live in the matching `io-*` crate; rend
 
 ```toml
 [patch.crates-io]
-io-discovery.git = "https://github.com/pimalaya/io-discovery"
 io-email.git = "https://github.com/pimalaya/io-email"
 io-http.git = "https://github.com/pimalaya/io-http"
 io-imap.git = "https://github.com/pimalaya/io-imap"
@@ -65,6 +64,7 @@ io-smtp.git = "https://github.com/pimalaya/io-smtp"
 pimalaya-cli.git = "https://github.com/pimalaya/cli"
 pimalaya-config.git = "https://github.com/pimalaya/config"
 pimalaya-stream.git = "https://github.com/pimalaya/stream"
+pimconf.git = "https://github.com/pimalaya/pimconf"
 ```
 
 To build against a local checkout of one of those crates, swap the matching `.git = "..."` for `.path = "../<repo>"`. For example, with `io-email` next to `himalaya`:
@@ -78,7 +78,6 @@ If cargo complains about *"perhaps two different versions of crate X are being u
 
 ```toml
 [patch.crates-io]
-io-discovery.path = "../io-discovery"
 io-email.path = "../io-email"
 io-http.path = "../io-http"
 io-imap.path = "../io-imap"
@@ -88,6 +87,7 @@ io-smtp.path = "../io-smtp"
 pimalaya-cli.path = "../cli"
 pimalaya-config.path = "../config"
 pimalaya-stream.path = "../stream"
+pimconf.path = "../pimconf"
 ```
 
 ## Lint, test, audit

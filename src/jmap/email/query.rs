@@ -20,8 +20,9 @@ use std::fmt;
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
-use io_jmap::rfc8621::email::{
-    Email, EmailAddress, EmailComparator, EmailFilter, EmailSortProperty,
+use io_jmap::{
+    rfc8620::filter::Filter,
+    rfc8621::email::{Email, EmailAddress, EmailComparator, EmailFilter, EmailSortProperty},
 };
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
@@ -140,7 +141,11 @@ impl JmapEmailQueryCommand {
                 || f.subject.is_some()
                 || f.body.is_some();
 
-            if has_one_filter { Some(f) } else { None }
+            if has_one_filter {
+                Some(Filter::from(f))
+            } else {
+                None
+            }
         };
 
         let sort = Some(vec![EmailComparator {

@@ -19,7 +19,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use io_email::flag::Flag;
+use io_email::flag::{Flag, FlagOp};
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
@@ -46,7 +46,7 @@ impl FlagRemoveCommand {
         let ids: Vec<&str> = self.message_ids.inner.iter().map(String::as_str).collect();
         let flags: Vec<Flag> = self.flags.inner.iter().map(Into::into).collect();
 
-        client.delete_flags(&mailbox, &ids, &flags)?;
+        client.store_flags(&mailbox, &ids, &flags, FlagOp::Remove)?;
 
         let flags: Vec<String> = self.flags.inner.iter().map(ToString::to_string).collect();
         printer.out(RemovedFlags { flags })

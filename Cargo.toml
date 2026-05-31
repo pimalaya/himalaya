@@ -17,15 +17,15 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-default = ["imap", "smtp", "jmap", "m2dir", "rustls-ring"]
+default = ["rustls-ring", "imap", "smtp", "jmap", "m2dir"]
 imap = ["dep:io-imap", "dep:mail-parser", "dep:rfc2047-decoder", "io-email/imap", "io-imap/client"]
 jmap = ["dep:base64", "dep:io-jmap", "dep:mail-parser", "dep:serde_json", "io-email/jmap", "io-jmap/client"]
 smtp = ["dep:io-smtp", "dep:mail-parser", "io-email/smtp"]
 maildir = ["dep:convert_case", "dep:io-maildir", "dep:mail-parser", "dep:mime_guess", "io-email/maildir", "io-maildir/client"]
 m2dir = ["dep:io-m2dir", "dep:mail-parser", "io-email/m2dir", "io-m2dir/client"]
-native-tls = ["pimalaya-stream/native-tls", "io-discovery/native-tls", "io-imap?/native-tls", "io-jmap?/native-tls", "io-smtp?/native-tls"]
-rustls-aws = ["pimalaya-stream/rustls-aws", "io-discovery/rustls-aws", "io-imap?/rustls-aws", "io-jmap?/rustls-aws", "io-smtp?/rustls-aws"]
-rustls-ring = ["pimalaya-stream/rustls-ring", "io-discovery/rustls-ring", "io-imap?/rustls-ring", "io-jmap?/rustls-ring", "io-smtp?/rustls-ring"]
+native-tls = ["pimalaya-stream/native-tls", "pimconf/native-tls", "io-email/native-tls", "io-imap?/native-tls", "io-jmap?/native-tls", "io-smtp?/native-tls"]
+rustls-aws = ["pimalaya-stream/rustls-aws", "pimconf/rustls-aws", "io-email/rustls-aws", "io-imap?/rustls-aws", "io-jmap?/rustls-aws", "io-smtp?/rustls-aws"]
+rustls-ring = ["pimalaya-stream/rustls-ring", "pimconf/rustls-ring", "io-email/rustls-ring", "io-imap?/rustls-ring", "io-jmap?/rustls-ring", "io-smtp?/rustls-ring"]
 vendored = ["pimalaya-stream/vendored"]
 
 [profile.release]
@@ -47,7 +47,6 @@ convert_case = { version = "0.11", optional = true }
 crossterm = { version = "0.29", default-features = false, features = ["serde"] }
 dirs = "6"
 humansize = "2"
-io-discovery = { version = "0.1.0", default-features = false, features = ["pacc", "autoconfig", "rfc6186", "client"] }
 ariadne = "0.6"
 io-email = { version = "0.0.1", default-features = false, features = ["serde", "client", "search"] }
 io-imap = { version = "0.0.1", default-features = false, optional = true }
@@ -63,6 +62,7 @@ open = "5"
 pimalaya-cli = { version = "0.0.1", default-features = false, features = ["terminal", "table", "prompt", "wizard", "imap", "smtp", "jmap", "spinner"] }
 pimalaya-config = { version = "0.0.1", default-features = false, features = ["toml", "secret"] }
 pimalaya-stream = { version = "0.0.1", default-features = false, features = ["std"] }
+pimconf = { version = "0.1.0", default-features = false, features = ["pacc", "autoconfig", "rfc6186", "client"] }
 rfc2047-decoder = { version = "1", optional = true }
 secrecy = "0.10"
 serde = { version = "1", features = ["derive"] }
@@ -84,7 +84,7 @@ tempfile = "3"
 
 # [patch.crates-io]
 # domain = { git = "https://github.com/soywod/domain", branch = "new-srv" }
-# io-discovery.path = "../io-discovery"
+# pimconf.path = "../pimconf"
 # io-email.path = "../io-email"
 # io-http.path = "../io-http"
 # io-imap.path = "../io-imap"
@@ -98,7 +98,8 @@ tempfile = "3"
 
 [patch.crates-io]
 domain = { git = "https://github.com/soywod/domain", branch = "new-srv" }
-io-discovery.git = "https://github.com/pimalaya/io-discovery"
+imap-codec.git = "https://github.com/soywod/imap-codec"
+pimconf.git = "https://github.com/pimalaya/pimconf"
 io-email.git = "https://github.com/pimalaya/io-email"
 io-http.git = "https://github.com/pimalaya/io-http"
 io-imap.git = "https://github.com/pimalaya/io-imap"
