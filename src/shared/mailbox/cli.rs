@@ -20,25 +20,18 @@ use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
 use crate::account::context::Account;
-use crate::shared::{
-    client::EmailClient,
-    envelopes::{list::EnvelopeListCommand, search::EnvelopeSearchCommand},
-};
+use crate::shared::{client::EmailClient, mailbox::list::MailboxListCommand};
 
-/// Shared API to manage envelopes for the active account.
+/// Shared API to manage mailboxes for the active account.
 ///
-/// An envelope is a message headers subset. It is usually small, and
-/// contains enough information to have an overall understanding of
-/// what a message is about.
+/// A mailbox is a message container.
 #[derive(Debug, Subcommand)]
-pub enum EnvelopeCommand {
+pub enum MailboxCommand {
     #[command(visible_alias = "ls")]
-    List(EnvelopeListCommand),
-    #[command(visible_alias = "sr")]
-    Search(EnvelopeSearchCommand),
+    List(MailboxListCommand),
 }
 
-impl EnvelopeCommand {
+impl MailboxCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -47,7 +40,6 @@ impl EnvelopeCommand {
     ) -> Result<()> {
         match self {
             Self::List(cmd) => cmd.execute(printer, account, client),
-            Self::Search(cmd) => cmd.execute(printer, account, client),
         }
     }
 }

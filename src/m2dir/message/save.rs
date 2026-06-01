@@ -25,7 +25,7 @@ use serde::Serialize;
 
 use crate::{
     m2dir::{arg::M2dirNameFlag, client::M2dirClient},
-    shared::messages::arg::MessageArg,
+    shared::message::arg::MessageArg,
 };
 
 /// Save a message to an m2dir folder.

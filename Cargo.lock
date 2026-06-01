@@ -1026,7 +1026,7 @@ dependencies = [
 [[package]]
 name = "imap-codec"
 version = "2.0.0-alpha.7"
-source = "git+https://github.com/soywod/imap-codec#dfd4f1f179defb6b479da3a95ed603170f0174ad"
+source = "git+https://github.com/soywod/imap-codec#f1c29c7b5368063922778afdbcaefa18ed497a5e"
 dependencies = [
  "abnf-core",
  "base64",
@@ -1039,7 +1039,7 @@ dependencies = [
 [[package]]
 name = "imap-types"
 version = "2.0.0-alpha.6"
-source = "git+https://github.com/soywod/imap-codec#dfd4f1f179defb6b479da3a95ed603170f0174ad"
+source = "git+https://github.com/soywod/imap-codec#f1c29c7b5368063922778afdbcaefa18ed497a5e"
 dependencies = [
  "base64",
  "bounded-static",
@@ -1664,7 +1664,7 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 [[package]]
 name = "pimalaya-cli"
 version = "0.0.1"
-source = "git+https://github.com/pimalaya/cli#8ee488f8701b9e4a5bb29dbcbc051b399b78e5c6"
+source = "git+https://github.com/pimalaya/cli#313c2e999ea9157fa42c84a6ae867451d8308114"
 dependencies = [
  "anyhow",
  "clap",
@@ -2006,9 +2006,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-native-certs"
-version = "0.8.3"
+version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "612460d5f7bea540c490b2b6395d8e34a953e52b491accd6c86c8164c5932a63"
+checksum = "dab5152771c58876a2146916e53e35057e1a4dfa2b9df0f0305b07f611fdea4d"
 dependencies = [
  "openssl-probe",
  "rustls-pki-types",

@@ -26,13 +26,13 @@ use serde::Serialize;
 use crate::account::context::Account;
 use crate::shared::{
     client::EmailClient,
-    flags::arg::{FlagsArg, MessageIdsArg},
-    mailboxes::arg::MailboxArg,
+    flag::arg::{FlagsArg, MessageIdsArg},
+    mailbox::arg::MailboxArg,
 };
 
-/// Add flag(s) to message(s) for the active account.
+/// Replace flag(s) of message(s) for the active account.
 #[derive(Debug, Parser)]
-pub struct FlagAddCommand {
+pub struct FlagSetCommand {
     #[command(flatten)]
     pub mailbox: MailboxArg,
     #[command(flatten)]
@@ -41,7 +41,7 @@ pub struct FlagAddCommand {
     pub flags: FlagsArg,
 }
 
-impl FlagAddCommand {
+impl FlagSetCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -52,20 +52,20 @@ impl FlagAddCommand {
         let ids: Vec<&str> = self.message_ids.inner.iter().map(String::as_str).collect();
         let flags: Vec<Flag> = self.flags.inner.iter().map(Into::into).collect();
 
-        client.store_flags(&mailbox, &ids, &flags, FlagOp::Add)?;
+        client.store_flags(&mailbox, &ids, &flags, FlagOp::Set)?;
 
         let flags: Vec<String> = self.flags.inner.iter().map(ToString::to_string).collect();
-        printer.out(AddedFlags { flags })
+        printer.out(SetFlags { flags })
     }
 }
 
 #[derive(Debug, Serialize)]
-struct AddedFlags {
+struct SetFlags {
     flags: Vec<String>,
 }
 
-impl fmt::Display for AddedFlags {
+impl fmt::Display for SetFlags {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Successfully added flags: {}", self.flags.join(", "))
+        write!(f, "Successfully set flags: {}", self.flags.join(", "))
     }
 }

@@ -180,7 +180,7 @@ A persistent configuration is loaded from the first valid path among:
 
 These are the same paths the [himalaya-tui](https://github.com/pimalaya/himalaya-tui) TUI looks at: one TOML file backs both binaries. CLI-only fields and TUI-only sections coexist without errors. See [config.sample.toml](./config.sample.toml) for a documented template.
 
-Override the path with `-c <PATH>` or `HIMALAYA_CONFIG=<PATH>`; multiple paths can be passed at once, separated by `:`. The first one is the base and the rest are deep-merged on top.
+Override the path with `-c <PATH>`; multiple paths can be passed at once, separated by `:`. The first one is the base and the rest are deep-merged on top.
 
 Accounts can be (re)configured later with `himalaya account configure <name>`. The wizard skips discovery in this mode: it reuses the existing values as prompt defaults.
 

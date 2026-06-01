@@ -6,9 +6,9 @@
 #   - $HOME/.config/himalaya/config.toml
 #   - $HOME/.himalayarc
 #
-# Override with `himalaya -c <PATH>` or `HIMALAYA_CONFIG=<PATH>`. Multiple paths
-# can be passed at once, separated by `:`; the first one is the base and the
-# rest are deep-merged on top of it.
+# Override with `himalaya -c <PATH>`. Multiple paths can be passed at once,
+# separated by `:`; the first one is the base and the rest are deep-merged on
+# top of it.
 #
 # Run `himalaya` once with no config file to launch the wizard, which discovers
 # IMAP/SMTP/JMAP defaults via PACC, Thunderbird Autoconfiguration and RFC 6186

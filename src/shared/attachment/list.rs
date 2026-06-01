@@ -26,7 +26,7 @@ use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
 use crate::account::context::Account;
-use crate::shared::{client::EmailClient, mailboxes::arg::MailboxArg};
+use crate::shared::{client::EmailClient, mailbox::arg::MailboxArg};
 
 /// List the attachments carried by a single message in the active
 /// account.

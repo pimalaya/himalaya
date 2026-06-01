@@ -22,21 +22,23 @@ use pimalaya_cli::printer::Printer;
 use crate::account::context::Account;
 use crate::shared::{
     client::EmailClient,
-    flags::{add::FlagAddCommand, remove::FlagRemoveCommand, set::FlagSetCommand},
+    envelope::{list::EnvelopeListCommand, search::EnvelopeSearchCommand},
 };
 
-/// Shared API to manage flags for the active account.
+/// Shared API to manage envelopes for the active account.
 ///
-/// A flag is acting like a tag, giving information about message state or kind.
+/// An envelope is a message headers subset. It is usually small, and
+/// contains enough information to have an overall understanding of
+/// what a message is about.
 #[derive(Debug, Subcommand)]
-pub enum FlagCommand {
-    Add(FlagAddCommand),
-    Set(FlagSetCommand),
-    #[command(visible_alias = "rm")]
-    Remove(FlagRemoveCommand),
+pub enum EnvelopeCommand {
+    #[command(visible_alias = "ls")]
+    List(EnvelopeListCommand),
+    #[command(visible_alias = "sr")]
+    Search(EnvelopeSearchCommand),
 }
 
-impl FlagCommand {
+impl EnvelopeCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -44,9 +46,8 @@ impl FlagCommand {
         client: &mut EmailClient,
     ) -> Result<()> {
         match self {
-            Self::Add(cmd) => cmd.execute(printer, account, client),
-            Self::Set(cmd) => cmd.execute(printer, account, client),
-            Self::Remove(cmd) => cmd.execute(printer, account, client),
+            Self::List(cmd) => cmd.execute(printer, account, client),
+            Self::Search(cmd) => cmd.execute(printer, account, client),
         }
     }
 }

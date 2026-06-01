@@ -29,7 +29,7 @@ use crate::{
         client::MaildirClient,
         flag::arg::FlagArg,
     },
-    shared::messages::arg::MessageArg,
+    shared::message::arg::MessageArg,
 };
 
 /// Save a message to a mailbox.

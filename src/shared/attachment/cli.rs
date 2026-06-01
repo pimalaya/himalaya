@@ -21,7 +21,7 @@ use pimalaya_cli::printer::Printer;
 
 use crate::account::context::Account;
 use crate::shared::{
-    attachments::{download::AttachmentDownloadCommand, list::AttachmentListCommand},
+    attachment::{download::AttachmentDownloadCommand, list::AttachmentListCommand},
     client::EmailClient,
 };
 

@@ -37,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Removed the `[message.composer.*]` and `[message.reader.*]` config tables together with the `messages compose-with`, `reply-with`, `forward-with`, `mailto` and `read-with` subcommands. The "stdout = MIME draft" contract was structurally incompatible with composers that spawn an interactive editor: the editor inherited the parent's piped stdout, breaking its UI. Richer composition is now wired through standalone tools chained into `messages send` / `messages add` via a tempfile or shell process substitution; see the README and [mml](https://github.com/pimalaya/mml).
 
+- Dropped `HIMALAYA_CONFIG` environment-variable support on `-c/--config`. The flag still accepts one or more `:`-separated paths on the command line; users relying on the env var should switch to a shell alias or wrapper script.
+
 ## [1.2.0] - 2026-02-19
 
 ### Added

@@ -22,7 +22,7 @@ use pimalaya_cli::printer::Printer;
 use crate::account::context::Account;
 use crate::shared::{
     client::EmailClient,
-    messages::{
+    message::{
         add::MessageAddCommand, compose::MessageComposeCommand, copy::MessageCopyCommand,
         forward::MessageForwardCommand, mv::MessageMoveCommand, read::MessageReadCommand,
         reply::MessageReplyCommand, send::MessageSendCommand,

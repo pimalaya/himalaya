@@ -28,9 +28,9 @@ use pimalaya_cli::printer::Printer;
 
 use crate::account::context::Account;
 use crate::shared::{
-    attachments::list::{Attachment, AttachmentColors, Attachments, mime_string},
+    attachment::list::{Attachment, AttachmentColors, Attachments, mime_string},
     client::EmailClient,
-    mailboxes::arg::MailboxArg,
+    mailbox::arg::MailboxArg,
 };
 
 /// Download specific attachments of a single message to disk.

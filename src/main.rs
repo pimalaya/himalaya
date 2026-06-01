@@ -47,7 +47,7 @@ fn main() {
 
 fn execute(cli: Cli, printer: &mut StdoutPrinter) -> Result<()> {
     Logger::try_init(&cli.log)?;
-    let config = cli.config_paths.as_ref();
+    let config = cli.config.paths.as_ref();
     let account = cli.account.name.as_deref();
     let backend = cli.backend;
     cli.cmd.execute(printer, config, account, backend)

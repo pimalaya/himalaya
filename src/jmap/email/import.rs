@@ -32,7 +32,7 @@ use crate::{
         client::{JmapClient, jmap_http_auth},
         error::format_set_error,
     },
-    shared::messages::arg::MessageArg,
+    shared::message::arg::MessageArg,
 };
 
 /// Import an RFC 5322 message into a mailbox (upload + Email/import).

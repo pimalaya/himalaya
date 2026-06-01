@@ -20,7 +20,7 @@ use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::account::context::Account;
-use crate::shared::{client::EmailClient, flags::arg::MessageIdsArg};
+use crate::shared::{client::EmailClient, flag::arg::MessageIdsArg};
 
 /// Move message(s) from one mailbox to another within the active
 /// account.

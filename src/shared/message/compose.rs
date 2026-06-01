@@ -24,65 +24,66 @@ use pimalaya_cli::printer::Printer;
 use crate::account::context::Account;
 use crate::shared::{
     client::EmailClient,
-    messages::{
-        builder::{self, BuilderArgs, PostingStyle, SourceArgs, SourceMode},
+    message::{
+        builder::{self, BuilderArgs},
         handler,
     },
 };
 
-/// Reply to a message using the built-in flag composer.
+/// Compose a new message from CLI arguments (built-in flag composer).
 ///
-/// Fetches the source message, pre-fills `In-Reply-To` / `References`
-/// and the `Re:` subject, optionally derives recipients from
-/// `Reply-To`/`From`, and quotes the source text body. The produced
-/// MIME is written to stdout, or routed via `--save` / `--send`.
-/// For richer composition, pipe `messages read <id>` into a
-/// standalone composer (`mml reply`, etc.) and feed its output back
-/// into `messages send` / `messages add`.
+/// Use this for the simple case: pass `--from`, `--to`, `--body`,
+/// etc., and the message is assembled with `mail_builder`. The
+/// produced RFC 5322 bytes are written to stdout by default; pass
+/// `--save <mailbox>` to append a copy, `--send` to push through the
+/// account's SMTP/JMAP send path, or both. For richer composition
+/// (multipart MIME, MML directives, signing/encryption, editor-driven
+/// workflows), chain a standalone composer like
+/// [`mml`](https://github.com/pimalaya/mml) into `messages send` /
+/// `messages add` via a tempfile or bash/zsh process substitution.
 #[derive(Debug, Parser)]
-pub struct MessageReplyCommand {
-    /// Identifier of the source message (IMAP UID, JMAP id, Maildir
-    /// filename id).
-    #[arg(value_name = "ID")]
-    pub id: String,
-
-    /// Mailbox the source message lives in. Ignored for JMAP, which
-    /// addresses messages by id directly.
-    #[arg(
-        long = "mailbox",
-        short = 'm',
-        value_name = "NAME",
-        default_value = "Inbox"
-    )]
-    pub mailbox: String,
-
+pub struct MessageComposeCommand {
+    /// Sender address (`From` header).
     #[arg(long, value_name = "ADDR")]
     pub from: Option<String>,
 
+    /// Recipient address(es) (`To` header). Repeat the flag or use a
+    /// comma-separated list.
     #[arg(long, short = 't', value_name = "ADDR", value_delimiter = ',')]
     pub to: Vec<String>,
 
+    /// Carbon-copy recipient(s) (`Cc` header).
     #[arg(long, value_name = "ADDR", value_delimiter = ',')]
     pub cc: Vec<String>,
 
+    /// Blind carbon-copy recipient(s) (`Bcc` header).
     #[arg(long, value_name = "ADDR", value_delimiter = ',')]
     pub bcc: Vec<String>,
 
+    /// Subject line.
     #[arg(long, short = 's', value_name = "TEXT")]
     pub subject: Option<String>,
 
+    /// Inline body. Mutually exclusive with `--body-file` and stdin.
     #[arg(long, value_name = "TEXT", conflicts_with = "body_file")]
     pub body: Option<String>,
 
+    /// Read the body from a file. Mutually exclusive with `--body`
+    /// and stdin.
     #[arg(long = "body-file", value_name = "PATH")]
     pub body_file: Option<PathBuf>,
 
+    /// Attachment file(s).
     #[arg(long = "attach", value_name = "PATH")]
     pub attach: Vec<PathBuf>,
 
+    /// Signature appended after the body, separated by the standard
+    /// `-- ` delimiter (RFC 3676 §4.3).
     #[arg(long, value_name = "TEXT")]
     pub signature: Option<String>,
 
+    /// Read the signature from a file. Mutually exclusive with
+    /// `--signature`.
     #[arg(
         long = "signature-file",
         value_name = "PATH",
@@ -90,40 +91,23 @@ pub struct MessageReplyCommand {
     )]
     pub signature_file: Option<PathBuf>,
 
-    /// How to lay out the quoted source body relative to the user's
-    /// body. Interleaved posting is left to the user — write your
-    /// reply inside the quoted block.
-    #[arg(
-        long = "posting-style",
-        short = 'P',
-        value_name = "STYLE",
-        default_value = "top"
-    )]
-    pub posting_style: PostingStyle,
-
-    /// Plain-text headline placed before the quoted source body
-    /// (e.g. `"On {date}, {from} wrote:"`). No substitution is
-    /// performed; pass the literal string you want.
-    #[arg(long = "quote-headline", short = 'Q', value_name = "TEXT")]
-    pub quote_headline: Option<String>,
-
+    /// Append a copy of the composed message to this mailbox.
     #[arg(long, value_name = "MAILBOX")]
     pub save: Option<String>,
 
+    /// Send the composed message through the account's SMTP/JMAP path.
+    /// Combines with `--save` to also keep a copy.
     #[arg(long)]
     pub send: bool,
 }
 
-impl MessageReplyCommand {
+impl MessageComposeCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
         account: &mut Account,
         client: &mut EmailClient,
     ) -> Result<()> {
-        let mailbox = account.resolve_mailbox(&self.mailbox).to_owned();
-        let source = client.get_message(&mailbox, &self.id)?;
-
         let raw = builder::build(
             BuilderArgs {
                 from: self.from.as_deref(),
@@ -137,12 +121,7 @@ impl MessageReplyCommand {
                 signature: self.signature.as_deref(),
                 signature_file: self.signature_file.as_deref(),
             },
-            Some(SourceArgs {
-                raw: &source,
-                mode: SourceMode::Reply,
-                posting_style: self.posting_style,
-                quote_headline: self.quote_headline.as_deref().unwrap_or(""),
-            }),
+            None,
         )?;
 
         handler::route(

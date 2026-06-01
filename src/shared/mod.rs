@@ -16,9 +16,9 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 #[cfg(any(feature = "imap", feature = "jmap", feature = "maildir"))]
-pub mod attachments;
+pub mod attachment;
 pub mod client;
-pub mod envelopes;
-pub mod flags;
-pub mod mailboxes;
-pub mod messages;
+pub mod envelope;
+pub mod flag;
+pub mod mailbox;
+pub mod message;

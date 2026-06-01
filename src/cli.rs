@@ -21,9 +21,8 @@ use anyhow::{Result, bail};
 use clap::{CommandFactory, Parser, Subcommand};
 use pimalaya_cli::{
     clap::{
-        args::{AccountFlag, JsonFlag, LogFlags},
+        args::{AccountFlag, ConfigFlags, JsonFlag, LogFlags},
         commands::{CompletionCommand, ManualCommand},
-        parsers::path_parser,
     },
     long_version,
     printer::Printer,
@@ -45,8 +44,8 @@ use crate::{
     backend::Backend,
     config::Config,
     shared::{
-        attachments::cli::AttachmentCommand, client::EmailClient, envelopes::cli::EnvelopeCommand,
-        flags::cli::FlagCommand, mailboxes::cli::MailboxCommand, messages::cli::MessageCommand,
+        attachment::cli::AttachmentCommand, client::EmailClient, envelope::cli::EnvelopeCommand,
+        flag::cli::FlagCommand, mailbox::cli::MailboxCommand, message::cli::MessageCommand,
     },
     wizard,
 };
@@ -60,18 +59,8 @@ pub struct Cli {
     #[command(subcommand)]
     pub cmd: Command,
 
-    /// Override the default configuration file path.
-    ///
-    /// The given paths are shell-expanded then canonicalized (if
-    /// applicable). If the first path does not point to a valid file,
-    /// the wizard will propose to assist you in the creation of the
-    /// configuration file. Other paths are merged with the first one,
-    /// which allows you to separate your public config from your
-    /// private(s) one(s). Multiple paths can also be provided by
-    /// delimiting them with `:` (like `$PATH` in a POSIX shell).
-    #[arg(short, long = "config", global = true, env = "HIMALAYA_CONFIG")]
-    #[arg(value_name = "PATH", value_parser = path_parser, value_delimiter = ':')]
-    pub config_paths: Vec<PathBuf>,
+    #[command(flatten)]
+    pub config: ConfigFlags,
     #[command(flatten)]
     pub account: AccountFlag,
     /// Force a specific backend for cross-protocol commands.

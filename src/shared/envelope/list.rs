@@ -27,7 +27,7 @@ use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
 use crate::account::context::Account;
-use crate::shared::{client::EmailClient, mailboxes::arg::MailboxArg};
+use crate::shared::{client::EmailClient, mailbox::arg::MailboxArg};
 
 /// List envelopes for the active account, regardless of the underlying
 /// backend (IMAP, JMAP or Maildir).

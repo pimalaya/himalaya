@@ -24,7 +24,7 @@ use pimalaya_cli::printer::Printer;
 use crate::account::context::Account;
 use crate::shared::{
     client::EmailClient,
-    messages::{
+    message::{
         builder::{self, BuilderArgs, PostingStyle, SourceArgs, SourceMode},
         handler,
     },

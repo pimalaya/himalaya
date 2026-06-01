@@ -26,7 +26,7 @@ use io_smtp::rfc5321::types::{
 use mail_parser::{Addr, Address, HeaderName, HeaderValue, MessageParser};
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::{shared::messages::arg::MessageArg, smtp::client::SmtpClient};
+use crate::{shared::message::arg::MessageArg, smtp::client::SmtpClient};
 
 /// Send a raw RFC 5322 message via SMTP.
 ///

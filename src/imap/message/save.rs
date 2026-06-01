@@ -24,7 +24,7 @@ use pimalaya_cli::printer::{Message, Printer};
 
 use crate::{
     imap::{client::ImapClient, mailbox::arg::MailboxNameArg},
-    shared::messages::arg::MessageArg,
+    shared::message::arg::MessageArg,
 };
 
 /// Save a message to a mailbox.

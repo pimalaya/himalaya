@@ -26,8 +26,8 @@ use serde::Serialize;
 use crate::account::context::Account;
 use crate::shared::{
     client::EmailClient,
-    flags::arg::FlagArg,
-    messages::{
+    flag::arg::FlagArg,
+    message::{
         arg::MessageArg,
         handler::{self, Outcome},
     },

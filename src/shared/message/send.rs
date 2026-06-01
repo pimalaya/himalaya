@@ -15,57 +15,45 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::fmt;
-
 use anyhow::Result;
 use clap::Parser;
-use io_email::flag::{Flag, FlagOp};
 use pimalaya_cli::printer::Printer;
-use serde::Serialize;
 
 use crate::account::context::Account;
 use crate::shared::{
     client::EmailClient,
-    flags::arg::{FlagsArg, MessageIdsArg},
-    mailboxes::arg::MailboxArg,
+    message::{arg::MessageArg, handler},
 };
 
-/// Replace flag(s) of message(s) for the active account.
+/// Send a message via the active account.
+///
+/// Routes through SMTP or JMAP depending on the account's configured
+/// outgoing backend. The envelope sender is taken from the `From:`
+/// header and recipients are collected from `To:` / `Cc:` / `Bcc:`.
+///
+/// The message can be passed as a positional file path, an inline
+/// raw string, or piped via stdin (see [`MessageArg`] for resolution
+/// order). Pass `--save <MAILBOX>` to also append a copy of the
+/// sent message to a mailbox; the mailbox name is resolved through
+/// the account's `[mailbox.alias]` map before the backend call.
 #[derive(Debug, Parser)]
-pub struct FlagSetCommand {
+pub struct MessageSendCommand {
+    /// Append a copy of the sent message to this mailbox.
+    #[arg(long, value_name = "MAILBOX")]
+    pub save: Option<String>,
+
     #[command(flatten)]
-    pub mailbox: MailboxArg,
-    #[command(flatten)]
-    pub message_ids: MessageIdsArg,
-    #[command(flatten)]
-    pub flags: FlagsArg,
+    pub message: MessageArg,
 }
 
-impl FlagSetCommand {
+impl MessageSendCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
         account: &mut Account,
         client: &mut EmailClient,
     ) -> Result<()> {
-        let mailbox = self.mailbox.resolve(account)?;
-        let ids: Vec<&str> = self.message_ids.inner.iter().map(String::as_str).collect();
-        let flags: Vec<Flag> = self.flags.inner.iter().map(Into::into).collect();
-
-        client.store_flags(&mailbox, &ids, &flags, FlagOp::Set)?;
-
-        let flags: Vec<String> = self.flags.inner.iter().map(ToString::to_string).collect();
-        printer.out(SetFlags { flags })
-    }
-}
-
-#[derive(Debug, Serialize)]
-struct SetFlags {
-    flags: Vec<String>,
-}
-
-impl fmt::Display for SetFlags {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Successfully set flags: {}", self.flags.join(", "))
+        let raw = self.message.parse()?.into_bytes();
+        handler::route(printer, account, client, raw, self.save.as_deref(), true)
     }
 }

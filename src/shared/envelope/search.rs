@@ -26,8 +26,8 @@ use pimalaya_cli::printer::Printer;
 use crate::account::context::Account;
 use crate::shared::{
     client::EmailClient,
-    envelopes::list::{EnvelopeColors, Envelopes, FlagChars},
-    mailboxes::arg::MailboxArg,
+    envelope::list::{EnvelopeColors, Envelopes, FlagChars},
+    mailbox::arg::MailboxArg,
 };
 
 /// Search envelopes for the active account using the shared search

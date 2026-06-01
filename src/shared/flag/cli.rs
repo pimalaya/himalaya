@@ -20,18 +20,23 @@ use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
 use crate::account::context::Account;
-use crate::shared::{client::EmailClient, mailboxes::list::MailboxListCommand};
+use crate::shared::{
+    client::EmailClient,
+    flag::{add::FlagAddCommand, remove::FlagRemoveCommand, set::FlagSetCommand},
+};
 
-/// Shared API to manage mailboxes for the active account.
+/// Shared API to manage flags for the active account.
 ///
-/// A mailbox is a message container.
+/// A flag is acting like a tag, giving information about message state or kind.
 #[derive(Debug, Subcommand)]
-pub enum MailboxCommand {
-    #[command(visible_alias = "ls")]
-    List(MailboxListCommand),
+pub enum FlagCommand {
+    Add(FlagAddCommand),
+    Set(FlagSetCommand),
+    #[command(visible_alias = "rm")]
+    Remove(FlagRemoveCommand),
 }
 
-impl MailboxCommand {
+impl FlagCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -39,7 +44,9 @@ impl MailboxCommand {
         client: &mut EmailClient,
     ) -> Result<()> {
         match self {
-            Self::List(cmd) => cmd.execute(printer, account, client),
+            Self::Add(cmd) => cmd.execute(printer, account, client),
+            Self::Set(cmd) => cmd.execute(printer, account, client),
+            Self::Remove(cmd) => cmd.execute(printer, account, client),
         }
     }
 }
