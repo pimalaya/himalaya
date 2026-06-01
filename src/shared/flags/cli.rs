@@ -19,6 +19,7 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
+use crate::account::context::Account;
 use crate::shared::{
     client::EmailClient,
     flags::{add::FlagAddCommand, remove::FlagRemoveCommand, set::FlagSetCommand},
@@ -36,11 +37,16 @@ pub enum FlagCommand {
 }
 
 impl FlagCommand {
-    pub fn execute(self, printer: &mut impl Printer, client: EmailClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut EmailClient,
+    ) -> Result<()> {
         match self {
-            Self::Add(cmd) => cmd.execute(printer, client),
-            Self::Set(cmd) => cmd.execute(printer, client),
-            Self::Remove(cmd) => cmd.execute(printer, client),
+            Self::Add(cmd) => cmd.execute(printer, account, client),
+            Self::Set(cmd) => cmd.execute(printer, account, client),
+            Self::Remove(cmd) => cmd.execute(printer, account, client),
         }
     }
 }

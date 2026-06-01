@@ -19,6 +19,7 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
+use crate::account::context::Account;
 use crate::shared::{
     attachments::{download::AttachmentDownloadCommand, list::AttachmentListCommand},
     client::EmailClient,
@@ -36,10 +37,15 @@ pub enum AttachmentCommand {
 }
 
 impl AttachmentCommand {
-    pub fn execute(self, printer: &mut impl Printer, client: EmailClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut EmailClient,
+    ) -> Result<()> {
         match self {
-            Self::List(cmd) => cmd.execute(printer, client),
-            Self::Download(cmd) => cmd.execute(printer, client),
+            Self::List(cmd) => cmd.execute(printer, account, client),
+            Self::Download(cmd) => cmd.execute(printer, account, client),
         }
     }
 }

@@ -23,6 +23,7 @@ use comfy_table::{Cell, ContentArrangement, Row, Table};
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
+use crate::account::context::Account;
 use crate::m2dir::{
     arg::{M2dirNameFlag, MessageIdArg},
     client::M2dirClient,
@@ -41,15 +42,20 @@ pub struct M2dirFlagListCommand {
 }
 
 impl M2dirFlagListCommand {
-    pub fn execute(self, printer: &mut impl Printer, client: M2dirClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut M2dirClient,
+    ) -> Result<()> {
         let store = client.open_store()?;
         let path = store.resolve_folder_path(&self.m2dir.inner)?;
         let m2dir = client.open_m2dir(path)?;
         let flags = client.read_flags(&m2dir, &self.id.inner)?;
 
         let table = FlagsTable {
-            preset: client.account.table_preset().to_string(),
-            arrangement: client.account.table_arrangement(),
+            preset: account.table_preset().to_string(),
+            arrangement: account.table_arrangement(),
             flags: flags.iter().map(str::to_owned).collect(),
         };
 

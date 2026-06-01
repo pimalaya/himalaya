@@ -42,7 +42,7 @@ pub struct JmapIdentityUpdateCommand {
 }
 
 impl JmapIdentityUpdateCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let patch = IdentityUpdate {
             name: self.name,
             reply_to: None,

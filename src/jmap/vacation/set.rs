@@ -57,7 +57,7 @@ pub struct JmapVacationSetCommand {
 }
 
 impl JmapVacationSetCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let has_vacation = client
             .session()
             .map(|s| s.capabilities.contains_key(VACATION_RESPONSE))

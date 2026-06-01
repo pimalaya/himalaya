@@ -43,7 +43,6 @@ use crate::{
 
 pub struct JmapClient {
     inner: Inner,
-    pub account: Account,
     /// The original JMAP config block, kept around so commands like
     /// `email import` / `email export` can spin up their own
     /// auxiliary sessions (e.g. against the upload/download URL when
@@ -53,9 +52,8 @@ pub struct JmapClient {
 
 impl JmapClient {
     /// Establishes the JMAP session (TLS, `/.well-known/jmap`
-    /// discovery) then wraps the resulting client alongside
-    /// `account`.
-    pub fn new(config: JmapConfig, account: Account) -> Result<Self> {
+    /// discovery).
+    pub fn new(config: JmapConfig) -> Result<Self> {
         let mut tls: Tls = config.tls.clone().into();
         tls.rustls.alpn = vec!["http/1.1".into()];
 
@@ -65,11 +63,7 @@ impl JmapClient {
         let mut inner = Inner::connect(&url, &tls, http_auth)?;
         inner.session_get(&url)?;
 
-        Ok(Self {
-            inner,
-            account,
-            config,
-        })
+        Ok(Self { inner, config })
     }
 }
 
@@ -89,11 +83,13 @@ impl DerefMut for JmapClient {
 
 /// Loads the configuration, picks the active account, builds the
 /// merged [`Account`] then opens the JMAP session. Bails when the
-/// account has no `[jmap]` block.
+/// account has no `[jmap]` block. Returns the live client paired
+/// with the merged account so subcommands receive both as sibling
+/// arguments.
 pub fn build_jmap_client(
     config_paths: &[PathBuf],
     account_name: Option<&str>,
-) -> Result<JmapClient> {
+) -> Result<(Account, JmapClient)> {
     let mut config = load_or_wizard(config_paths)?;
     let (name, mut ac) = config
         .take_account(account_name)?
@@ -103,7 +99,8 @@ pub fn build_jmap_client(
         .take()
         .ok_or_else(|| anyhow!("JMAP config is missing for account `{name}`"))?;
     let account = Account::from(config).merge(Account::from(ac));
-    JmapClient::new(jmap_config, account)
+    let client = JmapClient::new(jmap_config)?;
+    Ok((account, client))
 }
 
 /// Parses the JMAP `server` field into a [`Url`], defaulting bare

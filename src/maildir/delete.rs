@@ -32,7 +32,7 @@ pub struct MaildirMailboxDeleteCommand {
 }
 
 impl MaildirMailboxDeleteCommand {
-    pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut MaildirClient) -> Result<()> {
         let path = client
             .root
             .join(&self.maildir_path.inner)

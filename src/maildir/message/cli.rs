@@ -44,7 +44,7 @@ pub enum MaildirMessageCommand {
 }
 
 impl MaildirMessageCommand {
-    pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut MaildirClient) -> Result<()> {
         match self {
             Self::Save(cmd) => cmd.execute(printer, client),
             Self::Get(cmd) => cmd.execute(printer, client),

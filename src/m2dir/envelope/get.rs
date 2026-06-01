@@ -24,6 +24,7 @@ use mail_parser::{Header, MessageParser};
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
+use crate::account::context::Account;
 use crate::m2dir::{
     arg::{M2dirNameFlag, MessageIdArg},
     client::M2dirClient,
@@ -42,7 +43,12 @@ pub struct M2dirEnvelopeGetCommand {
 }
 
 impl M2dirEnvelopeGetCommand {
-    pub fn execute(self, printer: &mut impl Printer, client: M2dirClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut M2dirClient,
+    ) -> Result<()> {
         let store = client.open_store()?;
         let path = store.resolve_folder_path(&self.m2dir.inner)?;
         let m2dir = client.open_m2dir(path)?;
@@ -54,7 +60,7 @@ impl M2dirEnvelopeGetCommand {
         };
 
         let table = EnvelopeTable {
-            preset: client.account.table_preset().to_string(),
+            preset: account.table_preset().to_string(),
             headers: parsed.headers(),
         };
 

@@ -32,7 +32,7 @@ pub struct M2dirMailboxCreateCommand {
 }
 
 impl M2dirMailboxCreateCommand {
-    pub fn execute(self, printer: &mut impl Printer, client: M2dirClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut M2dirClient) -> Result<()> {
         client.init_store()?;
         client.create_mailbox(&self.m2dir_name.inner)?;
         printer.out(Message::new("m2dir folder successfully created"))

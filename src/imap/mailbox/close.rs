@@ -34,7 +34,7 @@ use crate::imap::client::ImapClient;
 pub struct ImapMailboxCloseCommand;
 
 impl ImapMailboxCloseCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         client.close()?;
         printer.out(Message::new("Mailbox successfully closed"))
     }

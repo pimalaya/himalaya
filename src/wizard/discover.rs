@@ -116,7 +116,6 @@ pub fn run_or_exit(target: &Path) -> Result<Config> {
         table: Default::default(),
         envelope: Default::default(),
         mailbox: Default::default(),
-        message: Default::default(),
         attachment: Default::default(),
         account: Default::default(),
         accounts: HashMap::from([(account_name, account)]),

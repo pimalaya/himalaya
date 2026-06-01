@@ -27,6 +27,7 @@ use io_imap::types::{
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
+use crate::account::context::Account;
 use crate::imap::{
     client::ImapClient,
     envelope::list::{decode_mime, format_address},
@@ -54,7 +55,12 @@ pub struct ImapEnvelopeGetCommand {
 }
 
 impl ImapEnvelopeGetCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut ImapClient,
+    ) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         if !self.mailbox_no_select.inner {
@@ -76,7 +82,7 @@ impl ImapEnvelopeGetCommand {
         };
 
         let table = EnvelopeTable {
-            preset: client.account.table_preset().to_string(),
+            preset: account.table_preset().to_string(),
             envelope: items.into(),
         };
 

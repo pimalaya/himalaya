@@ -25,6 +25,7 @@ use mail_parser::{MessageParser, MessagePart, MimeHeaders};
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
+use crate::account::context::Account;
 use crate::shared::{client::EmailClient, mailboxes::arg::MailboxArg};
 
 /// List the attachments carried by a single message in the active
@@ -53,8 +54,13 @@ pub struct AttachmentListCommand {
 }
 
 impl AttachmentListCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: EmailClient) -> Result<()> {
-        let mailbox = self.mailbox.resolve(&client.account)?;
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut EmailClient,
+    ) -> Result<()> {
+        let mailbox = self.mailbox.resolve(account)?;
         let raw = client.get_message(&mailbox, &self.message_id)?;
 
         let Some(message) = MessageParser::new().parse(&raw) else {
@@ -83,17 +89,17 @@ impl AttachmentListCommand {
         }
 
         let attachments = Attachments {
-            preset: client.account.table_preset().to_string(),
-            arrangement: client.account.table_arrangement(),
+            preset: account.table_preset().to_string(),
+            arrangement: account.table_arrangement(),
             with_inline: self.inline,
             with_path: false,
             colors: AttachmentColors {
-                id: client.account.attachments_list_table_id_color(),
-                filename: client.account.attachments_list_table_filename_color(),
-                r#type: client.account.attachments_list_table_type_color(),
-                size: client.account.attachments_list_table_size_color(),
-                inline: client.account.attachments_list_table_inline_color(),
-                path: client.account.attachments_list_table_path_color(),
+                id: account.attachments_list_table_id_color(),
+                filename: account.attachments_list_table_filename_color(),
+                r#type: account.attachments_list_table_type_color(),
+                size: account.attachments_list_table_size_color(),
+                inline: account.attachments_list_table_inline_color(),
+                path: account.attachments_list_table_path_color(),
             },
             attachments,
         };

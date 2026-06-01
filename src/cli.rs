@@ -170,56 +170,56 @@ impl Command {
             //
             Self::Mailbox(cmd) => {
                 let (config, account_config) = configs()?;
-                let client = EmailClient::new(config, account_config, backend)?;
-                cmd.execute(printer, client)
+                let (mut account, mut client) = EmailClient::new(config, account_config, backend)?;
+                cmd.execute(printer, &mut account, &mut client)
             }
             Self::Envelope(cmd) => {
                 let (config, account_config) = configs()?;
-                let client = EmailClient::new(config, account_config, backend)?;
-                cmd.execute(printer, client)
+                let (mut account, mut client) = EmailClient::new(config, account_config, backend)?;
+                cmd.execute(printer, &mut account, &mut client)
             }
             Self::Flag(cmd) => {
                 let (config, account_config) = configs()?;
-                let client = EmailClient::new(config, account_config, backend)?;
-                cmd.execute(printer, client)
+                let (mut account, mut client) = EmailClient::new(config, account_config, backend)?;
+                cmd.execute(printer, &mut account, &mut client)
             }
             Self::Message(cmd) => {
                 let (config, account_config) = configs()?;
-                let client = EmailClient::new(config, account_config, backend)?;
-                cmd.execute(printer, client)
+                let (mut account, mut client) = EmailClient::new(config, account_config, backend)?;
+                cmd.execute(printer, &mut account, &mut client)
             }
             Self::Attachment(cmd) => {
                 let (config, account_config) = configs()?;
-                let client = EmailClient::new(config, account_config, backend)?;
-                cmd.execute(printer, client)
+                let (mut account, mut client) = EmailClient::new(config, account_config, backend)?;
+                cmd.execute(printer, &mut account, &mut client)
             }
 
             // --- Protocol-specific APIs
             //
             #[cfg(feature = "imap")]
             Self::Imap(cmd) => {
-                let client = build_imap_client(config_paths, account_name)?;
-                cmd.execute(printer, client)
+                let (mut account, mut client) = build_imap_client(config_paths, account_name)?;
+                cmd.execute(printer, &mut account, &mut client)
             }
             #[cfg(feature = "jmap")]
             Self::Jmap(cmd) => {
-                let client = build_jmap_client(config_paths, account_name)?;
-                cmd.execute(printer, client)
+                let (mut account, mut client) = build_jmap_client(config_paths, account_name)?;
+                cmd.execute(printer, &mut account, &mut client)
             }
             #[cfg(feature = "maildir")]
             Self::Maildir(cmd) => {
-                let client = build_maildir_client(config_paths, account_name)?;
-                cmd.execute(printer, client)
+                let (mut account, mut client) = build_maildir_client(config_paths, account_name)?;
+                cmd.execute(printer, &mut account, &mut client)
             }
             #[cfg(feature = "m2dir")]
             Self::M2dir(cmd) => {
-                let client = build_m2dir_client(config_paths, account_name)?;
-                cmd.execute(printer, client)
+                let (mut account, mut client) = build_m2dir_client(config_paths, account_name)?;
+                cmd.execute(printer, &mut account, &mut client)
             }
             #[cfg(feature = "smtp")]
             Self::Smtp(cmd) => {
-                let client = build_smtp_client(config_paths, account_name)?;
-                cmd.execute(printer, client)
+                let (_account, mut client) = build_smtp_client(config_paths, account_name)?;
+                cmd.execute(printer, &mut client)
             }
 
             // --- Meta

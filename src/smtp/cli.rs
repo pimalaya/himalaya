@@ -35,7 +35,7 @@ pub enum SmtpCommand {
 }
 
 impl SmtpCommand {
-    pub fn execute(self, printer: &mut impl Printer, client: SmtpClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut SmtpClient) -> Result<()> {
         match self {
             Self::Messages(cmd) => cmd.execute(printer, client),
         }

@@ -19,6 +19,7 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
+use crate::account::context::Account;
 use crate::shared::{client::EmailClient, mailboxes::list::MailboxListCommand};
 
 /// Shared API to manage mailboxes for the active account.
@@ -31,9 +32,14 @@ pub enum MailboxCommand {
 }
 
 impl MailboxCommand {
-    pub fn execute(self, printer: &mut impl Printer, client: EmailClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut EmailClient,
+    ) -> Result<()> {
         match self {
-            Self::List(cmd) => cmd.execute(printer, client),
+            Self::List(cmd) => cmd.execute(printer, account, client),
         }
     }
 }

@@ -21,6 +21,7 @@ use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 
+use crate::account::context::Account;
 use crate::shared::{
     client::EmailClient,
     messages::{
@@ -34,7 +35,9 @@ use crate::shared::{
 /// Fetches the source, pre-fills `Fwd:` on the subject and the
 /// `References` header, and quotes the source body. The produced
 /// MIME is written to stdout, or routed via `--save` / `--send`.
-/// For non-default composition, use `forward-with <id> <name>`.
+/// For richer composition, pipe `messages read <id>` into a
+/// standalone composer (`mml forward`, etc.) and feed its output
+/// back into `messages send` / `messages add`.
 #[derive(Debug, Parser)]
 pub struct MessageForwardCommand {
     #[arg(value_name = "ID")]
@@ -101,7 +104,12 @@ pub struct MessageForwardCommand {
 }
 
 impl MessageForwardCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: EmailClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut EmailClient,
+    ) -> Result<()> {
         let source = client.get_message(&self.mailbox, &self.id)?;
 
         let raw = builder::build(
@@ -125,6 +133,13 @@ impl MessageForwardCommand {
             }),
         )?;
 
-        output::route(printer, &mut client, raw, self.save.as_deref(), self.send)
+        output::route(
+            printer,
+            account,
+            client,
+            raw,
+            self.save.as_deref(),
+            self.send,
+        )
     }
 }

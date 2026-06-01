@@ -15,8 +15,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-//! Himalaya wrapper around [`io_m2dir::client::M2dirClient`] bundling
-//! the merged [`Account`] alongside the m2dir client.
+//! Himalaya wrapper around [`io_m2dir::client::M2dirClient`].
 
 use std::{
     ops::{Deref, DerefMut},
@@ -31,15 +30,14 @@ use crate::{account::context::Account, cli::load_or_wizard, config::M2dirConfig}
 
 pub struct M2dirClient {
     inner: Inner,
-    pub account: Account,
 }
 
 impl M2dirClient {
     /// Builds an [`M2dirClient`] rooted at the configured m2store
     /// path.
-    pub fn new(config: M2dirConfig, account: Account) -> Self {
+    pub fn new(config: M2dirConfig) -> Self {
         let inner = Inner::new(config.root.to_string_lossy().into_owned());
-        Self { inner, account }
+        Self { inner }
     }
 }
 
@@ -59,11 +57,13 @@ impl DerefMut for M2dirClient {
 
 /// Loads the configuration, picks the active account, builds the
 /// merged [`Account`] then opens the m2dir client. Bails when the
-/// account has no `[m2dir]` block.
+/// account has no `[m2dir]` block. Returns the client paired with
+/// the merged account so subcommands receive both as sibling
+/// arguments.
 pub fn build_m2dir_client(
     config_paths: &[PathBuf],
     account_name: Option<&str>,
-) -> Result<M2dirClient> {
+) -> Result<(Account, M2dirClient)> {
     let mut config = load_or_wizard(config_paths)?;
     let (name, mut ac) = config
         .take_account(account_name)?
@@ -73,5 +73,5 @@ pub fn build_m2dir_client(
         .take()
         .ok_or_else(|| anyhow!("m2dir config is missing for account `{name}`"))?;
     let account = Account::from(config).merge(Account::from(ac));
-    Ok(M2dirClient::new(m2dir_config, account))
+    Ok((account, M2dirClient::new(m2dir_config)))
 }

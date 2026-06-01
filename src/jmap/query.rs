@@ -54,7 +54,7 @@ pub struct JmapQueryCommand {
 }
 
 impl JmapQueryCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let raw = if self.method_calls.is_empty()
             || self.method_calls.first().map(|s| s.as_str()) == Some("-")
         {

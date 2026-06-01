@@ -30,14 +30,13 @@
 
 use std::{collections::HashMap, env::temp_dir, path::PathBuf};
 
-use anyhow::{Result, anyhow};
 use comfy_table::{Color as TableColor, ContentArrangement, presets};
 use crossterm::style::Color;
 use dirs::download_dir;
 
 use crate::config::{
-    AccountConfig, AttachmentListTableConfig, ComposerConfig, Config, EnvelopeListTableConfig,
-    MailboxListTableConfig, ReaderConfig, TableArrangementConfig,
+    AccountConfig, AttachmentListTableConfig, Config, EnvelopeListTableConfig,
+    MailboxListTableConfig, TableArrangementConfig,
 };
 
 const DEFAULT_DATETIME_FMT: &str = "%F %R%:z";
@@ -70,28 +69,15 @@ pub struct Account {
     /// `mailbox.alias` at the global and account levels; account
     /// entries overwrite same-named global entries.
     pub mailbox_alias: HashMap<String, String>,
-
-    /// User-defined composers. Only sourced from the global
-    /// [`Config`]; account-level configs do not override these.
-    pub composer: HashMap<String, ComposerConfig>,
-    /// User-defined readers. See [`Account::composer`].
-    pub reader: HashMap<String, ReaderConfig>,
 }
 
 impl Account {
     /// Folds `other`'s set fields on top of `self`. Each `Option`
     /// field is taken from `other` when `Some`, otherwise from
-    /// `self`. The composer/reader maps are extended (entries from
-    /// `other` overwrite same-named entries from `self`).
+    /// `self`.
     pub fn merge(self, other: Self) -> Self {
         let mut mailbox_alias = self.mailbox_alias;
         mailbox_alias.extend(other.mailbox_alias);
-
-        let mut composer = self.composer;
-        composer.extend(other.composer);
-
-        let mut reader = self.reader;
-        reader.extend(other.reader);
 
         Self {
             downloads_dir: other.downloads_dir.or(self.downloads_dir),
@@ -118,9 +104,6 @@ impl Account {
             ),
 
             mailbox_alias,
-
-            composer,
-            reader,
         }
     }
 
@@ -196,40 +179,6 @@ impl Account {
         self.mailbox_alias
             .get(DEFAULT_MAILBOX_ALIAS)
             .map(String::as_str)
-    }
-
-    /// Gets a composer configuration. When `name` is given, looks up
-    /// the corresponding entry and bails if missing.
-    /// When `name` is `None`, returns the entry with `default = true`,
-    /// or bails with a hint if no default is set.
-    pub fn get_composer_mut(&mut self, name: Option<&str>) -> Result<&mut ComposerConfig> {
-        match name {
-            Some(name) => self
-                .composer
-                .get_mut(name)
-                .ok_or(anyhow!("no composer named `{name}` in [message.composer]")),
-            None => self
-                .composer
-                .values_mut()
-                .find(|c| c.default)
-                .ok_or(anyhow!(
-                    "no composer specified and no default in [message.composer.*]; \
-                 pass a <name> or set `default = true` on one entry"
-                )),
-        }
-    }
-
-    pub fn get_reader_mut(&mut self, name: Option<&str>) -> Result<&mut ReaderConfig> {
-        match name {
-            Some(name) => self
-                .reader
-                .get_mut(name)
-                .ok_or(anyhow!("no reader named `{name}` in [message.reader]")),
-            None => self.reader.values_mut().find(|c| c.default).ok_or(anyhow!(
-                "no reader specified and no default in [message.reader.*]; \
-             pass a <name> or set `default = true` on one entry"
-            )),
-        }
     }
 
     // ── envelopes list — flag glyphs ─────────────────────────────────────
@@ -429,9 +378,6 @@ impl From<Config> for Account {
             attachments_list_table: config.attachment.list.table,
 
             mailbox_alias: lowercase_alias_keys(config.mailbox.alias),
-
-            composer: config.message.composer,
-            reader: config.message.reader,
         }
     }
 }
@@ -452,9 +398,6 @@ impl From<AccountConfig> for Account {
             attachments_list_table: config.attachment.list.table,
 
             mailbox_alias: lowercase_alias_keys(config.mailbox.alias),
-
-            composer: HashMap::new(),
-            reader: HashMap::new(),
         }
     }
 }

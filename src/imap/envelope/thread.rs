@@ -62,7 +62,7 @@ pub struct ImapEnvelopeThreadCommand {
 }
 
 impl ImapEnvelopeThreadCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         if !self.mailbox_no_select.inner {
@@ -76,7 +76,7 @@ impl ImapEnvelopeThreadCommand {
 
         let all_ids = collect_thread_ids(&threads);
         let subjects = if !all_ids.is_empty() {
-            fetch_subjects(&mut client, &all_ids, !self.seq)?
+            fetch_subjects(client, &all_ids, !self.seq)?
         } else {
             HashMap::new()
         };

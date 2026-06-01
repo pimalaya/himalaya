@@ -41,7 +41,7 @@ pub struct JmapEmailCopyCommand {
 }
 
 impl JmapEmailCopyCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let mailbox_ids: BTreeMap<String, bool> =
             self.mailbox_id.into_iter().map(|m| (m, true)).collect();
 

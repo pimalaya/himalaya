@@ -121,32 +121,6 @@
 #mailbox.alias.trash = "[Gmail]/Trash"
 
 # --------------------------------------------------------------------------------
-# User-defined composers and readers
-# --------------------------------------------------------------------------------
-
-# Composers produce a MIME draft on stdout. They are invoked by the
-# `messages compose-with` / `reply-with` / `forward-with` subcommands.
-# Each entry declares one shell command per operation: `compose` (for blank
-# drafts and `mailto`), `reply`, and `forward`. Stdin carries the source MIME
-# bytes for `reply` / `forward` and is empty for `compose`; stderr is inherited
-# so the composer can prompt the user.
-#
-# Pick one with `compose-with <name>`, or let himalaya use the entry flagged
-# `default = true` when no name is passed.
-#
-# Example using https://github.com/pimalaya/mml:
-#message.composer.mml.compose = ["mml", "compose"]
-#message.composer.mml.reply = ["mml", "reply"]
-#message.composer.mml.forward = ["mml", "forward"]
-#message.composer.mml.default = true
-
-# Readers consume a MIME message on stdin and emit human-readable bytes on
-# stdout. They are invoked by `messages read-with`.
-#
-#message.reader.mml.command = ["mml", "read"]
-#message.reader.mml.default = true
-
-# --------------------------------------------------------------------------------
 # Account config
 # --------------------------------------------------------------------------------
 

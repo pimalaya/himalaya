@@ -19,6 +19,7 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
+use crate::account::context::Account;
 use crate::maildir::{
     client::MaildirClient,
     envelope::{get::MaildirEnvelopeGetCommand, list::MaildirEnvelopeListCommand},
@@ -36,10 +37,15 @@ pub enum MaildirEnvelopeCommand {
 }
 
 impl MaildirEnvelopeCommand {
-    pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut MaildirClient,
+    ) -> Result<()> {
         match self {
-            Self::Get(cmd) => cmd.execute(printer, client),
-            Self::List(cmd) => cmd.execute(printer, client),
+            Self::Get(cmd) => cmd.execute(printer, account, client),
+            Self::List(cmd) => cmd.execute(printer, account, client),
         }
     }
 }

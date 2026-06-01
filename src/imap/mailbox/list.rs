@@ -25,6 +25,7 @@ use io_imap::types::{core::QuotedChar, flag::FlagNameAttribute, mailbox::Mailbox
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
+use crate::account::context::Account;
 use crate::imap::client::ImapClient;
 
 /// List, search and filter mailboxes.
@@ -48,7 +49,12 @@ pub struct ImapMailboxListCommand {
 }
 
 impl ImapMailboxListCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut ImapClient,
+    ) -> Result<()> {
         let reference = self.reference.try_into()?;
         let pattern = self.pattern.try_into()?;
 
@@ -59,8 +65,8 @@ impl ImapMailboxListCommand {
         };
 
         let table = MailboxesTable {
-            preset: client.account.table_preset().to_string(),
-            name_color: client.account.mailboxes_list_table_name_color(),
+            preset: account.table_preset().to_string(),
+            name_color: account.mailboxes_list_table_name_color(),
             mailboxes: mailboxes.into_iter().map(From::from).collect(),
         };
 

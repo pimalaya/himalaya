@@ -26,6 +26,7 @@ use io_email::{address::Address, envelope::Envelope, flag::Flag};
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
+use crate::account::context::Account;
 use crate::shared::{client::EmailClient, mailboxes::arg::MailboxArg};
 
 /// List envelopes for the active account, regardless of the underlying
@@ -75,39 +76,44 @@ pub struct EnvelopeListCommand {
 }
 
 impl EnvelopeListCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: EmailClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut EmailClient,
+    ) -> Result<()> {
         let page = Some(self.page).filter(|p| *p > 0);
         let page_size = self
             .page_size
-            .or(Some(client.account.envelopes_list_page_size()))
+            .or(Some(account.envelopes_list_page_size()))
             .filter(|p| *p > 0);
-        let mailbox = self.mailbox.resolve(&client.account)?;
+        let mailbox = self.mailbox.resolve(account)?;
 
         let envelopes = client.list_envelopes(&mailbox, page, page_size, self.has_attachment)?;
 
         let envelopes = Envelopes {
-            preset: client.account.table_preset().to_string(),
-            arrangement: client.account.table_arrangement(),
+            preset: account.table_preset().to_string(),
+            arrangement: account.table_arrangement(),
             max_width: self.max_width,
-            datetime_fmt: client.account.datetime_fmt().to_string(),
-            datetime_local_tz: client.account.datetime_local_tz(),
+            datetime_fmt: account.datetime_fmt().to_string(),
+            datetime_local_tz: account.datetime_local_tz(),
             recipient: self.recipient,
             with_attachment: self.has_attachment,
             chars: FlagChars {
-                unseen: client.account.envelopes_list_table_unseen_char(),
-                replied: client.account.envelopes_list_table_replied_char(),
-                flagged: client.account.envelopes_list_table_flagged_char(),
-                attachment: client.account.envelopes_list_table_attachment_char(),
+                unseen: account.envelopes_list_table_unseen_char(),
+                replied: account.envelopes_list_table_replied_char(),
+                flagged: account.envelopes_list_table_flagged_char(),
+                attachment: account.envelopes_list_table_attachment_char(),
             },
             colors: EnvelopeColors {
-                id: client.account.envelopes_list_table_id_color(),
-                flags: client.account.envelopes_list_table_flags_color(),
-                att: client.account.envelopes_list_table_att_color(),
-                subject: client.account.envelopes_list_table_subject_color(),
-                from: client.account.envelopes_list_table_from_color(),
-                to: client.account.envelopes_list_table_to_color(),
-                date: client.account.envelopes_list_table_date_color(),
-                size: client.account.envelopes_list_table_size_color(),
+                id: account.envelopes_list_table_id_color(),
+                flags: account.envelopes_list_table_flags_color(),
+                att: account.envelopes_list_table_att_color(),
+                subject: account.envelopes_list_table_subject_color(),
+                from: account.envelopes_list_table_from_color(),
+                to: account.envelopes_list_table_to_color(),
+                date: account.envelopes_list_table_date_color(),
+                size: account.envelopes_list_table_size_color(),
             },
             envelopes,
         };

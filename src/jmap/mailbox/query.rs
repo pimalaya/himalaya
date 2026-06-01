@@ -26,6 +26,7 @@ use io_jmap::rfc8621::mailbox::{
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
+use crate::account::context::Account;
 use crate::jmap::client::JmapClient;
 
 /// Query JMAP mailboxes (Mailbox/query + Mailbox/get).
@@ -72,7 +73,12 @@ pub struct JmapMailboxQueryCommand {
 }
 
 impl JmapMailboxQueryCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut JmapClient,
+    ) -> Result<()> {
         let filter = {
             let f = MailboxFilter {
                 parent_id: self.parent_id,
@@ -105,12 +111,12 @@ impl JmapMailboxQueryCommand {
         )?;
 
         let table = MailboxesTable {
-            preset: client.account.table_preset().to_string(),
+            preset: account.table_preset().to_string(),
             colors: MailboxColors {
-                id: client.account.mailboxes_list_table_id_color(),
-                name: client.account.mailboxes_list_table_name_color(),
-                total: client.account.mailboxes_list_table_total_color(),
-                unread: client.account.mailboxes_list_table_unread_color(),
+                id: account.mailboxes_list_table_id_color(),
+                name: account.mailboxes_list_table_name_color(),
+                total: account.mailboxes_list_table_total_color(),
+                unread: account.mailboxes_list_table_unread_color(),
             },
             mailboxes: output.mailboxes,
         };

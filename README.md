@@ -235,38 +235,18 @@ himalaya messages compose --from me@example.org --to you@example.org \
     --subject "Hello" --body "Hi!" --send
 ```
 
-For richer composition (multipart MIME, MML directives, signing/encryption, editor-driven workflows…), wire a user-defined composer in `[message.composer.*]` and invoke it with the `-with` variants. Each entry declares one shell command per operation (`compose` for blank drafts and `mailto`, `reply` for replies, `forward` for forwards); the source message is piped on stdin for `reply` / `forward`. For example, with [mml](https://github.com/pimalaya/mml):
+For richer composition (multipart MIME, MML directives, signing/encryption, editor-driven workflows), chain a standalone composer such as [mml](https://github.com/pimalaya/mml) into `messages send` / `messages add` through a tempfile or bash/zsh process substitution:
 
-```toml
-[message.composer.mml]
-compose = "mml compose"
-reply = "mml reply"
-forward = "mml forward"
-default = true
+```sh
+# Explicit tempfile, works in plain POSIX sh
+mml compose /tmp/draft.eml && himalaya messages send /tmp/draft.eml
+
+# Bash / zsh process substitution, single command, no tempfile
+mml compose >(himalaya messages send)
+himalaya messages read 42 | mml reply >(himalaya messages send)
 ```
 
-```
-himalaya messages compose-with
-himalaya messages reply-with -m INBOX 42 --send
-himalaya messages forward-with -m INBOX 42 --send
-himalaya messages mailto 'mailto:bob@example.org?subject=Hi&body=Hello'
-```
-
-`messages mailto <URI>` parses an RFC 6068 `mailto:` URI (recipient list in the path, `to` / `cc` / `bcc` / `subject` / `body` query parameters), builds a draft RFC 5322 skeleton with those headers pre-filled, then pipes it on stdin to the named (or default) composer's `compose` command. The composer's output is routed through `--save` / `--send` like the other `-with` variants. Useful as a desktop `mailto:` handler.
-
-### Reading messages
-
-The built-in `messages read` command renders a message with himalaya's default formatter. For custom rendering, declare a reader in `[message.reader.*]` and call `read-with`:
-
-```toml
-[message.reader.mml]
-command = "mml read"
-default = true
-```
-
-```
-himalaya messages read-with -m INBOX 42
-```
+The path-arg or process-substitution forms keep the composer's stdout connected to the terminal, so any `$EDITOR` it spawns sees a real tty. The bare-pipe form (`mml compose | himalaya messages send`) hangs because the editor inherits a pipe on its stdout.
 
 ### Re-using sessions
 

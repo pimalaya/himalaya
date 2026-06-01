@@ -27,6 +27,7 @@ use io_imap::types::fetch::{MacroOrMessageDataItemNames, MessageDataItem, Messag
 use mail_parser::{MessageParser, MimeHeaders};
 use pimalaya_cli::printer::{Message, Printer};
 
+use crate::account::context::Account;
 use crate::imap::{client::ImapClient, mailbox::arg::MailboxNameOptionalFlag};
 
 /// Export type for message export.
@@ -73,7 +74,12 @@ pub struct ImapMessageExportCommand {
 }
 
 impl ImapMessageExportCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut ImapClient,
+    ) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         client.select(mailbox)?;
@@ -133,9 +139,7 @@ impl ImapMessageExportCommand {
 
                 // Generate filename from subject or message-id
                 let filename = generate_eml_filename(&message, self.id);
-                let dir = self
-                    .directory
-                    .unwrap_or_else(|| client.account.downloads_dir());
+                let dir = self.directory.unwrap_or_else(|| account.downloads_dir());
 
                 if !dir.exists() {
                     fs::create_dir_all(&dir)?;

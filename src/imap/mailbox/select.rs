@@ -36,7 +36,7 @@ pub struct ImapMailboxSelectCommand {
 }
 
 impl ImapMailboxSelectCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
         client.select(mailbox)?;
         printer.out(Message::new("Mailbox successfully selected"))

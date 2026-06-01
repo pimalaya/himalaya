@@ -49,7 +49,7 @@ pub struct MessageCopyCommand {
 }
 
 impl MessageCopyCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: EmailClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut EmailClient) -> Result<()> {
         let ids: Vec<&str> = self.ids.inner.iter().map(String::as_str).collect();
         client.copy_messages(&self.from, &self.to, &ids)?;
         printer.out(Message::new("Message(s) successfully copied"))

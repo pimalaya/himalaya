@@ -56,7 +56,7 @@ pub struct MaildirMessageSaveCommand {
 }
 
 impl MaildirMessageSaveCommand {
-    pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut MaildirClient) -> Result<()> {
         let maildir = client.resolve_maildir(&self.maildir.inner)?;
         let msg = self.message.parse()?;
         let flags = MaildirFlags::from_iter(self.flags.into_iter().map(Into::into));

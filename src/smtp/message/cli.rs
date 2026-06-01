@@ -32,7 +32,7 @@ pub enum SmtpMessageCommand {
 }
 
 impl SmtpMessageCommand {
-    pub fn execute(self, printer: &mut impl Printer, client: SmtpClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut SmtpClient) -> Result<()> {
         match self {
             Self::Send(cmd) => cmd.execute(printer, client),
         }

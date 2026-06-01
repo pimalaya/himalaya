@@ -15,12 +15,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-//! Himalaya wrapper around [`io_smtp::client::SmtpClientStd`] that
-//! bundles the merged [`Account`] alongside the live SMTP client.
+//! Himalaya wrapper around [`io_smtp::client::SmtpClientStd`].
 //!
 //! Built up front by the dispatch layer (`crate::cli`) via
 //! [`build_smtp_client`] and handed down to every SMTP-specific
-//! subcommand. SMTP send is stateless after auth, so no session
+//! subcommand, together with the merged [`Account`] as a sibling
+//! argument. SMTP send is stateless after auth, so no session
 //! context needs to follow the stream.
 
 use std::{
@@ -39,21 +39,19 @@ use crate::{account::context::Account, cli::load_or_wizard, config::SmtpConfig};
 
 pub struct SmtpClient {
     inner: Inner,
-    #[allow(dead_code)]
-    pub account: Account,
 }
 
 impl SmtpClient {
     /// Opens the SMTP connection (TCP/TLS/STARTTLS, greeting, EHLO,
-    /// SASL) then wraps the resulting client alongside `account`.
-    pub fn new(config: SmtpConfig, account: Account) -> Result<Self> {
+    /// SASL).
+    pub fn new(config: SmtpConfig) -> Result<Self> {
         let mut tls: Tls = config.tls.into();
         tls.rustls.alpn = vec!["smtp".into()];
         let sasl: Option<Sasl> = config.sasl.map(Sasl::try_from).transpose()?;
         let domain: EhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
         let server = parse_smtp_server(&config.server)?;
         let inner = Inner::connect(&server, &tls, config.starttls, domain, sasl)?;
-        Ok(Self { inner, account })
+        Ok(Self { inner })
     }
 }
 
@@ -89,11 +87,13 @@ impl DerefMut for SmtpClient {
 
 /// Loads the configuration, picks the active account, builds the
 /// merged [`Account`] then opens the SMTP session. Bails when the
-/// account has no `[smtp]` block.
+/// account has no `[smtp]` block. Returns the live client paired
+/// with the merged account so subcommands receive both as sibling
+/// arguments.
 pub fn build_smtp_client(
     config_paths: &[PathBuf],
     account_name: Option<&str>,
-) -> Result<SmtpClient> {
+) -> Result<(Account, SmtpClient)> {
     let mut config = load_or_wizard(config_paths)?;
     let (name, mut ac) = config
         .take_account(account_name)?
@@ -103,5 +103,6 @@ pub fn build_smtp_client(
         .take()
         .ok_or_else(|| anyhow!("SMTP config is missing for account `{name}`"))?;
     let account = Account::from(config).merge(Account::from(ac));
-    SmtpClient::new(smtp_config, account)
+    let client = SmtpClient::new(smtp_config)?;
+    Ok((account, client))
 }

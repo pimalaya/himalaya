@@ -32,6 +32,7 @@ use pimalaya_cli::printer::Printer;
 use rfc2047_decoder::{Decoder, RecoverStrategy};
 use serde::Serialize;
 
+use crate::account::context::Account;
 use crate::imap::{
     client::ImapClient,
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
@@ -67,7 +68,12 @@ pub struct ImapEnvelopeListCommand {
 }
 
 impl ImapEnvelopeListCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut ImapClient,
+    ) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         let exists = if self.mailbox_no_select.inner {
@@ -100,13 +106,13 @@ impl ImapEnvelopeListCommand {
         let data = client.fetch(sequence_set, item_names, !self.sequence && has_sequence)?;
 
         let table = EnvelopesTable {
-            preset: client.account.table_preset().to_string(),
-            arrangement: client.account.table_arrangement(),
+            preset: account.table_preset().to_string(),
+            arrangement: account.table_arrangement(),
             colors: EnvelopeColors {
-                id: client.account.envelopes_list_table_id_color(),
-                subject: client.account.envelopes_list_table_subject_color(),
-                from: client.account.envelopes_list_table_from_color(),
-                date: client.account.envelopes_list_table_date_color(),
+                id: account.envelopes_list_table_id_color(),
+                subject: account.envelopes_list_table_subject_color(),
+                from: account.envelopes_list_table_from_color(),
+                date: account.envelopes_list_table_date_color(),
             },
             envelopes: map_envelopes_table_entries(data),
         };

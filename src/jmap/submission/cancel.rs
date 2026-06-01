@@ -33,7 +33,7 @@ pub struct JmapSubmissionCancelCommand {
 }
 
 impl JmapSubmissionCancelCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let output = client.email_submission_cancel(self.ids.clone())?;
 
         if !output.not_updated.is_empty() {

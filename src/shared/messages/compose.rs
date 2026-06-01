@@ -21,6 +21,7 @@ use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 
+use crate::account::context::Account;
 use crate::shared::{
     client::EmailClient,
     messages::{
@@ -36,8 +37,10 @@ use crate::shared::{
 /// produced RFC 5322 bytes are written to stdout by default; pass
 /// `--save <mailbox>` to append a copy, `--send` to push through the
 /// account's SMTP/JMAP send path, or both. For richer composition
-/// (multipart MIME, MML directives, signing/encryption, TUI editing,
-/// …) use `compose-with <name>` instead.
+/// (multipart MIME, MML directives, signing/encryption, editor-driven
+/// workflows), chain a standalone composer like
+/// [`mml`](https://github.com/pimalaya/mml) into `messages send` /
+/// `messages add` via a tempfile or bash/zsh process substitution.
 #[derive(Debug, Parser)]
 pub struct MessageComposeCommand {
     /// Sender address (`From` header).
@@ -99,7 +102,12 @@ pub struct MessageComposeCommand {
 }
 
 impl MessageComposeCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: EmailClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut EmailClient,
+    ) -> Result<()> {
         let raw = builder::build(
             BuilderArgs {
                 from: self.from.as_deref(),
@@ -116,6 +124,13 @@ impl MessageComposeCommand {
             None,
         )?;
 
-        output::route(printer, &mut client, raw, self.save.as_deref(), self.send)
+        output::route(
+            printer,
+            account,
+            client,
+            raw,
+            self.save.as_deref(),
+            self.send,
+        )
     }
 }

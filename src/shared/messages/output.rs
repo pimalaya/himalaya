@@ -15,27 +15,35 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-//! Post-composer routing: where the produced MIME bytes go.
+//! Post-build routing: where the produced MIME bytes go.
 //!
-//! Used by `compose` / `reply` / `forward` (and their `-with`
-//! variants). The same `--save <mbox>` / `--send` flags can combine:
-//! `--save Sent --send` sends the message *and* appends a copy to the
-//! `Sent` mailbox. With neither flag, the raw bytes are written to
-//! stdout — same shape as a manual `mml compile > out.eml`.
+//! Used by the built-in flag composers `compose` / `reply` /
+//! `forward`. The same `--save <mbox>` / `--send` flags can combine:
+//! `--save Sent --send` sends the message and appends a copy to the
+//! `Sent` mailbox. The mailbox name is resolved through
+//! [`Account::resolve_mailbox`] before the backend call so user
+//! aliases (`mailbox.alias.sent = "[Gmail]/Sent Mail"`) apply. With
+//! neither flag, the raw bytes are written to stdout: same shape as
+//! a manual `mml compile > out.eml`.
+//!
+//! [`Account::resolve_mailbox`]: crate::account::context::Account::resolve_mailbox
 
 use std::io::{Write, stdout};
 
 use anyhow::Result;
+use io_email::flag::{Flag, IanaFlag};
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::shared::client::EmailClient;
+use crate::{account::context::Account, shared::client::EmailClient};
 
 /// Routes `raw` through the requested combination of side-effects.
-/// `save` writes a copy to the named mailbox before sending; `send`
-/// pushes the message through the configured SMTP / JMAP send path.
-/// With neither set, dumps `raw` to stdout and returns.
+/// `save` writes a copy to the named mailbox (resolved through the
+/// account's alias map) before sending; `send` pushes the message
+/// through the configured SMTP / JMAP send path. With neither set,
+/// dumps `raw` to stdout and returns.
 pub fn route(
     printer: &mut impl Printer,
+    account: &Account,
     client: &mut EmailClient,
     raw: Vec<u8>,
     save: Option<&str>,
@@ -47,14 +55,21 @@ pub fn route(
         return Ok(());
     }
 
-    if let Some(mailbox) = save {
-        client.add_message(mailbox, &[], raw.clone())?;
+    if let Some(name) = save {
+        let mailbox = account.resolve_mailbox(name);
+        client.add_message(mailbox, &[Flag::from_iana(IanaFlag::Seen)], raw.clone())?;
     }
 
     if send {
         client.send_message(raw)?;
-        return printer.out(Message::new("Message successfully sent"));
     }
 
-    printer.out(Message::new("Message saved"))
+    let msg = match (save.is_some(), send) {
+        (true, true) => "Message successfully saved and sent",
+        (false, true) => "Message successfully saved",
+        (true, false) => "Message successfully sent",
+        (false, false) => "Nothing done with this message",
+    };
+
+    printer.out(Message::new(msg))
 }

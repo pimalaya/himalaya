@@ -15,12 +15,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-//! Himalaya wrapper around [`io_imap::client::ImapClientStd`] that
-//! bundles the merged [`Account`] alongside the live IMAP client.
+//! Himalaya wrapper around [`io_imap::client::ImapClientStd`].
 //!
 //! This is what every IMAP-specific subcommand receives: the dispatch
 //! layer (`crate::cli`) opens the session up front via
-//! [`build_imap_client`] and hands the ready-to-use wrapper down.
+//! [`build_imap_client`] and hands the ready-to-use wrapper down,
+//! together with the merged [`Account`] as a sibling argument.
 
 use std::{
     ops::{Deref, DerefMut},
@@ -40,23 +40,21 @@ use crate::{
 
 pub struct ImapClient {
     inner: Inner,
-    pub account: Account,
 }
 
 impl ImapClient {
-    /// Opens the IMAP connection (TCP/TLS/STARTTLS, greeting, SASL)
-    /// then wraps the resulting client alongside `account`. The
-    /// capability list reported by the connect handshake is discarded;
-    /// IMAP-specific subcommands that need it should call
+    /// Opens the IMAP connection (TCP/TLS/STARTTLS, greeting, SASL).
+    /// The capability list reported by the connect handshake is
+    /// discarded; IMAP-specific subcommands that need it should call
     /// [`Inner::capability`] explicitly.
-    pub fn new(config: ImapConfig, account: Account) -> Result<Self> {
+    pub fn new(config: ImapConfig) -> Result<Self> {
         let mut tls: Tls = config.tls.into();
         tls.rustls.alpn = vec!["imap".into()];
         let sasl: Option<Sasl> = config.sasl.map(Sasl::try_from).transpose()?;
         let auto_id = resolve_auto_id_params(&config.id)?;
         let server = parse_imap_server(&config.server)?;
         let (inner, _capability) = Inner::connect(&server, &tls, config.starttls, sasl, auto_id)?;
-        Ok(Self { inner, account })
+        Ok(Self { inner })
     }
 }
 
@@ -92,11 +90,13 @@ impl DerefMut for ImapClient {
 
 /// Loads the configuration, picks the active account, builds the
 /// merged [`Account`] then opens the IMAP session. Bails when the
-/// account has no `[imap]` block.
+/// account has no `[imap]` block. Returns the live client paired
+/// with the merged account so subcommands receive both as sibling
+/// arguments.
 pub fn build_imap_client(
     config_paths: &[PathBuf],
     account_name: Option<&str>,
-) -> Result<ImapClient> {
+) -> Result<(Account, ImapClient)> {
     let mut config = load_or_wizard(config_paths)?;
     let (name, mut ac) = config
         .take_account(account_name)?
@@ -106,5 +106,6 @@ pub fn build_imap_client(
         .take()
         .ok_or_else(|| anyhow!("IMAP config is missing for account `{name}`"))?;
     let account = Account::from(config).merge(Account::from(ac));
-    ImapClient::new(imap_config, account)
+    let client = ImapClient::new(imap_config)?;
+    Ok((account, client))
 }

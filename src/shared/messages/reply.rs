@@ -21,6 +21,7 @@ use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 
+use crate::account::context::Account;
 use crate::shared::{
     client::EmailClient,
     messages::{
@@ -35,7 +36,9 @@ use crate::shared::{
 /// and the `Re:` subject, optionally derives recipients from
 /// `Reply-To`/`From`, and quotes the source text body. The produced
 /// MIME is written to stdout, or routed via `--save` / `--send`.
-/// For non-default composition, use `reply-with <id> <name>`.
+/// For richer composition, pipe `messages read <id>` into a
+/// standalone composer (`mml reply`, etc.) and feed its output back
+/// into `messages send` / `messages add`.
 #[derive(Debug, Parser)]
 pub struct MessageReplyCommand {
     /// Identifier of the source message (IMAP UID, JMAP id, Maildir
@@ -112,7 +115,12 @@ pub struct MessageReplyCommand {
 }
 
 impl MessageReplyCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: EmailClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut EmailClient,
+    ) -> Result<()> {
         let source = client.get_message(&self.mailbox, &self.id)?;
 
         let raw = builder::build(
@@ -136,6 +144,13 @@ impl MessageReplyCommand {
             }),
         )?;
 
-        output::route(printer, &mut client, raw, self.save.as_deref(), self.send)
+        output::route(
+            printer,
+            account,
+            client,
+            raw,
+            self.save.as_deref(),
+            self.send,
+        )
     }
 }

@@ -69,13 +69,13 @@ New in v2: `-b`, `--backend` (force a specific backend for shared commands) and 
 - `save --folder` (optional) becomes `add --mailbox` (mandatory).
 - `save <path-or-raw>` split into the explicit `--file <PATH>` and positional `<raw>`.
 - Added `add --flag` to attach flags at insertion time.
-- `write`, `reply`, `forward` are no longer interactive. They build the message from CLI flags through the built-in flag composer. The interactive variants live under `compose-with`, `reply-with`, `forward-with`, which delegate to a user-defined composer declared in `[message.composer.*]`.
-- `read` no longer renders human-readable text; that responsibility moved to the reader. The v2 `read` prints message-level info; the reader pipeline lives under `read-with`, backed by `[message.reader.*]`.
-- `mailto <URI>` now pipes the parsed RFC 6068 URI through a user-defined composer (same routing options as `compose-with`) instead of opening the v1 interactive editor.
-- `messages send` gains `--file <PATH>` as a parity with `messages add` for reading the raw message from a file instead of stdin or the positional argument.
+- `write`, `reply`, `forward` are no longer interactive. They build the message from CLI flags through the built-in flag composer. Interactive composition is delegated to standalone tools chained into `messages send` / `messages add` via a tempfile or shell process substitution; no `*-with` subcommands or `[message.composer.*]` table on the himalaya side.
+- `read` no longer renders human-readable text; the v2 `read` prints message-level info. For custom rendering, pipe `read --raw` into a standalone interpreter.
+- `mailto:` URI handling is no longer a himalaya subcommand. Register a small shell wrapper (e.g. `mml mailto "$1" /tmp/draft.eml && himalaya messages send /tmp/draft.eml`) as your desktop mailto handler.
+- `messages send` and `messages add` read the raw message from a positional path, an inline raw value, or stdin (the unified `MessageArg`).
 - `export` and `edit` are removed.
 
-See [pimalaya/mml](https://github.com/pimalaya/mml) for a ready-to-use composer and reader.
+See [pimalaya/mml](https://github.com/pimalaya/mml) for a ready-to-use composer / interpreter.
 
 #### Attachments
 
@@ -86,7 +86,7 @@ See [pimalaya/mml](https://github.com/pimalaya/mml) for a ready-to-use composer 
 
 #### Template
 
-Fully removed. The template pipeline (compose / reply / forward drafts, MML compile, MIME interpret) lives in [pimalaya/mml](https://github.com/pimalaya/mml) as both a library and a CLI; plug it into himalaya as a composer/reader.
+Fully removed. The template pipeline (compose / reply / forward drafts, MML compile, MIME interpret) lives in [pimalaya/mml](https://github.com/pimalaya/mml) as both a library and a CLI; chain its CLI into `messages send` / `messages add` (see the README).
 
 ### Configuration changes
 
@@ -96,8 +96,7 @@ The full configuration schema is documented in [config.sample.toml](./config.sam
 
 - Removed `display-name`, `signature`, `signature-delim`: composition left the CLI.
 - Only `downloads-dir` remains for the `attachments download` command.
-- Composition / reading hooks live under `[message.composer.<name>]` and `[message.reader.<name>]`, each optionally flagged `default = true`. A composer entry sets one shell command per operation (`compose`, `reply`, `forward`); a reader entry sets a single `command`.
-- The `message`, `template` and `pgp` top-level entries are removed.
+- The `message`, `template` and `pgp` top-level entries are removed. Composition and rendering happen outside himalaya now (see the README for the recommended shell-pipeline shapes).
 
 #### Table customization
 
@@ -221,4 +220,4 @@ Both backends are removed. Notmuch may come back in a future release.
 2. Run `himalaya -c ~/.config/himalaya/config.v2.toml account check` to validate the connection for each declared backend.
 3. Once the new file passes the check, replace the v1 `config.toml` with it.
 4. If you relied on keyring / OAuth, install [pimalaya/mimosa](https://github.com/pimalaya/mimosa) and/or [pimalaya/ortie](https://github.com/pimalaya/ortie) and wire them as `command = …` secrets.
-5. If you relied on `write` / `reply` / `forward`, install [pimalaya/mml](https://github.com/pimalaya/mml) and declare it under `[message.composer.*]` / `[message.reader.*]`.
+5. If you relied on the interactive `write` / `reply` / `forward`, install [pimalaya/mml](https://github.com/pimalaya/mml) and chain it into `himalaya messages send` / `messages add` via a tempfile or `>(...)` process substitution (see the README for ready-made `bash`/`zsh` snippets).

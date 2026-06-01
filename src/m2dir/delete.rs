@@ -29,7 +29,7 @@ pub struct M2dirMailboxDeleteCommand {
 }
 
 impl M2dirMailboxDeleteCommand {
-    pub fn execute(self, printer: &mut impl Printer, client: M2dirClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut M2dirClient) -> Result<()> {
         let store = client.open_store()?;
         let path = store.resolve_folder_path(&self.m2dir_name.inner)?;
         client.delete_mailbox(path)?;

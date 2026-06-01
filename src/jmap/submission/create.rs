@@ -24,6 +24,7 @@ use io_jmap::rfc8621::email_submission::{
 };
 use pimalaya_cli::printer::Printer;
 
+use crate::account::context::Account;
 use crate::jmap::{
     client::JmapClient, error::format_set_error, submission::query::SubmissionsTable,
 };
@@ -52,7 +53,12 @@ pub struct JmapSubmissionCreateCommand {
 }
 
 impl JmapSubmissionCreateCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut JmapClient,
+    ) -> Result<()> {
         let envelope = if let Some(mail_from_addr) = self.mail_from {
             let rcpt_to = self
                 .rcpt_to
@@ -91,7 +97,7 @@ impl JmapSubmissionCreateCommand {
         }
 
         let table = SubmissionsTable {
-            preset: client.account.table_preset().to_string(),
+            preset: account.table_preset().to_string(),
             submissions: output.created.into_values().collect(),
         };
 

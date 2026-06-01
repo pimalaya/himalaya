@@ -41,7 +41,7 @@ pub struct SmtpMessageSendCommand {
 }
 
 impl SmtpMessageSendCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: SmtpClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut SmtpClient) -> Result<()> {
         let message = self.message.parse()?;
         let (reverse_path, forward_paths) = into_smtp_msg(message.as_bytes())?;
         client.send(reverse_path, forward_paths, message.into_bytes())?;

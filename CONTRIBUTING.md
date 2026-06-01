@@ -42,7 +42,7 @@ Himalaya CLI is the command-line front-end of the [Pimalaya](https://github.com/
 - [pimalaya/stream](https://github.com/pimalaya/stream): TCP / TLS / SASL plumbing shared by all std clients.
 - [pimalaya/cli](https://github.com/pimalaya/cli): cross-binary CLI helpers (printer, prompt, wizard primitives, clap args, build-time env, spinner).
 - [pimalaya/config](https://github.com/pimalaya/config): TOML configuration loader and shell-expanded secrets.
-- [pimalaya/mml](https://github.com/pimalaya/mml): MIME Meta Language composer / reader, plugged in via `[message.composer.*]` / `[message.reader.*]`.
+- [pimalaya/mml](https://github.com/pimalaya/mml): MIME Meta Language composer / interpreter, chained into `messages send` / `messages add` via a tempfile or shell process substitution.
 - [pimalaya/sirup](https://github.com/pimalaya/sirup): session re-use over a Unix socket (pair with `imap.server` / `smtp.server` to amortize TLS handshakes).
 - [pimalaya/ortie](https://github.com/pimalaya/ortie): standalone OAuth 2.0 token broker (replaces v1's bundled `oauth-lib`).
 - [pimalaya/mimosa](https://github.com/pimalaya/mimosa): standalone secret manager (replaces v1's bundled `keyring-lib`).

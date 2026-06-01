@@ -19,6 +19,7 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
+use crate::account::context::Account;
 use crate::m2dir::{
     client::M2dirClient, create::M2dirMailboxCreateCommand, delete::M2dirMailboxDeleteCommand,
     envelope::cli::M2dirEnvelopeCommand, flag::cli::M2dirFlagCommand,
@@ -48,15 +49,20 @@ pub enum M2dirCommand {
 }
 
 impl M2dirCommand {
-    pub fn execute(self, printer: &mut impl Printer, client: M2dirClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut M2dirClient,
+    ) -> Result<()> {
         match self {
             Self::Create(cmd) => cmd.execute(printer, client),
             Self::Delete(cmd) => cmd.execute(printer, client),
-            Self::List(cmd) => cmd.execute(printer, client),
+            Self::List(cmd) => cmd.execute(printer, account, client),
 
             Self::Messages(cmd) => cmd.execute(printer, client),
-            Self::Flags(cmd) => cmd.execute(printer, client),
-            Self::Envelopes(cmd) => cmd.execute(printer, client),
+            Self::Flags(cmd) => cmd.execute(printer, account, client),
+            Self::Envelopes(cmd) => cmd.execute(printer, account, client),
         }
     }
 }

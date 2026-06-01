@@ -64,7 +64,7 @@ pub struct JmapEmailImportCommand {
 }
 
 impl JmapEmailImportCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let data = self.message.parse()?.into_bytes();
 
         let session = client.session().expect("session loaded by new_jmap_client");

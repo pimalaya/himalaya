@@ -25,6 +25,7 @@ use log::warn;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
+use crate::account::context::Account;
 use crate::jmap::client::JmapClient;
 
 /// Get JMAP identities (Identity/get).
@@ -39,7 +40,12 @@ pub struct JmapIdentityGetCommand {
 }
 
 impl JmapIdentityGetCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut JmapClient,
+    ) -> Result<()> {
         let output = client.identity_get(self.ids)?;
 
         for id in output.not_found {
@@ -47,7 +53,7 @@ impl JmapIdentityGetCommand {
         }
 
         let table = IdentitiesTable {
-            preset: client.account.table_preset().to_string(),
+            preset: account.table_preset().to_string(),
             identities: output.identities,
         };
 

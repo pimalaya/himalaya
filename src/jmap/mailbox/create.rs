@@ -42,7 +42,7 @@ pub struct JmapMailboxCreateCommand {
 }
 
 impl JmapMailboxCreateCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let new_mailbox = MailboxCreate {
             name: Some(self.name.clone()),
             parent_id: self.parent_id,

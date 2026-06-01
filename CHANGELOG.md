@@ -17,9 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Unified raw-message input across `messages add`, `messages send`, `imap message save`, `maildir message save`, `jmap email import` and `smtp message send` behind a single `MessageArg` (ported from `mml::cli::args::MessageArg`). Every command now accepts the same three forms: a positional file path, a positional inline raw message (with `\r` / `\n` literals normalized to `\r\n`), or stdin when piped. The legacy `--file <PATH>` flag on `messages add` is gone (positional path replaces it).
 
+- Split the merged `Account` out of every client wrapper (`EmailClient`, `ImapClient`, `JmapClient`, `MaildirClient`, `M2dirClient`, `SmtpClient`). Subcommands now receive `account: &mut Account` and `client: &mut Client` as sibling arguments rather than reaching through `client.account`, which keeps account access borrow-disjoint from `&mut client` calls.
+
 ### Fixed
 
 - Fixed compilation error when `wizard` feature was disabled ([#634]).
+
+- Fixed `--save <mailbox>` on `messages compose` / `reply` / `forward` to resolve the mailbox name through the account's alias map (`account.resolve_mailbox`) before calling the backend, so `--save Sent` honours e.g. `mailbox.alias.sent = "[Gmail]/Sent Mail"`.
+
+### Removed
+
+- Removed the `[message.composer.*]` and `[message.reader.*]` config tables together with the `messages compose-with`, `reply-with`, `forward-with`, `mailto` and `read-with` subcommands. The "stdout = MIME draft" contract was structurally incompatible with composers that spawn an interactive editor: the editor inherited the parent's piped stdout, breaking its UI. Richer composition is now wired through standalone tools chained into `messages send` / `messages add` via a tempfile or shell process substitution; see the README and [mml](https://github.com/pimalaya/mml).
 
 ## [1.2.0] - 2026-02-19
 

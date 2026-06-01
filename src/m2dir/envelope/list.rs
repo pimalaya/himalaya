@@ -24,6 +24,7 @@ use mail_parser::MessageParser;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
+use crate::account::context::Account;
 use crate::m2dir::{arg::M2dirNameFlag, client::M2dirClient};
 
 /// List M2DIR envelopes from the given mailbox.
@@ -37,7 +38,12 @@ pub struct M2dirEnvelopeListCommand {
 }
 
 impl M2dirEnvelopeListCommand {
-    pub fn execute(self, printer: &mut impl Printer, client: M2dirClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut M2dirClient,
+    ) -> Result<()> {
         let store = client.open_store()?;
         let path = store.resolve_folder_path(&self.m2dir.inner)?;
         let m2dir = client.open_m2dir(path)?;
@@ -72,13 +78,13 @@ impl M2dirEnvelopeListCommand {
         envelopes.sort_by(|a, b| a.date.cmp(&b.date));
 
         let table = EnvelopesTable {
-            preset: client.account.table_preset().to_string(),
-            arrangement: client.account.table_arrangement(),
+            preset: account.table_preset().to_string(),
+            arrangement: account.table_arrangement(),
             colors: EnvelopeColors {
-                id: client.account.envelopes_list_table_id_color(),
-                subject: client.account.envelopes_list_table_subject_color(),
-                from: client.account.envelopes_list_table_from_color(),
-                date: client.account.envelopes_list_table_date_color(),
+                id: account.envelopes_list_table_id_color(),
+                subject: account.envelopes_list_table_subject_color(),
+                from: account.envelopes_list_table_from_color(),
+                date: account.envelopes_list_table_date_color(),
             },
             envelopes,
         };

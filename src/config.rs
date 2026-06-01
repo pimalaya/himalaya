@@ -15,13 +15,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, fs, path::Path, path::PathBuf, process::Command};
+use std::{collections::HashMap, fs, path::Path, path::PathBuf};
 
 use anyhow::{Context, Result};
 use comfy_table::ContentArrangement;
 use crossterm::style::Color;
 use pimalaya_config::{
-    command,
     secret::Secret,
     toml::{TomlConfig, shell_expanded_string},
 };
@@ -50,8 +49,6 @@ pub struct Config {
     pub envelope: EnvelopeConfig,
     #[serde(default)]
     pub mailbox: MailboxConfig,
-    #[serde(default)]
-    pub message: MessageConfig,
     #[serde(default)]
     pub attachment: AttachmentConfig,
     /// `account list` rendering options (global only — there is no
@@ -281,82 +278,6 @@ pub struct EnvelopeListTableConfig {
     pub to_color: Option<Color>,
     pub date_color: Option<Color>,
     pub size_color: Option<Color>,
-}
-
-/// Message-level configuration: user-defined composers and readers.
-///
-/// Composers produce a MIME draft on stdout (called by `compose-with`,
-/// `reply-with`, `forward-with`). Readers consume a MIME message from
-/// stdin and emit human-readable bytes on stdout (called by
-/// `read-with`). Both are looked up by name; the entry flagged
-/// `default = true` is used when no name is passed.
-#[derive(Debug, Default, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct MessageConfig {
-    #[serde(default)]
-    pub composer: HashMap<String, ComposerConfig>,
-    #[serde(default)]
-    pub reader: HashMap<String, ReaderConfig>,
-}
-
-/// Single composer entry under `[message.composer.<name>]`.
-///
-/// For all shell command strings defined below:
-/// - The command is invoked via `sh -c`.
-/// - stdin behavior varies by command as documented below.
-/// - stdout is captured as the MIME draft.
-/// - stderr is inherited so the composer can prompt the user.
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct ComposerConfig {
-    /// Command used to write a brand new message.
-    ///
-    /// This is invoked by the `compose-with` and `mailto` commands.
-    ///
-    /// - When invoked by `compose-with`, stdin is empty.
-    /// - When invoked by `mailto`, stdin is piped with a pre-filled RFC 5322
-    ///   draft skeleton built from the parsed RFC 6068 `mailto:` URI parameters
-    ///   (such as to, cc, bcc, subject, and body).
-    #[serde(with = "command")]
-    pub compose: Command,
-
-    /// Command used to reply to an existing message.
-    ///
-    /// This is invoked by the `reply-with` command. The original message's
-    /// MIME bytes are passed via stdin.
-    #[serde(with = "command")]
-    pub reply: Command,
-
-    /// Command used to forward an existing message.
-    ///
-    /// This is invoked by the `forward-with` command. The original message's
-    /// MIME bytes are passed via stdin.
-    #[serde(with = "command")]
-    pub forward: Command,
-
-    /// Marks this entry as the fallback when `compose-with` /
-    /// `reply-with` / `forward-with` are invoked without a name.
-    /// Exactly one composer should set this; if several do, the
-    /// first one returned by the config lookup wins.
-    #[serde(default)]
-    pub default: bool,
-}
-
-/// Single reader entry under `[message.reader.<name>]`.
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct ReaderConfig {
-    /// Shell command line invoked via `sh -c`. Stdin carries the
-    /// source MIME bytes; stdout is forwarded to the terminal (zero
-    /// bytes is fine — the reader may have spawned its own UI);
-    /// stderr is inherited.
-    #[serde(with = "command")]
-    pub command: Command,
-
-    /// Marks this entry as the fallback when `read-with` is
-    /// invoked without a name.
-    #[serde(default)]
-    pub default: bool,
 }
 
 /// Global / per-account table rendering quirks shared across every list

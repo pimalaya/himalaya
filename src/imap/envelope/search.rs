@@ -28,6 +28,7 @@ use io_imap::types::{
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
+use crate::account::context::Account;
 use crate::imap::{
     client::ImapClient,
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
@@ -75,7 +76,12 @@ pub struct ImapEnvelopeSearchCommand {
 }
 
 impl ImapEnvelopeSearchCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut ImapClient,
+    ) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         if !self.mailbox_no_select.inner {
@@ -86,9 +92,9 @@ impl ImapEnvelopeSearchCommand {
         let ids = client.search(criteria, !self.seq)?;
 
         let table = SearchTable {
-            preset: client.account.table_preset().to_string(),
-            arrangement: client.account.table_arrangement(),
-            id_color: client.account.envelopes_list_table_id_color(),
+            preset: account.table_preset().to_string(),
+            arrangement: account.table_arrangement(),
+            id_color: account.envelopes_list_table_id_color(),
             ids: ids
                 .into_iter()
                 .map(|id| SearchResult { id: id.get() })

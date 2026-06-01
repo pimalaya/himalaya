@@ -20,6 +20,7 @@ use clap::Parser;
 use log::warn;
 use pimalaya_cli::printer::Printer;
 
+use crate::account::context::Account;
 use crate::jmap::{client::JmapClient, submission::query::SubmissionsTable};
 
 /// Get JMAP email submissions by ID (EmailSubmission/get).
@@ -31,7 +32,12 @@ pub struct JmapSubmissionGetCommand {
 }
 
 impl JmapSubmissionGetCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut JmapClient,
+    ) -> Result<()> {
         let output = client.email_submission_get(Some(self.ids.clone()))?;
 
         for id in output.not_found {
@@ -39,7 +45,7 @@ impl JmapSubmissionGetCommand {
         }
 
         let table = SubmissionsTable {
-            preset: client.account.table_preset().to_string(),
+            preset: account.table_preset().to_string(),
             submissions: output.submissions,
         };
 

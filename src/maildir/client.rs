@@ -15,12 +15,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-//! Himalaya wrapper around [`io_maildir::client::MaildirClient`]
-//! that bundles the merged [`Account`] alongside the maildir client.
+//! Himalaya wrapper around [`io_maildir::client::MaildirClient`].
 //!
 //! Built up front by the dispatch layer (`crate::cli`) via
 //! [`build_maildir_client`] and handed down to every maildir-specific
-//! subcommand.
+//! subcommand, together with the merged [`Account`] as a sibling
+//! argument.
 
 use std::{
     ops::{Deref, DerefMut},
@@ -35,7 +35,6 @@ use crate::{account::context::Account, cli::load_or_wizard, config::MaildirConfi
 
 pub struct MaildirClient {
     inner: Inner,
-    pub account: Account,
     /// Filesystem root of the configured maildir. Kept on the wrapper
     /// so commands can join sub-paths (per-mailbox) without needing
     /// the original [`MaildirConfig`].
@@ -45,14 +44,10 @@ pub struct MaildirClient {
 impl MaildirClient {
     /// Builds a [`MaildirClient`] rooted at the configured maildir
     /// path.
-    pub fn new(config: MaildirConfig, account: Account) -> Self {
+    pub fn new(config: MaildirConfig) -> Self {
         let root = config.root.clone();
         let inner = Inner::new(root.to_string_lossy().into_owned());
-        Self {
-            inner,
-            account,
-            root,
-        }
+        Self { inner, root }
     }
 
     /// Resolves a maildir CLI argument: tries `path` as-is first, then
@@ -83,11 +78,13 @@ impl DerefMut for MaildirClient {
 
 /// Loads the configuration, picks the active account, builds the
 /// merged [`Account`] then opens the maildir client. Bails when the
-/// account has no `[maildir]` block.
+/// account has no `[maildir]` block. Returns the client paired with
+/// the merged account so subcommands receive both as sibling
+/// arguments.
 pub fn build_maildir_client(
     config_paths: &[PathBuf],
     account_name: Option<&str>,
-) -> Result<MaildirClient> {
+) -> Result<(Account, MaildirClient)> {
     let mut config = load_or_wizard(config_paths)?;
     let (name, mut ac) = config
         .take_account(account_name)?
@@ -97,5 +94,5 @@ pub fn build_maildir_client(
         .take()
         .ok_or_else(|| anyhow!("Maildir config is missing for account `{name}`"))?;
     let account = Account::from(config).merge(Account::from(ac));
-    Ok(MaildirClient::new(maildir_config, account))
+    Ok((account, MaildirClient::new(maildir_config)))
 }

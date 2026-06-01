@@ -41,7 +41,7 @@ pub struct MaildirMessageGetCommand {
 }
 
 impl MaildirMessageGetCommand {
-    pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut MaildirClient) -> Result<()> {
         let maildir = client.resolve_maildir(&self.maildir.inner)?;
 
         let msg = client.get(maildir, &self.id.inner)?;

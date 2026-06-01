@@ -33,7 +33,7 @@ use crate::imap::client::ImapClient;
 pub struct ImapMailboxUnselectCommand;
 
 impl ImapMailboxUnselectCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         client.unselect()?;
         printer.out(Message::new("Mailbox successfully unselected"))
     }

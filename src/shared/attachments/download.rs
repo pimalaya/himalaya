@@ -26,6 +26,7 @@ use clap::Parser;
 use mail_parser::{MessageParser, MimeHeaders};
 use pimalaya_cli::printer::Printer;
 
+use crate::account::context::Account;
 use crate::shared::{
     attachments::list::{Attachment, AttachmentColors, Attachments, mime_string},
     client::EmailClient,
@@ -66,18 +67,20 @@ pub struct AttachmentDownloadCommand {
 }
 
 impl AttachmentDownloadCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: EmailClient) -> Result<()> {
-        let mailbox = self.mailbox.resolve(&client.account)?;
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut EmailClient,
+    ) -> Result<()> {
+        let mailbox = self.mailbox.resolve(account)?;
         let raw = client.get_message(&mailbox, &self.message_id)?;
 
         let Some(message) = MessageParser::new().parse(&raw) else {
             bail!("Failed to parse RFC 5322 message");
         };
 
-        let dir = self
-            .dir
-            .clone()
-            .unwrap_or_else(|| client.account.downloads_dir());
+        let dir = self.dir.clone().unwrap_or_else(|| account.downloads_dir());
 
         if !dir.exists() {
             fs::create_dir_all(&dir)?;
@@ -126,17 +129,17 @@ impl AttachmentDownloadCommand {
         }
 
         let attachments = Attachments {
-            preset: client.account.table_preset().to_string(),
-            arrangement: client.account.table_arrangement(),
+            preset: account.table_preset().to_string(),
+            arrangement: account.table_arrangement(),
             with_inline: written.iter().any(|a| a.inline),
             with_path: true,
             colors: AttachmentColors {
-                id: client.account.attachments_list_table_id_color(),
-                filename: client.account.attachments_list_table_filename_color(),
-                r#type: client.account.attachments_list_table_type_color(),
-                size: client.account.attachments_list_table_size_color(),
-                inline: client.account.attachments_list_table_inline_color(),
-                path: client.account.attachments_list_table_path_color(),
+                id: account.attachments_list_table_id_color(),
+                filename: account.attachments_list_table_filename_color(),
+                r#type: account.attachments_list_table_type_color(),
+                size: account.attachments_list_table_size_color(),
+                inline: account.attachments_list_table_inline_color(),
+                path: account.attachments_list_table_path_color(),
             },
             attachments: written,
         };

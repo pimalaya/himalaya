@@ -24,6 +24,7 @@ use io_m2dir::m2dir::M2dir;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
+use crate::account::context::Account;
 use crate::m2dir::client::M2dirClient;
 
 /// List m2dir folders found under the store root.
@@ -31,12 +32,17 @@ use crate::m2dir::client::M2dirClient;
 pub struct M2dirMailboxListCommand;
 
 impl M2dirMailboxListCommand {
-    pub fn execute(self, printer: &mut impl Printer, client: M2dirClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut M2dirClient,
+    ) -> Result<()> {
         let m2dirs = client.list_mailboxes()?;
 
         let table = M2dirsTable {
-            preset: client.account.table_preset().to_string(),
-            name_color: client.account.mailboxes_list_table_name_color(),
+            preset: account.table_preset().to_string(),
+            name_color: account.mailboxes_list_table_name_color(),
             rows: m2dirs.into_iter().map(From::from).collect(),
         };
 

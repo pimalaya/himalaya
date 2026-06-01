@@ -20,6 +20,7 @@ use clap::Parser;
 use log::warn;
 use pimalaya_cli::printer::Printer;
 
+use crate::account::context::Account;
 use crate::jmap::{
     client::JmapClient,
     email::query::{EmailsChars, EmailsColors, EmailsTable},
@@ -36,7 +37,12 @@ pub struct JmapEmailGetCommand {
 }
 
 impl JmapEmailGetCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut JmapClient,
+    ) -> Result<()> {
         let output = client.email_get(self.ids.clone(), None, false, false, 0)?;
 
         for id in output.not_found {
@@ -44,19 +50,19 @@ impl JmapEmailGetCommand {
         }
 
         let table = EmailsTable {
-            preset: client.account.table_preset().to_string(),
-            arrangement: client.account.table_arrangement(),
+            preset: account.table_preset().to_string(),
+            arrangement: account.table_arrangement(),
             colors: EmailsColors {
-                id: client.account.envelopes_list_table_id_color(),
-                flags: client.account.envelopes_list_table_flags_color(),
-                subject: client.account.envelopes_list_table_subject_color(),
-                from: client.account.envelopes_list_table_from_color(),
-                date: client.account.envelopes_list_table_date_color(),
+                id: account.envelopes_list_table_id_color(),
+                flags: account.envelopes_list_table_flags_color(),
+                subject: account.envelopes_list_table_subject_color(),
+                from: account.envelopes_list_table_from_color(),
+                date: account.envelopes_list_table_date_color(),
             },
             chars: EmailsChars {
-                unseen: client.account.envelopes_list_table_unseen_char(),
-                flagged: client.account.envelopes_list_table_flagged_char(),
-                attachment: client.account.envelopes_list_table_attachment_char(),
+                unseen: account.envelopes_list_table_unseen_char(),
+                flagged: account.envelopes_list_table_flagged_char(),
+                attachment: account.envelopes_list_table_attachment_char(),
             },
             emails: output.emails,
         };

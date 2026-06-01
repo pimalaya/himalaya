@@ -41,7 +41,7 @@ pub struct JmapIdentityCreateCommand {
 }
 
 impl JmapIdentityCreateCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let identity = IdentityCreate {
             name: self.name.clone(),
             email: self.email.clone(),

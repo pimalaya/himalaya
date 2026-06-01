@@ -19,6 +19,7 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
+use crate::account::context::Account;
 use crate::jmap::{
     client::JmapClient, email::cli::JmapEmailCommand, identity::cli::JmapIdentityCommand,
     mailbox::cli::JmapMailboxCommand, query::JmapQueryCommand,
@@ -57,15 +58,20 @@ pub enum JmapCommand {
 }
 
 impl JmapCommand {
-    pub fn execute(self, printer: &mut impl Printer, client: JmapClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut JmapClient,
+    ) -> Result<()> {
         match self {
-            Self::Mailboxes(cmd) => cmd.execute(printer, client),
-            Self::Emails(cmd) => cmd.execute(printer, client),
+            Self::Mailboxes(cmd) => cmd.execute(printer, account, client),
+            Self::Emails(cmd) => cmd.execute(printer, account, client),
 
-            Self::Threads(cmd) => cmd.execute(printer, client),
-            Self::Identity(cmd) => cmd.execute(printer, client),
-            Self::Submission(cmd) => cmd.execute(printer, client),
-            Self::Vacation(cmd) => cmd.execute(printer, client),
+            Self::Threads(cmd) => cmd.execute(printer, account, client),
+            Self::Identity(cmd) => cmd.execute(printer, account, client),
+            Self::Submission(cmd) => cmd.execute(printer, account, client),
+            Self::Vacation(cmd) => cmd.execute(printer, account, client),
             Self::Query(cmd) => cmd.execute(printer, client),
         }
     }

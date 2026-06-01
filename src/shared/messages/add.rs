@@ -49,7 +49,7 @@ pub struct MessageAddCommand {
 }
 
 impl MessageAddCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: EmailClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut EmailClient) -> Result<()> {
         let raw = self.message.parse()?.into_bytes();
         let flags: Vec<Flag> = self.flag.iter().map(Into::into).collect();
         let id = client.add_message(&self.mailbox, &flags, raw)?;

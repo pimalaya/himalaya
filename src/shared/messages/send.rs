@@ -37,7 +37,7 @@ pub struct MessageSendCommand {
 }
 
 impl MessageSendCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: EmailClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut EmailClient) -> Result<()> {
         let raw = self.message.parse()?.into_bytes();
         client.send_message(raw)?;
         printer.out(Message::new("Message successfully sent"))

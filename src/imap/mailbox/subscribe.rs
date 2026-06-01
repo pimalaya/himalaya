@@ -32,7 +32,7 @@ pub struct ImapMailboxSubscribeCommand {
 }
 
 impl ImapMailboxSubscribeCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
         client.subscribe(mailbox)?;
         printer.out(Message::new("Mailbox successfully subscribed"))

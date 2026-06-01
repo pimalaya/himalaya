@@ -38,7 +38,7 @@ pub struct JmapEmailExportCommand {
 }
 
 impl JmapEmailExportCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let properties = Some(vec![EmailProperty::Id, EmailProperty::BlobId]);
         let output = client.email_get(vec![self.id.clone()], properties, false, false, 0)?;
 

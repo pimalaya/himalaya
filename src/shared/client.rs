@@ -18,9 +18,11 @@
 //! Cross-protocol [`EmailClient`] for the shared subcommands
 //! (`mailboxes`, `envelopes`, `flags`, `messages`, `attachments`).
 //!
-//! Wraps [`io_email::client::EmailClientStd`] and bundles the active
-//! [`Account`] (display, identity, composer/reader registries) the
-//! shared commands need alongside the I/O client. Implements
+//! Wraps [`io_email::client::EmailClientStd`]. The active
+//! [`Account`] is threaded as a sibling argument through every
+//! `execute` chain rather than being bundled into the client; this
+//! keeps account access (`resolve_mailbox`, identity, etc.) borrow-
+//! disjoint from `&mut EmailClient` calls. Implements
 //! [`Deref`]/[`DerefMut`] onto the inner client so callers can call
 //! its methods directly.
 //!
@@ -45,7 +47,6 @@ use crate::{
 
 pub struct EmailClient {
     inner: EmailClientStd,
-    pub account: Account,
 }
 
 impl EmailClient {
@@ -53,7 +54,7 @@ impl EmailClient {
         config: Config,
         mut account_config: AccountConfig,
         backend: Backend,
-    ) -> Result<Self> {
+    ) -> Result<(Account, Self)> {
         let mut inner = EmailClientStd::new();
         let mut configured = false;
 
@@ -156,7 +157,7 @@ impl EmailClient {
 
         let account = Account::from(config).merge(Account::from(account_config));
 
-        Ok(Self { inner, account })
+        Ok((account, Self { inner }))
     }
 }
 

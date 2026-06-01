@@ -19,6 +19,7 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
+use crate::account::context::Account;
 use crate::shared::{
     client::EmailClient,
     envelopes::{list::EnvelopeListCommand, search::EnvelopeSearchCommand},
@@ -38,10 +39,15 @@ pub enum EnvelopeCommand {
 }
 
 impl EnvelopeCommand {
-    pub fn execute(self, printer: &mut impl Printer, client: EmailClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut EmailClient,
+    ) -> Result<()> {
         match self {
-            Self::List(cmd) => cmd.execute(printer, client),
-            Self::Search(cmd) => cmd.execute(printer, client),
+            Self::List(cmd) => cmd.execute(printer, account, client),
+            Self::Search(cmd) => cmd.execute(printer, account, client),
         }
     }
 }

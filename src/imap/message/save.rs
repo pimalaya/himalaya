@@ -46,7 +46,7 @@ pub struct ImapMessageSaveCommand {
 }
 
 impl ImapMessageSaveCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         let mailbox: Mailbox<'static> = self.mailbox.inner.try_into()?;
         let message = self.message.parse()?;
         let message = Literal::try_from(message)?;

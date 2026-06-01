@@ -27,6 +27,7 @@ use io_imap::types::{
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
+use crate::account::context::Account;
 use crate::imap::{
     client::ImapClient, envelope::search::parse_query, mailbox::arg::MailboxNameOptionalArg,
 };
@@ -68,7 +69,12 @@ pub struct ImapEnvelopeSortCommand {
 }
 
 impl ImapEnvelopeSortCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut ImapClient,
+    ) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         client.select(mailbox)?;
@@ -82,7 +88,7 @@ impl ImapEnvelopeSortCommand {
 
         let ids = client.sort(sort_criteria, search_criteria, !self.seq)?;
 
-        let id_color = client.account.envelopes_list_table_id_color();
+        let id_color = account.envelopes_list_table_id_color();
         let table = SortResultsTable::new(ids, !self.seq, id_color);
 
         printer.out(table)?;

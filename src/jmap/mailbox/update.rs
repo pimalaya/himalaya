@@ -57,7 +57,7 @@ pub struct JmapMailboxUpdateCommand {
 }
 
 impl JmapMailboxUpdateCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let is_subscribed = if self.subscribe {
             Some(true)
         } else if self.unsubscribe {

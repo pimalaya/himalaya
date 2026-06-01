@@ -24,6 +24,7 @@ use mail_parser::Header;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
+use crate::account::context::Account;
 use crate::maildir::{
     arg::{MaildirPathFlag, MessageIdArg},
     client::MaildirClient,
@@ -43,7 +44,12 @@ pub struct MaildirEnvelopeGetCommand {
 }
 
 impl MaildirEnvelopeGetCommand {
-    pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut MaildirClient,
+    ) -> Result<()> {
         let maildir = client.resolve_maildir(&self.maildir.inner)?;
 
         let message = client.get(maildir, &self.id.inner)?;
@@ -55,7 +61,7 @@ impl MaildirEnvelopeGetCommand {
         };
 
         let table = EnvelopeTable {
-            preset: client.account.table_preset().to_string(),
+            preset: account.table_preset().to_string(),
             headers: parsed.headers(),
         };
 

@@ -24,6 +24,7 @@ use io_email::mailbox::Mailbox;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
+use crate::account::context::Account;
 use crate::shared::client::EmailClient;
 
 /// Shared API to list mailboxes for the active account.
@@ -48,19 +49,24 @@ pub struct MailboxListCommand {
 }
 
 impl MailboxListCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: EmailClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut EmailClient,
+    ) -> Result<()> {
         let mailboxes = client.list_mailboxes(self.counts)?;
 
         let mailboxes = Mailboxes {
-            preset: client.account.table_preset().to_string(),
-            arrangement: client.account.table_arrangement(),
+            preset: account.table_preset().to_string(),
+            arrangement: account.table_arrangement(),
             max_width: self.max_width,
             with_counts: self.counts,
             colors: MailboxColors {
-                id: client.account.mailboxes_list_table_id_color(),
-                name: client.account.mailboxes_list_table_name_color(),
-                total: client.account.mailboxes_list_table_total_color(),
-                unread: client.account.mailboxes_list_table_unread_color(),
+                id: account.mailboxes_list_table_id_color(),
+                name: account.mailboxes_list_table_name_color(),
+                total: account.mailboxes_list_table_total_color(),
+                unread: account.mailboxes_list_table_unread_color(),
             },
             mailboxes,
         };

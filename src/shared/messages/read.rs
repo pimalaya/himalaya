@@ -33,8 +33,8 @@ use crate::shared::client::EmailClient;
 /// Fetches the message and renders headers + text bodies. Pass
 /// `--raw` to dump the original RFC 5322 bytes to stdout instead,
 /// or `--json` to emit the parsed message as JSON. For a custom
-/// pretty-printer (mml interpret, w3m, your own viewer, …) use
-/// `read-with <id> <name>`.
+/// pretty-printer (`mml interpret`, w3m, your own viewer), pipe the
+/// `--raw` output into the renderer of your choice.
 #[derive(Debug, Parser)]
 pub struct MessageReadCommand {
     /// Identifier of the message (IMAP UID, JMAP email id, or Maildir
@@ -59,7 +59,7 @@ pub struct MessageReadCommand {
 }
 
 impl MessageReadCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: EmailClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut EmailClient) -> Result<()> {
         if self.raw && printer.is_json() {
             bail!("`--raw` and `--json` cannot be combined");
         }

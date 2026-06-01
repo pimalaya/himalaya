@@ -40,7 +40,7 @@ pub enum M2dirMessageCommand {
 }
 
 impl M2dirMessageCommand {
-    pub fn execute(self, printer: &mut impl Printer, client: M2dirClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut M2dirClient) -> Result<()> {
         match self {
             Self::Save(cmd) => cmd.execute(printer, client),
             Self::Get(cmd) => cmd.execute(printer, client),

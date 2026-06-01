@@ -35,7 +35,7 @@ pub struct JmapMailboxDestroyCommand {
 }
 
 impl JmapMailboxDestroyCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let args = JmapMailboxSetArgs {
             destroy: Some(self.ids.clone()),
             on_destroy_remove_emails: if self.purge { Some(true) } else { None },

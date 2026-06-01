@@ -38,7 +38,7 @@ pub struct JmapEmailReadCommand {
 }
 
 impl JmapEmailReadCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let output = client.email_get(self.ids.clone(), None, !self.html, self.html, 0)?;
 
         for id in output.not_found {

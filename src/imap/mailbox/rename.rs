@@ -36,7 +36,7 @@ pub struct ImapMailboxRenameCommand {
 }
 
 impl ImapMailboxRenameCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         let from = self.mailbox_source_name.inner.try_into()?;
         let to = self.mailbox_dest_name.inner.try_into()?;
         client.rename(from, to)?;

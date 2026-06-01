@@ -23,6 +23,7 @@ use io_email::flag::{Flag, FlagOp};
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
+use crate::account::context::Account;
 use crate::shared::{
     client::EmailClient,
     flags::arg::{FlagsArg, MessageIdsArg},
@@ -41,8 +42,13 @@ pub struct FlagAddCommand {
 }
 
 impl FlagAddCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: EmailClient) -> Result<()> {
-        let mailbox = self.mailbox.resolve(&client.account)?;
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut EmailClient,
+    ) -> Result<()> {
+        let mailbox = self.mailbox.resolve(account)?;
         let ids: Vec<&str> = self.message_ids.inner.iter().map(String::as_str).collect();
         let flags: Vec<Flag> = self.flags.inner.iter().map(Into::into).collect();
 

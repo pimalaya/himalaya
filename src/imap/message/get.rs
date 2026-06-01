@@ -49,7 +49,7 @@ pub struct ImapMessageGetCommand {
 }
 
 impl ImapMessageGetCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: ImapClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
         if self.id == 0 {
             bail!("ID must be non-zero");

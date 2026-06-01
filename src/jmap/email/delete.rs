@@ -31,7 +31,7 @@ pub struct JmapEmailDestroyCommand {
 }
 
 impl JmapEmailDestroyCommand {
-    pub fn execute(self, printer: &mut impl Printer, mut client: JmapClient) -> Result<()> {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let mut args = JmapEmailSetArgs::default();
 
         for id in self.ids {

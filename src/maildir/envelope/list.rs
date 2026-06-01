@@ -23,6 +23,7 @@ use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
+use crate::account::context::Account;
 use crate::maildir::{arg::MaildirPathFlag, client::MaildirClient};
 
 /// List MAILDIR envelopes from the given mailbox.
@@ -37,7 +38,12 @@ pub struct MaildirEnvelopeListCommand {
 }
 
 impl MaildirEnvelopeListCommand {
-    pub fn execute(self, printer: &mut impl Printer, client: MaildirClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut MaildirClient,
+    ) -> Result<()> {
         let maildir = client.resolve_maildir(&self.maildir.inner)?;
 
         let entries: Vec<_> = client.list_entries(maildir)?.into_iter().collect();
@@ -76,13 +82,13 @@ impl MaildirEnvelopeListCommand {
         envelopes.sort_by(|a, b| a.date.cmp(&b.date));
 
         let table = EnvelopesTable {
-            preset: client.account.table_preset().to_string(),
-            arrangement: client.account.table_arrangement(),
+            preset: account.table_preset().to_string(),
+            arrangement: account.table_arrangement(),
             colors: EnvelopeColors {
-                id: client.account.envelopes_list_table_id_color(),
-                subject: client.account.envelopes_list_table_subject_color(),
-                from: client.account.envelopes_list_table_from_color(),
-                date: client.account.envelopes_list_table_date_color(),
+                id: account.envelopes_list_table_id_color(),
+                subject: account.envelopes_list_table_subject_color(),
+                from: account.envelopes_list_table_from_color(),
+                date: account.envelopes_list_table_date_color(),
             },
             envelopes,
         };
