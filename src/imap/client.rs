@@ -49,9 +49,16 @@ impl ImapClient {
     /// [`Inner::capability`] explicitly.
     pub fn new(config: ImapConfig) -> Result<Self> {
         let tls = config.tls.into_tls(config.alpn);
-        let sasl: Option<Sasl> = config.sasl.map(Sasl::try_from).transpose()?;
         let auto_id = resolve_auto_id_params(&config.id)?;
         let server = parse_imap_server(&config.server)?;
+        let sasl: Option<Sasl> = config
+            .sasl
+            .and_then(|cfg| {
+                let host = server.host_str()?;
+                let port = server.port_or_known_default()?;
+                Some(cfg.try_into_sasl(host, port))
+            })
+            .transpose()?;
         let (inner, _capability) = Inner::connect(&server, &tls, config.starttls, sasl, auto_id)?;
         Ok(Self { inner })
     }

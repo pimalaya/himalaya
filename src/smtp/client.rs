@@ -46,9 +46,16 @@ impl SmtpClient {
     /// SASL).
     pub fn new(config: SmtpConfig) -> Result<Self> {
         let tls = config.tls.into_tls(config.alpn);
-        let sasl: Option<Sasl> = config.sasl.map(Sasl::try_from).transpose()?;
         let domain: EhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
         let server = parse_smtp_server(&config.server)?;
+        let sasl: Option<Sasl> = config
+            .sasl
+            .and_then(|cfg| {
+                let host = server.host_str()?;
+                let port = server.port_or_known_default()?;
+                Some(cfg.try_into_sasl(host, port))
+            })
+            .transpose()?;
         let inner = Inner::connect(&server, &tls, config.starttls, domain, sasl)?;
         Ok(Self { inner })
     }

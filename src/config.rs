@@ -518,14 +518,17 @@ pub struct SaslLoginConfig {
 pub struct SaslPlainConfig {
     pub authzid: Option<String>,
     #[serde(deserialize_with = "shell_expanded_string")]
+    #[serde(alias = "username")]
     pub authcid: String,
+    #[serde(alias = "password")]
     pub passwd: Secret,
 }
 
 /// SASL OAUTHBEARER configuration <sup>[rfc7628]</sup>.
 ///
-/// `host` and `port` are echoed verbatim in the GS2 header and should
-/// match the server the connection is actually opened against.
+/// The `host` and `port` echoed in the GS2 header are derived from
+/// the live IMAP/SMTP server URL at connect time, so they aren't part
+/// of the user-facing config.
 ///
 /// [rfc7628]: https://www.iana.org/go/rfc7628
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -533,8 +536,6 @@ pub struct SaslPlainConfig {
 pub struct SaslOauthbearerConfig {
     #[serde(deserialize_with = "shell_expanded_string")]
     pub username: String,
-    pub host: String,
-    pub port: u16,
     pub token: Secret,
 }
 
@@ -559,11 +560,13 @@ pub struct SaslScramSha256Config {
     pub password: Secret,
 }
 
-impl TryFrom<SaslConfig> for Sasl {
-    type Error = anyhow::Error;
-
-    fn try_from(config: SaslConfig) -> Result<Self> {
-        Ok(match config {
+impl SaslConfig {
+    /// Resolves the SASL config into a runtime [`Sasl`]. `host` and
+    /// `port` come from the live server URL; they are only used by
+    /// OAUTHBEARER (echoed in the GS2 header) and ignored by every
+    /// other mechanism.
+    pub fn try_into_sasl(self, host: impl ToString, port: u16) -> Result<Sasl> {
+        Ok(match self {
             SaslConfig::Anonymous(c) => Sasl::Anonymous(SaslAnonymous { message: c.message }),
             SaslConfig::Login(c) => Sasl::Login(SaslLogin {
                 username: c.username,
@@ -576,8 +579,8 @@ impl TryFrom<SaslConfig> for Sasl {
             }),
             SaslConfig::Oauthbearer(c) => Sasl::Oauthbearer(SaslOauthbearer {
                 username: c.username,
-                host: c.host,
-                port: c.port,
+                host: host.to_string(),
+                port,
                 token: c.token.get()?,
             }),
             SaslConfig::Xoauth2(c) => Sasl::Xoauth2(SaslXoauth2 {

@@ -180,22 +180,19 @@ imap.server = "example.com"
 
 # SASL PLAIN
 # https://datatracker.ietf.org/doc/html/rfc4616
-imap.sasl.plain.authcid = "user@example.com"
-imap.sasl.plain.passwd.raw = "***"
-#imap.sasl.plain.passwd.command = "pass show example"
-#imap.sasl.plain.passwd.command = ["mimosa", "password", "read", "example"]
+imap.sasl.plain.username = "user@example.com"
+imap.sasl.plain.password.raw = "***"
+#imap.sasl.plain.password.command = "pass show example"
 
 # SASL LOGIN
 # https://datatracker.ietf.org/doc/html/draft-murchison-sasl-login-00
 #imap.sasl.login.username = "user@example.com"
 #imap.sasl.login.password.raw = "***"
 
-# SASL OAUTHBEARER (host/port echoed in the GS2 header; usually mirror the
-# server you actually connect to).
+# SASL OAUTHBEARER (host/port for the GS2 header are derived from the
+# IMAP server URL at connect time).
 # https://datatracker.ietf.org/doc/html/rfc7628
 #imap.sasl.oauthbearer.username = "user@example.com"
-#imap.sasl.oauthbearer.host = "imap.example.com"
-#imap.sasl.oauthbearer.port = 993
 #imap.sasl.oauthbearer.token.raw = "***"
 #imap.sasl.oauthbearer.token.command = ["ortie", "token", "read", "example"]
 
@@ -312,19 +309,17 @@ smtp.server = "example.com"
 #smtp.sasl.anonymous.message = "himalaya"
 
 # SASL PLAIN
-smtp.sasl.plain.authcid = "user@example.com"
-smtp.sasl.plain.passwd.raw = "***"
-#smtp.sasl.plain.passwd.command = "pass show example"
-#smtp.sasl.plain.passwd.command = ["mimosa", "password", "read", "example"]
+smtp.sasl.plain.username = "user@example.com"
+smtp.sasl.plain.password.raw = "***"
+#smtp.sasl.plain.password.command = "pass show example"
 
 # SASL LOGIN
 #smtp.sasl.login.username = "user@example.com"
 #smtp.sasl.login.password.raw = "***"
 
-# SASL OAUTHBEARER
+# SASL OAUTHBEARER (host/port for the GS2 header are derived from the
+# SMTP server URL at connect time).
 #smtp.sasl.oauthbearer.username = "user@example.com"
-#smtp.sasl.oauthbearer.host = "smtp.example.com"
-#smtp.sasl.oauthbearer.port = 465
 #smtp.sasl.oauthbearer.token.raw = "***"
 
 # SASL XOAUTH2

@@ -120,9 +120,17 @@ fn check_imap(
 
     let result = (|| -> Result<()> {
         let tls = imap_config.tls.clone().into_tls(imap_config.alpn.clone());
-        let sasl: Option<Sasl> = imap_config.sasl.clone().map(Sasl::try_from).transpose()?;
         let auto_id = resolve_auto_id_params(&imap_config.id)?;
         let server = crate::imap::client::parse_imap_server(&imap_config.server)?;
+        let sasl: Option<Sasl> = imap_config
+            .sasl
+            .clone()
+            .and_then(|cfg| {
+                let host = server.host_str()?;
+                let port = server.port_or_known_default()?;
+                Some(cfg.try_into_sasl(host, port))
+            })
+            .transpose()?;
         let _ = ImapClientStd::connect(&server, &tls, imap_config.starttls, sasl, auto_id)?;
         Ok(())
     })();
@@ -184,9 +192,17 @@ fn check_smtp(
 
     let result = (|| -> Result<()> {
         let tls = smtp_config.tls.clone().into_tls(smtp_config.alpn.clone());
-        let sasl: Option<Sasl> = smtp_config.sasl.clone().map(Sasl::try_from).transpose()?;
         let domain: EhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
         let server = crate::smtp::client::parse_smtp_server(&smtp_config.server)?;
+        let sasl: Option<Sasl> = smtp_config
+            .sasl
+            .clone()
+            .and_then(|cfg| {
+                let host = server.host_str()?;
+                let port = server.port_or_known_default()?;
+                Some(cfg.try_into_sasl(host, port))
+            })
+            .transpose()?;
         let _client = SmtpClientStd::connect(&server, &tls, smtp_config.starttls, domain, sasl)?;
         Ok(())
     })();
