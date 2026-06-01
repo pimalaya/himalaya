@@ -30,7 +30,7 @@ use std::{
 use anyhow::{Result, anyhow};
 use io_imap::client::ImapClientStd as Inner;
 use pimalaya_config::toml::TomlConfig;
-use pimalaya_stream::{sasl::Sasl, tls::Tls};
+use pimalaya_stream::sasl::Sasl;
 use url::Url;
 
 use crate::{
@@ -48,8 +48,7 @@ impl ImapClient {
     /// discarded; IMAP-specific subcommands that need it should call
     /// [`Inner::capability`] explicitly.
     pub fn new(config: ImapConfig) -> Result<Self> {
-        let mut tls: Tls = config.tls.into();
-        tls.rustls.alpn = vec!["imap".into()];
+        let tls = config.tls.into_tls(config.alpn);
         let sasl: Option<Sasl> = config.sasl.map(Sasl::try_from).transpose()?;
         let auto_id = resolve_auto_id_params(&config.id)?;
         let server = parse_imap_server(&config.server)?;

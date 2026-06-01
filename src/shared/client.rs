@@ -60,12 +60,9 @@ impl EmailClient {
         #[cfg(feature = "jmap")]
         if backend.allows_jmap() {
             if let Some(jmap_config) = account_config.jmap.take() {
-                use pimalaya_stream::tls::Tls;
-
                 use crate::jmap::client::{jmap_http_auth, parse_server_url};
 
-                let mut tls: Tls = jmap_config.tls.clone().into();
-                tls.rustls.alpn = vec!["http/1.1".into()];
+                let tls = jmap_config.tls.clone().into_tls(jmap_config.alpn.clone());
                 let http_auth = jmap_http_auth(jmap_config.auth.clone())?;
                 let url = parse_server_url(&jmap_config.server)?;
                 inner = inner.connect_jmap(&url, &tls, http_auth)?;
@@ -76,12 +73,11 @@ impl EmailClient {
         if backend.allows_imap() {
             if let Some(imap_config) = account_config.imap.take() {
                 use io_email::imap::client::ImapClientStd;
-                use pimalaya_stream::{sasl::Sasl, tls::Tls};
+                use pimalaya_stream::sasl::Sasl;
 
                 use crate::imap::id::resolve_auto_id_params;
 
-                let mut tls: Tls = imap_config.tls.into();
-                tls.rustls.alpn = vec!["imap".into()];
+                let tls = imap_config.tls.into_tls(imap_config.alpn);
                 let sasl: Option<Sasl> = imap_config.sasl.map(Sasl::try_from).transpose()?;
                 let auto_id = resolve_auto_id_params(&imap_config.id)?;
                 let server = crate::imap::client::parse_imap_server(&imap_config.server)?;
@@ -98,7 +94,6 @@ impl EmailClient {
 
                 let client = MaildirClient::new(maildir_config.root.to_string_lossy().into_owned());
                 inner = inner.with_maildir(client);
-                configured = true;
             }
         }
 
@@ -128,10 +123,9 @@ impl EmailClient {
 
                 use io_email::smtp::client::SmtpClientStd;
                 use io_smtp::rfc5321::types::ehlo_domain::EhloDomain;
-                use pimalaya_stream::{sasl::Sasl, tls::Tls};
+                use pimalaya_stream::sasl::Sasl;
 
-                let mut tls: Tls = smtp_config.tls.into();
-                tls.rustls.alpn = vec!["smtp".into()];
+                let tls = smtp_config.tls.into_tls(smtp_config.alpn);
                 let sasl: Option<Sasl> = smtp_config.sasl.map(Sasl::try_from).transpose()?;
                 let domain: EhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
                 let server = crate::smtp::client::parse_smtp_server(&smtp_config.server)?;

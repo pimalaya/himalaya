@@ -1078,7 +1078,7 @@ dependencies = [
 [[package]]
 name = "io-email"
 version = "0.0.1"
-source = "git+https://github.com/pimalaya/io-email#5d01da7acb98d8394077d40780f1cded639f4574"
+source = "git+https://github.com/pimalaya/io-email#050738cbaf9e177683c7e4eeeb8b2ef145c4abe2"
 dependencies = [
  "chrono",
  "chumsky",
@@ -1103,7 +1103,7 @@ dependencies = [
 [[package]]
 name = "io-http"
 version = "0.0.3"
-source = "git+https://github.com/pimalaya/io-http#73b264b85209d86de48afed25957ab582b54c272"
+source = "git+https://github.com/pimalaya/io-http#23f3668558059c2db3603b1afdda5ce0f840e46a"
 dependencies = [
  "anyhow",
  "base64",
@@ -1119,7 +1119,7 @@ dependencies = [
 [[package]]
 name = "io-imap"
 version = "0.0.1"
-source = "git+https://github.com/pimalaya/io-imap#518da423e551684fa8202a9cc4fede99f1be3f23"
+source = "git+https://github.com/pimalaya/io-imap#5c915ae5536e5e5ac48f3284c1827111a71939f7"
 dependencies = [
  "anyhow",
  "base64",
@@ -1134,7 +1134,7 @@ dependencies = [
 [[package]]
 name = "io-jmap"
 version = "0.0.1"
-source = "git+https://github.com/pimalaya/io-jmap#2463ecb104d0ff24b8c3ba2f4eaa09562ce5a1cd"
+source = "git+https://github.com/pimalaya/io-jmap#18103bdbf883798b48566f6d45e4dfed8458d0e6"
 dependencies = [
  "anyhow",
  "io-http",
@@ -1170,7 +1170,7 @@ dependencies = [
 [[package]]
 name = "io-smtp"
 version = "0.0.1"
-source = "git+https://github.com/pimalaya/io-smtp#3b8cf0d806c23339a46a540e159de3d4cd9898f3"
+source = "git+https://github.com/pimalaya/io-smtp#8ade022516b83358d66772b74bd42216763b5ec3"
 dependencies = [
  "anyhow",
  "base64",
@@ -1664,7 +1664,7 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 [[package]]
 name = "pimalaya-cli"
 version = "0.0.1"
-source = "git+https://github.com/pimalaya/cli#313c2e999ea9157fa42c84a6ae867451d8308114"
+source = "git+https://github.com/pimalaya/cli#64cd78d702ed9251021f4ed8f549ac262b0e6985"
 dependencies = [
  "anyhow",
  "clap",
@@ -1704,7 +1704,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-stream"
 version = "0.0.1"
-source = "git+https://github.com/pimalaya/stream#6449136364c9ef81248e3b4ab6491dd154293481"
+source = "git+https://github.com/pimalaya/stream#152911be92647ae47c2052c1bf1270f02eefbdd1"
 dependencies = [
  "anyhow",
  "log",
@@ -2484,9 +2484,9 @@ checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
 
 [[package]]
 name = "unicode-segmentation"
-version = "1.13.2"
+version = "1.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9629274872b2bfaf8d66f5f15725007f635594914870f65218920345aa11aa8c"
+checksum = "c6f5d3c3b1bf09027a88a6bc961fc00497d651009560b5463668dc81b0fa87a8"
 
 [[package]]
 name = "unicode-width"

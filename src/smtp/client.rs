@@ -32,7 +32,7 @@ use std::{
 use anyhow::{Result, anyhow};
 use io_smtp::{client::SmtpClientStd as Inner, rfc5321::types::ehlo_domain::EhloDomain};
 use pimalaya_config::toml::TomlConfig;
-use pimalaya_stream::{sasl::Sasl, tls::Tls};
+use pimalaya_stream::sasl::Sasl;
 use url::Url;
 
 use crate::{account::context::Account, cli::load_or_wizard, config::SmtpConfig};
@@ -45,8 +45,7 @@ impl SmtpClient {
     /// Opens the SMTP connection (TCP/TLS/STARTTLS, greeting, EHLO,
     /// SASL).
     pub fn new(config: SmtpConfig) -> Result<Self> {
-        let mut tls: Tls = config.tls.into();
-        tls.rustls.alpn = vec!["smtp".into()];
+        let tls = config.tls.into_tls(config.alpn);
         let sasl: Option<Sasl> = config.sasl.map(Sasl::try_from).transpose()?;
         let domain: EhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
         let server = parse_smtp_server(&config.server)?;

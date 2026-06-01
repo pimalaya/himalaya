@@ -114,13 +114,12 @@ fn check_imap(
     imap_config: crate::config::ImapConfig,
 ) -> BackendCheck {
     use io_imap::client::ImapClientStd;
-    use pimalaya_stream::{sasl::Sasl, tls::Tls};
+    use pimalaya_stream::sasl::Sasl;
 
     use crate::imap::id::resolve_auto_id_params;
 
     let result = (|| -> Result<()> {
-        let mut tls: Tls = imap_config.tls.clone().into();
-        tls.rustls.alpn = vec!["imap".into()];
+        let tls = imap_config.tls.clone().into_tls(imap_config.alpn.clone());
         let sasl: Option<Sasl> = imap_config.sasl.clone().map(Sasl::try_from).transpose()?;
         let auto_id = resolve_auto_id_params(&imap_config.id)?;
         let server = crate::imap::client::parse_imap_server(&imap_config.server)?;
@@ -138,13 +137,11 @@ fn check_jmap(
     jmap_config: crate::config::JmapConfig,
 ) -> BackendCheck {
     use io_jmap::client::JmapClientStd;
-    use pimalaya_stream::tls::Tls;
 
     use crate::jmap::client::{jmap_http_auth, parse_server_url};
 
     let result = (|| -> Result<()> {
-        let mut tls: Tls = jmap_config.tls.clone().into();
-        tls.rustls.alpn = vec!["http/1.1".into()];
+        let tls = jmap_config.tls.clone().into_tls(jmap_config.alpn.clone());
         let http_auth = jmap_http_auth(jmap_config.auth.clone())?;
         let url = parse_server_url(&jmap_config.server)?;
         let mut client = JmapClientStd::connect(&url, &tls, http_auth)?;
@@ -183,11 +180,10 @@ fn check_smtp(
     use std::net::Ipv4Addr;
 
     use io_smtp::{client::SmtpClientStd, rfc5321::types::ehlo_domain::EhloDomain};
-    use pimalaya_stream::{sasl::Sasl, tls::Tls};
+    use pimalaya_stream::sasl::Sasl;
 
     let result = (|| -> Result<()> {
-        let mut tls: Tls = smtp_config.tls.clone().into();
-        tls.rustls.alpn = vec!["smtp".into()];
+        let tls = smtp_config.tls.clone().into_tls(smtp_config.alpn.clone());
         let sasl: Option<Sasl> = smtp_config.sasl.clone().map(Sasl::try_from).transpose()?;
         let domain: EhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
         let server = crate::smtp::client::parse_smtp_server(&smtp_config.server)?;

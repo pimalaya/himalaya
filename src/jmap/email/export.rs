@@ -22,7 +22,6 @@ use io_jmap::{
     rfc8621::{capabilities::MAIL, email::EmailProperty},
 };
 use pimalaya_cli::printer::{Message, Printer};
-use pimalaya_stream::tls::Tls;
 use url::Url;
 
 use crate::jmap::client::{JmapClient, jmap_http_auth};
@@ -68,8 +67,11 @@ impl JmapEmailExportCommand {
         let data = if same_authority(&api_url, &download_url) {
             client.blob_download(&download_url)?
         } else {
-            let mut tls: Tls = client.config.tls.clone().into();
-            tls.rustls.alpn = vec!["http/1.1".into()];
+            let tls = client
+                .config
+                .tls
+                .clone()
+                .into_tls(client.config.alpn.clone());
             let http_auth = jmap_http_auth(client.config.auth.clone())?;
             let mut download_client = JmapClientStd::connect(&download_url, &tls, http_auth)?;
             download_client.blob_download(&download_url)?

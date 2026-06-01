@@ -331,6 +331,13 @@ pub struct ImapConfig {
     #[serde(default)]
     pub starttls: bool,
 
+    /// ALPN protocol identifiers offered during the TLS handshake.
+    /// Defaults to `["imap"]` (RFC 7595, IANA registry). Set to `[]`
+    /// to skip ALPN negotiation entirely. Only relevant for the
+    /// rustls provider; `native-tls` ignores ALPN.
+    #[serde(default = "io_imap::client::default_alpn")]
+    pub alpn: Vec<String>,
+
     /// Optional SASL credentials. When omitted, the connection skips
     /// authentication entirely (no `AUTHENTICATE` command is sent);
     /// to advertise the ANONYMOUS mechanism explicitly, set
@@ -397,6 +404,13 @@ pub struct SmtpConfig {
     #[serde(default)]
     pub starttls: bool,
 
+    /// ALPN protocol identifiers offered during the TLS handshake.
+    /// Defaults to `["smtp"]` (RFC 7595, IANA registry). Set to `[]`
+    /// to skip ALPN negotiation entirely. Only relevant for the
+    /// rustls provider; `native-tls` ignores ALPN.
+    #[serde(default = "io_smtp::client::default_alpn")]
+    pub alpn: Vec<String>,
+
     /// Optional SASL credentials. See [`ImapConfig::sasl`].
     pub sasl: Option<SaslConfig>,
 }
@@ -434,21 +448,26 @@ pub enum RustlsCryptoConfig {
     Ring,
 }
 
-impl From<TlsConfig> for Tls {
-    fn from(config: TlsConfig) -> Self {
+impl TlsConfig {
+    /// Builds the runtime [`Tls`] handle the connect helpers expect.
+    /// `alpn` is the protocol-level ALPN list (e.g. `["imap"]`,
+    /// `["smtp"]`, `["http/1.1"]`); pass an empty vec to skip ALPN.
+    /// The TOML schema never exposes `tls.rustls.alpn` directly: the
+    /// per-protocol `*.alpn` field is folded in here.
+    pub fn into_tls(self, alpn: Vec<String>) -> Tls {
         Tls {
-            provider: config.provider.map(|config| match config {
+            provider: self.provider.map(|p| match p {
                 TlsProviderConfig::Rustls => TlsProvider::Rustls,
                 TlsProviderConfig::NativeTls => TlsProvider::NativeTls,
             }),
             rustls: Rustls {
-                crypto: config.rustls.crypto.map(|config| match config {
+                crypto: self.rustls.crypto.map(|c| match c {
                     RustlsCryptoConfig::Aws => RustlsCrypto::Aws,
                     RustlsCryptoConfig::Ring => RustlsCrypto::Ring,
                 }),
-                alpn: Vec::new(),
+                alpn,
             },
-            cert: config.cert,
+            cert: self.cert,
         }
     }
 }
@@ -589,6 +608,13 @@ pub struct JmapConfig {
     /// TLS configuration.
     #[serde(default)]
     pub tls: TlsConfig,
+
+    /// ALPN protocol identifiers offered during the TLS handshake.
+    /// Defaults to `["http/1.1"]` (JMAP rides on HTTP/1.1). Set to
+    /// `[]` to skip ALPN negotiation entirely. Only relevant for the
+    /// rustls provider; `native-tls` ignores ALPN.
+    #[serde(default = "io_jmap::client::default_alpn")]
+    pub alpn: Vec<String>,
 
     /// Authentication configuration.
     pub auth: JmapAuthConfig,

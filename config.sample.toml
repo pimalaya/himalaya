@@ -165,6 +165,11 @@ imap.server = "example.com"
 # Enable STARTTLS (only valid when the server resolves to `imap://`).
 #imap.starttls = false
 
+# ALPN protocol identifiers offered during the TLS handshake (rustls only;
+# native-tls ignores it). Defaults to ["imap"]; set to [] to skip ALPN.
+#imap.alpn = ["imap"]
+#imap.alpn = []
+
 # Pick exactly one SASL mechanism among `anonymous`, `login`, `plain`,
 # `oauthbearer`, `xoauth2`, `scram-sha-256`. Omit the whole `imap.sasl` table
 # to skip authentication entirely (no `AUTHENTICATE` command sent).
@@ -231,6 +236,11 @@ imap.sasl.plain.passwd.raw = "***"
 #jmap.tls.rustls.crypto = "ring"
 #jmap.tls.cert = "/path/to/custom/cert.pem"
 
+# ALPN protocol identifiers offered during the TLS handshake. Defaults to
+# ["http/1.1"] (JMAP rides on HTTP/1.1); set to [] to skip ALPN.
+#jmap.alpn = ["http/1.1"]
+#jmap.alpn = []
+
 # Pick exactly one of `header`, `bearer`, `basic`.
 
 # Raw `Authorization` header value, used verbatim.
@@ -288,6 +298,11 @@ smtp.server = "example.com"
 
 # Enable STARTTLS (only valid when the server resolves to `smtp://`).
 #smtp.starttls = false
+
+# ALPN protocol identifiers offered during the TLS handshake. Defaults to
+# ["smtp"]; set to [] to skip ALPN.
+#smtp.alpn = ["smtp"]
+#smtp.alpn = []
 
 # Pick exactly one SASL mechanism among `anonymous`, `login`, `plain`,
 # `oauthbearer`, `xoauth2`, `scram-sha-256`. Omit the whole `smtp.sasl` table

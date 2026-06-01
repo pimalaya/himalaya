@@ -24,7 +24,6 @@ use io_jmap::{
     rfc8621::{capabilities::MAIL, email::EmailImport},
 };
 use pimalaya_cli::printer::{Message, Printer};
-use pimalaya_stream::tls::Tls;
 use url::Url;
 
 use crate::{
@@ -84,8 +83,11 @@ impl JmapEmailImportCommand {
                 .blob_upload(&upload_url, "message/rfc822", data)?
                 .blob_id
         } else {
-            let mut tls: Tls = client.config.tls.clone().into();
-            tls.rustls.alpn = vec!["http/1.1".into()];
+            let tls = client
+                .config
+                .tls
+                .clone()
+                .into_tls(client.config.alpn.clone());
             let http_auth = jmap_http_auth(client.config.auth.clone())?;
             let mut upload_client = JmapClientStd::connect(&upload_url, &tls, http_auth)?;
             upload_client

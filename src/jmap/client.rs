@@ -31,7 +31,6 @@ use anyhow::{Result, anyhow};
 use base64::{Engine, prelude::BASE64_STANDARD};
 use io_jmap::client::JmapClientStd as Inner;
 use pimalaya_config::toml::TomlConfig;
-use pimalaya_stream::tls::Tls;
 use secrecy::{ExposeSecret, SecretString};
 use url::Url;
 
@@ -54,8 +53,7 @@ impl JmapClient {
     /// Establishes the JMAP session (TLS, `/.well-known/jmap`
     /// discovery).
     pub fn new(config: JmapConfig) -> Result<Self> {
-        let mut tls: Tls = config.tls.clone().into();
-        tls.rustls.alpn = vec!["http/1.1".into()];
+        let tls = config.tls.clone().into_tls(config.alpn.clone());
 
         let http_auth = jmap_http_auth(config.auth.clone())?;
         let url = parse_server_url(&config.server)?;

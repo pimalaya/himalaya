@@ -48,6 +48,7 @@ pub fn imap_to_config(w: WizardImapConfig) -> Result<ImapConfig> {
         server,
         tls: Default::default(),
         starttls,
+        alpn: io_imap::client::default_alpn(),
         sasl,
         id: Default::default(),
     })
@@ -66,6 +67,7 @@ pub fn smtp_to_config(w: WizardSmtpConfig) -> Result<SmtpConfig> {
         server,
         tls: Default::default(),
         starttls,
+        alpn: io_smtp::client::default_alpn(),
         sasl,
     })
 }
@@ -84,6 +86,7 @@ pub fn jmap_to_config(w: WizardJmapConfig) -> Result<JmapConfig> {
     Ok(JmapConfig {
         server: w.server,
         tls: Default::default(),
+        alpn: io_jmap::client::default_alpn(),
         auth,
         identity_id: None,
         drafts_mailbox_id: None,
