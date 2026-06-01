@@ -36,7 +36,7 @@
 
 use std::ops::{Deref, DerefMut};
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use io_email::client::EmailClientStd;
 
 use crate::{
@@ -56,10 +56,9 @@ impl EmailClient {
         backend: Backend,
     ) -> Result<(Account, Self)> {
         let mut inner = EmailClientStd::new();
-        let mut configured = false;
 
         #[cfg(feature = "jmap")]
-        if !configured && backend.allows_jmap() {
+        if backend.allows_jmap() {
             if let Some(jmap_config) = account_config.jmap.take() {
                 use pimalaya_stream::tls::Tls;
 
@@ -70,12 +69,11 @@ impl EmailClient {
                 let http_auth = jmap_http_auth(jmap_config.auth.clone())?;
                 let url = parse_server_url(&jmap_config.server)?;
                 inner = inner.connect_jmap(&url, &tls, http_auth)?;
-                configured = true;
             }
         }
 
         #[cfg(feature = "imap")]
-        if !configured && backend.allows_imap() {
+        if backend.allows_imap() {
             if let Some(imap_config) = account_config.imap.take() {
                 use io_email::imap::client::ImapClientStd;
                 use pimalaya_stream::{sasl::Sasl, tls::Tls};
@@ -90,12 +88,11 @@ impl EmailClient {
                 let imap =
                     ImapClientStd::connect(&server, &tls, imap_config.starttls, sasl, auto_id)?;
                 inner = inner.with_imap(imap);
-                configured = true;
             }
         }
 
         #[cfg(feature = "maildir")]
-        if !configured && backend.allows_maildir() {
+        if backend.allows_maildir() {
             if let Some(maildir_config) = account_config.maildir.take() {
                 use io_email::maildir::client::MaildirClient;
 
@@ -106,52 +103,45 @@ impl EmailClient {
         }
 
         #[cfg(feature = "m2dir")]
-        if !configured && backend.allows_m2dir() {
+        if backend.allows_m2dir() {
             if let Some(m2dir_config) = account_config.m2dir.take() {
                 use io_email::m2dir::client::M2dirClient;
 
                 let client = M2dirClient::new(m2dir_config.root.to_string_lossy().into_owned());
                 inner = inner.with_m2dir(client);
-                configured = true;
             }
-        }
-
-        if !configured {
-            bail!("no backend matching `{backend}` is configured for this account");
         }
 
         // Register SMTP alongside the storage backend so shared
         // `send_message` works for IMAP/Maildir accounts. JMAP already
         // sends via submission; the dispatch priority (JMAP → SMTP in
         // the send path) keeps that working when both are present.
+        // SMTP also counts as a configured backend on its own, so
+        // accounts with only `[smtp]` populated still construct and
+        // can run `message send`. SMTP is initialized regardless of
+        // the `--backend` flag so an explicit storage pin (e.g.
+        // `--backend imap`) does not drop the send transport.
         #[cfg(feature = "smtp")]
-        if let Some(smtp_config) = account_config.smtp.take() {
-            use std::net::Ipv4Addr;
+        if backend.allows_smtp() {
+            if let Some(smtp_config) = account_config.smtp.take() {
+                use std::net::Ipv4Addr;
 
-            use io_email::smtp::client::SmtpClientStd;
-            use io_smtp::rfc5321::types::ehlo_domain::EhloDomain;
-            use pimalaya_stream::{sasl::Sasl, tls::Tls};
+                use io_email::smtp::client::SmtpClientStd;
+                use io_smtp::rfc5321::types::ehlo_domain::EhloDomain;
+                use pimalaya_stream::{sasl::Sasl, tls::Tls};
 
-            let smtp = (|| -> Result<SmtpClientStd> {
                 let mut tls: Tls = smtp_config.tls.into();
                 tls.rustls.alpn = vec!["smtp".into()];
                 let sasl: Option<Sasl> = smtp_config.sasl.map(Sasl::try_from).transpose()?;
                 let domain: EhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
                 let server = crate::smtp::client::parse_smtp_server(&smtp_config.server)?;
-                Ok(SmtpClientStd::connect(
+                inner = inner.with_smtp(SmtpClientStd::connect(
                     &server,
                     &tls,
                     smtp_config.starttls,
                     domain,
                     sasl,
-                )?)
-            })();
-
-            match smtp {
-                Ok(client) => inner = inner.with_smtp(client),
-                Err(err) => {
-                    log::warn!("SMTP backend disabled: {err}. Sending will be unavailable.")
-                }
+                )?);
             }
         }
 
