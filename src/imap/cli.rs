@@ -35,15 +35,15 @@ pub enum ImapCommand {
     Id(ImapIdCommand),
 
     #[command(subcommand)]
-    #[command(aliases = ["mboxes", "mbox"])]
-    Mailboxes(ImapMailboxCommand),
+    #[command(aliases = ["mbox"])]
+    Mailbox(ImapMailboxCommand),
     #[command(subcommand)]
-    Envelopes(ImapEnvelopeCommand),
+    Envelope(ImapEnvelopeCommand),
     #[command(subcommand)]
-    Flags(ImapFlagCommand),
+    Flag(ImapFlagCommand),
     #[command(subcommand)]
-    #[command(aliases = ["msgs", "msg"])]
-    Messages(ImapMessageCommand),
+    #[command(aliases = ["msg"])]
+    Message(ImapMessageCommand),
 }
 
 impl ImapCommand {
@@ -56,10 +56,10 @@ impl ImapCommand {
         match self {
             Self::Id(cmd) => cmd.execute(printer, account, client),
 
-            Self::Envelopes(cmd) => cmd.execute(printer, account, client),
-            Self::Flags(cmd) => cmd.execute(printer, account, client),
-            Self::Mailboxes(cmd) => cmd.execute(printer, account, client),
-            Self::Messages(cmd) => cmd.execute(printer, account, client),
+            Self::Envelope(cmd) => cmd.execute(printer, account, client),
+            Self::Flag(cmd) => cmd.execute(printer, account, client),
+            Self::Mailbox(cmd) => cmd.execute(printer, account, client),
+            Self::Message(cmd) => cmd.execute(printer, account, client),
         }
     }
 }

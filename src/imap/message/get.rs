@@ -42,7 +42,7 @@ pub struct ImapMessageGetCommand {
     pub mailbox_no_select: MailboxNoSelectFlag,
 
     /// The message UID (or sequence number with --seq).
-    pub id: u32,
+    pub id: String,
     /// Use sequence numbers instead of UIDs.
     #[arg(long)]
     pub seq: bool,
@@ -51,9 +51,6 @@ pub struct ImapMessageGetCommand {
 impl ImapMessageGetCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
-        if self.id == 0 {
-            bail!("ID must be non-zero");
-        }
 
         if !self.mailbox_no_select.inner {
             client.select(mailbox)?;
@@ -66,7 +63,7 @@ impl ImapMessageGetCommand {
                 peek: true,
             }]);
 
-        let sequence_set = self.id.to_string().parse()?;
+        let sequence_set = self.id.parse()?;
         let mut data = client.fetch(sequence_set, item_names, !self.seq)?;
 
         let Some((_, items)) = data.pop_first() else {

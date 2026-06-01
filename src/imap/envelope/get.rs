@@ -48,7 +48,7 @@ pub struct ImapEnvelopeGetCommand {
 
     /// The message UID (or sequence number with --seq).
     #[arg(name = "id", value_name = "ID")]
-    pub id: u32,
+    pub id: String,
     /// Use sequence numbers instead of UIDs.
     #[arg(long)]
     pub seq: bool,
@@ -67,14 +67,10 @@ impl ImapEnvelopeGetCommand {
             client.select(mailbox)?;
         }
 
-        if self.id == 0 {
-            bail!("ID must be non-zero");
-        }
-
         let item_names =
             MacroOrMessageDataItemNames::MessageDataItemNames(vec![MessageDataItemName::Envelope]);
 
-        let sequence_set = self.id.to_string().parse()?;
+        let sequence_set = self.id.parse()?;
         let mut data = client.fetch(sequence_set, item_names, !self.seq)?;
 
         let Some((_, items)) = data.pop_first() else {
