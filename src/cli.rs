@@ -56,9 +56,9 @@ use crate::{
 #[command(author, version, about)]
 #[command(long_version = long_version!())]
 #[command(propagate_version = true, infer_subcommands = true)]
-pub struct HimalayaCli {
+pub struct Cli {
     #[command(subcommand)]
-    pub command: HimalayaCommand,
+    pub cmd: Command,
 
     /// Override the default configuration file path.
     ///
@@ -96,19 +96,19 @@ pub struct HimalayaCli {
 }
 
 #[derive(Debug, Subcommand)]
-pub enum HimalayaCommand {
+pub enum Command {
     // --- Shared API
     //
-    #[command(subcommand, visible_alias = "mbox", alias = "mboxes")]
-    Mailboxes(MailboxCommand),
+    #[command(subcommand, visible_alias = "mbox")]
+    Mailbox(MailboxCommand),
     #[command(subcommand)]
-    Envelopes(EnvelopeCommand),
+    Envelope(EnvelopeCommand),
     #[command(subcommand)]
-    Flags(FlagCommand),
-    #[command(subcommand, visible_alias = "msg", alias = "msgs")]
-    Messages(MessageCommand),
+    Flag(FlagCommand),
+    #[command(subcommand, visible_alias = "msg")]
+    Message(MessageCommand),
     #[command(subcommand)]
-    Attachments(AttachmentCommand),
+    Attachment(AttachmentCommand),
 
     // --- Protocol-specific APIs
     //
@@ -132,8 +132,8 @@ pub enum HimalayaCommand {
     //
     #[command(subcommand)]
     Account(AccountCommand),
-    Completions(CompletionCommand),
-    Manuals(ManualCommand),
+    Completion(CompletionCommand),
+    Manual(ManualCommand),
 }
 
 /// Loads `Config` from the merged `config_paths` or, when no file
@@ -147,7 +147,7 @@ pub fn load_or_wizard(config_paths: &[PathBuf]) -> Result<Config> {
     }
 }
 
-impl HimalayaCommand {
+impl Command {
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -168,27 +168,27 @@ impl HimalayaCommand {
         match self {
             // --- Shared API
             //
-            Self::Mailboxes(cmd) => {
+            Self::Mailbox(cmd) => {
                 let (config, account_config) = configs()?;
                 let client = EmailClient::new(config, account_config, backend)?;
                 cmd.execute(printer, client)
             }
-            Self::Envelopes(cmd) => {
+            Self::Envelope(cmd) => {
                 let (config, account_config) = configs()?;
                 let client = EmailClient::new(config, account_config, backend)?;
                 cmd.execute(printer, client)
             }
-            Self::Flags(cmd) => {
+            Self::Flag(cmd) => {
                 let (config, account_config) = configs()?;
                 let client = EmailClient::new(config, account_config, backend)?;
                 cmd.execute(printer, client)
             }
-            Self::Messages(cmd) => {
+            Self::Message(cmd) => {
                 let (config, account_config) = configs()?;
                 let client = EmailClient::new(config, account_config, backend)?;
                 cmd.execute(printer, client)
             }
-            Self::Attachments(cmd) => {
+            Self::Attachment(cmd) => {
                 let (config, account_config) = configs()?;
                 let client = EmailClient::new(config, account_config, backend)?;
                 cmd.execute(printer, client)
@@ -225,8 +225,8 @@ impl HimalayaCommand {
             // --- Meta
             //
             Self::Account(cmd) => cmd.execute(printer, config_paths, account_name, backend),
-            Self::Completions(cmd) => cmd.execute(printer, HimalayaCli::command()),
-            Self::Manuals(cmd) => cmd.execute(printer, HimalayaCli::command()),
+            Self::Completion(cmd) => cmd.execute(printer, Cli::command()),
+            Self::Manual(cmd) => cmd.execute(printer, Cli::command()),
         }
     }
 }

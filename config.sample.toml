@@ -115,11 +115,10 @@
 # shared commands fall back to this id when `-m/--mailbox` is not passed.
 #
 # Account-level entries override same-named global entries.
-#[mailbox.alias]
-#inbox = "INBOX"
-#sent = "[Gmail]/Sent Mail"
-#drafts = "[Gmail]/Drafts"
-#trash = "[Gmail]/Trash"
+#mailbox.alias.inbox = "INBOX"
+#mailbox.alias.sent = "[Gmail]/Sent Mail"
+#mailbox.alias.drafts = "[Gmail]/Drafts"
+#mailbox.alias.trash = "[Gmail]/Trash"
 
 # --------------------------------------------------------------------------------
 # User-defined composers and readers
@@ -136,18 +135,16 @@
 # `default = true` when no name is passed.
 #
 # Example using https://github.com/pimalaya/mml:
-#[message.composer.mml]
-#compose = "mml compose"
-#reply = "mml reply"
-#forward = "mml forward"
-#default = true
+#message.composer.mml.compose = ["mml", "compose"]
+#message.composer.mml.reply = ["mml", "reply"]
+#message.composer.mml.forward = ["mml", "forward"]
+#message.composer.mml.default = true
 
 # Readers consume a MIME message on stdin and emit human-readable bytes on
 # stdout. They are invoked by `messages read-with`.
 #
-#[message.reader.mml]
-#command = "mml read"
-#default = true
+#message.reader.mml.command = ["mml", "read"]
+#message.reader.mml.default = true
 
 # --------------------------------------------------------------------------------
 # Account config
