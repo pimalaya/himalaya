@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Brought the `m2dir` backend to feature parity with `maildir` at the CLI level: `m2dir messages {save, get, read, export}`, `m2dir flags {list, add, set, remove}`, `m2dir envelopes {get, list}`. Flags are free-form UTF-8 strings persisted in the `.meta/<id>.flags` metadata file. Still missing relative to `maildir`: mailbox `rename`, message `copy` and `move` (need io-m2dir lib support first).
 
+- Added `--save <MAILBOX>` to `messages send`, mirroring the existing flag on `messages compose` / `reply` / `forward`. Sends the message and appends a copy of it to the named mailbox. The mailbox name is resolved through the account's `[mailbox.alias]` map.
+
+- Added `--send` to `messages add` (alias `messages save`), mirroring `messages send --save`. Appends the message to the mandatory `--mailbox` first and then pushes it through the account's send path. Success line now reads "Message {id} successfully added and sent" when `--send` is set.
+
 ### Changed
 
 - Unified raw-message input across `messages add`, `messages send`, `imap message save`, `maildir message save`, `jmap email import` and `smtp message send` behind a single `MessageArg` (ported from `mml::cli::args::MessageArg`). Every command now accepts the same three forms: a positional file path, a positional inline raw message (with `\r` / `\n` literals normalized to `\r\n`), or stdin when piped. The legacy `--file <PATH>` flag on `messages add` is gone (positional path replaces it).
@@ -24,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed compilation error when `wizard` feature was disabled ([#634]).
 
 - Fixed `--save <mailbox>` on `messages compose` / `reply` / `forward` to resolve the mailbox name through the account's alias map (`account.resolve_mailbox`) before calling the backend, so `--save Sent` honours e.g. `mailbox.alias.sent = "[Gmail]/Sent Mail"`.
+
+- Extended mailbox-alias resolution across every shared `messages` subcommand that takes a mailbox name: `add -m`, `read -m`, `reply -m`, `forward -m`, `copy --from/--to`, `move --from/--to`. Previously the value was passed verbatim to the backend; now each goes through `account.resolve_mailbox`. The shared `mailboxes` / `envelopes` / `flags` / `attachments` commands already resolved through `MailboxArg`; this brings the `messages` group in line.
+
+- Fixed the success-message dispatch in `handler::route`: `(save, send)` cases `(true, false)` and `(false, true)` were swapped, printing "saved" after a pure send and "sent" after a pure save.
 
 ### Removed
 

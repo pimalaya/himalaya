@@ -26,7 +26,7 @@ use crate::shared::{
     client::EmailClient,
     messages::{
         builder::{self, BuilderArgs, PostingStyle, SourceArgs, SourceMode},
-        output,
+        handler,
     },
 };
 
@@ -110,7 +110,8 @@ impl MessageForwardCommand {
         account: &mut Account,
         client: &mut EmailClient,
     ) -> Result<()> {
-        let source = client.get_message(&self.mailbox, &self.id)?;
+        let mailbox = account.resolve_mailbox(&self.mailbox).to_owned();
+        let source = client.get_message(&mailbox, &self.id)?;
 
         let raw = builder::build(
             BuilderArgs {
@@ -133,7 +134,7 @@ impl MessageForwardCommand {
             }),
         )?;
 
-        output::route(
+        handler::route(
             printer,
             account,
             client,

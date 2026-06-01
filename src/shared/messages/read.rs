@@ -26,6 +26,7 @@ use mail_parser::{Message, MessageParser};
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
+use crate::account::context::Account;
 use crate::shared::client::EmailClient;
 
 /// Read a message from the active account (built-in flag reader).
@@ -42,8 +43,8 @@ pub struct MessageReadCommand {
     #[arg(value_name = "ID")]
     pub id: String,
 
-    /// Mailbox name or path (IMAP mailbox / Maildir path). Ignored for
-    /// JMAP, which addresses messages by id directly.
+    /// Mailbox name or alias (IMAP mailbox / Maildir path). Ignored
+    /// for JMAP, which addresses messages by id directly.
     #[arg(
         long = "mailbox",
         short = 'm',
@@ -59,12 +60,18 @@ pub struct MessageReadCommand {
 }
 
 impl MessageReadCommand {
-    pub fn execute(self, printer: &mut impl Printer, client: &mut EmailClient) -> Result<()> {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut EmailClient,
+    ) -> Result<()> {
         if self.raw && printer.is_json() {
             bail!("`--raw` and `--json` cannot be combined");
         }
 
-        let raw = client.get_message(&self.mailbox, &self.id)?;
+        let mailbox = account.resolve_mailbox(&self.mailbox).to_owned();
+        let raw = client.get_message(&mailbox, &self.id)?;
 
         if self.raw {
             let mut out = stdout().lock();

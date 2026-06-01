@@ -62,14 +62,14 @@ impl MessageCommand {
         client: &mut EmailClient,
     ) -> Result<()> {
         match self {
-            Self::Add(cmd) => cmd.execute(printer, client),
+            Self::Add(cmd) => cmd.execute(printer, account, client),
             Self::Compose(cmd) => cmd.execute(printer, account, client),
-            Self::Copy(cmd) => cmd.execute(printer, client),
+            Self::Copy(cmd) => cmd.execute(printer, account, client),
             Self::Forward(cmd) => cmd.execute(printer, account, client),
-            Self::Move(cmd) => cmd.execute(printer, client),
-            Self::Read(cmd) => cmd.execute(printer, client),
+            Self::Move(cmd) => cmd.execute(printer, account, client),
+            Self::Read(cmd) => cmd.execute(printer, account, client),
             Self::Reply(cmd) => cmd.execute(printer, account, client),
-            Self::Send(cmd) => cmd.execute(printer, client),
+            Self::Send(cmd) => cmd.execute(printer, account, client),
         }
     }
 }

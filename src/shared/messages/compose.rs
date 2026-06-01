@@ -26,7 +26,7 @@ use crate::shared::{
     client::EmailClient,
     messages::{
         builder::{self, BuilderArgs},
-        output,
+        handler,
     },
 };
 
@@ -124,7 +124,7 @@ impl MessageComposeCommand {
             None,
         )?;
 
-        output::route(
+        handler::route(
             printer,
             account,
             client,
