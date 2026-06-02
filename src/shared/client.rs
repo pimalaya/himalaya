@@ -84,7 +84,7 @@ impl EmailClient {
                     .sasl
                     .and_then(|cfg| {
                         let host = server.host_str()?;
-                        let port = server.port_or_known_default()?;
+                        let port = server.port().unwrap_or(993);
                         Some(cfg.try_into_sasl(host, port))
                     })
                     .transpose()?;
@@ -139,7 +139,7 @@ impl EmailClient {
                     .sasl
                     .and_then(|cfg| {
                         let host = server.host_str()?;
-                        let port = server.port_or_known_default()?;
+                        let port = server.port().unwrap_or(587);
                         Some(cfg.try_into_sasl(host, port))
                     })
                     .transpose()?;
