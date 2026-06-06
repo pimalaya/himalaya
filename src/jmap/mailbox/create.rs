@@ -19,7 +19,7 @@ use std::collections::BTreeMap;
 
 use anyhow::{Result, bail};
 use clap::Parser;
-use io_jmap::rfc8621::{mailbox::MailboxCreate, mailbox_set::JmapMailboxSetArgs};
+use io_jmap::rfc8621::mailbox::{JmapMailboxCreate, set::JmapMailboxSetArgs};
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::jmap::{client::JmapClient, error::format_set_error};
@@ -43,7 +43,7 @@ pub struct JmapMailboxCreateCommand {
 
 impl JmapMailboxCreateCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
-        let new_mailbox = MailboxCreate {
+        let new_mailbox = JmapMailboxCreate {
             name: Some(self.name.clone()),
             parent_id: self.parent_id,
             is_subscribed: if self.subscribe { Some(true) } else { None },

@@ -16,10 +16,10 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use io_jmap::rfc8621::{
-    email::{EmailCopyError, EmailImportError, EmailSetError},
-    email_submission::EmailSubmissionSetError,
-    identity::IdentitySetError,
-    mailbox::MailboxSetError,
+    email::{JmapEmailCopyItemError, JmapEmailImportItemError, JmapEmailSetItemError},
+    email_submission::JmapEmailSubmissionSetItemError,
+    identity::JmapIdentitySetItemError,
+    mailbox::JmapMailboxSetItemError,
 };
 
 /// Returns the optional human-readable description carried by a JMAP set error.
@@ -48,7 +48,7 @@ pub fn format_set_error<E: JmapSetError>(err: &E) -> String {
     msg
 }
 
-impl JmapSetError for MailboxSetError {
+impl JmapSetError for JmapMailboxSetItemError {
     fn description(&self) -> Option<&str> {
         match self {
             Self::MailboxHasChild { description }
@@ -83,7 +83,7 @@ impl JmapSetError for MailboxSetError {
     }
 }
 
-impl JmapSetError for EmailSetError {
+impl JmapSetError for JmapEmailSetItemError {
     fn description(&self) -> Option<&str> {
         match self {
             Self::TooManyKeywords { description }
@@ -120,7 +120,7 @@ impl JmapSetError for EmailSetError {
     }
 }
 
-impl JmapSetError for EmailImportError {
+impl JmapSetError for JmapEmailImportItemError {
     fn description(&self) -> Option<&str> {
         match self {
             Self::InvalidEmail { description }
@@ -147,7 +147,7 @@ impl JmapSetError for EmailImportError {
     }
 }
 
-impl JmapSetError for EmailCopyError {
+impl JmapSetError for JmapEmailCopyItemError {
     fn description(&self) -> Option<&str> {
         match self {
             Self::AlreadyExists { description }
@@ -174,7 +174,7 @@ impl JmapSetError for EmailCopyError {
     }
 }
 
-impl JmapSetError for IdentitySetError {
+impl JmapSetError for JmapIdentitySetItemError {
     fn description(&self) -> Option<&str> {
         match self {
             Self::NotFound { description }
@@ -205,7 +205,7 @@ impl JmapSetError for IdentitySetError {
     }
 }
 
-impl JmapSetError for EmailSubmissionSetError {
+impl JmapSetError for JmapEmailSubmissionSetItemError {
     fn description(&self) -> Option<&str> {
         match self {
             Self::TooManyRecipients { description }

@@ -33,7 +33,7 @@
 use std::io::{Write, stdout};
 
 use anyhow::Result;
-use io_email::flag::{Flag, IanaFlag};
+use io_email::flag::types::{Flag, IanaFlag};
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::{account::context::Account, shared::client::EmailClient};

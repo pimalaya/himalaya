@@ -20,14 +20,17 @@ use std::fmt;
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use comfy_table::{Cell, Row, Table};
-use io_jmap::rfc8621::email_submission::{EmailSubmission, EmailSubmissionFilter, UndoStatus};
+use io_jmap::rfc8621::email_submission::{
+    JmapEmailSubmission, JmapEmailSubmissionFilter, JmapUndoStatus,
+    query::JmapEmailSubmissionQueryOptions,
+};
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
 use crate::account::context::Account;
 use crate::jmap::client::JmapClient;
 
-/// CLI proxy for [`UndoStatus`].
+/// CLI proxy for [`JmapUndoStatus`].
 #[derive(Clone, Debug, ValueEnum)]
 pub enum UndoStatusArg {
     Pending,
@@ -35,12 +38,12 @@ pub enum UndoStatusArg {
     Canceled,
 }
 
-impl From<UndoStatusArg> for UndoStatus {
+impl From<UndoStatusArg> for JmapUndoStatus {
     fn from(arg: UndoStatusArg) -> Self {
         match arg {
-            UndoStatusArg::Pending => UndoStatus::Pending,
-            UndoStatusArg::Final => UndoStatus::Final,
-            UndoStatusArg::Canceled => UndoStatus::Canceled,
+            UndoStatusArg::Pending => JmapUndoStatus::Pending,
+            UndoStatusArg::Final => JmapUndoStatus::Final,
+            UndoStatusArg::Canceled => JmapUndoStatus::Canceled,
         }
     }
 }
@@ -77,7 +80,7 @@ impl JmapSubmissionQueryCommand {
         client: &mut JmapClient,
     ) -> Result<()> {
         let filter = {
-            let f = EmailSubmissionFilter {
+            let f = JmapEmailSubmissionFilter {
                 undo_status: self.undo_status.map(Into::into),
                 before: self.before,
                 after: self.after,
@@ -89,12 +92,12 @@ impl JmapSubmissionQueryCommand {
             if has_one { Some(f) } else { None }
         };
 
-        let output = client.email_submission_query(
+        let output = client.email_submission_query(JmapEmailSubmissionQueryOptions {
             filter,
-            None,
-            Some(self.page.saturating_sub(1) * self.page_size),
-            Some(self.page_size),
-        )?;
+            sort: None,
+            position: Some(self.page.saturating_sub(1) * self.page_size),
+            limit: Some(self.page_size),
+        })?;
 
         let table = SubmissionsTable {
             preset: account.table_preset().to_string(),
@@ -109,7 +112,7 @@ impl JmapSubmissionQueryCommand {
 pub struct SubmissionsTable {
     #[serde(skip)]
     pub preset: String,
-    pub submissions: Vec<EmailSubmission>,
+    pub submissions: Vec<JmapEmailSubmission>,
 }
 
 impl fmt::Display for SubmissionsTable {

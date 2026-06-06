@@ -17,7 +17,7 @@
 
 use anyhow::Result;
 use clap::Parser;
-use io_jmap::rfc8621::email::EmailAddress;
+use io_jmap::rfc8621::email::{JmapEmailAddress, get::JmapEmailGetOptions};
 use log::warn;
 use pimalaya_cli::printer::{Message, Printer};
 
@@ -39,7 +39,13 @@ pub struct JmapEmailReadCommand {
 
 impl JmapEmailReadCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
-        let output = client.email_get(self.ids.clone(), None, !self.html, self.html, 0)?;
+        let opts = JmapEmailGetOptions {
+            properties: None,
+            fetch_text_body_values: !self.html,
+            fetch_html_body_values: self.html,
+            max_body_value_bytes: 0,
+        };
+        let output = client.email_get(self.ids.clone(), opts)?;
 
         for id in output.not_found {
             warn!("email `{id}` not found, ignoring it");
@@ -96,7 +102,7 @@ impl JmapEmailReadCommand {
     }
 }
 
-fn format_addresses(addrs: &[EmailAddress]) -> String {
+fn format_addresses(addrs: &[JmapEmailAddress]) -> String {
     addrs
         .iter()
         .map(|a| match &a.name {

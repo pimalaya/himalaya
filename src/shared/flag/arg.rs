@@ -85,9 +85,9 @@ impl From<&FlagArg> for io_maildir::flag::MaildirFlag {
     }
 }
 
-impl From<&FlagArg> for io_email::flag::Flag {
+impl From<&FlagArg> for io_email::flag::types::Flag {
     fn from(flag: &FlagArg) -> Self {
-        use io_email::flag::{Flag, IanaFlag};
+        use io_email::flag::types::{Flag, IanaFlag};
 
         let iana = match flag {
             FlagArg::Seen => IanaFlag::Seen,

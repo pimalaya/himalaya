@@ -20,7 +20,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, Color, Row, Table};
-use io_m2dir::m2dir::M2dir;
+use io_m2dir::m2dir::types::M2dir;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
@@ -38,7 +38,7 @@ impl M2dirMailboxListCommand {
         account: &mut Account,
         client: &mut M2dirClient,
     ) -> Result<()> {
-        let m2dirs = client.list_mailboxes()?;
+        let m2dirs = client.list_m2dirs()?;
 
         let table = M2dirsTable {
             preset: account.table_preset().to_string(),

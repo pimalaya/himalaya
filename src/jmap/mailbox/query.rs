@@ -21,7 +21,8 @@ use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use comfy_table::{Cell, Color, Row, Table};
 use io_jmap::rfc8621::mailbox::{
-    Mailbox, MailboxFilter, MailboxRole, MailboxSortComparator, MailboxSortProperty,
+    JmapMailbox, JmapMailboxFilter, JmapMailboxRole, JmapMailboxSortComparator,
+    JmapMailboxSortProperty, query::JmapMailboxQueryOptions,
 };
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
@@ -80,7 +81,7 @@ impl JmapMailboxQueryCommand {
         client: &mut JmapClient,
     ) -> Result<()> {
         let filter = {
-            let f = MailboxFilter {
+            let f = JmapMailboxFilter {
                 parent_id: self.parent_id,
                 role: self.role.map(Into::into),
                 name: self.name,
@@ -97,18 +98,18 @@ impl JmapMailboxQueryCommand {
             if has_one_filter { Some(f) } else { None }
         };
 
-        let sort = Some(vec![MailboxSortComparator {
+        let sort = Some(vec![JmapMailboxSortComparator {
             property: self.sort.into(),
             is_ascending: Some(!self.desc),
         }]);
 
-        let output = client.mailbox_query(
+        let output = client.mailbox_query(JmapMailboxQueryOptions {
             filter,
             sort,
-            Some(self.page.saturating_sub(1) * self.page_size),
-            Some(self.page_size),
-            None,
-        )?;
+            position: Some(self.page.saturating_sub(1) * self.page_size),
+            limit: Some(self.page_size),
+            properties: None,
+        })?;
 
         let table = MailboxesTable {
             preset: account.table_preset().to_string(),
@@ -150,7 +151,7 @@ pub struct MailboxesTable {
     pub preset: String,
     #[serde(skip)]
     pub colors: MailboxColors,
-    pub mailboxes: Vec<Mailbox>,
+    pub mailboxes: Vec<JmapMailbox>,
 }
 
 impl fmt::Display for MailboxesTable {
@@ -222,19 +223,19 @@ impl FromStr for RoleArg {
     }
 }
 
-impl From<RoleArg> for MailboxRole {
+impl From<RoleArg> for JmapMailboxRole {
     fn from(arg: RoleArg) -> Self {
         match arg {
-            RoleArg::Inbox => MailboxRole::Inbox,
-            RoleArg::Archive => MailboxRole::Archive,
-            RoleArg::Drafts => MailboxRole::Drafts,
-            RoleArg::Flagged => MailboxRole::Flagged,
-            RoleArg::Important => MailboxRole::Important,
-            RoleArg::Junk => MailboxRole::Junk,
-            RoleArg::Sent => MailboxRole::Sent,
-            RoleArg::Subscribed => MailboxRole::Subscribed,
-            RoleArg::Trash => MailboxRole::Trash,
-            RoleArg::Other(s) => MailboxRole::Other(s),
+            RoleArg::Inbox => JmapMailboxRole::Inbox,
+            RoleArg::Archive => JmapMailboxRole::Archive,
+            RoleArg::Drafts => JmapMailboxRole::Drafts,
+            RoleArg::Flagged => JmapMailboxRole::Flagged,
+            RoleArg::Important => JmapMailboxRole::Important,
+            RoleArg::Junk => JmapMailboxRole::Junk,
+            RoleArg::Sent => JmapMailboxRole::Sent,
+            RoleArg::Subscribed => JmapMailboxRole::Subscribed,
+            RoleArg::Trash => JmapMailboxRole::Trash,
+            RoleArg::Other(s) => JmapMailboxRole::Other(s),
         }
     }
 }
@@ -258,12 +259,12 @@ impl fmt::Display for SortArg {
     }
 }
 
-impl From<SortArg> for MailboxSortProperty {
+impl From<SortArg> for JmapMailboxSortProperty {
     fn from(arg: SortArg) -> Self {
         match arg {
-            SortArg::Name => MailboxSortProperty::Name,
-            SortArg::SortOrder => MailboxSortProperty::SortOrder,
-            SortArg::ParentId => MailboxSortProperty::ParentId,
+            SortArg::Name => JmapMailboxSortProperty::Name,
+            SortArg::SortOrder => JmapMailboxSortProperty::SortOrder,
+            SortArg::ParentId => JmapMailboxSortProperty::ParentId,
         }
     }
 }

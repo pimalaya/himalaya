@@ -17,6 +17,7 @@
 
 use anyhow::Result;
 use clap::Parser;
+use io_jmap::rfc8621::mailbox::get::JmapMailboxGetOptions;
 use log::warn;
 use pimalaya_cli::printer::Printer;
 
@@ -41,7 +42,10 @@ impl JmapMailboxGetCommand {
         account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
-        let output = client.mailbox_get(Some(self.ids.clone()), None)?;
+        let output = client.mailbox_get(JmapMailboxGetOptions {
+            ids: Some(self.ids.clone()),
+            properties: None,
+        })?;
 
         for id in output.not_found {
             warn!("mailbox `{id}` not found, ignoring it");

@@ -20,7 +20,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
-use io_jmap::rfc8621::identity::Identity;
+use io_jmap::rfc8621::identity::{JmapIdentity, get::JmapIdentityGetOptions};
 use log::warn;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
@@ -46,7 +46,7 @@ impl JmapIdentityGetCommand {
         account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
-        let output = client.identity_get(self.ids)?;
+        let output = client.identity_get(JmapIdentityGetOptions { ids: self.ids })?;
 
         for id in output.not_found {
             warn!("identity `{id}` not found");
@@ -65,7 +65,7 @@ impl JmapIdentityGetCommand {
 pub struct IdentitiesTable {
     #[serde(skip)]
     pub preset: String,
-    pub identities: Vec<Identity>,
+    pub identities: Vec<JmapIdentity>,
 }
 
 impl fmt::Display for IdentitiesTable {

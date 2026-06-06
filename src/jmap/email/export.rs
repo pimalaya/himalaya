@@ -19,7 +19,10 @@ use anyhow::{Result, anyhow};
 use clap::Parser;
 use io_jmap::{
     client::JmapClientStd,
-    rfc8621::{capabilities::MAIL, email::EmailProperty},
+    rfc8621::{
+        MAIL_CAPABILITY,
+        email::{JmapEmailProperty, get::JmapEmailGetOptions},
+    },
 };
 use pimalaya_cli::printer::{Message, Printer};
 use url::Url;
@@ -38,14 +41,19 @@ pub struct JmapEmailExportCommand {
 
 impl JmapEmailExportCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
-        let properties = Some(vec![EmailProperty::Id, EmailProperty::BlobId]);
-        let output = client.email_get(vec![self.id.clone()], properties, false, false, 0)?;
+        let opts = JmapEmailGetOptions {
+            properties: Some(vec![JmapEmailProperty::Id, JmapEmailProperty::BlobId]),
+            fetch_text_body_values: false,
+            fetch_html_body_values: false,
+            max_body_value_bytes: 0,
+        };
+        let output = client.email_get(vec![self.id.clone()], opts)?;
 
         let session = client.session().expect("session loaded by new_jmap_client");
         let api_url = session.api_url.clone();
         let account_id = session
             .primary_accounts
-            .get(MAIL)
+            .get(MAIL_CAPABILITY)
             .map(|s| s.as_str())
             .unwrap_or("");
 

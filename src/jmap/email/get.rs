@@ -43,7 +43,7 @@ impl JmapEmailGetCommand {
         account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
-        let output = client.email_get(self.ids.clone(), None, false, false, 0)?;
+        let output = client.email_get(self.ids.clone(), Default::default())?;
 
         for id in output.not_found {
             warn!("email `{id}` not found, ignoring it");

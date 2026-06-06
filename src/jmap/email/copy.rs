@@ -19,7 +19,7 @@ use std::collections::BTreeMap;
 
 use anyhow::{Result, bail};
 use clap::Parser;
-use io_jmap::rfc8621::email::EmailCopy;
+use io_jmap::rfc8621::email::JmapEmailCopyArgs;
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::jmap::{client::JmapClient, error::format_set_error};
@@ -45,13 +45,13 @@ impl JmapEmailCopyCommand {
         let mailbox_ids: BTreeMap<String, bool> =
             self.mailbox_id.into_iter().map(|m| (m, true)).collect();
 
-        let emails: BTreeMap<String, EmailCopy> = self
+        let emails: BTreeMap<String, JmapEmailCopyArgs> = self
             .ids
             .into_iter()
             .map(|id| {
                 (
                     id.clone(),
-                    EmailCopy {
+                    JmapEmailCopyArgs {
                         id,
                         mailbox_ids: mailbox_ids.clone(),
                         keywords: None,

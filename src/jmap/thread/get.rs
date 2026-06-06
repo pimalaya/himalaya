@@ -20,7 +20,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
-use io_jmap::rfc8621::thread::Thread;
+use io_jmap::rfc8621::thread::JmapThread;
 use log::warn;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
@@ -62,7 +62,7 @@ impl JmapThreadGetCommand {
 pub struct ThreadsTable {
     #[serde(skip)]
     pub preset: String,
-    pub threads: Vec<Thread>,
+    pub threads: Vec<JmapThread>,
 }
 
 impl fmt::Display for ThreadsTable {

@@ -19,7 +19,7 @@ use std::collections::BTreeMap;
 
 use anyhow::{Result, bail};
 use clap::Parser;
-use io_jmap::rfc8621::{mailbox::MailboxUpdate, mailbox_set::JmapMailboxSetArgs};
+use io_jmap::rfc8621::mailbox::{JmapMailboxUpdate, set::JmapMailboxSetArgs};
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::jmap::{client::JmapClient, error::format_set_error, mailbox::query::RoleArg};
@@ -66,7 +66,7 @@ impl JmapMailboxUpdateCommand {
             None
         };
 
-        let patch = MailboxUpdate {
+        let patch = JmapMailboxUpdate {
             name: self.name,
             parent_id: self.parent_id,
             role: self.role.map(Into::into),

@@ -17,6 +17,7 @@
 
 use anyhow::Result;
 use clap::Parser;
+use io_jmap::rfc8621::email_submission::get::JmapEmailSubmissionGetOptions;
 use log::warn;
 use pimalaya_cli::printer::Printer;
 
@@ -38,7 +39,9 @@ impl JmapSubmissionGetCommand {
         account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
-        let output = client.email_submission_get(Some(self.ids.clone()))?;
+        let output = client.email_submission_get(JmapEmailSubmissionGetOptions {
+            ids: Some(self.ids.clone()),
+        })?;
 
         for id in output.not_found {
             warn!("submission `{id}` not found, ignoring it");

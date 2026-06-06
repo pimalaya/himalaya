@@ -20,7 +20,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
-use io_email::mailbox::Mailbox;
+use io_email::mailbox::types::Mailbox;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 

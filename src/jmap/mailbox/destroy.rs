@@ -17,7 +17,7 @@
 
 use anyhow::{Result, bail};
 use clap::Parser;
-use io_jmap::rfc8621::mailbox_set::JmapMailboxSetArgs;
+use io_jmap::rfc8621::mailbox::set::JmapMailboxSetArgs;
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::jmap::{client::JmapClient, error::format_set_error};

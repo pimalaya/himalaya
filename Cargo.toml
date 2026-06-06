@@ -48,12 +48,12 @@ crossterm = { version = "0.29", default-features = false, features = ["serde"] }
 dirs = "6"
 humansize = "2"
 ariadne = "0.6"
-io-email = { version = "0.0.1", default-features = false, features = ["serde", "client", "search"] }
-io-imap = { version = "0.0.1", default-features = false, optional = true }
-io-jmap = { version = "0.0.1", default-features = false, optional = true }
-io-m2dir = { version = "0.0.1", default-features = false, optional = true }
-io-maildir = { version = "0.0.1", default-features = false, optional = true }
-io-smtp = { version = "0.0.1", default-features = false, optional = true }
+io-email = { version = "0.1", default-features = false, features = ["serde", "client", "search"] }
+io-imap = { version = "0.1", default-features = false, optional = true }
+io-jmap = { version = "0.1", default-features = false, optional = true }
+io-m2dir = { version = "0.1", default-features = false, optional = true }
+io-maildir = { version = "0.1", default-features = false, optional = true }
+io-smtp = { version = "0.1", default-features = false, optional = true }
 log = "0.4"
 mail-builder = "0.4"
 mail-parser = { version = "0.11", features = ["serde"], optional = true }
@@ -75,38 +75,6 @@ url = { version = "2.2", features = ["serde"] }
 [target.'cfg(windows)'.dependencies]
 uds_windows = "1"
 
-[dev-dependencies]
-assert_cmd = "2"
-io-jmap = { version = "0.0.1", default-features = false }
-serde = "1"
-serde_json = "1"
-tempfile = "3"
-
-# [patch.crates-io]
-# domain = { git = "https://github.com/soywod/domain", branch = "new-srv" }
-# pimconf.path = "../pimconf"
-# io-email.path = "../io-email"
-# io-http.path = "../io-http"
-# io-imap.path = "../io-imap"
-# io-jmap.path = "../io-jmap"
-# io-m2dir.path = "../io-m2dir"
-# io-maildir.path = "../io-maildir"
-# io-smtp.path = "../io-smtp"
-# pimalaya-cli.path = "../cli"
-# pimalaya-config.path = "../config"
-# pimalaya-stream.path = "../stream"
-
 [patch.crates-io]
-domain = { git = "https://github.com/soywod/domain", branch = "new-srv" }
-imap-codec.git = "https://github.com/soywod/imap-codec"
+domain = { git = "https://github.com/nlnetlabs/domain", rev = "b30087125c13e71010d9783a1bcdd9eb9fa3f336" }
 pimconf.git = "https://github.com/pimalaya/pimconf"
-io-email.git = "https://github.com/pimalaya/io-email"
-io-http.git = "https://github.com/pimalaya/io-http"
-io-imap.git = "https://github.com/pimalaya/io-imap"
-io-jmap.git = "https://github.com/pimalaya/io-jmap"
-io-m2dir.git = "https://github.com/pimalaya/io-m2dir"
-io-maildir.git = "https://github.com/pimalaya/io-maildir"
-io-smtp.git = "https://github.com/pimalaya/io-smtp"
-pimalaya-cli.git = "https://github.com/pimalaya/cli"
-pimalaya-config.git = "https://github.com/pimalaya/config"
-pimalaya-stream.git = "https://github.com/pimalaya/stream"

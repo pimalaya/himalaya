@@ -21,8 +21,11 @@ use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use io_jmap::{
-    rfc8620::filter::Filter,
-    rfc8621::email::{Email, EmailAddress, EmailComparator, EmailFilter, EmailSortProperty},
+    rfc8620::JmapFilter,
+    rfc8621::email::{
+        JmapEmail, JmapEmailAddress, JmapEmailComparator, JmapEmailFilter, JmapEmailSortProperty,
+        query::JmapEmailQueryOptions,
+    },
 };
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
@@ -112,7 +115,7 @@ impl JmapEmailQueryCommand {
         client: &mut JmapClient,
     ) -> Result<()> {
         let filter = {
-            let f = EmailFilter {
+            let f = JmapEmailFilter {
                 in_mailbox: self.mailbox,
                 before: self.before,
                 after: self.after,
@@ -148,26 +151,26 @@ impl JmapEmailQueryCommand {
                 || f.body.is_some();
 
             if has_one_filter {
-                Some(Filter::from(f))
+                Some(JmapFilter::from(f))
             } else {
                 None
             }
         };
 
-        let sort = Some(vec![EmailComparator {
+        let sort = Some(vec![JmapEmailComparator {
             property: self.sort.into(),
             is_ascending: Some(!self.desc),
             collation: None,
             keyword: None,
         }]);
 
-        let output = client.email_query(
+        let output = client.email_query(JmapEmailQueryOptions {
             filter,
             sort,
-            Some(self.page.saturating_sub(1) * self.page_size),
-            Some(self.page_size),
-            None,
-        )?;
+            position: Some(self.page.saturating_sub(1) * self.page_size),
+            limit: Some(self.page_size),
+            properties: None,
+        })?;
 
         let table = EmailsTable {
             preset: account.table_preset().to_string(),
@@ -217,7 +220,7 @@ pub struct EmailsTable {
     pub colors: EmailsColors,
     #[serde(skip)]
     pub chars: EmailsChars,
-    pub emails: Vec<Email>,
+    pub emails: Vec<JmapEmail>,
 }
 
 impl fmt::Display for EmailsTable {
@@ -292,21 +295,21 @@ impl fmt::Display for SortArg {
     }
 }
 
-impl From<SortArg> for EmailSortProperty {
+impl From<SortArg> for JmapEmailSortProperty {
     fn from(arg: SortArg) -> Self {
         match arg {
-            SortArg::ReceivedAt => EmailSortProperty::ReceivedAt,
-            SortArg::SentAt => EmailSortProperty::SentAt,
-            SortArg::Size => EmailSortProperty::Size,
-            SortArg::From => EmailSortProperty::From,
-            SortArg::To => EmailSortProperty::To,
-            SortArg::Subject => EmailSortProperty::Subject,
-            SortArg::HasAttachment => EmailSortProperty::HasAttachment,
+            SortArg::ReceivedAt => JmapEmailSortProperty::ReceivedAt,
+            SortArg::SentAt => JmapEmailSortProperty::SentAt,
+            SortArg::Size => JmapEmailSortProperty::Size,
+            SortArg::From => JmapEmailSortProperty::From,
+            SortArg::To => JmapEmailSortProperty::To,
+            SortArg::Subject => JmapEmailSortProperty::Subject,
+            SortArg::HasAttachment => JmapEmailSortProperty::HasAttachment,
         }
     }
 }
 
-fn format_addresses(addrs: &[EmailAddress]) -> String {
+fn format_addresses(addrs: &[JmapEmailAddress]) -> String {
     addrs
         .iter()
         .map(|a| {

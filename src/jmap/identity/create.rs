@@ -17,7 +17,7 @@
 
 use anyhow::{Result, bail};
 use clap::Parser;
-use io_jmap::rfc8621::{identity::IdentityCreate, identity_set::JmapIdentitySetArgs};
+use io_jmap::rfc8621::identity::{JmapIdentityCreate, set::JmapIdentitySetArgs};
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::jmap::{client::JmapClient, error::format_set_error};
@@ -42,7 +42,7 @@ pub struct JmapIdentityCreateCommand {
 
 impl JmapIdentityCreateCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
-        let identity = IdentityCreate {
+        let identity = JmapIdentityCreate {
             name: self.name.clone(),
             email: self.email.clone(),
             reply_to: None,

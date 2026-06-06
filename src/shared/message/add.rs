@@ -19,7 +19,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use io_email::flag::Flag;
+use io_email::flag::types::Flag;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 

@@ -17,7 +17,7 @@
 
 use anyhow::Result;
 use clap::Parser;
-use io_m2dir::flag::M2dirFlags;
+use io_m2dir::flag::types::M2dirFlags;
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::m2dir::{

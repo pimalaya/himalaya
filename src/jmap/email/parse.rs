@@ -36,7 +36,7 @@ pub struct JmapEmailParseCommand {
 
 impl JmapEmailParseCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
-        let output = client.email_parse(self.blob_ids.clone(), None)?;
+        let output = client.email_parse(self.blob_ids.clone(), Default::default())?;
 
         for id in output.not_found {
             warn!("blob `{id}` not found, ignoring it");

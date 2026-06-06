@@ -20,7 +20,7 @@ use std::collections::BTreeMap;
 use anyhow::{Result, bail};
 use clap::Parser;
 use io_jmap::rfc8621::email_submission::{
-    EmailAddressWithParameters, EmailSubmissionCreate, Envelope,
+    JmapEmailAddressWithParameters, JmapEmailSubmissionCreate, JmapEnvelope,
 };
 use pimalaya_cli::printer::Printer;
 
@@ -63,13 +63,13 @@ impl JmapSubmissionCreateCommand {
             let rcpt_to = self
                 .rcpt_to
                 .into_iter()
-                .map(|addr| EmailAddressWithParameters {
+                .map(|addr| JmapEmailAddressWithParameters {
                     email: addr,
                     parameters: None,
                 })
                 .collect();
-            Some(Envelope {
-                mail_from: EmailAddressWithParameters {
+            Some(JmapEnvelope {
+                mail_from: JmapEmailAddressWithParameters {
                     email: mail_from_addr,
                     parameters: None,
                 },
@@ -79,7 +79,7 @@ impl JmapSubmissionCreateCommand {
             None
         };
 
-        let submission = EmailSubmissionCreate {
+        let submission = JmapEmailSubmissionCreate {
             identity_id: self.identity_id,
             email_id: self.email_id.clone(),
             envelope,

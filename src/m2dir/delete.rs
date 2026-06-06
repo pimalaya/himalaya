@@ -32,7 +32,7 @@ impl M2dirMailboxDeleteCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut M2dirClient) -> Result<()> {
         let store = client.open_store()?;
         let path = store.resolve_folder_path(&self.m2dir_name.inner)?;
-        client.delete_mailbox(path)?;
+        client.delete_m2dir(path)?;
         printer.out(Message::new("m2dir folder successfully deleted"))
     }
 }

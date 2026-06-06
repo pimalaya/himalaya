@@ -19,7 +19,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use io_m2dir::flag::M2dirFlags;
+use io_m2dir::flag::types::M2dirFlags;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
