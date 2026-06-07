@@ -28,7 +28,7 @@ use std::{
 };
 
 use anyhow::{Result, anyhow};
-use io_maildir::{client::MaildirClient as Inner, maildir::Maildir};
+use io_maildir::{client::MaildirClient as Inner, maildir::types::Maildir};
 use pimalaya_config::toml::TomlConfig;
 
 use crate::{account::context::Account, cli::load_or_wizard, config::MaildirConfig};

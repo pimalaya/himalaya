@@ -16,7 +16,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use clap::ValueEnum;
-use io_maildir::flag::MaildirFlag;
+use io_maildir::flag::types::MaildirFlag;
 
 #[derive(Clone, Debug, ValueEnum)]
 #[clap(rename_all = "kebab-case")]

@@ -72,9 +72,9 @@ impl FlagArg {
 }
 
 #[cfg(feature = "maildir")]
-impl From<&FlagArg> for io_maildir::flag::MaildirFlag {
+impl From<&FlagArg> for io_maildir::flag::types::MaildirFlag {
     fn from(flag: &FlagArg) -> Self {
-        use io_maildir::flag::MaildirFlag;
+        use io_maildir::flag::types::MaildirFlag;
 
         match flag {
             FlagArg::Seen => MaildirFlag::Seen,

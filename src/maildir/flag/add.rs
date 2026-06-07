@@ -17,7 +17,7 @@
 
 use anyhow::Result;
 use clap::Parser;
-use io_maildir::flag::MaildirFlags;
+use io_maildir::flag::types::MaildirFlags;
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::maildir::{

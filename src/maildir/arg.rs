@@ -18,7 +18,7 @@
 use std::path::PathBuf;
 
 use clap::{Parser, ValueEnum};
-use io_maildir::maildir::MaildirSubdir;
+use io_maildir::maildir::types::MaildirSubdir;
 
 const INBOX: &str = "Inbox";
 
