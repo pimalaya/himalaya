@@ -1,20 +1,3 @@
-// This file is part of Himalaya, a CLI to manage emails.
-//
-// Copyright (C) 2022-2026 soywod <pimalaya.org@posteo.net>
-//
-// This program is free software: you can redistribute it and/or modify it under
-// the terms of the GNU Affero General Public License as published by the Free
-// Software Foundation, either version 3 of the License, or (at your option) any
-// later version.
-//
-// This program is distributed in the hope that it will be useful, but WITHOUT
-// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-// FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
-// details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 //! RFC 6186 SRV step of the wizard's discovery chain. Runs the three
 //! `_imap._tcp` / `_imaps._tcp` / `_submission._tcp` lookups under
 //! one spinner and assembles them into a [`DiscoveryResult`].

@@ -34,6 +34,7 @@
   - [Re-using sessions](#re-using-sessions)
 - [Interfaces](#interfaces)
 - [FAQ](#faq)
+- [License](#license)
 - [AI disclosure](#ai-disclosure)
 - [Social](#social)
 - [Sponsoring](#sponsoring)
@@ -336,6 +337,15 @@ Himalaya CLI is one of several front-ends to the Pimalaya libraries:
 
   Set `NO_COLOR=1` in your environment.
 </details>
+
+## License
+
+This project is licensed under either of:
+
+- [MIT license](LICENSE-MIT)
+- [Apache License, Version 2.0](LICENSE-APACHE)
+
+at your option.
 
 ## AI disclosure
 
