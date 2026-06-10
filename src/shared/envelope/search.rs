@@ -79,13 +79,30 @@ impl EnvelopeSearchCommand {
         let mailbox = self.mailbox.resolve(account)?;
         let query = parse_query(self.query.as_deref());
 
-        let envelopes = client.search_envelopes(
+        let envelopes = match client.search_envelopes(
             &mailbox,
             query.as_ref(),
             page,
             page_size,
             self.has_attachment,
-        )?;
+        ) {
+            // Servers without the SORT capability (e.g. Gmail) reject
+            // the UID SORT the shared search is built on; rerun as a
+            // plain UID SEARCH on the same session.
+            #[cfg(feature = "imap")]
+            Err(err) if super::search_fallback::applies(&err) && client.imap.is_some() => {
+                let imap = client.imap.as_mut().expect("checked in guard");
+                super::search_fallback::search(
+                    imap,
+                    &mailbox,
+                    query.as_ref(),
+                    page,
+                    page_size,
+                    self.has_attachment,
+                )?
+            }
+            res => res?,
+        };
 
         let envelopes = Envelopes {
             preset: account.table_preset().to_string(),
