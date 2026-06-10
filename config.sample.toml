@@ -120,6 +120,13 @@
 #mailbox.alias.drafts = "[Gmail]/Drafts"
 #mailbox.alias.trash = "[Gmail]/Trash"
 
+# Gmail notes: every Gmail label shows up as a top-level IMAP mailbox, and the
+# special mailboxes live under the `[Gmail]/` prefix — quote them in the shell
+# (`-m "[Gmail]/Drafts"`) or reach them through an alias. The archive
+# containing every message is `[Gmail]/All Mail`; aliasing it makes "search
+# everything" one flag away (`himalaya envelope search -m archive ...`):
+#mailbox.alias.archive = "[Gmail]/All Mail"
+
 # --------------------------------------------------------------------------------
 # Account config
 # --------------------------------------------------------------------------------
@@ -180,6 +187,10 @@ imap.server = "example.com"
 
 # SASL PLAIN
 # https://datatracker.ietf.org/doc/html/rfc4616
+#
+# Gmail does not accept the account password over SASL PLAIN: generate an app
+# password (https://myaccount.google.com/apppasswords, requires 2-step
+# verification) and feed it through `password.command` or `password.raw`.
 imap.sasl.plain.username = "user@example.com"
 imap.sasl.plain.password.raw = "***"
 #imap.sasl.plain.password.command = "pass show example"
