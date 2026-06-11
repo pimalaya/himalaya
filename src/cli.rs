@@ -71,15 +71,15 @@ pub struct Cli {
 pub enum Command {
     // --- Shared API
     //
-    #[command(subcommand, visible_alias = "mbox")]
+    #[command(subcommand, visible_alias = "mbox", alias = "mailboxes")]
     Mailbox(MailboxCommand),
-    #[command(subcommand)]
+    #[command(subcommand, alias = "envelopes")]
     Envelope(EnvelopeCommand),
-    #[command(subcommand)]
+    #[command(subcommand, alias = "flags")]
     Flag(FlagCommand),
-    #[command(subcommand, visible_alias = "msg")]
+    #[command(subcommand, visible_alias = "msg", alias = "messages")]
     Message(MessageCommand),
-    #[command(subcommand)]
+    #[command(subcommand, alias = "attachments")]
     Attachment(AttachmentCommand),
 
     // --- Protocol-specific APIs

@@ -360,7 +360,7 @@ impl From<Config> for Account {
             mailboxes_list_table: config.mailbox.list.table,
             attachments_list_table: config.attachment.list.table,
 
-            mailbox_alias: lowercase_alias_keys(config.mailbox.alias),
+            mailbox_alias: lowercase_alias_keys(config.mailbox.aliases),
         }
     }
 }
@@ -380,7 +380,7 @@ impl From<AccountConfig> for Account {
             mailboxes_list_table: config.mailbox.list.table,
             attachments_list_table: config.attachment.list.table,
 
-            mailbox_alias: lowercase_alias_keys(config.mailbox.alias),
+            mailbox_alias: lowercase_alias_keys(config.mailbox.aliases),
         }
     }
 }
@@ -391,13 +391,13 @@ mod tests {
     use crate::config::MailboxConfig;
 
     fn account_with_aliases(pairs: &[(&str, &str)]) -> Account {
-        let alias = pairs
+        let aliases = pairs
             .iter()
             .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
             .collect();
         let config = Config {
             mailbox: MailboxConfig {
-                alias,
+                aliases,
                 ..MailboxConfig::default()
             },
             ..Config::default()
