@@ -133,8 +133,8 @@ pub struct EnvelopeConfig {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MailboxConfig {
-    #[serde(default, alias = "aliases")]
-    pub alias: HashMap<String, String>,
+    #[serde(default, rename = "alias", alias = "aliases")]
+    pub aliases: HashMap<String, String>,
 
     #[serde(default)]
     pub list: MailboxListConfig,
