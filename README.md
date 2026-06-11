@@ -26,6 +26,7 @@
   - [Nix](#nix)
   - [Sources](#sources)
 - [Configuration](#configuration)
+  - [Gmail](#gmail)
 - [Usage](#usage)
   - [Shared API](#shared-api)
   - [Protocol-specific APIs](#protocol-specific-apis)
@@ -184,6 +185,31 @@ These are the same paths the [himalaya-tui](https://github.com/pimalaya/himalaya
 Override the path with `-c <PATH>`; multiple paths can be passed at once, separated by `:`. The first one is the base and the rest are deep-merged on top.
 
 Accounts can be (re)configured later with `himalaya account configure <name>`. The wizard skips discovery in this mode: it reuses the existing values as prompt defaults.
+
+### Gmail
+
+Gmail rejects the account password over SASL PLAIN: generate an [app password](https://myaccount.google.com/apppasswords) (requires 2-step verification) and feed it through `password.command` or `password.raw`.
+
+```toml
+[accounts.gmail]
+default = true
+
+imap.server = "imaps://imap.gmail.com:993"
+imap.sasl.plain.username = "example@gmail.com"
+imap.sasl.plain.password.command = "pass show gmail"
+
+smtp.server = "smtps://smtp.gmail.com:465"
+smtp.sasl.plain.username = "example@gmail.com"
+smtp.sasl.plain.password.command = "pass show gmail"
+
+mailbox.alias.inbox = "INBOX"
+mailbox.alias.sent = "[Gmail]/Sent Mail"
+mailbox.alias.drafts = "[Gmail]/Drafts"
+mailbox.alias.trash = "[Gmail]/Trash"
+mailbox.alias.archive = "[Gmail]/All Mail"
+```
+
+Every Gmail label shows up as a top-level IMAP mailbox, and the special mailboxes live under the `[Gmail]/` prefix — quote them in the shell (`-m "[Gmail]/Drafts"`) or reach them through an alias. `[Gmail]/All Mail` is the archive containing every message: aliasing it makes "search everything" one flag away (`himalaya envelope search -m archive ...`).
 
 ## Usage
 
