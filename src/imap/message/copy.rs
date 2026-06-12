@@ -1,6 +1,9 @@
 use anyhow::Result;
 use clap::Parser;
-use io_imap::types::mailbox::Mailbox;
+use io_imap::{
+    rfc3501::{copy::ImapMessageCopyOptions, select::ImapMailboxSelectOptions},
+    types::mailbox::Mailbox,
+};
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::imap::{
@@ -35,13 +38,17 @@ impl ImapMessageCopyCommand {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         if !self.mailbox_no_select.inner {
-            client.select(mailbox)?;
+            client.select(mailbox, ImapMailboxSelectOptions::default())?;
         }
 
         let sequence_set = self.sequence_set.as_str().try_into()?;
         let destination: Mailbox = self.mailbox_dest_name.inner.try_into()?;
 
-        client.copy(sequence_set, destination, !self.seq)?;
+        client.copy(
+            sequence_set,
+            destination,
+            ImapMessageCopyOptions { uid: !self.seq },
+        )?;
 
         printer.out(Message::new("Message(s) successfully copied"))
     }

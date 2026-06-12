@@ -3,9 +3,13 @@ use std::fmt;
 use anyhow::{Result, bail};
 use clap::Parser;
 use comfy_table::{Cell, Color, ContentArrangement, Row, Table, presets};
-use io_imap::types::{
-    core::Vec1,
-    extensions::sort::{SortCriterion, SortKey},
+use io_imap::{
+    rfc3501::select::ImapMailboxSelectOptions,
+    rfc5256::sort::ImapMessageSortOptions,
+    types::{
+        core::Vec1,
+        extensions::sort::{SortCriterion, SortKey},
+    },
 };
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
@@ -60,7 +64,7 @@ impl ImapEnvelopeSortCommand {
     ) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        client.select(mailbox)?;
+        client.select(mailbox, ImapMailboxSelectOptions::default())?;
 
         let sort_key = parse_sort_key(&self.sort)?;
         let sort_criteria = Vec1::unvalidated(vec![SortCriterion {
@@ -69,7 +73,15 @@ impl ImapEnvelopeSortCommand {
         }]);
         let search_criteria = parse_query(&self.query)?;
 
-        let ids = client.sort(sort_criteria, search_criteria, !self.seq)?;
+        let fallback = client.sort_fallback();
+        let ids = client.sort(
+            sort_criteria,
+            search_criteria,
+            ImapMessageSortOptions {
+                uid: !self.seq,
+                fallback,
+            },
+        )?;
 
         let id_color = account.envelopes_list_table_id_color();
         let table = SortResultsTable::new(ids, !self.seq, id_color);

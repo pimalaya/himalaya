@@ -3,12 +3,15 @@ use std::{collections::BTreeMap, fmt, num::NonZeroU32};
 use anyhow::{Result, bail};
 use clap::Parser;
 use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
-use io_imap::types::{
-    core::Vec1,
-    envelope::Address,
-    fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
-    sequence::{SeqOrUid, Sequence, SequenceSet},
-    status::{StatusDataItem, StatusDataItemName},
+use io_imap::{
+    rfc3501::{fetch::ImapMessageFetchOptions, select::ImapMailboxSelectOptions},
+    types::{
+        core::Vec1,
+        envelope::Address,
+        fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
+        sequence::{SeqOrUid, Sequence, SequenceSet},
+        status::{StatusDataItem, StatusDataItemName},
+    },
 };
 use log::debug;
 use pimalaya_cli::printer::Printer;
@@ -66,7 +69,9 @@ impl ImapEnvelopeListCommand {
                 _ => None,
             })
         } else {
-            client.select(mailbox)?.exists
+            client
+                .select(mailbox, ImapMailboxSelectOptions::default())?
+                .exists
         };
 
         let mut has_sequence = false;
@@ -86,7 +91,14 @@ impl ImapEnvelopeListCommand {
             MessageDataItemName::Envelope,
         ]);
 
-        let data = client.fetch(sequence_set, item_names, !self.sequence && has_sequence)?;
+        let data = client.fetch(
+            sequence_set,
+            item_names,
+            ImapMessageFetchOptions {
+                uid: !self.sequence && has_sequence,
+                modifiers: Vec::new(),
+            },
+        )?;
 
         let table = EnvelopesTable {
             preset: account.table_preset().to_string(),

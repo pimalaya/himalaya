@@ -314,24 +314,38 @@ pub struct ImapConfig {
     #[serde(default)]
     pub starttls: bool,
 
-    /// ALPN protocol identifiers offered during the TLS handshake.
-    /// Defaults to `["imap"]` (RFC 7595, IANA registry). Set to `[]`
-    /// to skip ALPN negotiation entirely. Only relevant for the
-    /// rustls provider; `native-tls` ignores ALPN.
+    /// ALPN protocol identifiers offered during the TLS handshake.  Defaults to
+    /// `["imap"]` (RFC 7595, IANA registry). Set to `[]` to skip ALPN
+    /// negotiation entirely. Only relevant for the rustls provider;
+    /// `native-tls` ignores ALPN.
     #[serde(default = "io_imap::client::default_alpn")]
     pub alpn: Vec<String>,
 
     /// Optional SASL credentials. When omitted, the connection skips
-    /// authentication entirely (no `AUTHENTICATE` command is sent);
-    /// to advertise the ANONYMOUS mechanism explicitly, set
-    /// `sasl.anonymous = {}`.
+    /// authentication entirely (no `AUTHENTICATE` command is sent); to
+    /// advertise the ANONYMOUS mechanism explicitly, set `sasl.anonymous = {}`.
     pub sasl: Option<SaslConfig>,
 
-    /// RFC 2971 `ID` extension quirks. Some providers (notably
-    /// mail.qq.com, fastmail) require an `ID` exchange straight after
-    /// authentication; set `id.auto = true` to opt in.
+    /// RFC 2971 `ID` extension quirks. Some providers (notably mail.qq.com,
+    /// fastmail) require an `ID` exchange straight after authentication; set
+    /// `id.auto = true` to opt in.
     #[serde(default)]
     pub id: ImapIdConfig,
+
+    /// RFC 5256 `SORT` extension config.
+    #[serde(default)]
+    pub sort: ImapSortConfig,
+}
+
+/// Per-account `imap.sort.*` options.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct ImapSortConfig {
+    /// Forces the SORT fallback on or off. `Some(true)` always sorts
+    /// client-side via SEARCH + FETCH; `Some(false)` always issues a server
+    /// `SORT`. Left unset, the fallback is enabled only when the server lacks
+    /// the SORT capability.
+    pub fallback: Option<bool>,
 }
 
 /// Per-account `imap.id.*` quirks.

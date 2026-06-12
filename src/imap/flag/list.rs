@@ -3,7 +3,10 @@ use std::{collections::BTreeMap, fmt};
 use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, Row, Table};
-use io_imap::types::flag::{Flag, FlagPerm};
+use io_imap::{
+    rfc3501::select::ImapMailboxSelectOptions,
+    types::flag::{Flag, FlagPerm},
+};
 use pimalaya_cli::printer::Printer;
 use serde::{Serialize, Serializer};
 
@@ -30,7 +33,7 @@ impl ImapFlagListCommand {
     ) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        let data = client.select(mailbox)?;
+        let data = client.select(mailbox, ImapMailboxSelectOptions::default())?;
         let flags = data.flags.unwrap_or_default();
         let permanent_flags = data.permanent_flags.unwrap_or_default();
 

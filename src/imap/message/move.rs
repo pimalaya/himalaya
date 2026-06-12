@@ -1,6 +1,9 @@
 use anyhow::Result;
 use clap::Parser;
-use io_imap::types::mailbox::Mailbox;
+use io_imap::{
+    rfc3501::select::ImapMailboxSelectOptions, rfc6851::r#move::ImapMessageMoveOptions,
+    types::mailbox::Mailbox,
+};
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::imap::{
@@ -36,13 +39,17 @@ impl ImapMessageMoveCommand {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         if !self.mailbox_no_select.inner {
-            client.select(mailbox)?;
+            client.select(mailbox, ImapMailboxSelectOptions::default())?;
         }
 
         let sequence_set = self.sequence_set.as_str().try_into()?;
         let destination: Mailbox<'static> = self.mailbox_dest_name.inner.try_into()?;
 
-        client.r#move(sequence_set, destination, !self.seq)?;
+        client.r#move(
+            sequence_set,
+            destination,
+            ImapMessageMoveOptions { uid: !self.seq },
+        )?;
 
         printer.out(Message::new("Message(s) successfully moved"))
     }

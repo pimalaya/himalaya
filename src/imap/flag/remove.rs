@@ -1,8 +1,11 @@
 use anyhow::Result;
 use clap::Parser;
-use io_imap::types::{
-    IntoStatic,
-    flag::{Flag, StoreType},
+use io_imap::{
+    rfc3501::{select::ImapMailboxSelectOptions, store::ImapMessageStoreOptions},
+    types::{
+        IntoStatic,
+        flag::{Flag, StoreType},
+    },
 };
 use pimalaya_cli::printer::{Message, Printer};
 
@@ -39,7 +42,7 @@ impl ImapFlagRemoveCommand {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         if !self.mailbox_no_select.inner {
-            client.select(mailbox)?;
+            client.select(mailbox, ImapMailboxSelectOptions::default())?;
         }
 
         let sequence_set = self.sequence_set.as_str().try_into()?;
@@ -49,7 +52,12 @@ impl ImapFlagRemoveCommand {
             .map(|f| Flag::try_from(f.as_str()).map(|flag| flag.into_static()))
             .collect::<Result<_, _>>()?;
 
-        client.store(sequence_set, StoreType::Remove, flags, !self.seq)?;
+        client.store(
+            sequence_set,
+            StoreType::Remove,
+            flags,
+            ImapMessageStoreOptions { uid: !self.seq },
+        )?;
 
         printer.out(Message::new("Flag(s) successfully removed"))
     }

@@ -1,7 +1,8 @@
 use anyhow::Result;
 use clap::Parser;
-use io_imap::types::{
-    IntoStatic, core::Literal, extensions::binary::LiteralOrLiteral8, flag::Flag, mailbox::Mailbox,
+use io_imap::{
+    rfc3501::append::ImapMessageAppendOptions,
+    types::{IntoStatic, flag::Flag, mailbox::Mailbox},
 };
 use pimalaya_cli::printer::{Message, Printer};
 
@@ -32,17 +33,23 @@ impl ImapMessageSaveCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         let mailbox: Mailbox<'static> = self.mailbox.inner.try_into()?;
         let message = self.message.parse()?;
-        let message = Literal::try_from(message)?;
-        let message = LiteralOrLiteral8::Literal(message);
 
-        let flags: Vec<_> = self
+        let flags: Vec<Flag<'static>> = self
             .flag
             .iter()
             .map(String::as_str)
             .map(|f| Flag::try_from(f).map(IntoStatic::into_static))
             .collect::<Result<_, _>>()?;
 
-        client.append(mailbox, flags, None, message)?;
+        client.append(
+            mailbox,
+            message.as_bytes(),
+            ImapMessageAppendOptions {
+                flags,
+                date: None,
+                non_sync: false,
+            },
+        )?;
 
         printer.out(Message::new("Message successfully saved"))
     }

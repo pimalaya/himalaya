@@ -217,6 +217,12 @@ imap.sasl.plain.password.raw = "***"
 # a warning. `false` always sends NIL. An empty map sends `ID NIL`.
 #imap.id.fields = { name = true, version = true, vendor = true, support-url = true }
 
+# RFC 5256 SORT fallback. When the server lacks the SORT capability, himalaya
+# sorts client-side via SEARCH + FETCH. Leave unset to follow the capability;
+# set `true` to always sort client-side, or `false` to always issue a server SORT.
+# https://www.rfc-editor.org/rfc/rfc5256.html
+#imap.sort.fallback = false
+
 # --------------------------------------------------------------------------------
 # JMAP config
 # https://www.iana.org/go/rfc8620

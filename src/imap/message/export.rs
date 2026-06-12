@@ -6,7 +6,10 @@ use std::{
 
 use anyhow::{Result, bail};
 use clap::Parser;
-use io_imap::types::fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName};
+use io_imap::{
+    rfc3501::{fetch::ImapMessageFetchOptions, select::ImapMailboxSelectOptions},
+    types::fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
+};
 use mail_parser::{MessageParser, MimeHeaders};
 use pimalaya_cli::printer::{Message, Printer};
 
@@ -65,7 +68,7 @@ impl ImapMessageExportCommand {
     ) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        client.select(mailbox)?;
+        client.select(mailbox, ImapMailboxSelectOptions::default())?;
 
         if self.id == 0 {
             bail!("Export message error: ID must be non-zero");
@@ -79,7 +82,14 @@ impl ImapMessageExportCommand {
             }]);
 
         let sequence_set = self.id.to_string().parse()?;
-        let mut data = client.fetch(sequence_set, item_names, !self.seq)?;
+        let mut data = client.fetch(
+            sequence_set,
+            item_names,
+            ImapMessageFetchOptions {
+                uid: !self.seq,
+                modifiers: Vec::new(),
+            },
+        )?;
 
         let Some((_, items)) = data.pop_first() else {
             bail!(

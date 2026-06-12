@@ -2,10 +2,14 @@ use std::{collections::HashMap, fmt, num::NonZeroU32};
 
 use anyhow::{Result, bail};
 use clap::Parser;
-use io_imap::types::{
-    extensions::thread::{Thread, ThreadingAlgorithm},
-    fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
-    sequence::SequenceSet,
+use io_imap::{
+    rfc3501::{fetch::ImapMessageFetchOptions, select::ImapMailboxSelectOptions},
+    rfc5256::thread::ImapMessageThreadOptions,
+    types::{
+        extensions::thread::{Thread, ThreadingAlgorithm},
+        fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
+        sequence::SequenceSet,
+    },
 };
 use pimalaya_cli::printer::Printer;
 use serde::{Serialize, Serializer, ser::SerializeStruct};
@@ -49,13 +53,17 @@ impl ImapEnvelopeThreadCommand {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         if !self.mailbox_no_select.inner {
-            client.select(mailbox)?;
+            client.select(mailbox, ImapMailboxSelectOptions::default())?;
         }
 
         let algorithm = parse_algorithm(&self.algorithm)?;
         let search_criteria = parse_query(&self.query)?;
 
-        let threads = client.thread(algorithm, search_criteria, !self.seq)?;
+        let threads = client.thread(
+            algorithm,
+            search_criteria,
+            ImapMessageThreadOptions { uid: !self.seq },
+        )?;
 
         let all_ids = collect_thread_ids(&threads);
         let subjects = if !all_ids.is_empty() {
@@ -127,7 +135,14 @@ fn fetch_subjects(
         MessageDataItemName::Uid,
     ]);
 
-    let data = client.fetch(sequence_set, item_names, uid)?;
+    let data = client.fetch(
+        sequence_set,
+        item_names,
+        ImapMessageFetchOptions {
+            uid,
+            modifiers: Vec::new(),
+        },
+    )?;
 
     let mut subjects: HashMap<u32, String> = HashMap::new();
 

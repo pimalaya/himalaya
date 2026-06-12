@@ -11,7 +11,7 @@ use std::{
 };
 
 use anyhow::{Result, anyhow};
-use io_imap::client::ImapClientStd as Inner;
+use io_imap::{client::ImapClientStd as Inner, has_imap_capability, types::response::Capability};
 use pimalaya_config::toml::TomlConfig;
 use pimalaya_stream::sasl::Sasl;
 use url::Url;
@@ -23,14 +23,16 @@ use crate::{
 
 pub struct ImapClient {
     inner: Inner,
+    capabilities: Vec<Capability<'static>>,
+    sort_fallback: Option<bool>,
 }
 
 impl ImapClient {
-    /// Opens the IMAP connection (TCP/TLS/STARTTLS, greeting, SASL).
-    /// The capability list reported by the connect handshake is
-    /// discarded; IMAP-specific subcommands that need it should call
-    /// [`Inner::capability`] explicitly.
+    /// Opens the IMAP connection (TCP/TLS/STARTTLS, greeting, SASL),
+    /// caching the capability list reported by the handshake and the
+    /// `imap.sort.fallback` config override for later policy checks.
     pub fn new(config: ImapConfig) -> Result<Self> {
+        let sort_fallback = config.sort.fallback;
         let tls = config.tls.into_tls(config.alpn);
         let auto_id = resolve_auto_id_params(&config.id)?;
         let server = parse_imap_server(&config.server)?;
@@ -42,8 +44,21 @@ impl ImapClient {
                 Some(cfg.try_into_sasl(host, port))
             })
             .transpose()?;
-        let (inner, _capability) = Inner::connect(&server, &tls, config.starttls, sasl, auto_id)?;
-        Ok(Self { inner })
+        let (inner, capabilities) = Inner::connect(&server, &tls, config.starttls, sasl, auto_id)?;
+        Ok(Self {
+            inner,
+            capabilities,
+            sort_fallback,
+        })
+    }
+
+    /// Resolves the SORT fallback policy: the `imap.sort.fallback`
+    /// config override when set, otherwise on only when the server
+    /// lacks the SORT capability. When `true`, sort client-side via
+    /// SEARCH + FETCH instead of issuing a server `SORT`.
+    pub fn sort_fallback(&self) -> bool {
+        self.sort_fallback
+            .unwrap_or_else(|| !has_imap_capability!(self.capabilities, Sort(_)))
     }
 }
 

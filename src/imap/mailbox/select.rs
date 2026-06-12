@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use io_imap::rfc3501::select::ImapMailboxSelectOptions;
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::imap::{client::ImapClient, mailbox::arg::MailboxNameArg};
@@ -21,7 +22,7 @@ pub struct ImapMailboxSelectCommand {
 impl ImapMailboxSelectCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
-        client.select(mailbox)?;
+        client.select(mailbox, ImapMailboxSelectOptions::default())?;
         printer.out(Message::new("Mailbox successfully selected"))
     }
 }

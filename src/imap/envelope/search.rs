@@ -3,10 +3,13 @@ use std::fmt;
 use anyhow::{Result, anyhow, bail};
 use clap::Parser;
 use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
-use io_imap::types::{
-    core::{AString, Vec1},
-    datetime::NaiveDate,
-    search::SearchKey,
+use io_imap::{
+    rfc3501::{search::ImapMessageSearchOptions, select::ImapMailboxSelectOptions},
+    types::{
+        core::{AString, Vec1},
+        datetime::NaiveDate,
+        search::SearchKey,
+    },
 };
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
@@ -68,11 +71,11 @@ impl ImapEnvelopeSearchCommand {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         if !self.mailbox_no_select.inner {
-            client.select(mailbox)?;
+            client.select(mailbox, ImapMailboxSelectOptions::default())?;
         }
 
         let criteria = parse_query(&self.query)?;
-        let ids = client.search(criteria, !self.seq)?;
+        let ids = client.search(criteria, ImapMessageSearchOptions { uid: !self.seq })?;
 
         let table = SearchTable {
             preset: account.table_preset().to_string(),

@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use io_imap::rfc3501::select::ImapMailboxSelectOptions;
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::imap::{
@@ -24,7 +25,7 @@ impl ImapMailboxExpungeCommand {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         if !self.mailbox_no_select.inner {
-            client.select(mailbox)?;
+            client.select(mailbox, ImapMailboxSelectOptions::default())?;
         }
 
         client.expunge()?;

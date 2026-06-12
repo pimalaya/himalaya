@@ -3,7 +3,10 @@ use std::fmt;
 use anyhow::{Result, bail};
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, Row, Table, presets};
-use io_imap::types::fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName};
+use io_imap::{
+    rfc3501::{fetch::ImapMessageFetchOptions, select::ImapMailboxSelectOptions},
+    types::fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
+};
 use mail_parser::{Addr, Address, ContentType, Message, MessageParser, MimeHeaders};
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
@@ -36,7 +39,7 @@ impl ImapMessageGetCommand {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         if !self.mailbox_no_select.inner {
-            client.select(mailbox)?;
+            client.select(mailbox, ImapMailboxSelectOptions::default())?;
         }
 
         let item_names =
@@ -47,7 +50,14 @@ impl ImapMessageGetCommand {
             }]);
 
         let sequence_set = self.id.parse()?;
-        let mut data = client.fetch(sequence_set, item_names, !self.seq)?;
+        let mut data = client.fetch(
+            sequence_set,
+            item_names,
+            ImapMessageFetchOptions {
+                uid: !self.seq,
+                modifiers: Vec::new(),
+            },
+        )?;
 
         let Some((_, items)) = data.pop_first() else {
             bail!("Get message `{}` error: no message data returned", self.id);

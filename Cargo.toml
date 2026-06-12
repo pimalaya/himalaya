@@ -77,4 +77,6 @@ uds_windows = "1"
 
 [patch.crates-io]
 domain = { git = "https://github.com/nlnetlabs/domain", rev = "b30087125c13e71010d9783a1bcdd9eb9fa3f336" }
+io-email.git = "https://github.com/pimalaya/io-email"
+io-imap.git = "https://github.com/pimalaya/io-imap"
 pimconf.git = "https://github.com/pimalaya/pimconf"

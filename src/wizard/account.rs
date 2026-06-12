@@ -34,6 +34,7 @@ pub fn imap_to_config(w: WizardImapConfig) -> Result<ImapConfig> {
         alpn: io_imap::client::default_alpn(),
         sasl,
         id: Default::default(),
+        sort: Default::default(),
     })
 }
 

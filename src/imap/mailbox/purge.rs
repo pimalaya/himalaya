@@ -1,6 +1,9 @@
 use anyhow::Result;
 use clap::Parser;
-use io_imap::types::flag::{Flag, StoreType};
+use io_imap::{
+    rfc3501::{select::ImapMailboxSelectOptions, store::ImapMessageStoreOptions},
+    types::flag::{Flag, StoreType},
+};
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::imap::{
@@ -26,14 +29,14 @@ impl ImapMailboxPurgeCommand {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         if !self.mailbox_no_select.inner {
-            client.select(mailbox)?;
+            client.select(mailbox, ImapMailboxSelectOptions::default())?;
         }
 
         client.store(
             "1:*".try_into()?,
             StoreType::Add,
             vec![Flag::Deleted],
-            false,
+            ImapMessageStoreOptions { uid: false },
         )?;
         client.expunge()?;
 

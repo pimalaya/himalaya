@@ -3,9 +3,12 @@ use std::fmt;
 use anyhow::{Result, bail};
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
-use io_imap::types::{
-    core::Vec1,
-    fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
+use io_imap::{
+    rfc3501::{fetch::ImapMessageFetchOptions, select::ImapMailboxSelectOptions},
+    types::{
+        core::Vec1,
+        fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
+    },
 };
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
@@ -47,14 +50,21 @@ impl ImapEnvelopeGetCommand {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
         if !self.mailbox_no_select.inner {
-            client.select(mailbox)?;
+            client.select(mailbox, ImapMailboxSelectOptions::default())?;
         }
 
         let item_names =
             MacroOrMessageDataItemNames::MessageDataItemNames(vec![MessageDataItemName::Envelope]);
 
         let sequence_set = self.id.parse()?;
-        let mut data = client.fetch(sequence_set, item_names, !self.seq)?;
+        let mut data = client.fetch(
+            sequence_set,
+            item_names,
+            ImapMessageFetchOptions {
+                uid: !self.seq,
+                modifiers: Vec::new(),
+            },
+        )?;
 
         let Some((_, items)) = data.pop_first() else {
             bail!("No envelope returned for ID {}", self.id);

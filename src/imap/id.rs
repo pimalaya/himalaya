@@ -3,9 +3,12 @@ use std::{collections::HashMap, fmt};
 use anyhow::{Result, anyhow};
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
-use io_imap::types::{
-    IntoStatic,
-    core::{IString, NString},
+use io_imap::{
+    rfc2971::id::ImapServerIdOptions,
+    types::{
+        IntoStatic,
+        core::{IString, NString},
+    },
 };
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
@@ -44,7 +47,9 @@ impl ImapIdCommand {
             params.extend(more);
         }
 
-        let params = client.id(Some(params.into_iter().collect()))?;
+        let params = client.id(ImapServerIdOptions {
+            parameters: Some(params.into_iter().collect()),
+        })?;
 
         let table = ServerIdTable {
             preset: account.table_preset().to_string(),
