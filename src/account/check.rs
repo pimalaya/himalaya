@@ -64,6 +64,15 @@ impl AccountCheckCommand {
             }
         }
 
+        #[cfg(feature = "gmail")]
+        if backend.allows_gmail() {
+            if let Some(gmail_config) = account_config.gmail.clone() {
+                report
+                    .backends
+                    .push(check_gmail(&config, &account_config, gmail_config));
+            }
+        }
+
         #[cfg(feature = "maildir")]
         if backend.allows_maildir() {
             if let Some(maildir_config) = account_config.maildir.clone() {
@@ -141,6 +150,32 @@ fn check_jmap(
     })();
 
     BackendCheck::from("jmap", result)
+}
+
+#[cfg(feature = "gmail")]
+fn check_gmail(
+    _config: &Config,
+    _account_config: &AccountConfig,
+    gmail_config: crate::config::GmailConfig,
+) -> BackendCheck {
+    use io_gmail::v1::client::{GmailClientStd, GmailClientStdConnectOptions};
+    use secrecy::ExposeSecret;
+
+    use crate::gmail::client::gmail_token;
+
+    let result = (|| -> Result<()> {
+        let tls = gmail_config.tls.clone().into_tls(gmail_config.alpn.clone());
+        let token = gmail_token(gmail_config.auth.clone())?;
+        let options = GmailClientStdConnectOptions {
+            tls,
+            user_id: gmail_config.user_id.clone(),
+        };
+        let mut client = GmailClientStd::connect(token.expose_secret(), options)?;
+        client.profile_get()?;
+        Ok(())
+    })();
+
+    BackendCheck::from("gmail", result)
 }
 
 #[cfg(feature = "maildir")]

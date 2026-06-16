@@ -1,0 +1,105 @@
+use anyhow::Result;
+use clap::{Parser, Subcommand};
+use io_gmail::v1::rest::settings::{
+    GmailAutoForwarding, get_auto_forwarding::GmailAutoForwardingGet,
+    update_auto_forwarding::GmailAutoForwardingUpdate,
+};
+use pimalaya_cli::printer::{Message, Printer};
+
+use crate::{
+    account::context::Account,
+    gmail::{
+        client::GmailClient,
+        settings::convert::{disposition_wire, parse_disposition},
+    },
+};
+
+/// Manage the Gmail auto-forwarding settings
+/// (users.settings.getAutoForwarding / updateAutoForwarding).
+#[derive(Debug, Subcommand)]
+#[command(rename_all = "kebab-case")]
+pub enum GmailSettingsAutoForwardingCommand {
+    Get(GmailSettingsAutoForwardingGetCommand),
+    #[command(visible_aliases = ["update"])]
+    Set(GmailSettingsAutoForwardingSetCommand),
+}
+
+impl GmailSettingsAutoForwardingCommand {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        _account: &mut Account,
+        client: &mut GmailClient,
+    ) -> Result<()> {
+        match self {
+            Self::Get(cmd) => cmd.execute(printer, client),
+            Self::Set(cmd) => cmd.execute(printer, client),
+        }
+    }
+}
+
+/// Get the Gmail auto-forwarding settings.
+#[derive(Debug, Parser)]
+pub struct GmailSettingsAutoForwardingGetCommand;
+
+impl GmailSettingsAutoForwardingGetCommand {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
+        let out = {
+            let c = GmailAutoForwardingGet::new(&client.auth, &client.user_id)?;
+            client.run(c)?
+        };
+        let settings = out.response;
+
+        let mut text = String::new();
+        text.push_str(&format!(
+            "Enabled: {}\n",
+            if settings.enabled { "yes" } else { "no" }
+        ));
+        if let Some(email_address) = settings.email_address {
+            text.push_str(&format!("Email address: {email_address}\n"));
+        }
+        if let Some(disposition) = settings.disposition {
+            text.push_str(&format!("Disposition: {}\n", disposition_wire(disposition)));
+        }
+
+        printer.out(Message::new(text))
+    }
+}
+
+/// Update the Gmail auto-forwarding settings.
+#[derive(Debug, Parser)]
+pub struct GmailSettingsAutoForwardingSetCommand {
+    #[arg(long)]
+    pub enable: bool,
+
+    #[arg(long)]
+    pub email_address: Option<String>,
+
+    #[arg(long)]
+    pub disposition: Option<String>,
+}
+
+impl GmailSettingsAutoForwardingSetCommand {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
+        let disposition = self
+            .disposition
+            .as_deref()
+            .map(parse_disposition)
+            .transpose()?;
+
+        let settings = GmailAutoForwarding {
+            enabled: self.enable,
+            email_address: self.email_address,
+            disposition,
+        };
+
+        let _out = {
+            let c = GmailAutoForwardingUpdate::new(&client.auth, &client.user_id, settings)?;
+            client.run(c)?
+        };
+
+        printer.out(Message::new(
+            "Gmail auto-forwarding settings successfully updated",
+        ))
+    }
+}

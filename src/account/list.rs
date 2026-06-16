@@ -95,6 +95,9 @@ impl AccountRow {
         if account.jmap.is_some() {
             backends.push("jmap");
         }
+        if account.gmail.is_some() {
+            backends.push("gmail");
+        }
         if account.maildir.is_some() {
             backends.push("maildir");
         }

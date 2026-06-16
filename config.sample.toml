@@ -269,6 +269,35 @@ imap.sasl.plain.password.raw = "***"
 #jmap.drafts-mailbox-id = "M0123abc"
 
 # --------------------------------------------------------------------------------
+# Gmail config
+# --------------------------------------------------------------------------------
+#
+# Gmail REST API backend (https://gmail.googleapis.com). Labels are
+# exposed as mailboxes and Gmail system labels back the shared flags
+# (\Seen is the absence of UNREAD). Reachable through the shared
+# commands (`mailboxes`, `envelopes`, `flags`, `messages`); select it
+# with `--backend gmail` when an account configures several backends.
+# --------------------------------------------------------------------------------
+
+# Gmail user id (the mailbox owner). Defaults to "me", the authenticated user.
+#gmail.user-id = "me"
+
+# Gmail TLS provider (mirrors the imap.tls block above).
+#gmail.tls.provider = "rustls"
+#gmail.tls.rustls.crypto = "ring"
+#gmail.tls.cert = "/path/to/custom/cert.pem"
+
+# ALPN protocol identifiers offered during the TLS handshake. Defaults to
+# ["http/1.1"] (the Gmail REST API rides on HTTP/1.1); set to [] to skip ALPN.
+#gmail.alpn = ["http/1.1"]
+
+# Gmail only accepts OAuth 2.0 bearer tokens; supply a short-lived access token
+# (token refresh is the caller's responsibility). The client adds the `Bearer `
+# prefix itself.
+#gmail.auth.token.raw = "***"
+#gmail.auth.token.command = ["ortie", "access-token", "read", "gmail"]
+
+# --------------------------------------------------------------------------------
 # Maildir config
 # --------------------------------------------------------------------------------
 

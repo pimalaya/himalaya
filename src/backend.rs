@@ -18,6 +18,7 @@ pub enum Backend {
     Auto,
     Imap,
     Jmap,
+    Gmail,
     Maildir,
     M2dir,
     Smtp,
@@ -33,6 +34,11 @@ impl Backend {
     /// Whether the JMAP arm of a shared command is allowed to run.
     pub fn allows_jmap(self) -> bool {
         matches!(self, Self::Auto | Self::Jmap)
+    }
+
+    /// Whether the Gmail arm of a shared command is allowed to run.
+    pub fn allows_gmail(self) -> bool {
+        matches!(self, Self::Auto | Self::Gmail)
     }
 
     /// Whether the Maildir arm of a shared command is allowed to run.
@@ -59,6 +65,7 @@ impl FromStr for Backend {
             "auto" => Ok(Self::Auto),
             "imap" => Ok(Self::Imap),
             "jmap" => Ok(Self::Jmap),
+            "gmail" => Ok(Self::Gmail),
             "maildir" => Ok(Self::Maildir),
             "m2dir" => Ok(Self::M2dir),
             "smtp" => Ok(Self::Smtp),
@@ -73,6 +80,7 @@ impl fmt::Display for Backend {
             Self::Auto => write!(f, "auto"),
             Self::Imap => write!(f, "imap"),
             Self::Jmap => write!(f, "jmap"),
+            Self::Gmail => write!(f, "gmail"),
             Self::Maildir => write!(f, "maildir"),
             Self::M2dir => write!(f, "m2dir"),
             Self::Smtp => write!(f, "smtp"),

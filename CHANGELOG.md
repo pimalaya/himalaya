@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added Gmail REST API support. A `[gmail]` account backend (built on io-email's `gmail` feature) plugs into the shared `mailboxes` / `envelopes` / `flags` / `messages` / `attachments` commands; select it with `--backend gmail`. Authentication is a single OAuth 2.0 bearer access token (`gmail.auth.token.raw` or `gmail.auth.token.command`), the only authorization Gmail's REST API accepts.
+
+  Also added a protocol-specific `gmail` command exposing the full Gmail REST surface beyond the shared least-common-denominator: `profile`, `labels`, `messages` (including `import` / `insert` / `batch-modify` / `batch-delete`), `attachments`, `drafts`, `threads`, `history` and `settings` (vacation, IMAP, POP, language, auto-forwarding, filters, forwarding addresses, delegates, send-as).
+
 - Restored the RFC 2971 `ID`-after-auth quirk under the new shape `imap.id.{auto, fields}`. Set `imap.id.auto = true` to chain an `ID` exchange straight after IMAP authentication (required by mail.qq.com, fastmail). `imap.id.fields` is a `{ name = bool, … }` map: missing keys are not transmitted, `false` sends `NIL`, `true` sends himalaya's canned value for the well-known keys (`name`, `version`, `vendor`, `support-url`) or `NIL` (with a warning) for any other key. Replaces the v1.2.0 `imap.extensions.id.send-after-auth` flag dropped during the v2 migration.
 
 - Brought the `m2dir` backend to feature parity with `maildir` at the CLI level: `m2dir messages {save, get, read, export}`, `m2dir flags {list, add, set, remove}`, `m2dir envelopes {get, list}`. Flags are free-form UTF-8 strings persisted in the `.meta/<id>.flags` metadata file. Still missing relative to `maildir`: mailbox `rename`, message `copy` and `move` (need io-m2dir lib support first).

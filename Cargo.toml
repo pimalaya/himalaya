@@ -17,15 +17,16 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-default = ["rustls-ring", "imap", "smtp", "jmap", "m2dir"]
+default = ["rustls-ring", "imap", "smtp", "jmap", "gmail", "m2dir"]
 imap = ["dep:io-imap", "dep:mail-parser", "dep:rfc2047-decoder", "io-email/imap", "io-imap/client"]
 jmap = ["dep:base64", "dep:io-jmap", "dep:mail-parser", "dep:serde_json", "io-email/jmap", "io-jmap/client"]
+gmail = ["dep:io-gmail", "dep:mail-parser", "io-email/gmail", "io-gmail/client"]
 smtp = ["dep:io-smtp", "dep:mail-parser", "io-email/smtp"]
 maildir = ["dep:convert_case", "dep:io-maildir", "dep:mail-parser", "dep:mime_guess", "io-email/maildir", "io-maildir/client"]
 m2dir = ["dep:convert_case", "dep:io-m2dir", "dep:mail-parser", "dep:mime_guess", "io-email/m2dir", "io-m2dir/client"]
-native-tls = ["pimalaya-stream/native-tls", "pimconf/native-tls", "io-email/native-tls", "io-imap?/native-tls", "io-jmap?/native-tls", "io-smtp?/native-tls"]
-rustls-aws = ["pimalaya-stream/rustls-aws", "pimconf/rustls-aws", "io-email/rustls-aws", "io-imap?/rustls-aws", "io-jmap?/rustls-aws", "io-smtp?/rustls-aws"]
-rustls-ring = ["pimalaya-stream/rustls-ring", "pimconf/rustls-ring", "io-email/rustls-ring", "io-imap?/rustls-ring", "io-jmap?/rustls-ring", "io-smtp?/rustls-ring"]
+native-tls = ["pimalaya-stream/native-tls", "pimconf/native-tls", "io-email/native-tls", "io-imap?/native-tls", "io-jmap?/native-tls", "io-gmail?/native-tls", "io-smtp?/native-tls"]
+rustls-aws = ["pimalaya-stream/rustls-aws", "pimconf/rustls-aws", "io-email/rustls-aws", "io-imap?/rustls-aws", "io-jmap?/rustls-aws", "io-gmail?/rustls-aws", "io-smtp?/rustls-aws"]
+rustls-ring = ["pimalaya-stream/rustls-ring", "pimconf/rustls-ring", "io-email/rustls-ring", "io-imap?/rustls-ring", "io-jmap?/rustls-ring", "io-gmail?/rustls-ring", "io-smtp?/rustls-ring"]
 vendored = ["pimalaya-stream/vendored"]
 
 [profile.release]
@@ -49,6 +50,7 @@ dirs = "6"
 humansize = "2"
 ariadne = "0.6"
 io-email = { version = "0.1", default-features = false, features = ["serde", "client", "search"] }
+io-gmail = { version = "0.0.1", default-features = false, optional = true }
 io-imap = { version = "0.1", default-features = false, optional = true }
 io-jmap = { version = "0.1", default-features = false, optional = true }
 io-m2dir = { version = "0.1", default-features = false, optional = true }
@@ -78,5 +80,7 @@ uds_windows = "1"
 [patch.crates-io]
 domain = { git = "https://github.com/nlnetlabs/domain", rev = "b30087125c13e71010d9783a1bcdd9eb9fa3f336" }
 io-email.git = "https://github.com/pimalaya/io-email"
+io-gmail.git = "https://github.com/pimalaya/io-gmail"
+io-http.git = "https://github.com/pimalaya/io-http"
 io-imap.git = "https://github.com/pimalaya/io-imap"
 pimconf.git = "https://github.com/pimalaya/pimconf"

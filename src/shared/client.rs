@@ -52,6 +52,23 @@ impl EmailClient {
             }
         }
 
+        #[cfg(feature = "gmail")]
+        if backend.allows_gmail() {
+            if let Some(gmail_config) = account_config.gmail.take() {
+                use secrecy::ExposeSecret;
+
+                use crate::gmail::client::gmail_token;
+
+                let tls = gmail_config.tls.clone().into_tls(gmail_config.alpn.clone());
+                let token = gmail_token(gmail_config.auth.clone())?;
+                inner = inner.connect_gmail(
+                    &tls,
+                    token.expose_secret(),
+                    gmail_config.user_id.clone(),
+                )?;
+            }
+        }
+
         #[cfg(feature = "imap")]
         if backend.allows_imap() {
             if let Some(imap_config) = account_config.imap.take() {

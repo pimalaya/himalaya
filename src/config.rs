@@ -108,6 +108,8 @@ pub struct AccountConfig {
     #[allow(unused)]
     pub jmap: Option<JmapConfig>,
     #[allow(unused)]
+    pub gmail: Option<GmailConfig>,
+    #[allow(unused)]
     pub maildir: Option<MaildirConfig>,
     #[allow(unused)]
     pub m2dir: Option<M2dirConfig>,
@@ -646,4 +648,53 @@ pub enum JmapAuthConfig {
         username: String,
         password: Secret,
     },
+}
+
+/// Gmail REST API configuration.
+///
+/// Gmail has no per-account server address: the client always talks to
+/// `https://gmail.googleapis.com`. Only the mailbox owner, TLS and the
+/// OAuth 2.0 credential are configurable.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct GmailConfig {
+    /// Gmail user id (the mailbox owner). Defaults to `me`, the
+    /// authenticated user.
+    #[serde(default = "default_gmail_user_id")]
+    pub user_id: String,
+
+    /// TLS configuration.
+    #[serde(default)]
+    pub tls: TlsConfig,
+
+    /// ALPN protocol identifiers offered during the TLS handshake.
+    /// Defaults to `["http/1.1"]` (the Gmail REST API rides on
+    /// HTTP/1.1). Set to `[]` to skip ALPN negotiation entirely. Only
+    /// relevant for the rustls provider; `native-tls` ignores ALPN.
+    #[serde(default = "default_gmail_alpn")]
+    pub alpn: Vec<String>,
+
+    /// Authentication configuration.
+    pub auth: GmailAuthConfig,
+}
+
+fn default_gmail_user_id() -> String {
+    String::from("me")
+}
+
+fn default_gmail_alpn() -> Vec<String> {
+    vec![String::from("http/1.1")]
+}
+
+/// Gmail authentication configuration.
+///
+/// Gmail only accepts OAuth 2.0 bearer tokens; supply a short-lived
+/// access token (e.g. minted by an external helper such as `ortie`).
+/// Token refresh is the caller's responsibility.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct GmailAuthConfig {
+    /// OAuth 2.0 bearer access token; sent as `Bearer <token>`. It is
+    /// the only authorization Gmail's REST API accepts.
+    pub token: Secret,
 }

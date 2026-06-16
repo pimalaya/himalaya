@@ -12,6 +12,8 @@ use pimalaya_cli::{
 };
 use pimalaya_config::toml::TomlConfig;
 
+#[cfg(feature = "gmail")]
+use crate::gmail::{cli::GmailCommand, client::build_gmail_client};
 #[cfg(feature = "imap")]
 use crate::imap::{cli::ImapCommand, client::build_imap_client};
 #[cfg(feature = "jmap")]
@@ -53,8 +55,8 @@ pub struct Cli {
     /// (`imap`, `jmap`, `maildir`, `smtp`) ignore it and always use
     /// their own backend.
     ///
-    /// Possible values: `auto` (default), `imap`, `jmap`, `maildir`,
-    /// `smtp`. With `auto`, the shared command picks the first
+    /// Possible values: `auto` (default), `imap`, `jmap`, `gmail`,
+    /// `maildir`, `smtp`. With `auto`, the shared command picks the first
     /// configured backend it supports; with an explicit value, it uses
     /// only that backend (and bails if the account has no matching
     /// config block, or if the operation has no implementation for it
@@ -90,6 +92,9 @@ pub enum Command {
     #[cfg(feature = "jmap")]
     #[command(subcommand)]
     Jmap(JmapCommand),
+    #[cfg(feature = "gmail")]
+    #[command(subcommand)]
+    Gmail(GmailCommand),
     #[cfg(feature = "maildir")]
     #[command(subcommand)]
     Maildir(MaildirCommand),
@@ -176,6 +181,11 @@ impl Command {
             #[cfg(feature = "jmap")]
             Self::Jmap(cmd) => {
                 let (mut account, mut client) = build_jmap_client(config_paths, account_name)?;
+                cmd.execute(printer, &mut account, &mut client)
+            }
+            #[cfg(feature = "gmail")]
+            Self::Gmail(cmd) => {
+                let (mut account, mut client) = build_gmail_client(config_paths, account_name)?;
                 cmd.execute(printer, &mut account, &mut client)
             }
             #[cfg(feature = "maildir")]
