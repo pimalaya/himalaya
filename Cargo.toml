@@ -58,7 +58,7 @@ io-maildir = { version = "0.1", default-features = false, optional = true }
 io-smtp = { version = "0.1", default-features = false, optional = true }
 log = "0.4"
 mail-builder = "0.4"
-mail-parser = { version = "0.11", features = ["serde"], optional = true }
+mail-parser = { version = "0.11", features = ["full_encoding", "serde"], optional = true }
 mime_guess = { version = "2", optional = true }
 open = "5"
 pimalaya-cli = { version = "0.0.1", default-features = false, features = ["terminal", "table", "prompt", "wizard", "imap", "smtp", "jmap", "spinner"] }
