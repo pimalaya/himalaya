@@ -5,25 +5,17 @@ use pimalaya_cli::printer::Printer;
 use crate::account::context::Account;
 use crate::imap::{
     client::ImapClient,
-    envelope::{
-        get::ImapEnvelopeGetCommand, list::ImapEnvelopeListCommand,
-        search::ImapEnvelopeSearchCommand, sort::ImapEnvelopeSortCommand,
-        thread::ImapEnvelopeThreadCommand,
-    },
+    envelope::{get::ImapEnvelopeGetCommand, list::ImapEnvelopeListCommand},
 };
 
-/// Manage IMAP envelopes.
+/// Fetch IMAP envelopes (FETCH ENVELOPE, RFC 3501).
 ///
-/// An envelope contains header information about a message such as
-/// date, subject, from, to, cc, bcc, etc. This subcommand allows you
-/// to get, list, search, sort, and thread envelopes.
+/// An envelope is the parsed header summary (date, subject, from, to,
+/// cc, bcc, ...) the server returns for the FETCH ENVELOPE item.
 #[derive(Debug, Subcommand)]
 pub enum ImapEnvelopeCommand {
     Get(ImapEnvelopeGetCommand),
     List(ImapEnvelopeListCommand),
-    Search(ImapEnvelopeSearchCommand),
-    Sort(ImapEnvelopeSortCommand),
-    Thread(ImapEnvelopeThreadCommand),
 }
 
 impl ImapEnvelopeCommand {
@@ -36,9 +28,6 @@ impl ImapEnvelopeCommand {
         match self {
             Self::Get(cmd) => cmd.execute(printer, account, client),
             Self::List(cmd) => cmd.execute(printer, account, client),
-            Self::Search(cmd) => cmd.execute(printer, account, client),
-            Self::Sort(cmd) => cmd.execute(printer, account, client),
-            Self::Thread(cmd) => cmd.execute(printer, client),
         }
     }
 }

@@ -1,11 +1,9 @@
 pub mod arg;
-pub mod cli;
 pub mod close;
 pub mod create;
 pub mod delete;
 pub mod expunge;
 pub mod list;
-pub mod purge;
 pub mod rename;
 pub mod select;
 pub mod status;

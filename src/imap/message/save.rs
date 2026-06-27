@@ -11,11 +11,11 @@ use crate::{
     shared::message::arg::MessageArg,
 };
 
-/// Save a message to a mailbox.
+/// Append a message to a mailbox (APPEND, RFC 3501).
 ///
-/// Appends a message to the specified mailbox. The message can be
-/// passed as a positional file path, an inline raw string, or piped
-/// via stdin (see [`MessageArg`] for resolution order).
+/// Uploads a message into the given mailbox. The message can be passed
+/// as a positional file path, an inline raw string, or piped via stdin
+/// (see [`MessageArg`] for resolution order).
 #[derive(Debug, Parser)]
 pub struct ImapMessageSaveCommand {
     #[command(flatten)]

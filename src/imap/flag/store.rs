@@ -1,5 +1,5 @@
 use anyhow::Result;
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use io_imap::{
     rfc3501::{select::ImapMailboxSelectOptions, store::ImapMessageStoreOptions},
     types::{
@@ -14,21 +14,26 @@ use crate::imap::{
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
 };
 
-/// Remove IMAP flag(s) from message(s).
+/// Store IMAP flags on message(s) (STORE, RFC 3501).
 ///
-/// This command removes the specified flag(s) from message(s)
-/// identified by the given sequence set.
+/// Adds (`+FLAGS`), removes (`-FLAGS`) or replaces (`FLAGS`) the given
+/// flags on every message in the sequence set, depending on --action.
 #[derive(Debug, Parser)]
-pub struct ImapFlagRemoveCommand {
+pub struct ImapStoreCommand {
     #[command(flatten)]
     pub mailbox_name: MailboxNameOptionalFlag,
     #[command(flatten)]
     pub mailbox_no_select: MailboxNoSelectFlag,
 
-    /// The sequence set of messages (e.g., "1", "1,2,3", "1:*").
-    #[arg(name = "sequence_set", value_name = "SEQUENCE")]
+    /// The sequence set of messages (e.g. "1", "1,2,3", "1:*").
+    #[arg(value_name = "SEQUENCE")]
     pub sequence_set: String,
-    /// The flags to remove (e.g., "\\Seen", "\\Flagged").
+
+    /// How to apply the flags.
+    #[arg(long, value_name = "ACTION", default_value = "add")]
+    pub action: StoreActionArg,
+
+    /// The flags (e.g. "\\Seen", "\\Flagged").
     #[arg(short, long, required = true, num_args = 1..)]
     pub flag: Vec<String>,
 
@@ -37,7 +42,27 @@ pub struct ImapFlagRemoveCommand {
     pub seq: bool,
 }
 
-impl ImapFlagRemoveCommand {
+/// STORE action: add (+FLAGS), remove (-FLAGS) or set (FLAGS).
+#[derive(Clone, Copy, Debug, Default, ValueEnum)]
+#[clap(rename_all = "lower")]
+pub enum StoreActionArg {
+    #[default]
+    Add,
+    Remove,
+    Set,
+}
+
+impl From<StoreActionArg> for StoreType {
+    fn from(action: StoreActionArg) -> Self {
+        match action {
+            StoreActionArg::Add => StoreType::Add,
+            StoreActionArg::Remove => StoreType::Remove,
+            StoreActionArg::Set => StoreType::Replace,
+        }
+    }
+}
+
+impl ImapStoreCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut ImapClient) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
@@ -54,11 +79,17 @@ impl ImapFlagRemoveCommand {
 
         client.store(
             sequence_set,
-            StoreType::Remove,
+            self.action.into(),
             flags,
             ImapMessageStoreOptions { uid: !self.seq },
         )?;
 
-        printer.out(Message::new("Flag(s) successfully removed"))
+        let outcome = match self.action {
+            StoreActionArg::Add => "added",
+            StoreActionArg::Remove => "removed",
+            StoreActionArg::Set => "replaced",
+        };
+
+        printer.out(Message::new(format!("Flag(s) successfully {outcome}")))
     }
 }
