@@ -16,8 +16,9 @@ use serde::{Serialize, Serializer, ser::SerializeStruct};
 
 use crate::imap::{
     client::ImapClient,
-    envelope::{list::decode_mime, search::SearchCriteriaArgs},
+    envelope::search::SearchCriteriaArgs,
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
+    utils::decode_mime,
 };
 
 /// Thread IMAP messages (THREAD, RFC 5256).

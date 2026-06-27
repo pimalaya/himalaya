@@ -6,9 +6,10 @@ use crate::account::context::Account;
 use crate::imap::{
     client::ImapClient,
     envelope::{
-        cli::ImapEnvelopeCommand, search::ImapEnvelopeSearchCommand, sort::ImapEnvelopeSortCommand,
+        search::ImapEnvelopeSearchCommand, sort::ImapEnvelopeSortCommand,
         thread::ImapEnvelopeThreadCommand,
     },
+    fetch::ImapFetchCommand,
     flag::{list::ImapFlagListCommand, store::ImapStoreCommand},
     id::ImapIdCommand,
     mailbox::{
@@ -20,8 +21,7 @@ use crate::imap::{
         unsubscribe::ImapMailboxUnsubscribeCommand,
     },
     message::{
-        cli::ImapMessageCommand, copy::ImapMessageCopyCommand, r#move::ImapMessageMoveCommand,
-        save::ImapMessageSaveCommand,
+        copy::ImapMessageCopyCommand, r#move::ImapMessageMoveCommand, save::ImapMessageSaveCommand,
     },
 };
 
@@ -58,15 +58,10 @@ pub enum ImapCommand {
     Flags(ImapFlagListCommand),
 
     // Message data.
+    Fetch(ImapFetchCommand),
     Append(ImapMessageSaveCommand),
     Copy(ImapMessageCopyCommand),
     Move(ImapMessageMoveCommand),
-
-    // FETCH family, pending merge into a single `fetch` command.
-    #[command(subcommand)]
-    Envelope(ImapEnvelopeCommand),
-    #[command(subcommand)]
-    Message(ImapMessageCommand),
 }
 
 impl ImapCommand {
@@ -98,12 +93,10 @@ impl ImapCommand {
             Self::Store(cmd) => cmd.execute(printer, client),
             Self::Flags(cmd) => cmd.execute(printer, account, client),
 
+            Self::Fetch(cmd) => cmd.execute(printer, client),
             Self::Append(cmd) => cmd.execute(printer, client),
             Self::Copy(cmd) => cmd.execute(printer, client),
             Self::Move(cmd) => cmd.execute(printer, client),
-
-            Self::Envelope(cmd) => cmd.execute(printer, account, client),
-            Self::Message(cmd) => cmd.execute(printer, client),
         }
     }
 }

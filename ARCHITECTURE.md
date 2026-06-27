@@ -33,6 +33,10 @@ The shared commands target a backend chosen by the global `--backend` flag, a `B
 
 Each protocol module (`imap/`, `jmap/`, `gmail/`, ...) builds its own backend client via a `build_<proto>_client` helper and a `<Proto>Client` wrapper that `Deref`s onto the underlying io-* `*Std` client, ignoring `--backend`. Subcommands are clap-derived structs carrying their own arguments, with an `execute(self, printer, account, client)` method (the shared nested-execute convention); the module's command enum dispatches to them.
 
+### The `imap` command
+
+The `imap` command mirrors IMAP's own flat command list (RFC 3501 and extensions) rather than grouping by domain: `select`, `create`, `delete`, `rename`, `subscribe`, `unsubscribe`, `list`, `status`, `close`, `unselect`, `expunge`, `search`, `sort`, `thread`, `store`, `flags`, `fetch`, `append`, `copy`, `move`, `id`. Unlike JMAP (whose method names are `Type/op`, so grouping mirrors the spec), IMAP has no command namespaces, so flat is the faithful shape; this is why the protocol commands deliberately do not all look alike. Two commands fold what the protocol expresses as one verb with arguments: `store` takes `--action add|remove|set` (STORE `+FLAGS` / `-FLAGS` / `FLAGS`) and `fetch` takes `--envelope` / `--structure` / `--flags` / `--internal-date` / `--size` to compose a single FETCH. Body rendering (decoding parts and charsets) is left to the shared `messages` / `attachments` commands; `fetch --structure` only shows the server's BODYSTRUCTURE.
+
 ### The `gmail` command
 
 The `gmail` command is organized one-to-one by Gmail REST API resource domain, so it tracks io-gmail directly rather than going through io-email's least-common-denominator shape (io-email's shared commands already cover the LCD over Gmail; this command is the Gmail-native escape hatch). `gmail/client.rs` provides `GmailClient` (wrapping io-gmail's `GmailClientStd`) and `build_gmail_client`; one file per domain holds that domain's subcommands:
