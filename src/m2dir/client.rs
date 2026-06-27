@@ -11,6 +11,7 @@ use pimalaya_config::toml::TomlConfig;
 
 use crate::{account::context::Account, cli::load_or_wizard, config::M2dirConfig};
 
+/// Live m2dir client wrapping io_m2dir with the configured store root.
 pub struct M2dirClient {
     inner: Inner,
 }

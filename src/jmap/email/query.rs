@@ -177,6 +177,7 @@ impl JmapEmailQueryCommand {
     }
 }
 
+/// Per-column colors for the emails table.
 #[derive(Clone, Copy, Debug)]
 pub struct EmailsColors {
     pub id: Color,
@@ -186,6 +187,7 @@ pub struct EmailsColors {
     pub date: Color,
 }
 
+/// Flag glyphs used in the emails table.
 #[derive(Clone, Copy, Debug)]
 pub struct EmailsChars {
     pub unseen: char,
@@ -193,6 +195,7 @@ pub struct EmailsChars {
     pub attachment: char,
 }
 
+/// Renderable table of email envelopes.
 #[derive(Clone, Debug, Serialize)]
 pub struct EmailsTable {
     #[serde(skip)]
@@ -251,6 +254,7 @@ impl fmt::Display for EmailsTable {
     }
 }
 
+/// CLI sort key for emails.
 #[derive(Clone, Debug, Default, ValueEnum)]
 #[clap(rename_all = "kebab-case")]
 pub enum SortArg {

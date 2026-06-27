@@ -53,6 +53,7 @@ impl M2dirMessageSaveCommand {
     }
 }
 
+/// Output of a saved m2dir message: its id and path.
 #[derive(Serialize)]
 pub struct StoredMessage {
     id: String,

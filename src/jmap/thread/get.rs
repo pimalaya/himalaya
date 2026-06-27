@@ -41,6 +41,7 @@ impl JmapThreadGetCommand {
     }
 }
 
+/// Renderable table of threads and their email IDs.
 #[derive(Clone, Debug, Serialize)]
 pub struct ThreadsTable {
     #[serde(skip)]

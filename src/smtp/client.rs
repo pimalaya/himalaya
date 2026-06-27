@@ -24,6 +24,7 @@ use crate::{
     config::{SmtpConfig, parse_server},
 };
 
+/// SMTP client wrapping the inner stream for sending messages.
 pub struct SmtpClient {
     inner: Inner,
 }

@@ -16,6 +16,7 @@ use pimalaya_config::toml::TomlConfig;
 
 use crate::{account::context::Account, cli::load_or_wizard, config::MaildirConfig};
 
+/// Live Maildir client wrapping io_maildir with the configured root.
 pub struct MaildirClient {
     inner: Inner,
     /// Filesystem root of the configured maildir. Kept on the wrapper

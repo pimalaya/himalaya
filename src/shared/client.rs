@@ -28,6 +28,7 @@ use crate::{
     config::{AccountConfig, Config},
 };
 
+/// Cross-protocol email client backing the shared subcommands.
 pub struct EmailClient {
     inner: EmailClientStd,
 }

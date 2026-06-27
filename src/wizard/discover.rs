@@ -60,6 +60,7 @@ pub fn discovery_tls() -> Tls {
     tls
 }
 
+/// Per-protocol backend configs found by autodiscovery.
 #[derive(Default)]
 pub struct DiscoveryResult {
     pub jmap: Option<WizardJmapConfig>,

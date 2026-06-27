@@ -79,6 +79,7 @@ fn load_config(paths: &[PathBuf]) -> Result<Config> {
     }
 }
 
+/// One account row in the account list: name, backends, default flag.
 #[derive(Clone, Debug, Serialize)]
 pub struct AccountRow {
     pub name: String,
@@ -116,6 +117,7 @@ impl AccountRow {
     }
 }
 
+/// Renderable table for the account list command.
 #[derive(Clone, Debug, Serialize)]
 pub struct AccountsTable {
     #[serde(skip)]

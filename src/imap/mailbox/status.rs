@@ -46,6 +46,7 @@ impl ImapMailboxStatusCommand {
     }
 }
 
+/// Parsed STATUS data items for a mailbox.
 #[derive(Clone, Debug, Serialize)]
 pub struct MailboxStatus {
     pub messages: Option<u32>,
@@ -88,6 +89,7 @@ impl From<Vec<StatusDataItem>> for MailboxStatus {
     }
 }
 
+/// Renderable table of a mailbox's STATUS values.
 pub struct MailboxStatusTable {
     pub preset: String,
     pub status: MailboxStatus,

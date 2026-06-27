@@ -36,6 +36,7 @@ impl MaildirMailboxListCommand {
     }
 }
 
+/// Renderable table of Maildir folders.
 #[derive(Clone, Debug, Serialize)]
 pub struct MaildirsTable {
     #[serde(skip)]
@@ -70,6 +71,7 @@ impl fmt::Display for MaildirsTable {
     }
 }
 
+/// One row of the Maildir folders table: name and path.
 #[derive(Clone, Debug, Serialize)]
 pub struct MaildirRow {
     pub name: String,

@@ -35,6 +35,7 @@ impl Default for MailboxNameOptionalFlag {
     }
 }
 
+/// The no-select mailbox flag parser.
 #[derive(Debug, Parser)]
 pub struct MailboxNoSelectFlag {
     /// Do not select the given mailbox before performing the current

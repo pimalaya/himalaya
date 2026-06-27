@@ -2,6 +2,7 @@ use clap::Parser;
 
 const INBOX: &str = "Inbox";
 
+/// CLI argument carrying the name of an m2dir folder.
 #[derive(Debug, Parser)]
 pub struct M2dirNameArg {
     /// Name of the m2dir folder, relative to the m2store root.
@@ -9,6 +10,7 @@ pub struct M2dirNameArg {
     pub inner: String,
 }
 
+/// CLI flag selecting an m2dir folder by name.
 #[derive(Debug, Parser)]
 pub struct M2dirNameFlag {
     /// Name of the m2dir folder, relative to the m2store root.
@@ -17,6 +19,7 @@ pub struct M2dirNameFlag {
     pub inner: String,
 }
 
+/// CLI argument carrying a single message identifier.
 #[derive(Debug, Parser)]
 pub struct MessageIdArg {
     /// Identifier of the message.
@@ -24,6 +27,7 @@ pub struct MessageIdArg {
     pub inner: String,
 }
 
+/// CLI argument carrying one or more message identifiers.
 #[derive(Debug, Parser)]
 pub struct MessageIdsArg {
     /// Identifier(s) of message(s).

@@ -124,6 +124,7 @@ pub struct Attachment {
     pub path: Option<String>,
 }
 
+/// Table of attachment rows rendered to the terminal or as JSON.
 #[derive(Clone, Debug, Serialize)]
 pub struct Attachments {
     #[serde(skip)]

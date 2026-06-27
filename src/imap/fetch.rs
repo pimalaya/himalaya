@@ -105,11 +105,13 @@ impl ImapFetchCommand {
     }
 }
 
+/// Renderable list of FETCH results, one block per message.
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct FetchedMessages {
     pub messages: Vec<FetchedMessage>,
 }
 
+/// The fetched data items of a single message.
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct FetchedMessage {
     pub seq: u32,
@@ -148,6 +150,7 @@ impl FetchedMessage {
     }
 }
 
+/// Display view of a fetched message envelope.
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct EnvelopeView {
     pub date: Option<String>,
@@ -179,6 +182,7 @@ impl From<&Envelope<'_>> for EnvelopeView {
     }
 }
 
+/// One node of a fetched MIME body structure tree.
 #[derive(Clone, Debug, Serialize)]
 pub struct BodyPart {
     pub content_type: String,

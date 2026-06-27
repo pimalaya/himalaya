@@ -83,6 +83,7 @@ impl From<&FlagArg> for io_email::flag::types::Flag {
     }
 }
 
+/// Positional argument holding one or more message identifiers.
 #[derive(Debug, Parser)]
 pub struct MessageIdsArg {
     /// Message Identifier(s).
@@ -91,6 +92,7 @@ pub struct MessageIdsArg {
     pub inner: Vec<String>,
 }
 
+/// Repeatable option holding one or more flags to apply to messages.
 #[derive(Debug, Parser)]
 pub struct FlagsArg {
     /// Flag(s) to add on message(s). Repeat the option to pass several

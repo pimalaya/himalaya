@@ -66,6 +66,7 @@ struct MailboxColors {
     unread: Color,
 }
 
+/// Table of mailbox rows rendered to the terminal or as JSON.
 #[derive(Clone, Debug, Serialize)]
 pub struct Mailboxes {
     #[serde(skip)]

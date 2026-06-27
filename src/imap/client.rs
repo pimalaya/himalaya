@@ -23,6 +23,8 @@ use crate::{
     imap::id::resolve_auto_id_params,
 };
 
+/// Live IMAP client wrapping the io-imap session with cached
+/// capabilities and the sort fallback policy.
 pub struct ImapClient {
     inner: Inner,
     capabilities: Vec<Capability<'static>>,

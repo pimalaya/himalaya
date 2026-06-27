@@ -266,12 +266,14 @@ fn check_smtp(
     BackendCheck::from("smtp", result)
 }
 
+/// Aggregated account check result: one outcome per backend.
 #[derive(Clone, Debug, Serialize)]
 pub struct CheckReport {
     pub account: String,
     pub backends: Vec<BackendCheck>,
 }
 
+/// Outcome of checking a single backend's connection.
 #[derive(Clone, Debug, Serialize)]
 pub struct BackendCheck {
     pub backend: &'static str,

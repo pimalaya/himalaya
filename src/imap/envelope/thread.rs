@@ -181,6 +181,7 @@ fn fetch_subjects(
     Ok(subjects)
 }
 
+/// One flattened THREAD node: a message id with its subject and depth.
 #[derive(Clone, Debug, Serialize)]
 pub struct ThreadEntry {
     pub id: u32,
@@ -188,6 +189,7 @@ pub struct ThreadEntry {
     pub depth: usize,
 }
 
+/// Renderable tree of THREAD results with their fetched subjects.
 pub struct ThreadResultsTable {
     threads: Vec<Thread>,
     subjects: HashMap<u32, String>,

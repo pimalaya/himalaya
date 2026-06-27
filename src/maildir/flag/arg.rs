@@ -1,6 +1,7 @@
 use clap::ValueEnum;
 use io_maildir::flag::types::MaildirFlag;
 
+/// CLI value selecting one of the six standard Maildir flags.
 #[derive(Clone, Debug, ValueEnum)]
 #[clap(rename_all = "kebab-case")]
 pub enum FlagArg {

@@ -23,6 +23,7 @@ use crate::{
     config::{JmapAuthConfig, JmapConfig, parse_server},
 };
 
+/// Live JMAP session paired with the merged account configuration.
 pub struct JmapClient {
     inner: Inner,
     /// The original JMAP config block, kept around so commands like

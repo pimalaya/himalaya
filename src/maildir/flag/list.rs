@@ -35,6 +35,7 @@ impl MaildirFlagListCommand {
     }
 }
 
+/// Renderable table of the standard Maildir flags.
 #[derive(Clone, Debug, Serialize)]
 pub struct FlagsTable {
     #[serde(skip_serializing)]
@@ -44,6 +45,7 @@ pub struct FlagsTable {
     flags: Vec<FlagRow>,
 }
 
+/// One row of the Maildir flags table: code and name.
 #[derive(Clone, Debug, Serialize)]
 pub struct FlagRow {
     code: String,

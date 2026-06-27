@@ -47,6 +47,7 @@ impl ImapFlagListCommand {
     }
 }
 
+/// Renderable table of a mailbox's flags and permanent flags.
 #[derive(Clone, Debug, Serialize)]
 pub struct FlagsTable<'a> {
     #[serde(skip_serializing)]

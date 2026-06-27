@@ -44,6 +44,7 @@ impl JmapIdentityGetCommand {
     }
 }
 
+/// Renderable table of sender identities.
 #[derive(Clone, Debug, Serialize)]
 pub struct IdentitiesTable {
     #[serde(skip)]

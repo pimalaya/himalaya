@@ -31,6 +31,7 @@ const DEFAULT_REPLIED_CHAR: char = 'R';
 const DEFAULT_FLAGGED_CHAR: char = '!';
 const DEFAULT_ATTACHMENT_CHAR: char = '@';
 
+/// Merged runtime account settings consumed by every command.
 #[derive(Debug, Default)]
 pub struct Account {
     pub downloads_dir: Option<PathBuf>,

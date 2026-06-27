@@ -108,6 +108,7 @@ impl From<SortKeyArg> for SortKey {
     }
 }
 
+/// Renderable table of SORT result message ids.
 #[derive(Clone, Debug, Serialize)]
 pub struct SortResultsTable {
     ids: Vec<u32>,

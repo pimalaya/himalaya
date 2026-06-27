@@ -54,6 +54,7 @@ impl ImapMailboxListCommand {
     }
 }
 
+/// Renderable table of LIST/LSUB mailboxes.
 #[derive(Clone, Debug, Serialize)]
 pub struct MailboxesTable {
     #[serde(skip)]
@@ -103,6 +104,7 @@ impl fmt::Display for MailboxesTable {
     }
 }
 
+/// One row of the mailboxes table: name, delimiter and attributes.
 #[derive(Clone, Debug, Serialize)]
 pub struct MailboxRow {
     pub name: String,

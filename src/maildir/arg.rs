@@ -5,6 +5,7 @@ use io_maildir::maildir::types::MaildirSubdir;
 
 const INBOX: &str = "Inbox";
 
+/// CLI argument carrying the name of a Maildir.
 #[derive(Debug, Parser)]
 pub struct MaildirNameArg {
     /// Name of the Maildir.
@@ -12,6 +13,7 @@ pub struct MaildirNameArg {
     pub inner: String,
 }
 
+/// CLI flag selecting the source Maildir by path.
 #[derive(Debug, Parser)]
 pub struct MaildirPathFlag {
     /// Path to the source Maildir.
@@ -20,6 +22,7 @@ pub struct MaildirPathFlag {
     pub inner: PathBuf,
 }
 
+/// CLI flag selecting the target Maildir by path.
 #[derive(Debug, Parser)]
 pub struct TargetMaildirPathFlag {
     /// Path to the target Maildir.
@@ -28,6 +31,7 @@ pub struct TargetMaildirPathFlag {
     pub inner: PathBuf,
 }
 
+/// CLI argument carrying a single message identifier.
 #[derive(Debug, Parser)]
 pub struct MessageIdArg {
     /// Identifier of the message
@@ -35,6 +39,7 @@ pub struct MessageIdArg {
     pub inner: String,
 }
 
+/// CLI argument carrying one or more message identifiers.
 #[derive(Debug, Parser)]
 pub struct MessageIdsArg {
     /// Identifier(s) of message(s).
@@ -43,6 +48,7 @@ pub struct MessageIdsArg {
     pub inner: Vec<String>,
 }
 
+/// CLI value selecting a Maildir subdirectory: cur, new, or tmp.
 #[derive(Clone, Debug, ValueEnum)]
 pub enum MaildirSubdirArg {
     Cur,

@@ -129,6 +129,7 @@ pub(super) struct EnvelopeColors {
     pub size: Color,
 }
 
+/// Table of envelope rows rendered to the terminal or as JSON.
 #[derive(Clone, Debug, Serialize)]
 pub struct Envelopes {
     #[serde(skip)]

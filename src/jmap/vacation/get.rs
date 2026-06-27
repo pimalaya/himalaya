@@ -43,6 +43,7 @@ impl JmapVacationGetCommand {
     }
 }
 
+/// Renderable table of the vacation response settings.
 #[derive(Clone, Debug, Serialize)]
 #[serde(transparent)]
 pub struct VacationTable {

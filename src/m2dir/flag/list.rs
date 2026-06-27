@@ -46,6 +46,7 @@ impl M2dirFlagListCommand {
     }
 }
 
+/// Renderable table of flags set on an m2dir message.
 #[derive(Clone, Debug, Serialize)]
 pub struct FlagsTable {
     #[serde(skip_serializing)]

@@ -70,6 +70,7 @@ impl MessageReadCommand {
     }
 }
 
+/// Parsed message rendered as headers plus text bodies, or as JSON.
 #[derive(Serialize)]
 #[serde(transparent)]
 pub struct MessageView(Message<'static>);

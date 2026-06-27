@@ -109,6 +109,7 @@ impl JmapMailboxQueryCommand {
     }
 }
 
+/// Per-column colors for the mailboxes table.
 #[derive(Clone, Copy, Debug)]
 pub struct MailboxColors {
     pub id: Color,
@@ -128,6 +129,7 @@ impl Default for MailboxColors {
     }
 }
 
+/// Renderable table of mailboxes.
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct MailboxesTable {
     #[serde(skip)]
@@ -173,6 +175,7 @@ impl fmt::Display for MailboxesTable {
     }
 }
 
+/// CLI proxy for the mailbox role filter.
 #[derive(Clone, Debug)]
 pub enum RoleArg {
     Inbox,
@@ -223,6 +226,7 @@ impl From<RoleArg> for JmapMailboxRole {
     }
 }
 
+/// CLI sort key for mailboxes.
 #[derive(Clone, Debug, Default, ValueEnum)]
 #[clap(rename_all = "kebab-case")]
 pub enum SortArg {

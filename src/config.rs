@@ -160,6 +160,7 @@ pub struct MailboxConfig {
     pub list: MailboxListConfig,
 }
 
+/// `mailboxes list` rendering options under `mailbox.list.*`.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MailboxListConfig {
@@ -167,6 +168,7 @@ pub struct MailboxListConfig {
     pub table: MailboxListTableConfig,
 }
 
+/// Per-column color overrides for the `mailboxes list` table.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MailboxListTableConfig {
@@ -184,6 +186,7 @@ pub struct AttachmentConfig {
     pub list: AttachmentListConfig,
 }
 
+/// `attachments list` rendering options under `attachment.list.*`.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct AttachmentListConfig {
@@ -191,6 +194,7 @@ pub struct AttachmentListConfig {
     pub table: AttachmentListTableConfig,
 }
 
+/// Per-column color overrides for the `attachments list` table.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct AttachmentListTableConfig {
@@ -211,6 +215,7 @@ pub struct AccountListingConfig {
     pub list: AccountListingListConfig,
 }
 
+/// `account list` rendering options under `account.list.*`.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct AccountListingListConfig {
@@ -218,6 +223,7 @@ pub struct AccountListingListConfig {
     pub table: AccountListingTableConfig,
 }
 
+/// Per-column color overrides for the `account list` table.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct AccountListingTableConfig {
@@ -257,6 +263,7 @@ pub struct EnvelopeListConfig {
     pub table: EnvelopeListTableConfig,
 }
 
+/// Per-column color and flag glyph overrides for the envelopes table.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct EnvelopeListTableConfig {
@@ -298,6 +305,7 @@ pub struct TableConfig {
     pub arrangement: Option<TableArrangementConfig>,
 }
 
+/// Column-arrangement strategy for rendered tables.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum TableArrangementConfig {
@@ -681,11 +689,10 @@ pub struct JmapConfig {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum JmapAuthConfig {
+    /// Full raw Authorization header value, sent verbatim.
     Header(Secret),
     /// Bearer token (OAuth 2.0 access token).
-    Bearer {
-        token: Secret,
-    },
+    Bearer { token: Secret },
     /// HTTP Basic authentication (username + password).
     Basic {
         #[serde(deserialize_with = "shell_expanded_string")]

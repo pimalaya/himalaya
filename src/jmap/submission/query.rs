@@ -91,6 +91,7 @@ impl JmapSubmissionQueryCommand {
     }
 }
 
+/// Renderable table of email submissions.
 #[derive(Clone, Debug, Serialize)]
 pub struct SubmissionsTable {
     #[serde(skip)]

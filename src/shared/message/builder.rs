@@ -58,6 +58,7 @@ pub struct SourceArgs<'a> {
     pub quote_headline: &'a str,
 }
 
+/// Whether the source message is being replied to or forwarded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SourceMode {
     Reply,

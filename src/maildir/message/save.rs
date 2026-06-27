@@ -52,6 +52,7 @@ impl MaildirMessageSaveCommand {
     }
 }
 
+/// Output of a saved Maildir message: its id and file path.
 #[derive(Serialize)]
 pub struct StoredMessage {
     id: String,

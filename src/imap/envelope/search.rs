@@ -261,11 +261,13 @@ fn date_parser(s: &str) -> Result<NaiveDate, String> {
     NaiveDate::try_from(date).map_err(|e| format!("invalid date `{s}`: {e}"))
 }
 
+/// One row of the SEARCH results table: a single message id.
 #[derive(Clone, Debug, Serialize)]
 pub struct SearchResult {
     pub id: u32,
 }
 
+/// Renderable table of SEARCH result message ids.
 #[derive(Clone, Debug, Serialize)]
 pub struct SearchTable {
     #[serde(skip)]

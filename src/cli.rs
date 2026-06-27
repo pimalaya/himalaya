@@ -37,6 +37,7 @@ use crate::{
     wizard,
 };
 
+/// Top-level command-line interface parser.
 #[derive(Parser, Debug)]
 #[command(name = env!("CARGO_PKG_NAME"))]
 #[command(author, version, about)]
@@ -71,6 +72,7 @@ pub struct Cli {
     pub log: LogFlags,
 }
 
+/// Top-level subcommands.
 #[derive(Debug, Subcommand)]
 pub enum Command {
     // --- Shared API
