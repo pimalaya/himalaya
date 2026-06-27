@@ -8,7 +8,7 @@ use crate::shared::{
     flag::{add::FlagAddCommand, remove::FlagRemoveCommand, set::FlagSetCommand},
 };
 
-/// Shared API to manage flags for the active account.
+/// Manage flags using the shared API.
 ///
 /// A flag is acting like a tag, giving information about message state or kind.
 #[derive(Debug, Subcommand)]

@@ -10,8 +10,8 @@ use crate::imap::{
 
 /// Expunge the given mailbox.
 ///
-/// All envelopes with the \Deleted flag will be definitely removed
-/// from the given mailbox.
+/// All envelopes with the \Deleted flag will be definitely removed from the
+/// given mailbox.
 #[derive(Debug, Parser)]
 pub struct ImapMailboxExpungeCommand {
     #[command(flatten)]

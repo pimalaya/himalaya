@@ -10,34 +10,28 @@ use crate::jmap::{
     vacation::cli::JmapVacationCommand,
 };
 
-/// JMAP CLI.
+/// JMAP-specific API.
 ///
-/// This command gives you access to the JMAP CLI API, and allows you
-/// to manage JMAP mailboxes, threads, emails, identities, submissions
-/// and vacation responses.
+/// Gives access to the raw JMAP API. Every CLI command matches the name of its
+/// JMAP counterpart, grouped by domain: mailbox, email, thread, identity,
+/// submission, vacation.
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum JmapCommand {
-    #[command(subcommand)]
-    #[command(visible_aliases = ["mbox"])]
-    Mailboxes(JmapMailboxCommand),
+    Query(JmapQueryCommand),
 
+    #[command(subcommand, visible_aliases = ["mbox"])]
+    Mailbox(JmapMailboxCommand),
     #[command(subcommand)]
-    #[command(visible_aliases = ["msg"])]
-    Emails(JmapEmailCommand),
-
+    Email(JmapEmailCommand),
     #[command(subcommand)]
-    Threads(JmapThreadCommand),
+    Thread(JmapThreadCommand),
     #[command(subcommand)]
-    #[command(aliases = ["identities"])]
     Identity(JmapIdentityCommand),
     #[command(subcommand)]
-    #[command(aliases = ["submissions", "submit"])]
     Submission(JmapSubmissionCommand),
-    #[command(subcommand)]
-    #[command(alias = "vacation-response")]
-    Vacation(JmapVacationCommand),
-    Query(JmapQueryCommand),
+    #[command(subcommand, visible_alias = "vacation")]
+    VacationResponse(JmapVacationCommand),
 }
 
 impl JmapCommand {
@@ -48,13 +42,13 @@ impl JmapCommand {
         client: &mut JmapClient,
     ) -> Result<()> {
         match self {
-            Self::Mailboxes(cmd) => cmd.execute(printer, account, client),
-            Self::Emails(cmd) => cmd.execute(printer, account, client),
+            Self::Mailbox(cmd) => cmd.execute(printer, account, client),
+            Self::Email(cmd) => cmd.execute(printer, account, client),
 
-            Self::Threads(cmd) => cmd.execute(printer, account, client),
+            Self::Thread(cmd) => cmd.execute(printer, account, client),
             Self::Identity(cmd) => cmd.execute(printer, account, client),
             Self::Submission(cmd) => cmd.execute(printer, account, client),
-            Self::Vacation(cmd) => cmd.execute(printer, account, client),
+            Self::VacationResponse(cmd) => cmd.execute(printer, account, client),
             Self::Query(cmd) => cmd.execute(printer, client),
         }
     }

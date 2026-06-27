@@ -69,6 +69,26 @@ impl EmailClient {
             }
         }
 
+        #[cfg(feature = "msgraph")]
+        if backend.allows_msgraph() {
+            if let Some(msgraph_config) = account_config.msgraph.take() {
+                use secrecy::ExposeSecret;
+
+                use crate::msgraph::client::msgraph_token;
+
+                let tls = msgraph_config
+                    .tls
+                    .clone()
+                    .into_tls(msgraph_config.alpn.clone());
+                let token = msgraph_token(msgraph_config.auth.clone())?;
+                inner = inner.connect_msgraph(
+                    &tls,
+                    token.expose_secret(),
+                    msgraph_config.user_id.clone(),
+                )?;
+            }
+        }
+
         #[cfg(feature = "imap")]
         if backend.allows_imap() {
             if let Some(imap_config) = account_config.imap.take() {

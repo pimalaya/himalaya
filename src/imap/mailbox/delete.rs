@@ -6,8 +6,8 @@ use crate::imap::{client::ImapClient, mailbox::arg::MailboxNameArg};
 
 /// Delete the given mailbox.
 ///
-/// All emails from the given mailbox are definitely deleted. The
-/// mailbox is also deleted after execution of the command.
+/// All emails from the given mailbox are definitely deleted. The mailbox is
+/// also deleted after execution of the command.
 #[derive(Debug, Parser)]
 pub struct ImapMailboxDeleteCommand {
     #[command(flatten)]

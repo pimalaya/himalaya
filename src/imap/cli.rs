@@ -8,10 +8,10 @@ use crate::imap::{
     id::ImapIdCommand, mailbox::cli::ImapMailboxCommand, message::cli::ImapMessageCommand,
 };
 
-/// IMAP CLI.
+/// IMAP-specific API.
 ///
-/// This command gives you access to the IMAP CLI API, and allows you
-/// to manage IMAP mailboxes, envelopes, flags, messages etc.
+/// Gives access to the raw IMAP API. Every CLI command matches the name of its
+/// IMAP counterpart, grouped by domain: mailbox, envelope, flag and message.
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum ImapCommand {

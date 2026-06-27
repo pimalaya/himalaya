@@ -73,6 +73,15 @@ impl AccountCheckCommand {
             }
         }
 
+        #[cfg(feature = "msgraph")]
+        if backend.allows_msgraph() {
+            if let Some(msgraph_config) = account_config.msgraph.clone() {
+                report
+                    .backends
+                    .push(check_msgraph(&config, &account_config, msgraph_config));
+            }
+        }
+
         #[cfg(feature = "maildir")]
         if backend.allows_maildir() {
             if let Some(maildir_config) = account_config.maildir.clone() {
@@ -176,6 +185,35 @@ fn check_gmail(
     })();
 
     BackendCheck::from("gmail", result)
+}
+
+#[cfg(feature = "msgraph")]
+fn check_msgraph(
+    _config: &Config,
+    _account_config: &AccountConfig,
+    msgraph_config: crate::config::MsgraphConfig,
+) -> BackendCheck {
+    use io_msgraph::v1::client::{MsgraphClientStd, MsgraphClientStdConnectOptions};
+    use secrecy::ExposeSecret;
+
+    use crate::msgraph::client::msgraph_token;
+
+    let result = (|| -> Result<()> {
+        let tls = msgraph_config
+            .tls
+            .clone()
+            .into_tls(msgraph_config.alpn.clone());
+        let token = msgraph_token(msgraph_config.auth.clone())?;
+        let options = MsgraphClientStdConnectOptions {
+            tls,
+            user_id: msgraph_config.user_id.clone(),
+        };
+        let mut client = MsgraphClientStd::connect(token.expose_secret(), options)?;
+        client.me()?;
+        Ok(())
+    })();
+
+    BackendCheck::from("msgraph", result)
 }
 
 #[cfg(feature = "maildir")]

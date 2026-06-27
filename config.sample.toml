@@ -298,6 +298,35 @@ imap.sasl.plain.password.raw = "***"
 #gmail.auth.token.command = ["ortie", "access-token", "read", "gmail"]
 
 # --------------------------------------------------------------------------------
+# Microsoft Graph config
+# --------------------------------------------------------------------------------
+#
+# Microsoft Graph API backend (https://graph.microsoft.com). Mail folders are
+# exposed as mailboxes and message fields back the shared flags (\Seen is isRead,
+# \Flagged is the follow-up flag, $Important is importance=high). Reachable
+# through the shared commands (`mailboxes`, `envelopes`, `flags`, `messages`);
+# select it with `--backend msgraph` when an account configures several backends.
+# --------------------------------------------------------------------------------
+
+# Graph user id (the mailbox owner). Defaults to "me", the authenticated user.
+#msgraph.user-id = "me"
+
+# Graph TLS provider (mirrors the imap.tls block above).
+#msgraph.tls.provider = "rustls"
+#msgraph.tls.rustls.crypto = "ring"
+#msgraph.tls.cert = "/path/to/custom/cert.pem"
+
+# ALPN protocol identifiers offered during the TLS handshake. Defaults to
+# ["http/1.1"] (the Graph API rides on HTTP/1.1); set to [] to skip ALPN.
+#msgraph.alpn = ["http/1.1"]
+
+# Graph only accepts OAuth 2.0 bearer tokens; supply a short-lived access token
+# (token refresh is the caller's responsibility). The client adds the `Bearer `
+# prefix itself.
+#msgraph.auth.token.raw = "***"
+#msgraph.auth.token.command = ["ortie", "access-token", "read", "msgraph"]
+
+# --------------------------------------------------------------------------------
 # Maildir config
 # --------------------------------------------------------------------------------
 

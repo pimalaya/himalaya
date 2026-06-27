@@ -9,12 +9,9 @@ use crate::m2dir::{
     list::M2dirMailboxListCommand, message::cli::M2dirMessageCommand,
 };
 
-/// m2dir CLI.
+/// M2dir-specific API.
 ///
-/// Protocol-specific entry point for the m2dir backend. Mailbox and
-/// per-folder operations (messages, flags, envelopes) live here;
-/// cross-backend shared commands also dispatch here when
-/// `--backend m2dir` is passed.
+/// This command gives you access to the raw m2dir API.
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum M2dirCommand {

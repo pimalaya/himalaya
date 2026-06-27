@@ -5,7 +5,7 @@ use pimalaya_cli::printer::Printer;
 use crate::account::context::Account;
 use crate::shared::{client::EmailClient, mailbox::list::MailboxListCommand};
 
-/// Shared API to manage mailboxes for the active account.
+/// Manage mailboxes using the shared API.
 ///
 /// A mailbox is a message container.
 #[derive(Debug, Subcommand)]

@@ -98,6 +98,9 @@ impl AccountRow {
         if account.gmail.is_some() {
             backends.push("gmail");
         }
+        if account.msgraph.is_some() {
+            backends.push("msgraph");
+        }
         if account.maildir.is_some() {
             backends.push("maildir");
         }

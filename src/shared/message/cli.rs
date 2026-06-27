@@ -12,14 +12,14 @@ use crate::shared::{
     },
 };
 
-/// Shared API to manage messages for the active account.
+/// Manage messages using the shared API.
 ///
-/// A message is composed of headers (key-value properties) and a body
-/// (suite of MIME parts). The built-in `compose` / `reply` / `forward`
-/// / `read` subcommands cover simple cases via CLI flags. Richer
-/// composition is delegated to standalone tools (e.g.
-/// [`mml`](https://github.com/pimalaya/mml)) wired up through shell
-/// pipelines into `messages send` / `messages add`.
+/// A message is composed of headers (key-value properties) and a body (suite of
+/// MIME parts). The built-in `compose` / `reply` / `forward` / `read`
+/// subcommands cover simple cases via CLI flags. Richer composition is
+/// delegated to standalone tools (e.g.
+/// [`mml`](https://github.com/pimalaya/mml)) wired up through shell pipelines
+/// into `messages send` / `messages add`.
 #[derive(Debug, Subcommand)]
 pub enum MessageCommand {
     #[command(visible_alias = "save")]

@@ -8,7 +8,7 @@ use crate::shared::{
     client::EmailClient,
 };
 
-/// Shared API to manage attachments for the active account.
+/// Manage attachments using the shared API.
 ///
 /// An attachment is a binary part of a message.
 #[derive(Debug, Subcommand)]

@@ -19,6 +19,7 @@ pub enum Backend {
     Imap,
     Jmap,
     Gmail,
+    Msgraph,
     Maildir,
     M2dir,
     Smtp,
@@ -39,6 +40,12 @@ impl Backend {
     /// Whether the Gmail arm of a shared command is allowed to run.
     pub fn allows_gmail(self) -> bool {
         matches!(self, Self::Auto | Self::Gmail)
+    }
+
+    /// Whether the Microsoft Graph arm of a shared command is allowed to
+    /// run.
+    pub fn allows_msgraph(self) -> bool {
+        matches!(self, Self::Auto | Self::Msgraph)
     }
 
     /// Whether the Maildir arm of a shared command is allowed to run.
@@ -66,6 +73,7 @@ impl FromStr for Backend {
             "imap" => Ok(Self::Imap),
             "jmap" => Ok(Self::Jmap),
             "gmail" => Ok(Self::Gmail),
+            "msgraph" => Ok(Self::Msgraph),
             "maildir" => Ok(Self::Maildir),
             "m2dir" => Ok(Self::M2dir),
             "smtp" => Ok(Self::Smtp),
@@ -81,6 +89,7 @@ impl fmt::Display for Backend {
             Self::Imap => write!(f, "imap"),
             Self::Jmap => write!(f, "jmap"),
             Self::Gmail => write!(f, "gmail"),
+            Self::Msgraph => write!(f, "msgraph"),
             Self::Maildir => write!(f, "maildir"),
             Self::M2dir => write!(f, "m2dir"),
             Self::Smtp => write!(f, "smtp"),

@@ -18,9 +18,9 @@ use crate::{config::ImapIdConfig, imap::client::ImapClient};
 
 /// Get information about the IMAP server.
 ///
-/// This command allows you to exchange parameters with the IMAP
-/// server accordingly to the [RFC 2971]. Some providers like mail.qq
-/// enforce sending ID command before selecting a mailbox.
+/// This command allows you to exchange parameters with the IMAP server
+/// accordingly to the [RFC 2971]. Some providers like mail.qq enforce sending
+/// ID command before selecting a mailbox.
 ///
 /// [RFC 2971]: https://www.rfc-editor.org/rfc/rfc2971.html
 #[derive(Debug, Parser)]

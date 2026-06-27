@@ -22,6 +22,8 @@ use crate::jmap::{cli::JmapCommand, client::build_jmap_client};
 use crate::m2dir::{cli::M2dirCommand, client::build_m2dir_client};
 #[cfg(feature = "maildir")]
 use crate::maildir::{cli::MaildirCommand, client::build_maildir_client};
+#[cfg(feature = "msgraph")]
+use crate::msgraph::{cli::MsgraphCommand, client::build_msgraph_client};
 #[cfg(feature = "smtp")]
 use crate::smtp::{cli::SmtpCommand, client::build_smtp_client};
 use crate::{
@@ -56,7 +58,7 @@ pub struct Cli {
     /// their own backend.
     ///
     /// Possible values: `auto` (default), `imap`, `jmap`, `gmail`,
-    /// `maildir`, `smtp`. With `auto`, the shared command picks the first
+    /// `msgraph`, `maildir`, `smtp`. With `auto`, the shared command picks the first
     /// configured backend it supports; with an explicit value, it uses
     /// only that backend (and bails if the account has no matching
     /// config block, or if the operation has no implementation for it
@@ -95,6 +97,9 @@ pub enum Command {
     #[cfg(feature = "gmail")]
     #[command(subcommand)]
     Gmail(GmailCommand),
+    #[cfg(feature = "msgraph")]
+    #[command(subcommand)]
+    Msgraph(MsgraphCommand),
     #[cfg(feature = "maildir")]
     #[command(subcommand)]
     Maildir(MaildirCommand),
@@ -186,6 +191,11 @@ impl Command {
             #[cfg(feature = "gmail")]
             Self::Gmail(cmd) => {
                 let (mut account, mut client) = build_gmail_client(config_paths, account_name)?;
+                cmd.execute(printer, &mut account, &mut client)
+            }
+            #[cfg(feature = "msgraph")]
+            Self::Msgraph(cmd) => {
+                let (mut account, mut client) = build_msgraph_client(config_paths, account_name)?;
                 cmd.execute(printer, &mut account, &mut client)
             }
             #[cfg(feature = "maildir")]

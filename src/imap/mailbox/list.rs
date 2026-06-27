@@ -21,11 +21,9 @@ pub struct ImapMailboxListCommand {
     /// List all mailboxes, not just subscribed ones.
     #[arg(short = 'A', long)]
     pub all: bool,
-
     /// The reference name for the LIST/LSUB command.
     #[arg(short, long, default_value = "")]
     pub reference: String,
-
     /// The mailbox name pattern with wildcards (* and %).
     #[arg(short, long, default_value = "*")]
     pub pattern: String,

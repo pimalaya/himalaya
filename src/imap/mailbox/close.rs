@@ -9,8 +9,8 @@ use crate::imap::client::ImapClient;
 /// This command also expunges the current mailbox and returns to the
 /// authenticated state.
 ///
-/// NOTE: Since a selected mailbox is required, this command only
-/// works for stateful IMAP sessions. See:
+/// NOTE: Since a selected mailbox is required, this command only works for
+/// stateful IMAP sessions. See:
 ///
 /// https://github.com/pimalaya/sirup
 #[derive(Debug, Parser)]

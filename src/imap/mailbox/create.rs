@@ -6,8 +6,7 @@ use crate::imap::{client::ImapClient, mailbox::arg::MailboxNameArg};
 
 /// Create the given mailbox.
 ///
-/// This command allows you to create a new mailbox using the given
-/// name.
+/// This command allows you to create a new mailbox using the given name.
 #[derive(Debug, Parser)]
 pub struct ImapMailboxCreateCommand {
     #[command(flatten)]

@@ -110,6 +110,8 @@ pub struct AccountConfig {
     #[allow(unused)]
     pub gmail: Option<GmailConfig>,
     #[allow(unused)]
+    pub msgraph: Option<MsgraphConfig>,
+    #[allow(unused)]
     pub maildir: Option<MaildirConfig>,
     #[allow(unused)]
     pub m2dir: Option<M2dirConfig>,
@@ -696,5 +698,55 @@ fn default_gmail_alpn() -> Vec<String> {
 pub struct GmailAuthConfig {
     /// OAuth 2.0 bearer access token; sent as `Bearer <token>`. It is
     /// the only authorization Gmail's REST API accepts.
+    pub token: Secret,
+}
+
+/// Microsoft Graph API configuration.
+///
+/// Graph has no per-account server address: the client always talks to
+/// `https://graph.microsoft.com`. Only the mailbox owner, TLS and the
+/// OAuth 2.0 credential are configurable.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct MsgraphConfig {
+    /// Graph user id (the mailbox owner). Defaults to `me`, the
+    /// authenticated user; set it to a user id or principal name to
+    /// target another mailbox.
+    #[serde(default = "default_msgraph_user_id")]
+    pub user_id: String,
+
+    /// TLS configuration.
+    #[serde(default)]
+    pub tls: TlsConfig,
+
+    /// ALPN protocol identifiers offered during the TLS handshake.
+    /// Defaults to `["http/1.1"]` (the Graph API rides on HTTP/1.1). Set
+    /// to `[]` to skip ALPN negotiation entirely. Only relevant for the
+    /// rustls provider; `native-tls` ignores ALPN.
+    #[serde(default = "default_msgraph_alpn")]
+    pub alpn: Vec<String>,
+
+    /// Authentication configuration.
+    pub auth: MsgraphAuthConfig,
+}
+
+fn default_msgraph_user_id() -> String {
+    String::from("me")
+}
+
+fn default_msgraph_alpn() -> Vec<String> {
+    vec![String::from("http/1.1")]
+}
+
+/// Microsoft Graph authentication configuration.
+///
+/// Graph only accepts OAuth 2.0 bearer tokens; supply a short-lived
+/// access token (e.g. minted by an external helper such as `ortie`).
+/// Token refresh is the caller's responsibility.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct MsgraphAuthConfig {
+    /// OAuth 2.0 bearer access token; sent as `Bearer <token>`. It is
+    /// the only authorization the Graph API accepts.
     pub token: Secret,
 }

@@ -9,11 +9,11 @@ use crate::gmail::{
     profile::GmailProfileCommand, settings::GmailSettingsCommand, threads::GmailThreadsCommand,
 };
 
-/// Gmail CLI.
+/// Gmail-specific API.
 ///
-/// This command gives you access to the Gmail REST API, organized by
-/// Gmail resource: profile, labels, messages (and attachments),
-/// drafts, threads, history and settings.
+/// This command gives you access to the raw Gmail REST API, organized by Gmail
+/// resource: profile, labels, messages (and attachments), drafts, threads,
+/// history and settings.
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum GmailCommand {

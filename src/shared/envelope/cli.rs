@@ -8,11 +8,11 @@ use crate::shared::{
     envelope::{list::EnvelopeListCommand, search::EnvelopeSearchCommand},
 };
 
-/// Shared API to manage envelopes for the active account.
+/// Manage envelopes using the shared API.
 ///
-/// An envelope is a message headers subset. It is usually small, and
-/// contains enough information to have an overall understanding of
-/// what a message is about.
+/// An envelope is a message headers subset. It is usually small, and contains
+/// enough information to have an overall understanding of what a message is
+/// about.
 #[derive(Debug, Subcommand)]
 pub enum EnvelopeCommand {
     #[command(visible_alias = "ls")]

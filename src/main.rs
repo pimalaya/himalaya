@@ -12,6 +12,8 @@ mod jmap;
 mod m2dir;
 #[cfg(feature = "maildir")]
 mod maildir;
+#[cfg(feature = "msgraph")]
+mod msgraph;
 mod shared;
 #[cfg(feature = "smtp")]
 mod smtp;
