@@ -1,5 +1,5 @@
-use anyhow::{Result, bail};
-use clap::{Parser, Subcommand};
+use anyhow::Result;
+use clap::{Parser, Subcommand, ValueEnum};
 use io_gmail::v1::rest::history::{
     GmailHistoryType,
     list::{GmailHistoryList, GmailHistoryListParams},
@@ -41,7 +41,7 @@ pub struct GmailHistoryListCommand {
 
     /// History change types to include (repeatable).
     #[arg(long = "history-type", value_name = "TYPE")]
-    pub history_types: Vec<String>,
+    pub history_types: Vec<HistoryTypeArg>,
 
     /// Maximum number of history records to return.
     #[arg(short = 's', long, value_name = "N")]
@@ -54,11 +54,8 @@ pub struct GmailHistoryListCommand {
 
 impl GmailHistoryListCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
-        let mut types = Vec::with_capacity(self.history_types.len());
-
-        for history_type in &self.history_types {
-            types.push(parse_history_type(history_type)?);
-        }
+        let types: Vec<GmailHistoryType> =
+            self.history_types.iter().copied().map(Into::into).collect();
 
         let out = {
             let params = GmailHistoryListParams {
@@ -102,17 +99,23 @@ impl GmailHistoryListCommand {
     }
 }
 
-/// Parse a CLI history type into its Gmail enum value, matching the
-/// camelCase wire spellings.
-fn parse_history_type(value: &str) -> Result<GmailHistoryType> {
-    match value {
-        "messageAdded" => Ok(GmailHistoryType::MessageAdded),
-        "messageDeleted" => Ok(GmailHistoryType::MessageDeleted),
-        "labelAdded" => Ok(GmailHistoryType::LabelAdded),
-        "labelRemoved" => Ok(GmailHistoryType::LabelRemoved),
-        other => bail!(
-            "Unknown history type `{other}`, expected one of \
-             messageAdded, messageDeleted, labelAdded, labelRemoved"
-        ),
+/// Gmail history change type accepted on the CLI.
+#[derive(Clone, Copy, Debug, ValueEnum)]
+#[clap(rename_all = "camelCase")]
+pub enum HistoryTypeArg {
+    MessageAdded,
+    MessageDeleted,
+    LabelAdded,
+    LabelRemoved,
+}
+
+impl From<HistoryTypeArg> for GmailHistoryType {
+    fn from(arg: HistoryTypeArg) -> Self {
+        match arg {
+            HistoryTypeArg::MessageAdded => GmailHistoryType::MessageAdded,
+            HistoryTypeArg::MessageDeleted => GmailHistoryType::MessageDeleted,
+            HistoryTypeArg::LabelAdded => GmailHistoryType::LabelAdded,
+            HistoryTypeArg::LabelRemoved => GmailHistoryType::LabelRemoved,
+        }
     }
 }

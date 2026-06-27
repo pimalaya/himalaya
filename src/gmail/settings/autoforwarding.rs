@@ -10,7 +10,7 @@ use crate::{
     account::context::Account,
     gmail::{
         client::GmailClient,
-        settings::convert::{disposition_wire, parse_disposition},
+        settings::convert::{DispositionArg, disposition_wire},
     },
 };
 
@@ -75,22 +75,16 @@ pub struct GmailSettingsAutoForwardingSetCommand {
     #[arg(long)]
     pub email_address: Option<String>,
 
-    #[arg(long)]
-    pub disposition: Option<String>,
+    #[arg(long, value_name = "DISPOSITION")]
+    pub disposition: Option<DispositionArg>,
 }
 
 impl GmailSettingsAutoForwardingSetCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
-        let disposition = self
-            .disposition
-            .as_deref()
-            .map(parse_disposition)
-            .transpose()?;
-
         let settings = GmailAutoForwarding {
             enabled: self.enable,
             email_address: self.email_address,
-            disposition,
+            disposition: self.disposition.map(Into::into),
         };
 
         let _out = {

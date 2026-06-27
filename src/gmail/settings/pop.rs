@@ -10,7 +10,7 @@ use crate::{
     gmail::{
         client::GmailClient,
         settings::convert::{
-            access_window_wire, disposition_wire, parse_access_window, parse_disposition,
+            DispositionArg, PopAccessWindowArg, access_window_wire, disposition_wire,
         },
     },
 };
@@ -69,29 +69,18 @@ impl GmailSettingsPopGetCommand {
 /// Update the Gmail POP access settings.
 #[derive(Debug, Parser)]
 pub struct GmailSettingsPopSetCommand {
-    #[arg(long)]
-    pub access_window: Option<String>,
+    #[arg(long, value_name = "WINDOW")]
+    pub access_window: Option<PopAccessWindowArg>,
 
-    #[arg(long)]
-    pub disposition: Option<String>,
+    #[arg(long, value_name = "DISPOSITION")]
+    pub disposition: Option<DispositionArg>,
 }
 
 impl GmailSettingsPopSetCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
-        let access_window = self
-            .access_window
-            .as_deref()
-            .map(parse_access_window)
-            .transpose()?;
-        let disposition = self
-            .disposition
-            .as_deref()
-            .map(parse_disposition)
-            .transpose()?;
-
         let settings = GmailPopSettings {
-            access_window,
-            disposition,
+            access_window: self.access_window.map(Into::into),
+            disposition: self.disposition.map(Into::into),
         };
 
         let _out = {

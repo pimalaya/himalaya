@@ -1,11 +1,72 @@
-//! CLI presentation and parsing helpers mapping Gmail settings enums
-//! to and from their camelCase wire spellings. These converters live in
-//! himalaya, not io-gmail, since they are pure CLI affordances.
+//! CLI presentation and input helpers mapping Gmail settings enums to
+//! and from their camelCase wire spellings. These converters live in
+//! himalaya, not io-gmail, since they are pure CLI affordances. Input
+//! enums derive [`ValueEnum`] with the Gmail wire spelling, so the
+//! value a `set` command accepts matches what the paired `get` prints.
 
-use anyhow::{Result, bail};
+use clap::ValueEnum;
 use io_gmail::v1::rest::settings::{
     GmailDisposition, GmailExpungeBehavior, GmailPopAccessWindow, GmailVerificationStatus,
 };
+
+/// Auto-forwarding / POP disposition accepted on the CLI.
+#[derive(Clone, Copy, Debug, ValueEnum)]
+#[clap(rename_all = "camelCase")]
+pub enum DispositionArg {
+    LeaveInInbox,
+    Archive,
+    Trash,
+    MarkRead,
+}
+
+impl From<DispositionArg> for GmailDisposition {
+    fn from(arg: DispositionArg) -> Self {
+        match arg {
+            DispositionArg::LeaveInInbox => GmailDisposition::LeaveInInbox,
+            DispositionArg::Archive => GmailDisposition::Archive,
+            DispositionArg::Trash => GmailDisposition::Trash,
+            DispositionArg::MarkRead => GmailDisposition::MarkRead,
+        }
+    }
+}
+
+/// IMAP expunge behavior accepted on the CLI.
+#[derive(Clone, Copy, Debug, ValueEnum)]
+#[clap(rename_all = "camelCase")]
+pub enum ExpungeBehaviorArg {
+    Archive,
+    Trash,
+    DeleteForever,
+}
+
+impl From<ExpungeBehaviorArg> for GmailExpungeBehavior {
+    fn from(arg: ExpungeBehaviorArg) -> Self {
+        match arg {
+            ExpungeBehaviorArg::Archive => GmailExpungeBehavior::Archive,
+            ExpungeBehaviorArg::Trash => GmailExpungeBehavior::Trash,
+            ExpungeBehaviorArg::DeleteForever => GmailExpungeBehavior::DeleteForever,
+        }
+    }
+}
+
+/// POP access window accepted on the CLI.
+#[derive(Clone, Copy, Debug, ValueEnum)]
+#[clap(rename_all = "camelCase")]
+pub enum PopAccessWindowArg {
+    Disabled,
+    FromNowOn,
+    AllMail,
+}
+
+impl From<PopAccessWindowArg> for GmailPopAccessWindow {
+    fn from(arg: PopAccessWindowArg) -> Self {
+        match arg {
+            PopAccessWindowArg::Disabled => GmailPopAccessWindow::Disabled,
+            PopAccessWindowArg::FromNowOn => GmailPopAccessWindow::FromNowOn,
+            PopAccessWindowArg::AllMail => GmailPopAccessWindow::AllMail,
+        }
+    }
+}
 
 /// Map a disposition to its Gmail wire spelling for display.
 pub fn disposition_wire(disposition: GmailDisposition) -> &'static str {
@@ -15,21 +76,6 @@ pub fn disposition_wire(disposition: GmailDisposition) -> &'static str {
         GmailDisposition::Archive => "archive",
         GmailDisposition::Trash => "trash",
         GmailDisposition::MarkRead => "markRead",
-    }
-}
-
-/// Parse a CLI disposition into its Gmail enum value.
-pub fn parse_disposition(value: &str) -> Result<GmailDisposition> {
-    match value {
-        "dispositionUnspecified" => Ok(GmailDisposition::DispositionUnspecified),
-        "leaveInInbox" => Ok(GmailDisposition::LeaveInInbox),
-        "archive" => Ok(GmailDisposition::Archive),
-        "trash" => Ok(GmailDisposition::Trash),
-        "markRead" => Ok(GmailDisposition::MarkRead),
-        other => bail!(
-            "Unknown disposition `{other}`, expected one of \
-             dispositionUnspecified, leaveInInbox, archive, trash, markRead"
-        ),
     }
 }
 
@@ -43,20 +89,6 @@ pub fn expunge_behavior_wire(behavior: GmailExpungeBehavior) -> &'static str {
     }
 }
 
-/// Parse a CLI expunge behavior into its Gmail enum value.
-pub fn parse_expunge_behavior(value: &str) -> Result<GmailExpungeBehavior> {
-    match value {
-        "expungeBehaviorUnspecified" => Ok(GmailExpungeBehavior::ExpungeBehaviorUnspecified),
-        "archive" => Ok(GmailExpungeBehavior::Archive),
-        "trash" => Ok(GmailExpungeBehavior::Trash),
-        "deleteForever" => Ok(GmailExpungeBehavior::DeleteForever),
-        other => bail!(
-            "Unknown expunge behavior `{other}`, expected one of \
-             expungeBehaviorUnspecified, archive, trash, deleteForever"
-        ),
-    }
-}
-
 /// Map a POP access window to its Gmail wire spelling for display.
 pub fn access_window_wire(access_window: GmailPopAccessWindow) -> &'static str {
     match access_window {
@@ -64,20 +96,6 @@ pub fn access_window_wire(access_window: GmailPopAccessWindow) -> &'static str {
         GmailPopAccessWindow::Disabled => "disabled",
         GmailPopAccessWindow::FromNowOn => "fromNowOn",
         GmailPopAccessWindow::AllMail => "allMail",
-    }
-}
-
-/// Parse a CLI POP access window into its Gmail enum value.
-pub fn parse_access_window(value: &str) -> Result<GmailPopAccessWindow> {
-    match value {
-        "accessWindowUnspecified" => Ok(GmailPopAccessWindow::AccessWindowUnspecified),
-        "disabled" => Ok(GmailPopAccessWindow::Disabled),
-        "fromNowOn" => Ok(GmailPopAccessWindow::FromNowOn),
-        "allMail" => Ok(GmailPopAccessWindow::AllMail),
-        other => bail!(
-            "Unknown access window `{other}`, expected one of \
-             accessWindowUnspecified, disabled, fromNowOn, allMail"
-        ),
     }
 }
 

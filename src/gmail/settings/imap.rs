@@ -9,7 +9,7 @@ use crate::{
     account::context::Account,
     gmail::{
         client::GmailClient,
-        settings::convert::{expunge_behavior_wire, parse_expunge_behavior},
+        settings::convert::{ExpungeBehaviorArg, expunge_behavior_wire},
     },
 };
 
@@ -83,8 +83,8 @@ pub struct GmailSettingsImapSetCommand {
     #[arg(long)]
     pub auto_expunge: Option<bool>,
 
-    #[arg(long)]
-    pub expunge_behavior: Option<String>,
+    #[arg(long, value_name = "BEHAVIOR")]
+    pub expunge_behavior: Option<ExpungeBehaviorArg>,
 
     #[arg(long)]
     pub max_folder_size: Option<u32>,
@@ -92,16 +92,10 @@ pub struct GmailSettingsImapSetCommand {
 
 impl GmailSettingsImapSetCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
-        let expunge_behavior = self
-            .expunge_behavior
-            .as_deref()
-            .map(parse_expunge_behavior)
-            .transpose()?;
-
         let settings = GmailImapSettings {
             enabled: self.enable,
             auto_expunge: self.auto_expunge,
-            expunge_behavior,
+            expunge_behavior: self.expunge_behavior.map(Into::into),
             max_folder_size: self.max_folder_size,
         };
 
