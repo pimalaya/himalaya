@@ -1137,7 +1137,7 @@ dependencies = [
 [[package]]
 name = "io-imap"
 version = "0.1.0"
-source = "git+https://github.com/pimalaya/io-imap#e6b4fb10633875b2f7d313f459dbd561458ed244"
+source = "git+https://github.com/pimalaya/io-imap#a86ee75454af928f0a073e44c5666629d4be1d86"
 dependencies = [
  "anyhow",
  "base64",
@@ -1194,7 +1194,7 @@ dependencies = [
 [[package]]
 name = "io-msgraph"
 version = "0.0.1"
-source = "git+https://github.com/pimalaya/io-msgraph#d438fc3957e4c3f145e99454e5064951f798233d"
+source = "git+https://github.com/pimalaya/io-msgraph#3a973a67248676ed59f5c008ac053fd17783eb91"
 dependencies = [
  "anyhow",
  "base64",

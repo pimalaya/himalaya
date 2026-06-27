@@ -23,6 +23,7 @@ use crate::imap::{
     message::{
         copy::ImapMessageCopyCommand, r#move::ImapMessageMoveCommand, save::ImapMessageSaveCommand,
     },
+    raw::ImapRawCommand,
 };
 
 /// IMAP-specific API.
@@ -62,6 +63,9 @@ pub enum ImapCommand {
     Append(ImapMessageSaveCommand),
     Copy(ImapMessageCopyCommand),
     Move(ImapMessageMoveCommand),
+
+    // Raw passthrough.
+    Raw(ImapRawCommand),
 }
 
 impl ImapCommand {
@@ -97,6 +101,8 @@ impl ImapCommand {
             Self::Append(cmd) => cmd.execute(printer, client),
             Self::Copy(cmd) => cmd.execute(printer, client),
             Self::Move(cmd) => cmd.execute(printer, client),
+
+            Self::Raw(cmd) => cmd.execute(printer, client),
         }
     }
 }
