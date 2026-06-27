@@ -35,14 +35,21 @@ impl SmtpClient {
         let tls = config.tls.into_tls(config.alpn);
         let domain: EhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
         let server = parse_smtp_server(&config.server)?;
-        let sasl: Option<Sasl> = config
-            .sasl
-            .and_then(|cfg| {
-                let host = server.host_str()?;
-                let port = server.port_or_known_default()?;
-                Some(cfg.try_into_sasl(host, port))
-            })
-            .transpose()?;
+        let sasl: Option<Sasl> = match config.sasl {
+            Some(cfg) => {
+                let host = server
+                    .host_str()
+                    .ok_or_else(|| anyhow!("Cannot derive host from SMTP server `{server}`"))?;
+                // url does not know the smtp(s) default ports; match
+                // io-smtp's own connection defaults (465 for smtps).
+                let port =
+                    server
+                        .port()
+                        .unwrap_or(if server.scheme() == "smtps" { 465 } else { 25 });
+                Some(cfg.try_into_sasl(host, port)?)
+            }
+            None => None,
+        };
         let inner = Inner::connect(&server, &tls, config.starttls, domain, sasl)?;
         Ok(Self { inner })
     }

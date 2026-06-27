@@ -38,14 +38,21 @@ impl ImapClient {
         let tls = config.tls.into_tls(config.alpn);
         let auto_id = resolve_auto_id_params(&config.id)?;
         let server = parse_imap_server(&config.server)?;
-        let sasl: Option<Sasl> = config
-            .sasl
-            .and_then(|cfg| {
-                let host = server.host_str()?;
-                let port = server.port_or_known_default()?;
-                Some(cfg.try_into_sasl(host, port))
-            })
-            .transpose()?;
+        let sasl: Option<Sasl> = match config.sasl {
+            Some(cfg) => {
+                let host = server
+                    .host_str()
+                    .ok_or_else(|| anyhow!("Cannot derive host from IMAP server `{server}`"))?;
+                // url does not know the imap(s) default ports, so fall
+                // back to the same scheme defaults io-imap connects with.
+                let port =
+                    server
+                        .port()
+                        .unwrap_or(if server.scheme() == "imaps" { 993 } else { 143 });
+                Some(cfg.try_into_sasl(host, port)?)
+            }
+            None => None,
+        };
         let (inner, capabilities) = Inner::connect(&server, &tls, config.starttls, sasl, auto_id)?;
         Ok(Self {
             inner,
