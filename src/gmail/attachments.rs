@@ -1,9 +1,11 @@
 use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
 use io_gmail::v1::rest::messages::{attachments::get::GmailAttachmentGet, decode_raw};
-use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::printer::Printer;
 
-use crate::{account::context::Account, gmail::client::GmailClient};
+use crate::{
+    account::context::Account, gmail::client::GmailClient, shared::output::write_bytes_or_save,
+};
 
 /// Manage Gmail message attachments (messages.attachments).
 #[derive(Debug, Subcommand)]
@@ -54,15 +56,6 @@ impl GmailAttachmentGetCommand {
         let bytes =
             decode_raw(&data).map_err(|err| anyhow!("Decode Gmail attachment error: {err}"))?;
 
-        if let Some(path) = self.output {
-            std::fs::write(&path, &bytes)?;
-            printer.out(Message::new(format!(
-                "Saved {} bytes to {}",
-                bytes.len(),
-                path.display()
-            )))
-        } else {
-            printer.out(Message::new(String::from_utf8_lossy(&bytes).into_owned()))
-        }
+        write_bytes_or_save(printer, self.output.as_deref(), &bytes)
     }
 }

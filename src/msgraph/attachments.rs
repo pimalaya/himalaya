@@ -7,7 +7,9 @@ use io_msgraph::v1::rest::users::messages::attachments::MsgraphAttachment;
 use pimalaya_cli::printer::{Message, Printer};
 use serde::Serialize;
 
-use crate::{account::context::Account, msgraph::client::MsgraphClient};
+use crate::{
+    account::context::Account, msgraph::client::MsgraphClient, shared::output::write_bytes_or_save,
+};
 
 /// Manage Microsoft Graph message attachments
 /// (`me.messages.attachments`).
@@ -91,16 +93,7 @@ impl MsgraphAttachmentGetCommand {
             .attachment_get_raw(&self.message_id, &self.id)?
             .response;
 
-        if let Some(path) = self.output {
-            std::fs::write(&path, &bytes)?;
-            printer.out(Message::new(format!(
-                "Saved {} bytes to {}",
-                bytes.len(),
-                path.display()
-            )))
-        } else {
-            printer.out(Message::new(String::from_utf8_lossy(&bytes).into_owned()))
-        }
+        write_bytes_or_save(printer, self.output.as_deref(), &bytes)
     }
 }
 

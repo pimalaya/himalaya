@@ -11,7 +11,9 @@ use io_gmail::v1::rest::messages::{
 use pimalaya_cli::printer::{Message, Printer};
 use serde::Serialize;
 
-use crate::{account::context::Account, gmail::client::GmailClient};
+use crate::{
+    account::context::Account, gmail::client::GmailClient, shared::output::write_bytes_or_save,
+};
 
 /// Manage Gmail messages (users.messages).
 #[derive(Debug, Subcommand)]
@@ -141,8 +143,7 @@ impl GmailMessageGetCommand {
             if let Some(raw) = &msg.raw {
                 let bytes =
                     decode_raw(raw).map_err(|err| anyhow!("Decode Gmail message error: {err}"))?;
-                let content = String::from_utf8_lossy(&bytes).into_owned();
-                return printer.out(Message::new(content));
+                return write_bytes_or_save(printer, None, &bytes);
             }
         }
 

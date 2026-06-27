@@ -9,7 +9,9 @@ use io_msgraph::v1::rest::users::messages::{
 use pimalaya_cli::printer::{Message, Printer};
 use serde::Serialize;
 
-use crate::{account::context::Account, msgraph::client::MsgraphClient};
+use crate::{
+    account::context::Account, msgraph::client::MsgraphClient, shared::output::write_bytes_or_save,
+};
 
 /// Manage Microsoft Graph messages (`me.messages`).
 #[derive(Debug, Subcommand)]
@@ -150,8 +152,7 @@ impl MsgraphMessageGetCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
         if self.raw {
             let bytes = client.message_get_raw(&self.id)?.response;
-            let content = String::from_utf8_lossy(&bytes).into_owned();
-            return printer.out(Message::new(content));
+            return write_bytes_or_save(printer, None, &bytes);
         }
 
         let msg = client.message_get(&self.id)?.response;
