@@ -10,10 +10,9 @@ use serde::{Serialize, Serializer};
 use crate::account::context::Account;
 use crate::imap::{client::ImapClient, mailbox::arg::MailboxNameArg};
 
-/// Get the status of the given mailbox.
+/// Get the status of the given mailbox (STATUS, RFC 3501).
 ///
-/// This command displays status information about a mailbox,
-/// including message counts and UID values.
+/// Reports message counts and UID values without selecting the mailbox.
 #[derive(Debug, Parser)]
 pub struct ImapMailboxStatusCommand {
     #[command(flatten)]

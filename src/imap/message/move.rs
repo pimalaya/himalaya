@@ -11,11 +11,10 @@ use crate::imap::{
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag, TargetMailboxNameArg},
 };
 
-/// Move message(s) to the given mailbox.
+/// Move IMAP message(s) to the given mailbox (MOVE, RFC 6851).
 ///
-/// This command moves messages identified by the given sequence set
-/// from the source mailbox to the destination mailbox. Requires the
-/// MOVE IMAP extension.
+/// Moves the messages in the sequence set from the source mailbox to
+/// the destination mailbox. Requires the MOVE extension.
 #[derive(Debug, Parser)]
 pub struct ImapMessageMoveCommand {
     #[command(flatten)]

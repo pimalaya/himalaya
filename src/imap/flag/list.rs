@@ -13,11 +13,10 @@ use serde::{Serialize, Serializer};
 use crate::account::context::Account;
 use crate::imap::{client::ImapClient, mailbox::arg::MailboxNameArg};
 
-/// List available IMAP flags for the given mailbox.
+/// List the flags available in the given mailbox (SELECT response, RFC 3501).
 ///
-/// This command displays the flags and permanent flags that are
-/// available in the given mailbox. These flags come from the SELECT
-/// response.
+/// Reports the FLAGS and PERMANENTFLAGS the server returns when the
+/// mailbox is selected.
 #[derive(Debug, Parser)]
 pub struct ImapFlagListCommand {
     #[command(flatten)]

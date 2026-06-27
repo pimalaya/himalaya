@@ -4,10 +4,9 @@ use pimalaya_cli::printer::{Message, Printer};
 
 use crate::imap::{client::ImapClient, mailbox::arg::MailboxNameArg};
 
-/// Subscribe to the given mailbox.
+/// Subscribe to the given mailbox (SUBSCRIBE, RFC 3501).
 ///
-/// This command subscribes to a mailbox, making it appear in the
-/// list of subscribed mailboxes.
+/// Adds the mailbox to the set of subscribed mailboxes.
 #[derive(Debug, Parser)]
 pub struct ImapMailboxSubscribeCommand {
     #[command(flatten)]

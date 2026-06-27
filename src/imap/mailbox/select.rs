@@ -5,14 +5,13 @@ use pimalaya_cli::printer::{Message, Printer};
 
 use crate::imap::{client::ImapClient, mailbox::arg::MailboxNameArg};
 
-/// Select the given mailbox.
+/// Select the given mailbox (SELECT, RFC 3501).
 ///
-/// This command permanently removes all messages with the \Deleted
-/// flag and returns to the authenticated state.
+/// Opens the mailbox for read-write access and returns its status
+/// (flags, message count, UID validity, ...).
 ///
-/// NOTE: This command only works for stateful IMAP sessions. See:
-///
-/// https://github.com/pimalaya/sirup
+/// NOTE: a selected mailbox only persists within a stateful IMAP
+/// session. See https://github.com/pimalaya/sirup
 #[derive(Debug, Parser)]
 pub struct ImapMailboxSelectCommand {
     #[command(flatten)]

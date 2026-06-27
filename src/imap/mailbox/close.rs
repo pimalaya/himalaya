@@ -4,15 +4,12 @@ use pimalaya_cli::printer::{Message, Printer};
 
 use crate::imap::client::ImapClient;
 
-/// Close the current, selected mailbox.
+/// Close the selected mailbox (CLOSE, RFC 3501).
 ///
-/// This command also expunges the current mailbox and returns to the
-/// authenticated state.
+/// Expunges \Deleted messages and returns to the authenticated state.
 ///
-/// NOTE: Since a selected mailbox is required, this command only works for
-/// stateful IMAP sessions. See:
-///
-/// https://github.com/pimalaya/sirup
+/// NOTE: requires a selected mailbox, so this only works within a
+/// stateful IMAP session. See https://github.com/pimalaya/sirup
 #[derive(Debug, Parser)]
 pub struct ImapMailboxCloseCommand;
 

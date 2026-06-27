@@ -4,14 +4,12 @@ use pimalaya_cli::printer::{Message, Printer};
 
 use crate::imap::client::ImapClient;
 
-/// Unselect a current, selected mailbox.
+/// Unselect the selected mailbox (UNSELECT, RFC 3691).
 ///
-/// Unlike CLOSE, UNSELECT does not expunge deleted messages.
+/// Like CLOSE but does not expunge \Deleted messages.
 ///
-/// NOTE: Since a selected mailbox is required, this command only
-/// works for stateful IMAP sessions. See:
-///
-/// https://github.com/pimalaya/sirup
+/// NOTE: requires a selected mailbox, so this only works within a
+/// stateful IMAP session. See https://github.com/pimalaya/sirup
 #[derive(Debug, Parser)]
 pub struct ImapMailboxUnselectCommand;
 

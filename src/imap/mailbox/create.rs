@@ -4,9 +4,9 @@ use pimalaya_cli::printer::{Message, Printer};
 
 use crate::imap::{client::ImapClient, mailbox::arg::MailboxNameArg};
 
-/// Create the given mailbox.
+/// Create the given mailbox (CREATE, RFC 3501).
 ///
-/// This command allows you to create a new mailbox using the given name.
+/// Creates a new mailbox with the given name.
 #[derive(Debug, Parser)]
 pub struct ImapMailboxCreateCommand {
     #[command(flatten)]

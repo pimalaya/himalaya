@@ -8,10 +8,9 @@ use crate::imap::{
     mailbox::arg::{MailboxNameArg, MailboxNoSelectFlag},
 };
 
-/// Expunge the given mailbox.
+/// Expunge the given mailbox (EXPUNGE, RFC 3501).
 ///
-/// All envelopes with the \Deleted flag will be definitely removed from the
-/// given mailbox.
+/// Permanently removes every message flagged \Deleted from the mailbox.
 #[derive(Debug, Parser)]
 pub struct ImapMailboxExpungeCommand {
     #[command(flatten)]

@@ -4,10 +4,9 @@ use pimalaya_cli::printer::{Message, Printer};
 
 use crate::imap::{client::ImapClient, mailbox::arg::MailboxNameArg};
 
-/// Unsubscribe from the given mailbox.
+/// Unsubscribe from the given mailbox (UNSUBSCRIBE, RFC 3501).
 ///
-/// This command unsubscribes from a mailbox, removing it from the
-/// list of subscribed mailboxes.
+/// Removes the mailbox from the set of subscribed mailboxes.
 #[derive(Debug, Parser)]
 pub struct ImapMailboxUnsubscribeCommand {
     #[command(flatten)]

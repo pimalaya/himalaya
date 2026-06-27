@@ -11,11 +11,10 @@ use serde::Serialize;
 use crate::account::context::Account;
 use crate::imap::client::ImapClient;
 
-/// List, search and filter mailboxes.
+/// List mailboxes (LIST / LSUB, RFC 3501).
 ///
-/// This command allows you to list mailboxes from your IMAP account.
-/// By default, only subscribed mailboxes are listed. Use --all to
-/// list all mailboxes.
+/// Lists subscribed mailboxes (LSUB) by default, or every mailbox
+/// (LIST) with --all.
 #[derive(Debug, Parser)]
 pub struct ImapMailboxListCommand {
     /// List all mailboxes, not just subscribed ones.

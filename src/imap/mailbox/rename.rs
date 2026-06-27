@@ -7,9 +7,9 @@ use crate::imap::{
     mailbox::arg::{MailboxNameArg, TargetMailboxNameArg},
 };
 
-/// Rename the given mailbox.
+/// Rename the given mailbox (RENAME, RFC 3501).
 ///
-/// This command renames an existing mailbox to a new name.
+/// Renames an existing mailbox to a new name.
 #[derive(Debug, Parser)]
 pub struct ImapMailboxRenameCommand {
     #[command(flatten)]

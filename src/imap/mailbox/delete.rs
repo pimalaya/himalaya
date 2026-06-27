@@ -4,10 +4,9 @@ use pimalaya_cli::printer::{Message, Printer};
 
 use crate::imap::{client::ImapClient, mailbox::arg::MailboxNameArg};
 
-/// Delete the given mailbox.
+/// Delete the given mailbox (DELETE, RFC 3501).
 ///
-/// All emails from the given mailbox are definitely deleted. The mailbox is
-/// also deleted after execution of the command.
+/// Permanently deletes the mailbox and all the messages it contains.
 #[derive(Debug, Parser)]
 pub struct ImapMailboxDeleteCommand {
     #[command(flatten)]

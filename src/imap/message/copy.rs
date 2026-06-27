@@ -11,10 +11,10 @@ use crate::imap::{
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag, TargetMailboxNameArg},
 };
 
-/// Copy IMAP message(s) to the given mailbox.
+/// Copy IMAP message(s) to the given mailbox (COPY, RFC 3501).
 ///
-/// This command copies message(s) identified by the given sequence
-/// set from the source mailbox to the destination mailbox.
+/// Copies the messages in the sequence set from the source mailbox to
+/// the destination mailbox.
 #[derive(Debug, Parser)]
 pub struct ImapMessageCopyCommand {
     #[command(flatten)]
