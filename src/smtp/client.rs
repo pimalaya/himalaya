@@ -18,7 +18,11 @@ use pimalaya_config::toml::TomlConfig;
 use pimalaya_stream::sasl::Sasl;
 use url::Url;
 
-use crate::{account::context::Account, cli::load_or_wizard, config::SmtpConfig};
+use crate::{
+    account::context::Account,
+    cli::load_or_wizard,
+    config::{SmtpConfig, parse_server},
+};
 
 pub struct SmtpClient {
     inner: Inner,
@@ -46,18 +50,11 @@ impl SmtpClient {
 
 /// Parses an SMTP server string into a URL.
 ///
-/// Accepts a bare authority (`smtp.example.com`, optionally with a
-/// port), which is treated as `smtps://<authority>` (secure by
-/// default); or a full URL whose scheme (`smtp` or `smtps`) is used
-/// verbatim. Mirrors the JMAP server-string handling.
+/// Accepts `smtp`/`smtps://host[:port]`, a bare `host:port`, or a bare
+/// `host`; the last two default to `smtps://` (secure). Any other
+/// scheme is rejected.
 pub fn parse_smtp_server(server: &str) -> Result<Url> {
-    match Url::parse(server) {
-        Ok(url) => Ok(url),
-        Err(url::ParseError::RelativeUrlWithoutBase) => {
-            Ok(Url::parse(&format!("smtps://{server}"))?)
-        }
-        Err(err) => Err(err.into()),
-    }
+    parse_server(server, "smtps", &["smtp", "smtps"])
 }
 
 impl Deref for SmtpClient {

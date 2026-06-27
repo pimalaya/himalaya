@@ -20,7 +20,7 @@ use url::Url;
 use crate::{
     account::context::Account,
     cli::load_or_wizard,
-    config::{JmapAuthConfig, JmapConfig},
+    config::{JmapAuthConfig, JmapConfig, parse_server},
 };
 
 pub struct JmapClient {
@@ -84,16 +84,12 @@ pub fn build_jmap_client(
     Ok((account, client))
 }
 
-/// Parses the JMAP `server` field into a [`Url`], defaulting bare
-/// authorities (e.g. `mail.example.com`) to `https://`.
+/// Parses the JMAP `server` field into a [`Url`]. Accepts a full
+/// `http`/`https://host[:port][/path]` URL, a bare `host:port`, or a
+/// bare `host`; the last two default to `https://` (secure). Any other
+/// scheme is rejected.
 pub fn parse_server_url(server: &str) -> Result<Url> {
-    match Url::parse(server) {
-        Ok(url) => Ok(url),
-        Err(url::ParseError::RelativeUrlWithoutBase) => {
-            Ok(Url::parse(&format!("https://{server}"))?)
-        }
-        Err(err) => Err(err.into()),
-    }
+    parse_server(server, "https", &["http", "https"])
 }
 
 /// Converts a [`JmapAuthConfig`] into the pre-formatted HTTP

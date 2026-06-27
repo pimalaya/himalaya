@@ -2,7 +2,7 @@
 use std::os::unix::fs::OpenOptionsExt;
 use std::{collections::HashMap, fs, fs::OpenOptions, io::Write, path::Path, path::PathBuf};
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use comfy_table::ContentArrangement;
 use crossterm::style::Color;
 use pimalaya_config::{
@@ -16,6 +16,7 @@ use pimalaya_stream::{
     tls::{Rustls, RustlsCrypto, Tls, TlsProvider},
 };
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 /// Global configuration.
 ///
@@ -314,6 +315,32 @@ impl From<TableArrangementConfig> for ContentArrangement {
             TableArrangementConfig::Disabled => ContentArrangement::Disabled,
         }
     }
+}
+
+/// Parses a backend `server` config string into a [`Url`], accepting
+/// three forms: a full `scheme://host[:port][/path]` URL, a bare
+/// authority `host:port`, or a bare `host`. The last two default to
+/// `default_scheme` (the protocol's secure scheme).
+///
+/// A bare `host:port` must be detected by the absence of `://`: the
+/// URL parser would otherwise read it as `scheme:path` (e.g.
+/// `mail.example.com:993` parses as scheme `mail.example.com`), so any
+/// string without an explicit `://` is treated as an authority. The
+/// resulting scheme is validated against `allowed`.
+pub fn parse_server(server: &str, default_scheme: &str, allowed: &[&str]) -> Result<Url> {
+    let url = if server.contains("://") {
+        Url::parse(server)?
+    } else {
+        Url::parse(&format!("{default_scheme}://{server}"))?
+    };
+
+    let scheme = url.scheme();
+
+    if !allowed.contains(&scheme) {
+        bail!("Invalid server scheme `{scheme}`: expected one of {allowed:?}");
+    }
+
+    Ok(url)
 }
 
 /// IMAP configuration.
@@ -764,4 +791,50 @@ pub struct MsgraphAuthConfig {
     /// OAuth 2.0 bearer access token; sent as `Bearer <token>`. It is
     /// the only authorization the Graph API accepts.
     pub token: Secret,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const IMAP: &[&str] = &["imap", "imaps"];
+
+    #[test]
+    fn bare_host_defaults_to_secure_scheme() {
+        let url = parse_server("mail.example.com", "imaps", IMAP).unwrap();
+        assert_eq!(url.scheme(), "imaps");
+        assert_eq!(url.host_str(), Some("mail.example.com"));
+        // No explicit port: the protocol's default (e.g. 993) is
+        // applied by the backend client, not by this parser.
+        assert_eq!(url.port(), None);
+    }
+
+    #[test]
+    fn bare_host_port_keeps_port_and_secure_scheme() {
+        let url = parse_server("mail.example.com:1993", "imaps", IMAP).unwrap();
+        assert_eq!(url.scheme(), "imaps");
+        assert_eq!(url.host_str(), Some("mail.example.com"));
+        assert_eq!(url.port(), Some(1993));
+    }
+
+    #[test]
+    fn full_url_scheme_host_port_is_kept_verbatim() {
+        let url = parse_server("imap://mail.example.com:143", "imaps", IMAP).unwrap();
+        assert_eq!(url.scheme(), "imap");
+        assert_eq!(url.host_str(), Some("mail.example.com"));
+        assert_eq!(url.port(), Some(143));
+    }
+
+    #[test]
+    fn unknown_scheme_is_rejected() {
+        let err = parse_server("ftp://mail.example.com", "imaps", IMAP).unwrap_err();
+        assert!(err.to_string().contains("Invalid server scheme `ftp`"));
+    }
+
+    #[test]
+    fn path_is_preserved_for_full_url() {
+        let url = parse_server("https://example.com/jmap/session", "https", &["https"]).unwrap();
+        assert_eq!(url.scheme(), "https");
+        assert_eq!(url.path(), "/jmap/session");
+    }
 }

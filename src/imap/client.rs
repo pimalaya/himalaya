@@ -17,7 +17,9 @@ use pimalaya_stream::sasl::Sasl;
 use url::Url;
 
 use crate::{
-    account::context::Account, cli::load_or_wizard, config::ImapConfig,
+    account::context::Account,
+    cli::load_or_wizard,
+    config::{ImapConfig, parse_server},
     imap::id::resolve_auto_id_params,
 };
 
@@ -64,18 +66,11 @@ impl ImapClient {
 
 /// Parses an IMAP server string into a URL.
 ///
-/// Accepts a bare authority (`imap.example.com`, optionally with a
-/// port), which is treated as `imaps://<authority>` (secure by
-/// default); or a full URL whose scheme (`imap` or `imaps`) is used
-/// verbatim. Mirrors the JMAP server-string handling.
+/// Accepts `imap`/`imaps://host[:port]`, a bare `host:port`, or a bare
+/// `host`; the last two default to `imaps://` (secure). Any other
+/// scheme is rejected.
 pub fn parse_imap_server(server: &str) -> Result<Url> {
-    match Url::parse(server) {
-        Ok(url) => Ok(url),
-        Err(url::ParseError::RelativeUrlWithoutBase) => {
-            Ok(Url::parse(&format!("imaps://{server}"))?)
-        }
-        Err(err) => Err(err.into()),
-    }
+    parse_server(server, "imaps", &["imap", "imaps"])
 }
 
 impl Deref for ImapClient {
