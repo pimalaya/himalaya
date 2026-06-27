@@ -15,11 +15,12 @@ use crate::{
     shared::message::arg::MessageArg,
 };
 
-/// Save a message to a mailbox.
+/// Store a message into a Maildir folder.
 ///
-/// Appends a message to the specified maildir. The message can be
-/// passed as a positional file path, an inline raw string, or piped
-/// via stdin (see [`MessageArg`] for resolution order).
+/// Writes the raw message as a new file under the folder's chosen
+/// subdirectory (new by default). The message can be passed as a
+/// positional file path, an inline raw string, or piped via stdin
+/// (see [`MessageArg`] for resolution order).
 #[derive(Debug, Parser)]
 pub struct MaildirMessageSaveCommand {
     #[command(flatten)]

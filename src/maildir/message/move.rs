@@ -7,10 +7,10 @@ use crate::maildir::{
     client::MaildirClient,
 };
 
-/// Move Maildir message to the given mailbox.
+/// Move Maildir message(s) to another folder.
 ///
-/// This command copies message(s) identified by the given sequence
-/// set from the source mailbox to the destination mailbox.
+/// Relocates each message file identified by the given id(s) from the
+/// source folder into the target folder.
 #[derive(Debug, Parser)]
 pub struct MaildirMessageMoveCommand {
     #[command(flatten)]
@@ -20,7 +20,7 @@ pub struct MaildirMessageMoveCommand {
     #[command(flatten)]
     pub target: TargetMaildirPathFlag,
 
-    /// Copy the message into a different subdirectory.
+    /// Move the message into a different subdirectory.
     #[arg(long, short, value_name = "DIR", value_enum)]
     pub subdir: Option<MaildirSubdirArg>,
 }
@@ -39,6 +39,6 @@ impl MaildirMessageMoveCommand {
             )?;
         }
 
-        printer.out(Message::new("Message(s) successfully copied"))
+        printer.out(Message::new("Message(s) successfully moved"))
     }
 }

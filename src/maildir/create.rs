@@ -4,10 +4,10 @@ use pimalaya_cli::printer::{Message, Printer};
 
 use crate::maildir::{arg::MaildirNameArg, client::MaildirClient};
 
-/// Create the given mailbox.
+/// Create a Maildir folder.
 ///
-/// This command allows you to create a new mailbox using the given
-/// name.
+/// Creates the new, cur and tmp subdirectories for a new folder under
+/// the account root.
 #[derive(Debug, Parser)]
 pub struct MaildirMailboxCreateCommand {
     #[command(flatten)]

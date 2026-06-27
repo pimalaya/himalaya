@@ -9,10 +9,10 @@ use crate::maildir::{
     flag::arg::FlagArg,
 };
 
-/// Set MAILDIR flag(s) to message(s).
+/// Set MAILDIR flag(s) on message(s).
 ///
-/// This command sets the given flags to messages identified by the
-/// given sequence set.
+/// Replaces the info flags in the filename of each message identified
+/// by the given id(s) with the given flags.
 #[derive(Debug, Parser)]
 pub struct MaildirFlagSetCommand {
     #[command(flatten)]
@@ -20,7 +20,7 @@ pub struct MaildirFlagSetCommand {
 
     #[command(flatten)]
     pub maildir: MaildirPathFlag,
-    /// MaildirFlag(s) to set to the message
+    /// MaildirFlag(s) to set on the message
     #[arg(long = "flag", short, num_args = 1..)]
     pub flags: Vec<FlagArg>,
 }

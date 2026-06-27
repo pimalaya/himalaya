@@ -9,10 +9,10 @@ use crate::maildir::{
     flag::arg::FlagArg,
 };
 
-/// Remove MAILDIR flag(s) to message(s).
+/// Remove MAILDIR flag(s) from message(s).
 ///
-/// This command removes the given flags to messages identified by the
-/// given sequence set.
+/// Removes the given info flags from the filename of each message
+/// identified by the given id(s).
 #[derive(Debug, Parser)]
 pub struct MaildirFlagRemoveCommand {
     #[command(flatten)]
@@ -20,7 +20,7 @@ pub struct MaildirFlagRemoveCommand {
 
     #[command(flatten)]
     pub maildir: MaildirPathFlag,
-    /// MaildirFlag(s) to remove to the message
+    /// MaildirFlag(s) to remove from the message
     #[arg(long = "flag", short, num_args = 1..)]
     pub flags: Vec<FlagArg>,
 }

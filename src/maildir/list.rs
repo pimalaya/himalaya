@@ -10,11 +10,10 @@ use serde::Serialize;
 use crate::account::context::Account;
 use crate::maildir::client::MaildirClient;
 
-/// List, search and filter maildirs.
+/// List Maildir folders.
 ///
-/// This command allows you to list maildirs from your MAILDIR account.
-/// By default, only subscribed maildirs are listed. Use --all to
-/// list all maildirs.
+/// Scans the account root and lists every folder found, with its name
+/// and filesystem path.
 #[derive(Debug, Parser)]
 pub struct MaildirMailboxListCommand;
 

@@ -13,8 +13,8 @@ use crate::maildir::{
 
 /// Manage MAILDIR flags.
 ///
-/// A flag is a label attached to a message. This subcommand allows
-/// you to manage them.
+/// A flag is an info code stored in the message filename (the part
+/// after `:2,`, e.g. FRST). This subcommand manages them.
 #[derive(Debug, Subcommand)]
 pub enum MaildirFlagCommand {
     List(MaildirFlagListCommand),

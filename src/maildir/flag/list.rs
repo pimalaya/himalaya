@@ -9,11 +9,10 @@ use serde::Serialize;
 
 use crate::account::context::Account;
 
-/// List available MAILDIR flags for the given mailbox.
+/// List the standard Maildir flags.
 ///
-/// This command displays the flags and permanent flags that are
-/// available in the given mailbox. These flags come from the SELECT
-/// response.
+/// Displays the six standard Maildir info flags with their
+/// single-letter codes (P, R, S, T, D, F).
 #[derive(Debug, Parser)]
 pub struct MaildirFlagListCommand;
 

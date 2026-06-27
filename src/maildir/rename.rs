@@ -7,10 +7,9 @@ use crate::maildir::{
     client::MaildirClient,
 };
 
-/// Rename the given mailbox.
+/// Rename a Maildir folder.
 ///
-/// This command allows you to rename a new mailbox using the given
-/// name.
+/// Renames the folder directory from its current path to the new name.
 #[derive(Debug, Parser)]
 pub struct MaildirMailboxRenameCommand {
     #[command(flatten)]

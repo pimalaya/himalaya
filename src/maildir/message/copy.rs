@@ -7,10 +7,10 @@ use crate::maildir::{
     client::MaildirClient,
 };
 
-/// Copy Maildir message to the given mailbox.
+/// Copy Maildir message(s) to another folder.
 ///
-/// This command copies message(s) identified by the given sequence
-/// set from the source mailbox to the destination mailbox.
+/// Writes a copy of each message file identified by the given id(s)
+/// into the target folder.
 #[derive(Debug, Parser)]
 pub struct MaildirMessageCopyCommand {
     #[command(flatten)]

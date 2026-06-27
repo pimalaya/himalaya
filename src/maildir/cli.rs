@@ -5,9 +5,9 @@ use pimalaya_cli::printer::Printer;
 use crate::account::context::Account;
 use crate::maildir::{
     client::MaildirClient, create::MaildirMailboxCreateCommand,
-    delete::MaildirMailboxDeleteCommand, envelope::cli::MaildirEnvelopeCommand,
-    flag::cli::MaildirFlagCommand, list::MaildirMailboxListCommand,
-    message::cli::MaildirMessageCommand, rename::MaildirMailboxRenameCommand,
+    delete::MaildirMailboxDeleteCommand, flag::cli::MaildirFlagCommand,
+    list::MaildirMailboxListCommand, message::cli::MaildirMessageCommand,
+    rename::MaildirMailboxRenameCommand,
 };
 
 /// Maildir-specific API.
@@ -26,8 +26,6 @@ pub enum MaildirCommand {
     Messages(MaildirMessageCommand),
     #[command(subcommand)]
     Flags(MaildirFlagCommand),
-    #[command(subcommand)]
-    Envelopes(MaildirEnvelopeCommand),
 }
 
 impl MaildirCommand {
@@ -45,7 +43,6 @@ impl MaildirCommand {
 
             Self::Messages(cmd) => cmd.execute(printer, client),
             Self::Flags(cmd) => cmd.execute(printer, account, client),
-            Self::Envelopes(cmd) => cmd.execute(printer, account, client),
         }
     }
 }

@@ -11,8 +11,8 @@ use crate::maildir::{
 
 /// Add MAILDIR flag(s) to message(s).
 ///
-/// This command adds the given flags to messages identified by the
-/// given sequence set.
+/// Appends the given info flags to the filename of each message
+/// identified by the given id(s).
 #[derive(Debug, Parser)]
 pub struct MaildirFlagAddCommand {
     #[command(flatten)]

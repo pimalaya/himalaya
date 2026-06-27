@@ -4,10 +4,9 @@ use pimalaya_cli::printer::{Message, Printer};
 
 use crate::maildir::{arg::MaildirPathFlag, client::MaildirClient};
 
-/// Delete the given mailbox.
+/// Delete a Maildir folder.
 ///
-/// This command allows you to delete a new mailbox using the given
-/// name.
+/// Removes the folder directory and every message it contains.
 #[derive(Debug, Parser)]
 pub struct MaildirMailboxDeleteCommand {
     #[command(flatten)]
