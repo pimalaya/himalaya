@@ -4,9 +4,9 @@ use pimalaya_cli::printer::Printer;
 
 use crate::account::context::Account;
 use crate::msgraph::{
-    attachments::MsgraphAttachmentsCommand, client::MsgraphClient,
-    mail_folders::MsgraphMailFoldersCommand, messages::MsgraphMessagesCommand,
-    profile::MsgraphProfileCommand,
+    attachment::cli::MsgraphAttachmentCommand, client::MsgraphClient,
+    mail_folder::cli::MsgraphMailFolderCommand, message::cli::MsgraphMessageCommand,
+    profile::cli::MsgraphProfileCommand,
 };
 
 /// Microsoft Graph CLI.
@@ -19,15 +19,12 @@ use crate::msgraph::{
 pub enum MsgraphCommand {
     #[command(subcommand)]
     Profile(MsgraphProfileCommand),
-    #[command(subcommand)]
-    #[command(visible_aliases = ["mail-folder", "folders", "folder"])]
-    MailFolders(MsgraphMailFoldersCommand),
-    #[command(subcommand)]
-    #[command(visible_aliases = ["message", "msg"])]
-    Messages(MsgraphMessagesCommand),
-    #[command(subcommand)]
-    #[command(visible_aliases = ["attachment"])]
-    Attachments(MsgraphAttachmentsCommand),
+    #[command(subcommand, visible_aliases = ["mail-folders", "folder", "folders"])]
+    MailFolder(MsgraphMailFolderCommand),
+    #[command(subcommand, visible_aliases = ["messages", "msg"])]
+    Message(MsgraphMessageCommand),
+    #[command(subcommand, visible_aliases = ["attachments"])]
+    Attachment(MsgraphAttachmentCommand),
 }
 
 impl MsgraphCommand {
@@ -39,9 +36,9 @@ impl MsgraphCommand {
     ) -> Result<()> {
         match self {
             Self::Profile(cmd) => cmd.execute(printer, account, client),
-            Self::MailFolders(cmd) => cmd.execute(printer, account, client),
-            Self::Messages(cmd) => cmd.execute(printer, account, client),
-            Self::Attachments(cmd) => cmd.execute(printer, account, client),
+            Self::MailFolder(cmd) => cmd.execute(printer, account, client),
+            Self::Message(cmd) => cmd.execute(printer, account, client),
+            Self::Attachment(cmd) => cmd.execute(printer, account, client),
         }
     }
 }

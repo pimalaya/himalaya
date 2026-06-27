@@ -21,7 +21,7 @@ pub struct MaildirFlagAddCommand {
     #[command(flatten)]
     pub maildir: MaildirPathFlag,
     /// MaildirFlag(s) to add to the message
-    #[arg(long = "flag", short, num_args = 1..)]
+    #[arg(long = "flag", short, num_args = 1.., required = true)]
     pub flags: Vec<FlagArg>,
 }
 

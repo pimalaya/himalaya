@@ -18,7 +18,7 @@ pub struct M2dirFlagRemoveCommand {
     pub m2dir: M2dirNameFlag,
 
     /// Flag(s) to remove from the message.
-    #[arg(long = "flag", short = 'f', num_args = 1..)]
+    #[arg(long = "flag", short = 'f', num_args = 1.., required = true)]
     pub flags: Vec<String>,
 }
 

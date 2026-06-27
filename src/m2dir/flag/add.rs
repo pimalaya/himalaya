@@ -20,7 +20,7 @@ pub struct M2dirFlagAddCommand {
     pub m2dir: M2dirNameFlag,
 
     /// Flag(s) to add to the message.
-    #[arg(long = "flag", short = 'f', num_args = 1..)]
+    #[arg(long = "flag", short = 'f', num_args = 1.., required = true)]
     pub flags: Vec<String>,
 }
 
