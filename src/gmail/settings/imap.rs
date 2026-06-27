@@ -1,15 +1,13 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use io_gmail::v1::rest::settings::{
-    GmailImapSettings, get_imap::GmailImapGet, update_imap::GmailImapUpdate,
-};
+use io_gmail::v1::rest::settings::{get_imap::GmailImapGet, update_imap::GmailImapUpdate};
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::{
     account::context::Account,
     gmail::{
         client::GmailClient,
-        settings::convert::{ExpungeBehaviorArg, expunge_behavior_wire},
+        settings::convert::{ExpungeBehaviorArg, enabled_flag, expunge_behavior_wire},
     },
 };
 
@@ -75,10 +73,20 @@ impl GmailSettingsImapGetCommand {
 }
 
 /// Update the Gmail IMAP access settings.
+///
+/// Partial update: the settings are fetched first and only the options
+/// you pass are changed, so unspecified fields are preserved. IMAP
+/// access is toggled with `--enable` / `--disable` and never by
+/// accident.
 #[derive(Debug, Parser)]
 pub struct GmailSettingsImapSetCommand {
-    #[arg(long)]
+    /// Turn IMAP access on.
+    #[arg(long, conflicts_with = "disable")]
     pub enable: bool,
+
+    /// Turn IMAP access off.
+    #[arg(long)]
+    pub disable: bool,
 
     #[arg(long)]
     pub auto_expunge: Option<bool>,
@@ -92,12 +100,23 @@ pub struct GmailSettingsImapSetCommand {
 
 impl GmailSettingsImapSetCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
-        let settings = GmailImapSettings {
-            enabled: self.enable,
-            auto_expunge: self.auto_expunge,
-            expunge_behavior: self.expunge_behavior.map(Into::into),
-            max_folder_size: self.max_folder_size,
+        let mut settings = {
+            let c = GmailImapGet::new(&client.auth, &client.user_id)?;
+            client.run(c)?.response
         };
+
+        if let Some(enabled) = enabled_flag(self.enable, self.disable) {
+            settings.enabled = enabled;
+        }
+        if let Some(auto_expunge) = self.auto_expunge {
+            settings.auto_expunge = Some(auto_expunge);
+        }
+        if let Some(behavior) = self.expunge_behavior {
+            settings.expunge_behavior = Some(behavior.into());
+        }
+        if let Some(size) = self.max_folder_size {
+            settings.max_folder_size = Some(size);
+        }
 
         let _out = {
             let c = GmailImapUpdate::new(&client.auth, &client.user_id, settings)?;

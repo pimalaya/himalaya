@@ -1,11 +1,14 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use io_gmail::v1::rest::settings::{
-    GmailVacationSettings, get_vacation::GmailVacationGet, update_vacation::GmailVacationUpdate,
+    get_vacation::GmailVacationGet, update_vacation::GmailVacationUpdate,
 };
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::{account::context::Account, gmail::client::GmailClient};
+use crate::{
+    account::context::Account,
+    gmail::{client::GmailClient, settings::convert::enabled_flag},
+};
 
 /// Manage the Gmail vacation responder settings
 /// (users.settings.getVacation / updateVacation).
@@ -85,10 +88,20 @@ impl GmailSettingsVacationGetCommand {
 }
 
 /// Update the Gmail vacation responder settings.
+///
+/// Partial update: the settings are fetched first and only the options
+/// you pass are changed, so unspecified fields are preserved. The
+/// responder is toggled with `--enable` / `--disable` and never by
+/// accident.
 #[derive(Debug, Parser)]
 pub struct GmailSettingsVacationSetCommand {
-    #[arg(long)]
+    /// Turn the responder on.
+    #[arg(long, conflicts_with = "disable")]
     pub enable: bool,
+
+    /// Turn the responder off.
+    #[arg(long)]
+    pub disable: bool,
 
     #[arg(long)]
     pub subject: Option<String>,
@@ -100,10 +113,10 @@ pub struct GmailSettingsVacationSetCommand {
     pub html: Option<String>,
 
     #[arg(long)]
-    pub restrict_to_contacts: bool,
+    pub restrict_to_contacts: Option<bool>,
 
     #[arg(long)]
-    pub restrict_to_domain: bool,
+    pub restrict_to_domain: Option<bool>,
 
     #[arg(long)]
     pub start_time: Option<String>,
@@ -114,16 +127,35 @@ pub struct GmailSettingsVacationSetCommand {
 
 impl GmailSettingsVacationSetCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
-        let settings = GmailVacationSettings {
-            enable_auto_reply: self.enable,
-            response_subject: self.subject,
-            response_body_plain_text: self.body,
-            response_body_html: self.html,
-            restrict_to_contacts: self.restrict_to_contacts.then_some(true),
-            restrict_to_domain: self.restrict_to_domain.then_some(true),
-            start_time: self.start_time,
-            end_time: self.end_time,
+        let mut settings = {
+            let c = GmailVacationGet::new(&client.auth, &client.user_id)?;
+            client.run(c)?.response
         };
+
+        if let Some(enabled) = enabled_flag(self.enable, self.disable) {
+            settings.enable_auto_reply = enabled;
+        }
+        if let Some(subject) = self.subject {
+            settings.response_subject = Some(subject);
+        }
+        if let Some(body) = self.body {
+            settings.response_body_plain_text = Some(body);
+        }
+        if let Some(html) = self.html {
+            settings.response_body_html = Some(html);
+        }
+        if let Some(restrict) = self.restrict_to_contacts {
+            settings.restrict_to_contacts = Some(restrict);
+        }
+        if let Some(restrict) = self.restrict_to_domain {
+            settings.restrict_to_domain = Some(restrict);
+        }
+        if let Some(start) = self.start_time {
+            settings.start_time = Some(start);
+        }
+        if let Some(end) = self.end_time {
+            settings.end_time = Some(end);
+        }
 
         let _out = {
             let c = GmailVacationUpdate::new(&client.auth, &client.user_id, settings)?;

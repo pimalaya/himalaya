@@ -68,6 +68,20 @@ impl From<PopAccessWindowArg> for GmailPopAccessWindow {
     }
 }
 
+/// Folds a `--enable` / `--disable` flag pair into a tri-state:
+/// `Some(true)` to enable, `Some(false)` to disable, `None` to leave
+/// the current value unchanged. The two flags are mutually exclusive
+/// at the clap layer.
+pub fn enabled_flag(enable: bool, disable: bool) -> Option<bool> {
+    if enable {
+        Some(true)
+    } else if disable {
+        Some(false)
+    } else {
+        None
+    }
+}
+
 /// Map a disposition to its Gmail wire spelling for display.
 pub fn disposition_wire(disposition: GmailDisposition) -> &'static str {
     match disposition {
