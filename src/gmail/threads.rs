@@ -18,7 +18,7 @@ use io_gmail::v1::rest::{
 use pimalaya_cli::printer::{Message, Printer};
 use serde::Serialize;
 
-use crate::{account::context::Account, gmail::client::GmailClient};
+use crate::{account::context::Account, gmail::client::GmailClient, shared::output::Paginated};
 
 /// Manage Gmail threads (users.threads).
 #[derive(Debug, Subcommand)]
@@ -99,17 +99,14 @@ impl GmailThreadsListCommand {
         };
         let response = out.response;
 
-        if let Some(token) = response.next_page_token {
-            log::info!("next page token: {token}");
-        }
-
+        let next_page = response.next_page_token;
         let table = ThreadsTable {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             threads: response.threads,
         };
 
-        printer.out(table)
+        printer.out(Paginated::new(table, next_page))
     }
 }
 

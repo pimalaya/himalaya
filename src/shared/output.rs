@@ -1,14 +1,45 @@
-//! Shared raw-bytes output helper for commands that return message or
-//! attachment content (Gmail, Microsoft Graph).
+//! Shared output helpers for commands that return raw message or
+//! attachment content, or paginated listings (Gmail, Microsoft Graph).
 
 use std::{
-    fs,
+    fmt, fs,
     io::{self, IsTerminal, Write},
     path::Path,
 };
 
 use anyhow::{Context, Result, bail};
 use pimalaya_cli::printer::{Message, Printer};
+use serde::Serialize;
+
+/// Wraps a renderable listing with an optional pagination cursor so the
+/// "next page" hint is part of the command output: a trailing footer
+/// line in text mode, an extra `next_page` field in JSON. This keeps
+/// the cursor visible to scripts, unlike logging it to stderr.
+#[derive(Serialize)]
+pub struct Paginated<T> {
+    #[serde(flatten)]
+    inner: T,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    next_page: Option<String>,
+}
+
+impl<T> Paginated<T> {
+    pub fn new(inner: T, next_page: Option<String>) -> Self {
+        Self { inner, next_page }
+    }
+}
+
+impl<T: fmt::Display> fmt::Display for Paginated<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.inner)?;
+
+        if let Some(cursor) = &self.next_page {
+            writeln!(f, "Next page: {cursor}")?;
+        }
+
+        Ok(())
+    }
+}
 
 /// Writes `bytes` to `output` when given, otherwise to stdout.
 ///

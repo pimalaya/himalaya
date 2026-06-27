@@ -9,7 +9,7 @@ use io_msgraph::v1::rest::users::messages::{
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
-use crate::{account::context::Account, msgraph::client::MsgraphClient};
+use crate::{account::context::Account, msgraph::client::MsgraphClient, shared::output::Paginated};
 
 /// List Microsoft Graph messages (`GET /me/messages` or, with
 /// `--folder`, `GET /me/mailFolders/{id}/messages`).
@@ -88,11 +88,10 @@ impl MsgraphMessageListCommand {
             .messages_list(self.folder.as_deref(), &params)?
             .response;
 
-        if let Some(link) = response.next_link {
-            log::info!("next page link: {link}");
-        }
+        let next_page = response.next_link;
+        let table = messages_table(account, response.value);
 
-        printer.out(messages_table(account, response.value))
+        printer.out(Paginated::new(table, next_page))
     }
 }
 

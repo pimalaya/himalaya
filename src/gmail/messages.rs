@@ -12,7 +12,9 @@ use pimalaya_cli::printer::{Message, Printer};
 use serde::Serialize;
 
 use crate::{
-    account::context::Account, gmail::client::GmailClient, shared::output::write_bytes_or_save,
+    account::context::Account,
+    gmail::client::GmailClient,
+    shared::output::{Paginated, write_bytes_or_save},
 };
 
 /// Manage Gmail messages (users.messages).
@@ -100,10 +102,7 @@ impl GmailMessagesListCommand {
         };
         let response = client.messages_list(&params)?.response;
 
-        if let Some(token) = response.next_page_token {
-            log::info!("next page token: {token}");
-        }
-
+        let next_page = response.next_page_token;
         let table = MessageIdsTable {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
@@ -111,7 +110,7 @@ impl GmailMessagesListCommand {
             ids: response.messages,
         };
 
-        printer.out(table)
+        printer.out(Paginated::new(table, next_page))
     }
 }
 

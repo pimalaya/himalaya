@@ -6,7 +6,7 @@ use io_gmail::v1::rest::history::{
 };
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::{account::context::Account, gmail::client::GmailClient};
+use crate::{account::context::Account, gmail::client::GmailClient, shared::output::Paginated};
 
 /// Manage the Gmail mailbox history (users.history).
 #[derive(Debug, Subcommand)]
@@ -71,10 +71,6 @@ impl GmailHistoryListCommand {
 
         let resp = out.response;
 
-        if let Some(token) = &resp.next_page_token {
-            log::info!("next page token: {token}");
-        }
-
         let mut out_string = format!(
             "New history id: {}\n",
             resp.history_id.as_deref().unwrap_or("(none)")
@@ -95,7 +91,10 @@ impl GmailHistoryListCommand {
             }
         }
 
-        printer.out(Message::new(out_string))
+        printer.out(Paginated::new(
+            Message::new(out_string),
+            resp.next_page_token,
+        ))
     }
 }
 
