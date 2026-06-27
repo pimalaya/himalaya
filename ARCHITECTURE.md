@@ -49,6 +49,10 @@ The `msgraph` command mirrors the `gmail` one but tracks the Microsoft Graph RES
 
 Graph's mail surface has no equivalent of Gmail's labels/threads/history/settings, so those have no counterpart here. Commands call the client's convenience methods (and `client.run(...)` for ad-hoc coroutines), exactly like the `gmail` command.
 
+### The `maildir` and `m2dir` commands
+
+The two filesystem backends expose only operations that map directly to their on-disk layout: folder create/delete/list (plus `rename` for Maildir), message store (`save`), Maildir message `copy`/`move` between folders, and flag edits (Maildir info-flag codes in the filename; m2dir free-form strings under .meta/<id>.flags). Rendering a stored message (parsing MIME headers, bodies or parts) is a generic concern, not a filesystem operation, so it is left to the shared `messages` / `envelopes` commands running over the same backend rather than reimplemented per backend. m2dir omits `copy`/`move`/`rename` because io-m2dir does not implement them yet.
+
 ## Command conventions and output
 
 `Command::execute` in `cli.rs` is the single dispatch point: it loads the config (running the wizard if none exists via `load_or_wizard`), selects the account, builds the appropriate client (shared `EmailClient` or a per-protocol client), and hands it to the subcommand.

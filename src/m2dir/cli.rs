@@ -5,8 +5,7 @@ use pimalaya_cli::printer::Printer;
 use crate::account::context::Account;
 use crate::m2dir::{
     client::M2dirClient, create::M2dirMailboxCreateCommand, delete::M2dirMailboxDeleteCommand,
-    envelope::cli::M2dirEnvelopeCommand, flag::cli::M2dirFlagCommand,
-    list::M2dirMailboxListCommand, message::cli::M2dirMessageCommand,
+    flag::cli::M2dirFlagCommand, list::M2dirMailboxListCommand, message::cli::M2dirMessageCommand,
 };
 
 /// M2dir-specific API.
@@ -24,8 +23,6 @@ pub enum M2dirCommand {
     Messages(M2dirMessageCommand),
     #[command(subcommand)]
     Flags(M2dirFlagCommand),
-    #[command(subcommand)]
-    Envelopes(M2dirEnvelopeCommand),
 }
 
 impl M2dirCommand {
@@ -42,7 +39,6 @@ impl M2dirCommand {
 
             Self::Messages(cmd) => cmd.execute(printer, client),
             Self::Flags(cmd) => cmd.execute(printer, account, client),
-            Self::Envelopes(cmd) => cmd.execute(printer, account, client),
         }
     }
 }
