@@ -1,4 +1,6 @@
-use std::{collections::HashMap, fs, path::Path, path::PathBuf};
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
+use std::{collections::HashMap, fs, fs::OpenOptions, io::Write, path::Path, path::PathBuf};
 
 use anyhow::{Context, Result};
 use comfy_table::ContentArrangement;
@@ -66,6 +68,10 @@ impl Config {
     /// Serializes `self` to TOML and writes it to `path`, creating
     /// any missing parent directories. Used by the wizard to persist
     /// a freshly-built configuration.
+    ///
+    /// The file may hold plaintext secrets (a `Secret::Raw` password or
+    /// token), so on unix it is created with `0600` permissions to keep
+    /// it readable by the owner only.
     pub fn write(&self, path: &Path) -> Result<()> {
         let toml = toml::to_string_pretty(self).context("Serialize TOML config error")?;
 
@@ -75,7 +81,16 @@ impl Config {
             })?;
         }
 
-        fs::write(path, toml)
+        let mut options = OpenOptions::new();
+        options.write(true).create(true).truncate(true);
+
+        #[cfg(unix)]
+        options.mode(0o600);
+
+        let mut file = options
+            .open(path)
+            .with_context(|| format!("Open TOML config `{}` error", path.display()))?;
+        file.write_all(toml.as_bytes())
             .with_context(|| format!("Write TOML config `{}` error", path.display()))?;
 
         Ok(())
