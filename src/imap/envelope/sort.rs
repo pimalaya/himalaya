@@ -1,7 +1,7 @@
 use std::fmt;
 
-use anyhow::{Result, bail};
-use clap::Parser;
+use anyhow::Result;
+use clap::{Parser, ValueEnum};
 use comfy_table::{Cell, Color, ContentArrangement, Row, Table, presets};
 use io_imap::{
     rfc3501::select::ImapMailboxSelectOptions,
@@ -16,39 +16,29 @@ use serde::Serialize;
 
 use crate::account::context::Account;
 use crate::imap::{
-    client::ImapClient, envelope::search::parse_query, mailbox::arg::MailboxNameOptionalArg,
+    client::ImapClient, envelope::search::SearchCriteriaArgs, mailbox::arg::MailboxNameOptionalArg,
 };
 
-/// Sort messages by criteria.
+/// Sort IMAP messages (SORT, RFC 5256).
 ///
-/// This command searches for messages matching the given query and
-/// returns them sorted by the specified criteria. Requires the SORT
-/// IMAP extension.
-///
-/// Sort criteria:
-///   - date      - sort by Date header
-///   - arrival   - sort by internal date (arrival time)
-///   - from      - sort by From header
-///   - to        - sort by To header
-///   - cc        - sort by Cc header
-///   - subject   - sort by Subject header
-///   - size      - sort by message size
+/// Searches with the given criteria, then returns the matching UIDs
+/// (or sequence numbers with --seq) sorted by --sort. Requires the
+/// SORT extension.
 #[derive(Debug, Parser)]
 pub struct ImapEnvelopeSortCommand {
     #[command(flatten)]
     pub mailbox_name: MailboxNameOptionalArg,
 
-    /// Sort criteria (e.g., "date", "from", "subject", "size").
-    #[arg(short = 'S', long, default_value = "date")]
-    pub sort: String,
+    /// Sort key.
+    #[arg(short = 'S', long, value_name = "KEY", default_value = "date")]
+    pub sort: SortKeyArg,
 
     /// Reverse sort order.
     #[arg(short, long)]
     pub reverse: bool,
 
-    /// Search query (same syntax as search command).
-    #[arg(name = "query", value_name = "QUERY", default_value = "all")]
-    pub query: String,
+    #[command(flatten)]
+    pub criteria: SearchCriteriaArgs,
 
     /// Use sequence numbers instead of UIDs.
     #[arg(long)]
@@ -66,12 +56,11 @@ impl ImapEnvelopeSortCommand {
 
         client.select(mailbox, ImapMailboxSelectOptions::default())?;
 
-        let sort_key = parse_sort_key(&self.sort)?;
         let sort_criteria = Vec1::unvalidated(vec![SortCriterion {
             reverse: self.reverse,
-            key: sort_key,
+            key: self.sort.into(),
         }]);
-        let search_criteria = parse_query(&self.query)?;
+        let search_criteria = self.criteria.into_criteria()?;
 
         let fallback = client.sort_fallback();
         let ids = client.sort(
@@ -91,18 +80,31 @@ impl ImapEnvelopeSortCommand {
     }
 }
 
-fn parse_sort_key(s: &str) -> Result<SortKey> {
-    match s.to_lowercase().as_str() {
-        "date" => Ok(SortKey::Date),
-        "arrival" => Ok(SortKey::Arrival),
-        "from" => Ok(SortKey::From),
-        "to" => Ok(SortKey::To),
-        "cc" => Ok(SortKey::Cc),
-        "subject" => Ok(SortKey::Subject),
-        "size" => Ok(SortKey::Size),
-        _ => bail!(
-            "Unknown sort key `{s}`, valid options: date, arrival, from, to, cc, subject, size"
-        ),
+/// IMAP SORT key (RFC 5256).
+#[derive(Clone, Copy, Debug, Default, ValueEnum)]
+#[clap(rename_all = "lower")]
+pub enum SortKeyArg {
+    #[default]
+    Date,
+    Arrival,
+    From,
+    To,
+    Cc,
+    Subject,
+    Size,
+}
+
+impl From<SortKeyArg> for SortKey {
+    fn from(arg: SortKeyArg) -> Self {
+        match arg {
+            SortKeyArg::Date => SortKey::Date,
+            SortKeyArg::Arrival => SortKey::Arrival,
+            SortKeyArg::From => SortKey::From,
+            SortKeyArg::To => SortKey::To,
+            SortKeyArg::Cc => SortKey::Cc,
+            SortKeyArg::Subject => SortKey::Subject,
+            SortKeyArg::Size => SortKey::Size,
+        }
     }
 }
 

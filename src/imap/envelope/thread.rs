@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt, num::NonZeroU32};
 
-use anyhow::{Result, bail};
-use clap::Parser;
+use anyhow::Result;
+use clap::{Parser, ValueEnum};
 use io_imap::{
     rfc3501::{fetch::ImapMessageFetchOptions, select::ImapMailboxSelectOptions},
     rfc5256::thread::ImapMessageThreadOptions,
@@ -16,18 +16,14 @@ use serde::{Serialize, Serializer, ser::SerializeStruct};
 
 use crate::imap::{
     client::ImapClient,
-    envelope::{list::decode_mime, search::parse_query},
+    envelope::{list::decode_mime, search::SearchCriteriaArgs},
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
 };
 
-/// Thread IMAP messages by algorithm.
+/// Thread IMAP messages (THREAD, RFC 5256).
 ///
-/// This command groups messages into conversation threads using the
-/// specified threading algorithm. Requires the THREAD IMAP extension.
-///
-/// Threading algorithms:
-///   - references (default) - uses References and In-Reply-To headers
-///   - orderedsubject       - groups by normalized subject
+/// Groups messages matching the given criteria into conversation
+/// threads using --algorithm. Requires the THREAD extension.
 #[derive(Debug, Parser)]
 pub struct ImapEnvelopeThreadCommand {
     #[command(flatten)]
@@ -35,13 +31,17 @@ pub struct ImapEnvelopeThreadCommand {
     #[command(flatten)]
     pub mailbox_no_select: MailboxNoSelectFlag,
 
-    /// Threading algorithm (orderedsubject or references).
-    #[arg(short = 'A', long, default_value = "references")]
-    pub algorithm: String,
+    /// Threading algorithm.
+    #[arg(
+        short = 'A',
+        long,
+        value_name = "ALGORITHM",
+        default_value = "references"
+    )]
+    pub algorithm: ThreadAlgorithmArg,
 
-    /// Search query (same syntax as search command).
-    #[arg(name = "query", value_name = "QUERY", default_value = "all")]
-    pub query: String,
+    #[command(flatten)]
+    pub criteria: SearchCriteriaArgs,
 
     /// Use sequence numbers instead of UIDs.
     #[arg(long)]
@@ -56,11 +56,10 @@ impl ImapEnvelopeThreadCommand {
             client.select(mailbox, ImapMailboxSelectOptions::default())?;
         }
 
-        let algorithm = parse_algorithm(&self.algorithm)?;
-        let search_criteria = parse_query(&self.query)?;
+        let search_criteria = self.criteria.into_criteria()?;
 
         let threads = client.thread(
-            algorithm,
+            self.algorithm.into(),
             search_criteria,
             ImapMessageThreadOptions { uid: !self.seq },
         )?;
@@ -78,11 +77,21 @@ impl ImapEnvelopeThreadCommand {
     }
 }
 
-fn parse_algorithm(s: &str) -> Result<ThreadingAlgorithm<'static>> {
-    match s.to_lowercase().as_str() {
-        "references" => Ok(ThreadingAlgorithm::References),
-        "orderedsubject" => Ok(ThreadingAlgorithm::OrderedSubject),
-        _ => bail!("Unknown threading algorithm `{s}`, valid options: references, orderedsubject"),
+/// IMAP THREAD algorithm (RFC 5256).
+#[derive(Clone, Copy, Debug, Default, ValueEnum)]
+#[clap(rename_all = "lower")]
+pub enum ThreadAlgorithmArg {
+    #[default]
+    References,
+    OrderedSubject,
+}
+
+impl From<ThreadAlgorithmArg> for ThreadingAlgorithm<'static> {
+    fn from(arg: ThreadAlgorithmArg) -> Self {
+        match arg {
+            ThreadAlgorithmArg::References => ThreadingAlgorithm::References,
+            ThreadAlgorithmArg::OrderedSubject => ThreadingAlgorithm::OrderedSubject,
+        }
     }
 }
 

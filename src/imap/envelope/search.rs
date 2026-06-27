@@ -1,6 +1,6 @@
 use std::fmt;
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use io_imap::{
@@ -20,31 +20,12 @@ use crate::imap::{
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
 };
 
-/// Search IMAP messages by criteria.
+/// Search IMAP messages (SEARCH, RFC 3501).
 ///
-/// This command searches for messages matching the given criteria and
-/// returns a list of matching sequence numbers or UIDs.
-///
-/// Query syntax (multiple terms are ANDed together):
-///   - from:alice     - messages from "alice"
-///   - to:bob         - messages to "bob"
-///   - cc:charlie     - messages CC'd to "charlie"
-///   - bcc:dave       - messages BCC'd to "dave"
-///   - subject:hello  - messages with "hello" in subject
-///   - body:keyword   - messages with "keyword" in body
-///   - text:keyword   - messages with "keyword" in header or body
-///   - seen           - messages that have been read
-///   - unseen         - messages that have not been read
-///   - flagged        - messages that are flagged
-///   - answered       - messages that have been answered
-///   - deleted        - messages marked for deletion
-///   - draft          - draft messages
-///   - before:2024-01-15 - messages before date
-///   - since:2024-01-01  - messages since date
-///   - on:2024-01-10     - messages on date
-///   - larger:1000       - messages larger than 1000 bytes
-///   - smaller:5000      - messages smaller than 5000 bytes
-///   - all               - all messages
+/// Returns the UIDs (or sequence numbers with --seq) of messages
+/// matching the given criteria. Each criteria flag maps to one IMAP
+/// search key and multiple flags are ANDed; with no criteria, every
+/// message matches.
 #[derive(Debug, Parser)]
 pub struct ImapEnvelopeSearchCommand {
     #[command(flatten)]
@@ -52,9 +33,8 @@ pub struct ImapEnvelopeSearchCommand {
     #[command(flatten)]
     pub mailbox_no_select: MailboxNoSelectFlag,
 
-    /// Search query (e.g., "from:alice unseen").
-    #[arg(name = "query", value_name = "QUERY", default_value = "all")]
-    pub query: String,
+    #[command(flatten)]
+    pub criteria: SearchCriteriaArgs,
 
     /// Use sequence numbers instead of UIDs.
     #[arg(long)]
@@ -74,7 +54,7 @@ impl ImapEnvelopeSearchCommand {
             client.select(mailbox, ImapMailboxSelectOptions::default())?;
         }
 
-        let criteria = parse_query(&self.query)?;
+        let criteria = self.criteria.into_criteria()?;
         let ids = client.search(criteria, ImapMessageSearchOptions { uid: !self.seq })?;
 
         let table = SearchTable {
@@ -90,6 +70,195 @@ impl ImapEnvelopeSearchCommand {
 
         printer.out(table)
     }
+}
+
+/// IMAP SEARCH criteria (RFC 3501).
+///
+/// Each flag maps to one IMAP search key; multiple flags are ANDed
+/// together. With no flag set, the criteria resolve to `ALL`. Search
+/// keys not exposed here (OR, NOT, HEADER, ...) are reachable through
+/// the raw passthrough.
+#[derive(Debug, Parser)]
+pub struct SearchCriteriaArgs {
+    /// Match messages whose From header contains TEXT.
+    #[arg(long, value_name = "TEXT")]
+    pub from: Option<String>,
+    /// Match messages whose To header contains TEXT.
+    #[arg(long, value_name = "TEXT")]
+    pub to: Option<String>,
+    /// Match messages whose Cc header contains TEXT.
+    #[arg(long, value_name = "TEXT")]
+    pub cc: Option<String>,
+    /// Match messages whose Bcc header contains TEXT.
+    #[arg(long, value_name = "TEXT")]
+    pub bcc: Option<String>,
+    /// Match messages whose Subject header contains TEXT.
+    #[arg(long, value_name = "TEXT")]
+    pub subject: Option<String>,
+    /// Match messages whose body contains TEXT.
+    #[arg(long, value_name = "TEXT")]
+    pub body: Option<String>,
+    /// Match messages whose headers or body contain TEXT.
+    #[arg(long, value_name = "TEXT")]
+    pub text: Option<String>,
+
+    /// Match messages received before DATE (YYYY-MM-DD).
+    #[arg(long, value_name = "DATE", value_parser = date_parser)]
+    pub before: Option<NaiveDate>,
+    /// Match messages received since DATE (YYYY-MM-DD).
+    #[arg(long, value_name = "DATE", value_parser = date_parser)]
+    pub since: Option<NaiveDate>,
+    /// Match messages received on DATE (YYYY-MM-DD).
+    #[arg(long, value_name = "DATE", value_parser = date_parser)]
+    pub on: Option<NaiveDate>,
+
+    /// Match messages larger than BYTES.
+    #[arg(long, value_name = "BYTES")]
+    pub larger: Option<u32>,
+    /// Match messages smaller than BYTES.
+    #[arg(long, value_name = "BYTES")]
+    pub smaller: Option<u32>,
+
+    /// Match \Seen messages.
+    #[arg(long)]
+    pub seen: bool,
+    /// Match messages without the \Seen flag.
+    #[arg(long)]
+    pub unseen: bool,
+    /// Match \Flagged messages.
+    #[arg(long)]
+    pub flagged: bool,
+    /// Match messages without the \Flagged flag.
+    #[arg(long)]
+    pub unflagged: bool,
+    /// Match \Answered messages.
+    #[arg(long)]
+    pub answered: bool,
+    /// Match messages without the \Answered flag.
+    #[arg(long)]
+    pub unanswered: bool,
+    /// Match \Deleted messages.
+    #[arg(long)]
+    pub deleted: bool,
+    /// Match messages without the \Deleted flag.
+    #[arg(long)]
+    pub undeleted: bool,
+    /// Match \Draft messages.
+    #[arg(long)]
+    pub draft: bool,
+    /// Match messages without the \Draft flag.
+    #[arg(long)]
+    pub undraft: bool,
+    /// Match \Recent messages that are also unseen (NEW).
+    #[arg(long)]
+    pub new: bool,
+    /// Match messages without the \Recent flag (OLD).
+    #[arg(long)]
+    pub old: bool,
+    /// Match \Recent messages.
+    #[arg(long)]
+    pub recent: bool,
+}
+
+impl SearchCriteriaArgs {
+    /// Folds every set flag into an IMAP search key, ANDed together;
+    /// resolves to a single `ALL` key when nothing is set.
+    pub fn into_criteria(self) -> Result<Vec1<SearchKey<'static>>> {
+        let mut keys: Vec<SearchKey<'static>> = Vec::new();
+
+        if let Some(text) = self.from {
+            keys.push(SearchKey::From(AString::try_from(text)?));
+        }
+        if let Some(text) = self.to {
+            keys.push(SearchKey::To(AString::try_from(text)?));
+        }
+        if let Some(text) = self.cc {
+            keys.push(SearchKey::Cc(AString::try_from(text)?));
+        }
+        if let Some(text) = self.bcc {
+            keys.push(SearchKey::Bcc(AString::try_from(text)?));
+        }
+        if let Some(text) = self.subject {
+            keys.push(SearchKey::Subject(AString::try_from(text)?));
+        }
+        if let Some(text) = self.body {
+            keys.push(SearchKey::Body(AString::try_from(text)?));
+        }
+        if let Some(text) = self.text {
+            keys.push(SearchKey::Text(AString::try_from(text)?));
+        }
+
+        if let Some(date) = self.before {
+            keys.push(SearchKey::Before(date));
+        }
+        if let Some(date) = self.since {
+            keys.push(SearchKey::Since(date));
+        }
+        if let Some(date) = self.on {
+            keys.push(SearchKey::On(date));
+        }
+
+        if let Some(size) = self.larger {
+            keys.push(SearchKey::Larger(size));
+        }
+        if let Some(size) = self.smaller {
+            keys.push(SearchKey::Smaller(size));
+        }
+
+        if self.seen {
+            keys.push(SearchKey::Seen);
+        }
+        if self.unseen {
+            keys.push(SearchKey::Unseen);
+        }
+        if self.flagged {
+            keys.push(SearchKey::Flagged);
+        }
+        if self.unflagged {
+            keys.push(SearchKey::Unflagged);
+        }
+        if self.answered {
+            keys.push(SearchKey::Answered);
+        }
+        if self.unanswered {
+            keys.push(SearchKey::Unanswered);
+        }
+        if self.deleted {
+            keys.push(SearchKey::Deleted);
+        }
+        if self.undeleted {
+            keys.push(SearchKey::Undeleted);
+        }
+        if self.draft {
+            keys.push(SearchKey::Draft);
+        }
+        if self.undraft {
+            keys.push(SearchKey::Undraft);
+        }
+        if self.new {
+            keys.push(SearchKey::New);
+        }
+        if self.old {
+            keys.push(SearchKey::Old);
+        }
+        if self.recent {
+            keys.push(SearchKey::Recent);
+        }
+
+        if keys.is_empty() {
+            keys.push(SearchKey::All);
+        }
+
+        Ok(Vec1::unvalidated(keys))
+    }
+}
+
+/// Clap value parser for a YYYY-MM-DD search date.
+fn date_parser(s: &str) -> Result<NaiveDate, String> {
+    let date = chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
+        .map_err(|_| format!("expected a YYYY-MM-DD date, got `{s}`"))?;
+
+    NaiveDate::try_from(date).map_err(|e| format!("invalid date `{s}`: {e}"))
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -130,130 +299,4 @@ impl fmt::Display for SearchTable {
         writeln!(f, "Found {} message(s)", self.ids.len())?;
         Ok(())
     }
-}
-
-/// Parse a query string into search criteria.
-///
-/// Multiple terms are ANDed together.
-pub fn parse_query(query: &str) -> Result<Vec1<SearchKey<'static>>> {
-    let mut keys: Vec<SearchKey<'static>> = Vec::new();
-
-    for term in query.split_whitespace() {
-        let key = parse_term(term)?;
-        keys.push(key);
-    }
-
-    if keys.is_empty() {
-        keys.push(SearchKey::All);
-    }
-
-    Ok(Vec1::unvalidated(keys))
-}
-
-fn parse_term(term: &str) -> Result<SearchKey<'static>> {
-    let term_lower = term.to_lowercase();
-
-    // Simple flag keywords
-    match term_lower.as_str() {
-        "all" => return Ok(SearchKey::All),
-        "seen" => return Ok(SearchKey::Seen),
-        "unseen" => return Ok(SearchKey::Unseen),
-        "flagged" => return Ok(SearchKey::Flagged),
-        "unflagged" => return Ok(SearchKey::Unflagged),
-        "answered" => return Ok(SearchKey::Answered),
-        "unanswered" => return Ok(SearchKey::Unanswered),
-        "deleted" => return Ok(SearchKey::Deleted),
-        "undeleted" => return Ok(SearchKey::Undeleted),
-        "draft" => return Ok(SearchKey::Draft),
-        "undraft" => return Ok(SearchKey::Undraft),
-        "new" => return Ok(SearchKey::New),
-        "old" => return Ok(SearchKey::Old),
-        "recent" => return Ok(SearchKey::Recent),
-        _ => {}
-    }
-
-    // Key:value patterns
-    if let Some((key, value)) = term.split_once(':') {
-        let key_lower = key.to_lowercase();
-        let value_str = value.to_string();
-
-        match key_lower.as_str() {
-            "from" => {
-                let astring = AString::try_from(value_str)?;
-                return Ok(SearchKey::From(astring));
-            }
-            "to" => {
-                let astring = AString::try_from(value_str)?;
-                return Ok(SearchKey::To(astring));
-            }
-            "cc" => {
-                let astring = AString::try_from(value_str)?;
-                return Ok(SearchKey::Cc(astring));
-            }
-            "bcc" => {
-                let astring = AString::try_from(value_str)?;
-                return Ok(SearchKey::Bcc(astring));
-            }
-            "subject" => {
-                let astring = AString::try_from(value_str)?;
-                return Ok(SearchKey::Subject(astring));
-            }
-            "body" => {
-                let astring = AString::try_from(value_str)?;
-                return Ok(SearchKey::Body(astring));
-            }
-            "text" => {
-                let astring = AString::try_from(value_str)?;
-                return Ok(SearchKey::Text(astring));
-            }
-            "before" => {
-                let date = parse_date(value)?;
-                return Ok(SearchKey::Before(date));
-            }
-            "since" => {
-                let date = parse_date(value)?;
-                return Ok(SearchKey::Since(date));
-            }
-            "on" => {
-                let date = parse_date(value)?;
-                return Ok(SearchKey::On(date));
-            }
-            "larger" => {
-                let size: u32 = value.parse()?;
-                return Ok(SearchKey::Larger(size));
-            }
-            "smaller" => {
-                let size: u32 = value.parse()?;
-                return Ok(SearchKey::Smaller(size));
-            }
-            _ => {}
-        }
-    }
-
-    bail!("Unknown search term `{term}`")
-}
-
-fn parse_date(s: &str) -> Result<NaiveDate> {
-    // Parse YYYY-MM-DD format
-    let parts: Vec<&str> = s.split('-').collect();
-    if parts.len() != 3 {
-        bail!("Invalid date format `{s}`, expected YYYY-MM-DD");
-    }
-
-    let year: i32 = parts[0]
-        .parse()
-        .map_err(|_| anyhow!("Invalid year in date `{s}`"))?;
-    let month: u32 = parts[1]
-        .parse()
-        .map_err(|_| anyhow!("Invalid month in date `{s}`"))?;
-    let day: u32 = parts[2]
-        .parse()
-        .map_err(|_| anyhow!("Invalid day in date `{s}`"))?;
-
-    // Create chrono::NaiveDate first
-    let chrono_date = chrono::NaiveDate::from_ymd_opt(year, month, day)
-        .ok_or_else(|| anyhow!("Invalid date `{s}`"))?;
-
-    // Convert to imap-types NaiveDate
-    NaiveDate::try_from(chrono_date).map_err(|e| anyhow!("Invalid date `{s}`: {e}"))
 }
