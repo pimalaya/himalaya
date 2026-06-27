@@ -16,9 +16,14 @@ use crate::{account::context::Account, msgraph::client::MsgraphClient};
 #[command(rename_all = "kebab-case")]
 pub enum MsgraphMailFoldersCommand {
     List(MsgraphMailFoldersListCommand),
+    #[command(visible_aliases = ["children", "child"])]
+    ChildFolders(MsgraphChildFoldersListCommand),
     Get(MsgraphMailFolderGetCommand),
     Create(MsgraphMailFolderCreateCommand),
     Rename(MsgraphMailFolderRenameCommand),
+    Copy(MsgraphMailFolderCopyCommand),
+    #[command(name = "move")]
+    Move(MsgraphMailFolderMoveCommand),
     #[command(visible_aliases = ["del", "remove", "rm"])]
     Delete(MsgraphMailFolderDeleteCommand),
 }
@@ -32,9 +37,12 @@ impl MsgraphMailFoldersCommand {
     ) -> Result<()> {
         match self {
             Self::List(cmd) => cmd.execute(printer, account, client),
+            Self::ChildFolders(cmd) => cmd.execute(printer, account, client),
             Self::Get(cmd) => cmd.execute(printer, account, client),
             Self::Create(cmd) => cmd.execute(printer, client),
             Self::Rename(cmd) => cmd.execute(printer, client),
+            Self::Copy(cmd) => cmd.execute(printer, client),
+            Self::Move(cmd) => cmd.execute(printer, client),
             Self::Delete(cmd) => cmd.execute(printer, client),
         }
     }
@@ -51,6 +59,11 @@ pub struct MsgraphMailFoldersListCommand {
     #[arg(long, value_name = "N")]
     pub skip: Option<u32>,
 
+    /// OData `$select`: comma-separated fields to return (e.g.
+    /// `displayName,totalItemCount`).
+    #[arg(long, value_name = "FIELDS")]
+    pub select: Option<String>,
+
     /// Also include hidden folders.
     #[arg(long)]
     pub hidden: bool,
@@ -66,10 +79,55 @@ impl MsgraphMailFoldersListCommand {
         let params = MsgraphMailFoldersListParams {
             top: self.top,
             skip: self.skip,
-            select: None,
+            select: self.select.as_deref(),
             include_hidden_folders: self.hidden.then_some(true),
         };
         let folders = client.mail_folders_list(&params)?.response.value;
+
+        printer.out(folders_table(account, folders))
+    }
+}
+
+/// List a mail folder's child folders (`GET
+/// /me/mailFolders/{id}/childFolders`).
+#[derive(Debug, Parser)]
+pub struct MsgraphChildFoldersListCommand {
+    /// The id or well-known name of the parent folder.
+    #[arg(value_name = "ID")]
+    pub id: String,
+
+    /// Maximum number of folders to return (OData `$top`).
+    #[arg(short = 's', long, value_name = "N")]
+    pub top: Option<u32>,
+
+    /// Number of folders to skip (OData `$skip`).
+    #[arg(long, value_name = "N")]
+    pub skip: Option<u32>,
+
+    /// OData `$select`: comma-separated fields to return (e.g.
+    /// `displayName,totalItemCount`).
+    #[arg(long, value_name = "FIELDS")]
+    pub select: Option<String>,
+
+    /// Also include hidden folders.
+    #[arg(long)]
+    pub hidden: bool,
+}
+
+impl MsgraphChildFoldersListCommand {
+    pub fn execute(
+        self,
+        printer: &mut impl Printer,
+        account: &mut Account,
+        client: &mut MsgraphClient,
+    ) -> Result<()> {
+        let params = MsgraphMailFoldersListParams {
+            top: self.top,
+            skip: self.skip,
+            select: self.select.as_deref(),
+            include_hidden_folders: self.hidden.then_some(true),
+        };
+        let folders = client.child_folders_list(&self.id, &params)?.response.value;
 
         printer.out(folders_table(account, folders))
     }
@@ -144,6 +202,58 @@ impl MsgraphMailFolderRenameCommand {
         printer.out(Message::new(format!(
             "Microsoft Graph mail folder `{}` successfully renamed",
             self.id
+        )))
+    }
+}
+
+/// Copy a Microsoft Graph mail folder into another folder (`POST
+/// /me/mailFolders/{id}/copy`).
+#[derive(Debug, Parser)]
+pub struct MsgraphMailFolderCopyCommand {
+    /// The id of the folder to copy.
+    #[arg(value_name = "ID")]
+    pub id: String,
+
+    /// The destination folder id or well-known name.
+    #[arg(value_name = "DESTINATION")]
+    pub destination: String,
+}
+
+impl MsgraphMailFolderCopyCommand {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
+        let folder = client
+            .mail_folder_copy(&self.id, &self.destination)?
+            .response;
+
+        printer.out(Message::new(format!(
+            "Microsoft Graph mail folder copied to `{}`",
+            folder.id
+        )))
+    }
+}
+
+/// Move a Microsoft Graph mail folder into another folder (`POST
+/// /me/mailFolders/{id}/move`).
+#[derive(Debug, Parser)]
+pub struct MsgraphMailFolderMoveCommand {
+    /// The id of the folder to move.
+    #[arg(value_name = "ID")]
+    pub id: String,
+
+    /// The destination folder id or well-known name.
+    #[arg(value_name = "DESTINATION")]
+    pub destination: String,
+}
+
+impl MsgraphMailFolderMoveCommand {
+    pub fn execute(self, printer: &mut impl Printer, client: &mut MsgraphClient) -> Result<()> {
+        let folder = client
+            .mail_folder_move(&self.id, &self.destination)?
+            .response;
+
+        printer.out(Message::new(format!(
+            "Microsoft Graph mail folder moved to `{}`",
+            folder.id
         )))
     }
 }

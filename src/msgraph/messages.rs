@@ -68,9 +68,26 @@ pub struct MsgraphMessagesListCommand {
     #[arg(long, value_name = "EXPR")]
     pub filter: Option<String>,
 
+    /// OData `$search` query (e.g. `subject:report` or a bare term).
+    ///
+    /// Graph forbids combining `$search` with `$orderby` and ignores
+    /// `$count`, so both are dropped when this is set; results come back
+    /// in relevance order.
+    #[arg(long, value_name = "QUERY")]
+    pub search: Option<String>,
+
     /// OData `$orderby` expression. Defaults to `receivedDateTime desc`.
     #[arg(long, value_name = "EXPR")]
     pub orderby: Option<String>,
+
+    /// OData `$select`: comma-separated fields to return (e.g.
+    /// `subject,from,receivedDateTime`).
+    #[arg(long, value_name = "FIELDS")]
+    pub select: Option<String>,
+
+    /// Request the total count of matching messages (OData `$count`).
+    #[arg(long)]
+    pub count: bool,
 }
 
 impl MsgraphMessagesListCommand {
@@ -80,14 +97,28 @@ impl MsgraphMessagesListCommand {
         account: &mut Account,
         client: &mut MsgraphClient,
     ) -> Result<()> {
-        let orderby = self.orderby.as_deref().unwrap_or("receivedDateTime desc");
+        let search = self.search.as_deref();
+
+        // Graph rejects `$search` alongside `$orderby` and needs a
+        // `ConsistencyLevel` header (not sent by the client) for
+        // `$search` + `$count`; drop both when searching.
+        let orderby = match search {
+            Some(_) => None,
+            None => Some(self.orderby.as_deref().unwrap_or("receivedDateTime desc")),
+        };
+        let count = match search {
+            Some(_) => None,
+            None => self.count.then_some(true),
+        };
+
         let params = MsgraphMessagesListParams {
             top: self.top,
             skip: self.skip,
-            select: None,
+            select: self.select.as_deref(),
             filter: self.filter.as_deref(),
-            orderby: Some(orderby),
-            count: None,
+            search,
+            orderby,
+            count,
         };
         let response = client
             .messages_list(self.folder.as_deref(), &params)?
