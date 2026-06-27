@@ -5,9 +5,13 @@ use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, Row, Table, presets};
 use io_imap::{
     rfc3501::{fetch::ImapMessageFetchOptions, select::ImapMailboxSelectOptions},
-    types::fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
+    types::{
+        body::{BasicFields, BodyStructure, SpecificFields},
+        core::{IString, NString},
+        envelope::{Address, Envelope},
+        fetch::{MacroOrMessageDataItemNames, MessageDataItem, MessageDataItemName},
+    },
 };
-use mail_parser::{Addr, Address, ContentType, Message, MessageParser, MimeHeaders};
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
@@ -16,10 +20,12 @@ use crate::imap::{
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
 };
 
-/// Get a message and display its structure.
+/// Get an IMAP message structure (FETCH ENVELOPE BODYSTRUCTURE).
 ///
-/// This command fetches a message and displays its headers along with
-/// the body structure tree showing all MIME parts.
+/// Displays the envelope headers and the server-reported MIME body
+/// structure tree (types, sizes, names), without downloading the
+/// message body. To read a body or extract parts, use the shared
+/// `messages` and `attachments` commands.
 #[derive(Debug, Parser)]
 pub struct ImapMessageGetCommand {
     #[command(flatten)]
@@ -42,12 +48,10 @@ impl ImapMessageGetCommand {
             client.select(mailbox, ImapMailboxSelectOptions::default())?;
         }
 
-        let item_names =
-            MacroOrMessageDataItemNames::MessageDataItemNames(vec![MessageDataItemName::BodyExt {
-                section: None,
-                partial: None,
-                peek: true,
-            }]);
+        let item_names = MacroOrMessageDataItemNames::MessageDataItemNames(vec![
+            MessageDataItemName::Envelope,
+            MessageDataItemName::BodyStructure,
+        ]);
 
         let sequence_set = self.id.parse()?;
         let mut data = client.fetch(
@@ -63,27 +67,24 @@ impl ImapMessageGetCommand {
             bail!("Get message `{}` error: no message data returned", self.id);
         };
 
-        let mut raw_message: Option<Vec<u8>> = None;
+        let mut envelope = None;
+        let mut body_structure = None;
         for item in items.into_iter() {
-            if let MessageDataItem::BodyExt { data, .. } = item {
-                if let Some(data) = data.0 {
-                    raw_message = Some(data.as_ref().to_vec());
-                }
+            match item {
+                MessageDataItem::Envelope(env) => envelope = Some(env),
+                MessageDataItem::BodyStructure(bs) => body_structure = Some(bs),
+                _ => {}
             }
         }
 
-        let Some(raw) = raw_message else {
-            bail!("Get message `{}` error: no message data returned", self.id);
-        };
-
-        let Some(message) = MessageParser::new().parse(&raw) else {
+        let (Some(envelope), Some(body_structure)) = (envelope, body_structure) else {
             bail!(
-                "Get message `{}` error: failed to parse MIME message",
+                "Get message `{}` error: missing envelope or body structure",
                 self.id
             );
         };
 
-        let structure = MessageStructure::from_parsed(&message);
+        let structure = MessageStructure::from_fetch(&envelope, &body_structure);
         printer.out(structure)
     }
 }
@@ -113,114 +114,108 @@ pub struct BodyPart {
 #[derive(Clone, Debug, Serialize)]
 pub struct MessageStructure {
     pub headers: MessageHeaders,
-    pub body: Option<BodyPart>,
+    pub body: BodyPart,
 }
 
 impl MessageStructure {
-    pub fn from_parsed(message: &Message<'_>) -> Self {
-        // Extract headers
+    pub fn from_fetch(envelope: &Envelope<'_>, body_structure: &BodyStructure<'_>) -> Self {
         let headers = MessageHeaders {
-            date: message.date().map(|d| d.to_rfc3339()),
-            subject: message.subject().map(|s| s.to_string()),
-            message_id: message.message_id().map(|s| s.to_string()),
-            in_reply_to: message.in_reply_to().as_text().map(|s| s.to_string()),
-            from: extract_addresses(message.from()),
-            to: extract_addresses(message.to()),
-            cc: extract_addresses(message.cc()),
-            bcc: extract_addresses(message.bcc()),
-            reply_to: extract_addresses(message.reply_to()),
+            date: nstring(&envelope.date),
+            subject: nstring(&envelope.subject),
+            message_id: nstring(&envelope.message_id),
+            in_reply_to: nstring(&envelope.in_reply_to),
+            from: format_addresses(&envelope.from),
+            to: format_addresses(&envelope.to),
+            cc: format_addresses(&envelope.cc),
+            bcc: format_addresses(&envelope.bcc),
+            reply_to: format_addresses(&envelope.reply_to),
         };
 
-        // Build body structure tree
-        let body = build_body_tree(message);
-
-        Self { headers, body }
+        Self {
+            headers,
+            body: build_part(body_structure),
+        }
     }
 }
 
-fn extract_addresses(addr: Option<&Address<'_>>) -> Vec<String> {
-    match addr {
-        Some(Address::List(list)) => list.iter().map(format_addr).collect(),
-        Some(Address::Group(groups)) => groups
-            .iter()
-            .flat_map(|g| g.addresses.iter().map(format_addr))
-            .collect(),
-        None => Vec::new(),
+/// Maps a server body structure node to a display part, recursing into
+/// multipart children and message/rfc822 encapsulated structures.
+fn build_part(structure: &BodyStructure<'_>) -> BodyPart {
+    match structure {
+        BodyStructure::Single { body, .. } => {
+            let parts = match &body.specific {
+                SpecificFields::Message { body_structure, .. } => vec![build_part(body_structure)],
+                _ => Vec::new(),
+            };
+
+            BodyPart {
+                content_type: content_type(&body.specific),
+                name: part_name(&body.basic),
+                size: Some(body.basic.size as usize),
+                parts,
+            }
+        }
+        BodyStructure::Multi {
+            bodies, subtype, ..
+        } => BodyPart {
+            content_type: format!("multipart/{}", istring(subtype)),
+            name: None,
+            size: None,
+            parts: bodies.as_ref().iter().map(build_part).collect(),
+        },
     }
 }
 
-fn format_addr(addr: &Addr<'_>) -> String {
-    match (&addr.name, &addr.address) {
-        (Some(name), Some(email)) => format!("{} <{}>", name, email),
-        (None, Some(email)) => email.to_string(),
-        (Some(name), None) => name.to_string(),
+fn content_type(specific: &SpecificFields<'_>) -> String {
+    match specific {
+        SpecificFields::Basic { r#type, subtype } => {
+            format!("{}/{}", istring(r#type), istring(subtype))
+        }
+        SpecificFields::Message { .. } => "message/rfc822".to_string(),
+        SpecificFields::Text { subtype, .. } => format!("text/{}", istring(subtype)),
+    }
+}
+
+fn part_name(basic: &BasicFields<'_>) -> Option<String> {
+    basic
+        .parameter_list
+        .iter()
+        .find(|(key, _)| istring(key).eq_ignore_ascii_case("name"))
+        .map(|(_, value)| istring(value))
+}
+
+fn format_addresses(addresses: &[Address<'_>]) -> Vec<String> {
+    addresses
+        .iter()
+        .map(format_address)
+        .filter(|addr| !addr.is_empty())
+        .collect()
+}
+
+fn format_address(addr: &Address<'_>) -> String {
+    let email = match (nstring(&addr.mailbox), nstring(&addr.host)) {
+        (Some(mailbox), Some(host)) => Some(format!("{mailbox}@{host}")),
+        (Some(mailbox), None) => Some(mailbox),
+        _ => None,
+    };
+
+    match (nstring(&addr.name), email) {
+        (Some(name), Some(email)) => format!("{name} <{email}>"),
+        (None, Some(email)) => email,
+        (Some(name), None) => name,
         (None, None) => String::new(),
     }
 }
 
-fn format_content_type(ct: &ContentType<'_>) -> String {
-    match &ct.c_subtype {
-        Some(sub) => format!("{}/{}", ct.c_type, sub),
-        None => ct.c_type.to_string(),
-    }
+fn istring(string: &IString<'_>) -> String {
+    String::from_utf8_lossy(string.as_ref()).into_owned()
 }
 
-fn build_body_tree(message: &mail_parser::Message<'_>) -> Option<BodyPart> {
-    let content_type = message
-        .root_part()
-        .content_type()
-        .map(format_content_type)
-        .unwrap_or_else(|| "text/plain".to_string());
-
-    let is_multipart = content_type.starts_with("multipart/");
-
-    if is_multipart {
-        // Multipart message - build tree from parts
-        let parts: Vec<BodyPart> = message
-            .parts
-            .iter()
-            .skip(1) // Skip the root part (it's the multipart container)
-            .filter_map(|part| build_part_tree(part))
-            .collect();
-
-        Some(BodyPart {
-            content_type,
-            name: None,
-            size: None,
-            parts,
-        })
-    } else {
-        // Single part message
-        let size = message.raw_message.len();
-        Some(BodyPart {
-            content_type,
-            name: None,
-            size: Some(size),
-            parts: Vec::new(),
-        })
-    }
-}
-
-fn build_part_tree(part: &mail_parser::MessagePart<'_>) -> Option<BodyPart> {
-    let content_type = part
-        .content_type()
-        .map(format_content_type)
-        .unwrap_or_else(|| "application/octet-stream".to_string());
-
-    // Skip multipart container parts (they're represented by their children)
-    if content_type.starts_with("multipart/") {
-        return None;
-    }
-
-    let name = part.attachment_name().map(|s| s.to_string());
-    let size = part.len();
-
-    Some(BodyPart {
-        content_type,
-        name,
-        size: Some(size),
-        parts: Vec::new(),
-    })
+fn nstring(string: &NString<'_>) -> Option<String> {
+    string
+        .0
+        .as_ref()
+        .map(|inner| String::from_utf8_lossy(inner.as_ref()).into_owned())
 }
 
 fn format_size(bytes: usize) -> String {
@@ -229,13 +224,12 @@ fn format_size(bytes: usize) -> String {
     } else if bytes >= 1024 {
         format!("{:.1} KB", bytes as f64 / 1024.0)
     } else {
-        format!("{} B", bytes)
+        format!("{bytes} B")
     }
 }
 
 impl fmt::Display for MessageStructure {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Display headers as a table
         let mut table = Table::new();
         table
             .load_preset(presets::ASCII_MARKDOWN)
@@ -292,11 +286,8 @@ impl fmt::Display for MessageStructure {
         write!(f, "{table}")?;
         writeln!(f)?;
 
-        // Display body structure
-        if let Some(body) = &self.body {
-            writeln!(f, "\nBody structure:")?;
-            write_body_tree(f, body, "", true)?;
-        }
+        writeln!(f, "\nBody structure:")?;
+        write_body_tree(f, &self.body, "", true)?;
 
         writeln!(f)?;
         Ok(())
@@ -311,22 +302,20 @@ fn write_body_tree(
 ) -> fmt::Result {
     let connector = if is_last { "└─ " } else { "├─ " };
 
-    // Build the part description
     let mut desc = part.content_type.clone();
     if let Some(name) = &part.name {
-        desc.push_str(&format!(" \"{}\"", name));
+        desc.push_str(&format!(" \"{name}\""));
     }
     if let Some(size) = part.size {
         desc.push_str(&format!(" ({})", format_size(size)));
     }
 
-    writeln!(f, "{}{}{}", prefix, connector, desc)?;
+    writeln!(f, "{prefix}{connector}{desc}")?;
 
-    // Handle children
     let child_prefix = if is_last {
-        format!("{}   ", prefix)
+        format!("{prefix}   ")
     } else {
-        format!("{}│  ", prefix)
+        format!("{prefix}│  ")
     };
 
     for (i, child) in part.parts.iter().enumerate() {

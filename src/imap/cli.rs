@@ -42,7 +42,7 @@ impl ImapCommand {
             Self::Envelope(cmd) => cmd.execute(printer, account, client),
             Self::Flag(cmd) => cmd.execute(printer, account, client),
             Self::Mailbox(cmd) => cmd.execute(printer, account, client),
-            Self::Message(cmd) => cmd.execute(printer, account, client),
+            Self::Message(cmd) => cmd.execute(printer, client),
         }
     }
 }
