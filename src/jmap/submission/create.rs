@@ -42,24 +42,30 @@ impl JmapSubmissionCreateCommand {
         account: &mut Account,
         client: &mut JmapClient,
     ) -> Result<()> {
-        let envelope = if let Some(mail_from_addr) = self.mail_from {
-            let rcpt_to = self
-                .rcpt_to
-                .into_iter()
-                .map(|addr| JmapEmailAddressWithParameters {
-                    email: addr,
-                    parameters: None,
+        // The JMAP envelope is all-or-nothing: mail_from is required, so
+        // it cannot be derived while overriding rcpt_to (or vice versa).
+        // With neither, the server derives mail_from from the identity
+        // and rcpt_to from the message headers.
+        let envelope = match (self.mail_from, self.rcpt_to.is_empty()) {
+            (None, true) => None,
+            (Some(mail_from_addr), false) => {
+                let rcpt_to = self
+                    .rcpt_to
+                    .into_iter()
+                    .map(|addr| JmapEmailAddressWithParameters {
+                        email: addr,
+                        parameters: None,
+                    })
+                    .collect();
+                Some(JmapEnvelope {
+                    mail_from: JmapEmailAddressWithParameters {
+                        email: mail_from_addr,
+                        parameters: None,
+                    },
+                    rcpt_to,
                 })
-                .collect();
-            Some(JmapEnvelope {
-                mail_from: JmapEmailAddressWithParameters {
-                    email: mail_from_addr,
-                    parameters: None,
-                },
-                rcpt_to,
-            })
-        } else {
-            None
+            }
+            _ => bail!("Overriding the JMAP envelope requires both --mail-from and --rcpt-to"),
         };
 
         let submission = JmapEmailSubmissionCreate {

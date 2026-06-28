@@ -1,4 +1,4 @@
-use std::{convert::Infallible, fmt, str::FromStr};
+use std::fmt;
 
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
@@ -22,10 +22,13 @@ pub struct JmapMailboxQueryCommand {
     #[arg(long, value_name = "ID")]
     pub parent_id: Option<String>,
 
-    /// Filter by role [possible values: inbox, archive, drafts,
-    /// flagged, important, junk, sent, subscribed, trash].
-    #[arg(long, value_name = "ROLE")]
+    /// Filter by a standard role.
+    #[arg(long, value_name = "ROLE", conflicts_with = "custom_role")]
     pub role: Option<RoleArg>,
+
+    /// Filter by a custom (non-standard) role.
+    #[arg(long, value_name = "ROLE")]
+    pub custom_role: Option<String>,
 
     /// Filter by substring name match.
     #[arg(long, value_name = "NAME")]
@@ -66,7 +69,7 @@ impl JmapMailboxQueryCommand {
         let filter = {
             let f = JmapMailboxFilter {
                 parent_id: self.parent_id,
-                role: self.role.map(Into::into),
+                role: role_from_args(self.role, self.custom_role),
                 name: self.name,
                 is_subscribed: if self.all { None } else { Some(true) },
                 has_any_role: if self.has_any_role { Some(true) } else { None },
@@ -175,8 +178,9 @@ impl fmt::Display for MailboxesTable {
     }
 }
 
-/// CLI proxy for the mailbox role filter.
-#[derive(Clone, Debug)]
+/// Standard JMAP mailbox role (RFC 8621 / IANA).
+#[derive(Clone, Copy, Debug, ValueEnum)]
+#[clap(rename_all = "lower")]
 pub enum RoleArg {
     Inbox,
     Archive,
@@ -187,26 +191,6 @@ pub enum RoleArg {
     Sent,
     Subscribed,
     Trash,
-    Other(String),
-}
-
-impl FromStr for RoleArg {
-    type Err = Infallible;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "inbox" => Ok(Self::Inbox),
-            "archive" => Ok(Self::Archive),
-            "drafts" => Ok(Self::Drafts),
-            "flagged" => Ok(Self::Flagged),
-            "important" => Ok(Self::Important),
-            "junk" => Ok(Self::Junk),
-            "sent" => Ok(Self::Sent),
-            "subscribed" => Ok(Self::Subscribed),
-            "trash" => Ok(Self::Trash),
-            other => Ok(Self::Other(other.to_owned())),
-        }
-    }
 }
 
 impl From<RoleArg> for JmapMailboxRole {
@@ -221,8 +205,21 @@ impl From<RoleArg> for JmapMailboxRole {
             RoleArg::Sent => JmapMailboxRole::Sent,
             RoleArg::Subscribed => JmapMailboxRole::Subscribed,
             RoleArg::Trash => JmapMailboxRole::Trash,
-            RoleArg::Other(s) => JmapMailboxRole::Other(s),
         }
+    }
+}
+
+/// Resolves a standard `--role` or a free-form `--custom-role` into a
+/// JMAP mailbox role, when either is set. The two are mutually
+/// exclusive at the clap layer.
+pub(crate) fn role_from_args(
+    role: Option<RoleArg>,
+    custom: Option<String>,
+) -> Option<JmapMailboxRole> {
+    match (role, custom) {
+        (Some(role), _) => Some(role.into()),
+        (None, Some(custom)) => Some(JmapMailboxRole::Other(custom)),
+        (None, None) => None,
     }
 }
 

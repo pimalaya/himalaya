@@ -5,7 +5,11 @@ use clap::Parser;
 use io_jmap::rfc8621::mailbox::{JmapMailboxUpdate, set::JmapMailboxSetArgs};
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::jmap::{client::JmapClient, error::format_set_error, mailbox::query::RoleArg};
+use crate::jmap::{
+    client::JmapClient,
+    error::format_set_error,
+    mailbox::query::{RoleArg, role_from_args},
+};
 
 /// Update a JMAP mailbox.
 #[derive(Debug, Parser)]
@@ -22,9 +26,13 @@ pub struct JmapMailboxUpdateCommand {
     #[arg(long, value_name = "ID")]
     pub parent_id: Option<String>,
 
-    /// New role.
-    #[arg(long, value_name = "ROLE")]
+    /// Set a standard role.
+    #[arg(long, value_name = "ROLE", conflicts_with = "custom_role")]
     pub role: Option<RoleArg>,
+
+    /// Set a custom (non-standard) role.
+    #[arg(long, value_name = "ROLE")]
+    pub custom_role: Option<String>,
 
     /// New sort order.
     #[arg(long, value_name = "N")]
@@ -52,7 +60,7 @@ impl JmapMailboxUpdateCommand {
         let patch = JmapMailboxUpdate {
             name: self.name,
             parent_id: self.parent_id,
-            role: self.role.map(Into::into),
+            role: role_from_args(self.role, self.custom_role),
             sort_order: self.sort_order,
             is_subscribed,
         };
