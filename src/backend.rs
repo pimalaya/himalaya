@@ -1,7 +1,6 @@
-use std::{fmt, str::FromStr};
+use std::fmt;
 
-use anyhow::{Error, bail};
-use clap::Parser;
+use clap::ValueEnum;
 
 /// Selects which backend a cross-protocol command should target.
 ///
@@ -12,7 +11,7 @@ use clap::Parser;
 ///
 /// The protocol-specific subcommands (`imap`, `jmap`, `maildir`,
 /// `m2dir`, `smtp`) ignore this arg entirely.
-#[derive(Clone, Copy, Debug, Default, Parser, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, ValueEnum)]
 pub enum Backend {
     #[default]
     Auto,
@@ -61,24 +60,6 @@ impl Backend {
     /// Whether the SMTP arm of a shared command is allowed to run.
     pub fn allows_smtp(self) -> bool {
         matches!(self, Self::Auto | Self::Smtp)
-    }
-}
-
-impl FromStr for Backend {
-    type Err = Error;
-
-    fn from_str(backend: &str) -> Result<Self, Self::Err> {
-        match backend {
-            "auto" => Ok(Self::Auto),
-            "imap" => Ok(Self::Imap),
-            "jmap" => Ok(Self::Jmap),
-            "gmail" => Ok(Self::Gmail),
-            "msgraph" => Ok(Self::Msgraph),
-            "maildir" => Ok(Self::Maildir),
-            "m2dir" => Ok(Self::M2dir),
-            "smtp" => Ok(Self::Smtp),
-            backend => bail!("Invalid backend {backend}"),
-        }
     }
 }
 

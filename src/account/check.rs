@@ -91,6 +91,15 @@ impl AccountCheckCommand {
             }
         }
 
+        #[cfg(feature = "m2dir")]
+        if backend.allows_m2dir() {
+            if let Some(m2dir_config) = account_config.m2dir.clone() {
+                report
+                    .backends
+                    .push(check_m2dir(&config, &account_config, m2dir_config));
+            }
+        }
+
         #[cfg(feature = "smtp")]
         if backend.allows_smtp() {
             if let Some(smtp_config) = account_config.smtp.clone() {
@@ -233,6 +242,25 @@ fn check_maildir(
     })();
 
     BackendCheck::from("maildir", result)
+}
+
+#[cfg(feature = "m2dir")]
+fn check_m2dir(
+    _config: &Config,
+    _account_config: &AccountConfig,
+    m2dir_config: crate::config::M2dirConfig,
+) -> BackendCheck {
+    let result = (|| -> Result<()> {
+        if !m2dir_config.root.is_dir() {
+            bail!(
+                "m2dir root `{}` does not exist or is not a directory",
+                m2dir_config.root.display()
+            );
+        }
+        Ok(())
+    })();
+
+    BackendCheck::from("m2dir", result)
 }
 
 #[cfg(feature = "smtp")]

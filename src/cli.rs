@@ -54,16 +54,12 @@ pub struct Cli {
     /// Force a specific backend for cross-protocol commands.
     ///
     /// Only consumed by the shared commands (`mailboxes`, `envelopes`,
-    /// `flags`, `messages`); the protocol-specific subcommands
-    /// (`imap`, `jmap`, `maildir`, `smtp`) ignore it and always use
-    /// their own backend.
-    ///
-    /// Possible values: `auto` (default), `imap`, `jmap`, `gmail`,
-    /// `msgraph`, `maildir`, `smtp`. With `auto`, the shared command picks the first
-    /// configured backend it supports; with an explicit value, it uses
-    /// only that backend (and bails if the account has no matching
-    /// config block, or if the operation has no implementation for it
-    /// — e.g. `--backend smtp mailboxes list`).
+    /// `flags`, `messages`); the protocol-specific subcommands ignore it
+    /// and always use their own backend. With `auto` (the default) the
+    /// shared command picks the first configured backend it supports;
+    /// with an explicit value it uses only that backend, and bails if
+    /// the account has no matching config block or the operation has no
+    /// implementation for it (e.g. `--backend smtp mailboxes list`).
     #[arg(short, long, global = true, default_value_t)]
     pub backend: Backend,
     #[command(flatten)]

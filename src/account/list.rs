@@ -105,6 +105,9 @@ impl AccountRow {
         if account.maildir.is_some() {
             backends.push("maildir");
         }
+        if account.m2dir.is_some() {
+            backends.push("m2dir");
+        }
         if account.smtp.is_some() {
             backends.push("smtp");
         }
