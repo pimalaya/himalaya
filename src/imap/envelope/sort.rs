@@ -2,7 +2,7 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
-use comfy_table::{Cell, Color, ContentArrangement, Row, Table, presets};
+use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use io_imap::{
     rfc3501::select::ImapMailboxSelectOptions,
     rfc5256::sort::ImapMessageSortOptions,
@@ -16,7 +16,9 @@ use serde::Serialize;
 
 use crate::account::context::Account;
 use crate::imap::{
-    client::ImapClient, envelope::search::SearchCriteriaArgs, mailbox::arg::MailboxNameOptionalArg,
+    client::ImapClient,
+    envelope::search::SearchCriteriaArgs,
+    mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
 };
 
 /// Sort IMAP messages (SORT, RFC 5256).
@@ -27,7 +29,9 @@ use crate::imap::{
 #[derive(Debug, Parser)]
 pub struct ImapEnvelopeSortCommand {
     #[command(flatten)]
-    pub mailbox_name: MailboxNameOptionalArg,
+    pub mailbox_name: MailboxNameOptionalFlag,
+    #[command(flatten)]
+    pub mailbox_no_select: MailboxNoSelectFlag,
 
     /// Sort key.
     #[arg(short = 'S', long, value_name = "KEY", default_value = "date")]
@@ -54,7 +58,9 @@ impl ImapEnvelopeSortCommand {
     ) -> Result<()> {
         let mailbox = self.mailbox_name.inner.try_into()?;
 
-        client.select(mailbox, ImapMailboxSelectOptions::default())?;
+        if !self.mailbox_no_select.inner {
+            client.select(mailbox, ImapMailboxSelectOptions::default())?;
+        }
 
         let sort_criteria = Vec1::unvalidated(vec![SortCriterion {
             reverse: self.reverse,
@@ -72,11 +78,15 @@ impl ImapEnvelopeSortCommand {
             },
         )?;
 
-        let id_color = account.envelopes_list_table_id_color();
-        let table = SortResultsTable::new(ids, !self.seq, id_color);
+        let table = SortResultsTable {
+            preset: account.table_preset().to_string(),
+            arrangement: account.table_arrangement(),
+            id_color: account.envelopes_list_table_id_color(),
+            uid_mode: !self.seq,
+            ids: ids.into_iter().map(|id| id.get()).collect(),
+        };
 
-        printer.out(table)?;
-        Ok(())
+        printer.out(table)
     }
 }
 
@@ -111,21 +121,14 @@ impl From<SortKeyArg> for SortKey {
 /// Renderable table of SORT result message ids.
 #[derive(Clone, Debug, Serialize)]
 pub struct SortResultsTable {
-    ids: Vec<u32>,
-    uid_mode: bool,
+    #[serde(skip)]
+    preset: String,
+    #[serde(skip)]
+    arrangement: ContentArrangement,
     #[serde(skip)]
     id_color: Color,
-}
-
-impl SortResultsTable {
-    pub fn new(ids: Vec<std::num::NonZeroU32>, uid_mode: bool, id_color: Color) -> Self {
-        let ids = ids.into_iter().map(|id| id.get()).collect();
-        Self {
-            ids,
-            uid_mode,
-            id_color,
-        }
-    }
+    uid_mode: bool,
+    ids: Vec<u32>,
 }
 
 impl fmt::Display for SortResultsTable {
@@ -135,8 +138,8 @@ impl fmt::Display for SortResultsTable {
         let id_header = if self.uid_mode { "UID" } else { "SEQ" };
 
         table
-            .load_preset(presets::ASCII_MARKDOWN)
-            .set_content_arrangement(ContentArrangement::DynamicFullWidth)
+            .load_preset(&self.preset)
+            .set_content_arrangement(self.arrangement.clone())
             .set_header(Row::from([Cell::new(id_header)]));
 
         for id in &self.ids {
