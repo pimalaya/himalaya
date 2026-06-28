@@ -1,7 +1,7 @@
-use std::process::exit;
+use std::io::{IsTerminal, stdout};
 
-use anyhow::Result;
-use ariadne::{Color, Label, Report, ReportKind, Source};
+use anyhow::{Result, bail};
+use ariadne::{Color, Config, Label, Report, ReportKind, Source};
 use clap::Parser;
 use io_email::search::{error::Error as SearchQueryError, query::SearchEmailsQuery};
 use pimalaya_cli::printer::Printer;
@@ -77,7 +77,7 @@ impl EnvelopeSearchCommand {
             .or(Some(account.envelopes_list_page_size()))
             .filter(|p| *p > 0);
         let mailbox = self.mailbox.resolve(account)?;
-        let query = parse_query(self.query.as_deref());
+        let query = parse_query(self.query.as_deref())?;
 
         let envelopes = client.search_envelopes(
             &mailbox,
@@ -118,13 +118,15 @@ impl EnvelopeSearchCommand {
     }
 }
 
-/// Joins the trailing-positional words, feeds them to
-/// [`SearchEmailsQuery::from_str`], and renders any parse error with
-/// ariadne before exiting with code 1. Returns `None` when the input
+/// Joins the trailing-positional words and feeds them to
+/// [`SearchEmailsQuery::from_str`]. Returns `Ok(None)` when the input
 /// is empty (no query) so `client.search_envelopes` keeps its default
-/// behaviour.
-fn parse_query(words: Option<&[String]>) -> Option<SearchEmailsQuery> {
-    let words = words?;
+/// behaviour, or bails with the ariadne-rendered parse error.
+fn parse_query(words: Option<&[String]>) -> Result<Option<SearchEmailsQuery>> {
+    let Some(words) = words else {
+        return Ok(None);
+    };
+
     let joined = words
         .iter()
         .map(String::as_str)
@@ -132,27 +134,29 @@ fn parse_query(words: Option<&[String]>) -> Option<SearchEmailsQuery> {
         .join(" ");
     let trimmed = joined.trim();
     if trimmed.is_empty() {
-        return None;
+        return Ok(None);
     }
 
     match trimmed.parse::<SearchEmailsQuery>() {
-        Ok(query) => Some(query),
-        Err(err) => {
-            render_query_parse_error(&err);
-            exit(1);
-        }
+        Ok(query) => Ok(Some(query)),
+        Err(err) => bail!(render_query_parse_error(&err)),
     }
 }
 
-/// Pretty-prints a `chumsky` parse error to stderr using ariadne, one
-/// labelled report per inner error, then leaves the caller to decide
-/// what to do (we [`exit`]).
-fn render_query_parse_error(err: &SearchQueryError) {
+/// Pretty-prints a `chumsky` parse error with ariadne, one labelled
+/// report per inner error, into a single returned string so the caller
+/// can surface it through the normal error channel (stdout). Color is
+/// disabled when stdout is not a terminal.
+fn render_query_parse_error(err: &SearchQueryError) -> String {
     let SearchQueryError::ParseError(errs, src) = err;
     let source_name = "query";
+    let config = Config::default().with_color(stdout().is_terminal());
+    let mut buf = Vec::new();
+
     for inner in errs {
         let range = inner.span().into_range();
         let _ = Report::build(ReportKind::Error, (source_name, range.clone()))
+            .with_config(config)
             .with_message(err.to_string())
             .with_label(
                 Label::new((source_name, range))
@@ -160,6 +164,8 @@ fn render_query_parse_error(err: &SearchQueryError) {
                     .with_color(Color::Red),
             )
             .finish()
-            .eprint((source_name, Source::from(src.as_str())));
+            .write((source_name, Source::from(src.as_str())), &mut buf);
     }
+
+    String::from_utf8_lossy(&buf).into_owned()
 }
