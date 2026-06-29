@@ -76,6 +76,7 @@ impl GmailSendAsListCommand {
 /// Get one Gmail send-as alias by e-mail address (settings.sendAs.get).
 #[derive(Debug, Parser)]
 pub struct GmailSendAsGetCommand {
+    /// E-mail address of the send-as alias to get.
     #[arg(value_name = "EMAIL")]
     pub email: String,
 }
@@ -122,18 +123,23 @@ impl GmailSendAsGetCommand {
 /// Create a Gmail send-as alias (settings.sendAs.create).
 #[derive(Debug, Parser)]
 pub struct GmailSendAsCreateCommand {
+    /// E-mail address of the send-as alias to create.
     #[arg(value_name = "EMAIL")]
     pub email: String,
 
+    /// Display name shown in the From header for this alias.
     #[arg(long)]
     pub display_name: Option<String>,
 
+    /// Reply-To address to set on messages sent from this alias.
     #[arg(long)]
     pub reply_to_address: Option<String>,
 
+    /// HTML signature appended to messages sent from this alias.
     #[arg(long)]
     pub signature: Option<String>,
 
+    /// Treat this alias as an alias of the primary address.
     #[arg(long)]
     pub treat_as_alias: bool,
 }
@@ -165,21 +171,28 @@ impl GmailSendAsCreateCommand {
 /// Update a Gmail send-as alias (settings.sendAs.update/patch).
 #[derive(Debug, Parser)]
 pub struct GmailSendAsUpdateCommand {
+    /// E-mail address of the send-as alias to update.
     #[arg(value_name = "EMAIL")]
     pub email: String,
 
+    /// Display name shown in the From header for this alias.
     #[arg(long)]
     pub display_name: Option<String>,
 
+    /// Reply-To address to set on messages sent from this alias.
     #[arg(long)]
     pub reply_to_address: Option<String>,
 
+    /// HTML signature appended to messages sent from this alias.
     #[arg(long)]
     pub signature: Option<String>,
 
+    /// Treat this alias as an alias of the primary address.
     #[arg(long)]
     pub treat_as_alias: bool,
 
+    /// Switch from a full update to a partial patch; without it the
+    /// default update clears any field you omit.
     #[arg(long)]
     pub patch: bool,
 }
@@ -213,6 +226,7 @@ impl GmailSendAsUpdateCommand {
 /// Delete a Gmail send-as alias (settings.sendAs.delete).
 #[derive(Debug, Parser)]
 pub struct GmailSendAsDeleteCommand {
+    /// E-mail address of the send-as alias to delete.
     #[arg(value_name = "EMAIL")]
     pub email: String,
 }
@@ -235,6 +249,7 @@ impl GmailSendAsDeleteCommand {
 /// (settings.sendAs.verify).
 #[derive(Debug, Parser)]
 pub struct GmailSendAsVerifyCommand {
+    /// E-mail address of the send-as alias to verify.
     #[arg(value_name = "EMAIL")]
     pub email: String,
 }

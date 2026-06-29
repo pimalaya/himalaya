@@ -69,9 +69,11 @@ impl GmailSettingsPopGetCommand {
 /// Update the Gmail POP access settings.
 #[derive(Debug, Parser)]
 pub struct GmailSettingsPopSetCommand {
+    /// Range of messages made available over POP.
     #[arg(long, value_name = "WINDOW")]
     pub access_window: Option<PopAccessWindowArg>,
 
+    /// Action taken on messages after they are fetched over POP.
     #[arg(long, value_name = "DISPOSITION")]
     pub disposition: Option<DispositionArg>,
 }

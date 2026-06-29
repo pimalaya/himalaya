@@ -103,25 +103,34 @@ pub struct GmailSettingsVacationSetCommand {
     #[arg(long)]
     pub disable: bool,
 
+    /// Subject of the auto-reply message.
     #[arg(long)]
     pub subject: Option<String>,
 
+    /// Plain-text body of the auto-reply message.
     #[arg(long)]
     pub body: Option<String>,
 
+    /// HTML body of the auto-reply message.
     #[arg(long)]
     pub html: Option<String>,
 
+    /// Send the auto-reply only to people in your contacts.
     #[arg(long)]
     pub restrict_to_contacts: Option<bool>,
 
+    /// Send the auto-reply only to people in your domain.
     #[arg(long)]
     pub restrict_to_domain: Option<bool>,
 
-    #[arg(long)]
+    /// First day the responder is active; Gmail expects epoch
+    /// milliseconds.
+    #[arg(long, value_name = "EPOCH_MS")]
     pub start_time: Option<String>,
 
-    #[arg(long)]
+    /// Last day the responder is active; Gmail expects epoch
+    /// milliseconds.
+    #[arg(long, value_name = "EPOCH_MS")]
     pub end_time: Option<String>,
 }
 

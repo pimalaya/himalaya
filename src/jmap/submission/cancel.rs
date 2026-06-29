@@ -31,7 +31,7 @@ impl JmapSubmissionCancelCommand {
         }
 
         printer.out(Message::new(format!(
-            "{} submission(s) canceled.",
+            "{} submission(s) canceled",
             self.ids.len()
         )))
     }

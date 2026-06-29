@@ -52,6 +52,7 @@ impl GmailSettingsLanguageGetCommand {
 /// Update the Gmail display language settings.
 #[derive(Debug, Parser)]
 pub struct GmailSettingsLanguageSetCommand {
+    /// Display language tag to set, such as `en` or `fr`.
     #[arg(long, value_name = "LANG")]
     pub display_language: String,
 }

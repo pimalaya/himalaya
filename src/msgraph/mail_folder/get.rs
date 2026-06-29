@@ -11,6 +11,7 @@ use crate::{
 /// /me/mailFolders/{id}`).
 #[derive(Debug, Parser)]
 pub struct MsgraphMailFolderGetCommand {
+    /// The ids of the mail folders to get.
     #[arg(value_name = "ID", required = true)]
     pub ids: Vec<String>,
 }

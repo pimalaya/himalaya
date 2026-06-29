@@ -14,9 +14,11 @@ use crate::msgraph::client::MsgraphClient;
 /// for Graph to infer unless `--content-type` is given.
 #[derive(Debug, Parser)]
 pub struct MsgraphAttachmentCreateCommand {
+    /// The id of the message to attach the file to.
     #[arg(value_name = "MESSAGE_ID")]
     pub message_id: String,
 
+    /// The path to the file to upload as an attachment.
     #[arg(value_name = "PATH")]
     pub path: PathBuf,
 

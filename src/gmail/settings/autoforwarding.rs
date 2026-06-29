@@ -81,9 +81,11 @@ pub struct GmailSettingsAutoForwardingSetCommand {
     #[arg(long)]
     pub disable: bool,
 
+    /// Address to which incoming messages are forwarded.
     #[arg(long)]
     pub email_address: Option<String>,
 
+    /// Action taken on the original message after it is forwarded.
     #[arg(long, value_name = "DISPOSITION")]
     pub disposition: Option<DispositionArg>,
 }

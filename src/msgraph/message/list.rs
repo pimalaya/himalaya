@@ -21,7 +21,7 @@ pub struct MsgraphMessageListCommand {
     pub folder: Option<String>,
 
     /// Maximum number of messages to return (OData `$top`).
-    #[arg(short = 's', long, value_name = "N")]
+    #[arg(long, value_name = "N")]
     pub top: Option<u32>,
 
     /// Number of messages to skip (OData `$skip`).

@@ -9,6 +9,7 @@ use crate::msgraph::client::MsgraphClient;
 /// /me/mailFolders`).
 #[derive(Debug, Parser)]
 pub struct MsgraphMailFolderCreateCommand {
+    /// The display name of the mail folder to create.
     #[arg(value_name = "NAME")]
     pub name: String,
 }

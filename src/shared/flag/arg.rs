@@ -95,8 +95,8 @@ pub struct MessageIdsArg {
 /// Repeatable option holding one or more flags to apply to messages.
 #[derive(Debug, Parser)]
 pub struct FlagsArg {
-    /// Flag(s) to add on message(s). Repeat the option to pass several
-    /// flags (e.g. `-f seen -f flagged`).
+    /// Flag(s) to apply. Repeat the option to pass several (e.g. `-f
+    /// seen -f flagged`).
     #[arg(name = "flags", value_name = "FLAG")]
     #[arg(long = "flag", short, required = true)]
     pub inner: Vec<FlagArg>,

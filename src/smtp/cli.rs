@@ -11,9 +11,11 @@ use crate::smtp::{client::SmtpClient, raw::SmtpRawCommand, send::SmtpSendCommand
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum SmtpCommand {
+    /// Send a raw RFC 5322 message (MAIL FROM / RCPT TO / DATA).
     Send(SmtpSendCommand),
 
     // Raw passthrough.
+    /// Send a raw SMTP command and print the verbatim reply.
     Raw(SmtpRawCommand),
 }
 

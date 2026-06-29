@@ -8,6 +8,7 @@ use crate::msgraph::client::MsgraphClient;
 /// /me/mailFolders/{id}`).
 #[derive(Debug, Parser)]
 pub struct MsgraphMailFolderDeleteCommand {
+    /// The id of the mail folder to delete.
     #[arg(value_name = "ID")]
     pub id: String,
 }

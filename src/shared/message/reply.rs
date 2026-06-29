@@ -33,30 +33,41 @@ pub struct MessageReplyCommand {
     #[command(flatten)]
     pub mailbox: MailboxArg,
 
+    /// Sender address (`From` header).
     #[arg(long, value_name = "ADDR")]
     pub from: Option<String>,
 
+    /// Recipient address(es) (`To` header). Repeat the flag or use a
+    /// comma-separated list.
     #[arg(long, short = 't', value_name = "ADDR", value_delimiter = ',')]
     pub to: Vec<String>,
 
+    /// Carbon-copy recipient(s) (`Cc` header).
     #[arg(long, value_name = "ADDR", value_delimiter = ',')]
     pub cc: Vec<String>,
 
+    /// Blind carbon-copy recipient(s) (`Bcc` header).
     #[arg(long, value_name = "ADDR", value_delimiter = ',')]
     pub bcc: Vec<String>,
 
+    /// Subject line.
     #[arg(long, short = 's', value_name = "TEXT")]
     pub subject: Option<String>,
 
+    /// Inline body. Conflicts with `--body-file`; stdin is used as a
+    /// fallback when neither is given.
     #[arg(long, value_name = "TEXT", conflicts_with = "body_file")]
     pub body: Option<String>,
 
     #[arg(long = "body-file", value_name = "PATH")]
     pub body_file: Option<PathBuf>,
 
+    /// Attachment file(s).
     #[arg(long = "attach", value_name = "PATH")]
     pub attach: Vec<PathBuf>,
 
+    /// Signature appended after the body, separated by the standard
+    /// `-- ` delimiter (RFC 3676 §4.3).
     #[arg(long, value_name = "TEXT")]
     pub signature: Option<String>,
 

@@ -8,9 +8,11 @@ use crate::msgraph::client::MsgraphClient;
 /// Rename a Microsoft Graph mail folder (`PATCH /me/mailFolders/{id}`).
 #[derive(Debug, Parser)]
 pub struct MsgraphMailFolderRenameCommand {
+    /// The id of the mail folder to rename.
     #[arg(value_name = "ID")]
     pub id: String,
 
+    /// The new display name of the mail folder.
     #[arg(value_name = "NAME")]
     pub name: String,
 }

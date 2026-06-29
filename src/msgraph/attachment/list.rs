@@ -12,6 +12,7 @@ use crate::{account::context::Account, msgraph::client::MsgraphClient};
 /// List a message's attachments (`GET /me/messages/{id}/attachments`).
 #[derive(Debug, Parser)]
 pub struct MsgraphAttachmentListCommand {
+    /// The id of the message whose attachments to list.
     #[arg(value_name = "MESSAGE_ID")]
     pub message_id: String,
 }

@@ -18,18 +18,25 @@ use crate::jmap::{
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum JmapCommand {
+    /// Send a raw JMAP method-calls array and print the response.
     Query(JmapQueryCommand),
 
+    /// Manage JMAP mailboxes.
     #[command(subcommand, visible_aliases = ["mbox"])]
     Mailbox(JmapMailboxCommand),
+    /// Manage JMAP emails.
     #[command(subcommand)]
     Email(JmapEmailCommand),
+    /// Manage JMAP threads.
     #[command(subcommand)]
     Thread(JmapThreadCommand),
+    /// Manage JMAP sender identities.
     #[command(subcommand)]
     Identity(JmapIdentityCommand),
+    /// Manage JMAP email submissions.
     #[command(subcommand)]
     Submission(JmapSubmissionCommand),
+    /// Manage JMAP vacation response.
     #[command(subcommand, visible_alias = "vacation")]
     VacationResponse(JmapVacationCommand),
 }

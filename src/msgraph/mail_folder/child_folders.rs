@@ -17,7 +17,7 @@ pub struct MsgraphChildFoldersListCommand {
     pub id: String,
 
     /// Maximum number of folders to return (OData `$top`).
-    #[arg(short = 's', long, value_name = "N")]
+    #[arg(long, value_name = "N")]
     pub top: Option<u32>,
 
     /// Number of folders to skip (OData `$skip`).

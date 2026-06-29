@@ -15,7 +15,7 @@ use crate::{account::context::Account, msgraph::client::MsgraphClient};
 #[derive(Debug, Parser)]
 pub struct MsgraphMailFolderListCommand {
     /// Maximum number of folders to return (OData `$top`).
-    #[arg(short = 's', long, value_name = "N")]
+    #[arg(long, value_name = "N")]
     pub top: Option<u32>,
 
     /// Number of folders to skip (OData `$skip`).

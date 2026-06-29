@@ -8,9 +8,11 @@ use crate::msgraph::client::MsgraphClient;
 /// /me/messages/{id}/attachments/{aid}`).
 #[derive(Debug, Parser)]
 pub struct MsgraphAttachmentDeleteCommand {
+    /// The id of the message the attachment belongs to.
     #[arg(value_name = "MESSAGE_ID")]
     pub message_id: String,
 
+    /// The id of the attachment to delete.
     #[arg(value_name = "ATTACHMENT_ID")]
     pub id: String,
 }

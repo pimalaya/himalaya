@@ -88,12 +88,15 @@ pub struct GmailSettingsImapSetCommand {
     #[arg(long)]
     pub disable: bool,
 
+    /// Auto-expunge messages when their last label is removed.
     #[arg(long)]
     pub auto_expunge: Option<bool>,
 
+    /// Action taken on messages marked deleted in IMAP.
     #[arg(long, value_name = "BEHAVIOR")]
     pub expunge_behavior: Option<ExpungeBehaviorArg>,
 
+    /// Maximum number of messages exposed in an IMAP folder.
     #[arg(long)]
     pub max_folder_size: Option<u32>,
 }

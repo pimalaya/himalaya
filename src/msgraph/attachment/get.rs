@@ -11,12 +11,15 @@ use crate::{msgraph::client::MsgraphClient, shared::output::write_bytes_or_save}
 /// bytes.
 #[derive(Debug, Parser)]
 pub struct MsgraphAttachmentGetCommand {
+    /// The id of the message the attachment belongs to.
     #[arg(value_name = "MESSAGE_ID")]
     pub message_id: String,
 
+    /// The id of the attachment to download.
     #[arg(value_name = "ATTACHMENT_ID")]
     pub id: String,
 
+    /// Save the attachment to this path instead of printing its bytes.
     #[arg(short = 'o', long, value_name = "PATH")]
     pub output: Option<PathBuf>,
 }

@@ -15,11 +15,16 @@ use crate::jmap::{
 /// Manage JMAP mailboxes.
 #[derive(Debug, Subcommand)]
 pub enum JmapMailboxCommand {
+    /// Get JMAP mailboxes by ID (Mailbox/get).
     Get(JmapMailboxGetCommand),
+    /// Query JMAP mailboxes (Mailbox/query + Mailbox/get).
     Query(JmapMailboxQueryCommand),
+    /// Create a JMAP mailbox.
     #[command(visible_aliases = ["add", "new"])]
     Create(JmapMailboxCreateCommand),
+    /// Update a JMAP mailbox.
     Update(JmapMailboxUpdateCommand),
+    /// Delete a JMAP mailbox.
     #[command(visible_aliases = ["delete", "del", "remove", "rm"])]
     Destroy(JmapMailboxDestroyCommand),
 }

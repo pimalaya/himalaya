@@ -19,11 +19,11 @@ use crate::jmap::{
 #[derive(Debug, Parser)]
 pub struct JmapSubmissionCreateCommand {
     /// The ID of the draft email to send.
-    #[arg(value_name = "EMAIL_ID")]
+    #[arg(value_name = "EMAIL-ID")]
     pub email_id: String,
 
     /// The identity ID to send as (from `identity get`).
-    #[arg(long, value_name = "IDENTITY_ID")]
+    #[arg(long, value_name = "IDENTITY-ID")]
     pub identity_id: String,
 
     /// Override the MAIL FROM address (uses `From` header if omitted).

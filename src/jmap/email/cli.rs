@@ -17,16 +17,25 @@ use crate::jmap::{
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum JmapEmailCommand {
+    /// Get JMAP emails by ID (Email/get).
     Get(JmapEmailGetCommand),
+    /// Query JMAP emails (Email/query + Email/get).
     Query(JmapEmailQueryCommand),
+    /// Read the content of a JMAP email (Email/get with body).
     Read(JmapEmailReadCommand),
+    /// Update JMAP emails via patch operations (Email/set).
     #[command(alias = "edit")]
     Update(JmapEmailUpdateCommand),
+    /// Delete JMAP emails (Email/set destroy).
     #[command(aliases = ["remove", "rm"])]
     Delete(JmapEmailDestroyCommand),
+    /// Copy JMAP emails from another account (Email/copy).
     Copy(JmapEmailCopyCommand),
+    /// Export a raw RFC 5322 message to stdout (Email/get + blob download).
     Export(JmapEmailExportCommand),
+    /// Import an RFC 5322 message into a mailbox (upload + Email/import).
     Import(JmapEmailImportCommand),
+    /// Parse RFC 5322 message blobs without storing them (Email/parse).
     Parse(JmapEmailParseCommand),
 }
 

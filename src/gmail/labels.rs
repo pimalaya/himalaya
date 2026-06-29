@@ -70,6 +70,7 @@ impl GmailLabelsListCommand {
 /// Get one or more Gmail labels by identifier (users.labels.get).
 #[derive(Debug, Parser)]
 pub struct GmailLabelGetCommand {
+    /// Identifiers of the labels to get.
     #[arg(value_name = "ID", required = true)]
     pub ids: Vec<String>,
 }
@@ -106,6 +107,7 @@ impl GmailLabelGetCommand {
 /// Create a Gmail label (users.labels.create).
 #[derive(Debug, Parser)]
 pub struct GmailLabelCreateCommand {
+    /// Display name of the label to create.
     #[arg(value_name = "NAME")]
     pub name: String,
 }
@@ -128,9 +130,11 @@ impl GmailLabelCreateCommand {
 /// Update a Gmail label name (users.labels.update).
 #[derive(Debug, Parser)]
 pub struct GmailLabelUpdateCommand {
+    /// Identifier of the label to update.
     #[arg(value_name = "ID")]
     pub id: String,
 
+    /// New display name to set on the label.
     #[arg(value_name = "NAME")]
     pub name: String,
 }
@@ -154,6 +158,7 @@ impl GmailLabelUpdateCommand {
 /// Delete a Gmail label (users.labels.delete).
 #[derive(Debug, Parser)]
 pub struct GmailLabelDeleteCommand {
+    /// Identifier of the label to delete.
     #[arg(value_name = "ID")]
     pub id: String,
 }

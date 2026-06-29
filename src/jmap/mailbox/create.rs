@@ -20,7 +20,7 @@ pub struct JmapMailboxCreateCommand {
     pub parent_id: Option<String>,
 
     /// Should subscribe to the new mailbox.
-    #[arg(long, value_name = "NAME")]
+    #[arg(long)]
     pub subscribe: bool,
 }
 

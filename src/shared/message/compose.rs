@@ -47,7 +47,8 @@ pub struct MessageComposeCommand {
     #[arg(long, short = 's', value_name = "TEXT")]
     pub subject: Option<String>,
 
-    /// Inline body. Mutually exclusive with `--body-file` and stdin.
+    /// Inline body. Conflicts with `--body-file`; stdin is used as a
+    /// fallback when neither is given.
     #[arg(long, value_name = "TEXT", conflicts_with = "body_file")]
     pub body: Option<String>,
 

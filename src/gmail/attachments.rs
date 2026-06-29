@@ -31,12 +31,15 @@ impl GmailAttachmentsCommand {
 /// save its decoded bytes.
 #[derive(Debug, Parser)]
 pub struct GmailAttachmentGetCommand {
+    /// Identifier of the message owning the attachment.
     #[arg(value_name = "MESSAGE_ID")]
     pub message_id: String,
 
+    /// Identifier of the attachment to get.
     #[arg(value_name = "ATTACHMENT_ID")]
     pub id: String,
 
+    /// Save the decoded bytes to this path instead of printing them.
     #[arg(short = 'o', long, value_name = "PATH")]
     pub output: Option<std::path::PathBuf>,
 }
