@@ -3,7 +3,6 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, Color, Row, Table};
-use io_m2dir::m2dir::types::M2dir;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
@@ -21,12 +20,24 @@ impl M2dirMailboxListCommand {
         account: &mut Account,
         client: &mut M2dirClient,
     ) -> Result<()> {
+        let store = client.open_store()?;
         let m2dirs = client.list_m2dirs()?;
+
+        let rows = m2dirs
+            .into_iter()
+            .map(|m2dir| {
+                let name = store
+                    .decode_folder_name(m2dir.path())
+                    .unwrap_or_else(|| m2dir.path().as_str().to_owned());
+                let path = m2dir.path().as_str().to_owned();
+                M2dirRow { name, path }
+            })
+            .collect();
 
         let table = M2dirsTable {
             preset: account.table_preset().to_string(),
             name_color: account.mailboxes_list_table_name_color(),
-            rows: m2dirs.into_iter().map(From::from).collect(),
+            rows,
         };
 
         printer.out(table)
@@ -73,16 +84,4 @@ impl fmt::Display for M2dirsTable {
 pub struct M2dirRow {
     pub name: String,
     pub path: String,
-}
-
-impl From<M2dir> for M2dirRow {
-    fn from(m2dir: M2dir) -> Self {
-        let name = m2dir
-            .path()
-            .file_name()
-            .map(str::to_owned)
-            .unwrap_or_default();
-        let path = m2dir.path().as_str().to_owned();
-        Self { name, path }
-    }
 }
