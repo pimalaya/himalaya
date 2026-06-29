@@ -1,8 +1,13 @@
+use std::path::Path;
+
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::maildir::{arg::MaildirNameArg, client::MaildirClient};
+use crate::maildir::{
+    arg::MaildirNameArg,
+    client::{MaildirClient, validate_maildir_name},
+};
 
 /// Create a Maildir folder.
 ///
@@ -16,6 +21,8 @@ pub struct MaildirMailboxCreateCommand {
 
 impl MaildirMailboxCreateCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut MaildirClient) -> Result<()> {
+        validate_maildir_name(Path::new(&self.maildir_name.inner))?;
+
         let path = client
             .root
             .join(&self.maildir_name.inner)

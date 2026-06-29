@@ -7,10 +7,10 @@
 
 use std::{
     ops::{Deref, DerefMut},
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
 };
 
-use anyhow::{Result, anyhow};
+use anyhow::{Result, anyhow, bail};
 use io_maildir::{client::MaildirClient as Inner, maildir::types::Maildir};
 use pimalaya_config::toml::TomlConfig;
 
@@ -79,4 +79,22 @@ pub fn build_maildir_client(
         .ok_or_else(|| anyhow!("Maildir config is missing for account `{name}`"))?;
     let account = Account::from(config).merge(Account::from(ac));
     Ok((account, MaildirClient::new(maildir_config)))
+}
+
+/// Rejects a Maildir folder name that is empty, absolute, or contains a
+/// `..` component, so a folder operation joined to the account root
+/// cannot escape it.
+pub fn validate_maildir_name(name: &Path) -> Result<()> {
+    if name.as_os_str().is_empty() {
+        bail!("Maildir folder name must not be empty");
+    }
+
+    if name.is_absolute() || name.components().any(|c| matches!(c, Component::ParentDir)) {
+        bail!(
+            "Invalid Maildir folder `{}`: it must be relative and must not contain `..`",
+            name.display()
+        );
+    }
+
+    Ok(())
 }

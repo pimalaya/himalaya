@@ -22,6 +22,17 @@ pub struct MaildirPathFlag {
     pub inner: PathBuf,
 }
 
+/// CLI flag selecting a Maildir by path, required with no default.
+/// Used by destructive commands that must not silently fall back to
+/// Inbox.
+#[derive(Debug, Parser)]
+pub struct RequiredMaildirPathFlag {
+    /// Path to the Maildir.
+    #[arg(name = "maildir_path", long = "maildir", short = 'm')]
+    #[arg(value_name = "PATH")]
+    pub inner: PathBuf,
+}
+
 /// CLI flag selecting the target Maildir by path.
 #[derive(Debug, Parser)]
 pub struct TargetMaildirPathFlag {
