@@ -103,7 +103,7 @@ impl Config {
 /// `deny_unknown_fields` is omitted so per-account TUI-only fields
 /// (`email`, `display-name`, `signature`, `signature-delim`) coexist
 /// in the same `[accounts.<name>]` block when the file is shared.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct AccountConfig {
     #[serde(default)]

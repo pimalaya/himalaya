@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, process::exit};
 
 use anyhow::{Result, bail};
 use clap::{CommandFactory, Parser, Subcommand};
@@ -121,9 +121,13 @@ pub enum Command {
 /// by every `build_*_client` helper to get a populated `Config` before
 /// the per-backend client opens its connection.
 pub fn load_or_wizard(config_paths: &[PathBuf]) -> Result<Config> {
-    match Config::from_paths_or_default(config_paths)? {
+    if let Some(config) = Config::from_paths_or_default(config_paths)? {
+        return Ok(config);
+    }
+
+    match wizard::discover::run(&Config::target_path(config_paths)?)? {
         Some(config) => Ok(config),
-        None => wizard::discover::run_or_exit(&Config::target_path(config_paths)?),
+        None => exit(0),
     }
 }
 
