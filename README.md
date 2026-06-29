@@ -46,8 +46,8 @@
 ## Features
 
 - **Shared API** that maps `mailboxes`, `envelopes`, `flags`, `messages` and `attachments` to the active backend
-- **Protocol-specific APIs** exposing each backend's full surface (`himalaya imap/smtp/maildir/jmap…`)
-- Remote backend support: **IMAP**, **SMTP**, **JMAP**
+- **Protocol-specific APIs** exposing each backend's full surface (`himalaya imap/smtp/jmap/gmail/msgraph/maildir…`)
+- Remote backend support: **IMAP**, **SMTP**, **JMAP**, **Gmail** (REST API), **Microsoft Graph** (Outlook / Microsoft 365)
 - Local (filesystem) backends support: **Maildir** <sup>[specs](https://cr.yp.to/proto/maildir.html)</sup>, **m2dir** <sup>[specs](https://man.sr.ht/~bitfehler/m2dir/)</sup>
 - **Simple auth** support for IMAP/SMTP: anonymous, login, plain, oauthbearer, xoauth2, scram-sha-256
 - **HTTP auth** support for JMAP: basic, bearer
@@ -297,25 +297,33 @@ When the `inbox` alias is configured under `[mailbox.alias]`, `-m/--mailbox` bec
 
 The query DSL is himalaya's own and compiles to each backend's native search: provider-specific operators (Gmail's `in:`/`label:` syntax, `X-GM-RAW`, …) are not supported. On IMAP the search currently runs server-side as `UID SORT`, so it requires the `SORT` capability — servers without it (notably Gmail) reject the command for now (see [#698](https://github.com/pimalaya/himalaya/issues/698)).
 
-The shared surface is a strict least-common-denominator subset across IMAP, JMAP and Maildir. Operations that do not generalize (mailbox roles, attribute flags, JMAP-specific queries…) live under the protocol-specific subcommands.
+The shared surface is a strict least-common-denominator subset across IMAP, JMAP, Gmail, Microsoft Graph, Maildir and m2dir. Operations that do not generalize (mailbox roles, attribute flags, JMAP-specific queries…) live under the protocol-specific subcommands.
 
 ### Protocol-specific APIs
 
 Each backend exposes its full native API under its own subgroup:
 
-```
-himalaya imap mailbox select INBOX
-himalaya imap mailbox status INBOX
-himalaya imap mailbox subscribe INBOX
+```sh
+himalaya imap select INBOX
+himalaya imap status INBOX
+himalaya imap subscribe INBOX
+himalaya imap raw 'SEARCH FROM "alice@example.com"'
 
-himalaya jmap mailboxes query --role drafts
+himalaya jmap mailbox query --role drafts
 himalaya jmap identity get
 himalaya jmap vacation get
+
+himalaya gmail messages list -q "from:alice is:unread"
+himalaya gmail labels list
+
+himalaya msgraph message list --folder inbox
+himalaya msgraph mail-folder list
 
 himalaya maildir create Archives
 himalaya maildir messages save -m ~/Mail/example/Archives < message.eml
 
-himalaya smtp messages send < message.eml
+himalaya smtp send -f me@example.com -t you@example.com < message.eml
+himalaya smtp raw 'VRFY postmaster'
 ```
 
 The `-b/--backend` flag is only consumed by the shared commands; protocol subcommands always use their own backend.
@@ -397,7 +405,7 @@ Himalaya CLI is one of several front-ends to the Pimalaya libraries:
   imap.sasl.plain.passwd.command = ["pass", "show", "example"]
   ```
 
-  Native keyring support was removed in v2. Use [pimalaya/mimosa](https://github.com/pimalaya/mimosa) (or `pass`, `secret-tool`, `gopass`…) as the `command`.
+  Native keyring support was removed in v2. Use a third-party keyring CLI (`pass`, `secret-tool`, `gopass`…) as the `command`.
 </details>
 
 <details>

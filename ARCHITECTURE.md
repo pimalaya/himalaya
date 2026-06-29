@@ -61,7 +61,7 @@ The two filesystem backends expose only operations that map directly to their on
 
 `Command::execute` in `cli.rs` is the single dispatch point: it loads the config (running the wizard if none exists via `load_or_wizard`), selects the account, builds the appropriate client (shared `EmailClient` or a per-protocol client), and hands it to the subcommand.
 
-Output follows the Pimalaya stdout/stderr rule: all data and errors go to stdout through `pimalaya_cli::printer` (with `--output json` switching every command to JSON), stderr carries logs only. A command returns a `Serialize + Display` type to the printer (e.g. a table) or a `Message`, rather than printing inline. Each command's doc comment is its `--help` text, so `himalaya <command> --help` is the canonical usage reference for both humans and AI agents; the README documents no per-command usage.
+Output follows the Pimalaya stdout/stderr rule: all data and errors go to stdout through `pimalaya_cli::printer` (with `--json` switching every command to JSON), stderr carries logs only. A command returns a `Serialize + Display` type to the printer (e.g. a table) or a `Message`, rather than printing inline. Each command's doc comment is its `--help` text, so `himalaya <command> --help` is the canonical usage reference for both humans and AI agents; the README documents no per-command usage.
 
 ## Configuration and the wizard
 

@@ -36,7 +36,7 @@ The release profile (`[profile.release]` in `Cargo.toml`) sets `lto = "fat"`, `c
 Himalaya CLI is the command-line front-end of the [Pimalaya](https://github.com/pimalaya) project. Most of the work happens in companion crates rather than in this repository:
 
 - [io-email](https://github.com/pimalaya/io-email): cross-protocol email client (`EmailClientStd`, shared `Envelope` / `Mailbox` / `Flag` / `Address` types, search DSL).
-- [io-imap](https://github.com/pimalaya/io-imap), [io-jmap](https://github.com/pimalaya/io-jmap), [io-maildir](https://github.com/pimalaya/io-maildir), [io-smtp](https://github.com/pimalaya/io-smtp): per-protocol I/O-free coroutines plus the std-blocking clients that drive them.
+- [io-imap](https://github.com/pimalaya/io-imap), [io-jmap](https://github.com/pimalaya/io-jmap), [io-gmail](https://github.com/pimalaya/io-gmail), [io-msgraph](https://github.com/pimalaya/io-msgraph), [io-maildir](https://github.com/pimalaya/io-maildir), [io-m2dir](https://github.com/pimalaya/io-m2dir), [io-smtp](https://github.com/pimalaya/io-smtp): per-protocol I/O-free coroutines plus the std-blocking clients that drive them.
 - [io-http](https://github.com/pimalaya/io-http): I/O-free HTTP request/response state machines used by JMAP and the discovery wizard.
 - [pimconf](https://github.com/pimalaya/pimconf): PIM service discovery (PACC, Thunderbird Autoconfiguration, RFC 6186 SRV) consumed by the wizard.
 - [pimalaya/stream](https://github.com/pimalaya/stream): TCP / TLS / SASL plumbing shared by all std clients.
@@ -45,7 +45,6 @@ Himalaya CLI is the command-line front-end of the [Pimalaya](https://github.com/
 - [pimalaya/mml](https://github.com/pimalaya/mml): MIME Meta Language composer / interpreter, chained into `messages send` / `messages add` via a tempfile or shell process substitution.
 - [pimalaya/sirup](https://github.com/pimalaya/sirup): session re-use over a Unix socket (pair with `imap.server` / `smtp.server` to amortize TLS handshakes).
 - [pimalaya/ortie](https://github.com/pimalaya/ortie): standalone OAuth 2.0 token broker (replaces v1's bundled `oauth-lib`).
-- [pimalaya/mimosa](https://github.com/pimalaya/mimosa): standalone secret manager (replaces v1's bundled `keyring-lib`).
 
 Bugs touching protocol semantics usually live in the matching `io-*` crate; rendering, composition and CLI surface live here.
 
@@ -56,10 +55,12 @@ Bugs touching protocol semantics usually live in the matching `io-*` crate; rend
 ```toml
 [patch.crates-io]
 io-email.git = "https://github.com/pimalaya/io-email"
+io-gmail.git = "https://github.com/pimalaya/io-gmail"
 io-http.git = "https://github.com/pimalaya/io-http"
 io-imap.git = "https://github.com/pimalaya/io-imap"
 io-jmap.git = "https://github.com/pimalaya/io-jmap"
 io-maildir.git = "https://github.com/pimalaya/io-maildir"
+io-msgraph.git = "https://github.com/pimalaya/io-msgraph"
 io-smtp.git = "https://github.com/pimalaya/io-smtp"
 pimalaya-cli.git = "https://github.com/pimalaya/cli"
 pimalaya-config.git = "https://github.com/pimalaya/config"
@@ -79,10 +80,12 @@ If cargo complains about *"perhaps two different versions of crate X are being u
 ```toml
 [patch.crates-io]
 io-email.path = "../io-email"
+io-gmail.path = "../io-gmail"
 io-http.path = "../io-http"
 io-imap.path = "../io-imap"
 io-jmap.path = "../io-jmap"
 io-maildir.path = "../io-maildir"
+io-msgraph.path = "../io-msgraph"
 io-smtp.path = "../io-smtp"
 pimalaya-cli.path = "../cli"
 pimalaya-config.path = "../config"

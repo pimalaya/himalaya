@@ -46,7 +46,7 @@ New in v2: `-b`, `--backend` (force a specific backend for shared commands) and 
 #### Folders
 
 - Renamed `folders` to `mailboxes`.
-- Removed `add`, `expunge`, `purge`, `delete`: these are rarely useful at the interface level (Emacs, Vim plugin, TUI). Use the protocol-specific subcommands instead (`himalaya imap mailboxes create`, `… expunge`, `… purge`, `… delete`).
+- Removed `add`, `expunge`, `purge`, `delete`: these are rarely useful at the interface level (Emacs, Vim plugin, TUI). Use the protocol-specific subcommands instead (`himalaya imap create`, `himalaya imap expunge`, `himalaya imap delete`).
 - Added `--counts` to `list` to populate per-mailbox message counts.
 
 #### Envelopes

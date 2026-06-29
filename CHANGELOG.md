@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added Microsoft Graph REST API support. A `[msgraph]` account backend (built on io-email's `msgraph` feature) plugs into the shared `mailboxes` / `envelopes` / `flags` / `messages` / `attachments` commands; select it with `--backend msgraph`. Mirrors the `[gmail]` block field for field, authenticating with a single OAuth 2.0 bearer access token (`msgraph.auth.token.raw` or `msgraph.auth.token.command`). `account list` reports it and `account check` exercises its connection.
 
-  Also added a protocol-specific `msgraph` command exposing the Graph mail surface beyond the shared least-common-denominator, organized by Graph resource: `profile` (the signed-in user), `mail-folders` (list, get, create, rename, delete), `messages` (list, get with `--raw`, create draft from MIME, update, send, copy, move, delete) and `attachments` (list, get/download, delete).
+  Also added a protocol-specific `msgraph` command exposing the Graph mail surface beyond the shared least-common-denominator, organized by Graph resource: `profile` (the signed-in user), `mail-folder` (list, child-folders, get, create, rename, copy, move, delete), `message` (list with `--search`, get with `--raw`, create draft from MIME, update, send, copy, move, delete) and `attachment` (list, get/download, create, delete).
 
 - Restored the RFC 2971 `ID`-after-auth quirk under the new shape `imap.id.{auto, fields}`. Set `imap.id.auto = true` to chain an `ID` exchange straight after IMAP authentication (required by mail.qq.com, fastmail). `imap.id.fields` is a `{ name = bool, … }` map: missing keys are not transmitted, `false` sends `NIL`, `true` sends himalaya's canned value for the well-known keys (`name`, `version`, `vendor`, `support-url`) or `NIL` (with a warning) for any other key. Replaces the v1.2.0 `imap.extensions.id.send-after-auth` flag dropped during the v2 migration.
 
@@ -25,9 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added `--send` to `messages add` (alias `messages save`), mirroring `messages send --save`. Appends the message to the mandatory `--mailbox` first and then pushes it through the account's send path. Success line now reads "Message {id} successfully added and sent" when `--send` is set.
 
+- Added raw passthrough commands `imap raw <command>` and `smtp raw <command>`: send an arbitrary IMAP or SMTP command and print the verbatim server response, for anything the typed commands do not cover.
+
 ### Changed
 
-- Unified raw-message input across `messages add`, `messages send`, `imap message save`, `maildir message save`, `jmap email import` and `smtp message send` behind a single `MessageArg` (ported from `mml::cli::args::MessageArg`). Every command now accepts the same three forms: a positional file path, a positional inline raw message (with `\r` / `\n` literals normalized to `\r\n`), or stdin when piped. The legacy `--file <PATH>` flag on `messages add` is gone (positional path replaces it).
+- Flattened the `imap` command tree to mirror the protocol's own flat command list (RFC 3501 and extensions): the former `imap mailbox …` / `imap envelope …` / `imap message …` / `imap flag …` subgroups are replaced by top-level verbs (`select`, `create`, `delete`, `rename`, `subscribe`, `unsubscribe`, `list`, `status`, `close`, `unselect`, `expunge`, `search`, `sort`, `thread`, `store`, `flags`, `fetch`, `append`, `copy`, `move`, `id`, `raw`). `imap message save` is now `imap append`; flag edits fold into `imap store --action add|remove|set`; the FETCH data items fold into a single `imap fetch` with `--envelope` / `--structure` / `--flags` / `--internal-date` / `--size`.
+
+- Unified raw-message input across `messages add`, `messages send`, `imap append`, `maildir messages save`, `jmap email import`, `msgraph message create` / `msgraph message send` and `smtp send` behind a single `MessageArg` (ported from `mml::cli::args::MessageArg`). Every command now accepts the same three forms: a positional file path, a positional inline raw message (with `\r` literals stripped and `\n` literals turned into `\r\n`), or stdin when piped. The legacy `--file <PATH>` flag on `messages add` is gone (positional path replaces it).
 
 - Split the merged `Account` out of every client wrapper (`EmailClient`, `ImapClient`, `JmapClient`, `MaildirClient`, `M2dirClient`, `SmtpClient`). Subcommands now receive `account: &mut Account` and `client: &mut Client` as sibling arguments rather than reaching through `client.account`, which keeps account access borrow-disjoint from `&mut client` calls.
 
