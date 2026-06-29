@@ -98,3 +98,24 @@ pub fn validate_maildir_name(name: &Path) -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::validate_maildir_name;
+
+    #[test]
+    fn accepts_plain_and_nested_names() {
+        assert!(validate_maildir_name(Path::new("Archive")).is_ok());
+        assert!(validate_maildir_name(Path::new("Archive/2024")).is_ok());
+    }
+
+    #[test]
+    fn rejects_empty_absolute_and_parent_dir() {
+        assert!(validate_maildir_name(Path::new("")).is_err());
+        assert!(validate_maildir_name(Path::new("/etc")).is_err());
+        assert!(validate_maildir_name(Path::new("../foo")).is_err());
+        assert!(validate_maildir_name(Path::new("a/../../b")).is_err());
+    }
+}

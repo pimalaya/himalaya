@@ -171,3 +171,32 @@ fn unique_path(dir: &Path, name: &str) -> PathBuf {
     }
     dir.join(name)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::sanitize;
+
+    #[test]
+    fn keeps_a_plain_filename() {
+        assert_eq!(sanitize("report.pdf"), "report.pdf");
+    }
+
+    #[test]
+    fn replaces_path_separators() {
+        assert_eq!(sanitize("../../etc/passwd"), "_.._etc_passwd");
+        assert_eq!(sanitize("a/b\\c"), "a_b_c");
+    }
+
+    #[test]
+    fn collapses_traversal_and_dot_names_to_the_fallback() {
+        assert_eq!(sanitize(".."), "attachment");
+        assert_eq!(sanitize("."), "attachment");
+        assert_eq!(sanitize(""), "attachment");
+        assert_eq!(sanitize("   "), "attachment");
+    }
+
+    #[test]
+    fn strips_leading_dots() {
+        assert_eq!(sanitize(".hidden"), "hidden");
+    }
+}
