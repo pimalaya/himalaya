@@ -32,7 +32,9 @@ impl JmapEmailExportCommand {
         };
         let output = client.email_get(vec![self.id.clone()], opts)?;
 
-        let session = client.session().expect("session loaded by new_jmap_client");
+        let session = client
+            .session()
+            .expect("session loaded by build_jmap_client");
         let api_url = session.api_url.clone();
         let account_id = session
             .primary_accounts

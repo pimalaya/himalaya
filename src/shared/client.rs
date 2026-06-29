@@ -9,13 +9,14 @@
 //! [`Deref`]/[`DerefMut`] onto the inner client so callers can call
 //! its methods directly.
 //!
-//! Construction picks the first storage backend (`jmap → imap →
-//! maildir → m2dir`) allowed by the [`Backend`] flag that is
-//! configured on the account. When the account also has SMTP
-//! configured, an SMTP slot is registered on the same client so
-//! `send_message` works for IMAP/Maildir accounts; JMAP accounts
-//! already send via JMAP submission. SMTP connection failures are
-//! logged and skipped: the client still opens for reading.
+//! Construction registers every storage backend (`jmap`, `gmail`,
+//! `msgraph`, `imap`, `maildir`, `m2dir`) that the [`Backend`] flag
+//! allows and the account has configured; io-email's dispatcher then
+//! routes each shared call to the appropriate one by priority. When
+//! the account also has SMTP configured, an SMTP slot is registered
+//! too so `send_message` works for IMAP/Maildir accounts; JMAP
+//! accounts send via JMAP submission. A connection failure on any
+//! registered backend (SMTP included) aborts construction.
 
 use std::ops::{Deref, DerefMut};
 

@@ -20,10 +20,10 @@ use pimalaya_cli::clap::parsers::path_parser;
 /// Resolution order:
 ///
 /// 1. When the positional arg is non-empty: join the tokens with a
-///    space, replace `\r` / `\n` literals with `\r\n`, and treat the
-///    result as a path. If the path parses and the file is readable,
-///    return its contents; otherwise treat the joined value as the
-///    raw message verbatim.
+///    space, strip `\r` literals and turn `\n` literals into `\r\n`,
+///    then treat the result as a path. If the path parses and the file
+///    is readable, return its contents; otherwise treat the joined
+///    value as the raw message verbatim.
 /// 2. Otherwise, when stdin is piped, return stdin lines joined with
 ///    `\r\n`.
 /// 3. Otherwise, bail.

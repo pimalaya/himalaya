@@ -2,9 +2,10 @@
 //!
 //! Built up front by the dispatch layer (`crate::cli`) via
 //! [`build_smtp_client`] and handed down to every SMTP-specific
-//! subcommand, together with the merged [`Account`] as a sibling
-//! argument. SMTP send is stateless after auth, so no session
-//! context needs to follow the stream.
+//! subcommand. SMTP send is stateless after auth, so unlike the
+//! storage backends the commands need no account context: the merged
+//! [`Account`] returned by [`build_smtp_client`] (for dispatch
+//! uniformity) is not threaded into them.
 
 use std::{
     net::Ipv4Addr,
@@ -81,9 +82,10 @@ impl DerefMut for SmtpClient {
 
 /// Loads the configuration, picks the active account, builds the
 /// merged [`Account`] then opens the SMTP session. Bails when the
-/// account has no `[smtp]` block. Returns the live client paired
-/// with the merged account so subcommands receive both as sibling
-/// arguments.
+/// account has no `[smtp]` block. Returns the live client paired with
+/// the merged account for dispatch uniformity with the other
+/// `build_*_client` helpers, though SMTP subcommands ignore the
+/// account.
 pub fn build_smtp_client(
     config_paths: &[PathBuf],
     account_name: Option<&str>,

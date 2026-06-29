@@ -20,7 +20,7 @@ pub struct MaildirFlagRemoveCommand {
 
     #[command(flatten)]
     pub maildir: MaildirPathFlag,
-    /// MaildirFlag(s) to remove from the message
+    /// Flag(s) to remove from the message
     #[arg(long = "flag", short, num_args = 1.., required = true)]
     pub flags: Vec<FlagArg>,
 }
@@ -35,6 +35,6 @@ impl MaildirFlagRemoveCommand {
             client.remove_flags(maildir.clone(), id, flags.clone())?;
         }
 
-        printer.out(Message::new("MaildirFlag(s) successfully removed"))
+        printer.out(Message::new("Flag(s) successfully removed"))
     }
 }

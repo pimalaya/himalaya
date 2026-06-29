@@ -20,7 +20,7 @@ pub struct MaildirFlagSetCommand {
 
     #[command(flatten)]
     pub maildir: MaildirPathFlag,
-    /// MaildirFlag(s) to set on the message
+    /// Flag(s) to set on the message
     #[arg(long = "flag", short, num_args = 1..)]
     pub flags: Vec<FlagArg>,
 }
@@ -35,6 +35,6 @@ impl MaildirFlagSetCommand {
             client.set_flags(maildir.clone(), id, flags.clone())?;
         }
 
-        printer.out(Message::new("MaildirFlag(s) successfully changed"))
+        printer.out(Message::new("Flag(s) successfully changed"))
     }
 }

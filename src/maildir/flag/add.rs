@@ -20,7 +20,7 @@ pub struct MaildirFlagAddCommand {
 
     #[command(flatten)]
     pub maildir: MaildirPathFlag,
-    /// MaildirFlag(s) to add to the message
+    /// Flag(s) to add to the message
     #[arg(long = "flag", short, num_args = 1.., required = true)]
     pub flags: Vec<FlagArg>,
 }
@@ -35,6 +35,6 @@ impl MaildirFlagAddCommand {
             client.add_flags(maildir.clone(), id, flags.clone())?;
         }
 
-        printer.out(Message::new("MaildirFlag(s) successfully added"))
+        printer.out(Message::new("Flag(s) successfully added"))
     }
 }

@@ -55,7 +55,7 @@ pub fn build_m2dir_client(
     let m2dir_config = ac
         .m2dir
         .take()
-        .ok_or_else(|| anyhow!("m2dir config is missing for account `{name}`"))?;
+        .ok_or_else(|| anyhow!("M2dir config is missing for account `{name}`"))?;
     let account = Account::from(config).merge(Account::from(ac));
     Ok((account, M2dirClient::new(m2dir_config)))
 }

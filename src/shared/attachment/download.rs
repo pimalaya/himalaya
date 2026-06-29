@@ -105,7 +105,7 @@ impl AttachmentDownloadCommand {
         if !remaining.is_empty() {
             let missing: Vec<String> = remaining.into_iter().collect();
             bail!(
-                "no attachment with id {} on message `{}`",
+                "No attachment with id {} on message `{}`",
                 missing.join(", "),
                 self.message_id,
             );
