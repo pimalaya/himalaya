@@ -357,16 +357,9 @@ fn push_msg_id(out: &mut String, id: &str) {
     }
 }
 
-fn mime_for(path: &Path) -> &'static str {
-    #[cfg(feature = "maildir")]
-    {
-        let guess = mime_guess::from_path(path).first_or_octet_stream();
-        let s = guess.essence_str().to_string();
-        Box::leak(s.into_boxed_str())
-    }
-    #[cfg(not(feature = "maildir"))]
-    {
-        let _ = path;
-        "application/octet-stream"
-    }
+fn mime_for(path: &Path) -> String {
+    mime_guess::from_path(path)
+        .first_or_octet_stream()
+        .essence_str()
+        .to_owned()
 }

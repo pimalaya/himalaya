@@ -7,6 +7,7 @@ use pimalaya_cli::printer::Printer;
 use crate::account::context::Account;
 use crate::shared::{
     client::EmailClient,
+    mailbox::arg::MailboxArg,
     message::{
         builder::{self, BuilderArgs, PostingStyle, SourceArgs, SourceMode},
         handler,
@@ -26,13 +27,8 @@ pub struct MessageForwardCommand {
     #[arg(value_name = "ID")]
     pub id: String,
 
-    #[arg(
-        long = "mailbox",
-        short = 'm',
-        value_name = "NAME",
-        default_value = "Inbox"
-    )]
-    pub mailbox: String,
+    #[command(flatten)]
+    pub mailbox: MailboxArg,
 
     #[arg(long, value_name = "ADDR")]
     pub from: Option<String>,
@@ -93,7 +89,7 @@ impl MessageForwardCommand {
         account: &mut Account,
         client: &mut EmailClient,
     ) -> Result<()> {
-        let mailbox = account.resolve_mailbox(&self.mailbox).to_owned();
+        let mailbox = self.mailbox.resolve(account)?;
         let source = client.get_message(&mailbox, &self.id)?;
 
         let raw = builder::build(

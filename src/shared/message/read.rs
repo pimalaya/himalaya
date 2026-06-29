@@ -5,12 +5,12 @@ use std::{
 
 use anyhow::{Result, bail};
 use clap::Parser;
-use mail_parser::{Message, MessageParser};
+use mail_parser::{Addr, Address, HeaderValue, Message, MessageParser};
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
 use crate::account::context::Account;
-use crate::shared::client::EmailClient;
+use crate::shared::{client::EmailClient, mailbox::arg::MailboxArg};
 
 /// Read a message from the active account (built-in flag reader).
 ///
@@ -26,15 +26,8 @@ pub struct MessageReadCommand {
     #[arg(value_name = "ID")]
     pub id: String,
 
-    /// Mailbox name or alias (IMAP mailbox / Maildir path). Ignored
-    /// for JMAP, which addresses messages by id directly.
-    #[arg(
-        long = "mailbox",
-        short = 'm',
-        value_name = "NAME",
-        default_value = "Inbox"
-    )]
-    pub mailbox: String,
+    #[command(flatten)]
+    pub mailbox: MailboxArg,
 
     /// Write the raw RFC 5322 bytes to stdout. Mutually exclusive with
     /// the global `--json` flag.
@@ -53,7 +46,7 @@ impl MessageReadCommand {
             bail!("`--raw` and `--json` cannot be combined");
         }
 
-        let mailbox = account.resolve_mailbox(&self.mailbox).to_owned();
+        let mailbox = self.mailbox.resolve(account)?;
         let raw = client.get_message(&mailbox, &self.id)?;
 
         if self.raw {
@@ -78,7 +71,8 @@ pub struct MessageView(Message<'static>);
 impl fmt::Display for MessageView {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for header in self.0.headers() {
-            writeln!(f, "{}: {:?}", header.name.as_str(), header.value)?;
+            let value = render_header_value(&header.value);
+            writeln!(f, "{}: {value}", header.name.as_str())?;
         }
 
         writeln!(f)?;
@@ -95,5 +89,45 @@ impl fmt::Display for MessageView {
         }
 
         Ok(())
+    }
+}
+
+/// Renders a parsed header value as decoded, human-readable text rather
+/// than its `Debug` form.
+fn render_header_value(value: &HeaderValue) -> String {
+    match value {
+        HeaderValue::Text(text) => text.to_string(),
+        HeaderValue::TextList(list) => list
+            .iter()
+            .map(|text| text.as_ref())
+            .collect::<Vec<_>>()
+            .join(", "),
+        HeaderValue::Address(address) => {
+            let addrs: Vec<String> = match address {
+                Address::List(list) => list.iter().map(format_addr).collect(),
+                Address::Group(groups) => groups
+                    .iter()
+                    .flat_map(|group| group.addresses.iter())
+                    .map(format_addr)
+                    .collect(),
+            };
+            addrs.join(", ")
+        }
+        HeaderValue::DateTime(date) => date.to_rfc822(),
+        HeaderValue::ContentType(ctype) => match ctype.subtype() {
+            Some(subtype) => format!("{}/{subtype}", ctype.ctype()),
+            None => ctype.ctype().to_owned(),
+        },
+        HeaderValue::Received(_) | HeaderValue::Empty => String::new(),
+    }
+}
+
+/// Formats a single address as `Name <addr>`, or just the address when
+/// it has no display name.
+fn format_addr(addr: &Addr) -> String {
+    let email = addr.address.as_deref().unwrap_or_default();
+    match addr.name.as_deref() {
+        Some(name) if !name.is_empty() => format!("{name} <{email}>"),
+        _ => email.to_owned(),
     }
 }
