@@ -3,7 +3,7 @@
 //! ([`crate::shared::client`]) and the account checker
 //! ([`crate::account::check`]).
 //!
-//! The shared API ([`io_email::client::EmailClientStd`]) covers the
+//! The shared API ([`crate::shared::client::EmailClient`]) covers the
 //! least-common-denominator operations over Gmail; the protocol-
 //! specific `himalaya gmail` command uses [`GmailClient`] directly to
 //! expose the full Gmail REST surface (labels, threads, drafts,

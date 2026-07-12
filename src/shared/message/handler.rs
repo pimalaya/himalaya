@@ -15,8 +15,8 @@
 
 use std::io::{Write, stdout};
 
+use crate::email::flag::{Flag, IanaFlag};
 use anyhow::Result;
-use io_email::flag::types::{Flag, IanaFlag};
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::{account::context::Account, shared::client::EmailClient};

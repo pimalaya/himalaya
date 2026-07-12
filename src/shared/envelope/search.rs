@@ -1,9 +1,9 @@
 use std::io::{IsTerminal, stdout};
 
+use crate::email::search::{error::Error as SearchQueryError, query::SearchEmailsQuery};
 use anyhow::{Result, bail};
 use ariadne::{Color, Config, Label, Report, ReportKind, Source};
 use clap::Parser;
-use io_email::search::{error::Error as SearchQueryError, query::SearchEmailsQuery};
 use pimalaya_cli::printer::Printer;
 
 use crate::account::context::Account;

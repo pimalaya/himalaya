@@ -3,7 +3,7 @@
 //! ([`crate::shared::client`]) and the account checker
 //! ([`crate::account::check`]).
 //!
-//! The shared API ([`io_email::client::EmailClientStd`]) covers the
+//! The shared API ([`crate::shared::client::EmailClient`]) covers the
 //! least-common-denominator operations over Microsoft Graph; the
 //! protocol-specific `himalaya msgraph` command uses [`MsgraphClient`]
 //! directly to expose the Graph mail surface (mail folders, messages,

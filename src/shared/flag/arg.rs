@@ -28,32 +28,6 @@ impl fmt::Display for FlagArg {
     }
 }
 
-#[cfg(feature = "imap")]
-impl FlagArg {
-    pub fn imap(&self) -> io_imap::types::flag::Flag<'static> {
-        use io_imap::types::flag::Flag;
-
-        match self {
-            Self::Seen => Flag::Seen,
-            Self::Answered => Flag::Answered,
-            Self::Flagged => Flag::Flagged,
-            Self::Draft => Flag::Draft,
-        }
-    }
-}
-
-#[cfg(feature = "jmap")]
-impl FlagArg {
-    pub fn jmap(&self) -> &'static str {
-        match self {
-            Self::Seen => "$seen",
-            Self::Answered => "$answered",
-            Self::Flagged => "$flagged",
-            Self::Draft => "$draft",
-        }
-    }
-}
-
 #[cfg(feature = "maildir")]
 impl From<&FlagArg> for io_maildir::flag::types::MaildirFlag {
     fn from(flag: &FlagArg) -> Self {
@@ -68,9 +42,9 @@ impl From<&FlagArg> for io_maildir::flag::types::MaildirFlag {
     }
 }
 
-impl From<&FlagArg> for io_email::flag::types::Flag {
+impl From<&FlagArg> for crate::email::flag::Flag {
     fn from(flag: &FlagArg) -> Self {
-        use io_email::flag::types::{Flag, IanaFlag};
+        use crate::email::flag::{Flag, IanaFlag};
 
         let iana = match flag {
             FlagArg::Seen => IanaFlag::Seen,

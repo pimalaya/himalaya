@@ -1,3 +1,4 @@
+pub mod backend;
 pub mod cli;
 pub mod client;
 pub mod raw;

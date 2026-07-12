@@ -1,11 +1,11 @@
 use std::{collections::BTreeSet, fmt};
 
+use crate::email::{address::Address, envelope::Envelope, flag::Flag};
 use anyhow::Result;
 use chrono::{DateTime, FixedOffset, Local};
 use clap::Parser;
 use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use humansize::{BINARY, format_size};
-use io_email::{address::Address, envelope::types::Envelope, flag::types::Flag};
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 

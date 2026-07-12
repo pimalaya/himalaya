@@ -1,8 +1,8 @@
 use std::fmt;
 
+use crate::email::flag::{Flag, FlagOp};
 use anyhow::Result;
 use clap::Parser;
-use io_email::flag::types::{Flag, FlagOp};
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 

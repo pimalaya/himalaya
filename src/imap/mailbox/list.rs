@@ -3,12 +3,12 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, Color, Row, Table};
-use io_email::mailbox::types::MailboxRole;
 use io_imap::types::{core::QuotedChar, flag::FlagNameAttribute, mailbox::Mailbox};
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 
 use crate::account::context::Account;
+use crate::email::mailbox::MailboxRole;
 use crate::imap::client::ImapClient;
 
 /// List mailboxes (LIST / LSUB, RFC 3501).

@@ -2,6 +2,7 @@ mod account;
 mod backend;
 mod cli;
 mod config;
+mod email;
 #[cfg(feature = "gmail")]
 mod gmail;
 #[cfg(feature = "imap")]
