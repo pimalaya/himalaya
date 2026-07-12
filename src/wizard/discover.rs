@@ -1,130 +1,73 @@
-//! Interactive configuration wizard with discovery-based defaults.
+//! First-run configuration wizard.
 //!
 //! Triggered by `cli::load_or_wizard` when no config file is found.
 //!
-//! Flow:
+//! One prompt takes an email address, a server URL, or a local folder
+//! path, and its shape orients the setup, mirroring the cardamum-android
+//! onboarding:
 //!
-//! 1. Confirm with the user; exit cleanly if they decline.
-//! 2. Ask for an email address (account name defaults from it).
-//! 3. Run PACC, Autoconfig (which does the MX hop for custom domains)
-//!    and RFC 6186 SRV, merging their results across mechanisms.
-//! 4. Detect the provider (Google / Microsoft / other) and offer the
-//!    relevant backends: the API path (Gmail / Microsoft Graph) and/or
-//!    IMAP+SMTP and/or JMAP.
-//! 5. Run the matching sub-wizard, build a [`Config`], write it.
+//! - an email (or bare domain) runs pimconf's parallel discovery (see
+//!   [`super::search`]) and every reachable service and authentication
+//!   method becomes one selectable configuration; a detected Google or
+//!   Microsoft account collapses to its dedicated set;
+//! - a `scheme://` URL is a server to configure by hand;
+//! - an existing folder is a local Maildir or m2dir.
+//!
+//! OAuth 2.0 entries appear in the list but cannot be configured here:
+//! selecting one prints a note pointing at an external token manager
+//! and returns to the list.
 
-use std::{collections::HashMap, env, fmt, path::Path};
+use std::{collections::HashMap, path::Path};
 
-use anyhow::{Result, anyhow};
-use pimalaya_cli::{
-    prompt,
-    wizard::{
-        imap::{
-            self as imap_wizard, Encryption as ImapEncryption, ImapAuth, ImapSecret,
-            WizardImapConfig,
-        },
-        jmap::{self as jmap_wizard, WizardJmapConfig},
-        smtp::{
-            self as smtp_wizard, Encryption as SmtpEncryption, SmtpAuth, SmtpSecret,
-            WizardSmtpConfig,
-        },
-    },
-};
-use pimalaya_config::{command::shell, secret::Secret};
-use pimalaya_stream::tls::Tls;
-use pimconf::{autoconfig::types::Autoconfig, shared::dns::system_resolver};
+use anyhow::{Context, Result, bail};
+use pimalaya_cli::{prompt, spinner::Spinner};
 use url::Url;
 
+#[cfg(feature = "gmail")]
+use crate::config::GmailConfig;
+#[cfg(feature = "jmap")]
+use crate::config::JmapConfig;
+#[cfg(feature = "m2dir")]
+use crate::config::M2dirConfig;
+#[cfg(feature = "maildir")]
+use crate::config::MaildirConfig;
+#[cfg(feature = "msgraph")]
+use crate::config::MsgraphConfig;
+#[cfg(all(feature = "imap", feature = "smtp"))]
+use crate::config::{ImapConfig, SmtpConfig};
+#[cfg(feature = "gmail")]
+use crate::wizard::gmail;
+#[cfg(all(feature = "imap", feature = "smtp"))]
+use crate::wizard::imap_smtp;
+#[cfg(feature = "jmap")]
+use crate::wizard::jmap;
+#[cfg(any(feature = "maildir", feature = "m2dir"))]
+use crate::wizard::local;
+#[cfg(feature = "msgraph")]
+use crate::wizard::msgraph;
 use crate::{
-    config::{
-        AccountConfig, Config, GmailAuthConfig, GmailConfig, MsgraphAuthConfig, MsgraphConfig,
-    },
-    wizard::{
-        account::{imap_to_config, jmap_to_config, smtp_to_config},
-        autoconfig, pacc, srv,
-    },
+    config::{AccountConfig, Config},
+    wizard::search::{self, Discovered, DiscoveredAuth, DiscoveredKind},
 };
 
-/// Default DNS resolver used by PACC, Autoconfig, and SRV discovery
-/// when `HIMALAYA_DNS_RESOLVER` is unset. Cloudflare's `1.1.1.1`.
-const DEFAULT_RESOLVER: &str = "tcp://1.1.1.1:53";
+/// The endpoint prompt label, shared by the create flow.
+const ENDPOINT_PROMPT: &str = "Email, server or folder path:";
 
-/// Resolver used by discovery: the `HIMALAYA_DNS_RESOLVER` override
-/// first, then the system resolver (`/etc/resolv.conf` on unix, the
-/// network adapters on windows), then the Cloudflare default. This
-/// avoids leaking the email domain to a third-party resolver and works
-/// around networks that block the default.
-pub fn discovery_resolver() -> Url {
-    if let Ok(resolver) = env::var("HIMALAYA_DNS_RESOLVER") {
-        if let Ok(url) = resolver.parse() {
-            return url;
-        }
-    }
-
-    if let Some(url) = system_resolver() {
-        return url;
-    }
-
-    DEFAULT_RESOLVER
-        .parse()
-        .expect("DEFAULT_RESOLVER must be a valid URL")
-}
-
-/// Builds the [`Tls`] profile passed to the per-mechanism discovery
-/// clients via `with_tls`. Discovery only speaks HTTPS to `_well-known`
-/// endpoints, so `http/1.1` is the only ALPN protocol we offer.
-pub fn discovery_tls() -> Tls {
-    let mut tls = Tls::default();
-    tls.rustls.alpn = vec!["http/1.1".into()];
-    tls
-}
-
-/// Per-protocol backend configs surfaced by autodiscovery.
-#[derive(Default)]
-pub struct DiscoveryResult {
-    pub jmap: Option<WizardJmapConfig>,
-    pub imap: Option<WizardImapConfig>,
-    pub smtp: Option<WizardSmtpConfig>,
-}
-
-impl DiscoveryResult {
-    /// Fills this result's empty slots from `other`, so an earlier
-    /// mechanism's hit is kept and later mechanisms only complete what
-    /// is still missing.
-    fn merge(&mut self, other: DiscoveryResult) {
-        self.imap = self.imap.take().or(other.imap);
-        self.smtp = self.smtp.take().or(other.smtp);
-        self.jmap = self.jmap.take().or(other.jmap);
-    }
-}
-
-/// The email provider, used to decide which backends to offer.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Provider {
-    Google,
-    Microsoft,
-    Other,
-}
-
-/// A backend the wizard can configure, rendered in the selection menu.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum BackendChoice {
-    ImapSmtp,
-    Jmap,
-    GmailApi,
-    MsgraphApi,
-}
-
-impl fmt::Display for BackendChoice {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let label = match self {
-            Self::ImapSmtp => "IMAP + SMTP",
-            Self::Jmap => "JMAP",
-            Self::GmailApi => "Gmail API (OAuth)",
-            Self::MsgraphApi => "Microsoft Graph API (OAuth)",
-        };
-        f.write_str(label)
-    }
+/// The backend config produced by the chosen flow, folded into a fresh
+/// [`AccountConfig`] afterwards.
+enum Chosen {
+    #[cfg(all(feature = "imap", feature = "smtp"))]
+    ImapSmtp(Box<ImapConfig>, Box<SmtpConfig>),
+    #[cfg(feature = "jmap")]
+    Jmap(Box<JmapConfig>),
+    #[cfg(feature = "gmail")]
+    Gmail(GmailConfig),
+    #[cfg(feature = "msgraph")]
+    Msgraph(MsgraphConfig),
+    #[cfg(feature = "maildir")]
+    Maildir(MaildirConfig),
+    #[cfg(feature = "m2dir")]
+    M2dir(M2dirConfig),
 }
 
 /// Runs the wizard, writing the resulting [`Config`] to `target`.
@@ -138,23 +81,14 @@ pub fn run(target: &Path) -> Result<Option<Config>> {
         return Ok(None);
     }
 
-    let email = prompt::text::<&str>("Email address:", None)?;
-    let (local_part, domain) = email
-        .rsplit_once('@')
-        .filter(|(local, domain)| !local.is_empty() && !domain.is_empty())
-        .ok_or_else(|| anyhow!("Invalid email address `{email}`: expected `local@domain`"))?;
+    let input = prompt::text::<&str>(ENDPOINT_PROMPT, None)?;
+    let input = input.trim();
+    if input.is_empty() {
+        bail!("Empty input: enter an email address, a server URL, or a folder path");
+    }
 
-    let account_name = prompt::text("Account name:", Some(local_part))?;
-
-    let (discovery, provider) = discover(local_part, domain);
-    let account = build_account(
-        &account_name,
-        &email,
-        local_part,
-        domain,
-        discovery,
-        provider,
-    )?;
+    let account_name = prompt::text("Account name:", Some(&default_account_name(input)))?;
+    let account = build_account(&account_name, input)?;
 
     let config = Config {
         accounts: HashMap::from([(account_name, account)]),
@@ -167,271 +101,239 @@ pub fn run(target: &Path) -> Result<Option<Config>> {
     Ok(Some(config))
 }
 
-/// Runs every discovery mechanism and merges their results, then
-/// classifies the provider from the autoconfig response.
-fn discover(local_part: &str, domain: &str) -> (DiscoveryResult, Provider) {
-    let mut result = DiscoveryResult::default();
-
-    if let Some(config) = pacc::run(domain) {
-        result.merge(pacc::defaults(&config));
-    }
-
-    let autoconfig = autoconfig::run(local_part, domain);
-    if let Some(config) = &autoconfig {
-        result.merge(autoconfig::defaults(config));
-    }
-
-    if let Some(report) = srv::run(domain) {
-        result.merge(srv::defaults(&report));
-    }
-
-    let provider = detect_provider(domain, autoconfig.as_ref());
-    (result, provider)
-}
-
-/// Prompts for a backend (when more than one fits), runs the matching
-/// sub-wizard and assembles the [`AccountConfig`].
-fn build_account(
-    account_name: &str,
-    email: &str,
-    local_part: &str,
-    domain: &str,
-    discovery: DiscoveryResult,
-    provider: Provider,
-) -> Result<AccountConfig> {
-    let choice = choose_backend(&discovery, provider)?;
-    let DiscoveryResult { jmap, imap, smtp } = discovery;
-
-    let account = match choice {
-        BackendChoice::GmailApi => AccountConfig {
-            default: true,
-            gmail: Some(gmail_account()?),
-            ..Default::default()
-        },
-        BackendChoice::MsgraphApi => AccountConfig {
-            default: true,
-            msgraph: Some(msgraph_account()?),
-            ..Default::default()
-        },
-        BackendChoice::Jmap => {
-            let jmap = jmap_wizard::run(account_name, local_part, domain, jmap.as_ref())?;
-            AccountConfig {
-                default: true,
-                jmap: Some(jmap_to_config(jmap)?),
-                ..Default::default()
-            }
-        }
-        BackendChoice::ImapSmtp => {
-            if matches!(provider, Provider::Google | Provider::Microsoft) {
-                println!(
-                    "Note: {} requires an app-specific password for IMAP/SMTP, not your account password.",
-                    provider_label(provider),
-                );
-            }
-
-            let imap_default = imap.or_else(|| provider_imap_default(provider, email));
-            let smtp_default = smtp.or_else(|| provider_smtp_default(provider, email));
-
-            let imap = imap_wizard::run(account_name, local_part, domain, imap_default.as_ref())?;
-            let smtp = smtp_wizard::run(account_name, local_part, domain, smtp_default.as_ref())?;
-
-            AccountConfig {
-                default: true,
-                imap: Some(imap_to_config(imap)?),
-                smtp: Some(smtp_to_config(smtp)?),
-                ..Default::default()
-            }
-        }
+/// Orients the setup from the input shape, then folds the chosen
+/// backend into a fresh default [`AccountConfig`].
+fn build_account(account_name: &str, input: &str) -> Result<AccountConfig> {
+    let chosen = if is_path(input) {
+        configure_local(input)?
+    } else if input.contains("://") {
+        configure_server(account_name, input)?
+    } else {
+        configure_email(account_name, input)?
     };
+
+    let mut account = AccountConfig {
+        default: true,
+        ..Default::default()
+    };
+
+    match chosen {
+        #[cfg(all(feature = "imap", feature = "smtp"))]
+        Chosen::ImapSmtp(imap, smtp) => {
+            account.imap = Some(*imap);
+            account.smtp = Some(*smtp);
+        }
+        #[cfg(feature = "jmap")]
+        Chosen::Jmap(jmap) => account.jmap = Some(*jmap),
+        #[cfg(feature = "gmail")]
+        Chosen::Gmail(gmail) => account.gmail = Some(gmail),
+        #[cfg(feature = "msgraph")]
+        Chosen::Msgraph(msgraph) => account.msgraph = Some(msgraph),
+        #[cfg(feature = "maildir")]
+        Chosen::Maildir(maildir) => account.maildir = Some(maildir),
+        #[cfg(feature = "m2dir")]
+        Chosen::M2dir(m2dir) => account.m2dir = Some(m2dir),
+    }
 
     Ok(account)
 }
 
-/// Returns the backend to configure, prompting only when the provider
-/// and discovery leave more than one sensible option.
-fn choose_backend(discovery: &DiscoveryResult, provider: Provider) -> Result<BackendChoice> {
-    let choices = backend_choices(discovery, provider);
-
-    if let [only] = choices.as_slice() {
-        return Ok(*only);
-    }
-
-    let choice = prompt::item("Which backend would you like to configure?", choices, None)?;
-    Ok(choice)
-}
-
-/// The backend options offered for a given provider and discovery.
-fn backend_choices(discovery: &DiscoveryResult, provider: Provider) -> Vec<BackendChoice> {
-    match provider {
-        Provider::Google => vec![BackendChoice::ImapSmtp, BackendChoice::GmailApi],
-        Provider::Microsoft => vec![BackendChoice::MsgraphApi, BackendChoice::ImapSmtp],
-        Provider::Other => {
-            let mut choices = Vec::new();
-
-            if discovery.imap.is_some() || discovery.smtp.is_some() {
-                choices.push(BackendChoice::ImapSmtp);
-            }
-            if discovery.jmap.is_some() {
-                choices.push(BackendChoice::Jmap);
-            }
-
-            // Nothing discovered: fall back to manual IMAP+SMTP entry.
-            if choices.is_empty() {
-                choices.push(BackendChoice::ImapSmtp);
-            }
-
-            choices
-        }
-    }
-}
-
-/// Builds a Gmail config block, explaining that the OAuth token is the
-/// user's responsibility.
-fn gmail_account() -> Result<GmailConfig> {
-    print_oauth_notice("Gmail", "gmail");
-
-    let user_id = prompt::text("Gmail user id:", Some("me"))?;
-    let token = oauth_token_secret()?;
-
-    Ok(GmailConfig {
-        user_id,
-        tls: Default::default(),
-        alpn: vec!["http/1.1".to_string()],
-        auth: GmailAuthConfig { token },
-    })
-}
-
-/// Builds a Microsoft Graph config block, explaining that the OAuth
-/// token is the user's responsibility.
-fn msgraph_account() -> Result<MsgraphConfig> {
-    print_oauth_notice("Microsoft Graph", "msgraph");
-
-    let user_id = prompt::text("Microsoft Graph user id:", Some("me"))?;
-    let token = oauth_token_secret()?;
-
-    Ok(MsgraphConfig {
-        user_id,
-        tls: Default::default(),
-        alpn: vec!["http/1.1".to_string()],
-        auth: MsgraphAuthConfig { token },
-    })
-}
-
-/// Prompts for an OAuth token command, falling back to an empty raw
-/// token the user must fill in later.
-fn oauth_token_secret() -> Result<Secret> {
-    let command = prompt::some_text(
-        "OAuth token command (an external token manager such as `ortie`); leave empty to set the token later:",
-        None::<&str>,
-    )?;
-
-    let secret = match command {
-        Some(command) if !command.trim().is_empty() => Secret::Command(shell(command.trim())),
-        _ => Secret::Raw(String::new().into()),
-    };
-
-    Ok(secret)
-}
-
-/// Prints the OAuth notice: Himalaya does not mint or refresh tokens.
-fn print_oauth_notice(label: &str, key: &str) {
-    println!();
-    println!("{label} uses OAuth 2.0. Himalaya does not manage OAuth tokens itself;");
-    println!(
-        "install a token manager (such as `ortie`) and point `{key}.auth.token.command` at it."
-    );
-    println!();
-}
-
-/// Classifies the provider from the email domain first (fast path for
-/// consumer addresses), then from the autoconfig response (which has
-/// already resolved custom Workspace / Microsoft 365 domains via MX).
-fn detect_provider(domain: &str, autoconfig: Option<&Autoconfig>) -> Provider {
-    if let Some(provider) = provider_from_domain(domain) {
-        return provider;
-    }
-
-    autoconfig
-        .map(provider_from_autoconfig)
-        .unwrap_or(Provider::Other)
-}
-
-/// Recognizes the well-known consumer domains.
-fn provider_from_domain(domain: &str) -> Option<Provider> {
-    match domain.to_lowercase().as_str() {
-        "gmail.com" | "googlemail.com" => Some(Provider::Google),
-        "outlook.com" | "hotmail.com" | "live.com" | "msn.com" | "passport.com" => {
-            Some(Provider::Microsoft)
-        }
-        _ => None,
-    }
-}
-
-/// Recognizes the provider from the autoconfig id and server hostnames.
-fn provider_from_autoconfig(autoconfig: &Autoconfig) -> Provider {
-    let provider = &autoconfig.email_provider;
-    let hosts = provider
-        .incoming_server
-        .iter()
-        .chain(provider.outgoing_server.iter())
-        .filter_map(|server| server.hostname.as_deref())
-        .collect::<Vec<_>>()
-        .join(" ");
-    let haystack = format!("{} {hosts}", provider.id).to_lowercase();
-
-    if haystack.contains("google") || haystack.contains("gmail") {
-        Provider::Google
-    } else if haystack.contains("outlook")
-        || haystack.contains("office365")
-        || haystack.contains("microsoft")
-        || haystack.contains("hotmail")
-    {
-        Provider::Microsoft
+/// Runs the email-driven discovery flow: search the services reachable
+/// from the address, let the user pick one (OAuth entries loop back
+/// with a note), and configure its backend. Falls back to manual
+/// IMAP+SMTP entry when nothing is discovered.
+fn configure_email(account_name: &str, input: &str) -> Result<Chosen> {
+    let email = if input.contains('@') {
+        input.to_string()
     } else {
-        Provider::Other
+        format!("@{input}")
+    };
+
+    let spinner = Spinner::start("Searching for email server settings");
+    let mut found = search::search(&email)?;
+    retain_supported(&mut found);
+
+    if found.is_empty() {
+        spinner.failure("No configuration found");
+        return manual_fallback(account_name, &email);
+    }
+    spinner.success(format!("Found {} configuration(s)", found.len()));
+
+    // OAuth entries loop back with a note, but only when a usable
+    // configuration remains to fall back on; otherwise the note is
+    // shown and the manual flow takes over so the user is not trapped.
+    let has_usable = found
+        .iter()
+        .any(|entry| entry.auth != DiscoveredAuth::OAuth);
+
+    loop {
+        let default = found.first().cloned();
+        let choice = prompt::item("Choose a configuration:", found.clone(), default)?;
+
+        if choice.auth == DiscoveredAuth::OAuth {
+            print_oauth_note();
+            if has_usable {
+                continue;
+            }
+            return manual_fallback(account_name, &email);
+        }
+
+        return dispatch(&email, choice);
     }
 }
 
-/// Human-facing provider name for notices.
-fn provider_label(provider: Provider) -> &'static str {
-    match provider {
-        Provider::Google => "Gmail",
-        Provider::Microsoft => "Outlook",
-        Provider::Other => "This provider",
+/// Configures the backend behind a discovered entry.
+#[cfg_attr(
+    all(
+        feature = "imap",
+        feature = "smtp",
+        feature = "jmap",
+        feature = "gmail",
+        feature = "msgraph"
+    ),
+    allow(unreachable_patterns)
+)]
+fn dispatch(email: &str, choice: Discovered) -> Result<Chosen> {
+    match &choice.kind {
+        #[cfg(all(feature = "imap", feature = "smtp"))]
+        DiscoveredKind::ImapSmtp { .. } => {
+            let (imap, smtp) = imap_smtp::configure_discovered(email, &choice)?;
+            Ok(Chosen::ImapSmtp(Box::new(imap), Box::new(smtp)))
+        }
+        #[cfg(feature = "jmap")]
+        DiscoveredKind::Jmap(_) => Ok(Chosen::Jmap(Box::new(jmap::configure_discovered(
+            email, &choice,
+        )?))),
+        #[cfg(feature = "gmail")]
+        DiscoveredKind::Gmail => Ok(Chosen::Gmail(gmail::configure()?)),
+        #[cfg(feature = "msgraph")]
+        DiscoveredKind::Msgraph => Ok(Chosen::Msgraph(msgraph::configure()?)),
+        kind => bail!("Configuration `{kind:?}` is not supported by this build"),
     }
 }
 
-/// Pre-filled IMAP defaults for the well-known providers, so the user
-/// does not have to type the host and port by hand.
-fn provider_imap_default(provider: Provider, email: &str) -> Option<WizardImapConfig> {
-    let (host, port) = match provider {
-        Provider::Google => ("imap.gmail.com", 993),
-        Provider::Microsoft => ("outlook.office365.com", 993),
-        Provider::Other => return None,
-    };
+/// Configures IMAP + SMTP by hand when discovery yields nothing.
+#[cfg(all(feature = "imap", feature = "smtp"))]
+fn manual_fallback(account_name: &str, email: &str) -> Result<Chosen> {
+    let (local_part, domain) = split_email(email);
+    let (imap, smtp) = imap_smtp::configure_manual(account_name, local_part, domain, None)?;
+    Ok(Chosen::ImapSmtp(Box::new(imap), Box::new(smtp)))
+}
 
-    Some(WizardImapConfig {
-        host: host.to_string(),
-        port,
-        encryption: ImapEncryption::Tls,
-        login: email.to_string(),
-        auth: ImapAuth::Password(ImapSecret::Raw(String::new().into())),
+#[cfg(not(all(feature = "imap", feature = "smtp")))]
+fn manual_fallback(_account_name: &str, email: &str) -> Result<Chosen> {
+    bail!("No configuration discovered for `{email}`, and IMAP+SMTP is not compiled in")
+}
+
+/// Configures a server the user typed as a `scheme://` URL, routing by
+/// scheme: `imap`/`imaps` to IMAP+SMTP, an HTTP-family scheme to JMAP.
+#[cfg_attr(
+    not(any(all(feature = "imap", feature = "smtp"), feature = "jmap")),
+    allow(unused_variables)
+)]
+fn configure_server(account_name: &str, input: &str) -> Result<Chosen> {
+    let url = Url::parse(input).with_context(|| format!("Invalid server URL `{input}`"))?;
+    let domain = url.host_str().unwrap_or_default().to_string();
+
+    match url.scheme() {
+        #[cfg(all(feature = "imap", feature = "smtp"))]
+        "imap" | "imaps" => {
+            let (imap, smtp) = imap_smtp::configure_manual(account_name, "", &domain, Some(&url))?;
+            Ok(Chosen::ImapSmtp(Box::new(imap), Box::new(smtp)))
+        }
+        #[cfg(feature = "jmap")]
+        "http" | "https" | "jmap" | "jmaps" => {
+            Ok(Chosen::Jmap(Box::new(jmap::configure_manual(input, None)?)))
+        }
+        other => bail!("Unsupported server scheme `{other}`"),
+    }
+}
+
+/// Configures a local backend from a typed folder path.
+#[cfg(any(feature = "maildir", feature = "m2dir"))]
+fn configure_local(input: &str) -> Result<Chosen> {
+    let raw = input.strip_prefix("file://").unwrap_or(input);
+    let root = shellexpand::tilde(raw).into_owned();
+    if !Path::new(&root).is_dir() {
+        bail!("No such folder `{raw}`");
+    }
+
+    Ok(match local::configure(root.into())? {
+        #[cfg(feature = "maildir")]
+        local::Local::Maildir(config) => Chosen::Maildir(config),
+        #[cfg(feature = "m2dir")]
+        local::Local::M2dir(config) => Chosen::M2dir(config),
     })
 }
 
-/// Pre-filled SMTP defaults for the well-known providers.
-fn provider_smtp_default(provider: Provider, email: &str) -> Option<WizardSmtpConfig> {
-    let (host, port, encryption) = match provider {
-        Provider::Google => ("smtp.gmail.com", 465, SmtpEncryption::Tls),
-        Provider::Microsoft => ("smtp.office365.com", 587, SmtpEncryption::StartTls),
-        Provider::Other => return None,
-    };
+#[cfg(not(any(feature = "maildir", feature = "m2dir")))]
+fn configure_local(input: &str) -> Result<Chosen> {
+    bail!("`{input}` looks like a folder path, but no local backend is compiled in")
+}
 
-    Some(WizardSmtpConfig {
-        host: host.to_string(),
-        port,
-        encryption,
-        login: email.to_string(),
-        auth: SmtpAuth::Password(SmtpSecret::Raw(String::new().into())),
-    })
+/// Drops the discovered entries whose backend is not compiled in.
+fn retain_supported(found: &mut Vec<Discovered>) {
+    found.retain(|entry| match entry.kind {
+        DiscoveredKind::ImapSmtp { .. } => cfg!(all(feature = "imap", feature = "smtp")),
+        DiscoveredKind::Jmap(_) => cfg!(feature = "jmap"),
+        DiscoveredKind::Gmail => cfg!(feature = "gmail"),
+        DiscoveredKind::Msgraph => cfg!(feature = "msgraph"),
+    });
+}
+
+/// Prints the note shown when an OAuth 2.0 entry is selected, before
+/// returning to the configuration list.
+fn print_oauth_note() {
+    println!(
+        "OAuth 2.0 is not configured directly by Himalaya; install an external token manager such as Ortie, then choose the \"API token\" configuration"
+    );
+}
+
+/// Proposes a default account name from the input shape: the local part
+/// of an email, the first label of a domain or host, or the folder name
+/// of a local path.
+fn default_account_name(input: &str) -> String {
+    if is_path(input) {
+        let raw = input.strip_prefix("file://").unwrap_or(input);
+        return Path::new(raw)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("personal")
+            .to_string();
+    }
+
+    if let Ok(url) = Url::parse(input) {
+        if let Some(host) = url.host_str() {
+            return first_label(host);
+        }
+    }
+
+    match input.rsplit_once('@') {
+        Some((local, _)) if !local.is_empty() => local.to_string(),
+        Some((_, domain)) => first_label(domain),
+        None => first_label(input),
+    }
+}
+
+/// The first dot-separated label of a host or domain.
+fn first_label(host: &str) -> String {
+    host.split('.').next().unwrap_or(host).to_string()
+}
+
+/// Whether the input names a filesystem path (absolute, home-relative,
+/// explicitly relative, or a `file://` URL) rather than a network
+/// endpoint.
+fn is_path(input: &str) -> bool {
+    input.starts_with("file://")
+        || input.starts_with('/')
+        || input.starts_with('~')
+        || input.starts_with("./")
+        || input.starts_with("../")
+}
+
+/// Splits an email into its local part and domain, tolerating the
+/// bare-domain form (`@domain`) discovery synthesizes.
+#[cfg(all(feature = "imap", feature = "smtp"))]
+fn split_email(email: &str) -> (&str, &str) {
+    email.rsplit_once('@').unwrap_or(("", email))
 }

@@ -66,7 +66,7 @@ open = "5"
 pimalaya-cli = { version = "0.0.1", default-features = false, features = ["terminal", "table", "prompt", "wizard", "imap", "smtp", "jmap", "spinner"] }
 pimalaya-config = { version = "0.0.1", default-features = false, features = ["toml", "secret"] }
 pimalaya-stream = { version = "0.0.1", default-features = false, features = ["std"] }
-pimconf = { version = "0.1.0", default-features = false, features = ["pacc", "autoconfig", "rfc6186", "client"] }
+pimconf = { version = "0.1.0", default-features = false, features = ["search", "client"] }
 rfc2047-decoder = { version = "1", optional = true }
 secrecy = "0.10"
 serde = { version = "1", features = ["derive"] }
