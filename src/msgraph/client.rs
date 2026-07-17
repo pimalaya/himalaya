@@ -11,19 +11,15 @@
 //!
 //! [`MsgraphClientStd::connect`]: io_msgraph::v1::client::MsgraphClientStd::connect
 
-use std::{
-    ops::{Deref, DerefMut},
-    path::PathBuf,
-};
+use std::ops::{Deref, DerefMut};
 
 use anyhow::{Result, anyhow};
 use io_msgraph::v1::client::{MsgraphClientStd as Inner, MsgraphClientStdConnectOptions};
-use pimalaya_config::toml::TomlConfig;
 use secrecy::{ExposeSecret, SecretString};
 
 use crate::{
-    account::context::Account, cli::load_or_wizard, config::MsgraphAuthConfig,
-    config::MsgraphConfig,
+    account::context::Account,
+    config::{AccountConfig, Config, MsgraphAuthConfig, MsgraphConfig},
 };
 
 /// Live Microsoft Graph client handed down to every `msgraph` subcommand.
@@ -61,22 +57,19 @@ impl DerefMut for MsgraphClient {
     }
 }
 
-/// Loads the configuration, picks the active account, builds the merged
-/// [`Account`] then opens the Microsoft Graph client. Bails when the
-/// account has no `[msgraph]` block.
+/// Opens the Microsoft Graph client for an already-resolved account:
+/// takes the `[msgraph]` block out of `account_config` and builds the
+/// merged [`Account`]. Bails when the account has no `[msgraph]` block.
 pub fn build_msgraph_client(
-    config_paths: &[PathBuf],
-    account_name: Option<&str>,
+    config: Config,
+    name: String,
+    mut account_config: AccountConfig,
 ) -> Result<(Account, MsgraphClient)> {
-    let mut config = load_or_wizard(config_paths)?;
-    let (name, mut ac) = config
-        .take_account(account_name)?
-        .ok_or_else(|| anyhow!("Cannot find account"))?;
-    let msgraph_config = ac
+    let msgraph_config = account_config
         .msgraph
         .take()
         .ok_or_else(|| anyhow!("Microsoft Graph config is missing for account `{name}`"))?;
-    let account = Account::from(config).merge(Account::from(ac));
+    let account = Account::from(config).merge(Account::from(account_config));
     let client = MsgraphClient::new(msgraph_config)?;
     Ok((account, client))
 }

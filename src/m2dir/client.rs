@@ -1,15 +1,14 @@
 //! Himalaya wrapper around [`io_m2dir::client::M2dirClient`].
 
-use std::{
-    ops::{Deref, DerefMut},
-    path::PathBuf,
-};
+use std::ops::{Deref, DerefMut};
 
 use anyhow::{Result, anyhow};
 use io_m2dir::client::M2dirClient as Inner;
-use pimalaya_config::toml::TomlConfig;
 
-use crate::{account::context::Account, cli::load_or_wizard, config::M2dirConfig};
+use crate::{
+    account::context::Account,
+    config::{AccountConfig, Config, M2dirConfig},
+};
 
 /// Live m2dir client wrapping io_m2dir with the configured store root.
 pub struct M2dirClient {
@@ -39,23 +38,20 @@ impl DerefMut for M2dirClient {
     }
 }
 
-/// Loads the configuration, picks the active account, builds the
-/// merged [`Account`] then opens the m2dir client. Bails when the
-/// account has no `[m2dir]` block. Returns the client paired with
-/// the merged account so subcommands receive both as sibling
-/// arguments.
+/// Opens the m2dir client for an already-resolved account: takes the
+/// `[m2dir]` block out of `account_config` and builds the merged
+/// [`Account`]. Bails when the account has no `[m2dir]` block. Returns
+/// the client paired with the merged account so subcommands receive both
+/// as sibling arguments.
 pub fn build_m2dir_client(
-    config_paths: &[PathBuf],
-    account_name: Option<&str>,
+    config: Config,
+    name: String,
+    mut account_config: AccountConfig,
 ) -> Result<(Account, M2dirClient)> {
-    let mut config = load_or_wizard(config_paths)?;
-    let (name, mut ac) = config
-        .take_account(account_name)?
-        .ok_or_else(|| anyhow!("Cannot find account"))?;
-    let m2dir_config = ac
+    let m2dir_config = account_config
         .m2dir
         .take()
         .ok_or_else(|| anyhow!("M2dir config is missing for account `{name}`"))?;
-    let account = Account::from(config).merge(Account::from(ac));
+    let account = Account::from(config).merge(Account::from(account_config));
     Ok((account, M2dirClient::new(m2dir_config)))
 }

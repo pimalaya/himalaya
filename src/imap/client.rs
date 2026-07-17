@@ -5,21 +5,16 @@
 //! [`build_imap_client`] and hands the ready-to-use wrapper down,
 //! together with the merged [`Account`] as a sibling argument.
 
-use std::{
-    ops::{Deref, DerefMut},
-    path::PathBuf,
-};
+use std::ops::{Deref, DerefMut};
 
 use anyhow::{Result, anyhow};
 use io_imap::{client::ImapClientStd as Inner, has_imap_capability, types::response::Capability};
-use pimalaya_config::toml::TomlConfig;
 use pimalaya_stream::sasl::Sasl;
 use url::Url;
 
 use crate::{
     account::context::Account,
-    cli::load_or_wizard,
-    config::{ImapConfig, parse_server},
+    config::{AccountConfig, Config, ImapConfig, parse_server},
     imap::id::resolve_auto_id_params,
 };
 
@@ -96,24 +91,21 @@ impl DerefMut for ImapClient {
     }
 }
 
-/// Loads the configuration, picks the active account, builds the
-/// merged [`Account`] then opens the IMAP session. Bails when the
-/// account has no `[imap]` block. Returns the live client paired
-/// with the merged account so subcommands receive both as sibling
-/// arguments.
+/// Opens the IMAP session for an already-resolved account: takes the
+/// `[imap]` block out of `account_config`, builds the merged [`Account`]
+/// and connects. Bails when the account has no `[imap]` block. Returns
+/// the live client paired with the merged account so subcommands receive
+/// both as sibling arguments.
 pub fn build_imap_client(
-    config_paths: &[PathBuf],
-    account_name: Option<&str>,
+    config: Config,
+    name: String,
+    mut account_config: AccountConfig,
 ) -> Result<(Account, ImapClient)> {
-    let mut config = load_or_wizard(config_paths)?;
-    let (name, mut ac) = config
-        .take_account(account_name)?
-        .ok_or_else(|| anyhow!("Cannot find account"))?;
-    let imap_config = ac
+    let imap_config = account_config
         .imap
         .take()
         .ok_or_else(|| anyhow!("IMAP config is missing for account `{name}`"))?;
-    let account = Account::from(config).merge(Account::from(ac));
+    let account = Account::from(config).merge(Account::from(account_config));
     let client = ImapClient::new(imap_config)?;
     Ok((account, client))
 }

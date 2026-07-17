@@ -1,6 +1,6 @@
 use std::{path::PathBuf, process::exit};
 
-use anyhow::{Result, bail};
+use anyhow::{Result, anyhow};
 use clap::{CommandFactory, Parser, Subcommand};
 use pimalaya_cli::{
     clap::{
@@ -9,6 +9,7 @@ use pimalaya_cli::{
     },
     long_version,
     printer::Printer,
+    prompt,
 };
 use pimalaya_config::toml::TomlConfig;
 
@@ -29,7 +30,7 @@ use crate::smtp::{cli::SmtpCommand, client::build_smtp_client};
 use crate::{
     account::cli::AccountCommand,
     backend::Backend,
-    config::Config,
+    config::{AccountConfig, Config},
     shared::{
         attachment::cli::AttachmentCommand, client::EmailClient, envelope::cli::EnvelopeCommand,
         flag::cli::FlagCommand, mailbox::cli::MailboxCommand, message::cli::MessageCommand,
@@ -44,8 +45,11 @@ use crate::{
 #[command(long_version = long_version!())]
 #[command(propagate_version = true, infer_subcommands = true)]
 pub struct Cli {
+    /// The subcommand to run. Omitted (bare `himalaya`), it runs the
+    /// first-run wizard, which discovers an account and prints it as a
+    /// ready-to-save config on stdout, exactly like bare `ortie`.
     #[command(subcommand)]
-    pub cmd: Command,
+    pub cmd: Option<Command>,
 
     #[command(flatten)]
     pub config: ConfigFlags,
@@ -116,19 +120,36 @@ pub enum Command {
     Manual(ManualCommand),
 }
 
-/// Loads `Config` from the merged `config_paths` or, when no file
-/// exists, runs the wizard to bootstrap one at the target path. Used
-/// by every `build_*_client` helper to get a populated `Config` before
-/// the per-backend client opens its connection.
-pub fn load_or_wizard(config_paths: &[PathBuf]) -> Result<Config> {
-    if let Some(config) = Config::from_paths_or_default(config_paths)? {
-        return Ok(config);
-    }
+/// Resolves the account a command runs against: loads the merged config
+/// from `config_paths`, then takes the account named by `-a` (or the one
+/// marked `default`). Returns the leftover global config, the resolved
+/// account name and its config.
+///
+/// When no config file exists, proposes the first-run wizard (which
+/// prints a ready-to-save config on stdout without touching disk) then
+/// exits. A config that exists but lacks the requested account is a hard
+/// error: `take_account` bails on a missing named account, and a missing
+/// default surfaces here.
+fn resolve_account(
+    printer: &mut impl Printer,
+    config_paths: &[PathBuf],
+    account_name: Option<&str>,
+) -> Result<(Config, String, AccountConfig)> {
+    let Some(mut config) = Config::from_paths_or_default(config_paths)? else {
+        if prompt::bool(
+            "No configuration found. Assist you in generating one?",
+            true,
+        )? {
+            wizard::discover::run(printer)?;
+        }
+        exit(0);
+    };
 
-    match wizard::discover::run(&Config::target_path(config_paths)?)? {
-        Some(config) => Ok(config),
-        None => exit(0),
-    }
+    let (name, account_config) = config.take_account(account_name)?.ok_or_else(|| {
+        anyhow!("No default account found; select one with `-a <NAME>` or mark one with `default = true`")
+    })?;
+
+    Ok((config, name, account_config))
 }
 
 impl Command {
@@ -139,41 +160,36 @@ impl Command {
         account_name: Option<&str>,
         backend: Backend,
     ) -> Result<()> {
-        let configs = || {
-            let mut config = load_or_wizard(config_paths)?;
-
-            let Some((_, account_config)) = config.take_account(account_name)? else {
-                bail!("Cannot find account")
-            };
-
-            Ok((config, account_config))
-        };
-
         match self {
             // --- Shared API
             //
             Self::Mailbox(cmd) => {
-                let (config, account_config) = configs()?;
+                let (config, _name, account_config) =
+                    resolve_account(printer, config_paths, account_name)?;
                 let (mut account, mut client) = EmailClient::new(config, account_config, backend)?;
                 cmd.execute(printer, &mut account, &mut client)
             }
             Self::Envelope(cmd) => {
-                let (config, account_config) = configs()?;
+                let (config, _name, account_config) =
+                    resolve_account(printer, config_paths, account_name)?;
                 let (mut account, mut client) = EmailClient::new(config, account_config, backend)?;
                 cmd.execute(printer, &mut account, &mut client)
             }
             Self::Flag(cmd) => {
-                let (config, account_config) = configs()?;
+                let (config, _name, account_config) =
+                    resolve_account(printer, config_paths, account_name)?;
                 let (mut account, mut client) = EmailClient::new(config, account_config, backend)?;
                 cmd.execute(printer, &mut account, &mut client)
             }
             Self::Message(cmd) => {
-                let (config, account_config) = configs()?;
+                let (config, _name, account_config) =
+                    resolve_account(printer, config_paths, account_name)?;
                 let (mut account, mut client) = EmailClient::new(config, account_config, backend)?;
                 cmd.execute(printer, &mut account, &mut client)
             }
             Self::Attachment(cmd) => {
-                let (config, account_config) = configs()?;
+                let (config, _name, account_config) =
+                    resolve_account(printer, config_paths, account_name)?;
                 let (mut account, mut client) = EmailClient::new(config, account_config, backend)?;
                 cmd.execute(printer, &mut account, &mut client)
             }
@@ -182,37 +198,51 @@ impl Command {
             //
             #[cfg(feature = "imap")]
             Self::Imap(cmd) => {
-                let (mut account, mut client) = build_imap_client(config_paths, account_name)?;
+                let (config, name, account_config) =
+                    resolve_account(printer, config_paths, account_name)?;
+                let (mut account, mut client) = build_imap_client(config, name, account_config)?;
                 cmd.execute(printer, &mut account, &mut client)
             }
             #[cfg(feature = "jmap")]
             Self::Jmap(cmd) => {
-                let (mut account, mut client) = build_jmap_client(config_paths, account_name)?;
+                let (config, name, account_config) =
+                    resolve_account(printer, config_paths, account_name)?;
+                let (mut account, mut client) = build_jmap_client(config, name, account_config)?;
                 cmd.execute(printer, &mut account, &mut client)
             }
             #[cfg(feature = "gmail")]
             Self::Gmail(cmd) => {
-                let (mut account, mut client) = build_gmail_client(config_paths, account_name)?;
+                let (config, name, account_config) =
+                    resolve_account(printer, config_paths, account_name)?;
+                let (mut account, mut client) = build_gmail_client(config, name, account_config)?;
                 cmd.execute(printer, &mut account, &mut client)
             }
             #[cfg(feature = "msgraph")]
             Self::Msgraph(cmd) => {
-                let (mut account, mut client) = build_msgraph_client(config_paths, account_name)?;
+                let (config, name, account_config) =
+                    resolve_account(printer, config_paths, account_name)?;
+                let (mut account, mut client) = build_msgraph_client(config, name, account_config)?;
                 cmd.execute(printer, &mut account, &mut client)
             }
             #[cfg(feature = "maildir")]
             Self::Maildir(cmd) => {
-                let (mut account, mut client) = build_maildir_client(config_paths, account_name)?;
+                let (config, name, account_config) =
+                    resolve_account(printer, config_paths, account_name)?;
+                let (mut account, mut client) = build_maildir_client(config, name, account_config)?;
                 cmd.execute(printer, &mut account, &mut client)
             }
             #[cfg(feature = "m2dir")]
             Self::M2dir(cmd) => {
-                let (mut account, mut client) = build_m2dir_client(config_paths, account_name)?;
+                let (config, name, account_config) =
+                    resolve_account(printer, config_paths, account_name)?;
+                let (mut account, mut client) = build_m2dir_client(config, name, account_config)?;
                 cmd.execute(printer, &mut account, &mut client)
             }
             #[cfg(feature = "smtp")]
             Self::Smtp(cmd) => {
-                let (_account, mut client) = build_smtp_client(config_paths, account_name)?;
+                let (config, name, account_config) =
+                    resolve_account(printer, config_paths, account_name)?;
+                let (_account, mut client) = build_smtp_client(config, name, account_config)?;
                 cmd.execute(printer, &mut client)
             }
 

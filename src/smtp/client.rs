@@ -10,19 +10,16 @@
 use std::{
     net::Ipv4Addr,
     ops::{Deref, DerefMut},
-    path::PathBuf,
 };
 
 use anyhow::{Result, anyhow};
 use io_smtp::{client::SmtpClientStd as Inner, rfc5321::SmtpEhloDomain};
-use pimalaya_config::toml::TomlConfig;
 use pimalaya_stream::sasl::Sasl;
 use url::Url;
 
 use crate::{
     account::context::Account,
-    cli::load_or_wizard,
-    config::{SmtpConfig, parse_server},
+    config::{AccountConfig, Config, SmtpConfig, parse_server},
 };
 
 /// SMTP client wrapping the inner stream for sending messages.
@@ -80,25 +77,22 @@ impl DerefMut for SmtpClient {
     }
 }
 
-/// Loads the configuration, picks the active account, builds the
-/// merged [`Account`] then opens the SMTP session. Bails when the
-/// account has no `[smtp]` block. Returns the live client paired with
-/// the merged account for dispatch uniformity with the other
-/// `build_*_client` helpers, though SMTP subcommands ignore the
-/// account.
+/// Opens the SMTP session for an already-resolved account: takes the
+/// `[smtp]` block out of `account_config` and builds the merged
+/// [`Account`]. Bails when the account has no `[smtp]` block. Returns the
+/// live client paired with the merged account for dispatch uniformity
+/// with the other `build_*_client` helpers, though SMTP subcommands
+/// ignore the account.
 pub fn build_smtp_client(
-    config_paths: &[PathBuf],
-    account_name: Option<&str>,
+    config: Config,
+    name: String,
+    mut account_config: AccountConfig,
 ) -> Result<(Account, SmtpClient)> {
-    let mut config = load_or_wizard(config_paths)?;
-    let (name, mut ac) = config
-        .take_account(account_name)?
-        .ok_or_else(|| anyhow!("Cannot find account"))?;
-    let smtp_config = ac
+    let smtp_config = account_config
         .smtp
         .take()
         .ok_or_else(|| anyhow!("SMTP config is missing for account `{name}`"))?;
-    let account = Account::from(config).merge(Account::from(ac));
+    let account = Account::from(config).merge(Account::from(account_config));
     let client = SmtpClient::new(smtp_config)?;
     Ok((account, client))
 }

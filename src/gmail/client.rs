@@ -11,18 +11,15 @@
 //!
 //! [`GmailClientStd::connect`]: io_gmail::v1::client::GmailClientStd::connect
 
-use std::{
-    ops::{Deref, DerefMut},
-    path::PathBuf,
-};
+use std::ops::{Deref, DerefMut};
 
 use anyhow::{Result, anyhow};
 use io_gmail::v1::client::{GmailClientStd as Inner, GmailClientStdConnectOptions};
-use pimalaya_config::toml::TomlConfig;
 use secrecy::{ExposeSecret, SecretString};
 
 use crate::{
-    account::context::Account, cli::load_or_wizard, config::GmailAuthConfig, config::GmailConfig,
+    account::context::Account,
+    config::{AccountConfig, Config, GmailAuthConfig, GmailConfig},
 };
 
 /// Live Gmail client handed down to every `gmail` subcommand.
@@ -60,22 +57,19 @@ impl DerefMut for GmailClient {
     }
 }
 
-/// Loads the configuration, picks the active account, builds the
-/// merged [`Account`] then opens the Gmail client. Bails when the
-/// account has no `[gmail]` block.
+/// Opens the Gmail client for an already-resolved account: takes the
+/// `[gmail]` block out of `account_config` and builds the merged
+/// [`Account`]. Bails when the account has no `[gmail]` block.
 pub fn build_gmail_client(
-    config_paths: &[PathBuf],
-    account_name: Option<&str>,
+    config: Config,
+    name: String,
+    mut account_config: AccountConfig,
 ) -> Result<(Account, GmailClient)> {
-    let mut config = load_or_wizard(config_paths)?;
-    let (name, mut ac) = config
-        .take_account(account_name)?
-        .ok_or_else(|| anyhow!("Cannot find account"))?;
-    let gmail_config = ac
+    let gmail_config = account_config
         .gmail
         .take()
         .ok_or_else(|| anyhow!("Gmail config is missing for account `{name}`"))?;
-    let account = Account::from(config).merge(Account::from(ac));
+    let account = Account::from(config).merge(Account::from(account_config));
     let client = GmailClient::new(gmail_config)?;
     Ok((account, client))
 }

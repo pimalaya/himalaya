@@ -1,6 +1,5 @@
 pub mod account;
 pub mod discover;
-pub mod edit;
 #[cfg(feature = "gmail")]
 pub mod gmail;
 #[cfg(all(feature = "imap", feature = "smtp"))]

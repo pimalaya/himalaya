@@ -10,10 +10,11 @@
 # separated by `:`; the first one is the base and the rest are deep-merged on
 # top of it.
 #
-# Run `himalaya` once with no config file to launch the wizard, which discovers
+# Run bare `himalaya` (no subcommand) to launch the wizard, which discovers
 # IMAP/SMTP/JMAP defaults via PACC, Thunderbird Autoconfiguration and RFC 6186
-# SRV, then writes the result here. `himalaya account configure <name>` can be
-# used afterwards to edit (or add) an account through the same wizard.
+# SRV, then prints a ready-to-save account on stdout (prompts go to stderr), so
+# `himalaya > <path>` writes it here. Re-run it anytime to generate another
+# account and append it.
 # ================================================================================
 
 # --------------------------------------------------------------------------------

@@ -31,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Split the merged `Account` out of every client wrapper: subcommands now receive `account` and `client` as sibling arguments instead of reaching through `client.account`.
 
+- **Breaking:** changed bare `himalaya` (no subcommand) to run the account wizard instead of listing the default account's envelopes. Himalaya is now a lower-level tool: envelope listing lives under its explicit commands, and the bare invocation is the natural entry point for setting up an account.
+
+- Changed the wizard to print the generated account as a ready-to-save TOML document on stdout instead of writing it to disk, mirroring ortie; redirect it into your config file yourself (e.g. `himalaya > ~/.config/himalaya/config.toml`). It runs on bare `himalaya` and is still proposed when a command finds no config, while a config that exists but lacks the requested account is now a hard error rather than a wizard trigger.
+
+  The account's connection is tested before the config is printed, so a bad credential or endpoint stops the wizard instead of yielding a config that cannot connect. The output is compact: only the `[accounts.<name>]` table stays a section header, every other table is flattened into dotted keys (`imap.sasl.plain.username = …`), and empty tables and defaulted values (`starttls`, `alpn`, `id.auto`) are dropped.
+
 ### Fixed
 
 - Fixed compilation error when the `wizard` feature was disabled ([#634]).
@@ -46,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The "stdout = MIME draft" contract was incompatible with composers spawning an interactive editor, whose UI inherited the parent's piped stdout.
 
 - Dropped `HIMALAYA_CONFIG` environment-variable support; `-c/--config` still accepts one or more `:`-separated paths.
+
+- Removed the `account configure` command (alias `account edit`) and its per-field edit wizard; account setup now goes through the bare `himalaya` discovery wizard, leaving `account list` and `account check` for inspection.
 
 ## [1.2.0] - 2026-02-19
 

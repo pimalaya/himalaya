@@ -3,9 +3,11 @@
 //! Thin glue over [`JmapClient`], which wraps io_jmap's high-level
 //! client (`mailbox_get`, `email_query`, `email_get`, `email_set`,
 //! `email_import`, `email_submission_set`, `blob_upload`,
-//! `blob_download`). The shared `mailbox` argument is the JMAP mailbox
-//! id directly (the shared layer resolves the alias). The conversion is
-//! lifted from the retired io-email JMAP drivers.
+//! `blob_download`). The shared `mailbox` argument is always a JMAP
+//! mailbox id: the shared client maps human names to ids up front via
+//! [`JmapClient::resolve_mailbox_id`], so these adapters never resolve
+//! names themselves. The conversion is lifted from the retired io-email
+//! JMAP drivers.
 
 use std::collections::BTreeMap;
 
@@ -201,7 +203,7 @@ impl JmapClient {
         let url = Url::parse(&url_str)
             .map_err(|_| anyhow!("Resolved JMAP download URL is invalid: {url_str}"))?;
 
-        Ok(self.blob_download(&url)?)
+        self.download_blob(&url)
     }
 
     /// Uploads `raw` as a blob then imports it into `mailbox` with the

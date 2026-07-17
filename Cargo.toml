@@ -73,3 +73,8 @@ url = { version = "2.2", features = ["serde"] }
 
 [target.'cfg(windows)'.dependencies]
 uds_windows = "1"
+
+# Temporary: use the local pimalaya-config for `toml::to_string` (the
+# wizard's compact serializer), until it ships to crates.io.
+[patch.crates-io]
+pimalaya-config = { path = "../config" }

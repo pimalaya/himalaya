@@ -573,7 +573,25 @@ fn parse_rfc2822_date(raw: &str) -> Option<DateTime<FixedOffset>> {
     if trimmed.is_empty() {
         return None;
     }
-    DateTime::parse_from_rfc2822(trimmed).ok()
+
+    // `chrono` validates the optional leading day-of-week against the
+    // date and rejects the whole timestamp when they disagree (a
+    // surprising number of senders get the weekday wrong). The weekday
+    // is redundant, so on failure retry without it.
+    DateTime::parse_from_rfc2822(trimmed)
+        .or_else(|_| DateTime::parse_from_rfc2822(strip_weekday(trimmed)))
+        .ok()
+}
+
+/// Drops a leading `Dow, ` day-of-week token (e.g. `Thu, `) from an
+/// RFC 2822 date, leaving the unambiguous `DD Mon YYYY …` remainder
+/// that `chrono` parses without a weekday check. Returns the input
+/// untouched when it has no such prefix.
+fn strip_weekday(date: &str) -> &str {
+    match date.split_once(", ") {
+        Some((dow, rest)) if dow.len() == 3 && dow.bytes().all(|b| b.is_ascii_alphabetic()) => rest,
+        _ => date,
+    }
 }
 
 fn bytes_to_string(bytes: &[u8]) -> String {
@@ -725,4 +743,34 @@ fn reorder_envelopes(
         .iter()
         .filter_map(|u| by_uid.get(u).cloned())
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_rfc2822_date;
+
+    #[test]
+    fn parses_a_well_formed_date() {
+        let date = parse_rfc2822_date("Fri, 17 Jul 2026 10:00:00 +0000").unwrap();
+        assert_eq!(date.to_rfc3339(), "2026-07-17T10:00:00+00:00");
+    }
+
+    #[test]
+    fn parses_despite_a_wrong_weekday() {
+        // 2026-07-17 is a Friday; `Thu` is wrong but must not void the date.
+        let date = parse_rfc2822_date("Thu, 17 Jul 2026 10:00:00 +0000").unwrap();
+        assert_eq!(date.to_rfc3339(), "2026-07-17T10:00:00+00:00");
+    }
+
+    #[test]
+    fn parses_without_a_weekday() {
+        let date = parse_rfc2822_date("17 Jul 2026 10:00:00 +0000").unwrap();
+        assert_eq!(date.to_rfc3339(), "2026-07-17T10:00:00+00:00");
+    }
+
+    #[test]
+    fn rejects_empty_and_garbage() {
+        assert!(parse_rfc2822_date("   ").is_none());
+        assert!(parse_rfc2822_date("not a date").is_none());
+    }
 }

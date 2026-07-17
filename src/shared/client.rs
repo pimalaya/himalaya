@@ -128,6 +128,8 @@ impl EmailClient {
         page_size: Option<u32>,
         with_attachment: bool,
     ) -> Result<Vec<Envelope>> {
+        let mailbox = self.resolve_mailbox_id(mailbox)?;
+        let mailbox = mailbox.as_str();
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
             BackendClient::Imap(client) => {
@@ -166,6 +168,8 @@ impl EmailClient {
         page_size: Option<u32>,
         with_attachment: bool,
     ) -> Result<Vec<Envelope>> {
+        let mailbox = self.resolve_mailbox_id(mailbox)?;
+        let mailbox = mailbox.as_str();
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
             BackendClient::Imap(client) => {
@@ -200,6 +204,8 @@ impl EmailClient {
         flags: &[Flag],
         op: FlagOp,
     ) -> Result<()> {
+        let mailbox = self.resolve_mailbox_id(mailbox)?;
+        let mailbox = mailbox.as_str();
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
             BackendClient::Imap(client) => client.store_flags(mailbox, ids, flags, op),
@@ -237,6 +243,8 @@ impl EmailClient {
     /// Adds `raw` to `mailbox` with `flags`. Gmail and Microsoft Graph
     /// do not implement adding messages.
     pub fn add_message(&mut self, mailbox: &str, flags: &[Flag], raw: Vec<u8>) -> Result<String> {
+        let mailbox = self.resolve_mailbox_id(mailbox)?;
+        let mailbox = mailbox.as_str();
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
             BackendClient::Imap(client) => client.add_message(mailbox, flags, raw),
@@ -255,6 +263,9 @@ impl EmailClient {
 
     /// Copies a message id set from `from` to `to`.
     pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<()> {
+        let from = self.resolve_mailbox_id(from)?;
+        let to = self.resolve_mailbox_id(to)?;
+        let (from, to) = (from.as_str(), to.as_str());
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
             BackendClient::Imap(client) => client.copy_messages(from, to, ids),
@@ -273,6 +284,9 @@ impl EmailClient {
 
     /// Moves a message id set from `from` to `to`.
     pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<()> {
+        let from = self.resolve_mailbox_id(from)?;
+        let to = self.resolve_mailbox_id(to)?;
+        let (from, to) = (from.as_str(), to.as_str());
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
             BackendClient::Imap(client) => client.move_messages(from, to, ids),
@@ -308,6 +322,21 @@ impl EmailClient {
         }
 
         bail!("No send-capable backend (JMAP/Gmail/Graph) or SMTP is configured for this account")
+    }
+
+    /// Maps the shared layer's human mailbox name onto the
+    /// backend-native id the operation methods expect. Identity for
+    /// every backend whose name already is its id (IMAP, Maildir, m2dir,
+    /// Gmail, Graph); JMAP resolves the opaque id via a cached
+    /// `Mailbox/get`. Applied by the mailbox-addressing methods above
+    /// before they dispatch, so each per-protocol adapter only ever
+    /// receives ids.
+    fn resolve_mailbox_id(&mut self, mailbox: &str) -> Result<String> {
+        match self.storage_mut()? {
+            #[cfg(feature = "jmap")]
+            BackendClient::Jmap(client) => client.resolve_mailbox_id(mailbox),
+            _ => Ok(mailbox.to_string()),
+        }
     }
 
     fn storage_mut(&mut self) -> Result<&mut BackendClient> {

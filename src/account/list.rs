@@ -73,8 +73,8 @@ fn load_config(paths: &[PathBuf]) -> Result<Config> {
     match Config::from_paths_or_default(paths)? {
         Some(config) => Ok(config),
         None => anyhow::bail!(
-            "No configuration found. Run `himalaya` once to launch the wizard, \
-             or `himalaya account configure <name>` to create one."
+            "No configuration found. Run bare `himalaya` to launch the wizard \
+             and generate one."
         ),
     }
 }

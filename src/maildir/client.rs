@@ -12,9 +12,11 @@ use std::{
 
 use anyhow::{Result, anyhow, bail};
 use io_maildir::{client::MaildirClient as Inner, maildir::Maildir};
-use pimalaya_config::toml::TomlConfig;
 
-use crate::{account::context::Account, cli::load_or_wizard, config::MaildirConfig};
+use crate::{
+    account::context::Account,
+    config::{AccountConfig, Config, MaildirConfig},
+};
 
 /// Live Maildir client wrapping io_maildir with the configured root.
 pub struct MaildirClient {
@@ -60,24 +62,21 @@ impl DerefMut for MaildirClient {
     }
 }
 
-/// Loads the configuration, picks the active account, builds the
-/// merged [`Account`] then opens the maildir client. Bails when the
-/// account has no `[maildir]` block. Returns the client paired with
-/// the merged account so subcommands receive both as sibling
-/// arguments.
+/// Opens the maildir client for an already-resolved account: takes the
+/// `[maildir]` block out of `account_config` and builds the merged
+/// [`Account`]. Bails when the account has no `[maildir]` block. Returns
+/// the client paired with the merged account so subcommands receive both
+/// as sibling arguments.
 pub fn build_maildir_client(
-    config_paths: &[PathBuf],
-    account_name: Option<&str>,
+    config: Config,
+    name: String,
+    mut account_config: AccountConfig,
 ) -> Result<(Account, MaildirClient)> {
-    let mut config = load_or_wizard(config_paths)?;
-    let (name, mut ac) = config
-        .take_account(account_name)?
-        .ok_or_else(|| anyhow!("Cannot find account"))?;
-    let maildir_config = ac
+    let maildir_config = account_config
         .maildir
         .take()
         .ok_or_else(|| anyhow!("Maildir config is missing for account `{name}`"))?;
-    let account = Account::from(config).merge(Account::from(ac));
+    let account = Account::from(config).merge(Account::from(account_config));
     Ok((account, MaildirClient::new(maildir_config)))
 }
 

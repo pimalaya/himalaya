@@ -1,16 +1,13 @@
 use anyhow::{Result, anyhow};
 use clap::Parser;
-use io_jmap::{
-    client::JmapClientStd,
-    rfc8621::{
-        JMAP_MAIL_CAPABILITY,
-        email::{JmapEmailProperty, get::JmapEmailGetOptions},
-    },
+use io_jmap::rfc8621::{
+    JMAP_MAIL_CAPABILITY,
+    email::{JmapEmailProperty, get::JmapEmailGetOptions},
 };
 use pimalaya_cli::printer::{Message, Printer};
 use url::Url;
 
-use crate::jmap::client::{JmapClient, jmap_http_auth};
+use crate::jmap::client::JmapClient;
 
 /// Export a raw RFC 5322 message to stdout (Email/get + blob download).
 ///
@@ -35,7 +32,6 @@ impl JmapEmailExportCommand {
         let session = client
             .session()
             .expect("session loaded by build_jmap_client");
-        let api_url = session.api_url.clone();
         let account_id = session
             .primary_accounts
             .get(JMAP_MAIL_CAPABILITY)
@@ -57,23 +53,8 @@ impl JmapEmailExportCommand {
             .replace("{name}", "message.eml")
             .parse()?;
 
-        let data = if same_authority(&api_url, &download_url) {
-            client.blob_download(&download_url)?
-        } else {
-            let tls = client
-                .config
-                .tls
-                .clone()
-                .into_tls(client.config.alpn.clone());
-            let http_auth = jmap_http_auth(client.config.auth.clone())?;
-            let mut download_client = JmapClientStd::connect(&download_url, &tls, http_auth)?;
-            download_client.blob_download(&download_url)?
-        };
+        let data = client.download_blob(&download_url)?;
 
         printer.out(Message::new(String::from_utf8(data)?))
     }
-}
-
-fn same_authority(a: &Url, b: &Url) -> bool {
-    a.host() == b.host() && a.port_or_known_default() == b.port_or_known_default()
 }

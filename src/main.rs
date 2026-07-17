@@ -54,13 +54,15 @@
 //! ## Configuration and output
 //!
 //! Config is loaded by pimalaya-config from the first existing canonical
-//! path (or the `-c` / `HIMALAYA_CONFIG` override), later paths
-//! deep-merged on top; the schema ([`config`]) is multi-account, a
-//! top-level block plus named account blocks carrying optional
-//! per-backend sub-blocks. When no config exists, `load_or_wizard` runs
-//! the interactive [`wizard`], bootstrapping an account through
-//! discovery. Output follows the Pimalaya rule: data and errors go to
-//! stdout through the printer (`--json` switches every command to JSON),
+//! path (or the `-c` override), later paths deep-merged on top; the
+//! schema ([`config`]) is multi-account, a top-level block plus named
+//! account blocks carrying optional per-backend sub-blocks. Bare
+//! `himalaya` (no subcommand) runs the interactive [`wizard`], which
+//! discovers an account and prints it as a ready-to-save fragment on
+//! stdout without writing to disk; it is also proposed when a command
+//! finds no config. A config that exists but lacks the requested account
+//! is a hard error. Output follows the Pimalaya rule: data and errors go
+//! to stdout through the printer (`--json` switches every command to JSON),
 //! stderr carries logs only. Each command's doc comment is its `--help`
 //! text, so `himalaya <command> --help` is the canonical per-command
 //! usage reference; see also the development notes under docs/.
@@ -91,7 +93,7 @@ use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::{error::ErrorReport, log::Logger, printer::StdoutPrinter};
 
-use crate::cli::Cli;
+use crate::{cli::Cli, wizard::discover};
 
 fn main() {
     let cli = Cli::parse();
@@ -105,5 +107,9 @@ fn execute(cli: Cli, printer: &mut StdoutPrinter) -> Result<()> {
     let config = cli.config.paths.as_ref();
     let account = cli.account.name.as_deref();
     let backend = cli.backend;
-    cli.cmd.execute(printer, config, account, backend)
+
+    match cli.cmd {
+        Some(cmd) => cmd.execute(printer, config, account, backend),
+        None => discover::run(printer),
+    }
 }

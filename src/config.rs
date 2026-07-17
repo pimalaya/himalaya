@@ -1,8 +1,6 @@
-#[cfg(unix)]
-use std::os::unix::fs::OpenOptionsExt;
-use std::{collections::HashMap, fs, fs::OpenOptions, io::Write, path::Path, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
 use comfy_table::ContentArrangement;
 use crossterm::style::Color;
 use pimalaya_config::{
@@ -17,6 +15,33 @@ use pimalaya_stream::{
 };
 use serde::{Deserialize, Serialize};
 use url::Url;
+
+/// `skip_serializing_if` predicate skipping a field equal to its type's
+/// default, so a wizard-generated config omits defaulted scalars (the
+/// only serializer is the wizard, see [`crate::wizard`]).
+fn is_default<T: Default + PartialEq>(value: &T) -> bool {
+    *value == T::default()
+}
+
+fn is_default_imap_alpn(alpn: &[String]) -> bool {
+    alpn == io_imap::client::default_alpn().as_slice()
+}
+
+fn is_default_smtp_alpn(alpn: &[String]) -> bool {
+    alpn == io_smtp::client::SmtpClientStd::default_alpn().as_slice()
+}
+
+fn is_default_jmap_alpn(alpn: &[String]) -> bool {
+    alpn == io_jmap::client::JmapClientStd::default_alpn().as_slice()
+}
+
+fn is_default_gmail_alpn(alpn: &[String]) -> bool {
+    alpn == default_gmail_alpn().as_slice()
+}
+
+fn is_default_msgraph_alpn(alpn: &[String]) -> bool {
+    alpn == default_msgraph_alpn().as_slice()
+}
 
 /// Global configuration.
 ///
@@ -62,39 +87,6 @@ impl TomlConfig for Config {
             .find_map(|(name, account)| account.default.then(|| name.clone()))?;
 
         self.take_named_account(&name)
-    }
-}
-
-impl Config {
-    /// Serializes `self` to TOML and writes it to `path`, creating
-    /// any missing parent directories. Used by the wizard to persist
-    /// a freshly-built configuration.
-    ///
-    /// The file may hold plaintext secrets (a `Secret::Raw` password or
-    /// token), so on unix it is created with `0600` permissions to keep
-    /// it readable by the owner only.
-    pub fn write(&self, path: &Path) -> Result<()> {
-        let toml = toml::to_string_pretty(self).context("Serialize TOML config error")?;
-
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).with_context(|| {
-                format!("Create TOML config parent `{}` error", parent.display())
-            })?;
-        }
-
-        let mut options = OpenOptions::new();
-        options.write(true).create(true).truncate(true);
-
-        #[cfg(unix)]
-        options.mode(0o600);
-
-        let mut file = options
-            .open(path)
-            .with_context(|| format!("Open TOML config `{}` error", path.display()))?;
-        file.write_all(toml.as_bytes())
-            .with_context(|| format!("Write TOML config `{}` error", path.display()))?;
-
-        Ok(())
     }
 }
 
@@ -365,14 +357,17 @@ pub struct ImapConfig {
 
     #[serde(default)]
     pub tls: TlsConfig,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_default")]
     pub starttls: bool,
 
     /// ALPN protocol identifiers offered during the TLS handshake.  Defaults to
     /// `["imap"]` (RFC 7595, IANA registry). Set to `[]` to skip ALPN
     /// negotiation entirely. Only relevant for the rustls provider;
     /// `native-tls` ignores ALPN.
-    #[serde(default = "io_imap::client::default_alpn")]
+    #[serde(
+        default = "io_imap::client::default_alpn",
+        skip_serializing_if = "is_default_imap_alpn"
+    )]
     pub alpn: Vec<String>,
 
     /// Optional SASL credentials. When omitted, the connection skips
@@ -409,7 +404,7 @@ pub struct ImapIdConfig {
     /// When `true`, the auth coroutine chains an `ID` round-trip
     /// after the tagged auth response. Default `false` skips ID
     /// entirely.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_default")]
     pub auto: bool,
 
     /// Parameters sent with the auto-ID command. Empty (default)
@@ -418,7 +413,7 @@ pub struct ImapIdConfig {
     /// `vendor`, `support-url`) or `NIL` for unknown keys; `false`
     /// always sends `NIL`. Keys absent from this map are not
     /// transmitted.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub fields: HashMap<String, bool>,
 }
 
@@ -452,14 +447,17 @@ pub struct SmtpConfig {
 
     #[serde(default)]
     pub tls: TlsConfig,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_default")]
     pub starttls: bool,
 
     /// ALPN protocol identifiers offered during the TLS handshake.
     /// Defaults to `["smtp"]` (RFC 7595, IANA registry). Set to `[]`
     /// to skip ALPN negotiation entirely. Only relevant for the
     /// rustls provider; `native-tls` ignores ALPN.
-    #[serde(default = "io_smtp::client::SmtpClientStd::default_alpn")]
+    #[serde(
+        default = "io_smtp::client::SmtpClientStd::default_alpn",
+        skip_serializing_if = "is_default_smtp_alpn"
+    )]
     pub alpn: Vec<String>,
 
     /// Optional SASL credentials. See [`ImapConfig::sasl`].
@@ -667,7 +665,10 @@ pub struct JmapConfig {
     /// Defaults to `["http/1.1"]` (JMAP rides on HTTP/1.1). Set to
     /// `[]` to skip ALPN negotiation entirely. Only relevant for the
     /// rustls provider; `native-tls` ignores ALPN.
-    #[serde(default = "io_jmap::client::JmapClientStd::default_alpn")]
+    #[serde(
+        default = "io_jmap::client::JmapClientStd::default_alpn",
+        skip_serializing_if = "is_default_jmap_alpn"
+    )]
     pub alpn: Vec<String>,
 
     /// Authentication configuration.
@@ -722,7 +723,10 @@ pub struct GmailConfig {
     /// Defaults to `["http/1.1"]` (the Gmail REST API rides on
     /// HTTP/1.1). Set to `[]` to skip ALPN negotiation entirely. Only
     /// relevant for the rustls provider; `native-tls` ignores ALPN.
-    #[serde(default = "default_gmail_alpn")]
+    #[serde(
+        default = "default_gmail_alpn",
+        skip_serializing_if = "is_default_gmail_alpn"
+    )]
     pub alpn: Vec<String>,
 
     /// Authentication configuration.
@@ -772,7 +776,10 @@ pub struct MsgraphConfig {
     /// Defaults to `["http/1.1"]` (the Graph API rides on HTTP/1.1). Set
     /// to `[]` to skip ALPN negotiation entirely. Only relevant for the
     /// rustls provider; `native-tls` ignores ALPN.
-    #[serde(default = "default_msgraph_alpn")]
+    #[serde(
+        default = "default_msgraph_alpn",
+        skip_serializing_if = "is_default_msgraph_alpn"
+    )]
     pub alpn: Vec<String>,
 
     /// Authentication configuration.
