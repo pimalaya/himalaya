@@ -4,8 +4,8 @@ use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use comfy_table::{Cell, Row, Table};
 use io_jmap::rfc8621::email_submission::{
-    JmapEmailSubmission, JmapEmailSubmissionFilter, JmapUndoStatus,
-    query::JmapEmailSubmissionQueryOptions,
+    JmapEmailSubmission, JmapUndoStatus,
+    query::{JmapEmailSubmissionFilter, JmapEmailSubmissionQueryOptions},
 };
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;

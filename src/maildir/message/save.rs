@@ -2,7 +2,7 @@ use std::{fmt, path::PathBuf};
 
 use anyhow::Result;
 use clap::Parser;
-use io_maildir::flag::types::MaildirFlags;
+use io_maildir::flag::MaildirFlags;
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
 

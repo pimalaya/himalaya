@@ -2,7 +2,7 @@
 //!
 //! Thin glue over [`MsgraphClient`], which wraps io_msgraph's high-level
 //! client (`mail_folders_list`, `messages_list`, `message_get_raw`,
-//! `message_update`, `message_copy`, `message_move`, `send_mail_mime`).
+//! `message_update`, `message_copy`, `message_move`, `mail_send_mime`).
 //! Graph is folder-based; flags map to the message's scalar fields
 //! (`isRead`, follow-up flag, importance) plus `categories`. No
 //! `add_message`. The conversion is lifted from the retired io-email
@@ -114,7 +114,7 @@ impl MsgraphClient {
     /// Sends a raw RFC 5322 message via `POST /sendMail` (MIME form);
     /// Graph saves it to Sent Items.
     pub fn send_message(&mut self, raw: Vec<u8>) -> Result<()> {
-        self.send_mail_mime(&raw)?;
+        self.mail_send_mime(&raw)?;
         Ok(())
     }
 }

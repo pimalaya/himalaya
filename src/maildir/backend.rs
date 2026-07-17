@@ -12,10 +12,10 @@ use std::{collections::BTreeSet, path::Path};
 use anyhow::Result;
 use chrono::DateTime;
 use io_maildir::{
-    entry::types::MaildirFullEntry,
-    flag::types::{MaildirFlag, MaildirFlags},
-    maildir::types::{Maildir, MaildirSubdir},
-    path::FsPath,
+    entry::MaildirFullEntry,
+    flag::{MaildirFlag, MaildirFlags},
+    maildir::{Maildir, MaildirSubdir},
+    path::MaildirFsPath,
 };
 use mail_parser::Address as MailParserAddress;
 
@@ -222,7 +222,7 @@ fn envelope_from_entry(entry: &MaildirFullEntry) -> Envelope {
 }
 
 /// IANA flags from a Maildir filename's info section.
-fn parse_filename_flags(path: &FsPath) -> BTreeSet<Flag> {
+fn parse_filename_flags(path: &MaildirFsPath) -> BTreeSet<Flag> {
     let Some(name) = path.file_name() else {
         return BTreeSet::new();
     };

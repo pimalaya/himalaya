@@ -1,26 +1,30 @@
 //! Email-driven service discovery for the wizard.
 //!
 //! Mirrors the cardamum-android configuration screen, adapted to mail:
-//! the address feeds pimconf's parallel search (fixed provider rules,
-//! PACC, Mozilla autoconfig, RFC 6186 SRV, RFC 8620 JMAP resolve, with
-//! a final WWW-Authenticate probe refining the advertised schemes), and
-//! every reachable service and authentication method becomes one
-//! selectable entry. A detected Google or Microsoft account collapses
-//! to its dedicated configurations (the proprietary Gmail / Graph APIs
-//! plus IMAP+SMTP), matching the app's provider short-circuit.
+//! the address feeds io-pim-discovery's parallel discovery (fixed
+//! provider rules, PACC, Mozilla autoconfig, RFC 6186 SRV, RFC 8620
+//! JMAP resolve, with a final WWW-Authenticate probe refining the
+//! advertised schemes), and every reachable service and authentication
+//! method becomes one selectable entry. A detected Google or Microsoft
+//! account collapses to its dedicated configurations (the proprietary
+//! Gmail / Graph APIs plus IMAP+SMTP), matching the app's provider
+//! short-circuit.
 
 use std::{collections::BTreeSet, env, fmt};
 
 use anyhow::Result;
-use pimalaya_stream::tls::{Rustls, Tls};
-use pimconf::{
-    search::{
-        client::SearchClientStd,
-        providers::Provider,
-        types::{AuthMethod, ConfigSource, Endpoint, Security, Service, ServiceConfig},
+use io_pim_discovery::{
+    compose::{
+        client::DiscoveryComposeClientStd,
+        config::{
+            DiscoveryAuthMethod, DiscoveryConfigSource, DiscoveryEndpoint, DiscoverySecurity,
+            DiscoveryService, DiscoveryServiceConfig,
+        },
+        providers::DiscoveryKnownProvider,
     },
     shared::dns::system_resolver,
 };
+use pimalaya_stream::tls::{Rustls, Tls};
 use url::Url;
 
 /// DNS-over-TCP resolver backing discovery when `HIMALAYA_DNS_RESOLVER`
@@ -61,7 +65,7 @@ pub enum DiscoveredKind {
 pub struct TcpEndpoint {
     pub host: String,
     pub port: u16,
-    pub security: Security,
+    pub security: DiscoverySecurity,
 }
 
 /// The discovered authentication method. OAuth 2.0 grants stay distinct
@@ -135,9 +139,13 @@ impl Discovered {
 /// [`Discovered::rank`]. A detected Google or Microsoft account yields
 /// only its dedicated configurations.
 pub fn search(email: &str) -> Result<Vec<Discovered>> {
-    let client = SearchClientStd::new(discovery_resolver(), discovery_tls());
-    let services = BTreeSet::from([Service::Imap, Service::Smtp, Service::Jmap]);
-    let configs = client.search_all(email, services)?;
+    let client = DiscoveryComposeClientStd::new(discovery_resolver(), discovery_tls());
+    let services = BTreeSet::from([
+        DiscoveryService::Imap,
+        DiscoveryService::Smtp,
+        DiscoveryService::Jmap,
+    ]);
+    let configs = client.compose_all(email, services)?;
 
     let provider = provider_of(email, &configs);
     let mut found = Vec::new();
@@ -146,8 +154,8 @@ pub fn search(email: &str) -> Result<Vec<Discovered>> {
     // IMAP+SMTP plus a proprietary API, so JMAP is offered for other
     // providers only.
     if provider.is_none() {
-        if let Some(jmap) = configs.iter().find(|c| c.service == Service::Jmap) {
-            if let Endpoint::Http(url) = &jmap.endpoint {
+        if let Some(jmap) = configs.iter().find(|c| c.service == DiscoveryService::Jmap) {
+            if let DiscoveryEndpoint::Http(url) = &jmap.endpoint {
                 let kind = DiscoveredKind::Jmap(url.clone());
                 push_entries(&mut found, kind, jmap.username.clone(), &jmap.auth);
             }
@@ -157,9 +165,9 @@ pub fn search(email: &str) -> Result<Vec<Discovered>> {
     // A detected provider restricts IMAP+SMTP to its own configs, so
     // the app-style dedicated set shows instead of every discovered
     // relay.
-    if let Some(imap) = best(&configs, Service::Imap, provider) {
+    if let Some(imap) = best(&configs, DiscoveryService::Imap, provider) {
         if let Some(endpoint) = tcp_endpoint(imap) {
-            let smtp = best(&configs, Service::Smtp, provider).and_then(tcp_endpoint);
+            let smtp = best(&configs, DiscoveryService::Smtp, provider).and_then(tcp_endpoint);
             let kind = DiscoveredKind::ImapSmtp {
                 imap: endpoint,
                 smtp,
@@ -169,12 +177,12 @@ pub fn search(email: &str) -> Result<Vec<Discovered>> {
     }
 
     match provider {
-        Some(Provider::Google) => found.push(Discovered {
+        Some(DiscoveryKnownProvider::Google) => found.push(Discovered {
             kind: DiscoveredKind::Gmail,
             username: Some(email.to_string()),
             auth: DiscoveredAuth::Token,
         }),
-        Some(Provider::Microsoft) => found.push(Discovered {
+        Some(DiscoveryKnownProvider::Microsoft) => found.push(Discovered {
             kind: DiscoveredKind::Msgraph,
             username: Some(email.to_string()),
             auth: DiscoveredAuth::Token,
@@ -189,14 +197,14 @@ pub fn search(email: &str) -> Result<Vec<Discovered>> {
 /// Resolves the provider from the email domain (fast path for consumer
 /// addresses), falling back to any provider-tagged config, which
 /// catches custom domains detected through their MX records.
-fn provider_of(email: &str, configs: &[ServiceConfig]) -> Option<Provider> {
+fn provider_of(email: &str, configs: &[DiscoveryServiceConfig]) -> Option<DiscoveryKnownProvider> {
     let by_domain = email
         .rsplit_once('@')
-        .and_then(|(_, domain)| Provider::from_domain(domain));
+        .and_then(|(_, domain)| DiscoveryKnownProvider::from_domain(domain));
 
     by_domain.or_else(|| {
         configs.iter().find_map(|config| match config.source {
-            ConfigSource::Provider(provider) => Some(provider),
+            DiscoveryConfigSource::Provider(provider) => Some(provider),
             _ => None,
         })
     })
@@ -208,12 +216,12 @@ fn push_entries(
     found: &mut Vec<Discovered>,
     kind: DiscoveredKind,
     username: Option<String>,
-    auth: &[AuthMethod],
+    auth: &[DiscoveryAuthMethod],
 ) {
     for method in auth {
         let auth = match method {
-            AuthMethod::Password => DiscoveredAuth::Password,
-            AuthMethod::Bearer => DiscoveredAuth::Token,
+            DiscoveryAuthMethod::Password => DiscoveredAuth::Password,
+            DiscoveryAuthMethod::Bearer => DiscoveredAuth::Token,
             _ => DiscoveredAuth::OAuth,
         };
 
@@ -233,24 +241,24 @@ fn push_entries(
 /// wins, so a domain advertising both implicit TLS and STARTTLS keeps
 /// the former.
 fn best(
-    configs: &[ServiceConfig],
-    service: Service,
-    provider: Option<Provider>,
-) -> Option<&ServiceConfig> {
+    configs: &[DiscoveryServiceConfig],
+    service: DiscoveryService,
+    provider: Option<DiscoveryKnownProvider>,
+) -> Option<&DiscoveryServiceConfig> {
     configs
         .iter()
         .filter(|config| config.service == service)
         .filter(|config| match provider {
-            Some(provider) => config.source == ConfigSource::Provider(provider),
+            Some(provider) => config.source == DiscoveryConfigSource::Provider(provider),
             None => true,
         })
         .max_by_key(|config| match &config.endpoint {
-            Endpoint::Tcp {
-                security: Security::Tls,
+            DiscoveryEndpoint::Tcp {
+                security: DiscoverySecurity::Tls,
                 ..
             } => 2,
-            Endpoint::Tcp {
-                security: Security::Starttls,
+            DiscoveryEndpoint::Tcp {
+                security: DiscoverySecurity::Starttls,
                 ..
             } => 1,
             _ => 0,
@@ -266,9 +274,9 @@ fn looks_like_address(value: &str) -> bool {
 }
 
 /// Extracts a [`TcpEndpoint`] from a config, or `None` for an HTTP one.
-fn tcp_endpoint(config: &ServiceConfig) -> Option<TcpEndpoint> {
+fn tcp_endpoint(config: &DiscoveryServiceConfig) -> Option<TcpEndpoint> {
     match &config.endpoint {
-        Endpoint::Tcp {
+        DiscoveryEndpoint::Tcp {
             host,
             port,
             security,
@@ -277,7 +285,7 @@ fn tcp_endpoint(config: &ServiceConfig) -> Option<TcpEndpoint> {
             port: *port,
             security: *security,
         }),
-        Endpoint::Http(_) => None,
+        DiscoveryEndpoint::Http(_) => None,
     }
 }
 

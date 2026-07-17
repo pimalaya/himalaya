@@ -2,9 +2,8 @@ use std::borrow::Cow;
 
 use anyhow::Result;
 use clap::Parser;
-use io_smtp::rfc5321::types::{
-    domain::Domain, ehlo_domain::EhloDomain, forward_path::ForwardPath, local_part::LocalPart,
-    mailbox::Mailbox, reverse_path::ReversePath,
+use io_smtp::rfc5321::{
+    SmtpDomain, SmtpEhloDomain, SmtpForwardPath, SmtpLocalPart, SmtpMailbox, SmtpReversePath,
 };
 use pimalaya_cli::printer::{Message, Printer};
 
@@ -26,10 +25,10 @@ pub struct SmtpSendCommand {
     ///
     /// Pass an empty value or `<>` for the null reverse path.
     #[arg(long, short = 'f', value_name = "ADDR", value_parser = reverse_path_parser)]
-    pub mail_from: ReversePath<'static>,
+    pub mail_from: SmtpReversePath<'static>,
     /// The envelope recipient(s) (RCPT TO forward path); repeatable.
     #[arg(long, short = 't', value_name = "ADDR", required = true, value_parser = forward_path_parser)]
-    pub rcpt_to: Vec<ForwardPath<'static>>,
+    pub rcpt_to: Vec<SmtpForwardPath<'static>>,
     #[command(flatten)]
     pub message: MessageArg,
 }
@@ -44,23 +43,23 @@ impl SmtpSendCommand {
 
 /// Clap value parser for MAIL FROM: maps an empty value or `<>` to the
 /// null reverse path, otherwise parses a `local-part@domain` mailbox.
-fn reverse_path_parser(addr: &str) -> Result<ReversePath<'static>, String> {
+fn reverse_path_parser(addr: &str) -> Result<SmtpReversePath<'static>, String> {
     let addr = addr.trim();
 
     if addr.is_empty() || addr == "<>" {
-        return Ok(ReversePath::Null);
+        return Ok(SmtpReversePath::Null);
     }
 
-    Ok(ReversePath::Mailbox(mailbox_parser(addr)?))
+    Ok(SmtpReversePath::SmtpMailbox(mailbox_parser(addr)?))
 }
 
 /// Clap value parser for RCPT TO: parses a `local-part@domain` mailbox.
-fn forward_path_parser(addr: &str) -> Result<ForwardPath<'static>, String> {
-    Ok(ForwardPath(mailbox_parser(addr)?))
+fn forward_path_parser(addr: &str) -> Result<SmtpForwardPath<'static>, String> {
+    Ok(SmtpForwardPath(mailbox_parser(addr)?))
 }
 
-/// Builds an SMTP [`Mailbox`] from a `local-part@domain` string.
-fn mailbox_parser(addr: &str) -> Result<Mailbox<'static>, String> {
+/// Builds an SMTP [`SmtpMailbox`] from a `local-part@domain` string.
+fn mailbox_parser(addr: &str) -> Result<SmtpMailbox<'static>, String> {
     let Some((local, domain)) = addr.trim().rsplit_once('@') else {
         return Err(format!("expected local-part@domain, got `{addr}`"));
     };
@@ -69,8 +68,8 @@ fn mailbox_parser(addr: &str) -> Result<Mailbox<'static>, String> {
         return Err(format!("expected local-part@domain, got `{addr}`"));
     }
 
-    Ok(Mailbox {
-        local_part: LocalPart(Cow::Owned(local.to_owned())),
-        domain: EhloDomain::Domain(Domain(Cow::Owned(domain.to_owned()))),
+    Ok(SmtpMailbox {
+        local_part: SmtpLocalPart(Cow::Owned(local.to_owned())),
+        domain: SmtpEhloDomain::SmtpDomain(SmtpDomain(Cow::Owned(domain.to_owned()))),
     })
 }

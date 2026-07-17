@@ -3,7 +3,9 @@ use std::fmt;
 use anyhow::{Result, bail};
 use clap::Parser;
 use comfy_table::{Cell, Row, Table};
-use io_jmap::rfc8621::vacation_response::{JmapVacationResponse, VACATION_RESPONSE_CAPABILITY};
+use io_jmap::rfc8621::vacation_response::{
+    JMAP_VACATION_RESPONSE_CAPABILITY, JmapVacationResponse,
+};
 use pimalaya_cli::printer::{Message, Printer};
 use serde::Serialize;
 
@@ -23,7 +25,10 @@ impl JmapVacationGetCommand {
     ) -> Result<()> {
         let has_vacation = client
             .session()
-            .map(|s| s.capabilities.contains_key(VACATION_RESPONSE_CAPABILITY))
+            .map(|s| {
+                s.capabilities
+                    .contains_key(JMAP_VACATION_RESPONSE_CAPABILITY)
+            })
             .unwrap_or(false);
 
         if !has_vacation {

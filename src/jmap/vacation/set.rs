@@ -1,7 +1,7 @@
 use anyhow::{Result, bail};
 use clap::Parser;
 use io_jmap::rfc8621::vacation_response::{
-    JmapVacationResponseUpdate, VACATION_RESPONSE_CAPABILITY,
+    JMAP_VACATION_RESPONSE_CAPABILITY, set::JmapVacationResponseUpdate,
 };
 use pimalaya_cli::printer::{Message, Printer};
 
@@ -43,7 +43,10 @@ impl JmapVacationSetCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut JmapClient) -> Result<()> {
         let has_vacation = client
             .session()
-            .map(|s| s.capabilities.contains_key(VACATION_RESPONSE_CAPABILITY))
+            .map(|s| {
+                s.capabilities
+                    .contains_key(JMAP_VACATION_RESPONSE_CAPABILITY)
+            })
             .unwrap_or(false);
 
         if !has_vacation {

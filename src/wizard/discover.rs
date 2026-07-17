@@ -6,10 +6,11 @@
 //! path, and its shape orients the setup, mirroring the cardamum-android
 //! onboarding:
 //!
-//! - an email (or bare domain) runs pimconf's parallel discovery (see
-//!   [`super::search`]) and every reachable service and authentication
-//!   method becomes one selectable configuration; a detected Google or
-//!   Microsoft account collapses to its dedicated set;
+//! - an email (or bare domain) runs io-pim-discovery's parallel
+//!   discovery (see [`super::search`]) and every reachable service and
+//!   authentication method becomes one selectable configuration; a
+//!   detected Google or Microsoft account collapses to its dedicated
+//!   set;
 //! - a `scheme://` URL is a server to configure by hand;
 //! - an existing folder is a local Maildir or m2dir.
 //!

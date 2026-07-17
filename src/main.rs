@@ -1,3 +1,70 @@
+//! # himalaya
+//!
+//! CLI to manage emails. himalaya is an application, the top layer of
+//! the Pimalaya stack: it writes no protocol or storage logic of its
+//! own and ships no library target, only this binary. It is a thin
+//! shell driving the sans-I/O io-* libraries below it, consuming their
+//! blocking `*Std` clients and orchestrating and rendering the results.
+//!
+//! ## Backends and plumbing
+//!
+//! The network backends are io-imap, io-jmap, io-gmail, io-msgraph and
+//! io-smtp; the local storage backends are io-maildir and io-m2dir.
+//! Account discovery comes from io-pim-discovery (Mozilla autoconfig,
+//! PACC, RFC 6186 SRV, RFC 8620 JMAP resolve). The CLI plumbing (clap
+//! args, printer, logger), TOML config loading and the blocking stream
+//! runtime come from pimalaya-cli, pimalaya-config and pimalaya-stream.
+//! Every backend sits behind its own cargo feature, so a build ships
+//! only the protocols it needs.
+//!
+//! ## Command families
+//!
+//! The command tree ([`cli`], `Command`) splits into three groups. The
+//! shared API (mailbox, envelope, flag, message, attachment) is the
+//! cross-protocol least-common-denominator surface, behaving the same
+//! whatever backend serves the active account. The protocol-specific
+//! APIs (imap, jmap, gmail, msgraph, maildir, m2dir, smtp) each expose
+//! the full surface of one backend, including operations the shared API
+//! cannot model. The meta commands (account, completion, manual) cover
+//! account configuration, shell completions and man pages.
+//!
+//! ## Shared commands and backend selection
+//!
+//! The shared commands run over a local [`shared::client`] `EmailClient`
+//! that owns one `BackendClient` enum variant per compiled-in backend:
+//! the first configured storage backend the global `--backend` flag
+//! allows (local before network), plus an optional SMTP transport for
+//! storage backends that cannot send (IMAP, Maildir, m2dir). Each shared
+//! method matches the active backend and calls its per-protocol
+//! `backend.rs` adapter, which converts io-* results into the CLI's own
+//! [`email`] shared types. The active [`account`] context is threaded as
+//! a sibling argument through every `execute` chain.
+//!
+//! ## Protocol-specific commands
+//!
+//! Each protocol module builds its client via a `build_<proto>_client`
+//! helper and a `<Proto>Client` wrapper that derefs onto the io-* `*Std`
+//! client, ignoring `--backend`. Subcommands are clap-derived structs
+//! with an `execute` method the module's command enum dispatches to. The
+//! imap command mirrors IMAP's flat command list; gmail and msgraph
+//! track their REST resource domains one-to-one; the filesystem backends
+//! expose only operations that map to their on-disk layout, leaving MIME
+//! rendering to the shared commands.
+//!
+//! ## Configuration and output
+//!
+//! Config is loaded by pimalaya-config from the first existing canonical
+//! path (or the `-c` / `HIMALAYA_CONFIG` override), later paths
+//! deep-merged on top; the schema ([`config`]) is multi-account, a
+//! top-level block plus named account blocks carrying optional
+//! per-backend sub-blocks. When no config exists, `load_or_wizard` runs
+//! the interactive [`wizard`], bootstrapping an account through
+//! discovery. Output follows the Pimalaya rule: data and errors go to
+//! stdout through the printer (`--json` switches every command to JSON),
+//! stderr carries logs only. Each command's doc comment is its `--help`
+//! text, so `himalaya <command> --help` is the canonical per-command
+//! usage reference; see also the development notes under docs/.
+
 mod account;
 mod backend;
 mod cli;

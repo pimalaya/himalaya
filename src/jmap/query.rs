@@ -6,8 +6,8 @@ use std::{
 use anyhow::{Context, Result, bail};
 use clap::Parser;
 use io_jmap::{
-    rfc8620::{CORE_CAPABILITY, JmapRequest},
-    rfc8621::MAIL_CAPABILITY,
+    rfc8620::{JMAP_CORE_CAPABILITY, request::JmapRequest},
+    rfc8621::JMAP_MAIL_CAPABILITY,
 };
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;
@@ -60,7 +60,7 @@ impl JmapQueryCommand {
 
         let account_id = client
             .session()
-            .and_then(|s| s.primary_accounts.get(MAIL_CAPABILITY).cloned())
+            .and_then(|s| s.primary_accounts.get(JMAP_MAIL_CAPABILITY).cloned())
             .unwrap_or_default();
 
         let mut method_calls = Vec::with_capacity(calls_arr.len());
@@ -92,7 +92,10 @@ impl JmapQueryCommand {
             method_calls.push((name, args, call_id));
         }
 
-        let mut using = vec![CORE_CAPABILITY.to_string(), MAIL_CAPABILITY.to_string()];
+        let mut using = vec![
+            JMAP_CORE_CAPABILITY.to_string(),
+            JMAP_MAIL_CAPABILITY.to_string(),
+        ];
         for extra in self.using {
             if !using.contains(&extra) {
                 using.push(extra);

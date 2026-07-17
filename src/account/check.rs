@@ -271,12 +271,12 @@ fn check_smtp(
 ) -> BackendCheck {
     use std::net::Ipv4Addr;
 
-    use io_smtp::{client::SmtpClientStd, rfc5321::types::ehlo_domain::EhloDomain};
+    use io_smtp::{client::SmtpClientStd, rfc5321::SmtpEhloDomain};
     use pimalaya_stream::sasl::Sasl;
 
     let result = (|| -> Result<()> {
         let tls = smtp_config.tls.clone().into_tls(smtp_config.alpn.clone());
-        let domain: EhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
+        let domain: SmtpEhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
         let server = crate::smtp::client::parse_smtp_server(&smtp_config.server)?;
         let sasl: Option<Sasl> = smtp_config
             .sasl

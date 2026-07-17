@@ -12,15 +12,19 @@ use std::collections::BTreeMap;
 use anyhow::{Result, anyhow, bail};
 use chrono::{DateTime, Datelike, FixedOffset, NaiveDate};
 use io_jmap::{
-    rfc8620::JmapFilter,
+    rfc8620::filter::JmapFilter,
     rfc8621::{
-        MAIL_CAPABILITY,
+        JMAP_MAIL_CAPABILITY,
         email::{
-            JmapEmail, JmapEmailAddress, JmapEmailComparator, JmapEmailFilter, JmapEmailImportArgs,
-            JmapEmailProperty, JmapEmailSortProperty, get::JmapEmailGetOptions,
-            query::JmapEmailQueryOptions, set::JmapEmailSetArgs,
+            JmapEmail, JmapEmailAddress, JmapEmailProperty,
+            get::JmapEmailGetOptions,
+            import::JmapEmailImportArgs,
+            query::{
+                JmapEmailComparator, JmapEmailFilter, JmapEmailQueryOptions, JmapEmailSortProperty,
+            },
+            set::JmapEmailSetArgs,
         },
-        email_submission::JmapEmailSubmissionCreate,
+        email_submission::set::JmapEmailSubmissionCreate,
         mailbox::{JmapMailbox, get::JmapMailboxGetOptions},
     },
 };
@@ -341,10 +345,10 @@ fn bail_on_not_updated<E>(not_updated: BTreeMap<String, E>) -> Result<()> {
 }
 
 /// Primary mail account id; empty when the session has none.
-fn account_id_of(session: &io_jmap::rfc8620::JmapSession) -> String {
+fn account_id_of(session: &io_jmap::rfc8620::session::JmapSession) -> String {
     session
         .primary_accounts
-        .get(MAIL_CAPABILITY)
+        .get(JMAP_MAIL_CAPABILITY)
         .cloned()
         .unwrap_or_default()
 }

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use anyhow::{Result, bail};
 use clap::Parser;
-use io_jmap::rfc8621::email::JmapEmailCopyArgs;
+use io_jmap::rfc8621::email::copy::JmapEmailCopyArgs;
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::jmap::{client::JmapClient, error::format_set_error};

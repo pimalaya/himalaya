@@ -9,7 +9,7 @@
 
 use anyhow::Result;
 use chrono::DateTime;
-use io_m2dir::{entry::types::M2dirEntry, flag::types::M2dirFlags, m2dir::types::M2dir};
+use io_m2dir::{entry::M2dirEntry, flag::M2dirFlags, m2dir::M2dir};
 use mail_parser::{Address as MailParserAddress, Message as ParsedMessage, MessageParser};
 
 use crate::{

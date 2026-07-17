@@ -10,9 +10,8 @@
 use std::borrow::Cow;
 
 use anyhow::{Result, anyhow, bail};
-use io_smtp::rfc5321::types::{
-    domain::Domain, ehlo_domain::EhloDomain, forward_path::ForwardPath, local_part::LocalPart,
-    mailbox::Mailbox as SmtpMailbox, reverse_path::ReversePath,
+use io_smtp::rfc5321::{
+    SmtpDomain, SmtpEhloDomain, SmtpForwardPath, SmtpLocalPart, SmtpMailbox, SmtpReversePath,
 };
 use mail_parser::{Address as MailParserAddress, MessageParser};
 
@@ -50,9 +49,9 @@ impl SmtpClient {
             bail!("No `To:` / `Cc:` / `Bcc:` recipients found in raw message");
         }
 
-        let reverse_path = ReversePath::Mailbox(reverse);
-        let forward_paths: Vec<ForwardPath<'static>> =
-            forwards.into_iter().map(ForwardPath::from).collect();
+        let reverse_path = SmtpReversePath::SmtpMailbox(reverse);
+        let forward_paths: Vec<SmtpForwardPath<'static>> =
+            forwards.into_iter().map(SmtpForwardPath::from).collect();
 
         self.send(reverse_path, forward_paths, raw)?;
         Ok(())
@@ -88,7 +87,7 @@ fn parse_smtp_mailbox(address: &str) -> Result<SmtpMailbox<'static>> {
     }
 
     Ok(SmtpMailbox {
-        local_part: LocalPart(Cow::Owned(local.to_string())),
-        domain: EhloDomain::Domain(Domain(Cow::Owned(domain.to_string()))),
+        local_part: SmtpLocalPart(Cow::Owned(local.to_string())),
+        domain: SmtpEhloDomain::SmtpDomain(SmtpDomain(Cow::Owned(domain.to_string()))),
     })
 }

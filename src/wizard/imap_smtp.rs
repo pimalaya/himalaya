@@ -8,6 +8,7 @@
 //! per-protocol prompts run, seeded from what is known.
 
 use anyhow::{Result, bail};
+use io_pim_discovery::compose::config::DiscoverySecurity;
 use pimalaya_cli::{
     prompt,
     wizard::imap::{
@@ -15,7 +16,6 @@ use pimalaya_cli::{
     },
     wizard::smtp::{self as smtp_wizard},
 };
-use pimconf::search::types::Security;
 use url::Url;
 
 use crate::{
@@ -88,12 +88,12 @@ fn default_smtp(email: &str) -> TcpEndpoint {
     TcpEndpoint {
         host: format!("smtp.{domain}"),
         port: 465,
-        security: Security::Tls,
+        security: DiscoverySecurity::Tls,
     }
 }
 
 fn imap_config(endpoint: &TcpEndpoint, sasl: SaslConfig) -> ImapConfig {
-    let scheme = if endpoint.security == Security::Tls {
+    let scheme = if endpoint.security == DiscoverySecurity::Tls {
         "imaps"
     } else {
         "imap"
@@ -102,7 +102,7 @@ fn imap_config(endpoint: &TcpEndpoint, sasl: SaslConfig) -> ImapConfig {
     ImapConfig {
         server: format!("{scheme}://{}:{}", endpoint.host, endpoint.port),
         tls: Default::default(),
-        starttls: endpoint.security == Security::Starttls,
+        starttls: endpoint.security == DiscoverySecurity::Starttls,
         alpn: io_imap::client::default_alpn(),
         sasl: Some(sasl),
         id: Default::default(),
@@ -111,7 +111,7 @@ fn imap_config(endpoint: &TcpEndpoint, sasl: SaslConfig) -> ImapConfig {
 }
 
 fn smtp_config(endpoint: &TcpEndpoint, sasl: SaslConfig) -> SmtpConfig {
-    let scheme = if endpoint.security == Security::Tls {
+    let scheme = if endpoint.security == DiscoverySecurity::Tls {
         "smtps"
     } else {
         "smtp"
@@ -120,8 +120,8 @@ fn smtp_config(endpoint: &TcpEndpoint, sasl: SaslConfig) -> SmtpConfig {
     SmtpConfig {
         server: format!("{scheme}://{}:{}", endpoint.host, endpoint.port),
         tls: Default::default(),
-        starttls: endpoint.security == Security::Starttls,
-        alpn: io_smtp::client::default_alpn(),
+        starttls: endpoint.security == DiscoverySecurity::Starttls,
+        alpn: io_smtp::client::SmtpClientStd::default_alpn(),
         sasl: Some(sasl),
     }
 }

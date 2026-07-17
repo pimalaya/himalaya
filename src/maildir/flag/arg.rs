@@ -1,5 +1,5 @@
 use clap::ValueEnum;
-use io_maildir::flag::types::MaildirFlag;
+use io_maildir::flag::MaildirFlag;
 
 /// CLI value selecting one of the six standard Maildir flags.
 #[derive(Clone, Debug, ValueEnum)]

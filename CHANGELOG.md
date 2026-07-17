@@ -9,47 +9,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added Gmail REST API support. A `[gmail]` account backend (built on io-email's `gmail` feature) plugs into the shared `mailboxes` / `envelopes` / `flags` / `messages` / `attachments` commands; select it with `--backend gmail`. Authentication is a single OAuth 2.0 bearer access token (`gmail.auth.token.raw` or `gmail.auth.token.command`), the only authorization Gmail's REST API accepts.
+- Added Gmail REST API support: a `[gmail]` account backend behind the shared mail commands (`--backend gmail`), plus a protocol-specific `gmail` command exposing the full REST surface (profile, labels, messages, attachments, drafts, threads, history, settings). Authenticates with a single OAuth 2.0 bearer token (`gmail.auth.token.raw` / `.command`), the only authorization Gmail's REST API accepts.
 
-  Also added a protocol-specific `gmail` command exposing the full Gmail REST surface beyond the shared least-common-denominator: `profile`, `labels`, `messages` (including `import` / `insert` / `batch-modify` / `batch-delete`), `attachments`, `drafts`, `threads`, `history` and `settings` (vacation, IMAP, POP, language, auto-forwarding, filters, forwarding addresses, delegates, send-as).
+- Added Microsoft Graph REST API support: a `[msgraph]` account backend behind the shared mail commands (`--backend msgraph`), plus a protocol-specific `msgraph` command exposing the Graph mail surface (profile, mail-folder, message, attachment). Mirrors `[gmail]`, authenticating with a single OAuth 2.0 bearer token.
 
-- Added Microsoft Graph REST API support. A `[msgraph]` account backend (built on io-email's `msgraph` feature) plugs into the shared `mailboxes` / `envelopes` / `flags` / `messages` / `attachments` commands; select it with `--backend msgraph`. Mirrors the `[gmail]` block field for field, authenticating with a single OAuth 2.0 bearer access token (`msgraph.auth.token.raw` or `msgraph.auth.token.command`). `account list` reports it and `account check` exercises its connection.
+- Restored the RFC 2971 `ID`-after-auth quirk as `imap.id.{auto, fields}`, replacing the v1.2.0 `imap.extensions.id.send-after-auth` flag dropped during the v2 migration.
 
-  Also added a protocol-specific `msgraph` command exposing the Graph mail surface beyond the shared least-common-denominator, organized by Graph resource: `profile` (the signed-in user), `mail-folder` (list, child-folders, get, create, rename, copy, move, delete), `message` (list with `--search`, get with `--raw`, create draft from MIME, update, send, copy, move, delete) and `attachment` (list, get/download, create, delete).
+- Brought the `m2dir` backend to CLI feature parity with `maildir` (messages, flags, envelopes); mailbox `rename` and message `copy` / `move` still await io-m2dir support.
 
-- Restored the RFC 2971 `ID`-after-auth quirk under the new shape `imap.id.{auto, fields}`. Set `imap.id.auto = true` to chain an `ID` exchange straight after IMAP authentication (required by mail.qq.com, fastmail). `imap.id.fields` is a `{ name = bool, … }` map: missing keys are not transmitted, `false` sends `NIL`, `true` sends himalaya's canned value for the well-known keys (`name`, `version`, `vendor`, `support-url`) or `NIL` (with a warning) for any other key. Replaces the v1.2.0 `imap.extensions.id.send-after-auth` flag dropped during the v2 migration.
+- Added `--save <MAILBOX>` to `messages send`, mirroring the flag on `messages compose` / `reply` / `forward`.
 
-- Brought the `m2dir` backend to feature parity with `maildir` at the CLI level: `m2dir messages {save, get, read, export}`, `m2dir flags {list, add, set, remove}`, `m2dir envelopes {get, list}`. Flags are free-form UTF-8 strings persisted in the `.meta/<id>.flags` metadata file. Still missing relative to `maildir`: mailbox `rename`, message `copy` and `move` (need io-m2dir lib support first).
+- Added `--send` to `messages add` (alias `messages save`), mirroring `messages send --save`.
 
-- Added `--save <MAILBOX>` to `messages send`, mirroring the existing flag on `messages compose` / `reply` / `forward`. Sends the message and appends a copy of it to the named mailbox. The mailbox name is resolved through the account's `[mailbox.alias]` map.
-
-- Added `--send` to `messages add` (alias `messages save`), mirroring `messages send --save`. Appends the message to the mandatory `--mailbox` first and then pushes it through the account's send path. Success line now reads "Message {id} successfully added and sent" when `--send` is set.
-
-- Added raw passthrough commands `imap raw <command>` and `smtp raw <command>`: send an arbitrary IMAP or SMTP command and print the verbatim server response, for anything the typed commands do not cover.
+- Added raw passthrough commands `imap raw <command>` and `smtp raw <command>`.
 
 ### Changed
 
-- Flattened the `imap` command tree to mirror the protocol's own flat command list (RFC 3501 and extensions): the former `imap mailbox …` / `imap envelope …` / `imap message …` / `imap flag …` subgroups are replaced by top-level verbs (`select`, `create`, `delete`, `rename`, `subscribe`, `unsubscribe`, `list`, `status`, `close`, `unselect`, `expunge`, `search`, `sort`, `thread`, `store`, `flags`, `fetch`, `append`, `copy`, `move`, `id`, `raw`). `imap message save` is now `imap append`; flag edits fold into `imap store --action add|remove|set`; the FETCH data items fold into a single `imap fetch` with `--envelope` / `--structure` / `--flags` / `--internal-date` / `--size`.
+- Flattened the `imap` command tree into top-level verbs mirroring the protocol's flat command list (`select`, `create`, `append`, `store`, `fetch`, …), replacing the former `mailbox` / `envelope` / `message` / `flag` subgroups.
 
-- Unified raw-message input across `messages add`, `messages send`, `imap append`, `maildir messages save`, `jmap email import`, `msgraph message create` / `msgraph message send` and `smtp send` behind a single `MessageArg` (ported from `mml::cli::args::MessageArg`). Every command now accepts the same three forms: a positional file path, a positional inline raw message (with `\r` literals stripped and `\n` literals turned into `\r\n`), or stdin when piped. The legacy `--file <PATH>` flag on `messages add` is gone (positional path replaces it).
+- Unified raw-message input across the `messages`, `imap`, `maildir`, `jmap`, `msgraph` and `smtp` send/add commands behind a single `MessageArg` (file path, inline raw, or piped stdin); removed the legacy `--file` flag on `messages add`.
 
-- Split the merged `Account` out of every client wrapper (`EmailClient`, `ImapClient`, `JmapClient`, `MaildirClient`, `M2dirClient`, `SmtpClient`). Subcommands now receive `account: &mut Account` and `client: &mut Client` as sibling arguments rather than reaching through `client.account`, which keeps account access borrow-disjoint from `&mut client` calls.
+- Split the merged `Account` out of every client wrapper: subcommands now receive `account` and `client` as sibling arguments instead of reaching through `client.account`.
 
 ### Fixed
 
-- Fixed compilation error when `wizard` feature was disabled ([#634]).
+- Fixed compilation error when the `wizard` feature was disabled ([#634]).
 
-- Fixed `--save <mailbox>` on `messages compose` / `reply` / `forward` to resolve the mailbox name through the account's alias map (`account.resolve_mailbox`) before calling the backend, so `--save Sent` honours e.g. `mailbox.alias.sent = "[Gmail]/Sent Mail"`.
+- Fixed mailbox-alias resolution to apply across every shared `messages` subcommand (`add`, `read`, `reply`, `forward`, `copy`, `move`) and the `--save` flag on `compose` / `reply` / `forward`, so aliases like `mailbox.alias.sent` are honoured before the backend call.
 
-- Extended mailbox-alias resolution across every shared `messages` subcommand that takes a mailbox name: `add -m`, `read -m`, `reply -m`, `forward -m`, `copy --from/--to`, `move --from/--to`. Previously the value was passed verbatim to the backend; now each goes through `account.resolve_mailbox`. The shared `mailboxes` / `envelopes` / `flags` / `attachments` commands already resolved through `MailboxArg`; this brings the `messages` group in line.
-
-- Fixed the success-message dispatch in `handler::route`: `(save, send)` cases `(true, false)` and `(false, true)` were swapped, printing "saved" after a pure send and "sent" after a pure save.
+- Fixed swapped save/send success messages ("saved" printed after a pure send, "sent" after a pure save).
 
 ### Removed
 
-- Removed the `[message.composer.*]` and `[message.reader.*]` config tables together with the `messages compose-with`, `reply-with`, `forward-with`, `mailto` and `read-with` subcommands. The "stdout = MIME draft" contract was structurally incompatible with composers that spawn an interactive editor: the editor inherited the parent's piped stdout, breaking its UI. Richer composition is now wired through standalone tools chained into `messages send` / `messages add` via a tempfile or shell process substitution; see the README and [mml](https://github.com/pimalaya/mml).
+- Removed the `[message.composer.*]` / `[message.reader.*]` config tables and the `compose-with` / `reply-with` / `forward-with` / `mailto` / `read-with` subcommands; richer composition now chains standalone tools such as [mml](https://github.com/pimalaya/mml) into `messages send` / `add`.
 
-- Dropped `HIMALAYA_CONFIG` environment-variable support on `-c/--config`. The flag still accepts one or more `:`-separated paths on the command line; users relying on the env var should switch to a shell alias or wrapper script.
+  The "stdout = MIME draft" contract was incompatible with composers spawning an interactive editor, whose UI inherited the parent's piped stdout.
+
+- Dropped `HIMALAYA_CONFIG` environment-variable support; `-c/--config` still accepts one or more `:`-separated paths.
 
 ## [1.2.0] - 2026-02-19
 

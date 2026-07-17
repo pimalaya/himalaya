@@ -1,8 +1,10 @@
 use io_jmap::rfc8621::{
-    email::{JmapEmailCopyItemError, JmapEmailImportItemError, JmapEmailSetItemError},
+    email::{
+        copy::JmapEmailCopyItemError, import::JmapEmailImportItemError, set::JmapEmailSetItemError,
+    },
     email_submission::JmapEmailSubmissionSetItemError,
-    identity::JmapIdentitySetItemError,
-    mailbox::JmapMailboxSetItemError,
+    identity::set::JmapIdentitySetItemError,
+    mailbox::set::JmapMailboxSetItemError,
 };
 
 /// Returns the optional human-readable description carried by a JMAP set error.

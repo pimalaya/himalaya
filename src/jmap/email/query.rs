@@ -4,10 +4,12 @@ use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use io_jmap::{
-    rfc8620::JmapFilter,
+    rfc8620::filter::JmapFilter,
     rfc8621::email::{
-        JmapEmail, JmapEmailAddress, JmapEmailComparator, JmapEmailFilter, JmapEmailSortProperty,
-        query::JmapEmailQueryOptions,
+        JmapEmail, JmapEmailAddress,
+        query::{
+            JmapEmailComparator, JmapEmailFilter, JmapEmailQueryOptions, JmapEmailSortProperty,
+        },
     },
 };
 use pimalaya_cli::printer::Printer;

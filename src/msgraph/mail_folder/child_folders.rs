@@ -47,7 +47,10 @@ impl MsgraphChildFoldersListCommand {
             select: self.select.as_deref(),
             include_hidden_folders: self.hidden.then_some(true),
         };
-        let folders = client.child_folders_list(&self.id, &params)?.response.value;
+        let folders = client
+            .mail_child_folders_list(&self.id, &params)?
+            .response
+            .value;
 
         printer.out(folders_table(account, folders))
     }

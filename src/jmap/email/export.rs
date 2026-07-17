@@ -3,7 +3,7 @@ use clap::Parser;
 use io_jmap::{
     client::JmapClientStd,
     rfc8621::{
-        MAIL_CAPABILITY,
+        JMAP_MAIL_CAPABILITY,
         email::{JmapEmailProperty, get::JmapEmailGetOptions},
     },
 };
@@ -38,7 +38,7 @@ impl JmapEmailExportCommand {
         let api_url = session.api_url.clone();
         let account_id = session
             .primary_accounts
-            .get(MAIL_CAPABILITY)
+            .get(JMAP_MAIL_CAPABILITY)
             .map(|s| s.as_str())
             .unwrap_or("");
 

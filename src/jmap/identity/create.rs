@@ -1,6 +1,6 @@
 use anyhow::{Result, bail};
 use clap::Parser;
-use io_jmap::rfc8621::identity::{JmapIdentityCreate, set::JmapIdentitySetArgs};
+use io_jmap::rfc8621::identity::set::{JmapIdentityCreate, JmapIdentitySetArgs};
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::jmap::{client::JmapClient, error::format_set_error};

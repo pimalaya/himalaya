@@ -38,9 +38,10 @@
   - [Re-using sessions](#re-using-sessions)
 - [Interfaces](#interfaces)
 - [FAQ](#faq)
-- [License](#license)
 - [AI disclosure](#ai-disclosure)
+- [License](#license)
 - [Social](#social)
+- [Contributing](#contributing)
 - [Sponsoring](#sponsoring)
 
 ## Features
@@ -59,6 +60,7 @@
   - PACC <sup>[specs](https://datatracker.ietf.org/doc/html/draft-ietf-mailmaint-pacc)</sup>
   - Autoconfiguration (Thunderbird) <sup>[specs](https://wiki.mozilla.org/Thunderbird:Autoconfiguration)</sup>
   - SRV DNS lookups <sup>[rfc6186](https://datatracker.ietf.org/doc/html/rfc6186)</sup>
+  - JMAP session resolution <sup>[rfc8620](https://datatracker.ietf.org/doc/html/rfc8620)</sup>
 - **TOML configuration** with multi-account support
 - **Shared configuration file** with `himalaya-tui`: same `[accounts.<name>]` blocks load on both binaries (see [Configuration](#configuration))
 - **JSON** output via `--json`
@@ -175,7 +177,7 @@ nix run
 
 ## Configuration
 
-Run `himalaya`. With no configuration file on disk the wizard prompts for an account name and an email address, runs provider discovery (PACC, then Thunderbird Autoconfiguration, then RFC 6186 SRV), fills the IMAP/SMTP (or JMAP) prompts with the discovered defaults, then writes the result to disk.
+Run `himalaya`. With no configuration file on disk the wizard prompts for an account name and an email address, runs provider discovery (PACC, Thunderbird Autoconfiguration, RFC 6186 SRV and RFC 8620 JMAP resolution, all probed in parallel and merged), fills the IMAP/SMTP (or JMAP) prompts with the discovered defaults, then writes the result to disk.
 
 A persistent configuration is loaded from the first valid path among:
 
@@ -417,13 +419,14 @@ Himalaya CLI is one of several front-ends to the Pimalaya libraries:
 <details>
   <summary>How does the wizard discover IMAP/SMTP/JMAP configs?</summary>
 
-  The wizard runs three discovery mechanisms in series on the email address domain; the first non-empty hit wins:
+  The wizard probes several discovery mechanisms in parallel on the email address domain, merges their results and keeps the most secure endpoint per service:
 
-  1. **PACC** <sup>[draft-ietf-mailmaint-pacc-02](https://datatracker.ietf.org/doc/html/draft-ietf-mailmaint-pacc-02)</sup>: well-known JSON, digest-verified against the `_ua-auto-config` TXT record.
-  2. **Thunderbird Autoconfiguration**: ISP main / well-known / ISPDB lookups, then MX-based retry, then the `mailconf=<URL>` TXT redirect.
-  3. **RFC 6186 SRV**: `_imap._tcp`, `_imaps._tcp`, `_submission._tcp` lookups assembled into a single report.
+  - **PACC** <sup>[draft-ietf-mailmaint-pacc-02](https://datatracker.ietf.org/doc/html/draft-ietf-mailmaint-pacc-02)</sup>: well-known JSON, digest-verified against the `_ua-auto-config` TXT record.
+  - **Thunderbird Autoconfiguration**: ISP main / well-known / ISPDB lookups, then MX-based retry, then the `mailconf=<URL>` TXT redirect.
+  - **RFC 6186 SRV**: `_imap._tcp`, `_imaps._tcp`, `_submission._tcp` lookups assembled into a single report.
+  - **RFC 8620 JMAP**: the SRV record and the `/.well-known/jmap` session resource.
 
-  See [pimconf](https://github.com/pimalaya/pimconf) for the full chain.
+  A final WWW-Authenticate probe refines the advertised auth schemes, and a detected Google or Microsoft account short-circuits to its dedicated configurations. See [io-pim-discovery](https://github.com/pimalaya/io-pim-discovery) for the full chain.
 </details>
 
 <details>
@@ -456,6 +459,17 @@ Himalaya CLI is one of several front-ends to the Pimalaya libraries:
   Set `NO_COLOR=1` in your environment.
 </details>
 
+## AI disclosure
+
+This project is developed with AI assistance. This section documents how, so users and downstream packagers can make informed decisions.
+
+- **Tools**: Claude Code (Anthropic), invoked locally with a persistent project-scoped memory and a small set of repo-specific rules.
+- **Used for**: Refactors, mechanical multi-file edits, boilerplate (feature gates, error enums, derive macros, trait impls), test scaffolding, doc polish, exploratory design conversations.
+- **Not used for**: Engineering, critical code, git manipulation (commit, merge, rebase…), real-world tests.
+- **Verification**: Every AI-assisted change is read, compiled, tested, and formatted before commit. Behavioural correctness is verified against the relevant RFC or upstream spec, not assumed from the model output. Tests are never adjusted to fit AI-generated code; the code is adjusted to fit correct behaviour.
+- **Limitations**: AI models occasionally produce code that compiles and passes tests but is subtly wrong. The verification workflow catches most of this; it does not catch all of it. Bug reports are welcome and taken seriously.
+- **Last reviewed**: 17/07/2026
+
 ## License
 
 This project is licensed under either of:
@@ -465,27 +479,15 @@ This project is licensed under either of:
 
 at your option.
 
-## AI disclosure
-
-This project is developed with AI assistance. This section documents how, so users and downstream packagers can make informed decisions.
-
-- **Tools**: Claude Code (Anthropic), Opus 4.7, invoked locally with a persistent project-scoped memory and a small set of repo-specific rules.
-
-- **Used for**: Refactors, mechanical multi-file edits, boilerplate (feature gates, error enums, derive macros, trait impls), test scaffolding, doc polish, exploratory design conversations.
-
-- **Not used for**: Engineering, critical code, git manipulation (commit, merge, rebase…), real-world tests.
-
-- **Verification**: Every AI-assisted change is read, compiled, tested, and formatted before commit (`nix develop --command cargo check / cargo test / cargo fmt`). Behavioural correctness is verified against the relevant RFC or upstream spec, not assumed from the model output. Tests are never adjusted to fit AI-generated code; the code is adjusted to fit correct behaviour.
-
-- **Limitations**: AI models occasionally produce code that compiles and passes tests but is subtly wrong: off-by-one errors, missed edge cases, plausible but nonexistent APIs, stale RFC references. The verification workflow catches most of this; it does not catch all of it. Bug reports are welcome and taken seriously.
-
-- **Last reviewed**: 31/05/2026
-
 ## Social
 
 - Chat on [Matrix](https://matrix.to/#/#pimalaya:matrix.org)
 - News on [Mastodon](https://fosstodon.org/@pimalaya) or [RSS](https://fosstodon.org/@pimalaya.rss)
 - Mail at [pimalaya.org@posteo.net](mailto:pimalaya.org@posteo.net)
+
+## Contributing
+
+Contributions are welcome: start with [CONTRIBUTING.md](./CONTRIBUTING.md), which opens with the Pimalaya-wide guides to read first.
 
 ## Sponsoring
 

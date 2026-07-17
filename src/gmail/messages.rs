@@ -4,8 +4,8 @@ use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand, ValueEnum};
 use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use io_gmail::v1::rest::messages::{
-    GmailMessage, GmailMessageFormat, GmailMessageId, batch_delete::GmailMessageBatchDelete,
-    batch_modify::GmailMessageBatchModify, decode_raw, encode_raw, import::GmailMessageImport,
+    GmailMessage, GmailMessageFormat, GmailMessageId, batch_delete::GmailMessagesBatchDelete,
+    batch_modify::GmailMessagesBatchModify, decode_raw, encode_raw, import::GmailMessageImport,
     insert::GmailMessageInsert, list::GmailMessagesListParams,
 };
 use pimalaya_cli::printer::{Message, Printer};
@@ -377,7 +377,7 @@ impl GmailMessageBatchModifyCommand {
         let count = self.ids.len();
 
         {
-            let c = GmailMessageBatchModify::new(
+            let c = GmailMessagesBatchModify::new(
                 &client.auth,
                 &client.user_id,
                 &self.ids,
@@ -405,7 +405,7 @@ impl GmailMessageBatchDeleteCommand {
         let count = self.ids.len();
 
         {
-            let c = GmailMessageBatchDelete::new(&client.auth, &client.user_id, &self.ids)?;
+            let c = GmailMessagesBatchDelete::new(&client.auth, &client.user_id, &self.ids)?;
             client.run(c)?
         };
 

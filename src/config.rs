@@ -459,7 +459,7 @@ pub struct SmtpConfig {
     /// Defaults to `["smtp"]` (RFC 7595, IANA registry). Set to `[]`
     /// to skip ALPN negotiation entirely. Only relevant for the
     /// rustls provider; `native-tls` ignores ALPN.
-    #[serde(default = "io_smtp::client::default_alpn")]
+    #[serde(default = "io_smtp::client::SmtpClientStd::default_alpn")]
     pub alpn: Vec<String>,
 
     /// Optional SASL credentials. See [`ImapConfig::sasl`].
@@ -667,7 +667,7 @@ pub struct JmapConfig {
     /// Defaults to `["http/1.1"]` (JMAP rides on HTTP/1.1). Set to
     /// `[]` to skip ALPN negotiation entirely. Only relevant for the
     /// rustls provider; `native-tls` ignores ALPN.
-    #[serde(default = "io_jmap::client::default_alpn")]
+    #[serde(default = "io_jmap::client::JmapClientStd::default_alpn")]
     pub alpn: Vec<String>,
 
     /// Authentication configuration.

@@ -4,7 +4,7 @@ use anyhow::{Result, bail};
 use clap::Parser;
 use io_jmap::{
     client::JmapClientStd,
-    rfc8621::{MAIL_CAPABILITY, email::JmapEmailImportArgs},
+    rfc8621::{JMAP_MAIL_CAPABILITY, email::import::JmapEmailImportArgs},
 };
 use pimalaya_cli::printer::{Message, Printer};
 use url::Url;
@@ -55,7 +55,7 @@ impl JmapEmailImportCommand {
         let api_url = session.api_url.clone();
         let account_id = session
             .primary_accounts
-            .get(MAIL_CAPABILITY)
+            .get(JMAP_MAIL_CAPABILITY)
             .map(|s| s.as_str())
             .unwrap_or("");
         let upload_url: Url = session

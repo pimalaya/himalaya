@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use anyhow::{Result, bail};
 use clap::Parser;
 use io_jmap::rfc8621::email_submission::{
-    JmapEmailAddressWithParameters, JmapEmailSubmissionCreate, JmapEnvelope,
+    JmapEmailAddressWithParameters, JmapEnvelope, set::JmapEmailSubmissionCreate,
 };
 use pimalaya_cli::printer::Printer;
 

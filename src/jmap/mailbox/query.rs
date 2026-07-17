@@ -4,8 +4,11 @@ use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use comfy_table::{Cell, Color, Row, Table};
 use io_jmap::rfc8621::mailbox::{
-    JmapMailbox, JmapMailboxFilter, JmapMailboxRole, JmapMailboxSortComparator,
-    JmapMailboxSortProperty, query::JmapMailboxQueryOptions,
+    JmapMailbox, JmapMailboxRole,
+    query::{
+        JmapMailboxFilter, JmapMailboxQueryOptions, JmapMailboxSortComparator,
+        JmapMailboxSortProperty,
+    },
 };
 use pimalaya_cli::printer::Printer;
 use serde::Serialize;

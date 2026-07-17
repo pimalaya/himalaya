@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use anyhow::{Result, bail};
 use clap::Parser;
-use io_jmap::rfc8621::mailbox::{JmapMailboxUpdate, set::JmapMailboxSetArgs};
+use io_jmap::rfc8621::mailbox::set::{JmapMailboxSetArgs, JmapMailboxUpdate};
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::jmap::{

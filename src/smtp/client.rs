@@ -14,7 +14,7 @@ use std::{
 };
 
 use anyhow::{Result, anyhow};
-use io_smtp::{client::SmtpClientStd as Inner, rfc5321::types::ehlo_domain::EhloDomain};
+use io_smtp::{client::SmtpClientStd as Inner, rfc5321::SmtpEhloDomain};
 use pimalaya_config::toml::TomlConfig;
 use pimalaya_stream::sasl::Sasl;
 use url::Url;
@@ -35,7 +35,7 @@ impl SmtpClient {
     /// SASL).
     pub fn new(config: SmtpConfig) -> Result<Self> {
         let tls = config.tls.into_tls(config.alpn);
-        let domain: EhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
+        let domain: SmtpEhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
         let server = parse_smtp_server(&config.server)?;
         let sasl: Option<Sasl> = match config.sasl {
             Some(cfg) => {
