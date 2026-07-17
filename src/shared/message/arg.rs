@@ -42,6 +42,23 @@ pub struct MessageArg {
 
 impl MessageArg {
     pub fn parse(&self) -> anyhow::Result<String> {
+        let message = self.resolve()?;
+
+        // Reject an empty message uniformly, whatever the source: an
+        // empty positional (`-- ''`), an empty file, or empty stdin
+        // would otherwise reach the backend and fail with an opaque
+        // server error (e.g. IMAP `APPEND … Zero-length message`).
+        if message.trim().is_empty() {
+            bail!("Message is empty");
+        }
+
+        Ok(message)
+    }
+
+    /// Resolves the raw message from the positional arg, a file path,
+    /// or piped stdin (see the type docs), normalising line endings to
+    /// CRLF. Emptiness is rejected by [`Self::parse`].
+    fn resolve(&self) -> anyhow::Result<String> {
         if !self.raw.is_empty() {
             let mime = self.raw.join(" ").replace("\\r", "").replace("\\n", "\r\n");
 
@@ -63,7 +80,7 @@ impl MessageArg {
             return Ok(lines.join("\r\n"));
         }
 
-        bail!("Message cannot be empty");
+        bail!("No message provided: pass it as an argument, a file path, or via stdin");
     }
 }
 

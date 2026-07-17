@@ -33,7 +33,12 @@ pub struct ImapStoreCommand {
     #[arg(long, value_name = "ACTION", default_value = "add")]
     pub action: StoreActionArg,
 
-    /// The flags (e.g. "\\Seen", "\\Flagged").
+    /// Flags as raw IMAP tokens (RFC 3501) — this is the raw IMAP API,
+    /// NOT the shared `seen|answered|flagged|draft` enum. System flags
+    /// keep their backslash: `-f '\Seen'`, `-f '\Flagged'`. A bare word
+    /// is a custom keyword: `-f seen` stores the keyword `seen`, not the
+    /// `\Seen` system flag. Use the shared `flag add -f seen` for the
+    /// enum-mapped behaviour.
     #[arg(short, long, required = true, num_args = 1..)]
     pub flag: Vec<String>,
 

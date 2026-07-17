@@ -135,7 +135,7 @@ impl MaildirClient {
     }
 
     /// Copies every id from `from` to `to`.
-    pub fn copy_messages(&self, from: &str, to: &str, ids: &[&str]) -> Result<()> {
+    pub fn copy_messages(&self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let source = self.resolve_maildir(Path::new(from))?;
         let target = self.resolve_maildir(Path::new(to))?;
 
@@ -143,11 +143,11 @@ impl MaildirClient {
             self.copy(*id, source.clone(), target.clone(), None)?;
         }
 
-        Ok(())
+        Ok(ids.len())
     }
 
     /// Moves every id from `from` to `to`.
-    pub fn move_messages(&self, from: &str, to: &str, ids: &[&str]) -> Result<()> {
+    pub fn move_messages(&self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let source = self.resolve_maildir(Path::new(from))?;
         let target = self.resolve_maildir(Path::new(to))?;
 
@@ -155,7 +155,7 @@ impl MaildirClient {
             self.r#move(*id, source.clone(), target.clone(), None)?;
         }
 
-        Ok(())
+        Ok(ids.len())
     }
 }
 

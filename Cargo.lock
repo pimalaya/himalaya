@@ -118,9 +118,9 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "aws-lc-rs"
-version = "1.17.1"
+version = "1.17.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4342d8937fc7e5dd9b1c60292261c0670c882a2cd1719cfc11b1af41731e32ad"
+checksum = "00bdb5da18dac48ca2cc7cd4a98e533e8635a58e2361d13a1a4ee3888e0d72f1"
 dependencies = [
  "aws-lc-sys",
  "zeroize",
@@ -128,9 +128,9 @@ dependencies = [
 
 [[package]]
 name = "aws-lc-sys"
-version = "0.42.0"
+version = "0.43.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d9ceb1da931507a12f4fccea479dccd00da1943e1b4ae72d8e502d707361444"
+checksum = "43103168cc76fe62678a375e722fc9cb3a0146159ac5828bc4f0dfd755c2224c"
 dependencies = [
  "cc",
  "cmake",
@@ -1071,9 +1071,8 @@ dependencies = [
 
 [[package]]
 name = "io-gmail"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ffd20c9158092035fc3b6a965e2c2b51013c514f20058b89f2c83bf2b9bec5a4"
+version = "0.2.0"
+source = "git+https://github.com/pimalaya/io-gmail#e5a1792d55e6d1831e4bd510f082fb8d48104b5d"
 dependencies = [
  "anyhow",
  "base64",
@@ -1107,8 +1106,7 @@ dependencies = [
 [[package]]
 name = "io-imap"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6fcb366dce5e2f55450fea83af544ae418baa8b3ac2527d8333812179df8e537"
+source = "git+https://github.com/pimalaya/io-imap#f57418aebc1491cdc0aed4135d5627f3349370db"
 dependencies = [
  "anyhow",
  "base64",
@@ -1726,6 +1724,7 @@ dependencies = [
 [[package]]
 name = "pimalaya-config"
 version = "0.1.0"
+source = "git+https://github.com/pimalaya/config#eafa58b3b451b966f6afd98192034f23572a453b"
 dependencies = [
  "anyhow",
  "dirs",

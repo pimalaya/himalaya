@@ -27,14 +27,29 @@ impl MailboxArg {
     /// Errors only when `-m/--mailbox` is omitted and the account has
     /// no `inbox` alias configured.
     pub fn resolve(&self, account: &Account) -> Result<String> {
-        match self.inner.as_deref() {
-            Some(name) => Ok(account.resolve_mailbox(name).to_string()),
-            None => account.default_mailbox().map(str::to_owned).ok_or_else(|| {
-                anyhow!(
-                    "Mailbox is required: pass -m/--mailbox <NAME>, \
-                         or set `mailbox.alias.inbox = \"<id>\"` in your configuration."
-                )
-            }),
-        }
+        resolve_mailbox_or_default(account, self.inner.as_deref())
+    }
+}
+
+/// Resolves a shared command's optional mailbox argument to a
+/// backend-native id: a provided `name` goes through the account's
+/// `[mailbox.alias]` map ([`Account::resolve_mailbox`]); an omitted one
+/// falls back to the `inbox` alias ([`Account::default_mailbox`]),
+/// erroring when none is configured.
+///
+/// The shared commands cannot guess a backend's inbox id (JMAP's is an
+/// opaque server-assigned string), so an omitted mailbox requires the
+/// `inbox` alias rather than silently defaulting to a literal name.
+/// Shared by `-m/--mailbox` and the `--from` source of `message
+/// copy`/`move`.
+pub fn resolve_mailbox_or_default(account: &Account, name: Option<&str>) -> Result<String> {
+    match name {
+        Some(name) => Ok(account.resolve_mailbox(name).to_string()),
+        None => account.default_mailbox().map(str::to_owned).ok_or_else(|| {
+            anyhow!(
+                "Mailbox is required: pass the mailbox name or alias, \
+                 or set `mailbox.alias.inbox = \"<id>\"` in your configuration."
+            )
+        }),
     }
 }

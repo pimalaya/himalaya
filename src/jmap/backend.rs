@@ -27,7 +27,8 @@ use io_jmap::{
             set::JmapEmailSetArgs,
         },
         email_submission::set::JmapEmailSubmissionCreate,
-        mailbox::{JmapMailbox, get::JmapMailboxGetOptions},
+        identity::get::JmapIdentityGetOptions,
+        mailbox::{JmapMailbox, JmapMailboxRole, get::JmapMailboxGetOptions},
     },
 };
 use url::Url;
@@ -242,18 +243,22 @@ impl JmapClient {
 
     /// Copies an email id set into `to` by adding `to`'s mailbox id.
     /// `from` is unused (existing `mailboxIds` carry the source).
-    pub fn copy_messages(&mut self, _from: &str, to: &str, ids: &[&str]) -> Result<()> {
+    /// Returns the number of emails updated (any failure bails).
+    pub fn copy_messages(&mut self, _from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let mut args = JmapEmailSetArgs::default();
         for id in ids {
             args.add_to_mailbox(id.to_string(), to.to_string());
         }
 
         let output = self.email_set(args)?;
-        bail_on_not_updated(output.not_updated)
+        let count = output.updated.len();
+        bail_on_not_updated(output.not_updated)?;
+        Ok(count)
     }
 
     /// Moves an email id set from `from` to `to` in one `Email/set`.
-    pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<()> {
+    /// Returns the number of emails updated (any failure bails).
+    pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let mut args = JmapEmailSetArgs::default();
         for id in ids {
             args.add_to_mailbox(id.to_string(), to.to_string());
@@ -261,19 +266,20 @@ impl JmapClient {
         }
 
         let output = self.email_set(args)?;
-        bail_on_not_updated(output.not_updated)
+        let count = output.updated.len();
+        bail_on_not_updated(output.not_updated)?;
+        Ok(count)
     }
 
-    /// Queues `raw` for delivery: upload, import into drafts as
-    /// `$draft`, then `EmailSubmission/set` under the configured
-    /// identity. Requires `identity_id` and `drafts_mailbox_id` config.
+    /// Queues `raw` for delivery: upload, import into the drafts mailbox
+    /// as `$draft`, then `EmailSubmission/set` under the sending
+    /// identity. The identity and drafts mailbox come from the
+    /// `identity_id` / `drafts_mailbox_id` config when set, otherwise
+    /// they are discovered from the account (default identity and the
+    /// `drafts`-role mailbox).
     pub fn send_message(&mut self, raw: Vec<u8>) -> Result<()> {
-        let identity_id = self.config.identity_id.clone().ok_or_else(|| {
-            anyhow!("JMAP `identity_id` is required to send; set it in the account config")
-        })?;
-        let drafts_id = self.config.drafts_mailbox_id.clone().ok_or_else(|| {
-            anyhow!("JMAP `drafts_mailbox_id` is required to send; set it in the account config")
-        })?;
+        let identity_id = self.resolve_identity_id()?;
+        let drafts_id = self.resolve_drafts_mailbox_id()?;
 
         let blob_id = self.upload(raw)?;
 
@@ -317,6 +323,50 @@ impl JmapClient {
         }
 
         Ok(())
+    }
+
+    /// Resolves the identity to submit under: the configured
+    /// `identity_id`, else the account's default — the first identity
+    /// `Identity/get` reports (servers list the primary first).
+    fn resolve_identity_id(&mut self) -> Result<String> {
+        if let Some(id) = self.config.identity_id.clone() {
+            return Ok(id);
+        }
+
+        let output = self.identity_get(JmapIdentityGetOptions { ids: None })?;
+        output
+            .identities
+            .into_iter()
+            .next()
+            .map(|identity| identity.id)
+            .ok_or_else(|| {
+                anyhow!("JMAP send found no identity; set `identity_id` in the account config")
+            })
+    }
+
+    /// Resolves the drafts mailbox to stage outgoing mail in: the
+    /// configured `drafts_mailbox_id`, else the mailbox carrying the
+    /// `drafts` role (`Mailbox/get`).
+    fn resolve_drafts_mailbox_id(&mut self) -> Result<String> {
+        if let Some(id) = self.config.drafts_mailbox_id.clone() {
+            return Ok(id);
+        }
+
+        let output = self.mailbox_get(JmapMailboxGetOptions {
+            ids: None,
+            properties: None,
+        })?;
+        output
+            .mailboxes
+            .into_iter()
+            .find(|mailbox| matches!(mailbox.role, Some(JmapMailboxRole::Drafts)))
+            .and_then(|mailbox| mailbox.id)
+            .ok_or_else(|| {
+                anyhow!(
+                    "JMAP send found no `drafts`-role mailbox; \
+                     set `drafts_mailbox_id` in the account config"
+                )
+            })
     }
 
     /// Uploads `raw` as a `message/rfc822` blob, returning its blob id.

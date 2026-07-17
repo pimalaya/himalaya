@@ -3,7 +3,9 @@ use clap::Parser;
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::account::context::Account;
-use crate::shared::{client::EmailClient, flag::arg::MessageIdsArg};
+use crate::shared::{
+    client::EmailClient, flag::arg::MessageIdsArg, mailbox::arg::resolve_mailbox_or_default,
+};
 
 /// Move message(s) from one mailbox to another within the active
 /// account.
@@ -19,15 +21,11 @@ pub struct MessageMoveCommand {
     #[command(flatten)]
     pub ids: MessageIdsArg,
 
-    /// Source mailbox name or alias (IMAP/Maildir). For JMAP this is
-    /// resolved by exact-match name against `Mailbox/get`.
-    #[arg(
-        long = "from",
-        short = 'f',
-        value_name = "NAME",
-        default_value = "Inbox"
-    )]
-    pub from: String,
+    /// Source mailbox name or alias. Omit to fall back to the `inbox`
+    /// alias (errors when none is configured, as the shared layer
+    /// cannot guess a backend's inbox id).
+    #[arg(long = "from", short = 'f', value_name = "NAME")]
+    pub from: Option<String>,
 
     /// Destination mailbox name or alias. Mandatory.
     #[arg(long = "to", short = 't', value_name = "NAME")]
@@ -41,10 +39,15 @@ impl MessageMoveCommand {
         account: &mut Account,
         client: &mut EmailClient,
     ) -> Result<()> {
-        let from = account.resolve_mailbox(&self.from).to_owned();
+        let from = resolve_mailbox_or_default(account, self.from.as_deref())?;
         let to = account.resolve_mailbox(&self.to).to_owned();
         let ids: Vec<&str> = self.ids.inner.iter().map(String::as_str).collect();
-        client.move_messages(&from, &to, &ids)?;
-        printer.out(Message::new("Message(s) successfully moved"))
+        let count = client.move_messages(&from, &to, &ids)?;
+        let message = match count {
+            0 => "No message moved: no id matched in the source mailbox".to_string(),
+            1 => "1 message successfully moved".to_string(),
+            n => format!("{n} messages successfully moved"),
+        };
+        printer.out(Message::new(message))
     }
 }

@@ -260,13 +260,16 @@ imap.sasl.plain.password.raw = "***"
 #jmap.auth.basic.password.raw = "***"
 #jmap.auth.basic.password.command = "pass show fastmail"
 
-# Identity to send as. Required only for `messages send` over JMAP; can be
-# discovered with `himalaya jmap identity get`.
+# Identity to send as, for `messages send` over JMAP. Optional: when
+# omitted, the account's default identity (the first `Identity/get`
+# reports) is used. Set it to pin a specific one; list them with
+# `himalaya jmap identity get`.
 #jmap.identity-id = "I0123abc"
 
-# Drafts mailbox id used to stage outgoing messages before submission.
-# Required only for `messages send` over JMAP; can be discovered with
-# `himalaya jmap mailbox query --role drafts`.
+# Drafts mailbox id used to stage outgoing messages before submission,
+# for `messages send` over JMAP. Optional: when omitted, the mailbox
+# with the `drafts` role is used. Set it to pin a specific one; find it
+# with `himalaya jmap mailbox query --role drafts`.
 #jmap.drafts-mailbox-id = "M0123abc"
 
 # --------------------------------------------------------------------------------

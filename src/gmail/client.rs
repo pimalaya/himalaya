@@ -25,6 +25,12 @@ use crate::{
 /// Live Gmail client handed down to every `gmail` subcommand.
 pub struct GmailClient {
     inner: Inner,
+    /// Lazily-fetched `(id, name)` pairs for every label, used by
+    /// [`Self::resolve_mailbox_id`] to map the shared layer's
+    /// human-facing label names onto opaque Gmail label ids. Cached for
+    /// the client's lifetime so a `copy`/`move` resolves both endpoints
+    /// with a single `labels.list`.
+    label_index: Option<Vec<(String, String)>>,
 }
 
 impl GmailClient {
@@ -39,7 +45,45 @@ impl GmailClient {
             user_id: config.user_id,
         };
         let inner = Inner::connect(token.expose_secret(), options)?;
-        Ok(Self { inner })
+        Ok(Self {
+            inner,
+            label_index: None,
+        })
+    }
+
+    /// Maps a human label name to its opaque Gmail label id, for the
+    /// shared backend which otherwise addresses mailboxes (labels) by
+    /// their id.
+    ///
+    /// A value already matching a known id passes through untouched (id
+    /// passthrough); an exact display-name match returns the mapped id
+    /// (first match wins); an unknown value is handed back as-is so the
+    /// API surfaces the error. The label index is fetched once
+    /// (`labels.list`) and cached.
+    ///
+    /// Lives here so the backend operation methods stay pure id
+    /// consumers: name resolution never happens inside them.
+    pub fn resolve_mailbox_id(&mut self, mailbox: &str) -> Result<String> {
+        if self.label_index.is_none() {
+            let labels = self.labels_list()?.response.labels;
+            let index = labels
+                .into_iter()
+                .map(|label| (label.id, label.name))
+                .collect();
+            self.label_index = Some(index);
+        }
+
+        let index = self.label_index.as_deref().unwrap_or_default();
+
+        if index.iter().any(|(id, _)| id == mailbox) {
+            return Ok(mailbox.to_string());
+        }
+
+        if let Some((id, _)) = index.iter().find(|(_, name)| name == mailbox) {
+            return Ok(id.clone());
+        }
+
+        Ok(mailbox.to_string())
     }
 }
 

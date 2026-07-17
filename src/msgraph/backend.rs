@@ -96,19 +96,19 @@ impl MsgraphClient {
     }
 
     /// Copies a message id set into `to`. `from` is unused.
-    pub fn copy_messages(&mut self, _from: &str, to: &str, ids: &[&str]) -> Result<()> {
+    pub fn copy_messages(&mut self, _from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         for id in ids {
             self.message_copy(id, to)?;
         }
-        Ok(())
+        Ok(ids.len())
     }
 
     /// Moves a message id set into `to`. `from` is unused.
-    pub fn move_messages(&mut self, _from: &str, to: &str, ids: &[&str]) -> Result<()> {
+    pub fn move_messages(&mut self, _from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         for id in ids {
             self.message_move(id, to)?;
         }
-        Ok(())
+        Ok(ids.len())
     }
 
     /// Sends a raw RFC 5322 message via `POST /sendMail` (MIME form);

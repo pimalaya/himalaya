@@ -37,9 +37,10 @@ pub struct JmapMailboxQueryCommand {
     #[arg(long, value_name = "NAME")]
     pub name: Option<String>,
 
-    /// List all mailboxes, not just subscribed ones.
+    /// Restrict to subscribed mailboxes. Native `Mailbox/query` applies
+    /// no subscription filter, so the default lists every mailbox.
     #[arg(long, default_value_t)]
-    pub all: bool,
+    pub subscribed: bool,
 
     /// Only return mailboxes that have a role.
     #[arg(long, default_value_t)]
@@ -74,7 +75,7 @@ impl JmapMailboxQueryCommand {
                 parent_id: self.parent_id,
                 role: role_from_args(self.role, self.custom_role),
                 name: self.name,
-                is_subscribed: if self.all { None } else { Some(true) },
+                is_subscribed: if self.subscribed { Some(true) } else { None },
                 has_any_role: if self.has_any_role { Some(true) } else { None },
             };
 

@@ -144,7 +144,7 @@ impl M2dirClient {
 
     /// Copies every id from `from` to `to` (get + store; flags are not
     /// propagated, matching io-email).
-    pub fn copy_messages(&self, from: &str, to: &str, ids: &[&str]) -> Result<()> {
+    pub fn copy_messages(&self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let source = self.open_m2dir(from)?;
         let target = self.open_m2dir(to)?;
 
@@ -153,11 +153,11 @@ impl M2dirClient {
             self.store(target.clone(), bytes)?;
         }
 
-        Ok(())
+        Ok(ids.len())
     }
 
     /// Moves every id from `from` to `to` (copy then delete the source).
-    pub fn move_messages(&self, from: &str, to: &str, ids: &[&str]) -> Result<()> {
+    pub fn move_messages(&self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let source = self.open_m2dir(from)?;
         let target = self.open_m2dir(to)?;
 
@@ -167,7 +167,7 @@ impl M2dirClient {
             self.delete_entry(source.clone(), *id)?;
         }
 
-        Ok(())
+        Ok(ids.len())
     }
 }
 

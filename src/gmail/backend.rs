@@ -139,23 +139,23 @@ impl GmailClient {
 
     /// Copies a message id set into `to` by adding `to`'s label. `from`
     /// is unused (labels are additive).
-    pub fn copy_messages(&mut self, _from: &str, to: &str, ids: &[&str]) -> Result<()> {
+    pub fn copy_messages(&mut self, _from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let add = vec![to.to_string()];
         for id in ids {
             self.message_modify(id, &add, &[])?;
         }
-        Ok(())
+        Ok(ids.len())
     }
 
     /// Moves a message id set from `from` to `to` by adding `to`'s label
     /// and removing `from`'s.
-    pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<()> {
+    pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let add = vec![to.to_string()];
         let remove = vec![from.to_string()];
         for id in ids {
             self.message_modify(id, &add, &remove)?;
         }
-        Ok(())
+        Ok(ids.len())
     }
 
     /// Sends a raw RFC 5322 message via `messages.send` (Gmail both

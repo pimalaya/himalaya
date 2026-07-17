@@ -261,8 +261,9 @@ impl EmailClient {
         }
     }
 
-    /// Copies a message id set from `from` to `to`.
-    pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<()> {
+    /// Copies a message id set from `from` to `to`, returning the number
+    /// actually affected (see the per-backend adapters).
+    pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let from = self.resolve_mailbox_id(from)?;
         let to = self.resolve_mailbox_id(to)?;
         let (from, to) = (from.as_str(), to.as_str());
@@ -282,8 +283,9 @@ impl EmailClient {
         }
     }
 
-    /// Moves a message id set from `from` to `to`.
-    pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<()> {
+    /// Moves a message id set from `from` to `to`, returning the number
+    /// actually affected (see the per-backend adapters).
+    pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let from = self.resolve_mailbox_id(from)?;
         let to = self.resolve_mailbox_id(to)?;
         let (from, to) = (from.as_str(), to.as_str());
@@ -327,14 +329,17 @@ impl EmailClient {
     /// Maps the shared layer's human mailbox name onto the
     /// backend-native id the operation methods expect. Identity for
     /// every backend whose name already is its id (IMAP, Maildir, m2dir,
-    /// Gmail, Graph); JMAP resolves the opaque id via a cached
-    /// `Mailbox/get`. Applied by the mailbox-addressing methods above
+    /// Graph); JMAP resolves the opaque mailbox id via a cached
+    /// `Mailbox/get`, Gmail the opaque label id via a cached
+    /// `labels.list`. Applied by the mailbox-addressing methods above
     /// before they dispatch, so each per-protocol adapter only ever
     /// receives ids.
     fn resolve_mailbox_id(&mut self, mailbox: &str) -> Result<String> {
         match self.storage_mut()? {
             #[cfg(feature = "jmap")]
             BackendClient::Jmap(client) => client.resolve_mailbox_id(mailbox),
+            #[cfg(feature = "gmail")]
+            BackendClient::Gmail(client) => client.resolve_mailbox_id(mailbox),
             _ => Ok(mailbox.to_string()),
         }
     }

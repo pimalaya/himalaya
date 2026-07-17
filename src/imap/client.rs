@@ -66,6 +66,14 @@ impl ImapClient {
         self.sort_fallback
             .unwrap_or_else(|| !has_imap_capability!(self.capabilities, Sort(_)))
     }
+
+    /// Whether the server advertised UIDPLUS (RFC 4315). When it does,
+    /// `COPY`/`MOVE` return an authoritative `COPYUID` and an *absent*
+    /// one means nothing was affected (a stale-UID no-op), so the count
+    /// can be trusted; without it there is no such feedback.
+    pub fn supports_uidplus(&self) -> bool {
+        has_imap_capability!(self.capabilities, UidPlus)
+    }
 }
 
 /// Parses an IMAP server string into a URL.

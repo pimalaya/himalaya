@@ -46,7 +46,7 @@ dirs = "6"
 humansize = "2"
 ariadne = "0.6"
 chumsky = { version = "0.13", default-features = false }
-io-gmail = { version = "0.1", default-features = false, optional = true }
+io-gmail = { version = "0.2", default-features = false, optional = true }
 io-imap = { version = "0.2", default-features = false, optional = true }
 io-jmap = { version = "0.2", default-features = false, optional = true }
 io-m2dir = { version = "0.2", default-features = false, optional = true }
@@ -74,7 +74,10 @@ url = { version = "2.2", features = ["serde"] }
 [target.'cfg(windows)'.dependencies]
 uds_windows = "1"
 
-# Temporary: use the local pimalaya-config for `toml::to_string` (the
-# wizard's compact serializer), until it ships to crates.io.
 [patch.crates-io]
-pimalaya-config = { path = "../config" }
+# TODO: drop once version > 0.1.0 released
+pimalaya-config.git = "https://github.com/pimalaya/config"
+# TODO: drop once version > 0.2.0 released
+io-imap.git = "https://github.com/pimalaya/io-imap"
+# TODO: drop once io-gmail G4 fix (empty-body parsing) is released
+io-gmail.git = "https://github.com/pimalaya/io-gmail"

@@ -17,9 +17,12 @@ use anyhow::{Result, anyhow, bail};
 use chrono::{DateTime, FixedOffset};
 use io_imap::{
     rfc3501::{
-        append::ImapMessageAppendOptions, copy::ImapMessageCopyOptions,
-        fetch::ImapMessageFetchOptions, search::ImapMessageSearchOptions,
-        select::ImapMailboxSelectOptions, store::ImapMessageStoreOptions,
+        append::ImapMessageAppendOptions,
+        copy::{ImapCopyUid, ImapMessageCopyOptions},
+        fetch::ImapMessageFetchOptions,
+        search::ImapMessageSearchOptions,
+        select::ImapMailboxSelectOptions,
+        store::ImapMessageStoreOptions,
     },
     rfc5256::sort::ImapMessageSortOptions,
     rfc6851::r#move::ImapMessageMoveOptions,
@@ -291,27 +294,41 @@ impl ImapClient {
     }
 
     /// Copies a UID set from `from` to `to`.
-    pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<()> {
+    pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let source = parse_mailbox(from)?;
         let target = parse_mailbox(to)?;
         let sequence_set = parse_uids(ids)?;
 
         self.select(source, ImapMailboxSelectOptions::default())?;
-        self.copy(sequence_set, target, ImapMessageCopyOptions { uid: true })?;
+        let copy_uid = self.copy(sequence_set, target, ImapMessageCopyOptions { uid: true })?;
 
-        Ok(())
+        Ok(self.copied_count(copy_uid, ids.len()))
     }
 
     /// Moves a UID set from `from` to `to` (RFC 6851).
-    pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<()> {
+    pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let source = parse_mailbox(from)?;
         let target = parse_mailbox(to)?;
         let sequence_set = parse_uids(ids)?;
 
         self.select(source, ImapMailboxSelectOptions::default())?;
-        self.r#move(sequence_set, target, ImapMessageMoveOptions { uid: true })?;
+        let copy_uid = self.r#move(sequence_set, target, ImapMessageMoveOptions { uid: true })?;
 
-        Ok(())
+        Ok(self.copied_count(copy_uid, ids.len()))
+    }
+
+    /// Number of messages a UID COPY/MOVE actually affected. UIDPLUS
+    /// servers report a `COPYUID` whose source set lists exactly the
+    /// affected UIDs, so it is authoritative — including its absence,
+    /// which means nothing matched (a stale-UID no-op). Servers without
+    /// UIDPLUS give no such feedback, so fall back to the requested
+    /// count rather than under-report a real copy as zero.
+    fn copied_count(&self, copy_uid: ImapCopyUid, requested: usize) -> usize {
+        match copy_uid {
+            Some((_, source_uids, _)) => source_uids.len(),
+            None if self.supports_uidplus() => 0,
+            None => requested,
+        }
     }
 }
 
