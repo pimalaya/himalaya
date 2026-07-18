@@ -7,6 +7,8 @@
 //! get + store (+ delete). The conversion is lifted from the retired
 //! io-email m2dir drivers.
 
+use std::path::Path;
+
 use anyhow::Result;
 use chrono::DateTime;
 use io_m2dir::{entry::M2dirEntry, flag::M2dirFlags, m2dir::M2dir};
@@ -24,6 +26,25 @@ use crate::{
 };
 
 impl M2dirClient {
+    /// Resolves a shared-layer mailbox argument to an opened [`M2dir`].
+    ///
+    /// An absolute path — the `id` column of `mailbox list` — opens
+    /// directly; a relative name (`Inbox`, `Archive`, `Projects/Work`)
+    /// is resolved under the m2store root first, with the spec's
+    /// percent-encoding, since io-m2dir's `open_m2dir` only accepts a
+    /// filesystem path. This lets the shared commands address a folder
+    /// by name or by id, matching the raw `m2dir` commands (which take a
+    /// name) and the Maildir backend.
+    fn resolve_m2dir(&self, mailbox: &str) -> Result<M2dir> {
+        if Path::new(mailbox).is_absolute() {
+            return Ok(self.open_m2dir(mailbox)?);
+        }
+
+        let store = self.open_store()?;
+        let path = store.resolve_folder_path(mailbox)?;
+        Ok(self.open_m2dir(path)?)
+    }
+
     /// Lists every m2dir under the configured root, sorted by name.
     /// `with_counts` is ignored (m2dir does not surface counts cheaply).
     pub fn list_mailboxes(&self, _with_counts: bool) -> Result<Vec<Mailbox>> {
@@ -42,7 +63,7 @@ impl M2dirClient {
         page_size: Option<u32>,
         with_attachment: bool,
     ) -> Result<Vec<Envelope>> {
-        let m2dir = self.open_m2dir(mailbox)?;
+        let m2dir = self.resolve_m2dir(mailbox)?;
         let entries = self.list_entries(m2dir.clone())?;
 
         let mut envelopes = Vec::with_capacity(entries.len());
@@ -74,7 +95,7 @@ impl M2dirClient {
         page_size: Option<u32>,
         _with_attachment: bool,
     ) -> Result<Vec<Envelope>> {
-        let m2dir = self.open_m2dir(mailbox)?;
+        let m2dir = self.resolve_m2dir(mailbox)?;
         let entries = self.list_entries(m2dir.clone())?;
 
         let filter = query.and_then(|q| q.filter.as_ref());
@@ -107,7 +128,7 @@ impl M2dirClient {
         flags: &[Flag],
         op: FlagOp,
     ) -> Result<()> {
-        let m2dir = self.open_m2dir(mailbox)?;
+        let m2dir = self.resolve_m2dir(mailbox)?;
         let m2dir_flags = flags_to_m2dir(flags);
 
         for id in ids {
@@ -123,7 +144,7 @@ impl M2dirClient {
 
     /// Reads one message's raw RFC 5322 bytes from `mailbox`.
     pub fn get_message(&self, mailbox: &str, id: &str) -> Result<Vec<u8>> {
-        let m2dir = self.open_m2dir(mailbox)?;
+        let m2dir = self.resolve_m2dir(mailbox)?;
         let (_entry, bytes) = self.get(m2dir, id)?;
         Ok(bytes)
     }
@@ -131,7 +152,7 @@ impl M2dirClient {
     /// Stores `raw` under `mailbox`, then writes `flags` to the sidecar.
     /// Returns the content-addressed id.
     pub fn add_message(&self, mailbox: &str, flags: &[Flag], raw: Vec<u8>) -> Result<String> {
-        let m2dir = self.open_m2dir(mailbox)?;
+        let m2dir = self.resolve_m2dir(mailbox)?;
         let entry = self.store(m2dir.clone(), raw)?;
         let id = entry.id().to_string();
 
@@ -145,8 +166,8 @@ impl M2dirClient {
     /// Copies every id from `from` to `to` (get + store; flags are not
     /// propagated, matching io-email).
     pub fn copy_messages(&self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
-        let source = self.open_m2dir(from)?;
-        let target = self.open_m2dir(to)?;
+        let source = self.resolve_m2dir(from)?;
+        let target = self.resolve_m2dir(to)?;
 
         for id in ids {
             let (_entry, bytes) = self.get(source.clone(), *id)?;
@@ -158,8 +179,8 @@ impl M2dirClient {
 
     /// Moves every id from `from` to `to` (copy then delete the source).
     pub fn move_messages(&self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
-        let source = self.open_m2dir(from)?;
-        let target = self.open_m2dir(to)?;
+        let source = self.resolve_m2dir(from)?;
+        let target = self.resolve_m2dir(to)?;
 
         for id in ids {
             let (_entry, bytes) = self.get(source.clone(), *id)?;

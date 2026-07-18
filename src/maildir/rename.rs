@@ -27,13 +27,11 @@ impl MaildirMailboxRenameCommand {
         validate_maildir_name(&self.maildir_path.inner)?;
         validate_maildir_name(Path::new(&self.maildir_name.inner))?;
 
-        let path = client
-            .root
-            .join(&self.maildir_path.inner)
-            .to_string_lossy()
-            .into_owned();
-
-        client.rename_maildir(path, self.maildir_name.inner)?;
+        // Both names are resolved relative to the store root by
+        // io-maildir; pass them bare (pre-joining the root would make it
+        // re-join and operate under `<root>/<root>`).
+        let from = self.maildir_path.inner.to_string_lossy().into_owned();
+        client.rename_maildir(from, self.maildir_name.inner)?;
         printer.out(Message::new("Maildir successfully renamed"))
     }
 }

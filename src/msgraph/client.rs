@@ -14,7 +14,10 @@
 use std::ops::{Deref, DerefMut};
 
 use anyhow::{Result, anyhow};
-use io_msgraph::v1::client::{MsgraphClientStd as Inner, MsgraphClientStdConnectOptions};
+use io_msgraph::v1::{
+    client::{MsgraphClientStd as Inner, MsgraphClientStdConnectOptions},
+    rest::users::mail_folders::list::MsgraphMailFoldersListParams,
+};
 use secrecy::{ExposeSecret, SecretString};
 
 use crate::{
@@ -25,6 +28,12 @@ use crate::{
 /// Live Microsoft Graph client handed down to every `msgraph` subcommand.
 pub struct MsgraphClient {
     inner: Inner,
+    /// Lazily-fetched `(id, name)` pairs for every mail folder, used by
+    /// [`Self::resolve_mailbox_id`] to map the shared layer's
+    /// human-facing folder names onto opaque Graph folder ids. Cached for
+    /// the client's lifetime so a `copy`/`move` resolves both endpoints
+    /// with a single `mailFolders` listing.
+    folder_index: Option<Vec<(String, String)>>,
 }
 
 impl MsgraphClient {
@@ -39,7 +48,50 @@ impl MsgraphClient {
             user_id: config.user_id,
         };
         let inner = Inner::connect(token.expose_secret(), options)?;
-        Ok(Self { inner })
+        Ok(Self {
+            inner,
+            folder_index: None,
+        })
+    }
+
+    /// Maps a human folder name to its opaque Graph folder id, for the
+    /// shared backend which otherwise addresses mailboxes (folders) by
+    /// their id.
+    ///
+    /// A value already matching a known id passes through untouched (id
+    /// passthrough); an exact display-name match returns the mapped id
+    /// (first match wins); an unknown value is handed back as-is, so a
+    /// Graph well-known name (`inbox`, `archive`, `sentitems`, …) still
+    /// reaches the API and any other value surfaces the API error. The
+    /// folder index is fetched once (`mailFolders`) and cached.
+    ///
+    /// Lives here so the backend operation methods stay pure id
+    /// consumers: name resolution never happens inside them.
+    pub fn resolve_mailbox_id(&mut self, mailbox: &str) -> Result<String> {
+        if self.folder_index.is_none() {
+            let params = MsgraphMailFoldersListParams {
+                top: Some(100),
+                ..Default::default()
+            };
+            let folders = self.mail_folders_list(&params)?.response.value;
+            let index = folders
+                .into_iter()
+                .map(|folder| (folder.id, folder.display_name))
+                .collect();
+            self.folder_index = Some(index);
+        }
+
+        let index = self.folder_index.as_deref().unwrap_or_default();
+
+        if index.iter().any(|(id, _)| id == mailbox) {
+            return Ok(mailbox.to_string());
+        }
+
+        if let Some((id, _)) = index.iter().find(|(_, name)| name == mailbox) {
+            return Ok(id.clone());
+        }
+
+        Ok(mailbox.to_string())
     }
 }
 

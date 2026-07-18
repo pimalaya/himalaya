@@ -23,13 +23,10 @@ impl MaildirMailboxCreateCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut MaildirClient) -> Result<()> {
         validate_maildir_name(Path::new(&self.maildir_name.inner))?;
 
-        let path = client
-            .root
-            .join(&self.maildir_name.inner)
-            .to_string_lossy()
-            .into_owned();
-
-        client.create_maildir(path)?;
+        // io-maildir resolves the name relative to the store root, so
+        // pass the bare name — pre-joining the root here would make it
+        // re-join and land under `<root>/<root>`.
+        client.create_maildir(self.maildir_name.inner)?;
         printer.out(Message::new("Maildir successfully created"))
     }
 }

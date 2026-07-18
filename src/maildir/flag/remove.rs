@@ -20,8 +20,10 @@ pub struct MaildirFlagRemoveCommand {
 
     #[command(flatten)]
     pub maildir: MaildirPathFlag,
-    /// Flag(s) to remove from the message
-    #[arg(long = "flag", short, num_args = 1.., required = true)]
+    /// Flag(s) to remove from the message. Repeat `-f` per flag (e.g.
+    /// `-f seen -f flagged`); a single `-f` takes one value so trailing
+    /// message ids are not swallowed as flags.
+    #[arg(long = "flag", short, value_name = "FLAG", required = true)]
     pub flags: Vec<FlagArg>,
 }
 

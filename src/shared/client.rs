@@ -328,18 +328,22 @@ impl EmailClient {
 
     /// Maps the shared layer's human mailbox name onto the
     /// backend-native id the operation methods expect. Identity for
-    /// every backend whose name already is its id (IMAP, Maildir, m2dir,
-    /// Graph); JMAP resolves the opaque mailbox id via a cached
+    /// every backend whose name already is its id (IMAP, Maildir,
+    /// m2dir); JMAP resolves the opaque mailbox id via a cached
     /// `Mailbox/get`, Gmail the opaque label id via a cached
-    /// `labels.list`. Applied by the mailbox-addressing methods above
-    /// before they dispatch, so each per-protocol adapter only ever
-    /// receives ids.
+    /// `labels.list`, and Microsoft Graph the opaque folder id via a
+    /// cached `mailFolders` listing (Graph well-known names still pass
+    /// through). Applied by the mailbox-addressing methods above before
+    /// they dispatch, so each per-protocol adapter only ever receives
+    /// ids.
     fn resolve_mailbox_id(&mut self, mailbox: &str) -> Result<String> {
         match self.storage_mut()? {
             #[cfg(feature = "jmap")]
             BackendClient::Jmap(client) => client.resolve_mailbox_id(mailbox),
             #[cfg(feature = "gmail")]
             BackendClient::Gmail(client) => client.resolve_mailbox_id(mailbox),
+            #[cfg(feature = "msgraph")]
+            BackendClient::Msgraph(client) => client.resolve_mailbox_id(mailbox),
             _ => Ok(mailbox.to_string()),
         }
     }

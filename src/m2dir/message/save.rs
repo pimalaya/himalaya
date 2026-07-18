@@ -24,8 +24,9 @@ pub struct M2dirMessageSaveCommand {
     pub m2dir: M2dirNameFlag,
 
     /// Flag(s) to write to the new message's `.flags` metadata file.
-    /// Each flag is an arbitrary UTF-8 string (e.g. `$seen`, `custom`).
-    #[arg(long = "flag", short = 'f', num_args = 0..)]
+    /// Each flag is an arbitrary UTF-8 string (e.g. `$seen`, `custom`);
+    /// repeat `-f` per flag so one `-f` takes a single value.
+    #[arg(long = "flag", short = 'f', value_name = "FLAG")]
     pub flags: Vec<String>,
 
     #[command(flatten)]

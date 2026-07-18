@@ -22,12 +22,10 @@ impl MaildirMailboxDeleteCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut MaildirClient) -> Result<()> {
         validate_maildir_name(&self.maildir_path.inner)?;
 
-        let path = client
-            .root
-            .join(&self.maildir_path.inner)
-            .to_string_lossy()
-            .into_owned();
-
+        // io-maildir resolves the name relative to the store root, so
+        // pass the bare name — pre-joining the root here would make it
+        // re-join and delete under `<root>/<root>` (or nothing).
+        let path = self.maildir_path.inner.to_string_lossy().into_owned();
         client.delete_maildir(path)?;
         printer.out(Message::new("Maildir successfully deleted"))
     }

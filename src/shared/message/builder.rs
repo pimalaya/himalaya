@@ -268,7 +268,10 @@ fn compose_body(
 
 fn has_prefix(subject: &str, prefix: &str) -> bool {
     let s = subject.trim_start();
-    let p = prefix.trim_end_matches(' ').trim_end_matches(':');
+    // Keep the colon: comparing only the letters would treat a subject
+    // like "Ready to ship" as already carrying a "Re:" prefix and drop
+    // the real one.
+    let p = prefix.trim();
     s.len() >= p.len() && s.get(..p.len()).map(|h| h.eq_ignore_ascii_case(p)) == Some(true)
 }
 
@@ -362,4 +365,207 @@ fn mime_for(path: &Path) -> String {
         .first_or_octet_stream()
         .essence_str()
         .to_owned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A raw source message used by the reply/forward tests. It already
+    /// carries a `References` header so threading can be asserted.
+    const SOURCE: &[u8] = b"From: Alice <alice@example.com>\r\n\
+To: Bob <bob@example.com>\r\n\
+Subject: Project update\r\n\
+Message-ID: <orig-2@example.com>\r\n\
+References: <orig-0@example.com> <orig-1@example.com>\r\n\
+\r\n\
+Original body line.\r\n";
+
+    fn parse(raw: &[u8]) -> mail_parser::Message<'_> {
+        MessageParser::new()
+            .parse(raw)
+            .expect("parse built message")
+    }
+
+    fn source(mode: SourceMode) -> SourceArgs<'static> {
+        SourceArgs {
+            raw: SOURCE,
+            mode,
+            posting_style: PostingStyle::Top,
+            quote_headline: "On a day, Alice wrote:",
+        }
+    }
+
+    fn args<'a>(
+        from: &'a str,
+        to: &'a [String],
+        subject: Option<&'a str>,
+        body: &'a str,
+    ) -> BuilderArgs<'a> {
+        BuilderArgs {
+            from: Some(from),
+            to,
+            cc: &[],
+            bcc: &[],
+            subject,
+            body: Some(body),
+            body_file: None,
+            attach: &[],
+            signature: None,
+            signature_file: None,
+        }
+    }
+
+    #[test]
+    fn compose_populates_headers_and_body() {
+        let to = vec!["bob@example.com".to_string()];
+        let cc = vec!["carol@example.com".to_string()];
+        let mut a = args("alice@example.com", &to, Some("Hello"), "Hi Bob");
+        a.cc = &cc;
+
+        let raw = build(a, None).unwrap();
+        let msg = parse(&raw);
+        let text = String::from_utf8(raw.clone()).unwrap();
+
+        assert_eq!(msg.subject(), Some("Hello"));
+        assert!(msg.body_text(0).unwrap().contains("Hi Bob"));
+        assert!(text.contains("alice@example.com"));
+        assert!(text.contains("bob@example.com"));
+        assert!(text.contains("carol@example.com"));
+        assert!(!text.contains("In-Reply-To"));
+    }
+
+    #[test]
+    fn reply_sets_subject_recipients_and_threading() {
+        let empty: Vec<String> = Vec::new();
+        let a = args("bob@example.com", &empty, None, "My reply");
+
+        let raw = build(a, Some(source(SourceMode::Reply))).unwrap();
+        let msg = parse(&raw);
+        let text = String::from_utf8(raw.clone()).unwrap();
+
+        // subject gains a single "Re:" prefix
+        assert_eq!(msg.subject(), Some("Re: Project update"));
+        // with no explicit --to, the reply goes to the source's From
+        assert!(text.contains("alice@example.com"));
+        // threading: In-Reply-To is the source id, References appends it
+        assert!(text.contains("In-Reply-To:"));
+        assert!(text.contains("orig-2@example.com"));
+        // body: user text above the quoted source, with a headline
+        let body = msg.body_text(0).unwrap();
+        assert!(body.contains("My reply"));
+        assert!(body.contains("On a day, Alice wrote:"));
+        assert!(body.contains("> Original body line."));
+    }
+
+    #[test]
+    fn reply_keeps_existing_re_prefix() {
+        let raw = b"Subject: Re: Already replied\r\nMessage-ID: <x@e>\r\n\r\nbody";
+        let src = SourceArgs {
+            raw,
+            mode: SourceMode::Reply,
+            posting_style: PostingStyle::Top,
+            quote_headline: "",
+        };
+        let empty: Vec<String> = Vec::new();
+        let built = build(args("b@e", &empty, None, "r"), Some(src)).unwrap();
+        assert_eq!(parse(&built).subject(), Some("Re: Already replied"));
+    }
+
+    #[test]
+    fn reply_prefixes_subject_that_merely_starts_with_re_letters() {
+        // regression: "Ready…" starts with "Re" but is not "Re:"-prefixed
+        let raw = b"Subject: Ready to ship\r\nMessage-ID: <x@e>\r\n\r\nbody";
+        let src = SourceArgs {
+            raw,
+            mode: SourceMode::Reply,
+            posting_style: PostingStyle::Top,
+            quote_headline: "",
+        };
+        let empty: Vec<String> = Vec::new();
+        let built = build(args("b@e", &empty, None, "r"), Some(src)).unwrap();
+        assert_eq!(parse(&built).subject(), Some("Re: Ready to ship"));
+    }
+
+    #[test]
+    fn reply_explicit_to_overrides_source_from() {
+        let to = vec!["dave@example.com".to_string()];
+        let raw = build(
+            args("bob@example.com", &to, None, "r"),
+            Some(source(SourceMode::Reply)),
+        )
+        .unwrap();
+        let text = String::from_utf8(raw).unwrap();
+        assert!(text.contains("dave@example.com"));
+        assert!(!text.contains("alice@example.com"));
+    }
+
+    #[test]
+    fn forward_prefixes_subject_and_omits_in_reply_to() {
+        let to = vec!["dave@example.com".to_string()];
+        let raw = build(
+            args("bob@example.com", &to, None, "FYI"),
+            Some(source(SourceMode::Forward)),
+        )
+        .unwrap();
+        let msg = parse(&raw);
+        let text = String::from_utf8(raw.clone()).unwrap();
+
+        assert_eq!(msg.subject(), Some("Fwd: Project update"));
+        assert!(!text.contains("In-Reply-To"));
+        assert!(msg.body_text(0).unwrap().contains("> Original body line."));
+    }
+
+    #[test]
+    fn has_prefix_requires_the_colon_case_insensitively() {
+        assert!(has_prefix("Re: x", "Re: "));
+        assert!(has_prefix("re:x", "Re: "));
+        assert!(has_prefix("RE: x", "Re: "));
+        assert!(has_prefix("Fwd: x", "Fwd: "));
+        assert!(!has_prefix("Ready to ship", "Re: "));
+        assert!(!has_prefix("Review", "Re: "));
+        assert!(!has_prefix("Forwarding note", "Fwd: "));
+    }
+
+    #[test]
+    fn compute_references_appends_source_id() {
+        // existing References win and the source id is appended
+        let msg = parse(SOURCE);
+        assert_eq!(
+            compute_references(&msg, "orig-2@example.com"),
+            "<orig-0@example.com> <orig-1@example.com> <orig-2@example.com>",
+        );
+
+        // falls back to In-Reply-To when there is no References header
+        let raw = b"In-Reply-To: <a@e>\r\nMessage-ID: <b@e>\r\n\r\nx";
+        let msg = parse(raw);
+        assert_eq!(compute_references(&msg, "b@e"), "<a@e> <b@e>");
+
+        // neither header: just the source id, wrapped
+        let raw = b"Message-ID: <b@e>\r\n\r\nx";
+        let msg = parse(raw);
+        assert_eq!(compute_references(&msg, "b@e"), "<b@e>");
+    }
+
+    #[test]
+    fn push_msg_id_wraps_and_separates() {
+        let mut out = String::new();
+        push_msg_id(&mut out, "a@e");
+        push_msg_id(&mut out, "<b@e>");
+        push_msg_id(&mut out, "  ");
+        push_msg_id(&mut out, "c@e");
+        assert_eq!(out, "<a@e> <b@e> <c@e>");
+    }
+
+    #[test]
+    fn compose_body_honours_posting_style_and_signature() {
+        let top = compose_body("mine", "theirs", "wrote:", "", PostingStyle::Top);
+        assert_eq!(top, "mine\n\nwrote:\n> theirs");
+
+        let bottom = compose_body("mine", "theirs", "wrote:", "", PostingStyle::Bottom);
+        assert_eq!(bottom, "wrote:\n> theirs\n\nmine");
+
+        let signed = compose_body("mine", "", "", "Alice", PostingStyle::Top);
+        assert_eq!(signed, "mine\n\n-- \nAlice");
+    }
 }

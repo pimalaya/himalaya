@@ -17,8 +17,10 @@ pub struct M2dirFlagSetCommand {
     #[command(flatten)]
     pub m2dir: M2dirNameFlag,
 
-    /// Flag(s) to set on the message.
-    #[arg(long = "flag", short = 'f', num_args = 1..)]
+    /// Flag(s) to set on the message. Repeat `-f` per flag (e.g. `-f
+    /// seen -f flagged`); a single `-f` takes one value so trailing
+    /// message ids are not silently swallowed as flags.
+    #[arg(long = "flag", short = 'f', value_name = "FLAG")]
     pub flags: Vec<String>,
 }
 

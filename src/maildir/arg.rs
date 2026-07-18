@@ -16,7 +16,10 @@ pub struct MaildirNameArg {
 /// CLI flag selecting the source Maildir by path.
 #[derive(Debug, Parser)]
 pub struct MaildirPathFlag {
-    /// Path to the source Maildir.
+    /// Maildir folder, resolved relative to the account root. Must name
+    /// an existing folder; use `.` for the root maildir itself (the
+    /// INBOX in the default fs layout, where there is no `Inbox`
+    /// subfolder). Defaults to `Inbox`.
     #[arg(name = "maildir_source_path", long = "maildir", short = 'm')]
     #[arg(value_name = "PATH", default_value = INBOX)]
     pub inner: PathBuf,
