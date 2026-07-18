@@ -19,7 +19,7 @@
 - **Thinner shared API.** Just enough surface for interfaces (TUI, plugins) to drive any backend, kept deliberately small so it does not break on every release.
 - **Protocol-specific commands** (`himalaya imap/jmap/maildir/smtp …`) expose the full native capability of each protocol.
 - **OAuth moved out** to [pimalaya/ortie](https://github.com/pimalaya/ortie).
-- **Keyring moved out** to [pimalaya/mimosa](https://github.com/pimalaya/mimosa) (or any password manager exposed as a shell command).
+- **Keyring moved out** to any password manager exposed as a shell command (`pass`, `secret-tool`, `gopass`, `security`, …).
 - **Composition and reading moved out** to [pimalaya/mml](https://github.com/pimalaya/mml).
 - **Session reuse moved out** to [pimalaya/sirup](https://github.com/pimalaya/sirup), which exposes a pre-authenticated IMAP/SMTP session over a Unix socket.
 
@@ -115,7 +115,7 @@ Account-level `[accounts.<name>.mailbox.alias]` entries override same-named glob
 
 #### Secrets
 
-Every `*.passwd` / `*.password` / `*.token` field accepts either a raw literal (`{ raw = "…" }`) or a shell command (`{ command = "pass show foo" }` or `{ command = ["pass", "show", "foo"] }`). Native keyring support has been removed; use [pimalaya/mimosa](https://github.com/pimalaya/mimosa) (or `pass`, `secret-tool`, `gopass`…) as the command. OAuth tokens are produced by an external broker such as [pimalaya/ortie](https://github.com/pimalaya/ortie) and consumed the same way.
+Every `*.passwd` / `*.password` / `*.token` field accepts either a raw literal (`{ raw = "…" }`) or a shell command (`{ command = "pass show foo" }` or `{ command = ["pass", "show", "foo"] }`). Native keyring support has been removed; use a password-manager CLI (`pass`, `secret-tool`, `gopass`, `security`, …) as the command. OAuth tokens are produced by an external broker such as [pimalaya/ortie](https://github.com/pimalaya/ortie) and consumed the same way.
 
 #### IMAP
 
@@ -144,7 +144,7 @@ imap.sasl.anonymous.message = "himalaya"
 imap.sasl.plain.authcid = "user@example.com"
 imap.sasl.plain.passwd.raw = "***"
 # or
-imap.sasl.plain.passwd.command = ["mimosa", "password", "read", "example"]
+imap.sasl.plain.passwd.command = ["pass", "show", "example"]
 
 # SASL LOGIN
 imap.sasl.login.username = "user@example.com"
@@ -177,6 +177,14 @@ Same shape as IMAP, rooted at `[smtp]`. Bare authority defaults to `smtps://`. T
 maildir.root = "~/Mail/example"
 ```
 
+#### m2dir (new)
+
+An [m2dir](https://man.sr.ht/~bitfehler/m2dir/) store: content-addressed messages with sidecar flag metadata.
+
+```toml
+m2dir.root = "~/Mail/example"
+```
+
 #### JMAP (new)
 
 ```toml
@@ -197,7 +205,7 @@ jmap.auth.header.command = "pass show fastmail-raw-token"
 # OAuth 2.0 / API token bearer
 jmap.auth.bearer.token.raw = "***"
 # or
-jmap.auth.bearer.token.command = ["mimosa", "password", "read", "fastmail-api"]
+jmap.auth.bearer.token.command = ["pass", "show", "fastmail-api"]
 
 # HTTP Basic
 jmap.auth.basic.username = "user@example.com"
@@ -205,9 +213,27 @@ jmap.auth.basic.password.raw = "***"
 # or
 jmap.auth.basic.password.command = "pass show fastmail"
 
-# Required only for `messages send` over JMAP.
+# Optional for `messages send` over JMAP: auto-discovered when omitted.
+# Set them to pin a specific identity / drafts mailbox.
 jmap.identity-id = "I0123abc"
 jmap.drafts-mailbox-id = "M0123abc"
+```
+
+#### Gmail REST API (new)
+
+The native Gmail backend authenticates with a single OAuth 2.0 bearer token from a broker such as [pimalaya/ortie](https://github.com/pimalaya/ortie). Labels are the mailboxes, addressed by name.
+
+```toml
+gmail.auth.token.command = ["ortie", "token", "show", "-a", "gmail"]
+# or gmail.auth.token.raw = "***"
+```
+
+#### Microsoft Graph (new)
+
+Same shape as Gmail: a single OAuth 2.0 bearer token. Sending goes through Graph, so no `smtp` block is needed.
+
+```toml
+msgraph.auth.token.command = ["ortie", "token", "show", "-a", "msgraph"]
 ```
 
 #### Notmuch / Sendmail
@@ -219,5 +245,5 @@ Both backends are removed. Notmuch may come back in a future release.
 1. Copy [`config.sample.toml`](./config.sample.toml) to a side-by-side path (for example `~/.config/himalaya/config.v2.toml`) and edit it against your previous configuration.
 2. Run `himalaya -c ~/.config/himalaya/config.v2.toml account check` to validate the connection for each declared backend.
 3. Once the new file passes the check, replace the v1 `config.toml` with it.
-4. If you relied on keyring / OAuth, install [pimalaya/mimosa](https://github.com/pimalaya/mimosa) and/or [pimalaya/ortie](https://github.com/pimalaya/ortie) and wire them as `command = …` secrets.
+4. If you relied on keyring / OAuth, wire a password-manager CLI (`pass`, `secret-tool`, …) and/or [pimalaya/ortie](https://github.com/pimalaya/ortie) as `command = …` secrets.
 5. If you relied on the interactive `write` / `reply` / `forward`, install [pimalaya/mml](https://github.com/pimalaya/mml) and chain it into `himalaya messages send` / `messages add` via a tempfile or `>(...)` process substitution (see the README for ready-made `bash`/`zsh` snippets).

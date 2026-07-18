@@ -86,3 +86,58 @@ fn parse_cmd(cmd: &str) -> Result<Command> {
     }
     Ok(shell(line))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn imap(encryption: ImapEncryption, port: u16) -> WizardImapConfig {
+        WizardImapConfig {
+            host: "imap.example.com".into(),
+            port,
+            encryption,
+            login: "user@example.com".into(),
+            auth: ImapAuth::Password(ImapSecret::Command("pass show example".into())),
+        }
+    }
+
+    #[test]
+    fn imap_tls_yields_imaps_scheme_and_plain_sasl() {
+        let config = imap_to_config(imap(ImapEncryption::Tls, 993)).unwrap();
+        assert_eq!(config.server, "imaps://imap.example.com:993");
+        assert!(!config.starttls);
+        let Some(SaslConfig::Plain(plain)) = config.sasl else {
+            panic!("expected a plain SASL config");
+        };
+        assert_eq!(plain.authcid, "user@example.com");
+        assert!(matches!(plain.passwd, Secret::Command(_)));
+    }
+
+    #[test]
+    fn imap_starttls_yields_imap_scheme_and_flag() {
+        let config = imap_to_config(imap(ImapEncryption::StartTls, 143)).unwrap();
+        assert_eq!(config.server, "imap://imap.example.com:143");
+        assert!(config.starttls);
+    }
+
+    #[test]
+    fn smtp_tls_yields_smtps_scheme() {
+        let wizard = WizardSmtpConfig {
+            host: "smtp.example.com".into(),
+            port: 465,
+            encryption: SmtpEncryption::Tls,
+            login: "user@example.com".into(),
+            auth: SmtpAuth::Password(SmtpSecret::Command("pass show example".into())),
+        };
+        let config = smtp_to_config(wizard).unwrap();
+        assert_eq!(config.server, "smtps://smtp.example.com:465");
+        assert!(!config.starttls);
+    }
+
+    #[test]
+    fn blank_secret_command_is_rejected() {
+        let mut wizard = imap(ImapEncryption::Tls, 993);
+        wizard.auth = ImapAuth::Password(ImapSecret::Command("   ".into()));
+        assert!(imap_to_config(wizard).is_err());
+    }
+}
