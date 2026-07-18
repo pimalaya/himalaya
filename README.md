@@ -27,8 +27,10 @@
   - [Sources](#sources)
 - [Configuration](#configuration)
   - [Proton Mail](#proton-mail)
+  - [Fastmail](#fastmail)
   - [Gmail](#gmail)
   - [Outlook](#outlook)
+  - [Posteo](#posteo)
   - [iCloud Mail](#icloud-mail)
 - [Usage](#usage)
   - [Shared API](#shared-api)
@@ -217,6 +219,29 @@ smtp.starttls = true
 smtp.tls.cert = "/path/to/exported/cert.pem"
 ```
 
+### Fastmail
+
+Fastmail needs an [app password](https://www.fastmail.help/hc/en-us/articles/360058752854) for IMAP/SMTP, or an [API token](https://www.fastmail.help/hc/en-us/articles/5254602856719) for its native JMAP endpoint.
+
+```toml
+[accounts.fastmail]
+
+imap.server = "imaps://imap.fastmail.com"
+imap.sasl.plain.username = "example@fastmail.com"
+imap.sasl.plain.password.command = "pass show fastmail"
+
+smtp.server = "smtps://smtp.fastmail.com"
+smtp.sasl.plain.username = "example@fastmail.com"
+smtp.sasl.plain.password.command = "pass show fastmail"
+```
+
+To use JMAP instead, replace the `imap`/`smtp` blocks with a single `jmap` one:
+
+```toml
+jmap.server = "https://api.fastmail.com/jmap/session"
+jmap.auth.bearer.token.command = "pass show fastmail"
+```
+
 ### Gmail
 
 Gmail rejects the account password over SASL PLAIN: generate an [app password](https://myaccount.google.com/apppasswords) (requires 2-step verification) and feed it through `password.command` or `password.raw`.
@@ -242,6 +267,14 @@ mailbox.alias.archive = "[Gmail]/All Mail"
 
 Every Gmail label shows up as a top-level IMAP mailbox, and the special mailboxes live under the `[Gmail]/` prefix — quote them in the shell (`-m "[Gmail]/Drafts"`) or reach them through an alias. `[Gmail]/All Mail` is the archive containing every message: aliasing it makes "search everything" one flag away (`himalaya envelope search -m archive ...`).
 
+To use Gmail's native REST API instead of IMAP/SMTP, replace the blocks above with a single OAuth 2.0 bearer token from a helper such as [ortie](https://github.com/pimalaya/ortie):
+
+```toml
+gmail.auth.token.command = ["ortie", "token", "show", "-a", "gmail"]
+```
+
+Labels become mailboxes here too, but they carry the API's opaque label ids; address them by name (`-m Himalaya-Test`) and himalaya resolves the id.
+
 ### Outlook
 
 Microsoft has retired basic authentication: use OAuth 2.0 via `oauthbearer` or `xoauth2`, with the access token supplied by an external helper such as [ortie](https://github.com/pimalaya/ortie).
@@ -257,6 +290,30 @@ smtp.server = "smtp://smtp-mail.outlook.com:587"
 smtp.starttls = true
 smtp.sasl.xoauth2.username = "example@outlook.com"
 smtp.sasl.xoauth2.token.command = ["ortie", "token", "read", "outlook"]
+```
+
+To use the native Microsoft Graph API instead of IMAP/SMTP, replace the blocks above with a single OAuth 2.0 bearer token (sending goes through Graph too, so no SMTP is needed):
+
+```toml
+msgraph.auth.token.command = ["ortie", "token", "show", "-a", "msgraph"]
+```
+
+Mail folders carry Graph's opaque folder ids; address them by name (`-m Archive`) or by a well-known name (`-m inbox`) and himalaya resolves the id.
+
+### Posteo
+
+Standard IMAP/SMTP with your regular account password — no app password required.
+
+```toml
+[accounts.posteo]
+
+imap.server = "imaps://posteo.de"
+imap.sasl.plain.username = "example@posteo.net"
+imap.sasl.plain.password.command = "pass show posteo"
+
+smtp.server = "smtps://posteo.de"
+smtp.sasl.plain.username = "example@posteo.net"
+smtp.sasl.plain.password.command = "pass show posteo"
 ```
 
 ### iCloud Mail
