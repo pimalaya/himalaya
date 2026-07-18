@@ -104,10 +104,11 @@ pub fn build(args: BuilderArgs<'_>, source: Option<SourceArgs<'_>>) -> Result<Ve
             });
         }
 
-        if source.mode == SourceMode::Reply && args.to.is_empty() {
-            if let Some(addrs) = reply_recipients(parsed) {
-                builder = builder.to(addrs);
-            }
+        if source.mode == SourceMode::Reply
+            && args.to.is_empty()
+            && let Some(addrs) = reply_recipients(parsed)
+        {
+            builder = builder.to(addrs);
         }
 
         if let Some(message_id) = parsed.message_id() {

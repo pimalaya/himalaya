@@ -75,6 +75,8 @@ url = { version = "2.2", features = ["serde"] }
 uds_windows = "1"
 
 [patch.crates-io]
+# TODO: drop once the keyring-picker wizard change is released
+pimalaya-cli.git = "https://github.com/pimalaya/cli"
 # TODO: drop once version > 0.1.0 released
 pimalaya-config.git = "https://github.com/pimalaya/config"
 # TODO: drop once version > 0.2.0 released

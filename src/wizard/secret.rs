@@ -1,33 +1,36 @@
-//! Secret prompt shared by the discovered-backend wizards.
+//! Secret prompt shared by the discovered-backend wizards (JMAP, Gmail,
+//! Microsoft Graph).
 //!
-//! Every remote backend needs at least one secret (password, API
-//! token). The prompt offers the same two strategies everywhere: a
-//! shell command retrieving the secret at runtime (recommended; OAuth
-//! tokens typically shell out to Ortie), or the raw value stored in the
-//! configuration file.
+//! Delegates to pimalaya-cli's OS-aware keyring picker: a well-known
+//! credential CLI, a custom command, or a raw value. Token backends pass
+//! the Ortie broker as an extra first option. Himalaya only *reads* the
+//! secret, so a keyring choice prints a reminder (on stderr) to store it
+//! under the chosen entry first.
 
 use anyhow::Result;
-use pimalaya_cli::prompt;
+use pimalaya_cli::wizard::keyring::{self, SecretChoice};
 use pimalaya_config::{command::shell, secret::Secret};
 
-const CMD: &str = "Use a shell command to retrieve my secret (recommended)";
-const RAW: &str = "Save secret in the configuration file (plaintext, NOT recommended)";
-const SECRETS: [&str; 2] = [CMD, RAW];
+/// Prompts for a [`Secret`] through the shared keyring picker.
+///
+/// `key_default` seeds the keyring entry (typically
+/// `<account>-<protocol>`); the entry is used verbatim, so a
+/// pre-existing secret is read exactly as named. `extra` prepends
+/// product-specific options such as [`ortie`].
+pub fn configure(label: &str, key_default: &str, extra: &[(&str, String)]) -> Result<Secret> {
+    let choice = keyring::prompt_secret(label, key_default, extra)?;
 
-/// Prompts for a [`Secret`]: strategy picker, then either the shell
-/// command line (seeded with `default_cmd`) or the raw value.
-pub fn configure(label: &str, default_cmd: Option<&str>) -> Result<Secret> {
-    let strategy = prompt::item(format!("{label} strategy:"), SECRETS, None)?;
+    Ok(match choice {
+        SecretChoice::Command(command) => Secret::Command(shell(&command)),
+        SecretChoice::Raw(secret) => Secret::Raw(secret),
+    })
+}
 
-    match strategy {
-        CMD => {
-            let cmd = prompt::text("Shell command:", default_cmd)?;
-            Ok(Secret::Command(shell(&cmd)))
-        }
-        RAW => {
-            let secret = prompt::password(format!("{label}:"), format!("Confirm {label}:"))?;
-            Ok(Secret::Raw(secret))
-        }
-        _ => unreachable!(),
-    }
+/// The Ortie OAuth-broker extra option for token backends: reads (and
+/// transparently refreshes) the access token for `account`.
+pub fn ortie(account: &str) -> [(&'static str, String); 1] {
+    [(
+        "ortie (OAuth token broker)",
+        format!("ortie token show -a {account}"),
+    )]
 }

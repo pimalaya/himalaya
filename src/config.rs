@@ -98,7 +98,7 @@ impl TomlConfig for Config {
 #[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct AccountConfig {
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_default")]
     pub default: bool,
 
     pub downloads_dir: Option<PathBuf>,

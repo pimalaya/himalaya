@@ -374,57 +374,57 @@ fn select_storage(
     backend: Backend,
 ) -> Result<Option<BackendClient>> {
     #[cfg(feature = "maildir")]
-    if backend.allows_maildir() {
-        if let Some(config) = account_config.maildir.take() {
-            return Ok(Some(BackendClient::Maildir(Box::new(MaildirClient::new(
-                config,
-            )))));
-        }
+    if backend.allows_maildir()
+        && let Some(config) = account_config.maildir.take()
+    {
+        return Ok(Some(BackendClient::Maildir(Box::new(MaildirClient::new(
+            config,
+        )))));
     }
 
     #[cfg(feature = "m2dir")]
-    if backend.allows_m2dir() {
-        if let Some(config) = account_config.m2dir.take() {
-            return Ok(Some(BackendClient::M2dir(Box::new(M2dirClient::new(
-                config,
-            )))));
-        }
+    if backend.allows_m2dir()
+        && let Some(config) = account_config.m2dir.take()
+    {
+        return Ok(Some(BackendClient::M2dir(Box::new(M2dirClient::new(
+            config,
+        )))));
     }
 
     #[cfg(feature = "jmap")]
-    if backend.allows_jmap() {
-        if let Some(config) = account_config.jmap.take() {
-            return Ok(Some(BackendClient::Jmap(Box::new(JmapClient::new(
-                config,
-            )?))));
-        }
+    if backend.allows_jmap()
+        && let Some(config) = account_config.jmap.take()
+    {
+        return Ok(Some(BackendClient::Jmap(Box::new(JmapClient::new(
+            config,
+        )?))));
     }
 
     #[cfg(feature = "gmail")]
-    if backend.allows_gmail() {
-        if let Some(config) = account_config.gmail.take() {
-            return Ok(Some(BackendClient::Gmail(Box::new(GmailClient::new(
-                config,
-            )?))));
-        }
+    if backend.allows_gmail()
+        && let Some(config) = account_config.gmail.take()
+    {
+        return Ok(Some(BackendClient::Gmail(Box::new(GmailClient::new(
+            config,
+        )?))));
     }
 
     #[cfg(feature = "msgraph")]
-    if backend.allows_msgraph() {
-        if let Some(config) = account_config.msgraph.take() {
-            return Ok(Some(BackendClient::Msgraph(Box::new(MsgraphClient::new(
-                config,
-            )?))));
-        }
+    if backend.allows_msgraph()
+        && let Some(config) = account_config.msgraph.take()
+    {
+        return Ok(Some(BackendClient::Msgraph(Box::new(MsgraphClient::new(
+            config,
+        )?))));
     }
 
     #[cfg(feature = "imap")]
-    if backend.allows_imap() {
-        if let Some(config) = account_config.imap.take() {
-            return Ok(Some(BackendClient::Imap(Box::new(ImapClient::new(
-                config,
-            )?))));
-        }
+    if backend.allows_imap()
+        && let Some(config) = account_config.imap.take()
+    {
+        return Ok(Some(BackendClient::Imap(Box::new(ImapClient::new(
+            config,
+        )?))));
     }
 
     Ok(None)

@@ -155,7 +155,12 @@ impl Serialize for GeneratedConfig {
 }
 
 /// Orients the setup from the input shape, then folds the chosen
-/// backend into a fresh default [`AccountConfig`].
+/// backend into a fresh [`AccountConfig`].
+///
+/// The account is left non-default so it does not hijack the default
+/// when the wizard's output is merged into a config that already has
+/// one. Being false, `default` is omitted from the printed TOML; the
+/// user marks their choice with `default = true`.
 fn build_account(account_name: &str, input: &str) -> Result<AccountConfig> {
     let chosen = if is_path(input) {
         configure_local(input)?
@@ -166,7 +171,7 @@ fn build_account(account_name: &str, input: &str) -> Result<AccountConfig> {
     };
 
     let mut account = AccountConfig {
-        default: true,
+        default: false,
         ..Default::default()
     };
 
@@ -231,7 +236,7 @@ fn configure_email(account_name: &str, input: &str) -> Result<Chosen> {
             return manual_fallback(account_name, &email);
         }
 
-        return dispatch(&email, choice);
+        return dispatch(account_name, &email, choice);
     }
 }
 
@@ -246,21 +251,23 @@ fn configure_email(account_name: &str, input: &str) -> Result<Chosen> {
     ),
     allow(unreachable_patterns)
 )]
-fn dispatch(email: &str, choice: Discovered) -> Result<Chosen> {
+fn dispatch(account_name: &str, email: &str, choice: Discovered) -> Result<Chosen> {
     match &choice.kind {
         #[cfg(all(feature = "imap", feature = "smtp"))]
         DiscoveredKind::ImapSmtp { .. } => {
-            let (imap, smtp) = imap_smtp::configure_discovered(email, &choice)?;
+            let (imap, smtp) = imap_smtp::configure_discovered(account_name, email, &choice)?;
             Ok(Chosen::ImapSmtp(Box::new(imap), Box::new(smtp)))
         }
         #[cfg(feature = "jmap")]
         DiscoveredKind::Jmap(_) => Ok(Chosen::Jmap(Box::new(jmap::configure_discovered(
-            email, &choice,
+            account_name,
+            email,
+            &choice,
         )?))),
         #[cfg(feature = "gmail")]
-        DiscoveredKind::Gmail => Ok(Chosen::Gmail(gmail::configure()?)),
+        DiscoveredKind::Gmail => Ok(Chosen::Gmail(gmail::configure(account_name)?)),
         #[cfg(feature = "msgraph")]
-        DiscoveredKind::Msgraph => Ok(Chosen::Msgraph(msgraph::configure()?)),
+        DiscoveredKind::Msgraph => Ok(Chosen::Msgraph(msgraph::configure(account_name)?)),
         kind => bail!("Configuration `{kind:?}` is not supported by this build"),
     }
 }
@@ -295,9 +302,11 @@ fn configure_server(account_name: &str, input: &str) -> Result<Chosen> {
             Ok(Chosen::ImapSmtp(Box::new(imap), Box::new(smtp)))
         }
         #[cfg(feature = "jmap")]
-        "http" | "https" | "jmap" | "jmaps" => {
-            Ok(Chosen::Jmap(Box::new(jmap::configure_manual(input, None)?)))
-        }
+        "http" | "https" | "jmap" | "jmaps" => Ok(Chosen::Jmap(Box::new(jmap::configure_manual(
+            account_name,
+            input,
+            None,
+        )?))),
         other => bail!("Unsupported server scheme `{other}`"),
     }
 }
@@ -342,9 +351,9 @@ fn print_oauth_note() {
     );
 }
 
-/// Proposes a default account name from the input shape: the local part
-/// of an email, the first label of a domain or host, or the folder name
-/// of a local path.
+/// Proposes a default account name from the input shape: the first
+/// label of the domain (of an email, host, or bare domain), or the
+/// folder name of a local path.
 fn default_account_name(input: &str) -> String {
     if is_path(input) {
         let raw = input.strip_prefix("file://").unwrap_or(input);
@@ -355,14 +364,13 @@ fn default_account_name(input: &str) -> String {
             .to_string();
     }
 
-    if let Ok(url) = Url::parse(input) {
-        if let Some(host) = url.host_str() {
-            return first_label(host);
-        }
+    if let Ok(url) = Url::parse(input)
+        && let Some(host) = url.host_str()
+    {
+        return first_label(host);
     }
 
     match input.rsplit_once('@') {
-        Some((local, _)) if !local.is_empty() => local.to_string(),
         Some((_, domain)) => first_label(domain),
         None => first_label(input),
     }
@@ -389,4 +397,29 @@ fn is_path(input: &str) -> bool {
 #[cfg(all(feature = "imap", feature = "smtp"))]
 fn split_email(email: &str) -> (&str, &str) {
     email.rsplit_once('@').unwrap_or(("", email))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn account_name_defaults_to_the_first_domain_label() {
+        // Email: the domain's first label, never the local part.
+        assert_eq!(default_account_name("clement.douin@posteo.net"), "posteo");
+        assert_eq!(default_account_name("alice@mail.example.co.uk"), "mail");
+        // Bare domain (as discovery synthesizes it) and plain domain.
+        assert_eq!(default_account_name("@posteo.net"), "posteo");
+        assert_eq!(default_account_name("posteo.net"), "posteo");
+    }
+
+    #[test]
+    fn account_name_defaults_to_the_last_path_component() {
+        assert_eq!(
+            default_account_name("/home/alice/mail/personal"),
+            "personal"
+        );
+        assert_eq!(default_account_name("~/mail/work"), "work");
+        assert_eq!(default_account_name("file:///var/mail/archive"), "archive");
+    }
 }

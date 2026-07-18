@@ -47,68 +47,68 @@ impl AccountCheckCommand {
         };
 
         #[cfg(feature = "imap")]
-        if backend.allows_imap() {
-            if let Some(imap_config) = &account_config.imap {
-                report
-                    .backends
-                    .push(BackendCheck::from("imap", connect_imap(imap_config)));
-            }
+        if backend.allows_imap()
+            && let Some(imap_config) = &account_config.imap
+        {
+            report
+                .backends
+                .push(BackendCheck::from("imap", connect_imap(imap_config)));
         }
 
         #[cfg(feature = "jmap")]
-        if backend.allows_jmap() {
-            if let Some(jmap_config) = &account_config.jmap {
-                report
-                    .backends
-                    .push(BackendCheck::from("jmap", connect_jmap(jmap_config)));
-            }
+        if backend.allows_jmap()
+            && let Some(jmap_config) = &account_config.jmap
+        {
+            report
+                .backends
+                .push(BackendCheck::from("jmap", connect_jmap(jmap_config)));
         }
 
         #[cfg(feature = "gmail")]
-        if backend.allows_gmail() {
-            if let Some(gmail_config) = &account_config.gmail {
-                report
-                    .backends
-                    .push(BackendCheck::from("gmail", connect_gmail(gmail_config)));
-            }
+        if backend.allows_gmail()
+            && let Some(gmail_config) = &account_config.gmail
+        {
+            report
+                .backends
+                .push(BackendCheck::from("gmail", connect_gmail(gmail_config)));
         }
 
         #[cfg(feature = "msgraph")]
-        if backend.allows_msgraph() {
-            if let Some(msgraph_config) = &account_config.msgraph {
-                report.backends.push(BackendCheck::from(
-                    "msgraph",
-                    connect_msgraph(msgraph_config),
-                ));
-            }
+        if backend.allows_msgraph()
+            && let Some(msgraph_config) = &account_config.msgraph
+        {
+            report.backends.push(BackendCheck::from(
+                "msgraph",
+                connect_msgraph(msgraph_config),
+            ));
         }
 
         #[cfg(feature = "maildir")]
-        if backend.allows_maildir() {
-            if let Some(maildir_config) = &account_config.maildir {
-                report.backends.push(BackendCheck::from(
-                    "maildir",
-                    connect_maildir(maildir_config),
-                ));
-            }
+        if backend.allows_maildir()
+            && let Some(maildir_config) = &account_config.maildir
+        {
+            report.backends.push(BackendCheck::from(
+                "maildir",
+                connect_maildir(maildir_config),
+            ));
         }
 
         #[cfg(feature = "m2dir")]
-        if backend.allows_m2dir() {
-            if let Some(m2dir_config) = &account_config.m2dir {
-                report
-                    .backends
-                    .push(BackendCheck::from("m2dir", connect_m2dir(m2dir_config)));
-            }
+        if backend.allows_m2dir()
+            && let Some(m2dir_config) = &account_config.m2dir
+        {
+            report
+                .backends
+                .push(BackendCheck::from("m2dir", connect_m2dir(m2dir_config)));
         }
 
         #[cfg(feature = "smtp")]
-        if backend.allows_smtp() {
-            if let Some(smtp_config) = &account_config.smtp {
-                report
-                    .backends
-                    .push(BackendCheck::from("smtp", connect_smtp(smtp_config)));
-            }
+        if backend.allows_smtp()
+            && let Some(smtp_config) = &account_config.smtp
+        {
+            report
+                .backends
+                .push(BackendCheck::from("smtp", connect_smtp(smtp_config)));
         }
 
         if report.backends.is_empty() {

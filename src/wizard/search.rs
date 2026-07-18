@@ -153,27 +153,26 @@ pub fn search(email: &str) -> Result<Vec<Discovered>> {
     // Google and Microsoft expose no JMAP: their dedicated set is
     // IMAP+SMTP plus a proprietary API, so JMAP is offered for other
     // providers only.
-    if provider.is_none() {
-        if let Some(jmap) = configs.iter().find(|c| c.service == DiscoveryService::Jmap) {
-            if let DiscoveryEndpoint::Http(url) = &jmap.endpoint {
-                let kind = DiscoveredKind::Jmap(url.clone());
-                push_entries(&mut found, kind, jmap.username.clone(), &jmap.auth);
-            }
-        }
+    if provider.is_none()
+        && let Some(jmap) = configs.iter().find(|c| c.service == DiscoveryService::Jmap)
+        && let DiscoveryEndpoint::Http(url) = &jmap.endpoint
+    {
+        let kind = DiscoveredKind::Jmap(url.clone());
+        push_entries(&mut found, kind, jmap.username.clone(), &jmap.auth);
     }
 
     // A detected provider restricts IMAP+SMTP to its own configs, so
     // the app-style dedicated set shows instead of every discovered
     // relay.
-    if let Some(imap) = best(&configs, DiscoveryService::Imap, provider) {
-        if let Some(endpoint) = tcp_endpoint(imap) {
-            let smtp = best(&configs, DiscoveryService::Smtp, provider).and_then(tcp_endpoint);
-            let kind = DiscoveredKind::ImapSmtp {
-                imap: endpoint,
-                smtp,
-            };
-            push_entries(&mut found, kind, imap.username.clone(), &imap.auth);
-        }
+    if let Some(imap) = best(&configs, DiscoveryService::Imap, provider)
+        && let Some(endpoint) = tcp_endpoint(imap)
+    {
+        let smtp = best(&configs, DiscoveryService::Smtp, provider).and_then(tcp_endpoint);
+        let kind = DiscoveredKind::ImapSmtp {
+            imap: endpoint,
+            smtp,
+        };
+        push_entries(&mut found, kind, imap.username.clone(), &imap.auth);
     }
 
     match provider {
@@ -295,10 +294,10 @@ fn tcp_endpoint(config: &DiscoveryServiceConfig) -> Option<TcpEndpoint> {
 /// avoids leaking the email domain to a third-party resolver and works
 /// around networks that block the default.
 pub fn discovery_resolver() -> Url {
-    if let Ok(resolver) = env::var("HIMALAYA_DNS_RESOLVER") {
-        if let Ok(url) = resolver.parse() {
-            return url;
-        }
+    if let Ok(resolver) = env::var("HIMALAYA_DNS_RESOLVER")
+        && let Ok(url) = resolver.parse()
+    {
+        return url;
     }
 
     if let Some(url) = system_resolver() {

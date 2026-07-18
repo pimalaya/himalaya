@@ -32,14 +32,14 @@ impl JmapEmailParseCommand {
         let mut bodies = Vec::new();
 
         for (_blob_id, email) in output.parsed {
-            if let Some(body_values) = &email.body_values {
-                if let Some(text_parts) = &email.text_body {
-                    for part in text_parts {
-                        if let Some(part_id) = &part.part_id {
-                            if let Some(body_value) = body_values.get(part_id) {
-                                bodies.push(body_value.value.clone());
-                            }
-                        }
+            if let Some(body_values) = &email.body_values
+                && let Some(text_parts) = &email.text_body
+            {
+                for part in text_parts {
+                    if let Some(part_id) = &part.part_id
+                        && let Some(body_value) = body_values.get(part_id)
+                    {
+                        bodies.push(body_value.value.clone());
                     }
                 }
             }

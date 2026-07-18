@@ -353,13 +353,13 @@ fn parse_addresses(raw: &str) -> Vec<Address> {
 }
 
 fn parse_address(part: &str) -> Address {
-    if let Some(open) = part.rfind('<') {
-        if let Some(end) = part[open..].find('>') {
-            let email = part[open + 1..open + end].trim().to_string();
-            let name = part[..open].trim().trim_matches('"').trim();
-            let name = (!name.is_empty()).then(|| name.to_string());
-            return Address { name, email };
-        }
+    if let Some(open) = part.rfind('<')
+        && let Some(end) = part[open..].find('>')
+    {
+        let email = part[open + 1..open + end].trim().to_string();
+        let name = part[..open].trim().trim_matches('"').trim();
+        let name = (!name.is_empty()).then(|| name.to_string());
+        return Address { name, email };
     }
     Address {
         name: None,

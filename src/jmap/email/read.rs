@@ -38,14 +38,14 @@ impl JmapEmailReadCommand {
 
         for email in &output.emails {
             if self.html {
-                if let Some(body_values) = &email.body_values {
-                    if let Some(html_parts) = &email.html_body {
-                        for part in html_parts {
-                            if let Some(part_id) = &part.part_id {
-                                if let Some(body_value) = body_values.get(part_id) {
-                                    content.push_str(&body_value.value);
-                                }
-                            }
+                if let Some(body_values) = &email.body_values
+                    && let Some(html_parts) = &email.html_body
+                {
+                    for part in html_parts {
+                        if let Some(part_id) = &part.part_id
+                            && let Some(body_value) = body_values.get(part_id)
+                        {
+                            content.push_str(&body_value.value);
                         }
                     }
                 }
@@ -66,15 +66,15 @@ impl JmapEmailReadCommand {
                     content.push_str(&format!("Date: {date}\n"));
                 }
 
-                if let Some(body_values) = &email.body_values {
-                    if let Some(text_parts) = &email.text_body {
-                        for part in text_parts {
-                            if let Some(part_id) = &part.part_id {
-                                if let Some(body_value) = body_values.get(part_id) {
-                                    content.push('\n');
-                                    content.push_str(&body_value.value);
-                                }
-                            }
+                if let Some(body_values) = &email.body_values
+                    && let Some(text_parts) = &email.text_body
+                {
+                    for part in text_parts {
+                        if let Some(part_id) = &part.part_id
+                            && let Some(body_value) = body_values.get(part_id)
+                        {
+                            content.push('\n');
+                            content.push_str(&body_value.value);
                         }
                     }
                 }

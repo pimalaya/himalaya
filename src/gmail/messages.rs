@@ -138,12 +138,12 @@ impl GmailMessageGetCommand {
 
         let msg = client.message_get(&self.id, format, &hs)?.response;
 
-        if format == GmailMessageFormat::Raw {
-            if let Some(raw) = &msg.raw {
-                let bytes =
-                    decode_raw(raw).map_err(|err| anyhow!("Decode Gmail message error: {err}"))?;
-                return write_bytes_or_save(printer, None, &bytes);
-            }
+        if format == GmailMessageFormat::Raw
+            && let Some(raw) = &msg.raw
+        {
+            let bytes =
+                decode_raw(raw).map_err(|err| anyhow!("Decode Gmail message error: {err}"))?;
+            return write_bytes_or_save(printer, None, &bytes);
         }
 
         let mut out = String::new();

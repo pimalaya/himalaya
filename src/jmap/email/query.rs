@@ -302,10 +302,10 @@ fn format_addresses(addrs: &[JmapEmailAddress]) -> String {
     addrs
         .iter()
         .map(|a| {
-            if let Some(name) = &a.name {
-                if !name.is_empty() {
-                    return name.clone();
-                }
+            if let Some(name) = &a.name
+                && !name.is_empty()
+            {
+                return name.clone();
             }
             a.email.clone()
         })

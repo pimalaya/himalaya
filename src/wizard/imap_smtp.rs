@@ -31,6 +31,7 @@ use crate::{
 /// to the email) and the secret are prompted, and the same credential
 /// backs both protocols.
 pub fn configure_discovered(
+    account_name: &str,
     email: &str,
     discovered: &Discovered,
 ) -> Result<(ImapConfig, SmtpConfig)> {
@@ -41,9 +42,11 @@ pub fn configure_discovered(
     let default_login = discovered.login_default(email);
     let login = prompt::text("Login:", default_login.as_deref())?;
 
+    // IMAP and SMTP share one credential on the discovered path, so key
+    // it by the account alone rather than per protocol.
     let sasl = match discovered.auth {
         DiscoveredAuth::Password => {
-            let passwd = secret::configure("Password", None)?;
+            let passwd = secret::configure("Password", account_name, &[])?;
             SaslConfig::Plain(SaslPlainConfig {
                 authzid: None,
                 authcid: login,
@@ -51,7 +54,7 @@ pub fn configure_discovered(
             })
         }
         DiscoveredAuth::Token => {
-            let token = secret::configure("API token", Some("ortie token show"))?;
+            let token = secret::configure("API token", account_name, &secret::ortie(account_name))?;
             SaslConfig::Oauthbearer(SaslOauthbearerConfig {
                 username: login,
                 token,
