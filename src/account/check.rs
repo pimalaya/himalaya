@@ -163,7 +163,7 @@ pub fn test_account(account_config: &AccountConfig) -> Result<()> {
 }
 
 #[cfg(feature = "imap")]
-fn connect_imap(imap_config: &crate::config::ImapConfig) -> Result<()> {
+pub(crate) fn connect_imap(imap_config: &crate::config::ImapConfig) -> Result<()> {
     use io_imap::client::ImapClientStd;
     use pimalaya_stream::sasl::Sasl;
 
@@ -267,7 +267,7 @@ fn connect_m2dir(m2dir_config: &crate::config::M2dirConfig) -> Result<()> {
 }
 
 #[cfg(feature = "smtp")]
-fn connect_smtp(smtp_config: &crate::config::SmtpConfig) -> Result<()> {
+pub(crate) fn connect_smtp(smtp_config: &crate::config::SmtpConfig) -> Result<()> {
     use std::net::Ipv4Addr;
 
     use io_smtp::{client::SmtpClientStd, rfc5321::SmtpEhloDomain};

@@ -5,74 +5,115 @@
 //! [`configure_manual`] handles a typed server URL: it prompts the
 //! authentication strategy too.
 
+use std::collections::HashMap;
+
 use anyhow::{Result, bail};
-use pimalaya_cli::prompt;
+use pimalaya_cli::{prompt, spinner::Spinner};
 
 use crate::{
     config::{JmapAuthConfig, JmapConfig},
+    jmap::client::JmapClient,
     wizard::{
-        search::{Discovered, DiscoveredAuth, DiscoveredKind},
+        mailbox,
+        search::{AuthCaps, Discovered, DiscoveredKind},
         secret,
     },
 };
 
 const BASIC: &str = "Basic (login + password)";
 const BEARER: &str = "Bearer (API token)";
-const AUTHS: [&str; 2] = [BASIC, BEARER];
 
-/// Configures JMAP from a discovered entry: the endpoint and the
-/// authentication method are pinned, only the credentials are prompted.
+/// Configures JMAP from a discovered entry: the endpoint is pinned, the
+/// HTTP authentication scheme is picked among the advertised ones (skipped
+/// when only one qualifies), then its credentials are prompted. The
+/// connection is tested and its role-based `mailbox.alias.*` entries
+/// discovered on the same session, so the caller skips the final account
+/// test.
 pub fn configure_discovered(
     account_name: &str,
     email: &str,
     discovered: &Discovered,
-) -> Result<JmapConfig> {
+) -> Result<(JmapConfig, HashMap<String, String>)> {
     let DiscoveredKind::Jmap(server) = &discovered.kind else {
         bail!("Expected a JMAP configuration");
     };
 
-    let key = format!("{account_name}-jmap");
-    let auth = match discovered.auth {
-        DiscoveredAuth::Password => {
-            let default_login = discovered.login_default(email);
-            let username = prompt::text("Login:", default_login.as_deref())?;
-            let password = secret::configure("JMAP password", &key, &[])?;
-            JmapAuthConfig::Basic { username, password }
-        }
-        DiscoveredAuth::Token => {
-            let token = secret::configure("JMAP API token", &key, &secret::ortie(account_name))?;
-            JmapAuthConfig::Bearer { token }
-        }
-        DiscoveredAuth::OAuth => bail!("OAuth 2.0 cannot be configured directly"),
-    };
+    let auth = prompt_auth(
+        account_name,
+        discovered.login_default(email).as_deref(),
+        discovered.auth,
+    )?;
 
-    Ok(jmap_config(server.clone(), auth))
+    let config = jmap_config(server.clone(), auth);
+    let aliases = test_and_discover(&config)?;
+
+    Ok((config, aliases))
 }
 
-/// Configures JMAP against a typed `server` URL, prompting the
-/// authentication strategy and credentials.
+/// Connects to JMAP — the connection test — and best-effort discovers the
+/// role-based mailbox aliases on the same session. A failed connection is
+/// the wizard's error; a failed listing only means fewer aliases.
+fn test_and_discover(config: &JmapConfig) -> Result<HashMap<String, String>> {
+    let spinner = Spinner::start("Testing JMAP connection");
+
+    let mut client = match JmapClient::new(config.clone()) {
+        Ok(client) => client,
+        Err(err) => {
+            spinner.failure("JMAP connection failed");
+            return Err(err);
+        }
+    };
+
+    spinner.success("JMAP connection succeeded");
+    Ok(mailbox::jmap_aliases(&mut client))
+}
+
+/// Configures JMAP against a typed `server` URL: every scheme is on offer
+/// (discovery advertised none), the token flow includes the OAuth brokers.
 pub fn configure_manual(
     account_name: &str,
     server: &str,
     login_hint: Option<&str>,
 ) -> Result<JmapConfig> {
-    let strategy = prompt::item("JMAP authentication:", AUTHS, None)?;
+    let auth = prompt_auth(account_name, login_hint, AuthCaps::default())?;
+    Ok(jmap_config(server.to_string(), auth))
+}
+
+/// Prompts the HTTP authentication scheme from `caps` (both offered when
+/// none was advertised), then its credentials. The Bearer token flow shows
+/// the OAuth brokers only when a grant was advertised.
+fn prompt_auth(
+    account_name: &str,
+    login_hint: Option<&str>,
+    caps: AuthCaps,
+) -> Result<JmapAuthConfig> {
+    let mut schemes = Vec::new();
+    if caps.basic || !caps.any() {
+        schemes.push(BASIC);
+    }
+    if caps.token() || !caps.any() {
+        schemes.push(BEARER);
+    }
+
+    let scheme = if schemes.len() == 1 {
+        schemes[0]
+    } else {
+        prompt::item("JMAP authentication:", schemes, None)?
+    };
 
     let key = format!("{account_name}-jmap");
-    let auth = match strategy {
+    Ok(match scheme {
         BASIC => {
             let username = prompt::text("Login:", login_hint)?;
-            let password = secret::configure("JMAP password", &key, &[])?;
+            let password = secret::configure_password("JMAP password", &key)?;
             JmapAuthConfig::Basic { username, password }
         }
         BEARER => {
-            let token = secret::configure("JMAP API token", &key, &secret::ortie(account_name))?;
+            let token = secret::configure_token("JMAP API token", &key, caps.oauth || !caps.any())?;
             JmapAuthConfig::Bearer { token }
         }
         _ => unreachable!(),
-    };
-
-    Ok(jmap_config(server.to_string(), auth))
+    })
 }
 
 fn jmap_config(server: String, auth: JmapAuthConfig) -> JmapConfig {

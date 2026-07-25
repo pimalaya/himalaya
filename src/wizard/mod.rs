@@ -8,6 +8,13 @@ pub mod imap_smtp;
 pub mod jmap;
 #[cfg(any(feature = "maildir", feature = "m2dir"))]
 pub mod local;
+#[cfg(any(
+    feature = "imap",
+    feature = "jmap",
+    feature = "gmail",
+    feature = "msgraph"
+))]
+pub mod mailbox;
 #[cfg(feature = "msgraph")]
 pub mod msgraph;
 pub mod search;

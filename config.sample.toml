@@ -195,7 +195,7 @@ imap.sasl.plain.password.raw = "***"
 # https://datatracker.ietf.org/doc/html/rfc7628
 #imap.sasl.oauthbearer.username = "user@example.com"
 #imap.sasl.oauthbearer.token.raw = "***"
-#imap.sasl.oauthbearer.token.command = ["ortie", "token", "read", "example"]
+#imap.sasl.oauthbearer.token.command = ["ortie", "token", "show", "-a", "example"]
 
 # SASL XOAUTH2 (Google's pre-standard OAuth 2.0 SASL).
 # https://developers.google.com/gmail/imap/xoauth2-protocol
@@ -249,11 +249,11 @@ imap.sasl.plain.password.raw = "***"
 
 # Raw `Authorization` header value, used verbatim.
 #jmap.auth.header.raw = "Bearer eyJhbGciOiJ..."
-#jmap.auth.header.command = "pass show fastmail-token"
+#jmap.auth.header.command = ["pass", "show", "fastmail-token"]
 
 # OAuth 2.0 / API token bearer.
 #jmap.auth.bearer.token.raw = "***"
-#jmap.auth.bearer.token.command = ["mimosa", "password", "read", "fastmail-api"]
+#jmap.auth.bearer.token.command = ["ortie", "token", "show", "-a", "fastmail"]
 
 # HTTP Basic.
 #jmap.auth.basic.username = "user@example.com"
@@ -299,7 +299,7 @@ imap.sasl.plain.password.raw = "***"
 # (token refresh is the caller's responsibility). The client adds the `Bearer `
 # prefix itself.
 #gmail.auth.token.raw = "***"
-#gmail.auth.token.command = ["ortie", "access-token", "read", "gmail"]
+#gmail.auth.token.command = ["ortie", "token", "show", "-a", "gmail"]
 
 # --------------------------------------------------------------------------------
 # Microsoft Graph config
@@ -328,7 +328,7 @@ imap.sasl.plain.password.raw = "***"
 # (token refresh is the caller's responsibility). The client adds the `Bearer `
 # prefix itself.
 #msgraph.auth.token.raw = "***"
-#msgraph.auth.token.command = ["ortie", "access-token", "read", "msgraph"]
+#msgraph.auth.token.command = ["ortie", "token", "show", "-a", "msgraph"]
 
 # --------------------------------------------------------------------------------
 # Maildir config

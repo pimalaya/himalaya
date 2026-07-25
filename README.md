@@ -284,12 +284,12 @@ Microsoft has retired basic authentication: use OAuth 2.0 via `oauthbearer` or `
 
 imap.server = "imaps://outlook.office365.com:993"
 imap.sasl.xoauth2.username = "example@outlook.com"
-imap.sasl.xoauth2.token.command = ["ortie", "token", "read", "outlook"]
+imap.sasl.xoauth2.token.command = ["ortie", "token", "show", "-a", "outlook"]
 
 smtp.server = "smtp://smtp-mail.outlook.com:587"
 smtp.starttls = true
 smtp.sasl.xoauth2.username = "example@outlook.com"
-smtp.sasl.xoauth2.token.command = ["ortie", "token", "read", "outlook"]
+smtp.sasl.xoauth2.token.command = ["ortie", "token", "show", "-a", "outlook"]
 ```
 
 To use the native Microsoft Graph API instead of IMAP/SMTP, replace the blocks above with a single OAuth 2.0 bearer token (sending goes through Graph too, so no SMTP is needed):

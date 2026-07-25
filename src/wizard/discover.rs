@@ -11,16 +11,17 @@
 //! onboarding:
 //!
 //! - an email (or bare domain) runs io-pim-discovery's parallel
-//!   discovery (see [`super::search`]) and every reachable service and
-//!   authentication method becomes one selectable configuration; a
-//!   detected Google or Microsoft account collapses to its dedicated
-//!   set;
+//!   discovery (see [`super::search`]) and every reachable service
+//!   becomes one selectable configuration; picking one then prompts its
+//!   authentication method (SASL mechanism or HTTP scheme) among those
+//!   advertised; a detected Google or Microsoft account collapses to its
+//!   dedicated set;
 //! - a `scheme://` URL is a server to configure by hand;
 //! - an existing folder is a local Maildir or m2dir.
 //!
-//! OAuth 2.0 entries appear in the list but cannot be configured here:
-//! selecting one prints a note pointing at an external token manager
-//! and returns to the list.
+//! Himalaya runs no OAuth 2.0 grant itself: a grant only unlocks the
+//! external token brokers (Ortie, pizauth, oama) behind the API token
+//! credential prompt (see [`super::secret`]).
 
 use std::{collections::HashMap, fmt, path::Path};
 
@@ -50,12 +51,14 @@ use crate::wizard::imap_smtp;
 use crate::wizard::jmap;
 #[cfg(any(feature = "maildir", feature = "m2dir"))]
 use crate::wizard::local;
+#[cfg(any(feature = "gmail", feature = "msgraph"))]
+use crate::wizard::mailbox;
 #[cfg(feature = "msgraph")]
 use crate::wizard::msgraph;
 use crate::{
     account::check,
     config::{AccountConfig, Config},
-    wizard::search::{self, Discovered, DiscoveredAuth, DiscoveredKind},
+    wizard::search::{self, Discovered, DiscoveredKind},
 };
 
 /// The endpoint prompt label, shared by the create flow.
@@ -88,18 +91,25 @@ pub fn run(printer: &mut impl Printer) -> Result<()> {
         bail!("Empty input: enter an email address, a server URL, or a folder path");
     }
 
-    let account_name = prompt::text("Account name:", Some(&default_account_name(input)))?;
-    let account = build_account(&account_name, input)?;
+    // The account name is derived from the input, not prompted: it is
+    // just the TOML table key, which the user renames by hand in the
+    // printed config if they want something else.
+    let account_name = default_account_name(input);
+    let (account, tested) = build_account(&account_name, input)?;
 
     // Test the account before printing it: a bad credential or endpoint
     // fails here and stops the process, like any other error, rather
-    // than emitting a config that cannot connect.
-    let spinner = Spinner::start("Testing account configuration");
-    if let Err(err) = check::test_account(&account) {
-        spinner.failure("Account configuration test failed");
-        return Err(err);
+    // than emitting a config that cannot connect. The IMAP+SMTP flow
+    // already tests each protocol as it configures them, so skip the
+    // redundant round-trip in that case.
+    if !tested {
+        let spinner = Spinner::start("Testing account configuration");
+        if let Err(err) = check::test_account(&account) {
+            spinner.failure("Account configuration test failed");
+            return Err(err);
+        }
+        spinner.success("Account configuration is valid");
     }
-    spinner.success("Account configuration is valid");
 
     let config = Config {
         accounts: HashMap::from([(account_name, account)]),
@@ -138,6 +148,12 @@ impl fmt::Display for GeneratedConfig {
         )?;
         writeln!(f, "#   himalaya > ~/.config/himalaya/config.toml")?;
         writeln!(f, "#")?;
+        writeln!(
+            f,
+            "# The account name (the [accounts.*] table key) is derived"
+        )?;
+        writeln!(f, "# from your input; rename it to anything you like.")?;
+        writeln!(f, "#")?;
         writeln!(f, "# Every field is documented in the sample config:")?;
         writeln!(
             f,
@@ -154,18 +170,47 @@ impl Serialize for GeneratedConfig {
     }
 }
 
+/// The result of a configure flow: the chosen backend, whether it
+/// already validated its connections (so the caller skips the final
+/// account test), and any `mailbox.alias.*` entries discovered from the
+/// server.
+struct Outcome {
+    chosen: Chosen,
+    tested: bool,
+    aliases: HashMap<String, String>,
+}
+
+impl Outcome {
+    /// A not-yet-tested outcome with no discovered aliases, for the flows
+    /// that defer validation to the final account test (manual entry, the
+    /// proprietary APIs, local backends).
+    fn untested(chosen: Chosen) -> Self {
+        Self {
+            chosen,
+            tested: false,
+            aliases: HashMap::new(),
+        }
+    }
+}
+
 /// Orients the setup from the input shape, then folds the chosen
-/// backend into a fresh [`AccountConfig`].
+/// backend into a fresh [`AccountConfig`]. The returned flag reports
+/// whether the flow already validated its connections (the IMAP+SMTP and
+/// JMAP paths do), so the caller can skip the final account test.
 ///
 /// The account is left non-default so it does not hijack the default
 /// when the wizard's output is merged into a config that already has
 /// one. Being false, `default` is omitted from the printed TOML; the
 /// user marks their choice with `default = true`.
-fn build_account(account_name: &str, input: &str) -> Result<AccountConfig> {
-    let chosen = if is_path(input) {
-        configure_local(input)?
+fn build_account(account_name: &str, input: &str) -> Result<(AccountConfig, bool)> {
+    let Outcome {
+        chosen,
+        tested,
+        aliases,
+    } = if is_path(input) {
+        Outcome::untested(configure_local(input)?)
     } else if input.contains("://") {
-        configure_server(account_name, input)?
+        Outcome::untested(configure_server(account_name, input)?)
     } else {
         configure_email(account_name, input)?
     };
@@ -193,14 +238,19 @@ fn build_account(account_name: &str, input: &str) -> Result<AccountConfig> {
         Chosen::M2dir(m2dir) => account.m2dir = Some(m2dir),
     }
 
-    Ok(account)
+    // Pre-fill the discovered special-use aliases (e.g. the default
+    // `inbox`), so shared commands resolve a mailbox without the user
+    // hand-editing ids. Empty for the flows that discover none.
+    account.mailbox.aliases = aliases;
+
+    Ok((account, tested))
 }
 
 /// Runs the email-driven discovery flow: search the services reachable
-/// from the address, let the user pick one (OAuth entries loop back
-/// with a note), and configure its backend. Falls back to manual
-/// IMAP+SMTP entry when nothing is discovered.
-fn configure_email(account_name: &str, input: &str) -> Result<Chosen> {
+/// from the address, let the user pick one, then configure its backend
+/// (the authentication method is picked in a second, service-specific
+/// prompt). Falls back to manual IMAP+SMTP entry when nothing is found.
+fn configure_email(account_name: &str, input: &str) -> Result<Outcome> {
     let email = if input.contains('@') {
         input.to_string()
     } else {
@@ -213,34 +263,20 @@ fn configure_email(account_name: &str, input: &str) -> Result<Chosen> {
 
     if found.is_empty() {
         spinner.failure("No configuration found");
-        return manual_fallback(account_name, &email);
+        return Ok(Outcome::untested(manual_fallback(account_name, &email)?));
     }
     spinner.success(format!("Found {} configuration(s)", found.len()));
 
-    // OAuth entries loop back with a note, but only when a usable
-    // configuration remains to fall back on; otherwise the note is
-    // shown and the manual flow takes over so the user is not trapped.
-    let has_usable = found
-        .iter()
-        .any(|entry| entry.auth != DiscoveredAuth::OAuth);
+    let default = found.first().cloned();
+    let choice = prompt::item("Choose a configuration:", found, default)?;
 
-    loop {
-        let default = found.first().cloned();
-        let choice = prompt::item("Choose a configuration:", found.clone(), default)?;
-
-        if choice.auth == DiscoveredAuth::OAuth {
-            print_oauth_note();
-            if has_usable {
-                continue;
-            }
-            return manual_fallback(account_name, &email);
-        }
-
-        return dispatch(account_name, &email, choice);
-    }
+    dispatch(account_name, &email, choice)
 }
 
-/// Configures the backend behind a discovered entry.
+/// Configures the backend behind a discovered entry. The IMAP+SMTP and
+/// JMAP flows test their connections inline (marking the outcome tested)
+/// and discover their `mailbox.alias.*` on the same session; the others
+/// defer to the final account test and discover no aliases.
 #[cfg_attr(
     all(
         feature = "imap",
@@ -251,23 +287,43 @@ fn configure_email(account_name: &str, input: &str) -> Result<Chosen> {
     ),
     allow(unreachable_patterns)
 )]
-fn dispatch(account_name: &str, email: &str, choice: Discovered) -> Result<Chosen> {
+fn dispatch(account_name: &str, email: &str, choice: Discovered) -> Result<Outcome> {
     match &choice.kind {
         #[cfg(all(feature = "imap", feature = "smtp"))]
         DiscoveredKind::ImapSmtp { .. } => {
-            let (imap, smtp) = imap_smtp::configure_discovered(account_name, email, &choice)?;
-            Ok(Chosen::ImapSmtp(Box::new(imap), Box::new(smtp)))
+            let (imap, smtp, aliases) =
+                imap_smtp::configure_discovered(account_name, email, &choice)?;
+            Ok(Outcome {
+                chosen: Chosen::ImapSmtp(Box::new(imap), Box::new(smtp)),
+                tested: true,
+                aliases,
+            })
         }
         #[cfg(feature = "jmap")]
-        DiscoveredKind::Jmap(_) => Ok(Chosen::Jmap(Box::new(jmap::configure_discovered(
-            account_name,
-            email,
-            &choice,
-        )?))),
+        DiscoveredKind::Jmap(_) => {
+            let (jmap, aliases) = jmap::configure_discovered(account_name, email, &choice)?;
+            Ok(Outcome {
+                chosen: Chosen::Jmap(Box::new(jmap)),
+                tested: true,
+                aliases,
+            })
+        }
+        // Gmail and Graph expose special-use mailboxes through fixed
+        // platform contracts (system-label ids / well-known names), so
+        // their aliases are pinned without a live listing. The connection
+        // is still validated by the final account test.
         #[cfg(feature = "gmail")]
-        DiscoveredKind::Gmail => Ok(Chosen::Gmail(gmail::configure(account_name)?)),
+        DiscoveredKind::Gmail => Ok(Outcome {
+            chosen: Chosen::Gmail(gmail::configure(account_name)?),
+            tested: false,
+            aliases: mailbox::gmail_aliases(),
+        }),
         #[cfg(feature = "msgraph")]
-        DiscoveredKind::Msgraph => Ok(Chosen::Msgraph(msgraph::configure(account_name)?)),
+        DiscoveredKind::Msgraph => Ok(Outcome {
+            chosen: Chosen::Msgraph(msgraph::configure(account_name)?),
+            tested: false,
+            aliases: mailbox::msgraph_aliases(),
+        }),
         kind => bail!("Configuration `{kind:?}` is not supported by this build"),
     }
 }
@@ -343,14 +399,6 @@ fn retain_supported(found: &mut Vec<Discovered>) {
     });
 }
 
-/// Prints the note shown when an OAuth 2.0 entry is selected, before
-/// returning to the configuration list.
-fn print_oauth_note() {
-    println!(
-        "OAuth 2.0 is not configured directly by Himalaya; install an external token manager such as Ortie, then choose the \"API token\" configuration"
-    );
-}
-
 /// Proposes a default account name from the input shape: the first
 /// label of the domain (of an email, host, or bare domain), or the
 /// folder name of a local path.
@@ -421,5 +469,24 @@ mod tests {
         );
         assert_eq!(default_account_name("~/mail/work"), "work");
         assert_eq!(default_account_name("file:///var/mail/archive"), "archive");
+    }
+
+    #[test]
+    fn discovered_aliases_render_as_a_mailbox_alias_table() {
+        let mut account = AccountConfig::default();
+        account
+            .mailbox
+            .aliases
+            .insert("inbox".to_string(), "INBOX".to_string());
+
+        let config = Config {
+            accounts: HashMap::from([("posteo".to_string(), account)]),
+            ..Default::default()
+        };
+        let rendered = GeneratedConfig(config).to_string();
+
+        // The pre-filled alias lands under the account's mailbox table.
+        assert!(rendered.contains("[accounts.posteo]"));
+        assert!(rendered.contains("mailbox.alias.inbox = \"INBOX\""));
     }
 }

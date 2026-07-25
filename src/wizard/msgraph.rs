@@ -14,15 +14,15 @@ use crate::{
 
 /// Runs the Microsoft Graph wizard, returning a ready [`MsgraphConfig`].
 pub fn configure(account_name: &str) -> Result<MsgraphConfig> {
-    println!(
-        "Microsoft Graph uses OAuth 2.0 tokens; issue and refresh them with an external manager such as Ortie"
+    eprintln!(
+        "Microsoft Graph uses OAuth 2.0 tokens; issue and refresh them with an external broker such as Ortie."
     );
 
     let user_id = prompt::text("Microsoft Graph user id:", Some("me"))?;
-    let token = secret::configure(
+    let token = secret::configure_token(
         "Microsoft Graph access token",
         &format!("{account_name}-msgraph"),
-        &secret::ortie(account_name),
+        true,
     )?;
 
     Ok(MsgraphConfig {

@@ -14,16 +14,13 @@ use crate::{
 
 /// Runs the Gmail wizard, returning a ready [`GmailConfig`].
 pub fn configure(account_name: &str) -> Result<GmailConfig> {
-    println!(
-        "Gmail uses OAuth 2.0 tokens; issue and refresh them with an external manager such as Ortie"
+    eprintln!(
+        "Gmail uses OAuth 2.0 tokens; issue and refresh them with an external broker such as Ortie."
     );
 
     let user_id = prompt::text("Gmail user id:", Some("me"))?;
-    let token = secret::configure(
-        "Gmail access token",
-        &format!("{account_name}-gmail"),
-        &secret::ortie(account_name),
-    )?;
+    let token =
+        secret::configure_token("Gmail access token", &format!("{account_name}-gmail"), true)?;
 
     Ok(GmailConfig {
         user_id,

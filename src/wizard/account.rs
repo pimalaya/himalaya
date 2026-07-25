@@ -55,7 +55,8 @@ fn build_sasl_imap(login: &str, auth: ImapAuth) -> Result<SaslConfig> {
     let ImapAuth::Password(secret) = auth;
     let passwd = match secret {
         ImapSecret::Raw(s) => Secret::Raw(s),
-        ImapSecret::Command(cmd) => Secret::Command(parse_cmd(&cmd)?),
+        ImapSecret::Command(argv) => command_secret(argv)?,
+        ImapSecret::Shell(line) => shell_secret(&line)?,
     };
 
     Ok(plain_sasl(login, passwd))
@@ -65,7 +66,8 @@ fn build_sasl_smtp(login: &str, auth: SmtpAuth) -> Result<SaslConfig> {
     let SmtpAuth::Password(secret) = auth;
     let passwd = match secret {
         SmtpSecret::Raw(s) => Secret::Raw(s),
-        SmtpSecret::Command(cmd) => Secret::Command(parse_cmd(&cmd)?),
+        SmtpSecret::Command(argv) => command_secret(argv)?,
+        SmtpSecret::Shell(line) => shell_secret(&line)?,
     };
 
     Ok(plain_sasl(login, passwd))
@@ -79,12 +81,29 @@ fn plain_sasl(login: &str, passwd: Secret) -> SaslConfig {
     })
 }
 
-fn parse_cmd(cmd: &str) -> Result<Command> {
-    let line = cmd.trim();
+/// Builds a [`Secret::Command`] from an argv (program + arguments, no
+/// shell), the form a known keyring provider or token broker yields. It
+/// serializes back as a TOML array. Shared with [`super::secret`].
+pub(crate) fn command_secret(argv: Vec<String>) -> Result<Secret> {
+    let Some((program, args)) = argv.split_first() else {
+        bail!("Empty command for secret");
+    };
+
+    let mut cmd = Command::new(program);
+    cmd.args(args);
+    Ok(Secret::Command(cmd))
+}
+
+/// Builds a [`Secret::Command`] from a shell command line, the fallback
+/// form a user typed by hand. It serializes back as a TOML string.
+/// Shared with [`super::secret`].
+pub(crate) fn shell_secret(line: &str) -> Result<Secret> {
+    let line = line.trim();
     if line.is_empty() {
         bail!("Empty shell command for secret");
     }
-    Ok(shell(line))
+
+    Ok(Secret::Command(shell(line)))
 }
 
 #[cfg(test)]
@@ -97,7 +116,9 @@ mod tests {
             port,
             encryption,
             login: "user@example.com".into(),
-            auth: ImapAuth::Password(ImapSecret::Command("pass show example".into())),
+            auth: ImapAuth::Password(ImapSecret::Command(
+                ["pass", "show", "example"].map(String::from).to_vec(),
+            )),
         }
     }
 
@@ -127,7 +148,9 @@ mod tests {
             port: 465,
             encryption: SmtpEncryption::Tls,
             login: "user@example.com".into(),
-            auth: SmtpAuth::Password(SmtpSecret::Command("pass show example".into())),
+            auth: SmtpAuth::Password(SmtpSecret::Command(
+                ["pass", "show", "example"].map(String::from).to_vec(),
+            )),
         };
         let config = smtp_to_config(wizard).unwrap();
         assert_eq!(config.server, "smtps://smtp.example.com:465");
@@ -135,9 +158,16 @@ mod tests {
     }
 
     #[test]
-    fn blank_secret_command_is_rejected() {
+    fn empty_command_secret_is_rejected() {
         let mut wizard = imap(ImapEncryption::Tls, 993);
-        wizard.auth = ImapAuth::Password(ImapSecret::Command("   ".into()));
+        wizard.auth = ImapAuth::Password(ImapSecret::Command(Vec::new()));
+        assert!(imap_to_config(wizard).is_err());
+    }
+
+    #[test]
+    fn blank_shell_secret_is_rejected() {
+        let mut wizard = imap(ImapEncryption::Tls, 993);
+        wizard.auth = ImapAuth::Password(ImapSecret::Shell("   ".into()));
         assert!(imap_to_config(wizard).is_err());
     }
 }

@@ -36,7 +36,7 @@ pimalaya-cli = { version = "0.1", default-features = false, features = ["build"]
 
 [dependencies]
 anyhow = "1"
-base64 = { version = "0.22", optional = true }
+base64 = { version = "0.23", optional = true }
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 clap = { version = "4.4", features = ["derive", "wrap_help"] }
 comfy-table = "7"
@@ -75,11 +75,7 @@ url = { version = "2.2", features = ["serde"] }
 uds_windows = "1"
 
 [patch.crates-io]
-# TODO: drop once the keyring-picker wizard change is released
-pimalaya-cli.git = "https://github.com/pimalaya/cli"
-# TODO: drop once version > 0.1.0 released
-pimalaya-config.git = "https://github.com/pimalaya/config"
-# TODO: drop once version > 0.2.0 released
-io-imap.git = "https://github.com/pimalaya/io-imap"
-# TODO: drop once io-gmail G4 fix (empty-body parsing) is released
 io-gmail.git = "https://github.com/pimalaya/io-gmail"
+io-imap.git = "https://github.com/pimalaya/io-imap"
+pimalaya-cli.git = "https://github.com/pimalaya/cli"
+pimalaya-config.git = "https://github.com/pimalaya/config"

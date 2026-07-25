@@ -4,11 +4,12 @@
 //! the address feeds io-pim-discovery's parallel discovery (fixed
 //! provider rules, PACC, Mozilla autoconfig, RFC 6186 SRV, RFC 8620
 //! JMAP resolve, with a final WWW-Authenticate probe refining the
-//! advertised schemes), and every reachable service and authentication
-//! method becomes one selectable entry. A detected Google or Microsoft
-//! account collapses to its dedicated configurations (the proprietary
-//! Gmail / Graph APIs plus IMAP+SMTP), matching the app's provider
-//! short-circuit.
+//! advertised schemes), and every reachable service becomes one
+//! selectable entry carrying the authentication capabilities it
+//! advertised (the concrete method is picked once the service is
+//! chosen). A detected Google or Microsoft account collapses to its
+//! dedicated configurations (the proprietary Gmail / Graph APIs plus
+//! IMAP+SMTP), matching the app's provider short-circuit.
 
 use std::{collections::BTreeSet, env, fmt};
 
@@ -31,15 +32,17 @@ use url::Url;
 /// is unset and no system resolver is found: Cloudflare's `1.1.1.1`.
 const DEFAULT_RESOLVER: &str = "tcp://1.1.1.1:53";
 
-/// One selectable way to reach the account: a discovered service
-/// paired with one of its authentication methods.
+/// One selectable service to reach the account, carrying the
+/// authentication capabilities it advertised. The concrete method (SASL
+/// mechanism, HTTP scheme) is picked in a second prompt once the service
+/// is chosen, so a service appears exactly once in the list.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Discovered {
     pub kind: DiscoveredKind,
     /// Login hint advertised by the mechanism (usually the email).
     pub username: Option<String>,
-    /// How to authenticate against the service.
-    pub auth: DiscoveredAuth,
+    /// What the service accepts, folded across its discovered methods.
+    pub auth: AuthCaps,
 }
 
 /// The discovered service kind, carrying its endpoint for the open
@@ -68,32 +71,46 @@ pub struct TcpEndpoint {
     pub security: DiscoverySecurity,
 }
 
-/// The discovered authentication method. OAuth 2.0 grants stay distinct
-/// from bearer tokens: Himalaya reads a token an external manager (such
-/// as Ortie) issues, but never runs a grant itself, so an OAuth entry
-/// only points the user at that manager (see [`super::discover`]).
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum DiscoveredAuth {
-    Password,
-    Token,
-    OAuth,
+/// The authentication capabilities a service advertised, folded across
+/// all its discovered methods. It drives the per-service auth prompt:
+/// which SASL mechanisms or HTTP schemes to offer, and whether the OAuth
+/// token brokers appear. Himalaya reads a token an external manager (such
+/// as Ortie) issues but never runs a grant itself, so OAuth is not a
+/// method of its own here: it only unlocks the brokers behind the API
+/// token flow (see [`super::secret`]).
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct AuthCaps {
+    /// Basic/password auth: SASL PLAIN/LOGIN/SCRAM for IMAP+SMTP, Basic
+    /// for JMAP. Often an app password (e.g. Fastmail, Gmail).
+    pub basic: bool,
+    /// A static bearer/API token: SASL OAUTHBEARER/XOAUTH2 for IMAP+SMTP,
+    /// Bearer for JMAP.
+    pub bearer: bool,
+    /// An OAuth 2.0 grant is advertised, so a broker can issue the token.
+    pub oauth: bool,
+}
+
+impl AuthCaps {
+    /// Whether any capability was advertised. When none was (a mechanism
+    /// that names no auth), the auth prompt offers every method so the
+    /// user is never left without a choice.
+    pub fn any(self) -> bool {
+        self.basic || self.bearer || self.oauth
+    }
+
+    /// Whether a token (static or broker-issued) is on offer.
+    pub fn token(self) -> bool {
+        self.bearer || self.oauth
+    }
 }
 
 impl fmt::Display for Discovered {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let auth = match self.auth {
-            DiscoveredAuth::Password => "Password",
-            DiscoveredAuth::Token => "API token",
-            DiscoveredAuth::OAuth => "OAuth 2.0",
-        };
-
         match &self.kind {
-            DiscoveredKind::ImapSmtp { imap, .. } => {
-                write!(f, "IMAP + SMTP {} ({auth})", imap.host)
-            }
-            DiscoveredKind::Jmap(url) => write!(f, "JMAP {url} ({auth})"),
-            DiscoveredKind::Gmail => write!(f, "Gmail API ({auth})"),
-            DiscoveredKind::Msgraph => write!(f, "Microsoft Graph API ({auth})"),
+            DiscoveredKind::ImapSmtp { imap, .. } => write!(f, "IMAP + SMTP {}", imap.host),
+            DiscoveredKind::Jmap(url) => write!(f, "JMAP {url}"),
+            DiscoveredKind::Gmail => write!(f, "Gmail API"),
+            DiscoveredKind::Msgraph => write!(f, "Microsoft Graph API"),
         }
     }
 }
@@ -110,27 +127,14 @@ impl Discovered {
             .or_else(|| looks_like_address(email).then(|| email.to_string()))
     }
 
-    /// Ranks an entry for the selection list: usable methods before
-    /// OAuth (which cannot be configured here), then JMAP before
-    /// IMAP+SMTP before the proprietary APIs, then API token before
-    /// password.
-    fn rank(&self) -> (u8, u8, u8) {
-        let usable = match self.auth {
-            DiscoveredAuth::OAuth => 1,
-            _ => 0,
-        };
-        let service = match self.kind {
+    /// Ranks an entry for the selection list: JMAP first, then IMAP+SMTP,
+    /// then the proprietary APIs.
+    fn rank(&self) -> u8 {
+        match self.kind {
             DiscoveredKind::Jmap(_) => 0,
             DiscoveredKind::ImapSmtp { .. } => 1,
             DiscoveredKind::Gmail | DiscoveredKind::Msgraph => 2,
-        };
-        let auth = match self.auth {
-            DiscoveredAuth::Token => 0,
-            DiscoveredAuth::Password => 1,
-            DiscoveredAuth::OAuth => 2,
-        };
-
-        (usable, service, auth)
+        }
     }
 }
 
@@ -157,34 +161,54 @@ pub fn search(email: &str) -> Result<Vec<Discovered>> {
         && let Some(jmap) = configs.iter().find(|c| c.service == DiscoveryService::Jmap)
         && let DiscoveryEndpoint::Http(url) = &jmap.endpoint
     {
-        let kind = DiscoveredKind::Jmap(url.clone());
-        push_entries(&mut found, kind, jmap.username.clone(), &jmap.auth);
+        found.push(Discovered {
+            kind: DiscoveredKind::Jmap(url.clone()),
+            username: jmap.username.clone(),
+            auth: caps_of(&jmap.auth),
+        });
     }
 
     // A detected provider restricts IMAP+SMTP to its own configs, so
     // the app-style dedicated set shows instead of every discovered
-    // relay.
+    // relay. IMAP and SMTP may advertise different auth, so the entry
+    // carries the union of both sides' capabilities.
     if let Some(imap) = best(&configs, DiscoveryService::Imap, provider)
         && let Some(endpoint) = tcp_endpoint(imap)
     {
-        let smtp = best(&configs, DiscoveryService::Smtp, provider).and_then(tcp_endpoint);
-        let kind = DiscoveredKind::ImapSmtp {
-            imap: endpoint,
-            smtp,
-        };
-        push_entries(&mut found, kind, imap.username.clone(), &imap.auth);
+        let smtp = best(&configs, DiscoveryService::Smtp, provider);
+        let mut auth = caps_of(&imap.auth);
+        if let Some(smtp) = smtp {
+            let smtp_auth = caps_of(&smtp.auth);
+            auth.basic |= smtp_auth.basic;
+            auth.bearer |= smtp_auth.bearer;
+            auth.oauth |= smtp_auth.oauth;
+        }
+        found.push(Discovered {
+            kind: DiscoveredKind::ImapSmtp {
+                imap: endpoint,
+                smtp: smtp.and_then(tcp_endpoint),
+            },
+            username: imap.username.clone(),
+            auth,
+        });
     }
 
     match provider {
         Some(DiscoveryKnownProvider::Google) => found.push(Discovered {
             kind: DiscoveredKind::Gmail,
             username: Some(email.to_string()),
-            auth: DiscoveredAuth::Token,
+            auth: AuthCaps {
+                oauth: true,
+                ..Default::default()
+            },
         }),
         Some(DiscoveryKnownProvider::Microsoft) => found.push(Discovered {
             kind: DiscoveredKind::Msgraph,
             username: Some(email.to_string()),
-            auth: DiscoveredAuth::Token,
+            auth: AuthCaps {
+                oauth: true,
+                ..Default::default()
+            },
         }),
         None => {}
     }
@@ -209,30 +233,21 @@ fn provider_of(email: &str, configs: &[DiscoveryServiceConfig]) -> Option<Discov
     })
 }
 
-/// Turns each authentication method of a service into one entry,
-/// skipping duplicates (several OAuth grants collapse to one).
-fn push_entries(
-    found: &mut Vec<Discovered>,
-    kind: DiscoveredKind,
-    username: Option<String>,
-    auth: &[DiscoveryAuthMethod],
-) {
-    for method in auth {
-        let auth = match method {
-            DiscoveryAuthMethod::Password => DiscoveredAuth::Password,
-            DiscoveryAuthMethod::Bearer => DiscoveredAuth::Token,
-            _ => DiscoveredAuth::OAuth,
-        };
+/// Folds a service's advertised methods into its [`AuthCaps`]: password
+/// into `basic`, bearer into `bearer`, and every OAuth grant into `oauth`
+/// (which only unlocks the token brokers, never a self-run grant).
+fn caps_of(auth: &[DiscoveryAuthMethod]) -> AuthCaps {
+    let mut caps = AuthCaps::default();
 
-        let entry = Discovered {
-            kind: kind.clone(),
-            username: username.clone(),
-            auth,
-        };
-        if !found.contains(&entry) {
-            found.push(entry);
+    for method in auth {
+        match method {
+            DiscoveryAuthMethod::Password => caps.basic = true,
+            DiscoveryAuthMethod::Bearer => caps.bearer = true,
+            _ => caps.oauth = true,
         }
     }
+
+    caps
 }
 
 /// Picks the best config for a TCP service, restricted to the detected
@@ -318,5 +333,74 @@ fn discovery_tls() -> Tls {
             ..Default::default()
         },
         ..Default::default()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn caps_fold_each_method_onto_its_axis() {
+        // A password advertises Basic; a bearer, a static token; any
+        // OAuth grant only unlocks the brokers (oauth), never a method.
+        let oauth = DiscoveryAuthMethod::OauthIssuer("https://issuer".into());
+
+        assert_eq!(
+            caps_of(&[DiscoveryAuthMethod::Password]),
+            AuthCaps {
+                basic: true,
+                ..Default::default()
+            }
+        );
+        assert_eq!(
+            caps_of(&[DiscoveryAuthMethod::Bearer]),
+            AuthCaps {
+                bearer: true,
+                ..Default::default()
+            }
+        );
+        assert_eq!(
+            caps_of(std::slice::from_ref(&oauth)),
+            AuthCaps {
+                oauth: true,
+                ..Default::default()
+            }
+        );
+
+        // Fastmail JMAP: bearer plus an OAuth grant, no Basic — one
+        // "API token" method whose broker choices are unlocked.
+        let fastmail = caps_of(&[DiscoveryAuthMethod::Bearer, oauth]);
+        assert_eq!(
+            fastmail,
+            AuthCaps {
+                bearer: true,
+                oauth: true,
+                ..Default::default()
+            }
+        );
+        assert!(fastmail.token());
+        assert!(!fastmail.basic);
+    }
+
+    #[test]
+    fn caps_report_emptiness_and_token_offer() {
+        assert!(!AuthCaps::default().any());
+        assert!(!AuthCaps::default().token());
+
+        let basic = AuthCaps {
+            basic: true,
+            ..Default::default()
+        };
+        assert!(basic.any());
+        // Basic alone offers no token.
+        assert!(!basic.token());
+
+        // An OAuth grant with no static bearer still offers a token.
+        let oauth = AuthCaps {
+            oauth: true,
+            ..Default::default()
+        };
+        assert!(oauth.token());
     }
 }
