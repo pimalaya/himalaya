@@ -1,3 +1,9 @@
+---
+cairn: spec
+capability: testing
+status: current
+---
+
 # Testing reports
 
 Real-world test reports for Himalaya CLI v2, one per backend/provider,

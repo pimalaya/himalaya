@@ -7,7 +7,7 @@ against a live server (search semantics, date handling, error surfaces,
 flag rendering, MIME round-trips).
 
 One report is produced per `(backend, provider)` pair, e.g.
-`docs/testing/imap-smtp-fastmail.md`. Follow the steps below, record
+`cairn/spec/testing/imap-smtp-fastmail.md`. Follow the steps below, record
 each variant, and fill in the report template at the end.
 
 ## Golden rules
@@ -243,7 +243,7 @@ $H imap delete "$A"; $H imap delete "$B"
 
 ## Report template
 
-Copy this into `docs/testing/<backend>-<provider>.md`:
+Copy this into `cairn/spec/testing/<backend>-<provider>.md`:
 
 ```markdown
 # <BACKEND> on <PROVIDER> — shared-command test report
