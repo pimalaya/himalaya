@@ -1,12 +1,5 @@
 # docs/
 
-Development memory of the himalaya CLI: architecture notes that outgrow the main.rs header, plus plans and their outcomes.
+The design memory of Himalaya now lives in the [cairn/](../cairn/) folder, following the [Cairn convention](https://github.com/pimalaya/cairn): spec/ is current truth, changes/ holds in-flight proposals, log/ is the dated history. Start there, and read the src/main.rs header for the architecture.
 
-- [io-email-inlining.md](io-email-inlining.md): landed plan for dropping the io-email dependency in favour of a local, lean, per-backend dispatching client owned by the CLI.
-- [testing/provider-test-plan.md](testing/provider-test-plan.md): followable checklist to deeply exercise every shared command against a real provider, one report per `(backend, provider)`.
-- [testing/imap-smtp-fastmail.md](testing/imap-smtp-fastmail.md): IMAP + SMTP on Fastmail — shared-command test report.
-- [testing/imap-smtp-specific-fastmail.md](testing/imap-smtp-specific-fastmail.md): IMAP + SMTP on Fastmail — `imap …` / `smtp …` raw protocol API test report.
-- [testing/jmap-fastmail.md](testing/jmap-fastmail.md): JMAP on Fastmail — shared-command test report.
-- [testing/jmap-specific-fastmail.md](testing/jmap-specific-fastmail.md): JMAP on Fastmail — `jmap …` raw API test report.
-- [testing/gmail.md](testing/gmail.md): Gmail REST on Google — shared-command test report.
-- [testing/gmail-specific.md](testing/gmail-specific.md): Gmail REST on Google — `gmail …` raw API test report.
+This folder keeps the manual, real-world provider test reports, which are operational QA records rather than design memory. See [testing/README.md](testing/README.md) for the index, and [testing/provider-test-plan.md](testing/provider-test-plan.md) for the followable checklist.

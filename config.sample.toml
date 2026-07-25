@@ -116,6 +116,11 @@
 # shared commands fall back to this id when `-m/--mailbox` is not passed.
 #
 # Account-level entries override same-named global entries.
+#
+# The wizard pre-fills these from the server: JMAP reads the mailbox roles,
+# Gmail/Microsoft Graph use their well-known label/folder ids, and IMAP pins
+# only `inbox` (= INBOX) for now — the other IMAP special-use roles (sent,
+# drafts, trash, …) are not yet discovered automatically, so set them by hand.
 #mailbox.alias.inbox = "INBOX"
 #mailbox.alias.sent = "[Gmail]/Sent Mail"
 #mailbox.alias.drafts = "[Gmail]/Drafts"

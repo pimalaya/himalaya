@@ -47,7 +47,7 @@ humansize = "2"
 ariadne = "0.6"
 chumsky = { version = "0.13", default-features = false }
 io-gmail = { version = "0.2", default-features = false, optional = true }
-io-imap = { version = "0.2", default-features = false, optional = true }
+io-imap = { version = "0.3", default-features = false, optional = true }
 io-jmap = { version = "0.2", default-features = false, optional = true }
 io-m2dir = { version = "0.2", default-features = false, optional = true }
 io-msgraph = { version = "0.2", default-features = false, optional = true }
@@ -73,9 +73,3 @@ url = { version = "2.2", features = ["serde"] }
 
 [target.'cfg(windows)'.dependencies]
 uds_windows = "1"
-
-[patch.crates-io]
-io-gmail.git = "https://github.com/pimalaya/io-gmail"
-io-imap.git = "https://github.com/pimalaya/io-imap"
-pimalaya-cli.git = "https://github.com/pimalaya/cli"
-pimalaya-config.git = "https://github.com/pimalaya/config"

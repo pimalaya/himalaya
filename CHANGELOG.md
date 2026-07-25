@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added raw passthrough commands `imap raw <command>` and `smtp raw <command>`.
 
+- The wizard now pre-fills `mailbox.alias.*` from the server, so a generated account has a working default mailbox (the `inbox` alias, which backs commands that omit `-m/--mailbox`) and known Sent/Drafts/Trash/… targets without hand-editing ids. JMAP reads the RFC 8621 mailbox roles live over the tested connection; Gmail and Microsoft Graph map their fixed system-label ids (`INBOX`, `SENT`, …) and well-known folder names (`inbox`, `sentitems`, …); IMAP pins the reserved `INBOX` only. The other special-use roles await LIST `RETURN (SPECIAL-USE)` support in io-imap (upstream imap-codec has none yet).
+
 ### Changed
 
 - Flattened the `imap` command tree into top-level verbs mirroring the protocol's flat command list (`select`, `create`, `append`, `store`, `fetch`, …), replacing the former `mailbox` / `envelope` / `message` / `flag` subgroups.
@@ -36,6 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed the wizard to print the generated account as a ready-to-save TOML document on stdout instead of writing it to disk, mirroring ortie; redirect it into your config file yourself (e.g. `himalaya > ~/.config/himalaya/config.toml`). It runs on bare `himalaya` and is still proposed when a command finds no config, while a config that exists but lacks the requested account is now a hard error rather than a wizard trigger.
 
   The account's connection is tested before the config is printed, so a bad credential or endpoint stops the wizard instead of yielding a config that cannot connect. The output is compact: only the `[accounts.<name>]` table stays a section header, every other table is flattened into dotted keys (`imap.sasl.plain.username = …`), and empty tables and defaulted values (`starttls`, `alpn`, `id.auto`) are dropped.
+
+- Reworked the wizard's account-setup flow. The discovery list now shows one entry per reachable service (IMAP + SMTP, JMAP, Gmail, Microsoft Graph), and the authentication method is chosen in a second, service-specific prompt: the SASL mechanism (`PLAIN`, `LOGIN`, `SCRAM-SHA-256`, `OAUTHBEARER`, …) for IMAP + SMTP, the HTTP scheme (Basic / Bearer) for JMAP. OAuth 2.0 is no longer a dead-end list entry: it folds into the "API token" credential prompt, which now offers the OS keyrings and the OAuth token brokers (Ortie, pizauth, oama) together, the brokers appearing only when the service advertises OAuth.
+
+- The wizard now tests IMAP and SMTP as it configures them: the IMAP connection is validated first, then it asks whether SMTP reuses the same credentials (the two may advertise different auth), re-running the SASL prompt for a distinct one, and tests SMTP last.
+
+- The wizard no longer prompts for an account name; it is derived from the input (the domain's first label, or the folder name) and rename it by editing the printed `[accounts.<name>]` table key.
 
 ### Fixed
 

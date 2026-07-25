@@ -37,9 +37,9 @@ use crate::{
     },
 };
 
-// SASL mechanisms Himalaya supports, split by credential kind: the
-// password family (login + secret) and the token family (login + API
-// token). ANONYMOUS carries no credential.
+// NOTE: the mechanisms split by credential kind, a password family
+// (login + secret) and a token family (login + API token); ANONYMOUS
+// carries none.
 const PLAIN: &str = "PLAIN (login + password)";
 const LOGIN: &str = "LOGIN (login + password)";
 const SCRAM_SHA_256: &str = "SCRAM-SHA-256 (login + password)";
@@ -64,18 +64,16 @@ pub fn configure_discovered(
 
     let login_hint = discovered.login_default(email);
 
-    // Receiving side: configure, then validate before moving on.
     let imap_sasl = prompt_sasl(account_name, login_hint.as_deref(), discovered.auth)?;
     let imap = imap_config(imap, imap_sasl.clone());
     test_connection("IMAP", || check::connect_imap(&imap))?;
 
-    // IMAP has no reliable special-use listing yet (see [`mailbox`]), so
-    // only the always-present INBOX is pinned as the default mailbox.
+    // NOTE: IMAP has no reliable special-use listing yet (see the mailbox
+    // module), so only the always-present INBOX is pinned as the default.
     let aliases = mailbox::imap_aliases();
 
-    // Sending side: reuse the IMAP credential unless the user opts to
-    // configure a distinct one (IMAP and SMTP may advertise different
-    // auth), then validate it too.
+    // NOTE: IMAP and SMTP may advertise different auth, so SMTP either
+    // reuses the IMAP credential or configures a distinct one.
     let smtp_endpoint = smtp.clone().unwrap_or_else(|| default_smtp(email));
     let smtp_sasl = if prompt::bool("Use the same credentials for SMTP?", true)? {
         imap_sasl
@@ -123,7 +121,7 @@ fn prompt_sasl(account_name: &str, login_hint: Option<&str>, caps: AuthCaps) -> 
         prompt::item("SASL mechanism:", mechs, None)?
     };
 
-    // ANONYMOUS carries no login; every other mechanism needs one.
+    // NOTE: ANONYMOUS carries no login; every other mechanism needs one.
     if mech == ANONYMOUS {
         let message = prompt::text("ANONYMOUS message (optional):", None::<&str>)?;
         let message = Some(message).filter(|m| !m.trim().is_empty());

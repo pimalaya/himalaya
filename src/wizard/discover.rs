@@ -91,9 +91,8 @@ pub fn run(printer: &mut impl Printer) -> Result<()> {
         bail!("Empty input: enter an email address, a server URL, or a folder path");
     }
 
-    // The account name is derived from the input, not prompted: it is
-    // just the TOML table key, which the user renames by hand in the
-    // printed config if they want something else.
+    // NOTE: the account name is just the TOML table key, so it is derived
+    // from the input rather than prompted; the user renames it by hand.
     let account_name = default_account_name(input);
     let (account, tested) = build_account(&account_name, input)?;
 
@@ -238,9 +237,9 @@ fn build_account(account_name: &str, input: &str) -> Result<(AccountConfig, bool
         Chosen::M2dir(m2dir) => account.m2dir = Some(m2dir),
     }
 
-    // Pre-fill the discovered special-use aliases (e.g. the default
-    // `inbox`), so shared commands resolve a mailbox without the user
-    // hand-editing ids. Empty for the flows that discover none.
+    // NOTE: the discovered special-use aliases (e.g. the default `inbox`)
+    // let shared commands resolve a mailbox without hand-editing ids;
+    // empty for the flows that discover none.
     account.mailbox.aliases = aliases;
 
     Ok((account, tested))
@@ -308,9 +307,9 @@ fn dispatch(account_name: &str, email: &str, choice: Discovered) -> Result<Outco
                 aliases,
             })
         }
-        // Gmail and Graph expose special-use mailboxes through fixed
+        // NOTE: Gmail and Graph expose special-use mailboxes through fixed
         // platform contracts (system-label ids / well-known names), so
-        // their aliases are pinned without a live listing. The connection
+        // their aliases are pinned without a live listing; the connection
         // is still validated by the final account test.
         #[cfg(feature = "gmail")]
         DiscoveredKind::Gmail => Ok(Outcome {
@@ -485,7 +484,6 @@ mod tests {
         };
         let rendered = GeneratedConfig(config).to_string();
 
-        // The pre-filled alias lands under the account's mailbox table.
         assert!(rendered.contains("[accounts.posteo]"));
         assert!(rendered.contains("mailbox.alias.inbox = \"INBOX\""));
     }

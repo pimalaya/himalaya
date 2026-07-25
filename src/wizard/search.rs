@@ -342,8 +342,6 @@ mod tests {
 
     #[test]
     fn caps_fold_each_method_onto_its_axis() {
-        // A password advertises Basic; a bearer, a static token; any
-        // OAuth grant only unlocks the brokers (oauth), never a method.
         let oauth = DiscoveryAuthMethod::OauthIssuer("https://issuer".into());
 
         assert_eq!(
@@ -361,15 +359,15 @@ mod tests {
             }
         );
         assert_eq!(
-            caps_of(std::slice::from_ref(&oauth)),
+            caps_of(&[oauth.clone()]),
             AuthCaps {
                 oauth: true,
                 ..Default::default()
             }
         );
 
-        // Fastmail JMAP: bearer plus an OAuth grant, no Basic — one
-        // "API token" method whose broker choices are unlocked.
+        // NOTE: the Fastmail JMAP shape, bearer plus an OAuth grant and no
+        // Basic, is one "API token" method whose brokers are unlocked.
         let fastmail = caps_of(&[DiscoveryAuthMethod::Bearer, oauth]);
         assert_eq!(
             fastmail,
@@ -393,10 +391,8 @@ mod tests {
             ..Default::default()
         };
         assert!(basic.any());
-        // Basic alone offers no token.
         assert!(!basic.token());
 
-        // An OAuth grant with no static bearer still offers a token.
         let oauth = AuthCaps {
             oauth: true,
             ..Default::default()

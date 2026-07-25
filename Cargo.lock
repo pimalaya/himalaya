@@ -1089,8 +1089,9 @@ dependencies = [
 
 [[package]]
 name = "io-gmail"
-version = "0.2.0"
-source = "git+https://github.com/pimalaya/io-gmail#e5a1792d55e6d1831e4bd510f082fb8d48104b5d"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "586c57b7ca14c36449359ddfe8e649885d9f7b841aad3d30d8a5973871fe9ef1"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -1123,8 +1124,9 @@ dependencies = [
 
 [[package]]
 name = "io-imap"
-version = "0.2.0"
-source = "git+https://github.com/pimalaya/io-imap#7fb1f92556456719647bbf3c171dc88d48f90d5c"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "92354184f4f85fb7a94d81bd543945a8627b32e59e7ab4d8e79b7bf86ce362ad"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -1221,12 +1223,12 @@ dependencies = [
 
 [[package]]
 name = "io-smtp"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e89dc1706cc9640d7e202188b5c54ffb23b2644445123eea36073283bd95db3"
+checksum = "a0967061fcb958227a65fb8efaae5abf4afda4ac1a2d4e501e51f7f7cd3cee6e"
 dependencies = [
  "anyhow",
- "base64 0.22.1",
+ "base64 0.23.0",
  "bounded-static",
  "bounded-static-derive",
  "chumsky",
@@ -1728,8 +1730,9 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 
 [[package]]
 name = "pimalaya-cli"
-version = "0.1.1"
-source = "git+https://github.com/pimalaya/cli#1aa7e8048a46cd92112a16858a170f29b368ebfd"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1779a51cbbf66fe262f51d96ea2b3b3d26b099cfe30f22244a0427b288c77a9d"
 dependencies = [
  "anyhow",
  "clap",
@@ -1752,8 +1755,9 @@ dependencies = [
 
 [[package]]
 name = "pimalaya-config"
-version = "0.1.0"
-source = "git+https://github.com/pimalaya/config#eafa58b3b451b966f6afd98192034f23572a453b"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb8003d82767b0337f8b73b908d022d41ca7a7a41a789a9bd1e6544f8d80338b"
 dependencies = [
  "anyhow",
  "dirs",
@@ -1767,9 +1771,9 @@ dependencies = [
 
 [[package]]
 name = "pimalaya-stream"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c2d8d3db56f71dc69095d6de94c4231fec970be8e86e8c84fd9c49cde782128"
+checksum = "3df89003eaaa8976938b48b80353cd4e9e286a6893cdf5d3d0380fe2ff78a168"
 dependencies = [
  "anyhow",
  "log",

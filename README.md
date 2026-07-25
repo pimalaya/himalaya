@@ -17,27 +17,8 @@
 
 - [Features](#features)
 - [Installation](#installation)
-  - [Pre-built binary](#pre-built-binary)
-  - [Cargo](#cargo)
-  - [Arch Linux](#arch-linux)
-  - [Homebrew](#homebrew)
-  - [Scoop](#scoop)
-  - [Fedora Linux/CentOS/RHEL](#fedora-linuxcentosrhel)
-  - [Nix](#nix)
-  - [Sources](#sources)
 - [Configuration](#configuration)
-  - [Proton Mail](#proton-mail)
-  - [Fastmail](#fastmail)
-  - [Gmail](#gmail)
-  - [Outlook](#outlook)
-  - [Posteo](#posteo)
-  - [iCloud Mail](#icloud-mail)
 - [Usage](#usage)
-  - [Shared API](#shared-api)
-  - [Protocol-specific APIs](#protocol-specific-apis)
-  - [Composing messages](#composing-messages)
-  - [Reading messages](#reading-messages)
-  - [Re-using sessions](#re-using-sessions)
 - [Interfaces](#interfaces)
 - [FAQ](#faq)
 - [AI disclosure](#ai-disclosure)
@@ -248,7 +229,6 @@ Gmail rejects the account password over SASL PLAIN: generate an [app password](h
 
 ```toml
 [accounts.gmail]
-default = true
 
 imap.server = "imaps://imap.gmail.com:993"
 imap.sasl.plain.username = "example@gmail.com"

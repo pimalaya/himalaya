@@ -65,7 +65,9 @@
 //! to stdout through the printer (`--json` switches every command to JSON),
 //! stderr carries logs only. Each command's doc comment is its `--help`
 //! text, so `himalaya <command> --help` is the canonical per-command
-//! usage reference; see also the development notes under docs/.
+//! usage reference. The design memory lives in the cairn/ folder (the
+//! Cairn convention: spec/, changes/, log/), and manual provider test
+//! reports under docs/testing/.
 
 mod account;
 mod backend;
