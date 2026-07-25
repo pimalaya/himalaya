@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Restored the RFC 2971 `ID`-after-auth quirk as `imap.id.{auto, fields}`, replacing the v1.2.0 `imap.extensions.id.send-after-auth` flag dropped during the v2 migration.
 
-- Brought the `m2dir` backend to CLI feature parity with `maildir` (messages, flags, envelopes); mailbox `rename` and message `copy` / `move` still await io-m2dir support.
+- Brought the `m2dir` backend to CLI feature parity with `maildir` (messages, flags, envelopes). Mailbox `rename` and message `copy` / `move` still await io-m2dir support.
 
 - Added `--save <MAILBOX>` to `messages send`, mirroring the flag on `messages compose` / `reply` / `forward`.
 
@@ -23,19 +23,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added raw passthrough commands `imap raw <command>` and `smtp raw <command>`.
 
-- The wizard now pre-fills `mailbox.alias.*` from the server, so a generated account has a working default mailbox (the `inbox` alias, which backs commands that omit `-m/--mailbox`) and known Sent/Drafts/Trash/… targets without hand-editing ids. JMAP reads the RFC 8621 mailbox roles live over the tested connection; Gmail and Microsoft Graph map their fixed system-label ids (`INBOX`, `SENT`, …) and well-known folder names (`inbox`, `sentitems`, …); IMAP pins the reserved `INBOX` only. The other special-use roles await LIST `RETURN (SPECIAL-USE)` support in io-imap (upstream imap-codec has none yet).
+- The wizard now pre-fills `mailbox.alias.*` from the server, so a generated account has a working default mailbox (the `inbox` alias, which backs commands that omit `-m/--mailbox`) and known Sent/Drafts/Trash/… targets without hand-editing ids. JMAP reads the RFC 8621 mailbox roles live over the tested connection. Gmail and Microsoft Graph map their fixed system-label ids (`INBOX`, `SENT`, …) and well-known folder names (`inbox`, `sentitems`, …). IMAP pins the reserved `INBOX` only. The other special-use roles await LIST `RETURN (SPECIAL-USE)` support in io-imap (upstream imap-codec has none yet).
+
+- Added the `json-schema <DIR>` command, which writes one JSON Schema file per structured-output command (`himalaya-<cmd>-<subcmd>.json`) describing its `--json` payload, so downstream tooling can validate and type Himalaya's machine output. Only the schemas for compiled-in backends are emitted ([#547]).
+
+- The discovery wizard now falls back to the system DNS resolver (/etc/resolv.conf on unix, the network adapters on windows) before the Cloudflare default, making the resolution chain `HIMALAYA_DNS_RESOLVER` then system then `1.1.1.1`. This avoids leaking the email domain to a third-party resolver and works around networks that block the default.
+
+- Added local socket-proxy support: `imap.server` / `smtp.server` now accept a `unix:///path` scheme to connect through a pre-authenticated session proxy such as [sirup](https://github.com/pimalaya/sirup). No SASL is negotiated over the socket (the session arrives already authenticated), and a single-session proxy can back the storage backend without Himalaya opening a second connection ([#264]).
 
 ### Changed
 
 - Flattened the `imap` command tree into top-level verbs mirroring the protocol's flat command list (`select`, `create`, `append`, `store`, `fetch`, …), replacing the former `mailbox` / `envelope` / `message` / `flag` subgroups.
 
-- Unified raw-message input across the `messages`, `imap`, `maildir`, `jmap`, `msgraph` and `smtp` send/add commands behind a single `MessageArg` (file path, inline raw, or piped stdin); removed the legacy `--file` flag on `messages add`.
+- Unified raw-message input across the `messages`, `imap`, `maildir`, `jmap`, `msgraph` and `smtp` send/add commands behind a single `MessageArg` (file path, inline raw, or piped stdin), and removed the legacy `--file` flag on `messages add`.
 
 - Split the merged `Account` out of every client wrapper: subcommands now receive `account` and `client` as sibling arguments instead of reaching through `client.account`.
 
 - **Breaking:** changed bare `himalaya` (no subcommand) to run the account wizard instead of listing the default account's envelopes. Himalaya is now a lower-level tool: envelope listing lives under its explicit commands, and the bare invocation is the natural entry point for setting up an account.
 
-- Changed the wizard to print the generated account as a ready-to-save TOML document on stdout instead of writing it to disk, mirroring ortie; redirect it into your config file yourself (e.g. `himalaya > ~/.config/himalaya/config.toml`). It runs on bare `himalaya` and is still proposed when a command finds no config, while a config that exists but lacks the requested account is now a hard error rather than a wizard trigger.
+- Changed the wizard to print the generated account as a ready-to-save TOML document on stdout instead of writing it to disk, mirroring ortie. Redirect it into your config file yourself (e.g. `himalaya > ~/.config/himalaya/config.toml`). It runs on bare `himalaya` and is still proposed when a command finds no config, while a config that exists but lacks the requested account is now a hard error rather than a wizard trigger.
 
   The account's connection is tested before the config is printed, so a bad credential or endpoint stops the wizard instead of yielding a config that cannot connect. The output is compact: only the `[accounts.<name>]` table stays a section header, every other table is flattened into dotted keys (`imap.sasl.plain.username = …`), and empty tables and defaulted values (`starttls`, `alpn`, `id.auto`) are dropped.
 
@@ -43,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The wizard now tests IMAP and SMTP as it configures them: the IMAP connection is validated first, then it asks whether SMTP reuses the same credentials (the two may advertise different auth), re-running the SASL prompt for a distinct one, and tests SMTP last.
 
-- The wizard no longer prompts for an account name; it is derived from the input (the domain's first label, or the folder name) and rename it by editing the printed `[accounts.<name>]` table key.
+- The wizard no longer prompts for an account name. It is derived from the input (the domain's first label, or the folder name). Rename it by editing the printed `[accounts.<name>]` table key.
 
 ### Fixed
 
@@ -55,13 +61,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- Removed the `[message.composer.*]` / `[message.reader.*]` config tables and the `compose-with` / `reply-with` / `forward-with` / `mailto` / `read-with` subcommands; richer composition now chains standalone tools such as [mml](https://github.com/pimalaya/mml) into `messages send` / `add`.
+- Removed the `[message.composer.*]` / `[message.reader.*]` config tables and the `compose-with` / `reply-with` / `forward-with` / `mailto` / `read-with` subcommands. Richer composition now chains standalone tools such as [mml](https://github.com/pimalaya/mml) into `messages send` / `add`.
 
   The "stdout = MIME draft" contract was incompatible with composers spawning an interactive editor, whose UI inherited the parent's piped stdout.
 
-- Dropped `HIMALAYA_CONFIG` environment-variable support; `-c/--config` still accepts one or more `:`-separated paths.
+- Dropped `HIMALAYA_CONFIG` environment-variable support. `-c/--config` still accepts one or more `:`-separated paths.
 
-- Removed the `account configure` command (alias `account edit`) and its per-field edit wizard; account setup now goes through the bare `himalaya` discovery wizard, leaving `account list` and `account check` for inspection.
+- Removed the `account configure` command (alias `account edit`) and its per-field edit wizard. Account setup now goes through the bare `himalaya` discovery wizard, leaving `account list` and `account check` for inspection.
 
 ## [1.2.0] - 2026-02-19
 
@@ -989,6 +995,7 @@ Few major concepts changed:
 - Password from command
 - Set up README
 
+[#264]: https://github.com/pimalaya/himalaya/issues/264
 [#469]: https://github.com/pimalaya/himalaya/issues/469
 [#486]: https://github.com/pimalaya/himalaya/issues/486
 [#492]: https://github.com/pimalaya/himalaya/issues/492
@@ -1003,6 +1010,7 @@ Few major concepts changed:
 [#536]: https://github.com/pimalaya/himalaya/issues/536
 [#538]: https://github.com/pimalaya/himalaya/issues/538
 [#545]: https://github.com/pimalaya/himalaya/issues/545
+[#547]: https://github.com/pimalaya/himalaya/issues/547
 [#552]: https://github.com/pimalaya/himalaya/issues/552
 [#559]: https://github.com/pimalaya/himalaya/issues/559
 [#593]: https://github.com/pimalaya/himalaya/issues/593

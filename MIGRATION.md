@@ -15,7 +15,7 @@
 
 #### v2 changes
 
-- **Deep refactor on top of the I/O-free pattern.** No async in the CLI, no backend abstraction; both the binary and the underlying libraries are simpler.
+- **Deep refactor on top of the I/O-free pattern.** No async in the CLI, no backend abstraction. Both the binary and the underlying libraries are simpler.
 - **Thinner shared API.** Just enough surface for interfaces (TUI, plugins) to drive any backend, kept deliberately small so it does not break on every release.
 - **Protocol-specific commands** (`himalaya imap/jmap/maildir/smtp …`) expose the full native capability of each protocol.
 - **OAuth moved out** to [pimalaya/ortie](https://github.com/pimalaya/ortie).
@@ -53,8 +53,8 @@ New in v2: `-b`, `--backend` (force a specific backend for shared commands) and 
 
 - `thread` moved to the protocol-specific APIs.
 - `list -f|--folder INBOX` becomes `list -m|--mailbox INBOX`. The flag is optional: when omitted, the id mapped to the `inbox` alias under `[mailbox.alias]` is used.
-- The v1 search query grammar drops the `before <date>` clause. The remaining operators (`and`, `or`, `not`, parens) and the sort suffix (`order by date|from|to|subject [asc|desc]`) are unchanged. Backends advertise the subset they accept; unsupported clauses fail at parse time. It is now accessible from the `search` command instead of `list`.
-- Default page size moves to `envelope.list.page-size` (per-account, with global fallback); the `-s/--page-size` CLI flag still wins when passed. Hard fallback when neither is set: 25.
+- The v1 search query grammar drops the `before <date>` clause. The remaining operators (`and`, `or`, `not`, parens) and the sort suffix (`order by date|from|to|subject [asc|desc]`) are unchanged. Backends advertise the subset they accept, and unsupported clauses fail at parse time. It is now accessible from the `search` command instead of `list`.
+- Default page size moves to `envelope.list.page-size` (per-account, with global fallback). The `-s/--page-size` CLI flag still wins when passed. Hard fallback when neither is set: 25.
 
 #### Flags
 
@@ -64,13 +64,13 @@ New in v2: `-b`, `--backend` (force a specific backend for shared commands) and 
 #### Messages
 
 - Removed `delete`: too protocol-specific. Use the matching protocol-specific subcommand, or combine `flags add` with the per-protocol expunge / move-to-trash step.
-- `copy` and `move`: `--folder <source>` renamed `--from <mailbox-id>`; positional `<target>` renamed `--to <mailbox-id>`.
+- `copy` and `move`: `--folder <source>` renamed `--from <mailbox-id>`, and positional `<target>` renamed `--to <mailbox-id>`.
 - `save` renamed `add` (kept as an alias, so `save` still works).
 - `save --folder` (optional) becomes `add --mailbox` (mandatory).
-- `save <path-or-raw>` split into the explicit `--file <PATH>` and positional `<raw>`.
-- Added `add --flag` to attach flags at insertion time.
-- `write`, `reply`, `forward` are no longer interactive. They build the message from CLI flags through the built-in flag composer. Interactive composition is delegated to standalone tools chained into `messages send` / `messages add` via a tempfile or shell process substitution; no `*-with` subcommands or `[message.composer.*]` table on the himalaya side.
-- `read` no longer renders human-readable text; the v2 `read` prints message-level info. For custom rendering, pipe `read --raw` into a standalone interpreter.
+- The old `save --file <PATH>` / positional split is gone: `add` now takes a single `MessageArg` (a positional file path, an inline raw value, or piped stdin).
+- Added `add --flag` to attach flags at insertion time, and `add --send` (alias `save --send`) to push the message through the account's send path after the append.
+- `write` renamed `compose` (kept as an alias). `compose`, `reply`, `forward` are no longer interactive. They build the message from CLI flags through the built-in flag composer. Interactive composition is delegated to standalone tools chained into `messages send` / `messages add` via a tempfile or shell process substitution. No `*-with` subcommands or `[message.composer.*]` table remain on the himalaya side.
+- `read` no longer renders human-readable text. The v2 `read` prints message-level info. For custom rendering, pipe `read --raw` into a standalone interpreter.
 - `mailto:` URI handling is no longer a himalaya subcommand. Register a small shell wrapper (e.g. `mml mailto "$1" /tmp/draft.eml && himalaya messages send /tmp/draft.eml`) as your desktop mailto handler.
 - `messages send` and `messages add` read the raw message from a positional path, an inline raw value, or stdin (the unified `MessageArg`).
 - `export` and `edit` are removed.
@@ -86,7 +86,7 @@ See [pimalaya/mml](https://github.com/pimalaya/mml) for a ready-to-use composer 
 
 #### Template
 
-Fully removed. The template pipeline (compose / reply / forward drafts, MML compile, MIME interpret) lives in [pimalaya/mml](https://github.com/pimalaya/mml) as both a library and a CLI; chain its CLI into `messages send` / `messages add` (see the README).
+Fully removed. The template pipeline (compose / reply / forward drafts, MML compile, MIME interpret) lives in [pimalaya/mml](https://github.com/pimalaya/mml) as both a library and a CLI. Chain its CLI into `messages send` / `messages add` (see the README).
 
 ### Configuration changes
 
@@ -106,7 +106,7 @@ The full configuration schema is documented in [config.sample.toml](./config.sam
 
 #### Mailbox aliases
 
-The v1 `[folder.aliases]` block becomes `[mailbox.aliases]`. Two behaviour changes on top of the rename:
+The v1 `[folder.alias]` block becomes `[mailbox.alias]`. Two behaviour changes on top of the rename:
 
 - Alias names are case-insensitive both on lookup and on storage, so `INBOX = "..."`, `Inbox = "..."` and `inbox = "..."` are equivalent entries.
 - The entry named `inbox` (case-insensitive) is the implicit default mailbox: shared commands fall back to its id when `-m/--mailbox` is omitted. No separate `default-mailbox` key.
@@ -115,7 +115,7 @@ Account-level `[accounts.<name>.mailbox.alias]` entries override same-named glob
 
 #### Secrets
 
-Every `*.passwd` / `*.password` / `*.token` field accepts either a raw literal (`{ raw = "…" }`) or a shell command (`{ command = "pass show foo" }` or `{ command = ["pass", "show", "foo"] }`). Native keyring support has been removed; use a password-manager CLI (`pass`, `secret-tool`, `gopass`, `security`, …) as the command. OAuth tokens are produced by an external broker such as [pimalaya/ortie](https://github.com/pimalaya/ortie) and consumed the same way.
+Every `*.passwd` / `*.password` / `*.token` field accepts either a raw literal (`{ raw = "…" }`) or a shell command (`{ command = "pass show foo" }` or `{ command = ["pass", "show", "foo"] }`). Native keyring support has been removed. Use a password-manager CLI (`pass`, `secret-tool`, `gopass`, `security`, …) as the command. OAuth tokens are produced by an external broker such as [pimalaya/ortie](https://github.com/pimalaya/ortie) and consumed the same way.
 
 #### IMAP
 
@@ -123,10 +123,13 @@ The whole `backend.type = "imap"` block collapses into:
 
 ```toml
 # Either a bare authority (treated as `imaps://<authority>`) or a full
-# URL with `imap://` or `imaps://`. Mirrors `jmap.server`.
+# URL with `imap://` or `imaps://`. Mirrors `jmap.server`. A
+# `unix:///path` scheme connects through a pre-authenticated session
+# proxy such as sirup, over which no SASL is negotiated.
 imap.server = "example.com"
 # or imap.server = "imaps://example.com:993"
 # or imap.server = "imap://example.com:143"  (use imap.starttls = true to upgrade)
+# or imap.server = "unix:///run/sirup/example.sock"
 
 imap.tls.provider = "rustls"     # or "native-tls"
 imap.tls.rustls.crypto = "ring"  # or "aws"
@@ -165,7 +168,7 @@ imap.sasl.scram-sha-256.username = "user@example.com"
 imap.sasl.scram-sha-256.password.raw = "***"
 ```
 
-The OAuth-specific section (`backend.auth.type = "oauth2"`) is gone; route the access token through SASL `oauthbearer` or `xoauth2` (with a command-sourced token from a broker such as [pimalaya/ortie](https://github.com/pimalaya/ortie)) instead.
+The OAuth-specific section (`backend.auth.type = "oauth2"`) is gone. Route the access token through SASL `oauthbearer` or `xoauth2` (with a command-sourced token from a broker such as [pimalaya/ortie](https://github.com/pimalaya/ortie)) instead.
 
 #### SMTP
 
@@ -242,8 +245,8 @@ Both backends are removed. Notmuch may come back in a future release.
 
 ### Suggested migration steps
 
-1. Copy [`config.sample.toml`](./config.sample.toml) to a side-by-side path (for example `~/.config/himalaya/config.v2.toml`) and edit it against your previous configuration.
+1. Copy [config.sample.toml](./config.sample.toml) to a side-by-side path (for example ~/.config/himalaya/config.v2.toml) and edit it against your previous configuration.
 2. Run `himalaya -c ~/.config/himalaya/config.v2.toml account check` to validate the connection for each declared backend.
-3. Once the new file passes the check, replace the v1 `config.toml` with it.
+3. Once the new file passes the check, replace the v1 config.toml with it.
 4. If you relied on keyring / OAuth, wire a password-manager CLI (`pass`, `secret-tool`, …) and/or [pimalaya/ortie](https://github.com/pimalaya/ortie) as `command = …` secrets.
 5. If you relied on the interactive `write` / `reply` / `forward`, install [pimalaya/mml](https://github.com/pimalaya/mml) and chain it into `himalaya messages send` / `messages add` via a tempfile or `>(...)` process substitution (see the README for ready-made `bash`/`zsh` snippets).
