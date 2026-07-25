@@ -6,6 +6,7 @@ use comfy_table::{Cell, Row, Table};
 use io_jmap::rfc8621::identity::{JmapIdentity, get::JmapIdentityGetOptions};
 use log::warn;
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::account::context::Account;
@@ -45,7 +46,7 @@ impl JmapIdentityGetCommand {
 }
 
 /// Renderable table of sender identities.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct IdentitiesTable {
     #[serde(skip)]
     pub preset: String,

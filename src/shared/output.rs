@@ -9,13 +9,14 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use pimalaya_cli::printer::{Message, Printer};
+use schemars::JsonSchema;
 use serde::Serialize;
 
 /// Wraps a renderable listing with an optional pagination cursor so the
 /// "next page" hint is part of the command output: a trailing footer
 /// line in text mode, an extra `next_page` field in JSON. This keeps
 /// the cursor visible to scripts, unlike logging it to stderr.
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 pub struct Paginated<T> {
     #[serde(flatten)]
     inner: T,

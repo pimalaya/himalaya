@@ -35,16 +35,18 @@ impl SmtpClient {
         let domain: SmtpEhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
         let server = parse_smtp_server(&config.server)?;
         let sasl: Option<Sasl> = match config.sasl {
+            // A `unix://` sirup socket presents a pre-authenticated
+            // session, so no SASL is negotiated over it.
+            Some(_) if server.scheme() == "unix" => None,
             Some(cfg) => {
                 let host = server
                     .host_str()
                     .ok_or_else(|| anyhow!("Cannot derive host from SMTP server `{server}`"))?;
                 // url does not know the smtp(s) default ports; match
                 // io-smtp's own connection defaults (465 for smtps).
-                let port =
-                    server
-                        .port()
-                        .unwrap_or(if server.scheme() == "smtps" { 465 } else { 25 });
+                let port = server
+                    .port()
+                    .unwrap_or(Inner::default_port(server.scheme()));
                 Some(cfg.try_into_sasl(host, port)?)
             }
             None => None,
@@ -57,10 +59,11 @@ impl SmtpClient {
 /// Parses an SMTP server string into a URL.
 ///
 /// Accepts `smtp`/`smtps://host[:port]`, a bare `host:port`, or a bare
-/// `host`; the last two default to `smtps://` (secure). Any other
+/// `host` (the last two default to `smtps://`, secure), or a
+/// `unix:///path` socket for a local proxy such as sirup. Any other
 /// scheme is rejected.
 pub fn parse_smtp_server(server: &str) -> Result<Url> {
-    parse_server(server, "smtps", &["smtp", "smtps"])
+    parse_server(server, "smtps", &["smtp", "smtps", "unix"])
 }
 
 impl Deref for SmtpClient {

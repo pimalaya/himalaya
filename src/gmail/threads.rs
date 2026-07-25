@@ -16,6 +16,7 @@ use io_gmail::v1::rest::{
     },
 };
 use pimalaya_cli::printer::{Message, Printer};
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{account::context::Account, gmail::client::GmailClient, shared::output::Paginated};
@@ -279,7 +280,7 @@ impl From<FormatArg> for GmailMessageFormat {
 }
 
 /// Renders a list of Gmail thread summaries as a three-column table.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct ThreadsTable {
     #[serde(skip)]
     pub preset: String,

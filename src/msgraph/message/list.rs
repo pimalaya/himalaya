@@ -7,6 +7,7 @@ use io_msgraph::v1::rest::users::messages::{
     MsgraphMessage, MsgraphRecipient, list::MsgraphMessagesListParams,
 };
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{account::context::Account, msgraph::client::MsgraphClient, shared::output::Paginated};
@@ -142,7 +143,7 @@ impl Default for MessageColors {
 }
 
 /// Renderable table of Microsoft Graph messages.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct MessagesTable {
     #[serde(skip)]
     preset: String,

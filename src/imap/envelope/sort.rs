@@ -12,6 +12,7 @@ use io_imap::{
     },
 };
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::account::context::Account;
@@ -119,7 +120,7 @@ impl From<SortKeyArg> for SortKey {
 }
 
 /// Renderable table of SORT result message ids.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct SortResultsTable {
     #[serde(skip)]
     preset: String,

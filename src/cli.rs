@@ -5,7 +5,7 @@ use clap::{CommandFactory, Parser, Subcommand};
 use pimalaya_cli::{
     clap::{
         args::{AccountFlag, ConfigFlags, JsonFlag, LogFlags},
-        commands::{CompletionCommand, ManualCommand},
+        commands::{CompletionCommand, JsonSchemaCommand, ManualCommand},
     },
     long_version,
     printer::Printer,
@@ -118,6 +118,7 @@ pub enum Command {
     Account(AccountCommand),
     Completion(CompletionCommand),
     Manual(ManualCommand),
+    JsonSchema(JsonSchemaCommand),
 }
 
 /// Resolves the account a command runs against: loads the merged config
@@ -251,6 +252,7 @@ impl Command {
             Self::Account(cmd) => cmd.execute(printer, config_paths, account_name, backend),
             Self::Completion(cmd) => cmd.execute(printer, Cli::command()),
             Self::Manual(cmd) => cmd.execute(printer, Cli::command()),
+            Self::JsonSchema(cmd) => cmd.execute(printer, crate::json_schema::schemas()),
         }
     }
 }

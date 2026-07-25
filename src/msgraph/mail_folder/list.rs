@@ -7,6 +7,7 @@ use io_msgraph::v1::rest::users::mail_folders::{
     MsgraphMailFolder, list::MsgraphMailFoldersListParams,
 };
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{account::context::Account, msgraph::client::MsgraphClient};
@@ -91,7 +92,7 @@ impl Default for MailFolderColors {
 }
 
 /// Renderable table of Microsoft Graph mail folders.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct MailFoldersTable {
     #[serde(skip)]
     preset: String,

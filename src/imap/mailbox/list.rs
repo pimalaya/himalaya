@@ -5,6 +5,7 @@ use clap::Parser;
 use comfy_table::{Cell, Color, Row, Table};
 use io_imap::types::{core::QuotedChar, flag::FlagNameAttribute, mailbox::Mailbox};
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::account::context::Account;
@@ -55,7 +56,7 @@ impl ImapMailboxListCommand {
 }
 
 /// Renderable table of LIST/LSUB mailboxes.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct MailboxesTable {
     #[serde(skip)]
     pub preset: String,
@@ -105,7 +106,7 @@ impl fmt::Display for MailboxesTable {
 }
 
 /// One row of the mailboxes table: name, delimiter and attributes.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct MailboxRow {
     pub name: String,
     pub delimiter: String,

@@ -6,6 +6,7 @@ use comfy_table::{Cell, Row, Table};
 use io_jmap::rfc8621::thread::JmapThread;
 use log::warn;
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::account::context::Account;
@@ -42,7 +43,7 @@ impl JmapThreadGetCommand {
 }
 
 /// Renderable table of threads and their email IDs.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct ThreadsTable {
     #[serde(skip)]
     pub preset: String,

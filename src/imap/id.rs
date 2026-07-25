@@ -11,6 +11,7 @@ use io_imap::{
     },
 };
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::account::context::Account;
@@ -73,7 +74,7 @@ impl ImapIdCommand {
 }
 
 /// Renderable table of the IMAP server ID parameters.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub struct ServerIdTable {
     #[serde(skip)]

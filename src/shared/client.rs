@@ -12,6 +12,9 @@
 //! The active [`Account`] is threaded as a sibling argument through
 //! every `execute` chain rather than being bundled into the client.
 
+#[cfg(feature = "smtp")]
+use std::mem;
+
 use anyhow::{Result, anyhow, bail};
 
 #[cfg(feature = "gmail")]
@@ -26,8 +29,6 @@ use crate::m2dir::client::M2dirClient;
 use crate::maildir::client::MaildirClient;
 #[cfg(feature = "msgraph")]
 use crate::msgraph::client::MsgraphClient;
-#[cfg(feature = "smtp")]
-use crate::smtp::client::SmtpClient;
 use crate::{
     account::context::Account,
     backend::Backend,
@@ -39,12 +40,26 @@ use crate::{
         search::query::SearchEmailsQuery,
     },
 };
+#[cfg(feature = "smtp")]
+use crate::{config::SmtpConfig, smtp::client::SmtpClient};
 
 /// Cross-protocol email client backing the shared subcommands.
 pub struct EmailClient {
     storage: Option<BackendClient>,
     #[cfg(feature = "smtp")]
-    smtp: Option<SmtpClient>,
+    smtp: SmtpTransport,
+}
+
+/// The SMTP transport slot, connected lazily on the first send so that
+/// read-only commands never open an SMTP connection.
+#[cfg(feature = "smtp")]
+enum SmtpTransport {
+    /// No SMTP configured, or excluded by `--backend`.
+    Absent,
+    /// Configured but not yet connected.
+    Pending(Box<SmtpConfig>),
+    /// Connected.
+    Ready(SmtpClient),
 }
 
 /// The active storage backend: exactly one of the compiled-in
@@ -76,14 +91,17 @@ impl EmailClient {
     ) -> Result<(Account, Self)> {
         let storage = select_storage(&mut account_config, backend)?;
 
+        // NOTE: kept unconnected here; a read-only command must not open
+        // an SMTP connection (it also lets a single-session proxy such as
+        // sirup serve the storage backend without a second client).
         #[cfg(feature = "smtp")]
         let smtp = match (backend.allows_smtp(), account_config.smtp.take()) {
-            (true, Some(config)) => Some(SmtpClient::new(config)?),
-            _ => None,
+            (true, Some(config)) => SmtpTransport::Pending(Box::new(config)),
+            _ => SmtpTransport::Absent,
         };
 
         #[cfg(feature = "smtp")]
-        let has_transport = storage.is_some() || smtp.is_some();
+        let has_transport = storage.is_some() || !matches!(smtp, SmtpTransport::Absent);
         #[cfg(not(feature = "smtp"))]
         let has_transport = storage.is_some();
         if !has_transport {
@@ -319,11 +337,31 @@ impl EmailClient {
         }
 
         #[cfg(feature = "smtp")]
-        if let Some(smtp) = &mut self.smtp {
+        if let Some(smtp) = self.smtp_client_mut()? {
             return smtp.send_message(raw);
         }
 
         bail!("No send-capable backend (JMAP/Gmail/Graph) or SMTP is configured for this account")
+    }
+
+    /// Connects the SMTP transport on first use, returning `None` when no
+    /// SMTP is configured. Only the send path calls this, so read-only
+    /// commands open no SMTP connection.
+    #[cfg(feature = "smtp")]
+    fn smtp_client_mut(&mut self) -> Result<Option<&mut SmtpClient>> {
+        if let SmtpTransport::Pending(_) = &self.smtp {
+            let SmtpTransport::Pending(config) =
+                mem::replace(&mut self.smtp, SmtpTransport::Absent)
+            else {
+                unreachable!()
+            };
+            self.smtp = SmtpTransport::Ready(SmtpClient::new(*config)?);
+        }
+
+        Ok(match &mut self.smtp {
+            SmtpTransport::Ready(client) => Some(client),
+            _ => None,
+        })
     }
 
     /// Maps the shared layer's human mailbox name onto the

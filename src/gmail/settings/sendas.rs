@@ -9,6 +9,7 @@ use io_gmail::v1::rest::settings::send_as::{
     verify::GmailSendAsVerify,
 };
 use pimalaya_cli::printer::{Message, Printer};
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
@@ -269,7 +270,7 @@ impl GmailSendAsVerifyCommand {
 }
 
 /// Renderable table of Gmail send-as aliases.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct SendAsTable {
     #[serde(skip)]
     preset: String,

@@ -7,6 +7,7 @@ use anyhow::{Result, bail};
 use clap::Parser;
 use mail_parser::{Addr, Address, HeaderValue, Message, MessageParser};
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::account::context::Account;
@@ -64,9 +65,9 @@ impl MessageReadCommand {
 }
 
 /// Parsed message rendered as headers plus text bodies, or as JSON.
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 #[serde(transparent)]
-pub struct MessageView(Message<'static>);
+pub struct MessageView(#[schemars(with = "serde_json::Value")] Message<'static>);
 
 impl fmt::Display for MessageView {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

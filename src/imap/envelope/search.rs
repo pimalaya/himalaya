@@ -12,6 +12,7 @@ use io_imap::{
     },
 };
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::account::context::Account;
@@ -262,13 +263,13 @@ fn date_parser(s: &str) -> Result<NaiveDate, String> {
 }
 
 /// One row of the SEARCH results table: a single message id.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct SearchResult {
     pub id: u32,
 }
 
 /// Renderable table of SEARCH result message ids.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct SearchTable {
     #[serde(skip)]
     preset: String,

@@ -66,8 +66,8 @@
 //! stderr carries logs only. Each command's doc comment is its `--help`
 //! text, so `himalaya <command> --help` is the canonical per-command
 //! usage reference. The design memory lives in the cairn/ folder (the
-//! Cairn convention: spec/, changes/, log/), and manual provider test
-//! reports under docs/testing/.
+//! Cairn convention: spec/, changes/, log/), including the manual
+//! provider test reports under cairn/spec/testing/.
 
 mod account;
 mod backend;
@@ -80,6 +80,7 @@ mod gmail;
 mod imap;
 #[cfg(feature = "jmap")]
 mod jmap;
+mod json_schema;
 #[cfg(feature = "m2dir")]
 mod m2dir;
 #[cfg(feature = "maildir")]

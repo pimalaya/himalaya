@@ -4,6 +4,7 @@ use anyhow::Result;
 use clap::Parser;
 use io_maildir::flag::MaildirFlags;
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
@@ -53,7 +54,7 @@ impl MaildirMessageSaveCommand {
 }
 
 /// Output of a saved Maildir message: its id and file path.
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 pub struct StoredMessage {
     id: String,
     path: PathBuf,

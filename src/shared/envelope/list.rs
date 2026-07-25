@@ -7,6 +7,7 @@ use clap::Parser;
 use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use humansize::{BINARY, format_size};
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::account::context::Account;
@@ -130,7 +131,7 @@ pub(super) struct EnvelopeColors {
 }
 
 /// Table of envelope rows rendered to the terminal or as JSON.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct Envelopes {
     #[serde(skip)]
     pub preset: String,

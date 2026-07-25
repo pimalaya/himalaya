@@ -34,4 +34,4 @@ Check the structure yourself against the strict rules (CAIRN.md §8): a discover
 
 ## Everything else
 
-For how this binary is built, where changes belong, and the Pimalaya standards it follows, read `CONTRIBUTING.md` and the `src/main.rs` header (the crate's architecture document). Manual provider test reports live under `docs/testing/`.
+For how this binary is built, where changes belong, and the Pimalaya standards it follows, read `CONTRIBUTING.md` and the `src/main.rs` header (the crate's architecture document). Manual provider test reports live under `cairn/spec/testing/`.

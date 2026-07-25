@@ -5,6 +5,7 @@ use clap::Parser;
 use comfy_table::{Cell, Row, Table};
 use io_imap::types::status::{StatusDataItem, StatusDataItemName};
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 
 use crate::account::context::Account;
@@ -47,7 +48,7 @@ impl ImapMailboxStatusCommand {
 }
 
 /// Parsed STATUS data items for a mailbox.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct MailboxStatus {
     pub messages: Option<u32>,
     pub recent: Option<u32>,

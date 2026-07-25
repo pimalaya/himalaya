@@ -13,6 +13,7 @@ use io_jmap::{
     },
 };
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::account::context::Account;
@@ -198,7 +199,7 @@ pub struct EmailsChars {
 }
 
 /// Renderable table of email envelopes.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct EmailsTable {
     #[serde(skip)]
     pub preset: String,

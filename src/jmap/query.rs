@@ -10,6 +10,7 @@ use io_jmap::{
     rfc8621::JMAP_MAIL_CAPABILITY,
 };
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::Value;
 
@@ -117,8 +118,8 @@ impl JmapQueryCommand {
 }
 
 /// Wraps the raw method_responses for display.
-#[derive(Serialize)]
-struct RawResponse {
+#[derive(Serialize, JsonSchema)]
+pub(crate) struct RawResponse {
     method_responses: Vec<(String, Value, String)>,
 }
 

@@ -5,6 +5,7 @@ use clap::Parser;
 use comfy_table::{Cell, Color, Row, Table};
 use io_maildir::maildir::Maildir;
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::account::context::Account;
@@ -37,7 +38,7 @@ impl MaildirMailboxListCommand {
 }
 
 /// Renderable table of Maildir folders.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct MaildirsTable {
     #[serde(skip)]
     pub preset: String,
@@ -72,7 +73,7 @@ impl fmt::Display for MaildirsTable {
 }
 
 /// One row of the Maildir folders table: name and path.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct MaildirRow {
     pub name: String,
     pub path: PathBuf,

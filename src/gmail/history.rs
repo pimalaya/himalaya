@@ -5,6 +5,7 @@ use io_gmail::v1::rest::history::{
     list::{GmailHistoryList, GmailHistoryListParams},
 };
 use pimalaya_cli::printer::{Message, Printer};
+use schemars::JsonSchema;
 
 use crate::{account::context::Account, gmail::client::GmailClient, shared::output::Paginated};
 
@@ -96,6 +97,18 @@ impl GmailHistoryListCommand {
             resp.next_page_token,
         ))
     }
+}
+
+/// Mirrors the JSON shape emitted by the `gmail history` command: the
+/// history changes are rendered as a single text `message` (wrapped in a
+/// [`Message`]) alongside the pagination cursor. Used only to derive the
+/// JSON Schema for this command.
+///
+/// [`Message`]: pimalaya_cli::printer::Message
+#[derive(JsonSchema)]
+#[allow(dead_code)]
+pub(crate) struct HistoryOutput {
+    pub message: String,
 }
 
 /// Gmail history change type accepted on the CLI.

@@ -4,6 +4,7 @@ use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, Row, Table};
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::account::context::Account;
@@ -47,11 +48,13 @@ impl M2dirFlagListCommand {
 }
 
 /// Renderable table of flags set on an m2dir message.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct FlagsTable {
     #[serde(skip_serializing)]
+    #[schemars(skip)]
     preset: String,
     #[serde(skip_serializing)]
+    #[schemars(skip)]
     arrangement: ContentArrangement,
     flags: Vec<String>,
 }

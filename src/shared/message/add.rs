@@ -4,6 +4,7 @@ use crate::email::flag::Flag;
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::account::context::Account;
@@ -66,8 +67,8 @@ impl MessageAddCommand {
     }
 }
 
-#[derive(Serialize)]
-struct MessageAddOutput {
+#[derive(Serialize, JsonSchema)]
+pub(crate) struct MessageAddOutput {
     id: String,
     sent: bool,
 }

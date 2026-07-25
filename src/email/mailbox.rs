@@ -1,5 +1,6 @@
 //! Mailbox shared across all protocols.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// A mailbox (a.k.a. folder).
@@ -9,7 +10,7 @@ use serde::{Deserialize, Serialize};
 /// m2dir). Protocol-specific data (IMAP delimiter and SPECIAL-USE
 /// attributes, JMAP role and rights, Maildir path, …) is intentionally
 /// absent; for these, use the protocol-specific subcommands.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub struct Mailbox {
     /// Backend-specific identifier.
@@ -38,7 +39,7 @@ pub struct Mailbox {
 /// Mirrors the IANA JMAP mailbox roles and the IMAP SPECIAL-USE
 /// attributes (RFC 6154). [`MailboxRole::Other`] holds any value that
 /// does not match a known role.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum MailboxRole {
     Inbox,

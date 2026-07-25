@@ -11,6 +11,7 @@ use io_jmap::rfc8621::mailbox::{
     },
 };
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::account::context::Account;
@@ -137,7 +138,7 @@ impl Default for MailboxColors {
 }
 
 /// Renderable table of mailboxes.
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Default, Serialize, JsonSchema)]
 pub struct MailboxesTable {
     #[serde(skip)]
     pub preset: String,

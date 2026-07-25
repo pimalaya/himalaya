@@ -5,6 +5,7 @@ use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, Row, Table};
 use io_maildir::flag::MaildirFlag;
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::account::context::Account;
@@ -36,17 +37,19 @@ impl MaildirFlagListCommand {
 }
 
 /// Renderable table of the standard Maildir flags.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct FlagsTable {
     #[serde(skip_serializing)]
+    #[schemars(skip)]
     preset: String,
     #[serde(skip_serializing)]
+    #[schemars(skip)]
     arrangement: ContentArrangement,
     flags: Vec<FlagRow>,
 }
 
 /// One row of the Maildir flags table: code and name.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct FlagRow {
     code: String,
     name: String,

@@ -3,6 +3,7 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::msgraph::client::MsgraphClient;
@@ -28,9 +29,9 @@ impl MsgraphProfileGetCommand {
 /// Microsoft Graph user profile, rendered as aligned text or, under
 /// `--json`, as a structured object (`{id, display-name, mail,
 /// user-principal-name}`) instead of a wrapped human string.
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
-struct MsgraphProfileOutput {
+pub(crate) struct MsgraphProfileOutput {
     id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     display_name: Option<String>,

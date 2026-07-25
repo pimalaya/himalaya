@@ -36,16 +36,18 @@ impl ImapClient {
         let auto_id = resolve_auto_id_params(&config.id)?;
         let server = parse_imap_server(&config.server)?;
         let sasl: Option<Sasl> = match config.sasl {
+            // A `unix://` sirup socket presents a pre-authenticated
+            // session (the greeting is PREAUTH), so no SASL is negotiated.
+            Some(_) if server.scheme() == "unix" => None,
             Some(cfg) => {
                 let host = server
                     .host_str()
                     .ok_or_else(|| anyhow!("Cannot derive host from IMAP server `{server}`"))?;
                 // url does not know the imap(s) default ports, so fall
                 // back to the same scheme defaults io-imap connects with.
-                let port =
-                    server
-                        .port()
-                        .unwrap_or(if server.scheme() == "imaps" { 993 } else { 143 });
+                let port = server
+                    .port()
+                    .unwrap_or(io_imap::client::default_port(server.scheme()));
                 Some(cfg.try_into_sasl(host, port)?)
             }
             None => None,
@@ -79,10 +81,11 @@ impl ImapClient {
 /// Parses an IMAP server string into a URL.
 ///
 /// Accepts `imap`/`imaps://host[:port]`, a bare `host:port`, or a bare
-/// `host`; the last two default to `imaps://` (secure). Any other
+/// `host` (the last two default to `imaps://`, secure), or a
+/// `unix:///path` socket for a local proxy such as sirup. Any other
 /// scheme is rejected.
 pub fn parse_imap_server(server: &str) -> Result<Url> {
-    parse_server(server, "imaps", &["imap", "imaps"])
+    parse_server(server, "imaps", &["imap", "imaps", "unix"])
 }
 
 impl Deref for ImapClient {

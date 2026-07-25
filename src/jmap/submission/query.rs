@@ -8,6 +8,7 @@ use io_jmap::rfc8621::email_submission::{
     query::{JmapEmailSubmissionFilter, JmapEmailSubmissionQueryOptions},
 };
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::account::context::Account;
@@ -92,7 +93,7 @@ impl JmapSubmissionQueryCommand {
 }
 
 /// Renderable table of email submissions.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct SubmissionsTable {
     #[serde(skip)]
     pub preset: String,

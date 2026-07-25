@@ -6,6 +6,7 @@ use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use crossterm::style::Color as CrosstermColor;
 use pimalaya_cli::printer::Printer;
 use pimalaya_config::toml::TomlConfig;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
@@ -80,7 +81,7 @@ fn load_config(paths: &[PathBuf]) -> Result<Config> {
 }
 
 /// One account row in the account list: name, backends, default flag.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct AccountRow {
     pub name: String,
     pub default: bool,
@@ -121,7 +122,7 @@ impl AccountRow {
 }
 
 /// Renderable table for the account list command.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct AccountsTable {
     #[serde(skip)]
     pub preset: String,

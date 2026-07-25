@@ -2,7 +2,7 @@
 name = "himalaya"
 description = "CLI to manage emails"
 version = "2.0.0-alpha.1"
-authors = ["soywod <pimalaya.org@posteo.net>"]
+authors = ["Clément DOUIN (soywod) <pimalaya.org@posteo.net>"]
 rust-version = "1.88"
 edition = "2024"
 license = "MIT OR Apache-2.0"
@@ -14,9 +14,9 @@ repository = "https://github.com/pimalaya/himalaya"
 [features]
 default = ["rustls-ring", "imap", "smtp", "jmap", "gmail", "msgraph", "m2dir"]
 imap = ["dep:io-imap", "dep:mail-parser", "dep:rfc2047-decoder", "io-imap/client"]
-jmap = ["dep:base64", "dep:io-jmap", "dep:mail-parser", "dep:serde_json", "io-jmap/client"]
-gmail = ["dep:io-gmail", "dep:mail-parser", "io-gmail/client"]
-msgraph = ["dep:io-msgraph", "dep:mail-parser", "io-msgraph/client"]
+jmap = ["dep:base64", "dep:io-jmap", "dep:mail-parser", "io-jmap/client", "io-jmap/schemars"]
+gmail = ["dep:io-gmail", "dep:mail-parser", "io-gmail/client", "io-gmail/schemars"]
+msgraph = ["dep:io-msgraph", "dep:mail-parser", "io-msgraph/client", "io-msgraph/schemars"]
 smtp = ["dep:io-smtp", "dep:mail-parser"]
 maildir = ["dep:convert_case", "dep:io-maildir", "dep:mail-parser", "io-maildir/client", "io-maildir/parser"]
 m2dir = ["dep:convert_case", "dep:io-m2dir", "dep:mail-parser", "io-m2dir/client"]
@@ -63,9 +63,10 @@ pimalaya-config = { version = "0.1", default-features = false, features = ["toml
 pimalaya-stream = { version = "0.1", default-features = false, features = ["std"] }
 io-pim-discovery = { version = "0.3", default-features = false, features = ["autoconfig", "pacc", "rfc6186", "rfc8620"] }
 rfc2047-decoder = { version = "1", optional = true }
+schemars = { version = "1", features = ["chrono04"] }
 secrecy = "0.10"
 serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", optional = true }
+serde_json = { version = "1" }
 shellexpand = "3.1"
 toml = "1.1"
 percent-encoding = "2"
@@ -73,3 +74,5 @@ url = { version = "2.2", features = ["serde"] }
 
 [target.'cfg(windows)'.dependencies]
 uds_windows = "1"
+
+[patch.crates-io]

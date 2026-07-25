@@ -16,6 +16,7 @@
 
 use std::{cmp::Ordering, hash::Hash};
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// A flag attached to an envelope or message.
@@ -23,7 +24,7 @@ use serde::{Deserialize, Serialize};
 /// Constructed via [`Flag::from_raw`] (wire spelling in, IANA lookup
 /// derived) or [`Flag::from_iana`] (IANA tag in, canonical wire
 /// spelling synthesised).
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 pub struct Flag {
     raw: String,
     iana: Option<IanaFlag>,
@@ -35,7 +36,9 @@ pub struct Flag {
 /// <https://www.iana.org/assignments/imap-jmap-keywords/>. Variant
 /// order is the lookup order; [`Ord`] is derived from declaration
 /// order to give stable per-IANA-key sorting.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum IanaFlag {
     Seen,

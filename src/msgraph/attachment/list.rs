@@ -5,6 +5,7 @@ use clap::Parser;
 use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use io_msgraph::v1::rest::users::messages::attachments::MsgraphAttachment;
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{account::context::Account, msgraph::client::MsgraphClient};
@@ -66,7 +67,7 @@ impl Default for AttachmentColors {
 }
 
 /// Renderable table of Microsoft Graph message attachments.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct AttachmentsTable {
     #[serde(skip)]
     preset: String,

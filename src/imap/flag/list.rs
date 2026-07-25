@@ -8,6 +8,7 @@ use io_imap::{
     types::flag::{Flag, FlagPerm},
 };
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 
 use crate::account::context::Account;
@@ -48,15 +49,19 @@ impl ImapFlagListCommand {
 }
 
 /// Renderable table of a mailbox's flags and permanent flags.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct FlagsTable<'a> {
     #[serde(skip_serializing)]
+    #[schemars(skip)]
     preset: String,
     #[serde(skip_serializing)]
+    #[schemars(skip)]
     arrangement: ContentArrangement,
     #[serde(serialize_with = "serialize_flags")]
+    #[schemars(with = "Vec<String>")]
     flags: Vec<Flag<'a>>,
     #[serde(serialize_with = "serialize_permanent_flags")]
+    #[schemars(with = "Vec<String>")]
     permanent_flags: Vec<FlagPerm<'a>>,
 }
 

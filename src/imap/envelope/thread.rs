@@ -12,6 +12,7 @@ use io_imap::{
     },
 };
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::{Serialize, Serializer, ser::SerializeStruct};
 
 use crate::imap::{
@@ -182,7 +183,7 @@ fn fetch_subjects(
 }
 
 /// One flattened THREAD node: a message id with its subject and depth.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct ThreadEntry {
     pub id: u32,
     pub subject: String,
@@ -307,5 +308,24 @@ impl Serialize for ThreadResultsTable {
         let mut s = serializer.serialize_struct("ThreadResultsTable", 1)?;
         s.serialize_field("threads", &self.build_entries())?;
         s.end()
+    }
+}
+
+/// Mirrors the JSON shape produced by [`ThreadResultsTable`]'s manual
+/// [`Serialize`] impl (a single `threads` field), used only to derive
+/// the JSON Schema for the `imap thread` command.
+#[derive(JsonSchema)]
+#[allow(dead_code)]
+struct ThreadResultsTableSchema {
+    threads: Vec<ThreadEntry>,
+}
+
+impl JsonSchema for ThreadResultsTable {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        <ThreadResultsTableSchema as JsonSchema>::schema_name()
+    }
+
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        <ThreadResultsTableSchema as JsonSchema>::json_schema(generator)
     }
 }

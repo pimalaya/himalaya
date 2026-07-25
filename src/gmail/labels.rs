@@ -5,6 +5,7 @@ use clap::{Parser, Subcommand};
 use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use io_gmail::v1::rest::labels::{GmailLabel, GmailLabelType};
 use pimalaya_cli::printer::{Message, Printer};
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{account::context::Account, gmail::client::GmailClient};
@@ -203,7 +204,7 @@ impl Default for LabelColors {
 }
 
 /// Renderable table of Gmail labels.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct LabelsTable {
     #[serde(skip)]
     preset: String,

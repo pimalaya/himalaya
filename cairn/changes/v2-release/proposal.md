@@ -15,7 +15,7 @@ Publish the dependency chain, drop the git patches, bump the version, and run a 
 
 The manifest currently patches io-imap, io-gmail, pimalaya-cli and pimalaya-config to git. Those crates must be published to crates.io at versions matching the declared requirements, then the `[patch.crates-io]` block removed. The pimalaya-cli change from the wizard work (the combined token picker with the `oauth` gate) must ship in the published cli before Himalaya can build against it, so cli leads the chain.
 
-Then bump the version from alpha to the release, finalise the CHANGELOG `[Unreleased]` heading into a dated section, and run the manual provider reports under docs/testing against the published build.
+Then bump the version from alpha to the release, finalise the CHANGELOG `[Unreleased]` heading into a dated section, and run the manual provider reports under cairn/spec/testing against the published build.
 
 ## Out of scope
 No behaviour change. This is packaging and verification only, so it carries no spec delta.

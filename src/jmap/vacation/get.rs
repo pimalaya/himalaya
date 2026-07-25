@@ -7,6 +7,7 @@ use io_jmap::rfc8621::vacation_response::{
     JMAP_VACATION_RESPONSE_CAPABILITY, JmapVacationResponse,
 };
 use pimalaya_cli::printer::{Message, Printer};
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::account::context::Account;
@@ -49,7 +50,7 @@ impl JmapVacationGetCommand {
 }
 
 /// Renderable table of the vacation response settings.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(transparent)]
 pub struct VacationTable {
     #[serde(skip)]

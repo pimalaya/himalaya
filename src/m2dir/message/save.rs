@@ -4,6 +4,7 @@ use anyhow::Result;
 use clap::Parser;
 use io_m2dir::flag::M2dirFlags;
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
@@ -55,7 +56,7 @@ impl M2dirMessageSaveCommand {
 }
 
 /// Output of a saved m2dir message: its id and path.
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 pub struct StoredMessage {
     id: String,
     path: String,

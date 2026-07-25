@@ -11,6 +11,7 @@ use io_gmail::v1::rest::settings::delegates::{
     list::{GmailDelegatesList, GmailDelegatesListResponse},
 };
 use pimalaya_cli::printer::{Message, Printer};
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
@@ -151,11 +152,13 @@ impl Delete {
 }
 
 /// Renderable table of Gmail delegates.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct DelegatesTable {
     #[serde(skip)]
+    #[schemars(skip)]
     preset: String,
     #[serde(skip)]
+    #[schemars(skip)]
     arrangement: ContentArrangement,
     response: GmailDelegatesListResponse,
 }

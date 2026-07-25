@@ -4,6 +4,7 @@ use crate::email::flag::{Flag, FlagOp};
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::account::context::Account;
@@ -42,8 +43,8 @@ impl FlagRemoveCommand {
     }
 }
 
-#[derive(Debug, Serialize)]
-struct RemovedFlags {
+#[derive(Debug, Serialize, JsonSchema)]
+pub(crate) struct RemovedFlags {
     flags: Vec<String>,
 }
 

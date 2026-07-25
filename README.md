@@ -317,98 +317,51 @@ mailbox.alias.sent = "Sent Messages"
 
 ## Usage
 
+Every command carries its own `--help`, the source of truth for its flags and syntax. The snippets below are a taste of the surface.
+
 ### Shared API
 
-Backend-agnostic commands operate on the account's first configured backend, or the one selected with `-b/--backend`:
+Backend-agnostic commands run on the account's first configured backend, or the one picked with `-b/--backend`. When an `inbox` alias is set under `[mailbox.alias]`, `-m/--mailbox` defaults to it.
 
-```
+```sh
 himalaya mailbox list
-himalaya envelope list -m INBOX --page 2
+himalaya envelope list --page 2
 himalaya envelope search from alice and after 2026-01-01 order by date desc
-himalaya flag add -m INBOX --flag seen 1:3,5
+himalaya flag add --flag seen 1:3,5
+himalaya message read 42
 himalaya message copy --from INBOX --to Archives 42
-himalaya attachment download -m INBOX 42
+himalaya attachment download 42
 ```
 
-When the `inbox` alias is configured under `[mailbox.alias]`, `-m/--mailbox` becomes optional: shared commands fall back to that id. With `[mailbox.alias] inbox = "INBOX"`, the calls above shorten to `envelope list --page 2`, `flag add --flag seen 1:3,5`, etc.
-
-`envelope list` is plain pagination, ordered by date descending. To filter or sort, use `envelope search` with a trailing query covering `date`, `after`, `from`, `to`, `subject`, `body`, `flag` conditions (combined with `and`, `or`, `not`, grouped with parens) and an `order by date|from|to|subject [asc|desc]` sort chain. Date clauses target the `Date:` header (sent-at) on every backend. The full grammar lives in `himalaya envelope search --help`, which is the source of truth for the query DSL.
-
-The query DSL is himalaya's own and compiles to each backend's native search: provider-specific operators (Gmail's `in:`/`label:` syntax, `X-GM-RAW`, …) are not supported. On IMAP the search currently runs server-side as `UID SORT`, so it requires the `SORT` capability — servers without it (notably Gmail) reject the command for now (see [#698](https://github.com/pimalaya/himalaya/issues/698)).
-
-The shared surface is a strict least-common-denominator subset across IMAP, JMAP, Gmail, Microsoft Graph, Maildir and m2dir. Operations that do not generalize (mailbox roles, attribute flags, JMAP-specific queries…) live under the protocol-specific subcommands.
+`envelope search` uses himalaya's own cross-backend query DSL; its grammar lives in `himalaya envelope search --help`.
 
 ### Protocol-specific APIs
 
-Each backend exposes its full native API under its own subgroup:
+Each backend also exposes its full native API under its own subgroup, always against that backend (`-b/--backend` is ignored here):
 
 ```sh
-himalaya imap select INBOX
-himalaya imap status INBOX
-himalaya imap subscribe INBOX
 himalaya imap raw 'SEARCH FROM "alice@example.com"'
-
 himalaya jmap mailbox query --role drafts
-himalaya jmap identity get
-himalaya jmap vacation get
-
 himalaya gmail messages list -q "from:alice is:unread"
-himalaya gmail labels list
-
-himalaya msgraph message list --folder inbox
 himalaya msgraph mail-folder list
-
-himalaya maildir create Archives
-himalaya maildir messages save -m ~/Mail/example/Archives < message.eml
-
 himalaya smtp send -f me@example.com -t you@example.com < message.eml
-himalaya smtp raw 'VRFY postmaster'
 ```
-
-The `-b/--backend` flag is only consumed by the shared commands; protocol subcommands always use their own backend.
 
 ### Composing messages
 
-The built-in `message compose` / `reply` / `forward` commands cover simple cases via CLI flags:
-
-```
-himalaya message compose --from me@example.org --to you@example.org \
-    --subject "Hello" --body "Hi!" --send
-```
-
-For richer composition (multipart MIME, MML directives, signing/encryption, editor-driven workflows), chain a standalone composer such as [mml](https://github.com/pimalaya/mml) into `message send` / `message add` through a tempfile or bash/zsh process substitution:
+`message compose` / `reply` / `forward` cover simple cases through flags. For rich MIME (MML directives, signing, encryption, an editor-driven flow), chain a composer such as [mml](https://github.com/pimalaya/mml) into `message send` / `message add`, or stage a prepared file as a draft:
 
 ```sh
-# Explicit tempfile, works in plain POSIX sh
-mml compose /tmp/draft.eml && himalaya message send /tmp/draft.eml
-
-# Bash / zsh process substitution, single command, no tempfile
+himalaya message compose --to you@example.org --subject Hello --body Hi --send
 mml compose >(himalaya message send)
-himalaya message read 42 | mml reply >(himalaya message send)
+himalaya message add -m drafts --flag draft < message.eml
 ```
 
-The path-arg or process-substitution forms keep the composer's stdout connected to the terminal, so any `$EDITOR` it spawns sees a real tty. The bare-pipe form (`mml compose | himalaya message send`) hangs because the editor inherits a pipe on its stdout.
-
-A prepared RFC 5322 file can also be staged as a draft instead of sent right away — handy for "compose, review in another client, then send" workflows:
-
-```sh
-himalaya message add -m drafts --flag draft < message.eml  # save as draft
-himalaya message send --save sent < message.eml            # send + keep a copy
-```
-
-Both `-m`/`--save` values are resolved through the account's `[mailbox.alias]` map.
-
-### Reading messages
-
-`himalaya message read <ID>` renders headers and text bodies; `--raw` dumps the original RFC 5322 bytes; `--json` emits the parsed message. A few behaviours worth knowing, especially when scripting:
-
-- Reading is side-effect-free: messages are fetched with `BODY.PEEK`, so `message read` never sets `\Seen`. Mark explicitly with `flag add --flag seen <ID>`.
-- Ids are per-mailbox (IMAP UID, JMAP email id or Maildir filename id): the same message gets a new id when copied or moved. The `message-id` field exposed in `--json` envelope output is the stable cross-mailbox key.
-- Every command accepts `--json`; envelope listings serialize as `{"envelopes": [{"id", "message-id", "flags": [{"raw", "iana"}], "subject", "from": [{"name", "email"}], "to", "date", "size", "has-attachment"}]}`.
+See `himalaya message send --help` and the [mml](https://github.com/pimalaya/mml) docs for the composer chaining.
 
 ### Re-using sessions
 
-Each invocation opens a fresh TCP+TLS+SASL session by default. To amortize the handshake across many commands, pair himalaya with [`sirup`](https://github.com/pimalaya/sirup): `sirup` exposes a pre-authenticated IMAP/SMTP session over a Unix socket, and himalaya can point its `imap.server` / `smtp.server` at that socket.
+Each invocation opens a fresh TCP+TLS+SASL session. To amortize the handshake, pair himalaya with [sirup](https://github.com/pimalaya/sirup): it serves a pre-authenticated IMAP/SMTP session over a Unix socket that `imap.server` / `smtp.server` can point at.
 
 ## Interfaces
 

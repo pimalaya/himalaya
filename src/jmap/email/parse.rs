@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use log::warn;
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::jmap::client::JmapClient;
@@ -49,8 +50,8 @@ impl JmapEmailParseCommand {
     }
 }
 
-#[derive(Serialize)]
-struct ParsedBodies {
+#[derive(Serialize, JsonSchema)]
+pub(crate) struct ParsedBodies {
     bodies: Vec<String>,
 }
 

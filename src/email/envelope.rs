@@ -3,13 +3,14 @@
 use std::collections::BTreeSet;
 
 use chrono::{DateTime, FixedOffset};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::email::{address::Address, flag::Flag};
 
 /// Lightweight summary of a message: enough to display in a list
 /// without fetching the full body.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub struct Envelope {
     /// Backend-specific identifier of the message.

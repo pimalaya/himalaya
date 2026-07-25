@@ -9,6 +9,7 @@ use io_gmail::v1::rest::settings::filters::{
     list::GmailFiltersListResponse,
 };
 use pimalaya_cli::printer::{Message, Printer};
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{account::context::Account, gmail::client::GmailClient};
@@ -239,11 +240,13 @@ fn action_summary(action: &GmailFilterAction) -> String {
 }
 
 /// Renderable table of Gmail filters.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct FiltersTable {
     #[serde(skip)]
+    #[schemars(skip)]
     preset: String,
     #[serde(skip)]
+    #[schemars(skip)]
     arrangement: ContentArrangement,
     response: GmailFiltersListResponse,
 }

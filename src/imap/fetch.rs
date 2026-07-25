@@ -13,6 +13,7 @@ use io_imap::{
     },
 };
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::imap::{
@@ -106,13 +107,13 @@ impl ImapFetchCommand {
 }
 
 /// Renderable list of FETCH results, one block per message.
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Default, Serialize, JsonSchema)]
 pub struct FetchedMessages {
     pub messages: Vec<FetchedMessage>,
 }
 
 /// The fetched data items of a single message.
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Default, Serialize, JsonSchema)]
 pub struct FetchedMessage {
     pub seq: u32,
     pub uid: Option<u32>,
@@ -151,7 +152,7 @@ impl FetchedMessage {
 }
 
 /// Display view of a fetched message envelope.
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Default, Serialize, JsonSchema)]
 pub struct EnvelopeView {
     pub date: Option<String>,
     pub subject: Option<String>,
@@ -183,7 +184,7 @@ impl From<&Envelope<'_>> for EnvelopeView {
 }
 
 /// One node of a fetched MIME body structure tree.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct BodyPart {
     pub content_type: String,
     pub name: Option<String>,

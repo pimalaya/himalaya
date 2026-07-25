@@ -9,6 +9,7 @@ use io_gmail::v1::rest::messages::{
     insert::GmailMessageInsert, list::GmailMessagesListParams,
 };
 use pimalaya_cli::printer::{Message, Printer};
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
@@ -438,7 +439,7 @@ impl From<FormatArg> for GmailMessageFormat {
 }
 
 /// Renders a list of Gmail message ids as a two-column table.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct MessageIdsTable {
     #[serde(skip)]
     pub preset: String,

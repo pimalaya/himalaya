@@ -4,6 +4,7 @@ use anyhow::{Result, bail};
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 use pimalaya_config::toml::TomlConfig;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
@@ -175,10 +176,12 @@ pub(crate) fn connect_imap(imap_config: &crate::config::ImapConfig) -> Result<()
     let sasl: Option<Sasl> = imap_config
         .sasl
         .clone()
-        .and_then(|cfg| {
-            let host = server.host_str()?;
-            let port = server.port_or_known_default()?;
-            Some(cfg.try_into_sasl(host, port))
+        .map(|cfg| {
+            let host = server.host_str().unwrap_or_default();
+            let port = server
+                .port()
+                .unwrap_or(io_imap::client::default_port(server.scheme()));
+            cfg.try_into_sasl(host, port)
         })
         .transpose()?;
     let _ = ImapClientStd::connect(&server, &tls, imap_config.starttls, sasl, auto_id)?;
@@ -279,10 +282,12 @@ pub(crate) fn connect_smtp(smtp_config: &crate::config::SmtpConfig) -> Result<()
     let sasl: Option<Sasl> = smtp_config
         .sasl
         .clone()
-        .and_then(|cfg| {
-            let host = server.host_str()?;
-            let port = server.port_or_known_default()?;
-            Some(cfg.try_into_sasl(host, port))
+        .map(|cfg| {
+            let host = server.host_str().unwrap_or_default();
+            let port = server
+                .port()
+                .unwrap_or(SmtpClientStd::default_port(server.scheme()));
+            cfg.try_into_sasl(host, port)
         })
         .transpose()?;
     let _client = SmtpClientStd::connect(&server, &tls, smtp_config.starttls, domain, sasl)?;
@@ -291,14 +296,14 @@ pub(crate) fn connect_smtp(smtp_config: &crate::config::SmtpConfig) -> Result<()
 }
 
 /// Aggregated account check result: one outcome per backend.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct CheckReport {
     pub account: String,
     pub backends: Vec<BackendCheck>,
 }
 
 /// Outcome of checking a single backend's connection.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct BackendCheck {
     pub backend: &'static str,
     pub ok: bool,

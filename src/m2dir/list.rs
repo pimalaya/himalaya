@@ -4,6 +4,7 @@ use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, Color, Row, Table};
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::account::context::Account;
@@ -45,7 +46,7 @@ impl M2dirMailboxListCommand {
 }
 
 /// Renderable table of m2dir folders.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct M2dirsTable {
     #[serde(skip)]
     pub preset: String,
@@ -80,7 +81,7 @@ impl fmt::Display for M2dirsTable {
 }
 
 /// One row of the m2dir folders table: name and path.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct M2dirRow {
     pub name: String,
     pub path: String,

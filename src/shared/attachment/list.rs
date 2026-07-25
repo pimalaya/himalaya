@@ -6,6 +6,7 @@ use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use humansize::{BINARY, format_size};
 use mail_parser::{MessageParser, MessagePart, MimeHeaders};
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::account::context::Account;
@@ -102,7 +103,7 @@ pub(crate) struct AttachmentColors {
 }
 
 /// One row of the `attachments list` / `attachments download` output.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct Attachment {
     /// 1-based linear index in mail-parser's attachment iteration
     /// order. Stable across the `--inline` filter.
@@ -125,7 +126,7 @@ pub struct Attachment {
 }
 
 /// Table of attachment rows rendered to the terminal or as JSON.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct Attachments {
     #[serde(skip)]
     pub preset: String,

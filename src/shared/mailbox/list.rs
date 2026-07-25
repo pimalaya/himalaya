@@ -5,6 +5,7 @@ use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::account::context::Account;
@@ -67,7 +68,7 @@ struct MailboxColors {
 }
 
 /// Table of mailbox rows rendered to the terminal or as JSON.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct Mailboxes {
     #[serde(skip)]
     pub preset: String,

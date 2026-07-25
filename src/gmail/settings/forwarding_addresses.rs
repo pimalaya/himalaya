@@ -9,6 +9,7 @@ use io_gmail::v1::rest::settings::forwarding_addresses::{
     list::GmailForwardingAddressesList, list::GmailForwardingAddressesListResponse,
 };
 use pimalaya_cli::printer::{Message, Printer};
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
@@ -153,11 +154,13 @@ impl Delete {
 }
 
 /// Renderable table of Gmail forwarding addresses.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct ForwardingAddressesTable {
     #[serde(skip)]
+    #[schemars(skip)]
     preset: String,
     #[serde(skip)]
+    #[schemars(skip)]
     arrangement: ContentArrangement,
     response: GmailForwardingAddressesListResponse,
 }
