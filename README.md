@@ -10,9 +10,6 @@
 
 ![screenshot](./screenshot.jpeg)
 
-> [!IMPORTANT]
-> This README documents Himalaya v2, which is **not yet released**. If you are running v1 (`himalaya v1.2.0` or earlier), refer to the [v1.2.0 README](https://github.com/pimalaya/himalaya/blob/v1.2.0/README.md) instead. The [MIGRATION.md](./MIGRATION.md) guide walks v1 users through the breaking changes.
-
 ## Table of contents
 
 - [Features](#features)
@@ -29,10 +26,10 @@
 
 ## Features
 
-- **Shared API** that maps `mailboxes`, `envelopes`, `flags`, `messages` and `attachments` to the active backend
-- **Protocol-specific APIs** exposing each backend's full surface (`himalaya imap/smtp/jmap/gmail/msgraph/maildir…`)
-- Remote backend support: **IMAP**, **SMTP**, **JMAP**, **Gmail** (REST API), **Microsoft Graph** (Outlook / Microsoft 365)
-- Local (filesystem) backends support: **Maildir** <sup>[specs](https://cr.yp.to/proto/maildir.html)</sup>, **m2dir** <sup>[specs](https://man.sr.ht/~bitfehler/m2dir/)</sup>
+- **Shared API** for `mailboxes`, `envelopes`, `flags`, `messages` and `attachments`
+- **Protocol-specific APIs** exposing each backend's full surface
+- **IMAP**, **SMTP**, **JMAP**, **Gmail** (REST API), **Microsoft Graph** (Outlook / Microsoft 365) support
+- **Maildir** <sup>[specs](https://cr.yp.to/proto/maildir.html)</sup>, **m2dir** <sup>[specs](https://man.sr.ht/~bitfehler/m2dir/)</sup> support
 - **Simple auth** support for IMAP/SMTP: anonymous, login, plain, oauthbearer, xoauth2, scram-sha-256
 - **HTTP auth** support for JMAP: basic, bearer
 - **TLS** support:
@@ -44,8 +41,8 @@
   - Autoconfiguration (Thunderbird) <sup>[specs](https://wiki.mozilla.org/Thunderbird:Autoconfiguration)</sup>
   - SRV DNS lookups <sup>[rfc6186](https://datatracker.ietf.org/doc/html/rfc6186)</sup>
   - JMAP session resolution <sup>[rfc8620](https://datatracker.ietf.org/doc/html/rfc8620)</sup>
+- **SOCKS5**, **HTTP** proxy support via `$ALL_PROXY` and `$HTTP_PROXY`
 - **TOML configuration** with multi-account support
-- **Shared configuration file** with `himalaya-tui`: same `[accounts.<name>]` blocks load on both binaries (see [Configuration](#configuration))
 - **JSON** output via `--json`
 
 > [!TIP]

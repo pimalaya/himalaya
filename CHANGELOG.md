@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-07-26
+
 ### Added
 
 - Added Gmail REST API support: a `[gmail]` account backend behind the shared mail commands (`--backend gmail`), plus a protocol-specific `gmail` command exposing the full REST surface (profile, labels, messages, attachments, drafts, threads, history, settings). Authenticates with a single OAuth 2.0 bearer token (`gmail.auth.token.raw` / `.command`), the only authorization Gmail's REST API accepts.
@@ -1023,7 +1025,8 @@ Few major concepts changed:
 [core#1]: https://github.com/pimalaya/core/issues/1
 [core#10]: https://github.com/pimalaya/core/issues/10
 
-[unreleased]: https://github.com/pimalaya/himalaya/compare/v1.2.0...HEAD
+[unreleased]: https://github.com/pimalaya/himalaya/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/pimalaya/himalaya/compare/v1.2.0...v2.0.0
 [1.2.0]: https://github.com/pimalaya/himalaya/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/pimalaya/himalaya/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/pimalaya/himalaya/compare/v1.0.0-beta.4...v1.0.0
