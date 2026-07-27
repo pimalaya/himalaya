@@ -34,7 +34,7 @@ the shared commands). This one exercises the raw protocol commands under
 | `imap copy` | UID, `--seq` | ✅ (F2 applies) |
 | `imap move` | UID | ✅ (F2 applies) |
 | `imap expunge` | `\Deleted` + `EXPUNGE` | ✅ |
-| `imap raw` | `NOOP`, `CAPABILITY` (verbatim reply) | ✅ |
+| `imap raw` | `a1 NOOP`, `a1 CAPABILITY` (tagged, verbatim reply) | ✅ |
 | `smtp send` | `--mail-from`, `--rcpt-to`, piped body | ✅ delivered |
 | `smtp raw` | `NOOP` → `250` | ✅ |
 

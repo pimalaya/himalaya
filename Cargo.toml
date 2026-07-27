@@ -12,7 +12,7 @@ homepage = "https://pimalaya.org"
 repository = "https://github.com/pimalaya/himalaya"
 
 [features]
-default = ["rustls-ring", "imap", "smtp", "jmap", "gmail", "msgraph", "m2dir"]
+default = ["rustls-ring", "jmap", "imap", "smtp", "gmail", "msgraph", "maildir", "m2dir"]
 imap = ["dep:io-imap", "dep:mail-parser", "dep:rfc2047-decoder", "io-imap/client"]
 jmap = ["dep:base64", "dep:io-jmap", "dep:mail-parser", "io-jmap/client", "io-jmap/schemars"]
 gmail = ["dep:io-gmail", "dep:mail-parser", "io-gmail/client", "io-gmail/schemars"]
@@ -76,3 +76,4 @@ url = { version = "2.2", features = ["serde"] }
 uds_windows = "1"
 
 [patch.crates-io]
+io-imap.git = "https://github.com/pimalaya/io-imap"

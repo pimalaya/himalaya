@@ -15,6 +15,8 @@ use anyhow::{Context, bail};
 use clap::Parser;
 use pimalaya_cli::clap::parsers::path_parser;
 
+use crate::shared::crlf;
+
 /// Trailing positional that resolves to a raw RFC 5322 message.
 ///
 /// Resolution order:
@@ -29,9 +31,10 @@ use pimalaya_cli::clap::parsers::path_parser;
 /// 3. Otherwise, bail.
 ///
 /// Whichever branch wins, the resolved bytes go through
-/// [`normalize_crlf`] so IMAP `APPEND` (which rejects bare newlines)
-/// and the other line-oriented backends receive canonical `\r\n`
-/// endings regardless of the source's convention.
+/// [`crlf::normalize`](crate::shared::crlf::normalize) so IMAP `APPEND`
+/// (which rejects bare newlines) and the other line-oriented backends
+/// receive canonical `\r\n` endings regardless of the source's
+/// convention.
 #[derive(Debug, Parser)]
 pub struct MessageArg {
     /// Can be a path to a file, raw message contents or nothing if
@@ -69,10 +72,10 @@ impl MessageArg {
             if let Some(path) = path_parser(&mime).ok().filter(|path| path.is_file()) {
                 let contents = fs::read_to_string(&path)
                     .with_context(|| format!("Failed to read message file `{}`", path.display()))?;
-                return Ok(normalize_crlf(&contents));
+                return Ok(crlf::normalize(&contents));
             }
 
-            return Ok(normalize_crlf(&mime));
+            return Ok(crlf::normalize(&mime));
         }
 
         if !stdin().is_terminal() {
@@ -81,50 +84,5 @@ impl MessageArg {
         }
 
         bail!("No message provided: pass it as an argument, a file path, or via stdin");
-    }
-}
-
-/// Rewrites bare line feeds to CRLF, idempotently: a `\n` already
-/// preceded by `\r` is left untouched, every other `\n` gets a `\r`
-/// inserted before it. A message read from a Unix-LF file or passed
-/// inline with real newlines is thus made RFC 5322 / IMAP `APPEND`
-/// compliant without corrupting content that is already CRLF.
-fn normalize_crlf(input: &str) -> String {
-    let mut out = String::with_capacity(input.len());
-    let mut prev = '\0';
-
-    for ch in input.chars() {
-        if ch == '\n' && prev != '\r' {
-            out.push('\r');
-        }
-        out.push(ch);
-        prev = ch;
-    }
-
-    out
-}
-
-#[cfg(test)]
-mod tests {
-    use super::normalize_crlf;
-
-    #[test]
-    fn bare_lf_gains_cr() {
-        assert_eq!(normalize_crlf("a\nb\n"), "a\r\nb\r\n");
-    }
-
-    #[test]
-    fn existing_crlf_is_untouched() {
-        assert_eq!(normalize_crlf("a\r\nb\r\n"), "a\r\nb\r\n");
-    }
-
-    #[test]
-    fn mixed_endings_converge_to_crlf() {
-        assert_eq!(normalize_crlf("a\r\nb\nc"), "a\r\nb\r\nc");
-    }
-
-    #[test]
-    fn lone_cr_is_preserved() {
-        assert_eq!(normalize_crlf("a\rb"), "a\rb");
     }
 }

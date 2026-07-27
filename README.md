@@ -337,7 +337,7 @@ himalaya attachment download 42
 Each backend also exposes its full native API under its own subgroup, always against that backend (`-b/--backend` is ignored here):
 
 ```sh
-himalaya imap raw 'SEARCH FROM "alice@example.com"'
+himalaya imap raw 'a1 SEARCH FROM "alice@example.com"\r\n'
 himalaya jmap mailbox query --role drafts
 himalaya gmail messages list -q "from:alice is:unread"
 himalaya msgraph mail-folder list

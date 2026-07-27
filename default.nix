@@ -7,7 +7,7 @@
 pimalaya.mkDefault (
   {
     src = ./.;
-    version = "2.0.0-alpha.1";
+    version = "2.0.0";
     mkPackage = (
       {
         lib,
@@ -37,20 +37,20 @@ pimalaya.mkDefault (
               mkdir -p $WINEPREFIX
             ''
             + ''
-              mkdir -p $out/share/{applications,completions,man}
+              mkdir -p $out/share/{applications,completions,man,schemas}
               cp assets/himalaya.desktop "$out"/share/applications/
+              ${emulator} "$out"/bin/himalaya${exe} completion -d "$out"/share/completions bash elvish fish powershell zsh
               ${emulator} "$out"/bin/himalaya${exe} manual "$out"/share/man
-              ${emulator} "$out"/bin/himalaya${exe} completion bash > "$out"/share/completions/himalaya.bash
-              ${emulator} "$out"/bin/himalaya${exe} completion elvish > "$out"/share/completions/himalaya.elvish
-              ${emulator} "$out"/bin/himalaya${exe} completion fish > "$out"/share/completions/himalaya.fish
-              ${emulator} "$out"/bin/himalaya${exe} completion powershell > "$out"/share/completions/himalaya.powershell
-              ${emulator} "$out"/bin/himalaya${exe} completion zsh > "$out"/share/completions/himalaya.zsh
+              ${emulator} "$out"/bin/himalaya${exe} json-schema "$out"/share/schemas
             ''
             + lib.optionalString (stdenv.buildPlatform.canExecute stdenv.hostPlatform) ''
               installManPage "$out"/share/man/*
             ''
             + lib.optionalString (stdenv.buildPlatform.canExecute stdenv.hostPlatform) ''
-              installShellCompletion "$out"/share/completions/himalaya.{bash,fish,zsh}
+              installShellCompletion --cmd himalaya \
+                --bash "$out"/share/completions/himalaya.bash \
+                --fish "$out"/share/completions/himalaya.fish \
+                --zsh "$out"/share/completions/_himalaya
             '';
         }
     );

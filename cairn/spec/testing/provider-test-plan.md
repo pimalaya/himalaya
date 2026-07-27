@@ -179,7 +179,8 @@ verbatim, so the flags differ from the shared enum-driven ones.
   `--from/--subject/--since/--larger/--seen/…` key, plus `--seq`);
   `sort -S <key> [-r]`; `thread -A <algo>`; `store <seq> --action
   add|set|remove -f <flag>`; `copy`/`move <seq> <target> [--seq]`;
-  `expunge`; `raw <COMMAND>`.
+  `expunge`; `raw '<TAG> <COMMAND>'` (each command tagged, e.g. `a1 NOOP`;
+  CRLF-separate to batch several).
   - **Raw flags are literal tokens**, not the shared enum: `-f seen`
     stores a *keyword* `seen`, not `\Seen`. Pass `-f '\Seen'` for the
     system flag. Verify with `search --seen` and `fetch --flags`.
