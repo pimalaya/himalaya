@@ -11,7 +11,7 @@
 //! dedicated configurations (the proprietary Gmail / Graph APIs plus
 //! IMAP+SMTP), matching the app's provider short-circuit.
 
-use std::{collections::BTreeSet, env, fmt};
+use std::{collections::BTreeSet, env, fmt, time::Duration};
 
 use anyhow::Result;
 use io_pim_discovery::{
@@ -31,6 +31,12 @@ use url::Url;
 /// DNS-over-TCP resolver backing discovery when `HIMALAYA_DNS_RESOLVER`
 /// is unset and no system resolver is found: Cloudflare's `1.1.1.1`.
 const DEFAULT_RESOLVER: &str = "tcp://1.1.1.1:53";
+
+/// Upper bound on the parallel discovery fan-out. An unreachable
+/// endpoint (a firewalled port, a black-hole host) must not stall the
+/// interactive wizard, so mechanisms that have not reported by then are
+/// abandoned and only what completed in time is offered.
+const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(8);
 
 /// One selectable service to reach the account, carrying the
 /// authentication capabilities it advertised. The concrete method (SASL
@@ -149,7 +155,7 @@ pub fn search(email: &str) -> Result<Vec<Discovered>> {
         DiscoveryService::Smtp,
         DiscoveryService::Jmap,
     ]);
-    let configs = client.compose_all(email, services)?;
+    let configs = client.compose_all_within(email, services, DISCOVERY_TIMEOUT)?;
 
     let provider = provider_of(email, &configs);
     let mut found = Vec::new();

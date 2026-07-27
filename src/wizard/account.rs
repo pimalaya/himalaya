@@ -10,17 +10,21 @@ use pimalaya_cli::wizard::{
     smtp::{Encryption as SmtpEncryption, SmtpAuth, SmtpSecret, WizardSmtpConfig},
 };
 use pimalaya_config::{command::shell, secret::Secret};
+use pimalaya_stream::sasl::SaslMechanism;
 
-use crate::config::{ImapConfig, SaslConfig, SaslPlainConfig, SmtpConfig};
+use crate::config::{
+    ImapConfig, SaslAnonymousConfig, SaslConfig, SaslLoginConfig, SaslOauthbearerConfig,
+    SaslPlainConfig, SaslScramSha256Config, SaslXoauth2Config, SmtpConfig,
+};
 
-pub fn imap_to_config(w: WizardImapConfig) -> Result<ImapConfig> {
+pub fn imap_to_config(w: WizardImapConfig, mechanism: SaslMechanism) -> Result<ImapConfig> {
     let scheme = match w.encryption {
         ImapEncryption::Tls => "imaps",
         ImapEncryption::StartTls | ImapEncryption::None => "imap",
     };
     let server = format!("{scheme}://{}:{}", w.host, w.port);
     let starttls = matches!(w.encryption, ImapEncryption::StartTls);
-    let sasl = Some(build_sasl_imap(&w.login, w.auth)?);
+    let sasl = Some(build_sasl_imap(&w.login, w.auth, mechanism)?);
 
     Ok(ImapConfig {
         server,
@@ -51,15 +55,43 @@ pub fn smtp_to_config(w: WizardSmtpConfig) -> Result<SmtpConfig> {
     })
 }
 
-fn build_sasl_imap(login: &str, auth: ImapAuth) -> Result<SaslConfig> {
+/// Builds the IMAP SASL config for `mechanism` from the manual wizard's
+/// answers. The wizard collects a single secret (labelled a password),
+/// which backs whichever mechanism was chosen: the password families use
+/// it as the password, the OAuth families as the API token, and
+/// ANONYMOUS ignores it.
+fn build_sasl_imap(login: &str, auth: ImapAuth, mechanism: SaslMechanism) -> Result<SaslConfig> {
     let ImapAuth::Password(secret) = auth;
-    let passwd = match secret {
+    let secret = match secret {
         ImapSecret::Raw(s) => Secret::Raw(s),
         ImapSecret::Command(argv) => command_secret(argv)?,
         ImapSecret::Shell(line) => shell_secret(&line)?,
     };
 
-    Ok(plain_sasl(login, passwd))
+    Ok(match mechanism {
+        SaslMechanism::Plain => SaslConfig::Plain(SaslPlainConfig {
+            authzid: None,
+            authcid: login.to_owned(),
+            passwd: secret,
+        }),
+        SaslMechanism::Login => SaslConfig::Login(SaslLoginConfig {
+            username: login.to_owned(),
+            password: secret,
+        }),
+        SaslMechanism::ScramSha256 => SaslConfig::ScramSha256(SaslScramSha256Config {
+            username: login.to_owned(),
+            password: secret,
+        }),
+        SaslMechanism::OAuthBearer => SaslConfig::Oauthbearer(SaslOauthbearerConfig {
+            username: login.to_owned(),
+            token: secret,
+        }),
+        SaslMechanism::XOAuth2 => SaslConfig::Xoauth2(SaslXoauth2Config {
+            username: login.to_owned(),
+            token: secret,
+        }),
+        SaslMechanism::Anonymous => SaslConfig::Anonymous(SaslAnonymousConfig { message: None }),
+    })
 }
 
 fn build_sasl_smtp(login: &str, auth: SmtpAuth) -> Result<SaslConfig> {
@@ -124,7 +156,7 @@ mod tests {
 
     #[test]
     fn imap_tls_yields_imaps_scheme_and_plain_sasl() {
-        let config = imap_to_config(imap(ImapEncryption::Tls, 993)).unwrap();
+        let config = imap_to_config(imap(ImapEncryption::Tls, 993), SaslMechanism::Plain).unwrap();
         assert_eq!(config.server, "imaps://imap.example.com:993");
         assert!(!config.starttls);
         let Some(SaslConfig::Plain(plain)) = config.sasl else {
@@ -136,7 +168,8 @@ mod tests {
 
     #[test]
     fn imap_starttls_yields_imap_scheme_and_flag() {
-        let config = imap_to_config(imap(ImapEncryption::StartTls, 143)).unwrap();
+        let config =
+            imap_to_config(imap(ImapEncryption::StartTls, 143), SaslMechanism::Plain).unwrap();
         assert_eq!(config.server, "imap://imap.example.com:143");
         assert!(config.starttls);
     }
@@ -161,13 +194,13 @@ mod tests {
     fn empty_command_secret_is_rejected() {
         let mut wizard = imap(ImapEncryption::Tls, 993);
         wizard.auth = ImapAuth::Password(ImapSecret::Command(Vec::new()));
-        assert!(imap_to_config(wizard).is_err());
+        assert!(imap_to_config(wizard, SaslMechanism::Plain).is_err());
     }
 
     #[test]
     fn blank_shell_secret_is_rejected() {
         let mut wizard = imap(ImapEncryption::Tls, 993);
         wizard.auth = ImapAuth::Password(ImapSecret::Shell("   ".into()));
-        assert!(imap_to_config(wizard).is_err());
+        assert!(imap_to_config(wizard, SaslMechanism::Plain).is_err());
     }
 }

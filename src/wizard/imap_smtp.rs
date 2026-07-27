@@ -19,8 +19,9 @@ use pimalaya_cli::{
     wizard::imap::{
         self as imap_wizard, Encryption as ImapEncryption, ImapAuth, ImapSecret, WizardImapConfig,
     },
-    wizard::smtp::{self as smtp_wizard},
+    wizard::smtp::{self as smtp_wizard, Encryption as SmtpEncryption},
 };
+use pimalaya_stream::sasl::SaslMechanism;
 use url::Url;
 
 use crate::{
@@ -64,7 +65,19 @@ pub fn configure_discovered(
 
     let login_hint = discovered.login_default(email);
 
-    let imap_sasl = prompt_sasl(account_name, login_hint.as_deref(), discovered.auth)?;
+    // Probe the server so only the mechanisms it actually advertises are
+    // offered (LOGIN last); on any probe failure fall back to the full
+    // list keyed on what discovery advertised.
+    let probed = probe_imap_mechanisms(
+        &endpoint_server(imap),
+        imap.security == DiscoverySecurity::Starttls,
+    );
+    let imap_sasl = prompt_sasl(
+        account_name,
+        login_hint.as_deref(),
+        discovered.auth,
+        probed.as_deref(),
+    )?;
     let imap = imap_config(imap, imap_sasl.clone());
     test_connection("IMAP", || check::connect_imap(&imap))?;
 
@@ -75,10 +88,13 @@ pub fn configure_discovered(
     // NOTE: IMAP and SMTP may advertise different auth, so SMTP either
     // reuses the IMAP credential or configures a distinct one.
     let smtp_endpoint = smtp.clone().unwrap_or_else(|| default_smtp(email));
+    // NOTE: SMTP advertises its auth over EHLO, not the IMAP CAPABILITY
+    // probe, so its mechanism list stays keyed on discovery (probed =
+    // None), unlike the IMAP side above.
     let smtp_sasl = if prompt::bool("Use the same credentials for SMTP?", true)? {
         imap_sasl
     } else {
-        prompt_sasl(account_name, login_hint.as_deref(), discovered.auth)?
+        prompt_sasl(account_name, login_hint.as_deref(), discovered.auth, None)?
     };
     let smtp = smtp_config(&smtp_endpoint, smtp_sasl);
     test_connection("SMTP", || check::connect_smtp(&smtp))?;
@@ -102,27 +118,56 @@ fn test_connection(label: &str, test: impl FnOnce() -> Result<()>) -> Result<()>
     Ok(())
 }
 
-/// Prompts the SASL mechanism from `caps` (every mechanism offered when
-/// none was advertised), then its credentials. The token mechanisms and
-/// their OAuth brokers appear only when a token or OAuth grant was
-/// advertised.
-fn prompt_sasl(account_name: &str, login_hint: Option<&str>, caps: AuthCaps) -> Result<SaslConfig> {
-    let mut mechs = Vec::new();
-    if caps.basic || !caps.any() {
-        mechs.extend([PLAIN, LOGIN, SCRAM_SHA_256, ANONYMOUS]);
-    }
-    if caps.token() || !caps.any() {
-        mechs.extend([OAUTHBEARER, XOAUTH2]);
-    }
+/// Prompts the SASL mechanism then its credentials. When `probed` is
+/// `Some` (a live IMAP CAPABILITY probe) only those mechanisms are
+/// offered, most preferred first and LOGIN last; otherwise the full list
+/// keyed on `caps` is offered, so a failed probe never leaves the user
+/// stuck. The token mechanisms' OAuth brokers appear only when a token
+/// or OAuth grant was advertised.
+fn prompt_sasl(
+    account_name: &str,
+    login_hint: Option<&str>,
+    caps: AuthCaps,
+    probed: Option<&[SaslMechanism]>,
+) -> Result<SaslConfig> {
+    let mechanism = prompt_mechanism(caps, probed)?;
+    build_sasl(mechanism, account_name, login_hint, caps)
+}
 
-    let mech = if mechs.len() == 1 {
-        mechs[0]
-    } else {
-        prompt::item("SASL mechanism:", mechs, None)?
+/// Prompts the authentication mechanism: the probed list when the server
+/// advertised one, otherwise the full fallback list. A single candidate
+/// is selected without prompting.
+fn prompt_mechanism(caps: AuthCaps, probed: Option<&[SaslMechanism]>) -> Result<SaslMechanism> {
+    let mechanisms = match probed {
+        Some(mechanisms) if !mechanisms.is_empty() => mechanisms.to_vec(),
+        _ => fallback_mechanisms(caps),
     };
 
-    // NOTE: ANONYMOUS carries no login; every other mechanism needs one.
-    if mech == ANONYMOUS {
+    let labels: Vec<&str> = mechanisms.iter().map(mechanism_label).collect();
+    let label = if labels.len() == 1 {
+        labels[0]
+    } else {
+        prompt::item("SASL mechanism:", labels, None)?
+    };
+
+    // Labels are unique, so the chosen one maps back to exactly one
+    // mechanism.
+    Ok(mechanisms
+        .into_iter()
+        .find(|m| mechanism_label(m) == label)
+        .expect("chosen label matches a mechanism"))
+}
+
+/// Prompts the credentials for `mechanism` and builds its SASL config.
+/// ANONYMOUS carries no login; every other mechanism needs one, plus a
+/// password (basic family) or an API token (OAuth family).
+fn build_sasl(
+    mechanism: SaslMechanism,
+    account_name: &str,
+    login_hint: Option<&str>,
+    caps: AuthCaps,
+) -> Result<SaslConfig> {
+    if let SaslMechanism::Anonymous = mechanism {
         let message = prompt::text("ANONYMOUS message (optional):", None::<&str>)?;
         let message = Some(message).filter(|m| !m.trim().is_empty());
         return Ok(SaslConfig::Anonymous(SaslAnonymousConfig { message }));
@@ -130,8 +175,8 @@ fn prompt_sasl(account_name: &str, login_hint: Option<&str>, caps: AuthCaps) -> 
 
     let login = prompt::text("Login:", login_hint)?;
 
-    Ok(match mech {
-        PLAIN => {
+    Ok(match mechanism {
+        SaslMechanism::Plain => {
             let passwd = secret::configure_password("Password", account_name)?;
             SaslConfig::Plain(SaslPlainConfig {
                 authzid: None,
@@ -139,21 +184,21 @@ fn prompt_sasl(account_name: &str, login_hint: Option<&str>, caps: AuthCaps) -> 
                 passwd,
             })
         }
-        LOGIN => {
+        SaslMechanism::Login => {
             let password = secret::configure_password("Password", account_name)?;
             SaslConfig::Login(SaslLoginConfig {
                 username: login,
                 password,
             })
         }
-        SCRAM_SHA_256 => {
+        SaslMechanism::ScramSha256 => {
             let password = secret::configure_password("Password", account_name)?;
             SaslConfig::ScramSha256(SaslScramSha256Config {
                 username: login,
                 password,
             })
         }
-        OAUTHBEARER => {
+        SaslMechanism::OAuthBearer => {
             let token =
                 secret::configure_token("API token", account_name, caps.oauth || !caps.any())?;
             SaslConfig::Oauthbearer(SaslOauthbearerConfig {
@@ -161,7 +206,7 @@ fn prompt_sasl(account_name: &str, login_hint: Option<&str>, caps: AuthCaps) -> 
                 token,
             })
         }
-        XOAUTH2 => {
+        SaslMechanism::XOAuth2 => {
             let token =
                 secret::configure_token("API token", account_name, caps.oauth || !caps.any())?;
             SaslConfig::Xoauth2(SaslXoauth2Config {
@@ -169,8 +214,67 @@ fn prompt_sasl(account_name: &str, login_hint: Option<&str>, caps: AuthCaps) -> 
                 token,
             })
         }
-        _ => unreachable!(),
+        SaslMechanism::Anonymous => unreachable!("handled above"),
     })
+}
+
+/// The menu label for a mechanism, split by the credential it needs.
+fn mechanism_label(mechanism: &SaslMechanism) -> &'static str {
+    match mechanism {
+        SaslMechanism::ScramSha256 => SCRAM_SHA_256,
+        SaslMechanism::Plain => PLAIN,
+        SaslMechanism::OAuthBearer => OAUTHBEARER,
+        SaslMechanism::XOAuth2 => XOAUTH2,
+        SaslMechanism::Anonymous => ANONYMOUS,
+        SaslMechanism::Login => LOGIN,
+    }
+}
+
+/// The mechanisms offered when no live probe is available, keyed on what
+/// discovery advertised (every family when nothing was): most preferred
+/// first, LOGIN last, token mechanisms only when a token or OAuth grant
+/// was advertised.
+fn fallback_mechanisms(caps: AuthCaps) -> Vec<SaslMechanism> {
+    let mut mechanisms = Vec::new();
+
+    if caps.basic || !caps.any() {
+        mechanisms.extend([SaslMechanism::ScramSha256, SaslMechanism::Plain]);
+    }
+    if caps.token() || !caps.any() {
+        mechanisms.extend([SaslMechanism::OAuthBearer, SaslMechanism::XOAuth2]);
+    }
+    if caps.basic || !caps.any() {
+        mechanisms.extend([SaslMechanism::Anonymous, SaslMechanism::Login]);
+    }
+
+    mechanisms
+}
+
+/// Probes the IMAP server for the mechanisms it advertises, returning
+/// `None` (offer the full list) when the probe fails or advertises
+/// nothing usable. The error is logged, never surfaced: the wizard falls
+/// back rather than stopping.
+fn probe_imap_mechanisms(server: &str, starttls: bool) -> Option<Vec<SaslMechanism>> {
+    match check::probe_imap_mechanisms(server, starttls) {
+        Ok(mechanisms) if !mechanisms.is_empty() => Some(mechanisms),
+        Ok(_) => None,
+        Err(err) => {
+            log::warn!("could not probe IMAP capabilities, offering all mechanisms: {err:#}");
+            None
+        }
+    }
+}
+
+/// The `scheme://host:port` string for a discovered endpoint, matching
+/// how [`imap_config`] builds the server URL.
+fn endpoint_server(endpoint: &TcpEndpoint) -> String {
+    let scheme = if endpoint.security == DiscoverySecurity::Tls {
+        "imaps"
+    } else {
+        "imap"
+    };
+
+    format!("{scheme}://{}:{}", endpoint.host, endpoint.port)
 }
 
 /// Runs the full per-protocol IMAP and SMTP prompts, seeding IMAP from
@@ -183,9 +287,68 @@ pub fn configure_manual(
 ) -> Result<(ImapConfig, SmtpConfig)> {
     let imap_default = imap_url.map(seed_imap);
     let imap = imap_wizard::run(account_name, local_part, domain, imap_default.as_ref())?;
-    let smtp = smtp_wizard::run(account_name, local_part, domain, None)?;
 
-    Ok((imap_to_config(imap)?, smtp_to_config(smtp)?))
+    // Probe the entered server and pick a mechanism it advertises (LOGIN
+    // last) instead of assuming PLAIN; the secret the wizard collected
+    // backs whichever mechanism is chosen. No discovery ran here, so the
+    // fallback list is the full one.
+    let (server, starttls) = wizard_imap_server(&imap);
+    let probed = probe_imap_mechanisms(&server, starttls);
+    let mechanism = prompt_mechanism(AuthCaps::default(), probed.as_deref())?;
+
+    let imap_host = imap.host.clone();
+    let imap = imap_to_config(imap, mechanism)?;
+
+    // Like the discovered flow, offer to reuse the IMAP credentials for
+    // SMTP so they are entered once. The endpoint is still prompted
+    // (nothing was discovered), seeded from the IMAP host.
+    let smtp = if prompt::bool("Use the same credentials for SMTP?", true)? {
+        let sasl = imap
+            .sasl
+            .clone()
+            .expect("manual IMAP flow always sets a SASL config");
+        prompt_smtp_endpoint(&imap_host, sasl)?
+    } else {
+        let smtp = smtp_wizard::run(account_name, local_part, domain, None)?;
+        smtp_to_config(smtp)?
+    };
+
+    Ok((imap, smtp))
+}
+
+/// Prompts only the SMTP endpoint (host, encryption, port) and builds
+/// its config reusing `sasl`, the IMAP credentials, so the manual flow
+/// does not re-enter them. The host defaults to the IMAP host, the
+/// common case when a provider shares one hostname for both.
+fn prompt_smtp_endpoint(imap_host: &str, sasl: SaslConfig) -> Result<SmtpConfig> {
+    let host = prompt::text("SMTP hostname:", Some(imap_host))?;
+
+    let encryptions = [
+        SmtpEncryption::Tls,
+        SmtpEncryption::StartTls,
+        SmtpEncryption::None,
+    ];
+    let encryption = prompt::item("SMTP encryption:", encryptions, Some(SmtpEncryption::Tls))?;
+
+    let default_port = match encryption {
+        SmtpEncryption::Tls => 465,
+        SmtpEncryption::StartTls => 587,
+        SmtpEncryption::None => 25,
+    };
+    let port = prompt::u16("SMTP port:", Some(default_port))?;
+
+    let scheme = match encryption {
+        SmtpEncryption::Tls => "smtps",
+        SmtpEncryption::StartTls | SmtpEncryption::None => "smtp",
+    };
+
+    Ok(SmtpConfig {
+        server: format!("{scheme}://{host}:{port}"),
+        tls: Default::default(),
+        starttls: matches!(encryption, SmtpEncryption::StartTls),
+        alpn: io_smtp::client::SmtpClientStd::default_alpn(),
+        sasl: Some(sasl),
+    })
 }
 
 /// Fallback SMTP endpoint when discovery found IMAP but no SMTP:
@@ -201,14 +364,8 @@ fn default_smtp(email: &str) -> TcpEndpoint {
 }
 
 fn imap_config(endpoint: &TcpEndpoint, sasl: SaslConfig) -> ImapConfig {
-    let scheme = if endpoint.security == DiscoverySecurity::Tls {
-        "imaps"
-    } else {
-        "imap"
-    };
-
     ImapConfig {
-        server: format!("{scheme}://{}:{}", endpoint.host, endpoint.port),
+        server: endpoint_server(endpoint),
         tls: Default::default(),
         starttls: endpoint.security == DiscoverySecurity::Starttls,
         alpn: io_imap::client::default_alpn(),
@@ -232,6 +389,20 @@ fn smtp_config(endpoint: &TcpEndpoint, sasl: SaslConfig) -> SmtpConfig {
         alpn: io_smtp::client::SmtpClientStd::default_alpn(),
         sasl: Some(sasl),
     }
+}
+
+/// The `scheme://host:port` string and STARTTLS flag for a manually
+/// entered IMAP config, matching how [`imap_to_config`] builds its
+/// server URL, so the probe hits the same endpoint that gets saved.
+fn wizard_imap_server(config: &WizardImapConfig) -> (String, bool) {
+    let scheme = match config.encryption {
+        ImapEncryption::Tls => "imaps",
+        ImapEncryption::StartTls | ImapEncryption::None => "imap",
+    };
+    let server = format!("{scheme}://{}:{}", config.host, config.port);
+    let starttls = matches!(config.encryption, ImapEncryption::StartTls);
+
+    (server, starttls)
 }
 
 /// Seeds the manual IMAP prompts from a typed `imap://` / `imaps://`

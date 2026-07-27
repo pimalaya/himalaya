@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The wizard now offers only the IMAP authentication mechanisms the server supports.
+
+  Before prompting, it opens an unauthenticated connection, reads the server's CAPABILITY, and offers only the advertised SASL mechanisms, most preferred first and the legacy `LOGIN` command last. A server exposing no SASL AUTH and no LOGINDISABLED (a perdition-style proxy such as isae-supaero.fr) offers `LOGIN` alone, where the wizard previously defaulted to `AUTHENTICATE PLAIN` and failed. Both the discovered and the manually entered IMAP paths probe; the manual path no longer hardcodes PLAIN. On any probe failure the wizard logs the error and falls back to the full mechanism list. SMTP keeps its discovery-advertised list, since it negotiates auth over EHLO.
+
+- The wizard's service discovery is now time-bounded, so a single unreachable endpoint (a firewalled port, a black-hole host) no longer stalls it for the operating-system connect timeout. Mechanisms still running at the deadline are abandoned and only what completed in time is offered.
+
+- The manually configured wizard flow now offers to reuse the IMAP credentials for SMTP, like the discovered flow, so they are entered once. On accept it reuses the IMAP SASL and prompts only the SMTP endpoint (host seeded from the IMAP host, encryption, port); on decline it runs the full SMTP prompts.
+
 - `imap raw` now sends a byte-verbatim batch of tagged commands.
 
   The command argument decodes literal `\r` / `\n` escapes into real CRLF, so a CRLF-separated batch (each command carrying its own tag) can be pipelined from the shell, e.g. `himalaya imap raw 'a1 SELECT INBOX\r\na2 SEARCH ALL\r\n'`. A trailing CRLF is appended when omitted, and the reply is read until every command is acknowledged (possibly out of order). `smtp raw` gains the same escape decoding but stays a single command line: it strips the trailing CRLF (io-smtp appends its own) and rejects batched input, since the exchange reads exactly one reply. Both accept the command via stdin.
