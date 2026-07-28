@@ -50,7 +50,7 @@
 # --------------------------------------------------------------------------------
 
 # Per-column foreground colors for the `envelopes list` table. Each value is
-# a crossterm-style color: a named variant (`"red"`, `"dark-magenta"`,
+# a crossterm-style color: a named variant (`"red"`, `"dark_magenta"`,
 # `"reset"`, …), or a `{ Rgb = { r, g, b } }` / `{ AnsiValue = N }` table.
 # Applied to both shared `envelopes list` and the protocol-specific
 # `imap`/`jmap`/`maildir` envelope listings so a single key affects every
@@ -62,7 +62,7 @@
 #envelope.list.table.subject-color = "green"
 #envelope.list.table.from-color = "blue"
 #envelope.list.table.to-color = "blue"
-#envelope.list.table.date-color = "dark-yellow"
+#envelope.list.table.date-color = "dark_yellow"
 #envelope.list.table.size-color = "reset"
 
 # Single-character glyphs used inside the FLAGS / ATT columns of the
