@@ -30,16 +30,9 @@ use crate::maildir::client::MaildirClient;
 #[cfg(feature = "msgraph")]
 use crate::msgraph::client::MsgraphClient;
 // `Envelope`/`Mailbox`/`FlagOp`/`SearchEmailsQuery` are only used by the
-// storage-dispatch methods, so they follow the same "any storage" gate;
+// mailbox-dispatch methods, so they carry the same `backend` gate;
 // `Flag` is also used by the always-compiled `add_message`.
-#[cfg(any(
-    feature = "imap",
-    feature = "jmap",
-    feature = "gmail",
-    feature = "msgraph",
-    feature = "maildir",
-    feature = "m2dir"
-))]
+#[cfg(backend)]
 use crate::email::{
     envelope::Envelope, flag::FlagOp, mailbox::Mailbox, search::query::SearchEmailsQuery,
 };
@@ -130,14 +123,7 @@ impl EmailClient {
     }
 
     /// Lists every mailbox available to the active account.
-    #[cfg(any(
-        feature = "imap",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "maildir",
-        feature = "m2dir"
-    ))]
+    #[cfg(backend)]
     pub fn list_mailboxes(&mut self, with_counts: bool) -> Result<Vec<Mailbox>> {
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
@@ -156,14 +142,7 @@ impl EmailClient {
     }
 
     /// Lists envelopes from `mailbox`.
-    #[cfg(any(
-        feature = "imap",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "maildir",
-        feature = "m2dir"
-    ))]
+    #[cfg(backend)]
     pub fn list_envelopes(
         &mut self,
         mailbox: &str,
@@ -203,14 +182,7 @@ impl EmailClient {
 
     /// Searches envelopes in `mailbox` against the shared query DSL.
     /// Gmail and Microsoft Graph do not implement the shared search.
-    #[cfg(any(
-        feature = "imap",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "maildir",
-        feature = "m2dir"
-    ))]
+    #[cfg(backend)]
     pub fn search_envelopes(
         &mut self,
         mailbox: &str,
@@ -248,14 +220,7 @@ impl EmailClient {
     }
 
     /// Adds, sets, or removes `flags` on a message id set in `mailbox`.
-    #[cfg(any(
-        feature = "imap",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "maildir",
-        feature = "m2dir"
-    ))]
+    #[cfg(backend)]
     pub fn store_flags(
         &mut self,
         mailbox: &str,
@@ -284,14 +249,7 @@ impl EmailClient {
     /// Fetches one message's raw RFC 5322 bytes. When `seen` is set, the
     /// message is also marked as seen: IMAP folds this into the fetch
     /// (`BODY[]`), the other backends issue a separate flag update.
-    #[cfg(any(
-        feature = "imap",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "maildir",
-        feature = "m2dir"
-    ))]
+    #[cfg(backend)]
     pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
@@ -330,28 +288,14 @@ impl EmailClient {
             // No storage backend compiled in (send-only build): `save`
             // has nowhere to land. `storage_mut()` bails first, so this
             // arm only keeps the match exhaustive over the empty enum.
-            #[cfg(not(any(
-                feature = "imap",
-                feature = "jmap",
-                feature = "gmail",
-                feature = "msgraph",
-                feature = "maildir",
-                feature = "m2dir"
-            )))]
+            #[cfg(not(backend))]
             _ => bail!("No storage backend is configured for this account"),
         }
     }
 
     /// Copies a message id set from `from` to `to`, returning the number
     /// actually affected (see the per-backend adapters).
-    #[cfg(any(
-        feature = "imap",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "maildir",
-        feature = "m2dir"
-    ))]
+    #[cfg(backend)]
     pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let from = self.resolve_mailbox_id(from)?;
         let to = self.resolve_mailbox_id(to)?;
@@ -374,14 +318,7 @@ impl EmailClient {
 
     /// Moves a message id set from `from` to `to`, returning the number
     /// actually affected (see the per-backend adapters).
-    #[cfg(any(
-        feature = "imap",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "maildir",
-        feature = "m2dir"
-    ))]
+    #[cfg(backend)]
     pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let from = self.resolve_mailbox_id(from)?;
         let to = self.resolve_mailbox_id(to)?;
@@ -399,6 +336,51 @@ impl EmailClient {
             BackendClient::Maildir(client) => client.move_messages(from, to, ids),
             #[cfg(feature = "m2dir")]
             BackendClient::M2dir(client) => client.move_messages(from, to, ids),
+        }
+    }
+
+    /// The backend's own trash mailbox id, when it can resolve one
+    /// without configuration (JMAP `role=trash`, Gmail `TRASH` label,
+    /// Graph `deleteditems`). IMAP, Maildir and m2dir return `None`, so
+    /// the caller falls back to the `mailbox.alias.trash` config entry.
+    /// The trash-first delete policy lives in `shared::message::delete`.
+    #[cfg(backend)]
+    pub fn native_trash(&mut self) -> Result<Option<String>> {
+        match self.storage_mut()? {
+            #[cfg(feature = "imap")]
+            BackendClient::Imap(_) => Ok(None),
+            #[cfg(feature = "jmap")]
+            BackendClient::Jmap(client) => client.native_trash(),
+            #[cfg(feature = "gmail")]
+            BackendClient::Gmail(_) => Ok(Some(String::from("TRASH"))),
+            #[cfg(feature = "msgraph")]
+            BackendClient::Msgraph(_) => Ok(Some(String::from("deleteditems"))),
+            #[cfg(feature = "maildir")]
+            BackendClient::Maildir(_) => Ok(None),
+            #[cfg(feature = "m2dir")]
+            BackendClient::M2dir(_) => Ok(None),
+        }
+    }
+
+    /// Permanently deletes `ids` from `mailbox` (assumed to be the trash).
+    /// Returns `true` when they were physically removed, `false` when
+    /// only flagged (IMAP without UIDPLUS). The move-vs-delete decision
+    /// is made by the caller (`shared::message::delete`).
+    #[cfg(backend)]
+    pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<bool> {
+        match self.storage_mut()? {
+            #[cfg(feature = "imap")]
+            BackendClient::Imap(client) => client.delete_messages(mailbox, ids),
+            #[cfg(feature = "jmap")]
+            BackendClient::Jmap(client) => client.delete_messages(ids).map(|()| true),
+            #[cfg(feature = "gmail")]
+            BackendClient::Gmail(client) => client.delete_messages(ids).map(|()| true),
+            #[cfg(feature = "msgraph")]
+            BackendClient::Msgraph(client) => client.delete_messages(ids).map(|()| true),
+            #[cfg(feature = "maildir")]
+            BackendClient::Maildir(client) => client.delete_messages(mailbox, ids).map(|()| true),
+            #[cfg(feature = "m2dir")]
+            BackendClient::M2dir(client) => client.delete_messages(mailbox, ids).map(|()| true),
         }
     }
 
@@ -452,8 +434,10 @@ impl EmailClient {
     /// cached `mailFolders` listing (Graph well-known names still pass
     /// through). Applied by the mailbox-addressing methods above before
     /// they dispatch, so each per-protocol adapter only ever receives
-    /// ids.
-    fn resolve_mailbox_id(&mut self, mailbox: &str) -> Result<String> {
+    /// ids. Idempotent: an already-resolved id passes through unchanged,
+    /// so `shared::message::delete` uses it to compare a mailbox against
+    /// the trash.
+    pub fn resolve_mailbox_id(&mut self, mailbox: &str) -> Result<String> {
         match self.storage_mut()? {
             #[cfg(feature = "jmap")]
             BackendClient::Jmap(client) => client.resolve_mailbox_id(mailbox),

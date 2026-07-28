@@ -120,6 +120,15 @@ impl MsgraphClient {
         Ok(ids.len())
     }
 
+    /// Permanently deletes `ids` (`DELETE /messages/{id}`; from Deleted
+    /// Items this is a hard delete).
+    pub fn delete_messages(&mut self, ids: &[&str]) -> Result<()> {
+        for id in ids {
+            self.message_delete(id)?;
+        }
+        Ok(())
+    }
+
     /// Sends a raw RFC 5322 message via `POST /sendMail` (MIME form);
     /// Graph saves it to Sent Items.
     pub fn send_message(&mut self, raw: Vec<u8>) -> Result<()> {

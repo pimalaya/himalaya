@@ -280,6 +280,35 @@ impl JmapClient {
         Ok(count)
     }
 
+    /// The id of the mailbox with role `trash` (RFC 8621), if any.
+    pub fn native_trash(&mut self) -> Result<Option<String>> {
+        let output = self.mailbox_get(JmapMailboxGetOptions {
+            ids: None,
+            properties: None,
+        })?;
+
+        Ok(output
+            .mailboxes
+            .into_iter()
+            .find(|mailbox| matches!(mailbox.role, Some(JmapMailboxRole::Trash)))
+            .and_then(|mailbox| mailbox.id))
+    }
+
+    /// Permanently destroys `ids` (`Email/set` destroy).
+    pub fn delete_messages(&mut self, ids: &[&str]) -> Result<()> {
+        let mut args = JmapEmailSetArgs::default();
+        for id in ids {
+            args.destroy(id.to_string());
+        }
+
+        let output = self.email_set(args)?;
+        if !output.not_destroyed.is_empty() {
+            let ids: Vec<String> = output.not_destroyed.into_keys().collect();
+            bail!("JMAP Email/set destroy failed for: {}", ids.join(", "));
+        }
+        Ok(())
+    }
+
     /// Queues `raw` for delivery: upload, import into the drafts mailbox
     /// as `$draft`, then `EmailSubmission/set` under the sending
     /// identity. The identity and drafts mailbox come from the

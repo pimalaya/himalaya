@@ -320,6 +320,30 @@ impl ImapClient {
         Ok(self.copied_count(copy_uid, ids.len()))
     }
 
+    /// Permanently deletes `ids` from `mailbox` (the trash): flags them
+    /// `\Deleted`, then `UID EXPUNGE`s exactly those UIDs when the server
+    /// advertises UIDPLUS (RFC 4315), leaving any other `\Deleted`
+    /// message untouched. Returns `true` when the messages were
+    /// physically removed, `false` when only flagged (no UIDPLUS).
+    pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<bool> {
+        let mbox = parse_mailbox(mailbox)?;
+
+        self.select(mbox, ImapMailboxSelectOptions::default())?;
+        self.store(
+            parse_uids(ids)?,
+            StoreType::Add,
+            vec![ImapFlag::Deleted],
+            ImapMessageStoreOptions { uid: true },
+        )?;
+
+        if self.supports_uidplus() {
+            self.uid_expunge(parse_uids(ids)?)?;
+            return Ok(true);
+        }
+
+        Ok(false)
+    }
+
     /// Number of messages a UID COPY/MOVE actually affected. UIDPLUS
     /// servers report a `COPYUID` whose source set lists exactly the
     /// affected UIDs, so it is authoritative — including its absence,

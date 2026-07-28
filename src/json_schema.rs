@@ -39,14 +39,7 @@ pub fn schemas() -> BTreeMap<String, Value> {
 
     // --- Shared API (needs a storage backend, like the commands)
 
-    #[cfg(any(
-        feature = "imap",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "maildir",
-        feature = "m2dir"
-    ))]
+    #[cfg(backend)]
     {
         insert!(
             "himalaya-mailbox-list",
@@ -74,6 +67,10 @@ pub fn schemas() -> BTreeMap<String, Value> {
         insert!(
             "himalaya-message-read",
             crate::shared::message::read::MessageView
+        );
+        insert!(
+            "himalaya-message-delete",
+            crate::shared::message::delete::DeleteReport
         );
         insert!(
             "himalaya-attachment-list",

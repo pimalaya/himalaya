@@ -25,29 +25,14 @@ use crate::m2dir::{cli::M2dirCommand, client::build_m2dir_client};
 use crate::maildir::{cli::MaildirCommand, client::build_maildir_client};
 #[cfg(feature = "msgraph")]
 use crate::msgraph::{cli::MsgraphCommand, client::build_msgraph_client};
-#[cfg(any(
-    feature = "imap",
-    feature = "jmap",
-    feature = "gmail",
-    feature = "msgraph",
-    feature = "maildir",
-    feature = "m2dir"
-))]
+#[cfg(backend)]
 use crate::shared::{
     attachment::cli::AttachmentCommand, envelope::cli::EnvelopeCommand, flag::cli::FlagCommand,
     mailbox::cli::MailboxCommand,
 };
 // `EmailClient` and the `message` command host the send path
 // (`compose`/`send`), so they exist for any backend, not just storage.
-#[cfg(any(
-    feature = "imap",
-    feature = "jmap",
-    feature = "gmail",
-    feature = "msgraph",
-    feature = "maildir",
-    feature = "m2dir",
-    feature = "smtp"
-))]
+#[cfg(any(backend, feature = "smtp"))]
 use crate::shared::{client::EmailClient, message::cli::MessageCommand};
 #[cfg(feature = "smtp")]
 use crate::smtp::{cli::SmtpCommand, client::build_smtp_client};
@@ -98,55 +83,19 @@ pub struct Cli {
 pub enum Command {
     // --- Shared API (needs a storage backend)
     //
-    #[cfg(any(
-        feature = "imap",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "maildir",
-        feature = "m2dir"
-    ))]
+    #[cfg(backend)]
     #[command(subcommand, visible_alias = "mbox", alias = "mailboxes")]
     Mailbox(MailboxCommand),
-    #[cfg(any(
-        feature = "imap",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "maildir",
-        feature = "m2dir"
-    ))]
+    #[cfg(backend)]
     #[command(subcommand, alias = "envelopes")]
     Envelope(EnvelopeCommand),
-    #[cfg(any(
-        feature = "imap",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "maildir",
-        feature = "m2dir"
-    ))]
+    #[cfg(backend)]
     #[command(subcommand, alias = "flags")]
     Flag(FlagCommand),
-    #[cfg(any(
-        feature = "imap",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "maildir",
-        feature = "m2dir",
-        feature = "smtp"
-    ))]
+    #[cfg(any(backend, feature = "smtp"))]
     #[command(subcommand, visible_alias = "msg", alias = "messages")]
     Message(MessageCommand),
-    #[cfg(any(
-        feature = "imap",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "maildir",
-        feature = "m2dir"
-    ))]
+    #[cfg(backend)]
     #[command(subcommand, alias = "attachments")]
     Attachment(AttachmentCommand),
 
@@ -226,71 +175,35 @@ impl Command {
         match self {
             // --- Shared API (needs a storage backend)
             //
-            #[cfg(any(
-                feature = "imap",
-                feature = "jmap",
-                feature = "gmail",
-                feature = "msgraph",
-                feature = "maildir",
-                feature = "m2dir"
-            ))]
+            #[cfg(backend)]
             Self::Mailbox(cmd) => {
                 let (config, _name, account_config) =
                     resolve_account(printer, config_paths, account_name)?;
                 let (mut account, mut client) = EmailClient::new(config, account_config, backend)?;
                 cmd.execute(printer, &mut account, &mut client)
             }
-            #[cfg(any(
-                feature = "imap",
-                feature = "jmap",
-                feature = "gmail",
-                feature = "msgraph",
-                feature = "maildir",
-                feature = "m2dir"
-            ))]
+            #[cfg(backend)]
             Self::Envelope(cmd) => {
                 let (config, _name, account_config) =
                     resolve_account(printer, config_paths, account_name)?;
                 let (mut account, mut client) = EmailClient::new(config, account_config, backend)?;
                 cmd.execute(printer, &mut account, &mut client)
             }
-            #[cfg(any(
-                feature = "imap",
-                feature = "jmap",
-                feature = "gmail",
-                feature = "msgraph",
-                feature = "maildir",
-                feature = "m2dir"
-            ))]
+            #[cfg(backend)]
             Self::Flag(cmd) => {
                 let (config, _name, account_config) =
                     resolve_account(printer, config_paths, account_name)?;
                 let (mut account, mut client) = EmailClient::new(config, account_config, backend)?;
                 cmd.execute(printer, &mut account, &mut client)
             }
-            #[cfg(any(
-                feature = "imap",
-                feature = "jmap",
-                feature = "gmail",
-                feature = "msgraph",
-                feature = "maildir",
-                feature = "m2dir",
-                feature = "smtp"
-            ))]
+            #[cfg(any(backend, feature = "smtp"))]
             Self::Message(cmd) => {
                 let (config, _name, account_config) =
                     resolve_account(printer, config_paths, account_name)?;
                 let (mut account, mut client) = EmailClient::new(config, account_config, backend)?;
                 cmd.execute(printer, &mut account, &mut client)
             }
-            #[cfg(any(
-                feature = "imap",
-                feature = "jmap",
-                feature = "gmail",
-                feature = "msgraph",
-                feature = "maildir",
-                feature = "m2dir"
-            ))]
+            #[cfg(backend)]
             Self::Attachment(cmd) => {
                 let (config, _name, account_config) =
                     resolve_account(printer, config_paths, account_name)?;

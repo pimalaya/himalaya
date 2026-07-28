@@ -569,13 +569,13 @@ dependencies = [
 
 [[package]]
 name = "displaydoc"
-version = "0.2.6"
+version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ac70aa55017e108007fbaf5aa0f54b021c98f92ff8af59d42eda9da96e3dd4f"
+checksum = "c6232dd377dcc64799954cbd3a9bb882e9cdc1308ccd87b1c098f1fb2eaf82a8"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.119",
+ "syn 3.0.3",
 ]
 
 [[package]]
@@ -1127,7 +1127,7 @@ dependencies = [
 [[package]]
 name = "io-imap"
 version = "0.3.1"
-source = "git+https://github.com/pimalaya/io-imap#5e1bd160d05a0bdacbf84fd5fd30a7d9158918ac"
+source = "git+https://github.com/pimalaya/io-imap#5011223f933e6ce593e4f4b2026a305f0b398921"
 dependencies = [
  "anyhow",
  "base64 0.23.0",
@@ -1174,8 +1174,7 @@ dependencies = [
 [[package]]
 name = "io-maildir"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4357792ab62175e30ac9010d2347251eeddef6bf2cad7269fd00356620e1ba1"
+source = "git+https://github.com/pimalaya/io-maildir#6a17220969665ac04740b47538aecf94e18eaedf"
 dependencies = [
  "gethostname",
  "log",
@@ -2501,9 +2500,9 @@ dependencies = [
 
 [[package]]
 name = "toml"
-version = "1.1.3+spec-1.1.0"
+version = "1.1.4+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53c96ecdfa941c8fc4fcaed14f99ada8ebed502eef533015095a07e3301d4c3c"
+checksum = "3aace63f4bbcdfc2c965b059de67119c89c4017a70d633be6c104910f67056f5"
 dependencies = [
  "indexmap",
  "serde_core",

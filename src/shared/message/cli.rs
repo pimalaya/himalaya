@@ -2,17 +2,11 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
-#[cfg(any(
-    feature = "imap",
-    feature = "jmap",
-    feature = "gmail",
-    feature = "msgraph",
-    feature = "maildir",
-    feature = "m2dir"
-))]
+#[cfg(backend)]
 use crate::shared::message::{
-    add::MessageAddCommand, copy::MessageCopyCommand, forward::MessageForwardCommand,
-    mv::MessageMoveCommand, read::MessageReadCommand, reply::MessageReplyCommand,
+    add::MessageAddCommand, copy::MessageCopyCommand, delete::MessageDeleteCommand,
+    forward::MessageForwardCommand, mv::MessageMoveCommand, read::MessageReadCommand,
+    reply::MessageReplyCommand,
 };
 use crate::{
     account::context::Account,
@@ -32,65 +26,26 @@ use crate::{
 /// into `messages send` / `messages add`.
 #[derive(Debug, Subcommand)]
 pub enum MessageCommand {
-    #[cfg(any(
-        feature = "imap",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "maildir",
-        feature = "m2dir"
-    ))]
+    #[cfg(backend)]
     #[command(visible_alias = "save")]
     Add(MessageAddCommand),
     #[command(visible_alias = "write", alias = "new")]
     Compose(MessageComposeCommand),
-    #[cfg(any(
-        feature = "imap",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "maildir",
-        feature = "m2dir"
-    ))]
+    #[cfg(backend)]
     #[command(visible_alias = "cp")]
     Copy(MessageCopyCommand),
-    #[cfg(any(
-        feature = "imap",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "maildir",
-        feature = "m2dir"
-    ))]
+    #[cfg(backend)]
+    #[command(visible_alias = "rm", alias = "remove")]
+    Delete(MessageDeleteCommand),
+    #[cfg(backend)]
     #[command(visible_alias = "fwd")]
     Forward(MessageForwardCommand),
-    #[cfg(any(
-        feature = "imap",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "maildir",
-        feature = "m2dir"
-    ))]
+    #[cfg(backend)]
     #[command(visible_alias = "mv")]
     Move(MessageMoveCommand),
-    #[cfg(any(
-        feature = "imap",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "maildir",
-        feature = "m2dir"
-    ))]
+    #[cfg(backend)]
     Read(MessageReadCommand),
-    #[cfg(any(
-        feature = "imap",
-        feature = "jmap",
-        feature = "gmail",
-        feature = "msgraph",
-        feature = "maildir",
-        feature = "m2dir"
-    ))]
+    #[cfg(backend)]
     Reply(MessageReplyCommand),
     Send(MessageSendCommand),
 }
@@ -103,60 +58,20 @@ impl MessageCommand {
         client: &mut EmailClient,
     ) -> Result<()> {
         match self {
-            #[cfg(any(
-                feature = "imap",
-                feature = "jmap",
-                feature = "gmail",
-                feature = "msgraph",
-                feature = "maildir",
-                feature = "m2dir"
-            ))]
+            #[cfg(backend)]
             Self::Add(cmd) => cmd.execute(printer, account, client),
             Self::Compose(cmd) => cmd.execute(printer, account, client),
-            #[cfg(any(
-                feature = "imap",
-                feature = "jmap",
-                feature = "gmail",
-                feature = "msgraph",
-                feature = "maildir",
-                feature = "m2dir"
-            ))]
+            #[cfg(backend)]
             Self::Copy(cmd) => cmd.execute(printer, account, client),
-            #[cfg(any(
-                feature = "imap",
-                feature = "jmap",
-                feature = "gmail",
-                feature = "msgraph",
-                feature = "maildir",
-                feature = "m2dir"
-            ))]
+            #[cfg(backend)]
+            Self::Delete(cmd) => cmd.execute(printer, account, client),
+            #[cfg(backend)]
             Self::Forward(cmd) => cmd.execute(printer, account, client),
-            #[cfg(any(
-                feature = "imap",
-                feature = "jmap",
-                feature = "gmail",
-                feature = "msgraph",
-                feature = "maildir",
-                feature = "m2dir"
-            ))]
+            #[cfg(backend)]
             Self::Move(cmd) => cmd.execute(printer, account, client),
-            #[cfg(any(
-                feature = "imap",
-                feature = "jmap",
-                feature = "gmail",
-                feature = "msgraph",
-                feature = "maildir",
-                feature = "m2dir"
-            ))]
+            #[cfg(backend)]
             Self::Read(cmd) => cmd.execute(printer, account, client),
-            #[cfg(any(
-                feature = "imap",
-                feature = "jmap",
-                feature = "gmail",
-                feature = "msgraph",
-                feature = "maildir",
-                feature = "m2dir"
-            ))]
+            #[cfg(backend)]
             Self::Reply(cmd) => cmd.execute(printer, account, client),
             Self::Send(cmd) => cmd.execute(printer, account, client),
         }

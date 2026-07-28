@@ -166,6 +166,17 @@ impl MaildirClient {
 
         Ok(ids.len())
     }
+
+    /// Permanently deletes `ids` from `mailbox` by unlinking their files.
+    pub fn delete_messages(&self, mailbox: &str, ids: &[&str]) -> Result<()> {
+        let maildir = self.resolve_maildir(Path::new(mailbox))?;
+
+        for id in ids {
+            self.delete_entry(maildir.clone(), *id)?;
+        }
+
+        Ok(())
+    }
 }
 
 /// Converts one [`Maildir`] into the shared [`Mailbox`] shape: `id` is

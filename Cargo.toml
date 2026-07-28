@@ -77,4 +77,5 @@ uds_windows = "1"
 
 [patch.crates-io]
 io-imap.git = "https://github.com/pimalaya/io-imap"
+io-maildir.git = "https://github.com/pimalaya/io-maildir"
 io-pim-discovery.git = "https://github.com/pimalaya/io-pim-discovery"

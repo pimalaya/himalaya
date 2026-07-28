@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added the shared `message delete <ids>` command (alias `del`). It follows a trash-first policy: the messages are moved to the trash mailbox, unless they already are in the trash, in which case they are permanently removed. The trash mailbox is resolved from the backend when it can be (JMAP `role=trash`, Gmail `TRASH` label, Microsoft Graph `deleteditems`), otherwise from the `mailbox.alias.trash` config entry, and failing that the command errors. In-trash removal is a real per-id delete on JMAP (`Email/set` destroy), Gmail/Graph (`messages.delete`), Maildir and m2dir (file unlink), and on IMAP flags `\Deleted` then `UID EXPUNGE`s exactly those UIDs when the server advertises UIDPLUS (RFC 4315) — on servers without UIDPLUS it only flags `\Deleted`, leaving a later expunge to reclaim them.
+
 - `message read` gained a `--seen` flag to mark the message as seen while reading it; without it the read stays non-mutating (the default since v2). Backends that offer a side-effecting fetch do it in a single round (IMAP switches `BODY.PEEK[]` to `BODY[]`); the others issue a separate flag update after the fetch (JMAP `Email/set`, Gmail `messages.modify`, Microsoft Graph `PATCH isRead`, Maildir/m2dir add the `S` flag).
 
 ### Fixed

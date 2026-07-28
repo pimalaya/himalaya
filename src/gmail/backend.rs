@@ -168,6 +168,14 @@ impl GmailClient {
         Ok(ids.len())
     }
 
+    /// Permanently deletes `ids` (`users.messages.delete`).
+    pub fn delete_messages(&mut self, ids: &[&str]) -> Result<()> {
+        for id in ids {
+            self.message_delete(id)?;
+        }
+        Ok(())
+    }
+
     /// Sends a raw RFC 5322 message via `messages.send` (Gmail both
     /// stores it in Sent and delivers it).
     pub fn send_message(&mut self, raw: Vec<u8>) -> Result<()> {

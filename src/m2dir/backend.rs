@@ -198,6 +198,17 @@ impl M2dirClient {
 
         Ok(ids.len())
     }
+
+    /// Permanently deletes `ids` from `mailbox` by unlinking their files.
+    pub fn delete_messages(&self, mailbox: &str, ids: &[&str]) -> Result<()> {
+        let m2dir = self.resolve_m2dir(mailbox)?;
+
+        for id in ids {
+            self.delete_entry(m2dir.clone(), *id)?;
+        }
+
+        Ok(())
+    }
 }
 
 /// Converts one [`M2dir`] into the shared [`Mailbox`] shape: `id` is the

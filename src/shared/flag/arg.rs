@@ -60,7 +60,7 @@ impl From<&FlagArg> for crate::email::flag::Flag {
 /// Positional argument holding one or more message identifiers.
 #[derive(Debug, Parser)]
 pub struct MessageIdsArg {
-    /// Message Identifier(s).
+    /// Message identifier(s).
     #[arg(name = "message_ids", value_name = "MESSAGE-IDS")]
     #[arg(num_args = 1..)]
     pub inner: Vec<String>,
