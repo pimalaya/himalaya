@@ -46,8 +46,9 @@ use crate::{
 #[command(propagate_version = true, infer_subcommands = true)]
 pub struct Cli {
     /// The subcommand to run. Omitted (bare `himalaya`), it runs the
-    /// first-run wizard, which discovers an account and prints it as a
-    /// ready-to-save config on stdout, exactly like bare `ortie`.
+    /// first-run wizard, which discovers an account and offers to save it
+    /// to a config file (or prints it on stdout when redirected). With
+    /// `--account` but no subcommand it shows this help instead.
     #[command(subcommand)]
     pub cmd: Option<Command>,
 
@@ -127,7 +128,7 @@ pub enum Command {
 /// account name and its config.
 ///
 /// When no config file exists, proposes the first-run wizard (which
-/// prints a ready-to-save config on stdout without touching disk) then
+/// discovers an account and offers to save it to a config file) then
 /// exits. A config that exists but lacks the requested account is a hard
 /// error: `take_account` bails on a missing named account, and a missing
 /// default surfaces here.

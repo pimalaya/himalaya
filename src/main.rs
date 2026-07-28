@@ -58,9 +58,10 @@
 //! schema ([`config`]) is multi-account, a top-level block plus named
 //! account blocks carrying optional per-backend sub-blocks. Bare
 //! `himalaya` (no subcommand) runs the interactive [`wizard`], which
-//! discovers an account and prints it as a ready-to-save fragment on
-//! stdout without writing to disk; it is also proposed when a command
-//! finds no config. A config that exists but lacks the requested account
+//! discovers an account and offers to save it to a config file (or
+//! prints it on stdout when redirected); it is also proposed when a
+//! command finds no config. Bare `himalaya --account <NAME>` shows the
+//! help instead. A config that exists but lacks the requested account
 //! is a hard error. Output follows the Pimalaya rule: data and errors go
 //! to stdout through the printer (`--json` switches every command to JSON),
 //! stderr carries logs only. Each command's doc comment is its `--help`
@@ -93,7 +94,7 @@ mod smtp;
 mod wizard;
 
 use anyhow::Result;
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 use pimalaya_cli::{error::ErrorReport, log::Logger, printer::StdoutPrinter};
 
 use crate::{cli::Cli, wizard::discover};
@@ -113,6 +114,14 @@ fn execute(cli: Cli, printer: &mut StdoutPrinter) -> Result<()> {
 
     match cli.cmd {
         Some(cmd) => cmd.execute(printer, config, account, backend),
+        // A bare `himalaya` runs the first-run wizard; but `--account`
+        // names an account to act on, so with no subcommand it is a
+        // half-typed command — show the help to point at the commands
+        // rather than dropping into account creation.
+        None if account.is_some() => {
+            Cli::command().print_help()?;
+            Ok(())
+        }
         None => discover::run(printer),
     }
 }

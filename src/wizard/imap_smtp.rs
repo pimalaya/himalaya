@@ -41,12 +41,12 @@ use crate::{
 // NOTE: the mechanisms split by credential kind, a password family
 // (login + secret) and a token family (login + API token); ANONYMOUS
 // carries none.
-const PLAIN: &str = "PLAIN (login + password)";
-const LOGIN: &str = "LOGIN (login + password)";
-const SCRAM_SHA_256: &str = "SCRAM-SHA-256 (login + password)";
+const PLAIN: &str = "PLAIN (username + password)";
+const LOGIN: &str = "LOGIN (username + password)";
+const SCRAM_SHA_256: &str = "SCRAM-SHA-256 (username + password)";
 const ANONYMOUS: &str = "ANONYMOUS (no credentials)";
-const OAUTHBEARER: &str = "OAUTHBEARER (login + API token)";
-const XOAUTH2: &str = "XOAUTH2 (login + API token)";
+const OAUTHBEARER: &str = "OAUTHBEARER (username + API token)";
+const XOAUTH2: &str = "XOAUTH2 (username + API token)";
 
 /// Configures IMAP + SMTP from a discovered entry: pick the SASL
 /// mechanism and credentials for IMAP, test the connection, then ask

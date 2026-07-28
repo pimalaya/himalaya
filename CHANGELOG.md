@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The first-run wizard now opens with a welcome banner on stderr explaining what Himalaya is and what the wizard does, replacing the comment header that used to head the generated config.
+
+- The wizard now offers to save the generated configuration to a file (defaulting to `$XDG_CONFIG_HOME/himalaya/config.toml`, creating parent directories and confirming before overwriting an existing file) instead of only printing it. When stdout is redirected (`himalaya > config.toml`) or in JSON mode it still prints straight to stdout, so redirects and scripts keep working.
+
+- Bare `himalaya --account <NAME>` (an account but no subcommand) now shows the help instead of dropping into the account-creation wizard.
+
 - The wizard now offers only the IMAP authentication mechanisms the server supports.
 
   Before prompting, it opens an unauthenticated connection, reads the server's CAPABILITY, and offers only the advertised SASL mechanisms, most preferred first and the legacy `LOGIN` command last. A server exposing no SASL AUTH and no LOGINDISABLED (a perdition-style proxy such as isae-supaero.fr) offers `LOGIN` alone, where the wizard previously defaulted to `AUTHENTICATE PLAIN` and failed. Both the discovered and the manually entered IMAP paths probe; the manual path no longer hardcodes PLAIN. On any probe failure the wizard logs the error and falls back to the full mechanism list. SMTP keeps its discovery-advertised list, since it negotiates auth over EHLO.

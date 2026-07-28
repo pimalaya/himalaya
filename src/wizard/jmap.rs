@@ -20,7 +20,7 @@ use crate::{
     },
 };
 
-const BASIC: &str = "Basic (login + password)";
+const BASIC: &str = "Basic (username + password)";
 const BEARER: &str = "Bearer (API token)";
 
 /// Configures JMAP from a discovered entry: the endpoint is pinned, the

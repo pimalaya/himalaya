@@ -1,10 +1,11 @@
 //! Configuration wizard.
 //!
 //! Run on bare `himalaya` (no subcommand), and proposed by
-//! `cli::resolve_account` when no config file is found. It writes
-//! nothing to disk: the resulting account is printed as a ready-to-save
-//! TOML document on stdout (prompts render on stderr), so
-//! `himalaya > <config>` is the write-back, exactly like ortie.
+//! `cli::resolve_account` when no config file is found. It opens with a
+//! welcome banner on stderr, then either saves the resulting account to
+//! a config file (offered when writing to a terminal) or prints it as a
+//! ready-to-save TOML document on stdout, so `himalaya > <config>` still
+//! works as the write-back when stdout is redirected, like ortie.
 //!
 //! One prompt takes an email address, a server URL, or a local folder
 //! path, and its shape orients the setup, mirroring the cardamum-android
@@ -23,7 +24,7 @@
 //! external token brokers (Ortie, pizauth, oama) behind the API token
 //! credential prompt (see [`super::secret`]).
 
-use std::{collections::HashMap, fmt, path::Path};
+use std::{collections::HashMap, fmt, fs, io::IsTerminal, path::Path};
 
 use anyhow::{Context, Result, bail};
 use pimalaya_cli::{printer::Printer, prompt, spinner::Spinner};
@@ -62,7 +63,7 @@ use crate::{
 };
 
 /// The endpoint prompt label, shared by the create flow.
-const ENDPOINT_PROMPT: &str = "Email, server or folder path:";
+const ENDPOINT_PROMPT: &str = "Email, server or URL:";
 
 /// The backend config produced by the chosen flow, folded into a fresh
 /// [`AccountConfig`] afterwards.
@@ -81,10 +82,20 @@ enum Chosen {
     M2dir(M2dirConfig),
 }
 
-/// Runs the wizard and prints the resulting [`Config`] as a
-/// ready-to-save TOML document, writing nothing to disk. Run on bare
+/// Runs the wizard and either saves the resulting [`Config`] to a file
+/// or prints it as a ready-to-save TOML document. Run on bare
 /// `himalaya`, and proposed by `cli::resolve_account` on first run.
+///
+/// A welcome message renders on stderr first (skipped in JSON mode) to
+/// frame what Himalaya is and what the wizard does. The generated
+/// config is then offered for saving when writing to a terminal; when
+/// stdout is redirected (`himalaya > config.toml`) or in JSON mode it is
+/// emitted straight to stdout so the redirect / script keeps working.
 pub fn run(printer: &mut impl Printer) -> Result<()> {
+    if !printer.is_json() {
+        print_welcome();
+    }
+
     let input = prompt::text::<&str>(ENDPOINT_PROMPT, None)?;
     let input = input.trim();
     if input.is_empty() {
@@ -115,50 +126,98 @@ pub fn run(printer: &mut impl Printer) -> Result<()> {
         ..Default::default()
     };
 
-    printer.out(GeneratedConfig(config))
+    // JSON mode and a redirected stdout stay non-interactive: emit the
+    // document straight to stdout so scripts and `himalaya > config.toml`
+    // keep working. Only offer to save when writing to a terminal.
+    if printer.is_json() || !std::io::stdout().is_terminal() {
+        return printer.out(GeneratedConfig(config));
+    }
+
+    save_or_print(printer, config)
 }
 
-/// The account produced by the wizard, printed as a ready-to-save TOML
-/// document on stdout with its guidance embedded as comments, or the
-/// same config serialized as an object in JSON mode. The wizard writes
-/// nothing itself: the user redirects the output into their config file
-/// (e.g. `himalaya > <config>`), so prompts go to stderr and only this
-/// lands on stdout.
+/// Prints a welcome banner on stderr framing the project and the wizard,
+/// so bare `himalaya` explains itself before dropping into prompts. On
+/// stderr so it never pollutes a redirected config document.
+fn print_welcome() {
+    println!();
+    eprintln!("Welcome to Himalaya, the CLI to manage emails.");
+    eprintln!();
+    eprintln!("Himalaya talks to your existing mailbox over IMAP, JMAP, Gmail,");
+    eprintln!("Microsoft Graph or a local Maildir. Before you can read or send");
+    eprintln!("mail, it needs to know about one account.");
+    eprintln!();
+    eprintln!("This wizard discovers a provider's settings from your email address");
+    eprintln!("(or a server URL, or a local folder path), tests the connection and");
+    eprintln!("generates a ready-to-use configuration it can save for you.");
+    eprintln!();
+    eprintln!("Every field is documented in the sample configuration:");
+    eprintln!("  https://github.com/pimalaya/himalaya/blob/master/config.sample.toml");
+    eprintln!();
+}
+
+/// Offers to save the generated config to a file (default
+/// `$XDG_CONFIG_HOME/himalaya/config.toml`), falling back to printing it
+/// on stdout when the user declines or an existing file must not be
+/// overwritten. Prompts and confirmations render on stderr.
+fn save_or_print(printer: &mut impl Printer, config: Config) -> Result<()> {
+    if !prompt::bool("Save this configuration to a file, or print it?", true)? {
+        return printer.out(GeneratedConfig(config));
+    }
+
+    let default = default_config_path();
+    let path = prompt::text("Configuration file path:", default.as_deref())?;
+    let path = shellexpand::full(path.trim())?.into_owned();
+    let path = Path::new(&path);
+
+    // Bare `himalaya` runs the wizard even when a config already exists,
+    // so guard the default path: never clobber without confirmation, and
+    // fall back to printing so the generated config is never lost.
+    if path.exists()
+        && !prompt::bool(
+            format!("`{}` already exists. Overwrite it?", path.display()),
+            false,
+        )?
+    {
+        return printer.out(GeneratedConfig(config));
+    }
+
+    if let Some(parent) = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("Create config directory `{}`", parent.display()))?;
+    }
+
+    fs::write(path, GeneratedConfig(config).to_string())
+        .with_context(|| format!("Write config file `{}`", path.display()))?;
+
+    eprintln!();
+    eprintln!("Configuration saved to {}.", path.display());
+    eprintln!("Run `himalaya envelope list` to read your mailbox.");
+    Ok(())
+}
+
+/// The default config path (`$XDG_CONFIG_HOME/himalaya/config.toml`),
+/// used to seed the save prompt; `None` when no config dir resolves.
+fn default_config_path() -> Option<String> {
+    let path = dirs::config_dir()?
+        .join(env!("CARGO_PKG_NAME"))
+        .join("config.toml");
+    Some(path.to_string_lossy().into_owned())
+}
+
+/// The account produced by the wizard, rendered as a ready-to-save TOML
+/// document (for a file write or stdout), or serialized as an object in
+/// JSON mode. The framing that used to head this document as comments
+/// now lives in the stderr welcome banner, so what lands here is the
+/// bare config, whether it is saved to a file or redirected on stdout.
 struct GeneratedConfig(Config);
 
 impl fmt::Display for GeneratedConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let toml = config_toml::to_string(&self.0).map_err(|_| fmt::Error)?;
-
-        writeln!(f, "# Configuration generated by the himalaya wizard.")?;
-        writeln!(f, "#")?;
-        writeln!(
-            f,
-            "# Nothing was written to disk: save this into your config"
-        )?;
-        writeln!(f, "# file, one of:")?;
-        writeln!(f, "#   $XDG_CONFIG_HOME/himalaya/config.toml")?;
-        writeln!(f, "#   $HOME/.config/himalaya/config.toml")?;
-        writeln!(f, "#   $HOME/.himalayarc")?;
-        writeln!(f, "#")?;
-        writeln!(
-            f,
-            "# Prompts render on stderr, so redirecting works directly:"
-        )?;
-        writeln!(f, "#   himalaya > ~/.config/himalaya/config.toml")?;
-        writeln!(f, "#")?;
-        writeln!(
-            f,
-            "# The account name (the [accounts.*] table key) is derived"
-        )?;
-        writeln!(f, "# from your input; rename it to anything you like.")?;
-        writeln!(f, "#")?;
-        writeln!(f, "# Every field is documented in the sample config:")?;
-        writeln!(
-            f,
-            "# https://github.com/pimalaya/himalaya/blob/master/config.sample.toml"
-        )?;
-        writeln!(f)?;
         write!(f, "{toml}")
     }
 }
