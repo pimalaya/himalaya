@@ -15,11 +15,14 @@
 
 use std::io::{Write, stdout};
 
-use crate::email::flag::{Flag, IanaFlag};
 use anyhow::Result;
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::{account::context::Account, shared::client::EmailClient};
+use crate::{
+    account::context::Account,
+    email::flag::{Flag, IanaFlag},
+    shared::client::EmailClient,
+};
 
 /// What [`apply`] actually did with `raw`.
 pub enum Outcome {

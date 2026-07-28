@@ -1,17 +1,19 @@
 use std::fmt;
 
-use crate::email::flag::{Flag, FlagOp};
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::account::context::Account;
-use crate::shared::{
-    client::EmailClient,
-    flag::arg::{FlagsArg, MessageIdsArg},
-    mailbox::arg::MailboxArg,
+use crate::{
+    account::context::Account,
+    email::flag::{Flag, FlagOp},
+    shared::{
+        client::EmailClient,
+        flag::arg::{FlagsArg, MessageIdsArg},
+        mailbox::arg::MailboxArg,
+    },
 };
 
 /// Remove flag(s) from message(s) for the active account.

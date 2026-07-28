@@ -2,10 +2,12 @@ use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 
-use crate::account::context::Account;
-use crate::shared::{
-    client::EmailClient,
-    message::{arg::MessageArg, handler},
+use crate::{
+    account::context::Account,
+    shared::{
+        client::EmailClient,
+        message::{arg::MessageArg, handler},
+    },
 };
 
 /// Send a message via the active account.

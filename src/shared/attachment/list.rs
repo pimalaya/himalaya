@@ -9,8 +9,10 @@ use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::account::context::Account;
-use crate::shared::{client::EmailClient, mailbox::arg::MailboxArg};
+use crate::{
+    account::context::Account,
+    shared::{client::EmailClient, mailbox::arg::MailboxArg},
+};
 
 /// List the attachments carried by a single message in the active
 /// account.

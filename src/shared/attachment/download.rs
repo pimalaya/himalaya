@@ -9,11 +9,13 @@ use clap::Parser;
 use mail_parser::{MessageParser, MimeHeaders};
 use pimalaya_cli::printer::Printer;
 
-use crate::account::context::Account;
-use crate::shared::{
-    attachment::list::{Attachment, AttachmentColors, Attachments, mime_string},
-    client::EmailClient,
-    mailbox::arg::MailboxArg,
+use crate::{
+    account::context::Account,
+    shared::{
+        attachment::list::{Attachment, AttachmentColors, Attachments, mime_string},
+        client::EmailClient,
+        mailbox::arg::MailboxArg,
+    },
 };
 
 /// Download specific attachments of a single message to disk.

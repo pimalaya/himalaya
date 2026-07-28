@@ -2,10 +2,12 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
-use crate::account::context::Account;
-use crate::shared::{
-    client::EmailClient,
-    envelope::{list::EnvelopeListCommand, search::EnvelopeSearchCommand},
+use crate::{
+    account::context::Account,
+    shared::{
+        client::EmailClient,
+        envelope::{list::EnvelopeListCommand, search::EnvelopeSearchCommand},
+    },
 };
 
 /// Manage envelopes using the shared API.

@@ -1,19 +1,21 @@
 use std::fmt;
 
-use crate::email::flag::Flag;
 use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::account::context::Account;
-use crate::shared::{
-    client::EmailClient,
-    flag::arg::FlagArg,
-    message::{
-        arg::MessageArg,
-        handler::{self, Outcome},
+use crate::{
+    account::context::Account,
+    email::flag::Flag,
+    shared::{
+        client::EmailClient,
+        flag::arg::FlagArg,
+        message::{
+            arg::MessageArg,
+            handler::{self, Outcome},
+        },
     },
 };
 

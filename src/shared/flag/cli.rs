@@ -2,10 +2,12 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
-use crate::account::context::Account;
-use crate::shared::{
-    client::EmailClient,
-    flag::{add::FlagAddCommand, remove::FlagRemoveCommand, set::FlagSetCommand},
+use crate::{
+    account::context::Account,
+    shared::{
+        client::EmailClient,
+        flag::{add::FlagAddCommand, remove::FlagRemoveCommand, set::FlagSetCommand},
+    },
 };
 
 /// Manage flags using the shared API.

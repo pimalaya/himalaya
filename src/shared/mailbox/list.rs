@@ -1,6 +1,5 @@
 use std::fmt;
 
-use crate::email::mailbox::Mailbox;
 use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
@@ -8,8 +7,7 @@ use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::account::context::Account;
-use crate::shared::client::EmailClient;
+use crate::{account::context::Account, email::mailbox::Mailbox, shared::client::EmailClient};
 
 /// Shared API to list mailboxes for the active account.
 #[derive(Debug, Parser)]

@@ -34,8 +34,7 @@ use crate::{
 /// pipe the `--raw` output into the renderer of your choice.
 #[derive(Debug, Parser)]
 pub struct MessageReadCommand {
-    /// Identifier of the message (IMAP UID, JMAP email id, or Maildir
-    /// filename id).
+    /// Identifier of the message.
     #[arg(value_name = "ID")]
     pub id: String,
     #[command(flatten)]
@@ -45,9 +44,8 @@ pub struct MessageReadCommand {
     /// instead, keeping the output valid JSON.
     #[arg(long)]
     pub raw: bool,
-    /// Mark the message as seen while reading it. Backends that offer a
-    /// side-effecting fetch (IMAP `BODY[]`) do this in a single round;
-    /// the others issue a separate flag update.
+    /// Mark the message as seen while reading it. Without this flag the
+    /// read leaves the seen state untouched.
     #[arg(long)]
     pub seen: bool,
 }

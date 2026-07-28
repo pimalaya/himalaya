@@ -1,21 +1,22 @@
 use std::io::{IsTerminal, stdout};
 
-use crate::email::search::{error::Error as SearchQueryError, query::SearchEmailsQuery};
 use anyhow::{Result, bail};
 use ariadne::{Color, Config, Label, Report, ReportKind, Source};
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 
-use crate::account::context::Account;
-use crate::shared::{
-    client::EmailClient,
-    envelope::list::{EnvelopeColors, Envelopes, FlagChars},
-    mailbox::arg::MailboxArg,
+use crate::{
+    account::context::Account,
+    email::search::{error::Error as SearchQueryError, query::SearchEmailsQuery},
+    shared::{
+        client::EmailClient,
+        envelope::list::{EnvelopeColors, Envelopes, FlagChars},
+        mailbox::arg::MailboxArg,
+    },
 };
 
 /// Search envelopes for the active account using the shared search
-/// query DSL, regardless of the underlying backend (IMAP, JMAP or
-/// Maildir).
+/// query DSL, regardless of the underlying backend.
 ///
 /// The trailing positional accepts a filter and/or sort clause that
 /// targets the `Date:` header (sent-at) for date clauses and

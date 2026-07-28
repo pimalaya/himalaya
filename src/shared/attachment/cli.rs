@@ -2,10 +2,12 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
-use crate::account::context::Account;
-use crate::shared::{
-    attachment::{download::AttachmentDownloadCommand, list::AttachmentListCommand},
-    client::EmailClient,
+use crate::{
+    account::context::Account,
+    shared::{
+        attachment::{download::AttachmentDownloadCommand, list::AttachmentListCommand},
+        client::EmailClient,
+    },
 };
 
 /// Manage attachments using the shared API.

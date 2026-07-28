@@ -1,6 +1,5 @@
 use std::{collections::BTreeSet, fmt};
 
-use crate::email::{address::Address, envelope::Envelope, flag::Flag};
 use anyhow::Result;
 use chrono::{DateTime, FixedOffset, Local};
 use clap::Parser;
@@ -10,11 +9,14 @@ use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::account::context::Account;
-use crate::shared::{client::EmailClient, mailbox::arg::MailboxArg};
+use crate::{
+    account::context::Account,
+    email::{address::Address, envelope::Envelope, flag::Flag},
+    shared::{client::EmailClient, mailbox::arg::MailboxArg},
+};
 
 /// List envelopes for the active account, regardless of the underlying
-/// backend (IMAP, JMAP or Maildir).
+/// backend.
 ///
 /// Envelopes are ordered by date descending (most recent first). Use
 /// `envelope search` to filter and/or sort with the shared search
@@ -51,10 +53,8 @@ pub struct EnvelopeListCommand {
     #[arg(long, short)]
     pub recipient: bool,
 
-    /// Populate the ATT column. Free on JMAP; on IMAP this fetches
-    /// `BODYSTRUCTURE` in addition to `ENVELOPE`; Maildir already
-    /// parses the message body for subject/from/to so the toggle is
-    /// essentially free there.
+    /// Populate the ATT column. Depending on the backend this can cost
+    /// an extra lookup per envelope, so it is opt-in.
     #[arg(long = "has-attachment")]
     pub has_attachment: bool,
 }

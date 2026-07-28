@@ -2,8 +2,10 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
-use crate::account::context::Account;
-use crate::shared::{client::EmailClient, mailbox::list::MailboxListCommand};
+use crate::{
+    account::context::Account,
+    shared::{client::EmailClient, mailbox::list::MailboxListCommand},
+};
 
 /// Manage mailboxes using the shared API.
 ///

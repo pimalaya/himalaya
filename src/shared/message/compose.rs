@@ -4,12 +4,14 @@ use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 
-use crate::account::context::Account;
-use crate::shared::{
-    client::EmailClient,
-    message::{
-        builder::{self, BuilderArgs},
-        handler,
+use crate::{
+    account::context::Account,
+    shared::{
+        client::EmailClient,
+        message::{
+            builder::{self, BuilderArgs},
+            handler,
+        },
     },
 };
 

@@ -4,13 +4,15 @@ use anyhow::Result;
 use clap::Parser;
 use pimalaya_cli::printer::Printer;
 
-use crate::account::context::Account;
-use crate::shared::{
-    client::EmailClient,
-    mailbox::arg::MailboxArg,
-    message::{
-        builder::{self, BuilderArgs, PostingStyle, SourceArgs, SourceMode},
-        handler,
+use crate::{
+    account::context::Account,
+    shared::{
+        client::EmailClient,
+        mailbox::arg::MailboxArg,
+        message::{
+            builder::{self, BuilderArgs, PostingStyle, SourceArgs, SourceMode},
+            handler,
+        },
     },
 };
 
@@ -25,8 +27,7 @@ use crate::shared::{
 /// into `messages send` / `messages add`.
 #[derive(Debug, Parser)]
 pub struct MessageReplyCommand {
-    /// Identifier of the source message (IMAP UID, JMAP id, Maildir
-    /// filename id).
+    /// Identifier of the source message.
     #[arg(value_name = "ID")]
     pub id: String,
 
