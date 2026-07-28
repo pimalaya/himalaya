@@ -18,10 +18,11 @@ use crate::shared::{
 
 /// Download specific attachments of a single message to disk.
 ///
-/// The attachment ids are the 1-based positions reported by
-/// `attachments list`. Pass one or more ids to fetch exactly those
-/// parts. Inline parts are addressable by their id too — the id you
-/// see in `attachments list --inline` is the same id you pass here.
+/// The attachment ids are the MIME part positions reported by
+/// `attachments list` and by `message read` (`[ID] ...`). Pass one or
+/// more ids to fetch exactly those parts. Inline parts are addressable
+/// by their id too — the id you see in `attachments list --inline` is
+/// the same id you pass here.
 ///
 /// The destination directory defaults to the account's
 /// `downloads-dir` config (falling back to the global one, then the
@@ -73,8 +74,9 @@ impl AttachmentDownloadCommand {
         let mut remaining: BTreeSet<String> = self.attachment_ids.iter().cloned().collect();
         let mut written = Vec::new();
 
-        for (index, part) in message.attachments().enumerate() {
-            let id = (index + 1).to_string();
+        for &part_id in &message.attachments {
+            let part = &message.parts[part_id as usize];
+            let id = (part_id + 1).to_string();
             if !wanted_all && !remaining.remove(&id) {
                 continue;
             }

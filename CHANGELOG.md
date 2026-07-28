@@ -11,7 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `message read` gained a `--seen` flag to mark the message as seen while reading it; without it the read stays non-mutating (the default since v2). Backends that offer a side-effecting fetch do it in a single round (IMAP switches `BODY.PEEK[]` to `BODY[]`); the others issue a separate flag update after the fetch (JMAP `Email/set`, Gmail `messages.modify`, Microsoft Graph `PATCH isRead`, Maildir/m2dir add the `S` flag).
 
+### Fixed
+
+- `message read --raw --json` no longer errors: the two combine, emitting the raw RFC 5322 bytes as a JSON `{ "message": "…" }` string (lossily decoded) instead of bailing with "`--raw` and `--json` cannot be combined".
+
 ### Changed
+
+- `message read`'s plain-text output is now a concise reading view: a minimal header block (Date, From, To, Cc, Subject) followed by a per-part walk — one summary line per MIME part (`[ID] <type>[ — <filename>] (<size>)`) with that part's own `Content-*` headers, then the decoded contents of plain-text parts inlined; HTML and binary parts stay a summary, except an HTML-only mail (whose sole text part is a single HTML one) has its markup printed rather than nothing readable. `--raw` (full RFC 5322 bytes) and `--json` (full parsed message) are unchanged for verbose or machine consumption.
+
+- The `ID` in `message read` and in `attachments list` / `attachments download` is now the MIME part's 1-based position in the message (matching between the two commands), so `message read` shows the same id you pass to `attachments download`. Attachment ids are therefore a sparse subset of the part positions (e.g. `1 5 9`) rather than a dense `1 2 3` sequence.
 
 - The first-run wizard now opens with a welcome banner on stderr explaining what Himalaya is and what the wizard does, replacing the comment header that used to head the generated config.
 

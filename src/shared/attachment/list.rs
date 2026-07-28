@@ -15,13 +15,11 @@ use crate::shared::{client::EmailClient, mailbox::arg::MailboxArg};
 /// List the attachments carried by a single message in the active
 /// account.
 ///
-/// Each row carries a 1-based `ID` matching the position of the part
-/// in mail_parser's attachment iteration order. The `ID` is stable
-/// regardless of the `--inline` filter — listing only the attachment
-/// parts and listing every non-body part assign the same id to the
-/// same underlying part. So if a message has parts `1=attachment,
-/// 2=attachment, 3=inline, 4=attachment`, the default listing shows
-/// `1 2 4` and `--inline` shows `1 2 3 4`.
+/// Each row carries the `ID` of the underlying MIME part: its 1-based
+/// position in the whole part list, the same id `message read` prints in
+/// its per-part summary (`[ID] ...`). Only attachment parts are listed,
+/// so the ids are a sparse subset of the message's parts (e.g. `1 5 9`),
+/// stable regardless of the `--inline` filter.
 ///
 /// Pass `--inline` to surface inline parts (typically embedded images
 /// referenced by HTML bodies via `cid:`).
@@ -52,7 +50,8 @@ impl AttachmentListCommand {
         };
 
         let mut attachments = Vec::new();
-        for (index, part) in message.attachments().enumerate() {
+        for &part_id in &message.attachments {
+            let part = &message.parts[part_id as usize];
             let inline = part
                 .content_disposition()
                 .map(|cd| cd.c_type.eq_ignore_ascii_case("inline"))
@@ -63,7 +62,7 @@ impl AttachmentListCommand {
             }
 
             attachments.push(Attachment {
-                id: (index + 1).to_string(),
+                id: (part_id + 1).to_string(),
                 filename: part.attachment_name().map(str::to_owned),
                 mime: mime_string(part),
                 size: part.contents().len() as u64,
@@ -105,8 +104,9 @@ pub(crate) struct AttachmentColors {
 /// One row of the `attachments list` / `attachments download` output.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct Attachment {
-    /// 1-based linear index in mail-parser's attachment iteration
-    /// order. Stable across the `--inline` filter.
+    /// 1-based position of the MIME part in the message's part list, the
+    /// same id `message read` prints. Sparse (attachments only) and
+    /// stable across the `--inline` filter.
     pub id: String,
     /// Filename from `Content-Disposition: filename=` (or
     /// `Content-Type: name=`), RFC 2231-decoded. `None` when the
