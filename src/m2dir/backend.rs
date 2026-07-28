@@ -18,7 +18,7 @@ use crate::{
     email::{
         address::Address,
         envelope::{Envelope, normalize_message_id},
-        flag::{Flag, FlagOp},
+        flag::{Flag, FlagOp, IanaFlag},
         mailbox::Mailbox,
         search::{eval, query::SearchEmailsQuery},
     },
@@ -143,9 +143,17 @@ impl M2dirClient {
     }
 
     /// Reads one message's raw RFC 5322 bytes from `mailbox`.
-    pub fn get_message(&self, mailbox: &str, id: &str) -> Result<Vec<u8>> {
+    pub fn get_message(&self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
         let m2dir = self.resolve_m2dir(mailbox)?;
         let (_entry, bytes) = self.get(m2dir, id)?;
+
+        // Reading the bytes never touches the sidecar; `--seen` adds the
+        // `S` flag so the read stays non-mutating by default.
+        if seen {
+            let seen = Flag::from_iana(IanaFlag::Seen);
+            self.store_flags(mailbox, &[id], &[seen], FlagOp::Add)?;
+        }
+
         Ok(bytes)
     }
 

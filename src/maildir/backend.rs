@@ -119,10 +119,19 @@ impl MaildirClient {
     }
 
     /// Reads one message's raw RFC 5322 bytes from `mailbox`.
-    pub fn get_message(&self, mailbox: &str, id: &str) -> Result<Vec<u8>> {
+    pub fn get_message(&self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
         let maildir = self.resolve_maildir(Path::new(mailbox))?;
         let entry = self.get(maildir, id)?;
-        Ok(entry.contents().to_vec())
+        let raw = entry.contents().to_vec();
+
+        // Reading the file never renames it; `--seen` adds the `S` flag
+        // (a local rename) so the read stays non-mutating by default.
+        if seen {
+            let seen = Flag::from_iana(IanaFlag::Seen);
+            self.store_flags(mailbox, &[id], &[seen], FlagOp::Add)?;
+        }
+
+        Ok(raw)
     }
 
     /// Stores `raw` under `mailbox`'s `cur/` with `flags`, returning the

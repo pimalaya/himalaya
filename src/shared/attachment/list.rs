@@ -45,7 +45,7 @@ impl AttachmentListCommand {
         client: &mut EmailClient,
     ) -> Result<()> {
         let mailbox = self.mailbox.resolve(account)?;
-        let raw = client.get_message(&mailbox, &self.message_id)?;
+        let raw = client.get_message(&mailbox, &self.message_id, false)?;
 
         let Some(message) = MessageParser::new().parse(&raw) else {
             bail!("Failed to parse RFC 5322 message");

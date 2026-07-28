@@ -129,12 +129,22 @@ impl GmailClient {
 
     /// Fetches one message's raw RFC 5322 bytes via `messages.get`
     /// (format=RAW), base64url-decoded.
-    pub fn get_message(&mut self, _mailbox: &str, id: &str) -> Result<Vec<u8>> {
+    pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
         let message = self.message_get(id, GmailMessageFormat::Raw, &[])?.response;
         let raw = message
             .raw
             .ok_or_else(|| anyhow!("Gmail message has no raw payload"))?;
-        decode_raw(&raw).map_err(|err| anyhow!("Gmail raw message could not be decoded: {err}"))
+        let raw = decode_raw(&raw)
+            .map_err(|err| anyhow!("Gmail raw message could not be decoded: {err}"))?;
+
+        // `messages.get` never changes read state; `--seen` removes the
+        // `UNREAD` label via a separate `messages.modify`.
+        if seen {
+            let seen = Flag::from_iana(IanaFlag::Seen);
+            self.store_flags(mailbox, &[id], &[seen], FlagOp::Add)?;
+        }
+
+        Ok(raw)
     }
 
     /// Copies a message id set into `to` by adding `to`'s label. `from`

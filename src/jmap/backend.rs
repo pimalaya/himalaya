@@ -172,7 +172,7 @@ impl JmapClient {
 
     /// Fetches one message's raw RFC 5322 bytes: `Email/get` for the
     /// blob id, then `Blob/download`.
-    pub fn get_message(&mut self, _mailbox: &str, id: &str) -> Result<Vec<u8>> {
+    pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
         let output = self.email_get(
             vec![id.to_string()],
             JmapEmailGetOptions {
@@ -204,7 +204,16 @@ impl JmapClient {
         let url = Url::parse(&url_str)
             .map_err(|_| anyhow!("Resolved JMAP download URL is invalid: {url_str}"))?;
 
-        self.download_blob(&url)
+        let raw = self.download_blob(&url)?;
+
+        // JMAP has no side-effecting read (the blob download cannot carry a
+        // mutation), so `--seen` is a separate `Email/set`.
+        if seen {
+            let seen = Flag::from_iana(IanaFlag::Seen);
+            self.store_flags(mailbox, &[id], &[seen], FlagOp::Add)?;
+        }
+
+        Ok(raw)
     }
 
     /// Uploads `raw` as a blob then imports it into `mailbox` with the

@@ -109,7 +109,7 @@ impl MessageForwardCommand {
         client: &mut EmailClient,
     ) -> Result<()> {
         let mailbox = self.mailbox.resolve(account)?;
-        let source = client.get_message(&mailbox, &self.id)?;
+        let source = client.get_message(&mailbox, &self.id, false)?;
 
         let raw = builder::build(
             BuilderArgs {

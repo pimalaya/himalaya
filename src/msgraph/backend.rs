@@ -91,8 +91,17 @@ impl MsgraphClient {
 
     /// Fetches one message's raw RFC 5322 bytes via
     /// `GET /messages/{id}/$value`. `mailbox` is unused.
-    pub fn get_message(&mut self, _mailbox: &str, id: &str) -> Result<Vec<u8>> {
-        Ok(self.message_get_raw(id)?.response)
+    pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
+        let raw = self.message_get_raw(id)?.response;
+
+        // Fetching `$value` never changes read state; `--seen` sets
+        // `isRead` via a separate PATCH.
+        if seen {
+            let seen = Flag::from_iana(IanaFlag::Seen);
+            self.store_flags(mailbox, &[id], &[seen], FlagOp::Add)?;
+        }
+
+        Ok(raw)
     }
 
     /// Copies a message id set into `to`. `from` is unused.

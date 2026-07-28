@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `message read` gained a `--seen` flag to mark the message as seen while reading it; without it the read stays non-mutating (the default since v2). Backends that offer a side-effecting fetch do it in a single round (IMAP switches `BODY.PEEK[]` to `BODY[]`); the others issue a separate flag update after the fetch (JMAP `Email/set`, Gmail `messages.modify`, Microsoft Graph `PATCH isRead`, Maildir/m2dir add the `S` flag).
+
 ### Changed
 
 - The wizard now offers only the IMAP authentication mechanisms the server supports.

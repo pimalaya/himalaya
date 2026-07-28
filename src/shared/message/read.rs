@@ -34,6 +34,12 @@ pub struct MessageReadCommand {
     /// the global `--json` flag.
     #[arg(long)]
     pub raw: bool,
+
+    /// Mark the message as seen while reading it. Backends that offer a
+    /// side-effecting fetch (IMAP `BODY[]`) do this in a single round;
+    /// the others issue a separate flag update.
+    #[arg(long)]
+    pub seen: bool,
 }
 
 impl MessageReadCommand {
@@ -48,7 +54,7 @@ impl MessageReadCommand {
         }
 
         let mailbox = self.mailbox.resolve(account)?;
-        let raw = client.get_message(&mailbox, &self.id)?;
+        let raw = client.get_message(&mailbox, &self.id, self.seen)?;
 
         if self.raw {
             let mut out = stdout().lock();

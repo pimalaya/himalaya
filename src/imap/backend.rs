@@ -216,17 +216,20 @@ impl ImapClient {
 
     /// Fetches one message's raw RFC 5322 bytes without flipping
     /// `\Seen` (BODY.PEEK[]).
-    pub fn get_message(&mut self, mailbox: &str, id: &str) -> Result<Vec<u8>> {
+    pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
         let mbox = parse_mailbox(mailbox)?;
         let sequence_set = parse_uids(&[id])?;
 
         self.select(mbox, ImapMailboxSelectOptions::default())?;
 
+        // `BODY[]` sets `\Seen` server-side as a side effect of the fetch,
+        // so `--seen` costs no extra round trip; `BODY.PEEK[]` leaves the
+        // flag untouched. The mailbox is always SELECTed read-write.
         let item_names =
             MacroOrMessageDataItemNames::MessageDataItemNames(vec![MessageDataItemName::BodyExt {
                 section: None,
                 partial: None,
-                peek: true,
+                peek: !seen,
             }]);
         let data = self.fetch(
             sequence_set,

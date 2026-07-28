@@ -240,21 +240,23 @@ impl EmailClient {
         }
     }
 
-    /// Fetches one message's raw RFC 5322 bytes.
-    pub fn get_message(&mut self, mailbox: &str, id: &str) -> Result<Vec<u8>> {
+    /// Fetches one message's raw RFC 5322 bytes. When `seen` is set, the
+    /// message is also marked as seen: IMAP folds this into the fetch
+    /// (`BODY[]`), the other backends issue a separate flag update.
+    pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
-            BackendClient::Imap(client) => client.get_message(mailbox, id),
+            BackendClient::Imap(client) => client.get_message(mailbox, id, seen),
             #[cfg(feature = "jmap")]
-            BackendClient::Jmap(client) => client.get_message(mailbox, id),
+            BackendClient::Jmap(client) => client.get_message(mailbox, id, seen),
             #[cfg(feature = "gmail")]
-            BackendClient::Gmail(client) => client.get_message(mailbox, id),
+            BackendClient::Gmail(client) => client.get_message(mailbox, id, seen),
             #[cfg(feature = "msgraph")]
-            BackendClient::Msgraph(client) => client.get_message(mailbox, id),
+            BackendClient::Msgraph(client) => client.get_message(mailbox, id, seen),
             #[cfg(feature = "maildir")]
-            BackendClient::Maildir(client) => client.get_message(mailbox, id),
+            BackendClient::Maildir(client) => client.get_message(mailbox, id, seen),
             #[cfg(feature = "m2dir")]
-            BackendClient::M2dir(client) => client.get_message(mailbox, id),
+            BackendClient::M2dir(client) => client.get_message(mailbox, id, seen),
         }
     }
 
