@@ -37,40 +37,44 @@ pub fn schemas() -> BTreeMap<String, Value> {
         };
     }
 
-    // --- Shared API (always present)
+    // --- Shared API (needs a storage backend, like the commands)
 
-    insert!(
-        "himalaya-mailbox-list",
-        crate::shared::mailbox::list::Mailboxes
-    );
-    insert!(
-        "himalaya-envelope-list",
-        crate::shared::envelope::list::Envelopes
-    );
-    // `envelope search` renders the same `Envelopes` table as `list`.
-    insert!(
-        "himalaya-envelope-search",
-        crate::shared::envelope::list::Envelopes
-    );
-    insert!("himalaya-flag-add", crate::shared::flag::add::AddedFlags);
-    insert!("himalaya-flag-set", crate::shared::flag::set::SetFlags);
-    insert!(
-        "himalaya-flag-remove",
-        crate::shared::flag::remove::RemovedFlags
-    );
-    insert!(
-        "himalaya-message-add",
-        crate::shared::message::add::MessageAddOutput
-    );
-    insert!(
-        "himalaya-message-read",
-        crate::shared::message::read::MessageView
-    );
-
-    // The attachment commands are only compiled with a storage/network
-    // backend able to fetch a message body.
-    #[cfg(any(feature = "imap", feature = "jmap", feature = "maildir"))]
+    #[cfg(any(
+        feature = "imap",
+        feature = "jmap",
+        feature = "gmail",
+        feature = "msgraph",
+        feature = "maildir",
+        feature = "m2dir"
+    ))]
     {
+        insert!(
+            "himalaya-mailbox-list",
+            crate::shared::mailbox::list::Mailboxes
+        );
+        insert!(
+            "himalaya-envelope-list",
+            crate::shared::envelope::list::Envelopes
+        );
+        // `envelope search` renders the same `Envelopes` table as `list`.
+        insert!(
+            "himalaya-envelope-search",
+            crate::shared::envelope::list::Envelopes
+        );
+        insert!("himalaya-flag-add", crate::shared::flag::add::AddedFlags);
+        insert!("himalaya-flag-set", crate::shared::flag::set::SetFlags);
+        insert!(
+            "himalaya-flag-remove",
+            crate::shared::flag::remove::RemovedFlags
+        );
+        insert!(
+            "himalaya-message-add",
+            crate::shared::message::add::MessageAddOutput
+        );
+        insert!(
+            "himalaya-message-read",
+            crate::shared::message::read::MessageView
+        );
         insert!(
             "himalaya-attachment-list",
             crate::shared::attachment::list::Attachments

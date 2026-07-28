@@ -29,16 +29,25 @@ use crate::m2dir::client::M2dirClient;
 use crate::maildir::client::MaildirClient;
 #[cfg(feature = "msgraph")]
 use crate::msgraph::client::MsgraphClient;
+// `Envelope`/`Mailbox`/`FlagOp`/`SearchEmailsQuery` are only used by the
+// storage-dispatch methods, so they follow the same "any storage" gate;
+// `Flag` is also used by the always-compiled `add_message`.
+#[cfg(any(
+    feature = "imap",
+    feature = "jmap",
+    feature = "gmail",
+    feature = "msgraph",
+    feature = "maildir",
+    feature = "m2dir"
+))]
+use crate::email::{
+    envelope::Envelope, flag::FlagOp, mailbox::Mailbox, search::query::SearchEmailsQuery,
+};
 use crate::{
     account::context::Account,
     backend::Backend,
     config::{AccountConfig, Config},
-    email::{
-        envelope::Envelope,
-        flag::{Flag, FlagOp},
-        mailbox::Mailbox,
-        search::query::SearchEmailsQuery,
-    },
+    email::flag::Flag,
 };
 #[cfg(feature = "smtp")]
 use crate::{config::SmtpConfig, smtp::client::SmtpClient};
@@ -121,6 +130,14 @@ impl EmailClient {
     }
 
     /// Lists every mailbox available to the active account.
+    #[cfg(any(
+        feature = "imap",
+        feature = "jmap",
+        feature = "gmail",
+        feature = "msgraph",
+        feature = "maildir",
+        feature = "m2dir"
+    ))]
     pub fn list_mailboxes(&mut self, with_counts: bool) -> Result<Vec<Mailbox>> {
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
@@ -139,6 +156,14 @@ impl EmailClient {
     }
 
     /// Lists envelopes from `mailbox`.
+    #[cfg(any(
+        feature = "imap",
+        feature = "jmap",
+        feature = "gmail",
+        feature = "msgraph",
+        feature = "maildir",
+        feature = "m2dir"
+    ))]
     pub fn list_envelopes(
         &mut self,
         mailbox: &str,
@@ -178,6 +203,14 @@ impl EmailClient {
 
     /// Searches envelopes in `mailbox` against the shared query DSL.
     /// Gmail and Microsoft Graph do not implement the shared search.
+    #[cfg(any(
+        feature = "imap",
+        feature = "jmap",
+        feature = "gmail",
+        feature = "msgraph",
+        feature = "maildir",
+        feature = "m2dir"
+    ))]
     pub fn search_envelopes(
         &mut self,
         mailbox: &str,
@@ -215,6 +248,14 @@ impl EmailClient {
     }
 
     /// Adds, sets, or removes `flags` on a message id set in `mailbox`.
+    #[cfg(any(
+        feature = "imap",
+        feature = "jmap",
+        feature = "gmail",
+        feature = "msgraph",
+        feature = "maildir",
+        feature = "m2dir"
+    ))]
     pub fn store_flags(
         &mut self,
         mailbox: &str,
@@ -243,6 +284,14 @@ impl EmailClient {
     /// Fetches one message's raw RFC 5322 bytes. When `seen` is set, the
     /// message is also marked as seen: IMAP folds this into the fetch
     /// (`BODY[]`), the other backends issue a separate flag update.
+    #[cfg(any(
+        feature = "imap",
+        feature = "jmap",
+        feature = "gmail",
+        feature = "msgraph",
+        feature = "maildir",
+        feature = "m2dir"
+    ))]
     pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
         match self.storage_mut()? {
             #[cfg(feature = "imap")]
@@ -278,11 +327,31 @@ impl EmailClient {
             BackendClient::Gmail(_) => bail!("Gmail does not support adding messages"),
             #[cfg(feature = "msgraph")]
             BackendClient::Msgraph(_) => bail!("Microsoft Graph does not support adding messages"),
+            // No storage backend compiled in (send-only build): `save`
+            // has nowhere to land. `storage_mut()` bails first, so this
+            // arm only keeps the match exhaustive over the empty enum.
+            #[cfg(not(any(
+                feature = "imap",
+                feature = "jmap",
+                feature = "gmail",
+                feature = "msgraph",
+                feature = "maildir",
+                feature = "m2dir"
+            )))]
+            _ => bail!("No storage backend is configured for this account"),
         }
     }
 
     /// Copies a message id set from `from` to `to`, returning the number
     /// actually affected (see the per-backend adapters).
+    #[cfg(any(
+        feature = "imap",
+        feature = "jmap",
+        feature = "gmail",
+        feature = "msgraph",
+        feature = "maildir",
+        feature = "m2dir"
+    ))]
     pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let from = self.resolve_mailbox_id(from)?;
         let to = self.resolve_mailbox_id(to)?;
@@ -305,6 +374,14 @@ impl EmailClient {
 
     /// Moves a message id set from `from` to `to`, returning the number
     /// actually affected (see the per-backend adapters).
+    #[cfg(any(
+        feature = "imap",
+        feature = "jmap",
+        feature = "gmail",
+        feature = "msgraph",
+        feature = "maildir",
+        feature = "m2dir"
+    ))]
     pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
         let from = self.resolve_mailbox_id(from)?;
         let to = self.resolve_mailbox_id(to)?;

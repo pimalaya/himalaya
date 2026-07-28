@@ -24,15 +24,31 @@ fn is_default<T: Default + PartialEq>(value: &T) -> bool {
 }
 
 fn is_default_imap_alpn(alpn: &[String]) -> bool {
-    alpn == io_imap::client::default_alpn().as_slice()
+    alpn == default_imap_alpn().as_slice()
 }
 
 fn is_default_smtp_alpn(alpn: &[String]) -> bool {
-    alpn == io_smtp::client::SmtpClientStd::default_alpn().as_slice()
+    alpn == default_smtp_alpn().as_slice()
 }
 
 fn is_default_jmap_alpn(alpn: &[String]) -> bool {
-    alpn == io_jmap::client::JmapClientStd::default_alpn().as_slice()
+    alpn == default_jmap_alpn().as_slice()
+}
+
+// NOTE: these mirror the io-* crates' `default_alpn()` (IMAP `["imap"]`,
+// SMTP `["smtp"]`, JMAP `["http/1.1"]`) but are kept local so the config
+// schema does not depend on any backend crate — the config compiles
+// under any feature subset, like the Gmail/Graph defaults below.
+pub(crate) fn default_imap_alpn() -> Vec<String> {
+    vec![String::from("imap")]
+}
+
+pub(crate) fn default_smtp_alpn() -> Vec<String> {
+    vec![String::from("smtp")]
+}
+
+pub(crate) fn default_jmap_alpn() -> Vec<String> {
+    vec![String::from("http/1.1")]
 }
 
 fn is_default_gmail_alpn(alpn: &[String]) -> bool {
@@ -365,7 +381,7 @@ pub struct ImapConfig {
     /// negotiation entirely. Only relevant for the rustls provider;
     /// `native-tls` ignores ALPN.
     #[serde(
-        default = "io_imap::client::default_alpn",
+        default = "default_imap_alpn",
         skip_serializing_if = "is_default_imap_alpn"
     )]
     pub alpn: Vec<String>,
@@ -455,7 +471,7 @@ pub struct SmtpConfig {
     /// to skip ALPN negotiation entirely. Only relevant for the
     /// rustls provider; `native-tls` ignores ALPN.
     #[serde(
-        default = "io_smtp::client::SmtpClientStd::default_alpn",
+        default = "default_smtp_alpn",
         skip_serializing_if = "is_default_smtp_alpn"
     )]
     pub alpn: Vec<String>,
@@ -666,7 +682,7 @@ pub struct JmapConfig {
     /// `[]` to skip ALPN negotiation entirely. Only relevant for the
     /// rustls provider; `native-tls` ignores ALPN.
     #[serde(
-        default = "io_jmap::client::JmapClientStd::default_alpn",
+        default = "default_jmap_alpn",
         skip_serializing_if = "is_default_jmap_alpn"
     )]
     pub alpn: Vec<String>,

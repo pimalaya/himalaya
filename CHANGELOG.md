@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Every cargo feature combination now compiles. Previously a lean build (e.g. `--no-default-features --features rustls-ring,imap`) failed: the config schema referenced the `io-imap`/`io-smtp`/`io-jmap` crates for its ALPN defaults even when those backends were disabled (now local `default_*_alpn` helpers, like the Gmail/Graph ones). The cross-protocol commands are now feature-gated by what they need: `mailboxes`/`envelopes`/`flags`/`attachments` and the storage message subcommands (`add`/`copy`/`move`/`read`/`reply`/`forward`) require a storage backend, while `messages compose`/`send` only need a send backend — so a send-only (`smtp`) build keeps compose/send but drops the storage commands, and a backend-less build drops the shared surface entirely, instead of failing to compile. The `attachments` commands are also now available for the Gmail, Microsoft Graph and m2dir backends (previously only IMAP/JMAP/Maildir).
+
 - `message read --raw --json` no longer errors: the two combine, emitting the raw RFC 5322 bytes as a JSON `{ "message": "…" }` string (lossily decoded) instead of bailing with "`--raw` and `--json` cannot be combined".
 
 ### Changed

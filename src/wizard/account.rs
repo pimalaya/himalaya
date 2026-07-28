@@ -14,7 +14,8 @@ use pimalaya_stream::sasl::SaslMechanism;
 
 use crate::config::{
     ImapConfig, SaslAnonymousConfig, SaslConfig, SaslLoginConfig, SaslOauthbearerConfig,
-    SaslPlainConfig, SaslScramSha256Config, SaslXoauth2Config, SmtpConfig,
+    SaslPlainConfig, SaslScramSha256Config, SaslXoauth2Config, SmtpConfig, default_imap_alpn,
+    default_smtp_alpn,
 };
 
 pub fn imap_to_config(w: WizardImapConfig, mechanism: SaslMechanism) -> Result<ImapConfig> {
@@ -30,7 +31,7 @@ pub fn imap_to_config(w: WizardImapConfig, mechanism: SaslMechanism) -> Result<I
         server,
         tls: Default::default(),
         starttls,
-        alpn: io_imap::client::default_alpn(),
+        alpn: default_imap_alpn(),
         sasl,
         id: Default::default(),
         sort: Default::default(),
@@ -50,7 +51,7 @@ pub fn smtp_to_config(w: WizardSmtpConfig) -> Result<SmtpConfig> {
         server,
         tls: Default::default(),
         starttls,
-        alpn: io_smtp::client::SmtpClientStd::default_alpn(),
+        alpn: default_smtp_alpn(),
         sasl,
     })
 }
