@@ -17,8 +17,13 @@
 //!   authentication method (SASL mechanism or HTTP scheme) among those
 //!   advertised; a detected Google or Microsoft account collapses to its
 //!   dedicated set;
-//! - a `scheme://` URL is a server to configure by hand;
+//! - a `scheme://` URL discovers from its host, its scheme narrowing the
+//!   results (`imap(s)` to IMAP + SMTP, an HTTP-family scheme to JMAP);
 //! - an existing folder is a local Maildir or m2dir.
+//!
+//! The wizard only configures what it can discover automatically. When
+//! discovery finds nothing for the given input it stops and points at the
+//! documented sample, rather than prompting for a hand-entered config.
 //!
 //! Himalaya runs no OAuth 2.0 grant itself: a grant only unlocks the
 //! external token brokers (Ortie, pizauth, oama) behind the API token
@@ -27,6 +32,8 @@
 use std::{collections::HashMap, fmt, fs, io::IsTerminal, path::Path};
 
 use anyhow::{Context, Result, bail};
+#[cfg(all(feature = "imap", feature = "smtp"))]
+use io_pim_discovery::compose::config::DiscoverySecurity;
 use pimalaya_cli::{printer::Printer, prompt, spinner::Spinner};
 use pimalaya_config::toml as config_toml;
 use serde::{Serialize, Serializer};
@@ -65,11 +72,16 @@ use crate::{
 /// The endpoint prompt label, shared by the create flow.
 const ENDPOINT_PROMPT: &str = "Email, server or URL:";
 
+/// The documented sample configuration, shown in the welcome banner and
+/// pointed at when discovery finds nothing to configure automatically.
+const CONFIG_SAMPLE_URL: &str =
+    "https://github.com/pimalaya/himalaya/blob/master/config.sample.toml";
+
 /// The backend config produced by the chosen flow, folded into a fresh
 /// [`AccountConfig`] afterwards.
 enum Chosen {
     #[cfg(all(feature = "imap", feature = "smtp"))]
-    ImapSmtp(Box<ImapConfig>, Box<SmtpConfig>),
+    ImapSmtp(Box<ImapConfig>, Option<Box<SmtpConfig>>),
     #[cfg(feature = "jmap")]
     Jmap(Box<JmapConfig>),
     #[cfg(feature = "gmail")]
@@ -152,7 +164,7 @@ fn print_welcome() {
     eprintln!("generates a ready-to-use configuration it can save for you.");
     eprintln!();
     eprintln!("Every field is documented in the sample configuration:");
-    eprintln!("  https://github.com/pimalaya/himalaya/blob/master/config.sample.toml");
+    eprintln!("  {CONFIG_SAMPLE_URL}");
     eprintln!();
 }
 
@@ -267,10 +279,8 @@ fn build_account(account_name: &str, input: &str) -> Result<(AccountConfig, bool
         aliases,
     } = if is_path(input) {
         Outcome::untested(configure_local(input)?)
-    } else if input.contains("://") {
-        Outcome::untested(configure_server(account_name, input)?)
     } else {
-        configure_email(account_name, input)?
+        configure_discovery(account_name, input)?
     };
 
     let mut account = AccountConfig {
@@ -282,7 +292,7 @@ fn build_account(account_name: &str, input: &str) -> Result<(AccountConfig, bool
         #[cfg(all(feature = "imap", feature = "smtp"))]
         Chosen::ImapSmtp(imap, smtp) => {
             account.imap = Some(*imap);
-            account.smtp = Some(*smtp);
+            account.smtp = smtp.map(|smtp| *smtp);
         }
         #[cfg(feature = "jmap")]
         Chosen::Jmap(jmap) => account.jmap = Some(*jmap),
@@ -304,24 +314,37 @@ fn build_account(account_name: &str, input: &str) -> Result<(AccountConfig, bool
     Ok((account, tested))
 }
 
-/// Runs the email-driven discovery flow: search the services reachable
-/// from the address, let the user pick one, then configure its backend
+/// Runs the discovery flow for an email, a bare domain, or a
+/// `scheme://` server URL: search the services reachable from it, keep
+/// only those supported by this build (and matching the URL scheme when
+/// one was given), let the user pick one, then configure its backend
 /// (the authentication method is picked in a second, service-specific
-/// prompt). Falls back to manual IMAP+SMTP entry when nothing is found.
-fn configure_email(account_name: &str, input: &str) -> Result<Outcome> {
-    let email = if input.contains('@') {
-        input.to_string()
+/// prompt). When nothing is discovered the wizard stops rather than
+/// prompting for a hand-entered config (see [`stop_undiscovered`]).
+fn configure_discovery(account_name: &str, input: &str) -> Result<Outcome> {
+    // A `scheme://host` URL discovers from its host, and its scheme
+    // narrows the results; an email or bare domain discovers from the
+    // domain with no scheme filter.
+    let (email, scheme) = if input.contains("://") {
+        let url = Url::parse(input).with_context(|| format!("Invalid server URL `{input}`"))?;
+        let host = url.host_str().unwrap_or_default().to_string();
+        (format!("@{host}"), Some(url.scheme().to_string()))
+    } else if input.contains('@') {
+        (input.to_string(), None)
     } else {
-        format!("@{input}")
+        (format!("@{input}"), None)
     };
 
-    let spinner = Spinner::start("Searching for email server settings");
+    let spinner = Spinner::start("Searching for server settings");
     let mut found = search::search(&email)?;
     retain_supported(&mut found);
+    if let Some(scheme) = &scheme {
+        retain_scheme(&mut found, scheme)?;
+    }
 
     if found.is_empty() {
         spinner.failure("No configuration found");
-        return Ok(Outcome::untested(manual_fallback(account_name, &email)?));
+        return stop_undiscovered(input);
     }
     spinner.success(format!("Found {} configuration(s)", found.len()));
 
@@ -329,6 +352,45 @@ fn configure_email(account_name: &str, input: &str) -> Result<Outcome> {
     let choice = prompt::item("Choose a configuration:", found, default)?;
 
     dispatch(account_name, &email, choice)
+}
+
+/// Keeps only the discovered entries a `scheme://` URL asked for: `imap`
+/// and `imaps` keep IMAP + SMTP (with `imaps` requiring an implicit-TLS
+/// IMAP endpoint), and the HTTP-family schemes keep JMAP. A proprietary
+/// entry (Gmail, Graph) is dropped, since the user named an open
+/// protocol. An unknown scheme is rejected outright.
+fn retain_scheme(found: &mut Vec<Discovered>, scheme: &str) -> Result<()> {
+    match scheme {
+        #[cfg(all(feature = "imap", feature = "smtp"))]
+        "imap" | "imaps" => {
+            let tls_only = scheme == "imaps";
+            found.retain(|entry| match &entry.kind {
+                DiscoveredKind::ImapSmtp { imap, .. } => {
+                    !tls_only || imap.security == DiscoverySecurity::Tls
+                }
+                _ => false,
+            });
+        }
+        "jmap" | "jmaps" | "http" | "https" => {
+            found.retain(|entry| matches!(entry.kind, DiscoveredKind::Jmap(_)));
+        }
+        other => bail!("Unsupported server scheme `{other}`"),
+    }
+
+    Ok(())
+}
+
+/// Stops the wizard when discovery found nothing to configure for
+/// `input`: it prints where to go next (a hand-written config, seeded
+/// from the documented sample) and errors out, rather than dropping into
+/// a hand-entry flow. Himalaya's wizard only ever configures what it can
+/// discover automatically.
+fn stop_undiscovered(input: &str) -> Result<Outcome> {
+    bail!(
+        "Could not automatically discover a configuration for `{input}`.\n\n\
+         Write your account configuration by hand instead, starting from the \
+         documented sample:\n  {CONFIG_SAMPLE_URL}"
+    )
 }
 
 /// Configures the backend behind a discovered entry. The IMAP+SMTP and
@@ -352,7 +414,7 @@ fn dispatch(account_name: &str, email: &str, choice: Discovered) -> Result<Outco
             let (imap, smtp, aliases) =
                 imap_smtp::configure_discovered(account_name, email, &choice)?;
             Ok(Outcome {
-                chosen: Chosen::ImapSmtp(Box::new(imap), Box::new(smtp)),
+                chosen: Chosen::ImapSmtp(Box::new(imap), smtp.map(Box::new)),
                 tested: true,
                 aliases,
             })
@@ -383,45 +445,6 @@ fn dispatch(account_name: &str, email: &str, choice: Discovered) -> Result<Outco
             aliases: mailbox::msgraph_aliases(),
         }),
         kind => bail!("Configuration `{kind:?}` is not supported by this build"),
-    }
-}
-
-/// Configures IMAP + SMTP by hand when discovery yields nothing.
-#[cfg(all(feature = "imap", feature = "smtp"))]
-fn manual_fallback(account_name: &str, email: &str) -> Result<Chosen> {
-    let (local_part, domain) = split_email(email);
-    let (imap, smtp) = imap_smtp::configure_manual(account_name, local_part, domain, None)?;
-    Ok(Chosen::ImapSmtp(Box::new(imap), Box::new(smtp)))
-}
-
-#[cfg(not(all(feature = "imap", feature = "smtp")))]
-fn manual_fallback(_account_name: &str, email: &str) -> Result<Chosen> {
-    bail!("No configuration discovered for `{email}`, and IMAP+SMTP is not compiled in")
-}
-
-/// Configures a server the user typed as a `scheme://` URL, routing by
-/// scheme: `imap`/`imaps` to IMAP+SMTP, an HTTP-family scheme to JMAP.
-#[cfg_attr(
-    not(any(all(feature = "imap", feature = "smtp"), feature = "jmap")),
-    allow(unused_variables)
-)]
-fn configure_server(account_name: &str, input: &str) -> Result<Chosen> {
-    let url = Url::parse(input).with_context(|| format!("Invalid server URL `{input}`"))?;
-    let domain = url.host_str().unwrap_or_default().to_string();
-
-    match url.scheme() {
-        #[cfg(all(feature = "imap", feature = "smtp"))]
-        "imap" | "imaps" => {
-            let (imap, smtp) = imap_smtp::configure_manual(account_name, "", &domain, Some(&url))?;
-            Ok(Chosen::ImapSmtp(Box::new(imap), Box::new(smtp)))
-        }
-        #[cfg(feature = "jmap")]
-        "http" | "https" | "jmap" | "jmaps" => Ok(Chosen::Jmap(Box::new(jmap::configure_manual(
-            account_name,
-            input,
-            None,
-        )?))),
-        other => bail!("Unsupported server scheme `{other}`"),
     }
 }
 
@@ -496,13 +519,6 @@ fn is_path(input: &str) -> bool {
         || input.starts_with('~')
         || input.starts_with("./")
         || input.starts_with("../")
-}
-
-/// Splits an email into its local part and domain, tolerating the
-/// bare-domain form (`@domain`) discovery synthesizes.
-#[cfg(all(feature = "imap", feature = "smtp"))]
-fn split_email(email: &str) -> (&str, &str) {
-    email.rsplit_once('@').unwrap_or(("", email))
 }
 
 #[cfg(test)]

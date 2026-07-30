@@ -1,10 +1,13 @@
 //! Local backend wizard.
 //!
 //! A typed path pointing at an existing folder configures a local
-//! store. When both are compiled in the user picks Maildir or m2dir;
-//! otherwise the sole compiled backend is used.
+//! store. The backend kind is auto-detected from the directory's on-disk
+//! markers — a `.m2store`/`.m2dir` marker means m2dir, a `cur`/`new`/`tmp`
+//! tree means Maildir. When detection is inconclusive (an empty or
+//! ambiguous directory) and both backends are compiled in, the user
+//! picks; otherwise the sole compiled backend is used.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
@@ -21,9 +24,40 @@ pub enum Local {
     M2dir(M2dirConfig),
 }
 
-/// Configures a local backend rooted at `root`.
+/// Configures a local backend rooted at `root`, auto-detecting its kind
+/// from the on-disk markers and only prompting when that is inconclusive.
 pub fn configure(root: PathBuf) -> Result<Local> {
+    if let Some(local) = detect(&root) {
+        return Ok(local);
+    }
+
     pick(root)
+}
+
+/// Detects the backend kind from `root`'s markers: the m2dir `.m2store`
+/// (store) or `.m2dir` (single mailbox) marker, or the Maildir
+/// `cur`/`new`/`tmp` tree. Returns `None` when no marker of a compiled-in
+/// backend is present, leaving the choice to [`pick`].
+#[cfg_attr(
+    not(all(feature = "maildir", feature = "m2dir")),
+    allow(unused_variables)
+)]
+fn detect(root: &Path) -> Option<Local> {
+    #[cfg(feature = "m2dir")]
+    if root.join(".m2store").exists() || root.join(".m2dir").exists() {
+        return Some(Local::M2dir(M2dirConfig {
+            root: root.to_path_buf(),
+        }));
+    }
+
+    #[cfg(feature = "maildir")]
+    if root.join("cur").is_dir() && root.join("new").is_dir() && root.join("tmp").is_dir() {
+        return Some(Local::Maildir(MaildirConfig {
+            root: root.to_path_buf(),
+        }));
+    }
+
+    None
 }
 
 #[cfg(all(feature = "maildir", feature = "m2dir"))]

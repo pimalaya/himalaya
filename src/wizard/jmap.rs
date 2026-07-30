@@ -2,8 +2,6 @@
 //!
 //! A discovery entry pins the session endpoint and the authentication
 //! method, so [`configure_discovered`] prompts only the credentials.
-//! [`configure_manual`] handles a typed server URL: it prompts the
-//! authentication strategy too.
 
 use std::collections::HashMap;
 
@@ -66,17 +64,6 @@ fn test_and_discover(config: &JmapConfig) -> Result<HashMap<String, String>> {
 
     spinner.success("JMAP connection succeeded");
     Ok(mailbox::jmap_aliases(&mut client))
-}
-
-/// Configures JMAP against a typed `server` URL: every scheme is on offer
-/// (discovery advertised none), the token flow includes the OAuth brokers.
-pub fn configure_manual(
-    account_name: &str,
-    server: &str,
-    login_hint: Option<&str>,
-) -> Result<JmapConfig> {
-    let auth = prompt_auth(account_name, login_hint, AuthCaps::default())?;
-    Ok(jmap_config(server.to_string(), auth))
 }
 
 /// Prompts the HTTP authentication scheme from `caps` (both offered when

@@ -2,27 +2,19 @@
 //!
 //! A discovery entry pins the endpoints, so [`configure_discovered`]
 //! picks the SASL mechanism, prompts its credentials and tests the IMAP
-//! connection, then asks whether SMTP shares them: if so the same
-//! credential backs both sides, otherwise the SASL prompts run again for
-//! SMTP (IMAP and SMTP may advertise different auth). The SMTP connection
-//! is tested last. [`configure_manual`] is the fallback when discovery
-//! finds nothing or the user typed an `imap://` URL: the full
-//! per-protocol prompts run, seeded from what is known.
+//! connection, then, when discovery also found a submission endpoint,
+//! asks whether SMTP shares them: if so the same credential backs both
+//! sides, otherwise the SASL prompts run again for SMTP (IMAP and SMTP
+//! may advertise different auth), and the SMTP connection is tested last.
+//! The wizard never invents an SMTP host: with no discovered submission
+//! endpoint the account is IMAP-only, and the user adds SMTP by hand.
 
 use std::collections::HashMap;
 
 use anyhow::{Result, bail};
 use io_pim_discovery::compose::config::DiscoverySecurity;
-use pimalaya_cli::{
-    prompt,
-    spinner::Spinner,
-    wizard::imap::{
-        self as imap_wizard, Encryption as ImapEncryption, ImapAuth, ImapSecret, WizardImapConfig,
-    },
-    wizard::smtp::{self as smtp_wizard, Encryption as SmtpEncryption},
-};
+use pimalaya_cli::{prompt, spinner::Spinner};
 use pimalaya_stream::sasl::SaslMechanism;
-use url::Url;
 
 use crate::{
     account::check,
@@ -31,7 +23,6 @@ use crate::{
         SaslPlainConfig, SaslScramSha256Config, SaslXoauth2Config, SmtpConfig,
     },
     wizard::{
-        account::{imap_to_config, smtp_to_config},
         mailbox,
         search::{AuthCaps, Discovered, DiscoveredKind, TcpEndpoint},
         secret,
@@ -58,7 +49,7 @@ pub fn configure_discovered(
     account_name: &str,
     email: &str,
     discovered: &Discovered,
-) -> Result<(ImapConfig, SmtpConfig, HashMap<String, String>)> {
+) -> Result<(ImapConfig, Option<SmtpConfig>, HashMap<String, String>)> {
     let DiscoveredKind::ImapSmtp { imap, smtp } = &discovered.kind else {
         bail!("Expected an IMAP + SMTP configuration");
     };
@@ -85,19 +76,26 @@ pub fn configure_discovered(
     // module), so only the always-present INBOX is pinned as the default.
     let aliases = mailbox::imap_aliases();
 
-    // NOTE: IMAP and SMTP may advertise different auth, so SMTP either
-    // reuses the IMAP credential or configures a distinct one.
-    let smtp_endpoint = smtp.clone().unwrap_or_else(|| default_smtp(email));
-    // NOTE: SMTP advertises its auth over EHLO, not the IMAP CAPABILITY
-    // probe, so its mechanism list stays keyed on discovery (probed =
-    // None), unlike the IMAP side above.
-    let smtp_sasl = if prompt::bool("Use the same credentials for SMTP?", true)? {
-        imap_sasl
-    } else {
-        prompt_sasl(account_name, login_hint.as_deref(), discovered.auth, None)?
+    // The wizard never invents an SMTP host: when discovery found no
+    // submission endpoint, the account stays IMAP-only and the user adds
+    // SMTP by hand. Otherwise configure and test it, reusing the IMAP
+    // credential unless the user opts for a distinct one — IMAP and SMTP
+    // may advertise different auth. SMTP advertises its auth over EHLO,
+    // not the IMAP CAPABILITY probe, so its mechanism list stays keyed on
+    // discovery (probed = None), unlike the IMAP side above.
+    let smtp = match smtp {
+        Some(endpoint) => {
+            let smtp_sasl = if prompt::bool("Use the same credentials for SMTP?", true)? {
+                imap_sasl
+            } else {
+                prompt_sasl(account_name, login_hint.as_deref(), discovered.auth, None)?
+            };
+            let smtp = smtp_config(endpoint, smtp_sasl);
+            test_connection("SMTP", || check::connect_smtp(&smtp))?;
+            Some(smtp)
+        }
+        None => None,
     };
-    let smtp = smtp_config(&smtp_endpoint, smtp_sasl);
-    test_connection("SMTP", || check::connect_smtp(&smtp))?;
 
     Ok((imap, smtp, aliases))
 }
@@ -277,92 +275,6 @@ fn endpoint_server(endpoint: &TcpEndpoint) -> String {
     format!("{scheme}://{}:{}", endpoint.host, endpoint.port)
 }
 
-/// Runs the full per-protocol IMAP and SMTP prompts, seeding IMAP from
-/// `imap_url` when the user typed one.
-pub fn configure_manual(
-    account_name: &str,
-    local_part: &str,
-    domain: &str,
-    imap_url: Option<&Url>,
-) -> Result<(ImapConfig, SmtpConfig)> {
-    let imap_default = imap_url.map(seed_imap);
-    let imap = imap_wizard::run(account_name, local_part, domain, imap_default.as_ref())?;
-
-    // Probe the entered server and pick a mechanism it advertises (LOGIN
-    // last) instead of assuming PLAIN; the secret the wizard collected
-    // backs whichever mechanism is chosen. No discovery ran here, so the
-    // fallback list is the full one.
-    let (server, starttls) = wizard_imap_server(&imap);
-    let probed = probe_imap_mechanisms(&server, starttls);
-    let mechanism = prompt_mechanism(AuthCaps::default(), probed.as_deref())?;
-
-    let imap_host = imap.host.clone();
-    let imap = imap_to_config(imap, mechanism)?;
-
-    // Like the discovered flow, offer to reuse the IMAP credentials for
-    // SMTP so they are entered once. The endpoint is still prompted
-    // (nothing was discovered), seeded from the IMAP host.
-    let smtp = if prompt::bool("Use the same credentials for SMTP?", true)? {
-        let sasl = imap
-            .sasl
-            .clone()
-            .expect("manual IMAP flow always sets a SASL config");
-        prompt_smtp_endpoint(&imap_host, sasl)?
-    } else {
-        let smtp = smtp_wizard::run(account_name, local_part, domain, None)?;
-        smtp_to_config(smtp)?
-    };
-
-    Ok((imap, smtp))
-}
-
-/// Prompts only the SMTP endpoint (host, encryption, port) and builds
-/// its config reusing `sasl`, the IMAP credentials, so the manual flow
-/// does not re-enter them. The host defaults to the IMAP host, the
-/// common case when a provider shares one hostname for both.
-fn prompt_smtp_endpoint(imap_host: &str, sasl: SaslConfig) -> Result<SmtpConfig> {
-    let host = prompt::text("SMTP hostname:", Some(imap_host))?;
-
-    let encryptions = [
-        SmtpEncryption::Tls,
-        SmtpEncryption::StartTls,
-        SmtpEncryption::None,
-    ];
-    let encryption = prompt::item("SMTP encryption:", encryptions, Some(SmtpEncryption::Tls))?;
-
-    let default_port = match encryption {
-        SmtpEncryption::Tls => 465,
-        SmtpEncryption::StartTls => 587,
-        SmtpEncryption::None => 25,
-    };
-    let port = prompt::u16("SMTP port:", Some(default_port))?;
-
-    let scheme = match encryption {
-        SmtpEncryption::Tls => "smtps",
-        SmtpEncryption::StartTls | SmtpEncryption::None => "smtp",
-    };
-
-    Ok(SmtpConfig {
-        server: format!("{scheme}://{host}:{port}"),
-        tls: Default::default(),
-        starttls: matches!(encryption, SmtpEncryption::StartTls),
-        alpn: io_smtp::client::SmtpClientStd::default_alpn(),
-        sasl: Some(sasl),
-    })
-}
-
-/// Fallback SMTP endpoint when discovery found IMAP but no SMTP:
-/// `smtp.<domain>` over implicit TLS.
-fn default_smtp(email: &str) -> TcpEndpoint {
-    let domain = email.rsplit_once('@').map(|(_, d)| d).unwrap_or(email);
-
-    TcpEndpoint {
-        host: format!("smtp.{domain}"),
-        port: 465,
-        security: DiscoverySecurity::Tls,
-    }
-}
-
 fn imap_config(endpoint: &TcpEndpoint, sasl: SaslConfig) -> ImapConfig {
     ImapConfig {
         server: endpoint_server(endpoint),
@@ -388,40 +300,5 @@ fn smtp_config(endpoint: &TcpEndpoint, sasl: SaslConfig) -> SmtpConfig {
         starttls: endpoint.security == DiscoverySecurity::Starttls,
         alpn: io_smtp::client::SmtpClientStd::default_alpn(),
         sasl: Some(sasl),
-    }
-}
-
-/// The `scheme://host:port` string and STARTTLS flag for a manually
-/// entered IMAP config, matching how [`imap_to_config`] builds its
-/// server URL, so the probe hits the same endpoint that gets saved.
-fn wizard_imap_server(config: &WizardImapConfig) -> (String, bool) {
-    let scheme = match config.encryption {
-        ImapEncryption::Tls => "imaps",
-        ImapEncryption::StartTls | ImapEncryption::None => "imap",
-    };
-    let server = format!("{scheme}://{}:{}", config.host, config.port);
-    let starttls = matches!(config.encryption, ImapEncryption::StartTls);
-
-    (server, starttls)
-}
-
-/// Seeds the manual IMAP prompts from a typed `imap://` / `imaps://`
-/// URL; the login and secret are left for the user.
-fn seed_imap(url: &Url) -> WizardImapConfig {
-    let encryption = match url.scheme() {
-        "imaps" => ImapEncryption::Tls,
-        _ => ImapEncryption::StartTls,
-    };
-    let port = url.port().unwrap_or(match encryption {
-        ImapEncryption::Tls => 993,
-        _ => 143,
-    });
-
-    WizardImapConfig {
-        host: url.host_str().unwrap_or_default().to_string(),
-        port,
-        encryption,
-        login: String::new(),
-        auth: ImapAuth::Password(ImapSecret::Raw(String::new().into())),
     }
 }
