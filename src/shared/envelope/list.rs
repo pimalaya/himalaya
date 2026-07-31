@@ -3,7 +3,7 @@ use std::{collections::BTreeSet, fmt};
 use anyhow::Result;
 use chrono::{DateTime, FixedOffset, Local};
 use clap::Parser;
-use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
+use comfy_table::{Cell, CellAlignment, Color, ContentArrangement, Row, Table};
 use humansize::{BINARY, format_size};
 use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
@@ -165,7 +165,7 @@ impl fmt::Display for Envelopes {
         header.push(Cell::new("SUBJECT"));
         header.push(Cell::new(if self.recipient { "TO" } else { "FROM" }));
         header.push(Cell::new("DATE"));
-        header.push(Cell::new("SIZE"));
+        header.push(Cell::new("SIZE").set_alignment(CellAlignment::Right));
 
         table
             .load_preset(&self.preset)
@@ -202,7 +202,11 @@ impl fmt::Display for Envelopes {
                     ))
                     .fg(self.colors.date),
                 );
-                row.add_cell(Cell::new(format_size(env.size, BINARY)).fg(self.colors.size));
+                row.add_cell(
+                    Cell::new(format_size(env.size, BINARY))
+                        .fg(self.colors.size)
+                        .set_alignment(CellAlignment::Right),
+                );
                 row
             }));
 
