@@ -71,7 +71,7 @@ pub fn build(args: BuilderArgs<'_>, source: Option<SourceArgs<'_>>) -> Result<Ve
     let mut builder = MessageBuilder::new();
 
     if let Some(from) = args.from {
-        builder = builder.from(from);
+        builder = builder.from(parse_mailbox(from)?);
     }
     if !args.to.is_empty() {
         builder = builder.to(addresses(args.to));
@@ -160,6 +160,31 @@ pub fn build(args: BuilderArgs<'_>, source: Option<SourceArgs<'_>>) -> Result<Ve
     builder
         .write_to_vec()
         .map_err(|err| anyhow!("serialize composed message: {err}"))
+}
+
+fn parse_mailbox(value: &str) -> Result<Address<'static>> {
+    let synthetic = format!("From: {value}\r\n\r\n");
+    let parsed = MessageParser::new()
+        .parse(synthetic.as_bytes())
+        .ok_or_else(|| anyhow!("Could not parse address `{value}`"))?;
+
+    let mailbox = match parsed.from() {
+        Some(mail_parser::Address::List(list)) => list.first(),
+        Some(mail_parser::Address::Group(groups)) => {
+            groups.first().and_then(|g| g.addresses.first())
+        }
+        None => None,
+    }
+    .ok_or_else(|| anyhow!("Could not parse address `{value}`"))?;
+
+    let email = mailbox
+        .address
+        .clone()
+        .ok_or_else(|| anyhow!("Address `{value}` has no email"))?
+        .into_owned();
+    let name = mailbox.name.clone().map(|s| s.into_owned());
+
+    Ok(Address::new_address(name, email))
 }
 
 fn addresses(values: &[String]) -> Address<'static> {
@@ -556,6 +581,40 @@ Original body line.\r\n";
         push_msg_id(&mut out, "  ");
         push_msg_id(&mut out, "c@e");
         assert_eq!(out, "<a@e> <b@e> <c@e>");
+    }
+
+    #[test]
+    fn parse_mailbox_splits_name_and_address() {
+        let addr = parse_mailbox("Truls Borgvall <truls@example.com>").unwrap();
+        let Address::Address(email) = addr else {
+            panic!("expected a single address");
+        };
+        assert_eq!(email.name.as_deref(), Some("Truls Borgvall"));
+        assert_eq!(email.email, "truls@example.com");
+
+        let addr = parse_mailbox("truls@example.com").unwrap();
+        let Address::Address(email) = addr else {
+            panic!("expected a single address");
+        };
+        assert_eq!(email.name, None);
+        assert_eq!(email.email, "truls@example.com");
+    }
+
+    #[test]
+    fn compose_from_with_display_name_is_not_corrupted() {
+        let empty: Vec<String> = Vec::new();
+        let raw = build(
+            args("Truls Borgvall <truls@example.com>", &empty, None, "hi"),
+            None,
+        )
+        .unwrap();
+        let text = String::from_utf8(raw.clone()).unwrap();
+        assert!(!text.contains("<Truls Borgvall <truls@example.com>>"));
+
+        let msg = parse(&raw);
+        let from = msg.from().unwrap().first().unwrap();
+        assert_eq!(from.name(), Some("Truls Borgvall"));
+        assert_eq!(from.address(), Some("truls@example.com"));
     }
 
     #[test]
