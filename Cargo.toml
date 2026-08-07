@@ -77,6 +77,3 @@ url = { version = "2.2", features = ["serde"] }
 
 [target.'cfg(windows)'.dependencies]
 uds_windows = "1"
-
-[patch.crates-io]
-io-maildir.git = "https://github.com/pimalaya/io-maildir"

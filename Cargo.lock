@@ -1188,8 +1188,8 @@ dependencies = [
 
 [[package]]
 name = "io-maildir"
-version = "0.2.0"
-source = "git+https://github.com/pimalaya/io-maildir#6a17220969665ac04740b47538aecf94e18eaedf"
+version = "0.2.1"
+source = "git+https://github.com/pimalaya/io-maildir#08b320cf1e3a3d4d5500964bdb39a88463740676"
 dependencies = [
  "gethostname",
  "log",
