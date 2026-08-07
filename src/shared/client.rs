@@ -29,6 +29,8 @@ use crate::m2dir::client::M2dirClient;
 use crate::maildir::client::MaildirClient;
 #[cfg(feature = "msgraph")]
 use crate::msgraph::client::MsgraphClient;
+#[cfg(feature = "pimdir")]
+use crate::pimdir::client::PimdirClient;
 // `Envelope`/`Mailbox`/`FlagOp`/`SearchEmailsQuery` are only used by the
 // mailbox-dispatch methods, so they carry the same `backend` gate;
 // `Flag` is also used by the always-compiled `add_message`.
@@ -79,6 +81,8 @@ enum BackendClient {
     Maildir(Box<MaildirClient>),
     #[cfg(feature = "m2dir")]
     M2dir(Box<M2dirClient>),
+    #[cfg(feature = "pimdir")]
+    Pimdir(Box<PimdirClient>),
 }
 
 impl EmailClient {
@@ -138,6 +142,8 @@ impl EmailClient {
             BackendClient::Maildir(client) => client.list_mailboxes(with_counts),
             #[cfg(feature = "m2dir")]
             BackendClient::M2dir(client) => client.list_mailboxes(with_counts),
+            #[cfg(feature = "pimdir")]
+            BackendClient::Pimdir(client) => client.list_mailboxes(with_counts),
         }
     }
 
@@ -177,6 +183,10 @@ impl EmailClient {
             BackendClient::M2dir(client) => {
                 client.list_envelopes(mailbox, page, page_size, with_attachment)
             }
+            #[cfg(feature = "pimdir")]
+            BackendClient::Pimdir(client) => {
+                client.list_envelopes(mailbox, page, page_size, with_attachment)
+            }
         }
     }
 
@@ -208,6 +218,10 @@ impl EmailClient {
             }
             #[cfg(feature = "m2dir")]
             BackendClient::M2dir(client) => {
+                client.search_envelopes(mailbox, query, page, page_size, with_attachment)
+            }
+            #[cfg(feature = "pimdir")]
+            BackendClient::Pimdir(client) => {
                 client.search_envelopes(mailbox, query, page, page_size, with_attachment)
             }
             #[cfg(feature = "gmail")]
@@ -243,6 +257,8 @@ impl EmailClient {
             BackendClient::Maildir(client) => client.store_flags(mailbox, ids, flags, op),
             #[cfg(feature = "m2dir")]
             BackendClient::M2dir(client) => client.store_flags(mailbox, ids, flags, op),
+            #[cfg(feature = "pimdir")]
+            BackendClient::Pimdir(client) => client.store_flags(mailbox, ids, flags, op),
         }
     }
 
@@ -264,6 +280,8 @@ impl EmailClient {
             BackendClient::Maildir(client) => client.get_message(mailbox, id, seen),
             #[cfg(feature = "m2dir")]
             BackendClient::M2dir(client) => client.get_message(mailbox, id, seen),
+            #[cfg(feature = "pimdir")]
+            BackendClient::Pimdir(client) => client.get_message(mailbox, id, seen),
         }
     }
 
@@ -281,6 +299,8 @@ impl EmailClient {
             BackendClient::Maildir(client) => client.add_message(mailbox, flags, raw),
             #[cfg(feature = "m2dir")]
             BackendClient::M2dir(client) => client.add_message(mailbox, flags, raw),
+            #[cfg(feature = "pimdir")]
+            BackendClient::Pimdir(client) => client.add_message(mailbox, flags, raw),
             #[cfg(feature = "gmail")]
             BackendClient::Gmail(_) => bail!("Gmail does not support adding messages"),
             #[cfg(feature = "msgraph")]
@@ -313,6 +333,8 @@ impl EmailClient {
             BackendClient::Maildir(client) => client.copy_messages(from, to, ids),
             #[cfg(feature = "m2dir")]
             BackendClient::M2dir(client) => client.copy_messages(from, to, ids),
+            #[cfg(feature = "pimdir")]
+            BackendClient::Pimdir(client) => client.copy_messages(from, to, ids),
         }
     }
 
@@ -336,6 +358,8 @@ impl EmailClient {
             BackendClient::Maildir(client) => client.move_messages(from, to, ids),
             #[cfg(feature = "m2dir")]
             BackendClient::M2dir(client) => client.move_messages(from, to, ids),
+            #[cfg(feature = "pimdir")]
+            BackendClient::Pimdir(client) => client.move_messages(from, to, ids),
         }
     }
 
@@ -359,6 +383,8 @@ impl EmailClient {
             BackendClient::Maildir(_) => Ok(None),
             #[cfg(feature = "m2dir")]
             BackendClient::M2dir(_) => Ok(None),
+            #[cfg(feature = "pimdir")]
+            BackendClient::Pimdir(_) => Ok(None),
         }
     }
 
@@ -381,6 +407,8 @@ impl EmailClient {
             BackendClient::Maildir(client) => client.delete_messages(mailbox, ids).map(|()| true),
             #[cfg(feature = "m2dir")]
             BackendClient::M2dir(client) => client.delete_messages(mailbox, ids).map(|()| true),
+            #[cfg(feature = "pimdir")]
+            BackendClient::Pimdir(client) => client.delete_messages(mailbox, ids).map(|()| true),
         }
     }
 
@@ -463,6 +491,7 @@ impl EmailClient {
     not(any(
         feature = "maildir",
         feature = "m2dir",
+        feature = "pimdir",
         feature = "jmap",
         feature = "gmail",
         feature = "msgraph",
@@ -490,6 +519,15 @@ fn select_storage(
         return Ok(Some(BackendClient::M2dir(Box::new(M2dirClient::new(
             config,
         )))));
+    }
+
+    #[cfg(feature = "pimdir")]
+    if backend.allows_pimdir()
+        && let Some(config) = account_config.pimdir.take()
+    {
+        return Ok(Some(BackendClient::Pimdir(Box::new(PimdirClient::new(
+            config,
+        )?))));
     }
 
     #[cfg(feature = "jmap")]

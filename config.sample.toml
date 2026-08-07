@@ -343,6 +343,30 @@ imap.sasl.plain.password.raw = "***"
 #maildir.root = "~/Mail/example"
 
 # --------------------------------------------------------------------------------
+# pimdir config
+# https://github.com/pimalaya/pimdir
+# --------------------------------------------------------------------------------
+
+# A local pimdir store (SQLite index + content-addressed blobs) that the sync
+# engine (Neverest) populates: read mail offline and stage edits (flags, moves,
+# deletes, appends) that the next sync pushes to the server. To read/browse an
+# account you sync with Neverest, this single line is all you need — no network.
+
+# The store directory — the one Neverest writes, holding `pimdir.db` and
+# `objects/`. By default Neverest stores it under the XDG state dir per account:
+# `~/.local/state/neverest/<account>/` (or the `store.root` you set in the
+# Neverest config).
+#pimdir.root = "~/.local/state/neverest/example"
+
+# Optional. The replica source this client opens the store as, which labels the
+# edits it stages (reads never need it). Leave it unset: it is auto-detected from
+# the store — a store synced as a single source (the usual case) is opened as that
+# source, so staged edits propagate with no configuration. Set it only to
+# disambiguate a store synced from two sources.
+#pimdir.source = "left"
+#pimdir.source = "right"
+
+# --------------------------------------------------------------------------------
 # SMTP config
 # https://www.iana.org/go/rfc5321
 # --------------------------------------------------------------------------------

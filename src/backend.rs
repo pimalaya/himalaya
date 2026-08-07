@@ -21,6 +21,7 @@ pub enum Backend {
     Msgraph,
     Maildir,
     M2dir,
+    Pimdir,
     Smtp,
 }
 
@@ -57,6 +58,11 @@ impl Backend {
         matches!(self, Self::Auto | Self::M2dir)
     }
 
+    /// Whether the pimdir arm of a shared command is allowed to run.
+    pub fn allows_pimdir(self) -> bool {
+        matches!(self, Self::Auto | Self::Pimdir)
+    }
+
     /// Whether the SMTP arm of a shared command is allowed to run.
     pub fn allows_smtp(self) -> bool {
         matches!(self, Self::Auto | Self::Smtp)
@@ -73,6 +79,7 @@ impl fmt::Display for Backend {
             Self::Msgraph => write!(f, "msgraph"),
             Self::Maildir => write!(f, "maildir"),
             Self::M2dir => write!(f, "m2dir"),
+            Self::Pimdir => write!(f, "pimdir"),
             Self::Smtp => write!(f, "smtp"),
         }
     }

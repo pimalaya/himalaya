@@ -12,7 +12,7 @@ homepage = "https://pimalaya.org"
 repository = "https://github.com/pimalaya/himalaya"
 
 [features]
-default = ["rustls-ring", "jmap", "imap", "smtp", "gmail", "msgraph", "maildir", "m2dir"]
+default = ["rustls-ring", "jmap", "imap", "smtp", "gmail", "msgraph", "maildir", "m2dir", "pimdir"]
 imap = ["dep:io-imap", "dep:mail-parser", "dep:rfc2047-decoder", "io-imap/client"]
 jmap = ["dep:base64", "dep:io-jmap", "dep:mail-parser", "io-jmap/client", "io-jmap/schemars"]
 gmail = ["dep:io-gmail", "dep:mail-parser", "io-gmail/client", "io-gmail/schemars"]
@@ -20,6 +20,7 @@ msgraph = ["dep:io-msgraph", "dep:mail-parser", "io-msgraph/client", "io-msgraph
 smtp = ["dep:io-smtp", "dep:mail-parser"]
 maildir = ["dep:convert_case", "dep:io-maildir", "dep:mail-parser", "io-maildir/client", "io-maildir/parser"]
 m2dir = ["dep:convert_case", "dep:io-m2dir", "dep:mail-parser", "io-m2dir/client"]
+pimdir = ["dep:io-pimdir", "dep:io-replica", "dep:mail-parser"]
 native-tls = ["pimalaya-stream/native-tls", "io-pim-discovery/native-tls", "io-imap?/native-tls", "io-jmap?/native-tls", "io-gmail?/native-tls", "io-msgraph?/native-tls", "io-smtp?/native-tls"]
 rustls-aws = ["pimalaya-stream/rustls-aws", "io-pim-discovery/rustls-aws", "io-imap?/rustls-aws", "io-jmap?/rustls-aws", "io-gmail?/rustls-aws", "io-msgraph?/rustls-aws", "io-smtp?/rustls-aws"]
 rustls-ring = ["pimalaya-stream/rustls-ring", "io-pim-discovery/rustls-ring", "io-imap?/rustls-ring", "io-jmap?/rustls-ring", "io-gmail?/rustls-ring", "io-msgraph?/rustls-ring", "io-smtp?/rustls-ring"]
@@ -47,11 +48,13 @@ humansize = "2"
 ariadne = "0.6"
 chumsky = { version = "0.13", default-features = false }
 io-gmail = { version = "0.2", default-features = false, optional = true }
-io-imap = { version = "0.3", default-features = false, optional = true }
+io-imap = { version = "0.4", default-features = false, optional = true }
 io-jmap = { version = "0.2", default-features = false, optional = true }
 io-m2dir = { version = "0.2", default-features = false, optional = true }
 io-msgraph = { version = "0.2", default-features = false, optional = true }
 io-maildir = { version = "0.2", default-features = false, optional = true }
+io-pimdir = { version = "0.1", default-features = false, features = ["client"], optional = true }
+io-replica = { version = "0.2", default-features = false, optional = true }
 io-smtp = { version = "0.2", default-features = false, optional = true }
 log = "0.4"
 mail-builder = "0.4"
@@ -61,7 +64,7 @@ open = "5"
 pimalaya-cli = { version = "0.1", default-features = false, features = ["terminal", "table", "prompt", "wizard", "imap", "smtp", "jmap", "spinner"] }
 pimalaya-config = { version = "0.1", default-features = false, features = ["toml", "secret"] }
 pimalaya-stream = { version = "0.1", default-features = false, features = ["std"] }
-io-pim-discovery = { version = "0.3", default-features = false, features = ["autoconfig", "pacc", "rfc6186", "rfc8620"] }
+io-pim-discovery = { version = "0.4", default-features = false, features = ["autoconfig", "pacc", "rfc6186", "rfc8620"] }
 rfc2047-decoder = { version = "1", optional = true }
 schemars = { version = "1", features = ["chrono04"] }
 secrecy = "0.10"
@@ -76,6 +79,4 @@ url = { version = "2.2", features = ["serde"] }
 uds_windows = "1"
 
 [patch.crates-io]
-io-imap.git = "https://github.com/pimalaya/io-imap"
 io-maildir.git = "https://github.com/pimalaya/io-maildir"
-io-pim-discovery.git = "https://github.com/pimalaya/io-pim-discovery"

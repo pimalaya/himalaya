@@ -88,6 +88,8 @@ mod m2dir;
 mod maildir;
 #[cfg(feature = "msgraph")]
 mod msgraph;
+#[cfg(feature = "pimdir")]
+mod pimdir;
 mod shared;
 #[cfg(feature = "smtp")]
 mod smtp;

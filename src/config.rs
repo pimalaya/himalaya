@@ -140,6 +140,8 @@ pub struct AccountConfig {
     #[allow(unused)]
     pub m2dir: Option<M2dirConfig>,
     #[allow(unused)]
+    pub pimdir: Option<PimdirConfig>,
+    #[allow(unused)]
     pub smtp: Option<SmtpConfig>,
 }
 
@@ -447,6 +449,26 @@ pub struct MaildirConfig {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct M2dirConfig {
     pub root: PathBuf,
+}
+
+/// pimdir configuration: a local [pimdir](https://github.com/pimalaya/pimdir)
+/// store (SQLite index + content-addressed blobs) used as an offline cache the
+/// sync engine (Neverest) populates.
+#[allow(unused)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct PimdirConfig {
+    /// The store directory (holds `pimdir.db` and `objects/`).
+    pub root: PathBuf,
+    /// The replica source name this client opens the store as. Reads are
+    /// source-independent, but a staged write (flag/move/delete/append) is
+    /// attributed to this source, so for the change to propagate it must match
+    /// the source name the sync engine drives for this device. Usually left
+    /// unset: it is auto-detected from the store — a store synced as a single
+    /// source is opened as that source. Set it only to disambiguate a store
+    /// synced from two sources.
+    #[serde(default)]
+    pub source: Option<String>,
 }
 
 /// SMTP configuration.
