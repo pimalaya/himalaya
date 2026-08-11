@@ -4,8 +4,10 @@ use io_jmap::rfc8621::email_submission::get::JmapEmailSubmissionGetOptions;
 use log::warn;
 use pimalaya_cli::printer::Printer;
 
-use crate::account::context::Account;
-use crate::jmap::{client::JmapClient, submission::query::SubmissionsTable};
+use crate::{
+    account::context::Account,
+    jmap::{client::JmapClient, submission::query::SubmissionsTable},
+};
 
 /// Get JMAP email submissions by ID (EmailSubmission/get).
 #[derive(Debug, Parser)]

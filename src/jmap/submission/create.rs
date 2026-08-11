@@ -7,9 +7,9 @@ use io_jmap::rfc8621::email_submission::{
 };
 use pimalaya_cli::printer::Printer;
 
-use crate::account::context::Account;
-use crate::jmap::{
-    client::JmapClient, error::format_set_error, submission::query::SubmissionsTable,
+use crate::{
+    account::context::Account,
+    jmap::{client::JmapClient, error::format_set_error, submission::query::SubmissionsTable},
 };
 
 /// Submit a JMAP email for sending (EmailSubmission/set).

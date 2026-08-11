@@ -7,12 +7,14 @@ use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::account::context::Account;
-use crate::m2dir::{
-    arg::{M2dirNameFlag, MessageIdArg},
-    client::M2dirClient,
+use crate::{
+    account::context::Account,
+    m2dir::{
+        arg::{M2dirNameFlag, MessageIdArg},
+        client::M2dirClient,
+    },
+    shared::table::style_from_preset,
 };
-use crate::shared::table::style_from_preset;
 
 /// List flags set on an m2dir message.
 ///

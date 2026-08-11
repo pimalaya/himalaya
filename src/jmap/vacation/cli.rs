@@ -2,10 +2,12 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
-use crate::account::context::Account;
-use crate::jmap::{
-    client::JmapClient,
-    vacation::{get::JmapVacationGetCommand, set::JmapVacationSetCommand},
+use crate::{
+    account::context::Account,
+    jmap::{
+        client::JmapClient,
+        vacation::{get::JmapVacationGetCommand, set::JmapVacationSetCommand},
+    },
 };
 
 /// Manage JMAP vacation response.

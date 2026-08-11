@@ -2,28 +2,31 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
-use crate::account::context::Account;
-use crate::imap::{
-    client::ImapClient,
-    envelope::{
-        search::ImapEnvelopeSearchCommand, sort::ImapEnvelopeSortCommand,
-        thread::ImapEnvelopeThreadCommand,
+use crate::{
+    account::context::Account,
+    imap::{
+        client::ImapClient,
+        envelope::{
+            search::ImapEnvelopeSearchCommand, sort::ImapEnvelopeSortCommand,
+            thread::ImapEnvelopeThreadCommand,
+        },
+        fetch::ImapFetchCommand,
+        flag::{list::ImapFlagListCommand, store::ImapStoreCommand},
+        id::ImapIdCommand,
+        mailbox::{
+            close::ImapMailboxCloseCommand, create::ImapMailboxCreateCommand,
+            delete::ImapMailboxDeleteCommand, expunge::ImapMailboxExpungeCommand,
+            list::ImapMailboxListCommand, rename::ImapMailboxRenameCommand,
+            select::ImapMailboxSelectCommand, status::ImapMailboxStatusCommand,
+            subscribe::ImapMailboxSubscribeCommand, unselect::ImapMailboxUnselectCommand,
+            unsubscribe::ImapMailboxUnsubscribeCommand,
+        },
+        message::{
+            copy::ImapMessageCopyCommand, r#move::ImapMessageMoveCommand,
+            save::ImapMessageSaveCommand,
+        },
+        raw::ImapRawCommand,
     },
-    fetch::ImapFetchCommand,
-    flag::{list::ImapFlagListCommand, store::ImapStoreCommand},
-    id::ImapIdCommand,
-    mailbox::{
-        close::ImapMailboxCloseCommand, create::ImapMailboxCreateCommand,
-        delete::ImapMailboxDeleteCommand, expunge::ImapMailboxExpungeCommand,
-        list::ImapMailboxListCommand, rename::ImapMailboxRenameCommand,
-        select::ImapMailboxSelectCommand, status::ImapMailboxStatusCommand,
-        subscribe::ImapMailboxSubscribeCommand, unselect::ImapMailboxUnselectCommand,
-        unsubscribe::ImapMailboxUnsubscribeCommand,
-    },
-    message::{
-        copy::ImapMessageCopyCommand, r#move::ImapMessageMoveCommand, save::ImapMessageSaveCommand,
-    },
-    raw::ImapRawCommand,
 };
 
 /// IMAP-specific API.

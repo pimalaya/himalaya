@@ -375,13 +375,14 @@ pub struct ImapConfig {
     /// optional STARTTLS upgrade) or `imaps://` (implicit TLS) scheme
     /// used verbatim. Mirrors [`JmapConfig::server`].
     pub server: String,
-
+    /// TLS provider and custom certificate used by the connection.
     #[serde(default)]
     pub tls: TlsConfig,
+    /// Whether to upgrade the connection with `STARTTLS` after the
+    /// greeting. Only valid when the server resolves to `imap://`.
     #[serde(default, skip_serializing_if = "is_default")]
     pub starttls: bool,
-
-    /// ALPN protocol identifiers offered during the TLS handshake.  Defaults to
+    /// ALPN protocol identifiers offered during the TLS handshake. Defaults to
     /// `["imap"]` (RFC 7595, IANA registry). Set to `[]` to skip ALPN
     /// negotiation entirely. Only relevant for the rustls provider;
     /// `native-tls` ignores ALPN.
@@ -390,25 +391,21 @@ pub struct ImapConfig {
         skip_serializing_if = "is_default_imap_alpn"
     )]
     pub alpn: Vec<String>,
-
     /// Optional SASL credentials. When omitted, the connection skips
     /// authentication entirely (no `AUTHENTICATE` command is sent); to
     /// advertise the ANONYMOUS mechanism explicitly, set `sasl.anonymous = {}`.
     pub sasl: Option<SaslConfig>,
-
     /// RFC 4959 SASL-IR quirk. Left unset, follows the advertised `SASL-IR`
     /// capability; `false` waits for the server's continuation request rather
-    /// than sending credentials inline with `AUTHENTICATE`, `true` always
-    /// inlines them. Coremail (126.com, 163.com) advertises it falsely.
+    /// than inlining credentials with `AUTHENTICATE`. Coremail (126.com,
+    /// 163.com) advertises it falsely.
     #[serde(default, skip_serializing_if = "is_default")]
     pub sasl_ir: Option<bool>,
-
     /// RFC 2971 `ID` extension quirks. Some providers (notably mail.qq.com,
     /// fastmail) require an `ID` exchange straight after authentication; set
     /// `id.auto = true` to opt in.
     #[serde(default)]
     pub id: ImapIdConfig,
-
     /// RFC 5256 `SORT` extension config.
     #[serde(default)]
     pub sort: ImapSortConfig,

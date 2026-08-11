@@ -2,11 +2,13 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
-use crate::account::context::Account;
-use crate::gmail::{
-    attachments::GmailAttachmentsCommand, client::GmailClient, drafts::GmailDraftsCommand,
-    history::GmailHistoryCommand, labels::GmailLabelsCommand, messages::GmailMessagesCommand,
-    profile::GmailProfileCommand, settings::GmailSettingsCommand, threads::GmailThreadsCommand,
+use crate::{
+    account::context::Account,
+    gmail::{
+        attachments::GmailAttachmentsCommand, client::GmailClient, drafts::GmailDraftsCommand,
+        history::GmailHistoryCommand, labels::GmailLabelsCommand, messages::GmailMessagesCommand,
+        profile::GmailProfileCommand, settings::GmailSettingsCommand, threads::GmailThreadsCommand,
+    },
 };
 
 /// Gmail-specific API.

@@ -2,12 +2,14 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
-use crate::account::context::Account;
-use crate::maildir::{
-    client::MaildirClient,
-    flag::{
-        add::MaildirFlagAddCommand, list::MaildirFlagListCommand, remove::MaildirFlagRemoveCommand,
-        set::MaildirFlagSetCommand,
+use crate::{
+    account::context::Account,
+    maildir::{
+        client::MaildirClient,
+        flag::{
+            add::MaildirFlagAddCommand, list::MaildirFlagListCommand,
+            remove::MaildirFlagRemoveCommand, set::MaildirFlagSetCommand,
+        },
     },
 };
 

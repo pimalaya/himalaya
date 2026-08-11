@@ -9,9 +9,9 @@ use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::account::context::Account;
-use crate::jmap::client::JmapClient;
-use crate::shared::table::style_from_preset;
+use crate::{
+    account::context::Account, jmap::client::JmapClient, shared::table::style_from_preset,
+};
 
 /// Get JMAP threads by ID (Thread/get).
 ///

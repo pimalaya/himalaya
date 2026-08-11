@@ -2,14 +2,16 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
-use crate::account::context::Account;
-use crate::msgraph::{
-    client::MsgraphClient,
-    mail_folder::{
-        child_folders::MsgraphChildFoldersListCommand, copy::MsgraphMailFolderCopyCommand,
-        create::MsgraphMailFolderCreateCommand, delete::MsgraphMailFolderDeleteCommand,
-        get::MsgraphMailFolderGetCommand, list::MsgraphMailFolderListCommand,
-        r#move::MsgraphMailFolderMoveCommand, rename::MsgraphMailFolderRenameCommand,
+use crate::{
+    account::context::Account,
+    msgraph::{
+        client::MsgraphClient,
+        mail_folder::{
+            child_folders::MsgraphChildFoldersListCommand, copy::MsgraphMailFolderCopyCommand,
+            create::MsgraphMailFolderCreateCommand, delete::MsgraphMailFolderDeleteCommand,
+            get::MsgraphMailFolderGetCommand, list::MsgraphMailFolderListCommand,
+            r#move::MsgraphMailFolderMoveCommand, rename::MsgraphMailFolderRenameCommand,
+        },
     },
 };
 

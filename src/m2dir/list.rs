@@ -7,9 +7,9 @@ use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::account::context::Account;
-use crate::m2dir::client::M2dirClient;
-use crate::shared::table::style_from_preset;
+use crate::{
+    account::context::Account, m2dir::client::M2dirClient, shared::table::style_from_preset,
+};
 
 /// List m2dir folders found under the store root.
 #[derive(Debug, Parser)]

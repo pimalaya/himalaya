@@ -15,13 +15,15 @@ use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::account::context::Account;
-use crate::imap::{
-    client::ImapClient,
-    envelope::search::SearchCriteriaArgs,
-    mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
+use crate::{
+    account::context::Account,
+    imap::{
+        client::ImapClient,
+        envelope::search::SearchCriteriaArgs,
+        mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
+    },
+    shared::table::style_from_preset,
 };
-use crate::shared::table::style_from_preset;
 
 /// Sort IMAP messages (SORT, RFC 5256).
 ///

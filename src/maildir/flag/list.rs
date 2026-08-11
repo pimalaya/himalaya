@@ -8,8 +8,7 @@ use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::account::context::Account;
-use crate::shared::table::style_from_preset;
+use crate::{account::context::Account, shared::table::style_from_preset};
 
 /// List the standard Maildir flags.
 ///

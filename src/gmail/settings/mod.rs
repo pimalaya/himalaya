@@ -13,16 +13,18 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
-use crate::account::context::Account;
-use crate::gmail::{
-    client::GmailClient,
-    settings::{
-        autoforwarding::GmailSettingsAutoForwardingCommand,
-        delegates::GmailSettingsDelegatesCommand, filters::GmailSettingsFiltersCommand,
-        forwarding_addresses::GmailSettingsForwardingAddressesCommand,
-        imap::GmailSettingsImapCommand, language::GmailSettingsLanguageCommand,
-        pop::GmailSettingsPopCommand, sendas::GmailSettingsSendAsCommand,
-        vacation::GmailSettingsVacationCommand,
+use crate::{
+    account::context::Account,
+    gmail::{
+        client::GmailClient,
+        settings::{
+            autoforwarding::GmailSettingsAutoForwardingCommand,
+            delegates::GmailSettingsDelegatesCommand, filters::GmailSettingsFiltersCommand,
+            forwarding_addresses::GmailSettingsForwardingAddressesCommand,
+            imap::GmailSettingsImapCommand, language::GmailSettingsLanguageCommand,
+            pop::GmailSettingsPopCommand, sendas::GmailSettingsSendAsCommand,
+            vacation::GmailSettingsVacationCommand,
+        },
     },
 };
 

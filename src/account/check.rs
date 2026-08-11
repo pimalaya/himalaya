@@ -9,6 +9,8 @@ use pimalaya_stream::sasl::SaslMechanism;
 use schemars::JsonSchema;
 use serde::Serialize;
 
+#[cfg(feature = "imap")]
+use crate::config::ImapConfig;
 use crate::{
     backend::Backend,
     config::{AccountConfig, Config},
@@ -166,23 +168,21 @@ pub fn test_account(account_config: &AccountConfig) -> Result<()> {
 }
 
 #[cfg(feature = "imap")]
-pub(crate) fn connect_imap(imap_config: &crate::config::ImapConfig) -> Result<()> {
-    use io_imap::client::{ImapClientStd, ImapClientStdConnectOptions};
+pub(crate) fn connect_imap(imap_config: &ImapConfig) -> Result<()> {
+    use io_imap::client::{ImapClientStd, ImapClientStdConnectOptions, default_port};
     use pimalaya_stream::sasl::Sasl;
 
-    use crate::imap::id::resolve_auto_id_params;
+    use crate::imap::{client::parse_imap_server, id::resolve_auto_id_params};
 
     let tls = imap_config.tls.clone().into_tls(imap_config.alpn.clone());
     let auto_id = resolve_auto_id_params(&imap_config.id)?;
-    let server = crate::imap::client::parse_imap_server(&imap_config.server)?;
+    let server = parse_imap_server(&imap_config.server)?;
     let sasl: Option<Sasl> = imap_config
         .sasl
         .clone()
         .map(|cfg| {
             let host = server.host_str().unwrap_or_default();
-            let port = server
-                .port()
-                .unwrap_or(io_imap::client::default_port(server.scheme()));
+            let port = server.port().unwrap_or(default_port(server.scheme()));
             cfg.try_into_sasl(host, port)
         })
         .transpose()?;
@@ -204,15 +204,15 @@ pub(crate) fn connect_imap(imap_config: &crate::config::ImapConfig) -> Result<()
 #[cfg(feature = "imap")]
 pub(crate) fn probe_imap_mechanisms(server: &str, starttls: bool) -> Result<Vec<SaslMechanism>> {
     use io_imap::{
-        client::{ImapClientStd, ImapClientStdConnectOptions},
+        client::{ImapClientStd, ImapClientStdConnectOptions, default_alpn},
         rfc3501::capability::available_auth_mechanisms,
     };
     use pimalaya_stream::sasl::Sasl;
 
-    use crate::config::TlsConfig;
+    use crate::{config::TlsConfig, imap::client::parse_imap_server};
 
-    let tls = TlsConfig::default().into_tls(io_imap::client::default_alpn());
-    let server = crate::imap::client::parse_imap_server(server)?;
+    let tls = TlsConfig::default().into_tls(default_alpn());
+    let server = parse_imap_server(server)?;
     let opts = ImapClientStdConnectOptions {
         starttls,
         ..Default::default()

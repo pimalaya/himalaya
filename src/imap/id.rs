@@ -14,8 +14,10 @@ use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::account::context::Account;
-use crate::{config::ImapIdConfig, imap::client::ImapClient, shared::table::style_from_preset};
+use crate::{
+    account::context::Account, config::ImapIdConfig, imap::client::ImapClient,
+    shared::table::style_from_preset,
+};
 
 /// Get information about the IMAP server.
 ///

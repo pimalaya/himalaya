@@ -3,10 +3,12 @@ use clap::Parser;
 use log::warn;
 use pimalaya_cli::printer::Printer;
 
-use crate::account::context::Account;
-use crate::jmap::{
-    client::JmapClient,
-    email::query::{EmailsChars, EmailsColors, EmailsTable},
+use crate::{
+    account::context::Account,
+    jmap::{
+        client::JmapClient,
+        email::query::{EmailsChars, EmailsColors, EmailsTable},
+    },
 };
 
 /// Get JMAP emails by ID (Email/get).

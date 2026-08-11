@@ -2,13 +2,15 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
-use crate::account::context::Account;
-use crate::jmap::{
-    client::JmapClient,
-    mailbox::{
-        create::JmapMailboxCreateCommand, destroy::JmapMailboxDestroyCommand,
-        get::JmapMailboxGetCommand, query::JmapMailboxQueryCommand,
-        update::JmapMailboxUpdateCommand,
+use crate::{
+    account::context::Account,
+    jmap::{
+        client::JmapClient,
+        mailbox::{
+            create::JmapMailboxCreateCommand, destroy::JmapMailboxDestroyCommand,
+            get::JmapMailboxGetCommand, query::JmapMailboxQueryCommand,
+            update::JmapMailboxUpdateCommand,
+        },
     },
 };
 

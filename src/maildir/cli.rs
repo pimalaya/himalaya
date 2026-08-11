@@ -2,12 +2,14 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
-use crate::account::context::Account;
-use crate::maildir::{
-    client::MaildirClient, create::MaildirMailboxCreateCommand,
-    delete::MaildirMailboxDeleteCommand, flag::cli::MaildirFlagCommand,
-    list::MaildirMailboxListCommand, message::cli::MaildirMessageCommand,
-    rename::MaildirMailboxRenameCommand,
+use crate::{
+    account::context::Account,
+    maildir::{
+        client::MaildirClient, create::MaildirMailboxCreateCommand,
+        delete::MaildirMailboxDeleteCommand, flag::cli::MaildirFlagCommand,
+        list::MaildirMailboxListCommand, message::cli::MaildirMessageCommand,
+        rename::MaildirMailboxRenameCommand,
+    },
 };
 
 /// Maildir-specific API.

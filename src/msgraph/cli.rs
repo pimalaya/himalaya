@@ -2,11 +2,13 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
-use crate::account::context::Account;
-use crate::msgraph::{
-    attachment::cli::MsgraphAttachmentCommand, client::MsgraphClient,
-    mail_folder::cli::MsgraphMailFolderCommand, message::cli::MsgraphMessageCommand,
-    profile::cli::MsgraphProfileCommand,
+use crate::{
+    account::context::Account,
+    msgraph::{
+        attachment::cli::MsgraphAttachmentCommand, client::MsgraphClient,
+        mail_folder::cli::MsgraphMailFolderCommand, message::cli::MsgraphMessageCommand,
+        profile::cli::MsgraphProfileCommand,
+    },
 };
 
 /// Microsoft Graph CLI.

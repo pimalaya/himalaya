@@ -2,13 +2,15 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
-use crate::account::context::Account;
-use crate::msgraph::{
-    attachment::{
-        create::MsgraphAttachmentCreateCommand, delete::MsgraphAttachmentDeleteCommand,
-        get::MsgraphAttachmentGetCommand, list::MsgraphAttachmentListCommand,
+use crate::{
+    account::context::Account,
+    msgraph::{
+        attachment::{
+            create::MsgraphAttachmentCreateCommand, delete::MsgraphAttachmentDeleteCommand,
+            get::MsgraphAttachmentGetCommand, list::MsgraphAttachmentListCommand,
+        },
+        client::MsgraphClient,
     },
-    client::MsgraphClient,
 };
 
 /// Manage Microsoft Graph message attachments

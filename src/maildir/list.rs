@@ -8,9 +8,9 @@ use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::account::context::Account;
-use crate::maildir::client::MaildirClient;
-use crate::shared::table::style_from_preset;
+use crate::{
+    account::context::Account, maildir::client::MaildirClient, shared::table::style_from_preset,
+};
 
 /// List Maildir folders.
 ///

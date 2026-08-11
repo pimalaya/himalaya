@@ -8,10 +8,10 @@ use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::account::context::Account;
-use crate::email::mailbox::MailboxRole;
-use crate::imap::client::ImapClient;
-use crate::shared::table::style_from_preset;
+use crate::{
+    account::context::Account, email::mailbox::MailboxRole, imap::client::ImapClient,
+    shared::table::style_from_preset,
+};
 
 /// List mailboxes (LIST / LSUB, RFC 3501).
 ///

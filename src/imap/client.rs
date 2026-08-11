@@ -9,7 +9,7 @@ use std::ops::{Deref, DerefMut};
 
 use anyhow::{Result, anyhow};
 use io_imap::{
-    client::{ImapClientStd as Inner, ImapClientStdConnectOptions},
+    client::{ImapClientStd as Inner, ImapClientStdConnectOptions, default_port},
     has_imap_capability,
     types::response::Capability,
 };
@@ -40,18 +40,16 @@ impl ImapClient {
         let auto_id = resolve_auto_id_params(&config.id)?;
         let server = parse_imap_server(&config.server)?;
         let sasl: Option<Sasl> = match config.sasl {
-            // A `unix://` sirup socket presents a pre-authenticated
+            // NOTE: a `unix://` sirup socket presents a pre-authenticated
             // session (the greeting is PREAUTH), so no SASL is negotiated.
             Some(_) if server.scheme() == "unix" => None,
             Some(cfg) => {
                 let host = server
                     .host_str()
                     .ok_or_else(|| anyhow!("Cannot derive host from IMAP server `{server}`"))?;
-                // url does not know the imap(s) default ports, so fall
+                // NOTE: url does not know the imap(s) default ports, so fall
                 // back to the same scheme defaults io-imap connects with.
-                let port = server
-                    .port()
-                    .unwrap_or(io_imap::client::default_port(server.scheme()));
+                let port = server.port().unwrap_or(default_port(server.scheme()));
                 Some(cfg.try_into_sasl(host, port)?)
             }
             None => None,

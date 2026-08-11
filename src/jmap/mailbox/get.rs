@@ -4,10 +4,12 @@ use io_jmap::rfc8621::mailbox::get::JmapMailboxGetOptions;
 use log::warn;
 use pimalaya_cli::printer::Printer;
 
-use crate::account::context::Account;
-use crate::jmap::{
-    client::JmapClient,
-    mailbox::query::{MailboxColors, MailboxesTable},
+use crate::{
+    account::context::Account,
+    jmap::{
+        client::JmapClient,
+        mailbox::query::{MailboxColors, MailboxesTable},
+    },
 };
 
 /// Get JMAP mailboxes by ID (Mailbox/get).

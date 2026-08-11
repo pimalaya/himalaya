@@ -2,8 +2,10 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
-use crate::account::context::Account;
-use crate::jmap::{client::JmapClient, thread::get::JmapThreadGetCommand};
+use crate::{
+    account::context::Account,
+    jmap::{client::JmapClient, thread::get::JmapThreadGetCommand},
+};
 
 /// Manage JMAP threads.
 #[derive(Debug, Subcommand)]

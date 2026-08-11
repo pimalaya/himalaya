@@ -11,9 +11,11 @@ use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 
-use crate::account::context::Account;
-use crate::imap::{client::ImapClient, mailbox::arg::MailboxNameArg};
-use crate::shared::table::style_from_preset;
+use crate::{
+    account::context::Account,
+    imap::{client::ImapClient, mailbox::arg::MailboxNameArg},
+    shared::table::style_from_preset,
+};
 
 /// List the flags available in the given mailbox (SELECT response, RFC 3501).
 ///

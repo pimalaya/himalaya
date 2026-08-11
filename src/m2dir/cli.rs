@@ -2,10 +2,13 @@ use anyhow::Result;
 use clap::Subcommand;
 use pimalaya_cli::printer::Printer;
 
-use crate::account::context::Account;
-use crate::m2dir::{
-    client::M2dirClient, create::M2dirMailboxCreateCommand, delete::M2dirMailboxDeleteCommand,
-    flag::cli::M2dirFlagCommand, list::M2dirMailboxListCommand, message::cli::M2dirMessageCommand,
+use crate::{
+    account::context::Account,
+    m2dir::{
+        client::M2dirClient, create::M2dirMailboxCreateCommand, delete::M2dirMailboxDeleteCommand,
+        flag::cli::M2dirFlagCommand, list::M2dirMailboxListCommand,
+        message::cli::M2dirMessageCommand,
+    },
 };
 
 /// M2dir-specific API.

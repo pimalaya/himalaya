@@ -17,11 +17,13 @@ use comfy_table::{Color as TableColor, ContentArrangement};
 use crossterm::style::Color;
 use dirs::download_dir;
 
-use crate::config::{
-    AccountConfig, AttachmentListTableConfig, Config, EnvelopeListTableConfig,
-    MailboxListTableConfig, TableArrangementConfig,
+use crate::{
+    config::{
+        AccountConfig, AttachmentListTableConfig, Config, EnvelopeListTableConfig,
+        MailboxListTableConfig, TableArrangementConfig,
+    },
+    shared::table::DEFAULT_PRESET,
 };
-use crate::shared::table::DEFAULT_PRESET;
 
 const DEFAULT_DATETIME_FMT: &str = "%F %R%:z";
 const DEFAULT_MAILBOX_ALIAS: &str = "inbox";

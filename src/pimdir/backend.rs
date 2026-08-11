@@ -517,7 +517,6 @@ mod tests {
             level: io_replica::placement::ReplicaLevel::Meta,
         };
         let envelope = envelope_from_item(&item);
-        // The public id comes from the seq, not from the link id.
         assert_eq!(envelope.id, "42");
         assert_eq!(envelope.subject, "Hi");
         assert_eq!(envelope.from[0].email, "a@x.org");
