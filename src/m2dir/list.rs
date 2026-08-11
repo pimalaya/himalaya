@@ -9,6 +9,7 @@ use serde::Serialize;
 
 use crate::account::context::Account;
 use crate::m2dir::client::M2dirClient;
+use crate::shared::table::style_from_preset;
 
 /// List m2dir folders found under the store root.
 #[derive(Debug, Parser)]
@@ -61,7 +62,7 @@ impl fmt::Display for M2dirsTable {
         let mut table = Table::new();
 
         table
-            .load_preset(&self.preset)
+            .load_style(style_from_preset(&self.preset))
             .set_header(Row::from([Cell::new("NAME"), Cell::new("PATH")]))
             .add_rows(self.rows.iter().map(|m| {
                 let mut row = Row::new();

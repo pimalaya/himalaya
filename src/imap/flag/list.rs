@@ -13,6 +13,7 @@ use serde::{Serialize, Serializer};
 
 use crate::account::context::Account;
 use crate::imap::{client::ImapClient, mailbox::arg::MailboxNameArg};
+use crate::shared::table::style_from_preset;
 
 /// List the flags available in the given mailbox (SELECT response, RFC 3501).
 ///
@@ -90,7 +91,7 @@ impl fmt::Display for FlagsTable<'_> {
         let mut table = Table::new();
 
         table
-            .load_preset(&self.preset)
+            .load_style(style_from_preset(&self.preset))
             .set_content_arrangement(self.arrangement.clone())
             .set_header(Row::from([Cell::new("FLAG"), Cell::new("PERMANENT")]));
 

@@ -8,7 +8,9 @@ use pimalaya_cli::printer::{Message, Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, gmail::client::GmailClient};
+use crate::{
+    account::context::Account, gmail::client::GmailClient, shared::table::style_from_preset,
+};
 
 /// Manage Gmail labels (users.labels).
 #[derive(Debug, Subcommand)]
@@ -220,7 +222,7 @@ impl fmt::Display for LabelsTable {
         let mut table = Table::new();
 
         table
-            .load_preset(&self.preset)
+            .load_style(style_from_preset(&self.preset))
             .set_content_arrangement(self.arrangement.clone())
             .set_header(Row::from([
                 Cell::new("ID"),

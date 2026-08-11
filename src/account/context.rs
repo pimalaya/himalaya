@@ -13,7 +13,7 @@
 
 use std::{collections::HashMap, env::temp_dir, path::PathBuf};
 
-use comfy_table::{Color as TableColor, ContentArrangement, presets};
+use comfy_table::{Color as TableColor, ContentArrangement};
 use crossterm::style::Color;
 use dirs::download_dir;
 
@@ -21,6 +21,7 @@ use crate::config::{
     AccountConfig, AttachmentListTableConfig, Config, EnvelopeListTableConfig,
     MailboxListTableConfig, TableArrangementConfig,
 };
+use crate::shared::table::DEFAULT_PRESET;
 
 const DEFAULT_DATETIME_FMT: &str = "%F %R%:z";
 const DEFAULT_MAILBOX_ALIAS: &str = "inbox";
@@ -107,9 +108,7 @@ impl Account {
     /// Effective `comfy_table` preset string. Defaults to
     /// `UTF8_FULL_CONDENSED`.
     pub fn table_preset(&self) -> &str {
-        self.table_preset
-            .as_deref()
-            .unwrap_or(presets::UTF8_FULL_CONDENSED)
+        self.table_preset.as_deref().unwrap_or(DEFAULT_PRESET)
     }
 
     /// Effective `comfy_table` content arrangement. Defaults to

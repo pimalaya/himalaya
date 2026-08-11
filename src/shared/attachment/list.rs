@@ -11,7 +11,7 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    shared::{client::EmailClient, mailbox::arg::MailboxArg},
+    shared::{client::EmailClient, mailbox::arg::MailboxArg, table::style_from_preset},
 };
 
 /// List the attachments carried by a single message in the active
@@ -161,7 +161,7 @@ impl fmt::Display for Attachments {
         }
 
         table
-            .load_preset(&self.preset)
+            .load_style(style_from_preset(&self.preset))
             .set_content_arrangement(self.arrangement.clone())
             .set_header(Row::from(header))
             .add_rows(self.attachments.iter().map(|a| {

@@ -10,6 +10,7 @@ use serde::{Serialize, Serializer};
 
 use crate::account::context::Account;
 use crate::imap::{client::ImapClient, mailbox::arg::MailboxNameArg};
+use crate::shared::table::style_from_preset;
 
 /// Get the status of the given mailbox (STATUS, RFC 3501).
 ///
@@ -101,7 +102,7 @@ impl fmt::Display for MailboxStatusTable {
         let mut table = Table::new();
 
         table
-            .load_preset(&self.preset)
+            .load_style(style_from_preset(&self.preset))
             .set_header(Row::from([Cell::new("ATTRIBUTE"), Cell::new("VALUE")]));
 
         if let Some(n) = self.status.messages {

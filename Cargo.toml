@@ -40,7 +40,7 @@ anyhow = "1"
 base64 = { version = "0.23", optional = true }
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 clap = { version = "4.4", features = ["derive", "wrap_help"] }
-comfy-table = "7"
+comfy-table = "8"
 convert_case = { version = "0.11", optional = true }
 crossterm = { version = "0.29", default-features = false, features = ["serde"] }
 dirs = "6"

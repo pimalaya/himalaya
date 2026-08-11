@@ -12,6 +12,7 @@ use serde::Serialize;
 use crate::{
     account::context::map_color_or,
     config::{AccountConfig, Config, TableArrangementConfig},
+    shared::table::style_from_preset,
 };
 
 /// List all accounts declared in the configuration.
@@ -29,7 +30,7 @@ impl AccountListCommand {
             .table
             .preset
             .clone()
-            .unwrap_or_else(|| comfy_table::presets::UTF8_FULL_CONDENSED.to_string());
+            .unwrap_or_else(|| crate::shared::table::DEFAULT_PRESET.to_string());
         let arrangement = config
             .table
             .arrangement
@@ -138,7 +139,7 @@ impl fmt::Display for AccountsTable {
         let mut table = Table::new();
 
         table
-            .load_preset(&self.preset)
+            .load_style(style_from_preset(&self.preset))
             .set_content_arrangement(self.arrangement.clone())
             .set_header(Row::from(vec![
                 Cell::new("NAME"),

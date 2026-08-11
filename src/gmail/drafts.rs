@@ -19,7 +19,11 @@ use pimalaya_cli::printer::{Message, Printer};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, gmail::client::GmailClient, shared::output::Paginated};
+use crate::{
+    account::context::Account,
+    gmail::client::GmailClient,
+    shared::{output::Paginated, table::style_from_preset},
+};
 
 /// Manage Gmail drafts (users.drafts).
 #[derive(Debug, Subcommand)]
@@ -311,7 +315,7 @@ impl fmt::Display for DraftsTable {
         let mut table = Table::new();
 
         table
-            .load_preset(&self.preset)
+            .load_style(style_from_preset(&self.preset))
             .set_content_arrangement(self.arrangement.clone())
             .set_header(Row::from([
                 Cell::new("DRAFT ID"),

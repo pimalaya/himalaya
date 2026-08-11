@@ -11,6 +11,7 @@ use serde::Serialize;
 
 use crate::account::context::Account;
 use crate::jmap::client::JmapClient;
+use crate::shared::table::style_from_preset;
 
 /// Get JMAP identities (Identity/get).
 ///
@@ -58,7 +59,7 @@ impl fmt::Display for IdentitiesTable {
         let mut table = Table::new();
 
         table
-            .load_preset(&self.preset)
+            .load_style(style_from_preset(&self.preset))
             .set_header(Row::from([
                 Cell::new("ID"),
                 Cell::new("NAME"),

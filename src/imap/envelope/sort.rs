@@ -21,6 +21,7 @@ use crate::imap::{
     envelope::search::SearchCriteriaArgs,
     mailbox::arg::{MailboxNameOptionalFlag, MailboxNoSelectFlag},
 };
+use crate::shared::table::style_from_preset;
 
 /// Sort IMAP messages (SORT, RFC 5256).
 ///
@@ -139,7 +140,7 @@ impl fmt::Display for SortResultsTable {
         let id_header = if self.uid_mode { "UID" } else { "SEQ" };
 
         table
-            .load_preset(&self.preset)
+            .load_style(style_from_preset(&self.preset))
             .set_content_arrangement(self.arrangement.clone())
             .set_header(Row::from([Cell::new(id_header)]));
 

@@ -307,9 +307,12 @@ pub struct EnvelopeListTableConfig {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct TableConfig {
-    /// `comfy_table` preset string (chars for borders / corners /
-    /// separators). Defaults to `UTF8_FULL_CONDENSED`. See
-    /// <https://docs.rs/comfy-table/latest/comfy_table/presets/>.
+    /// Preset string: one char per table component (borders, corners,
+    /// separators), a space meaning "don't draw this one". Defaults to
+    /// `UTF8_FULL_CONDENSED`. See [`style_from_preset`] for the
+    /// component order.
+    ///
+    /// [`style_from_preset`]: crate::shared::table::style_from_preset
     pub preset: Option<String>,
     /// Column-arrangement strategy. Defaults to `Dynamic`.
     pub arrangement: Option<TableArrangementConfig>,

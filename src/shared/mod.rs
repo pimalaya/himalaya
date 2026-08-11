@@ -19,3 +19,4 @@ pub mod message;
 pub mod output;
 #[cfg(any(feature = "imap", feature = "smtp"))]
 pub mod raw;
+pub mod table;

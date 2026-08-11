@@ -12,7 +12,7 @@ use serde::Serialize;
 use crate::{
     account::context::Account,
     email::{address::Address, envelope::Envelope, flag::Flag},
-    shared::{client::EmailClient, mailbox::arg::MailboxArg},
+    shared::{client::EmailClient, mailbox::arg::MailboxArg, table::style_from_preset},
 };
 
 /// List envelopes for the active account, regardless of the underlying
@@ -168,7 +168,7 @@ impl fmt::Display for Envelopes {
         header.push(Cell::new("SIZE").set_alignment(CellAlignment::Right));
 
         table
-            .load_preset(&self.preset)
+            .load_style(style_from_preset(&self.preset))
             .set_content_arrangement(self.arrangement.clone())
             .set_header(Row::from(header))
             .add_rows(self.envelopes.iter().map(|env| {

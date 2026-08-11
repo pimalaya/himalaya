@@ -12,6 +12,7 @@ use crate::m2dir::{
     arg::{M2dirNameFlag, MessageIdArg},
     client::M2dirClient,
 };
+use crate::shared::table::style_from_preset;
 
 /// List flags set on an m2dir message.
 ///
@@ -64,7 +65,7 @@ impl fmt::Display for FlagsTable {
         let mut table = Table::new();
 
         table
-            .load_preset(&self.preset)
+            .load_style(style_from_preset(&self.preset))
             .set_content_arrangement(self.arrangement.clone())
             .set_header(Row::from([Cell::new("FLAG")]));
 

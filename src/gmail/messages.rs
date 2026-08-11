@@ -15,7 +15,10 @@ use serde::Serialize;
 use crate::{
     account::context::Account,
     gmail::client::GmailClient,
-    shared::output::{Paginated, write_bytes_or_save},
+    shared::{
+        output::{Paginated, write_bytes_or_save},
+        table::style_from_preset,
+    },
 };
 
 /// Manage Gmail messages (users.messages).
@@ -455,7 +458,7 @@ impl fmt::Display for MessageIdsTable {
         let mut table = Table::new();
 
         table
-            .load_preset(&self.preset)
+            .load_style(style_from_preset(&self.preset))
             .set_content_arrangement(self.arrangement.clone())
             .set_header(Row::from([Cell::new("ID"), Cell::new("THREAD ID")]))
             .add_rows(self.ids.iter().map(|id| {

@@ -11,6 +11,7 @@ use serde::Serialize;
 use crate::account::context::Account;
 use crate::email::mailbox::MailboxRole;
 use crate::imap::client::ImapClient;
+use crate::shared::table::style_from_preset;
 
 /// List mailboxes (LIST / LSUB, RFC 3501).
 ///
@@ -70,7 +71,7 @@ impl fmt::Display for MailboxesTable {
         let mut table = Table::new();
 
         table
-            .load_preset(&self.preset)
+            .load_style(style_from_preset(&self.preset))
             .set_header(Row::from([
                 Cell::new("NAME"),
                 Cell::new("DELIMITER"),

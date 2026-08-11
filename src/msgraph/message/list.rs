@@ -10,7 +10,11 @@ use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, msgraph::client::MsgraphClient, shared::output::Paginated};
+use crate::{
+    account::context::Account,
+    msgraph::client::MsgraphClient,
+    shared::{output::Paginated, table::style_from_preset},
+};
 
 /// List Microsoft Graph messages (`GET /me/messages` or, with
 /// `--folder`, `GET /me/mailFolders/{id}/messages`).
@@ -159,7 +163,7 @@ impl fmt::Display for MessagesTable {
         let mut table = Table::new();
 
         table
-            .load_preset(&self.preset)
+            .load_style(style_from_preset(&self.preset))
             .set_content_arrangement(self.arrangement.clone())
             .set_header(Row::from([
                 Cell::new("ID"),

@@ -15,6 +15,7 @@ use serde::Serialize;
 use crate::{
     account::context::Account,
     gmail::{client::GmailClient, settings::convert::verification_status_wire},
+    shared::table::style_from_preset,
 };
 
 /// Manage Gmail forwarding addresses (users.settings.forwardingAddresses).
@@ -170,7 +171,7 @@ impl fmt::Display for ForwardingAddressesTable {
         let mut table = Table::new();
 
         table
-            .load_preset(&self.preset)
+            .load_style(style_from_preset(&self.preset))
             .set_content_arrangement(self.arrangement.clone())
             .set_header(Row::from([Cell::new("EMAIL"), Cell::new("VERIFICATION")]))
             .add_rows(self.response.forwarding_addresses.iter().map(|address| {

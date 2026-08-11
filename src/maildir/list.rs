@@ -10,6 +10,7 @@ use serde::Serialize;
 
 use crate::account::context::Account;
 use crate::maildir::client::MaildirClient;
+use crate::shared::table::style_from_preset;
 
 /// List Maildir folders.
 ///
@@ -53,7 +54,7 @@ impl fmt::Display for MaildirsTable {
         let mut table = Table::new();
 
         table
-            .load_preset(&self.preset)
+            .load_style(style_from_preset(&self.preset))
             .set_header(Row::from([Cell::new("NAME"), Cell::new("PATH")]))
             .add_rows(self.rows.iter().map(|m| {
                 let mut row = Row::new();

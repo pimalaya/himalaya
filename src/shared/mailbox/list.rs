@@ -7,7 +7,11 @@ use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, email::mailbox::Mailbox, shared::client::EmailClient};
+use crate::{
+    account::context::Account,
+    email::mailbox::Mailbox,
+    shared::{client::EmailClient, table::style_from_preset},
+};
 
 /// Shared API to list mailboxes for the active account.
 #[derive(Debug, Parser)]
@@ -92,7 +96,7 @@ impl fmt::Display for Mailboxes {
         }
 
         table
-            .load_preset(&self.preset)
+            .load_style(style_from_preset(&self.preset))
             .set_content_arrangement(self.arrangement.clone())
             .set_header(Row::from(header))
             .add_rows(self.mailboxes.iter().map(|m| {

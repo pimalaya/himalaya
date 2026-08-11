@@ -8,7 +8,9 @@ use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{account::context::Account, msgraph::client::MsgraphClient};
+use crate::{
+    account::context::Account, msgraph::client::MsgraphClient, shared::table::style_from_preset,
+};
 
 /// List a message's attachments (`GET /me/messages/{id}/attachments`).
 #[derive(Debug, Parser)]
@@ -83,7 +85,7 @@ impl fmt::Display for AttachmentsTable {
         let mut table = Table::new();
 
         table
-            .load_preset(&self.preset)
+            .load_style(style_from_preset(&self.preset))
             .set_content_arrangement(self.arrangement.clone())
             .set_header(Row::from([
                 Cell::new("ID"),

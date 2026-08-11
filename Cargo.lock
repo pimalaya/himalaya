@@ -381,6 +381,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "comfy-table"
+version = "8.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "136c8c4c3823846e8ba6d4bda011b4e5d5827b8bb0ac26c31f9ab31abe9f54f2"
+dependencies = [
+ "crossterm",
+ "unicode-segmentation",
+ "unicode-width",
+]
+
+[[package]]
 name = "convert_case"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -864,7 +875,7 @@ dependencies = [
  "chrono",
  "chumsky",
  "clap",
- "comfy-table",
+ "comfy-table 8.0.0",
  "convert_case 0.11.0",
  "crossterm",
  "dirs",
@@ -1189,7 +1200,8 @@ dependencies = [
 [[package]]
 name = "io-maildir"
 version = "0.2.1"
-source = "git+https://github.com/pimalaya/io-maildir#08b320cf1e3a3d4d5500964bdb39a88463740676"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "67592790c24c5be17adcdf6e406a47ca7d00ea49d964bfe16af3069bcacd81df"
 dependencies = [
  "gethostname",
  "log",
@@ -1798,7 +1810,7 @@ dependencies = [
  "clap",
  "clap_complete",
  "clap_mangen",
- "comfy-table",
+ "comfy-table 7.2.2",
  "crossterm",
  "ctrlc",
  "env_logger",

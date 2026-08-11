@@ -15,7 +15,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::account::context::Account;
-use crate::{config::ImapIdConfig, imap::client::ImapClient};
+use crate::{config::ImapIdConfig, imap::client::ImapClient, shared::table::style_from_preset};
 
 /// Get information about the IMAP server.
 ///
@@ -87,7 +87,7 @@ impl fmt::Display for ServerIdTable {
         let mut table = Table::new();
 
         table
-            .load_preset(&self.preset)
+            .load_style(style_from_preset(&self.preset))
             .set_header(Row::from([Cell::new("PARAMETER"), Cell::new("VALUE")]));
 
         for (key, val) in &self.server_id {
