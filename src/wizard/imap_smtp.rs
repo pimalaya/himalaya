@@ -282,6 +282,7 @@ fn imap_config(endpoint: &TcpEndpoint, sasl: SaslConfig) -> ImapConfig {
         starttls: endpoint.security == DiscoverySecurity::Starttls,
         alpn: io_imap::client::default_alpn(),
         sasl: Some(sasl),
+        sasl_ir: None,
         id: Default::default(),
         sort: Default::default(),
     }

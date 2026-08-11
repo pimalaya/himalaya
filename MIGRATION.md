@@ -71,7 +71,7 @@ New in v2: `-b`, `--backend` (force a specific backend for shared commands) and 
 - Added `add --flag` to attach flags at insertion time, and `add --send` (alias `save --send`) to push the message through the account's send path after the append.
 - `write` renamed `compose` (kept as an alias). `compose`, `reply`, `forward` are no longer interactive. They build the message from CLI flags through the built-in flag composer. Interactive composition is delegated to standalone tools chained into `messages send` / `messages add` via a tempfile or shell process substitution. No `*-with` subcommands or `[message.composer.*]` table remain on the himalaya side.
 - `read` no longer renders human-readable text. The v2 `read` prints message-level info. For custom rendering, pipe `read --raw` into a standalone interpreter.
-- `mailto:` URI handling is no longer a himalaya subcommand. Register a small shell wrapper (e.g. `mml mailto "$1" /tmp/draft.eml && himalaya messages send /tmp/draft.eml`) as your desktop mailto handler.
+- `mailto:` URI handling is no longer a himalaya subcommand. Register a small shell wrapper (e.g. `mml mailto "$1" --output /tmp/draft.eml && himalaya messages send /tmp/draft.eml`) as your desktop mailto handler.
 - `messages send` and `messages add` read the raw message from a positional path, an inline raw value, or stdin (the unified `MessageArg`).
 - `export` and `edit` are removed.
 

@@ -8,7 +8,11 @@
 use std::ops::{Deref, DerefMut};
 
 use anyhow::{Result, anyhow};
-use io_imap::{client::ImapClientStd as Inner, has_imap_capability, types::response::Capability};
+use io_imap::{
+    client::{ImapClientStd as Inner, ImapClientStdConnectOptions},
+    has_imap_capability,
+    types::response::Capability,
+};
 use pimalaya_stream::sasl::Sasl;
 use url::Url;
 
@@ -52,7 +56,12 @@ impl ImapClient {
             }
             None => None,
         };
-        let (inner, capabilities) = Inner::connect(&server, &tls, config.starttls, sasl, auto_id)?;
+        let opts = ImapClientStdConnectOptions {
+            starttls: config.starttls,
+            auto_id,
+            sasl_ir: config.sasl_ir,
+        };
+        let (inner, capabilities) = Inner::connect(&server, &tls, sasl, opts)?;
         Ok(Self {
             inner,
             capabilities,

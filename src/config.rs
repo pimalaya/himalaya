@@ -396,6 +396,13 @@ pub struct ImapConfig {
     /// advertise the ANONYMOUS mechanism explicitly, set `sasl.anonymous = {}`.
     pub sasl: Option<SaslConfig>,
 
+    /// RFC 4959 SASL-IR quirk. Left unset, follows the advertised `SASL-IR`
+    /// capability; `false` waits for the server's continuation request rather
+    /// than sending credentials inline with `AUTHENTICATE`, `true` always
+    /// inlines them. Coremail (126.com, 163.com) advertises it falsely.
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub sasl_ir: Option<bool>,
+
     /// RFC 2971 `ID` extension quirks. Some providers (notably mail.qq.com,
     /// fastmail) require an `ID` exchange straight after authentication; set
     /// `id.auto = true` to opt in.

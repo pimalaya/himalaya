@@ -13,11 +13,9 @@ pub struct JmapEmailCopyCommand {
     /// Email ID(s) to copy.
     #[arg(value_name = "ID", required = true)]
     pub ids: Vec<String>,
-
     /// Source account ID to copy from.
     #[arg(long, value_name = "ACCOUNT-ID")]
     pub from_account: String,
-
     /// Destination mailbox ID(s) to place copies in.
     #[arg(long, value_name = "MAILBOX-ID", required = false)]
     pub mailbox_id: Vec<String>,

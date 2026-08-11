@@ -506,6 +506,7 @@ mod tests {
     #[test]
     fn envelope_is_built_from_meta_without_a_body() {
         let item = PimdirItem {
+            seq: 42,
             link_id: ReplicaLinkId("mid:x@y".into()),
             flags: ReplicaFlags(["\\Seen".to_string()].into_iter().collect()),
             meta: Some(ReplicaMeta(
@@ -516,7 +517,8 @@ mod tests {
             level: io_replica::placement::ReplicaLevel::Meta,
         };
         let envelope = envelope_from_item(&item);
-        assert_eq!(envelope.id, "mid:x@y");
+        // The public id comes from the seq, not from the link id.
+        assert_eq!(envelope.id, "42");
         assert_eq!(envelope.subject, "Hi");
         assert_eq!(envelope.from[0].email, "a@x.org");
         assert_eq!(envelope.to[0].email, "b@x.org");

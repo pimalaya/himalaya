@@ -167,7 +167,7 @@ pub fn test_account(account_config: &AccountConfig) -> Result<()> {
 
 #[cfg(feature = "imap")]
 pub(crate) fn connect_imap(imap_config: &crate::config::ImapConfig) -> Result<()> {
-    use io_imap::client::ImapClientStd;
+    use io_imap::client::{ImapClientStd, ImapClientStdConnectOptions};
     use pimalaya_stream::sasl::Sasl;
 
     use crate::imap::id::resolve_auto_id_params;
@@ -186,7 +186,12 @@ pub(crate) fn connect_imap(imap_config: &crate::config::ImapConfig) -> Result<()
             cfg.try_into_sasl(host, port)
         })
         .transpose()?;
-    let _ = ImapClientStd::connect(&server, &tls, imap_config.starttls, sasl, auto_id)?;
+    let opts = ImapClientStdConnectOptions {
+        starttls: imap_config.starttls,
+        auto_id,
+        sasl_ir: imap_config.sasl_ir,
+    };
+    let _ = ImapClientStd::connect(&server, &tls, sasl, opts)?;
 
     Ok(())
 }
@@ -198,15 +203,21 @@ pub(crate) fn connect_imap(imap_config: &crate::config::ImapConfig) -> Result<()
 /// connection is dropped without authenticating.
 #[cfg(feature = "imap")]
 pub(crate) fn probe_imap_mechanisms(server: &str, starttls: bool) -> Result<Vec<SaslMechanism>> {
-    use io_imap::{client::ImapClientStd, rfc3501::capability::available_auth_mechanisms};
+    use io_imap::{
+        client::{ImapClientStd, ImapClientStdConnectOptions},
+        rfc3501::capability::available_auth_mechanisms,
+    };
     use pimalaya_stream::sasl::Sasl;
 
     use crate::config::TlsConfig;
 
     let tls = TlsConfig::default().into_tls(io_imap::client::default_alpn());
     let server = crate::imap::client::parse_imap_server(server)?;
-    let (_client, capabilities) =
-        ImapClientStd::connect(&server, &tls, starttls, None::<Sasl>, None)?;
+    let opts = ImapClientStdConnectOptions {
+        starttls,
+        ..Default::default()
+    };
+    let (_client, capabilities) = ImapClientStd::connect(&server, &tls, None::<Sasl>, opts)?;
 
     Ok(available_auth_mechanisms(&capabilities))
 }

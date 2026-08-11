@@ -212,8 +212,15 @@ imap.sasl.plain.password.raw = "***"
 #imap.sasl.scram-sha-256.username = "user@example.com"
 #imap.sasl.scram-sha-256.password.raw = "***"
 
-# RFC 2971 ID extension. Some providers (mail.qq.com, fastmail) require an `ID`
-# exchange straight after authentication; set `auto = true` to opt in.
+# RFC 4959 SASL-IR. Leave unset to follow the capability; set `false` to wait for
+# the server's continuation request instead of sending credentials inline (needed
+# by Coremail: 126.com, 163.com), or `true` to always send them inline.
+# https://www.rfc-editor.org/rfc/rfc4959.html
+#imap.sasl-ir = false
+
+# RFC 2971 ID extension. Some providers (mail.qq.com, fastmail, 126.com, 163.com)
+# require an `ID` exchange straight after authentication; set `auto = true` to
+# opt in.
 # https://www.rfc-editor.org/rfc/rfc2971.html
 #imap.id.auto = false
 
