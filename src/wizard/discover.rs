@@ -69,9 +69,6 @@ use crate::{
     wizard::search::{self, Discovered, DiscoveredKind},
 };
 
-/// The endpoint prompt label, shared by the create flow.
-const ENDPOINT_PROMPT: &str = "Email, server or URL:";
-
 /// The documented sample configuration, shown in the welcome banner and
 /// pointed at when discovery finds nothing to configure automatically.
 const CONFIG_SAMPLE_URL: &str =
@@ -108,7 +105,7 @@ pub fn run(printer: &mut impl Printer) -> Result<()> {
         print_welcome();
     }
 
-    let input = prompt::text::<&str>(ENDPOINT_PROMPT, None)?;
+    let input = prompt::text("Email:", None)?;
     let input = input.trim();
     if input.is_empty() {
         bail!("Empty input: enter an email address, a server URL, or a folder path");
