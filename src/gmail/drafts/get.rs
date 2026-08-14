@@ -1,13 +1,19 @@
 use std::fmt;
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use clap::Parser;
-use io_gmail::v1::rest::{drafts::get::GmailDraftGet, messages::GmailMessageFormat};
+use io_gmail::v1::rest::{
+    drafts::get::GmailDraftGet,
+    messages::{GmailMessageFormat, decode_raw},
+};
 use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::gmail::{client::GmailClient, format::FormatArg};
+use crate::{
+    gmail::{client::GmailClient, format::FormatArg},
+    shared::output::write_bytes_or_save,
+};
 
 /// Get a single Gmail draft (users.drafts.get).
 #[derive(Debug, Parser)]
@@ -29,6 +35,17 @@ impl GmailDraftGetCommand {
             client.run(c)?
         }
         .response;
+
+        if format == GmailMessageFormat::Raw
+            && let Some(raw) = draft
+                .message
+                .as_ref()
+                .and_then(|message| message.raw.as_ref())
+        {
+            let bytes =
+                decode_raw(raw).map_err(|err| anyhow!("Decode Gmail draft error: {err}"))?;
+            return write_bytes_or_save(printer, None, &bytes);
+        }
 
         printer.out(GmailDraftGetOutput {
             id: draft.id,

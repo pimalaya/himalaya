@@ -75,6 +75,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Gmail `messages get`, `drafts get`, `threads get`, `history list` and the `settings` readers now serialize their data, as does Microsoft Graph `message get`, each with a published JSON Schema. Text output is unchanged, except that Gmail `messages get` and `threads get` print the headers they already fetched. Gmail `history list` reports the affected message ids rather than per-record counts.
 
+- Fixed `gmail drafts get --format raw` discarding the raw message it had fetched and printing the draft summary instead. It now writes the RFC 5322 bytes, like `gmail messages get --format raw`.
+
 ## [2.0.0] - 2026-07-26
 
 ### Added
