@@ -1,9 +1,13 @@
+use std::fmt;
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use io_gmail::v1::rest::settings::{
     GmailLanguageSettings, get_language::GmailLanguageGet, update_language::GmailLanguageUpdate,
 };
 use pimalaya_cli::printer::{Message, Printer};
+use schemars::JsonSchema;
+use serde::Serialize;
 
 use crate::{account::context::Account, gmail::client::GmailClient};
 
@@ -43,9 +47,9 @@ impl GmailSettingsLanguageGetCommand {
         };
         let settings = out.response;
 
-        let text = format!("Display language: {}\n", settings.display_language);
-
-        printer.out(Message::new(text))
+        printer.out(GmailSettingsLanguageGetOutput {
+            display_language: settings.display_language,
+        })
     }
 }
 
@@ -69,5 +73,19 @@ impl GmailSettingsLanguageSetCommand {
         };
 
         printer.out(Message::new("Gmail language settings successfully updated"))
+    }
+}
+
+/// Gmail display language settings, rendered as text or, under `--json`,
+/// as a structured object instead of a wrapped human string.
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) struct GmailSettingsLanguageGetOutput {
+    display_language: String,
+}
+
+impl fmt::Display for GmailSettingsLanguageGetOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Display language: {}", self.display_language)
     }
 }

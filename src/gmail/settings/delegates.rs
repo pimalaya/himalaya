@@ -90,15 +90,7 @@ impl Get {
         };
         let delegate = out.response;
 
-        let mut text = format!("Email: {}\n", delegate.delegate_email);
-        if let Some(status) = delegate.verification_status {
-            text.push_str(&format!(
-                "Verification: {}\n",
-                verification_status_wire(status)
-            ));
-        }
-
-        printer.out(Message::new(text))
+        printer.out(GmailSettingsDelegateGetOutput(delegate))
     }
 }
 
@@ -149,6 +141,27 @@ impl Delete {
             "Gmail delegate `{}` successfully deleted",
             self.email
         )))
+    }
+}
+
+/// A Gmail delegate, rendered as aligned text or, under `--json`, as
+/// the delegate resource itself instead of a wrapped human string.
+///
+/// The resource is emitted verbatim so that one delegate read with `get`
+/// has the very same shape as a row of `list`.
+#[derive(Serialize, JsonSchema)]
+#[serde(transparent)]
+pub(crate) struct GmailSettingsDelegateGetOutput(GmailDelegate);
+
+impl fmt::Display for GmailSettingsDelegateGetOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Email: {}", self.0.delegate_email)?;
+
+        if let Some(status) = self.0.verification_status {
+            writeln!(f, "Verification: {}", verification_status_wire(status))?;
+        }
+
+        Ok(())
     }
 }
 

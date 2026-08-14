@@ -91,34 +91,7 @@ impl GmailSendAsGetCommand {
         };
         let send_as = out.response;
 
-        let mut buf = String::new();
-        buf.push_str(&format!("Email: {}\n", send_as.send_as_email));
-        if let Some(display_name) = send_as.display_name {
-            buf.push_str(&format!("Name: {display_name}\n"));
-        }
-        if let Some(reply_to_address) = send_as.reply_to_address {
-            buf.push_str(&format!("Reply-To: {reply_to_address}\n"));
-        }
-        if let Some(signature) = send_as.signature {
-            buf.push_str(&format!("Signature: {signature}\n"));
-        }
-        if let Some(is_primary) = send_as.is_primary {
-            buf.push_str(&format!("Primary: {is_primary}\n"));
-        }
-        if let Some(is_default) = send_as.is_default {
-            buf.push_str(&format!("Default: {is_default}\n"));
-        }
-        if let Some(treat_as_alias) = send_as.treat_as_alias {
-            buf.push_str(&format!("Treat as alias: {treat_as_alias}\n"));
-        }
-        if let Some(verification_status) = send_as.verification_status {
-            buf.push_str(&format!(
-                "Verification: {}\n",
-                verification_status_wire(verification_status)
-            ));
-        }
-
-        printer.out(Message::new(buf))
+        printer.out(GmailSettingsSendAsGetOutput(send_as))
     }
 }
 
@@ -267,6 +240,45 @@ impl GmailSendAsVerifyCommand {
             "Verification e-mail sent for Gmail send-as `{}`",
             self.email
         )))
+    }
+}
+
+/// A Gmail send-as alias, rendered as aligned text or, under `--json`,
+/// as the send-as resource itself instead of a wrapped human string.
+///
+/// The resource is emitted verbatim so that one alias read with `get`
+/// has the very same shape as a row of `list`.
+#[derive(Serialize, JsonSchema)]
+#[serde(transparent)]
+pub(crate) struct GmailSettingsSendAsGetOutput(GmailSendAs);
+
+impl fmt::Display for GmailSettingsSendAsGetOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Email: {}", self.0.send_as_email)?;
+
+        if let Some(display_name) = &self.0.display_name {
+            writeln!(f, "Name: {display_name}")?;
+        }
+        if let Some(reply_to_address) = &self.0.reply_to_address {
+            writeln!(f, "Reply-To: {reply_to_address}")?;
+        }
+        if let Some(signature) = &self.0.signature {
+            writeln!(f, "Signature: {signature}")?;
+        }
+        if let Some(is_primary) = self.0.is_primary {
+            writeln!(f, "Primary: {is_primary}")?;
+        }
+        if let Some(is_default) = self.0.is_default {
+            writeln!(f, "Default: {is_default}")?;
+        }
+        if let Some(treat_as_alias) = self.0.treat_as_alias {
+            writeln!(f, "Treat as alias: {treat_as_alias}")?;
+        }
+        if let Some(status) = self.0.verification_status {
+            writeln!(f, "Verification: {}", verification_status_wire(status))?;
+        }
+
+        Ok(())
     }
 }
 

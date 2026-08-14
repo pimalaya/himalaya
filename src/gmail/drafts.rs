@@ -1,7 +1,7 @@
 use std::{fmt, io::Read};
 
 use anyhow::Result;
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use io_gmail::v1::rest::{
     drafts::{
@@ -21,7 +21,7 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    gmail::client::GmailClient,
+    gmail::{client::GmailClient, format::FormatArg},
     shared::{output::Paginated, table::style_from_preset},
 };
 
@@ -130,19 +130,14 @@ impl GmailDraftGetCommand {
         }
         .response;
 
-        let mut out = String::new();
-        out.push_str(&format!("Draft id: {}\n", draft.id));
-        if let Some(message) = &draft.message {
-            out.push_str(&format!("Message id: {}\n", message.id));
-            if let Some(thread_id) = &message.thread_id {
-                out.push_str(&format!("Thread: {thread_id}\n"));
-            }
-            if let Some(snippet) = &message.snippet {
-                out.push_str(&format!("Snippet: {snippet}\n"));
-            }
-        }
-
-        printer.out(Message::new(out))
+        printer.out(GmailDraftGetOutput {
+            id: draft.id,
+            message: draft.message.map(|message| GmailDraftMessageOutput {
+                id: message.id,
+                thread_id: message.thread_id,
+                snippet: message.snippet,
+            }),
+        })
     }
 }
 
@@ -278,26 +273,43 @@ impl GmailDraftDeleteCommand {
     }
 }
 
-/// Gmail message format requested by `drafts get`.
-#[derive(Clone, Copy, Debug, Default, ValueEnum)]
-#[clap(rename_all = "kebab-case")]
-pub enum FormatArg {
-    Minimal,
-    #[default]
-    Full,
-    Raw,
-    Metadata,
+/// Gmail draft, rendered as aligned text or, under `--json`, as a
+/// structured object instead of a wrapped human string.
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) struct GmailDraftGetOutput {
+    id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    message: Option<GmailDraftMessageOutput>,
 }
 
-impl From<FormatArg> for GmailMessageFormat {
-    fn from(arg: FormatArg) -> Self {
-        match arg {
-            FormatArg::Minimal => GmailMessageFormat::Minimal,
-            FormatArg::Full => GmailMessageFormat::Full,
-            FormatArg::Raw => GmailMessageFormat::Raw,
-            FormatArg::Metadata => GmailMessageFormat::Metadata,
+impl fmt::Display for GmailDraftGetOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Draft id: {}", self.id)?;
+
+        if let Some(message) = &self.message {
+            writeln!(f, "Message id: {}", message.id)?;
+            if let Some(thread_id) = &message.thread_id {
+                writeln!(f, "Thread: {thread_id}")?;
+            }
+            if let Some(snippet) = &message.snippet {
+                writeln!(f, "Snippet: {snippet}")?;
+            }
         }
+
+        Ok(())
     }
+}
+
+/// The message a Gmail draft carries.
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) struct GmailDraftMessageOutput {
+    id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    thread_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    snippet: Option<String>,
 }
 
 /// Renders a list of Gmail drafts as a three-column table.

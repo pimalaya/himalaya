@@ -1,7 +1,7 @@
 use std::fmt;
 
 use anyhow::Result;
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use io_gmail::v1::rest::{
     messages::GmailMessageFormat,
@@ -21,7 +21,7 @@ use serde::Serialize;
 
 use crate::{
     account::context::Account,
-    gmail::client::GmailClient,
+    gmail::{client::GmailClient, format::FormatArg, messages::GmailMessageHeaderOutput},
     shared::{output::Paginated, table::style_from_preset},
 };
 
@@ -144,14 +144,31 @@ impl GmailThreadGetCommand {
         };
         let thread = out.response;
 
-        let mut text = String::new();
-        text.push_str(&format!("Thread id: {}\n", thread.id));
-        for message in &thread.messages {
-            let snippet = message.snippet.as_deref().unwrap_or("");
-            text.push_str(&format!("- {}: {snippet}\n", message.id));
-        }
+        let messages = thread
+            .messages
+            .into_iter()
+            .map(|message| {
+                let headers = message
+                    .payload
+                    .map(|payload| payload.headers)
+                    .unwrap_or_default();
 
-        printer.out(Message::new(text))
+                GmailThreadMessageOutput {
+                    id: message.id,
+                    label_ids: message.label_ids,
+                    snippet: message.snippet,
+                    headers: headers
+                        .into_iter()
+                        .map(GmailMessageHeaderOutput::from)
+                        .collect(),
+                }
+            })
+            .collect();
+
+        printer.out(GmailThreadGetOutput {
+            id: thread.id,
+            messages,
+        })
     }
 }
 
@@ -261,26 +278,45 @@ impl GmailThreadDeleteCommand {
     }
 }
 
-/// Gmail message format requested by `threads get`.
-#[derive(Clone, Copy, Debug, Default, ValueEnum)]
-#[clap(rename_all = "kebab-case")]
-pub enum FormatArg {
-    Minimal,
-    #[default]
-    Full,
-    Raw,
-    Metadata,
+/// Gmail thread and its messages, rendered as an indented list or,
+/// under `--json`, as a structured object instead of a wrapped human
+/// string.
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) struct GmailThreadGetOutput {
+    id: String,
+    messages: Vec<GmailThreadMessageOutput>,
 }
 
-impl From<FormatArg> for GmailMessageFormat {
-    fn from(arg: FormatArg) -> Self {
-        match arg {
-            FormatArg::Minimal => GmailMessageFormat::Minimal,
-            FormatArg::Full => GmailMessageFormat::Full,
-            FormatArg::Raw => GmailMessageFormat::Raw,
-            FormatArg::Metadata => GmailMessageFormat::Metadata,
+impl fmt::Display for GmailThreadGetOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Thread id: {}", self.id)?;
+
+        for message in &self.messages {
+            let snippet = message.snippet.as_deref().unwrap_or("");
+            writeln!(f, "- {}: {snippet}", message.id)?;
+
+            for header in &message.headers {
+                writeln!(f, "  {}: {}", header.name, header.value)?;
+            }
         }
+
+        Ok(())
     }
+}
+
+/// One message of a Gmail thread.
+///
+/// The thread id is left out, since it is the id of the enclosing
+/// [`GmailThreadGetOutput`].
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) struct GmailThreadMessageOutput {
+    id: String,
+    label_ids: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    snippet: Option<String>,
+    headers: Vec<GmailMessageHeaderOutput>,
 }
 
 /// Renders a list of Gmail thread summaries as a three-column table.

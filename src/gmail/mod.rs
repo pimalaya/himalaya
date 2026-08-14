@@ -3,6 +3,7 @@ pub mod backend;
 pub mod cli;
 pub mod client;
 pub mod drafts;
+pub mod format;
 pub mod history;
 pub mod labels;
 pub mod messages;

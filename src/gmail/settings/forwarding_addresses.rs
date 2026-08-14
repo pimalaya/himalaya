@@ -90,15 +90,7 @@ impl Get {
         };
         let address = out.response;
 
-        let mut text = format!("Email: {}\n", address.forwarding_email);
-        if let Some(status) = address.verification_status {
-            text.push_str(&format!(
-                "Verification: {}\n",
-                verification_status_wire(status)
-            ));
-        }
-
-        printer.out(Message::new(text))
+        printer.out(GmailSettingsForwardingAddressGetOutput(address))
     }
 }
 
@@ -151,6 +143,28 @@ impl Delete {
             "Gmail forwarding address `{}` successfully deleted",
             self.email
         )))
+    }
+}
+
+/// A Gmail forwarding address, rendered as aligned text or, under
+/// `--json`, as the forwarding address resource itself instead of a
+/// wrapped human string.
+///
+/// The resource is emitted verbatim so that one address read with `get`
+/// has the very same shape as a row of `list`.
+#[derive(Serialize, JsonSchema)]
+#[serde(transparent)]
+pub(crate) struct GmailSettingsForwardingAddressGetOutput(GmailForwardingAddress);
+
+impl fmt::Display for GmailSettingsForwardingAddressGetOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Email: {}", self.0.forwarding_email)?;
+
+        if let Some(status) = self.0.verification_status {
+            writeln!(f, "Verification: {}", verification_status_wire(status))?;
+        }
+
+        Ok(())
     }
 }
 

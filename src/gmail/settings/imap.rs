@@ -1,13 +1,17 @@
+use std::fmt;
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use io_gmail::v1::rest::settings::{get_imap::GmailImapGet, update_imap::GmailImapUpdate};
 use pimalaya_cli::printer::{Message, Printer};
+use schemars::JsonSchema;
+use serde::Serialize;
 
 use crate::{
     account::context::Account,
     gmail::{
         client::GmailClient,
-        settings::convert::{ExpungeBehaviorArg, enabled_flag, expunge_behavior_wire},
+        settings::convert::{ExpungeBehaviorArg, enabled_flag, expunge_behavior_wire, yes_no},
     },
 };
 
@@ -47,28 +51,14 @@ impl GmailSettingsImapGetCommand {
         };
         let settings = out.response;
 
-        let mut text = String::new();
-        text.push_str(&format!(
-            "Enabled: {}\n",
-            if settings.enabled { "yes" } else { "no" }
-        ));
-        if let Some(auto_expunge) = settings.auto_expunge {
-            text.push_str(&format!(
-                "Auto expunge: {}\n",
-                if auto_expunge { "yes" } else { "no" }
-            ));
-        }
-        if let Some(behavior) = settings.expunge_behavior {
-            text.push_str(&format!(
-                "Expunge behavior: {}\n",
-                expunge_behavior_wire(behavior)
-            ));
-        }
-        if let Some(size) = settings.max_folder_size {
-            text.push_str(&format!("Max folder size: {size}\n"));
-        }
-
-        printer.out(Message::new(text))
+        printer.out(GmailSettingsImapGetOutput {
+            enabled: settings.enabled,
+            auto_expunge: settings.auto_expunge,
+            expunge_behavior: settings
+                .expunge_behavior
+                .map(|behavior| expunge_behavior_wire(behavior).to_string()),
+            max_folder_size: settings.max_folder_size,
+        })
     }
 }
 
@@ -127,5 +117,41 @@ impl GmailSettingsImapSetCommand {
         };
 
         printer.out(Message::new("Gmail IMAP settings successfully updated"))
+    }
+}
+
+/// Gmail IMAP access settings, rendered as aligned text or, under
+/// `--json`, as a structured object instead of a wrapped human string.
+///
+/// The booleans stay booleans in JSON, where the text rendering spells
+/// them yes and no; the expunge behavior keeps its Gmail wire spelling,
+/// so a value read with `get` is a value `set` accepts back.
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) struct GmailSettingsImapGetOutput {
+    enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    auto_expunge: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    expunge_behavior: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_folder_size: Option<u32>,
+}
+
+impl fmt::Display for GmailSettingsImapGetOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Enabled: {}", yes_no(self.enabled))?;
+
+        if let Some(auto_expunge) = self.auto_expunge {
+            writeln!(f, "Auto expunge: {}", yes_no(auto_expunge))?;
+        }
+        if let Some(behavior) = &self.expunge_behavior {
+            writeln!(f, "Expunge behavior: {behavior}")?;
+        }
+        if let Some(size) = self.max_folder_size {
+            writeln!(f, "Max folder size: {size}")?;
+        }
+
+        Ok(())
     }
 }

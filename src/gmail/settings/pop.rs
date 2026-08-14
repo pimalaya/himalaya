@@ -1,9 +1,13 @@
+use std::fmt;
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use io_gmail::v1::rest::settings::{
     GmailPopSettings, get_pop::GmailPopGet, update_pop::GmailPopUpdate,
 };
 use pimalaya_cli::printer::{Message, Printer};
+use schemars::JsonSchema;
+use serde::Serialize;
 
 use crate::{
     account::context::Account,
@@ -51,18 +55,14 @@ impl GmailSettingsPopGetCommand {
         };
         let settings = out.response;
 
-        let mut text = String::new();
-        if let Some(access_window) = settings.access_window {
-            text.push_str(&format!(
-                "Access window: {}\n",
-                access_window_wire(access_window)
-            ));
-        }
-        if let Some(disposition) = settings.disposition {
-            text.push_str(&format!("Disposition: {}\n", disposition_wire(disposition)));
-        }
-
-        printer.out(Message::new(text))
+        printer.out(GmailSettingsPopGetOutput {
+            access_window: settings
+                .access_window
+                .map(|window| access_window_wire(window).to_string()),
+            disposition: settings
+                .disposition
+                .map(|disposition| disposition_wire(disposition).to_string()),
+        })
     }
 }
 
@@ -91,5 +91,32 @@ impl GmailSettingsPopSetCommand {
         };
 
         printer.out(Message::new("Gmail POP settings successfully updated"))
+    }
+}
+
+/// Gmail POP access settings, rendered as aligned text or, under
+/// `--json`, as a structured object instead of a wrapped human string.
+///
+/// The enums keep their Gmail wire spelling, so a value read with `get`
+/// is a value `set` accepts back.
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) struct GmailSettingsPopGetOutput {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    access_window: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    disposition: Option<String>,
+}
+
+impl fmt::Display for GmailSettingsPopGetOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(access_window) = &self.access_window {
+            writeln!(f, "Access window: {access_window}")?;
+        }
+        if let Some(disposition) = &self.disposition {
+            writeln!(f, "Disposition: {disposition}")?;
+        }
+
+        Ok(())
     }
 }

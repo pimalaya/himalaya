@@ -82,6 +82,11 @@ pub fn enabled_flag(enable: bool, disable: bool) -> Option<bool> {
     }
 }
 
+/// Spell a boolean the way the settings commands display it.
+pub fn yes_no(value: bool) -> &'static str {
+    if value { "yes" } else { "no" }
+}
+
 /// Map a disposition to its Gmail wire spelling for display.
 pub fn disposition_wire(disposition: GmailDisposition) -> &'static str {
     match disposition {

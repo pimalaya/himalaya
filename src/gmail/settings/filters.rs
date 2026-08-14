@@ -86,21 +86,7 @@ impl Get {
         };
         let filter = out.response;
 
-        let mut text = format!("Id: {}\n", filter.id);
-        if let Some(criteria) = &filter.criteria {
-            let summary = criteria_summary(criteria);
-            if !summary.is_empty() {
-                text.push_str(&format!("Criteria: {summary}\n"));
-            }
-        }
-        if let Some(action) = &filter.action {
-            let summary = action_summary(action);
-            if !summary.is_empty() {
-                text.push_str(&format!("Action: {summary}\n"));
-            }
-        }
-
-        printer.out(Message::new(text))
+        printer.out(GmailSettingsFilterGetOutput(filter))
     }
 }
 
@@ -199,6 +185,40 @@ impl Delete {
             "Gmail filter `{}` successfully deleted",
             self.id
         )))
+    }
+}
+
+/// A Gmail filter, rendered as a one-line summary of its criteria and
+/// action or, under `--json`, as the filter resource itself instead of a
+/// wrapped human string.
+///
+/// The resource is emitted verbatim so that one filter read with `get`
+/// has the very same shape as a row of `list`, and so that the criteria
+/// and action stay machine-readable: the summaries the text rendering
+/// builds are lossy on purpose.
+#[derive(Serialize, JsonSchema)]
+#[serde(transparent)]
+pub(crate) struct GmailSettingsFilterGetOutput(GmailFilter);
+
+impl fmt::Display for GmailSettingsFilterGetOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Id: {}", self.0.id)?;
+
+        if let Some(criteria) = &self.0.criteria {
+            let summary = criteria_summary(criteria);
+            if !summary.is_empty() {
+                writeln!(f, "Criteria: {summary}")?;
+            }
+        }
+
+        if let Some(action) = &self.0.action {
+            let summary = action_summary(action);
+            if !summary.is_empty() {
+                writeln!(f, "Action: {summary}")?;
+            }
+        }
+
+        Ok(())
     }
 }
 

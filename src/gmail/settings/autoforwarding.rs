@@ -1,15 +1,19 @@
+use std::fmt;
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use io_gmail::v1::rest::settings::{
     get_auto_forwarding::GmailAutoForwardingGet, update_auto_forwarding::GmailAutoForwardingUpdate,
 };
 use pimalaya_cli::printer::{Message, Printer};
+use schemars::JsonSchema;
+use serde::Serialize;
 
 use crate::{
     account::context::Account,
     gmail::{
         client::GmailClient,
-        settings::convert::{DispositionArg, disposition_wire, enabled_flag},
+        settings::convert::{DispositionArg, disposition_wire, enabled_flag, yes_no},
     },
 };
 
@@ -49,19 +53,13 @@ impl GmailSettingsAutoForwardingGetCommand {
         };
         let settings = out.response;
 
-        let mut text = String::new();
-        text.push_str(&format!(
-            "Enabled: {}\n",
-            if settings.enabled { "yes" } else { "no" }
-        ));
-        if let Some(email_address) = settings.email_address {
-            text.push_str(&format!("Email address: {email_address}\n"));
-        }
-        if let Some(disposition) = settings.disposition {
-            text.push_str(&format!("Disposition: {}\n", disposition_wire(disposition)));
-        }
-
-        printer.out(Message::new(text))
+        printer.out(GmailSettingsAutoForwardingGetOutput {
+            enabled: settings.enabled,
+            email_address: settings.email_address,
+            disposition: settings
+                .disposition
+                .map(|disposition| disposition_wire(disposition).to_string()),
+        })
     }
 }
 
@@ -115,5 +113,35 @@ impl GmailSettingsAutoForwardingSetCommand {
         printer.out(Message::new(
             "Gmail auto-forwarding settings successfully updated",
         ))
+    }
+}
+
+/// Gmail auto-forwarding settings, rendered as aligned text or, under
+/// `--json`, as a structured object instead of a wrapped human string.
+///
+/// The disposition keeps its Gmail wire spelling, so a value read with
+/// `get` is a value `set` accepts back.
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) struct GmailSettingsAutoForwardingGetOutput {
+    enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    email_address: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    disposition: Option<String>,
+}
+
+impl fmt::Display for GmailSettingsAutoForwardingGetOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Enabled: {}", yes_no(self.enabled))?;
+
+        if let Some(email_address) = &self.email_address {
+            writeln!(f, "Email address: {email_address}")?;
+        }
+        if let Some(disposition) = &self.disposition {
+            writeln!(f, "Disposition: {disposition}")?;
+        }
+
+        Ok(())
     }
 }
