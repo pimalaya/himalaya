@@ -2,7 +2,9 @@ use std::fmt;
 
 use anyhow::{Result, anyhow};
 use clap::Parser;
-use io_gmail::v1::rest::messages::{GmailMessageFormat, GmailMessageHeader, decode_raw};
+use io_gmail::v1::rest::messages::{
+    GmailMessageFormat, GmailMessageHeader, GmailMessagePayload, decode_raw,
+};
 use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -21,8 +23,11 @@ pub struct GmailMessageGetCommand {
     /// The amount of message detail to return.
     #[arg(long, value_enum, default_value_t)]
     pub format: FormatArg,
-    /// Header to include when `--format metadata` is used. Can be
-    /// repeated.
+    /// Only render the given header. Can be repeated, and matched
+    /// case-insensitively.
+    ///
+    /// Under `--format metadata` it also narrows what Gmail sends back,
+    /// since the API honours the filter for that format alone.
     #[arg(long = "header", value_name = "NAME")]
     pub headers: Vec<String>,
 }
@@ -42,11 +47,6 @@ impl GmailMessageGetCommand {
             return write_bytes_or_save(printer, None, &bytes);
         }
 
-        let headers = msg
-            .payload
-            .map(|payload| payload.headers)
-            .unwrap_or_default();
-
         printer.out(GmailMessageGetOutput {
             id: msg.id,
             thread_id: msg.thread_id,
@@ -54,10 +54,7 @@ impl GmailMessageGetCommand {
             snippet: msg.snippet,
             size_estimate: msg.size_estimate,
             internal_date: msg.internal_date,
-            headers: headers
-                .into_iter()
-                .map(GmailMessageHeaderOutput::from)
-                .collect(),
+            headers: message_headers(msg.payload, &hs),
         })
     }
 }
@@ -117,8 +114,8 @@ impl fmt::Display for GmailMessageGetOutput {
 ///
 /// Headers are a list rather than a map because a message may repeat a
 /// name (Received, References) and their order is meaningful. They are
-/// absent with the minimal format, restricted to the names passed to
-/// `--header` with the metadata format, and complete otherwise.
+/// absent with the minimal format, narrowed by `--header` when it is
+/// given, and complete otherwise.
 #[derive(Serialize, JsonSchema)]
 pub(crate) struct GmailMessageHeaderOutput {
     pub name: String,
@@ -131,5 +128,90 @@ impl From<GmailMessageHeader> for GmailMessageHeaderOutput {
             name: header.name,
             value: header.value,
         }
+    }
+}
+
+/// Folds the RFC 5322 headers of a message payload into output headers,
+/// keeping only the `names` requested with `--header`. An empty `names`
+/// keeps them all.
+///
+/// The filter is applied here rather than left to Gmail because the
+/// `metadataHeaders` query parameter narrows the response under the
+/// metadata format alone: the full format returns every header whatever
+/// is asked for. Matching is case-insensitive, as RFC 5322 header names
+/// are, and both the order and the repeats of the payload are kept.
+///
+/// Only the top-level part is read, since that is where Gmail puts the
+/// message headers; nested parts carry their own MIME headers.
+pub(crate) fn message_headers(
+    payload: Option<GmailMessagePayload>,
+    names: &[&str],
+) -> Vec<GmailMessageHeaderOutput> {
+    payload
+        .map(|payload| payload.headers)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|header| {
+            names.is_empty()
+                || names
+                    .iter()
+                    .any(|name| name.eq_ignore_ascii_case(&header.name))
+        })
+        .map(GmailMessageHeaderOutput::from)
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use io_gmail::v1::rest::messages::{GmailMessageHeader, GmailMessagePayload};
+
+    use super::message_headers;
+
+    fn payload(headers: &[(&str, &str)]) -> Option<GmailMessagePayload> {
+        Some(GmailMessagePayload {
+            headers: headers
+                .iter()
+                .map(|(name, value)| GmailMessageHeader {
+                    name: name.to_string(),
+                    value: value.to_string(),
+                })
+                .collect(),
+            ..Default::default()
+        })
+    }
+
+    #[test]
+    fn no_requested_name_keeps_every_header() {
+        let headers = message_headers(payload(&[("Subject", "hi"), ("From", "a@b")]), &[]);
+
+        let names: Vec<_> = headers.iter().map(|h| h.name.as_str()).collect();
+        assert_eq!(names, ["Subject", "From"]);
+    }
+
+    #[test]
+    fn requested_names_match_case_insensitively() {
+        let headers = message_headers(
+            payload(&[("Subject", "hi"), ("From", "a@b"), ("To", "c@d")]),
+            &["subject", "TO"],
+        );
+
+        let names: Vec<_> = headers.iter().map(|h| h.name.as_str()).collect();
+        assert_eq!(names, ["Subject", "To"]);
+    }
+
+    #[test]
+    fn repeated_headers_keep_their_order_and_duplicates() {
+        let headers = message_headers(
+            payload(&[("Received", "one"), ("Subject", "hi"), ("Received", "two")]),
+            &["Received"],
+        );
+
+        let values: Vec<_> = headers.iter().map(|h| h.value.as_str()).collect();
+        assert_eq!(values, ["one", "two"]);
+    }
+
+    #[test]
+    fn a_payload_less_message_has_no_header() {
+        assert!(message_headers(None, &["Subject"]).is_empty());
     }
 }

@@ -57,6 +57,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The manually configured wizard flow now offers to reuse the IMAP credentials for SMTP, like the discovered flow, so they are entered once. On accept it reuses the IMAP SASL and prompts only the SMTP endpoint (host seeded from the IMAP host, encryption, port); on decline it runs the full SMTP prompts.
 
+- `gmail messages get --header` and `gmail threads get --header` now narrow the rendered headers under every format, not only `--format metadata`.
+
+  Gmail honours its `metadataHeaders` parameter for the metadata format alone and returns every header otherwise, so the filter is applied to the response as well. Names match case-insensitively, and repeated headers keep their order. Passing no `--header` still renders them all.
+
 - `imap raw` now sends a byte-verbatim batch of tagged commands.
 
   The command argument decodes literal `\r` / `\n` escapes into real CRLF, so a CRLF-separated batch (each command carrying its own tag) can be pipelined from the shell, e.g. `himalaya imap raw 'a1 SELECT INBOX\r\na2 SEARCH ALL\r\n'`. A trailing CRLF is appended when omitted, and the reply is read until every command is acknowledged (possibly out of order). `smtp raw` gains the same escape decoding but stays a single command line: it strips the trailing CRLF (io-smtp appends its own) and rejects batched input, since the exchange reads exactly one reply. Both accept the command via stdin.

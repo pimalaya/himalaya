@@ -8,7 +8,9 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::gmail::{
-    client::GmailClient, format::FormatArg, messages::get::GmailMessageHeaderOutput,
+    client::GmailClient,
+    format::FormatArg,
+    messages::get::{GmailMessageHeaderOutput, message_headers},
 };
 
 /// Get a single Gmail thread with all its messages
@@ -21,8 +23,11 @@ pub struct GmailThreadGetCommand {
     /// The amount of message detail to return.
     #[arg(long, value_enum, default_value_t)]
     pub format: FormatArg,
-    /// Header to include when `--format metadata` is used. Can be
-    /// repeated.
+    /// Only render the given header. Can be repeated, and matched
+    /// case-insensitively.
+    ///
+    /// Under `--format metadata` it also narrows what Gmail sends back,
+    /// since the API honours the filter for that format alone.
     #[arg(long = "header", value_name = "NAME")]
     pub headers: Vec<String>,
 }
@@ -41,21 +46,11 @@ impl GmailThreadGetCommand {
         let messages = thread
             .messages
             .into_iter()
-            .map(|message| {
-                let headers = message
-                    .payload
-                    .map(|payload| payload.headers)
-                    .unwrap_or_default();
-
-                GmailThreadMessageOutput {
-                    id: message.id,
-                    label_ids: message.label_ids,
-                    snippet: message.snippet,
-                    headers: headers
-                        .into_iter()
-                        .map(GmailMessageHeaderOutput::from)
-                        .collect(),
-                }
+            .map(|message| GmailThreadMessageOutput {
+                id: message.id,
+                label_ids: message.label_ids,
+                snippet: message.snippet,
+                headers: message_headers(message.payload, &hs),
             })
             .collect();
 
