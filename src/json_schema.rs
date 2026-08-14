@@ -179,95 +179,95 @@ pub fn schemas() -> BTreeMap<String, Value> {
 
         insert!(
             "himalaya-gmail-profile-get",
-            crate::gmail::profile::GmailProfileOutput
+            crate::gmail::profile::get::GmailProfileOutput
         );
         insert!(
             "himalaya-gmail-labels-list",
-            crate::gmail::labels::LabelsTable
+            crate::gmail::labels::list::LabelsTable
         );
         insert!(
             "himalaya-gmail-labels-get",
-            crate::gmail::labels::LabelsTable
+            crate::gmail::labels::list::LabelsTable
         );
         insert!(
             "himalaya-gmail-messages-list",
-            Paginated<crate::gmail::messages::MessageIdsTable>
+            Paginated<crate::gmail::messages::list::MessageIdsTable>
         );
         insert!(
             "himalaya-gmail-messages-get",
-            crate::gmail::messages::GmailMessageGetOutput
+            crate::gmail::messages::get::GmailMessageGetOutput
         );
         insert!(
             "himalaya-gmail-drafts-list",
-            Paginated<crate::gmail::drafts::DraftsTable>
+            Paginated<crate::gmail::drafts::list::DraftsTable>
         );
         insert!(
             "himalaya-gmail-drafts-get",
-            crate::gmail::drafts::GmailDraftGetOutput
+            crate::gmail::drafts::get::GmailDraftGetOutput
         );
         insert!(
             "himalaya-gmail-threads-list",
-            Paginated<crate::gmail::threads::ThreadsTable>
+            Paginated<crate::gmail::threads::list::ThreadsTable>
         );
         insert!(
             "himalaya-gmail-threads-get",
-            crate::gmail::threads::GmailThreadGetOutput
+            crate::gmail::threads::get::GmailThreadGetOutput
         );
         insert!(
             "himalaya-gmail-history-list",
-            Paginated<crate::gmail::history::GmailHistoryListOutput>
+            Paginated<crate::gmail::history::list::GmailHistoryListOutput>
         );
         insert!(
             "himalaya-gmail-settings-filters-list",
-            crate::gmail::settings::filters::FiltersTable
+            crate::gmail::settings::filters::list::FiltersTable
         );
         insert!(
             "himalaya-gmail-settings-filters-get",
-            crate::gmail::settings::filters::GmailSettingsFilterGetOutput
+            crate::gmail::settings::filters::get::GmailSettingsFilterGetOutput
         );
         insert!(
             "himalaya-gmail-settings-forwarding-addresses-list",
-            crate::gmail::settings::forwarding_addresses::ForwardingAddressesTable
+            crate::gmail::settings::forwarding_addresses::list::ForwardingAddressesTable
         );
         insert!(
             "himalaya-gmail-settings-forwarding-addresses-get",
-            crate::gmail::settings::forwarding_addresses::GmailSettingsForwardingAddressGetOutput
+            crate::gmail::settings::forwarding_addresses::get::GmailSettingsForwardingAddressGetOutput
         );
         insert!(
             "himalaya-gmail-settings-delegates-list",
-            crate::gmail::settings::delegates::DelegatesTable
+            crate::gmail::settings::delegates::list::DelegatesTable
         );
         insert!(
             "himalaya-gmail-settings-delegates-get",
-            crate::gmail::settings::delegates::GmailSettingsDelegateGetOutput
+            crate::gmail::settings::delegates::get::GmailSettingsDelegateGetOutput
         );
         insert!(
             "himalaya-gmail-settings-send-as-list",
-            crate::gmail::settings::sendas::SendAsTable
+            crate::gmail::settings::sendas::list::SendAsTable
         );
         insert!(
             "himalaya-gmail-settings-send-as-get",
-            crate::gmail::settings::sendas::GmailSettingsSendAsGetOutput
+            crate::gmail::settings::sendas::get::GmailSettingsSendAsGetOutput
         );
         insert!(
             "himalaya-gmail-settings-vacation-get",
-            crate::gmail::settings::vacation::GmailSettingsVacationGetOutput
+            crate::gmail::settings::vacation::get::GmailSettingsVacationGetOutput
         );
         insert!(
             "himalaya-gmail-settings-auto-forwarding-get",
-            crate::gmail::settings::autoforwarding::GmailSettingsAutoForwardingGetOutput
+            crate::gmail::settings::autoforwarding::get::GmailSettingsAutoForwardingGetOutput
         );
         insert!(
             "himalaya-gmail-settings-pop-get",
-            crate::gmail::settings::pop::GmailSettingsPopGetOutput
+            crate::gmail::settings::pop::get::GmailSettingsPopGetOutput
         );
         insert!(
             "himalaya-gmail-settings-imap-get",
-            crate::gmail::settings::imap::GmailSettingsImapGetOutput
+            crate::gmail::settings::imap::get::GmailSettingsImapGetOutput
         );
         insert!(
             "himalaya-gmail-settings-language-get",
-            crate::gmail::settings::language::GmailSettingsLanguageGetOutput
+            crate::gmail::settings::language::get::GmailSettingsLanguageGetOutput
         );
     }
 

@@ -71,9 +71,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `message read --raw --json` no longer errors: the two combine, emitting the raw RFC 5322 bytes as a JSON `{ "message": "…" }` string (lossily decoded) instead of bailing with "`--raw` and `--json` cannot be combined".
 
-- Fixed the Gmail `get` commands wrapping their data in a `message` string under `--json`, which left the output unparseable and `--header` without visible effect ([#730]).
+- Fixed the Gmail and Microsoft Graph `get` commands wrapping their data in a `message` string under `--json`, which left the output unparseable and `--header` without visible effect ([#730]).
 
-  `messages get`, `drafts get`, `threads get`, `history list` and the `settings` readers now serialize their data, each with a published JSON Schema. Text output is unchanged, except that `messages get` and `threads get` print the headers they already fetched. `history list` reports the affected message ids rather than per-record counts.
+  Gmail `messages get`, `drafts get`, `threads get`, `history list` and the `settings` readers now serialize their data, as does Microsoft Graph `message get`, each with a published JSON Schema. Text output is unchanged, except that Gmail `messages get` and `threads get` print the headers they already fetched. Gmail `history list` reports the affected message ids rather than per-record counts.
 
 ## [2.0.0] - 2026-07-26
 
