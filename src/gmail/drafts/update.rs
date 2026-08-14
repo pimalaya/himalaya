@@ -6,7 +6,7 @@ use io_gmail::v1::rest::{
 };
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::gmail::{client::GmailClient, input::read_message};
+use crate::{gmail::client::GmailClient, shared::message::arg::MessageArg};
 
 /// Update a Gmail draft (users.drafts.update).
 #[derive(Debug, Parser)]
@@ -17,15 +17,13 @@ pub struct GmailDraftUpdateCommand {
     /// Thread id to attach the draft to.
     #[arg(long = "thread-id", value_name = "ID")]
     pub thread_id: Option<String>,
-    /// The raw RFC 5322 message to draft. Read from standard input when
-    /// omitted.
-    #[arg(value_name = "MESSAGE")]
-    pub message: Option<String>,
+    #[command(flatten)]
+    pub message: MessageArg,
 }
 
 impl GmailDraftUpdateCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
-        let raw = read_message(self.message)?;
+        let raw = self.message.parse()?.into_bytes();
 
         let draft = GmailDraft {
             id: self.id.clone(),

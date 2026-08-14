@@ -5,7 +5,6 @@ pub mod client;
 pub mod drafts;
 pub mod format;
 pub mod history;
-pub mod input;
 pub mod labels;
 pub mod messages;
 pub mod profile;

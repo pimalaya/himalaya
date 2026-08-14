@@ -3,7 +3,7 @@ use clap::Parser;
 use io_gmail::v1::rest::messages::{GmailMessage, encode_raw, insert::GmailMessageInsert};
 use pimalaya_cli::printer::{Message, Printer};
 
-use crate::gmail::{client::GmailClient, input::read_message};
+use crate::{gmail::client::GmailClient, shared::message::arg::MessageArg};
 
 /// Insert a Gmail message into the mailbox without sending
 /// (users.messages.insert).
@@ -12,15 +12,13 @@ pub struct GmailMessageInsertCommand {
     /// Label id to apply to the inserted message. Can be repeated.
     #[arg(long = "label", value_name = "ID")]
     pub labels: Vec<String>,
-    /// The raw RFC 5322 message to insert. Read from standard input
-    /// when omitted.
-    #[arg(value_name = "MESSAGE")]
-    pub message: Option<String>,
+    #[command(flatten)]
+    pub message: MessageArg,
 }
 
 impl GmailMessageInsertCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
-        let raw = read_message(self.message)?;
+        let raw = self.message.parse()?.into_bytes();
 
         let message = GmailMessage {
             raw: Some(encode_raw(&raw)),
