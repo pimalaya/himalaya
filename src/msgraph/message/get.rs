@@ -1,6 +1,11 @@
+use std::fmt;
+
 use anyhow::Result;
 use clap::Parser;
-use pimalaya_cli::printer::{Message, Printer};
+use io_msgraph::v1::rest::users::messages::MsgraphMessage;
+use pimalaya_cli::printer::Printer;
+use schemars::JsonSchema;
+use serde::Serialize;
 
 use crate::{
     msgraph::{client::MsgraphClient, message::list::recipient},
@@ -14,7 +19,6 @@ pub struct MsgraphMessageGetCommand {
     /// The id of the message to get.
     #[arg(value_name = "ID")]
     pub id: String,
-
     /// Return the raw RFC 5322 MIME message instead of the parsed
     /// fields.
     #[arg(long)]
@@ -30,31 +34,50 @@ impl MsgraphMessageGetCommand {
 
         let msg = client.message_get(&self.id)?.response;
 
-        let mut out = String::new();
-        out.push_str(&format!("Id: {}\n", msg.id));
-        if let Some(subject) = &msg.subject {
-            out.push_str(&format!("Subject: {subject}\n"));
+        printer.out(MsgraphMessageGetOutput(msg))
+    }
+}
+
+/// A Microsoft Graph message, rendered as aligned text or, under
+/// `--json`, as the message resource itself instead of a wrapped human
+/// string.
+///
+/// The resource is emitted verbatim so that one message read with `get`
+/// has the very same shape as a row of `list`. The text rendering keeps
+/// showing a summary; `--raw` remains the way to get the RFC 5322 bytes.
+#[derive(Serialize, JsonSchema)]
+#[serde(transparent)]
+pub(crate) struct MsgraphMessageGetOutput(MsgraphMessage);
+
+impl fmt::Display for MsgraphMessageGetOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Id: {}", self.0.id)?;
+
+        if let Some(subject) = &self.0.subject {
+            writeln!(f, "Subject: {subject}")?;
         }
-        if let Some(from) = msg.from.as_ref().map(recipient) {
-            out.push_str(&format!("From: {from}\n"));
-        }
-        let to: Vec<String> = msg.to_recipients.iter().map(recipient).collect();
-        if !to.is_empty() {
-            out.push_str(&format!("To: {}\n", to.join(", ")));
-        }
-        if let Some(date) = &msg.received_date_time {
-            out.push_str(&format!("Received: {date}\n"));
-        }
-        if let Some(is_read) = msg.is_read {
-            out.push_str(&format!("Read: {is_read}\n"));
-        }
-        if let Some(folder) = &msg.parent_folder_id {
-            out.push_str(&format!("Folder: {folder}\n"));
-        }
-        if let Some(preview) = &msg.body_preview {
-            out.push_str(&format!("Preview: {preview}\n"));
+        if let Some(from) = self.0.from.as_ref().map(recipient) {
+            writeln!(f, "From: {from}")?;
         }
 
-        printer.out(Message::new(out))
+        let to: Vec<String> = self.0.to_recipients.iter().map(recipient).collect();
+        if !to.is_empty() {
+            writeln!(f, "To: {}", to.join(", "))?;
+        }
+
+        if let Some(date) = &self.0.received_date_time {
+            writeln!(f, "Received: {date}")?;
+        }
+        if let Some(is_read) = self.0.is_read {
+            writeln!(f, "Read: {is_read}")?;
+        }
+        if let Some(folder) = &self.0.parent_folder_id {
+            writeln!(f, "Folder: {folder}")?;
+        }
+        if let Some(preview) = &self.0.body_preview {
+            writeln!(f, "Preview: {preview}")?;
+        }
+
+        Ok(())
     }
 }

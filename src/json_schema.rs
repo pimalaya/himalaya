@@ -298,6 +298,10 @@ pub fn schemas() -> BTreeMap<String, Value> {
             Paginated<crate::msgraph::message::list::MessagesTable>
         );
         insert!(
+            "himalaya-msgraph-message-get",
+            crate::msgraph::message::get::MsgraphMessageGetOutput
+        );
+        insert!(
             "himalaya-msgraph-attachment-list",
             crate::msgraph::attachment::list::AttachmentsTable
         );
