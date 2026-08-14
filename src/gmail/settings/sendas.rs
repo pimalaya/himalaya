@@ -22,13 +22,13 @@ use crate::{
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum GmailSettingsSendAsCommand {
-    List(GmailSendAsListCommand),
-    Get(GmailSendAsGetCommand),
-    Create(GmailSendAsCreateCommand),
-    Update(GmailSendAsUpdateCommand),
+    List(GmailSettingsSendAsListCommand),
+    Get(GmailSettingsSendAsGetCommand),
+    Create(GmailSettingsSendAsCreateCommand),
+    Update(GmailSettingsSendAsUpdateCommand),
     #[command(visible_aliases = ["del", "remove", "rm"])]
-    Delete(GmailSendAsDeleteCommand),
-    Verify(GmailSendAsVerifyCommand),
+    Delete(GmailSettingsSendAsDeleteCommand),
+    Verify(GmailSettingsSendAsVerifyCommand),
 }
 
 impl GmailSettingsSendAsCommand {
@@ -51,9 +51,9 @@ impl GmailSettingsSendAsCommand {
 
 /// List all Gmail send-as aliases (settings.sendAs.list).
 #[derive(Debug, Parser)]
-pub struct GmailSendAsListCommand;
+pub struct GmailSettingsSendAsListCommand;
 
-impl GmailSendAsListCommand {
+impl GmailSettingsSendAsListCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -77,13 +77,13 @@ impl GmailSendAsListCommand {
 
 /// Get one Gmail send-as alias by e-mail address (settings.sendAs.get).
 #[derive(Debug, Parser)]
-pub struct GmailSendAsGetCommand {
+pub struct GmailSettingsSendAsGetCommand {
     /// E-mail address of the send-as alias to get.
     #[arg(value_name = "EMAIL")]
     pub email: String,
 }
 
-impl GmailSendAsGetCommand {
+impl GmailSettingsSendAsGetCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let out = {
             let c = GmailSendAsGet::new(&client.auth, &client.user_id, &self.email)?;
@@ -97,7 +97,7 @@ impl GmailSendAsGetCommand {
 
 /// Create a Gmail send-as alias (settings.sendAs.create).
 #[derive(Debug, Parser)]
-pub struct GmailSendAsCreateCommand {
+pub struct GmailSettingsSendAsCreateCommand {
     /// E-mail address of the send-as alias to create.
     #[arg(value_name = "EMAIL")]
     pub email: String,
@@ -119,7 +119,7 @@ pub struct GmailSendAsCreateCommand {
     pub treat_as_alias: bool,
 }
 
-impl GmailSendAsCreateCommand {
+impl GmailSettingsSendAsCreateCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let send_as = GmailSendAs {
             send_as_email: self.email.clone(),
@@ -145,7 +145,7 @@ impl GmailSendAsCreateCommand {
 
 /// Update a Gmail send-as alias (settings.sendAs.update/patch).
 #[derive(Debug, Parser)]
-pub struct GmailSendAsUpdateCommand {
+pub struct GmailSettingsSendAsUpdateCommand {
     /// E-mail address of the send-as alias to update.
     #[arg(value_name = "EMAIL")]
     pub email: String,
@@ -172,7 +172,7 @@ pub struct GmailSendAsUpdateCommand {
     pub patch: bool,
 }
 
-impl GmailSendAsUpdateCommand {
+impl GmailSettingsSendAsUpdateCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let send_as = GmailSendAs {
             send_as_email: self.email.clone(),
@@ -200,13 +200,13 @@ impl GmailSendAsUpdateCommand {
 
 /// Delete a Gmail send-as alias (settings.sendAs.delete).
 #[derive(Debug, Parser)]
-pub struct GmailSendAsDeleteCommand {
+pub struct GmailSettingsSendAsDeleteCommand {
     /// E-mail address of the send-as alias to delete.
     #[arg(value_name = "EMAIL")]
     pub email: String,
 }
 
-impl GmailSendAsDeleteCommand {
+impl GmailSettingsSendAsDeleteCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         {
             let c = GmailSendAsDelete::new(&client.auth, &client.user_id, &self.email)?;
@@ -223,13 +223,13 @@ impl GmailSendAsDeleteCommand {
 /// Send a verification e-mail for a Gmail send-as alias
 /// (settings.sendAs.verify).
 #[derive(Debug, Parser)]
-pub struct GmailSendAsVerifyCommand {
+pub struct GmailSettingsSendAsVerifyCommand {
     /// E-mail address of the send-as alias to verify.
     #[arg(value_name = "EMAIL")]
     pub email: String,
 }
 
-impl GmailSendAsVerifyCommand {
+impl GmailSettingsSendAsVerifyCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         {
             let c = GmailSendAsVerify::new(&client.auth, &client.user_id, &self.email)?;

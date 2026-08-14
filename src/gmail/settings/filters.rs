@@ -20,11 +20,11 @@ use crate::{
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum GmailSettingsFiltersCommand {
-    List(List),
-    Get(Get),
-    Create(Create),
+    List(GmailSettingsFiltersListCommand),
+    Get(GmailSettingsFilterGetCommand),
+    Create(GmailSettingsFilterCreateCommand),
     #[command(visible_aliases = ["del", "remove", "rm"])]
-    Delete(Delete),
+    Delete(GmailSettingsFilterDeleteCommand),
 }
 
 impl GmailSettingsFiltersCommand {
@@ -45,9 +45,9 @@ impl GmailSettingsFiltersCommand {
 
 /// List all Gmail filters (users.settings.filters.list).
 #[derive(Debug, Parser)]
-pub struct List;
+pub struct GmailSettingsFiltersListCommand;
 
-impl List {
+impl GmailSettingsFiltersListCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -72,13 +72,13 @@ impl List {
 
 /// Get a Gmail filter by identifier (users.settings.filters.get).
 #[derive(Debug, Parser)]
-pub struct Get {
+pub struct GmailSettingsFilterGetCommand {
     /// Identifier of the filter to get.
     #[arg(value_name = "ID")]
     pub id: String,
 }
 
-impl Get {
+impl GmailSettingsFilterGetCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let out = {
             let c = GmailFilterGet::new(&client.auth, &client.user_id, &self.id)?;
@@ -92,7 +92,7 @@ impl Get {
 
 /// Create a Gmail filter (users.settings.filters.create).
 #[derive(Debug, Parser)]
-pub struct Create {
+pub struct GmailSettingsFilterCreateCommand {
     /// Match messages whose sender matches this value.
     #[arg(long, value_name = "ADDR")]
     pub from: Option<String>,
@@ -130,7 +130,7 @@ pub struct Create {
     pub forward: Option<String>,
 }
 
-impl Create {
+impl GmailSettingsFilterCreateCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let filter = GmailFilter {
             id: String::new(),
@@ -168,13 +168,13 @@ impl Create {
 
 /// Delete a Gmail filter (users.settings.filters.delete).
 #[derive(Debug, Parser)]
-pub struct Delete {
+pub struct GmailSettingsFilterDeleteCommand {
     /// Identifier of the filter to delete.
     #[arg(value_name = "ID")]
     pub id: String,
 }
 
-impl Delete {
+impl GmailSettingsFilterDeleteCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         {
             let c = GmailFilterDelete::new(&client.auth, &client.user_id, &self.id)?;

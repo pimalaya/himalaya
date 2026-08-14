@@ -22,11 +22,11 @@ use crate::{
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum GmailSettingsForwardingAddressesCommand {
-    List(List),
-    Get(Get),
-    Create(Create),
+    List(GmailSettingsForwardingAddressesListCommand),
+    Get(GmailSettingsForwardingAddressGetCommand),
+    Create(GmailSettingsForwardingAddressCreateCommand),
     #[command(visible_aliases = ["del", "remove", "rm"])]
-    Delete(Delete),
+    Delete(GmailSettingsForwardingAddressDeleteCommand),
 }
 
 impl GmailSettingsForwardingAddressesCommand {
@@ -48,9 +48,9 @@ impl GmailSettingsForwardingAddressesCommand {
 /// List all Gmail forwarding addresses
 /// (users.settings.forwardingAddresses.list).
 #[derive(Debug, Parser)]
-pub struct List;
+pub struct GmailSettingsForwardingAddressesListCommand;
 
-impl List {
+impl GmailSettingsForwardingAddressesListCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -76,13 +76,13 @@ impl List {
 /// Get a Gmail forwarding address by email address
 /// (users.settings.forwardingAddresses.get).
 #[derive(Debug, Parser)]
-pub struct Get {
+pub struct GmailSettingsForwardingAddressGetCommand {
     /// Email address of the forwarding address to get.
     #[arg(value_name = "EMAIL")]
     pub email: String,
 }
 
-impl Get {
+impl GmailSettingsForwardingAddressGetCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let out = {
             let c = GmailForwardingAddressGet::new(&client.auth, &client.user_id, &self.email)?;
@@ -97,13 +97,13 @@ impl Get {
 /// Create a Gmail forwarding address
 /// (users.settings.forwardingAddresses.create).
 #[derive(Debug, Parser)]
-pub struct Create {
+pub struct GmailSettingsForwardingAddressCreateCommand {
     /// Email address of the forwarding address to create.
     #[arg(value_name = "EMAIL")]
     pub email: String,
 }
 
-impl Create {
+impl GmailSettingsForwardingAddressCreateCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let address = GmailForwardingAddress {
             forwarding_email: self.email.clone(),
@@ -126,13 +126,13 @@ impl Create {
 /// Delete a Gmail forwarding address
 /// (users.settings.forwardingAddresses.delete).
 #[derive(Debug, Parser)]
-pub struct Delete {
+pub struct GmailSettingsForwardingAddressDeleteCommand {
     /// Email address of the forwarding address to delete.
     #[arg(value_name = "EMAIL")]
     pub email: String,
 }
 
-impl Delete {
+impl GmailSettingsForwardingAddressDeleteCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         {
             let c = GmailForwardingAddressDelete::new(&client.auth, &client.user_id, &self.email)?;

@@ -24,11 +24,11 @@ use crate::{
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum GmailSettingsDelegatesCommand {
-    List(List),
-    Get(Get),
-    Create(Create),
+    List(GmailSettingsDelegatesListCommand),
+    Get(GmailSettingsDelegateGetCommand),
+    Create(GmailSettingsDelegateCreateCommand),
     #[command(visible_aliases = ["del", "remove", "rm"])]
-    Delete(Delete),
+    Delete(GmailSettingsDelegateDeleteCommand),
 }
 
 impl GmailSettingsDelegatesCommand {
@@ -49,9 +49,9 @@ impl GmailSettingsDelegatesCommand {
 
 /// List all Gmail delegates (users.settings.delegates.list).
 #[derive(Debug, Parser)]
-pub struct List;
+pub struct GmailSettingsDelegatesListCommand;
 
-impl List {
+impl GmailSettingsDelegatesListCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
@@ -76,13 +76,13 @@ impl List {
 
 /// Get a Gmail delegate by email address (users.settings.delegates.get).
 #[derive(Debug, Parser)]
-pub struct Get {
+pub struct GmailSettingsDelegateGetCommand {
     /// Email address of the delegate to get.
     #[arg(value_name = "EMAIL")]
     pub email: String,
 }
 
-impl Get {
+impl GmailSettingsDelegateGetCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let out = {
             let c = GmailDelegateGet::new(&client.auth, &client.user_id, &self.email)?;
@@ -96,13 +96,13 @@ impl Get {
 
 /// Create a Gmail delegate (users.settings.delegates.create).
 #[derive(Debug, Parser)]
-pub struct Create {
+pub struct GmailSettingsDelegateCreateCommand {
     /// Email address of the delegate to create.
     #[arg(value_name = "EMAIL")]
     pub email: String,
 }
 
-impl Create {
+impl GmailSettingsDelegateCreateCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         let delegate = GmailDelegate {
             delegate_email: self.email.clone(),
@@ -124,13 +124,13 @@ impl Create {
 
 /// Delete a Gmail delegate (users.settings.delegates.delete).
 #[derive(Debug, Parser)]
-pub struct Delete {
+pub struct GmailSettingsDelegateDeleteCommand {
     /// Email address of the delegate to delete.
     #[arg(value_name = "EMAIL")]
     pub email: String,
 }
 
-impl Delete {
+impl GmailSettingsDelegateDeleteCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut GmailClient) -> Result<()> {
         {
             let c = GmailDelegateDelete::new(&client.auth, &client.user_id, &self.email)?;
