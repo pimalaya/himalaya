@@ -3,16 +3,16 @@ use std::{collections::HashMap, path::PathBuf};
 use anyhow::{Result, bail};
 use comfy_table::ContentArrangement;
 use crossterm::style::Color;
+use io_sasl::{
+    login::SaslLoginCreds, mechanism::Sasl, rfc4505::anonymous::SaslAnonymousCreds,
+    rfc4616::plain::SaslPlainCreds, rfc5801::SaslGs2ChannelBinding, rfc5802::SaslScramCreds,
+    rfc7628::oauthbearer::SaslOauthbearerCreds, xoauth2::SaslXoauth2Creds,
+};
 use pimalaya_config::{
     secret::Secret,
     toml::{TomlConfig, shell_expanded_string},
 };
-use pimalaya_stream::{
-    sasl::{
-        Sasl, SaslAnonymous, SaslLogin, SaslOauthbearer, SaslPlain, SaslScramSha256, SaslXoauth2,
-    },
-    tls::{Rustls, RustlsCrypto, Tls, TlsProvider},
-};
+use pimalaya_stream::tls::{Rustls, RustlsCrypto, Tls, TlsProvider};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -103,6 +103,103 @@ impl TomlConfig for Config {
             .find_map(|(name, account)| account.default.then(|| name.clone()))?;
 
         self.take_named_account(&name)
+    }
+}
+
+/// The order the rendered account groups its keys in, most defining
+/// first: what the account is, then the backend it reads from, the
+/// transport it sends over, the mailboxes it names, and last the
+/// rendering options.
+///
+/// A key outside this list still renders, after the ones listed, so a
+/// field added to [`AccountConfig`] can never go missing from a
+/// generated document just because nobody updated this table.
+const RENDER_ORDER: [&str; 13] = [
+    "default",
+    "imap",
+    "jmap",
+    "gmail",
+    "msgraph",
+    "maildir",
+    "m2dir",
+    "pimdir",
+    "smtp",
+    "mailbox",
+    "envelope",
+    "attachment",
+    "table",
+];
+
+impl AccountConfig {
+    /// Renders this account as an `[accounts.<name>]` block, ready to be
+    /// written to a configuration file or appended to one.
+    ///
+    /// The serializer decides what is written, so a field left at its
+    /// default is omitted and nothing has to be listed here twice. What
+    /// this adds is reading order: the flattened dotted keys come out
+    /// alphabetically, which buries `imap.server` under the credentials
+    /// that authenticate against it, and runs every group together. The
+    /// groups are reordered, `server` is lifted to the top of its own,
+    /// and a blank line separates them.
+    pub fn render(&self, name: &str) -> Result<String> {
+        // NOTE: borrowed rather than built into a `Config`, which would
+        // mean cloning the account (and so deriving `Clone` down every
+        // backend config) to render it. The emitter only looks for an
+        // `accounts` table, so any shape carrying one will do.
+        #[derive(Serialize)]
+        struct AccountDocument<'a> {
+            accounts: HashMap<&'a str, &'a AccountConfig>,
+        }
+
+        let document = AccountDocument {
+            accounts: HashMap::from([(name, self)]),
+        };
+        let rendered = pimalaya_config::toml::to_string(&document)?;
+
+        // The emitter writes the header itself, and everything below it
+        // is one dotted key per line.
+        let (header, body) = match rendered.split_once('\n') {
+            Some((header, body)) => (header, body),
+            None => return Ok(rendered),
+        };
+
+        let mut groups: Vec<(String, Vec<&str>)> = Vec::new();
+
+        for line in body.lines().filter(|line| !line.trim().is_empty()) {
+            let key = line.split(['.', ' ']).next().unwrap_or(line).to_string();
+
+            match groups.iter_mut().find(|(name, _)| *name == key) {
+                Some((_, lines)) => lines.push(line),
+                None => groups.push((key, vec![line])),
+            }
+        }
+
+        groups.sort_by_key(|(key, _)| {
+            RENDER_ORDER
+                .iter()
+                .position(|known| known == key)
+                .unwrap_or(RENDER_ORDER.len())
+        });
+
+        let mut document = format!("{header}\n");
+
+        for (index, (key, mut lines)) in groups.into_iter().enumerate() {
+            if index > 0 {
+                document.push('\n');
+            }
+
+            // The endpoint is what the group is about, so it reads first;
+            // the credentials and the quirks qualify it.
+            let server = format!("{key}.server ");
+            lines.sort_by_key(|line| !line.starts_with(&server));
+
+            for line in lines {
+                document.push_str(line);
+                document.push('\n');
+            }
+        }
+
+        Ok(document)
     }
 }
 
@@ -661,29 +758,34 @@ impl SaslConfig {
     /// other mechanism.
     pub fn try_into_sasl(self, host: impl ToString, port: u16) -> Result<Sasl> {
         Ok(match self {
-            SaslConfig::Anonymous(c) => Sasl::Anonymous(SaslAnonymous { message: c.message }),
-            SaslConfig::Login(c) => Sasl::Login(SaslLogin {
+            SaslConfig::Anonymous(c) => Sasl::Anonymous(SaslAnonymousCreds { message: c.message }),
+            SaslConfig::Login(c) => Sasl::Login(SaslLoginCreds {
                 username: c.username,
                 password: c.password.get()?,
             }),
-            SaslConfig::Plain(c) => Sasl::Plain(SaslPlain {
+            SaslConfig::Plain(c) => Sasl::Plain(SaslPlainCreds {
                 authzid: c.authzid,
                 authcid: c.authcid,
                 passwd: c.passwd.get()?,
             }),
-            SaslConfig::Oauthbearer(c) => Sasl::Oauthbearer(SaslOauthbearer {
+            SaslConfig::Oauthbearer(c) => Sasl::Oauthbearer(SaslOauthbearerCreds {
                 username: c.username,
                 host: host.to_string(),
                 port,
                 token: c.token.get()?,
             }),
-            SaslConfig::Xoauth2(c) => Sasl::Xoauth2(SaslXoauth2 {
+            SaslConfig::Xoauth2(c) => Sasl::Xoauth2(SaslXoauth2Creds {
                 username: c.username,
                 token: c.token.get()?,
             }),
-            SaslConfig::ScramSha256(c) => Sasl::ScramSha256(SaslScramSha256 {
+            // NOTE: an empty nonce means "draw one for me": the client
+            // fills it before the exchange, an I/O-free coroutine having
+            // no way to generate randomness itself.
+            SaslConfig::ScramSha256(c) => Sasl::ScramSha256(SaslScramCreds {
                 username: c.username,
                 password: c.password.get()?,
+                nonce: Vec::new(),
+                channel_binding: SaslGs2ChannelBinding::Unsupported,
             }),
         })
     }

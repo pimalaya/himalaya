@@ -1,5 +1,6 @@
 use anyhow::{Result, bail};
 use clap::Parser;
+use io_smtp::client::SmtpClient as _;
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::{shared::raw::RawCommandArg, smtp::client::SmtpClient};
@@ -33,7 +34,7 @@ impl SmtpRawCommand {
             bail!("SMTP raw accepts a single command line; batching is not supported");
         }
 
-        let reply = client.raw(command.to_string())?;
+        let reply = client.raw(command.to_string().into())?;
 
         printer.out(Message::new(reply))
     }

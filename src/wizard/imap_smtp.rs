@@ -13,8 +13,8 @@ use std::collections::HashMap;
 
 use anyhow::{Result, bail};
 use io_pim_discovery::compose::config::DiscoverySecurity;
+use io_sasl::mechanism::SaslMechanism;
 use pimalaya_cli::{prompt, spinner::Spinner};
-use pimalaya_stream::sasl::SaslMechanism;
 
 use crate::{
     account::check,
@@ -213,6 +213,11 @@ fn build_sasl(
             })
         }
         SaslMechanism::Anonymous => unreachable!("handled above"),
+        // NOTE: io-sasl knows more mechanisms than the config can
+        // express, and the wizard only ever offers the six above, so
+        // this arm is unreachable through the menu. It bails rather
+        // than panics in case a caller hands one over directly.
+        other => bail!("Unsupported SASL mechanism `{}`", mechanism_name(&other)),
     })
 }
 
@@ -225,6 +230,30 @@ fn mechanism_label(mechanism: &SaslMechanism) -> &'static str {
         SaslMechanism::XOAuth2 => XOAUTH2,
         SaslMechanism::Anonymous => ANONYMOUS,
         SaslMechanism::Login => LOGIN,
+        other => mechanism_name(other),
+    }
+}
+
+/// The registered SASL name of a mechanism the wizard does not offer,
+/// used to name it in a menu label or an error.
+fn mechanism_name(mechanism: &SaslMechanism) -> &'static str {
+    match mechanism {
+        SaslMechanism::CramMd5 => "CRAM-MD5",
+        SaslMechanism::External => "EXTERNAL",
+        SaslMechanism::Gssapi => "GSSAPI",
+        SaslMechanism::Gs2Krb5 => "GS2-KRB5",
+        SaslMechanism::Gs2Krb5Plus => "GS2-KRB5-PLUS",
+        SaslMechanism::ScramSha1 => "SCRAM-SHA-1",
+        SaslMechanism::ScramSha1Plus => "SCRAM-SHA-1-PLUS",
+        SaslMechanism::ScramSha256Plus => "SCRAM-SHA-256-PLUS",
+        SaslMechanism::ScramSha512 => "SCRAM-SHA-512",
+        SaslMechanism::ScramSha512Plus => "SCRAM-SHA-512-PLUS",
+        SaslMechanism::Anonymous => ANONYMOUS,
+        SaslMechanism::Login => LOGIN,
+        SaslMechanism::Plain => PLAIN,
+        SaslMechanism::OAuthBearer => OAUTHBEARER,
+        SaslMechanism::XOAuth2 => XOAUTH2,
+        SaslMechanism::ScramSha256 => SCRAM_SHA_256,
     }
 }
 

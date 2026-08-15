@@ -1,3 +1,4 @@
+use io_imap::client::ImapClient as _;
 use std::{collections::HashMap, fmt, num::NonZeroU32};
 
 use anyhow::Result;

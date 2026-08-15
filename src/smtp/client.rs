@@ -13,8 +13,10 @@ use std::{
 };
 
 use anyhow::{Result, anyhow};
-use io_smtp::{client::SmtpClientStd as Inner, rfc5321::SmtpEhloDomain};
-use pimalaya_stream::sasl::Sasl;
+use io_sasl::mechanism::Sasl;
+use io_smtp::{
+    client::SmtpClientStd as Inner, rfc5321::SmtpEhloDomain, session::SmtpSessionOpenOptions,
+};
 use url::Url;
 
 use crate::{
@@ -51,7 +53,10 @@ impl SmtpClient {
             }
             None => None,
         };
-        let inner = Inner::connect(&server, &tls, config.starttls, domain, sasl)?;
+        let opts = SmtpSessionOpenOptions {
+            starttls: config.starttls,
+        };
+        let (inner, _capabilities) = Inner::connect(&server, &tls, domain, sasl, opts)?;
         Ok(Self { inner })
     }
 }

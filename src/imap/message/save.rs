@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use io_imap::client::ImapClient as _;
 use io_imap::{
     rfc3501::append::ImapMessageAppendOptions,
     types::{IntoStatic, flag::Flag, mailbox::Mailbox},

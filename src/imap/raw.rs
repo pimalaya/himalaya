@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use io_imap::client::ImapClient as _;
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::{imap::client::ImapClient, shared::raw::RawCommandArg};
@@ -32,7 +33,7 @@ impl ImapRawCommand {
             command.push('\n');
         }
 
-        let response = client.raw(command)?;
+        let response = client.raw(command.as_bytes())?;
 
         printer.out(Message::new(response))
     }

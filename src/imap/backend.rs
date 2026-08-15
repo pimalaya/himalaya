@@ -7,6 +7,7 @@
 //! converting between those and io_imap's wire types, adapted from the
 //! retired io-email IMAP drivers.
 
+use io_imap::client::ImapClient as _;
 use std::{
     collections::{BTreeMap, BTreeSet},
     num::NonZeroU32,
@@ -82,7 +83,7 @@ impl ImapClient {
                 let mbox = parse_mailbox(&mailbox.id)?;
                 let items = self.status(
                     mbox,
-                    vec![StatusDataItemName::Messages, StatusDataItemName::Unseen],
+                    vec![StatusDataItemName::Messages, StatusDataItemName::Unseen].into(),
                 )?;
                 apply_status(mailbox, items);
             }

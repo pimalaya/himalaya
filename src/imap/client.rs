@@ -9,11 +9,12 @@ use std::ops::{Deref, DerefMut};
 
 use anyhow::{Result, anyhow};
 use io_imap::{
-    client::{ImapClientStd as Inner, ImapClientStdConnectOptions, default_port},
+    client::{ImapClientStd as Inner, default_port},
     has_imap_capability,
+    session::ImapSessionOpenOptions,
     types::response::Capability,
 };
-use pimalaya_stream::sasl::Sasl;
+use io_sasl::mechanism::Sasl;
 use url::Url;
 
 use crate::{
@@ -54,7 +55,7 @@ impl ImapClient {
             }
             None => None,
         };
-        let opts = ImapClientStdConnectOptions {
+        let opts = ImapSessionOpenOptions {
             starttls: config.starttls,
             auto_id,
             sasl_ir: config.sasl_ir,

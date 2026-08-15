@@ -1,3 +1,4 @@
+use io_smtp::client::SmtpClient as _;
 use std::borrow::Cow;
 
 use anyhow::Result;

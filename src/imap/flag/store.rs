@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
+use io_imap::client::ImapClient as _;
 use io_imap::{
     rfc3501::{select::ImapMailboxSelectOptions, store::ImapMessageStoreOptions},
     types::{

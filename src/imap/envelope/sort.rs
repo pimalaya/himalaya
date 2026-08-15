@@ -1,3 +1,4 @@
+use io_imap::client::ImapClient as _;
 use std::fmt;
 
 use anyhow::Result;

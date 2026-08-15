@@ -3,7 +3,7 @@ name = "himalaya"
 description = "CLI to manage emails"
 version = "2.0.0"
 authors = ["Clément DOUIN (soywod) <pimalaya.org@posteo.net>"]
-rust-version = "1.88"
+rust-version = "1.89"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 categories = ["command-line-utilities", "email"]
@@ -41,22 +41,23 @@ ariadne = "0.6"
 base64 = { version = "0.23", optional = true }
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 chumsky = { version = "0.13", default-features = false }
-clap = { version = "4.4", features = ["derive", "wrap_help"] }
+clap = { version = "4.4", features = ["derive", "env", "wrap_help"] }
 comfy-table = "8"
 convert_case = { version = "0.11", optional = true }
 crossterm = { version = "0.29", default-features = false, features = ["serde"] }
 dirs = "6"
 humansize = "2"
-io-gmail = { version = "0.2", default-features = false, optional = true }
-io-imap = { version = "0.4", default-features = false, optional = true }
-io-jmap = { version = "0.2", default-features = false, optional = true }
+io-gmail = { version = "0.3", default-features = false, optional = true }
+io-imap = { version = "0.5", default-features = false, optional = true }
+io-jmap = { version = "0.3", default-features = false, optional = true }
 io-m2dir = { version = "0.2", default-features = false, optional = true }
 io-maildir = { version = "0.2", default-features = false, optional = true }
-io-msgraph = { version = "0.2", default-features = false, optional = true }
-io-pim-discovery = { version = "0.5", default-features = false, features = ["autoconfig", "pacc", "rfc6186", "rfc8620"] }
+io-msgraph = { version = "0.3", default-features = false, optional = true }
+io-pim-discovery = { version = "0.7", default-features = false, features = ["autoconfig", "pacc", "rfc6186", "rfc8620"] }
 io-pimdir = { version = "0.2", default-features = false, features = ["client"], optional = true }
 io-replica = { version = "0.3", default-features = false, optional = true }
-io-smtp = { version = "0.2", default-features = false, optional = true }
+io-sasl = { version = "0.1", default-features = false, features = ["scram"] }
+io-smtp = { version = "0.3", default-features = false, optional = true }
 log = "0.4"
 mail-builder = "0.4"
 mail-parser = { version = "0.11", features = ["full_encoding", "serde"], optional = true }
@@ -65,7 +66,7 @@ open = "5"
 percent-encoding = "2"
 pimalaya-cli = { version = "0.2", default-features = false, features = ["terminal", "table", "prompt", "wizard", "imap", "smtp", "jmap", "spinner"] }
 pimalaya-config = { version = "0.1", default-features = false, features = ["toml", "secret"] }
-pimalaya-stream = { version = "0.1", default-features = false, features = ["std"] }
+pimalaya-stream = { version = "0.3", default-features = false, features = ["std"] }
 rfc2047-decoder = { version = "1", optional = true }
 schemars = { version = "1", features = ["chrono04"] }
 secrecy = "0.10"
@@ -77,8 +78,3 @@ url = { version = "2.2", features = ["serde"] }
 
 [target.'cfg(windows)'.dependencies]
 uds_windows = "1"
-
-[patch.crates-io]
-io-imap.git = "https://github.com/pimalaya/io-imap"
-pimalaya-cli.git = "https://github.com/pimalaya/cli"
-pimalaya-config.git = "https://github.com/pimalaya/config"

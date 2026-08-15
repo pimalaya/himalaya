@@ -1,3 +1,4 @@
+pub mod configure;
 pub mod discover;
 #[cfg(feature = "gmail")]
 pub mod gmail;

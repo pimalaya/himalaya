@@ -7,6 +7,7 @@
 //! forward paths), then reuses [`SmtpClient`]'s `send`. The envelope
 //! parsing is lifted from the retired io-email SMTP driver.
 
+use io_smtp::client::SmtpClient as _;
 use std::borrow::Cow;
 
 use anyhow::{Result, anyhow, bail};

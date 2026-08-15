@@ -23,6 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Without it the read stays non-mutating, the default since v2. IMAP does it in a single round by switching `BODY.PEEK[]` to `BODY[]`. The other backends issue a separate flag update after the fetch: JMAP `Email/set`, Gmail `messages.modify`, Microsoft Graph `PATCH isRead`, Maildir and m2dir add the `S` flag.
 
+- Added the `configure` command (alias `wizard`), running the account wizard by name.
+
+  A bare `himalaya` and any command needing an account still offer it when they find no configuration, behind a welcome naming the file they looked for. That offer is now a hook rather than a gate: the command carries on afterwards either way, where it used to exit whatever you answered. Nothing prompts when stdin is not a terminal or `--json` is set.
+
+- Added back the `HIMALAYA_CONFIG` environment variable, read like `-c` and accepting the same `:`-delimited list.
+
 ### Changed
 
 - Made the configuration wizard discovery-only, removing the hand-entry flow entirely.
@@ -41,11 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   The commands now agree, so `message read` shows the same id passed to `attachments download`. Attachment ids are therefore a sparse subset of the part positions (`1 5 9`) rather than a dense sequence.
 
-- The first-run wizard now opens with a welcome banner on stderr explaining what Himalaya is and what the wizard does, replacing the comment header that used to head the generated config.
+- The first-run offer now opens with a welcome banner on stderr explaining what Himalaya is, naming the configuration file it looked for and pointing at the documented sample, replacing the comment header that used to head the generated config. `himalaya configure`, asked for by name, skips it.
 
-- The wizard now offers to save the generated configuration to a file, instead of only printing it.
+- The wizard now writes the account to the configuration file rather than only printing it, and never rewrites what a human wrote.
 
-  It defaults to `$XDG_CONFIG_HOME/himalaya/config.toml`, creates parent directories and confirms before overwriting an existing file. When stdout is redirected or in JSON mode it still prints straight to stdout, so redirects and scripts keep working.
+  The path is no longer prompted: it is where `-c` or `HIMALAYA_CONFIG` pointed, or `$XDG_CONFIG_HOME/himalaya/config.toml`. A file that is not there is written whole, and one that is gets a plain text append, so comments, ordering and formatting survive. The generated account takes a free name, suffixed until it is, and claims `default` only when no other account does. When stdout is redirected or in JSON mode it still prints straight to stdout, so redirects and scripts keep working.
 
 - Bare `himalaya --account <NAME>` (an account but no subcommand) now shows the help instead of dropping into the account-creation wizard.
 
@@ -66,6 +72,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The command argument decodes literal `\r` / `\n` escapes into real CRLF, so a CRLF-separated batch (each command carrying its own tag) can be pipelined from the shell, e.g. `himalaya imap raw 'a1 SELECT INBOX\r\na2 SEARCH ALL\r\n'`. A trailing CRLF is appended when omitted, and the reply is read until every command is acknowledged (possibly out of order). `smtp raw` gains the same escape decoding but stays a single command line: it strips the trailing CRLF (io-smtp appends its own) and rejects batched input, since the exchange reads exactly one reply. Both accept the command via stdin.
 
 ### Fixed
+
+- Fixed commands dying mid-exchange with a bare `Resource temporarily unavailable (os error 35)` ([#731], [#732]).
+
+  A blocking socket is not supposed to report `EAGAIN`, yet it surfaced on large mailboxes, the more readily the longer the exchange ran: on the chunked `FETCH` an IMAP `SORT` fallback runs, and on a slow `AUTHENTICATE` against a 260k-message account. The transport underneath every backend now retries a stream that reports it is not ready, for a minute before giving up and saying so. It also arms a socket read deadline at connect time, so a server that goes silent on an otherwise healthy connection ends the command instead of hanging forever.
 
 - Fixed lean cargo feature combinations failing to compile. Every combination now builds.
 
@@ -1097,6 +1107,8 @@ Few major concepts changed:
 [#634]: https://github.com/pimalaya/himalaya/issues/634
 [#729]: https://github.com/pimalaya/himalaya/issues/729
 [#730]: https://github.com/pimalaya/himalaya/issues/730
+[#731]: https://github.com/pimalaya/himalaya/issues/731
+[#732]: https://github.com/pimalaya/himalaya/issues/732
 
 [core#1]: https://github.com/pimalaya/core/issues/1
 [core#10]: https://github.com/pimalaya/core/issues/10

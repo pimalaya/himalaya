@@ -2,10 +2,10 @@ use std::{fmt, path::PathBuf};
 
 use anyhow::{Result, bail};
 use clap::Parser;
+#[cfg(feature = "imap")]
+use io_sasl::mechanism::SaslMechanism;
 use pimalaya_cli::printer::Printer;
 use pimalaya_config::toml::TomlConfig;
-#[cfg(feature = "imap")]
-use pimalaya_stream::sasl::SaslMechanism;
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -169,8 +169,11 @@ pub fn test_account(account_config: &AccountConfig) -> Result<()> {
 
 #[cfg(feature = "imap")]
 pub(crate) fn connect_imap(imap_config: &ImapConfig) -> Result<()> {
-    use io_imap::client::{ImapClientStd, ImapClientStdConnectOptions, default_port};
-    use pimalaya_stream::sasl::Sasl;
+    use io_imap::{
+        client::{ImapClientStd, default_port},
+        session::ImapSessionOpenOptions,
+    };
+    use io_sasl::mechanism::Sasl;
 
     use crate::imap::{client::parse_imap_server, id::resolve_auto_id_params};
 
@@ -186,7 +189,7 @@ pub(crate) fn connect_imap(imap_config: &ImapConfig) -> Result<()> {
             cfg.try_into_sasl(host, port)
         })
         .transpose()?;
-    let opts = ImapClientStdConnectOptions {
+    let opts = ImapSessionOpenOptions {
         starttls: imap_config.starttls,
         auto_id,
         sasl_ir: imap_config.sasl_ir,
@@ -204,16 +207,17 @@ pub(crate) fn connect_imap(imap_config: &ImapConfig) -> Result<()> {
 #[cfg(feature = "imap")]
 pub(crate) fn probe_imap_mechanisms(server: &str, starttls: bool) -> Result<Vec<SaslMechanism>> {
     use io_imap::{
-        client::{ImapClientStd, ImapClientStdConnectOptions, default_alpn},
+        client::{ImapClientStd, default_alpn},
         rfc3501::capability::available_auth_mechanisms,
+        session::ImapSessionOpenOptions,
     };
-    use pimalaya_stream::sasl::Sasl;
+    use io_sasl::mechanism::Sasl;
 
     use crate::{config::TlsConfig, imap::client::parse_imap_server};
 
     let tls = TlsConfig::default().into_tls(default_alpn());
     let server = parse_imap_server(server)?;
-    let opts = ImapClientStdConnectOptions {
+    let opts = ImapSessionOpenOptions {
         starttls,
         ..Default::default()
     };
@@ -306,8 +310,10 @@ fn connect_m2dir(m2dir_config: &crate::config::M2dirConfig) -> Result<()> {
 pub(crate) fn connect_smtp(smtp_config: &crate::config::SmtpConfig) -> Result<()> {
     use std::net::Ipv4Addr;
 
-    use io_smtp::{client::SmtpClientStd, rfc5321::SmtpEhloDomain};
-    use pimalaya_stream::sasl::Sasl;
+    use io_sasl::mechanism::Sasl;
+    use io_smtp::{
+        client::SmtpClientStd, rfc5321::SmtpEhloDomain, session::SmtpSessionOpenOptions,
+    };
 
     let tls = smtp_config.tls.clone().into_tls(smtp_config.alpn.clone());
     let domain: SmtpEhloDomain<'static> = Ipv4Addr::new(127, 0, 0, 1).into();
@@ -323,7 +329,10 @@ pub(crate) fn connect_smtp(smtp_config: &crate::config::SmtpConfig) -> Result<()
             cfg.try_into_sasl(host, port)
         })
         .transpose()?;
-    let _client = SmtpClientStd::connect(&server, &tls, smtp_config.starttls, domain, sasl)?;
+    let opts = SmtpSessionOpenOptions {
+        starttls: smtp_config.starttls,
+    };
+    let _client = SmtpClientStd::connect(&server, &tls, domain, sasl, opts)?;
 
     Ok(())
 }

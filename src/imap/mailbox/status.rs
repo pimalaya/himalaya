@@ -1,3 +1,4 @@
+use io_imap::client::ImapClient as _;
 use std::fmt;
 
 use anyhow::Result;
@@ -39,7 +40,7 @@ impl ImapMailboxStatusCommand {
             StatusDataItemName::UidValidity,
         ];
 
-        let items = client.status(mailbox, item_names)?;
+        let items = client.status(mailbox, item_names.into())?;
 
         let table = MailboxStatusTable {
             preset: account.table_preset().to_string(),

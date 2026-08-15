@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use io_imap::client::ImapClient as _;
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::imap::{
