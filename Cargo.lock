@@ -1203,11 +1203,11 @@ dependencies = [
 
 [[package]]
 name = "io-m2dir"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41abc5f5001a3d9e0aa63491e453e418c1cca6431ceb758f306ba12be0309799"
+checksum = "5f0ab0ee3c28e7d5056941a17b403417b9ba2ac3ce239e7174700179a1789804"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "log",
  "mail-parser",
  "percent-encoding",
