@@ -16,6 +16,8 @@
 use std::mem;
 
 use anyhow::{Result, anyhow, bail};
+#[cfg(any(backend, feature = "smtp"))]
+use mail_parser::MessageParser;
 
 #[cfg(feature = "gmail")]
 use crate::gmail::client::GmailClient;
@@ -413,8 +415,13 @@ impl EmailClient {
     }
 
     /// Sends `raw`: through the storage backend when it can send itself
-    /// (JMAP, Gmail, Graph), otherwise through the SMTP transport.
+    /// (JMAP, Gmail, Graph), otherwise through the SMTP transport. A
+    /// missing `Date:` header is filled in first (see
+    /// [`with_origination_date`]).
     pub fn send_message(&mut self, raw: Vec<u8>) -> Result<()> {
+        #[cfg(any(backend, feature = "smtp"))]
+        let raw = with_origination_date(raw);
+
         match &mut self.storage {
             #[cfg(feature = "jmap")]
             Some(BackendClient::Jmap(client)) => return client.send_message(raw),
@@ -567,4 +574,89 @@ fn select_storage(
     }
 
     Ok(None)
+}
+
+/// Prepends a `Date:` header carrying the current local date and time
+/// when `raw` has none. RFC 5322 §3.6 requires every message to carry
+/// an origination date, but a raw message piped into `message send`
+/// (or assembled by the built-in composers, which never set one) may
+/// lack it; receiving servers then file the message at the Unix
+/// epoch. An existing `Date:` header is never modified.
+#[cfg(any(backend, feature = "smtp"))]
+fn with_origination_date(mut raw: Vec<u8>) -> Vec<u8> {
+    let has_date = MessageParser::default()
+        .parse_headers(&raw)
+        .is_some_and(|parsed| parsed.header("Date").is_some());
+
+    if has_date {
+        return raw;
+    }
+
+    // Match the message's own line-ending convention so an LF-only
+    // message does not gain a lone CR.
+    let eol = match raw.iter().position(|&b| b == b'\n') {
+        Some(i) if i > 0 && raw[i - 1] == b'\r' => "\r\n",
+        _ => "\n",
+    };
+
+    let date = chrono::Local::now().to_rfc2822();
+    let mut header = format!("Date: {date}{eol}").into_bytes();
+    header.append(&mut raw);
+    header
+}
+
+#[cfg(all(test, any(backend, feature = "smtp")))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn send_injects_date_header_when_missing() {
+        let raw =
+            b"From: alice@example.com\r\nTo: bob@example.com\r\nSubject: Hi\r\n\r\nbody\r\n"
+                .to_vec();
+
+        let out = with_origination_date(raw.clone());
+
+        assert!(out.starts_with(b"Date: "));
+        // CRLF message: the injected line is CRLF-terminated.
+        let eol = out.iter().position(|&b| b == b'\n').unwrap();
+        assert_eq!(out[eol - 1], b'\r');
+        // The injected value is a valid RFC 5322 date-time…
+        let parsed = MessageParser::default()
+            .parse_headers(&out)
+            .expect("message with injected Date should parse");
+        assert!(parsed.date().is_some());
+        // …and the original message survives byte-for-byte after it.
+        assert!(out.ends_with(raw.as_slice()));
+    }
+
+    #[test]
+    fn send_preserves_existing_date_header_byte_identically() {
+        let raw = b"From: alice@example.com\r\n\
+Date: Thu, 01 Jan 1970 00:00:00 +0000\r\n\
+To: bob@example.com\r\n\
+\r\n\
+body\r\n"
+            .to_vec();
+
+        let out = with_origination_date(raw.clone());
+
+        assert_eq!(out, raw);
+    }
+
+    #[test]
+    fn send_injected_date_matches_lf_line_endings() {
+        let raw = b"From: alice@example.com\nTo: bob@example.com\n\nbody\n".to_vec();
+
+        let out = with_origination_date(raw.clone());
+
+        // An LF-only message gains an LF-terminated Date line, no CR.
+        let eol = out.iter().position(|&b| b == b'\n').unwrap();
+        assert_ne!(out[eol - 1], b'\r');
+        let parsed = MessageParser::default()
+            .parse_headers(&out)
+            .expect("message with injected Date should parse");
+        assert!(parsed.date().is_some());
+        assert!(out.ends_with(raw.as_slice()));
+    }
 }
