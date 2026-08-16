@@ -37,8 +37,7 @@ pimalaya.mkDefault (
               mkdir -p $WINEPREFIX
             ''
             + ''
-              mkdir -p $out/share/{applications,completions,man,schemas}
-              cp assets/himalaya.desktop "$out"/share/applications/
+              mkdir -p $out/share/{completions,man,schemas}
               ${emulator} "$out"/bin/himalaya${exe} completion -d "$out"/share/completions bash elvish fish powershell zsh
               ${emulator} "$out"/bin/himalaya${exe} manual "$out"/share/man
               ${emulator} "$out"/bin/himalaya${exe} json-schema "$out"/share/schemas

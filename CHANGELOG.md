@@ -99,6 +99,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed `gmail drafts get --format raw` discarding the raw message it had fetched and printing the draft summary instead. It now writes the RFC 5322 bytes, like `gmail messages get --format raw`.
 
+### Removed
+
+- Removed the `assets/himalaya.desktop` entry, and the Nix install line copying it into `share/applications`. Packagers installing it by hand should drop it too.
+
+  Every functional line of it had stopped working: `Exec=himalaya %U` answers a `mailto:` link with `unrecognized subcommand`, its Compose action passes the same URL to `message write`, which takes no positional argument, and the `x-scheme-handler/mailto` and `message/rfc822` types it claimed are not handled at all. Claiming the scheme was the harmful part, a desktop being free to route every mail link to a command that then errors out. `mailto:` handling belongs to a wrapper of your own, as MIGRATION.md describes.
+
 ## [2.0.0] - 2026-07-26
 
 ### Added
