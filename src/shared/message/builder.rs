@@ -22,7 +22,7 @@ use mail_builder::{
     MessageBuilder,
     headers::{address::Address, raw::Raw},
 };
-use mail_parser::{HeaderValue, MessageParser};
+use mail_parser::{HeaderValue, MessageParser, parsers::MessageStream};
 
 /// How a quoted source body is laid out relative to the user's body
 /// when replying or forwarding.
@@ -39,7 +39,9 @@ pub enum PostingStyle {
 /// populates these from its own clap struct.
 pub struct BuilderArgs<'a> {
     /// Address the `From` header carries, from `--from` or from the
-    /// account's `email`.
+    /// account's `email`. A value spelling out a display name, as in
+    /// `Alice <alice@example.org>`, is split back apart rather than
+    /// taken for one long address.
     pub from: Option<&'a str>,
     /// Name that address goes by, from the account's `display-name`.
     /// Kept apart from the address so `mail_builder` encodes it, a
@@ -83,7 +85,9 @@ pub fn build(args: BuilderArgs<'_>, source: Option<SourceArgs<'_>>) -> Result<Ve
     let mut builder = MessageBuilder::new();
 
     if let Some(from) = args.from {
-        builder = builder.from(Address::new_address(args.from_name, from));
+        let (parsed_name, address) = parse_mailbox(from)?;
+        let name = args.from_name.map(str::to_owned).or(parsed_name);
+        builder = builder.from(Address::new_address(name, address));
     }
     if !args.to.is_empty() {
         builder = builder.to(addresses(args.to));
@@ -173,6 +177,38 @@ pub fn build(args: BuilderArgs<'_>, source: Option<SourceArgs<'_>>) -> Result<Ve
     builder
         .write_to_vec()
         .map_err(|err| anyhow!("serialize composed message: {err}"))
+}
+
+/// Splits a mailbox into its display name, if it carries one, and its
+/// address. Handing `mail_builder` the whole `Alice <alice@example.org>`
+/// as an address would make it a `From: <Alice <alice@example.org>>`
+/// no SMTP server accepts.
+fn parse_mailbox(value: &str) -> Result<(Option<String>, String)> {
+    use mail_parser::Address as ParserAddress;
+
+    // NOTE: the header parser flushes its last token on the
+    // terminating newline, which a bare address, unlike one closed by
+    // a `>`, does not otherwise carry.
+    let header = format!("{value}\n");
+    let parsed = MessageStream::new(header.as_bytes()).parse_address();
+
+    let mailbox = match &parsed {
+        HeaderValue::Address(ParserAddress::List(list)) => list.first(),
+        HeaderValue::Address(ParserAddress::Group(groups)) => {
+            groups.first().and_then(|group| group.addresses.first())
+        }
+        _ => None,
+    }
+    .ok_or_else(|| anyhow!("Could not parse address `{value}`"))?;
+
+    let address = mailbox
+        .address
+        .as_ref()
+        .ok_or_else(|| anyhow!("Address `{value}` has no email"))?
+        .to_string();
+    let name = mailbox.name.as_ref().map(|name| name.to_string());
+
+    Ok((name, address))
 }
 
 fn addresses(values: &[String]) -> Address<'static> {
@@ -589,6 +625,44 @@ Original body line.\r\n";
         push_msg_id(&mut out, "  ");
         push_msg_id(&mut out, "c@e");
         assert_eq!(out, "<a@e> <b@e> <c@e>");
+    }
+
+    #[test]
+    fn parse_mailbox_splits_name_and_address() {
+        let (name, address) = parse_mailbox("Alice <alice@example.org>").unwrap();
+        assert_eq!(name.as_deref(), Some("Alice"));
+        assert_eq!(address, "alice@example.org");
+
+        let (name, address) = parse_mailbox("alice@example.org").unwrap();
+        assert_eq!(name, None);
+        assert_eq!(address, "alice@example.org");
+
+        // a quoted name keeps the comma the quotes protect
+        let (name, address) = parse_mailbox("\"Doe, Alice\" <alice@example.org>").unwrap();
+        assert_eq!(name.as_deref(), Some("Doe, Alice"));
+        assert_eq!(address, "alice@example.org");
+
+        // an encoded word is decoded rather than carried verbatim
+        let (name, _) = parse_mailbox("=?utf-8?B?QWxpY2U=?= <alice@example.org>").unwrap();
+        assert_eq!(name.as_deref(), Some("Alice"));
+
+        assert!(parse_mailbox("not-an-address").is_err());
+        assert!(parse_mailbox("").is_err());
+    }
+
+    #[test]
+    fn compose_from_keeps_a_spelled_out_display_name_apart() {
+        let empty: Vec<String> = Vec::new();
+        let raw = build(args("Alice <alice@example.org>", &empty, None, "hi"), None).unwrap();
+        let text = String::from_utf8(raw.clone()).unwrap();
+
+        // regression: the whole value used to land inside the brackets
+        assert!(!text.contains("<Alice <alice@example.org>>"));
+
+        let msg = parse(&raw);
+        let from = msg.from().unwrap().first().unwrap();
+        assert_eq!(from.name(), Some("Alice"));
+        assert_eq!(from.address(), Some("alice@example.org"));
     }
 
     #[test]

@@ -83,6 +83,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed `configure --json` emitting a payload no schema described: `json-schema <DIR>` now writes `himalaya-configure.json`, like every other command returning data.
 
+- Fixed `--from` spelling out a display name producing a `From: <Alice <alice@example.org>>` no SMTP server accepts, the send failing with `501 5.1.7 Bad sender address syntax` ([#727]).
+
+  The value is now parsed as a mailbox, the name reaching the MIME builder apart from the address exactly as the configured `display-name` does. A bare address is unaffected, and one that parses to no address at all errors instead of composing a broken header.
+
 - Fixed commands dying mid-exchange with a bare `Resource temporarily unavailable (os error 35)` ([#731], [#732]).
 
   A blocking socket is not supposed to report `EAGAIN`, yet it surfaced on large mailboxes, the more readily the longer the exchange ran. The transport underneath every backend now retries a stream that reports it is not ready, for a minute before giving up and saying so. It also arms a socket read deadline at connect time, so a server that goes silent on an otherwise healthy connection ends the command instead of hanging forever.
@@ -1120,6 +1124,7 @@ Few major concepts changed:
 [#632]: https://github.com/pimalaya/himalaya/issues/632
 [#634]: https://github.com/pimalaya/himalaya/issues/634
 [#721]: https://github.com/pimalaya/himalaya/issues/721
+[#727]: https://github.com/pimalaya/himalaya/issues/727
 [#729]: https://github.com/pimalaya/himalaya/issues/729
 [#730]: https://github.com/pimalaya/himalaya/issues/730
 [#731]: https://github.com/pimalaya/himalaya/issues/731
