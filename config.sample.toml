@@ -349,18 +349,19 @@ imap.sasl.plain.password.raw = "***"
 # Root directory containing one subdirectory per mailbox (Maildir++ layout).
 #maildir.root = "~/Mail/example"
 
-# Optional. Resolves custom keywords through the `dovecot-keywords` file at the
-# root, mapping a lowercase info-section letter to a keyword (dovecot, mbsync,
-# OfflineIMAP). Off by default, leaving those letters unread. Until io-maildir
-# 0.2.2, a later `flag add` or `flag remove` strips the keyword: see
-# https://github.com/pimalaya/io-maildir/pull/3
-#maildir.dovecot-keywords = true
+# Optional. Resolves custom keywords through each mailbox's own dovecot-keywords
+# file, mapping a lowercase info-section letter to a keyword (dovecot, mbsync,
+# OfflineIMAP). Off by default, leaving those letters unread.
+#maildir.keywords.dovecot = true
 
 # Optional. Reads custom keywords from a body header instead: `x-keywords` is the
 # comma-separated OfflineIMAP and mbsync convention, `x-label` the space-separated
 # mutt and notmuch one. Unset by default, reading neither.
-#maildir.keywords-header = "x-keywords"
-#maildir.keywords-header = "x-label"
+#maildir.keywords.header = "x-keywords"
+#maildir.keywords.header = "x-label"
+
+# Reading keywords is not a round trip. No command can name a custom keyword, so
+# `flag set` replaces the whole set and drops any keyword the message carried.
 
 # --------------------------------------------------------------------------------
 # pimdir config
