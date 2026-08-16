@@ -1216,9 +1216,9 @@ dependencies = [
 
 [[package]]
 name = "io-maildir"
-version = "0.2.1"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67592790c24c5be17adcdf6e406a47ca7d00ea49d964bfe16af3069bcacd81df"
+checksum = "b02306d32aa78f1f493d70b751f539379c8ca4f7873e765e878d101eba6c060d"
 dependencies = [
  "gethostname",
  "log",

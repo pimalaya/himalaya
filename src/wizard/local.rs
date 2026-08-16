@@ -14,7 +14,7 @@ use anyhow::Result;
 #[cfg(feature = "m2dir")]
 use crate::config::M2dirConfig;
 #[cfg(feature = "maildir")]
-use crate::config::MaildirConfig;
+use crate::config::{MaildirConfig, MaildirKeywordsConfig};
 
 /// A configured local backend.
 pub enum Local {
@@ -54,6 +54,7 @@ fn detect(root: &Path) -> Option<Local> {
     if root.join("cur").is_dir() && root.join("new").is_dir() && root.join("tmp").is_dir() {
         return Some(Local::Maildir(MaildirConfig {
             root: root.to_path_buf(),
+            keywords: MaildirKeywordsConfig::default(),
         }));
     }
 
@@ -70,14 +71,20 @@ fn pick(root: PathBuf) -> Result<Local> {
     let kind = prompt::item("Local backend:", [MAILDIR, M2DIR], None)?;
 
     Ok(match kind {
-        MAILDIR => Local::Maildir(MaildirConfig { root }),
+        MAILDIR => Local::Maildir(MaildirConfig {
+            root,
+            keywords: MaildirKeywordsConfig::default(),
+        }),
         _ => Local::M2dir(M2dirConfig { root }),
     })
 }
 
 #[cfg(all(feature = "maildir", not(feature = "m2dir")))]
 fn pick(root: PathBuf) -> Result<Local> {
-    Ok(Local::Maildir(MaildirConfig { root }))
+    Ok(Local::Maildir(MaildirConfig {
+        root,
+        keywords: MaildirKeywordsConfig::default(),
+    }))
 }
 
 #[cfg(all(feature = "m2dir", not(feature = "maildir")))]

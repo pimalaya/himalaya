@@ -29,6 +29,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Messages are moved to the trash mailbox, unless they already are in it, in which case they are permanently removed. The trash mailbox is resolved from the backend role, then from the `mailbox.alias.trash` config entry, and failing that the command errors. IMAP needs UIDPLUS (RFC 4315) to expunge exactly the deleted UIDs; without it the messages are only flagged `\Deleted` and a later expunge reclaims them.
 
+- Added the `maildir.keywords.dovecot` and `maildir.keywords.header` account config fields, surfacing custom Maildir keywords.
+
+  Custom (non-IANA) keywords such as `NonJunk` were invisible on Maildir: the six standard info-section letters became flags and everything else was dropped, so `envelope list "flag NonJunk"` matched nothing where the same search works on IMAP, JMAP and Microsoft Graph. Maildir has no single keyword convention, so which one a mailbox uses has to be named. `maildir.keywords.dovecot = true` resolves the lowercase slot letters through each mailbox's own `dovecot-keywords` file (dovecot, mbsync, OfflineIMAP), and `maildir.keywords.header` reads them from `X-Keywords` (comma-separated) or `X-Label` (space-separated, mutt and notmuch). Both default to off, leaving the flag set unchanged.
+
+  Reading only, and lossy on write: no command can name a custom keyword, so `flag set` replaces the whole set and drops any keyword the message carried.
+
 - Added the `imap.sasl-ir` account config field, forcing the RFC 4959 SASL-IR initial response on or off for every SASL mechanism: `true` always inlines credentials with `AUTHENTICATE`, `false` waits for the server's continuation request, and leaving it unset follows the advertised `SASL-IR` capability as before.
 
   Coremail (NetEase 126.com and 163.com) advertises `SASL-IR` yet answers the inline form with `BAD Request not ending with`, leaving those accounts unable to authenticate at all ([#729]). They need `imap.sasl-ir = false`, and usually `imap.id.auto = true` as well since Coremail also rejects `SELECT` without a prior `ID`.

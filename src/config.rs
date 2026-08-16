@@ -592,12 +592,45 @@ pub struct ImapIdConfig {
     pub fields: HashMap<String, bool>,
 }
 
+/// Header carrying custom keywords inline with a message body.
+///
+/// Mirrors io-maildir's `KeywordHeader`, kept local so the config
+/// schema does not depend on any backend crate.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum MaildirKeywordHeaderConfig {
+    /// `X-Keywords`, comma-separated (OfflineIMAP, mbsync).
+    XKeywords,
+    /// `X-Label`, space-separated (mutt, notmuch).
+    XLabel,
+}
+
+/// Per-account `maildir.keywords.*` options, naming how a mailbox
+/// encodes custom keywords. Both unset reads none.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct MaildirKeywordsConfig {
+    /// Whether to resolve custom keywords through each mailbox's own
+    /// `dovecot-keywords` file, which maps a lowercase info-section
+    /// letter to a keyword. Default `false`, leaving those letters
+    /// unread.
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub dovecot: bool,
+    /// The body header custom keywords are read from. Unset, the
+    /// default, reads neither.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub header: Option<MaildirKeywordHeaderConfig>,
+}
+
 /// Maildir configuration.
 #[allow(unused)]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MaildirConfig {
     pub root: PathBuf,
+    /// How custom (non-IANA) keywords are read, if at all.
+    #[serde(default)]
+    pub keywords: MaildirKeywordsConfig,
 }
 
 /// m2dir configuration.
@@ -1012,6 +1045,31 @@ mod tests {
     use super::*;
 
     const IMAP: &[&str] = &["imap", "imaps"];
+
+    #[test]
+    fn maildir_root_alone_keeps_keywords_off() {
+        let config: MaildirConfig = toml::from_str(r#"root = "/tmp/mail""#).unwrap();
+        assert!(!config.keywords.dovecot);
+        assert_eq!(config.keywords.header, None);
+    }
+
+    #[test]
+    fn maildir_keyword_options_parse() {
+        let config: MaildirConfig = toml::from_str(
+            r#"
+                root = "/tmp/mail"
+                keywords.dovecot = true
+                keywords.header = "x-label"
+            "#,
+        )
+        .unwrap();
+
+        assert!(config.keywords.dovecot);
+        assert_eq!(
+            config.keywords.header,
+            Some(MaildirKeywordHeaderConfig::XLabel)
+        );
+    }
 
     #[test]
     fn bare_host_defaults_to_secure_scheme() {
