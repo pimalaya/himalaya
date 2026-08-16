@@ -11,27 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added `in_reply_to` to the shared envelope, the message(s) a message replies to ([#734]).
 
-  It is a list, since RFC 5322 §3.6.4 spells the header `1*msg-id`, and every id is stripped of its angle brackets exactly as `message_id` is, so a reply and its parent compare byte-for-byte whatever backend returned them. It rides the JSON output and takes no column in the listing table.
-
-  No backend pays a request for it: IMAP reads the 9th `ENVELOPE` element it already fetches, JMAP adds `inReplyTo` to the properties it asks for, Gmail reads one more metadata header, Maildir and m2dir read the parsed message, and pimdir reads the stored summary, which now carries the field. Microsoft Graph leaves it empty, `In-Reply-To` living in `internetMessageHeaders`, which a listing selection does not return.
+  It is a list, since RFC 5322 §3.6.4 spells the header `1*msg-id`, and every id is stripped of its angle brackets exactly as `message_id` is, so a reply and its parent compare byte-for-byte whatever backend returned them. It rides the JSON output, takes no column in the listing table, and costs no backend an extra request. Microsoft Graph leaves it empty, `In-Reply-To` living in `internetMessageHeaders`, which a listing selection does not return.
 
 - Added the shared `message delete <ids>` command (alias `del`), following a trash-first policy.
 
-  Messages are moved to the trash mailbox, unless they already are in it, in which case they are permanently removed. The trash mailbox is resolved from the backend (JMAP `role=trash`, Gmail `TRASH` label, Microsoft Graph `deleteditems`), then from the `mailbox.alias.trash` config entry, and failing that the command errors.
+  Messages are moved to the trash mailbox, unless they already are in it, in which case they are permanently removed. The trash mailbox is resolved from the backend role, then from the `mailbox.alias.trash` config entry, and failing that the command errors. IMAP needs UIDPLUS (RFC 4315) to expunge exactly the deleted UIDs; without it the messages are only flagged `\Deleted` and a later expunge reclaims them.
 
-  In-trash removal is a real per-id delete on JMAP (`Email/set` destroy), Gmail and Microsoft Graph (`messages.delete`), Maildir and m2dir (file unlink). IMAP flags `\Deleted` then `UID EXPUNGE`s exactly those UIDs when the server advertises UIDPLUS (RFC 4315). Without it, messages are only flagged and a later expunge reclaims them.
+- Added the `imap.sasl-ir` account config field, forcing the RFC 4959 SASL-IR initial response on or off for every SASL mechanism: `true` always inlines credentials with `AUTHENTICATE`, `false` waits for the server's continuation request, and leaving it unset follows the advertised `SASL-IR` capability as before.
 
-- Added the `imap.sasl-ir` account config field.
+  Coremail (NetEase 126.com and 163.com) advertises `SASL-IR` yet answers the inline form with `BAD Request not ending with`, leaving those accounts unable to authenticate at all ([#729]). They need `imap.sasl-ir = false`, and usually `imap.id.auto = true` as well since Coremail also rejects `SELECT` without a prior `ID`.
 
-  Forces the RFC 4959 SASL-IR initial response on or off for every SASL mechanism: `false` waits for the server's continuation request instead of inlining credentials with `AUTHENTICATE`, `true` always inlines them, and leaving it unset follows the advertised `SASL-IR` capability as before. Coremail (NetEase 126.com and 163.com) advertises `SASL-IR` yet answers the inline form with `BAD Request not ending with`, leaving those accounts unable to authenticate at all ([#729]). They need `imap.sasl-ir = false`, and usually `imap.id.auto = true` as well since Coremail also rejects `SELECT` without a prior `ID`.
-
-- Added a `--seen` flag to `message read`, marking the message as seen while reading it.
-
-  Without it the read stays non-mutating, the default since v2. IMAP does it in a single round by switching `BODY.PEEK[]` to `BODY[]`. The other backends issue a separate flag update after the fetch: JMAP `Email/set`, Gmail `messages.modify`, Microsoft Graph `PATCH isRead`, Maildir and m2dir add the `S` flag.
+- Added a `--seen` flag to `message read`, marking the message as seen while reading it. Without it the read stays non-mutating, the default since v2.
 
 - Added the `configure` command (alias `wizard`), running the account wizard by name.
 
-  A bare `himalaya` and any command needing an account still offer it when they find no configuration, behind a welcome naming the file they looked for. That offer is now a hook rather than a gate: the command carries on afterwards either way, where it used to exit whatever you answered. Nothing prompts when stdin is not a terminal or `--json` is set.
+  A bare `himalaya` and any command needing an account still offer it when they find no configuration. That offer is now a hook rather than a gate: the command carries on afterwards either way, where it used to exit whatever you answered. Nothing prompts when stdin is not a terminal or `--json` is set.
 
 - Added back the `HIMALAYA_CONFIG` environment variable, read like `-c` and accepting the same `:`-delimited list.
 
@@ -39,61 +33,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Made the configuration wizard discovery-only, removing the hand-entry flow entirely.
 
-  An email, a bare domain or a `scheme://` server URL all run discovery. A URL discovers from its host, and its scheme narrows the results: `imap` and `imaps` to IMAP plus SMTP, an HTTP-family scheme to JMAP. When nothing is discovered, the wizard stops and points at the documented sample configuration.
+  An email, a bare domain or a `scheme://` server URL all run discovery, the URL scheme narrowing the results: `imap` and `imaps` to IMAP plus SMTP, an HTTP-family scheme to JMAP. A local folder path auto-detects Maildir against m2dir, prompting only when the directory is ambiguous. When nothing is discovered, the wizard stops and points at the documented sample configuration.
 
-  The wizard no longer invents an SMTP host. When discovery finds IMAP but no submission endpoint, the account is IMAP-only and the user adds SMTP by hand, instead of guessing `smtp.<domain>` and failing its connection test. A local folder path auto-detects Maildir (`cur`, `new`, `tmp`) against m2dir (`.m2store` or `.m2dir` marker), prompting only when the directory is ambiguous.
+  The wizard no longer invents an SMTP host. When discovery finds IMAP but no submission endpoint, the account is IMAP-only and the user adds SMTP by hand, instead of guessing `smtp.<domain>` and failing its connection test.
 
 - Reworked `message read`'s plain-text output into a concise reading view.
 
-  A minimal header block (Date, From, To, Cc, Subject) is followed by a per-part walk: one summary line per MIME part (`[ID] <type>[ — <filename>] (<size>)`) carrying that part's own `Content-*` headers, then the decoded contents of plain-text parts inlined. HTML and binary parts stay a summary, except an HTML-only mail, whose markup is printed rather than nothing readable.
+  A minimal header block (Date, From, To, Cc, Subject) is followed by a per-part walk: one summary line per MIME part (`[ID] <type>[ — <filename>] (<size>)`) carrying that part's own `Content-*` headers, then the decoded contents of plain-text parts inlined. HTML and binary parts stay a summary, except an HTML-only mail, whose markup is printed rather than nothing readable. `--raw` and `--json` are unchanged.
 
-  `--raw` (full RFC 5322 bytes) and `--json` (full parsed message) are unchanged for verbose or machine consumption.
-
-- Aligned the `ID` in `message read`, `attachments list` and `attachments download` on the MIME part's 1-based position.
-
-  The commands now agree, so `message read` shows the same id passed to `attachments download`. Attachment ids are therefore a sparse subset of the part positions (`1 5 9`) rather than a dense sequence.
+- Aligned the `ID` in `message read`, `attachments list` and `attachments download` on the MIME part's 1-based position, so `message read` shows the same id passed to `attachments download`. Attachment ids are therefore a sparse subset of the part positions (`1 5 9`) rather than a dense sequence.
 
 - The first-run offer now opens with a welcome banner on stderr explaining what Himalaya is, naming the configuration file it looked for and pointing at the documented sample, replacing the comment header that used to head the generated config. `himalaya configure`, asked for by name, skips it.
 
 - The wizard now writes the account to the configuration file rather than only printing it, and never rewrites what a human wrote.
 
-  The path is no longer prompted: it is where `-c` or `HIMALAYA_CONFIG` pointed, or `$XDG_CONFIG_HOME/himalaya/config.toml`. A file that is not there is written whole, and one that is gets a plain text append, so comments, ordering and formatting survive. The generated account takes a free name, suffixed until it is, and claims `default` only when no other account does. When stdout is redirected or in JSON mode it still prints straight to stdout, so redirects and scripts keep working.
+  The path is no longer prompted: it is where `-c` or `HIMALAYA_CONFIG` pointed, or `$XDG_CONFIG_HOME/himalaya/config.toml`. A file that is not there is written whole, and one that is gets a plain text append, so comments, ordering and formatting survive. The generated account takes a free name, suffixed until it is, and claims `default` only when no other account does. When stdout is redirected or in JSON mode it still prints straight to stdout.
 
 - Bare `himalaya --account <NAME>` (an account but no subcommand) now shows the help instead of dropping into the account-creation wizard.
 
-- The wizard now offers only the IMAP authentication mechanisms the server supports.
+- The wizard now offers only the IMAP authentication mechanisms the server supports, read from an unauthenticated CAPABILITY before prompting: the advertised SASL mechanisms, most preferred first and the legacy `LOGIN` command last.
 
-  Before prompting, it opens an unauthenticated connection, reads the server's CAPABILITY, and offers only the advertised SASL mechanisms, most preferred first and the legacy `LOGIN` command last. A server exposing no SASL AUTH and no LOGINDISABLED (a perdition-style proxy such as isae-supaero.fr) offers `LOGIN` alone, where the wizard previously defaulted to `AUTHENTICATE PLAIN` and failed. Both the discovered and the manually entered IMAP paths probe; the manual path no longer hardcodes PLAIN. On any probe failure the wizard logs the error and falls back to the full mechanism list. SMTP keeps its discovery-advertised list, since it negotiates auth over EHLO.
+  A server exposing no SASL AUTH and no LOGINDISABLED (a perdition-style proxy such as isae-supaero.fr) offers `LOGIN` alone, where the wizard previously defaulted to `AUTHENTICATE PLAIN` and failed. On any probe failure it falls back to the full mechanism list. SMTP keeps its discovery-advertised list, since it negotiates auth over EHLO.
 
 - The wizard's service discovery is now time-bounded, so a single unreachable endpoint (a firewalled port, a black-hole host) no longer stalls it for the operating-system connect timeout. Mechanisms still running at the deadline are abandoned and only what completed in time is offered.
 
-- The manually configured wizard flow now offers to reuse the IMAP credentials for SMTP, like the discovered flow, so they are entered once. On accept it reuses the IMAP SASL and prompts only the SMTP endpoint (host seeded from the IMAP host, encryption, port); on decline it runs the full SMTP prompts.
+- The wizard now offers to reuse the IMAP credentials for SMTP, so they are entered once. On accept it prompts only the SMTP endpoint (host seeded from the IMAP host, encryption, port); on decline it runs the full SMTP prompts.
 
-- `gmail messages get --header` and `gmail threads get --header` now narrow the rendered headers under every format, not only `--format metadata`.
-
-  Gmail honours its `metadataHeaders` parameter for the metadata format alone and returns every header otherwise, so the filter is applied to the response as well. Names match case-insensitively, and repeated headers keep their order. Passing no `--header` still renders them all.
+- `gmail messages get --header` and `gmail threads get --header` now narrow the rendered headers under every format, not only `--format metadata`. Gmail honours its `metadataHeaders` parameter for the metadata format alone and returns every header otherwise, so the filter is applied to the response as well. Names match case-insensitively, repeated headers keep their order, and passing no `--header` still renders them all.
 
 - `imap raw` now sends a byte-verbatim batch of tagged commands.
 
-  The command argument decodes literal `\r` / `\n` escapes into real CRLF, so a CRLF-separated batch (each command carrying its own tag) can be pipelined from the shell, e.g. `himalaya imap raw 'a1 SELECT INBOX\r\na2 SEARCH ALL\r\n'`. A trailing CRLF is appended when omitted, and the reply is read until every command is acknowledged (possibly out of order). `smtp raw` gains the same escape decoding but stays a single command line: it strips the trailing CRLF (io-smtp appends its own) and rejects batched input, since the exchange reads exactly one reply. Both accept the command via stdin.
+  The command argument decodes literal `\r` / `\n` escapes into real CRLF, so a CRLF-separated batch (each command carrying its own tag) can be pipelined from the shell, e.g. `himalaya imap raw 'a1 SELECT INBOX\r\na2 SEARCH ALL\r\n'`, and the reply is read until every command is acknowledged (possibly out of order). `smtp raw` gains the same escape decoding but stays a single command line, rejecting batched input since the exchange reads exactly one reply. Both accept the command via stdin.
 
 ### Fixed
 
 - Fixed commands dying mid-exchange with a bare `Resource temporarily unavailable (os error 35)` ([#731], [#732]).
 
-  A blocking socket is not supposed to report `EAGAIN`, yet it surfaced on large mailboxes, the more readily the longer the exchange ran: on the chunked `FETCH` an IMAP `SORT` fallback runs, and on a slow `AUTHENTICATE` against a 260k-message account. The transport underneath every backend now retries a stream that reports it is not ready, for a minute before giving up and saying so. It also arms a socket read deadline at connect time, so a server that goes silent on an otherwise healthy connection ends the command instead of hanging forever.
+  A blocking socket is not supposed to report `EAGAIN`, yet it surfaced on large mailboxes, the more readily the longer the exchange ran. The transport underneath every backend now retries a stream that reports it is not ready, for a minute before giving up and saying so. It also arms a socket read deadline at connect time, so a server that goes silent on an otherwise healthy connection ends the command instead of hanging forever.
 
 - Fixed lean cargo feature combinations failing to compile. Every combination now builds.
 
-  The config schema referenced the `io-imap`, `io-smtp` and `io-jmap` crates for its ALPN defaults even when those backends were disabled, now local `default_*_alpn` helpers like the Gmail and Microsoft Graph ones.
-
-  Cross-protocol commands are feature-gated by what they need. `mailboxes`, `envelopes`, `flags`, `attachments` and the storage message subcommands (`add`, `copy`, `move`, `read`, `reply`, `forward`) require a storage backend, while `messages compose` and `messages send` only need a send backend. A send-only build keeps compose and send but drops the storage commands, and a backend-less build drops the shared surface entirely. The `attachments` commands also reached the Gmail, Microsoft Graph and m2dir backends, previously IMAP, JMAP and Maildir only.
+  The config schema no longer reaches for the `io-imap`, `io-smtp` and `io-jmap` ALPN defaults when those backends are disabled, and the cross-protocol commands are feature-gated by what they need: `mailboxes`, `envelopes`, `flags`, `attachments` and the storage message subcommands (`add`, `copy`, `move`, `read`, `reply`, `forward`) require a storage backend, while `messages compose` and `messages send` only need a send backend. A backend-less build drops the shared surface entirely. The `attachments` commands also reached the Gmail, Microsoft Graph and m2dir backends, previously IMAP, JMAP and Maildir only.
 
 - `message read --raw --json` no longer errors: the two combine, emitting the raw RFC 5322 bytes as a JSON `{ "message": "…" }` string (lossily decoded) instead of bailing with "`--raw` and `--json` cannot be combined".
 
 - Fixed the Gmail and Microsoft Graph `get` commands wrapping their data in a `message` string under `--json`, which left the output unparseable and `--header` without visible effect ([#730]).
 
-  Gmail `messages get`, `drafts get`, `threads get`, `history list` and the `settings` readers now serialize their data, as does Microsoft Graph `message get`, each with a published JSON Schema. Text output is unchanged, except that Gmail `messages get` and `threads get` print the headers they already fetched. Gmail `history list` reports the affected message ids rather than per-record counts.
+  Gmail `messages get`, `drafts get`, `threads get`, `history list` and the `settings` readers now serialize their data, as does Microsoft Graph `message get`, each with a published JSON Schema. Text output is unchanged, except that Gmail `messages get` and `threads get` print the headers they already fetched, and `history list` reports the affected message ids rather than per-record counts.
 
 - Fixed `gmail drafts get --format raw` discarding the raw message it had fetched and printing the draft summary instead. It now writes the RFC 5322 bytes, like `gmail messages get --format raw`.
 
