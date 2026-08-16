@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added back the `email` and `display-name` account config fields, and the global `display-name`, dropped in v2 ([#721]).
+
+  `messages compose`, `messages reply` and `messages forward` fill the `From` header from them when `--from` is not passed, so the address no longer has to be repeated on every invocation. An explicit `--from` still wins whole, and an account declaring neither composes without a `From` header as before. The name is handed to the MIME builder apart from the address, so one holding a comma, a quote or a non-ASCII character is encoded rather than mangled.
+
+  Both keys are also read under the spellings himalaya-tui writes, `from` and `from-name`, and himalaya-tui now reads `email` and `display-name` in turn, one configuration file backing the two binaries either way. The wizard writes `email` when its prompt was answered with an address rather than a server URL or a folder path.
+
 - Added `in_reply_to` to the shared envelope, the message(s) a message replies to ([#734]).
 
   It is a list, since RFC 5322 §3.6.4 spells the header `1*msg-id`, and every id is stripped of its angle brackets exactly as `message_id` is, so a reply and its parent compare byte-for-byte whatever backend returned them. It rides the JSON output, takes no column in the listing table, and costs no backend an extra request. Microsoft Graph leaves it empty, `In-Reply-To` living in `internetMessageHeaders`, which a listing selection does not return.
@@ -1097,6 +1103,7 @@ Few major concepts changed:
 [#627]: https://github.com/pimalaya/himalaya/issues/627
 [#632]: https://github.com/pimalaya/himalaya/issues/632
 [#634]: https://github.com/pimalaya/himalaya/issues/634
+[#721]: https://github.com/pimalaya/himalaya/issues/721
 [#729]: https://github.com/pimalaya/himalaya/issues/729
 [#730]: https://github.com/pimalaya/himalaya/issues/730
 [#731]: https://github.com/pimalaya/himalaya/issues/731

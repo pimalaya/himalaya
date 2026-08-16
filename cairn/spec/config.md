@@ -17,6 +17,11 @@ The config SHALL load from the first existing canonical path (`$XDG_CONFIG_HOME/
 ### Requirement: Missing account is an error
 When the config exists but lacks the requested account, the command SHALL fail with a hard error, not fall back to the wizard. The wizard is proposed only when no config is found at all.
 
+### Requirement: Account identity
+An account MAY declare the address it sends as, `email`, and the name that address carries, `display-name`. `display-name` MAY also be declared at the top level, where it applies to every account that does not override it. Neither is required, and neither is validated as an addr-spec: an account that never composes has no use for them.
+
+Both keys SHALL also be accepted under the spellings himalaya-tui writes, `from` and `from-name`, and himalaya-tui SHALL accept `email` and `display-name` in turn, the two binaries sharing one configuration file.
+
 ### Requirement: Mailbox aliases
 An account MAY map friendly mailbox names to backend-native ids under `[accounts.<name>.mailbox.alias]`. Alias names are case-insensitive on lookup and on storage. The entry named `inbox` is the implicit default mailbox: a shared command that omits `-m/--mailbox` resolves it. Account-level entries override same-named global entries, and ids are stored verbatim.
 

@@ -28,7 +28,8 @@ use crate::{
 /// `messages add` via a tempfile or bash/zsh process substitution.
 #[derive(Debug, Parser)]
 pub struct MessageComposeCommand {
-    /// Sender address (`From` header).
+    /// Sender address (`From` header). Defaults to the account's
+    /// `email`, named by its `display-name`.
     #[arg(long, value_name = "ADDR")]
     pub from: Option<String>,
 
@@ -94,9 +95,12 @@ impl MessageComposeCommand {
         account: &mut Account,
         client: &mut EmailClient,
     ) -> Result<()> {
+        let (from, from_name) = account.resolve_from(self.from.as_deref());
+
         let raw = builder::build(
             BuilderArgs {
-                from: self.from.as_deref(),
+                from,
+                from_name,
                 to: &self.to,
                 cc: &self.cc,
                 bcc: &self.bcc,

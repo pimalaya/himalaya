@@ -37,6 +37,11 @@ const DEFAULT_ATTACHMENT_CHAR: char = '@';
 /// Merged runtime account settings consumed by every command.
 #[derive(Debug, Default)]
 pub struct Account {
+    /// Address the account sends as, `None` when it declares none.
+    pub email: Option<String>,
+    /// Name that address carries, `None` when it declares none.
+    pub display_name: Option<String>,
+
     pub downloads_dir: Option<PathBuf>,
     pub table_preset: Option<String>,
     pub table_arrangement: Option<TableArrangementConfig>,
@@ -67,6 +72,9 @@ impl Account {
         mailbox_alias.extend(other.mailbox_alias);
 
         Self {
+            email: other.email.or(self.email),
+            display_name: other.display_name.or(self.display_name),
+
             downloads_dir: other.downloads_dir.or(self.downloads_dir),
             table_preset: other.table_preset.or(self.table_preset),
             table_arrangement: other.table_arrangement.or(self.table_arrangement),
@@ -91,6 +99,21 @@ impl Account {
             ),
 
             mailbox_alias,
+        }
+    }
+
+    /// Resolves the `From` header of a composed message into the
+    /// address it carries and the name that address goes by, the two
+    /// kept apart so the MIME builder does the quoting.
+    ///
+    /// `over` is the command's `--from` flag: given, it wins whole, and
+    /// the configured name is not grafted onto an address the user
+    /// spelled out. Otherwise the merged account answers, and a `None`
+    /// address leaves the header out.
+    pub fn resolve_from<'a>(&'a self, over: Option<&'a str>) -> (Option<&'a str>, Option<&'a str>) {
+        match over {
+            Some(address) => (Some(address), None),
+            None => (self.email.as_deref(), self.display_name.as_deref()),
         }
     }
 
@@ -350,6 +373,11 @@ fn lowercase_alias_keys(aliases: HashMap<String, String>) -> HashMap<String, Str
 impl From<Config> for Account {
     fn from(config: Config) -> Self {
         Self {
+            // NOTE: the address is per-account by nature, so only the
+            // name it carries has a global default.
+            email: None,
+            display_name: config.display_name,
+
             downloads_dir: config.downloads_dir,
             table_preset: config.table.preset,
             table_arrangement: config.table.arrangement,
@@ -370,6 +398,9 @@ impl From<Config> for Account {
 impl From<AccountConfig> for Account {
     fn from(config: AccountConfig) -> Self {
         Self {
+            email: config.email,
+            display_name: config.display_name,
+
             downloads_dir: config.downloads_dir,
             table_preset: config.table.preset,
             table_arrangement: config.table.arrangement,
@@ -449,6 +480,31 @@ mod tests {
     fn default_mailbox_is_none_without_inbox_alias() {
         let account = account_with_aliases(&[("sent", "Sent Items")]);
         assert_eq!(account.default_mailbox(), None);
+    }
+
+    #[test]
+    fn resolve_from_takes_the_global_name_and_the_account_address() {
+        let global = Account::from(Config {
+            display_name: Some("Alice".to_string()),
+            ..Config::default()
+        });
+        let per_account = Account::from(AccountConfig {
+            email: Some("alice@example.org".to_string()),
+            ..AccountConfig::default()
+        });
+        let account = global.merge(per_account);
+
+        assert_eq!(
+            account.resolve_from(None),
+            (Some("alice@example.org"), Some("Alice")),
+        );
+
+        // An address the user spelled out is theirs whole: the
+        // configured name is not grafted onto it.
+        assert_eq!(
+            account.resolve_from(Some("alias@example.org")),
+            (Some("alias@example.org"), None),
+        );
     }
 
     #[test]

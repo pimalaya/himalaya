@@ -21,6 +21,12 @@
 # Global config
 # --------------------------------------------------------------------------------
 
+# Name the `From` address carries when an account declares none of its own,
+# e.g. `Alice` in `Alice <alice@example.org>`. Quoting and encoding are done
+# for you, so write the name as it should read. Also spelled `from-name`, the
+# key himalaya-tui writes; both binaries read both.
+#display-name = "Alice"
+
 # Default download directory for attachments. Falls back to `$TMPDIR`.
 #downloads-dir = "~/downloads"
 
@@ -136,6 +142,16 @@
 
 # Use this account when `-a/--account` is not passed.
 default = true
+
+# Address this account sends as, and the name that address carries. They fill
+# the `From` header of `messages compose`, `messages reply` and `messages
+# forward` when `--from` is not passed; without them the header is left out.
+# The wizard writes `email` when its prompt was answered with an address.
+#
+# Also spelled `from` and `from-name`, the keys himalaya-tui writes; both
+# binaries read both, one file backing the two.
+#email = "alice@example.org"
+#display-name = "Alice"
 
 # Per-account overrides for the global options above.
 #downloads-dir = "~/downloads/example"

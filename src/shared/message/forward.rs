@@ -33,7 +33,8 @@ pub struct MessageForwardCommand {
     #[command(flatten)]
     pub mailbox: MailboxArg,
 
-    /// Sender address (`From` header).
+    /// Sender address (`From` header). Defaults to the account's
+    /// `email`, named by its `display-name`.
     #[arg(long, value_name = "ADDR")]
     pub from: Option<String>,
 
@@ -112,9 +113,12 @@ impl MessageForwardCommand {
         let mailbox = self.mailbox.resolve(account)?;
         let source = client.get_message(&mailbox, &self.id, false)?;
 
+        let (from, from_name) = account.resolve_from(self.from.as_deref());
+
         let raw = builder::build(
             BuilderArgs {
-                from: self.from.as_deref(),
+                from,
+                from_name,
                 to: &self.to,
                 cc: &self.cc,
                 bcc: &self.bcc,

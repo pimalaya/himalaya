@@ -192,6 +192,12 @@ fn build_account(account_name: &str, input: &str) -> Result<(AccountConfig, bool
     // empty for the flows that discover none.
     account.mailbox.aliases = aliases;
 
+    // NOTE: an address is the one thing the prompt may already have
+    // been answered with, so the composers get their `From` without
+    // the user writing it down twice. The name it carries is not
+    // discoverable, and is left to be added by hand.
+    account.email = prompted_email(input).map(ToString::to_string);
+
     Ok((account, tested))
 }
 
@@ -386,6 +392,26 @@ fn default_account_name(input: &str) -> String {
     }
 }
 
+/// The input read back as an email address, or [`None`] when it names
+/// a folder, a server URL or a bare domain instead.
+///
+/// A server URL may carry a userinfo part and so hold an `@` of its
+/// own, which is a credential and not an address, hence the check for
+/// a scheme before the one for a local part.
+fn prompted_email(input: &str) -> Option<&str> {
+    if is_path(input) || input.contains("://") {
+        return None;
+    }
+
+    let (local, domain) = input.rsplit_once('@')?;
+
+    if local.is_empty() || domain.is_empty() {
+        return None;
+    }
+
+    Some(input)
+}
+
 /// The first dot-separated label of a host or domain.
 fn first_label(host: &str) -> String {
     host.split('.').next().unwrap_or(host).to_string()
@@ -427,8 +453,27 @@ mod tests {
     }
 
     #[test]
+    fn only_an_address_is_kept_as_the_account_email() {
+        assert_eq!(
+            prompted_email("alice@example.org"),
+            Some("alice@example.org")
+        );
+
+        // A bare domain, as discovery also synthesizes it, names no
+        // mailbox; neither does a folder or a server URL, whose `@`
+        // would be a credential.
+        assert_eq!(prompted_email("@example.org"), None);
+        assert_eq!(prompted_email("example.org"), None);
+        assert_eq!(prompted_email("~/mail/work"), None);
+        assert_eq!(prompted_email("imaps://alice@imap.example.org"), None);
+    }
+
+    #[test]
     fn discovered_aliases_render_as_a_mailbox_alias_table() {
-        let mut account = AccountConfig::default();
+        let mut account = AccountConfig {
+            email: Some("me@posteo.net".to_string()),
+            ..Default::default()
+        };
         account
             .mailbox
             .aliases
@@ -438,5 +483,13 @@ mod tests {
 
         assert!(rendered.contains("[accounts.posteo]"));
         assert!(rendered.contains("mailbox.alias.inbox = \"INBOX\""));
+
+        // The identity says what the account is, so it reads before the
+        // mailboxes it names.
+        let email = rendered.find("email = ").expect("the address is rendered");
+        let alias = rendered
+            .find("mailbox.alias")
+            .expect("the alias is rendered");
+        assert!(email < alias);
     }
 }

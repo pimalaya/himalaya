@@ -26,6 +26,9 @@ The discovered IMAP + SMTP flow SHALL test each protocol as it configures it: th
 ### Requirement: Mailbox alias pre-fill
 The wizard SHALL pre-fill `mailbox.alias.*` so a generated account has a working default mailbox and known special-use targets. JMAP reads the RFC 8621 mailbox roles live over the tested connection. Gmail and Microsoft Graph map their fixed system-label ids (`INBOX`, `SENT`, ...) and well-known folder names (`inbox`, `sentitems`, ...). IMAP pins only the reserved `INBOX`; the other IMAP special-use roles are not discovered yet (see provider-quirks).
 
+### Requirement: The prompted address is kept
+When the wizard's single prompt is answered with an email address rather than a server URL or a folder path, that address SHALL be written as the generated account's `email`. The wizard SHALL NOT prompt for a display name: it discovers, and a name is not discoverable.
+
 ### Requirement: Account name derived, not prompted
 The wizard SHALL NOT prompt for an account name. It derives one from the input (the domain's first label, or the folder name) and uses it as the `[accounts.<name>]` table key; the user renames it by editing that key.
 
@@ -51,4 +54,4 @@ The welcome SHALL name the configuration path that was looked for, which is the 
 The wizard SHALL write a configuration file that does not exist and append a plain text block to one that does, never parsing and re-serializing the document, so comments, ordering and formatting survive. Two invariants guard the append: the account name must be free, since a second `[accounts.<name>]` table makes the whole document fail to parse, and the generated account claims `default` only when no other account does. The derived name is suffixed until free. The target path is not prompted: it is where `-c` pointed, or the default location.
 
 ### Requirement: A generated account reads in a deliberate order
-The serializer SHALL decide what a generated account holds, so a defaulted field is omitted and no field is enumerated twice, but the rendering SHALL order what it emits: the groups run most-defining first (`default`, the storage backend, the transport, the mailboxes, the rendering options), an unrecognised group renders after them rather than being dropped, a group's `server` key reads before the credentials qualifying it, and a blank line separates groups.
+The serializer SHALL decide what a generated account holds, so a defaulted field is omitted and no field is enumerated twice, but the rendering SHALL order what it emits: the groups run most-defining first (`default`, the identity, the storage backend, the transport, the mailboxes, the rendering options), an unrecognised group renders after them rather than being dropped, a group's `server` key reads before the credentials qualifying it, and a blank line separates groups.

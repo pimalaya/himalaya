@@ -38,7 +38,13 @@ pub enum PostingStyle {
 /// All the fields the built-in MIME assembler needs. Each subcommand
 /// populates these from its own clap struct.
 pub struct BuilderArgs<'a> {
+    /// Address the `From` header carries, from `--from` or from the
+    /// account's `email`.
     pub from: Option<&'a str>,
+    /// Name that address goes by, from the account's `display-name`.
+    /// Kept apart from the address so `mail_builder` encodes it, a
+    /// name holding a comma or a quote needing no rule of ours.
+    pub from_name: Option<&'a str>,
     pub to: &'a [String],
     pub cc: &'a [String],
     pub bcc: &'a [String],
@@ -71,7 +77,7 @@ pub fn build(args: BuilderArgs<'_>, source: Option<SourceArgs<'_>>) -> Result<Ve
     let mut builder = MessageBuilder::new();
 
     if let Some(from) = args.from {
-        builder = builder.from(from);
+        builder = builder.from(Address::new_address(args.from_name, from));
     }
     if !args.to.is_empty() {
         builder = builder.to(addresses(args.to));
@@ -405,6 +411,7 @@ Original body line.\r\n";
     ) -> BuilderArgs<'a> {
         BuilderArgs {
             from: Some(from),
+            from_name: None,
             to,
             cc: &[],
             bcc: &[],
@@ -434,6 +441,20 @@ Original body line.\r\n";
         assert!(text.contains("bob@example.com"));
         assert!(text.contains("carol@example.com"));
         assert!(!text.contains("In-Reply-To"));
+    }
+
+    #[test]
+    fn compose_names_the_from_address() {
+        let to = vec!["bob@example.com".to_string()];
+        let mut a = args("alice@example.com", &to, Some("Hello"), "Hi Bob");
+        // A comma is what an unquoted display name would break on, the
+        // header reading as two addresses.
+        a.from_name = Some("Doe, Alice");
+
+        let raw = build(a, None).unwrap();
+        let text = String::from_utf8(raw).unwrap();
+
+        assert!(text.contains("From: \"Doe, Alice\" <alice@example.com>"));
     }
 
     #[test]

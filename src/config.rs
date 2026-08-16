@@ -64,11 +64,15 @@ fn is_default_msgraph_alpn(alpn: &[String]) -> bool {
 /// Represents the whole TOML user's configuration file.
 /// `deny_unknown_fields` is intentionally omitted so the same TOML
 /// file can be shared with `himalaya-tui`: top-level TUI-only fields
-/// (`display-name`, `signature`, `signature-delim`) are silently
-/// ignored here.
+/// (`signature`, `signature-delim`) are silently ignored here.
 #[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Config {
+    /// Name the `From` address carries when an account declares none
+    /// of its own. See [`AccountConfig::display_name`].
+    #[serde(alias = "from-name")]
+    pub display_name: Option<String>,
+
     pub downloads_dir: Option<PathBuf>,
     #[serde(default)]
     pub table: TableConfig,
@@ -107,15 +111,17 @@ impl TomlConfig for Config {
 }
 
 /// The order the rendered account groups its keys in, most defining
-/// first: what the account is, then the backend it reads from, the
-/// transport it sends over, the mailboxes it names, and last the
-/// rendering options.
+/// first: what the account is, who it speaks for, then the backend it
+/// reads from, the transport it sends over, the mailboxes it names,
+/// and last the rendering options.
 ///
 /// A key outside this list still renders, after the ones listed, so a
 /// field added to [`AccountConfig`] can never go missing from a
 /// generated document just because nobody updated this table.
-const RENDER_ORDER: [&str; 13] = [
+const RENDER_ORDER: [&str; 15] = [
     "default",
+    "email",
+    "display-name",
     "imap",
     "jmap",
     "gmail",
@@ -206,13 +212,31 @@ impl AccountConfig {
 /// Account configuration.
 ///
 /// `deny_unknown_fields` is omitted so per-account TUI-only fields
-/// (`email`, `display-name`, `signature`, `signature-delim`) coexist
-/// in the same `[accounts.<name>]` block when the file is shared.
+/// (`signature`, `signature-delim`) coexist in the same
+/// `[accounts.<name>]` block when the file is shared.
 #[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct AccountConfig {
     #[serde(default, skip_serializing_if = "is_default")]
     pub default: bool,
+
+    /// Address this account sends as, used as the `From` header of a
+    /// composed message when `--from` is not passed. Not validated and
+    /// not required: an account that never composes has no use for it.
+    ///
+    /// Aliased to `from`, the spelling himalaya-tui writes, the two
+    /// binaries sharing one configuration file.
+    #[serde(alias = "from")]
+    pub email: Option<String>,
+
+    /// Name the `From` address carries, e.g. `Alice` in
+    /// `Alice <alice@example.org>`. Falls back to the global
+    /// [`Config::display_name`]. Quoting and encoding are the MIME
+    /// builder's business, so write the name as it should read.
+    ///
+    /// Aliased to `from-name`, the spelling himalaya-tui writes.
+    #[serde(alias = "from-name")]
+    pub display_name: Option<String>,
 
     pub downloads_dir: Option<PathBuf>,
     #[serde(default)]
@@ -990,6 +1014,29 @@ mod tests {
     fn unknown_scheme_is_rejected() {
         let err = parse_server("ftp://mail.example.com", "imaps", IMAP).unwrap_err();
         assert!(err.to_string().contains("Invalid server scheme `ftp`"));
+    }
+
+    /// himalaya-tui spells the identity `from` and `from-name`, and one
+    /// file backs both binaries, so a config it wrote must reach the
+    /// same two fields the composers read.
+    #[test]
+    fn the_identity_reads_under_the_tui_spelling() {
+        let config: Config = toml::from_str(
+            r#"
+            from-name = "Alice"
+
+            [accounts.example]
+            from = "alice@example.org"
+            from-name = "Alice at work"
+            "#,
+        )
+        .expect("the himalaya-tui spelling must deserialize");
+
+        let account = config.accounts.get("example").expect("the example account");
+
+        assert_eq!(config.display_name.as_deref(), Some("Alice"));
+        assert_eq!(account.email.as_deref(), Some("alice@example.org"));
+        assert_eq!(account.display_name.as_deref(), Some("Alice at work"));
     }
 
     #[test]
