@@ -79,6 +79,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed `configure --json` emitting a payload no schema described: `json-schema <DIR>` now writes `himalaya-configure.json`, like every other command returning data.
+
 - Fixed commands dying mid-exchange with a bare `Resource temporarily unavailable (os error 35)` ([#731], [#732]).
 
   A blocking socket is not supposed to report `EAGAIN`, yet it surfaced on large mailboxes, the more readily the longer the exchange ran. The transport underneath every backend now retries a stream that reports it is not ready, for a minute before giving up and saying so. It also arms a socket read deadline at connect time, so a server that goes silent on an otherwise healthy connection ends the command instead of hanging forever.

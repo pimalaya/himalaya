@@ -30,6 +30,7 @@ use anyhow::{Context, Result, bail};
 use clap::Parser;
 use pimalaya_cli::{printer::Printer, prompt};
 use pimalaya_config::toml::TomlConfig;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
@@ -129,7 +130,7 @@ impl ExistingConfig {
 }
 
 /// The generated account, as the printer takes it.
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 pub struct GeneratedConfig {
     /// The account name, which is the `[accounts.<name>]` table key.
     name: String,

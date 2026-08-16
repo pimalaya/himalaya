@@ -85,6 +85,10 @@ pub fn schemas() -> BTreeMap<String, Value> {
 
     // --- Account meta commands (always present)
 
+    insert!(
+        "himalaya-configure",
+        crate::wizard::configure::GeneratedConfig
+    );
     insert!("himalaya-account-list", crate::account::list::AccountsTable);
     insert!("himalaya-account-check", crate::account::check::CheckReport);
 
