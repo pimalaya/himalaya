@@ -11,183 +11,185 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added the `pimdir` storage backend, Himalaya over a local [pimdir](https://github.com/pimalaya/pimdir) store: the SQLite index and content-addressed blobs the sync engine (Neverest) populates. `pimdir.root` points at the store directory, and for an account you already sync that single line is the whole configuration, reading it touching no network.
+- Added the `pimdir` storage backend, Himalaya over the local store the sync engine populates.
 
-  The store is read as a possibly-partial cache. Envelopes are built from the stored meta without reading a single body, and a message whose body is not local still lists, reading as "body not fetched", the cue to sync, rather than failing. Writes are staged as replica mutations the next sync propagates: `flag set`, `message add`, `copy`, `move` and `delete` all go through the store's mutation seam rather than raw SQL, and an added message is content-hashed with the digest Neverest uses, so it deduplicates against a synced one.
+  Reads build envelopes from the stored meta and report a body that is not local as "body not fetched"; writes are staged as replica mutations attributed to `pimdir.source`, auto-detected when the store has a single source.
 
-  Staged writes are attributed to `pimdir.source`, auto-detected from a store synced as a single source and worth setting only to disambiguate one synced from two. A write against a store never synced as that source fails loudly instead of staging a change no sync would carry. Message ids are the store's short public ids, the same integer in every mailbox a message is filed in.
+- Added back the `email` and `display-name` config fields, at the global and the account level ([#721]).
 
-- Added back the `email` and `display-name` account config fields, and the global `display-name`, dropped in v2 ([#721]).
+  They fill the `From` header of `messages compose`, `reply` and `forward` when `--from` is not passed, and are also read as `from` and `from-name`, the spellings himalaya-tui writes.
 
-  `messages compose`, `messages reply` and `messages forward` fill the `From` header from them when `--from` is not passed, so the address no longer has to be repeated on every invocation. An explicit `--from` still wins whole, and an account declaring neither composes without a `From` header as before. The name is handed to the MIME builder apart from the address, so one holding a comma, a quote or a non-ASCII character is encoded rather than mangled.
+- Added back the `signature` and `signature-delim` config fields, at the global and the account level.
 
-  Both keys are also read under the spellings himalaya-tui writes, `from` and `from-name`, and himalaya-tui now reads `email` and `display-name` in turn, one configuration file backing the two binaries either way. The wizard writes `email` when its prompt was answered with an address rather than a server URL or a folder path.
+  The composers append the signature when neither `--signature` nor `--signature-file` is passed, `signature-delim` defaulting to the RFC 3676 §4.3 `"-- \n"` and written verbatim.
 
-- Added back the `signature` and `signature-delim` config fields, dropped in v2, at both the global and the account level.
+- Added `in_reply_to` to the shared envelope ([#734]).
 
-  The composers append the signature when neither `--signature` nor `--signature-file` is passed, and `signature-delim` decides what introduces it, defaulting to the RFC 3676 §4.3 `"-- \n"` the composers used to hardcode. The delimiter is written verbatim, so one meant to stand on its own line carries its own trailing newline.
+  A list of ids stripped of their angle brackets like `message_id`, riding the JSON output only, left empty by Microsoft Graph.
 
-  `signature` is the signature alone. himalaya-tui, which reads the same two keys, expected the delimiter to be written inside the value and ignored `signature-delim` entirely; it now assembles the block the same way, so one value reads the same under both binaries.
+- Added the shared `message delete <ids>` command (alias `del`).
 
-- Added `in_reply_to` to the shared envelope, the message(s) a message replies to ([#734]).
+  Trash-first: messages are moved to the trash mailbox, resolved from the backend role then from `mailbox.alias.trash`, or permanently removed when already in it.
 
-  It is a list, since RFC 5322 §3.6.4 spells the header `1*msg-id`, and every id is stripped of its angle brackets exactly as `message_id` is, so a reply and its parent compare byte-for-byte whatever backend returned them. It rides the JSON output, takes no column in the listing table, and costs no backend an extra request. Microsoft Graph leaves it empty, `In-Reply-To` living in `internetMessageHeaders`, which a listing selection does not return.
+- Added the `maildir.keywords.dovecot` and `maildir.keywords.header` config fields.
 
-- Added the shared `message delete <ids>` command (alias `del`), following a trash-first policy.
+  Surface custom Maildir keywords as flags, read from each mailbox's dovecot-keywords file or from `X-Keywords` / `X-Label`; reading only, both off by default.
 
-  Messages are moved to the trash mailbox, unless they already are in it, in which case they are permanently removed. The trash mailbox is resolved from the backend role, then from the `mailbox.alias.trash` config entry, and failing that the command errors. IMAP needs UIDPLUS (RFC 4315) to expunge exactly the deleted UIDs; without it the messages are only flagged `\Deleted` and a later expunge reclaims them.
+- Added the `imap.sasl-ir` config field, forcing the RFC 4959 initial response on or off ([#729]).
 
-- Added the `maildir.keywords.dovecot` and `maildir.keywords.header` account config fields, surfacing custom Maildir keywords.
+  Unset follows the advertised `SASL-IR` capability; `false` is needed by Coremail (126.com, 163.com), which advertises it then rejects the inline form.
 
-  Custom (non-IANA) keywords such as `NonJunk` were invisible on Maildir: the six standard info-section letters became flags and everything else was dropped, so `envelope list "flag NonJunk"` matched nothing where the same search works on IMAP, JMAP and Microsoft Graph. Maildir has no single keyword convention, so which one a mailbox uses has to be named. `maildir.keywords.dovecot = true` resolves the lowercase slot letters through each mailbox's own `dovecot-keywords` file (dovecot, mbsync, OfflineIMAP), and `maildir.keywords.header` reads them from `X-Keywords` (comma-separated) or `X-Label` (space-separated, mutt and notmuch). Both default to off, leaving the flag set unchanged.
-
-  Reading only, and lossy on write: no command can name a custom keyword, so `flag set` replaces the whole set and drops any keyword the message carried.
-
-- Added the `imap.sasl-ir` account config field, forcing the RFC 4959 SASL-IR initial response on or off for every SASL mechanism: `true` always inlines credentials with `AUTHENTICATE`, `false` waits for the server's continuation request, and leaving it unset follows the advertised `SASL-IR` capability as before.
-
-  Coremail (NetEase 126.com and 163.com) advertises `SASL-IR` yet answers the inline form with `BAD Request not ending with`, leaving those accounts unable to authenticate at all ([#729]). They need `imap.sasl-ir = false`, and usually `imap.id.auto = true` as well since Coremail also rejects `SELECT` without a prior `ID`.
-
-- Added a `--seen` flag to `message read`, marking the message as seen while reading it. Without it the read stays non-mutating, the default since v2.
+- Added a `--seen` flag to `message read`, marking the message as seen while reading it.
 
 - Added the `configure` command (alias `wizard`), running the account wizard by name.
 
-  A bare `himalaya` and any command needing an account still offer it when they find no configuration. That offer is now a hook rather than a gate: the command carries on afterwards either way, where it used to exit whatever you answered. Nothing prompts when stdin is not a terminal or `--json` is set.
+  The first-run offer is now a hook rather than a gate: the command carries on afterwards, and nothing prompts when stdin is not a terminal or `--json` is set.
 
-- Added back the `HIMALAYA_CONFIG` environment variable, read like `-c` and accepting the same `:`-delimited list.
+- Added back the `HIMALAYA_CONFIG` environment variable, read like `-c` and taking the same `:`-delimited list.
 
-- Added the `--help` footer every Pimalaya binary shares, naming the bug tracker and the sponsoring page. It ends `himalaya -h`, `himalaya --help` and the generated `himalaya.1` man page, and is not repeated under each subcommand.
+- Added the shared Pimalaya `--help` footer, naming the bug tracker and the sponsoring page.
 
 ### Changed
 
-- Made the configuration wizard discovery-only, removing the hand-entry flow entirely.
+- Made the configuration wizard discovery-only, removing the hand-entry flow.
 
-  An email, a bare domain or a `scheme://` server URL all run discovery, the URL scheme narrowing the results: `imap` and `imaps` to IMAP plus SMTP, an HTTP-family scheme to JMAP. A local folder path auto-detects Maildir against m2dir, prompting only when the directory is ambiguous. When nothing is discovered, the wizard stops and points at the documented sample configuration.
-
-  The wizard no longer invents an SMTP host. When discovery finds IMAP but no submission endpoint, the account is IMAP-only and the user adds SMTP by hand, instead of guessing `smtp.<domain>` and failing its connection test.
+  An email, a domain, a `scheme://` URL or a local folder path all run discovery, and the wizard stops when nothing is found rather than guessing an SMTP host.
 
 - Reworked `message read`'s plain-text output into a concise reading view.
 
-  A minimal header block (Date, From, To, Cc, Subject) is followed by a per-part walk: one summary line per MIME part (`[ID] <type>[ — <filename>] (<size>)`) carrying that part's own `Content-*` headers, then the decoded contents of plain-text parts inlined. HTML and binary parts stay a summary, except an HTML-only mail, whose markup is printed rather than nothing readable. `--raw` and `--json` are unchanged.
+  A header block (Date, From, To, Cc, Subject), then one summary line per MIME part with plain-text parts inlined; `--raw` and `--json` are unchanged.
 
-- Right-aligned the `SIZE` column of the envelope listing table, its header included, so sizes line up on their unit rather than on their first digit ([#723]).
+- Aligned the `ID` of `message read`, `attachments list` and `attachments download` on the MIME part's 1-based position, making attachment ids a sparse subset of it.
 
-- Aligned the `ID` in `message read`, `attachments list` and `attachments download` on the MIME part's 1-based position, so `message read` shows the same id passed to `attachments download`. Attachment ids are therefore a sparse subset of the part positions (`1 5 9`) rather than a dense sequence.
+- Right-aligned the `SIZE` column of the envelope listing table ([#723]).
 
-- The first-run offer now opens with a welcome banner on stderr explaining what Himalaya is, naming the configuration file it looked for and pointing at the documented sample, replacing the comment header that used to head the generated config. `himalaya configure`, asked for by name, skips it.
+- Made the wizard write the account to the configuration file rather than only print it.
 
-- The wizard now writes the account to the configuration file rather than only printing it, and never rewrites what a human wrote.
+  The file is where `-c` or `HIMALAYA_CONFIG` pointed, or the XDG default; an existing one gets a plain text append, so comments and formatting survive.
 
-  The path is no longer prompted: it is where `-c` or `HIMALAYA_CONFIG` pointed, or `$XDG_CONFIG_HOME/himalaya/config.toml`. A file that is not there is written whole, and one that is gets a plain text append, so comments, ordering and formatting survive. The generated account takes a free name, suffixed until it is, and claims `default` only when no other account does. When stdout is redirected or in JSON mode it still prints straight to stdout.
+- Made the first-run offer open with a welcome banner on stderr, naming the configuration file it looked for; `himalaya configure` skips it.
 
-- Bare `himalaya --account <NAME>` (an account but no subcommand) now shows the help instead of dropping into the account-creation wizard.
+- Changed bare `himalaya --account <NAME>` to show the help instead of running the account wizard.
 
-- The wizard now offers only the IMAP authentication mechanisms the server supports, read from an unauthenticated CAPABILITY before prompting: the advertised SASL mechanisms, most preferred first and the legacy `LOGIN` command last.
+- Made the wizard offer only the IMAP authentication mechanisms an unauthenticated CAPABILITY advertises, falling back to the full list on any probe failure.
 
-  A server exposing no SASL AUTH and no LOGINDISABLED (a perdition-style proxy such as isae-supaero.fr) offers `LOGIN` alone, where the wizard previously defaulted to `AUTHENTICATE PLAIN` and failed. On any probe failure it falls back to the full mechanism list. SMTP keeps its discovery-advertised list, since it negotiates auth over EHLO.
+- Time-bounded the wizard's service discovery, so one unreachable endpoint no longer stalls it for the operating-system connect timeout.
 
-- The wizard's service discovery is now time-bounded, so a single unreachable endpoint (a firewalled port, a black-hole host) no longer stalls it for the operating-system connect timeout. Mechanisms still running at the deadline are abandoned and only what completed in time is offered.
+- Made the wizard offer to reuse the IMAP credentials for SMTP, prompting only the SMTP endpoint on accept.
 
-- The wizard now offers to reuse the IMAP credentials for SMTP, so they are entered once. On accept it prompts only the SMTP endpoint (host seeded from the IMAP host, encryption, port); on decline it runs the full SMTP prompts.
+- Changed `gmail messages get --header` and `gmail threads get --header` to narrow the rendered headers under every format, not only `--format metadata`.
 
-- `gmail messages get --header` and `gmail threads get --header` now narrow the rendered headers under every format, not only `--format metadata`. Gmail honours its `metadataHeaders` parameter for the metadata format alone and returns every header otherwise, so the filter is applied to the response as well. Names match case-insensitively, repeated headers keep their order, and passing no `--header` still renders them all.
+- Changed `imap raw` to send a byte-verbatim batch of tagged commands.
 
-- `imap raw` now sends a byte-verbatim batch of tagged commands.
-
-  The command argument decodes literal `\r` / `\n` escapes into real CRLF, so a CRLF-separated batch (each command carrying its own tag) can be pipelined from the shell, e.g. `himalaya imap raw 'a1 SELECT INBOX\r\na2 SEARCH ALL\r\n'`, and the reply is read until every command is acknowledged (possibly out of order). `smtp raw` gains the same escape decoding but stays a single command line, rejecting batched input since the exchange reads exactly one reply. Both accept the command via stdin.
+  Literal `\r` / `\n` escapes decode to CRLF and the reply is read until every command is acknowledged; `smtp raw` decodes the same escapes but stays a single command.
 
 ### Fixed
 
-- Fixed `configure --json` emitting a payload no schema described: `json-schema <DIR>` now writes `himalaya-configure.json`, like every other command returning data.
+- Fixed `configure --json` emitting a payload no schema described: `json-schema <DIR>` now writes himalaya-configure.json.
 
-- Fixed `--from` spelling out a display name producing a `From: <Alice <alice@example.org>>` no SMTP server accepts, the send failing with `501 5.1.7 Bad sender address syntax` ([#727]).
+- Fixed `--from` carrying a display name composing a `From: <Alice <alice@example.org>>` no SMTP server accepts ([#727]).
 
-  The value is now parsed as a mailbox, the name reaching the MIME builder apart from the address exactly as the configured `display-name` does. A bare address is unaffected, and one that parses to no address at all errors instead of composing a broken header.
+  The value is parsed as a mailbox, the name reaching the MIME builder apart from the address.
 
 - Fixed commands dying mid-exchange with a bare `Resource temporarily unavailable (os error 35)` ([#731], [#732]).
 
-  A blocking socket is not supposed to report `EAGAIN`, yet it surfaced on large mailboxes, the more readily the longer the exchange ran. The transport underneath every backend now retries a stream that reports it is not ready, for a minute before giving up and saying so. It also arms a socket read deadline at connect time, so a server that goes silent on an otherwise healthy connection ends the command instead of hanging forever.
+  The transport now retries a stream reporting it is not ready, for a minute, and arms a socket read deadline at connect time.
 
-- Fixed lean cargo feature combinations failing to compile. Every combination now builds.
+- Fixed lean cargo feature combinations failing to compile.
 
-  The config schema no longer reaches for the `io-imap`, `io-smtp` and `io-jmap` ALPN defaults when those backends are disabled, and the cross-protocol commands are feature-gated by what they need: `mailboxes`, `envelopes`, `flags`, `attachments` and the storage message subcommands (`add`, `copy`, `move`, `read`, `reply`, `forward`) require a storage backend, while `messages compose` and `messages send` only need a send backend. A backend-less build drops the shared surface entirely. The `attachments` commands also reached the Gmail, Microsoft Graph and m2dir backends, previously IMAP, JMAP and Maildir only.
+  The config schema no longer reaches for disabled backends' ALPN defaults, and every shared command is gated on the storage or send backend it needs.
 
-- `message read --raw --json` no longer errors: the two combine, emitting the raw RFC 5322 bytes as a JSON `{ "message": "…" }` string (lossily decoded) instead of bailing with "`--raw` and `--json` cannot be combined".
+- Fixed `message read --raw --json` erroring: the two now combine, emitting the raw RFC 5322 bytes as a JSON string.
 
-- Fixed the Gmail and Microsoft Graph `get` commands wrapping their data in a `message` string under `--json`, which left the output unparseable and `--header` without visible effect ([#730]).
+- Fixed the Gmail and Microsoft Graph `get` commands wrapping their data in a `message` string under `--json` ([#730]).
 
-  Gmail `messages get`, `drafts get`, `threads get`, `history list` and the `settings` readers now serialize their data, as does Microsoft Graph `message get`, each with a published JSON Schema. Text output is unchanged, except that Gmail `messages get` and `threads get` print the headers they already fetched, and `history list` reports the affected message ids rather than per-record counts.
+  Gmail `messages get`, `drafts get`, `threads get`, `history list` and the `settings` readers now serialize their data, as does Microsoft Graph `message get`, each with a published JSON Schema.
 
-- Fixed `gmail drafts get --format raw` discarding the raw message it had fetched and printing the draft summary instead. It now writes the RFC 5322 bytes, like `gmail messages get --format raw`.
+- Fixed `gmail drafts get --format raw` printing the draft summary instead of the raw message it had fetched.
 
 ### Removed
 
-- Removed the `assets/himalaya.desktop` entry, and the Nix install line copying it into `share/applications`. Packagers installing it by hand should drop it too.
+- Removed the assets/himalaya.desktop entry and the Nix line installing it.
 
-  Every functional line of it had stopped working: `Exec=himalaya %U` answers a `mailto:` link with `unrecognized subcommand`, its Compose action passes the same URL to `message write`, which takes no positional argument, and the `x-scheme-handler/mailto` and `message/rfc822` types it claimed are not handled at all. Claiming the scheme was the harmful part, a desktop being free to route every mail link to a command that then errors out. `mailto:` handling belongs to a wrapper of your own, as MIGRATION.md describes.
+  Every functional line of it had stopped working, `Exec=himalaya %U` answering a mailto: link with `unrecognized subcommand`; handling mailto: is left to a wrapper of your own, as MIGRATION.md describes.
 
 ## [2.0.0] - 2026-07-26
 
 ### Added
 
-- Added Gmail REST API support: a `[gmail]` account backend behind the shared mail commands (`--backend gmail`), plus a protocol-specific `gmail` command exposing the full REST surface (profile, labels, messages, attachments, drafts, threads, history, settings). Authenticates with a single OAuth 2.0 bearer token (`gmail.auth.token.raw` / `.command`), the only authorization Gmail's REST API accepts.
+- Added Gmail REST API support: a `[gmail]` account backend behind the shared commands and a protocol-specific `gmail` command.
 
-- Added Microsoft Graph REST API support: a `[msgraph]` account backend behind the shared mail commands (`--backend msgraph`), plus a protocol-specific `msgraph` command exposing the Graph mail surface (profile, mail-folder, message, attachment). Mirrors `[gmail]`, authenticating with a single OAuth 2.0 bearer token.
+  Exposes the full REST surface (profile, labels, messages, attachments, drafts, threads, history, settings), authenticating with a single OAuth 2.0 bearer token, the only authorization the API accepts.
 
-- Restored the RFC 2971 `ID`-after-auth quirk as `imap.id.{auto, fields}`, replacing the v1.2.0 `imap.extensions.id.send-after-auth` flag dropped during the v2 migration.
+- Added Microsoft Graph REST API support: a `[msgraph]` account backend behind the shared commands and a protocol-specific `msgraph` command.
 
-- Brought the `m2dir` backend to CLI feature parity with `maildir` (messages, flags, envelopes). Mailbox `rename` and message `copy` / `move` still await io-m2dir support.
+  Exposes the Graph mail surface (profile, mail-folder, message, attachment) and mirrors `[gmail]`, authenticating with a single OAuth 2.0 bearer token.
+
+- Restored the RFC 2971 `ID`-after-auth quirk as `imap.id.{auto, fields}`, replacing the v1.2.0 `imap.extensions.id.send-after-auth` flag.
+
+- Brought the `m2dir` backend to CLI feature parity with `maildir`, minus mailbox `rename` and message `copy` / `move`, which await io-m2dir support.
 
 - Added `--save <MAILBOX>` to `messages send`, mirroring the flag on `messages compose` / `reply` / `forward`.
 
 - Added `--send` to `messages add` (alias `messages save`), mirroring `messages send --save`.
 
-- Added raw passthrough commands `imap raw <command>` and `smtp raw <command>`.
+- Added the raw passthrough commands `imap raw <command>` and `smtp raw <command>`.
 
-- The wizard now pre-fills `mailbox.alias.*` from the server, so a generated account has a working default mailbox (the `inbox` alias, which backs commands that omit `-m/--mailbox`) and known Sent/Drafts/Trash/… targets without hand-editing ids. JMAP reads the RFC 8621 mailbox roles live over the tested connection. Gmail and Microsoft Graph map their fixed system-label ids (`INBOX`, `SENT`, …) and well-known folder names (`inbox`, `sentitems`, …). IMAP pins the reserved `INBOX` only. The other special-use roles await LIST `RETURN (SPECIAL-USE)` support in io-imap (upstream imap-codec has none yet).
+- Added `mailbox.alias.*` pre-filling to the wizard, so a generated account has a working `inbox` and known Sent/Drafts/Trash targets.
 
-- Added the `json-schema <DIR>` command, which writes one JSON Schema file per structured-output command (`himalaya-<cmd>-<subcmd>.json`) describing its `--json` payload, so downstream tooling can validate and type Himalaya's machine output. Only the schemas for compiled-in backends are emitted ([#547]).
+  JMAP reads the RFC 8621 roles live, Gmail and Microsoft Graph map their fixed system ids, and IMAP pins the reserved `INBOX` alone until io-imap can issue LIST `RETURN (SPECIAL-USE)`.
 
-- The discovery wizard now falls back to the system DNS resolver (/etc/resolv.conf on unix, the network adapters on windows) before the Cloudflare default, making the resolution chain `HIMALAYA_DNS_RESOLVER` then system then `1.1.1.1`. This avoids leaking the email domain to a third-party resolver and works around networks that block the default.
+- Added the `json-schema <DIR>` command, writing one JSON Schema per structured-output command ([#547]).
 
-- Added local socket-proxy support: `imap.server` / `smtp.server` now accept a `unix:///path` scheme to connect through a pre-authenticated session proxy such as [sirup](https://github.com/pimalaya/sirup). No SASL is negotiated over the socket (the session arrives already authenticated), and a single-session proxy can back the storage backend without Himalaya opening a second connection ([#264]).
+  Describes each `--json` payload for downstream tooling; only compiled-in backends are emitted.
+
+- Added a system DNS resolver fallback to discovery, making the chain `HIMALAYA_DNS_RESOLVER` then system then `1.1.1.1`.
+
+  This keeps the email domain off a third-party resolver and works around networks blocking the default.
+
+- Added local socket-proxy support: `imap.server` and `smtp.server` accept a `unix:///path` scheme ([#264]).
+
+  The session arrives already authenticated from a proxy such as [sirup](https://github.com/pimalaya/sirup), so no SASL is negotiated over the socket.
 
 ### Changed
 
-- Flattened the `imap` command tree into top-level verbs mirroring the protocol's flat command list (`select`, `create`, `append`, `store`, `fetch`, …), replacing the former `mailbox` / `envelope` / `message` / `flag` subgroups.
+- Flattened the `imap` command tree into top-level verbs mirroring the protocol's flat command list (`select`, `create`, `append`, `store`, `fetch`), replacing the `mailbox` / `envelope` / `message` / `flag` subgroups.
 
-- Unified raw-message input across the `messages`, `imap`, `maildir`, `jmap`, `msgraph` and `smtp` send/add commands behind a single `MessageArg` (file path, inline raw, or piped stdin), and removed the legacy `--file` flag on `messages add`.
+- Unified raw-message input behind a single `MessageArg` (file path, inline raw or piped stdin) across every send and add command, removing the legacy `--file` flag on `messages add`.
 
-- Split the merged `Account` out of every client wrapper: subcommands now receive `account` and `client` as sibling arguments instead of reaching through `client.account`.
+- Split `Account` out of every client wrapper: subcommands now receive `account` and `client` as sibling arguments.
 
-- **Breaking:** changed bare `himalaya` (no subcommand) to run the account wizard instead of listing the default account's envelopes. Himalaya is now a lower-level tool: envelope listing lives under its explicit commands, and the bare invocation is the natural entry point for setting up an account.
+- **Breaking:** changed bare `himalaya` to run the account wizard instead of listing the default account's envelopes.
 
-- Changed the wizard to print the generated account as a ready-to-save TOML document on stdout instead of writing it to disk, mirroring ortie. Redirect it into your config file yourself (e.g. `himalaya > ~/.config/himalaya/config.toml`). It runs on bare `himalaya` and is still proposed when a command finds no config, while a config that exists but lacks the requested account is now a hard error rather than a wizard trigger.
+- Changed the wizard to print the generated account as a ready-to-save TOML document on stdout instead of writing it to disk.
 
-  The account's connection is tested before the config is printed, so a bad credential or endpoint stops the wizard instead of yielding a config that cannot connect. The output is compact: only the `[accounts.<name>]` table stays a section header, every other table is flattened into dotted keys (`imap.sasl.plain.username = …`), and empty tables and defaulted values (`starttls`, `alpn`, `id.auto`) are dropped.
+  The connection is tested before printing, and a config that exists but lacks the requested account is now a hard error rather than a wizard trigger.
 
-- Reworked the wizard's account-setup flow. The discovery list now shows one entry per reachable service (IMAP + SMTP, JMAP, Gmail, Microsoft Graph), and the authentication method is chosen in a second, service-specific prompt: the SASL mechanism (`PLAIN`, `LOGIN`, `SCRAM-SHA-256`, `OAUTHBEARER`, …) for IMAP + SMTP, the HTTP scheme (Basic / Bearer) for JMAP. OAuth 2.0 is no longer a dead-end list entry: it folds into the "API token" credential prompt, which now offers the OS keyrings and the OAuth token brokers (Ortie, pizauth, oama) together, the brokers appearing only when the service advertises OAuth.
+- Reworked the wizard's account-setup flow into one entry per reachable service, then a service-specific authentication prompt.
 
-- The wizard now tests IMAP and SMTP as it configures them: the IMAP connection is validated first, then it asks whether SMTP reuses the same credentials (the two may advertise different auth), re-running the SASL prompt for a distinct one, and tests SMTP last.
+  OAuth 2.0 folds into the credential prompt, which offers the OS keyrings and the token brokers (Ortie, pizauth, oama) together.
 
-- The wizard no longer prompts for an account name. It is derived from the input (the domain's first label, or the folder name). Rename it by editing the printed `[accounts.<name>]` table key.
+- Changed the wizard to test IMAP first, then ask whether SMTP reuses the same credentials, then test SMTP.
+
+- Removed the wizard's account-name prompt, the name being derived from the domain's first label or the folder name.
 
 ### Fixed
 
 - Fixed compilation error when the `wizard` feature was disabled ([#634]).
 
-- Fixed mailbox-alias resolution to apply across every shared `messages` subcommand (`add`, `read`, `reply`, `forward`, `copy`, `move`) and the `--save` flag on `compose` / `reply` / `forward`, so aliases like `mailbox.alias.sent` are honoured before the backend call.
+- Fixed mailbox-alias resolution to apply across every shared `messages` subcommand and the `--save` flag on `compose` / `reply` / `forward`.
 
-- Fixed swapped save/send success messages ("saved" printed after a pure send, "sent" after a pure save).
+- Fixed swapped save and send success messages.
 
 ### Removed
 
-- Removed the `[message.composer.*]` / `[message.reader.*]` config tables and the `compose-with` / `reply-with` / `forward-with` / `mailto` / `read-with` subcommands. Richer composition now chains standalone tools such as [mml](https://github.com/pimalaya/mml) into `messages send` / `add`.
+- Removed the `[message.composer.*]` and `[message.reader.*]` config tables, with the `compose-with` / `reply-with` / `forward-with` / `mailto` / `read-with` subcommands.
 
-  The "stdout = MIME draft" contract was incompatible with composers spawning an interactive editor, whose UI inherited the parent's piped stdout.
+  The "stdout = MIME draft" contract broke composers spawning an interactive editor; chain a standalone tool such as [mml](https://github.com/pimalaya/mml) into `messages send` / `add` instead.
 
-- Dropped `HIMALAYA_CONFIG` environment-variable support. `-c/--config` still accepts one or more `:`-separated paths.
+- Dropped `HIMALAYA_CONFIG` environment-variable support, `-c/--config` still taking one or more `:`-separated paths.
 
-- Removed the `account configure` command (alias `account edit`) and its per-field edit wizard. Account setup now goes through the bare `himalaya` discovery wizard, leaving `account list` and `account check` for inspection.
+- Removed the `account configure` command (alias `account edit`) and its per-field edit wizard, leaving `account list` and `account check` for inspection.
 
 ## [1.2.0] - 2026-02-19
 
