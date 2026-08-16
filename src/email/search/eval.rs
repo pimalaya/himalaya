@@ -149,6 +149,7 @@ mod tests {
         Envelope {
             id: String::from("1"),
             message_id: None,
+            in_reply_to: Vec::new(),
             flags: Default::default(),
             subject: String::from("Release notes"),
             from: vec![Address {

@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `in_reply_to` to the shared envelope, the message(s) a message replies to ([#734]).
+
+  It is a list, since RFC 5322 §3.6.4 spells the header `1*msg-id`, and every id is stripped of its angle brackets exactly as `message_id` is, so a reply and its parent compare byte-for-byte whatever backend returned them. It rides the JSON output and takes no column in the listing table.
+
+  No backend pays a request for it: IMAP reads the 9th `ENVELOPE` element it already fetches, JMAP adds `inReplyTo` to the properties it asks for, Gmail reads one more metadata header, Maildir and m2dir read the parsed message, and pimdir reads the stored summary, which now carries the field. Microsoft Graph leaves it empty, `In-Reply-To` living in `internetMessageHeaders`, which a listing selection does not return.
+
 - Added the shared `message delete <ids>` command (alias `del`), following a trash-first policy.
 
   Messages are moved to the trash mailbox, unless they already are in it, in which case they are permanently removed. The trash mailbox is resolved from the backend (JMAP `role=trash`, Gmail `TRASH` label, Microsoft Graph `deleteditems`), then from the `mailbox.alias.trash` config entry, and failing that the command errors.
@@ -1109,6 +1115,7 @@ Few major concepts changed:
 [#730]: https://github.com/pimalaya/himalaya/issues/730
 [#731]: https://github.com/pimalaya/himalaya/issues/731
 [#732]: https://github.com/pimalaya/himalaya/issues/732
+[#734]: https://github.com/pimalaya/himalaya/issues/734
 
 [core#1]: https://github.com/pimalaya/core/issues/1
 [core#10]: https://github.com/pimalaya/core/issues/10

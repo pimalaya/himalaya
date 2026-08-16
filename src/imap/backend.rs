@@ -47,7 +47,7 @@ use rfc2047_decoder::{Decoder, RecoverStrategy};
 use crate::{
     email::{
         address::Address,
-        envelope::{Envelope, normalize_message_id},
+        envelope::{Envelope, normalize_message_id, parse_message_ids},
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::Mailbox,
         search::{
@@ -440,6 +440,7 @@ fn compute_window(exists: u32, page: Option<u32>, page_size: Option<u32>) -> Opt
 fn envelope_from(seq: u32, items: Vec<MessageDataItem<'static>>) -> Envelope {
     let mut id = String::new();
     let mut message_id: Option<String> = None;
+    let mut in_reply_to = Vec::new();
     let mut flags = BTreeSet::new();
     let mut subject = String::new();
     let mut from = Vec::new();
@@ -464,6 +465,12 @@ fn envelope_from(seq: u32, items: Vec<MessageDataItem<'static>>) -> Envelope {
                 if let Some(m) = env.message_id.into_option() {
                     message_id = normalize_message_id(&bytes_to_string(m.as_ref()));
                 }
+                // NOTE: the 9th ENVELOPE element (RFC 3501 §7.4.2), so
+                // the reply's parent costs nothing beyond the FETCH the
+                // listing already issued.
+                if let Some(m) = env.in_reply_to.into_option() {
+                    in_reply_to = parse_message_ids(&bytes_to_string(m.as_ref()));
+                }
                 from = env.from.iter().map(address_from).collect();
                 to = env.to.iter().map(address_from).collect();
             }
@@ -482,6 +489,7 @@ fn envelope_from(seq: u32, items: Vec<MessageDataItem<'static>>) -> Envelope {
     Envelope {
         id,
         message_id,
+        in_reply_to,
         flags,
         subject,
         from,

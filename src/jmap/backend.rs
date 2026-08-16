@@ -484,6 +484,7 @@ fn envelope_properties() -> Vec<JmapEmailProperty> {
         JmapEmailProperty::Size,
         JmapEmailProperty::HasAttachment,
         JmapEmailProperty::MessageId,
+        JmapEmailProperty::InReplyTo,
     ]
 }
 
@@ -527,10 +528,21 @@ fn envelope_from(email: JmapEmail) -> Envelope {
     let message_id = email
         .message_id
         .and_then(|ids| ids.into_iter().find_map(|s| normalize_message_id(&s)));
+    // NOTE: inReplyTo is a list by definition (RFC 5322 §3.6.4), and
+    // JMAP hands the ids over already stripped of their brackets;
+    // normalising anyway keeps them comparable with a server that does
+    // not.
+    let in_reply_to = email
+        .in_reply_to
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|id| normalize_message_id(id))
+        .collect();
 
     Envelope {
         id,
         message_id,
+        in_reply_to,
         flags,
         subject,
         from,

@@ -2,7 +2,7 @@
 //!
 //! Reads project [`io_pimdir`]'s client read API (`list_collections`,
 //! `list_items`, `get_item`, `count_items`) plus the blob store, building
-//! envelopes from the stored `v: 1` meta (pimdir SPEC §13) with no body reads.
+//! envelopes from the stored `v: 1` meta (pimdir SPEC Annex A) with no body reads.
 //! An item whose body is not local (`level < Full`) still lists; `get_message`
 //! reports "body not fetched" rather than an error — the cue to sync.
 //!
@@ -24,13 +24,13 @@ use io_replica::{
     placement::{ReplicaFlags, ReplicaHandle, ReplicaLinkId, ReplicaMeta, ReplicaPlacement},
 };
 use log::warn;
-use mail_parser::{Address as MailParserAddress, MessageParser};
+use mail_parser::{Address as MailParserAddress, HeaderValue, MessageParser};
 use serde::Deserialize;
 
 use crate::{
     email::{
         address::Address,
-        envelope::Envelope,
+        envelope::{Envelope, normalize_message_id, parse_message_ids},
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::Mailbox,
         search::{eval, query::SearchEmailsQuery},
@@ -44,11 +44,13 @@ const MAIL_KIND: &str = "message/rfc822";
 /// How many items to pull per keyset page when scanning a whole collection.
 const SCAN_BATCH: usize = 500;
 
-/// A reader's view of the `message/rfc822` meta (pimdir SPEC §13).
+/// A reader's view of the `message/rfc822` meta (pimdir SPEC Annex A).
 #[derive(Default, Deserialize)]
 struct MetaView {
     #[serde(default)]
     message_id: Option<String>,
+    #[serde(default)]
+    in_reply_to: Vec<String>,
     #[serde(default)]
     subject: String,
     #[serde(default)]
@@ -376,6 +378,7 @@ fn envelope_from_item(item: &PimdirItem) -> Envelope {
         // The public id: a short per-collection integer, not the long link id.
         id: item.seq.to_string(),
         message_id: view.message_id,
+        in_reply_to: view.in_reply_to,
         flags,
         subject: view.subject,
         from,
@@ -391,6 +394,17 @@ fn envelope_from_item(item: &PimdirItem) -> Envelope {
 fn derive_link_and_meta(raw: &[u8]) -> (ReplicaLinkId, ReplicaMeta) {
     let parsed = MessageParser::default().parse(raw);
     let message_id = parsed.as_ref().and_then(|m| m.message_id());
+    let in_reply_to: Vec<String> = parsed
+        .as_ref()
+        .map(|m| match m.in_reply_to() {
+            HeaderValue::TextList(ids) => ids
+                .iter()
+                .filter_map(|id| normalize_message_id(id))
+                .collect(),
+            HeaderValue::Text(id) => parse_message_ids(id),
+            _ => Vec::new(),
+        })
+        .unwrap_or_default();
     let subject = parsed.as_ref().and_then(|m| m.subject()).unwrap_or("");
     let from = parsed
         .as_ref()
@@ -418,6 +432,8 @@ fn derive_link_and_meta(raw: &[u8]) -> (ReplicaLinkId, ReplicaMeta) {
         v: u8,
         #[serde(skip_serializing_if = "Option::is_none")]
         message_id: Option<&'a str>,
+        #[serde(skip_serializing_if = "<[String]>::is_empty")]
+        in_reply_to: &'a [String],
         subject: &'a str,
         #[serde(skip_serializing_if = "Option::is_none")]
         from: Option<&'a str>,
@@ -431,6 +447,7 @@ fn derive_link_and_meta(raw: &[u8]) -> (ReplicaLinkId, ReplicaMeta) {
     let summary = MetaWrite {
         v: 1,
         message_id,
+        in_reply_to: &in_reply_to,
         subject,
         from: from.as_deref(),
         to: to.as_deref(),

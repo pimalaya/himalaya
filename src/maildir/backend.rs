@@ -17,12 +17,12 @@ use io_maildir::{
     maildir::{Maildir, MaildirSubdir},
     path::MaildirFsPath,
 };
-use mail_parser::Address as MailParserAddress;
+use mail_parser::{Address as MailParserAddress, HeaderValue};
 
 use crate::{
     email::{
         address::Address,
-        envelope::{Envelope, normalize_message_id},
+        envelope::{Envelope, normalize_message_id, parse_message_ids},
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::Mailbox,
         search::{eval, query::SearchEmailsQuery},
@@ -228,9 +228,15 @@ fn envelope_from_entry(entry: &MaildirFullEntry) -> Envelope {
         .and_then(|m| m.message_id())
         .and_then(normalize_message_id);
 
+    let in_reply_to = parsed
+        .as_ref()
+        .map(|m| ids_from_header(m.in_reply_to()))
+        .unwrap_or_default();
+
     Envelope {
         id,
         message_id,
+        in_reply_to,
         flags,
         subject,
         from,
@@ -250,6 +256,22 @@ fn parse_filename_flags(path: &MaildirFsPath) -> BTreeSet<Flag> {
         return BTreeSet::new();
     };
     letters.chars().filter_map(flag_from_char).collect()
+}
+
+/// mail-parser msg-id header to the bare ids it names.
+///
+/// mail-parser knows `In-Reply-To` holds a msg-id list and usually
+/// yields one, but a single id comes back as text, so both shapes are
+/// read.
+fn ids_from_header(value: &HeaderValue<'_>) -> Vec<String> {
+    match value {
+        HeaderValue::TextList(ids) => ids
+            .iter()
+            .filter_map(|id| normalize_message_id(id))
+            .collect(),
+        HeaderValue::Text(id) => parse_message_ids(id),
+        _ => Vec::new(),
+    }
 }
 
 /// mail-parser address group to a shared [`Address`] list.

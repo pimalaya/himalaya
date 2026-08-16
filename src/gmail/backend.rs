@@ -21,7 +21,7 @@ use io_gmail::v1::rest::{
 use crate::{
     email::{
         address::Address,
-        envelope::{Envelope, normalize_message_id},
+        envelope::{Envelope, normalize_message_id, parse_message_ids},
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::Mailbox,
     },
@@ -216,6 +216,7 @@ fn envelope_from(message: GmailMessage) -> Envelope {
     let mut to = Vec::new();
     let mut date = None;
     let mut message_id = None;
+    let mut in_reply_to = Vec::new();
 
     if let Some(payload) = &message.payload {
         subject = payload.header("Subject").unwrap_or_default().to_string();
@@ -223,11 +224,13 @@ fn envelope_from(message: GmailMessage) -> Envelope {
         to = parse_addresses(payload.header("To").unwrap_or_default());
         date = payload.header("Date").and_then(parse_rfc2822);
         message_id = payload.header("Message-ID").and_then(normalize_message_id);
+        in_reply_to = parse_message_ids(payload.header("In-Reply-To").unwrap_or_default());
     }
 
     Envelope {
         id: message.id,
         message_id,
+        in_reply_to,
         flags,
         subject,
         from,

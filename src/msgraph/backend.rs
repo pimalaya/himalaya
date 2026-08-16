@@ -170,6 +170,11 @@ fn envelope_from(message: MsgraphMessage) -> Envelope {
     Envelope {
         id: message.id,
         message_id,
+        // NOTE: Graph carries In-Reply-To only inside
+        // `internetMessageHeaders`, which a listing selection does not
+        // return, so the field stays empty rather than costing one
+        // request per row.
+        in_reply_to: Vec::new(),
         flags,
         subject: message.subject.unwrap_or_default(),
         from,

@@ -12,12 +12,14 @@ use std::path::Path;
 use anyhow::Result;
 use chrono::DateTime;
 use io_m2dir::{entry::M2dirEntry, flag::M2dirFlags, m2dir::M2dir};
-use mail_parser::{Address as MailParserAddress, Message as ParsedMessage, MessageParser};
+use mail_parser::{
+    Address as MailParserAddress, HeaderValue, Message as ParsedMessage, MessageParser,
+};
 
 use crate::{
     email::{
         address::Address,
-        envelope::{Envelope, normalize_message_id},
+        envelope::{Envelope, normalize_message_id, parse_message_ids},
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::Mailbox,
         search::{eval, query::SearchEmailsQuery},
@@ -235,10 +237,19 @@ fn envelope_from(entry: &M2dirEntry, meta: &M2dirFlags, parsed: &ParsedMessage<'
         .and_then(|d| DateTime::parse_from_rfc3339(&d.to_rfc3339()).ok());
     let size = parsed.raw_message().len() as u64;
     let message_id = parsed.message_id().and_then(normalize_message_id);
+    let in_reply_to = match parsed.in_reply_to() {
+        HeaderValue::TextList(ids) => ids
+            .iter()
+            .filter_map(|id| normalize_message_id(id))
+            .collect(),
+        HeaderValue::Text(id) => parse_message_ids(id),
+        _ => Vec::new(),
+    };
 
     Envelope {
         id,
         message_id,
+        in_reply_to,
         flags,
         subject,
         from,
