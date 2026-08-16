@@ -11,7 +11,7 @@ use pimalaya_cli::{
         commands::{CompletionCommand, JsonSchemaCommand, ManualCommand},
         parsers::path_parser,
     },
-    long_version,
+    footer, long_version,
     printer::Printer,
     prompt,
 };
@@ -59,6 +59,7 @@ use crate::{
     "again later. Everything discovery does not cover is written by hand.",
 ))]
 #[command(long_version = long_version!())]
+#[command(after_help = footer!())]
 #[command(propagate_version = true, infer_subcommands = true)]
 pub struct Cli {
     /// The subcommand to run.

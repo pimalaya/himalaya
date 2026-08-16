@@ -41,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added back the `HIMALAYA_CONFIG` environment variable, read like `-c` and accepting the same `:`-delimited list.
 
+- Added the `--help` footer every Pimalaya binary shares, naming the bug tracker and the sponsoring page. It ends `himalaya -h`, `himalaya --help` and the generated `himalaya.1` man page, and is not repeated under each subcommand.
+
 ### Changed
 
 - Made the configuration wizard discovery-only, removing the hand-entry flow entirely.
