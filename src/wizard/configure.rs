@@ -302,6 +302,7 @@ mod tests {
             default,
             maildir: Some(crate::config::MaildirConfig {
                 root: PathBuf::from("/tmp/mail"),
+                ..Default::default()
             }),
             ..Default::default()
         }

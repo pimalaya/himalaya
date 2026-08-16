@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   In-trash removal is a real per-id delete on JMAP (`Email/set` destroy), Gmail and Microsoft Graph (`messages.delete`), Maildir and m2dir (file unlink). IMAP flags `\Deleted` then `UID EXPUNGE`s exactly those UIDs when the server advertises UIDPLUS (RFC 4315). Without it, messages are only flagged and a later expunge reclaims them.
 
+- Added the `maildir.dovecot-keywords` and `maildir.keywords-header` account config fields, surfacing custom Maildir keywords.
+
+  Custom (non-IANA) keywords such as `NonJunk` were invisible on Maildir: the six standard info-section letters became flags and everything else was dropped, so `envelope list "flag NonJunk"` matched nothing where the same search works on IMAP, JMAP and Microsoft Graph. Maildir has no single keyword convention, so which one a mailbox uses has to be named. `maildir.dovecot-keywords = true` resolves the lowercase slot letters through the `dovecot-keywords` file at the root (dovecot, mbsync, OfflineIMAP), and `maildir.keywords-header` reads them from `X-Keywords` (comma-separated) or `X-Label` (space-separated, mutt and notmuch). Both default to off, leaving the flag set unchanged. Reading only: no command can name a custom keyword to write, on any backend.
+
 - Added the `imap.sasl-ir` account config field.
 
   Forces the RFC 4959 SASL-IR initial response on or off for every SASL mechanism: `false` waits for the server's continuation request instead of inlining credentials with `AUTHENTICATE`, `true` always inlines them, and leaving it unset follows the advertised `SASL-IR` capability as before. Coremail (NetEase 126.com and 163.com) advertises `SASL-IR` yet answers the inline form with `BAD Request not ending with`, leaving those accounts unable to authenticate at all ([#729]). They need `imap.sasl-ir = false`, and usually `imap.id.auto = true` as well since Coremail also rejects `SELECT` without a prior `ID`.
@@ -72,6 +76,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The command argument decodes literal `\r` / `\n` escapes into real CRLF, so a CRLF-separated batch (each command carrying its own tag) can be pipelined from the shell, e.g. `himalaya imap raw 'a1 SELECT INBOX\r\na2 SEARCH ALL\r\n'`. A trailing CRLF is appended when omitted, and the reply is read until every command is acknowledged (possibly out of order). `smtp raw` gains the same escape decoding but stays a single command line: it strips the trailing CRLF (io-smtp appends its own) and rejects batched input, since the exchange reads exactly one reply. Both accept the command via stdin.
 
 ### Fixed
+
+- Fixed the Maildir backend deciding for itself what a Maildir filename means.
+
+  It parsed the info section by hand, splitting at the last comma of the name. Entry listing covers `new/` as well as `cur/`, and a name in `new/` carries no info section, so a delivery agent whose unique part ends in a comma-separated token could have that token read as flags. Flags are now read through io-maildir, which delimits the info section by its `:2,` marker, keeping one definition of the format in the library that owns it.
 
 - Fixed commands dying mid-exchange with a bare `Resource temporarily unavailable (os error 35)` ([#731], [#732]).
 

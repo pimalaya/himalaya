@@ -11,12 +11,21 @@ use std::{
 };
 
 use anyhow::{Result, anyhow, bail};
-use io_maildir::{client::MaildirClient as Inner, maildir::Maildir};
+use io_maildir::{client::MaildirClient as Inner, flag::KeywordHeader, maildir::Maildir};
 
 use crate::{
     account::context::Account,
-    config::{AccountConfig, Config, MaildirConfig},
+    config::{AccountConfig, Config, KeywordHeaderConfig, MaildirConfig},
 };
+
+impl From<KeywordHeaderConfig> for KeywordHeader {
+    fn from(header: KeywordHeaderConfig) -> Self {
+        match header {
+            KeywordHeaderConfig::XKeywords => Self::XKeywords,
+            KeywordHeaderConfig::XLabel => Self::XLabel,
+        }
+    }
+}
 
 /// Live Maildir client wrapping io_maildir with the configured root.
 pub struct MaildirClient {
@@ -32,7 +41,9 @@ impl MaildirClient {
     /// path.
     pub fn new(config: MaildirConfig) -> Self {
         let root = config.root.clone();
-        let inner = Inner::new(root.to_string_lossy().into_owned());
+        let mut inner = Inner::new(root.to_string_lossy().into_owned());
+        inner.dovecot_keywords = config.dovecot_keywords;
+        inner.keywords_header = config.keywords_header.map(Into::into);
         Self { inner, root }
     }
 
