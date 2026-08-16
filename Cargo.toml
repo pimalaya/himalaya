@@ -1,7 +1,7 @@
 [package]
 name = "himalaya"
 description = "CLI to manage emails"
-version = "2.0.0"
+version = "2.1.0"
 authors = ["Clément DOUIN (soywod) <pimalaya.org@posteo.net>"]
 rust-version = "1.89"
 edition = "2024"

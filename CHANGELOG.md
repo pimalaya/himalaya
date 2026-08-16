@@ -7,7 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-08-16
+
 ### Added
+
+- Added the `pimdir` storage backend, Himalaya over a local [pimdir](https://github.com/pimalaya/pimdir) store: the SQLite index and content-addressed blobs the sync engine (Neverest) populates. `pimdir.root` points at the store directory, and for an account you already sync that single line is the whole configuration, reading it touching no network.
+
+  The store is read as a possibly-partial cache. Envelopes are built from the stored meta without reading a single body, and a message whose body is not local still lists, reading as "body not fetched", the cue to sync, rather than failing. Writes are staged as replica mutations the next sync propagates: `flag set`, `message add`, `copy`, `move` and `delete` all go through the store's mutation seam rather than raw SQL, and an added message is content-hashed with the digest Neverest uses, so it deduplicates against a synced one.
+
+  Staged writes are attributed to `pimdir.source`, auto-detected from a store synced as a single source and worth setting only to disambiguate one synced from two. A write against a store never synced as that source fails loudly instead of staging a change no sync would carry. Message ids are the store's short public ids, the same integer in every mailbox a message is filed in.
 
 - Added back the `email` and `display-name` account config fields, and the global `display-name`, dropped in v2 ([#721]).
 
@@ -60,6 +68,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reworked `message read`'s plain-text output into a concise reading view.
 
   A minimal header block (Date, From, To, Cc, Subject) is followed by a per-part walk: one summary line per MIME part (`[ID] <type>[ — <filename>] (<size>)`) carrying that part's own `Content-*` headers, then the decoded contents of plain-text parts inlined. HTML and binary parts stay a summary, except an HTML-only mail, whose markup is printed rather than nothing readable. `--raw` and `--json` are unchanged.
+
+- Right-aligned the `SIZE` column of the envelope listing table, its header included, so sizes line up on their unit rather than on their first digit ([#723]).
 
 - Aligned the `ID` in `message read`, `attachments list` and `attachments download` on the MIME part's 1-based position, so `message read` shows the same id passed to `attachments download`. Attachment ids are therefore a sparse subset of the part positions (`1 5 9`) rather than a dense sequence.
 
@@ -1130,6 +1140,7 @@ Few major concepts changed:
 [#632]: https://github.com/pimalaya/himalaya/issues/632
 [#634]: https://github.com/pimalaya/himalaya/issues/634
 [#721]: https://github.com/pimalaya/himalaya/issues/721
+[#723]: https://github.com/pimalaya/himalaya/issues/723
 [#727]: https://github.com/pimalaya/himalaya/issues/727
 [#729]: https://github.com/pimalaya/himalaya/issues/729
 [#730]: https://github.com/pimalaya/himalaya/issues/730
@@ -1140,7 +1151,8 @@ Few major concepts changed:
 [core#1]: https://github.com/pimalaya/core/issues/1
 [core#10]: https://github.com/pimalaya/core/issues/10
 
-[unreleased]: https://github.com/pimalaya/himalaya/compare/v2.0.0...HEAD
+[unreleased]: https://github.com/pimalaya/himalaya/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/pimalaya/himalaya/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/pimalaya/himalaya/compare/v1.2.0...v2.0.0
 [1.2.0]: https://github.com/pimalaya/himalaya/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/pimalaya/himalaya/compare/v1.0.0...v1.1.0
