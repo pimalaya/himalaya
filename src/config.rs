@@ -64,7 +64,7 @@ fn is_default_msgraph_alpn(alpn: &[String]) -> bool {
 /// Represents the whole TOML user's configuration file.
 /// `deny_unknown_fields` is intentionally omitted so the same TOML
 /// file can be shared with `himalaya-tui`: top-level TUI-only fields
-/// (`signature`, `signature-delim`) are silently ignored here.
+/// (`keybinds`, `theme`) are silently ignored here.
 #[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Config {
@@ -72,6 +72,14 @@ pub struct Config {
     /// of its own. See [`AccountConfig::display_name`].
     #[serde(alias = "from-name")]
     pub display_name: Option<String>,
+
+    /// Signature appended to a composed message when an account
+    /// declares none of its own. See [`AccountConfig::signature`].
+    pub signature: Option<String>,
+
+    /// Separator written before the signature when an account declares
+    /// none of its own. See [`AccountConfig::signature_delim`].
+    pub signature_delim: Option<String>,
 
     pub downloads_dir: Option<PathBuf>,
     #[serde(default)]
@@ -118,10 +126,12 @@ impl TomlConfig for Config {
 /// A key outside this list still renders, after the ones listed, so a
 /// field added to [`AccountConfig`] can never go missing from a
 /// generated document just because nobody updated this table.
-const RENDER_ORDER: [&str; 15] = [
+const RENDER_ORDER: [&str; 17] = [
     "default",
     "email",
     "display-name",
+    "signature",
+    "signature-delim",
     "imap",
     "jmap",
     "gmail",
@@ -211,9 +221,10 @@ impl AccountConfig {
 
 /// Account configuration.
 ///
-/// `deny_unknown_fields` is omitted so per-account TUI-only fields
-/// (`signature`, `signature-delim`) coexist in the same
-/// `[accounts.<name>]` block when the file is shared.
+/// `deny_unknown_fields` is omitted so a block written for one binary
+/// loads in the other: every account field himalaya-tui models is
+/// modelled here too, but the CLI-only sub-blocks (`table`,
+/// `envelope`, `mailbox`, `attachment`) have to be tolerated there.
 #[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct AccountConfig {
@@ -237,6 +248,24 @@ pub struct AccountConfig {
     /// Aliased to `from-name`, the spelling himalaya-tui writes.
     #[serde(alias = "from-name")]
     pub display_name: Option<String>,
+
+    /// Signature appended to a composed message, after the body and
+    /// after any quoted source text, when neither `--signature` nor
+    /// `--signature-file` is passed. Falls back to the global
+    /// [`Config::signature`].
+    ///
+    /// The value is the signature alone: the separator before it is
+    /// [`AccountConfig::signature_delim`]'s business, so a signature
+    /// written for one binary reads the same in the other.
+    pub signature: Option<String>,
+
+    /// Separator written before the signature, defaulting to the
+    /// RFC 3676 §4.3 `"-- \n"`. Falls back to the global
+    /// [`Config::signature_delim`].
+    ///
+    /// Written verbatim, so a value meant to stand on its own line
+    /// carries its own trailing newline.
+    pub signature_delim: Option<String>,
 
     pub downloads_dir: Option<PathBuf>,
     #[serde(default)]
@@ -1018,16 +1047,19 @@ mod tests {
 
     /// himalaya-tui spells the identity `from` and `from-name`, and one
     /// file backs both binaries, so a config it wrote must reach the
-    /// same two fields the composers read.
+    /// same fields the composers read. `signature` and `signature-delim`
+    /// need no alias, both binaries having always spelled them alike.
     #[test]
-    fn the_identity_reads_under_the_tui_spelling() {
+    fn the_composing_config_reads_under_the_tui_spelling() {
         let config: Config = toml::from_str(
             r#"
             from-name = "Alice"
+            signature = "Alice"
 
             [accounts.example]
             from = "alice@example.org"
             from-name = "Alice at work"
+            signature-delim = "~~~\n"
             "#,
         )
         .expect("the himalaya-tui spelling must deserialize");
@@ -1035,8 +1067,10 @@ mod tests {
         let account = config.accounts.get("example").expect("the example account");
 
         assert_eq!(config.display_name.as_deref(), Some("Alice"));
+        assert_eq!(config.signature.as_deref(), Some("Alice"));
         assert_eq!(account.email.as_deref(), Some("alice@example.org"));
         assert_eq!(account.display_name.as_deref(), Some("Alice at work"));
+        assert_eq!(account.signature_delim.as_deref(), Some("~~~\n"));
     }
 
     #[test]

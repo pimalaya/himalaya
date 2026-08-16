@@ -11,7 +11,11 @@
 //! methods, not baked in during merge — keeping `Option<T>` fields
 //! lets layers compose cleanly.
 
-use std::{collections::HashMap, env::temp_dir, path::PathBuf};
+use std::{
+    collections::HashMap,
+    env::temp_dir,
+    path::{Path, PathBuf},
+};
 
 use comfy_table::{Color as TableColor, ContentArrangement};
 use crossterm::style::Color;
@@ -29,6 +33,10 @@ const DEFAULT_DATETIME_FMT: &str = "%F %R%:z";
 const DEFAULT_MAILBOX_ALIAS: &str = "inbox";
 const DEFAULT_ENVELOPES_LIST_PAGE_SIZE: u32 = 25;
 
+/// RFC 3676 §4.3 signature separator, written before the signature
+/// when neither the account nor the global config names one.
+const DEFAULT_SIGNATURE_DELIM: &str = "-- \n";
+
 const DEFAULT_UNSEEN_CHAR: char = '*';
 const DEFAULT_REPLIED_CHAR: char = 'R';
 const DEFAULT_FLAGGED_CHAR: char = '!';
@@ -41,6 +49,12 @@ pub struct Account {
     pub email: Option<String>,
     /// Name that address carries, `None` when it declares none.
     pub display_name: Option<String>,
+    /// Signature appended to a composed message, `None` when the
+    /// account declares none.
+    pub signature: Option<String>,
+    /// Separator written before the signature, `None` when the account
+    /// declares none.
+    pub signature_delim: Option<String>,
 
     pub downloads_dir: Option<PathBuf>,
     pub table_preset: Option<String>,
@@ -74,6 +88,8 @@ impl Account {
         Self {
             email: other.email.or(self.email),
             display_name: other.display_name.or(self.display_name),
+            signature: other.signature.or(self.signature),
+            signature_delim: other.signature_delim.or(self.signature_delim),
 
             downloads_dir: other.downloads_dir.or(self.downloads_dir),
             table_preset: other.table_preset.or(self.table_preset),
@@ -115,6 +131,33 @@ impl Account {
             Some(address) => (Some(address), None),
             None => (self.email.as_deref(), self.display_name.as_deref()),
         }
+    }
+
+    /// Resolves the signature a composed message ends with.
+    ///
+    /// `over` is `--signature` and `file` is `--signature-file`, which
+    /// clap keeps mutually exclusive. The flag wins; a file named on
+    /// the command line answers in the builder, which is why the
+    /// configured signature stands down rather than shadowing it; with
+    /// neither, the merged account answers.
+    pub fn resolve_signature<'a>(
+        &'a self,
+        over: Option<&'a str>,
+        file: Option<&Path>,
+    ) -> Option<&'a str> {
+        match (over, file) {
+            (Some(signature), _) => Some(signature),
+            (None, Some(_)) => None,
+            (None, None) => self.signature.as_deref(),
+        }
+    }
+
+    /// Effective separator written before the signature. Defaults to
+    /// the RFC 3676 §4.3 `"-- \n"`, and is written verbatim.
+    pub fn signature_delim(&self) -> &str {
+        self.signature_delim
+            .as_deref()
+            .unwrap_or(DEFAULT_SIGNATURE_DELIM)
     }
 
     /// Effective downloads directory. Tries the merged
@@ -377,6 +420,8 @@ impl From<Config> for Account {
             // name it carries has a global default.
             email: None,
             display_name: config.display_name,
+            signature: config.signature,
+            signature_delim: config.signature_delim,
 
             downloads_dir: config.downloads_dir,
             table_preset: config.table.preset,
@@ -400,6 +445,8 @@ impl From<AccountConfig> for Account {
         Self {
             email: config.email,
             display_name: config.display_name,
+            signature: config.signature,
+            signature_delim: config.signature_delim,
 
             downloads_dir: config.downloads_dir,
             table_preset: config.table.preset,
@@ -505,6 +552,39 @@ mod tests {
             account.resolve_from(Some("alias@example.org")),
             (Some("alias@example.org"), None),
         );
+    }
+
+    #[test]
+    fn resolve_signature_stands_down_for_either_flag() {
+        let global = Account::from(Config {
+            signature: Some("Alice".to_string()),
+            ..Config::default()
+        });
+        let per_account = Account::from(AccountConfig {
+            signature_delim: Some("~~~\n".to_string()),
+            ..AccountConfig::default()
+        });
+        let account = global.merge(per_account);
+
+        assert_eq!(account.resolve_signature(None, None), Some("Alice"));
+        assert_eq!(account.signature_delim(), "~~~\n");
+
+        // `--signature` replaces it, and `--signature-file` names the
+        // file the builder reads instead, so the config stands down
+        // rather than shadowing it.
+        assert_eq!(
+            account.resolve_signature(Some("Alias"), None),
+            Some("Alias"),
+        );
+        assert_eq!(
+            account.resolve_signature(None, Some(Path::new("/tmp/sig"))),
+            None,
+        );
+    }
+
+    #[test]
+    fn signature_delim_defaults_to_the_rfc_separator() {
+        assert_eq!(Account::default().signature_delim(), "-- \n");
     }
 
     #[test]

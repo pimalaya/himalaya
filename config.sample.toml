@@ -27,6 +27,14 @@
 # key himalaya-tui writes; both binaries read both.
 #display-name = "Alice"
 
+# Signature appended to a composed message when an account declares none of its
+# own, and the separator introducing it. The signature is the text alone; the
+# delimiter defaults to the RFC 3676 §4.3 `"-- \n"` and is written verbatim, so
+# one meant to stand on its own line carries its own trailing newline. Both
+# keys are shared with himalaya-tui, which spells them the same way.
+#signature = "Regards,\nAlice"
+#signature-delim = "-- \n"
+
 # Default download directory for attachments. Falls back to `$TMPDIR`.
 #downloads-dir = "~/downloads"
 
@@ -152,6 +160,12 @@ default = true
 # binaries read both, one file backing the two.
 #email = "alice@example.org"
 #display-name = "Alice"
+
+# Signature appended after the body of a composed message, and after any quoted
+# source text when replying or forwarding. Used when neither `--signature` nor
+# `--signature-file` is passed.
+#signature = "Best,\nAlice"
+#signature-delim = "-- \n"
 
 # Per-account overrides for the global options above.
 #downloads-dir = "~/downloads/example"

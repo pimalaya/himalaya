@@ -22,6 +22,11 @@ An account MAY declare the address it sends as, `email`, and the name that addre
 
 Both keys SHALL also be accepted under the spellings himalaya-tui writes, `from` and `from-name`, and himalaya-tui SHALL accept `email` and `display-name` in turn, the two binaries sharing one configuration file.
 
+### Requirement: Account signature
+An account MAY declare a `signature` and the `signature-delim` introducing it, and both MAY also be declared at the top level, where they apply to every account that does not override them.
+
+`signature` SHALL be the signature alone. `signature-delim` SHALL default to the RFC 3676 §4.3 `"-- \n"` and SHALL be written verbatim, its own trailing newline included, so a delimiter meant to stand on its own line says so rather than relying on a rule. Both binaries SHALL assemble the block from the same two keys, so one configured value reads the same whichever composes.
+
 ### Requirement: Mailbox aliases
 An account MAY map friendly mailbox names to backend-native ids under `[accounts.<name>.mailbox.alias]`. Alias names are case-insensitive on lookup and on storage. The entry named `inbox` is the implicit default mailbox: a shared command that omits `-m/--mailbox` resolves it. Account-level entries override same-named global entries, and ids are stored verbatim.
 

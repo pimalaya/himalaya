@@ -52,8 +52,14 @@ pub struct BuilderArgs<'a> {
     pub body: Option<&'a str>,
     pub body_file: Option<&'a Path>,
     pub attach: &'a [PathBuf],
+    /// Signature text, from `--signature` or from the account's
+    /// `signature`. Left `None` when `signature_file` names the file
+    /// holding it.
     pub signature: Option<&'a str>,
     pub signature_file: Option<&'a Path>,
+    /// Separator written before the signature, from the account's
+    /// `signature-delim`. Written verbatim.
+    pub signature_delim: &'a str,
 }
 
 /// Source-message metadata, populated for reply/forward subcommands.
@@ -148,6 +154,7 @@ pub fn build(args: BuilderArgs<'_>, source: Option<SourceArgs<'_>>) -> Result<Ve
         &source_text,
         headline,
         signature.as_deref().unwrap_or(""),
+        args.signature_delim,
         style,
     );
     builder = builder.text_body(body);
@@ -214,13 +221,14 @@ fn read_signature(
 }
 
 /// Builds the final text body from user input, optional quoted
-/// source text, an optional headline, an optional signature, and the
-/// requested posting style.
+/// source text, an optional headline, an optional signature and the
+/// separator introducing it, and the requested posting style.
 fn compose_body(
     user_body: &str,
     source_text: &str,
     headline: &str,
     signature: &str,
+    signature_delim: &str,
     style: PostingStyle,
 ) -> String {
     let user_body = user_body.trim_end_matches('\n');
@@ -264,10 +272,13 @@ fn compose_body(
         }
     };
 
+    // NOTE: the separator is written verbatim, its own trailing
+    // newline included, so a delimiter meant to stand on its own line
+    // says so rather than relying on a rule here.
     if !signature.trim().is_empty() {
-        let sig = signature.trim_end_matches('\n');
-        body.push_str("\n\n-- \n");
-        body.push_str(sig);
+        body.push_str("\n\n");
+        body.push_str(signature_delim);
+        body.push_str(signature.trim_end_matches('\n'));
     }
 
     body
@@ -421,6 +432,7 @@ Original body line.\r\n";
             attach: &[],
             signature: None,
             signature_file: None,
+            signature_delim: "-- \n",
         }
     }
 
@@ -581,13 +593,31 @@ Original body line.\r\n";
 
     #[test]
     fn compose_body_honours_posting_style_and_signature() {
-        let top = compose_body("mine", "theirs", "wrote:", "", PostingStyle::Top);
+        let top = compose_body("mine", "theirs", "wrote:", "", "-- \n", PostingStyle::Top);
         assert_eq!(top, "mine\n\nwrote:\n> theirs");
 
-        let bottom = compose_body("mine", "theirs", "wrote:", "", PostingStyle::Bottom);
+        let bottom = compose_body(
+            "mine",
+            "theirs",
+            "wrote:",
+            "",
+            "-- \n",
+            PostingStyle::Bottom,
+        );
         assert_eq!(bottom, "wrote:\n> theirs\n\nmine");
 
-        let signed = compose_body("mine", "", "", "Alice", PostingStyle::Top);
+        let signed = compose_body("mine", "", "", "Alice", "-- \n", PostingStyle::Top);
         assert_eq!(signed, "mine\n\n-- \nAlice");
+    }
+
+    #[test]
+    fn compose_body_writes_the_signature_delimiter_verbatim() {
+        // A delimiter meant to stand on its own line carries its own
+        // newline; one that does not, does not.
+        let custom = compose_body("mine", "", "", "Alice", "~~~\n", PostingStyle::Top);
+        assert_eq!(custom, "mine\n\n~~~\nAlice");
+
+        let inline = compose_body("mine", "", "", "Alice", "", PostingStyle::Top);
+        assert_eq!(inline, "mine\n\nAlice");
     }
 }

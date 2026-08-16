@@ -67,8 +67,9 @@ pub struct MessageForwardCommand {
     #[arg(long = "attach", value_name = "PATH")]
     pub attach: Vec<PathBuf>,
 
-    /// Signature appended after the body, separated by the standard
-    /// `-- ` delimiter (RFC 3676 §4.3).
+    /// Signature appended after the body, introduced by the account's
+    /// `signature-delim` (RFC 3676 §4.3 `-- ` by default). Defaults to
+    /// the account's `signature`.
     #[arg(long, value_name = "TEXT")]
     pub signature: Option<String>,
 
@@ -114,6 +115,8 @@ impl MessageForwardCommand {
         let source = client.get_message(&mailbox, &self.id, false)?;
 
         let (from, from_name) = account.resolve_from(self.from.as_deref());
+        let signature =
+            account.resolve_signature(self.signature.as_deref(), self.signature_file.as_deref());
 
         let raw = builder::build(
             BuilderArgs {
@@ -126,8 +129,9 @@ impl MessageForwardCommand {
                 body: self.body.as_deref(),
                 body_file: self.body_file.as_deref(),
                 attach: &self.attach,
-                signature: self.signature.as_deref(),
+                signature,
                 signature_file: self.signature_file.as_deref(),
+                signature_delim: account.signature_delim(),
             },
             Some(SourceArgs {
                 raw: &source,
