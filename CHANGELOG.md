@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed `completion` writing files instead of printing the completion script to the standard output ([#736]).
+
+  The script has been documented as going to stdout since the command exists, but the directory it fell back on turned `himalaya completion bash` into a file-writing command printing a report, which broke every packaging helper capturing stdout, Homebrew's `generate_completions_from_executable` among them. Giving `--dir` keeps writing one script per shell.
+
+  `manual` and `json-schema` follow the same shape, so the three behave alike: they print to stdout the single page or schema they are asked for, they take their directory through `--dir` where it used to be a positional argument, and they accept command names (`himalaya`, `himalaya-envelope`, `himalaya-envelope-list`) to select what to generate. Restoring the documented behaviour is a regression fix rather than a breaking change, hence the patch release, and generating completions, manual pages or schemas is not a daily gesture.
+
+- Fixed `maildir messages copy` leaving an empty message behind when the process died mid-copy ([#738]).
+
+  The copy wrote straight to the name the target mailbox lists, so a death inside it left a 0-byte entry that `envelope list` shows as an ordinary message with blank columns, that `account check` calls healthy, and that only `message read` rejects. The copy is now staged and renamed, so an interrupted copy leaves nothing behind in the mailbox.
+
+- Fixed maildir flag writes doing nothing to a message still unread in a mailbox's `new` directory ([#637]).
+
+  `message read --seen` and `flag add` reported success and left the message untouched, since a Maildir name in `new` has nowhere to carry a flag. The message now moves to `cur` under the same id with its flags in the name, the transition every other Maildir client performs when it takes a message out of `new`.
+
 ## [2.1.0] - 2026-08-16
 
 ### Added
@@ -1141,6 +1157,7 @@ Few major concepts changed:
 [#627]: https://github.com/pimalaya/himalaya/issues/627
 [#632]: https://github.com/pimalaya/himalaya/issues/632
 [#634]: https://github.com/pimalaya/himalaya/issues/634
+[#637]: https://github.com/pimalaya/himalaya/issues/637
 [#721]: https://github.com/pimalaya/himalaya/issues/721
 [#723]: https://github.com/pimalaya/himalaya/issues/723
 [#727]: https://github.com/pimalaya/himalaya/issues/727
@@ -1149,6 +1166,8 @@ Few major concepts changed:
 [#731]: https://github.com/pimalaya/himalaya/issues/731
 [#732]: https://github.com/pimalaya/himalaya/issues/732
 [#734]: https://github.com/pimalaya/himalaya/issues/734
+[#736]: https://github.com/pimalaya/himalaya/issues/736
+[#738]: https://github.com/pimalaya/himalaya/issues/738
 
 [core#1]: https://github.com/pimalaya/core/issues/1
 [core#10]: https://github.com/pimalaya/core/issues/10

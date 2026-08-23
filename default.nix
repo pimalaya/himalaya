@@ -55,8 +55,8 @@ pimalaya.mkDefault (
             ''
               mkdir -p $out/share/{completions,man,schemas}
               ${exe} completion -d "$out"/share/completions bash elvish fish powershell zsh
-              ${exe} manual "$out"/share/man
-              ${exe} json-schema "$out"/share/schemas
+              ${exe} manual -d "$out"/share/man
+              ${exe} json-schema -d "$out"/share/schemas
             '';
         }
     );
