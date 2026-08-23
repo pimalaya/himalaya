@@ -26,8 +26,9 @@
 //! whatever backend serves the active account. The protocol-specific
 //! APIs (imap, jmap, gmail, msgraph, maildir, m2dir, smtp, sieve) each expose
 //! the full surface of one backend, including operations the shared API
-//! cannot model. The meta commands (account, completion, manual) cover
-//! account configuration, shell completions and man pages.
+//! cannot model. The meta commands (account, completion, manual,
+//! json-schema) cover account configuration, shell completions, man
+//! pages and JSON Schemas.
 //!
 //! ## Shared commands and backend selection
 //!

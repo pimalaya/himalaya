@@ -6,7 +6,7 @@ status: current
 
 # Commands
 
-The command tree splits into three groups. The shared API (mailbox, envelope, flag, message, attachment) is the cross-protocol least-common-denominator surface, behaving the same whatever backend serves the active account. The protocol-specific APIs (imap, jmap, gmail, msgraph, maildir, m2dir, smtp, sieve) each expose the full surface of one backend, including operations the shared API cannot model. The meta commands (account, completion, manual) cover account configuration, shell completions and man pages.
+The command tree splits into three groups. The shared API (mailbox, envelope, flag, message, attachment) is the cross-protocol least-common-denominator surface, behaving the same whatever backend serves the active account. The protocol-specific APIs (imap, jmap, gmail, msgraph, maildir, m2dir, smtp, sieve) each expose the full surface of one backend, including operations the shared API cannot model. The meta commands (account, completion, manual, json-schema) cover account configuration, shell completions, man pages and JSON Schemas.
 
 ### Requirement: Shared commands over a selected backend
 The shared commands SHALL run over an `EmailClient` that owns one backend-client variant per compiled-in backend. It selects the first configured storage backend the global `--backend` flag allows, preferring local backends over network ones, plus an optional SMTP transport for storage backends that cannot send (IMAP, Maildir, m2dir). Each shared method matches the active backend and calls its per-protocol adapter.
@@ -30,6 +30,9 @@ The active account context SHALL be threaded as a sibling argument through every
 
 ### Requirement: Output discipline
 Data and errors SHALL go to stdout through the printer; `--json` switches every command to JSON. stderr carries logs only. Each command's doc comment is its `--help` text, so `himalaya <command> --help` is the canonical per-command usage reference.
+
+### Requirement: Generation commands print to the standard output
+The `completion`, `manual` and `json-schema` commands SHALL share one shape: a positional list selecting what to generate, defaulting to everything, and an optional `--dir` deciding where it lands. Without a directory they SHALL print the single selected item to the standard output, so a packaging helper can capture it and a shell can redirect it to a file, and SHALL fail when several items are selected rather than concatenating pieces valid for nothing. With a directory they SHALL write one file per selected item in it, creating the directory when missing, and report where each landed.
 
 ### Requirement: Data commands serialize their data
 A command returning data SHALL hand the printer a dedicated output type implementing both `Display` and `Serialize`, and register its JSON Schema under the command's invocation key. `Message` is reserved for confirmations, since it serializes as a single `message` string and leaves `--json` unparseable. Where a sibling `list` already serializes a backend resource, the `get` output SHALL emit that resource verbatim through a transparent newtype, so one item read with `get` has the shape of one row of `list`. Where the wire type is unsuitable (a recursive MIME tree, a type carrying no schema), the output type SHALL name its fields instead.
