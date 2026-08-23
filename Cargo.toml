@@ -12,7 +12,7 @@ homepage = "https://pimalaya.org"
 repository = "https://github.com/pimalaya/himalaya"
 
 [features]
-default = ["rustls-ring", "jmap", "imap", "smtp", "gmail", "msgraph", "maildir", "m2dir", "pimdir"]
+default = ["rustls-ring", "imap", "smtp", "jmap", "gmail", "msgraph", "maildir"]
 imap = ["dep:io-imap", "dep:mail-parser", "dep:rfc2047-decoder", "io-imap/client"]
 jmap = ["dep:base64", "dep:io-jmap", "dep:mail-parser", "io-jmap/client", "io-jmap/schemars"]
 gmail = ["dep:io-gmail", "dep:mail-parser", "io-gmail/client", "io-gmail/schemars"]
@@ -48,7 +48,7 @@ crossterm = { version = "0.29", default-features = false, features = ["serde"] }
 dirs = "6"
 humansize = "2"
 io-gmail = { version = "0.3", default-features = false, optional = true }
-io-imap = { version = "0.5", default-features = false, optional = true }
+io-imap = { version = "0.6", default-features = false, optional = true }
 io-jmap = { version = "0.3", default-features = false, optional = true }
 io-m2dir = { version = "0.2", default-features = false, optional = true }
 io-maildir = { version = "0.3", default-features = false, optional = true }
@@ -59,7 +59,7 @@ io-replica = { version = "0.3", default-features = false, optional = true }
 io-sasl = { version = "0.1", default-features = false, features = ["scram"] }
 io-smtp = { version = "0.3", default-features = false, optional = true }
 log = "0.4"
-mail-builder = "0.4"
+mail-builder = "0.5"
 mail-parser = { version = "0.11", features = ["full_encoding", "serde"], optional = true }
 mime_guess = "2"
 open = "5"
