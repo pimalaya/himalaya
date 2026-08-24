@@ -29,9 +29,9 @@
 
 - **Shared API** for `mailboxes`, `envelopes`, `flags`, `messages` and `attachments`
 - **Protocol-specific APIs** exposing each backend's full surface
-- **IMAP**, **SMTP**, **JMAP**, **Gmail** (REST API), **Microsoft Graph** (Outlook / Microsoft 365) support
+- **IMAP**, **SMTP**, **ManageSieve**, **JMAP**, **Gmail** (REST API), **Microsoft Graph** (Outlook / Microsoft 365) support
 - **Maildir** <sup>[specs](https://cr.yp.to/proto/maildir.html)</sup>, **m2dir** <sup>[specs](https://man.sr.ht/~bitfehler/m2dir/)</sup>, **pimdir** <sup>[specs](https://github.com/pimalaya/pimdir)</sup> support
-- **Simple auth** support for IMAP/SMTP: anonymous, login, plain, oauthbearer, xoauth2, scram-sha-256
+- **Simple auth** support for IMAP/SMTP (anonymous, login, plain, oauthbearer, xoauth2, scram-sha-256) and ManageSieve (login, plain)
 - **HTTP auth** support for JMAP: basic, bearer
 - **TLS** support:
   - [Rustls](https://crates.io/crates/rustls) with ring crypto
@@ -343,7 +343,16 @@ himalaya jmap mailbox query --role drafts
 himalaya gmail messages list -q "from:alice is:unread"
 himalaya msgraph mail-folder list
 himalaya smtp send -f me@example.com -t you@example.com < message.eml
+himalaya sieve list
+himalaya sieve check --script-file filters.sieve
+himalaya sieve activate main
 ```
+
+ManageSieve uses the optional `sieve` account block. A bare server address
+defaults to implicit TLS on port 4190; use `sieve://...` together with
+`sieve.starttls = true` for STARTTLS. `sieve capability`, `list`, `get`,
+`put`, `check`, `activate`, `deactivate`, `delete`, and `raw` are available.
+`put` and `check` accept a script file, inline text after `--`, or stdin.
 
 ### Composing messages
 

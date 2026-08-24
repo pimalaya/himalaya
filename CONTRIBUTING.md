@@ -24,11 +24,12 @@ The clap, printer, prompt and spinner primitives come from [pimalaya/cli](https:
 
 ## Feature matrix
 
-Himalaya is a binary, not a layered library, so it has no coroutine/client split. Its cargo features gate the backends (`imap`, `smtp`, `jmap`, `gmail`, `msgraph`, `maildir`, `m2dir`), the setup `wizard`, and the TLS provider (`rustls-ring` default, `rustls-aws`, `native-tls`), all on by default. Build a reduced set to check the feature gates still hold when touching them:
+Himalaya is a binary, not a layered library, so it has no coroutine/client split. Its cargo features gate the backends (`imap`, `smtp`, `jmap`, `gmail`, `msgraph`, `maildir`, `m2dir`), the ManageSieve service protocol (`sieve`), the setup `wizard`, and the TLS provider (`rustls-ring` default, `rustls-aws`, `native-tls`), all on by default. Build a reduced set to check the feature gates still hold when touching them:
 
 ```sh
 cargo build --no-default-features --features imap,smtp,rustls-ring
 cargo build --no-default-features --features jmap,rustls-ring
+cargo test --no-default-features --features sieve,rustls-ring
 ```
 
 ## Dependencies

@@ -10,7 +10,7 @@ use clap::ValueEnum;
 /// (config missing, or the operation has no arm for that backend).
 ///
 /// The protocol-specific subcommands (`imap`, `jmap`, `maildir`,
-/// `m2dir`, `smtp`) ignore this arg entirely.
+/// `m2dir`, `smtp`, `sieve`) ignore this arg entirely.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, ValueEnum)]
 pub enum Backend {
     #[default]
@@ -23,6 +23,7 @@ pub enum Backend {
     M2dir,
     Pimdir,
     Smtp,
+    Sieve,
 }
 
 #[allow(unused)]
@@ -67,6 +68,11 @@ impl Backend {
     pub fn allows_smtp(self) -> bool {
         matches!(self, Self::Auto | Self::Smtp)
     }
+
+    /// Whether the ManageSieve account-check arm is allowed to run.
+    pub fn allows_sieve(self) -> bool {
+        matches!(self, Self::Auto | Self::Sieve)
+    }
 }
 
 impl fmt::Display for Backend {
@@ -81,6 +87,7 @@ impl fmt::Display for Backend {
             Self::M2dir => write!(f, "m2dir"),
             Self::Pimdir => write!(f, "pimdir"),
             Self::Smtp => write!(f, "smtp"),
+            Self::Sieve => write!(f, "sieve"),
         }
     }
 }

@@ -9,7 +9,8 @@
 //! ## Backends and plumbing
 //!
 //! The network backends are io-imap, io-jmap, io-gmail, io-msgraph and
-//! io-smtp; the local storage backends are io-maildir and io-m2dir.
+//! io-smtp; ManageSieve is implemented in the optional `sieve` module;
+//! the local storage backends are io-maildir and io-m2dir.
 //! Account discovery comes from io-pim-discovery (Mozilla autoconfig,
 //! PACC, RFC 6186 SRV, RFC 8620 JMAP resolve). The CLI plumbing (clap
 //! args, printer, logger), TOML config loading and the blocking stream
@@ -23,7 +24,7 @@
 //! shared API (mailbox, envelope, flag, message, attachment) is the
 //! cross-protocol least-common-denominator surface, behaving the same
 //! whatever backend serves the active account. The protocol-specific
-//! APIs (imap, jmap, gmail, msgraph, maildir, m2dir, smtp) each expose
+//! APIs (imap, jmap, gmail, msgraph, maildir, m2dir, smtp, sieve) each expose
 //! the full surface of one backend, including operations the shared API
 //! cannot model. The meta commands (account, completion, manual) cover
 //! account configuration, shell completions and man pages.
@@ -91,6 +92,8 @@ mod msgraph;
 #[cfg(feature = "pimdir")]
 mod pimdir;
 mod shared;
+#[cfg(feature = "sieve")]
+mod sieve;
 #[cfg(feature = "smtp")]
 mod smtp;
 mod wizard;

@@ -64,3 +64,23 @@ io-imap client-side sort fallback ordered the `date` key by the raw
 Everything else on iCloud passed.
 
 Not yet tested: Proton Bridge; SMTP on iCloud (that account is IMAP-only).
+
+ManageSieve has local coverage in the default test suite: a fake server
+exercises greeting capability lines, quoted script names, GETSCRIPT literals,
+HAVESPACE/PUTSCRIPT/CHECKSCRIPT literals, activation, deletion, and logout.
+The 2026-08-24 Dovecot Pigeonhole smoke test against `franz@bett.ag` passed
+STARTTLS, PLAIN authentication, `CAPABILITY`, `LISTSCRIPTS`, and
+`account check --backend sieve`. The initial list was empty because the
+existing `.dovecot.sieve` was a regular file outside the personal store. In
+an explicitly authorized migration test, Himalaya uploaded the same rules as
+`main` and activated it; ManageSieve then listed `main` as active and
+`dovecot.orig` as the preserved inactive copy. `GETSCRIPT` verified both
+contents. No script was deleted.
+
+The same migration path was verified on 2026-08-24 for `mail@anycast.io` on
+`mail1.anycast.io`. Its pre-existing regular `.dovecot.sieve` contained the
+invoice forwarding rule. Himalaya uploaded it as `main` and activated it;
+Dovecot converted `.dovecot.sieve` into its managed `sieve/main.sieve`
+symlink and preserved the previous file as inactive `dovecot.orig`. Himalaya
+and `doveadm` returned the same script contents. No manual symlink or direct
+filesystem edit was used.

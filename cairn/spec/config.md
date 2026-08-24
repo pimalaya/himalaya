@@ -9,7 +9,12 @@ status: current
 Himalaya is configured through TOML: a top-level block plus named account blocks, one table per account under `[accounts.<name>]`, each carrying optional per-backend sub-blocks. The config schema is a set of pure DTOs (`*Config` types) mirroring the nested TOML shape; the selected account is flattened into a runtime `Account` view that commands consume. Config files stay user-owned: Himalaya never writes them.
 
 ### Requirement: Multi-account schema
-The config SHALL be multi-account: a top-level block holding shared defaults, plus `[accounts.<name>]` blocks. Each account carries at most one storage backend sub-block (`imap`, `jmap`, `gmail`, `msgraph`, `maildir`, `m2dir`) and an optional `smtp` sub-block for the backends that cannot send.
+The config SHALL be multi-account: a top-level block holding shared defaults, plus `[accounts.<name>]` blocks. Each account carries at most one storage backend sub-block (`imap`, `jmap`, `gmail`, `msgraph`, `maildir`, `m2dir`) and optional service sub-blocks for `smtp` and `sieve`.
+
+The `sieve` block SHALL accept `sieve://`, `sieves://`, and `unix://`
+servers, default bare authorities to implicit TLS on port 4190, and expose
+the shared TLS vocabulary plus optional SASL LOGIN or PLAIN credentials.
+STARTTLS SHALL only be enabled explicitly on a `sieve://` endpoint.
 
 ### Requirement: Config loading and merge
 The config SHALL load from the first existing canonical path (`$XDG_CONFIG_HOME/himalaya/config.toml`, `$HOME/.config/himalaya/config.toml`, `$HOME/.himalayarc`), overridable with `-c/--config`. Multiple `-c` paths MAY be passed, colon-free as repeated flags: the first is the base and the rest are deep-merged on top.

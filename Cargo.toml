@@ -7,17 +7,18 @@ rust-version = "1.89"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 categories = ["command-line-utilities", "email"]
-keywords = ["cli", "email", "imap", "maildir", "smtp"]
+keywords = ["cli", "email", "imap", "maildir", "sieve", "smtp"]
 homepage = "https://pimalaya.org"
 repository = "https://github.com/pimalaya/himalaya"
 
 [features]
-default = ["rustls-ring", "imap", "smtp", "jmap", "gmail", "msgraph", "maildir"]
+default = ["rustls-ring", "imap", "smtp", "sieve", "jmap", "gmail", "msgraph", "maildir"]
 imap = ["dep:io-imap", "dep:mail-parser", "dep:rfc2047-decoder", "io-imap/client"]
 jmap = ["dep:base64", "dep:io-jmap", "dep:mail-parser", "io-jmap/client", "io-jmap/schemars"]
 gmail = ["dep:io-gmail", "dep:mail-parser", "io-gmail/client", "io-gmail/schemars"]
 msgraph = ["dep:io-msgraph", "dep:mail-parser", "io-msgraph/client", "io-msgraph/schemars"]
 smtp = ["dep:io-smtp", "dep:mail-parser"]
+sieve = ["dep:base64"]
 maildir = ["dep:convert_case", "dep:io-maildir", "dep:mail-parser", "io-maildir/client", "io-maildir/parser"]
 m2dir = ["dep:convert_case", "dep:io-m2dir", "dep:mail-parser", "io-m2dir/client"]
 pimdir = ["dep:io-pimdir", "dep:io-replica", "dep:mail-parser"]

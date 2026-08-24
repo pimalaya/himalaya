@@ -38,6 +38,8 @@ use crate::shared::{
 // (`compose`/`send`), so they exist for any backend, not just storage.
 #[cfg(any(backend, feature = "smtp"))]
 use crate::shared::{client::EmailClient, message::cli::MessageCommand};
+#[cfg(feature = "sieve")]
+use crate::sieve::{cli::SieveCommand, client::build_sieve_client};
 #[cfg(feature = "smtp")]
 use crate::smtp::{cli::SmtpCommand, client::build_smtp_client};
 use crate::{
@@ -135,6 +137,9 @@ pub enum Command {
     #[cfg(feature = "smtp")]
     #[command(subcommand)]
     Smtp(SmtpCommand),
+    #[cfg(feature = "sieve")]
+    #[command(subcommand)]
+    Sieve(SieveCommand),
 
     // --- Meta
     //
@@ -355,6 +360,13 @@ impl Command {
                     resolve_account(printer, config_paths, account_name)?;
                 let (_account, mut client) = build_smtp_client(config, name, account_config)?;
                 cmd.execute(printer, &mut client)
+            }
+            #[cfg(feature = "sieve")]
+            Self::Sieve(cmd) => {
+                let (config, name, account_config) =
+                    resolve_account(printer, config_paths, account_name)?;
+                let (mut account, mut client) = build_sieve_client(config, name, account_config)?;
+                cmd.execute(printer, &mut account, &mut client)
             }
 
             // --- Meta

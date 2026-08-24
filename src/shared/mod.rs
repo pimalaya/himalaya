@@ -17,6 +17,6 @@ pub mod mailbox;
 pub mod message;
 #[cfg(any(feature = "gmail", feature = "msgraph"))]
 pub mod output;
-#[cfg(any(feature = "imap", feature = "smtp"))]
+#[cfg(any(feature = "imap", feature = "smtp", feature = "sieve"))]
 pub mod raw;
 pub mod table;
