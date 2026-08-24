@@ -124,6 +124,18 @@ pub fn schemas() -> BTreeMap<String, Value> {
         insert!("himalaya-imap-fetch", crate::imap::fetch::FetchedMessages);
     }
 
+    // --- ManageSieve
+
+    #[cfg(feature = "sieve")]
+    {
+        insert!(
+            "himalaya-sieve-capability",
+            crate::sieve::capability::SieveCapabilities
+        );
+        insert!("himalaya-sieve-list", crate::sieve::list::SieveScripts);
+        insert!("himalaya-sieve-get", crate::sieve::get::SieveScriptOutput);
+    }
+
     // --- JMAP
 
     #[cfg(feature = "jmap")]

@@ -116,6 +116,15 @@ impl AccountCheckCommand {
                 .push(BackendCheck::from("smtp", connect_smtp(smtp_config)));
         }
 
+        #[cfg(feature = "sieve")]
+        if backend.allows_sieve()
+            && let Some(sieve_config) = &account_config.sieve
+        {
+            report
+                .backends
+                .push(BackendCheck::from("sieve", connect_sieve(sieve_config)));
+        }
+
         if report.backends.is_empty() {
             bail!("No backend matching `{backend}` is configured for this account");
         }
@@ -162,6 +171,11 @@ pub fn test_account(account_config: &AccountConfig) -> Result<()> {
     #[cfg(feature = "smtp")]
     if let Some(smtp_config) = &account_config.smtp {
         connect_smtp(smtp_config)?;
+    }
+
+    #[cfg(feature = "sieve")]
+    if let Some(sieve_config) = &account_config.sieve {
+        connect_sieve(sieve_config)?;
     }
 
     Ok(())
@@ -334,6 +348,12 @@ pub(crate) fn connect_smtp(smtp_config: &crate::config::SmtpConfig) -> Result<()
     };
     let _client = SmtpClientStd::connect(&server, &tls, domain, sasl, opts)?;
 
+    Ok(())
+}
+
+#[cfg(feature = "sieve")]
+pub(crate) fn connect_sieve(sieve_config: &crate::config::SieveConfig) -> Result<()> {
+    let _client = crate::sieve::client::SieveClient::new(sieve_config.clone())?;
     Ok(())
 }
 

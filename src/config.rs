@@ -31,6 +31,10 @@ fn is_default_smtp_alpn(alpn: &[String]) -> bool {
     alpn == default_smtp_alpn().as_slice()
 }
 
+fn is_default_sieve_alpn(alpn: &[String]) -> bool {
+    alpn.is_empty()
+}
+
 fn is_default_jmap_alpn(alpn: &[String]) -> bool {
     alpn == default_jmap_alpn().as_slice()
 }
@@ -45,6 +49,10 @@ pub(crate) fn default_imap_alpn() -> Vec<String> {
 
 pub(crate) fn default_smtp_alpn() -> Vec<String> {
     vec![String::from("smtp")]
+}
+
+pub(crate) fn default_sieve_alpn() -> Vec<String> {
+    Vec::new()
 }
 
 pub(crate) fn default_jmap_alpn() -> Vec<String> {
@@ -126,7 +134,7 @@ impl TomlConfig for Config {
 /// A key outside this list still renders, after the ones listed, so a
 /// field added to [`AccountConfig`] can never go missing from a
 /// generated document just because nobody updated this table.
-const RENDER_ORDER: [&str; 17] = [
+const RENDER_ORDER: [&str; 18] = [
     "default",
     "email",
     "display-name",
@@ -140,6 +148,7 @@ const RENDER_ORDER: [&str; 17] = [
     "m2dir",
     "pimdir",
     "smtp",
+    "sieve",
     "mailbox",
     "envelope",
     "attachment",
@@ -293,6 +302,8 @@ pub struct AccountConfig {
     pub pimdir: Option<PimdirConfig>,
     #[allow(unused)]
     pub smtp: Option<SmtpConfig>,
+    #[allow(unused)]
+    pub sieve: Option<SieveConfig>,
 }
 
 /// Envelope-level rendering options.
@@ -692,6 +703,36 @@ pub struct SmtpConfig {
     pub sasl: Option<SaslConfig>,
 }
 
+/// ManageSieve configuration.
+#[allow(unused)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct SieveConfig {
+    /// ManageSieve server address. Either a bare authority
+    /// (`sieve.example.com[:port]`, treated as `sieves://<authority>` by
+    /// default), a full `sieve://` URL for cleartext/STARTTLS, a
+    /// `sieves://` URL for implicit TLS, or a `unix://` socket.
+    pub server: String,
+
+    #[serde(default)]
+    pub tls: TlsConfig,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub starttls: bool,
+
+    /// ManageSieve has no registered ALPN identifier, so the default is
+    /// an empty list. Set this explicitly when a server requires a private
+    /// ALPN protocol identifier.
+    #[serde(
+        default = "default_sieve_alpn",
+        skip_serializing_if = "is_default_sieve_alpn"
+    )]
+    pub alpn: Vec<String>,
+
+    /// Optional SASL credentials. The current client supports LOGIN and
+    /// PLAIN; other configured mechanisms are reported as unsupported.
+    pub sasl: Option<SaslConfig>,
+}
+
 /// SSL/TLS configuration.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
@@ -1069,6 +1110,22 @@ mod tests {
             config.keywords.header,
             Some(MaildirKeywordHeaderConfig::XLabel)
         );
+    }
+
+    #[test]
+    fn sieve_config_defaults_to_no_alpn() {
+        let config: SieveConfig = toml::from_str(
+            r#"
+                server = "sieve.example.com:4190"
+                starttls = true
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(config.server, "sieve.example.com:4190");
+        assert!(config.starttls);
+        assert!(config.alpn.is_empty());
+        assert!(config.sasl.is_none());
     }
 
     #[test]

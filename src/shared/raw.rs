@@ -1,4 +1,4 @@
-//! Reusable clap arg for raw protocol command input (IMAP/SMTP).
+//! Reusable clap arg for raw protocol command input (IMAP/SMTP/ManageSieve).
 //!
 //! A raw command typed on the shell arrives with backslash escapes
 //! left literal (e.g. `a0 NOOP\r\n` reaches the process as the bytes

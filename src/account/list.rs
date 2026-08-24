@@ -113,6 +113,9 @@ impl AccountRow {
         if account.smtp.is_some() {
             backends.push("smtp");
         }
+        if account.sieve.is_some() {
+            backends.push("sieve");
+        }
 
         Self {
             name: name.to_owned(),

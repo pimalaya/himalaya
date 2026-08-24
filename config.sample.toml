@@ -477,3 +477,32 @@ smtp.sasl.plain.password.raw = "***"
 # SASL SCRAM-SHA-256
 #smtp.sasl.scram-sha-256.username = "user@example.com"
 #smtp.sasl.scram-sha-256.password.raw = "***"
+
+# --------------------------------------------------------------------------------
+# ManageSieve config (RFC 5804)
+# --------------------------------------------------------------------------------
+
+# ManageSieve server. A bare authority defaults to `sieves://` on port 4190;
+# use `sieve://host:4190` for cleartext plus STARTTLS or `unix:///path` for a
+# local pre-authenticated proxy.
+#sieve.server = "sieves://sieve.example.com:4190"
+#sieve.server = "sieve://sieve.example.com:4190"
+#sieve.server = "unix:///run/sieve.sock"
+
+# TLS provider and custom certificate use the same settings as IMAP/SMTP.
+#sieve.tls.provider = "rustls"
+#sieve.tls.provider = "native-tls"
+#sieve.tls.cert = "/path/to/custom/cert.pem"
+
+# Enable STARTTLS only for a `sieve://` endpoint.
+#sieve.starttls = true
+
+# ManageSieve has no standard ALPN identifier; an empty list is the default.
+#sieve.alpn = []
+
+# LOGIN and PLAIN are supported. Credentials must not be sent over an
+# unencrypted `sieve://` connection.
+#sieve.sasl.plain.username = "user@example.com"
+#sieve.sasl.plain.password.command = "pass show sieve"
+#sieve.sasl.login.username = "user@example.com"
+#sieve.sasl.login.password.command = "pass show sieve"
