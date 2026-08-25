@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added ManageSieve support behind the `sieve` cargo feature, on by default ([#739]).
+
+  An account gains an optional `[sieve]` block, and `himalaya sieve` exposes `capability`, `list`, `get`, `put`, `check`, `activate`, `deactivate`, `rename`, `delete` and `raw`. The protocol lives in the new [io-managesieve](https://github.com/pimalaya/io-managesieve) library, so every SASL mechanism the other backends accept works here too, and a password or a bearer token is refused over an unencrypted connection unless `sieve.allow-cleartext-auth` says otherwise.
+
+  A bare `sieve.server` authority resolves to `sieve://` with STARTTLS on, where the `imap` and `smtp` ones resolve to their implicit-TLS scheme: RFC 5804 registers one port, 4190, and defines STARTTLS as the way to TLS on it. `sieves://` is accepted for the deployments listening for a TLS handshake straight away, and `unix://` for a local pre-authenticated proxy.
+
 ### Fixed
 
 - Fixed `completion` writing files instead of printing the completion script to the standard output ([#736]).
@@ -1168,6 +1176,7 @@ Few major concepts changed:
 [#734]: https://github.com/pimalaya/himalaya/issues/734
 [#736]: https://github.com/pimalaya/himalaya/issues/736
 [#738]: https://github.com/pimalaya/himalaya/issues/738
+[#739]: https://github.com/pimalaya/himalaya/issues/739
 
 [core#1]: https://github.com/pimalaya/core/issues/1
 [core#10]: https://github.com/pimalaya/core/issues/10

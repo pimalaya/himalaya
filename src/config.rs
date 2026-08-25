@@ -709,27 +709,49 @@ pub struct SmtpConfig {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SieveConfig {
     /// ManageSieve server address. Either a bare authority
-    /// (`sieve.example.com[:port]`, treated as `sieves://<authority>` by
-    /// default), a full `sieve://` URL for cleartext/STARTTLS, a
+    /// (`sieve.example.com[:port]`, treated as `sieve://<authority>` by
+    /// default), a full `sieve://` URL for STARTTLS or cleartext, a
     /// `sieves://` URL for implicit TLS, or a `unix://` socket.
+    ///
+    /// RFC 5804 registers one port, 4190, and reaches TLS through
+    /// STARTTLS rather than through a second port, so a bare authority
+    /// resolves to `sieve://` unlike the IMAP and SMTP ones. `sieves://`
+    /// is for the deployments listening for a TLS handshake straight
+    /// away, which the specification does not define.
     pub server: String,
 
+    /// TLS provider and custom certificate used by the connection.
     #[serde(default)]
     pub tls: TlsConfig,
-    #[serde(default, skip_serializing_if = "is_default")]
-    pub starttls: bool,
 
-    /// ManageSieve has no registered ALPN identifier, so the default is
-    /// an empty list. Set this explicitly when a server requires a private
-    /// ALPN protocol identifier.
+    /// Whether to upgrade the connection with `STARTTLS` after the
+    /// greeting. Left unset, follows the scheme: on for `sieve://`,
+    /// which is the only upgrade path RFC 5804 defines, off for
+    /// `sieves://` and `unix://`. Setting it on a `sieves://` server is
+    /// an error, TLS being already up.
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub starttls: Option<bool>,
+
+    /// ALPN protocol identifiers offered during the TLS handshake.
+    /// ManageSieve registers none, so the default is an empty list. Set
+    /// it when a server wants a private identifier.
     #[serde(
         default = "default_sieve_alpn",
         skip_serializing_if = "is_default_sieve_alpn"
     )]
     pub alpn: Vec<String>,
 
-    /// Optional SASL credentials. The current client supports LOGIN and
-    /// PLAIN; other configured mechanisms are reported as unsupported.
+    /// Whether a mechanism disclosing a reusable credential may run
+    /// over a cleartext connection.
+    ///
+    /// `plain`, `login`, `oauthbearer` and `xoauth2` hand a passive
+    /// observer something it can replay, so they are refused by default
+    /// unless the connection is encrypted. Set this for a server
+    /// reached over a trusted local link.
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub allow_cleartext_auth: bool,
+
+    /// Optional SASL credentials. See [`ImapConfig::sasl`].
     pub sasl: Option<SaslConfig>,
 }
 
@@ -1113,18 +1135,18 @@ mod tests {
     }
 
     #[test]
-    fn sieve_config_defaults_to_no_alpn() {
+    fn sieve_config_defaults_to_no_alpn_and_refuses_cleartext_auth() {
         let config: SieveConfig = toml::from_str(
             r#"
                 server = "sieve.example.com:4190"
-                starttls = true
             "#,
         )
         .unwrap();
 
         assert_eq!(config.server, "sieve.example.com:4190");
-        assert!(config.starttls);
+        assert_eq!(config.starttls, None);
         assert!(config.alpn.is_empty());
+        assert!(!config.allow_cleartext_auth);
         assert!(config.sasl.is_none());
     }
 

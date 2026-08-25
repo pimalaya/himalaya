@@ -3,14 +3,13 @@ use std::fmt;
 use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, Row, Table};
+use io_managesieve::client::ManagesieveClient as _;
 use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
-    account::context::Account,
-    shared::table::style_from_preset,
-    sieve::{client::SieveClient, protocol::SieveCapability},
+    account::context::Account, shared::table::style_from_preset, sieve::client::SieveClient,
 };
 
 /// Query and print the server's current ManageSieve capabilities.
@@ -24,12 +23,32 @@ impl SieveCapabilityListCommand {
         account: &Account,
         client: &mut SieveClient,
     ) -> Result<()> {
+        let capabilities = client
+            .capability()?
+            .capabilities
+            .into_iter()
+            .map(|capability| SieveCapability {
+                name: capability.name,
+                value: capability.value,
+            })
+            .collect();
+
         printer.out(SieveCapabilities {
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
-            capabilities: client.capability()?,
+            capabilities,
         })
     }
+}
+
+/// One capability the server advertises.
+#[derive(Clone, Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub struct SieveCapability {
+    /// The capability name, as the server spelled it.
+    pub name: String,
+    /// The value, for the capabilities carrying one.
+    pub value: Option<String>,
 }
 
 /// Structured output for `sieve capability`.
@@ -48,12 +67,12 @@ impl fmt::Display for SieveCapabilities {
         table
             .load_style(style_from_preset(&self.preset))
             .set_content_arrangement(self.arrangement.clone())
-            .set_header(Row::from([Cell::new("CAPABILITY"), Cell::new("VALUES")]));
+            .set_header(Row::from([Cell::new("CAPABILITY"), Cell::new("VALUE")]));
 
         for capability in &self.capabilities {
             table.add_row(Row::from([
                 Cell::new(&capability.name),
-                Cell::new(capability.values.join(" ")),
+                Cell::new(capability.value.as_deref().unwrap_or_default()),
             ]));
         }
 

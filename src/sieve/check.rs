@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use io_managesieve::client::ManagesieveClient as _;
 use pimalaya_cli::printer::{Message, Printer};
 
 use crate::sieve::{client::SieveClient, script::SieveScriptArg};
@@ -13,7 +14,11 @@ pub struct SieveScriptCheckCommand {
 
 impl SieveScriptCheckCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut SieveClient) -> Result<()> {
-        client.check_script(&self.script.read()?)?;
-        printer.out(Message::new("Sieve script is valid"))
+        let message = match client.check_script(self.script.read()?)? {
+            Some(warnings) => format!("Sieve script is valid: {warnings}"),
+            None => String::from("Sieve script is valid"),
+        };
+
+        printer.out(Message::new(message))
     }
 }

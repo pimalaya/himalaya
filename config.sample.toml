@@ -482,11 +482,15 @@ smtp.sasl.plain.password.raw = "***"
 # ManageSieve config (RFC 5804)
 # --------------------------------------------------------------------------------
 
-# ManageSieve server. A bare authority defaults to `sieves://` on port 4190;
-# use `sieve://host:4190` for cleartext plus STARTTLS or `unix:///path` for a
-# local pre-authenticated proxy.
-#sieve.server = "sieves://sieve.example.com:4190"
+# ManageSieve server. RFC 5804 registers one port, 4190, and reaches TLS
+# through STARTTLS rather than through a second port, so a bare authority
+# resolves to `sieve://` here where the IMAP and SMTP ones resolve to their
+# implicit-TLS scheme. `sieves://` is for the deployments listening for a TLS
+# handshake straight away, and `unix:///path` reaches a local
+# pre-authenticated proxy.
+#sieve.server = "sieve.example.com"
 #sieve.server = "sieve://sieve.example.com:4190"
+#sieve.server = "sieves://sieve.example.com:4190"
 #sieve.server = "unix:///run/sieve.sock"
 
 # TLS provider and custom certificate use the same settings as IMAP/SMTP.
@@ -494,15 +498,24 @@ smtp.sasl.plain.password.raw = "***"
 #sieve.tls.provider = "native-tls"
 #sieve.tls.cert = "/path/to/custom/cert.pem"
 
-# Enable STARTTLS only for a `sieve://` endpoint.
-#sieve.starttls = true
+# STARTTLS follows the scheme when left unset: on for `sieve://`, off for
+# `sieves://` and `unix://`. Set it to false for a cleartext link you trust.
+#sieve.starttls = false
 
 # ManageSieve has no standard ALPN identifier; an empty list is the default.
 #sieve.alpn = []
 
-# LOGIN and PLAIN are supported. Credentials must not be sent over an
-# unencrypted `sieve://` connection.
+# `plain`, `login`, `oauthbearer` and `xoauth2` hand a passive observer
+# something it can replay, so they are refused on an unencrypted connection.
+# Set this only for a server reached over a trusted local link.
+#sieve.allow-cleartext-auth = true
+
+# Pick exactly one SASL mechanism among `anonymous`, `login`, `plain`,
+# `oauthbearer`, `xoauth2`, `scram-sha-256`. Omit the whole `sieve.sasl` table
+# to skip authentication entirely, which is what a `unix://` proxy wants.
 #sieve.sasl.plain.username = "user@example.com"
 #sieve.sasl.plain.password.command = "pass show sieve"
 #sieve.sasl.login.username = "user@example.com"
 #sieve.sasl.login.password.command = "pass show sieve"
+#sieve.sasl.scram-sha-256.username = "user@example.com"
+#sieve.sasl.scram-sha-256.password.command = "pass show sieve"

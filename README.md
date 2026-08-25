@@ -31,7 +31,7 @@
 - **Protocol-specific APIs** exposing each backend's full surface
 - **IMAP**, **SMTP**, **ManageSieve**, **JMAP**, **Gmail** (REST API), **Microsoft Graph** (Outlook / Microsoft 365) support
 - **Maildir** <sup>[specs](https://cr.yp.to/proto/maildir.html)</sup>, **m2dir** <sup>[specs](https://man.sr.ht/~bitfehler/m2dir/)</sup>, **pimdir** <sup>[specs](https://github.com/pimalaya/pimdir)</sup> support
-- **Simple auth** support for IMAP/SMTP (anonymous, login, plain, oauthbearer, xoauth2, scram-sha-256) and ManageSieve (login, plain)
+- **Simple auth** support for IMAP, SMTP and ManageSieve (anonymous, login, plain, oauthbearer, xoauth2, scram-sha-256)
 - **HTTP auth** support for JMAP: basic, bearer
 - **TLS** support:
   - [Rustls](https://crates.io/crates/rustls) with ring crypto
@@ -345,14 +345,11 @@ himalaya msgraph mail-folder list
 himalaya smtp send -f me@example.com -t you@example.com < message.eml
 himalaya sieve list
 himalaya sieve check --script-file filters.sieve
+himalaya sieve put main --script-file filters.sieve
 himalaya sieve activate main
 ```
 
-ManageSieve uses the optional `sieve` account block. A bare server address
-defaults to implicit TLS on port 4190; use `sieve://...` together with
-`sieve.starttls = true` for STARTTLS. `sieve capability`, `list`, `get`,
-`put`, `check`, `activate`, `deactivate`, `delete`, and `raw` are available.
-`put` and `check` accept a script file, inline text after `--`, or stdin.
+ManageSieve uses the optional `sieve` account block. RFC 5804 registers one port, 4190, and reaches TLS through STARTTLS rather than through a second port, so a bare server address resolves to `sieve://` with the upgrade on, where the IMAP and SMTP ones resolve to their implicit-TLS scheme. `sieves://` is accepted too, for the deployments listening for a TLS handshake straight away. A password or a bearer token is refused on an unencrypted connection unless `sieve.allow-cleartext-auth` says otherwise. `sieve capability`, `list`, `get`, `put`, `check`, `activate`, `deactivate`, `rename`, `delete` and `raw` are available, and `put` and `check` accept a script file, inline text, or stdin.
 
 ### Composing messages
 

@@ -65,9 +65,13 @@ Everything else on iCloud passed.
 
 Not yet tested: Proton Bridge; SMTP on iCloud (that account is IMAP-only).
 
-ManageSieve has local coverage in the default test suite: a fake server
-exercises greeting capability lines, quoted script names, GETSCRIPT literals,
-HAVESPACE/PUTSCRIPT/CHECKSCRIPT literals, activation, deletion, and logout.
+ManageSieve protocol coverage lives in io-managesieve since 2026-08-25: its
+scripted server asserts the exact bytes every command sends and answers
+greeting capability lines, quoted and literal script names, GETSCRIPT
+literals, PUTSCRIPT warnings, activation, renaming, deletion, and logout.
+This repository keeps only the tests for the `sieve` config block and its
+server-URL scheme table.
+
 The 2026-08-24 Dovecot Pigeonhole smoke test against `franz@bett.ag` passed
 STARTTLS, PLAIN authentication, `CAPABILITY`, `LISTSCRIPTS`, and
 `account check --backend sieve`. The initial list was empty because the

@@ -13,13 +13,14 @@ pub struct SieveScriptArg {
     /// Read the script bytes from a file.
     #[arg(long = "script-file", value_name = "PATH", conflicts_with = "script")]
     pub script_file: Option<PathBuf>,
-
     /// Inline script text, or omit it and pipe the script on stdin.
     #[arg(name = "script", value_name = "SCRIPT", trailing_var_arg = true)]
     pub script: Vec<String>,
 }
 
 impl SieveScriptArg {
+    /// Resolves the script bytes from the file, the inline argument or
+    /// piped stdin, in that order.
     pub fn read(&self) -> Result<Vec<u8>> {
         if let Some(path) = &self.script_file {
             return fs::read(path)

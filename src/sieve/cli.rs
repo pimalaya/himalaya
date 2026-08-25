@@ -9,11 +9,14 @@ use crate::{
         check::SieveScriptCheckCommand, client::SieveClient,
         deactivate::SieveScriptDeactivateCommand, delete::SieveScriptDeleteCommand,
         get::SieveScriptGetCommand, list::SieveScriptListCommand, put::SieveScriptPutCommand,
-        raw::SieveRawCommand,
+        raw::SieveRawCommand, rename::SieveScriptRenameCommand,
     },
 };
 
-/// Manage server-side Sieve scripts through RFC 5804 ManageSieve.
+/// ManageSieve-specific API.
+///
+/// Gives access to the raw ManageSieve API, always against the account's
+/// `[sieve]` block whatever `--backend` says.
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum SieveCommand {
@@ -28,12 +31,14 @@ pub enum SieveCommand {
     Put(SieveScriptPutCommand),
     /// Validate a script without storing it.
     Check(SieveScriptCheckCommand),
+    /// Rename one script.
+    Rename(SieveScriptRenameCommand),
+    /// Delete one script.
+    Delete(SieveScriptDeleteCommand),
     /// Activate one script.
     Activate(SieveScriptActivateCommand),
     /// Disable the active script.
     Deactivate(SieveScriptDeactivateCommand),
-    /// Delete one script.
-    Delete(SieveScriptDeleteCommand),
     /// Send one raw command line.
     Raw(SieveRawCommand),
 }
@@ -51,9 +56,10 @@ impl SieveCommand {
             Self::Get(cmd) => cmd.execute(printer, client),
             Self::Put(cmd) => cmd.execute(printer, client),
             Self::Check(cmd) => cmd.execute(printer, client),
+            Self::Rename(cmd) => cmd.execute(printer, client),
+            Self::Delete(cmd) => cmd.execute(printer, client),
             Self::Activate(cmd) => cmd.execute(printer, client),
             Self::Deactivate(cmd) => cmd.execute(printer, client),
-            Self::Delete(cmd) => cmd.execute(printer, client),
             Self::Raw(cmd) => cmd.execute(printer, client),
         }
     }

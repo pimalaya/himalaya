@@ -1,7 +1,8 @@
 use std::fmt;
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use clap::Parser;
+use io_managesieve::client::ManagesieveClient as _;
 use pimalaya_cli::printer::Printer;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -18,9 +19,10 @@ pub struct SieveScriptGetCommand {
 
 impl SieveScriptGetCommand {
     pub fn execute(self, printer: &mut impl Printer, client: &mut SieveClient) -> Result<()> {
-        let script = client.get_script(&self.name)?;
+        let script = client.get_script(self.name.clone())?;
         let script = String::from_utf8(script)
-            .map_err(|_| anyhow::anyhow!("ManageSieve script is not valid UTF-8"))?;
+            .map_err(|_| anyhow!("Sieve script `{}` is not valid UTF-8", self.name))?;
+
         printer.out(SieveScriptOutput {
             name: self.name,
             script,
@@ -32,7 +34,9 @@ impl SieveScriptGetCommand {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub struct SieveScriptOutput {
+    /// The script name.
     pub name: String,
+    /// The script source.
     pub script: String,
 }
 

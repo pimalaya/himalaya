@@ -8,9 +8,9 @@
 //!
 //! ## Backends and plumbing
 //!
-//! The network backends are io-imap, io-jmap, io-gmail, io-msgraph and
-//! io-smtp; ManageSieve is implemented in the optional `sieve` module;
-//! the local storage backends are io-maildir and io-m2dir.
+//! The network backends are io-imap, io-jmap, io-gmail, io-msgraph,
+//! io-smtp and io-managesieve; the local storage backends are
+//! io-maildir and io-m2dir.
 //! Account discovery comes from io-pim-discovery (Mozilla autoconfig,
 //! PACC, RFC 6186 SRV, RFC 8620 JMAP resolve). The CLI plumbing (clap
 //! args, printer, logger), TOML config loading and the blocking stream

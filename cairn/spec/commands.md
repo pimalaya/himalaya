@@ -16,11 +16,9 @@ Each protocol command SHALL build its own `<Proto>Client` via a `build_<proto>_c
 
 ### Requirement: ManageSieve commands
 
-When built with the `sieve` feature, the protocol-specific API SHALL expose
-`sieve capability`, `list`, `get`, `put`, `check`, `activate`, `deactivate`,
-`delete`, and `raw`. Data commands SHALL use dedicated serializable output
-types; mutation commands SHALL use confirmation messages. `put` and `check`
-SHALL accept script bytes from a file, inline arguments, or stdin.
+When built with the `sieve` feature, the protocol-specific API SHALL expose `sieve capability`, `list`, `get`, `put`, `check`, `activate`, `deactivate`, `rename`, `delete`, and `raw`. Data commands SHALL use dedicated serializable output types; mutation commands SHALL use confirmation messages. `put` and `check` SHALL accept script bytes from a file, inline arguments, or stdin, and SHALL report the warning text a server attaches to an accepted script.
+
+The protocol SHALL live in io-managesieve, so this repository holds a `SieveClient` wrapping `ManagesieveClientStd`, one file per subcommand, and its own serializable output types, exactly as the other protocol modules do.
 
 ### Requirement: Raw passthrough is byte-verbatim
 The `imap raw` and `smtp raw` commands SHALL forward the command bytes to the server verbatim, resolving the argument through the shared `RawCommandArg` (positional or stdin). It decodes literal `\r` / `\n` escapes into real CRLF so a shell-typed command survives intact. `imap raw` sends a batch of caller-tagged commands: it appends a trailing CRLF when missing and delegates tagging, framing and out-of-order completion tracking to io-imap. `smtp raw` stays a single command line: it strips the trailing CRLF (io-smtp appends its own) and rejects a multi-line batch, since the SMTP exchange reads exactly one reply. `sieve raw` sends one command line and reads the complete ManageSieve response; literal-bearing Sieve commands use their typed commands so the response reader remains synchronized.
