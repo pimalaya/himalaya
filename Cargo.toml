@@ -44,7 +44,7 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "serd
 chumsky = { version = "0.13", default-features = false }
 clap = { version = "4.4", features = ["derive", "env", "wrap_help"] }
 comfy-table = "8"
-convert_case = { version = "0.11", optional = true }
+convert_case = { version = "0.12", optional = true }
 crossterm = { version = "0.29", default-features = false, features = ["serde"] }
 dirs = "6"
 humansize = "2"
