@@ -409,13 +409,18 @@ imap.sasl.plain.password.raw = "***"
 # Neverest config).
 #pimdir.root = "~/.local/state/neverest/example"
 
-# Optional. The replica source this client opens the store as, which labels the
-# edits it stages (reads never need it). Leave it unset: it is auto-detected from
-# the store — a store synced as a single source (the usual case) is opened as that
-# source, so staged edits propagate with no configuration. Set it only to
-# disambiguate a store synced from two sources.
-#pimdir.source = "left"
-#pimdir.source = "right"
+# Optional. The account whose collections this client reads, the account name
+# Neverest syncs under. Leave it unset: a store synced by one account is read as
+# that one. Set it only for a store several accounts share, where guessing would
+# show the wrong mailbox set.
+#pimdir.account = "posteo"
+
+# Optional. The namespace Neverest binds this account's collections under, which
+# is stripped off to name a mailbox: the collection `imap/INBOX` reads as `INBOX`.
+# Leave it unset: it is derived when every mail collection shares one prefix,
+# which a single-source account always does. Set it only for a store whose mail
+# collections span two namespaces.
+#pimdir.namespace = "imap"
 
 # --------------------------------------------------------------------------------
 # SMTP config

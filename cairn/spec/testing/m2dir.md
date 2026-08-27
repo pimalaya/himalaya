@@ -66,7 +66,7 @@ m2store in `/tmp`.
   retired io-email driver.
 - Flags live in the `.meta/<id>.flags` sidecar, one per line; removing
   the last flag deletes the sidecar. The shared layer writes the IANA
-  spelling (`\Seen`, `\Flagged`), while the raw `m2dir flags` command
+  spelling (`\Seen`, `\Flagged`), while the raw `m2dir flag` command
   writes the bare token (`seen`) — both are valid arbitrary-string m2dir
   flags.
 - `message send` bails with `No send-capable backend (JMAP/Gmail/Graph)

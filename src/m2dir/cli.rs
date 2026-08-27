@@ -22,10 +22,11 @@ pub enum M2dirCommand {
     List(M2dirMailboxListCommand),
 
     #[command(subcommand)]
-    #[command(aliases = ["msgs", "msg"])]
-    Messages(M2dirMessageCommand),
+    #[command(visible_alias = "msg", aliases = ["messages", "msgs"])]
+    Message(M2dirMessageCommand),
     #[command(subcommand)]
-    Flags(M2dirFlagCommand),
+    #[command(alias = "flags")]
+    Flag(M2dirFlagCommand),
 }
 
 impl M2dirCommand {
@@ -40,8 +41,8 @@ impl M2dirCommand {
             Self::Delete(cmd) => cmd.execute(printer, client),
             Self::List(cmd) => cmd.execute(printer, account, client),
 
-            Self::Messages(cmd) => cmd.execute(printer, client),
-            Self::Flags(cmd) => cmd.execute(printer, account, client),
+            Self::Message(cmd) => cmd.execute(printer, client),
+            Self::Flag(cmd) => cmd.execute(printer, account, client),
         }
     }
 }

@@ -16,24 +16,24 @@ mail folders, messages, attachments).
 | Command | Variants | Result |
 | --- | --- | --- |
 | `profile get` | text + `--json` | ✅ (`--json` structured, M2 fixed) |
-| `mail-folder list` | text + `--json` | ✅ |
-| `mail-folder get` | by id, `--json` | ✅ |
-| `mail-folder create` | `<name>` | ✅ |
-| `mail-folder rename` | `<id> <name>` | ✅ |
-| `mail-folder delete` | `<id>` (recursive) | ✅ (used for cleanup) |
-| `message create` | `--folder <id>`, raw MIME | ✅ draft placed in folder |
-| `message list` | `--folder`, `--top`/`--skip` | ✅ |
-| `message get` | parsed + `--raw` | ✅ |
-| `message update` | `--read`/`--unread`, `--importance`, `--category` | ✅ |
-| `message send` | raw MIME | ✅ delivered |
-| `message copy` | `<id> <dest>` | ✅ |
-| `message move` | `<id> <dest>` | ✅ on a settled id; ⚠️ 405 on a just-copied id (M3) |
-| `message delete` | permanent | ✅ (used for cleanup) |
-| `attachment list` | `<msg>` | ✅ |
-| `attachment get` | `<msg> <att-id> -o` | ✅ |
+| `mail-folders list` | text + `--json` | ✅ |
+| `mail-folders get` | by id, `--json` | ✅ |
+| `mail-folders create` | `<name>` | ✅ |
+| `mail-folders rename` | `<id> <name>` | ✅ |
+| `mail-folders delete` | `<id>` (recursive) | ✅ (used for cleanup) |
+| `messages create` | `--folder <id>`, raw MIME | ✅ draft placed in folder |
+| `messages list` | `--folder`, `--top`/`--skip` | ✅ |
+| `messages get` | parsed + `--raw` | ✅ |
+| `messages update` | `--read`/`--unread`, `--importance`, `--category` | ✅ |
+| `messages send` | raw MIME | ✅ delivered |
+| `messages copy` | `<id> <dest>` | ✅ |
+| `messages move` | `<id> <dest>` | ✅ on a settled id; ⚠️ 405 on a just-copied id (M3) |
+| `messages delete` | permanent | ✅ (used for cleanup) |
+| `attachments list` | `<msg>` | ✅ |
+| `attachments get` | `<msg> <att-id> -o` | ✅ |
 
-Not separately exercised here: `mail-folder child-folders`, `copy`,
-`move` (folder-level), and `attachment create`/`delete` — same request
+Not separately exercised here: `mail-folders child-folders`, `copy`,
+`move` (folder-level), and `attachments create`/`delete` — same request
 shapes as the verified verbs.
 
 ## Findings
@@ -50,8 +50,8 @@ shapes as the verified verbs.
   `{"id":"…","display-name":"…","mail":"…","user-principal-name":"…"}`
   and the text output is unchanged.
 
-- **M3 — moving a *just-copied* message can 405.** `msgraph message move
-  <id> <dest>` on the id returned directly by `msgraph message copy`
+- **M3 — moving a *just-copied* message can 405.** `msgraph messages move
+  <id> <dest>` on the id returned directly by `msgraph messages copy`
   fails `HTTP 405 (ErrorInvalidRequest): The OData request is not
   supported`. The command is byte-identical to the shared `message move`
   (both call `message_move`) and works on any settled message id — the
@@ -60,7 +60,7 @@ shapes as the verified verbs.
   operable. Not a himalaya bug; re-list the destination folder to get the
   settled id before moving it. The raw 405 is surfaced verbatim.
 
-- `msgraph message create --folder` and `message list --folder` take a
+- `msgraph messages create --folder` and `messages list --folder` take a
   raw folder id or a Graph *well-known* name (`inbox`, `drafts`, …), not
   a display name — the specific commands mirror the REST path and do not
   run the shared name→id resolver (that is `msgraph.md`'s M1, a

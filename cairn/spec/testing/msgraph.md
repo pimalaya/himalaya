@@ -59,7 +59,7 @@ inside a throwaway Graph mail folder.
   (`Microsoft Graph does not support adding messages` / `… the shared
   envelope search`) — Graph has no MIME append and no server-side
   shared-query search (its own `$search`/`$filter` live on the specific
-  `msgraph message list`).
+  `msgraph messages list`).
 - `flag`/`copy`/`move` map onto Graph's model: `seen` = `isRead`,
   `flagged` = the follow-up flag, `important` = `importance: high`,
   non-IANA flags = `categories`; copy = `POST /messages/{id}/copy`, move

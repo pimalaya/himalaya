@@ -32,7 +32,7 @@ sidecar flags).
 - **E2 — `flags add/set/remove` (and `messages save`) silently swallowed
   a trailing message id as a flag. FIXED.** `--flag` was declared
   `num_args = 1..` (greedy variadic) over a free-form `Vec<String>`, so
-  `m2dir flags add -m Inbox -f seen -f flagged <id>` consumed `<id>` as a
+  `m2dir flag add -m Inbox -f seen -f flagged <id>` consumed `<id>` as a
   third flag value, leaving **zero** target ids — and, because m2dir
   flags are arbitrary strings (no enum to reject the id), it reported
   `M2dir flag(s) successfully added` while writing **nothing** (a false
@@ -55,7 +55,7 @@ sidecar flags).
   missing.
 - `messages save` writes to `<folder>` by **name** (`-m`, relative to the
   store root) — the same resolution the shared layer gained in E1.
-  Message read/list are shared-only (no `m2dir messages read/list`).
+  Message read/list are shared-only (no `m2dir message read/list`).
 - Flag values are arbitrary UTF-8 strings (`seen`, `$custom`), stored one
   per line in `.meta/<id>.flags`; `flags list` prints them and an empty
   set deletes the sidecar.

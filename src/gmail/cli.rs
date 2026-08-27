@@ -22,24 +22,24 @@ pub enum GmailCommand {
     #[command(subcommand)]
     Profile(GmailProfileCommand),
     #[command(subcommand)]
-    #[command(visible_aliases = ["label"])]
+    #[command(alias = "label")]
     Labels(GmailLabelsCommand),
     #[command(subcommand)]
-    #[command(visible_aliases = ["message", "msg"])]
+    #[command(visible_alias = "msg", alias = "message")]
     Messages(GmailMessagesCommand),
     #[command(subcommand)]
-    #[command(visible_aliases = ["attachment"])]
+    #[command(alias = "attachment")]
     Attachments(GmailAttachmentsCommand),
     #[command(subcommand)]
-    #[command(visible_aliases = ["draft"])]
+    #[command(alias = "draft")]
     Drafts(GmailDraftsCommand),
     #[command(subcommand)]
-    #[command(visible_aliases = ["thread"])]
+    #[command(alias = "thread")]
     Threads(GmailThreadsCommand),
     #[command(subcommand)]
     History(GmailHistoryCommand),
     #[command(subcommand)]
-    #[command(visible_aliases = ["setting"])]
+    #[command(alias = "setting")]
     Settings(GmailSettingsCommand),
 }
 

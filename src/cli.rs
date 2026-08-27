@@ -29,6 +29,8 @@ use crate::m2dir::{cli::M2dirCommand, client::build_m2dir_client};
 use crate::maildir::{cli::MaildirCommand, client::build_maildir_client};
 #[cfg(feature = "msgraph")]
 use crate::msgraph::{cli::MsgraphCommand, client::build_msgraph_client};
+#[cfg(feature = "pimdir")]
+use crate::pimdir::{cli::PimdirCommand, client::build_pimdir_client};
 #[cfg(backend)]
 use crate::shared::{
     attachment::cli::AttachmentCommand, envelope::cli::EnvelopeCommand, flag::cli::FlagCommand,
@@ -134,6 +136,9 @@ pub enum Command {
     #[cfg(feature = "m2dir")]
     #[command(subcommand)]
     M2dir(M2dirCommand),
+    #[cfg(feature = "pimdir")]
+    #[command(subcommand)]
+    Pimdir(PimdirCommand),
     #[cfg(feature = "smtp")]
     #[command(subcommand)]
     Smtp(SmtpCommand),
@@ -148,8 +153,11 @@ pub enum Command {
     Configure(ConfigureCommand),
     #[command(subcommand)]
     Account(AccountCommand),
+    #[command(alias = "completions")]
     Completion(CompletionCommand),
+    #[command(alias = "manuals")]
     Manual(ManualCommand),
+    #[command(alias = "json-schemas")]
     JsonSchema(JsonSchemaCommand),
 }
 
@@ -352,6 +360,13 @@ impl Command {
                 let (config, name, account_config) =
                     resolve_account(printer, config_paths, account_name)?;
                 let (mut account, mut client) = build_m2dir_client(config, name, account_config)?;
+                cmd.execute(printer, &mut account, &mut client)
+            }
+            #[cfg(feature = "pimdir")]
+            Self::Pimdir(cmd) => {
+                let (config, name, account_config) =
+                    resolve_account(printer, config_paths, account_name)?;
+                let (mut account, mut client) = build_pimdir_client(config, name, account_config)?;
                 cmd.execute(printer, &mut account, &mut client)
             }
             #[cfg(feature = "smtp")]

@@ -59,7 +59,8 @@ pub enum ImapCommand {
 
     // Flags.
     Store(ImapStoreCommand),
-    Flags(ImapFlagListCommand),
+    #[command(alias = "flags")]
+    Flag(ImapFlagListCommand),
 
     // Message data.
     Fetch(ImapFetchCommand),
@@ -98,7 +99,7 @@ impl ImapCommand {
             Self::Thread(cmd) => cmd.execute(printer, client),
 
             Self::Store(cmd) => cmd.execute(printer, client),
-            Self::Flags(cmd) => cmd.execute(printer, account, client),
+            Self::Flag(cmd) => cmd.execute(printer, account, client),
 
             Self::Fetch(cmd) => cmd.execute(printer, client),
             Self::Append(cmd) => cmd.execute(printer, client),

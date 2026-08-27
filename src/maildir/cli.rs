@@ -24,10 +24,11 @@ pub enum MaildirCommand {
     List(MaildirMailboxListCommand),
 
     #[command(subcommand)]
-    #[command(aliases = ["msgs", "msg"])]
-    Messages(MaildirMessageCommand),
+    #[command(visible_alias = "msg", aliases = ["messages", "msgs"])]
+    Message(MaildirMessageCommand),
     #[command(subcommand)]
-    Flags(MaildirFlagCommand),
+    #[command(alias = "flags")]
+    Flag(MaildirFlagCommand),
 }
 
 impl MaildirCommand {
@@ -43,8 +44,8 @@ impl MaildirCommand {
             Self::Delete(cmd) => cmd.execute(printer, client),
             Self::List(cmd) => cmd.execute(printer, account, client),
 
-            Self::Messages(cmd) => cmd.execute(printer, client),
-            Self::Flags(cmd) => cmd.execute(printer, account, client),
+            Self::Message(cmd) => cmd.execute(printer, client),
+            Self::Flag(cmd) => cmd.execute(printer, account, client),
         }
     }
 }

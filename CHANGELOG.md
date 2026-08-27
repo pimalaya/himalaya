@@ -9,11 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added ManageSieve support behind the `sieve` cargo feature, on by default ([#739]).
+- A pimdir write now shows on the next read instead of on the next sync.
+
+  A pimdir store is a replica the sync engine owns, so Himalaya appends its writes to the store's queue rather than applying them; until now a read projected only the committed index, so flagging a message lost the flag from the listing and moving one left it where it was, until Neverest ran. Reads go through the store's reader role with the pending queue overlaid (pimdir SPEC §15.4), so a staged flag, edit, deletion, move or copy shows straight away. All of them address a message that already exists and keeps its public id, so nothing changed about how a message is addressed.
+
+  A staged *creation* has no id until the sync engine applies it, so it cannot be an envelope and does not list. `envelope list` reports how many the mailbox has instead, and names where to see them; `envelope search` reports none, a queued message never having been matched against the query.
+
+- `himalaya pimdir queue list` and `himalaya pimdir queue cancel`, for the staged creations the mailbox listing cannot show.
+
+  The `pimdir` binary is kind-agnostic and prints ids, hashes and flags; Himalaya holds the mail conventions and the blobs, so it renders a queued message with its flags, subject, recipient and the moment it was queued. `cancel` retracts one by the row id that view prints: the only way back for a message that does not exist yet, where a staged flag or move is undone by doing the opposite. Cancelling is the store owner's write, so it takes that role for the length of the call and reports a sync in flight rather than waiting on it.
+
+- Added ManageSieve support
+ behind the `sieve` cargo feature, on by default ([#739]).
 
   An account gains an optional `[sieve]` block, and `himalaya sieve` exposes `capability`, `list`, `get`, `put`, `check`, `activate`, `deactivate`, `rename`, `delete` and `raw`. The protocol lives in the new [io-managesieve](https://github.com/pimalaya/io-managesieve) library, so every SASL mechanism the other backends accept works here too, and a password or a bearer token is refused over an unencrypted connection unless `sieve.allow-cleartext-auth` says otherwise.
 
   A bare `sieve.server` authority resolves to `sieve://` with STARTTLS on, where the `imap` and `smtp` ones resolve to their implicit-TLS scheme: RFC 5804 registers one port, 4190, and defines STARTTLS as the way to TLS on it. `sieves://` is accepted for the deployments listening for a TLS handshake straight away, and `unix://` for a local pre-authenticated proxy.
+
+### Changed
+
+- **BREAKING**: renamed the plural commands that name no vendor resource to their singular, the plural staying as a hidden alias: `imap flags`, `maildir messages`, `maildir flags`, `m2dir messages` and `m2dir flags` become `imap flag`, `maildir message`, `maildir flag`, `m2dir message` and `m2dir flag`. Every old spelling keeps working, hidden from `--help`.
+
+  A command mirroring a vendor API resource keeps that API's spelling instead, so `gmail labels`, `messages`, `attachments`, `drafts`, `threads`, `settings` (with `filters`, `forwarding-addresses` and `delegates` under it) are unchanged. The `msgraph` family, singular where Graph is plural, is aligned onto Graph instead: `msgraph mail-folder`, `message` and `attachment` become `mail-folders`, `messages` and `attachments`, joining the `child-folders` that already sat under the first. Every singular spelling stays as a hidden alias, where it used to be shown beside the plural. `completion`, `manual` and `json-schema` gain the plural aliases they lacked.
 
 ### Fixed
 
@@ -23,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   `manual` and `json-schema` follow the same shape, so the three behave alike: they print to stdout the single page or schema they are asked for, they take their directory through `--dir` where it used to be a positional argument, and they accept command names (`himalaya`, `himalaya-envelope`, `himalaya-envelope-list`) to select what to generate. Restoring the documented behaviour is a regression fix rather than a breaking change, hence the patch release, and generating completions, manual pages or schemas is not a daily gesture.
 
-- Fixed `maildir messages copy` leaving an empty message behind when the process died mid-copy ([#738]).
+- Fixed `maildir message copy` leaving an empty message behind when the process died mid-copy ([#738]).
 
   The copy wrote straight to the name the target mailbox lists, so a death inside it left a 0-byte entry that `envelope list` shows as an ordinary message with blank columns, that `account check` calls healthy, and that only `message read` rejects. The copy is now staged and renamed, so an interrupted copy leaves nothing behind in the mailbox.
 
@@ -37,7 +54,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added the `pimdir` storage backend, Himalaya over the local store the sync engine populates.
 
-  Reads build envelopes from the stored meta and report a body that is not local as "body not fetched"; writes are staged as replica mutations attributed to `pimdir.source`, auto-detected when the store has a single source.
+  Reads build envelopes from the stored meta and report a body that is not local as "body not fetched". A mailbox is named the way its server names it: the sync keys a collection `<namespace>/<name>`, so the collection `imap/INBOX` is the mailbox `INBOX`, and a name matching no collection is refused naming the ones the account holds. The namespace is derived unless `pimdir.namespace` names it, and `pimdir.account` picks the account in a store several share.
+
+  Himalaya reads the store read-only, which takes no lock, so a sync in flight neither blocks it nor is blocked by it. A write (flag, move, copy, delete, append) is staged as an action queued for the store's owner to apply and push, rather than written into the index: the owner's write path collects unreferenced objects, and running that beside a sync destroys the bodies it has streamed but not yet attached. An appended body is written to the blob store before the action referencing it, which pins it.
 
 - Added back the `email` and `display-name` config fields, at the global and the account level ([#721]).
 

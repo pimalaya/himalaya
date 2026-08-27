@@ -4,7 +4,7 @@ use pimalaya_cli::printer::Printer;
 
 use crate::{
     account::context::Account,
-    msgraph::{client::MsgraphClient, mail_folder::list::folders_table},
+    msgraph::{client::MsgraphClient, mail_folders::list::folders_table},
 };
 
 /// Get one or more Microsoft Graph mail folders by id (`GET

@@ -44,7 +44,7 @@ store/copy/move, filename flags).
 ### Behaviour / usability
 
 - **D4 — the specific message/flag commands default `-m` to a literal
-  `Inbox` folder. DOCUMENTED.** With no `-m`, `maildir messages save` /
+  `Inbox` folder. DOCUMENTED.** With no `-m`, `maildir message save` /
   `flags …` resolve `Inbox` and fail `path <root>/Inbox is not a
   directory` in the fs layout, where the root *is* INBOX and no `Inbox`
   subfolder exists (the default is a Maildir++ assumption). The raw

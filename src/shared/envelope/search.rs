@@ -88,7 +88,10 @@ impl EnvelopeSearchCommand {
             self.has_attachment,
         )?;
 
+        // NOTE: a queued creation is not matched against the query, so a
+        // search reports none rather than a count its filter never saw.
         let envelopes = Envelopes {
+            queued: 0,
             preset: account.table_preset().to_string(),
             arrangement: account.table_arrangement(),
             max_width: self.max_width,

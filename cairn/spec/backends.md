@@ -39,16 +39,41 @@ Keyword reading is not a round trip: no command can name a custom keyword, so a 
 A sidecar that is absent, unreadable or disabled SHALL yield no keywords rather than fail the listing, since a mailbox without one is the normal case rather than an error.
 
 ### Requirement: pimdir shows a short public id
-The pimdir backend SHALL show and accept each message's public id (`items.seq`, a small store-assigned integer, the same across every mailbox the message is filed in) as its `Envelope.id`, not the internal `link_id`. It SHALL resolve the id to the `link_id` (via the store's `get_item` / `seq_for_link`) before reading a body or staging an edit, and SHALL fail clearly on a non-numeric id. `add_message` SHALL return the new item's `seq`.
+The pimdir backend SHALL show and accept each message's public id (`items.seq`, a small store-assigned integer, the same across every mailbox the message is filed in) as its `Envelope.id`, not the internal `link_id`. It SHALL check the id against the collection before reading a body or staging an action, and SHALL fail clearly on a non-numeric or unknown one. `add_message` SHALL return the link id it staged: a queued create has no `seq` yet, the store assigning one when its owner applies the action.
 
-### Requirement: pimdir writes auto-source
-When `pimdir.source` is unset, the pimdir backend SHALL attribute its writes to the store's single synced source (via `distinct_sources`) when there is exactly one — the local-sync case — so a staged edit propagates without configuration, falling back to `local` only when the store has no or several sources.
+### Requirement: pimdir names a mailbox the way its server does
+A hub collection is keyed `<namespace>/<name>`, so the pimdir backend SHALL show and accept the name without the namespace: the collection `imap/INBOX` is the mailbox `INBOX`. The namespace SHALL be derived when every mail collection of the account shares one prefix, which a single-source account always does; `pimdir.namespace` overrides it, and a store whose mail collections span two namespaces keeps whole ids as names rather than collapsing two mailboxes onto one.
+
+A user-typed name SHALL resolve against the account's mail collections, a full collection id still being taken as itself. A name matching none, or several, SHALL be refused naming what the account holds. It SHALL NOT be passed to the store unresolved, which reads as a mailbox that exists and is empty.
+
+### Requirement: pimdir reads one account
+The pimdir backend SHALL show the collections of one account (pimdir SPEC §9.2), `pimdir.account` naming it. Unset, it is derived: a store holding one account, or one ungrouped set, is read as that one, and a store holding several is refused naming them rather than guessing one and showing the wrong mailbox set.
 
 ### Requirement: pimdir store path is shell-expanded
 The pimdir backend SHALL expand `~` and environment variables on `pimdir.root` before opening the store and its blob reader, so a store path written with `~` (e.g. a Neverest store at `~/.local/state/neverest/<account>`) resolves to the home-relative directory. Opening the raw path would create an empty store at a literal `./~/…` and silently return an empty mailbox list.
 
-### Requirement: pimdir is an availability-aware cache
-The pimdir backend SHALL treat the store as a possibly-partial cache. `get_message` on an item whose body is not local (`level < Full`, no stored object) SHALL report a clear "body not fetched" state (the cue to sync), not a data-loss error; the item still lists. A staged write (`store_flags`→`SetFlags`, `add_message`→`Add`, `copy_messages`→`Copy`, `move_messages`→`Move`, `delete_messages`→`Remove`) is attributed to the configured `pimdir.source`; on a store not synced as that source (no binding for the item) the write SHALL fail loudly rather than stage a change no sync will carry. pimdir has no native trash. `add_message` content-hashes the body with the same digest as Neverest so an added message deduplicates against a synced one.
+### Requirement: pimdir is a reader and a producer, never the owner
+The pimdir backend SHALL treat the store as a possibly-partial cache owned by the sync engine. `get_message` on an item whose body is not local (`level < Full`, no stored object) SHALL report a clear "body not fetched" state (the cue to sync), not a data-loss error; the item still lists.
+
+Reads SHALL go through `PimdirReader`, the role that takes no lock (pimdir SPEC §8) and carries no write at all, so a sync in flight neither blocks Himalaya nor is blocked by it, and the backend cannot drain the queue or sweep the store even by mistake.
+
+The reader SHALL overlay the queue (pimdir SPEC §15.4), so an action this client staged is visible on the next read rather than on the next sync: a staged `set-flags`, `update`, `remove`, `move` or `copy` changes what a listing shows. Each addresses a message that already exists and keeps its public id, so a staged write never changes how a message is addressed.
+
+A write SHALL be staged as a queued `PimdirAction` through a producer handle (`store_flags`→`SetFlags`, `add_message`→`Add`, `copy_messages`→`Copy`, `move_messages`→`Move`, `delete_messages`→`Remove`), addressed by the public `seq`, for the store's owner to apply and push. The backend SHALL NOT write the index, load a collection, or run the owner's object sweep: a sweep run beside a sync destroys the bodies it has streamed but not yet attached, which SPEC §14 explicitly invites it to leave pending. A body an action references SHALL be written to the blob store durably before the action is enqueued, the queue row being what pins it.
+
+`SetFlags` carries the whole replacement set, so applying it twice lands the same state; a set the store reports as unknown contributes no markers rather than staging an unknown one, which would erase what a sync knows. pimdir has no native trash.
+
+An added message SHALL derive its link id, summary and sort key through `io_pimdir::conventions`, the one implementation of SPEC Annex A, and SHALL spell the link id the way the store it writes to already does, so an added message deduplicates against a synced copy rather than linking it a second time.
+
+### Requirement: A queued creation is reported, not listed
+A queued creation has no public id until the store's owner applies it, so the pimdir backend SHALL NOT project one as an envelope, and SHALL NOT put a placeholder in `Envelope.id`. `add_message` returns the link id it staged, which identifies the creation across the window.
+
+An envelope listing SHALL report how many creations the mailbox has queued and name the command that shows them, so a saved message that is not in the list reads as queued rather than as lost. A backend that stages nothing reports none, which every backend whose writes reach the server as they are made does. An envelope *search* SHALL report none whatever the backend: a queued creation is never matched against the query, so a count its filter never saw would be misleading.
+
+### Requirement: The pimdir subcommand reads and retracts the queue
+Himalaya SHALL carry a `pimdir` subcommand for what the operator CLI cannot do without knowing mail. `queue list` SHALL render a queued creation as a message (flags, subject, recipient, and when it was queued, from the row's `created_at`) where the kind-agnostic `pimdir` binary can only print ids and hashes. `queue cancel` SHALL retract one row through io-pimdir's scoped owner operation, confirming first unless `--yes`.
+
+Taking the owner role briefly is what cancelling costs (pimdir SPEC §15.5); the backend read and write paths SHALL NOT reach it. A store another process owns SHALL be refused immediately, saying a sync is running and that the action may already have been applied.
 
 ### Requirement: Append and search gaps
 Gmail and Graph SHALL NOT implement `add_message` (neither API has an append) and SHALL NOT implement shared `search_envelopes`. IMAP, JMAP, Maildir and m2dir implement search (see the search capability).

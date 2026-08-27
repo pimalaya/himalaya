@@ -661,15 +661,19 @@ pub struct M2dirConfig {
 pub struct PimdirConfig {
     /// The store directory (holds `pimdir.db` and `objects/`).
     pub root: PathBuf,
-    /// The replica source name this client opens the store as. Reads are
-    /// source-independent, but a staged write (flag/move/delete/append) is
-    /// attributed to this source, so for the change to propagate it must match
-    /// the source name the sync engine drives for this device. Usually left
-    /// unset: it is auto-detected from the store — a store synced as a single
-    /// source is opened as that source. Set it only to disambiguate a store
-    /// synced from two sources.
+    /// The account whose collections this client reads (pimdir SPEC §9.2), the
+    /// sync engine's account name. Usually left unset: a store synced by one
+    /// account is read as that one. Set it only for a store several accounts
+    /// share, where guessing would show the wrong mailbox set.
     #[serde(default)]
-    pub source: Option<String>,
+    pub account: Option<String>,
+    /// The namespace the sync binds this account's collections under, stripped
+    /// off a collection id to name a mailbox: `imap/INBOX` reads as `INBOX`.
+    /// Usually left unset: it is derived when every mail collection shares one
+    /// prefix, which a single-source account always does. Set it only for a
+    /// store whose mail collections span two namespaces.
+    #[serde(default)]
+    pub namespace: Option<String>,
 }
 
 /// SMTP configuration.

@@ -341,7 +341,7 @@ Each backend also exposes its full native API under its own subgroup, always aga
 himalaya imap raw 'a1 SEARCH FROM "alice@example.com"\r\n'
 himalaya jmap mailbox query --role drafts
 himalaya gmail messages list -q "from:alice is:unread"
-himalaya msgraph mail-folder list
+himalaya msgraph mail-folders list
 himalaya smtp send -f me@example.com -t you@example.com < message.eml
 himalaya sieve list
 himalaya sieve check --script-file filters.sieve

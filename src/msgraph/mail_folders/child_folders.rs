@@ -5,7 +5,7 @@ use pimalaya_cli::printer::Printer;
 
 use crate::{
     account::context::Account,
-    msgraph::{client::MsgraphClient, mail_folder::list::folders_table},
+    msgraph::{client::MsgraphClient, mail_folders::list::folders_table},
 };
 
 /// List a mail folder's child folders (`GET

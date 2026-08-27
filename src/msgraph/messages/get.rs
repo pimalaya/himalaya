@@ -8,7 +8,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::{
-    msgraph::{client::MsgraphClient, message::list::recipient},
+    msgraph::{client::MsgraphClient, messages::list::recipient},
     shared::output::write_bytes_or_save,
 };
 

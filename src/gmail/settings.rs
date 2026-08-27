@@ -44,13 +44,13 @@ pub enum GmailSettingsCommand {
     #[command(visible_aliases = ["autoforwarding"])]
     AutoForwarding(GmailSettingsAutoForwardingCommand),
     #[command(subcommand)]
-    #[command(visible_aliases = ["filter"])]
+    #[command(alias = "filter")]
     Filters(GmailSettingsFiltersCommand),
     #[command(subcommand)]
-    #[command(visible_aliases = ["forwarding-address"])]
+    #[command(alias = "forwarding-address")]
     ForwardingAddresses(GmailSettingsForwardingAddressesCommand),
     #[command(subcommand)]
-    #[command(visible_aliases = ["delegate"])]
+    #[command(alias = "delegate")]
     Delegates(GmailSettingsDelegatesCommand),
     #[command(subcommand)]
     #[command(visible_aliases = ["sendas"])]

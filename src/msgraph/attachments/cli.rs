@@ -5,7 +5,7 @@ use pimalaya_cli::printer::Printer;
 use crate::{
     account::context::Account,
     msgraph::{
-        attachment::{
+        attachments::{
             create::MsgraphAttachmentCreateCommand, delete::MsgraphAttachmentDeleteCommand,
             get::MsgraphAttachmentGetCommand, list::MsgraphAttachmentListCommand,
         },
@@ -17,7 +17,7 @@ use crate::{
 /// (`me.messages.attachments`).
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
-pub enum MsgraphAttachmentCommand {
+pub enum MsgraphAttachmentsCommand {
     List(MsgraphAttachmentListCommand),
     Get(MsgraphAttachmentGetCommand),
     Create(MsgraphAttachmentCreateCommand),
@@ -25,7 +25,7 @@ pub enum MsgraphAttachmentCommand {
     Delete(MsgraphAttachmentDeleteCommand),
 }
 
-impl MsgraphAttachmentCommand {
+impl MsgraphAttachmentsCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,

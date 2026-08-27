@@ -5,8 +5,8 @@ use pimalaya_cli::printer::Printer;
 use crate::{
     account::context::Account,
     msgraph::{
-        attachment::cli::MsgraphAttachmentCommand, client::MsgraphClient,
-        mail_folder::cli::MsgraphMailFolderCommand, message::cli::MsgraphMessageCommand,
+        attachments::cli::MsgraphAttachmentsCommand, client::MsgraphClient,
+        mail_folders::cli::MsgraphMailFoldersCommand, messages::cli::MsgraphMessagesCommand,
         profile::cli::MsgraphProfileCommand,
     },
 };
@@ -21,12 +21,12 @@ use crate::{
 pub enum MsgraphCommand {
     #[command(subcommand)]
     Profile(MsgraphProfileCommand),
-    #[command(subcommand, visible_aliases = ["mail-folders", "folder", "folders"])]
-    MailFolder(MsgraphMailFolderCommand),
-    #[command(subcommand, visible_aliases = ["messages", "msg"])]
-    Message(MsgraphMessageCommand),
-    #[command(subcommand, visible_aliases = ["attachments"])]
-    Attachment(MsgraphAttachmentCommand),
+    #[command(subcommand, visible_alias = "folders", aliases = ["mail-folder", "folder"])]
+    MailFolders(MsgraphMailFoldersCommand),
+    #[command(subcommand, visible_alias = "msg", alias = "message")]
+    Messages(MsgraphMessagesCommand),
+    #[command(subcommand, alias = "attachment")]
+    Attachments(MsgraphAttachmentsCommand),
 }
 
 impl MsgraphCommand {
@@ -38,9 +38,9 @@ impl MsgraphCommand {
     ) -> Result<()> {
         match self {
             Self::Profile(cmd) => cmd.execute(printer, account, client),
-            Self::MailFolder(cmd) => cmd.execute(printer, account, client),
-            Self::Message(cmd) => cmd.execute(printer, account, client),
-            Self::Attachment(cmd) => cmd.execute(printer, account, client),
+            Self::MailFolders(cmd) => cmd.execute(printer, account, client),
+            Self::Messages(cmd) => cmd.execute(printer, account, client),
+            Self::Attachments(cmd) => cmd.execute(printer, account, client),
         }
     }
 }

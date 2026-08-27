@@ -6,7 +6,7 @@ use crate::{
     account::context::Account,
     msgraph::{
         client::MsgraphClient,
-        mail_folder::{
+        mail_folders::{
             child_folders::MsgraphChildFoldersListCommand, copy::MsgraphMailFolderCopyCommand,
             create::MsgraphMailFolderCreateCommand, delete::MsgraphMailFolderDeleteCommand,
             get::MsgraphMailFolderGetCommand, list::MsgraphMailFolderListCommand,
@@ -18,9 +18,9 @@ use crate::{
 /// Manage Microsoft Graph mail folders (`me.mailFolders`).
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
-pub enum MsgraphMailFolderCommand {
+pub enum MsgraphMailFoldersCommand {
     List(MsgraphMailFolderListCommand),
-    #[command(visible_aliases = ["children", "child"])]
+    #[command(visible_alias = "children", aliases = ["child-folder", "child"])]
     ChildFolders(MsgraphChildFoldersListCommand),
     Get(MsgraphMailFolderGetCommand),
     Create(MsgraphMailFolderCreateCommand),
@@ -32,7 +32,7 @@ pub enum MsgraphMailFolderCommand {
     Delete(MsgraphMailFolderDeleteCommand),
 }
 
-impl MsgraphMailFolderCommand {
+impl MsgraphMailFoldersCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,

@@ -118,7 +118,7 @@ pub fn schemas() -> BTreeMap<String, Value> {
             crate::imap::envelope::thread::ThreadResultsTable
         );
         insert!(
-            "himalaya-imap-flags",
+            "himalaya-imap-flag",
             crate::imap::flag::list::FlagsTable<'static>
         );
         insert!("himalaya-imap-fetch", crate::imap::fetch::FetchedMessages);
@@ -298,28 +298,28 @@ pub fn schemas() -> BTreeMap<String, Value> {
             crate::msgraph::profile::get::MsgraphProfileOutput
         );
         insert!(
-            "himalaya-msgraph-mail-folder-list",
-            crate::msgraph::mail_folder::list::MailFoldersTable
+            "himalaya-msgraph-mail-folders-list",
+            crate::msgraph::mail_folders::list::MailFoldersTable
         );
         insert!(
-            "himalaya-msgraph-mail-folder-child-folders",
-            crate::msgraph::mail_folder::list::MailFoldersTable
+            "himalaya-msgraph-mail-folders-child-folders",
+            crate::msgraph::mail_folders::list::MailFoldersTable
         );
         insert!(
-            "himalaya-msgraph-mail-folder-get",
-            crate::msgraph::mail_folder::list::MailFoldersTable
+            "himalaya-msgraph-mail-folders-get",
+            crate::msgraph::mail_folders::list::MailFoldersTable
         );
         insert!(
-            "himalaya-msgraph-message-list",
-            Paginated<crate::msgraph::message::list::MessagesTable>
+            "himalaya-msgraph-messages-list",
+            Paginated<crate::msgraph::messages::list::MessagesTable>
         );
         insert!(
-            "himalaya-msgraph-message-get",
-            crate::msgraph::message::get::MsgraphMessageGetOutput
+            "himalaya-msgraph-messages-get",
+            crate::msgraph::messages::get::MsgraphMessageGetOutput
         );
         insert!(
-            "himalaya-msgraph-attachment-list",
-            crate::msgraph::attachment::list::AttachmentsTable
+            "himalaya-msgraph-attachments-list",
+            crate::msgraph::attachments::list::AttachmentsTable
         );
     }
 
@@ -329,11 +329,11 @@ pub fn schemas() -> BTreeMap<String, Value> {
     {
         insert!("himalaya-maildir-list", crate::maildir::list::MaildirsTable);
         insert!(
-            "himalaya-maildir-flags-list",
+            "himalaya-maildir-flag-list",
             crate::maildir::flag::list::FlagsTable
         );
         insert!(
-            "himalaya-maildir-messages-save",
+            "himalaya-maildir-message-save",
             crate::maildir::message::save::StoredMessage
         );
     }
@@ -344,12 +344,24 @@ pub fn schemas() -> BTreeMap<String, Value> {
     {
         insert!("himalaya-m2dir-list", crate::m2dir::list::M2dirsTable);
         insert!(
-            "himalaya-m2dir-flags-list",
+            "himalaya-m2dir-flag-list",
             crate::m2dir::flag::list::FlagsTable
         );
         insert!(
-            "himalaya-m2dir-messages-save",
+            "himalaya-m2dir-message-save",
             crate::m2dir::message::save::StoredMessage
+        );
+    }
+
+    #[cfg(feature = "pimdir")]
+    {
+        insert!(
+            "himalaya-pimdir-queue-list",
+            crate::pimdir::queue::list::PimdirQueuedMessages
+        );
+        insert!(
+            "himalaya-pimdir-queue-cancel",
+            crate::pimdir::queue::cancel::PimdirQueueCancelled
         );
     }
 

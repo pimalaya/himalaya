@@ -22,7 +22,7 @@ the shared commands). This one exercises the raw protocol commands under
 | `imap subscribe` / `unsubscribe` | fake A | ✅ |
 | `imap list` | default (LSUB), `-A` (LIST), `-p PATTERN` | ✅ (B1) |
 | `imap status` | `<MAILBOX>` | ✅ |
-| `imap flags` | available flags + PERMANENT | ✅ |
+| `imap flag` | available flags + PERMANENT | ✅ |
 | `imap select` | `<MAILBOX>` | ✅ |
 | `imap close` / `unselect` | no selection | ✅ errors as expected (B2) |
 | `imap append` | `-f` flags, inline/file/stdin | ✅ but see **G1** |

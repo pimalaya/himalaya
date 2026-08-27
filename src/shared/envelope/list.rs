@@ -74,6 +74,7 @@ impl EnvelopeListCommand {
         let mailbox = self.mailbox.resolve(account)?;
 
         let envelopes = client.list_envelopes(&mailbox, page, page_size, self.has_attachment)?;
+        let queued = client.queued_messages(&mailbox)?;
 
         let envelopes = Envelopes {
             preset: account.table_preset().to_string(),
@@ -99,6 +100,7 @@ impl EnvelopeListCommand {
                 date: account.envelopes_list_table_date_color(),
                 size: account.envelopes_list_table_size_color(),
             },
+            queued,
             envelopes,
         };
 
@@ -109,7 +111,7 @@ impl EnvelopeListCommand {
 /// Glyphs the FLAGS / ATT columns substitute in, sourced from the
 /// merged account config (v1.2.0 defaults: `*`, `R`, `!`, `@`).
 #[derive(Clone, Copy, Debug)]
-pub(super) struct FlagChars {
+pub struct FlagChars {
     pub unseen: char,
     pub replied: char,
     pub flagged: char,
@@ -151,6 +153,10 @@ pub struct Envelopes {
     pub(super) chars: FlagChars,
     #[serde(skip)]
     pub(super) colors: EnvelopeColors,
+    /// Messages staged for creation and not yet pushed, which have no id yet
+    /// and so cannot be listed. Zero for every backend whose writes reach the
+    /// server as they are made.
+    pub queued: usize,
     pub envelopes: Vec<Envelope>,
 }
 
@@ -215,14 +221,23 @@ impl fmt::Display for Envelopes {
         }
 
         writeln!(f)?;
-        writeln!(f, "{table}")
+        writeln!(f, "{table}")?;
+
+        // A queued message has no id and so no row; saying how many there are
+        // is what keeps a saved message that is not in the table from reading
+        // as one that was lost.
+        match self.queued {
+            0 => Ok(()),
+            1 => writeln!(f, "1 queued message, see `himalaya pimdir queue list`"),
+            n => writeln!(f, "{n} queued messages, see `himalaya pimdir queue list`"),
+        }
     }
 }
 
 /// 3-character flag widget: unseen, replied, flagged. Each slot is a
 /// space when the flag is absent, otherwise the configured glyph
 /// (v1.2.0 defaults: `*`, `R`, `!`).
-pub(super) fn format_flags(flags: &BTreeSet<Flag>, chars: &FlagChars) -> String {
+pub fn format_flags(flags: &BTreeSet<Flag>, chars: &FlagChars) -> String {
     let mut out = String::with_capacity(3);
     out.push(if flags.iter().any(Flag::is_seen) {
         ' '
@@ -250,7 +265,7 @@ pub(super) fn format_attachment(has: Option<bool>, glyph: char) -> String {
     }
 }
 
-pub(super) fn format_addresses(addrs: &[Address]) -> String {
+pub fn format_addresses(addrs: &[Address]) -> String {
     addrs
         .iter()
         .map(|a| match &a.name {

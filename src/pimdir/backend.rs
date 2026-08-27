@@ -1,41 +1,44 @@
 //! pimdir adapter for the shared cross-protocol client.
 //!
-//! Reads project [`io_pimdir`]'s client read API (`list_collections`,
+//! Reads project [`io_pimdir`]'s client read API (`list_collections_by_account`,
 //! `list_items`, `get_item`, `count_items`) plus the blob store, building
 //! envelopes from the stored `v: 1` meta (pimdir SPEC Annex A) with no body reads.
 //! An item whose body is not local (`level < Full`) still lists; `get_message`
 //! reports "body not fetched" rather than an error — the cue to sync.
 //!
-//! Writes stage io-replica [`ReplicaMutation`]s through the store's `mutate`
-//! seam (never raw SQL), so the next sync derives and pushes them. A write is
-//! attributed to the client's configured source; it fails loudly when the store
-//! was not synced as that source (no binding for the item), rather than silently
-//! staging a change no sync will carry.
+//! Writes enqueue [`PimdirAction`]s for the store's owner to apply (pimdir SPEC
+//! §15.1). Himalaya is a producer, not the owner: it never mutates the index and
+//! never collects, so a staged flag change cannot race a sync mid-hydration. The
+//! owner drains the queue on its next run and derives the push from there.
+//!
+//! A mailbox is named the way its server names it. The sync binds a source's
+//! collections under a namespace, so `INBOX` is stored as `imap/INBOX`; the
+//! prefix comes off for display and goes back on to address the store, at
+//! [`PimdirClient::hub_id`] and [`PimdirClient::mailbox_name`].
 
 use anyhow::{Result, anyhow, bail};
-use chrono::DateTime;
-use io_pimdir::PimdirItem;
+use chrono::{DateTime, SecondsFormat, Utc};
+use io_pimdir::{
+    PimdirItem, PimdirPendingAction,
+    codec::PimdirAction,
+    conventions::{self, PimdirDerivation},
+};
 use io_replica::{
-    client::ReplicaStorage,
     collection::ReplicaCollectionId,
-    coroutine::{ReplicaArg, ReplicaCoroutine, ReplicaCoroutineState, ReplicaYield},
-    mutate::{ReplicaMutate, ReplicaMutation},
-    object::ReplicaObject,
-    placement::{ReplicaFlags, ReplicaHandle, ReplicaLinkId, ReplicaMeta, ReplicaPlacement},
+    placement::{ReplicaFlags, ReplicaLevel, ReplicaLinkId},
 };
 use log::warn;
-use mail_parser::{Address as MailParserAddress, HeaderValue, MessageParser};
 use serde::Deserialize;
 
 use crate::{
     email::{
         address::Address,
-        envelope::{Envelope, normalize_message_id, parse_message_ids},
+        envelope::Envelope,
         flag::{Flag, FlagOp, IanaFlag},
         mailbox::Mailbox,
         search::{eval, query::SearchEmailsQuery},
     },
-    pimdir::{client::PimdirClient, hash::content_hash},
+    pimdir::client::PimdirClient,
 };
 
 /// The mail media type a pimdir collection carries to be a mailbox.
@@ -43,6 +46,15 @@ const MAIL_KIND: &str = "message/rfc822";
 
 /// How many items to pull per keyset page when scanning a whole collection.
 const SCAN_BATCH: usize = 500;
+
+/// Whether a collection's declared kind makes it a mailbox.
+///
+/// A kind-less collection counts: a sync that created one before kinds were
+/// declared left the column empty, and refusing those would hide the mailboxes
+/// of every store written back then.
+pub(crate) fn is_mail(kind: &str) -> bool {
+    kind.is_empty() || kind == MAIL_KIND
+}
 
 /// A reader's view of the `message/rfc822` meta (pimdir SPEC Annex A).
 #[derive(Default, Deserialize)]
@@ -64,25 +76,92 @@ struct MetaView {
 }
 
 impl PimdirClient {
-    // --- Reads (source-independent: they observe the shared items) -------
+    // --- Mailbox naming --------------------------------------------------
 
-    /// Lists the mail collections (declared `message/rfc822`, or kind-less
-    /// legacy ones), sorted by name. `with_counts` fills `total` with the live
-    /// item count.
+    /// The name a mailbox goes by: its collection id without the namespace.
+    ///
+    /// A name that merely starts with the namespace keeps its own spelling, only
+    /// the `<namespace>/` prefix being one.
+    pub(crate) fn mailbox_name<'a>(&self, collection: &'a str) -> &'a str {
+        let Some(namespace) = &self.namespace else {
+            return collection;
+        };
+
+        collection
+            .strip_prefix(namespace.as_str())
+            .and_then(|rest| rest.strip_prefix('/'))
+            .unwrap_or(collection)
+    }
+
+    /// The collection id a user-typed mailbox name addresses.
+    ///
+    /// A full id is taken as itself, so a name the sync stored verbatim still
+    /// works; otherwise the name is matched against the account's mail
+    /// collections. A name matching none is refused naming what the account does
+    /// hold, rather than read as an empty mailbox, which is what a store lookup
+    /// on an id nothing was written under would silently produce.
+    pub(crate) fn hub_id(&self, mailbox: &str) -> Result<String> {
+        let collections = self.mail_collections()?;
+
+        if collections.iter().any(|id| id == mailbox) {
+            return Ok(mailbox.to_string());
+        }
+
+        let mut matches = collections
+            .iter()
+            .filter(|id| self.mailbox_name(id) == mailbox);
+
+        let Some(first) = matches.next() else {
+            let mut names: Vec<&str> = collections.iter().map(|id| self.mailbox_name(id)).collect();
+            names.sort_unstable();
+
+            bail!(
+                "Mailbox `{mailbox}` not found in the pimdir store, which holds: {}",
+                names.join(", "),
+            );
+        };
+
+        match matches.next() {
+            None => Ok(first.clone()),
+            Some(second) => bail!(
+                "Mailbox `{mailbox}` is ambiguous in the pimdir store (`{first}`, `{second}`); \
+                 name the collection in full, or set `pimdir.namespace`",
+            ),
+        }
+    }
+
+    /// The account's mail collection ids, in store order.
+    fn mail_collections(&self) -> Result<Vec<String>> {
+        Ok(self
+            .store
+            .list_collections_by_account(self.account.as_deref())
+            .map_err(|err| anyhow!("List pimdir collections: {err}"))?
+            .into_iter()
+            .filter(|collection| is_mail(&collection.kind))
+            .map(|collection| collection.id)
+            .collect())
+    }
+
+    // --- Reads -----------------------------------------------------------
+
+    /// Lists the account's mail collections, named the way their server names
+    /// them, sorted by name. `with_counts` fills `total` with the live item
+    /// count.
     pub fn list_mailboxes(&mut self, with_counts: bool) -> Result<Vec<Mailbox>> {
         let mut mailboxes = Vec::new();
-        for collection in self.store.list_collections()? {
-            if !collection.kind.is_empty() && collection.kind != MAIL_KIND {
-                continue;
-            }
+        for id in self.mail_collections()? {
             let total = if with_counts {
-                Some(self.store.count_items(&collection.id)?)
+                Some(
+                    self.store
+                        .count_items(&id)
+                        .map_err(|err| anyhow!("Count items in `{id}`: {err}"))?,
+                )
             } else {
                 None
             };
             mailboxes.push(Mailbox {
-                id: collection.id,
-                name: collection.name,
+                name: self.mailbox_name(&id).to_string(),
+                id,
                 total,
                 unread: None,
             });
@@ -100,8 +179,9 @@ impl PimdirClient {
         page_size: Option<u32>,
         _with_attachment: bool,
     ) -> Result<Vec<Envelope>> {
+        let collection = self.hub_id(mailbox)?;
         let mut envelopes: Vec<Envelope> = self
-            .scan_items(mailbox)?
+            .scan_items(&collection)?
             .iter()
             .map(envelope_from_item)
             .collect();
@@ -120,9 +200,10 @@ impl PimdirClient {
         page_size: Option<u32>,
         _with_attachment: bool,
     ) -> Result<Vec<Envelope>> {
+        let collection = self.hub_id(mailbox)?;
         let filter = query.and_then(|q| q.filter.as_ref());
         let mut hits: Vec<Envelope> = self
-            .scan_items(mailbox)?
+            .scan_items(&collection)?
             .iter()
             .map(envelope_from_item)
             .filter(|envelope| match filter {
@@ -134,11 +215,41 @@ impl PimdirClient {
         Ok(paginate(hits, page, page_size))
     }
 
+    /// How many messages the mailbox has queued for creation and not yet
+    /// synced (pimdir SPEC §15.4).
+    ///
+    /// A queued create has no public id until the store's owner applies it, so
+    /// it is not an envelope and does not list; the count is what a listing
+    /// reports instead, so a saved message that is not in the list reads as
+    /// queued rather than as lost.
+    pub fn queued_messages(&mut self, mailbox: &str) -> Result<usize> {
+        let collection = self.hub_id(mailbox)?;
+        self.store
+            .count_pending_creates(&collection)
+            .map_err(|err| anyhow!("Count queued messages in `{mailbox}`: {err}"))
+    }
+
+    /// The mailbox's queued creations, rendered as mail.
+    ///
+    /// The operator CLI is kind-agnostic and prints ids, hashes and flags; this
+    /// client holds the conventions and the blobs, so it reads the sender,
+    /// subject and date out of the action's own `v: 1` summary.
+    pub fn queued_envelopes(&mut self, mailbox: &str) -> Result<Vec<PimdirQueued>> {
+        let collection = self.hub_id(mailbox)?;
+        let queued = self
+            .store
+            .pending_creates(&collection)
+            .map_err(|err| anyhow!("List queued messages in `{mailbox}`: {err}"))?;
+
+        Ok(queued.iter().filter_map(queued_from_action).collect())
+    }
+
     /// Reads one message's raw bytes from its content-addressed blob. Fails with
     /// a clear "body not fetched" when the item is not hydrated to `Full` (no
     /// local body) — the client's cue to sync rather than a data-loss error.
     pub fn get_message(&mut self, mailbox: &str, id: &str, seen: bool) -> Result<Vec<u8>> {
-        let Some(item) = self.store.get_item(mailbox, parse_id(id)?)? else {
+        let collection = self.hub_id(mailbox)?;
+        let Some(item) = self.get(&collection, id)? else {
             bail!("Message `{id}` not found in `{mailbox}`");
         };
         let Some(hash) = item.object else {
@@ -153,7 +264,7 @@ impl PimdirClient {
             .ok_or_else(|| anyhow!("Body blob missing for `{id}` in `{mailbox}`"))?;
 
         // `--seen` stages a flag change; a read stays non-mutating by default,
-        // and a store not synced as this source must not fail the read.
+        // and a store that refuses the staging must not fail the read.
         if seen {
             let seen_flag = Flag::from_iana(IanaFlag::Seen);
             if let Err(err) = self.store_flags(mailbox, &[id], &[seen_flag], FlagOp::Add) {
@@ -164,9 +275,12 @@ impl PimdirClient {
         Ok(bytes)
     }
 
-    // --- Writes (staged mutations a later sync pushes) -------------------
+    // --- Writes (queued actions the store's owner applies) ---------------
 
     /// Adds, sets, or removes `flags` on an id set, staged as `SetFlags`.
+    ///
+    /// The action carries the whole replacement set, never a delta, so the owner
+    /// applying it twice lands the same state.
     pub fn store_flags(
         &mut self,
         mailbox: &str,
@@ -174,107 +288,145 @@ impl PimdirClient {
         flags: &[Flag],
         op: FlagOp,
     ) -> Result<()> {
+        let collection = self.hub_id(mailbox)?;
+        let mut producer = self.producer()?;
+        let now = stamp();
+
         for id in ids {
-            let placement = self.synced_placement(mailbox, id)?;
-            let next = apply_flag_op(&placement.flags, flags, op);
-            self.run_mutation(
-                mailbox,
-                ReplicaMutation::SetFlags {
-                    handle: placement.handle,
-                    flags: next,
-                },
-            )?;
+            let seq = self.seq(&collection, id)?;
+            let current = self
+                .get(&collection, id)?
+                .map(|item| item.flags)
+                .unwrap_or(ReplicaFlags::Unknown);
+            let action = PimdirAction::SetFlags {
+                seq,
+                flags: apply_flag_op(&current, flags, op),
+            };
+            producer
+                .enqueue(&collection, &action, None, &now)
+                .map_err(|err| anyhow!("Stage flags on `{id}` in `{mailbox}`: {err}"))?;
         }
         Ok(())
     }
 
     /// Appends `raw` to `mailbox` as a locally-authored item, staged as `Add`
     /// (the next sync uploads it). Returns the link id it is stored under.
+    ///
+    /// The body lands in the blob store first and durably, then the action
+    /// referencing it is enqueued: the queue row pins the object, so nothing
+    /// collects a body between the two.
     pub fn add_message(&mut self, mailbox: &str, flags: &[Flag], raw: Vec<u8>) -> Result<String> {
-        let (link_id, meta) = derive_link_and_meta(&raw);
-        let object = ReplicaObject {
-            hash: content_hash(&raw),
-            size: raw.len(),
+        let collection = self.hub_id(mailbox)?;
+        let derived = derive(&raw)?;
+
+        let hash = self.blobs.hash(&raw);
+        let writer = self.blobs.writer()?;
+        let size = write_blob(writer, &raw, &hash)?;
+
+        let mut producer = self.producer()?;
+        let action = PimdirAction::Add {
+            link_id: Some(derived.link_id.clone()),
+            flags: to_replica_flags(flags),
+            object: Some(hash),
+            meta: Some(derived.meta),
+            handle: None,
         };
-        let handle = ReplicaHandle(format!("local:{}", link_id.0));
-        let link = link_id.0.clone();
-        self.run_mutation(
-            mailbox,
-            ReplicaMutation::Add {
-                handle,
-                link_id,
-                flags: to_replica_flags(flags),
-                object,
-                body: raw,
-                meta: Some(meta),
-            },
-        )?;
-        // The store assigned the item its public id on insert; return that.
-        let seq = self
-            .store
-            .seq_for_link(mailbox, &link)?
-            .ok_or_else(|| anyhow!("Added message `{link}` in `{mailbox}` has no public id"))?;
-        Ok(seq.to_string())
+        producer
+            .enqueue(&collection, &action, Some(size), &stamp())
+            .map_err(|err| anyhow!("Stage add in `{mailbox}`: {err}"))?;
+
+        Ok(derived.link_id.0)
     }
 
     /// Copies each id from `from` to `to`, staged as `Copy` (a server-side copy
     /// on the next sync, no body re-upload).
     pub fn copy_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
-        for id in ids {
-            let placement = self.synced_placement(from, id)?;
-            let placeholder = ReplicaHandle(format!("copy:{}:{}", to, placement.handle.0));
-            self.run_mutation(
-                from,
-                ReplicaMutation::Copy {
-                    handle: placement.handle,
-                    target: ReplicaCollectionId(to.to_string()),
-                    placeholder,
-                },
-            )?;
-        }
-        Ok(ids.len())
+        self.refile(from, to, ids, |seq, target| PimdirAction::Copy {
+            seq,
+            to: target,
+        })
     }
 
     /// Moves each id from `from` to `to`, staged as `Move` (one server-side move
     /// on the next sync).
     pub fn move_messages(&mut self, from: &str, to: &str, ids: &[&str]) -> Result<usize> {
-        for id in ids {
-            let placement = self.synced_placement(from, id)?;
-            let placeholder = ReplicaHandle(format!("move:{}:{}", to, placement.handle.0));
-            self.run_mutation(
-                from,
-                ReplicaMutation::Move {
-                    handle: placement.handle,
-                    target: ReplicaCollectionId(to.to_string()),
-                    placeholder,
-                },
-            )?;
-        }
-        Ok(ids.len())
+        self.refile(from, to, ids, |seq, target| PimdirAction::Move {
+            seq,
+            to: target,
+        })
     }
 
-    /// Deletes each id from `mailbox`, staged as `Remove` (a tombstone the next
-    /// sync pushes as an expunge).
+    /// Deletes each id from `mailbox`, staged as `Remove` (the next sync pushes
+    /// it as the backend's own disposal).
     pub fn delete_messages(&mut self, mailbox: &str, ids: &[&str]) -> Result<()> {
+        let collection = self.hub_id(mailbox)?;
+        let mut producer = self.producer()?;
+        let now = stamp();
+
         for id in ids {
-            let placement = self.synced_placement(mailbox, id)?;
-            self.run_mutation(mailbox, ReplicaMutation::Remove(placement.handle))?;
+            let seq = self.seq(&collection, id)?;
+            producer
+                .enqueue(&collection, &PimdirAction::Remove { seq }, None, &now)
+                .map_err(|err| anyhow!("Stage delete of `{id}` in `{mailbox}`: {err}"))?;
         }
         Ok(())
     }
 
-    // --- Internals ------------------------------------------------------
+    // --- Internals -------------------------------------------------------
+
+    /// Stages one refiling action per id, `build` deciding whether the source
+    /// copy stays.
+    fn refile(
+        &mut self,
+        from: &str,
+        to: &str,
+        ids: &[&str],
+        build: fn(i64, ReplicaCollectionId) -> PimdirAction,
+    ) -> Result<usize> {
+        let source = self.hub_id(from)?;
+        let target = ReplicaCollectionId(self.hub_id(to)?);
+        let mut producer = self.producer()?;
+        let now = stamp();
+
+        for id in ids {
+            let seq = self.seq(&source, id)?;
+            producer
+                .enqueue(&source, &build(seq, target.clone()), None, &now)
+                .map_err(|err| anyhow!("Stage refile of `{id}` from `{from}` to `{to}`: {err}"))?;
+        }
+        Ok(ids.len())
+    }
+
+    /// The item behind a public id, or `None` when the collection holds none.
+    fn get(&self, collection: &str, id: &str) -> Result<Option<PimdirItem>> {
+        self.store
+            .get_item(collection, parse_id(id)?)
+            .map_err(|err| anyhow!("Read `{id}` in `{collection}`: {err}"))
+    }
+
+    /// The public id an action addresses, checked against the collection so a
+    /// stale id is refused here rather than parked by the owner much later.
+    fn seq(&self, collection: &str, id: &str) -> Result<i64> {
+        match self.get(collection, id)? {
+            Some(item) => Ok(item.seq),
+            None => bail!(
+                "Message `{id}` not found in `{}`",
+                self.mailbox_name(collection)
+            ),
+        }
+    }
 
     /// Pulls every live item of a collection by keyset paging (the read API is
     /// paginated; the shared list/search commands sort and paginate in memory,
     /// as the file backends do).
-    fn scan_items(&self, mailbox: &str) -> Result<Vec<PimdirItem>> {
+    fn scan_items(&self, collection: &str) -> Result<Vec<PimdirItem>> {
         let mut all = Vec::new();
         let mut cursor: Option<String> = None;
         loop {
             let page = self
                 .store
-                .list_items(mailbox, cursor.as_deref(), SCAN_BATCH)?;
+                .list_items(collection, cursor.as_deref(), SCAN_BATCH)
+                .map_err(|err| anyhow!("List items in `{collection}`: {err}"))?;
             let n = page.len();
             if let Some(last) = page.last() {
                 cursor = Some(last.link_id.0.clone());
@@ -285,64 +437,6 @@ impl PimdirClient {
             }
         }
         Ok(all)
-    }
-
-    /// The source's placement for the public id `id`, guaranteed to carry a sync
-    /// base.
-    ///
-    /// Resolves the public `seq` to the internal `link_id` first, then finds the
-    /// placement by link id. A change on a placement with no base would stage as a
-    /// fresh create rather than an edit and no sync would carry it, so this is the
-    /// guard that turns a misconfigured source (the store was never synced as
-    /// `self.source`) into a clear error instead of a silent no-op.
-    fn synced_placement(&self, collection: &str, id: &str) -> Result<ReplicaPlacement> {
-        let seq = parse_id(id)?;
-        let link_id = self
-            .store
-            .get_item(collection, seq)?
-            .map(|item| item.link_id.0)
-            .ok_or_else(|| anyhow!("Message `{id}` not found in `{collection}`"))?;
-        let loaded = self
-            .store
-            .load(&ReplicaCollectionId(collection.to_string()))?;
-        let placement = loaded
-            .placements
-            .into_iter()
-            .find(|p| p.link_id.as_ref().map(|l| l.0.as_str()) == Some(link_id.as_str()))
-            .ok_or_else(|| anyhow!("Message `{id}` not found in `{collection}`"))?;
-        if placement.base.is_none() {
-            bail!(
-                "`{collection}` was not synced as source `{}`, so `{id}` cannot be edited \
-                 here; set `pimdir.source` to the sync source and sync first",
-                self.source
-            );
-        }
-        Ok(placement)
-    }
-
-    /// Drives a `mutate` coroutine to completion against the store: it only ever
-    /// asks to load the collection and to write the staged ops.
-    fn run_mutation(&mut self, collection: &str, mutation: ReplicaMutation) -> Result<()> {
-        let mut coroutine = ReplicaMutate::new(collection.to_string(), mutation);
-        let mut arg: Option<ReplicaArg> = None;
-        loop {
-            match coroutine.resume(arg.take()) {
-                ReplicaCoroutineState::Yielded(ReplicaYield::WantsLoad(collection)) => {
-                    let loaded = self.store.load(&collection)?;
-                    arg = Some(ReplicaArg::Load(loaded));
-                }
-                ReplicaCoroutineState::Yielded(ReplicaYield::WantsWrite(ops)) => {
-                    self.store.write(ops)?;
-                    arg = Some(ReplicaArg::Write);
-                }
-                ReplicaCoroutineState::Yielded(_) => {
-                    bail!("pimdir mutate asked for an unexpected step");
-                }
-                ReplicaCoroutineState::Complete(result) => {
-                    return result.map_err(|err| anyhow!("pimdir mutate failed: {err}"));
-                }
-            }
-        }
     }
 }
 
@@ -357,10 +451,14 @@ fn envelope_from_item(item: &PimdirItem) -> Envelope {
 
     let flags = item
         .flags
-        .0
-        .iter()
-        .map(|raw| Flag::from_raw(raw.clone()))
-        .collect();
+        .known()
+        .map(|flags| {
+            flags
+                .iter()
+                .map(|raw| Flag::from_raw(raw.clone()))
+                .collect()
+        })
+        .unwrap_or_default();
     let from = view
         .from
         .map(|email| vec![Address { name: None, email }])
@@ -375,7 +473,7 @@ fn envelope_from_item(item: &PimdirItem) -> Envelope {
         .and_then(|d| DateTime::parse_from_rfc3339(d).ok());
 
     Envelope {
-        // The public id: a short per-collection integer, not the long link id.
+        // The public id: a short store-global integer, not the long link id.
         id: item.seq.to_string(),
         message_id: view.message_id,
         in_reply_to: view.in_reply_to,
@@ -389,112 +487,109 @@ fn envelope_from_item(item: &PimdirItem) -> Envelope {
     }
 }
 
-/// Derives the link id and `v: 1` meta of a to-be-added raw message, matching
-/// Neverest's writer so an added message deduplicates against a synced one.
-fn derive_link_and_meta(raw: &[u8]) -> (ReplicaLinkId, ReplicaMeta) {
-    let parsed = MessageParser::default().parse(raw);
-    let message_id = parsed.as_ref().and_then(|m| m.message_id());
-    let in_reply_to: Vec<String> = parsed
-        .as_ref()
-        .map(|m| match m.in_reply_to() {
-            HeaderValue::TextList(ids) => ids
-                .iter()
-                .filter_map(|id| normalize_message_id(id))
-                .collect(),
-            HeaderValue::Text(id) => parse_message_ids(id),
-            _ => Vec::new(),
-        })
-        .unwrap_or_default();
-    let subject = parsed.as_ref().and_then(|m| m.subject()).unwrap_or("");
-    let from = parsed
-        .as_ref()
-        .and_then(|m| m.from())
-        .and_then(first_address);
-    let to = parsed.as_ref().and_then(|m| m.to()).and_then(first_address);
-    let date = parsed
-        .as_ref()
-        .and_then(|m| m.date())
-        .map(|d| d.to_rfc3339());
-
-    let link_id = match message_id {
-        Some(mid) if !mid.trim().is_empty() => {
-            ReplicaLinkId(format!("mid:{}", mid.trim().trim_matches(['<', '>'])))
-        }
-        _ => ReplicaLinkId(format!(
-            "alt:{subject}|{}|{}",
-            date.as_deref().unwrap_or(""),
-            from.as_deref().unwrap_or("")
-        )),
-    };
-
-    #[derive(serde::Serialize)]
-    struct MetaWrite<'a> {
-        v: u8,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        message_id: Option<&'a str>,
-        #[serde(skip_serializing_if = "<[String]>::is_empty")]
-        in_reply_to: &'a [String],
-        subject: &'a str,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        from: Option<&'a str>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        to: Option<&'a str>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        date: Option<&'a str>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        size: Option<u64>,
-    }
-    let summary = MetaWrite {
-        v: 1,
-        message_id,
-        in_reply_to: &in_reply_to,
-        subject,
-        from: from.as_deref(),
-        to: to.as_deref(),
-        date: date.as_deref(),
-        size: (!raw.is_empty()).then_some(raw.len() as u64),
-    };
-    let meta = ReplicaMeta(serde_json::to_string(&summary).unwrap_or_default());
-    (link_id, meta)
+/// One queued creation, as `pimdir queue list` shows it: the row an operator
+/// acts on, plus the mail the action carries.
+#[derive(Clone, Debug)]
+pub struct PimdirQueued {
+    /// The queue row id, which `pimdir queue cancel` takes.
+    pub id: i64,
+    /// The RFC 3339 instant the row was enqueued, stamped by the store.
+    pub created_at: String,
+    /// The process that staged it.
+    pub producer: String,
+    /// The message the action carries, built from its `v: 1` summary. It has
+    /// no `id`: a create has none until the owner applies it.
+    pub envelope: Envelope,
 }
 
-/// The first address of a mail-parser header group, as a plain string.
-fn first_address(addrs: &MailParserAddress<'_>) -> Option<String> {
-    addrs
-        .clone()
-        .into_list()
-        .into_iter()
-        .find_map(|a| a.address.map(|s| s.into_owned()))
+/// Builds a queued row from a pending `Add`, skipping any other kind.
+///
+/// The envelope keeps an empty id on purpose. A create has no public id yet,
+/// and putting the queue row id there would be an identifier from another
+/// space in the field every command reads back.
+fn queued_from_action(queued: &PimdirPendingAction) -> Option<PimdirQueued> {
+    let PimdirAction::Add { flags, meta, .. } = &queued.action else {
+        return None;
+    };
+
+    let item = PimdirItem {
+        seq: 0,
+        link_id: ReplicaLinkId(String::new()),
+        flags: flags.clone(),
+        meta: meta.clone(),
+        sort_key: String::new(),
+        object: None,
+        level: ReplicaLevel::Meta,
+        retention: None,
+    };
+    let mut envelope = envelope_from_item(&item);
+    envelope.id = String::new();
+
+    Some(PimdirQueued {
+        id: queued.id,
+        created_at: queued.created_at.clone(),
+        producer: queued.producer.clone(),
+        envelope,
+    })
+}
+
+/// Derives the link id, meta and sort key of a to-be-added raw message.
+///
+/// Through [`io_pimdir::conventions`], the one implementation of pimdir SPEC
+/// Annex A: two writers of one collection disagreeing about the id of a message
+/// with no `Message-ID` link it twice and store its body twice, so the sync
+/// engine and this client must derive it identically, not merely similarly.
+fn derive(raw: &[u8]) -> Result<PimdirDerivation> {
+    conventions::derive(MAIL_KIND, raw)
+        .ok_or_else(|| anyhow!("pimdir has no conventions for `{MAIL_KIND}`"))
+}
+
+/// Streams `raw` into the blob store under `hash` and commits it durably,
+/// returning the stored size.
+fn write_blob(
+    mut writer: io_pimdir::PimdirBlobWriter,
+    raw: &[u8],
+    hash: &io_replica::object::ReplicaHash,
+) -> Result<u64> {
+    use std::io::Write;
+
+    writer.write_all(raw)?;
+    Ok(writer.commit(hash)?)
+}
+
+/// Now, as the RFC 3339 stamp a queue row records.
+fn stamp() -> String {
+    Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true)
 }
 
 /// Applies a flag op to a base set, producing the replacement set `SetFlags`
-/// stores.
+/// stores. An unknown base holds no markers to build on, so it reads as empty.
 fn apply_flag_op(current: &ReplicaFlags, flags: &[Flag], op: FlagOp) -> ReplicaFlags {
     let incoming = flags.iter().map(|f| f.raw().to_string());
     match op {
-        FlagOp::Set => ReplicaFlags(incoming.collect()),
+        FlagOp::Set => ReplicaFlags::Known(incoming.collect()),
         FlagOp::Add => {
-            let mut set = current.0.clone();
+            let mut set = current.known().cloned().unwrap_or_default();
             set.extend(incoming);
-            ReplicaFlags(set)
+            ReplicaFlags::Known(set)
         }
         FlagOp::Remove => {
-            let mut set = current.0.clone();
+            let mut set = current.known().cloned().unwrap_or_default();
             for flag in incoming {
                 set.remove(&flag);
             }
-            ReplicaFlags(set)
+            ReplicaFlags::Known(set)
         }
     }
 }
 
 /// A shared flag slice to replica flags (raw wire spellings).
 fn to_replica_flags(flags: &[Flag]) -> ReplicaFlags {
-    ReplicaFlags(flags.iter().map(|f| f.raw().to_string()).collect())
+    ReplicaFlags::Known(flags.iter().map(|f| f.raw().to_string()).collect())
 }
 
-/// Parses a message id — the public per-collection `seq` (a small integer) — from
-/// the CLI, with a clear error for a non-numeric one.
+/// Parses a message id — the public `seq` (a small integer) — from the CLI, with
+/// a clear error for a non-numeric one.
 fn parse_id(id: &str) -> Result<i64> {
     id.parse::<i64>()
         .map_err(|_| anyhow!("Invalid message id `{id}` (expected a number)"))
@@ -518,20 +613,24 @@ fn paginate<T>(items: Vec<T>, page: Option<u32>, page_size: Option<u32>) -> Vec<
 
 #[cfg(test)]
 mod tests {
+    use io_replica::placement::{ReplicaLinkId, ReplicaMeta};
+
     use super::*;
 
     #[test]
     fn envelope_is_built_from_meta_without_a_body() {
         let item = PimdirItem {
             seq: 42,
-            link_id: ReplicaLinkId("mid:x@y".into()),
-            flags: ReplicaFlags(["\\Seen".to_string()].into_iter().collect()),
+            link_id: ReplicaLinkId("x@y".into()),
+            flags: ReplicaFlags::Known(["\\Seen".to_string()].into_iter().collect()),
             meta: Some(ReplicaMeta(
                 r#"{"v":1,"message_id":"x@y","subject":"Hi","from":"a@x.org","to":"b@x.org","size":99}"#
                     .into(),
             )),
+            sort_key: String::new(),
             object: None,
             level: io_replica::placement::ReplicaLevel::Meta,
+            retention: None,
         };
         let envelope = envelope_from_item(&item);
         assert_eq!(envelope.id, "42");
@@ -542,18 +641,52 @@ mod tests {
         assert!(envelope.flags.iter().any(|f| f.raw() == "\\Seen"));
     }
 
+    /// Markers nobody has read are not markers nobody holds: an item enumerated
+    /// but never fetched must not render as a message with no flags at all.
     #[test]
-    fn add_derives_a_mid_link_and_v1_meta() {
+    fn an_unread_flag_set_renders_as_no_flags_rather_than_panicking() {
+        let item = PimdirItem {
+            seq: 1,
+            link_id: ReplicaLinkId("x@y".into()),
+            flags: ReplicaFlags::Unknown,
+            meta: None,
+            sort_key: String::new(),
+            object: None,
+            level: io_replica::placement::ReplicaLevel::Probed,
+            retention: None,
+        };
+        assert!(envelope_from_item(&item).flags.is_empty());
+    }
+
+    /// An added message links the way the store spells it: the bare
+    /// `Message-ID` pimdir SPEC Annex A.1 gives, which is what a synced copy
+    /// carries, so an append deduplicates against it rather than linking one
+    /// message twice and storing its body twice.
+    #[test]
+    fn an_added_message_links_the_way_the_store_spells_it() {
         let raw = b"Message-ID: <new@host>\r\nSubject: Compose\r\nFrom: a@x.org\r\n\r\nbody";
-        let (link, meta) = derive_link_and_meta(raw);
-        assert_eq!(link.0, "mid:new@host");
-        assert!(meta.0.contains("\"v\":1"));
-        assert!(meta.0.contains("Compose"));
+        let derived = derive(raw).unwrap();
+        assert_eq!(derived.link_id.0, "new@host");
+        assert!(derived.meta.0.contains("\"v\":1"));
+        assert!(derived.meta.0.contains("Compose"));
+    }
+
+    /// A message with no `Message-ID` falls back to the marked id, which is
+    /// the one case a prefix names.
+    #[test]
+    fn a_message_without_a_message_id_keeps_the_alt_fallback() {
+        let raw = b"Subject: No id\r\nFrom: a@x.org\r\n\r\nbody";
+        let derived = derive(raw).unwrap();
+        assert!(
+            derived.link_id.0.starts_with("alt:"),
+            "got {}",
+            derived.link_id.0,
+        );
     }
 
     #[test]
     fn flag_ops_add_set_and_remove() {
-        let base = ReplicaFlags(["\\Seen".to_string()].into_iter().collect());
+        let base = ReplicaFlags::Known(["\\Seen".to_string()].into_iter().collect());
         let flagged = [Flag::from_raw("\\Flagged")];
         let added = apply_flag_op(&base, &flagged, FlagOp::Add);
         assert!(added.contains("\\Seen") && added.contains("\\Flagged"));
@@ -562,5 +695,63 @@ mod tests {
         let seen = [Flag::from_raw("\\Seen")];
         let removed = apply_flag_op(&base, &seen, FlagOp::Remove);
         assert!(!removed.contains("\\Seen"));
+    }
+
+    /// An add onto an unknown set must not carry the unknown forward: the action
+    /// replaces the set, and an unknown one would erase the markers a sync knows.
+    #[test]
+    fn a_flag_op_on_an_unknown_set_stages_a_known_one() {
+        let staged = apply_flag_op(
+            &ReplicaFlags::Unknown,
+            &[Flag::from_raw("\\Seen")],
+            FlagOp::Add,
+        );
+        assert_eq!(staged.known().map(|f| f.len()), Some(1));
+        assert!(staged.contains("\\Seen"));
+    }
+    #[test]
+    fn a_queued_creation_renders_as_mail_with_no_id() {
+        let queued = PimdirPendingAction {
+            id: 7,
+            created_at: "2026-08-27T10:00:00Z".into(),
+            producer: "himalaya".into(),
+            action: PimdirAction::Add {
+                link_id: Some(ReplicaLinkId("draft@x.org".into())),
+                flags: ReplicaFlags::Known(["\\Draft".to_string()].into_iter().collect()),
+                object: None,
+                meta: Some(ReplicaMeta(
+                    r#"{"v":1,"message_id":"draft@x.org","subject":"Re: lunch","to":"alice@x.org","size":12}"#
+                        .into(),
+                )),
+                handle: None,
+            },
+            attempts: 0,
+        };
+
+        let queued = queued_from_action(&queued).unwrap();
+
+        assert_eq!(queued.id, 7);
+        assert_eq!(queued.created_at, "2026-08-27T10:00:00Z");
+        assert_eq!(queued.envelope.subject, "Re: lunch");
+        assert_eq!(queued.envelope.to[0].email, "alice@x.org");
+        assert_eq!(queued.envelope.message_id.as_deref(), Some("draft@x.org"));
+        // The row id names an action, not a message: putting it in `id` would
+        // be an identifier from another space in the field commands read back.
+        assert!(queued.envelope.id.is_empty());
+    }
+
+    #[test]
+    fn only_a_queued_creation_renders_as_mail() {
+        let queued = PimdirPendingAction {
+            id: 8,
+            created_at: "2026-08-27T10:00:00Z".into(),
+            producer: "himalaya".into(),
+            action: PimdirAction::Remove { seq: 42 },
+            attempts: 0,
+        };
+
+        // A staged removal addresses a message that exists, so it shows in the
+        // ordinary listing (as an absence) and has nothing to render here.
+        assert!(queued_from_action(&queued).is_none());
     }
 }

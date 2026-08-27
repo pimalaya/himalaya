@@ -6,7 +6,7 @@ use crate::{
     account::context::Account,
     msgraph::{
         client::MsgraphClient,
-        message::{
+        messages::{
             copy::MsgraphMessageCopyCommand, create::MsgraphMessageCreateCommand,
             delete::MsgraphMessageDeleteCommand, get::MsgraphMessageGetCommand,
             list::MsgraphMessageListCommand, r#move::MsgraphMessageMoveCommand,
@@ -18,7 +18,7 @@ use crate::{
 /// Manage Microsoft Graph messages (`me.messages`).
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
-pub enum MsgraphMessageCommand {
+pub enum MsgraphMessagesCommand {
     List(MsgraphMessageListCommand),
     Get(MsgraphMessageGetCommand),
     Create(MsgraphMessageCreateCommand),
@@ -31,7 +31,7 @@ pub enum MsgraphMessageCommand {
     Delete(MsgraphMessageDeleteCommand),
 }
 
-impl MsgraphMessageCommand {
+impl MsgraphMessagesCommand {
     pub fn execute(
         self,
         printer: &mut impl Printer,
