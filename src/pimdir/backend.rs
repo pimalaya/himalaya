@@ -315,6 +315,17 @@ impl PimdirClient {
     /// The body lands in the blob store first and durably, then the action
     /// referencing it is enqueued: the queue row pins the object, so nothing
     /// collects a body between the two.
+    ///
+    /// The link id is the bare `Message-ID` [`derive`] gives, and a staged add
+    /// whose link id the collection already holds parks (pimdir SPEC §15.3):
+    /// it neither deduplicates against the stored copy nor mints a key of its
+    /// own. The store answers the two producers differently on purpose.
+    /// Minting is its answer to what a source hands over, a replica owing the
+    /// collection what the collection holds, so a mailbox holding one
+    /// `Message-ID` twice keeps both items (SPEC §9). Parking is its answer to
+    /// a producer authoring a message the collection already has, which named
+    /// a key it does not own and is told so rather than having its message
+    /// filed under a key it never asked for.
     pub fn add_message(&mut self, mailbox: &str, flags: &[Flag], raw: Vec<u8>) -> Result<String> {
         let collection = self.hub_id(mailbox)?;
         let derived = derive(&raw)?;
@@ -613,6 +624,8 @@ fn paginate<T>(items: Vec<T>, page: Option<u32>, page_size: Option<u32>) -> Vec<
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use io_replica::placement::{ReplicaLinkId, ReplicaMeta};
 
     use super::*;
@@ -641,6 +654,38 @@ mod tests {
         assert!(envelope.flags.iter().any(|f| f.raw() == "\\Seen"));
     }
 
+    /// A mailbox holding one `Message-ID` twice is ordinary (a double delivery,
+    /// a retried append, a restore, a copy of a sent message), and the store
+    /// keys the second copy apart under a minted `dup:<hint>#<handle>` (pimdir
+    /// SPEC §9) rather than keeping one of the two. Both project as ordinary
+    /// envelopes: the id a user sees is the `seq`, which differs between them,
+    /// so neither hides the other, and the minted key never shows.
+    #[test]
+    fn two_items_sharing_a_message_id_project_two_public_ids() {
+        let item = |seq, link_id: &str| PimdirItem {
+            seq,
+            link_id: ReplicaLinkId(link_id.into()),
+            flags: ReplicaFlags::Known(BTreeSet::new()),
+            meta: Some(ReplicaMeta(
+                r#"{"v":1,"message_id":"twice@host","subject":"Twice","from":"a@x.org","size":10}"#
+                    .into(),
+            )),
+            sort_key: String::new(),
+            object: None,
+            level: ReplicaLevel::Meta,
+            retention: None,
+        };
+
+        let bare = envelope_from_item(&item(11, "twice@host"));
+        let minted = envelope_from_item(&item(12, "dup:twice@host#1174"));
+
+        assert_eq!(bare.message_id.as_deref(), Some("twice@host"));
+        assert_eq!(bare.message_id, minted.message_id);
+        assert_eq!(bare.id, "11");
+        assert_eq!(minted.id, "12");
+        assert!(!minted.id.contains("dup:"), "got {}", minted.id);
+    }
+
     /// Markers nobody has read are not markers nobody holds: an item enumerated
     /// but never fetched must not render as a message with no flags at all.
     #[test]
@@ -659,9 +704,12 @@ mod tests {
     }
 
     /// An added message links the way the store spells it: the bare
-    /// `Message-ID` pimdir SPEC Annex A.1 gives, which is what a synced copy
-    /// carries, so an append deduplicates against it rather than linking one
-    /// message twice and storing its body twice.
+    /// `Message-ID` pimdir SPEC Annex A.1 gives, with nothing prepended, which
+    /// is what the sync engine derives for the same body. Staging any other
+    /// spelling would file a message the collection already holds as a second
+    /// item instead of parking it (pimdir SPEC §15.3), the answer the store
+    /// owes a producer that named a key it does not own; minting a second key
+    /// is what it does for a source, not for this client.
     #[test]
     fn an_added_message_links_the_way_the_store_spells_it() {
         let raw = b"Message-ID: <new@host>\r\nSubject: Compose\r\nFrom: a@x.org\r\n\r\nbody";

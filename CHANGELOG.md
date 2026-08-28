@@ -34,6 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed a duplicated message disappearing from the `pimdir` backend's listing.
+
+  A mailbox holding one `Message-ID` twice, which a double delivery, a retried append, a restore or a copy of a sent message all produce, used to resolve to a single stored item: one copy was kept, the other was recorded on it and mirrored nowhere, so it showed in no listing and could not be read. The store now gives the second copy a key of its own (pimdir SPEC §9), so both list, each with its own public id and neither marked, which is what the mailbox holds. Whether they are duplicates worth removing is the server's state and the user's call, so nothing here merges or hides one.
+
+  Saving a locally-composed message is unchanged: an add naming an id the mailbox already holds parks in the queue instead, the store being liberal with what a sync hands it and strict with what a producer creates.
+
 - Fixed `completion` writing files instead of printing the completion script to the standard output ([#736]).
 
   The script has been documented as going to stdout since the command exists, but the directory it fell back on turned `himalaya completion bash` into a file-writing command printing a report, which broke every packaging helper capturing stdout, Homebrew's `generate_completions_from_executable` among them. Giving `--dir` keeps writing one script per shell.

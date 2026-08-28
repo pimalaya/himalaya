@@ -38,8 +38,17 @@ Keyword reading is not a round trip: no command can name a custom keyword, so a 
 
 A sidecar that is absent, unreadable or disabled SHALL yield no keywords rather than fail the listing, since a mailbox without one is the normal case rather than an error.
 
+### Requirement: A Message-ID is not an address
+The pimdir backend SHALL NOT assume an item's link id is the `Message-ID` its body carries, nor that a `Message-ID` identifies at most one message in a mailbox. A store may hold two messages of one mailbox sharing a `Message-ID`, keyed apart by the store (pimdir SPEC §9), and both SHALL list, read and act as ordinary messages, each with its own public id and neither marked.
+
+What stays unique is the key and the public id: `(collection, link_id)` still names one item and `seq` still names one message. What ends is the link id being derivable from the body, so a read that re-derives an identity in order to address a row is addressing an unknown number of them.
+
+A mailbox holding one `Message-ID` twice is ordinary (a double delivery, a retried append, a restore, a copy of a sent message), and the store now keeps both rather than one. Showing one of them, or resolving an identity to whichever row came first, hides a message the server holds.
+
 ### Requirement: pimdir shows a short public id
 The pimdir backend SHALL show and accept each message's public id (`items.seq`, a small store-assigned integer, the same across every mailbox the message is filed in) as its `Envelope.id`, not the internal `link_id`. It SHALL check the id against the collection before reading a body or staging an action, and SHALL fail clearly on a non-numeric or unknown one. `add_message` SHALL return the link id it staged: a queued create has no `seq` yet, the store assigning one when its owner applies the action.
+
+Addressing by the public id is what keeps two duplicated messages distinguishable: they carry one `Message-ID` between them and have two `seq`s, so an address derived from the body would be ambiguous where a `seq` is not.
 
 ### Requirement: pimdir names a mailbox the way its server does
 A hub collection is keyed `<namespace>/<name>`, so the pimdir backend SHALL show and accept the name without the namespace: the collection `imap/INBOX` is the mailbox `INBOX`. The namespace SHALL be derived when every mail collection of the account shares one prefix, which a single-source account always does; `pimdir.namespace` overrides it, and a store whose mail collections span two namespaces keeps whole ids as names rather than collapsing two mailboxes onto one.
@@ -63,7 +72,7 @@ A write SHALL be staged as a queued `PimdirAction` through a producer handle (`s
 
 `SetFlags` carries the whole replacement set, so applying it twice lands the same state; a set the store reports as unknown contributes no markers rather than staging an unknown one, which would erase what a sync knows. pimdir has no native trash.
 
-An added message SHALL derive its link id, summary and sort key through `io_pimdir::conventions`, the one implementation of SPEC Annex A, and SHALL spell the link id the way the store it writes to already does, so an added message deduplicates against a synced copy rather than linking it a second time.
+An added message SHALL derive its link id, summary and sort key through `io_pimdir::conventions`, the one implementation of SPEC Annex A, which is the bare `Message-ID` with nothing prepended. A staged `Add` whose link id the collection already holds SHALL park (pimdir SPEC §15.3): it neither deduplicates against the stored copy nor mints a second key. Minting is the store's answer to what a source hands over; parking is its answer to a producer authoring a message the collection already has.
 
 ### Requirement: A queued creation is reported, not listed
 A queued creation has no public id until the store's owner applies it, so the pimdir backend SHALL NOT project one as an envelope, and SHALL NOT put a placeholder in `Envelope.id`. `add_message` returns the link id it staged, which identifies the creation across the window.
