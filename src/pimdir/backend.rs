@@ -11,15 +11,18 @@
 //! never collects, so a staged flag change cannot race a sync mid-hydration. The
 //! owner drains the queue on its next run and derives the push from there.
 //!
-//! A mailbox is named the way its server names it. The sync binds a source's
-//! collections under a namespace, so `INBOX` is stored as `imap/INBOX`; the
-//! prefix comes off for display and goes back on to address the store, at
-//! [`PimdirClient::hub_id`] and [`PimdirClient::mailbox_name`].
+//! A mailbox is its collection id, verbatim: the sync binds a source's
+//! collections under a namespace, so the mailbox a server calls `INBOX` is
+//! `imap/INBOX` here and is addressed by that. The id is opaque to the store,
+//! which parses it nowhere, so shortening it would be a guess at the sync's
+//! convention rather than a lookup. [`PimdirClient::hub_id`] checks one against
+//! the account's collections, and `[mailbox.alias]` is how a user avoids typing
+//! it, as for the JMAP ids it resembles.
 
 use anyhow::{Result, anyhow, bail};
 use chrono::{DateTime, SecondsFormat, Utc};
 use io_pimdir::{
-    PimdirItem, PimdirPendingAction,
+    PimdirCollection, PimdirItem, PimdirPendingAction,
     codec::PimdirAction,
     conventions::{self, PimdirDerivation},
 };
@@ -78,95 +81,68 @@ struct MetaView {
 impl PimdirClient {
     // --- Mailbox naming --------------------------------------------------
 
-    /// The name a mailbox goes by: its collection id without the namespace.
+    /// The collection a user-typed mailbox addresses, which is the mailbox
+    /// itself: a pimdir mailbox is its collection id, verbatim.
     ///
-    /// A name that merely starts with the namespace keeps its own spelling, only
-    /// the `<namespace>/` prefix being one.
-    pub(crate) fn mailbox_name<'a>(&self, collection: &'a str) -> &'a str {
-        let Some(namespace) = &self.namespace else {
-            return collection;
-        };
-
-        collection
-            .strip_prefix(namespace.as_str())
-            .and_then(|rest| rest.strip_prefix('/'))
-            .unwrap_or(collection)
-    }
-
-    /// The collection id a user-typed mailbox name addresses.
-    ///
-    /// A full id is taken as itself, so a name the sync stored verbatim still
-    /// works; otherwise the name is matched against the account's mail
-    /// collections. A name matching none is refused naming what the account does
-    /// hold, rather than read as an empty mailbox, which is what a store lookup
-    /// on an id nothing was written under would silently produce.
+    /// The id is checked against the account's mail collections rather than
+    /// passed through. An id nothing was written under reads as a mailbox that
+    /// exists and is empty, so an unknown one is refused here, naming what the
+    /// account does hold.
     pub(crate) fn hub_id(&self, mailbox: &str) -> Result<String> {
-        let collections = self.mail_collections()?;
+        let mut ids: Vec<String> = self
+            .mail_collections()?
+            .into_iter()
+            .map(|collection| collection.id)
+            .collect();
 
-        if collections.iter().any(|id| id == mailbox) {
+        if ids.iter().any(|id| id == mailbox) {
             return Ok(mailbox.to_string());
         }
 
-        let mut matches = collections
-            .iter()
-            .filter(|id| self.mailbox_name(id) == mailbox);
+        ids.sort();
 
-        let Some(first) = matches.next() else {
-            let mut names: Vec<&str> = collections.iter().map(|id| self.mailbox_name(id)).collect();
-            names.sort_unstable();
-
-            bail!(
-                "Mailbox `{mailbox}` not found in the pimdir store, which holds: {}",
-                names.join(", "),
-            );
-        };
-
-        match matches.next() {
-            None => Ok(first.clone()),
-            Some(second) => bail!(
-                "Mailbox `{mailbox}` is ambiguous in the pimdir store (`{first}`, `{second}`); \
-                 name the collection in full, or set `pimdir.namespace`",
-            ),
-        }
+        bail!(
+            "Mailbox `{mailbox}` not found in the pimdir store, which holds: {}",
+            ids.join(", "),
+        )
     }
 
-    /// The account's mail collection ids, in store order.
-    fn mail_collections(&self) -> Result<Vec<String>> {
+    /// The account's mail collections, in store order.
+    fn mail_collections(&self) -> Result<Vec<PimdirCollection>> {
         Ok(self
             .store
             .list_collections_by_account(self.account.as_deref())
             .map_err(|err| anyhow!("List pimdir collections: {err}"))?
             .into_iter()
             .filter(|collection| is_mail(&collection.kind))
-            .map(|collection| collection.id)
             .collect())
     }
 
     // --- Reads -----------------------------------------------------------
 
-    /// Lists the account's mail collections, named the way their server names
-    /// them, sorted by name. `with_counts` fills `total` with the live item
-    /// count.
+    /// Lists the account's mail collections, each addressed by its collection
+    /// id and named by the collection row's own name, sorted by id.
+    /// `with_counts` fills `total` with the live item count.
     pub fn list_mailboxes(&mut self, with_counts: bool) -> Result<Vec<Mailbox>> {
         let mut mailboxes = Vec::new();
-        for id in self.mail_collections()? {
+        for collection in self.mail_collections()? {
             let total = if with_counts {
                 Some(
                     self.store
-                        .count_items(&id)
-                        .map_err(|err| anyhow!("Count items in `{id}`: {err}"))?,
+                        .count_items(&collection.id)
+                        .map_err(|err| anyhow!("Count items in `{}`: {err}", collection.id))?,
                 )
             } else {
                 None
             };
             mailboxes.push(Mailbox {
-                name: self.mailbox_name(&id).to_string(),
-                id,
+                id: collection.id,
+                name: collection.name,
                 total,
                 unread: None,
             });
         }
-        mailboxes.sort_by(|a, b| a.name.cmp(&b.name));
+        mailboxes.sort_by(|a, b| a.id.cmp(&b.id));
         Ok(mailboxes)
     }
 
@@ -420,10 +396,7 @@ impl PimdirClient {
     fn seq(&self, collection: &str, id: &str) -> Result<i64> {
         match self.get(collection, id)? {
             Some(item) => Ok(item.seq),
-            None => bail!(
-                "Message `{id}` not found in `{}`",
-                self.mailbox_name(collection)
-            ),
+            None => bail!("Message `{id}` not found in `{}`", collection),
         }
     }
 

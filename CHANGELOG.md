@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING**: a `pimdir` mailbox is now its collection id, verbatim: `-m imap/INBOX` where `-m INBOX` used to work, and a listing shows `imap/INBOX` in both columns. `pimdir.namespace` is removed.
+
+  The sync engine binds a source's collections under a namespace, and Himalaya used to strip it back off, so one mailbox answered to two spellings. The store cannot be asked where that prefix ends: a collection id is opaque to it, parsed nowhere, and hierarchy is a parent link rather than a separator, so the stripping was a guess at the sync engine's convention that needed a config key wherever it could not decide. The id is now the only spelling, as it already is for JMAP's opaque ids, and `mailbox.alias.inbox = "imap/INBOX"` is how you stop typing it.
+
 - **BREAKING**: renamed the plural commands that name no vendor resource to their singular, the plural staying as a hidden alias: `imap flags`, `maildir messages`, `maildir flags`, `m2dir messages` and `m2dir flags` become `imap flag`, `maildir message`, `maildir flag`, `m2dir message` and `m2dir flag`. Every old spelling keeps working, hidden from `--help`.
 
   A command mirroring a vendor API resource keeps that API's spelling instead, so `gmail labels`, `messages`, `attachments`, `drafts`, `threads`, `settings` (with `filters`, `forwarding-addresses` and `delegates` under it) are unchanged. The `msgraph` family, singular where Graph is plural, is aligned onto Graph instead: `msgraph mail-folder`, `message` and `attachment` become `mail-folders`, `messages` and `attachments`, joining the `child-folders` that already sat under the first. Every singular spelling stays as a hidden alias, where it used to be shown beside the plural. `completion`, `manual` and `json-schema` gain the plural aliases they lacked.

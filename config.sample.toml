@@ -415,12 +415,10 @@ imap.sasl.plain.password.raw = "***"
 # show the wrong mailbox set.
 #pimdir.account = "posteo"
 
-# Optional. The namespace Neverest binds this account's collections under, which
-# is stripped off to name a mailbox: the collection `imap/INBOX` reads as `INBOX`.
-# Leave it unset: it is derived when every mail collection shares one prefix,
-# which a single-source account always does. Set it only for a store whose mail
-# collections span two namespaces.
-#pimdir.namespace = "imap"
+# A mailbox is its collection id, verbatim: Neverest binds a source's collections
+# under a namespace, so the mailbox your server calls `INBOX` is `imap/INBOX`
+# here, and that is what `-m` takes. Alias it if you would rather not type it:
+#mailbox.alias.inbox = "imap/INBOX"
 
 # --------------------------------------------------------------------------------
 # SMTP config

@@ -34,10 +34,6 @@ pub struct PimdirClient {
     /// The account grouping this client's collections (pimdir SPEC §9.2), or
     /// `None` in a store holding a single ungrouped account.
     pub(crate) account: Option<String>,
-    /// The namespace the sync binds this account's collections under, stripped
-    /// off a collection id to name a mailbox. See
-    /// [`PimdirClient::namespace`](Self::namespace).
-    pub(crate) namespace: Option<String>,
 }
 
 impl PimdirClient {
@@ -68,7 +64,6 @@ impl PimdirClient {
             .with_pending();
 
         let account = resolve_account(&store, config.account.clone())?;
-        let namespace = resolve_namespace(&store, account.as_deref(), config.namespace.clone())?;
         let blobs = PimdirBlobs::open(&root, store.hash_algo());
 
         Ok(Self {
@@ -76,7 +71,6 @@ impl PimdirClient {
             blobs,
             root,
             account,
-            namespace,
         })
     }
 
@@ -167,42 +161,4 @@ fn resolve_account(store: &PimdirReader, configured: Option<String>) -> Result<O
             ))
         }
     }
-}
-
-/// The namespace this client's mailbox names are relative to.
-///
-/// A sync binds a source's collections under a namespace, so a hub collection id
-/// is `<namespace>/<name>` and the mailbox the server calls `INBOX` is stored as
-/// `imap/INBOX`. Himalaya names mailboxes the way the server does, so the prefix
-/// comes back off; deriving it keeps one more key out of the configuration.
-///
-/// It is derived only when every mail collection of the account shares one
-/// prefix, which a single-source account always does. Anything else keeps the
-/// whole id as the name, since stripping a prefix two namespaces disagree on
-/// would collapse two distinct mailboxes onto one name.
-fn resolve_namespace(
-    store: &PimdirReader,
-    account: Option<&str>,
-    configured: Option<String>,
-) -> Result<Option<String>> {
-    if configured.is_some() {
-        return Ok(configured);
-    }
-
-    let collections = store
-        .list_collections_by_account(account)
-        .map_err(|err| anyhow!("List pimdir collections: {err}"))?;
-
-    let mut namespaces = collections
-        .iter()
-        .filter(|collection| super::backend::is_mail(&collection.kind))
-        .map(|collection| collection.id.split_once('/').map(|(prefix, _)| prefix));
-
-    let Some(first) = namespaces.next().flatten() else {
-        return Ok(None);
-    };
-
-    Ok(namespaces
-        .all(|namespace| namespace == Some(first))
-        .then(|| first.to_string()))
 }

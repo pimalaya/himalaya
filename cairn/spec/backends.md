@@ -50,10 +50,14 @@ The pimdir backend SHALL show and accept each message's public id (`items.seq`, 
 
 Addressing by the public id is what keeps two duplicated messages distinguishable: they carry one `Message-ID` between them and have two `seq`s, so an address derived from the body would be ambiguous where a `seq` is not.
 
-### Requirement: pimdir names a mailbox the way its server does
-A hub collection is keyed `<namespace>/<name>`, so the pimdir backend SHALL show and accept the name without the namespace: the collection `imap/INBOX` is the mailbox `INBOX`. The namespace SHALL be derived when every mail collection of the account shares one prefix, which a single-source account always does; `pimdir.namespace` overrides it, and a store whose mail collections span two namespaces keeps whole ids as names rather than collapsing two mailboxes onto one.
+### Requirement: A pimdir mailbox is its collection id
+The pimdir backend SHALL show and accept a mailbox as the store's collection id, verbatim: the collection `imap/INBOX` is the mailbox `imap/INBOX`. It SHALL NOT derive, strip or accept a shortened spelling, and no configuration SHALL offer one.
 
-A user-typed name SHALL resolve against the account's mail collections, a full collection id still being taken as itself. A name matching none, or several, SHALL be refused naming what the account holds. It SHALL NOT be passed to the store unresolved, which reads as a mailbox that exists and is empty.
+The id is opaque to the store, which neither parses nor validates it (pimdir SPEC 9.2) and models hierarchy through `parent` rather than through a separator. Any shortening is therefore a guess at the producer's convention, and one that makes a single mailbox answer to two spellings. This is the JMAP backend's shape, whose ids are opaque server strings, and `[mailbox.alias]` is the shortcut for both.
+
+`Mailbox.name` SHALL carry the collection row's own name rather than one derived from the id.
+
+A mailbox matching no collection of the account SHALL be refused naming the ones it holds. It SHALL NOT be passed to the store unresolved, which reads as a mailbox that exists and is empty.
 
 ### Requirement: pimdir reads one account
 The pimdir backend SHALL show the collections of one account (pimdir SPEC §9.2), `pimdir.account` naming it. Unset, it is derived: a store holding one account, or one ungrouped set, is read as that one, and a store holding several is refused naming them rather than guessing one and showing the wrong mailbox set.

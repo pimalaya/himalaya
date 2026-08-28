@@ -667,13 +667,6 @@ pub struct PimdirConfig {
     /// share, where guessing would show the wrong mailbox set.
     #[serde(default)]
     pub account: Option<String>,
-    /// The namespace the sync binds this account's collections under, stripped
-    /// off a collection id to name a mailbox: `imap/INBOX` reads as `INBOX`.
-    /// Usually left unset: it is derived when every mail collection shares one
-    /// prefix, which a single-source account always does. Set it only for a
-    /// store whose mail collections span two namespaces.
-    #[serde(default)]
-    pub namespace: Option<String>,
 }
 
 /// SMTP configuration.
