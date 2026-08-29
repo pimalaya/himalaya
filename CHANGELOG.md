@@ -63,6 +63,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed a local path carrying a `~` or a shell variable being read verbatim.
+
+  `maildir.root = "~/Mail"` looked for a directory literally named `~` under the working directory rather than the Maildir the sample documents, and `m2dir.root` and the `tls.cert` of every backend read the same way.
+
+  Every path key now expands as the configuration is read, so no reader can forget. `pimdir.root` and `downloads-dir` already expanded where they were read, and only moved onto that rule.
+
+- Fixed a `pimdir`-only build failing to compile.
+
+  The client-side search evaluation the backend calls was gated on the `maildir` and `m2dir` features alone, so `--no-default-features --features pimdir` did not build. The default feature set was unaffected.
+
 - Fixed a duplicated message disappearing from the `pimdir` backend's listing.
 
   A mailbox holding one `Message-ID` twice, which a double delivery, a retried append, a restore or a copy of a sent message all produce, used to resolve to a single stored item. One copy was kept and the other recorded on it, mirrored nowhere, so it showed in no listing and could not be read.

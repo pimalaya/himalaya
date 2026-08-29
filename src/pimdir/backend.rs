@@ -587,7 +587,7 @@ fn paginate<T>(items: Vec<T>, page: Option<u32>, page_size: Option<u32>) -> Vec<
 mod tests {
     use std::collections::BTreeSet;
 
-    use io_replica::placement::{ReplicaLinkId, ReplicaMeta};
+    use io_replica::placement::{ReplicaLevel, ReplicaLinkId, ReplicaMeta};
 
     use super::*;
 
@@ -603,7 +603,7 @@ mod tests {
             )),
             sort_key: String::new(),
             object: None,
-            level: io_replica::placement::ReplicaLevel::Meta,
+            level: ReplicaLevel::Meta,
             retention: None,
         };
         let envelope = envelope_from_item(&item);
@@ -659,7 +659,7 @@ mod tests {
             meta: None,
             sort_key: String::new(),
             object: None,
-            level: io_replica::placement::ReplicaLevel::Probed,
+            level: ReplicaLevel::Probed,
             retention: None,
         };
         assert!(envelope_from_item(&item).flags.is_empty());

@@ -3,7 +3,7 @@
 //! The `imap thread` command, RFC 5256 `THREAD`.
 
 use io_imap::client::ImapClient as _;
-use std::{collections::HashMap, fmt, num::NonZeroU32};
+use std::{borrow::Cow, collections::HashMap, fmt, num::NonZeroU32};
 
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
@@ -17,7 +17,7 @@ use io_imap::{
     },
 };
 use pimalaya_cli::printer::Printer;
-use schemars::JsonSchema;
+use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Serialize, Serializer, ser::SerializeStruct};
 
 use crate::imap::{
@@ -332,11 +332,11 @@ struct ThreadResultsTableSchema {
 }
 
 impl JsonSchema for ThreadResultsTable {
-    fn schema_name() -> std::borrow::Cow<'static, str> {
+    fn schema_name() -> Cow<'static, str> {
         <ThreadResultsTableSchema as JsonSchema>::schema_name()
     }
 
-    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    fn json_schema(generator: &mut SchemaGenerator) -> Schema {
         <ThreadResultsTableSchema as JsonSchema>::json_schema(generator)
     }
 }

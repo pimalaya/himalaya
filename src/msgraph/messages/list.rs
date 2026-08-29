@@ -7,11 +7,11 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use io_msgraph::v1::rest::users::messages::{
     MsgraphMessage, MsgraphRecipient, list::MsgraphMessagesListParams,
 };
 use pimalaya_cli::printer::Printer;
+use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table};
 use schemars::JsonSchema;
 use serde::Serialize;
 

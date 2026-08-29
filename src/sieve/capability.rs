@@ -6,9 +6,9 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use comfy_table::{Cell, ContentArrangement, Row, Table};
 use io_managesieve::client::ManagesieveClient as _;
 use pimalaya_cli::printer::Printer;
+use pimalaya_cli::table::{Cell, ContentArrangement, Row, Table};
 use schemars::JsonSchema;
 use serde::Serialize;
 

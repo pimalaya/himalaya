@@ -39,6 +39,13 @@ An account MAY map friendly mailbox names to backend-native ids under `[accounts
 ### Requirement: Config never written
 Himalaya SHALL NOT persist config itself. The wizard prints a ready-to-save fragment on stdout; the user redirects it into their config file.
 
+### Requirement: Path keys expand as the configuration is read
+Every path-valued key SHALL expand `~` and environment variables while the configuration is deserialized, not where it is read. This covers `maildir.root`, `m2dir.root`, `pimdir.root`, the global and per-account `downloads-dir`, and the `tls.cert` of every backend.
+
+An expansion that fails, an undefined variable being the case, SHALL leave the raw value untouched rather than fail the load.
+
+A reader SHALL therefore receive an already-expanded path and SHALL NOT expand again: expansion at a call site holds only where somebody remembered it, which is how `maildir.root = "~/Mail"` came to open a literal `./~/Mail`.
+
 ### Requirement: A credential command is spawned once per run
 A command backing a secret SHALL be spawned once per command run, however many blocks of the account name it, and its value SHALL be handed to every field naming it. A run that reaches IMAP, SMTP and ManageSieve therefore unlocks a `pass` or `gpg` entry once rather than three times.
 

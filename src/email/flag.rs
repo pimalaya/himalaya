@@ -9,7 +9,10 @@
 //! case-insensitively. That is what makes a `BTreeSet<Flag>` a normalised
 //! set across backends.
 
-use std::{cmp::Ordering, hash::Hash};
+use std::{
+    cmp::Ordering,
+    hash::{Hash, Hasher},
+};
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -157,7 +160,7 @@ impl PartialOrd for Flag {
 impl Hash for Flag {
     /// Hashes the IANA tag, or the lowercase raw bytes when there is
     /// none, so that values comparing equal hash equal.
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    fn hash<H: Hasher>(&self, state: &mut H) {
         match self.iana {
             Some(iana) => {
                 0u8.hash(state);

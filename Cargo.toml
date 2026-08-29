@@ -12,7 +12,7 @@ homepage = "https://pimalaya.org"
 repository = "https://github.com/pimalaya/himalaya"
 
 [features]
-default = ["rustls-ring", "imap", "smtp", "sieve", "jmap", "gmail", "msgraph", "maildir"]
+default = ["rustls-ring", "imap", "smtp", "sieve", "jmap", "gmail", "msgraph", "maildir", "pimdir"]
 imap = ["dep:io-imap", "dep:mail-parser", "dep:rfc2047-decoder", "io-imap/client"]
 jmap = ["dep:base64", "dep:io-jmap", "dep:mail-parser", "io-jmap/client", "io-jmap/schemars"]
 gmail = ["dep:io-gmail", "dep:mail-parser", "io-gmail/client", "io-gmail/schemars"]
@@ -43,7 +43,6 @@ base64 = { version = "0.23", optional = true }
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 chumsky = { version = "0.13", default-features = false }
 clap = { version = "4.4", features = ["derive", "env", "wrap_help"] }
-comfy-table = "8"
 convert_case = { version = "0.12", optional = true }
 crossterm = { version = "0.29", default-features = false, features = ["serde"] }
 dirs = "6"

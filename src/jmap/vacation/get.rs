@@ -7,11 +7,11 @@ use std::fmt;
 
 use anyhow::{Result, bail};
 use clap::Parser;
-use comfy_table::{Cell, Row, Table};
 use io_jmap::rfc8621::vacation_response::{
     JMAP_VACATION_RESPONSE_CAPABILITY, JmapVacationResponse,
 };
 use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_cli::table::{Cell, Row, Table};
 use schemars::JsonSchema;
 use serde::Serialize;
 

@@ -9,25 +9,34 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::{Result, bail};
-use comfy_table::ContentArrangement;
 use crossterm::style::Color;
 use io_sasl::{
     login::SaslLoginCreds, mechanism::Sasl, rfc4505::anonymous::SaslAnonymousCreds,
     rfc4616::plain::SaslPlainCreds, rfc5801::SaslGs2ChannelBinding, rfc5802::SaslScramCreds,
     rfc7628::oauthbearer::SaslOauthbearerCreds, xoauth2::SaslXoauth2Creds,
 };
+use pimalaya_cli::table::ContentArrangement;
 use pimalaya_config::{
     secret::{Secret, SecretResolver},
-    toml::{TomlConfig, shell_expanded_string},
+    toml::{TomlConfig, shell_expanded_path, shell_expanded_string},
 };
 use pimalaya_stream::tls::{Rustls, RustlsCrypto, Tls, TlsProvider};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use url::Url;
 
 /// Skips a field equal to its type's default, so a wizard-generated
 /// configuration omits defaulted scalars.
 fn is_default<T: Default + PartialEq>(value: &T) -> bool {
     *value == T::default()
+}
+
+/// Expands a leading tilde and any shell variable in an optional path,
+/// as [`shell_expanded_path`] does for a mandatory one.
+///
+/// TODO: drop this for `pimalaya_config::toml::opt_shell_expanded_path`
+/// once pimalaya-config ships an optional variant.
+fn opt_shell_expanded_path<'de, D: Deserializer<'de>>(de: D) -> Result<Option<PathBuf>, D::Error> {
+    shell_expanded_path(de).map(Some)
 }
 
 fn is_default_imap_alpn(alpn: &[String]) -> bool {
@@ -87,6 +96,7 @@ pub struct Config {
     /// Fallback for [`AccountConfig::signature_delim`].
     pub signature_delim: Option<String>,
     /// Directory attachments are downloaded to.
+    #[serde(default, deserialize_with = "opt_shell_expanded_path")]
     pub downloads_dir: Option<PathBuf>,
     /// Table rendering quirks shared by every listing.
     #[serde(default)]
@@ -260,6 +270,7 @@ pub struct AccountConfig {
     /// its own trailing newline.
     pub signature_delim: Option<String>,
     /// Directory attachments are downloaded to.
+    #[serde(default, deserialize_with = "opt_shell_expanded_path")]
     pub downloads_dir: Option<PathBuf>,
     /// Table rendering quirks shared by every listing.
     #[serde(default)]
@@ -644,6 +655,7 @@ pub struct MaildirKeywordsConfig {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MaildirConfig {
     /// The Maildir root, one directory per mailbox below it.
+    #[serde(deserialize_with = "shell_expanded_path")]
     pub root: PathBuf,
     /// How custom, non-IANA keywords are read, if at all.
     #[serde(default)]
@@ -656,6 +668,7 @@ pub struct MaildirConfig {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct M2dirConfig {
     /// The m2dir root, one directory per mailbox below it.
+    #[serde(deserialize_with = "shell_expanded_path")]
     pub root: PathBuf,
 }
 
@@ -668,6 +681,7 @@ pub struct M2dirConfig {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct PimdirConfig {
     /// The store directory, holding `pimdir.db` and `objects/`.
+    #[serde(deserialize_with = "shell_expanded_path")]
     pub root: PathBuf,
     /// The sync engine account whose collections this client reads,
     /// per pimdir SPEC section 9.2.
@@ -763,6 +777,7 @@ pub struct TlsConfig {
     #[serde(default)]
     pub rustls: RustlsConfig,
     /// A custom certificate to trust, in PEM format.
+    #[serde(default, deserialize_with = "opt_shell_expanded_path")]
     pub cert: Option<PathBuf>,
 }
 
@@ -1126,6 +1141,8 @@ pub struct MsgraphAuthConfig {
 
 #[cfg(test)]
 mod tests {
+    use std::env::var;
+
     use super::*;
 
     const IMAP: &[&str] = &["imap", "imaps"];
@@ -1228,6 +1245,30 @@ mod tests {
         assert_eq!(account.email.as_deref(), Some("alice@example.org"));
         assert_eq!(account.display_name.as_deref(), Some("Alice at work"));
         assert_eq!(account.signature_delim.as_deref(), Some("~~~\n"));
+    }
+
+    #[test]
+    fn local_roots_expand_the_leading_tilde() {
+        let home = PathBuf::from(var("HOME").expect("HOME must be set"));
+
+        let maildir: MaildirConfig = toml::from_str(r#"root = "~/Mail""#).unwrap();
+        let m2dir: M2dirConfig = toml::from_str(r#"root = "~/Mail""#).unwrap();
+        let pimdir: PimdirConfig = toml::from_str(r#"root = "~/Mail""#).unwrap();
+
+        assert_eq!(maildir.root, home.join("Mail"));
+        assert_eq!(m2dir.root, home.join("Mail"));
+        assert_eq!(pimdir.root, home.join("Mail"));
+    }
+
+    #[test]
+    fn optional_paths_expand_the_leading_tilde_and_stay_absent() {
+        let home = PathBuf::from(var("HOME").expect("HOME must be set"));
+
+        let tls: TlsConfig = toml::from_str(r#"cert = "~/ca.pem""#).unwrap();
+        assert_eq!(tls.cert, Some(home.join("ca.pem")));
+
+        let tls: TlsConfig = toml::from_str("").unwrap();
+        assert_eq!(tls.cert, None);
     }
 
     #[test]

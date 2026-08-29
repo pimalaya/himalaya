@@ -62,9 +62,6 @@ A mailbox matching no collection of the account SHALL be refused naming the ones
 ### Requirement: pimdir reads one account
 The pimdir backend SHALL show the collections of one account (pimdir SPEC §9.2), `pimdir.account` naming it. Unset, it is derived: a store holding one account, or one ungrouped set, is read as that one, and a store holding several is refused naming them rather than guessing one and showing the wrong mailbox set.
 
-### Requirement: pimdir store path is shell-expanded
-The pimdir backend SHALL expand `~` and environment variables on `pimdir.root` before opening the store and its blob reader, so a store path written with `~` (e.g. a Neverest store at `~/.local/state/neverest/<account>`) resolves to the home-relative directory. Opening the raw path would create an empty store at a literal `./~/…` and silently return an empty mailbox list.
-
 ### Requirement: pimdir is a reader and a producer, never the owner
 The pimdir backend SHALL treat the store as a possibly-partial cache owned by the sync engine. `get_message` on an item whose body is not local (`level < Full`, no stored object) SHALL report a clear "body not fetched" state (the cue to sync), not a data-loss error; the item still lists.
 

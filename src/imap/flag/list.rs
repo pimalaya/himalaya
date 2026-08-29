@@ -8,12 +8,12 @@ use std::{collections::BTreeMap, fmt};
 
 use anyhow::Result;
 use clap::Parser;
-use comfy_table::{Cell, ContentArrangement, Row, Table};
 use io_imap::{
     rfc3501::select::ImapMailboxSelectOptions,
     types::flag::{Flag, FlagPerm},
 };
 use pimalaya_cli::printer::Printer;
+use pimalaya_cli::table::{Cell, ContentArrangement, Row, Table};
 use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 

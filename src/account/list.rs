@@ -7,9 +7,9 @@ use std::{fmt, path::PathBuf};
 
 use anyhow::Result;
 use clap::Parser;
-use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use crossterm::style::Color as CrosstermColor;
 use pimalaya_cli::printer::Printer;
+use pimalaya_cli::table::{Cell, Color, ContentArrangement, Row, Table};
 use pimalaya_config::toml::TomlConfig;
 use schemars::JsonSchema;
 use serde::Serialize;

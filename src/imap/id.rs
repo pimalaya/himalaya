@@ -8,7 +8,6 @@ use std::{collections::HashMap, fmt};
 
 use anyhow::{Result, anyhow};
 use clap::Parser;
-use comfy_table::{Cell, Row, Table};
 use io_imap::{
     rfc2971::id::ImapServerIdOptions,
     types::{
@@ -17,6 +16,7 @@ use io_imap::{
     },
 };
 use pimalaya_cli::printer::Printer;
+use pimalaya_cli::table::{Cell, Row, Table};
 use schemars::JsonSchema;
 use serde::Serialize;
 

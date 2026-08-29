@@ -7,12 +7,12 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
-use comfy_table::{Cell, Row, Table};
 use io_jmap::rfc8621::email_submission::{
     JmapEmailSubmission, JmapUndoStatus,
     query::{JmapEmailSubmissionFilter, JmapEmailSubmissionQueryOptions},
 };
 use pimalaya_cli::printer::Printer;
+use pimalaya_cli::table::{Cell, Row, Table};
 use schemars::JsonSchema;
 use serde::Serialize;
 

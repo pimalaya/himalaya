@@ -915,7 +915,6 @@ dependencies = [
  "chrono",
  "chumsky",
  "clap",
- "comfy-table",
  "convert_case 0.12.0",
  "crossterm",
  "dirs",

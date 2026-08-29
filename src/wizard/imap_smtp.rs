@@ -16,6 +16,7 @@ use std::collections::HashMap;
 use anyhow::{Result, bail};
 use io_pim_discovery::compose::config::DiscoverySecurity;
 use io_sasl::mechanism::SaslMechanism;
+use io_smtp::client::SmtpClientStd;
 use pimalaya_cli::{prompt, spinner::Spinner};
 use pimalaya_config::secret::SecretResolver;
 
@@ -328,7 +329,7 @@ fn smtp_config(endpoint: &TcpEndpoint, sasl: SaslConfig) -> SmtpConfig {
         server: format!("{scheme}://{}:{}", endpoint.host, endpoint.port),
         tls: Default::default(),
         starttls: endpoint.security == DiscoverySecurity::Starttls,
-        alpn: io_smtp::client::SmtpClientStd::default_alpn(),
+        alpn: SmtpClientStd::default_alpn(),
         sasl: Some(sasl),
     }
 }

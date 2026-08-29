@@ -7,9 +7,9 @@ use std::fmt;
 
 use anyhow::Result;
 use clap::Parser;
-use comfy_table::{Cell, Row, Table};
 use io_imap::types::status::{StatusDataItem, StatusDataItemName};
 use pimalaya_cli::printer::Printer;
+use pimalaya_cli::table::{Cell, Row, Table};
 use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 

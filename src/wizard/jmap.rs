@@ -7,6 +7,7 @@
 use std::collections::HashMap;
 
 use anyhow::{Result, bail};
+use io_jmap::client::JmapClientStd;
 use pimalaya_cli::{prompt, spinner::Spinner};
 
 use crate::{
@@ -110,7 +111,7 @@ fn jmap_config(server: String, auth: JmapAuthConfig) -> JmapConfig {
     JmapConfig {
         server,
         tls: Default::default(),
-        alpn: io_jmap::client::JmapClientStd::default_alpn(),
+        alpn: JmapClientStd::default_alpn(),
         auth,
         identity_id: None,
         drafts_mailbox_id: None,

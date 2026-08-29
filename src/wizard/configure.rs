@@ -277,6 +277,7 @@ mod tests {
     };
 
     use super::*;
+    use crate::config::{AccountConfig, MaildirConfig};
 
     static NEXT_CONFIG: AtomicUsize = AtomicUsize::new(0);
 
@@ -288,10 +289,10 @@ mod tests {
 
     /// A minimal account naming a Maildir root, the one backend needing
     /// no network to describe.
-    fn account(default: bool) -> crate::config::AccountConfig {
-        crate::config::AccountConfig {
+    fn account(default: bool) -> AccountConfig {
+        AccountConfig {
             default,
-            maildir: Some(crate::config::MaildirConfig {
+            maildir: Some(MaildirConfig {
                 root: PathBuf::from("/tmp/mail"),
                 keywords: Default::default(),
             }),
