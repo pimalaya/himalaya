@@ -17,6 +17,7 @@ use anyhow::{Result, bail};
 use io_pim_discovery::compose::config::DiscoverySecurity;
 use io_sasl::mechanism::SaslMechanism;
 use pimalaya_cli::{prompt, spinner::Spinner};
+use pimalaya_config::secret::SecretResolver;
 
 use crate::{
     account::check,
@@ -73,7 +74,11 @@ pub fn configure_discovered(
         probed.as_deref(),
     )?;
     let imap = imap_config(imap, imap_sasl.clone());
-    test_connection("IMAP", || check::connect_imap(&imap))?;
+
+    // NOTE: one resolver for both tests, so answering yes to the question
+    // below costs one credential read rather than two.
+    let mut resolver = SecretResolver::new();
+    test_connection("IMAP", || check::connect_imap(&imap, &mut resolver))?;
 
     // NOTE: IMAP has no reliable special-use listing yet (see the mailbox
     // module), so only the always-present INBOX is pinned as the default.
@@ -89,7 +94,7 @@ pub fn configure_discovered(
                 prompt_sasl(account_name, login_hint.as_deref(), discovered.auth, None)?
             };
             let smtp = smtp_config(endpoint, smtp_sasl);
-            test_connection("SMTP", || check::connect_smtp(&smtp))?;
+            test_connection("SMTP", || check::connect_smtp(&smtp, &mut resolver))?;
             Some(smtp)
         }
         None => None,

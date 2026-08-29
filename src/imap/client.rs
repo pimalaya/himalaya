@@ -17,6 +17,7 @@ use io_imap::{
     types::response::Capability,
 };
 use io_sasl::mechanism::Sasl;
+use pimalaya_config::secret::SecretResolver;
 use url::Url;
 
 use crate::{
@@ -40,6 +41,7 @@ impl ImapClient {
         let tls = config.tls.into_tls(config.alpn);
         let auto_id = resolve_auto_id_params(&config.id)?;
         let server = parse_imap_server(&config.server)?;
+        let mut resolver = SecretResolver::new();
         let sasl: Option<Sasl> = match config.sasl {
             // NOTE: a `unix://` sirup socket greets with PREAUTH, so the
             // session is already authenticated and no SASL is negotiated.
@@ -51,7 +53,7 @@ impl ImapClient {
                 // NOTE: url knows no imap default port, so the fallback is
                 // the same scheme default io-imap connects with.
                 let port = server.port().unwrap_or(default_port(server.scheme()));
-                Some(cfg.try_into_sasl(host, port)?)
+                Some(cfg.try_into_sasl(host, port, &mut resolver)?)
             }
             None => None,
         };

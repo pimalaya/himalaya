@@ -37,6 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A credential command that several blocks of one account name is now spawned once per run instead of once per block.
+
+  `account check` and the wizard connection tests open IMAP, SMTP and ManageSieve in a row, each block resolving its own credential, so a `pass` or `gpg` entry was unlocked as many times as it was named. They now share one resolver, so it unlocks once.
+
+  Two commands count as one only where the configuration wrote them identically: a shell line and the argv spelling of it stay distinct. A run reaching a single backend is unchanged.
+
 - **BREAKING**: a `pimdir` mailbox is now its collection id, verbatim, and `pimdir.namespace` is removed.
 
   `-m imap/INBOX` is what `-m INBOX` used to be, and a listing shows `imap/INBOX` in both columns.

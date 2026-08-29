@@ -67,7 +67,7 @@ mime_guess = "2"
 open = "5"
 percent-encoding = "2"
 pimalaya-cli = { version = "0.2", default-features = false, features = ["terminal", "table", "prompt", "wizard", "imap", "smtp", "jmap", "spinner"] }
-pimalaya-config = { version = "0.1", default-features = false, features = ["toml", "secret"] }
+pimalaya-config = { version = "0.2", default-features = false, features = ["toml", "secret"] }
 pimalaya-stream = { version = "0.3", default-features = false, features = ["std"] }
 rfc2047-decoder = { version = "1", optional = true }
 schemars = { version = "1", features = ["chrono04"] }

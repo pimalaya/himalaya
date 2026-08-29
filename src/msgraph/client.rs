@@ -15,6 +15,7 @@ use io_msgraph::v1::{
     client::{MsgraphClientStd as Inner, MsgraphClientStdConnectOptions},
     rest::users::mail_folders::list::MsgraphMailFoldersListParams,
 };
+use pimalaya_config::secret::SecretResolver;
 use secrecy::{ExposeSecret, SecretString};
 
 use crate::{
@@ -36,7 +37,7 @@ impl MsgraphClient {
     /// credential and user id.
     pub fn new(config: MsgraphConfig) -> Result<Self> {
         let tls = config.tls.into_tls(config.alpn);
-        let token = msgraph_token(config.auth)?;
+        let token = msgraph_token(config.auth, &mut SecretResolver::new())?;
         let options = MsgraphClientStdConnectOptions {
             tls,
             user_id: config.user_id,
@@ -115,6 +116,12 @@ pub fn build_msgraph_client(
 
 /// Resolves a [`MsgraphAuthConfig`] into the bare OAuth 2.0 bearer token;
 /// the Microsoft Graph client adds the `Bearer ` prefix itself.
-pub fn msgraph_token(config: MsgraphAuthConfig) -> Result<SecretString> {
-    Ok(config.token.get()?)
+///
+/// The token goes through `resolver`, so an account naming one command
+/// here and in another block spawns it once.
+pub fn msgraph_token(
+    config: MsgraphAuthConfig,
+    resolver: &mut SecretResolver,
+) -> Result<SecretString> {
+    Ok(resolver.resolve(config.token)?)
 }

@@ -12,6 +12,7 @@ use io_jmap::{
     rfc8621::{JMAP_MAIL_CAPABILITY, email::import::JmapEmailImportArgs},
 };
 use pimalaya_cli::printer::{Message, Printer};
+use pimalaya_config::secret::SecretResolver;
 use url::Url;
 
 use crate::{
@@ -73,7 +74,7 @@ impl JmapEmailImportCommand {
                 .tls
                 .clone()
                 .into_tls(client.config.alpn.clone());
-            let http_auth = jmap_http_auth(client.config.auth.clone())?;
+            let http_auth = jmap_http_auth(client.config.auth.clone(), &mut SecretResolver::new())?;
             let mut upload_client = JmapClientStd::connect(&upload_url, &tls, http_auth)?;
             upload_client
                 .blob_upload(&upload_url, "message/rfc822", data)?
